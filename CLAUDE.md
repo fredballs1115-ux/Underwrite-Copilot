@@ -2360,6 +2360,66 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     reached for (`checkedFor`). Before, an edited address kept the old
     one's point, so the aerial, the pin and the flood zone showed the old
     place for up to a month.
+- Where a deal is, by its county (#447). The markets' keyword lists name
+  principal cities and a few counties, so a deal in Frisco, Irvine, Fort
+  Lauderdale or Cranberry Township read its STATE's figures.
+  `data/cbsa-counties.json` is the Census Bureau's delineation (List 1,
+  July 2023): all 1,252 metropolitan counties of the 393 metro areas, by
+  five-digit FIPS, with each county's CBSA, division, name and state.
+  `scripts/fetch-cbsa-counties.mjs` wrote it, run by `cbsa-counties.yml`
+  (dispatch only). That workflow publishes to its own `cbsa-counties`
+  branch, since the sandbox cannot reach census.gov; the runner printed
+  the file first (zori.yml probe run 36655654711). `lib/market-county.ts`
+  (`server-only`: the table is 130 KB and `lib/market-match` is
+  universal) does two things:
+  - `countyOf(address, siteFlags)` finds the county. First choice is the
+    building's census tract from the site flags, used only where the tract
+    lies in the state the address names and the flags were looked up for
+    this address (`siteFlagsStale` in `lib/site-flags/core.ts`: an edited
+    address keeps the old point's tract until the lookup runs again).
+    Otherwise it takes the county the address names, whole: "Collin
+    County", "City of Alexandria". A bare "Richmond" is never read, since
+    Virginia has a Richmond city and a Richmond County in different places.
+  - `placeDeal(address, county)` answers every "where is it" question at
+    once: `briefed`, `read`, `placedBy`, `live`. With no county it is
+    exactly the address matchers' answer. With one:
+    - the county decides the metro area. The keywords, read with the
+      county's name beside the address, only choose among the markets
+      inside it (`marketsForAddress` in `lib/market-match` lists every
+      match). A word naming a place in another metro area is dropped:
+      Kingston, WA is in Kitsap County, not King, and Dade City is Pasco
+      County's, so Tampa's by Tampa's own word, not Miami's;
+    - a county the market's own keywords name is that market's, brief and
+      all (Irving by its tract is Dallas County; Pasadena is Los Angeles
+      County);
+    - a county they do not name reads the metro area's published figures
+      and nothing else (`read` plus `placedBy`): Orange County is in Los
+      Angeles's metro area, and Los Angeles's brief, tracker and
+      benchmarks are Los Angeles County's. `modelVsMarketFor` reads no
+      tracker for a `placedBy` market. Washington's metro area reads
+      `dc`'s figures (the MSA's), New York's `nyc`'s, or `newark_jc`'s in
+      New Jersey;
+    - a county in no metro area the site reads places the deal in none:
+      the state's figures, whatever its words matched.
+
+  Every surface places the deal through this one function: the
+  pipeline's market check, the deal page (live figures, market photo,
+  research panel, public-record card), the pipeline list, the compare
+  page, the report route and the workbook route. The market check's
+  header, the deal page's fold, the shared screen, the report and the
+  verdict's brief each say how a county-placed deal reached its market
+  (`lib/placed-by.ts`, no imports, so the client fold can take it; the
+  stored record carries `placedBy`). The pipeline row reads "Dallas–Fort
+  Worth · Collin County" and the compare row "(by its county, …)".
+  The screen looks the site flags up itself where the page has not
+  (`siteFlagsForScreen` in the pipeline, at most `SITE_FLAGS_WAIT_MS`,
+  15 s): a batch upload, or a deal whose address came with its
+  memorandum, has no page view before its market check. The flags are
+  read once, before the comp step, for the flood line and the county.
+  "Since this screen" compares only a stored brief whose market is
+  today's (`storedBrief.metro === liveMarket.name`). A check stored for
+  the state before the county placed the deal is a different market's
+  figures, and no move between the two is a move.
 - Each building's own photograph: `lib/om-photo.ts` (pure) reads the JPEG
   image objects out of the deal's memorandum — a `/DCTDecode` stream IS the
   JPEG's bytes, verbatim, and `jpegInfo` reads its width, height and

@@ -3,6 +3,7 @@ import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/render
 import type { DealRow } from "@/lib/deals";
 import type { BuyBoxCheck } from "@/lib/criteria";
 import type { FloodMapView } from "@/lib/site-flags/core";
+import { placedBySentence } from "@/lib/placed-by";
 import { REPORT_FLOOD_SIZE } from "@/lib/basemaps";
 import type {
   ExtractionResult,
@@ -562,7 +563,7 @@ function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean)
   }
   const lead = `Figures the check read beside the rules of thumb: ${whose}, as published, read on ${b.readOn}${
     state ? " - the address lies outside the metros the site tracks" : ""
-  }.`;
+  }.${state ? "" : placedBySentence(b.placedBy)}`;
   const each =
     (nat > 0
       ? state

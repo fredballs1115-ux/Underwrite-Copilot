@@ -39,6 +39,17 @@ describe("marketPictureFor — the photograph a card shows where the building ha
     expect(marketPictureFor({ label: "1200 Liberty Ave, Pittsburgh, PA 15222", street: "", city: "", state: "" })?.id).toBe("pittsburgh");
   });
 
+  it("takes where a server page placed the deal over the address's own words (#447)", () => {
+    // A Frisco deal its county placed in Dallas-Fort Worth wears that photograph.
+    expect(marketPictureFor({ city: "Frisco", state: "TX" })).toBeNull();
+    expect(marketPictureFor({ city: "Frisco", state: "TX" }, null, { id: "dallas", name: "Dallas-Fort Worth" })?.id).toBe("dallas");
+    // Kingston, WA matches Seattle's "king"; placed nowhere by its county,
+    // it wears no Seattle photograph, and the memorandum's market still counts.
+    expect(marketPictureFor({ city: "Kingston", state: "WA", county: "Kitsap County" })?.id).toBe("seattle");
+    expect(marketPictureFor({ city: "Kingston", state: "WA", county: "Kitsap County" }, null, null)).toBeNull();
+    expect(marketPictureFor({ city: "Kingston", state: "WA" }, "Seattle, WA", null)?.id).toBe("seattle");
+  });
+
   it("outside every photographed market there is nothing to borrow", () => {
     expect(marketPictureFor({ city: "Boise", state: "ID" })).toBeNull();
     expect(marketPictureFor({ state: "PA" })).toBeNull();

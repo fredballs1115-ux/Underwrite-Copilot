@@ -7,7 +7,7 @@ import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxCheckSource, evaluateBuyBox, type BuyBox } from "@/lib/criteria";
 import { CompareTable, usd, type Col } from "./compare-table";
-import { dataMetroForAddress, metroForAddress } from "@/lib/market-match";
+import { countyOf, placeDeal } from "@/lib/market-county";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import type { FirstSignal } from "@/lib/anthropic/types";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
@@ -17,7 +17,7 @@ import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
 import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
 import { bannerSources } from "@/lib/deal-banner";
-import { floodCell, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { floodCell, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { compareInterest } from "@/lib/compare-interest";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
@@ -95,9 +95,19 @@ function toCol(
     name: deal.name,
     assetClass: deal.asset_class,
     market: ex?.market || "—",
-    // Same matcher the pipeline and deal page use — all three surfaces agree.
-    coveredMarket: metroForAddress(address ?? {})?.name ?? null,
-    readMarket: dataMetroForAddress(address ?? {})?.name ?? null,
+    // The same placement the pipeline and the deal page make (lib/market-
+    // county, #447) — all three surfaces agree, a county-placed deal naming
+    // its county.
+    ...(() => {
+      const stored = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+      const flags = siteFlagsStale(stored, address?.label) ? null : stored;
+      const placed = placeDeal(address, countyOf(address, flags));
+      return {
+        coveredMarket: placed.briefed?.name ?? null,
+        readMarket: placed.read?.name ?? null,
+        readCounty: placed.placedBy?.county ?? null,
+      };
+    })(),
     verdict: verdict?.verdict ?? null,
     reason: verdict?.reason ?? null,
     hasModel: model != null,
@@ -124,7 +134,7 @@ function toCol(
     flood: floodCell(
       (() => {
         const f = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
-        return f && f.status !== "pending" ? f.flood : undefined;
+        return f && f.status !== "pending" && !siteFlagsStale(f, address?.label) ? f.flood : undefined;
       })(),
     ),
     // The shared price reader — never a per-unit price or a prior trade; a

@@ -29,6 +29,23 @@ export interface SiteFlagsResult {
   note: string;
 }
 
+/**
+ * Whether stored flags were looked up for a different address than the
+ * deal's current one (#447): an edited address keeps the old point's tract
+ * and flood zone until the lookup runs again, and a tract from the old
+ * address would place the deal in the old address's metro area. Flags that
+ * name no address (a lookup that never geocoded) cannot be judged and are
+ * taken as they are.
+ */
+export function siteFlagsStale(
+  flags: Pick<SiteFlagsResult, "subject"> | null | undefined,
+  label: string | null | undefined,
+): boolean {
+  const was = flags?.subject?.label?.trim();
+  const now = (label ?? "").trim();
+  return !!was && was !== now;
+}
+
 export const SITE_FLAGS_NOTE =
   "Screening flags from federal datasets at the geocoded point — parcel boundaries can differ; verify zone membership and flood status before closing.";
 

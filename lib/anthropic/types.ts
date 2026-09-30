@@ -262,6 +262,10 @@ export interface LiveBriefRecord {
    *  debt market, lessor rents, the insurance index, CRE prices), so no
    *  surface calls them the metro's; absent on a record written before */
   national?: number;
+  /** where the deal's county alone placed it in this market (#447): "Collin
+   *  County, TX" in "Dallas-Fort Worth-Arlington, TX" — every surface that
+   *  heads the figures says so; absent where the address named the market */
+  placedBy?: { county: string; area: string } | null;
 }
 
 export interface LiveBriefFigure {

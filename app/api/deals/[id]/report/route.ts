@@ -11,7 +11,7 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { inferStrategy } from "@/lib/deal-strategy";
-import { marketForAddress } from "@/lib/market-match";
+import { countyOf, placeDeal } from "@/lib/market-county";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { assumableView, readAssumable, type AssumableView } from "@/lib/assumable-debt";
@@ -214,9 +214,14 @@ export async function GET(
       // one function, the same cached readers), so the report says what the
       // page says. Its own try: a failed live read leaves the grids in place.
       try {
-        // The covered metro, or the state's own series outside one — the
-        // same market the page reads, so the report cannot disagree with it.
-        const metro = marketForAddress(addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? {});
+        // The covered metro, the metro area its county sits in (#447), or
+        // the state's own series — the same market the page reads, so the
+        // report cannot disagree with it.
+        const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
+        const metro = placeDeal(
+          address,
+          countyOf(address, (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
+        ).live;
         assumptions = modelVsMarketFor({
           derived,
           extraction,

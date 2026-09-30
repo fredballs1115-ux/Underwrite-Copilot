@@ -471,6 +471,38 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("• Unemployment 4.4% (Jul 2026, Cleveland MSA; FRED)");
   }, 60000);
 
+  it("says how a county-placed deal reached its market's figures (#447)", async () => {
+    const market = {
+      checks: [{ assumption: "Rent growth", omSays: "4.0%", typicalRange: "2.5%–3.5%", assessment: "aggressive", note: "Above the index.", page: "" }],
+      summary: "One aggressive assumption.",
+      liveBrief: {
+        metro: "Dallas-Fort Worth",
+        grain: "metro" as const,
+        readOn: "2026-09-23",
+        lines: ["Unemployment 4.1% (Jul 2026, Dallas-Fort Worth MSA; FRED)"],
+        placedBy: { county: "Collin County, TX", area: "Dallas-Fort Worth-Arlington, TX" },
+      },
+    };
+    const deal = {
+      name: "Riverbend Site",
+      asset_class: "multifamily",
+      extraction: { dealName: "Riverbend Site", assetClass: "multifamily", metrics: [{ label: "Asking price", value: "$4,000,000", flagged: false, page: "p. 3" }] },
+      challenges: null,
+      comps: null,
+      market,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input: buildReportData(deal, "September 24, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "Figures the check read beside the rules of thumb: the Dallas-Fort Worth market's, as published, read on 2026-09-23. The deal was placed in this market by its county: Collin County, TX, which the Census Bureau files in the Dallas-Fort Worth-Arlington, TX metro area. Its address names no place the market's own list does, so these are the metro area's figures, not the county's.",
+    );
+  }, 60000);
+
   it("reads the OM's figure onto its typical range", () => {
     // The sample's three checks: at the low end, past the high end, inside.
     expect(rangeRead("5.25%", "5.25–5.75%")).toBe(0);

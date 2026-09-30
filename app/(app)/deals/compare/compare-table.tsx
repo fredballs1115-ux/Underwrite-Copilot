@@ -24,8 +24,11 @@ export type Col = {
   market: string;
   /** covered-market name when the address maps into the 15-market scope */
   coveredMarket: string | null;
-  /** the metro area read without a brief, where the address is in one */
+  /** the metro area read without a brief, where the address is in one — or
+   *  the metro area the deal's county placed it in (#447) */
   readMarket?: string | null;
+  /** where the county alone placed it: "Collin County, TX" */
+  readCounty?: string | null;
   verdict: string | null;
   reason: string | null;
   hasModel: boolean;
@@ -162,7 +165,12 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     signed?: boolean;
   }[] = [
     { label: "Market", get: (c) => c.market },
-    { label: "Covered market", get: (c) => c.coveredMarket ?? (c.readMarket ? `${c.readMarket} (read, not briefed)` : "—") },
+    {
+      label: "Covered market",
+      get: (c) =>
+        c.coveredMarket ??
+        (c.readMarket ? (c.readCounty ? `${c.readMarket} (by its county, ${c.readCounty})` : `${c.readMarket} (read, not briefed)`) : "—"),
+    },
     // FEMA's zone at the building (#426): a Special Flood Hazard Area means
     // flood insurance on federally backed debt, a cost and a lender's
     // condition, set side by side with the others.

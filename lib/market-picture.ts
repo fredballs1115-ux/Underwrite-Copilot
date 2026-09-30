@@ -54,13 +54,23 @@ export interface MarketPicture {
  * the market the memorandum names — only where the text says which market
  * it is (`metroForName`: a bare city is never read). Null where no
  * photographed market answers.
+ *
+ * `placed` is where a server page has already placed the deal
+ * (lib/market-county's `placeDeal`: its briefed market, else the metro area
+ * whose figures it reads — reached by its county where its address names no
+ * place a market's keywords know, #447). Given, it stands in for the address
+ * matchers, so a Frisco deal wears the Dallas-Fort Worth photograph its
+ * figures are read for, and a Kingston, WA deal — in Kitsap County, not
+ * Seattle's metro area — does not wear Seattle's.
  */
 export function marketPictureFor(
   address: Partial<StructuredAddress> | null,
   marketText?: string | null,
+  placed?: { id: string; name: string } | null,
 ): MarketPicture | null {
   const addr = address ?? {};
-  const market = metroForAddress(addr) ?? dataMetroForAddress(addr) ?? metroForName(marketText ?? null);
+  const fromAddress = placed !== undefined ? placed : (metroForAddress(addr) ?? dataMetroForAddress(addr));
+  const market = fromAddress ?? metroForName(marketText ?? null);
   if (!market) return null;
   for (const id of [market.id, metroAliasOf(market.id)]) {
     if (!id) continue;

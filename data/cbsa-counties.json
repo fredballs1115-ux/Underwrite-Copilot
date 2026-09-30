@@ -1,0 +1,6801 @@
+{
+ "source": "U.S. Census Bureau, Population Division: List 1, core based statistical areas, metropolitan divisions and combined statistical areas, July 2023 (OMB Bulletin 23-01)",
+ "url": "https://www2.census.gov/programs-surveys/metro-micro/geographies/reference-files/2023/delineation-files/list1_2023.xlsx",
+ "retrieved": "2026-09-30",
+ "titles": {
+  "10180": "Abilene, TX",
+  "10380": "Aguadilla, PR",
+  "10420": "Akron, OH",
+  "10500": "Albany, GA",
+  "10540": "Albany, OR",
+  "10580": "Albany-Schenectady-Troy, NY",
+  "10740": "Albuquerque, NM",
+  "10780": "Alexandria, LA",
+  "10900": "Allentown-Bethlehem-Easton, PA-NJ",
+  "11020": "Altoona, PA",
+  "11100": "Amarillo, TX",
+  "11180": "Ames, IA",
+  "11200": "Amherst Town-Northampton, MA",
+  "11260": "Anchorage, AK",
+  "11460": "Ann Arbor, MI",
+  "11500": "Anniston-Oxford, AL",
+  "11540": "Appleton, WI",
+  "11640": "Arecibo, PR",
+  "11700": "Asheville, NC",
+  "12020": "Athens-Clarke County, GA",
+  "12060": "Atlanta-Sandy Springs-Roswell, GA",
+  "12100": "Atlantic City-Hammonton, NJ",
+  "12220": "Auburn-Opelika, AL",
+  "12260": "Augusta-Richmond County, GA-SC",
+  "12420": "Austin-Round Rock-San Marcos, TX",
+  "12540": "Bakersfield-Delano, CA",
+  "12580": "Baltimore-Columbia-Towson, MD",
+  "12620": "Bangor, ME",
+  "12700": "Barnstable Town, MA",
+  "12940": "Baton Rouge, LA",
+  "12980": "Battle Creek, MI",
+  "13020": "Bay City, MI",
+  "13140": "Beaumont-Port Arthur, TX",
+  "13220": "Beckley, WV",
+  "13380": "Bellingham, WA",
+  "13460": "Bend, OR",
+  "13740": "Billings, MT",
+  "13780": "Binghamton, NY",
+  "13820": "Birmingham, AL",
+  "13900": "Bismarck, ND",
+  "13980": "Blacksburg-Christiansburg-Radford, VA",
+  "14010": "Bloomington, IL",
+  "14020": "Bloomington, IN",
+  "14260": "Boise City, ID",
+  "14460": "Boston-Cambridge-Newton, MA-NH",
+  "14500": "Boulder, CO",
+  "14540": "Bowling Green, KY",
+  "14580": "Bozeman, MT",
+  "14740": "Bremerton-Silverdale-Port Orchard, WA",
+  "14860": "Bridgeport-Stamford-Danbury, CT",
+  "15180": "Brownsville-Harlingen, TX",
+  "15260": "Brunswick-St. Simons, GA",
+  "15380": "Buffalo-Cheektowaga, NY",
+  "15500": "Burlington, NC",
+  "15540": "Burlington-South Burlington, VT",
+  "15940": "Canton-Massillon, OH",
+  "15980": "Cape Coral-Fort Myers, FL",
+  "16020": "Cape Girardeau, MO-IL",
+  "16180": "Carson City, NV",
+  "16220": "Casper, WY",
+  "16300": "Cedar Rapids, IA",
+  "16540": "Chambersburg, PA",
+  "16580": "Champaign-Urbana, IL",
+  "16620": "Charleston, WV",
+  "16700": "Charleston-North Charleston, SC",
+  "16740": "Charlotte-Concord-Gastonia, NC-SC",
+  "16820": "Charlottesville, VA",
+  "16860": "Chattanooga, TN-GA",
+  "16940": "Cheyenne, WY",
+  "16980": "Chicago-Naperville-Elgin, IL-IN",
+  "17020": "Chico, CA",
+  "17140": "Cincinnati, OH-KY-IN",
+  "17300": "Clarksville, TN-KY",
+  "17410": "Cleveland, OH",
+  "17420": "Cleveland, TN",
+  "17660": "Coeur d'Alene, ID",
+  "17780": "College Station-Bryan, TX",
+  "17820": "Colorado Springs, CO",
+  "17860": "Columbia, MO",
+  "17900": "Columbia, SC",
+  "17980": "Columbus, GA-AL",
+  "18020": "Columbus, IN",
+  "18140": "Columbus, OH",
+  "18580": "Corpus Christi, TX",
+  "18700": "Corvallis, OR",
+  "18880": "Crestview-Fort Walton Beach-Destin, FL",
+  "19100": "Dallas-Fort Worth-Arlington, TX",
+  "19140": "Dalton, GA",
+  "19300": "Daphne-Fairhope-Foley, AL",
+  "19340": "Davenport-Moline-Rock Island, IA-IL",
+  "19430": "Dayton-Kettering-Beavercreek, OH",
+  "19460": "Decatur, AL",
+  "19500": "Decatur, IL",
+  "19660": "Deltona-Daytona Beach-Ormond Beach, FL",
+  "19740": "Denver-Aurora-Centennial, CO",
+  "19780": "Des Moines-West Des Moines, IA",
+  "19820": "Detroit-Warren-Dearborn, MI",
+  "20020": "Dothan, AL",
+  "20100": "Dover, DE",
+  "20220": "Dubuque, IA",
+  "20260": "Duluth, MN-WI",
+  "20500": "Durham-Chapel Hill, NC",
+  "20580": "Eagle Pass, TX",
+  "20740": "Eau Claire, WI",
+  "20940": "El Centro, CA",
+  "21060": "Elizabethtown, KY",
+  "21140": "Elkhart-Goshen, IN",
+  "21300": "Elmira, NY",
+  "21340": "El Paso, TX",
+  "21420": "Enid, OK",
+  "21500": "Erie, PA",
+  "21660": "Eugene-Springfield, OR",
+  "21780": "Evansville, IN",
+  "21820": "Fairbanks-College, AK",
+  "22020": "Fargo, ND-MN",
+  "22140": "Farmington, NM",
+  "22180": "Fayetteville, NC",
+  "22220": "Fayetteville-Springdale-Rogers, AR",
+  "22380": "Flagstaff, AZ",
+  "22420": "Flint, MI",
+  "22500": "Florence, SC",
+  "22520": "Florence-Muscle Shoals, AL",
+  "22540": "Fond du Lac, WI",
+  "22660": "Fort Collins-Loveland, CO",
+  "22900": "Fort Smith, AR-OK",
+  "23060": "Fort Wayne, IN",
+  "23420": "Fresno, CA",
+  "23460": "Gadsden, AL",
+  "23540": "Gainesville, FL",
+  "23580": "Gainesville, GA",
+  "23900": "Gettysburg, PA",
+  "24020": "Glens Falls, NY",
+  "24140": "Goldsboro, NC",
+  "24220": "Grand Forks, ND-MN",
+  "24260": "Grand Island, NE",
+  "24300": "Grand Junction, CO",
+  "24340": "Grand Rapids-Wyoming-Kentwood, MI",
+  "24420": "Grants Pass, OR",
+  "24500": "Great Falls, MT",
+  "24540": "Greeley, CO",
+  "24580": "Green Bay, WI",
+  "24660": "Greensboro-High Point, NC",
+  "24780": "Greenville, NC",
+  "24860": "Greenville-Anderson-Greer, SC",
+  "25020": "Guayama, PR",
+  "25060": "Gulfport-Biloxi, MS",
+  "25180": "Hagerstown-Martinsburg, MD-WV",
+  "25220": "Hammond, LA",
+  "25260": "Hanford-Corcoran, CA",
+  "25420": "Harrisburg-Carlisle, PA",
+  "25500": "Harrisonburg, VA",
+  "25540": "Hartford-West Hartford-East Hartford, CT",
+  "25620": "Hattiesburg, MS",
+  "25740": "Helena, MT",
+  "25860": "Hickory-Lenoir-Morganton, NC",
+  "25940": "Hilton Head Island-Bluffton-Port Royal, SC",
+  "25980": "Hinesville, GA",
+  "26140": "Homosassa Springs, FL",
+  "26300": "Hot Springs, AR",
+  "26380": "Houma-Bayou Cane-Thibodaux, LA",
+  "26420": "Houston-Pasadena-The Woodlands, TX",
+  "26580": "Huntington-Ashland, WV-KY-OH",
+  "26620": "Huntsville, AL",
+  "26820": "Idaho Falls, ID",
+  "26900": "Indianapolis-Carmel-Greenwood, IN",
+  "26980": "Iowa City, IA",
+  "27060": "Ithaca, NY",
+  "27100": "Jackson, MI",
+  "27140": "Jackson, MS",
+  "27180": "Jackson, TN",
+  "27260": "Jacksonville, FL",
+  "27340": "Jacksonville, NC",
+  "27500": "Janesville-Beloit, WI",
+  "27620": "Jefferson City, MO",
+  "27740": "Johnson City, TN",
+  "27780": "Johnstown, PA",
+  "27860": "Jonesboro, AR",
+  "27900": "Joplin, MO-KS",
+  "27980": "Kahului-Wailuku, HI",
+  "28020": "Kalamazoo-Portage, MI",
+  "28100": "Kankakee, IL",
+  "28140": "Kansas City, MO-KS",
+  "28420": "Kennewick-Richland, WA",
+  "28450": "Kenosha, WI",
+  "28660": "Killeen-Temple, TX",
+  "28700": "Kingsport-Bristol, TN-VA",
+  "28740": "Kingston, NY",
+  "28880": "Kiryas Joel-Poughkeepsie-Newburgh, NY",
+  "28940": "Knoxville, TN",
+  "29020": "Kokomo, IN",
+  "29100": "La Crosse-Onalaska, WI-MN",
+  "29180": "Lafayette, LA",
+  "29200": "Lafayette-West Lafayette, IN",
+  "29340": "Lake Charles, LA",
+  "29420": "Lake Havasu City-Kingman, AZ",
+  "29460": "Lakeland-Winter Haven, FL",
+  "29540": "Lancaster, PA",
+  "29620": "Lansing-East Lansing, MI",
+  "29700": "Laredo, TX",
+  "29740": "Las Cruces, NM",
+  "29820": "Las Vegas-Henderson-North Las Vegas, NV",
+  "29940": "Lawrence, KS",
+  "30020": "Lawton, OK",
+  "30140": "Lebanon, PA",
+  "30300": "Lewiston, ID-WA",
+  "30340": "Lewiston-Auburn, ME",
+  "30460": "Lexington-Fayette, KY",
+  "30500": "Lexington Park, MD",
+  "30620": "Lima, OH",
+  "30700": "Lincoln, NE",
+  "30780": "Little Rock-North Little Rock-Conway, AR",
+  "30860": "Logan, UT-ID",
+  "30980": "Longview, TX",
+  "31020": "Longview-Kelso, WA",
+  "31080": "Los Angeles-Long Beach-Anaheim, CA",
+  "31140": "Louisville/Jefferson County, KY-IN",
+  "31180": "Lubbock, TX",
+  "31340": "Lynchburg, VA",
+  "31420": "Macon-Bibb County, GA",
+  "31540": "Madison, WI",
+  "31700": "Manchester-Nashua, NH",
+  "31740": "Manhattan, KS",
+  "31860": "Mankato, MN",
+  "31900": "Mansfield, OH",
+  "32420": "Mayagüez, PR",
+  "32580": "McAllen-Edinburg-Mission, TX",
+  "32780": "Medford, OR",
+  "32820": "Memphis, TN-MS-AR",
+  "32900": "Merced, CA",
+  "33100": "Miami-Fort Lauderdale-West Palm Beach, FL",
+  "33140": "Michigan City-La Porte, IN",
+  "33220": "Midland, MI",
+  "33260": "Midland, TX",
+  "33340": "Milwaukee-Waukesha, WI",
+  "33460": "Minneapolis-St. Paul-Bloomington, MN-WI",
+  "33500": "Minot, ND",
+  "33540": "Missoula, MT",
+  "33660": "Mobile, AL",
+  "33700": "Modesto, CA",
+  "33740": "Monroe, LA",
+  "33780": "Monroe, MI",
+  "33860": "Montgomery, AL",
+  "34060": "Morgantown, WV",
+  "34100": "Morristown, TN",
+  "34580": "Mount Vernon-Anacortes, WA",
+  "34620": "Muncie, IN",
+  "34740": "Muskegon-Norton Shores, MI",
+  "34820": "Myrtle Beach-Conway-North Myrtle Beach, SC",
+  "34900": "Napa, CA",
+  "34940": "Naples-Marco Island, FL",
+  "34980": "Nashville-Davidson--Murfreesboro--Franklin, TN",
+  "35300": "New Haven, CT",
+  "35380": "New Orleans-Metairie, LA",
+  "35620": "New York-Newark-Jersey City, NY-NJ",
+  "35660": "Niles, MI",
+  "35840": "North Port-Bradenton-Sarasota, FL",
+  "35980": "Norwich-New London-Willimantic, CT",
+  "36100": "Ocala, FL",
+  "36220": "Odessa, TX",
+  "36260": "Ogden, UT",
+  "36420": "Oklahoma City, OK",
+  "36500": "Olympia-Lacey-Tumwater, WA",
+  "36540": "Omaha, NE-IA",
+  "36740": "Orlando-Kissimmee-Sanford, FL",
+  "36780": "Oshkosh-Neenah, WI",
+  "36980": "Owensboro, KY",
+  "37100": "Oxnard-Thousand Oaks-Ventura, CA",
+  "37140": "Paducah, KY-IL",
+  "37340": "Palm Bay-Melbourne-Titusville, FL",
+  "37460": "Panama City-Panama City Beach, FL",
+  "37620": "Parkersburg-Vienna, WV",
+  "37860": "Pensacola-Ferry Pass-Brent, FL",
+  "37900": "Peoria, IL",
+  "37980": "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD",
+  "38060": "Phoenix-Mesa-Chandler, AZ",
+  "38240": "Pinehurst-Southern Pines, NC",
+  "38300": "Pittsburgh, PA",
+  "38340": "Pittsfield, MA",
+  "38540": "Pocatello, ID",
+  "38660": "Ponce, PR",
+  "38860": "Portland-South Portland, ME",
+  "38900": "Portland-Vancouver-Hillsboro, OR-WA",
+  "38940": "Port St. Lucie, FL",
+  "39150": "Prescott Valley-Prescott, AZ",
+  "39300": "Providence-Warwick, RI-MA",
+  "39340": "Provo-Orem-Lehi, UT",
+  "39380": "Pueblo, CO",
+  "39460": "Punta Gorda, FL",
+  "39540": "Racine-Mount Pleasant, WI",
+  "39580": "Raleigh-Cary, NC",
+  "39660": "Rapid City, SD",
+  "39740": "Reading, PA",
+  "39820": "Redding, CA",
+  "39900": "Reno, NV",
+  "40060": "Richmond, VA",
+  "40140": "Riverside-San Bernardino-Ontario, CA",
+  "40220": "Roanoke, VA",
+  "40340": "Rochester, MN",
+  "40380": "Rochester, NY",
+  "40420": "Rockford, IL",
+  "40580": "Rocky Mount, NC",
+  "40660": "Rome, GA",
+  "40900": "Sacramento-Roseville-Folsom, CA",
+  "40980": "Saginaw, MI",
+  "41060": "St. Cloud, MN",
+  "41100": "St. George, UT",
+  "41140": "St. Joseph, MO-KS",
+  "41180": "St. Louis, MO-IL",
+  "41420": "Salem, OR",
+  "41500": "Salinas, CA",
+  "41540": "Salisbury, MD",
+  "41620": "Salt Lake City-Murray, UT",
+  "41660": "San Angelo, TX",
+  "41700": "San Antonio-New Braunfels, TX",
+  "41740": "San Diego-Chula Vista-Carlsbad, CA",
+  "41780": "Sandusky, OH",
+  "41860": "San Francisco-Oakland-Fremont, CA",
+  "41940": "San Jose-Sunnyvale-Santa Clara, CA",
+  "41980": "San Juan-Bayamón-Caguas, PR",
+  "42020": "San Luis Obispo-Paso Robles, CA",
+  "42100": "Santa Cruz-Watsonville, CA",
+  "42140": "Santa Fe, NM",
+  "42200": "Santa Maria-Santa Barbara, CA",
+  "42220": "Santa Rosa-Petaluma, CA",
+  "42340": "Savannah, GA",
+  "42540": "Scranton--Wilkes-Barre, PA",
+  "42660": "Seattle-Tacoma-Bellevue, WA",
+  "42680": "Sebastian-Vero Beach-West Vero Corridor, FL",
+  "42700": "Sebring, FL",
+  "43100": "Sheboygan, WI",
+  "43300": "Sherman-Denison, TX",
+  "43340": "Shreveport-Bossier City, LA",
+  "43420": "Sierra Vista-Douglas, AZ",
+  "43580": "Sioux City, IA-NE-SD",
+  "43620": "Sioux Falls, SD-MN",
+  "43640": "Slidell-Mandeville-Covington, LA",
+  "43780": "South Bend-Mishawaka, IN-MI",
+  "43900": "Spartanburg, SC",
+  "44060": "Spokane-Spokane Valley, WA",
+  "44100": "Springfield, IL",
+  "44140": "Springfield, MA",
+  "44180": "Springfield, MO",
+  "44220": "Springfield, OH",
+  "44300": "State College, PA",
+  "44420": "Staunton-Stuarts Draft, VA",
+  "44700": "Stockton-Lodi, CA",
+  "44940": "Sumter, SC",
+  "45060": "Syracuse, NY",
+  "45220": "Tallahassee, FL",
+  "45300": "Tampa-St. Petersburg-Clearwater, FL",
+  "45460": "Terre Haute, IN",
+  "45500": "Texarkana, TX-AR",
+  "45780": "Toledo, OH",
+  "45820": "Topeka, KS",
+  "45900": "Traverse City, MI",
+  "45940": "Trenton-Princeton, NJ",
+  "46060": "Tucson, AZ",
+  "46140": "Tulsa, OK",
+  "46220": "Tuscaloosa, AL",
+  "46300": "Twin Falls, ID",
+  "46340": "Tyler, TX",
+  "46520": "Urban Honolulu, HI",
+  "46540": "Utica-Rome, NY",
+  "46660": "Valdosta, GA",
+  "46700": "Vallejo, CA",
+  "47020": "Victoria, TX",
+  "47220": "Vineland, NJ",
+  "47260": "Virginia Beach-Chesapeake-Norfolk, VA-NC",
+  "47300": "Visalia, CA",
+  "47380": "Waco, TX",
+  "47460": "Walla Walla, WA",
+  "47580": "Warner Robins, GA",
+  "47900": "Washington-Arlington-Alexandria, DC-VA-MD-WV",
+  "47930": "Waterbury-Shelton, CT",
+  "47940": "Waterloo-Cedar Falls, IA",
+  "48060": "Watertown-Fort Drum, NY",
+  "48140": "Wausau, WI",
+  "48260": "Weirton-Steubenville, WV-OH",
+  "48300": "Wenatchee-East Wenatchee, WA",
+  "48540": "Wheeling, WV-OH",
+  "48620": "Wichita, KS",
+  "48660": "Wichita Falls, TX",
+  "48680": "Wildwood-The Villages, FL",
+  "48700": "Williamsport, PA",
+  "48900": "Wilmington, NC",
+  "49020": "Winchester, VA-WV",
+  "49180": "Winston-Salem, NC",
+  "49340": "Worcester, MA",
+  "49420": "Yakima, WA",
+  "49620": "York-Hanover, PA",
+  "49660": "Youngstown-Warren, OH",
+  "49700": "Yuba City, CA",
+  "49740": "Yuma, AZ"
+ },
+ "counties": {
+  "10001": {
+   "cbsa": "20100",
+   "county": "Kent County",
+   "state": "Delaware"
+  },
+  "10003": {
+   "cbsa": "37980",
+   "division": "48864",
+   "county": "New Castle County",
+   "state": "Delaware"
+  },
+  "11001": {
+   "cbsa": "47900",
+   "division": "47764",
+   "county": "District of Columbia",
+   "state": "District of Columbia"
+  },
+  "12001": {
+   "cbsa": "23540",
+   "county": "Alachua County",
+   "state": "Florida"
+  },
+  "12003": {
+   "cbsa": "27260",
+   "county": "Baker County",
+   "state": "Florida"
+  },
+  "12005": {
+   "cbsa": "37460",
+   "county": "Bay County",
+   "state": "Florida"
+  },
+  "12009": {
+   "cbsa": "37340",
+   "county": "Brevard County",
+   "state": "Florida"
+  },
+  "12011": {
+   "cbsa": "33100",
+   "division": "22744",
+   "county": "Broward County",
+   "state": "Florida"
+  },
+  "12015": {
+   "cbsa": "39460",
+   "county": "Charlotte County",
+   "state": "Florida"
+  },
+  "12017": {
+   "cbsa": "26140",
+   "county": "Citrus County",
+   "state": "Florida"
+  },
+  "12019": {
+   "cbsa": "27260",
+   "county": "Clay County",
+   "state": "Florida"
+  },
+  "12021": {
+   "cbsa": "34940",
+   "county": "Collier County",
+   "state": "Florida"
+  },
+  "12031": {
+   "cbsa": "27260",
+   "county": "Duval County",
+   "state": "Florida"
+  },
+  "12033": {
+   "cbsa": "37860",
+   "county": "Escambia County",
+   "state": "Florida"
+  },
+  "12035": {
+   "cbsa": "19660",
+   "county": "Flagler County",
+   "state": "Florida"
+  },
+  "12039": {
+   "cbsa": "45220",
+   "county": "Gadsden County",
+   "state": "Florida"
+  },
+  "12041": {
+   "cbsa": "23540",
+   "county": "Gilchrist County",
+   "state": "Florida"
+  },
+  "12053": {
+   "cbsa": "45300",
+   "division": "45294",
+   "county": "Hernando County",
+   "state": "Florida"
+  },
+  "12055": {
+   "cbsa": "42700",
+   "county": "Highlands County",
+   "state": "Florida"
+  },
+  "12057": {
+   "cbsa": "45300",
+   "division": "45294",
+   "county": "Hillsborough County",
+   "state": "Florida"
+  },
+  "12061": {
+   "cbsa": "42680",
+   "county": "Indian River County",
+   "state": "Florida"
+  },
+  "12065": {
+   "cbsa": "45220",
+   "county": "Jefferson County",
+   "state": "Florida"
+  },
+  "12069": {
+   "cbsa": "36740",
+   "county": "Lake County",
+   "state": "Florida"
+  },
+  "12071": {
+   "cbsa": "15980",
+   "county": "Lee County",
+   "state": "Florida"
+  },
+  "12073": {
+   "cbsa": "45220",
+   "county": "Leon County",
+   "state": "Florida"
+  },
+  "12075": {
+   "cbsa": "23540",
+   "county": "Levy County",
+   "state": "Florida"
+  },
+  "12081": {
+   "cbsa": "35840",
+   "county": "Manatee County",
+   "state": "Florida"
+  },
+  "12083": {
+   "cbsa": "36100",
+   "county": "Marion County",
+   "state": "Florida"
+  },
+  "12085": {
+   "cbsa": "38940",
+   "county": "Martin County",
+   "state": "Florida"
+  },
+  "12086": {
+   "cbsa": "33100",
+   "division": "33124",
+   "county": "Miami-Dade County",
+   "state": "Florida"
+  },
+  "12089": {
+   "cbsa": "27260",
+   "county": "Nassau County",
+   "state": "Florida"
+  },
+  "12091": {
+   "cbsa": "18880",
+   "county": "Okaloosa County",
+   "state": "Florida"
+  },
+  "12095": {
+   "cbsa": "36740",
+   "county": "Orange County",
+   "state": "Florida"
+  },
+  "12097": {
+   "cbsa": "36740",
+   "county": "Osceola County",
+   "state": "Florida"
+  },
+  "12099": {
+   "cbsa": "33100",
+   "division": "48424",
+   "county": "Palm Beach County",
+   "state": "Florida"
+  },
+  "12101": {
+   "cbsa": "45300",
+   "division": "45294",
+   "county": "Pasco County",
+   "state": "Florida"
+  },
+  "12103": {
+   "cbsa": "45300",
+   "division": "41304",
+   "county": "Pinellas County",
+   "state": "Florida"
+  },
+  "12105": {
+   "cbsa": "29460",
+   "county": "Polk County",
+   "state": "Florida"
+  },
+  "12109": {
+   "cbsa": "27260",
+   "county": "St. Johns County",
+   "state": "Florida"
+  },
+  "12111": {
+   "cbsa": "38940",
+   "county": "St. Lucie County",
+   "state": "Florida"
+  },
+  "12113": {
+   "cbsa": "37860",
+   "county": "Santa Rosa County",
+   "state": "Florida"
+  },
+  "12115": {
+   "cbsa": "35840",
+   "county": "Sarasota County",
+   "state": "Florida"
+  },
+  "12117": {
+   "cbsa": "36740",
+   "county": "Seminole County",
+   "state": "Florida"
+  },
+  "12119": {
+   "cbsa": "48680",
+   "county": "Sumter County",
+   "state": "Florida"
+  },
+  "12127": {
+   "cbsa": "19660",
+   "county": "Volusia County",
+   "state": "Florida"
+  },
+  "12129": {
+   "cbsa": "45220",
+   "county": "Wakulla County",
+   "state": "Florida"
+  },
+  "12131": {
+   "cbsa": "18880",
+   "county": "Walton County",
+   "state": "Florida"
+  },
+  "12133": {
+   "cbsa": "37460",
+   "county": "Washington County",
+   "state": "Florida"
+  },
+  "13013": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Barrow County",
+   "state": "Georgia"
+  },
+  "13015": {
+   "cbsa": "12060",
+   "division": "31924",
+   "county": "Bartow County",
+   "state": "Georgia"
+  },
+  "13021": {
+   "cbsa": "31420",
+   "county": "Bibb County",
+   "state": "Georgia"
+  },
+  "13025": {
+   "cbsa": "15260",
+   "county": "Brantley County",
+   "state": "Georgia"
+  },
+  "13027": {
+   "cbsa": "46660",
+   "county": "Brooks County",
+   "state": "Georgia"
+  },
+  "13029": {
+   "cbsa": "42340",
+   "county": "Bryan County",
+   "state": "Georgia"
+  },
+  "13033": {
+   "cbsa": "12260",
+   "county": "Burke County",
+   "state": "Georgia"
+  },
+  "13035": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Butts County",
+   "state": "Georgia"
+  },
+  "13045": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Carroll County",
+   "state": "Georgia"
+  },
+  "13047": {
+   "cbsa": "16860",
+   "county": "Catoosa County",
+   "state": "Georgia"
+  },
+  "13051": {
+   "cbsa": "42340",
+   "county": "Chatham County",
+   "state": "Georgia"
+  },
+  "13053": {
+   "cbsa": "17980",
+   "county": "Chattahoochee County",
+   "state": "Georgia"
+  },
+  "13057": {
+   "cbsa": "12060",
+   "division": "31924",
+   "county": "Cherokee County",
+   "state": "Georgia"
+  },
+  "13059": {
+   "cbsa": "12020",
+   "county": "Clarke County",
+   "state": "Georgia"
+  },
+  "13063": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Clayton County",
+   "state": "Georgia"
+  },
+  "13067": {
+   "cbsa": "12060",
+   "division": "31924",
+   "county": "Cobb County",
+   "state": "Georgia"
+  },
+  "13073": {
+   "cbsa": "12260",
+   "county": "Columbia County",
+   "state": "Georgia"
+  },
+  "13077": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Coweta County",
+   "state": "Georgia"
+  },
+  "13079": {
+   "cbsa": "31420",
+   "county": "Crawford County",
+   "state": "Georgia"
+  },
+  "13083": {
+   "cbsa": "16860",
+   "county": "Dade County",
+   "state": "Georgia"
+  },
+  "13085": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Dawson County",
+   "state": "Georgia"
+  },
+  "13089": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "DeKalb County",
+   "state": "Georgia"
+  },
+  "13095": {
+   "cbsa": "10500",
+   "county": "Dougherty County",
+   "state": "Georgia"
+  },
+  "13097": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Douglas County",
+   "state": "Georgia"
+  },
+  "13101": {
+   "cbsa": "46660",
+   "county": "Echols County",
+   "state": "Georgia"
+  },
+  "13103": {
+   "cbsa": "42340",
+   "county": "Effingham County",
+   "state": "Georgia"
+  },
+  "13113": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Fayette County",
+   "state": "Georgia"
+  },
+  "13115": {
+   "cbsa": "40660",
+   "county": "Floyd County",
+   "state": "Georgia"
+  },
+  "13117": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Forsyth County",
+   "state": "Georgia"
+  },
+  "13121": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Fulton County",
+   "state": "Georgia"
+  },
+  "13127": {
+   "cbsa": "15260",
+   "county": "Glynn County",
+   "state": "Georgia"
+  },
+  "13135": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Gwinnett County",
+   "state": "Georgia"
+  },
+  "13139": {
+   "cbsa": "23580",
+   "county": "Hall County",
+   "state": "Georgia"
+  },
+  "13143": {
+   "cbsa": "12060",
+   "division": "31924",
+   "county": "Haralson County",
+   "state": "Georgia"
+  },
+  "13145": {
+   "cbsa": "17980",
+   "county": "Harris County",
+   "state": "Georgia"
+  },
+  "13149": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Heard County",
+   "state": "Georgia"
+  },
+  "13151": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Henry County",
+   "state": "Georgia"
+  },
+  "13153": {
+   "cbsa": "47580",
+   "county": "Houston County",
+   "state": "Georgia"
+  },
+  "13159": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Jasper County",
+   "state": "Georgia"
+  },
+  "13169": {
+   "cbsa": "31420",
+   "county": "Jones County",
+   "state": "Georgia"
+  },
+  "13173": {
+   "cbsa": "46660",
+   "county": "Lanier County",
+   "state": "Georgia"
+  },
+  "13177": {
+   "cbsa": "10500",
+   "county": "Lee County",
+   "state": "Georgia"
+  },
+  "13179": {
+   "cbsa": "25980",
+   "county": "Liberty County",
+   "state": "Georgia"
+  },
+  "13181": {
+   "cbsa": "12260",
+   "county": "Lincoln County",
+   "state": "Georgia"
+  },
+  "13183": {
+   "cbsa": "25980",
+   "county": "Long County",
+   "state": "Georgia"
+  },
+  "13185": {
+   "cbsa": "46660",
+   "county": "Lowndes County",
+   "state": "Georgia"
+  },
+  "13187": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Lumpkin County",
+   "state": "Georgia"
+  },
+  "13189": {
+   "cbsa": "12260",
+   "county": "McDuffie County",
+   "state": "Georgia"
+  },
+  "13191": {
+   "cbsa": "15260",
+   "county": "McIntosh County",
+   "state": "Georgia"
+  },
+  "13195": {
+   "cbsa": "12020",
+   "county": "Madison County",
+   "state": "Georgia"
+  },
+  "13197": {
+   "cbsa": "17980",
+   "county": "Marion County",
+   "state": "Georgia"
+  },
+  "13199": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Meriwether County",
+   "state": "Georgia"
+  },
+  "13207": {
+   "cbsa": "31420",
+   "county": "Monroe County",
+   "state": "Georgia"
+  },
+  "13211": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Morgan County",
+   "state": "Georgia"
+  },
+  "13213": {
+   "cbsa": "19140",
+   "county": "Murray County",
+   "state": "Georgia"
+  },
+  "13215": {
+   "cbsa": "17980",
+   "county": "Muscogee County",
+   "state": "Georgia"
+  },
+  "13217": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Newton County",
+   "state": "Georgia"
+  },
+  "13219": {
+   "cbsa": "12020",
+   "county": "Oconee County",
+   "state": "Georgia"
+  },
+  "13221": {
+   "cbsa": "12020",
+   "county": "Oglethorpe County",
+   "state": "Georgia"
+  },
+  "13223": {
+   "cbsa": "12060",
+   "division": "31924",
+   "county": "Paulding County",
+   "state": "Georgia"
+  },
+  "13225": {
+   "cbsa": "47580",
+   "county": "Peach County",
+   "state": "Georgia"
+  },
+  "13227": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Pickens County",
+   "state": "Georgia"
+  },
+  "13231": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Pike County",
+   "state": "Georgia"
+  },
+  "13245": {
+   "cbsa": "12260",
+   "county": "Richmond County",
+   "state": "Georgia"
+  },
+  "13247": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Rockdale County",
+   "state": "Georgia"
+  },
+  "13255": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Spalding County",
+   "state": "Georgia"
+  },
+  "13259": {
+   "cbsa": "17980",
+   "county": "Stewart County",
+   "state": "Georgia"
+  },
+  "13263": {
+   "cbsa": "17980",
+   "county": "Talbot County",
+   "state": "Georgia"
+  },
+  "13273": {
+   "cbsa": "10500",
+   "county": "Terrell County",
+   "state": "Georgia"
+  },
+  "13289": {
+   "cbsa": "31420",
+   "county": "Twiggs County",
+   "state": "Georgia"
+  },
+  "13295": {
+   "cbsa": "16860",
+   "county": "Walker County",
+   "state": "Georgia"
+  },
+  "13297": {
+   "cbsa": "12060",
+   "division": "12054",
+   "county": "Walton County",
+   "state": "Georgia"
+  },
+  "13313": {
+   "cbsa": "19140",
+   "county": "Whitfield County",
+   "state": "Georgia"
+  },
+  "13321": {
+   "cbsa": "10500",
+   "county": "Worth County",
+   "state": "Georgia"
+  },
+  "15003": {
+   "cbsa": "46520",
+   "county": "Honolulu County",
+   "state": "Hawaii"
+  },
+  "15005": {
+   "cbsa": "27980",
+   "county": "Kalawao County",
+   "state": "Hawaii"
+  },
+  "15009": {
+   "cbsa": "27980",
+   "county": "Maui County",
+   "state": "Hawaii"
+  },
+  "16001": {
+   "cbsa": "14260",
+   "county": "Ada County",
+   "state": "Idaho"
+  },
+  "16005": {
+   "cbsa": "38540",
+   "county": "Bannock County",
+   "state": "Idaho"
+  },
+  "16015": {
+   "cbsa": "14260",
+   "county": "Boise County",
+   "state": "Idaho"
+  },
+  "16019": {
+   "cbsa": "26820",
+   "county": "Bonneville County",
+   "state": "Idaho"
+  },
+  "16023": {
+   "cbsa": "26820",
+   "county": "Butte County",
+   "state": "Idaho"
+  },
+  "16027": {
+   "cbsa": "14260",
+   "county": "Canyon County",
+   "state": "Idaho"
+  },
+  "16041": {
+   "cbsa": "30860",
+   "county": "Franklin County",
+   "state": "Idaho"
+  },
+  "16045": {
+   "cbsa": "14260",
+   "county": "Gem County",
+   "state": "Idaho"
+  },
+  "16051": {
+   "cbsa": "26820",
+   "county": "Jefferson County",
+   "state": "Idaho"
+  },
+  "16053": {
+   "cbsa": "46300",
+   "county": "Jerome County",
+   "state": "Idaho"
+  },
+  "16055": {
+   "cbsa": "17660",
+   "county": "Kootenai County",
+   "state": "Idaho"
+  },
+  "16069": {
+   "cbsa": "30300",
+   "county": "Nez Perce County",
+   "state": "Idaho"
+  },
+  "16073": {
+   "cbsa": "14260",
+   "county": "Owyhee County",
+   "state": "Idaho"
+  },
+  "16083": {
+   "cbsa": "46300",
+   "county": "Twin Falls County",
+   "state": "Idaho"
+  },
+  "17003": {
+   "cbsa": "16020",
+   "county": "Alexander County",
+   "state": "Illinois"
+  },
+  "17005": {
+   "cbsa": "41180",
+   "county": "Bond County",
+   "state": "Illinois"
+  },
+  "17007": {
+   "cbsa": "40420",
+   "county": "Boone County",
+   "state": "Illinois"
+  },
+  "17013": {
+   "cbsa": "41180",
+   "county": "Calhoun County",
+   "state": "Illinois"
+  },
+  "17019": {
+   "cbsa": "16580",
+   "county": "Champaign County",
+   "state": "Illinois"
+  },
+  "17027": {
+   "cbsa": "41180",
+   "county": "Clinton County",
+   "state": "Illinois"
+  },
+  "17031": {
+   "cbsa": "16980",
+   "division": "16984",
+   "county": "Cook County",
+   "state": "Illinois"
+  },
+  "17037": {
+   "cbsa": "16980",
+   "division": "20994",
+   "county": "DeKalb County",
+   "state": "Illinois"
+  },
+  "17043": {
+   "cbsa": "16980",
+   "division": "16984",
+   "county": "DuPage County",
+   "state": "Illinois"
+  },
+  "17053": {
+   "cbsa": "16580",
+   "county": "Ford County",
+   "state": "Illinois"
+  },
+  "17063": {
+   "cbsa": "16980",
+   "division": "16984",
+   "county": "Grundy County",
+   "state": "Illinois"
+  },
+  "17073": {
+   "cbsa": "19340",
+   "county": "Henry County",
+   "state": "Illinois"
+  },
+  "17083": {
+   "cbsa": "41180",
+   "county": "Jersey County",
+   "state": "Illinois"
+  },
+  "17089": {
+   "cbsa": "16980",
+   "division": "20994",
+   "county": "Kane County",
+   "state": "Illinois"
+  },
+  "17091": {
+   "cbsa": "28100",
+   "county": "Kankakee County",
+   "state": "Illinois"
+  },
+  "17093": {
+   "cbsa": "16980",
+   "division": "20994",
+   "county": "Kendall County",
+   "state": "Illinois"
+  },
+  "17097": {
+   "cbsa": "16980",
+   "division": "29404",
+   "county": "Lake County",
+   "state": "Illinois"
+  },
+  "17111": {
+   "cbsa": "16980",
+   "division": "16984",
+   "county": "McHenry County",
+   "state": "Illinois"
+  },
+  "17113": {
+   "cbsa": "14010",
+   "county": "McLean County",
+   "state": "Illinois"
+  },
+  "17115": {
+   "cbsa": "19500",
+   "county": "Macon County",
+   "state": "Illinois"
+  },
+  "17117": {
+   "cbsa": "41180",
+   "county": "Macoupin County",
+   "state": "Illinois"
+  },
+  "17119": {
+   "cbsa": "41180",
+   "county": "Madison County",
+   "state": "Illinois"
+  },
+  "17123": {
+   "cbsa": "37900",
+   "county": "Marshall County",
+   "state": "Illinois"
+  },
+  "17127": {
+   "cbsa": "37140",
+   "county": "Massac County",
+   "state": "Illinois"
+  },
+  "17129": {
+   "cbsa": "44100",
+   "county": "Menard County",
+   "state": "Illinois"
+  },
+  "17131": {
+   "cbsa": "19340",
+   "county": "Mercer County",
+   "state": "Illinois"
+  },
+  "17133": {
+   "cbsa": "41180",
+   "county": "Monroe County",
+   "state": "Illinois"
+  },
+  "17143": {
+   "cbsa": "37900",
+   "county": "Peoria County",
+   "state": "Illinois"
+  },
+  "17147": {
+   "cbsa": "16580",
+   "county": "Piatt County",
+   "state": "Illinois"
+  },
+  "17161": {
+   "cbsa": "19340",
+   "county": "Rock Island County",
+   "state": "Illinois"
+  },
+  "17163": {
+   "cbsa": "41180",
+   "county": "St. Clair County",
+   "state": "Illinois"
+  },
+  "17167": {
+   "cbsa": "44100",
+   "county": "Sangamon County",
+   "state": "Illinois"
+  },
+  "17175": {
+   "cbsa": "37900",
+   "county": "Stark County",
+   "state": "Illinois"
+  },
+  "17179": {
+   "cbsa": "37900",
+   "county": "Tazewell County",
+   "state": "Illinois"
+  },
+  "17197": {
+   "cbsa": "16980",
+   "division": "16984",
+   "county": "Will County",
+   "state": "Illinois"
+  },
+  "17201": {
+   "cbsa": "40420",
+   "county": "Winnebago County",
+   "state": "Illinois"
+  },
+  "17203": {
+   "cbsa": "37900",
+   "county": "Woodford County",
+   "state": "Illinois"
+  },
+  "18003": {
+   "cbsa": "23060",
+   "county": "Allen County",
+   "state": "Indiana"
+  },
+  "18005": {
+   "cbsa": "18020",
+   "county": "Bartholomew County",
+   "state": "Indiana"
+  },
+  "18007": {
+   "cbsa": "29200",
+   "county": "Benton County",
+   "state": "Indiana"
+  },
+  "18011": {
+   "cbsa": "26900",
+   "county": "Boone County",
+   "state": "Indiana"
+  },
+  "18013": {
+   "cbsa": "26900",
+   "county": "Brown County",
+   "state": "Indiana"
+  },
+  "18015": {
+   "cbsa": "29200",
+   "county": "Carroll County",
+   "state": "Indiana"
+  },
+  "18019": {
+   "cbsa": "31140",
+   "county": "Clark County",
+   "state": "Indiana"
+  },
+  "18021": {
+   "cbsa": "45460",
+   "county": "Clay County",
+   "state": "Indiana"
+  },
+  "18029": {
+   "cbsa": "17140",
+   "county": "Dearborn County",
+   "state": "Indiana"
+  },
+  "18035": {
+   "cbsa": "34620",
+   "county": "Delaware County",
+   "state": "Indiana"
+  },
+  "18039": {
+   "cbsa": "21140",
+   "county": "Elkhart County",
+   "state": "Indiana"
+  },
+  "18043": {
+   "cbsa": "31140",
+   "county": "Floyd County",
+   "state": "Indiana"
+  },
+  "18047": {
+   "cbsa": "17140",
+   "county": "Franklin County",
+   "state": "Indiana"
+  },
+  "18057": {
+   "cbsa": "26900",
+   "county": "Hamilton County",
+   "state": "Indiana"
+  },
+  "18059": {
+   "cbsa": "26900",
+   "county": "Hancock County",
+   "state": "Indiana"
+  },
+  "18061": {
+   "cbsa": "31140",
+   "county": "Harrison County",
+   "state": "Indiana"
+  },
+  "18063": {
+   "cbsa": "26900",
+   "county": "Hendricks County",
+   "state": "Indiana"
+  },
+  "18067": {
+   "cbsa": "29020",
+   "county": "Howard County",
+   "state": "Indiana"
+  },
+  "18073": {
+   "cbsa": "16980",
+   "division": "29414",
+   "county": "Jasper County",
+   "state": "Indiana"
+  },
+  "18081": {
+   "cbsa": "26900",
+   "county": "Johnson County",
+   "state": "Indiana"
+  },
+  "18089": {
+   "cbsa": "16980",
+   "division": "29414",
+   "county": "Lake County",
+   "state": "Indiana"
+  },
+  "18091": {
+   "cbsa": "33140",
+   "county": "LaPorte County",
+   "state": "Indiana"
+  },
+  "18095": {
+   "cbsa": "26900",
+   "county": "Madison County",
+   "state": "Indiana"
+  },
+  "18097": {
+   "cbsa": "26900",
+   "county": "Marion County",
+   "state": "Indiana"
+  },
+  "18105": {
+   "cbsa": "14020",
+   "county": "Monroe County",
+   "state": "Indiana"
+  },
+  "18109": {
+   "cbsa": "26900",
+   "county": "Morgan County",
+   "state": "Indiana"
+  },
+  "18111": {
+   "cbsa": "16980",
+   "division": "29414",
+   "county": "Newton County",
+   "state": "Indiana"
+  },
+  "18115": {
+   "cbsa": "17140",
+   "county": "Ohio County",
+   "state": "Indiana"
+  },
+  "18119": {
+   "cbsa": "14020",
+   "county": "Owen County",
+   "state": "Indiana"
+  },
+  "18127": {
+   "cbsa": "16980",
+   "division": "29414",
+   "county": "Porter County",
+   "state": "Indiana"
+  },
+  "18129": {
+   "cbsa": "21780",
+   "county": "Posey County",
+   "state": "Indiana"
+  },
+  "18141": {
+   "cbsa": "43780",
+   "county": "St. Joseph County",
+   "state": "Indiana"
+  },
+  "18145": {
+   "cbsa": "26900",
+   "county": "Shelby County",
+   "state": "Indiana"
+  },
+  "18153": {
+   "cbsa": "45460",
+   "county": "Sullivan County",
+   "state": "Indiana"
+  },
+  "18157": {
+   "cbsa": "29200",
+   "county": "Tippecanoe County",
+   "state": "Indiana"
+  },
+  "18159": {
+   "cbsa": "26900",
+   "county": "Tipton County",
+   "state": "Indiana"
+  },
+  "18163": {
+   "cbsa": "21780",
+   "county": "Vanderburgh County",
+   "state": "Indiana"
+  },
+  "18165": {
+   "cbsa": "45460",
+   "county": "Vermillion County",
+   "state": "Indiana"
+  },
+  "18167": {
+   "cbsa": "45460",
+   "county": "Vigo County",
+   "state": "Indiana"
+  },
+  "18171": {
+   "cbsa": "29200",
+   "county": "Warren County",
+   "state": "Indiana"
+  },
+  "18173": {
+   "cbsa": "21780",
+   "county": "Warrick County",
+   "state": "Indiana"
+  },
+  "18175": {
+   "cbsa": "31140",
+   "county": "Washington County",
+   "state": "Indiana"
+  },
+  "18179": {
+   "cbsa": "23060",
+   "county": "Wells County",
+   "state": "Indiana"
+  },
+  "18183": {
+   "cbsa": "23060",
+   "county": "Whitley County",
+   "state": "Indiana"
+  },
+  "19011": {
+   "cbsa": "16300",
+   "county": "Benton County",
+   "state": "Iowa"
+  },
+  "19013": {
+   "cbsa": "47940",
+   "county": "Black Hawk County",
+   "state": "Iowa"
+  },
+  "19015": {
+   "cbsa": "11180",
+   "county": "Boone County",
+   "state": "Iowa"
+  },
+  "19017": {
+   "cbsa": "47940",
+   "county": "Bremer County",
+   "state": "Iowa"
+  },
+  "19049": {
+   "cbsa": "19780",
+   "county": "Dallas County",
+   "state": "Iowa"
+  },
+  "19061": {
+   "cbsa": "20220",
+   "county": "Dubuque County",
+   "state": "Iowa"
+  },
+  "19075": {
+   "cbsa": "47940",
+   "county": "Grundy County",
+   "state": "Iowa"
+  },
+  "19077": {
+   "cbsa": "19780",
+   "county": "Guthrie County",
+   "state": "Iowa"
+  },
+  "19085": {
+   "cbsa": "36540",
+   "county": "Harrison County",
+   "state": "Iowa"
+  },
+  "19099": {
+   "cbsa": "19780",
+   "county": "Jasper County",
+   "state": "Iowa"
+  },
+  "19103": {
+   "cbsa": "26980",
+   "county": "Johnson County",
+   "state": "Iowa"
+  },
+  "19105": {
+   "cbsa": "16300",
+   "county": "Jones County",
+   "state": "Iowa"
+  },
+  "19113": {
+   "cbsa": "16300",
+   "county": "Linn County",
+   "state": "Iowa"
+  },
+  "19121": {
+   "cbsa": "19780",
+   "county": "Madison County",
+   "state": "Iowa"
+  },
+  "19129": {
+   "cbsa": "36540",
+   "county": "Mills County",
+   "state": "Iowa"
+  },
+  "19153": {
+   "cbsa": "19780",
+   "county": "Polk County",
+   "state": "Iowa"
+  },
+  "19155": {
+   "cbsa": "36540",
+   "county": "Pottawattamie County",
+   "state": "Iowa"
+  },
+  "19163": {
+   "cbsa": "19340",
+   "county": "Scott County",
+   "state": "Iowa"
+  },
+  "19169": {
+   "cbsa": "11180",
+   "county": "Story County",
+   "state": "Iowa"
+  },
+  "19181": {
+   "cbsa": "19780",
+   "county": "Warren County",
+   "state": "Iowa"
+  },
+  "19183": {
+   "cbsa": "26980",
+   "county": "Washington County",
+   "state": "Iowa"
+  },
+  "19193": {
+   "cbsa": "43580",
+   "county": "Woodbury County",
+   "state": "Iowa"
+  },
+  "20015": {
+   "cbsa": "48620",
+   "county": "Butler County",
+   "state": "Kansas"
+  },
+  "20021": {
+   "cbsa": "27900",
+   "county": "Cherokee County",
+   "state": "Kansas"
+  },
+  "20043": {
+   "cbsa": "41140",
+   "county": "Doniphan County",
+   "state": "Kansas"
+  },
+  "20045": {
+   "cbsa": "29940",
+   "county": "Douglas County",
+   "state": "Kansas"
+  },
+  "20061": {
+   "cbsa": "31740",
+   "county": "Geary County",
+   "state": "Kansas"
+  },
+  "20079": {
+   "cbsa": "48620",
+   "county": "Harvey County",
+   "state": "Kansas"
+  },
+  "20085": {
+   "cbsa": "45820",
+   "county": "Jackson County",
+   "state": "Kansas"
+  },
+  "20087": {
+   "cbsa": "45820",
+   "county": "Jefferson County",
+   "state": "Kansas"
+  },
+  "20091": {
+   "cbsa": "28140",
+   "county": "Johnson County",
+   "state": "Kansas"
+  },
+  "20103": {
+   "cbsa": "28140",
+   "county": "Leavenworth County",
+   "state": "Kansas"
+  },
+  "20107": {
+   "cbsa": "28140",
+   "county": "Linn County",
+   "state": "Kansas"
+  },
+  "20121": {
+   "cbsa": "28140",
+   "county": "Miami County",
+   "state": "Kansas"
+  },
+  "20139": {
+   "cbsa": "45820",
+   "county": "Osage County",
+   "state": "Kansas"
+  },
+  "20149": {
+   "cbsa": "31740",
+   "county": "Pottawatomie County",
+   "state": "Kansas"
+  },
+  "20161": {
+   "cbsa": "31740",
+   "county": "Riley County",
+   "state": "Kansas"
+  },
+  "20173": {
+   "cbsa": "48620",
+   "county": "Sedgwick County",
+   "state": "Kansas"
+  },
+  "20177": {
+   "cbsa": "45820",
+   "county": "Shawnee County",
+   "state": "Kansas"
+  },
+  "20191": {
+   "cbsa": "48620",
+   "county": "Sumner County",
+   "state": "Kansas"
+  },
+  "20197": {
+   "cbsa": "45820",
+   "county": "Wabaunsee County",
+   "state": "Kansas"
+  },
+  "20209": {
+   "cbsa": "28140",
+   "county": "Wyandotte County",
+   "state": "Kansas"
+  },
+  "21003": {
+   "cbsa": "14540",
+   "county": "Allen County",
+   "state": "Kentucky"
+  },
+  "21007": {
+   "cbsa": "37140",
+   "county": "Ballard County",
+   "state": "Kentucky"
+  },
+  "21015": {
+   "cbsa": "17140",
+   "county": "Boone County",
+   "state": "Kentucky"
+  },
+  "21017": {
+   "cbsa": "30460",
+   "county": "Bourbon County",
+   "state": "Kentucky"
+  },
+  "21019": {
+   "cbsa": "26580",
+   "county": "Boyd County",
+   "state": "Kentucky"
+  },
+  "21023": {
+   "cbsa": "17140",
+   "county": "Bracken County",
+   "state": "Kentucky"
+  },
+  "21029": {
+   "cbsa": "31140",
+   "county": "Bullitt County",
+   "state": "Kentucky"
+  },
+  "21031": {
+   "cbsa": "14540",
+   "county": "Butler County",
+   "state": "Kentucky"
+  },
+  "21037": {
+   "cbsa": "17140",
+   "county": "Campbell County",
+   "state": "Kentucky"
+  },
+  "21039": {
+   "cbsa": "37140",
+   "county": "Carlisle County",
+   "state": "Kentucky"
+  },
+  "21043": {
+   "cbsa": "26580",
+   "county": "Carter County",
+   "state": "Kentucky"
+  },
+  "21047": {
+   "cbsa": "17300",
+   "county": "Christian County",
+   "state": "Kentucky"
+  },
+  "21049": {
+   "cbsa": "30460",
+   "county": "Clark County",
+   "state": "Kentucky"
+  },
+  "21059": {
+   "cbsa": "36980",
+   "county": "Daviess County",
+   "state": "Kentucky"
+  },
+  "21061": {
+   "cbsa": "14540",
+   "county": "Edmonson County",
+   "state": "Kentucky"
+  },
+  "21067": {
+   "cbsa": "30460",
+   "county": "Fayette County",
+   "state": "Kentucky"
+  },
+  "21077": {
+   "cbsa": "17140",
+   "county": "Gallatin County",
+   "state": "Kentucky"
+  },
+  "21081": {
+   "cbsa": "17140",
+   "county": "Grant County",
+   "state": "Kentucky"
+  },
+  "21089": {
+   "cbsa": "26580",
+   "county": "Greenup County",
+   "state": "Kentucky"
+  },
+  "21093": {
+   "cbsa": "21060",
+   "county": "Hardin County",
+   "state": "Kentucky"
+  },
+  "21103": {
+   "cbsa": "31140",
+   "county": "Henry County",
+   "state": "Kentucky"
+  },
+  "21111": {
+   "cbsa": "31140",
+   "county": "Jefferson County",
+   "state": "Kentucky"
+  },
+  "21113": {
+   "cbsa": "30460",
+   "county": "Jessamine County",
+   "state": "Kentucky"
+  },
+  "21117": {
+   "cbsa": "17140",
+   "county": "Kenton County",
+   "state": "Kentucky"
+  },
+  "21123": {
+   "cbsa": "21060",
+   "county": "Larue County",
+   "state": "Kentucky"
+  },
+  "21127": {
+   "cbsa": "26580",
+   "county": "Lawrence County",
+   "state": "Kentucky"
+  },
+  "21139": {
+   "cbsa": "37140",
+   "county": "Livingston County",
+   "state": "Kentucky"
+  },
+  "21145": {
+   "cbsa": "37140",
+   "county": "McCracken County",
+   "state": "Kentucky"
+  },
+  "21149": {
+   "cbsa": "36980",
+   "county": "McLean County",
+   "state": "Kentucky"
+  },
+  "21163": {
+   "cbsa": "31140",
+   "county": "Meade County",
+   "state": "Kentucky"
+  },
+  "21179": {
+   "cbsa": "31140",
+   "county": "Nelson County",
+   "state": "Kentucky"
+  },
+  "21185": {
+   "cbsa": "31140",
+   "county": "Oldham County",
+   "state": "Kentucky"
+  },
+  "21191": {
+   "cbsa": "17140",
+   "county": "Pendleton County",
+   "state": "Kentucky"
+  },
+  "21209": {
+   "cbsa": "30460",
+   "county": "Scott County",
+   "state": "Kentucky"
+  },
+  "21211": {
+   "cbsa": "31140",
+   "county": "Shelby County",
+   "state": "Kentucky"
+  },
+  "21215": {
+   "cbsa": "31140",
+   "county": "Spencer County",
+   "state": "Kentucky"
+  },
+  "21221": {
+   "cbsa": "17300",
+   "county": "Trigg County",
+   "state": "Kentucky"
+  },
+  "21227": {
+   "cbsa": "14540",
+   "county": "Warren County",
+   "state": "Kentucky"
+  },
+  "21239": {
+   "cbsa": "30460",
+   "county": "Woodford County",
+   "state": "Kentucky"
+  },
+  "22001": {
+   "cbsa": "29180",
+   "county": "Acadia Parish",
+   "state": "Louisiana"
+  },
+  "22005": {
+   "cbsa": "12940",
+   "county": "Ascension Parish",
+   "state": "Louisiana"
+  },
+  "22007": {
+   "cbsa": "12940",
+   "county": "Assumption Parish",
+   "state": "Louisiana"
+  },
+  "22015": {
+   "cbsa": "43340",
+   "county": "Bossier Parish",
+   "state": "Louisiana"
+  },
+  "22017": {
+   "cbsa": "43340",
+   "county": "Caddo Parish",
+   "state": "Louisiana"
+  },
+  "22019": {
+   "cbsa": "29340",
+   "county": "Calcasieu Parish",
+   "state": "Louisiana"
+  },
+  "22023": {
+   "cbsa": "29340",
+   "county": "Cameron Parish",
+   "state": "Louisiana"
+  },
+  "22031": {
+   "cbsa": "43340",
+   "county": "De Soto Parish",
+   "state": "Louisiana"
+  },
+  "22033": {
+   "cbsa": "12940",
+   "county": "East Baton Rouge Parish",
+   "state": "Louisiana"
+  },
+  "22037": {
+   "cbsa": "12940",
+   "county": "East Feliciana Parish",
+   "state": "Louisiana"
+  },
+  "22043": {
+   "cbsa": "10780",
+   "county": "Grant Parish",
+   "state": "Louisiana"
+  },
+  "22047": {
+   "cbsa": "12940",
+   "county": "Iberville Parish",
+   "state": "Louisiana"
+  },
+  "22051": {
+   "cbsa": "35380",
+   "county": "Jefferson Parish",
+   "state": "Louisiana"
+  },
+  "22053": {
+   "cbsa": "29340",
+   "county": "Jefferson Davis Parish",
+   "state": "Louisiana"
+  },
+  "22055": {
+   "cbsa": "29180",
+   "county": "Lafayette Parish",
+   "state": "Louisiana"
+  },
+  "22057": {
+   "cbsa": "26380",
+   "county": "Lafourche Parish",
+   "state": "Louisiana"
+  },
+  "22063": {
+   "cbsa": "12940",
+   "county": "Livingston Parish",
+   "state": "Louisiana"
+  },
+  "22067": {
+   "cbsa": "33740",
+   "county": "Morehouse Parish",
+   "state": "Louisiana"
+  },
+  "22071": {
+   "cbsa": "35380",
+   "county": "Orleans Parish",
+   "state": "Louisiana"
+  },
+  "22073": {
+   "cbsa": "33740",
+   "county": "Ouachita Parish",
+   "state": "Louisiana"
+  },
+  "22075": {
+   "cbsa": "35380",
+   "county": "Plaquemines Parish",
+   "state": "Louisiana"
+  },
+  "22077": {
+   "cbsa": "12940",
+   "county": "Pointe Coupee Parish",
+   "state": "Louisiana"
+  },
+  "22079": {
+   "cbsa": "10780",
+   "county": "Rapides Parish",
+   "state": "Louisiana"
+  },
+  "22083": {
+   "cbsa": "33740",
+   "county": "Richland Parish",
+   "state": "Louisiana"
+  },
+  "22087": {
+   "cbsa": "35380",
+   "county": "St. Bernard Parish",
+   "state": "Louisiana"
+  },
+  "22089": {
+   "cbsa": "35380",
+   "county": "St. Charles Parish",
+   "state": "Louisiana"
+  },
+  "22091": {
+   "cbsa": "12940",
+   "county": "St. Helena Parish",
+   "state": "Louisiana"
+  },
+  "22093": {
+   "cbsa": "35380",
+   "county": "St. James Parish",
+   "state": "Louisiana"
+  },
+  "22095": {
+   "cbsa": "35380",
+   "county": "St. John the Baptist Parish",
+   "state": "Louisiana"
+  },
+  "22099": {
+   "cbsa": "29180",
+   "county": "St. Martin Parish",
+   "state": "Louisiana"
+  },
+  "22103": {
+   "cbsa": "43640",
+   "county": "St. Tammany Parish",
+   "state": "Louisiana"
+  },
+  "22105": {
+   "cbsa": "25220",
+   "county": "Tangipahoa Parish",
+   "state": "Louisiana"
+  },
+  "22109": {
+   "cbsa": "26380",
+   "county": "Terrebonne Parish",
+   "state": "Louisiana"
+  },
+  "22111": {
+   "cbsa": "33740",
+   "county": "Union Parish",
+   "state": "Louisiana"
+  },
+  "22113": {
+   "cbsa": "29180",
+   "county": "Vermilion Parish",
+   "state": "Louisiana"
+  },
+  "22121": {
+   "cbsa": "12940",
+   "county": "West Baton Rouge Parish",
+   "state": "Louisiana"
+  },
+  "22125": {
+   "cbsa": "12940",
+   "county": "West Feliciana Parish",
+   "state": "Louisiana"
+  },
+  "23001": {
+   "cbsa": "30340",
+   "county": "Androscoggin County",
+   "state": "Maine"
+  },
+  "23005": {
+   "cbsa": "38860",
+   "county": "Cumberland County",
+   "state": "Maine"
+  },
+  "23019": {
+   "cbsa": "12620",
+   "county": "Penobscot County",
+   "state": "Maine"
+  },
+  "23023": {
+   "cbsa": "38860",
+   "county": "Sagadahoc County",
+   "state": "Maine"
+  },
+  "23031": {
+   "cbsa": "38860",
+   "county": "York County",
+   "state": "Maine"
+  },
+  "24003": {
+   "cbsa": "12580",
+   "county": "Anne Arundel County",
+   "state": "Maryland"
+  },
+  "24005": {
+   "cbsa": "12580",
+   "county": "Baltimore County",
+   "state": "Maryland"
+  },
+  "24009": {
+   "cbsa": "30500",
+   "county": "Calvert County",
+   "state": "Maryland"
+  },
+  "24013": {
+   "cbsa": "12580",
+   "county": "Carroll County",
+   "state": "Maryland"
+  },
+  "24015": {
+   "cbsa": "37980",
+   "division": "48864",
+   "county": "Cecil County",
+   "state": "Maryland"
+  },
+  "24017": {
+   "cbsa": "47900",
+   "division": "47764",
+   "county": "Charles County",
+   "state": "Maryland"
+  },
+  "24021": {
+   "cbsa": "47900",
+   "division": "23224",
+   "county": "Frederick County",
+   "state": "Maryland"
+  },
+  "24025": {
+   "cbsa": "12580",
+   "county": "Harford County",
+   "state": "Maryland"
+  },
+  "24027": {
+   "cbsa": "12580",
+   "county": "Howard County",
+   "state": "Maryland"
+  },
+  "24031": {
+   "cbsa": "47900",
+   "division": "23224",
+   "county": "Montgomery County",
+   "state": "Maryland"
+  },
+  "24033": {
+   "cbsa": "47900",
+   "division": "47764",
+   "county": "Prince George's County",
+   "state": "Maryland"
+  },
+  "24035": {
+   "cbsa": "12580",
+   "county": "Queen Anne's County",
+   "state": "Maryland"
+  },
+  "24037": {
+   "cbsa": "30500",
+   "county": "St. Mary's County",
+   "state": "Maryland"
+  },
+  "24039": {
+   "cbsa": "41540",
+   "county": "Somerset County",
+   "state": "Maryland"
+  },
+  "24043": {
+   "cbsa": "25180",
+   "county": "Washington County",
+   "state": "Maryland"
+  },
+  "24045": {
+   "cbsa": "41540",
+   "county": "Wicomico County",
+   "state": "Maryland"
+  },
+  "24510": {
+   "cbsa": "12580",
+   "county": "Baltimore city",
+   "state": "Maryland"
+  },
+  "25001": {
+   "cbsa": "12700",
+   "county": "Barnstable County",
+   "state": "Massachusetts"
+  },
+  "25003": {
+   "cbsa": "38340",
+   "county": "Berkshire County",
+   "state": "Massachusetts"
+  },
+  "25005": {
+   "cbsa": "39300",
+   "county": "Bristol County",
+   "state": "Massachusetts"
+  },
+  "25009": {
+   "cbsa": "14460",
+   "division": "15764",
+   "county": "Essex County",
+   "state": "Massachusetts"
+  },
+  "25013": {
+   "cbsa": "44140",
+   "county": "Hampden County",
+   "state": "Massachusetts"
+  },
+  "25015": {
+   "cbsa": "11200",
+   "county": "Hampshire County",
+   "state": "Massachusetts"
+  },
+  "25017": {
+   "cbsa": "14460",
+   "division": "15764",
+   "county": "Middlesex County",
+   "state": "Massachusetts"
+  },
+  "25021": {
+   "cbsa": "14460",
+   "division": "14454",
+   "county": "Norfolk County",
+   "state": "Massachusetts"
+  },
+  "25023": {
+   "cbsa": "14460",
+   "division": "14454",
+   "county": "Plymouth County",
+   "state": "Massachusetts"
+  },
+  "25025": {
+   "cbsa": "14460",
+   "division": "14454",
+   "county": "Suffolk County",
+   "state": "Massachusetts"
+  },
+  "25027": {
+   "cbsa": "49340",
+   "county": "Worcester County",
+   "state": "Massachusetts"
+  },
+  "26015": {
+   "cbsa": "24340",
+   "county": "Barry County",
+   "state": "Michigan"
+  },
+  "26017": {
+   "cbsa": "13020",
+   "county": "Bay County",
+   "state": "Michigan"
+  },
+  "26019": {
+   "cbsa": "45900",
+   "county": "Benzie County",
+   "state": "Michigan"
+  },
+  "26021": {
+   "cbsa": "35660",
+   "county": "Berrien County",
+   "state": "Michigan"
+  },
+  "26025": {
+   "cbsa": "12980",
+   "county": "Calhoun County",
+   "state": "Michigan"
+  },
+  "26027": {
+   "cbsa": "43780",
+   "county": "Cass County",
+   "state": "Michigan"
+  },
+  "26037": {
+   "cbsa": "29620",
+   "county": "Clinton County",
+   "state": "Michigan"
+  },
+  "26045": {
+   "cbsa": "29620",
+   "county": "Eaton County",
+   "state": "Michigan"
+  },
+  "26049": {
+   "cbsa": "22420",
+   "county": "Genesee County",
+   "state": "Michigan"
+  },
+  "26055": {
+   "cbsa": "45900",
+   "county": "Grand Traverse County",
+   "state": "Michigan"
+  },
+  "26065": {
+   "cbsa": "29620",
+   "county": "Ingham County",
+   "state": "Michigan"
+  },
+  "26067": {
+   "cbsa": "24340",
+   "county": "Ionia County",
+   "state": "Michigan"
+  },
+  "26075": {
+   "cbsa": "27100",
+   "county": "Jackson County",
+   "state": "Michigan"
+  },
+  "26077": {
+   "cbsa": "28020",
+   "county": "Kalamazoo County",
+   "state": "Michigan"
+  },
+  "26079": {
+   "cbsa": "45900",
+   "county": "Kalkaska County",
+   "state": "Michigan"
+  },
+  "26081": {
+   "cbsa": "24340",
+   "county": "Kent County",
+   "state": "Michigan"
+  },
+  "26087": {
+   "cbsa": "19820",
+   "division": "47664",
+   "county": "Lapeer County",
+   "state": "Michigan"
+  },
+  "26089": {
+   "cbsa": "45900",
+   "county": "Leelanau County",
+   "state": "Michigan"
+  },
+  "26093": {
+   "cbsa": "19820",
+   "division": "47664",
+   "county": "Livingston County",
+   "state": "Michigan"
+  },
+  "26099": {
+   "cbsa": "19820",
+   "division": "47664",
+   "county": "Macomb County",
+   "state": "Michigan"
+  },
+  "26111": {
+   "cbsa": "33220",
+   "county": "Midland County",
+   "state": "Michigan"
+  },
+  "26115": {
+   "cbsa": "33780",
+   "county": "Monroe County",
+   "state": "Michigan"
+  },
+  "26117": {
+   "cbsa": "24340",
+   "county": "Montcalm County",
+   "state": "Michigan"
+  },
+  "26121": {
+   "cbsa": "34740",
+   "county": "Muskegon County",
+   "state": "Michigan"
+  },
+  "26125": {
+   "cbsa": "19820",
+   "division": "47664",
+   "county": "Oakland County",
+   "state": "Michigan"
+  },
+  "26139": {
+   "cbsa": "24340",
+   "county": "Ottawa County",
+   "state": "Michigan"
+  },
+  "26145": {
+   "cbsa": "40980",
+   "county": "Saginaw County",
+   "state": "Michigan"
+  },
+  "26147": {
+   "cbsa": "19820",
+   "division": "47664",
+   "county": "St. Clair County",
+   "state": "Michigan"
+  },
+  "26161": {
+   "cbsa": "11460",
+   "county": "Washtenaw County",
+   "state": "Michigan"
+  },
+  "26163": {
+   "cbsa": "19820",
+   "division": "19804",
+   "county": "Wayne County",
+   "state": "Michigan"
+  },
+  "27003": {
+   "cbsa": "33460",
+   "county": "Anoka County",
+   "state": "Minnesota"
+  },
+  "27009": {
+   "cbsa": "41060",
+   "county": "Benton County",
+   "state": "Minnesota"
+  },
+  "27013": {
+   "cbsa": "31860",
+   "county": "Blue Earth County",
+   "state": "Minnesota"
+  },
+  "27017": {
+   "cbsa": "20260",
+   "county": "Carlton County",
+   "state": "Minnesota"
+  },
+  "27019": {
+   "cbsa": "33460",
+   "county": "Carver County",
+   "state": "Minnesota"
+  },
+  "27025": {
+   "cbsa": "33460",
+   "county": "Chisago County",
+   "state": "Minnesota"
+  },
+  "27027": {
+   "cbsa": "22020",
+   "county": "Clay County",
+   "state": "Minnesota"
+  },
+  "27037": {
+   "cbsa": "33460",
+   "county": "Dakota County",
+   "state": "Minnesota"
+  },
+  "27039": {
+   "cbsa": "40340",
+   "county": "Dodge County",
+   "state": "Minnesota"
+  },
+  "27045": {
+   "cbsa": "40340",
+   "county": "Fillmore County",
+   "state": "Minnesota"
+  },
+  "27053": {
+   "cbsa": "33460",
+   "county": "Hennepin County",
+   "state": "Minnesota"
+  },
+  "27055": {
+   "cbsa": "29100",
+   "county": "Houston County",
+   "state": "Minnesota"
+  },
+  "27059": {
+   "cbsa": "33460",
+   "county": "Isanti County",
+   "state": "Minnesota"
+  },
+  "27079": {
+   "cbsa": "33460",
+   "county": "Le Sueur County",
+   "state": "Minnesota"
+  },
+  "27095": {
+   "cbsa": "33460",
+   "county": "Mille Lacs County",
+   "state": "Minnesota"
+  },
+  "27103": {
+   "cbsa": "31860",
+   "county": "Nicollet County",
+   "state": "Minnesota"
+  },
+  "27109": {
+   "cbsa": "40340",
+   "county": "Olmsted County",
+   "state": "Minnesota"
+  },
+  "27119": {
+   "cbsa": "24220",
+   "county": "Polk County",
+   "state": "Minnesota"
+  },
+  "27123": {
+   "cbsa": "33460",
+   "county": "Ramsey County",
+   "state": "Minnesota"
+  },
+  "27133": {
+   "cbsa": "43620",
+   "county": "Rock County",
+   "state": "Minnesota"
+  },
+  "27137": {
+   "cbsa": "20260",
+   "county": "St. Louis County",
+   "state": "Minnesota"
+  },
+  "27139": {
+   "cbsa": "33460",
+   "county": "Scott County",
+   "state": "Minnesota"
+  },
+  "27141": {
+   "cbsa": "33460",
+   "county": "Sherburne County",
+   "state": "Minnesota"
+  },
+  "27145": {
+   "cbsa": "41060",
+   "county": "Stearns County",
+   "state": "Minnesota"
+  },
+  "27157": {
+   "cbsa": "40340",
+   "county": "Wabasha County",
+   "state": "Minnesota"
+  },
+  "27163": {
+   "cbsa": "33460",
+   "county": "Washington County",
+   "state": "Minnesota"
+  },
+  "27171": {
+   "cbsa": "33460",
+   "county": "Wright County",
+   "state": "Minnesota"
+  },
+  "28009": {
+   "cbsa": "32820",
+   "county": "Benton County",
+   "state": "Mississippi"
+  },
+  "28029": {
+   "cbsa": "27140",
+   "county": "Copiah County",
+   "state": "Mississippi"
+  },
+  "28033": {
+   "cbsa": "32820",
+   "county": "DeSoto County",
+   "state": "Mississippi"
+  },
+  "28035": {
+   "cbsa": "25620",
+   "county": "Forrest County",
+   "state": "Mississippi"
+  },
+  "28045": {
+   "cbsa": "25060",
+   "county": "Hancock County",
+   "state": "Mississippi"
+  },
+  "28047": {
+   "cbsa": "25060",
+   "county": "Harrison County",
+   "state": "Mississippi"
+  },
+  "28049": {
+   "cbsa": "27140",
+   "county": "Hinds County",
+   "state": "Mississippi"
+  },
+  "28051": {
+   "cbsa": "27140",
+   "county": "Holmes County",
+   "state": "Mississippi"
+  },
+  "28059": {
+   "cbsa": "25060",
+   "county": "Jackson County",
+   "state": "Mississippi"
+  },
+  "28073": {
+   "cbsa": "25620",
+   "county": "Lamar County",
+   "state": "Mississippi"
+  },
+  "28089": {
+   "cbsa": "27140",
+   "county": "Madison County",
+   "state": "Mississippi"
+  },
+  "28093": {
+   "cbsa": "32820",
+   "county": "Marshall County",
+   "state": "Mississippi"
+  },
+  "28111": {
+   "cbsa": "25620",
+   "county": "Perry County",
+   "state": "Mississippi"
+  },
+  "28121": {
+   "cbsa": "27140",
+   "county": "Rankin County",
+   "state": "Mississippi"
+  },
+  "28123": {
+   "cbsa": "27140",
+   "county": "Scott County",
+   "state": "Mississippi"
+  },
+  "28127": {
+   "cbsa": "27140",
+   "county": "Simpson County",
+   "state": "Mississippi"
+  },
+  "28131": {
+   "cbsa": "25060",
+   "county": "Stone County",
+   "state": "Mississippi"
+  },
+  "28137": {
+   "cbsa": "32820",
+   "county": "Tate County",
+   "state": "Mississippi"
+  },
+  "28143": {
+   "cbsa": "32820",
+   "county": "Tunica County",
+   "state": "Mississippi"
+  },
+  "28163": {
+   "cbsa": "27140",
+   "county": "Yazoo County",
+   "state": "Mississippi"
+  },
+  "29003": {
+   "cbsa": "41140",
+   "county": "Andrew County",
+   "state": "Missouri"
+  },
+  "29013": {
+   "cbsa": "28140",
+   "county": "Bates County",
+   "state": "Missouri"
+  },
+  "29017": {
+   "cbsa": "16020",
+   "county": "Bollinger County",
+   "state": "Missouri"
+  },
+  "29019": {
+   "cbsa": "17860",
+   "county": "Boone County",
+   "state": "Missouri"
+  },
+  "29021": {
+   "cbsa": "41140",
+   "county": "Buchanan County",
+   "state": "Missouri"
+  },
+  "29025": {
+   "cbsa": "28140",
+   "county": "Caldwell County",
+   "state": "Missouri"
+  },
+  "29027": {
+   "cbsa": "27620",
+   "county": "Callaway County",
+   "state": "Missouri"
+  },
+  "29031": {
+   "cbsa": "16020",
+   "county": "Cape Girardeau County",
+   "state": "Missouri"
+  },
+  "29037": {
+   "cbsa": "28140",
+   "county": "Cass County",
+   "state": "Missouri"
+  },
+  "29043": {
+   "cbsa": "44180",
+   "county": "Christian County",
+   "state": "Missouri"
+  },
+  "29047": {
+   "cbsa": "28140",
+   "county": "Clay County",
+   "state": "Missouri"
+  },
+  "29049": {
+   "cbsa": "28140",
+   "county": "Clinton County",
+   "state": "Missouri"
+  },
+  "29051": {
+   "cbsa": "27620",
+   "county": "Cole County",
+   "state": "Missouri"
+  },
+  "29053": {
+   "cbsa": "17860",
+   "county": "Cooper County",
+   "state": "Missouri"
+  },
+  "29059": {
+   "cbsa": "44180",
+   "county": "Dallas County",
+   "state": "Missouri"
+  },
+  "29063": {
+   "cbsa": "41140",
+   "county": "DeKalb County",
+   "state": "Missouri"
+  },
+  "29071": {
+   "cbsa": "41180",
+   "county": "Franklin County",
+   "state": "Missouri"
+  },
+  "29077": {
+   "cbsa": "44180",
+   "county": "Greene County",
+   "state": "Missouri"
+  },
+  "29089": {
+   "cbsa": "17860",
+   "county": "Howard County",
+   "state": "Missouri"
+  },
+  "29095": {
+   "cbsa": "28140",
+   "county": "Jackson County",
+   "state": "Missouri"
+  },
+  "29097": {
+   "cbsa": "27900",
+   "county": "Jasper County",
+   "state": "Missouri"
+  },
+  "29099": {
+   "cbsa": "41180",
+   "county": "Jefferson County",
+   "state": "Missouri"
+  },
+  "29107": {
+   "cbsa": "28140",
+   "county": "Lafayette County",
+   "state": "Missouri"
+  },
+  "29113": {
+   "cbsa": "41180",
+   "county": "Lincoln County",
+   "state": "Missouri"
+  },
+  "29135": {
+   "cbsa": "27620",
+   "county": "Moniteau County",
+   "state": "Missouri"
+  },
+  "29145": {
+   "cbsa": "27900",
+   "county": "Newton County",
+   "state": "Missouri"
+  },
+  "29151": {
+   "cbsa": "27620",
+   "county": "Osage County",
+   "state": "Missouri"
+  },
+  "29165": {
+   "cbsa": "28140",
+   "county": "Platte County",
+   "state": "Missouri"
+  },
+  "29167": {
+   "cbsa": "44180",
+   "county": "Polk County",
+   "state": "Missouri"
+  },
+  "29177": {
+   "cbsa": "28140",
+   "county": "Ray County",
+   "state": "Missouri"
+  },
+  "29183": {
+   "cbsa": "41180",
+   "county": "St. Charles County",
+   "state": "Missouri"
+  },
+  "29189": {
+   "cbsa": "41180",
+   "county": "St. Louis County",
+   "state": "Missouri"
+  },
+  "29219": {
+   "cbsa": "41180",
+   "county": "Warren County",
+   "state": "Missouri"
+  },
+  "29225": {
+   "cbsa": "44180",
+   "county": "Webster County",
+   "state": "Missouri"
+  },
+  "29510": {
+   "cbsa": "41180",
+   "county": "St. Louis city",
+   "state": "Missouri"
+  },
+  "30007": {
+   "cbsa": "25740",
+   "county": "Broadwater County",
+   "state": "Montana"
+  },
+  "30009": {
+   "cbsa": "13740",
+   "county": "Carbon County",
+   "state": "Montana"
+  },
+  "30013": {
+   "cbsa": "24500",
+   "county": "Cascade County",
+   "state": "Montana"
+  },
+  "30031": {
+   "cbsa": "14580",
+   "county": "Gallatin County",
+   "state": "Montana"
+  },
+  "30043": {
+   "cbsa": "25740",
+   "county": "Jefferson County",
+   "state": "Montana"
+  },
+  "30049": {
+   "cbsa": "25740",
+   "county": "Lewis and Clark County",
+   "state": "Montana"
+  },
+  "30061": {
+   "cbsa": "33540",
+   "county": "Mineral County",
+   "state": "Montana"
+  },
+  "30063": {
+   "cbsa": "33540",
+   "county": "Missoula County",
+   "state": "Montana"
+  },
+  "30095": {
+   "cbsa": "13740",
+   "county": "Stillwater County",
+   "state": "Montana"
+  },
+  "30111": {
+   "cbsa": "13740",
+   "county": "Yellowstone County",
+   "state": "Montana"
+  },
+  "31025": {
+   "cbsa": "36540",
+   "county": "Cass County",
+   "state": "Nebraska"
+  },
+  "31043": {
+   "cbsa": "43580",
+   "county": "Dakota County",
+   "state": "Nebraska"
+  },
+  "31055": {
+   "cbsa": "36540",
+   "county": "Douglas County",
+   "state": "Nebraska"
+  },
+  "31079": {
+   "cbsa": "24260",
+   "county": "Hall County",
+   "state": "Nebraska"
+  },
+  "31093": {
+   "cbsa": "24260",
+   "county": "Howard County",
+   "state": "Nebraska"
+  },
+  "31109": {
+   "cbsa": "30700",
+   "county": "Lancaster County",
+   "state": "Nebraska"
+  },
+  "31121": {
+   "cbsa": "24260",
+   "county": "Merrick County",
+   "state": "Nebraska"
+  },
+  "31153": {
+   "cbsa": "36540",
+   "county": "Sarpy County",
+   "state": "Nebraska"
+  },
+  "31155": {
+   "cbsa": "36540",
+   "county": "Saunders County",
+   "state": "Nebraska"
+  },
+  "31159": {
+   "cbsa": "30700",
+   "county": "Seward County",
+   "state": "Nebraska"
+  },
+  "31177": {
+   "cbsa": "36540",
+   "county": "Washington County",
+   "state": "Nebraska"
+  },
+  "32003": {
+   "cbsa": "29820",
+   "county": "Clark County",
+   "state": "Nevada"
+  },
+  "32019": {
+   "cbsa": "39900",
+   "county": "Lyon County",
+   "state": "Nevada"
+  },
+  "32029": {
+   "cbsa": "39900",
+   "county": "Storey County",
+   "state": "Nevada"
+  },
+  "32031": {
+   "cbsa": "39900",
+   "county": "Washoe County",
+   "state": "Nevada"
+  },
+  "32510": {
+   "cbsa": "16180",
+   "county": "Carson City",
+   "state": "Nevada"
+  },
+  "33011": {
+   "cbsa": "31700",
+   "county": "Hillsborough County",
+   "state": "New Hampshire"
+  },
+  "33015": {
+   "cbsa": "14460",
+   "division": "40484",
+   "county": "Rockingham County",
+   "state": "New Hampshire"
+  },
+  "33017": {
+   "cbsa": "14460",
+   "division": "40484",
+   "county": "Strafford County",
+   "state": "New Hampshire"
+  },
+  "34001": {
+   "cbsa": "12100",
+   "county": "Atlantic County",
+   "state": "New Jersey"
+  },
+  "34003": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Bergen County",
+   "state": "New Jersey"
+  },
+  "34005": {
+   "cbsa": "37980",
+   "division": "15804",
+   "county": "Burlington County",
+   "state": "New Jersey"
+  },
+  "34007": {
+   "cbsa": "37980",
+   "division": "15804",
+   "county": "Camden County",
+   "state": "New Jersey"
+  },
+  "34009": {
+   "cbsa": "12100",
+   "county": "Cape May County",
+   "state": "New Jersey"
+  },
+  "34011": {
+   "cbsa": "47220",
+   "county": "Cumberland County",
+   "state": "New Jersey"
+  },
+  "34013": {
+   "cbsa": "35620",
+   "division": "35084",
+   "county": "Essex County",
+   "state": "New Jersey"
+  },
+  "34015": {
+   "cbsa": "37980",
+   "division": "15804",
+   "county": "Gloucester County",
+   "state": "New Jersey"
+  },
+  "34017": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Hudson County",
+   "state": "New Jersey"
+  },
+  "34019": {
+   "cbsa": "35620",
+   "division": "35084",
+   "county": "Hunterdon County",
+   "state": "New Jersey"
+  },
+  "34021": {
+   "cbsa": "45940",
+   "county": "Mercer County",
+   "state": "New Jersey"
+  },
+  "34023": {
+   "cbsa": "35620",
+   "division": "29484",
+   "county": "Middlesex County",
+   "state": "New Jersey"
+  },
+  "34025": {
+   "cbsa": "35620",
+   "division": "29484",
+   "county": "Monmouth County",
+   "state": "New Jersey"
+  },
+  "34027": {
+   "cbsa": "35620",
+   "division": "35084",
+   "county": "Morris County",
+   "state": "New Jersey"
+  },
+  "34029": {
+   "cbsa": "35620",
+   "division": "29484",
+   "county": "Ocean County",
+   "state": "New Jersey"
+  },
+  "34031": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Passaic County",
+   "state": "New Jersey"
+  },
+  "34033": {
+   "cbsa": "37980",
+   "division": "48864",
+   "county": "Salem County",
+   "state": "New Jersey"
+  },
+  "34035": {
+   "cbsa": "35620",
+   "division": "29484",
+   "county": "Somerset County",
+   "state": "New Jersey"
+  },
+  "34037": {
+   "cbsa": "35620",
+   "division": "35084",
+   "county": "Sussex County",
+   "state": "New Jersey"
+  },
+  "34039": {
+   "cbsa": "35620",
+   "division": "35084",
+   "county": "Union County",
+   "state": "New Jersey"
+  },
+  "34041": {
+   "cbsa": "10900",
+   "county": "Warren County",
+   "state": "New Jersey"
+  },
+  "35001": {
+   "cbsa": "10740",
+   "county": "Bernalillo County",
+   "state": "New Mexico"
+  },
+  "35013": {
+   "cbsa": "29740",
+   "county": "Doña Ana County",
+   "state": "New Mexico"
+  },
+  "35043": {
+   "cbsa": "10740",
+   "county": "Sandoval County",
+   "state": "New Mexico"
+  },
+  "35045": {
+   "cbsa": "22140",
+   "county": "San Juan County",
+   "state": "New Mexico"
+  },
+  "35049": {
+   "cbsa": "42140",
+   "county": "Santa Fe County",
+   "state": "New Mexico"
+  },
+  "35057": {
+   "cbsa": "10740",
+   "county": "Torrance County",
+   "state": "New Mexico"
+  },
+  "35061": {
+   "cbsa": "10740",
+   "county": "Valencia County",
+   "state": "New Mexico"
+  },
+  "36001": {
+   "cbsa": "10580",
+   "county": "Albany County",
+   "state": "New York"
+  },
+  "36005": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Bronx County",
+   "state": "New York"
+  },
+  "36007": {
+   "cbsa": "13780",
+   "county": "Broome County",
+   "state": "New York"
+  },
+  "36015": {
+   "cbsa": "21300",
+   "county": "Chemung County",
+   "state": "New York"
+  },
+  "36027": {
+   "cbsa": "28880",
+   "county": "Dutchess County",
+   "state": "New York"
+  },
+  "36029": {
+   "cbsa": "15380",
+   "county": "Erie County",
+   "state": "New York"
+  },
+  "36043": {
+   "cbsa": "46540",
+   "county": "Herkimer County",
+   "state": "New York"
+  },
+  "36045": {
+   "cbsa": "48060",
+   "county": "Jefferson County",
+   "state": "New York"
+  },
+  "36047": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Kings County",
+   "state": "New York"
+  },
+  "36051": {
+   "cbsa": "40380",
+   "county": "Livingston County",
+   "state": "New York"
+  },
+  "36053": {
+   "cbsa": "45060",
+   "county": "Madison County",
+   "state": "New York"
+  },
+  "36055": {
+   "cbsa": "40380",
+   "county": "Monroe County",
+   "state": "New York"
+  },
+  "36059": {
+   "cbsa": "35620",
+   "division": "35004",
+   "county": "Nassau County",
+   "state": "New York"
+  },
+  "36061": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "New York County",
+   "state": "New York"
+  },
+  "36063": {
+   "cbsa": "15380",
+   "county": "Niagara County",
+   "state": "New York"
+  },
+  "36065": {
+   "cbsa": "46540",
+   "county": "Oneida County",
+   "state": "New York"
+  },
+  "36067": {
+   "cbsa": "45060",
+   "county": "Onondaga County",
+   "state": "New York"
+  },
+  "36069": {
+   "cbsa": "40380",
+   "county": "Ontario County",
+   "state": "New York"
+  },
+  "36071": {
+   "cbsa": "28880",
+   "county": "Orange County",
+   "state": "New York"
+  },
+  "36073": {
+   "cbsa": "40380",
+   "county": "Orleans County",
+   "state": "New York"
+  },
+  "36075": {
+   "cbsa": "45060",
+   "county": "Oswego County",
+   "state": "New York"
+  },
+  "36079": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Putnam County",
+   "state": "New York"
+  },
+  "36081": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Queens County",
+   "state": "New York"
+  },
+  "36083": {
+   "cbsa": "10580",
+   "county": "Rensselaer County",
+   "state": "New York"
+  },
+  "36085": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Richmond County",
+   "state": "New York"
+  },
+  "36087": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Rockland County",
+   "state": "New York"
+  },
+  "36091": {
+   "cbsa": "10580",
+   "county": "Saratoga County",
+   "state": "New York"
+  },
+  "36093": {
+   "cbsa": "10580",
+   "county": "Schenectady County",
+   "state": "New York"
+  },
+  "36095": {
+   "cbsa": "10580",
+   "county": "Schoharie County",
+   "state": "New York"
+  },
+  "36103": {
+   "cbsa": "35620",
+   "division": "35004",
+   "county": "Suffolk County",
+   "state": "New York"
+  },
+  "36107": {
+   "cbsa": "13780",
+   "county": "Tioga County",
+   "state": "New York"
+  },
+  "36109": {
+   "cbsa": "27060",
+   "county": "Tompkins County",
+   "state": "New York"
+  },
+  "36111": {
+   "cbsa": "28740",
+   "county": "Ulster County",
+   "state": "New York"
+  },
+  "36113": {
+   "cbsa": "24020",
+   "county": "Warren County",
+   "state": "New York"
+  },
+  "36115": {
+   "cbsa": "24020",
+   "county": "Washington County",
+   "state": "New York"
+  },
+  "36117": {
+   "cbsa": "40380",
+   "county": "Wayne County",
+   "state": "New York"
+  },
+  "36119": {
+   "cbsa": "35620",
+   "division": "35614",
+   "county": "Westchester County",
+   "state": "New York"
+  },
+  "37001": {
+   "cbsa": "15500",
+   "county": "Alamance County",
+   "state": "North Carolina"
+  },
+  "37003": {
+   "cbsa": "25860",
+   "county": "Alexander County",
+   "state": "North Carolina"
+  },
+  "37007": {
+   "cbsa": "16740",
+   "county": "Anson County",
+   "state": "North Carolina"
+  },
+  "37019": {
+   "cbsa": "48900",
+   "county": "Brunswick County",
+   "state": "North Carolina"
+  },
+  "37021": {
+   "cbsa": "11700",
+   "county": "Buncombe County",
+   "state": "North Carolina"
+  },
+  "37023": {
+   "cbsa": "25860",
+   "county": "Burke County",
+   "state": "North Carolina"
+  },
+  "37025": {
+   "cbsa": "16740",
+   "county": "Cabarrus County",
+   "state": "North Carolina"
+  },
+  "37027": {
+   "cbsa": "25860",
+   "county": "Caldwell County",
+   "state": "North Carolina"
+  },
+  "37029": {
+   "cbsa": "47260",
+   "county": "Camden County",
+   "state": "North Carolina"
+  },
+  "37035": {
+   "cbsa": "25860",
+   "county": "Catawba County",
+   "state": "North Carolina"
+  },
+  "37037": {
+   "cbsa": "20500",
+   "county": "Chatham County",
+   "state": "North Carolina"
+  },
+  "37051": {
+   "cbsa": "22180",
+   "county": "Cumberland County",
+   "state": "North Carolina"
+  },
+  "37053": {
+   "cbsa": "47260",
+   "county": "Currituck County",
+   "state": "North Carolina"
+  },
+  "37057": {
+   "cbsa": "49180",
+   "county": "Davidson County",
+   "state": "North Carolina"
+  },
+  "37059": {
+   "cbsa": "49180",
+   "county": "Davie County",
+   "state": "North Carolina"
+  },
+  "37063": {
+   "cbsa": "20500",
+   "county": "Durham County",
+   "state": "North Carolina"
+  },
+  "37065": {
+   "cbsa": "40580",
+   "county": "Edgecombe County",
+   "state": "North Carolina"
+  },
+  "37067": {
+   "cbsa": "49180",
+   "county": "Forsyth County",
+   "state": "North Carolina"
+  },
+  "37069": {
+   "cbsa": "39580",
+   "county": "Franklin County",
+   "state": "North Carolina"
+  },
+  "37071": {
+   "cbsa": "16740",
+   "county": "Gaston County",
+   "state": "North Carolina"
+  },
+  "37073": {
+   "cbsa": "47260",
+   "county": "Gates County",
+   "state": "North Carolina"
+  },
+  "37081": {
+   "cbsa": "24660",
+   "county": "Guilford County",
+   "state": "North Carolina"
+  },
+  "37089": {
+   "cbsa": "11700",
+   "county": "Henderson County",
+   "state": "North Carolina"
+  },
+  "37093": {
+   "cbsa": "22180",
+   "county": "Hoke County",
+   "state": "North Carolina"
+  },
+  "37097": {
+   "cbsa": "16740",
+   "county": "Iredell County",
+   "state": "North Carolina"
+  },
+  "37101": {
+   "cbsa": "39580",
+   "county": "Johnston County",
+   "state": "North Carolina"
+  },
+  "37109": {
+   "cbsa": "16740",
+   "county": "Lincoln County",
+   "state": "North Carolina"
+  },
+  "37115": {
+   "cbsa": "11700",
+   "county": "Madison County",
+   "state": "North Carolina"
+  },
+  "37119": {
+   "cbsa": "16740",
+   "county": "Mecklenburg County",
+   "state": "North Carolina"
+  },
+  "37125": {
+   "cbsa": "38240",
+   "county": "Moore County",
+   "state": "North Carolina"
+  },
+  "37127": {
+   "cbsa": "40580",
+   "county": "Nash County",
+   "state": "North Carolina"
+  },
+  "37129": {
+   "cbsa": "48900",
+   "county": "New Hanover County",
+   "state": "North Carolina"
+  },
+  "37133": {
+   "cbsa": "27340",
+   "county": "Onslow County",
+   "state": "North Carolina"
+  },
+  "37135": {
+   "cbsa": "20500",
+   "county": "Orange County",
+   "state": "North Carolina"
+  },
+  "37141": {
+   "cbsa": "48900",
+   "county": "Pender County",
+   "state": "North Carolina"
+  },
+  "37145": {
+   "cbsa": "20500",
+   "county": "Person County",
+   "state": "North Carolina"
+  },
+  "37147": {
+   "cbsa": "24780",
+   "county": "Pitt County",
+   "state": "North Carolina"
+  },
+  "37151": {
+   "cbsa": "24660",
+   "county": "Randolph County",
+   "state": "North Carolina"
+  },
+  "37157": {
+   "cbsa": "24660",
+   "county": "Rockingham County",
+   "state": "North Carolina"
+  },
+  "37159": {
+   "cbsa": "16740",
+   "county": "Rowan County",
+   "state": "North Carolina"
+  },
+  "37169": {
+   "cbsa": "49180",
+   "county": "Stokes County",
+   "state": "North Carolina"
+  },
+  "37179": {
+   "cbsa": "16740",
+   "county": "Union County",
+   "state": "North Carolina"
+  },
+  "37183": {
+   "cbsa": "39580",
+   "county": "Wake County",
+   "state": "North Carolina"
+  },
+  "37191": {
+   "cbsa": "24140",
+   "county": "Wayne County",
+   "state": "North Carolina"
+  },
+  "37197": {
+   "cbsa": "49180",
+   "county": "Yadkin County",
+   "state": "North Carolina"
+  },
+  "38015": {
+   "cbsa": "13900",
+   "county": "Burleigh County",
+   "state": "North Dakota"
+  },
+  "38017": {
+   "cbsa": "22020",
+   "county": "Cass County",
+   "state": "North Dakota"
+  },
+  "38035": {
+   "cbsa": "24220",
+   "county": "Grand Forks County",
+   "state": "North Dakota"
+  },
+  "38049": {
+   "cbsa": "33500",
+   "county": "McHenry County",
+   "state": "North Dakota"
+  },
+  "38059": {
+   "cbsa": "13900",
+   "county": "Morton County",
+   "state": "North Dakota"
+  },
+  "38065": {
+   "cbsa": "13900",
+   "county": "Oliver County",
+   "state": "North Dakota"
+  },
+  "38075": {
+   "cbsa": "33500",
+   "county": "Renville County",
+   "state": "North Dakota"
+  },
+  "38101": {
+   "cbsa": "33500",
+   "county": "Ward County",
+   "state": "North Dakota"
+  },
+  "39003": {
+   "cbsa": "30620",
+   "county": "Allen County",
+   "state": "Ohio"
+  },
+  "39007": {
+   "cbsa": "17410",
+   "county": "Ashtabula County",
+   "state": "Ohio"
+  },
+  "39013": {
+   "cbsa": "48540",
+   "county": "Belmont County",
+   "state": "Ohio"
+  },
+  "39015": {
+   "cbsa": "17140",
+   "county": "Brown County",
+   "state": "Ohio"
+  },
+  "39017": {
+   "cbsa": "17140",
+   "county": "Butler County",
+   "state": "Ohio"
+  },
+  "39019": {
+   "cbsa": "15940",
+   "county": "Carroll County",
+   "state": "Ohio"
+  },
+  "39023": {
+   "cbsa": "44220",
+   "county": "Clark County",
+   "state": "Ohio"
+  },
+  "39025": {
+   "cbsa": "17140",
+   "county": "Clermont County",
+   "state": "Ohio"
+  },
+  "39035": {
+   "cbsa": "17410",
+   "county": "Cuyahoga County",
+   "state": "Ohio"
+  },
+  "39041": {
+   "cbsa": "18140",
+   "county": "Delaware County",
+   "state": "Ohio"
+  },
+  "39043": {
+   "cbsa": "41780",
+   "county": "Erie County",
+   "state": "Ohio"
+  },
+  "39045": {
+   "cbsa": "18140",
+   "county": "Fairfield County",
+   "state": "Ohio"
+  },
+  "39049": {
+   "cbsa": "18140",
+   "county": "Franklin County",
+   "state": "Ohio"
+  },
+  "39051": {
+   "cbsa": "45780",
+   "county": "Fulton County",
+   "state": "Ohio"
+  },
+  "39055": {
+   "cbsa": "17410",
+   "county": "Geauga County",
+   "state": "Ohio"
+  },
+  "39057": {
+   "cbsa": "19430",
+   "county": "Greene County",
+   "state": "Ohio"
+  },
+  "39061": {
+   "cbsa": "17140",
+   "county": "Hamilton County",
+   "state": "Ohio"
+  },
+  "39073": {
+   "cbsa": "18140",
+   "county": "Hocking County",
+   "state": "Ohio"
+  },
+  "39081": {
+   "cbsa": "48260",
+   "county": "Jefferson County",
+   "state": "Ohio"
+  },
+  "39085": {
+   "cbsa": "17410",
+   "county": "Lake County",
+   "state": "Ohio"
+  },
+  "39087": {
+   "cbsa": "26580",
+   "county": "Lawrence County",
+   "state": "Ohio"
+  },
+  "39089": {
+   "cbsa": "18140",
+   "county": "Licking County",
+   "state": "Ohio"
+  },
+  "39093": {
+   "cbsa": "17410",
+   "county": "Lorain County",
+   "state": "Ohio"
+  },
+  "39095": {
+   "cbsa": "45780",
+   "county": "Lucas County",
+   "state": "Ohio"
+  },
+  "39097": {
+   "cbsa": "18140",
+   "county": "Madison County",
+   "state": "Ohio"
+  },
+  "39099": {
+   "cbsa": "49660",
+   "county": "Mahoning County",
+   "state": "Ohio"
+  },
+  "39103": {
+   "cbsa": "17410",
+   "county": "Medina County",
+   "state": "Ohio"
+  },
+  "39109": {
+   "cbsa": "19430",
+   "county": "Miami County",
+   "state": "Ohio"
+  },
+  "39113": {
+   "cbsa": "19430",
+   "county": "Montgomery County",
+   "state": "Ohio"
+  },
+  "39117": {
+   "cbsa": "18140",
+   "county": "Morrow County",
+   "state": "Ohio"
+  },
+  "39123": {
+   "cbsa": "41780",
+   "county": "Ottawa County",
+   "state": "Ohio"
+  },
+  "39127": {
+   "cbsa": "18140",
+   "county": "Perry County",
+   "state": "Ohio"
+  },
+  "39129": {
+   "cbsa": "18140",
+   "county": "Pickaway County",
+   "state": "Ohio"
+  },
+  "39133": {
+   "cbsa": "10420",
+   "county": "Portage County",
+   "state": "Ohio"
+  },
+  "39139": {
+   "cbsa": "31900",
+   "county": "Richland County",
+   "state": "Ohio"
+  },
+  "39151": {
+   "cbsa": "15940",
+   "county": "Stark County",
+   "state": "Ohio"
+  },
+  "39153": {
+   "cbsa": "10420",
+   "county": "Summit County",
+   "state": "Ohio"
+  },
+  "39155": {
+   "cbsa": "49660",
+   "county": "Trumbull County",
+   "state": "Ohio"
+  },
+  "39159": {
+   "cbsa": "18140",
+   "county": "Union County",
+   "state": "Ohio"
+  },
+  "39165": {
+   "cbsa": "17140",
+   "county": "Warren County",
+   "state": "Ohio"
+  },
+  "39173": {
+   "cbsa": "45780",
+   "county": "Wood County",
+   "state": "Ohio"
+  },
+  "40017": {
+   "cbsa": "36420",
+   "county": "Canadian County",
+   "state": "Oklahoma"
+  },
+  "40027": {
+   "cbsa": "36420",
+   "county": "Cleveland County",
+   "state": "Oklahoma"
+  },
+  "40031": {
+   "cbsa": "30020",
+   "county": "Comanche County",
+   "state": "Oklahoma"
+  },
+  "40033": {
+   "cbsa": "30020",
+   "county": "Cotton County",
+   "state": "Oklahoma"
+  },
+  "40037": {
+   "cbsa": "46140",
+   "county": "Creek County",
+   "state": "Oklahoma"
+  },
+  "40047": {
+   "cbsa": "21420",
+   "county": "Garfield County",
+   "state": "Oklahoma"
+  },
+  "40051": {
+   "cbsa": "36420",
+   "county": "Grady County",
+   "state": "Oklahoma"
+  },
+  "40081": {
+   "cbsa": "36420",
+   "county": "Lincoln County",
+   "state": "Oklahoma"
+  },
+  "40083": {
+   "cbsa": "36420",
+   "county": "Logan County",
+   "state": "Oklahoma"
+  },
+  "40087": {
+   "cbsa": "36420",
+   "county": "McClain County",
+   "state": "Oklahoma"
+  },
+  "40109": {
+   "cbsa": "36420",
+   "county": "Oklahoma County",
+   "state": "Oklahoma"
+  },
+  "40111": {
+   "cbsa": "46140",
+   "county": "Okmulgee County",
+   "state": "Oklahoma"
+  },
+  "40113": {
+   "cbsa": "46140",
+   "county": "Osage County",
+   "state": "Oklahoma"
+  },
+  "40117": {
+   "cbsa": "46140",
+   "county": "Pawnee County",
+   "state": "Oklahoma"
+  },
+  "40131": {
+   "cbsa": "46140",
+   "county": "Rogers County",
+   "state": "Oklahoma"
+  },
+  "40135": {
+   "cbsa": "22900",
+   "county": "Sequoyah County",
+   "state": "Oklahoma"
+  },
+  "40143": {
+   "cbsa": "46140",
+   "county": "Tulsa County",
+   "state": "Oklahoma"
+  },
+  "40145": {
+   "cbsa": "46140",
+   "county": "Wagoner County",
+   "state": "Oklahoma"
+  },
+  "41003": {
+   "cbsa": "18700",
+   "county": "Benton County",
+   "state": "Oregon"
+  },
+  "41005": {
+   "cbsa": "38900",
+   "county": "Clackamas County",
+   "state": "Oregon"
+  },
+  "41009": {
+   "cbsa": "38900",
+   "county": "Columbia County",
+   "state": "Oregon"
+  },
+  "41013": {
+   "cbsa": "13460",
+   "county": "Crook County",
+   "state": "Oregon"
+  },
+  "41017": {
+   "cbsa": "13460",
+   "county": "Deschutes County",
+   "state": "Oregon"
+  },
+  "41029": {
+   "cbsa": "32780",
+   "county": "Jackson County",
+   "state": "Oregon"
+  },
+  "41031": {
+   "cbsa": "13460",
+   "county": "Jefferson County",
+   "state": "Oregon"
+  },
+  "41033": {
+   "cbsa": "24420",
+   "county": "Josephine County",
+   "state": "Oregon"
+  },
+  "41039": {
+   "cbsa": "21660",
+   "county": "Lane County",
+   "state": "Oregon"
+  },
+  "41043": {
+   "cbsa": "10540",
+   "county": "Linn County",
+   "state": "Oregon"
+  },
+  "41047": {
+   "cbsa": "41420",
+   "county": "Marion County",
+   "state": "Oregon"
+  },
+  "41051": {
+   "cbsa": "38900",
+   "county": "Multnomah County",
+   "state": "Oregon"
+  },
+  "41053": {
+   "cbsa": "41420",
+   "county": "Polk County",
+   "state": "Oregon"
+  },
+  "41067": {
+   "cbsa": "38900",
+   "county": "Washington County",
+   "state": "Oregon"
+  },
+  "41071": {
+   "cbsa": "38900",
+   "county": "Yamhill County",
+   "state": "Oregon"
+  },
+  "42001": {
+   "cbsa": "23900",
+   "county": "Adams County",
+   "state": "Pennsylvania"
+  },
+  "42003": {
+   "cbsa": "38300",
+   "county": "Allegheny County",
+   "state": "Pennsylvania"
+  },
+  "42005": {
+   "cbsa": "38300",
+   "county": "Armstrong County",
+   "state": "Pennsylvania"
+  },
+  "42007": {
+   "cbsa": "38300",
+   "county": "Beaver County",
+   "state": "Pennsylvania"
+  },
+  "42011": {
+   "cbsa": "39740",
+   "county": "Berks County",
+   "state": "Pennsylvania"
+  },
+  "42013": {
+   "cbsa": "11020",
+   "county": "Blair County",
+   "state": "Pennsylvania"
+  },
+  "42017": {
+   "cbsa": "37980",
+   "division": "33874",
+   "county": "Bucks County",
+   "state": "Pennsylvania"
+  },
+  "42019": {
+   "cbsa": "38300",
+   "county": "Butler County",
+   "state": "Pennsylvania"
+  },
+  "42021": {
+   "cbsa": "27780",
+   "county": "Cambria County",
+   "state": "Pennsylvania"
+  },
+  "42025": {
+   "cbsa": "10900",
+   "county": "Carbon County",
+   "state": "Pennsylvania"
+  },
+  "42027": {
+   "cbsa": "44300",
+   "county": "Centre County",
+   "state": "Pennsylvania"
+  },
+  "42029": {
+   "cbsa": "37980",
+   "division": "33874",
+   "county": "Chester County",
+   "state": "Pennsylvania"
+  },
+  "42041": {
+   "cbsa": "25420",
+   "county": "Cumberland County",
+   "state": "Pennsylvania"
+  },
+  "42043": {
+   "cbsa": "25420",
+   "county": "Dauphin County",
+   "state": "Pennsylvania"
+  },
+  "42045": {
+   "cbsa": "37980",
+   "division": "37964",
+   "county": "Delaware County",
+   "state": "Pennsylvania"
+  },
+  "42049": {
+   "cbsa": "21500",
+   "county": "Erie County",
+   "state": "Pennsylvania"
+  },
+  "42051": {
+   "cbsa": "38300",
+   "county": "Fayette County",
+   "state": "Pennsylvania"
+  },
+  "42055": {
+   "cbsa": "16540",
+   "county": "Franklin County",
+   "state": "Pennsylvania"
+  },
+  "42069": {
+   "cbsa": "42540",
+   "county": "Lackawanna County",
+   "state": "Pennsylvania"
+  },
+  "42071": {
+   "cbsa": "29540",
+   "county": "Lancaster County",
+   "state": "Pennsylvania"
+  },
+  "42073": {
+   "cbsa": "38300",
+   "county": "Lawrence County",
+   "state": "Pennsylvania"
+  },
+  "42075": {
+   "cbsa": "30140",
+   "county": "Lebanon County",
+   "state": "Pennsylvania"
+  },
+  "42077": {
+   "cbsa": "10900",
+   "county": "Lehigh County",
+   "state": "Pennsylvania"
+  },
+  "42079": {
+   "cbsa": "42540",
+   "county": "Luzerne County",
+   "state": "Pennsylvania"
+  },
+  "42081": {
+   "cbsa": "48700",
+   "county": "Lycoming County",
+   "state": "Pennsylvania"
+  },
+  "42091": {
+   "cbsa": "37980",
+   "division": "33874",
+   "county": "Montgomery County",
+   "state": "Pennsylvania"
+  },
+  "42095": {
+   "cbsa": "10900",
+   "county": "Northampton County",
+   "state": "Pennsylvania"
+  },
+  "42099": {
+   "cbsa": "25420",
+   "county": "Perry County",
+   "state": "Pennsylvania"
+  },
+  "42101": {
+   "cbsa": "37980",
+   "division": "37964",
+   "county": "Philadelphia County",
+   "state": "Pennsylvania"
+  },
+  "42125": {
+   "cbsa": "38300",
+   "county": "Washington County",
+   "state": "Pennsylvania"
+  },
+  "42129": {
+   "cbsa": "38300",
+   "county": "Westmoreland County",
+   "state": "Pennsylvania"
+  },
+  "42131": {
+   "cbsa": "42540",
+   "county": "Wyoming County",
+   "state": "Pennsylvania"
+  },
+  "42133": {
+   "cbsa": "49620",
+   "county": "York County",
+   "state": "Pennsylvania"
+  },
+  "44001": {
+   "cbsa": "39300",
+   "county": "Bristol County",
+   "state": "Rhode Island"
+  },
+  "44003": {
+   "cbsa": "39300",
+   "county": "Kent County",
+   "state": "Rhode Island"
+  },
+  "44005": {
+   "cbsa": "39300",
+   "county": "Newport County",
+   "state": "Rhode Island"
+  },
+  "44007": {
+   "cbsa": "39300",
+   "county": "Providence County",
+   "state": "Rhode Island"
+  },
+  "44009": {
+   "cbsa": "39300",
+   "county": "Washington County",
+   "state": "Rhode Island"
+  },
+  "45003": {
+   "cbsa": "12260",
+   "county": "Aiken County",
+   "state": "South Carolina"
+  },
+  "45007": {
+   "cbsa": "24860",
+   "county": "Anderson County",
+   "state": "South Carolina"
+  },
+  "45013": {
+   "cbsa": "25940",
+   "county": "Beaufort County",
+   "state": "South Carolina"
+  },
+  "45015": {
+   "cbsa": "16700",
+   "county": "Berkeley County",
+   "state": "South Carolina"
+  },
+  "45017": {
+   "cbsa": "17900",
+   "county": "Calhoun County",
+   "state": "South Carolina"
+  },
+  "45019": {
+   "cbsa": "16700",
+   "county": "Charleston County",
+   "state": "South Carolina"
+  },
+  "45023": {
+   "cbsa": "16740",
+   "county": "Chester County",
+   "state": "South Carolina"
+  },
+  "45031": {
+   "cbsa": "22500",
+   "county": "Darlington County",
+   "state": "South Carolina"
+  },
+  "45035": {
+   "cbsa": "16700",
+   "county": "Dorchester County",
+   "state": "South Carolina"
+  },
+  "45037": {
+   "cbsa": "12260",
+   "county": "Edgefield County",
+   "state": "South Carolina"
+  },
+  "45039": {
+   "cbsa": "17900",
+   "county": "Fairfield County",
+   "state": "South Carolina"
+  },
+  "45041": {
+   "cbsa": "22500",
+   "county": "Florence County",
+   "state": "South Carolina"
+  },
+  "45045": {
+   "cbsa": "24860",
+   "county": "Greenville County",
+   "state": "South Carolina"
+  },
+  "45051": {
+   "cbsa": "34820",
+   "county": "Horry County",
+   "state": "South Carolina"
+  },
+  "45053": {
+   "cbsa": "25940",
+   "county": "Jasper County",
+   "state": "South Carolina"
+  },
+  "45055": {
+   "cbsa": "17900",
+   "county": "Kershaw County",
+   "state": "South Carolina"
+  },
+  "45057": {
+   "cbsa": "16740",
+   "county": "Lancaster County",
+   "state": "South Carolina"
+  },
+  "45059": {
+   "cbsa": "24860",
+   "county": "Laurens County",
+   "state": "South Carolina"
+  },
+  "45063": {
+   "cbsa": "17900",
+   "county": "Lexington County",
+   "state": "South Carolina"
+  },
+  "45077": {
+   "cbsa": "24860",
+   "county": "Pickens County",
+   "state": "South Carolina"
+  },
+  "45079": {
+   "cbsa": "17900",
+   "county": "Richland County",
+   "state": "South Carolina"
+  },
+  "45081": {
+   "cbsa": "17900",
+   "county": "Saluda County",
+   "state": "South Carolina"
+  },
+  "45083": {
+   "cbsa": "43900",
+   "county": "Spartanburg County",
+   "state": "South Carolina"
+  },
+  "45085": {
+   "cbsa": "44940",
+   "county": "Sumter County",
+   "state": "South Carolina"
+  },
+  "45087": {
+   "cbsa": "43900",
+   "county": "Union County",
+   "state": "South Carolina"
+  },
+  "45091": {
+   "cbsa": "16740",
+   "county": "York County",
+   "state": "South Carolina"
+  },
+  "46033": {
+   "cbsa": "39660",
+   "county": "Custer County",
+   "state": "South Dakota"
+  },
+  "46083": {
+   "cbsa": "43620",
+   "county": "Lincoln County",
+   "state": "South Dakota"
+  },
+  "46087": {
+   "cbsa": "43620",
+   "county": "McCook County",
+   "state": "South Dakota"
+  },
+  "46093": {
+   "cbsa": "39660",
+   "county": "Meade County",
+   "state": "South Dakota"
+  },
+  "46099": {
+   "cbsa": "43620",
+   "county": "Minnehaha County",
+   "state": "South Dakota"
+  },
+  "46103": {
+   "cbsa": "39660",
+   "county": "Pennington County",
+   "state": "South Dakota"
+  },
+  "46125": {
+   "cbsa": "43620",
+   "county": "Turner County",
+   "state": "South Dakota"
+  },
+  "46127": {
+   "cbsa": "43580",
+   "county": "Union County",
+   "state": "South Dakota"
+  },
+  "47001": {
+   "cbsa": "28940",
+   "county": "Anderson County",
+   "state": "Tennessee"
+  },
+  "47009": {
+   "cbsa": "28940",
+   "county": "Blount County",
+   "state": "Tennessee"
+  },
+  "47011": {
+   "cbsa": "17420",
+   "county": "Bradley County",
+   "state": "Tennessee"
+  },
+  "47013": {
+   "cbsa": "28940",
+   "county": "Campbell County",
+   "state": "Tennessee"
+  },
+  "47015": {
+   "cbsa": "34980",
+   "county": "Cannon County",
+   "state": "Tennessee"
+  },
+  "47019": {
+   "cbsa": "27740",
+   "county": "Carter County",
+   "state": "Tennessee"
+  },
+  "47021": {
+   "cbsa": "34980",
+   "county": "Cheatham County",
+   "state": "Tennessee"
+  },
+  "47023": {
+   "cbsa": "27180",
+   "county": "Chester County",
+   "state": "Tennessee"
+  },
+  "47033": {
+   "cbsa": "27180",
+   "county": "Crockett County",
+   "state": "Tennessee"
+  },
+  "47037": {
+   "cbsa": "34980",
+   "county": "Davidson County",
+   "state": "Tennessee"
+  },
+  "47043": {
+   "cbsa": "34980",
+   "county": "Dickson County",
+   "state": "Tennessee"
+  },
+  "47047": {
+   "cbsa": "32820",
+   "county": "Fayette County",
+   "state": "Tennessee"
+  },
+  "47053": {
+   "cbsa": "27180",
+   "county": "Gibson County",
+   "state": "Tennessee"
+  },
+  "47057": {
+   "cbsa": "28940",
+   "county": "Grainger County",
+   "state": "Tennessee"
+  },
+  "47063": {
+   "cbsa": "34100",
+   "county": "Hamblen County",
+   "state": "Tennessee"
+  },
+  "47065": {
+   "cbsa": "16860",
+   "county": "Hamilton County",
+   "state": "Tennessee"
+  },
+  "47073": {
+   "cbsa": "28700",
+   "county": "Hawkins County",
+   "state": "Tennessee"
+  },
+  "47081": {
+   "cbsa": "34980",
+   "county": "Hickman County",
+   "state": "Tennessee"
+  },
+  "47089": {
+   "cbsa": "34100",
+   "county": "Jefferson County",
+   "state": "Tennessee"
+  },
+  "47093": {
+   "cbsa": "28940",
+   "county": "Knox County",
+   "state": "Tennessee"
+  },
+  "47105": {
+   "cbsa": "28940",
+   "county": "Loudon County",
+   "state": "Tennessee"
+  },
+  "47111": {
+   "cbsa": "34980",
+   "county": "Macon County",
+   "state": "Tennessee"
+  },
+  "47113": {
+   "cbsa": "27180",
+   "county": "Madison County",
+   "state": "Tennessee"
+  },
+  "47115": {
+   "cbsa": "16860",
+   "county": "Marion County",
+   "state": "Tennessee"
+  },
+  "47119": {
+   "cbsa": "34980",
+   "county": "Maury County",
+   "state": "Tennessee"
+  },
+  "47125": {
+   "cbsa": "17300",
+   "county": "Montgomery County",
+   "state": "Tennessee"
+  },
+  "47129": {
+   "cbsa": "28940",
+   "county": "Morgan County",
+   "state": "Tennessee"
+  },
+  "47139": {
+   "cbsa": "17420",
+   "county": "Polk County",
+   "state": "Tennessee"
+  },
+  "47145": {
+   "cbsa": "28940",
+   "county": "Roane County",
+   "state": "Tennessee"
+  },
+  "47147": {
+   "cbsa": "34980",
+   "county": "Robertson County",
+   "state": "Tennessee"
+  },
+  "47149": {
+   "cbsa": "34980",
+   "county": "Rutherford County",
+   "state": "Tennessee"
+  },
+  "47153": {
+   "cbsa": "16860",
+   "county": "Sequatchie County",
+   "state": "Tennessee"
+  },
+  "47157": {
+   "cbsa": "32820",
+   "county": "Shelby County",
+   "state": "Tennessee"
+  },
+  "47159": {
+   "cbsa": "34980",
+   "county": "Smith County",
+   "state": "Tennessee"
+  },
+  "47161": {
+   "cbsa": "17300",
+   "county": "Stewart County",
+   "state": "Tennessee"
+  },
+  "47163": {
+   "cbsa": "28700",
+   "county": "Sullivan County",
+   "state": "Tennessee"
+  },
+  "47165": {
+   "cbsa": "34980",
+   "county": "Sumner County",
+   "state": "Tennessee"
+  },
+  "47167": {
+   "cbsa": "32820",
+   "county": "Tipton County",
+   "state": "Tennessee"
+  },
+  "47169": {
+   "cbsa": "34980",
+   "county": "Trousdale County",
+   "state": "Tennessee"
+  },
+  "47171": {
+   "cbsa": "27740",
+   "county": "Unicoi County",
+   "state": "Tennessee"
+  },
+  "47173": {
+   "cbsa": "28940",
+   "county": "Union County",
+   "state": "Tennessee"
+  },
+  "47179": {
+   "cbsa": "27740",
+   "county": "Washington County",
+   "state": "Tennessee"
+  },
+  "47187": {
+   "cbsa": "34980",
+   "county": "Williamson County",
+   "state": "Tennessee"
+  },
+  "47189": {
+   "cbsa": "34980",
+   "county": "Wilson County",
+   "state": "Tennessee"
+  },
+  "48007": {
+   "cbsa": "18580",
+   "county": "Aransas County",
+   "state": "Texas"
+  },
+  "48009": {
+   "cbsa": "48660",
+   "county": "Archer County",
+   "state": "Texas"
+  },
+  "48011": {
+   "cbsa": "11100",
+   "county": "Armstrong County",
+   "state": "Texas"
+  },
+  "48013": {
+   "cbsa": "41700",
+   "county": "Atascosa County",
+   "state": "Texas"
+  },
+  "48015": {
+   "cbsa": "26420",
+   "county": "Austin County",
+   "state": "Texas"
+  },
+  "48019": {
+   "cbsa": "41700",
+   "county": "Bandera County",
+   "state": "Texas"
+  },
+  "48021": {
+   "cbsa": "12420",
+   "county": "Bastrop County",
+   "state": "Texas"
+  },
+  "48027": {
+   "cbsa": "28660",
+   "county": "Bell County",
+   "state": "Texas"
+  },
+  "48029": {
+   "cbsa": "41700",
+   "county": "Bexar County",
+   "state": "Texas"
+  },
+  "48035": {
+   "cbsa": "47380",
+   "county": "Bosque County",
+   "state": "Texas"
+  },
+  "48037": {
+   "cbsa": "45500",
+   "county": "Bowie County",
+   "state": "Texas"
+  },
+  "48039": {
+   "cbsa": "26420",
+   "county": "Brazoria County",
+   "state": "Texas"
+  },
+  "48041": {
+   "cbsa": "17780",
+   "county": "Brazos County",
+   "state": "Texas"
+  },
+  "48051": {
+   "cbsa": "17780",
+   "county": "Burleson County",
+   "state": "Texas"
+  },
+  "48055": {
+   "cbsa": "12420",
+   "county": "Caldwell County",
+   "state": "Texas"
+  },
+  "48059": {
+   "cbsa": "10180",
+   "county": "Callahan County",
+   "state": "Texas"
+  },
+  "48061": {
+   "cbsa": "15180",
+   "county": "Cameron County",
+   "state": "Texas"
+  },
+  "48065": {
+   "cbsa": "11100",
+   "county": "Carson County",
+   "state": "Texas"
+  },
+  "48071": {
+   "cbsa": "26420",
+   "county": "Chambers County",
+   "state": "Texas"
+  },
+  "48077": {
+   "cbsa": "48660",
+   "county": "Clay County",
+   "state": "Texas"
+  },
+  "48079": {
+   "cbsa": "31180",
+   "county": "Cochran County",
+   "state": "Texas"
+  },
+  "48085": {
+   "cbsa": "19100",
+   "division": "19124",
+   "county": "Collin County",
+   "state": "Texas"
+  },
+  "48091": {
+   "cbsa": "41700",
+   "county": "Comal County",
+   "state": "Texas"
+  },
+  "48099": {
+   "cbsa": "28660",
+   "county": "Coryell County",
+   "state": "Texas"
+  },
+  "48107": {
+   "cbsa": "31180",
+   "county": "Crosby County",
+   "state": "Texas"
+  },
+  "48113": {
+   "cbsa": "19100",
+   "division": "19124",
+   "county": "Dallas County",
+   "state": "Texas"
+  },
+  "48121": {
+   "cbsa": "19100",
+   "division": "19124",
+   "county": "Denton County",
+   "state": "Texas"
+  },
+  "48135": {
+   "cbsa": "36220",
+   "county": "Ector County",
+   "state": "Texas"
+  },
+  "48139": {
+   "cbsa": "19100",
+   "division": "19124",
+   "county": "Ellis County",
+   "state": "Texas"
+  },
+  "48141": {
+   "cbsa": "21340",
+   "county": "El Paso County",
+   "state": "Texas"
+  },
+  "48145": {
+   "cbsa": "47380",
+   "county": "Falls County",
+   "state": "Texas"
+  },
+  "48157": {
+   "cbsa": "26420",
+   "county": "Fort Bend County",
+   "state": "Texas"
+  },
+  "48167": {
+   "cbsa": "26420",
+   "county": "Galveston County",
+   "state": "Texas"
+  },
+  "48169": {
+   "cbsa": "31180",
+   "county": "Garza County",
+   "state": "Texas"
+  },
+  "48175": {
+   "cbsa": "47020",
+   "county": "Goliad County",
+   "state": "Texas"
+  },
+  "48181": {
+   "cbsa": "43300",
+   "county": "Grayson County",
+   "state": "Texas"
+  },
+  "48183": {
+   "cbsa": "30980",
+   "county": "Gregg County",
+   "state": "Texas"
+  },
+  "48187": {
+   "cbsa": "41700",
+   "county": "Guadalupe County",
+   "state": "Texas"
+  },
+  "48199": {
+   "cbsa": "13140",
+   "county": "Hardin County",
+   "state": "Texas"
+  },
+  "48201": {
+   "cbsa": "26420",
+   "county": "Harris County",
+   "state": "Texas"
+  },
+  "48203": {
+   "cbsa": "30980",
+   "county": "Harrison County",
+   "state": "Texas"
+  },
+  "48209": {
+   "cbsa": "12420",
+   "county": "Hays County",
+   "state": "Texas"
+  },
+  "48215": {
+   "cbsa": "32580",
+   "county": "Hidalgo County",
+   "state": "Texas"
+  },
+  "48219": {
+   "cbsa": "31180",
+   "county": "Hockley County",
+   "state": "Texas"
+  },
+  "48229": {
+   "cbsa": "21340",
+   "county": "Hudspeth County",
+   "state": "Texas"
+  },
+  "48231": {
+   "cbsa": "19100",
+   "division": "19124",
+   "county": "Hunt County",
+   "state": "Texas"
+  },
+  "48235": {
+   "cbsa": "41660",
+   "county": "Irion County",
+   "state": "Texas"
+  },
+  "48245": {
+   "cbsa": "13140",
+   "county": "Jefferson County",
+   "state": "Texas"
+  },
+  "48251": {
+   "cbsa": "19100",
+   "division": "23104",
+   "county": "Johnson County",
+   "state": "Texas"
+  },
+  "48253": {
+   "cbsa": "10180",
+   "county": "Jones County",
+   "state": "Texas"
+  },
+  "48257": {
+   "cbsa": "19100",
+   "division": "19124",
+   "county": "Kaufman County",
+   "state": "Texas"
+  },
+  "48259": {
+   "cbsa": "41700",
+   "county": "Kendall County",
+   "state": "Texas"
+  },
+  "48281": {
+   "cbsa": "28660",
+   "county": "Lampasas County",
+   "state": "Texas"
+  },
+  "48291": {
+   "cbsa": "26420",
+   "county": "Liberty County",
+   "state": "Texas"
+  },
+  "48303": {
+   "cbsa": "31180",
+   "county": "Lubbock County",
+   "state": "Texas"
+  },
+  "48305": {
+   "cbsa": "31180",
+   "county": "Lynn County",
+   "state": "Texas"
+  },
+  "48309": {
+   "cbsa": "47380",
+   "county": "McLennan County",
+   "state": "Texas"
+  },
+  "48317": {
+   "cbsa": "33260",
+   "county": "Martin County",
+   "state": "Texas"
+  },
+  "48323": {
+   "cbsa": "20580",
+   "county": "Maverick County",
+   "state": "Texas"
+  },
+  "48325": {
+   "cbsa": "41700",
+   "county": "Medina County",
+   "state": "Texas"
+  },
+  "48329": {
+   "cbsa": "33260",
+   "county": "Midland County",
+   "state": "Texas"
+  },
+  "48339": {
+   "cbsa": "26420",
+   "county": "Montgomery County",
+   "state": "Texas"
+  },
+  "48355": {
+   "cbsa": "18580",
+   "county": "Nueces County",
+   "state": "Texas"
+  },
+  "48359": {
+   "cbsa": "11100",
+   "county": "Oldham County",
+   "state": "Texas"
+  },
+  "48361": {
+   "cbsa": "13140",
+   "county": "Orange County",
+   "state": "Texas"
+  },
+  "48367": {
+   "cbsa": "19100",
+   "division": "23104",
+   "county": "Parker County",
+   "state": "Texas"
+  },
+  "48375": {
+   "cbsa": "11100",
+   "county": "Potter County",
+   "state": "Texas"
+  },
+  "48381": {
+   "cbsa": "11100",
+   "county": "Randall County",
+   "state": "Texas"
+  },
+  "48395": {
+   "cbsa": "17780",
+   "county": "Robertson County",
+   "state": "Texas"
+  },
+  "48397": {
+   "cbsa": "19100",
+   "division": "19124",
+   "county": "Rockwall County",
+   "state": "Texas"
+  },
+  "48401": {
+   "cbsa": "30980",
+   "county": "Rusk County",
+   "state": "Texas"
+  },
+  "48407": {
+   "cbsa": "26420",
+   "county": "San Jacinto County",
+   "state": "Texas"
+  },
+  "48409": {
+   "cbsa": "18580",
+   "county": "San Patricio County",
+   "state": "Texas"
+  },
+  "48423": {
+   "cbsa": "46340",
+   "county": "Smith County",
+   "state": "Texas"
+  },
+  "48439": {
+   "cbsa": "19100",
+   "division": "23104",
+   "county": "Tarrant County",
+   "state": "Texas"
+  },
+  "48441": {
+   "cbsa": "10180",
+   "county": "Taylor County",
+   "state": "Texas"
+  },
+  "48451": {
+   "cbsa": "41660",
+   "county": "Tom Green County",
+   "state": "Texas"
+  },
+  "48453": {
+   "cbsa": "12420",
+   "county": "Travis County",
+   "state": "Texas"
+  },
+  "48459": {
+   "cbsa": "30980",
+   "county": "Upshur County",
+   "state": "Texas"
+  },
+  "48469": {
+   "cbsa": "47020",
+   "county": "Victoria County",
+   "state": "Texas"
+  },
+  "48473": {
+   "cbsa": "26420",
+   "county": "Waller County",
+   "state": "Texas"
+  },
+  "48479": {
+   "cbsa": "29700",
+   "county": "Webb County",
+   "state": "Texas"
+  },
+  "48485": {
+   "cbsa": "48660",
+   "county": "Wichita County",
+   "state": "Texas"
+  },
+  "48491": {
+   "cbsa": "12420",
+   "county": "Williamson County",
+   "state": "Texas"
+  },
+  "48493": {
+   "cbsa": "41700",
+   "county": "Wilson County",
+   "state": "Texas"
+  },
+  "48497": {
+   "cbsa": "19100",
+   "division": "23104",
+   "county": "Wise County",
+   "state": "Texas"
+  },
+  "49005": {
+   "cbsa": "30860",
+   "county": "Cache County",
+   "state": "Utah"
+  },
+  "49011": {
+   "cbsa": "36260",
+   "county": "Davis County",
+   "state": "Utah"
+  },
+  "49023": {
+   "cbsa": "39340",
+   "county": "Juab County",
+   "state": "Utah"
+  },
+  "49029": {
+   "cbsa": "36260",
+   "county": "Morgan County",
+   "state": "Utah"
+  },
+  "49035": {
+   "cbsa": "41620",
+   "county": "Salt Lake County",
+   "state": "Utah"
+  },
+  "49045": {
+   "cbsa": "41620",
+   "county": "Tooele County",
+   "state": "Utah"
+  },
+  "49049": {
+   "cbsa": "39340",
+   "county": "Utah County",
+   "state": "Utah"
+  },
+  "49053": {
+   "cbsa": "41100",
+   "county": "Washington County",
+   "state": "Utah"
+  },
+  "49057": {
+   "cbsa": "36260",
+   "county": "Weber County",
+   "state": "Utah"
+  },
+  "50007": {
+   "cbsa": "15540",
+   "county": "Chittenden County",
+   "state": "Vermont"
+  },
+  "50011": {
+   "cbsa": "15540",
+   "county": "Franklin County",
+   "state": "Vermont"
+  },
+  "50013": {
+   "cbsa": "15540",
+   "county": "Grand Isle County",
+   "state": "Vermont"
+  },
+  "51003": {
+   "cbsa": "16820",
+   "county": "Albemarle County",
+   "state": "Virginia"
+  },
+  "51007": {
+   "cbsa": "40060",
+   "county": "Amelia County",
+   "state": "Virginia"
+  },
+  "51009": {
+   "cbsa": "31340",
+   "county": "Amherst County",
+   "state": "Virginia"
+  },
+  "51011": {
+   "cbsa": "31340",
+   "county": "Appomattox County",
+   "state": "Virginia"
+  },
+  "51013": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Arlington County",
+   "state": "Virginia"
+  },
+  "51015": {
+   "cbsa": "44420",
+   "county": "Augusta County",
+   "state": "Virginia"
+  },
+  "51019": {
+   "cbsa": "31340",
+   "county": "Bedford County",
+   "state": "Virginia"
+  },
+  "51023": {
+   "cbsa": "40220",
+   "county": "Botetourt County",
+   "state": "Virginia"
+  },
+  "51031": {
+   "cbsa": "31340",
+   "county": "Campbell County",
+   "state": "Virginia"
+  },
+  "51036": {
+   "cbsa": "40060",
+   "county": "Charles City County",
+   "state": "Virginia"
+  },
+  "51041": {
+   "cbsa": "40060",
+   "county": "Chesterfield County",
+   "state": "Virginia"
+  },
+  "51043": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Clarke County",
+   "state": "Virginia"
+  },
+  "51045": {
+   "cbsa": "40220",
+   "county": "Craig County",
+   "state": "Virginia"
+  },
+  "51047": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Culpeper County",
+   "state": "Virginia"
+  },
+  "51053": {
+   "cbsa": "40060",
+   "county": "Dinwiddie County",
+   "state": "Virginia"
+  },
+  "51059": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Fairfax County",
+   "state": "Virginia"
+  },
+  "51061": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Fauquier County",
+   "state": "Virginia"
+  },
+  "51063": {
+   "cbsa": "13980",
+   "county": "Floyd County",
+   "state": "Virginia"
+  },
+  "51065": {
+   "cbsa": "16820",
+   "county": "Fluvanna County",
+   "state": "Virginia"
+  },
+  "51067": {
+   "cbsa": "40220",
+   "county": "Franklin County",
+   "state": "Virginia"
+  },
+  "51069": {
+   "cbsa": "49020",
+   "county": "Frederick County",
+   "state": "Virginia"
+  },
+  "51071": {
+   "cbsa": "13980",
+   "county": "Giles County",
+   "state": "Virginia"
+  },
+  "51073": {
+   "cbsa": "47260",
+   "county": "Gloucester County",
+   "state": "Virginia"
+  },
+  "51075": {
+   "cbsa": "40060",
+   "county": "Goochland County",
+   "state": "Virginia"
+  },
+  "51079": {
+   "cbsa": "16820",
+   "county": "Greene County",
+   "state": "Virginia"
+  },
+  "51085": {
+   "cbsa": "40060",
+   "county": "Hanover County",
+   "state": "Virginia"
+  },
+  "51087": {
+   "cbsa": "40060",
+   "county": "Henrico County",
+   "state": "Virginia"
+  },
+  "51093": {
+   "cbsa": "47260",
+   "county": "Isle of Wight County",
+   "state": "Virginia"
+  },
+  "51095": {
+   "cbsa": "47260",
+   "county": "James City County",
+   "state": "Virginia"
+  },
+  "51097": {
+   "cbsa": "40060",
+   "county": "King and Queen County",
+   "state": "Virginia"
+  },
+  "51101": {
+   "cbsa": "40060",
+   "county": "King William County",
+   "state": "Virginia"
+  },
+  "51107": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Loudoun County",
+   "state": "Virginia"
+  },
+  "51115": {
+   "cbsa": "47260",
+   "county": "Mathews County",
+   "state": "Virginia"
+  },
+  "51121": {
+   "cbsa": "13980",
+   "county": "Montgomery County",
+   "state": "Virginia"
+  },
+  "51125": {
+   "cbsa": "16820",
+   "county": "Nelson County",
+   "state": "Virginia"
+  },
+  "51127": {
+   "cbsa": "40060",
+   "county": "New Kent County",
+   "state": "Virginia"
+  },
+  "51145": {
+   "cbsa": "40060",
+   "county": "Powhatan County",
+   "state": "Virginia"
+  },
+  "51149": {
+   "cbsa": "40060",
+   "county": "Prince George County",
+   "state": "Virginia"
+  },
+  "51153": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Prince William County",
+   "state": "Virginia"
+  },
+  "51155": {
+   "cbsa": "13980",
+   "county": "Pulaski County",
+   "state": "Virginia"
+  },
+  "51157": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Rappahannock County",
+   "state": "Virginia"
+  },
+  "51161": {
+   "cbsa": "40220",
+   "county": "Roanoke County",
+   "state": "Virginia"
+  },
+  "51165": {
+   "cbsa": "25500",
+   "county": "Rockingham County",
+   "state": "Virginia"
+  },
+  "51169": {
+   "cbsa": "28700",
+   "county": "Scott County",
+   "state": "Virginia"
+  },
+  "51177": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Spotsylvania County",
+   "state": "Virginia"
+  },
+  "51179": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Stafford County",
+   "state": "Virginia"
+  },
+  "51181": {
+   "cbsa": "47260",
+   "county": "Surry County",
+   "state": "Virginia"
+  },
+  "51183": {
+   "cbsa": "40060",
+   "county": "Sussex County",
+   "state": "Virginia"
+  },
+  "51187": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Warren County",
+   "state": "Virginia"
+  },
+  "51191": {
+   "cbsa": "28700",
+   "county": "Washington County",
+   "state": "Virginia"
+  },
+  "51199": {
+   "cbsa": "47260",
+   "county": "York County",
+   "state": "Virginia"
+  },
+  "51510": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Alexandria city",
+   "state": "Virginia"
+  },
+  "51520": {
+   "cbsa": "28700",
+   "county": "Bristol city",
+   "state": "Virginia"
+  },
+  "51540": {
+   "cbsa": "16820",
+   "county": "Charlottesville city",
+   "state": "Virginia"
+  },
+  "51550": {
+   "cbsa": "47260",
+   "county": "Chesapeake city",
+   "state": "Virginia"
+  },
+  "51570": {
+   "cbsa": "40060",
+   "county": "Colonial Heights city",
+   "state": "Virginia"
+  },
+  "51600": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Fairfax city",
+   "state": "Virginia"
+  },
+  "51610": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Falls Church city",
+   "state": "Virginia"
+  },
+  "51630": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Fredericksburg city",
+   "state": "Virginia"
+  },
+  "51650": {
+   "cbsa": "47260",
+   "county": "Hampton city",
+   "state": "Virginia"
+  },
+  "51660": {
+   "cbsa": "25500",
+   "county": "Harrisonburg city",
+   "state": "Virginia"
+  },
+  "51670": {
+   "cbsa": "40060",
+   "county": "Hopewell city",
+   "state": "Virginia"
+  },
+  "51680": {
+   "cbsa": "31340",
+   "county": "Lynchburg city",
+   "state": "Virginia"
+  },
+  "51683": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Manassas city",
+   "state": "Virginia"
+  },
+  "51685": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Manassas Park city",
+   "state": "Virginia"
+  },
+  "51700": {
+   "cbsa": "47260",
+   "county": "Newport News city",
+   "state": "Virginia"
+  },
+  "51710": {
+   "cbsa": "47260",
+   "county": "Norfolk city",
+   "state": "Virginia"
+  },
+  "51730": {
+   "cbsa": "40060",
+   "county": "Petersburg city",
+   "state": "Virginia"
+  },
+  "51735": {
+   "cbsa": "47260",
+   "county": "Poquoson city",
+   "state": "Virginia"
+  },
+  "51740": {
+   "cbsa": "47260",
+   "county": "Portsmouth city",
+   "state": "Virginia"
+  },
+  "51750": {
+   "cbsa": "13980",
+   "county": "Radford city",
+   "state": "Virginia"
+  },
+  "51760": {
+   "cbsa": "40060",
+   "county": "Richmond city",
+   "state": "Virginia"
+  },
+  "51770": {
+   "cbsa": "40220",
+   "county": "Roanoke city",
+   "state": "Virginia"
+  },
+  "51775": {
+   "cbsa": "40220",
+   "county": "Salem city",
+   "state": "Virginia"
+  },
+  "51790": {
+   "cbsa": "44420",
+   "county": "Staunton city",
+   "state": "Virginia"
+  },
+  "51800": {
+   "cbsa": "47260",
+   "county": "Suffolk city",
+   "state": "Virginia"
+  },
+  "51810": {
+   "cbsa": "47260",
+   "county": "Virginia Beach city",
+   "state": "Virginia"
+  },
+  "51820": {
+   "cbsa": "44420",
+   "county": "Waynesboro city",
+   "state": "Virginia"
+  },
+  "51830": {
+   "cbsa": "47260",
+   "county": "Williamsburg city",
+   "state": "Virginia"
+  },
+  "51840": {
+   "cbsa": "49020",
+   "county": "Winchester city",
+   "state": "Virginia"
+  },
+  "53003": {
+   "cbsa": "30300",
+   "county": "Asotin County",
+   "state": "Washington"
+  },
+  "53005": {
+   "cbsa": "28420",
+   "county": "Benton County",
+   "state": "Washington"
+  },
+  "53007": {
+   "cbsa": "48300",
+   "county": "Chelan County",
+   "state": "Washington"
+  },
+  "53011": {
+   "cbsa": "38900",
+   "county": "Clark County",
+   "state": "Washington"
+  },
+  "53015": {
+   "cbsa": "31020",
+   "county": "Cowlitz County",
+   "state": "Washington"
+  },
+  "53017": {
+   "cbsa": "48300",
+   "county": "Douglas County",
+   "state": "Washington"
+  },
+  "53021": {
+   "cbsa": "28420",
+   "county": "Franklin County",
+   "state": "Washington"
+  },
+  "53033": {
+   "cbsa": "42660",
+   "division": "42644",
+   "county": "King County",
+   "state": "Washington"
+  },
+  "53035": {
+   "cbsa": "14740",
+   "county": "Kitsap County",
+   "state": "Washington"
+  },
+  "53053": {
+   "cbsa": "42660",
+   "division": "45104",
+   "county": "Pierce County",
+   "state": "Washington"
+  },
+  "53057": {
+   "cbsa": "34580",
+   "county": "Skagit County",
+   "state": "Washington"
+  },
+  "53059": {
+   "cbsa": "38900",
+   "county": "Skamania County",
+   "state": "Washington"
+  },
+  "53061": {
+   "cbsa": "42660",
+   "division": "21794",
+   "county": "Snohomish County",
+   "state": "Washington"
+  },
+  "53063": {
+   "cbsa": "44060",
+   "county": "Spokane County",
+   "state": "Washington"
+  },
+  "53065": {
+   "cbsa": "44060",
+   "county": "Stevens County",
+   "state": "Washington"
+  },
+  "53067": {
+   "cbsa": "36500",
+   "county": "Thurston County",
+   "state": "Washington"
+  },
+  "53071": {
+   "cbsa": "47460",
+   "county": "Walla Walla County",
+   "state": "Washington"
+  },
+  "53073": {
+   "cbsa": "13380",
+   "county": "Whatcom County",
+   "state": "Washington"
+  },
+  "53077": {
+   "cbsa": "49420",
+   "county": "Yakima County",
+   "state": "Washington"
+  },
+  "54003": {
+   "cbsa": "25180",
+   "county": "Berkeley County",
+   "state": "West Virginia"
+  },
+  "54005": {
+   "cbsa": "16620",
+   "county": "Boone County",
+   "state": "West Virginia"
+  },
+  "54009": {
+   "cbsa": "48260",
+   "county": "Brooke County",
+   "state": "West Virginia"
+  },
+  "54011": {
+   "cbsa": "26580",
+   "county": "Cabell County",
+   "state": "West Virginia"
+  },
+  "54015": {
+   "cbsa": "16620",
+   "county": "Clay County",
+   "state": "West Virginia"
+  },
+  "54019": {
+   "cbsa": "13220",
+   "county": "Fayette County",
+   "state": "West Virginia"
+  },
+  "54027": {
+   "cbsa": "49020",
+   "county": "Hampshire County",
+   "state": "West Virginia"
+  },
+  "54029": {
+   "cbsa": "48260",
+   "county": "Hancock County",
+   "state": "West Virginia"
+  },
+  "54037": {
+   "cbsa": "47900",
+   "division": "11694",
+   "county": "Jefferson County",
+   "state": "West Virginia"
+  },
+  "54039": {
+   "cbsa": "16620",
+   "county": "Kanawha County",
+   "state": "West Virginia"
+  },
+  "54051": {
+   "cbsa": "48540",
+   "county": "Marshall County",
+   "state": "West Virginia"
+  },
+  "54061": {
+   "cbsa": "34060",
+   "county": "Monongalia County",
+   "state": "West Virginia"
+  },
+  "54065": {
+   "cbsa": "25180",
+   "county": "Morgan County",
+   "state": "West Virginia"
+  },
+  "54069": {
+   "cbsa": "48540",
+   "county": "Ohio County",
+   "state": "West Virginia"
+  },
+  "54077": {
+   "cbsa": "34060",
+   "county": "Preston County",
+   "state": "West Virginia"
+  },
+  "54079": {
+   "cbsa": "26580",
+   "county": "Putnam County",
+   "state": "West Virginia"
+  },
+  "54081": {
+   "cbsa": "13220",
+   "county": "Raleigh County",
+   "state": "West Virginia"
+  },
+  "54099": {
+   "cbsa": "26580",
+   "county": "Wayne County",
+   "state": "West Virginia"
+  },
+  "54105": {
+   "cbsa": "37620",
+   "county": "Wirt County",
+   "state": "West Virginia"
+  },
+  "54107": {
+   "cbsa": "37620",
+   "county": "Wood County",
+   "state": "West Virginia"
+  },
+  "55009": {
+   "cbsa": "24580",
+   "county": "Brown County",
+   "state": "Wisconsin"
+  },
+  "55015": {
+   "cbsa": "11540",
+   "county": "Calumet County",
+   "state": "Wisconsin"
+  },
+  "55017": {
+   "cbsa": "20740",
+   "county": "Chippewa County",
+   "state": "Wisconsin"
+  },
+  "55021": {
+   "cbsa": "31540",
+   "county": "Columbia County",
+   "state": "Wisconsin"
+  },
+  "55025": {
+   "cbsa": "31540",
+   "county": "Dane County",
+   "state": "Wisconsin"
+  },
+  "55031": {
+   "cbsa": "20260",
+   "county": "Douglas County",
+   "state": "Wisconsin"
+  },
+  "55035": {
+   "cbsa": "20740",
+   "county": "Eau Claire County",
+   "state": "Wisconsin"
+  },
+  "55039": {
+   "cbsa": "22540",
+   "county": "Fond du Lac County",
+   "state": "Wisconsin"
+  },
+  "55045": {
+   "cbsa": "31540",
+   "county": "Green County",
+   "state": "Wisconsin"
+  },
+  "55049": {
+   "cbsa": "31540",
+   "county": "Iowa County",
+   "state": "Wisconsin"
+  },
+  "55059": {
+   "cbsa": "28450",
+   "county": "Kenosha County",
+   "state": "Wisconsin"
+  },
+  "55061": {
+   "cbsa": "24580",
+   "county": "Kewaunee County",
+   "state": "Wisconsin"
+  },
+  "55063": {
+   "cbsa": "29100",
+   "county": "La Crosse County",
+   "state": "Wisconsin"
+  },
+  "55073": {
+   "cbsa": "48140",
+   "county": "Marathon County",
+   "state": "Wisconsin"
+  },
+  "55079": {
+   "cbsa": "33340",
+   "county": "Milwaukee County",
+   "state": "Wisconsin"
+  },
+  "55083": {
+   "cbsa": "24580",
+   "county": "Oconto County",
+   "state": "Wisconsin"
+  },
+  "55087": {
+   "cbsa": "11540",
+   "county": "Outagamie County",
+   "state": "Wisconsin"
+  },
+  "55089": {
+   "cbsa": "33340",
+   "county": "Ozaukee County",
+   "state": "Wisconsin"
+  },
+  "55093": {
+   "cbsa": "33460",
+   "county": "Pierce County",
+   "state": "Wisconsin"
+  },
+  "55101": {
+   "cbsa": "39540",
+   "county": "Racine County",
+   "state": "Wisconsin"
+  },
+  "55105": {
+   "cbsa": "27500",
+   "county": "Rock County",
+   "state": "Wisconsin"
+  },
+  "55109": {
+   "cbsa": "33460",
+   "county": "St. Croix County",
+   "state": "Wisconsin"
+  },
+  "55117": {
+   "cbsa": "43100",
+   "county": "Sheboygan County",
+   "state": "Wisconsin"
+  },
+  "55123": {
+   "cbsa": "29100",
+   "county": "Vernon County",
+   "state": "Wisconsin"
+  },
+  "55131": {
+   "cbsa": "33340",
+   "county": "Washington County",
+   "state": "Wisconsin"
+  },
+  "55133": {
+   "cbsa": "33340",
+   "county": "Waukesha County",
+   "state": "Wisconsin"
+  },
+  "55139": {
+   "cbsa": "36780",
+   "county": "Winnebago County",
+   "state": "Wisconsin"
+  },
+  "56021": {
+   "cbsa": "16940",
+   "county": "Laramie County",
+   "state": "Wyoming"
+  },
+  "56025": {
+   "cbsa": "16220",
+   "county": "Natrona County",
+   "state": "Wyoming"
+  },
+  "72003": {
+   "cbsa": "10380",
+   "county": "Aguada Municipio",
+   "state": "Puerto Rico"
+  },
+  "72005": {
+   "cbsa": "10380",
+   "county": "Aguadilla Municipio",
+   "state": "Puerto Rico"
+  },
+  "72007": {
+   "cbsa": "41980",
+   "county": "Aguas Buenas Municipio",
+   "state": "Puerto Rico"
+  },
+  "72009": {
+   "cbsa": "41980",
+   "county": "Aibonito Municipio",
+   "state": "Puerto Rico"
+  },
+  "72011": {
+   "cbsa": "10380",
+   "county": "Añasco Municipio",
+   "state": "Puerto Rico"
+  },
+  "72013": {
+   "cbsa": "11640",
+   "county": "Arecibo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72015": {
+   "cbsa": "25020",
+   "county": "Arroyo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72017": {
+   "cbsa": "41980",
+   "county": "Barceloneta Municipio",
+   "state": "Puerto Rico"
+  },
+  "72019": {
+   "cbsa": "41980",
+   "county": "Barranquitas Municipio",
+   "state": "Puerto Rico"
+  },
+  "72021": {
+   "cbsa": "41980",
+   "county": "Bayamón Municipio",
+   "state": "Puerto Rico"
+  },
+  "72023": {
+   "cbsa": "32420",
+   "county": "Cabo Rojo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72025": {
+   "cbsa": "41980",
+   "county": "Caguas Municipio",
+   "state": "Puerto Rico"
+  },
+  "72027": {
+   "cbsa": "11640",
+   "county": "Camuy Municipio",
+   "state": "Puerto Rico"
+  },
+  "72029": {
+   "cbsa": "41980",
+   "county": "Canóvanas Municipio",
+   "state": "Puerto Rico"
+  },
+  "72031": {
+   "cbsa": "41980",
+   "county": "Carolina Municipio",
+   "state": "Puerto Rico"
+  },
+  "72033": {
+   "cbsa": "41980",
+   "county": "Cataño Municipio",
+   "state": "Puerto Rico"
+  },
+  "72035": {
+   "cbsa": "41980",
+   "county": "Cayey Municipio",
+   "state": "Puerto Rico"
+  },
+  "72037": {
+   "cbsa": "41980",
+   "county": "Ceiba Municipio",
+   "state": "Puerto Rico"
+  },
+  "72039": {
+   "cbsa": "41980",
+   "county": "Ciales Municipio",
+   "state": "Puerto Rico"
+  },
+  "72041": {
+   "cbsa": "41980",
+   "county": "Cidra Municipio",
+   "state": "Puerto Rico"
+  },
+  "72045": {
+   "cbsa": "41980",
+   "county": "Comerío Municipio",
+   "state": "Puerto Rico"
+  },
+  "72047": {
+   "cbsa": "41980",
+   "county": "Corozal Municipio",
+   "state": "Puerto Rico"
+  },
+  "72051": {
+   "cbsa": "41980",
+   "county": "Dorado Municipio",
+   "state": "Puerto Rico"
+  },
+  "72053": {
+   "cbsa": "41980",
+   "county": "Fajardo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72054": {
+   "cbsa": "41980",
+   "county": "Florida Municipio",
+   "state": "Puerto Rico"
+  },
+  "72057": {
+   "cbsa": "25020",
+   "county": "Guayama Municipio",
+   "state": "Puerto Rico"
+  },
+  "72059": {
+   "cbsa": "38660",
+   "county": "Guayanilla Municipio",
+   "state": "Puerto Rico"
+  },
+  "72061": {
+   "cbsa": "41980",
+   "county": "Guaynabo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72063": {
+   "cbsa": "41980",
+   "county": "Gurabo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72065": {
+   "cbsa": "11640",
+   "county": "Hatillo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72067": {
+   "cbsa": "32420",
+   "county": "Hormigueros Municipio",
+   "state": "Puerto Rico"
+  },
+  "72069": {
+   "cbsa": "41980",
+   "county": "Humacao Municipio",
+   "state": "Puerto Rico"
+  },
+  "72071": {
+   "cbsa": "10380",
+   "county": "Isabela Municipio",
+   "state": "Puerto Rico"
+  },
+  "72075": {
+   "cbsa": "38660",
+   "county": "Juana Díaz Municipio",
+   "state": "Puerto Rico"
+  },
+  "72077": {
+   "cbsa": "41980",
+   "county": "Juncos Municipio",
+   "state": "Puerto Rico"
+  },
+  "72079": {
+   "cbsa": "32420",
+   "county": "Lajas Municipio",
+   "state": "Puerto Rico"
+  },
+  "72085": {
+   "cbsa": "41980",
+   "county": "Las Piedras Municipio",
+   "state": "Puerto Rico"
+  },
+  "72087": {
+   "cbsa": "41980",
+   "county": "Loíza Municipio",
+   "state": "Puerto Rico"
+  },
+  "72089": {
+   "cbsa": "41980",
+   "county": "Luquillo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72091": {
+   "cbsa": "41980",
+   "county": "Manatí Municipio",
+   "state": "Puerto Rico"
+  },
+  "72095": {
+   "cbsa": "41980",
+   "county": "Maunabo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72097": {
+   "cbsa": "32420",
+   "county": "Mayagüez Municipio",
+   "state": "Puerto Rico"
+  },
+  "72099": {
+   "cbsa": "10380",
+   "county": "Moca Municipio",
+   "state": "Puerto Rico"
+  },
+  "72101": {
+   "cbsa": "41980",
+   "county": "Morovis Municipio",
+   "state": "Puerto Rico"
+  },
+  "72103": {
+   "cbsa": "41980",
+   "county": "Naguabo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72105": {
+   "cbsa": "41980",
+   "county": "Naranjito Municipio",
+   "state": "Puerto Rico"
+  },
+  "72107": {
+   "cbsa": "41980",
+   "county": "Orocovis Municipio",
+   "state": "Puerto Rico"
+  },
+  "72109": {
+   "cbsa": "25020",
+   "county": "Patillas Municipio",
+   "state": "Puerto Rico"
+  },
+  "72111": {
+   "cbsa": "38660",
+   "county": "Peñuelas Municipio",
+   "state": "Puerto Rico"
+  },
+  "72113": {
+   "cbsa": "38660",
+   "county": "Ponce Municipio",
+   "state": "Puerto Rico"
+  },
+  "72115": {
+   "cbsa": "11640",
+   "county": "Quebradillas Municipio",
+   "state": "Puerto Rico"
+  },
+  "72117": {
+   "cbsa": "10380",
+   "county": "Rincón Municipio",
+   "state": "Puerto Rico"
+  },
+  "72119": {
+   "cbsa": "41980",
+   "county": "Río Grande Municipio",
+   "state": "Puerto Rico"
+  },
+  "72121": {
+   "cbsa": "32420",
+   "county": "Sabana Grande Municipio",
+   "state": "Puerto Rico"
+  },
+  "72125": {
+   "cbsa": "32420",
+   "county": "San Germán Municipio",
+   "state": "Puerto Rico"
+  },
+  "72127": {
+   "cbsa": "41980",
+   "county": "San Juan Municipio",
+   "state": "Puerto Rico"
+  },
+  "72129": {
+   "cbsa": "41980",
+   "county": "San Lorenzo Municipio",
+   "state": "Puerto Rico"
+  },
+  "72131": {
+   "cbsa": "10380",
+   "county": "San Sebastián Municipio",
+   "state": "Puerto Rico"
+  },
+  "72135": {
+   "cbsa": "41980",
+   "county": "Toa Alta Municipio",
+   "state": "Puerto Rico"
+  },
+  "72137": {
+   "cbsa": "41980",
+   "county": "Toa Baja Municipio",
+   "state": "Puerto Rico"
+  },
+  "72139": {
+   "cbsa": "41980",
+   "county": "Trujillo Alto Municipio",
+   "state": "Puerto Rico"
+  },
+  "72143": {
+   "cbsa": "41980",
+   "county": "Vega Alta Municipio",
+   "state": "Puerto Rico"
+  },
+  "72145": {
+   "cbsa": "41980",
+   "county": "Vega Baja Municipio",
+   "state": "Puerto Rico"
+  },
+  "72149": {
+   "cbsa": "38660",
+   "county": "Villalba Municipio",
+   "state": "Puerto Rico"
+  },
+  "72151": {
+   "cbsa": "41980",
+   "county": "Yabucoa Municipio",
+   "state": "Puerto Rico"
+  },
+  "72153": {
+   "cbsa": "38660",
+   "county": "Yauco Municipio",
+   "state": "Puerto Rico"
+  },
+  "02020": {
+   "cbsa": "11260",
+   "county": "Anchorage Municipality",
+   "state": "Alaska"
+  },
+  "02170": {
+   "cbsa": "11260",
+   "county": "Matanuska-Susitna Borough",
+   "state": "Alaska"
+  },
+  "01015": {
+   "cbsa": "11500",
+   "county": "Calhoun County",
+   "state": "Alabama"
+  },
+  "01081": {
+   "cbsa": "12220",
+   "county": "Lee County",
+   "state": "Alabama"
+  },
+  "01087": {
+   "cbsa": "12220",
+   "county": "Macon County",
+   "state": "Alabama"
+  },
+  "06029": {
+   "cbsa": "12540",
+   "county": "Kern County",
+   "state": "California"
+  },
+  "01007": {
+   "cbsa": "13820",
+   "county": "Bibb County",
+   "state": "Alabama"
+  },
+  "01009": {
+   "cbsa": "13820",
+   "county": "Blount County",
+   "state": "Alabama"
+  },
+  "01021": {
+   "cbsa": "13820",
+   "county": "Chilton County",
+   "state": "Alabama"
+  },
+  "01073": {
+   "cbsa": "13820",
+   "county": "Jefferson County",
+   "state": "Alabama"
+  },
+  "01115": {
+   "cbsa": "13820",
+   "county": "St. Clair County",
+   "state": "Alabama"
+  },
+  "01117": {
+   "cbsa": "13820",
+   "county": "Shelby County",
+   "state": "Alabama"
+  },
+  "01127": {
+   "cbsa": "13820",
+   "county": "Walker County",
+   "state": "Alabama"
+  },
+  "08013": {
+   "cbsa": "14500",
+   "county": "Boulder County",
+   "state": "Colorado"
+  },
+  "09120": {
+   "cbsa": "14860",
+   "county": "Greater Bridgeport Planning Region",
+   "state": "Connecticut"
+  },
+  "09190": {
+   "cbsa": "14860",
+   "county": "Western Connecticut Planning Region",
+   "state": "Connecticut"
+  },
+  "06007": {
+   "cbsa": "17020",
+   "county": "Butte County",
+   "state": "California"
+  },
+  "08041": {
+   "cbsa": "17820",
+   "county": "El Paso County",
+   "state": "Colorado"
+  },
+  "08119": {
+   "cbsa": "17820",
+   "county": "Teller County",
+   "state": "Colorado"
+  },
+  "01113": {
+   "cbsa": "17980",
+   "county": "Russell County",
+   "state": "Alabama"
+  },
+  "01003": {
+   "cbsa": "19300",
+   "county": "Baldwin County",
+   "state": "Alabama"
+  },
+  "01079": {
+   "cbsa": "19460",
+   "county": "Lawrence County",
+   "state": "Alabama"
+  },
+  "01103": {
+   "cbsa": "19460",
+   "county": "Morgan County",
+   "state": "Alabama"
+  },
+  "08001": {
+   "cbsa": "19740",
+   "county": "Adams County",
+   "state": "Colorado"
+  },
+  "08005": {
+   "cbsa": "19740",
+   "county": "Arapahoe County",
+   "state": "Colorado"
+  },
+  "08014": {
+   "cbsa": "19740",
+   "county": "Broomfield County",
+   "state": "Colorado"
+  },
+  "08019": {
+   "cbsa": "19740",
+   "county": "Clear Creek County",
+   "state": "Colorado"
+  },
+  "08031": {
+   "cbsa": "19740",
+   "county": "Denver County",
+   "state": "Colorado"
+  },
+  "08035": {
+   "cbsa": "19740",
+   "county": "Douglas County",
+   "state": "Colorado"
+  },
+  "08039": {
+   "cbsa": "19740",
+   "county": "Elbert County",
+   "state": "Colorado"
+  },
+  "08047": {
+   "cbsa": "19740",
+   "county": "Gilpin County",
+   "state": "Colorado"
+  },
+  "08059": {
+   "cbsa": "19740",
+   "county": "Jefferson County",
+   "state": "Colorado"
+  },
+  "08093": {
+   "cbsa": "19740",
+   "county": "Park County",
+   "state": "Colorado"
+  },
+  "01061": {
+   "cbsa": "20020",
+   "county": "Geneva County",
+   "state": "Alabama"
+  },
+  "01067": {
+   "cbsa": "20020",
+   "county": "Henry County",
+   "state": "Alabama"
+  },
+  "01069": {
+   "cbsa": "20020",
+   "county": "Houston County",
+   "state": "Alabama"
+  },
+  "06025": {
+   "cbsa": "20940",
+   "county": "Imperial County",
+   "state": "California"
+  },
+  "02090": {
+   "cbsa": "21820",
+   "county": "Fairbanks North Star Borough",
+   "state": "Alaska"
+  },
+  "05007": {
+   "cbsa": "22220",
+   "county": "Benton County",
+   "state": "Arkansas"
+  },
+  "05087": {
+   "cbsa": "22220",
+   "county": "Madison County",
+   "state": "Arkansas"
+  },
+  "05143": {
+   "cbsa": "22220",
+   "county": "Washington County",
+   "state": "Arkansas"
+  },
+  "04005": {
+   "cbsa": "22380",
+   "county": "Coconino County",
+   "state": "Arizona"
+  },
+  "01033": {
+   "cbsa": "22520",
+   "county": "Colbert County",
+   "state": "Alabama"
+  },
+  "01077": {
+   "cbsa": "22520",
+   "county": "Lauderdale County",
+   "state": "Alabama"
+  },
+  "08069": {
+   "cbsa": "22660",
+   "county": "Larimer County",
+   "state": "Colorado"
+  },
+  "05033": {
+   "cbsa": "22900",
+   "county": "Crawford County",
+   "state": "Arkansas"
+  },
+  "05131": {
+   "cbsa": "22900",
+   "county": "Sebastian County",
+   "state": "Arkansas"
+  },
+  "06019": {
+   "cbsa": "23420",
+   "county": "Fresno County",
+   "state": "California"
+  },
+  "06039": {
+   "cbsa": "23420",
+   "county": "Madera County",
+   "state": "California"
+  },
+  "01055": {
+   "cbsa": "23460",
+   "county": "Etowah County",
+   "state": "Alabama"
+  },
+  "08077": {
+   "cbsa": "24300",
+   "county": "Mesa County",
+   "state": "Colorado"
+  },
+  "08123": {
+   "cbsa": "24540",
+   "county": "Weld County",
+   "state": "Colorado"
+  },
+  "06031": {
+   "cbsa": "25260",
+   "county": "Kings County",
+   "state": "California"
+  },
+  "09110": {
+   "cbsa": "25540",
+   "county": "Capitol Planning Region",
+   "state": "Connecticut"
+  },
+  "09130": {
+   "cbsa": "25540",
+   "county": "Lower Connecticut River Valley Planning Region",
+   "state": "Connecticut"
+  },
+  "05051": {
+   "cbsa": "26300",
+   "county": "Garland County",
+   "state": "Arkansas"
+  },
+  "01083": {
+   "cbsa": "26620",
+   "county": "Limestone County",
+   "state": "Alabama"
+  },
+  "01089": {
+   "cbsa": "26620",
+   "county": "Madison County",
+   "state": "Alabama"
+  },
+  "05031": {
+   "cbsa": "27860",
+   "county": "Craighead County",
+   "state": "Arkansas"
+  },
+  "05111": {
+   "cbsa": "27860",
+   "county": "Poinsett County",
+   "state": "Arkansas"
+  },
+  "04015": {
+   "cbsa": "29420",
+   "county": "Mohave County",
+   "state": "Arizona"
+  },
+  "05045": {
+   "cbsa": "30780",
+   "county": "Faulkner County",
+   "state": "Arkansas"
+  },
+  "05053": {
+   "cbsa": "30780",
+   "county": "Grant County",
+   "state": "Arkansas"
+  },
+  "05085": {
+   "cbsa": "30780",
+   "county": "Lonoke County",
+   "state": "Arkansas"
+  },
+  "05105": {
+   "cbsa": "30780",
+   "county": "Perry County",
+   "state": "Arkansas"
+  },
+  "05119": {
+   "cbsa": "30780",
+   "county": "Pulaski County",
+   "state": "Arkansas"
+  },
+  "05125": {
+   "cbsa": "30780",
+   "county": "Saline County",
+   "state": "Arkansas"
+  },
+  "06059": {
+   "cbsa": "31080",
+   "division": "11244",
+   "county": "Orange County",
+   "state": "California"
+  },
+  "06037": {
+   "cbsa": "31080",
+   "division": "31084",
+   "county": "Los Angeles County",
+   "state": "California"
+  },
+  "05035": {
+   "cbsa": "32820",
+   "county": "Crittenden County",
+   "state": "Arkansas"
+  },
+  "06047": {
+   "cbsa": "32900",
+   "county": "Merced County",
+   "state": "California"
+  },
+  "01097": {
+   "cbsa": "33660",
+   "county": "Mobile County",
+   "state": "Alabama"
+  },
+  "06099": {
+   "cbsa": "33700",
+   "county": "Stanislaus County",
+   "state": "California"
+  },
+  "01001": {
+   "cbsa": "33860",
+   "county": "Autauga County",
+   "state": "Alabama"
+  },
+  "01051": {
+   "cbsa": "33860",
+   "county": "Elmore County",
+   "state": "Alabama"
+  },
+  "01085": {
+   "cbsa": "33860",
+   "county": "Lowndes County",
+   "state": "Alabama"
+  },
+  "01101": {
+   "cbsa": "33860",
+   "county": "Montgomery County",
+   "state": "Alabama"
+  },
+  "06055": {
+   "cbsa": "34900",
+   "county": "Napa County",
+   "state": "California"
+  },
+  "09170": {
+   "cbsa": "35300",
+   "county": "South Central Connecticut Planning Region",
+   "state": "Connecticut"
+  },
+  "09180": {
+   "cbsa": "35980",
+   "county": "Southeastern Connecticut Planning Region",
+   "state": "Connecticut"
+  },
+  "06111": {
+   "cbsa": "37100",
+   "county": "Ventura County",
+   "state": "California"
+  },
+  "04013": {
+   "cbsa": "38060",
+   "county": "Maricopa County",
+   "state": "Arizona"
+  },
+  "04021": {
+   "cbsa": "38060",
+   "county": "Pinal County",
+   "state": "Arizona"
+  },
+  "04025": {
+   "cbsa": "39150",
+   "county": "Yavapai County",
+   "state": "Arizona"
+  },
+  "08101": {
+   "cbsa": "39380",
+   "county": "Pueblo County",
+   "state": "Colorado"
+  },
+  "06089": {
+   "cbsa": "39820",
+   "county": "Shasta County",
+   "state": "California"
+  },
+  "06065": {
+   "cbsa": "40140",
+   "county": "Riverside County",
+   "state": "California"
+  },
+  "06071": {
+   "cbsa": "40140",
+   "county": "San Bernardino County",
+   "state": "California"
+  },
+  "06017": {
+   "cbsa": "40900",
+   "county": "El Dorado County",
+   "state": "California"
+  },
+  "06061": {
+   "cbsa": "40900",
+   "county": "Placer County",
+   "state": "California"
+  },
+  "06067": {
+   "cbsa": "40900",
+   "county": "Sacramento County",
+   "state": "California"
+  },
+  "06113": {
+   "cbsa": "40900",
+   "county": "Yolo County",
+   "state": "California"
+  },
+  "06053": {
+   "cbsa": "41500",
+   "county": "Monterey County",
+   "state": "California"
+  },
+  "06073": {
+   "cbsa": "41740",
+   "county": "San Diego County",
+   "state": "California"
+  },
+  "06001": {
+   "cbsa": "41860",
+   "division": "36084",
+   "county": "Alameda County",
+   "state": "California"
+  },
+  "06013": {
+   "cbsa": "41860",
+   "division": "36084",
+   "county": "Contra Costa County",
+   "state": "California"
+  },
+  "06075": {
+   "cbsa": "41860",
+   "division": "41884",
+   "county": "San Francisco County",
+   "state": "California"
+  },
+  "06081": {
+   "cbsa": "41860",
+   "division": "41884",
+   "county": "San Mateo County",
+   "state": "California"
+  },
+  "06041": {
+   "cbsa": "41860",
+   "division": "42034",
+   "county": "Marin County",
+   "state": "California"
+  },
+  "06069": {
+   "cbsa": "41940",
+   "county": "San Benito County",
+   "state": "California"
+  },
+  "06085": {
+   "cbsa": "41940",
+   "county": "Santa Clara County",
+   "state": "California"
+  },
+  "06079": {
+   "cbsa": "42020",
+   "county": "San Luis Obispo County",
+   "state": "California"
+  },
+  "06087": {
+   "cbsa": "42100",
+   "county": "Santa Cruz County",
+   "state": "California"
+  },
+  "06083": {
+   "cbsa": "42200",
+   "county": "Santa Barbara County",
+   "state": "California"
+  },
+  "06097": {
+   "cbsa": "42220",
+   "county": "Sonoma County",
+   "state": "California"
+  },
+  "04003": {
+   "cbsa": "43420",
+   "county": "Cochise County",
+   "state": "Arizona"
+  },
+  "06077": {
+   "cbsa": "44700",
+   "county": "San Joaquin County",
+   "state": "California"
+  },
+  "05081": {
+   "cbsa": "45500",
+   "county": "Little River County",
+   "state": "Arkansas"
+  },
+  "05091": {
+   "cbsa": "45500",
+   "county": "Miller County",
+   "state": "Arkansas"
+  },
+  "04019": {
+   "cbsa": "46060",
+   "county": "Pima County",
+   "state": "Arizona"
+  },
+  "01063": {
+   "cbsa": "46220",
+   "county": "Greene County",
+   "state": "Alabama"
+  },
+  "01065": {
+   "cbsa": "46220",
+   "county": "Hale County",
+   "state": "Alabama"
+  },
+  "01107": {
+   "cbsa": "46220",
+   "county": "Pickens County",
+   "state": "Alabama"
+  },
+  "01125": {
+   "cbsa": "46220",
+   "county": "Tuscaloosa County",
+   "state": "Alabama"
+  },
+  "06095": {
+   "cbsa": "46700",
+   "county": "Solano County",
+   "state": "California"
+  },
+  "06107": {
+   "cbsa": "47300",
+   "county": "Tulare County",
+   "state": "California"
+  },
+  "09140": {
+   "cbsa": "47930",
+   "county": "Naugatuck Valley Planning Region",
+   "state": "Connecticut"
+  },
+  "06101": {
+   "cbsa": "49700",
+   "county": "Sutter County",
+   "state": "California"
+  },
+  "06115": {
+   "cbsa": "49700",
+   "county": "Yuba County",
+   "state": "California"
+  },
+  "04027": {
+   "cbsa": "49740",
+   "county": "Yuma County",
+   "state": "Arizona"
+  }
+ }
+}

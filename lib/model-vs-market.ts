@@ -606,7 +606,11 @@ export function modelVsMarketFor(args: {
   firstSignal?: FirstSignal | null;
   /** the deal row's own class column — "auto" shows what the deck turned out to be */
   storedAssetClass: string | null | undefined;
-  metro: { id: string; name: string } | null;
+  /** the market the live figures are read for (lib/market-county's
+   *  `placeDeal(...).live`); `placedBy` where the deal's county alone
+   *  placed it there, which reads the metro area's figures and never the
+   *  research tracker's */
+  metro: { id: string; name: string; placedBy?: unknown } | null;
   reads: MarketReads;
   /** the going-in cap as the page shows it; leave undefined to read the
    *  extraction's, pass null for none */
@@ -632,8 +636,11 @@ export function modelVsMarketFor(args: {
     zori: reads.zori,
     national: reads.national,
     // The tracker's read for this kind of building in this metro — the
-    // research layer, dated, beside the feeds.
-    tracker: metro ? trackerFor(metro.id, assetClass) : null,
+    // research layer, dated, beside the feeds. Research, so only for a
+    // market the address names: a deal its county alone placed (#447) reads
+    // the metro area's published figures, and the tracker's may be the core
+    // county's — Los Angeles's office vacancy is not Orange County's.
+    tracker: metro && !metro.placedBy ? trackerFor(metro.id, assetClass) : null,
     now: reads.now,
   });
 }
