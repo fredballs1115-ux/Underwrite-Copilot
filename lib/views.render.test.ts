@@ -3858,7 +3858,7 @@ describe("SiteFlagsCard — the flood chip says what FEMA's map says, and no mor
       renderToStaticMarkup(React.createElement(SiteFlagsCard, { result: { ...result(null), ...oz }, hasAddress: true }));
     const off = card({ opportunityZone: null, v: 3 });
     const offText = visibleText(off);
-    expect(offText).toContain("Tract's current number not on the Opportunity Zone list");
+    expect(offText).toContain("Tract's current number not on the 2018 Opportunity Zone list");
     expect(offText).toContain("Opportunity Zones were checked by the tract's current number.");
     expect(offText).not.toMatch(/not in an opportunity zone/i);
     expect(a11yIssues(off), "site flags card, off the list").toEqual([]);
@@ -3869,7 +3869,7 @@ describe("SiteFlagsCard — the flood chip says what FEMA's map says, and no mor
     expect(unloaded).not.toContain("current number");
     // A miss stored under the old rule is no answer until it is looked up again.
     expect(visibleText(card({ opportunityZone: null, v: 2 }))).toContain("Opportunity Zone: not checked");
-    expect(visibleText(card({ opportunityZone: null, v: 2 }))).not.toContain("not on the Opportunity Zone list");
+    expect(visibleText(card({ opportunityZone: null, v: 2 }))).not.toContain("Opportunity Zone list");
     expect(visibleText(card({ opportunityZone: { sourceDataset: "Maryland Opportunity Zones" }, v: 3 }))).toContain("Opportunity Zone tract");
   });
 });

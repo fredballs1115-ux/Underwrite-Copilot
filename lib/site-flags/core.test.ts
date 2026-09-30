@@ -386,7 +386,7 @@ describe("the Opportunity Zone check — not on the list only where the list hol
   it("says a miss was checked by the tract's current number, and never that the site is outside a zone", () => {
     const off = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V });
     expect(off.kind).toBe("not_listed");
-    expect(off.label).toBe("Tract's current number not on the Opportunity Zone list");
+    expect(off.label).toBe("Tract's current number not on the 2018 Opportunity Zone list");
     expect(off.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);
     expect(off.caveat).toContain("checked by the tract's current number");
     for (const text of [off.label, off.caveat ?? ""]) {
@@ -395,14 +395,14 @@ describe("the Opportunity Zone check — not on the list only where the list hol
     }
     expect(opportunityZoneRead({ opportunityZone: { sourceDataset: "x" }, v: SITE_FLAGS_V })).toEqual({
       kind: "listed",
-      label: "Opportunity Zone tract",
+      label: "Opportunity Zone tract (2018 designations)",
       caveat: null,
     });
   });
 
   it("a miss read by the 2010 tract the zones were designated on owes no caveat (#473)", () => {
     const off = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "2010" } });
-    expect(off).toEqual({ kind: "not_listed", label: "Tract not on the Opportunity Zone list", caveat: null });
+    expect(off).toEqual({ kind: "not_listed", label: "Tract not on the 2018 Opportunity Zone list", caveat: null });
     // Read by the current number, it keeps the caveat.
     const current = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "current" } });
     expect(current.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);

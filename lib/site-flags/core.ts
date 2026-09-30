@@ -149,20 +149,24 @@ export interface OpportunityZoneRead {
 export const OZ_CURRENT_NUMBER_CAVEAT =
   "Opportunity Zones were checked by the tract's current number. The zones were designated on 2010 tract numbers, so a tract split or renumbered since can sit in a zone and still miss the list.";
 
+/** The labels name the list's year: the zones on it are the 2018
+ *  designations (the CDFI Fund's workbook: "the final Qualified Opportunity
+ *  Zone designations for all States", updated December 14, 2018), and a
+ *  label that says which list stays true whatever is designated later. */
 export function opportunityZoneRead(
   flags: Pick<SiteFlagsResult, "opportunityZone" | "opportunityZoneUnchecked" | "v" | "ozTract">,
 ): OpportunityZoneRead {
   const oz = flags.opportunityZone;
-  if (oz && typeof oz === "object") return { kind: "listed", label: "Opportunity Zone tract", caveat: null };
+  if (oz && typeof oz === "object") return { kind: "listed", label: "Opportunity Zone tract (2018 designations)", caveat: null };
   // A "not on the list" stored before the state rule may have been read
   // against another state's zones: not an answer.
   if (oz === null && (flags.v ?? 1) >= OZ_STATE_RULE_V) {
     // Read by the 2010 number the zones were designated on, a miss is the
     // answer; read by the current number, it owes the caveat.
     if (flags.ozTract?.vintage === "2010") {
-      return { kind: "not_listed", label: "Tract not on the Opportunity Zone list", caveat: null };
+      return { kind: "not_listed", label: "Tract not on the 2018 Opportunity Zone list", caveat: null };
     }
-    return { kind: "not_listed", label: "Tract's current number not on the Opportunity Zone list", caveat: OZ_CURRENT_NUMBER_CAVEAT };
+    return { kind: "not_listed", label: "Tract's current number not on the 2018 Opportunity Zone list", caveat: OZ_CURRENT_NUMBER_CAVEAT };
   }
   const why = oz === "unchecked" && flags.opportunityZoneUnchecked ? OZ_UNCHECKED_WHY[flags.opportunityZoneUnchecked] : null;
   return { kind: "unchecked", label: `Opportunity Zone: not checked${why ? ` (${why})` : ""}`, caveat: null };

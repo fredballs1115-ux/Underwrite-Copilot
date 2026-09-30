@@ -3060,7 +3060,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   where the list holds the tract's state (`opportunityZoneFrom`,
   `OZ_STATE_RULE_V`: a v2 miss was read against any state's zones and now
   reads as not checked), and a check that did not run says why (no tract,
-  the tract lookup failed).
+  the tract lookup failed). The labels name the list's year ("Tract not on
+  the 2018 Opportunity Zone list"), so they stay true whatever is
+  designated later.
 - What the site says is held to its sources (#473, an audit's fixes):
   - **A rule's words are the file's.** Nothing but
     `scripts/seed-research.mjs` writes a rule's text to the database (the

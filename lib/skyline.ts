@@ -99,6 +99,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Arlington National Cemetery",
     license: "Public domain",
     licenseUrl: "",
+    size: [3008, 2000],
   },
   // The one suburban market with a waterfront that IS its picture: National
   // Harbor's Capital Wheel at dusk, from the same sheet. Chosen over the
@@ -109,6 +110,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "MamaGeek",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [3008, 2000],
   },
   // Northern Virginia is the one suburban market that gets a skyline, and
   // Rosslyn is the reason. PG County and Montgomery County still keep their
@@ -131,6 +133,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Theodore Christopher",
     license: "CC0",
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    size: [4867, 2692],
   },
   baltimore: {
     file: "Baltimore, Maryland skyline (cropped).jpg",
@@ -138,6 +141,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Quintin Soloviev",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [7988, 3495],
   },
   // From the same sheet: 5424px across against the 1600px file it replaces,
   // the towers sharp against a clear sky rather than soft behind autumn
@@ -148,6 +152,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Bruce Emmerling",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [5424, 3484],
   },
   // Second sheet (skyline-sheet run 2, 2026-09-21): the file it replaces was
   // a street corner at dusk — a hotel and a garage — and this is the
@@ -158,6 +163,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Bruce Emmerling",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [5436, 3352],
   },
   // The sample deal's own city, so this one carries /demo as well.
   philadelphia: {
@@ -166,6 +172,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "颐园居",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [4250, 2656],
   },
   newark_jc: {
     file: "Jersey City Skyline September 2025 038 (cropped).jpg",
@@ -173,6 +180,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Kidfly182",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [3793, 1466],
   },
   nyc: {
     file: "View of Empire State Building from Rockefeller Center New York City dllu (cropped).jpg",
@@ -180,6 +188,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Dllu",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [8207, 4616],
   },
   boston: {
     file: "Boston skyline from Longfellow Bridge September 2017 panorama 2.jpg",
@@ -187,6 +196,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "King of Hearts",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [9250, 3700],
   },
   // Sixth sheet (skyline-sheet run 35792083388, a one-market run — the
   // five-market sheet before it had shown six files for Chicago and the
@@ -202,6 +212,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "NorbertNagel",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [4000, 1668],
   },
   // Third sheet (skyline-sheet run 35661336976): the 6000px file it
   // replaces was a tight cluster of downtown towers under a blue sky —
@@ -213,6 +224,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Nserrano",
     license: "CC BY-SA 3.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    size: [2816, 1880],
   },
   san_francisco: {
     file: "SF From Marin Highlands3.jpg",
@@ -220,6 +232,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Paul.h",
     license: "Public domain",
     licenseUrl: "",
+    size: [2672, 1885],
   },
   seattle: {
     file: "View of Downtown Seattle from Ella Bailey Park (27305770463).jpg",
@@ -227,6 +240,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Tiffany Von Arnim",
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    size: [8443, 3361],
   },
   // Brickell rather than the whole bay: it is the submarket a CRE reader
   // means when they say Miami.
@@ -236,6 +250,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Rhododendrites",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [8330, 3456],
   },
   atlanta: {
     file: "Atlanta, Georgia Skyline.jpg",
@@ -243,6 +258,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Shawn M. Kent",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [1920, 1280],
   },
   // Fourth sheet (skyline-sheet run 35752500514, the first one-market run,
   // thirty-six files deep): the hazy plane-window aerial gives way to the
@@ -258,6 +274,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Robert Hensley",
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    size: [5951, 3669],
   },
   // pittsburgh: chosen by eye from contact sheet 7 (skyline-sheet run
   // 35943054619, 2026-09-24) — the golden-hour view over the Monongahela with PPG Place lit, the picture the city is known by — over a winter overlook framed by a bare tree and two night panoramas too short for the band.
@@ -267,6 +284,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "EEJCC",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [3264, 2448],
   },
   // denver: chosen by eye from contact sheet 7 (skyline-sheet run
   // 35943054619, 2026-09-24) — the article's own lead, the towers against the snow on the Front Range at 6782px — over a 2048×580 midnight panorama and a stadium aerial.
@@ -276,6 +294,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Quintin Soloviev",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [6782, 4069],
   },
   // nashville: chosen by eye from contact sheet 7 (skyline-sheet run
   // 35943054619, 2026-09-24) — the article's lead, downtown over the Cumberland with the river bridges in the frame at 6850px — over three drone aerials of the riverfront.
@@ -285,6 +304,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Quintin Soloviev",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [6850, 4113],
   },
   // austin: chosen by eye from contact sheet 7 (skyline-sheet run
   // 35943054619, 2026-09-24) — the article's lead, the tower cluster over Lady Bird Lake at 10242px — over the pedestrian-bridge view and a sunset frame from 2011.
@@ -294,6 +314,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Quintin Soloviev",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [10242, 5636],
   },
   // houston: chosen by eye from contact sheet 8 (skyline-sheet run
   // 35943350787, 2026-09-24) — the article's lead, the tower cluster over the bayou's trees at 4320px — over a 3587×1202 strip and street-level frames of the aquarium and the transit centre.
@@ -303,6 +324,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "David Daniel Turner",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [4320, 2160],
   },
   // minneapolis: chosen by eye from contact sheet 8 (skyline-sheet run
   // 35943350787, 2026-09-24) — the article's lead, the skyline over the river at 4828px — over St. Anthony Falls at dusk, which is the falls rather than the city, and a 5168×1528 strip.
@@ -312,6 +334,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "BpA9543",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [4828, 2672],
   },
   // las_vegas: chosen by eye from contact sheet 8 (skyline-sheet run
   // 35943350787, 2026-09-24) — the Strip lit at night from above at 6144px, the picture the place is known by — over a daytime aerial of downtown and the mountains, which is a city rather than Las Vegas.
@@ -321,6 +344,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Carol M. Highsmith",
     license: "Public domain",
     licenseUrl: "",
+    size: [6144, 4096],
   },
   // tampa: chosen by eye from contact sheet 8 (skyline-sheet run
   // 35943350787, 2026-09-24) — the article's lead, the towers across the river under a blue sky at 4810px — over two Gasparilla-festival frames from 2002 and a 1913 photograph.
@@ -330,6 +354,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Clément Bardot",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [4810, 2762],
   },
   // raleigh: chosen by eye from contact sheet 9 (skyline-sheet run
   // 35943520435, 2026-09-24) — the article's lead, the tower cluster and the amphitheatre lit low from the west at 4000px — over two panoramio street views, a Fayetteville Street frame and, from the search, a photograph of Kyiv by a Raleigh photographer.
@@ -339,6 +364,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Abhiram Juvvadi",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [4000, 2250],
   },
   // salt_lake_city: chosen by eye from contact sheet 9 (skyline-sheet run
   // 35943520435, 2026-09-24) — the article's lead, the skyline under the snow on the Wasatch at 3000px — over a rooftop view from the Church Office Building and four airport aerials.
@@ -350,6 +376,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Invictus323",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [3000, 1395],
   },
   // san_antonio: chosen by eye from contact sheet 9 (skyline-sheet run
   // 35943520435, 2026-09-24) — the city from its own observation tower at 4032px, the Grand Hyatt in the foreground — over a 2000×735 strip and a campus frame.
@@ -359,6 +386,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Jouaienttoi",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [4032, 1708],
   },
   // sacramento: chosen by eye from contact sheet 9 (skyline-sheet run
   // 35943520435, 2026-09-24) — the article's lead, the gold Tower Bridge with the skyline behind at 7967px — over a ballpark frame and two aerials.
@@ -368,6 +396,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Quintin Soloviev",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [7967, 4484],
   },
   // columbus: chosen by eye from contact sheet 9 (skyline-sheet run
   // 35943520435, 2026-09-24) — the article's lead, the LeVeque Tower and the river at 6188px, public domain — over the same view in two other crops and a rooftop frame from the tower.
@@ -377,6 +406,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Paul Wasneski",
     license: "Public domain",
     licenseUrl: "",
+    size: [6188, 4227],
   },  // kansas_city: chosen by eye from contact sheet 10 (skyline-sheet run
   // 35943694349, 2026-09-24), through the market band's own crop — the downtown article's own view, the towers and the Kauffman Center over Union Station's roof, 3264px — over a tight tower crop that loses its tops in the band, and an Army Corps aerial of Kansas City, Kansas.
   kansas_city: {
@@ -385,6 +415,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Brit By Birth",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [3264, 2448],
   },
   // st_louis: chosen by eye from contact sheet 10 (skyline-sheet run
   // 35943694349, 2026-09-24), through the market band's own crop — the article's lead, the Arch framing the courthouse dome, 3133px — over the Arch Overlook frame (a PNG, never served), a 2007 skyline strip too short for the band at 1139px, and a 1908 postcard.
@@ -394,6 +425,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Jefferson National Expansion Memorial, NPS from St. Louis, MO, USA",
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    size: [3133, 2400],
   },
   // cincinnati: chosen by eye from contact sheet 10 (skyline-sheet run
   // 35943694349, 2026-09-24), through the market band's own crop — the article's lead at 5568px, the towers, the stadium and the river in one frame — over the Roebling Bridge frame (a tower of the bridge and a sky) and the same photographer's view from Mt. Adams.
@@ -403,6 +435,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "EEJCC",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [5568, 2786],
   },
   // jacksonville: chosen by eye from contact sheet 10 (skyline-sheet run
   // 35943694349, 2026-09-24), through the market band's own crop — the article's lead at 7823px — over the Fuller Warren Bridge panorama, which in the band is an overpass, and a stadium aerial.
@@ -412,6 +445,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Quintin Soloviev",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [7823, 5035],
   },
   // detroit: chosen by eye from contact sheet 10 (skyline-sheet run
   // 35943694349, 2026-09-24), through the market band's own crop — the article's lead at 4773px — over a night frame from 2021 whose Renaissance Center falls out of the phone's crop, a Gordie Howe Bridge aerial and a 1929 panorama (a PNG).
@@ -421,6 +455,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "TheWxResearcher",
     license: "CC0",
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    size: [4773, 2787],
   },
   // portland: chosen by eye from contact sheet 11 (skyline-sheet run
   // 35943831078, 2026-09-24), through the market band's own crop — the view the city is known by, downtown under Mount Hood at 22500px and 3.75:1, the band's own shape — over the article's lead aerial, whose crop loses the mountain, and a night skyline on the Willamette that could be any river town.
@@ -430,6 +465,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "King of Hearts",
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    size: [22500, 6000],
   },
   // cleveland: chosen by eye from contact sheet 11 (skyline-sheet run
   // 35943831078, 2026-09-24), through the market band's own crop — the article's lead at 8199px, the Key Tower and the Terminal Tower tall in frame — over a sunrise panorama whose towers vanish under the words and the same view in June 2024, which loses the Key Tower's top.
@@ -439,6 +475,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Erik Drost",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [8199, 4340],
   },
   // phoenix: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35944782635, 2026-09-24), through the market band's own crop — the article's lead, an oblique aerial of the towers with the mountains beyond them — over a street corner and the airport's control tower, which are what the six-market sheet held, a hazy dusk from South Mountain and two night frames the band turns black.
@@ -448,6 +485,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "DPPed",
     license: "CC BY-SA 3.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    size: [3300, 2063],
   },
   // charlotte: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35944863842, 2026-09-24), through the market band's own crop — the Duke Energy Center's violet and the Bank of America crown filling the band — over the article's daytime lead, whose crop loses its tallest tower's top, a monochrome strip too short for the band and a stadium aerial.
@@ -457,6 +495,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Nan Palmero",
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    size: [6480, 4320],
   },
   // san_diego: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35944937703, 2026-09-24), through the market band's own crop — the view the city is known by, from its own tallest-buildings article — over a hazy night panorama, a sunrise panorama whose towers vanish under the words and two daytime frames that lose their tops.
@@ -466,6 +505,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "russellstreet",
     license: "CC BY-SA 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    size: [5289, 3537],
   },
   // orlando: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35944984991, 2026-09-24), through the market band's own crop — Lake Eola, the picture the city is known by, with the fountain and the towers reflected — over a high aerial, a rooftop over a car park and the same lake under a storm sky.
@@ -475,6 +515,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "Benoît Prieur",
     license: "CC0",
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    size: [4032, 2454],
   },
   // indianapolis: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35945058692, 2026-09-24), through the market band's own crop — the monument at the city's centre against a sunset — over two midday panoramas where the city is a strip under the words and the stadium and reservoir aerials the six-market sheet held; the credit is the name the runner printed, without the permission link printed after it.
@@ -484,6 +525,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "reddit user MikeSanborn",
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    size: [4382, 2230],
   },
   // riverside: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35945179705, 2026-09-24), through the market band's own crop — a real view of the place from the mountain over the campus — there is no skyline to photograph, and the convention-centre aerial and the San Bernardino station and airport frames were the alternatives.
@@ -493,6 +535,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     credit: "vlasta2",
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    size: [2512, 1844],
   },  // ── Metro areas the site reads no figures for (#472) ──────────────────────
   // Keyed by the metro area's Census code (`areaSkylineId`), each reached
   // through a deal's county (lib/market-picture) — a card and the deal page,

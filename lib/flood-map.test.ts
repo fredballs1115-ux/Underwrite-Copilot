@@ -110,7 +110,9 @@ beforeEach(() => {
   store.removed.length = 0;
 });
 
-describe("composeFloodFrame — the aerial, calmed, with the zones drawn over it", () => {
+// Full frames through sharp: seconds each on a loaded runner, so the
+// heavy blocks get the report tests' allowance rather than the 5 s default.
+describe("composeFloodFrame — the aerial, calmed, with the zones drawn over it", { timeout: 60_000 }, () => {
   it("lays the zones where FEMA drew them, at the zones' own pixels, and reads the classes each crop shows", async () => {
     const drawn = (await composeFloodFrame(await aerialJpeg(), await overlayPng(SFHA_ALPHA)))!;
     expect(intactImage(drawn.jpeg, "image/jpeg")).toBe(true);
@@ -140,7 +142,7 @@ describe("composeFloodFrame — the aerial, calmed, with the zones drawn over it
   });
 });
 
-describe("drawFloodFrame — one frame for the aerial and the zones", () => {
+describe("drawFloodFrame — one frame for the aerial and the zones", { timeout: 60_000 }, () => {
   it("asks both for the same ground: the aerial at the frame's pixels, the restyled zones at twice them, POSTed", async () => {
     const f = fetchers();
     const drawn = await drawFloodFrame(LOC, f);
@@ -161,7 +163,7 @@ describe("drawFloodFrame — one frame for the aerial and the zones", () => {
   });
 });
 
-describe("ensureFloodFrame — drawn once a deal, kept, and drawn again only when it no longer stands", () => {
+describe("ensureFloodFrame — drawn once a deal, kept, and drawn again only when it no longer stands", { timeout: 60_000 }, () => {
   it("stores the frame and records it on the deal's photo cache; the next ask reads it without drawing", async () => {
     const { client, db } = fakeDb({ lat: LOC.lat, lng: LOC.lng });
     const f = fetchers();
@@ -230,7 +232,7 @@ describe("ensureFloodFrame — drawn once a deal, kept, and drawn again only whe
   });
 });
 
-describe("floodCrop — the frame cut to a surface's shape", () => {
+describe("floodCrop — the frame cut to a surface's shape", { timeout: 60_000 }, () => {
   it("cuts from the centre, and never serves more pixels than the frame holds in that shape", async () => {
     const { client, db } = fakeDb(null);
     const record = (await ensureFloodFrame(client, "deal-6", LOC, db.photo, { fetchers: fetchers() }))!;
