@@ -23,7 +23,9 @@ import {
 // model at render time — hardcoded copies of these figures are exactly what
 // drifted (the page said 7.1% while the engine computed 6.9%).
 import { computeModel } from "@/lib/model/compute";
-import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import { scoreMandateFit, type MandateVerdict } from "@/lib/mandate";
 import { sampleLegal } from "@/lib/sample-legal";
 import { ruleCounts } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
@@ -701,13 +703,16 @@ export default function Home() {
 
             {/* Stat strip — the screen, quantified, two words each. */}
             <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-4">
+              {/* Each stat read once: the label is the term, the figure
+                  its value, and the column reversed so the figure still
+                  sits on top. (A hidden term above a second copy of the
+                  label as a value had a screen reader say it twice.) */}
               {STATS.map((st) => (
-                <div key={st.label}>
-                  <dt className="sr-only">{st.label}</dt>
+                <div key={st.label} className="flex flex-col-reverse">
+                  <dt className="mt-1 text-xs text-white/60">{st.label}</dt>
                   <dd className="font-mono text-3xl font-semibold tabular-nums text-accent">
                     <CountUp value={st.value} suffix={st.suffix} />
                   </dd>
-                  <dd className="mt-1 text-xs text-white/60">{st.label}</dd>
                 </div>
               ))}
             </dl>
@@ -1329,6 +1334,19 @@ function DealPreview() {
       : SAMPLE_DEAL.verdict.verdict === "pass_on"
         ? "No-go"
         : "Caution";
+  // The sample's mandate fit against its demo buy box — the score and call
+  // /demo's buy box draws — so the chip says what it is ("Fit") and can
+  // never drift from the engine.
+  const fit = scoreMandateFit(
+    SAMPLE_DEAL.asset_class,
+    dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
+    SAMPLE_DEMO_BOX,
+  );
+  const FIT: Record<MandateVerdict, { word: string; cls: string }> = {
+    PURSUE: { word: "Pursue", cls: "bg-pass/10 text-pass" },
+    WATCH: { word: "Watch", cls: "bg-caution/10 text-caution" },
+    PASS: { word: "Pass", cls: "bg-kill/10 text-kill" },
+  };
   return (
     <div className="relative">
       {/* Glow + a second sheet behind, so the card reads as a stack. */}
@@ -1341,12 +1359,18 @@ function DealPreview() {
           <p className="text-sm font-semibold tracking-tight">
             The Maddox at Brewerytown
           </p>
+          {/* Two chips, each named for a screen reader: the call, and the
+              buy-box fit, which says "Fit" on its face. */}
           <span className="stamp-in rounded-full bg-caution/10 px-2.5 py-0.5 text-xs font-semibold text-caution ring-1 ring-caution/30">
+            <span className="sr-only">Verdict: </span>
             {verdictWord}
           </span>
-          <span className="rounded-full bg-caution/10 px-2 py-0.5 text-[10px] font-semibold text-caution">
-            WATCH
-          </span>
+          {fit.score !== null && fit.verdict ? (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FIT[fit.verdict].cls}`}>
+              <span className="sr-only">Buy-box </span>
+              {`Fit ${fit.score} · ${FIT[fit.verdict].word}`}
+            </span>
+          ) : null}
         </div>
         <p className="mt-0.5 text-xs text-muted">
           Brewerytown, Philadelphia · Multifamily · {inputs.units} units
