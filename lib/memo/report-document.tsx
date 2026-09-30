@@ -13,6 +13,7 @@ import type {
   FirstSignal,
   ReconciliationResult,
   MarketResult,
+  VerdictResult,
 } from "@/lib/anthropic/types";
 import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type MemoData } from "./memo-document";
 
@@ -744,6 +745,131 @@ function PageChrome({
   );
 }
 
+const CALL_COLOR: Record<string, string> = { Go: C.pass, Caution: C.caution, "No-go": C.kill };
+// A range's confidence, in the memo's and the deal page's colours.
+const CONF_COLOR: Record<string, string> = { high: C.pass, medium: C.caution, low: C.kill };
+const CALL_WORD: Record<string, string> = { pass: "Go", caution: "Caution", pass_on: "No-go" };
+const LEVER_WORD: Record<string, string> = { basis: "Basis", exit: "Exit", debt: "Debt" };
+const SCENARIO_WORD: Record<string, string> = { conservative: "Conservative", base: "Base", sponsor: "Sponsor" };
+
+/**
+ * The call, in full: what the one-page memo clamps to fit its boxes or
+ * drops for room — the whole rationale, every top risk and next step, each
+ * range with its source, its basis and its confidence, and the deal-killers
+ * and the flips in their own words. Only what the verdict stores, through
+ * the WinAnsi filter; nothing is summarised or added.
+ */
+function CallInFullPage({
+  verdict,
+  memo,
+}: {
+  verdict: VerdictResult;
+  memo: MemoData;
+}) {
+  const word = memo.verdictWord ?? "";
+  const color = CALL_COLOR[word] ?? C.brand;
+  const risks = list(verdict.topRisks).map(str).filter(Boolean);
+  const steps = list(verdict.nextSteps).map(str).filter(Boolean);
+  const screen = verdict.screen;
+  const ranges = list(screen?.ranges) as NonNullable<VerdictResult["screen"]>["ranges"];
+  const killers = list(screen?.dealKillers) as NonNullable<VerdictResult["screen"]>["dealKillers"];
+  const flips = list(screen?.sensitivity) as NonNullable<VerdictResult["screen"]>["sensitivity"];
+  const item = { fontSize: 9, color: C.ink, lineHeight: 1.3 } as const;
+  return (
+    <PageChrome title="The call, in full" count={[word, memo.screened].filter(Boolean).join(" · ")} dealName={memo.name} branding={memo.branding}>
+      <Text style={s.sub}>
+        {"What the one-page memo shortens to fit or leaves out, as the verdict states it: the whole rationale, every risk and next step, and each range with its source, basis and confidence."}
+      </Text>
+      {str(verdict.reason) ? (
+        <View style={[s.summaryBox, { marginTop: 0, borderLeftColor: color }]} wrap={false}>
+          {word ? <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color, marginBottom: 3 }}>{word}</Text> : null}
+          <Text style={[s.summaryText, { lineHeight: 1.35 }]}>{str(verdict.reason)}</Text>
+        </View>
+      ) : null}
+      {risks.length > 0 ? (
+        <View>
+          <TitleRow title="Top risks" count={`${risks.length}`} marginTop={14} />
+          {risks.map((r, i) => (
+            <View key={i} style={{ flexDirection: "row", marginBottom: 4 }} wrap={false}>
+              <Text style={{ width: 12, fontSize: 9, color: C.muted }}>•</Text>
+              <Text style={[item, { flex: 1 }]}>{r}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {steps.length > 0 ? (
+        <View>
+          <TitleRow title="Next steps" count={`${steps.length}`} marginTop={10} />
+          {steps.map((n, i) => (
+            <View key={i} style={{ flexDirection: "row", marginBottom: 4 }} wrap={false}>
+              <Text style={{ width: 14, fontSize: 9, color: C.muted }}>{`${i + 1}.`}</Text>
+              <Text style={[item, { flex: 1 }]}>{n}</Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {ranges.length > 0 ? (
+        <View>
+          <TitleRow title="The screen's ranges" count={`${ranges.length}`} marginTop={10} />
+          <View style={s.tableHead} fixed>
+            <Text style={[s.headText, { width: "34%" }]}>Assumption</Text>
+            <Text style={[s.headText, { width: "15%", textAlign: "right" }]}>Low</Text>
+            <Text style={[s.headText, { width: "15%", textAlign: "right" }]}>Base</Text>
+            <Text style={[s.headText, { width: "15%", textAlign: "right" }]}>High</Text>
+            <Text style={[s.headText, { width: "21%", textAlign: "right" }]}>Confidence</Text>
+          </View>
+          {ranges.map((r, i) => (
+            <View key={i} style={[s.row, { flexDirection: "column", alignItems: "stretch" }, i % 2 === 1 ? s.rowAlt : {}]} wrap={false}>
+              <View style={{ flexDirection: "row" }}>
+                <Text style={{ width: "34%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}>{str(r?.label)}</Text>
+                <Text style={{ width: "15%", fontSize: 8.5, textAlign: "right" }}>{str(r?.low)}</Text>
+                <Text style={{ width: "15%", fontSize: 8.5, textAlign: "right", fontFamily: "Helvetica-Bold", color: C.brand }}>{str(r?.base)}</Text>
+                <Text style={{ width: "15%", fontSize: 8.5, textAlign: "right" }}>{str(r?.high)}</Text>
+                <Text style={{ width: "21%", fontSize: 8, textAlign: "right", color: CONF_COLOR[str(r?.confidence)] ?? C.muted }}>
+                  {str(r?.confidence)}
+                </Text>
+              </View>
+              {str(r?.source) ? (
+                <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 2 }}>{str(`Source: ${str(r?.source)}`)}</Text>
+              ) : null}
+              {str(r?.basis) ? (
+                <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(`What drives the spread: ${str(r?.basis)}`)}</Text>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {killers.length > 0 ? (
+        <View wrap={false}>
+          <TitleRow title="The deal-killers" marginTop={10} />
+          {killers.map((k, i) => (
+            <View key={i} style={{ marginBottom: 5 }} wrap={false}>
+              <Text style={[item, { fontFamily: "Helvetica-Bold", color: C.brand }]}>
+                {str(`${i + 1}. ${LEVER_WORD[str(k?.lever)] ?? str(k?.lever)}`)}
+              </Text>
+              {str(k?.read) ? <Text style={item}>{str(k?.read)}</Text> : null}
+              {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`Breaks if: ${str(k?.risk)}`)}</Text> : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {flips.length > 0 ? (
+        <View wrap={false}>
+          <TitleRow title="Where the call flips" marginTop={10} />
+          {flips.map((f, i) => {
+            const call = CALL_WORD[str(f?.call)] ?? str(f?.call);
+            return (
+              <Text key={i} style={[item, { marginBottom: 3 }]}>
+                {str(`${SCENARIO_WORD[str(f?.scenario)] ?? str(f?.scenario)}: ${call}${str(f?.note) ? ` — ${str(f?.note)}` : ""}`)}
+              </Text>
+            );
+          })}
+        </View>
+      ) : null}
+    </PageChrome>
+  );
+}
+
 export interface ReportInput {
   deal: DealRow;
   memo: MemoData;
@@ -1262,6 +1388,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
   const reconciliation = deal.reconciliation as ReconciliationResult | null;
+  const verdict = (deal.verdict as VerdictResult | null) ?? null;
 
   const metrics = list(extraction?.metrics) as NonNullable<
     ExtractionResult["metrics"]
@@ -1339,6 +1466,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     >
       {/* Page 1: the one-page memo, unchanged — the executive read. */}
       <MemoPage data={memo} />
+
+      {/* What the memo shortens to fit or leaves out, as the verdict
+          states it, before any page the model computed. */}
+      {verdict && <CallInFullPage verdict={verdict} memo={memo} />}
 
       {/* The plan page, before the IRR grids, on a deal that is not a
           stabilized asset: the plan as the OM states it, then yield on total

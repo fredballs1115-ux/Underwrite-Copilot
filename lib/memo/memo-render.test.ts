@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { MemoDocument, basePosition, buildMemoData } from "./memo-document";
+import { MemoDocument, basePosition, buildMemoData, clampWords } from "./memo-document";
 import { pdfFillCountOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
@@ -798,6 +798,31 @@ describe("MemoDocument (redesigned)", () => {
     expect(flipsAtBreak[1]).toMatch(/screening memo, continued WHERE THE CALL FLIPS/);
     expect(killersAtBreak[1]).toMatch(/screening memo, continued 1\. Basis/);
   }, 60000);
+
+  it("clamps a line to its box at a word boundary, never inside a figure or on a word that leaves the clause hanging", () => {
+    const reason =
+      "The going-in basis is rich for a receivership sale and the returns lean on an aggressive exit, a rent ramp the LIHTC limits cap, and an assumable HUD loan whose rate advantage mostly sits in the price. Worth a closer look only if the receiver moves on price or the ramp is de-risked.";
+    // The old clamp printed "…or the ramp is de-ris…".
+    const r = clampWords(reason, 280);
+    expect(r.length).toBeLessThanOrEqual(280);
+    expect(r).toMatch(/…$/);
+    expect(r).not.toMatch(/de-ris…$/);
+    expect(reason.startsWith(r.slice(0, -1).trimEnd())).toBe(true);
+    expect(r).toMatch(/ or the ramp…$/);
+    // "…to 9.3% from 11.1%" once lost its second figure and kept "from".
+    const killer = "A 100 bps rate shock takes the levered IRR to 9.3% from 11.1% at exit.";
+    expect(clampWords(killer, 60)).toBe("A 100 bps rate shock takes the levered IRR to 9.3%…");
+    // A figure is never cut, nor a range's two ends apart.
+    expect(clampWords("Market rents of $2,400 – $2,600 a month across the comps", 28)).toBe("Market rents…");
+    expect(clampWords("Exit cap 5.25% to 5.75% on the comps", 20)).toBe("Exit cap…");
+    expect(clampWords("A flat 5.5% exit knocks roughly 180 bps off the IRR.", 40)).toBe("A flat 5.5% exit knocks roughly 180 bps…");
+    expect(clampWords("A flat 5.5% exit knocks roughly 180 bps off the IRR.", 38)).toBe("A flat 5.5% exit knocks roughly…");
+    // A whole sentence kept is ended as one, with the ellipsis after it.
+    expect(clampWords("The basis is rich. Worth a look only on price.", 24)).toBe("The basis is rich. …");
+    // What fits is untouched; one word longer than the box is cut.
+    expect(clampWords("Rent roll actual", 28)).toBe("Rent roll actual");
+    expect(clampWords("https://example.com/a-very-long-path-with-no-spaces", 20)).toBe("https://example.com…");
+  });
 
   it("labels a market flag's typical range as the rule of thumb it is, as the deal page and the report do", async () => {
     // A verdict without the pre-model screen keeps the comp & market flags.

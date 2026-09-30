@@ -11,7 +11,7 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, rangeRead, ReportDocument } from "./report-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
-import { pdfFillCountOf, pdfTextOf } from "./pdf-text-of";
+import { pdfFillCountOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
 import { TINY_PNG_DATA_URI, tinyPng } from "./test-png";
 import { floodZoneLine, type FloodMapView } from "@/lib/site-flags/core";
 
@@ -218,6 +218,54 @@ describe("ReportDocument (full report)", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  it("prints the call in full after the memo: the whole rationale, every risk and step, each range's source, basis and confidence", async () => {
+    const reason =
+      "The going-in basis is rich for a receivership sale and the returns lean on an aggressive exit, a rent ramp the LIHTC limits cap, and an assumable HUD loan whose rate advantage mostly sits in the price. Worth a closer look only if the receiver moves on price or the ramp is de-risked.";
+    const verdict = {
+      ...SAMPLE_DEAL.verdict,
+      generatedAt: "2026-09-28T14:00:00.000Z",
+      reason,
+      topRisks: [...SAMPLE_DEAL.verdict.topRisks, "A fourth risk the memo has no room for.", "And a fifth."],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const input = buildReportData(deal, "September 30, 2026", []);
+    // The memo on page one clamps the rationale and keeps two risks.
+    expect(input.memo.verdictReason).not.toBe(reason);
+    expect(input.memo.topRisks).toHaveLength(2);
+    const pages = pdfPageTextsOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    ).map((p) => p.replace(/\s+/g, " "));
+    const at = pages.findIndex((p) => p.includes("The call, in full"));
+    // Right after the memo's page (or pages), before any page the model computed.
+    expect(at).toBeGreaterThanOrEqual(1);
+    expect(pages.slice(0, at).every((p) => p.includes("Deal Screening Memo") || p.includes("screening memo, continued"))).toBe(true);
+    const text = pages.slice(at).join(" ");
+    expect(text).toContain("Caution · Screened Sep 28, 2026");
+    expect(text).toContain(reason);
+    for (const r of verdict.topRisks) expect(text).toContain(r);
+    for (const n of verdict.nextSteps) expect(text).toContain(n);
+    for (const r of verdict.screen!.ranges) {
+      expect(text).toContain(`Source: ${r.source}`);
+      expect(text).toContain(`What drives the spread: ${r.basis}`);
+    }
+    for (const k of verdict.screen!.dealKillers) expect(text).toContain(`Breaks if: ${k.risk}`);
+    for (const f of verdict.screen!.sensitivity) expect(text).toContain(f.note);
+    // No verdict, no page.
+    const bare = buildReportData({ ...deal, verdict: null } as unknown as DealRow, "September 30, 2026", []);
+    const bareText = pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input: bare }) as unknown as Parameters<typeof renderToBuffer>[0]));
+    expect(bareText).not.toContain("The call, in full");
+  }, 60000);
 
   it("prints the deal page's max bid — solved on the buy box's every floor, the binding one named — never the IRR floor's alone", async () => {
     // The demo report route's own chain, beside the demo page's playground.

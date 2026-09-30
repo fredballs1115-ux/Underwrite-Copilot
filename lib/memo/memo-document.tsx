@@ -363,10 +363,54 @@ export interface MemoCover {
 const str = (v: unknown): string =>
   pdfSafe(typeof v === "string" ? v : v == null ? "" : String(v));
 
-const clamp = (v: unknown, n: number) => {
+// A figure, with its unit and a range's other end: "$1,200", "9.3%", "180
+// bps", "1.25x", "$2,400 \u2013 $2,600", "2.5 to 3.5%". A clamp never cuts
+// inside one.
+const FIGURE =
+  /[$\u20ac\u00a3]?\d[\d,]*(?:\.\d+)?(?:\s?(?:%|bps|bp|pts?|x|[kKMB]|MM|SF)\b|%)?(?:\s*(?:\u2013|\u2014|-|to)\s*[$\u20ac\u00a3]?\d[\d,]*(?:\.\d+)?(?:\s?(?:%|bps|bp|pts?|x|[kKMB]|MM|SF)\b|%)?)?/g;
+// Words a cut must not end on: a clause that stops at "from" or "the"
+// promises a figure or a noun the reader never gets.
+const DANGLING = new Set(
+  "a an the of to from at by for in on with and or nor but vs vs. versus against than into over under as per if is are was were be its their which that".split(" "),
+);
+
+/**
+ * Clamp to `n` characters for a fixed-size box on the one-page memo: cut at
+ * a word boundary, never inside a figure, never after a word that leaves
+ * the clause hanging, and say it was cut with an ellipsis. The rationale
+ * once ended "\u2026the ramp is de-ris\u2026" and a deal-killer "\u2026to 9.3% from\u2026";
+ * the full report's "The call, in full" page prints every word.
+ */
+export function clampWords(v: unknown, n: number): string {
   const s = str(v);
-  return s.length > n ? s.slice(0, n - 1).trimEnd() + "\u2026" : s;
-};
+  if (s.length <= n) return s;
+  const room = n - 1; // the ellipsis
+  const figures = [...s.matchAll(FIGURE)].map((m) => [m.index!, m.index! + m[0].length] as const);
+  const insideFigure = (i: number) => figures.some(([a, b]) => i > a && i < b);
+  let cut = -1;
+  for (let i = Math.min(room, s.length - 1); i > 0; i--) {
+    if (/\s/.test(s[i]) && !insideFigure(i)) {
+      cut = i;
+      break;
+    }
+  }
+  // One word longer than the box (a URL, a run of digits): cut it.
+  if (cut <= 0) return `${s.slice(0, room).trimEnd()}\u2026`;
+  let head = s.slice(0, cut);
+  for (;;) {
+    const trimmed = head.replace(/[\s,;:(\u2013\u2014-]+$/, "");
+    const last = trimmed.match(/(\S+)$/)?.[1] ?? "";
+    if (DANGLING.has(last.toLowerCase()) && trimmed.length > last.length) {
+      head = trimmed.slice(0, trimmed.length - last.length);
+      continue;
+    }
+    head = trimmed;
+    break;
+  }
+  return /[.!?]$/.test(head) ? `${head} \u2026` : `${head}\u2026`;
+}
+
+const clamp = clampWords;
 
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
