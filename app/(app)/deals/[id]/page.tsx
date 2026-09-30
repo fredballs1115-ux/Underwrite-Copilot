@@ -46,12 +46,15 @@ import { PICTURE_CREDIT, ensureDealPicture, memorandumPhotoCredit } from "@/lib/
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/pipeline-slots";
-import type { DealVisualCache } from "@/lib/deal-location";
+import { cacheFresh, resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
-import { floodKey, floodZoneLine, siteFlagsOutdated, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
-import { floodLegend } from "@/lib/flood-map";
+import { floodZoneLine, siteFlagsOutdated, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { VENDORED_LEGEND, ensureFloodFrame, floodLegend } from "@/lib/flood-map";
+import { FLOOD_FRAME_VERSION, floodFrameCurrent, pointKey } from "@/lib/flood-frame-core";
+import { floodClassOfZone } from "@/lib/flood-style";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
 import { buildingSfRow, findGoingInCap, parsePrice } from "@/lib/criteria";
@@ -848,18 +851,39 @@ export default async function DealPage({
     });
   }
 
-  // The Flood tab's key is FEMA's own legend (lib/flood-map, cached a day).
-  // Asked for here and read at the picture, so a slow FEMA overlaps the
-  // page's other reads; a legend that has not answered in 2.5 s leaves the
-  // key out rather than holding the page. A street address only: a
-  // neighbourhood placement's centre is not the building.
+  // The Flood tab (#472): the deal's flood frame, drawn once and kept
+  // (lib/flood-map). Where the location this page already knows has a
+  // current frame, its key rides with the page; where it has none, the frame
+  // is drawn behind the page, so it is usually there by the time the view is
+  // opened — the view waits for it otherwise. A street address only, and
+  // never a placement no finer than a neighbourhood: neither centre is the
+  // building. FEMA's legend names the building's zone: its own, cached a
+  // day, or the runner's copy when it has not answered in 1.5 s.
   const floodStreet = !!dealAddress?.street?.trim();
+  const visualCache = (deal.photo as DealVisualCache | null) ?? null;
+  const knownPoint =
+    cacheFresh(visualCache, Date.now(), dealAddress) && typeof visualCache?.lat === "number" && typeof visualCache?.lng === "number"
+      ? { lat: visualCache.lat, lng: visualCache.lng }
+      : null;
+  const floodArea = !!knownPoint && visualCache?.geoPrecision === "area";
+  const floodFrame = knownPoint && floodFrameCurrent(visualCache?.floodFrame, knownPoint) ? visualCache?.floodFrame ?? null : null;
+  if (floodStreet && !floodArea && !floodFrame) {
+    after(async () => {
+      try {
+        const admin = createSupabaseAdminClient();
+        const loc = await resolveDealLocation(admin, id, dealAddress, visualCache);
+        if (loc && loc.precision !== "area") await ensureFloodFrame(admin, id, loc, visualCache);
+      } catch {
+        // drawn on the view's own ask instead
+      }
+    });
+  }
   const floodLegendRead: Promise<NfhlLegendEntry[]> = floodStreet
     ? Promise.race([
         floodLegend(),
-        new Promise<NfhlLegendEntry[]>((resolve) => setTimeout(() => resolve([]), 2500)),
+        new Promise<NfhlLegendEntry[]>((resolve) => setTimeout(() => resolve(VENDORED_LEGEND), 1500)),
       ])
-    : Promise.resolve([]);
+    : Promise.resolve(VENDORED_LEGEND);
 
   // The buy-box call as one chip. When there's a numeric mandate-fit score,
   // it leads — "Buy box 82 · Pursue", coloured by the PURSUE/WATCH/PASS call.
@@ -986,9 +1010,15 @@ export default async function DealPage({
               market={marketPicture}
               gallery={gallery}
               flood={
-                floodStreet
+                floodStreet && !floodArea
                   ? {
-                      key: floodKey(floodLegendEntries, siteFlags?.flood),
+                      src: `/api/deals/${id}/flood?v=${FLOOD_FRAME_VERSION}.${knownPoint ? pointKey(knownPoint) : "0"}`,
+                      classes: floodFrame ? { page: floodFrame.classes.page, full: floodFrame.classes.full } : null,
+                      here:
+                        siteFlags?.flood && siteFlags.flood !== "unavailable"
+                          ? floodClassOfZone(floodLegendEntries, siteFlags.flood.zone, siteFlags.flood.subtype)
+                          : null,
+                      zone: siteFlags?.flood && siteFlags.flood !== "unavailable" ? `Zone ${siteFlags.flood.zone}` : null,
                       line: floodZoneLine(siteFlags?.flood, floodLegendEntries),
                     }
                   : null

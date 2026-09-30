@@ -1,9 +1,35 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
-import { NFHL_ROOT, REPORT_FLOOD_SIZE, nfhlOverlayUrl } from "@/lib/basemaps";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import vendoredLegend from "@/data/nfhl-legend.json";
+import { NFHL_ROOT, REPORT_FLOOD_SIZE, nfhlRestyledForm, usgsAerialUrl } from "@/lib/basemaps";
 export { FLOOD_MIN_ZOOM, FLOOD_ZOOM, REPORT_FLOOD_SIZE } from "@/lib/basemaps";
+import { finishAerial } from "@/lib/aerial-finish";
 import {
-  floodKey,
+  FLOOD_AERIAL_MUTE,
+  FLOOD_CLASS_LABEL,
+  classesIn,
+  floodClassOfZone,
+  floodDynamicLayers,
+  floodStyleOf,
+  floodSwatchSvg,
+  overlayAlphaScale,
+  unscaleAlpha,
+  type FloodClassKey,
+} from "@/lib/flood-style";
+import {
+  FLOOD_CROPS,
+  FLOOD_FRAME,
+  FLOOD_FRAME_VERSION,
+  cropBox,
+  cropRegion,
+  floodFrameCurrent,
+  pointKey,
+  servedSize,
+  type FloodCrop,
+  type FloodFrameRecord,
+} from "@/lib/flood-frame-core";
+import {
   floodZoneLine,
   parseNfhlLegend,
   resolveNfhlLayerId,
@@ -11,32 +37,51 @@ import {
   type NfhlLegendEntry,
   type SiteFlagsResult,
 } from "@/lib/site-flags/core";
-import type { SupabaseClient } from "@supabase/supabase-js";
+import { floodFramePath } from "@/lib/storage-paths";
+import { downloadDealFile, removeStorageFiles, uploadDealPhoto } from "@/lib/storage";
+import { resolveDealLocation, writeCache, type DealLocation, type DealVisualCache } from "@/lib/deal-location";
 import type { StructuredAddress } from "@/lib/address";
-import { resolveDealLocation, type DealLocation, type DealVisualCache } from "@/lib/deal-location";
-import { fetchOneImage } from "@/lib/imagery";
+import { RunGate } from "@/lib/anthropic/run-gate";
 import { intactImage } from "@/lib/memo/cover-aerial";
 
-// FEMA's flood map over the deal's aerial (#425): the National Flood Hazard
-// Layer's zones, in FEMA's own symbology, for the aerial's own frame.
+// FEMA's flood map over the deal's aerial (#425), drawn once a deal (#472).
 //
-// What the runner printed before any of this was written (flood-sheet run,
-// 2026-09-25): the service answers a layer list with the zones on layer 28;
-// that layer draws only at map scales finer than 1:36,112; its legend is
-// eight entries of 20px swatches; the export answers a transparent PNG for a
-// Web-Mercator bbox; and the composites line up over the USGS frame. The
-// same run's first attempt died on a connection reset from FEMA's host, so
-// every request here is asked twice before it is given up on.
+// What the runner printed before any of this was written (flood-sheet runs,
+// 2026-09-25 and 2026-09-30): the zones are layer 28 of the service; that
+// layer draws only finer than 1:36,112; its legend is eight entries, each
+// with the FLD_ZONE,ZONE_SUBTY values it draws; the export answers a
+// transparent PNG for a Web-Mercator bbox, POSTed dynamic layers in the
+// site's palette included, up to 4096 pixels a side at any dpi; the
+// composites line up over the USGS frame. And the hosts are slow cold: the
+// first request of a run took 20–30 s where the rest took one or two, and one
+// run died on a connection reset — so every request is asked twice, with a
+// timeout sized to the cold answer, and the frame is drawn behind the page
+// and kept, so a reader waits for FEMA at most once a month a deal.
 
 export const FLOOD_ROOT = process.env.NFHL_SERVICE_ROOT ?? NFHL_ROOT;
 
-const UA = { "user-agent": "underwrite-copilot/1.0", accept: "application/json" };
+const UA = "underwrite-copilot/1.0";
+/** A cold FEMA or USGS answer took up to 30 s on the runner. */
+const REQUEST_TIMEOUT_MS = 35_000;
 
-async function fetchWithRetry(url: string, init: RequestInit, timeoutMs: number): Promise<Response> {
-  let last: unknown;
+/**
+ * A request asked up to twice. A throw (a timeout, a reset), a 5xx, or an
+ * answer that is not what was asked for (`ok` false — ArcGIS answers 200 with
+ * a JSON error body when it dislikes a request) is asked again; the second
+ * answer stands either way.
+ */
+async function askTwice(
+  url: string,
+  init: RequestInit,
+  ok: (res: Response) => boolean,
+  timeoutMs = REQUEST_TIMEOUT_MS,
+): Promise<Response> {
+  let last: unknown = null;
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
-      return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+      const res = await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) });
+      if (ok(res) || attempt === 1) return res;
+      last = new Error(`HTTP ${res.status} ${res.headers.get("content-type") ?? ""} from ${new URL(url).host}`);
     } catch (err) {
       last = err;
     }
@@ -44,8 +89,10 @@ async function fetchWithRetry(url: string, init: RequestInit, timeoutMs: number)
   throw last instanceof Error ? last : new Error(String(last));
 }
 
+const isImage = (res: Response) => res.ok && (res.headers.get("content-type") ?? "").startsWith("image/");
+
 async function fetchJson(url: string): Promise<unknown> {
-  const res = await fetchWithRetry(url, { headers: UA }, 12_000);
+  const res = await askTwice(url, { headers: { "user-agent": UA, accept: "application/json" } }, (r) => r.ok, 15_000);
   if (!res.ok) throw new Error(`HTTP ${res.status} from ${new URL(url).host}`);
   return res.json();
 }
@@ -53,7 +100,7 @@ async function fetchJson(url: string): Promise<unknown> {
 /** The zones layer's id, from the service's own layer list. A service that
  *  lists no zones layer throws rather than returns, so the miss is not
  *  cached for a day. */
-const floodLayerId = unstable_cache(
+const liveLayerId = unstable_cache(
   async (root: string): Promise<number> => {
     const id = resolveNfhlLayerId(await fetchJson(`${root}?f=json`));
     if (id === null) throw new Error("FEMA's flood service lists no Flood Hazard Zones layer");
@@ -63,7 +110,7 @@ const floodLayerId = unstable_cache(
   { revalidate: 86_400 },
 );
 
-const cachedLegend = unstable_cache(
+const liveLegend = unstable_cache(
   async (root: string, layerId: number): Promise<NfhlLegendEntry[]> => {
     const legend = parseNfhlLegend(await fetchJson(`${root}/legend?f=json`), layerId);
     if (legend.length === 0) throw new Error("FEMA's legend has no entries for the zones layer");
@@ -73,58 +120,209 @@ const cachedLegend = unstable_cache(
   { revalidate: 86_400 },
 );
 
-/** FEMA's own legend for the zones layer — its labels and swatches — or an
- *  empty list when the service does not answer. */
+/** The legend the runner printed (data/nfhl-legend.json), for when FEMA's
+ *  own does not answer — the classes a drawing needs are FEMA's either way. */
+export const VENDORED_LEGEND: NfhlLegendEntry[] = vendoredLegend.legend.map((e) => ({
+  label: e.label.trim(),
+  image: null,
+  values: e.values,
+}));
+
+/**
+ * The zones layer and FEMA's legend for it: the service's own, cached a day,
+ * or — when it does not answer — the copy the runner printed, so a slow
+ * FEMA never leaves a frame undrawn for want of its class list.
+ */
+export async function floodClasses(): Promise<{ layerId: number; legend: NfhlLegendEntry[]; live: boolean }> {
+  try {
+    const layerId = await liveLayerId(FLOOD_ROOT);
+    return { layerId, legend: await liveLegend(FLOOD_ROOT, layerId), live: true };
+  } catch {
+    return { layerId: vendoredLegend.layerId, legend: VENDORED_LEGEND, live: false };
+  }
+}
+
+/** FEMA's legend — its own, else the runner's copy. Never empty. */
 export async function floodLegend(): Promise<NfhlLegendEntry[]> {
-  try {
-    return await cachedLegend(FLOOD_ROOT, await floodLayerId(FLOOD_ROOT));
-  } catch {
-    return [];
-  }
+  return (await floodClasses()).legend;
+}
+
+// ── Drawing the frame ───────────────────────────────────────────────────────
+
+/** The network, swappable in tests. */
+export interface FloodFetchers {
+  aerial: (url: string) => Promise<Buffer>;
+  overlay: (url: string, form: URLSearchParams) => Promise<Buffer>;
+}
+
+const defaultFetchers: FloodFetchers = {
+  async aerial(url) {
+    const res = await askTwice(url, { headers: { "user-agent": UA } }, isImage);
+    if (!isImage(res)) throw new Error(`the aerial answered HTTP ${res.status} ${res.headers.get("content-type") ?? ""}`);
+    return Buffer.from(await res.arrayBuffer());
+  },
+  async overlay(url, form) {
+    const init: RequestInit = {
+      method: "POST",
+      headers: { "user-agent": UA, "content-type": "application/x-www-form-urlencoded" },
+      body: form.toString(),
+    };
+    const res = await askTwice(url, init, isImage);
+    if (!isImage(res)) throw new Error(`FEMA answered HTTP ${res.status} ${res.headers.get("content-type") ?? ""}`);
+    return Buffer.from(await res.arrayBuffer());
+  },
+};
+
+export interface DrawnFloodFrame {
+  jpeg: Buffer;
+  width: number;
+  height: number;
+  classes: Record<FloodCrop, FloodClassKey[]>;
 }
 
 /**
- * FEMA's zones for the frame the aerial route draws at the same location,
- * zoom and size (both go through lib/basemaps' one frame definition), as a
- * transparent PNG. Null on any failure: the tab then goes, never a stale or
- * wrong picture.
+ * The aerial and the zones as one picture: the aerial finished (#429),
+ * brought to the zones' pixels and calmed, so the zones carry the colour and
+ * the photograph the place; FEMA's overlay measured and, where FEMA applied
+ * its own layer transparency, corrected — or refused where the measure fits
+ * neither behaviour, since a frame whose look cannot be vouched for is not
+ * one to keep. The classes each crop shows are read off the overlay here,
+ * once.
  */
-export async function fetchFloodOverlay(
-  loc: DealLocation,
-  size: { width: number; height: number; zoom: number },
-): Promise<Response | null> {
-  try {
-    const layerId = await floodLayerId(FLOOD_ROOT);
-    const res = await fetchWithRetry(
-      nfhlOverlayUrl({ center: loc, zoom: size.zoom, width: size.width, height: size.height, layerId, root: FLOOD_ROOT }),
-      { headers: { "user-agent": UA["user-agent"] } },
-      15_000,
-    );
-    // ArcGIS answers 200 with a JSON error body when it dislikes a request,
-    // so the content type is the real test.
-    const type = res.headers.get("content-type") ?? "";
-    if (!res.ok || !res.body || !type.startsWith("image/")) return null;
-    return res;
-  } catch {
-    return null;
-  }
-}
-
-// ── The flood map as a picture in the full report (#427) ────────────────────
-
-/**
- * The aerial and FEMA's transparent zones as one JPEG — the report embeds a
- * single image, and react-pdf's own compositing of two is not to be trusted
- * with alignment. Both inputs are the same frame (lib/basemaps' one
- * `frameParams`); the overlay is resized to the aerial's pixels in case a
- * server rounds a dimension.
- */
-export async function compositeFloodMap(aerial: Buffer, overlay: Buffer): Promise<Buffer> {
+export async function composeFloodFrame(aerial: Buffer, overlay: Buffer): Promise<DrawnFloodFrame | null> {
   const sharp = (await import("sharp")).default;
-  const base = sharp(aerial);
-  const { width, height } = await base.metadata();
-  const top = width && height ? await sharp(overlay).resize(width, height, { fit: "fill" }).png().toBuffer() : overlay;
-  return base.composite([{ input: top }]).jpeg({ quality: 82 }).toBuffer();
+  const { data, info } = await sharp(overlay).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const px = new Uint8Array(data.buffer, data.byteOffset, data.length);
+  const scale = overlayAlphaScale(px, info.width, info.height);
+  if (scale === null) return null;
+  unscaleAlpha(px, scale);
+  const { width, height } = info;
+  let base = aerial;
+  try {
+    base = await finishAerial(aerial);
+  } catch {
+    // The plain export is still the real picture.
+  }
+  const calm = await sharp(base)
+    .resize(width, height, { fit: "fill", kernel: "lanczos3" })
+    .modulate({ saturation: FLOOD_AERIAL_MUTE.saturation, brightness: FLOOD_AERIAL_MUTE.brightness })
+    .toBuffer();
+  const zones = await sharp(Buffer.from(px.buffer, px.byteOffset, px.length), { raw: { width, height, channels: 4 } })
+    .png()
+    .toBuffer();
+  const jpeg = await sharp(calm).composite([{ input: zones }]).jpeg({ quality: 84, mozjpeg: true }).toBuffer();
+  const min = Math.round(150 * (width / FLOOD_FRAME.width) ** 2);
+  const classes = Object.fromEntries(
+    (Object.keys(FLOOD_CROPS) as FloodCrop[]).map((crop) => [crop, classesIn(px, width, height, cropRegion(crop), min)]),
+  ) as Record<FloodCrop, FloodClassKey[]>;
+  return { jpeg, width, height, classes };
+}
+
+/** Draw the frame around a point: the aerial and FEMA's restyled zones for
+ *  the same ground, asked for together. Throws on any failure. */
+export async function drawFloodFrame(point: { lat: number; lng: number }, fetchers: FloodFetchers = defaultFetchers): Promise<DrawnFloodFrame> {
+  const { layerId, legend } = await floodClasses();
+  const dynamicLayers = floodDynamicLayers(layerId, legend);
+  if (!dynamicLayers) throw new Error("no legend entry matches a class the palette draws");
+  const frame = { center: point, zoom: FLOOD_FRAME.zoom, width: FLOOD_FRAME.width, height: FLOOD_FRAME.height };
+  const [aerial, overlay] = await Promise.all([
+    fetchers.aerial(usgsAerialUrl(frame)),
+    fetchers.overlay(`${FLOOD_ROOT}/export`, nfhlRestyledForm({ ...frame, dynamicLayers, scale: FLOOD_FRAME.scale })),
+  ]);
+  const drawn = await composeFloodFrame(aerial, overlay);
+  if (!drawn) throw new Error("FEMA's overlay came back at an alpha neither behaviour draws");
+  return drawn;
+}
+
+// ── Keeping it ──────────────────────────────────────────────────────────────
+
+/** Two frames drawn at once a process: each holds a few megabytes of
+ *  pixels for a second or two. */
+const DRAW_GATE = new RunGate(() => 2);
+/** One draw a deal at a time, shared by whoever asks while it runs. */
+const drawing = new Map<string, Promise<FloodFrameRecord | null>>();
+
+/** The stored frames' bytes a process holds, by path — a frame is read
+ *  once, then cut to each surface's shape from memory. */
+const held = new Map<string, Buffer>();
+const HELD_MAX = 16;
+function hold(path: string, bytes: Buffer): Buffer {
+  held.delete(path);
+  held.set(path, bytes);
+  while (held.size > HELD_MAX) held.delete(held.keys().next().value!);
+  return bytes;
+}
+
+const stamp = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+
+/**
+ * The deal's flood frame around `loc`: the stored one where it is current,
+ * else drawn now — one draw a deal at a time, two a process — stored in the
+ * bucket and recorded on the deal's photo cache, the frame it replaces
+ * removed. Null where the frame could not be drawn this time (the next ask
+ * tries again: a failure is never recorded). `waitMs` bounds how long the
+ * caller waits; the draw goes on behind a caller that stops waiting.
+ */
+export async function ensureFloodFrame(
+  supabase: SupabaseClient,
+  dealId: string,
+  loc: DealLocation,
+  cache: DealVisualCache | null,
+  opts: { waitMs?: number; fetchers?: FloodFetchers } = {},
+): Promise<FloodFrameRecord | null> {
+  if (floodFrameCurrent(cache?.floodFrame, loc)) return cache!.floodFrame!;
+  let run = drawing.get(dealId);
+  if (!run) {
+    run = (async (): Promise<FloodFrameRecord | null> => {
+      const release = await DRAW_GATE.acquire();
+      try {
+        const drawn = await drawFloodFrame(loc, opts.fetchers);
+        const path = floodFramePath(dealId, stamp());
+        await uploadDealPhoto(path, drawn.jpeg, { kind: "deal", dealId, only: ["flood"] });
+        hold(path, drawn.jpeg);
+        const record: FloodFrameRecord = {
+          v: FLOOD_FRAME_VERSION,
+          path,
+          at: new Date().toISOString(),
+          for: pointKey(loc),
+          width: drawn.width,
+          height: drawn.height,
+          classes: drawn.classes,
+        };
+        await writeCache(supabase, dealId, cache, { floodFrame: record });
+        const old = cache?.floodFrame?.path;
+        if (old && old !== path) {
+          await removeStorageFiles([old], { kind: "deal", dealId, only: ["flood"] }).catch(() => {});
+        }
+        return record;
+      } catch (err) {
+        console.warn(`[flood-frame] deal ${dealId}: ${err instanceof Error ? err.message : String(err)}`);
+        return null;
+      } finally {
+        release();
+        drawing.delete(dealId);
+      }
+    })();
+    drawing.set(dealId, run);
+  }
+  if (opts.waitMs === undefined) return run;
+  return within(run, opts.waitMs, null);
+}
+
+/**
+ * The frame cut to `w`×`h` from its centre, as a JPEG — never larger than
+ * the stored frame gives in that shape, so nothing is stretched.
+ */
+export async function floodCrop(dealId: string, record: FloodFrameRecord, w: number, h: number): Promise<Buffer> {
+  const sharp = (await import("sharp")).default;
+  const bytes = held.get(record.path) ?? hold(record.path, await downloadDealFile(record.path, { kind: "deal", dealId, only: ["flood"] }));
+  const box = cropBox(record.width, record.height, w, h);
+  const out = servedSize(w, h, record.width, record.height);
+  return sharp(bytes)
+    .extract(box)
+    .resize(out.width, out.height, { fit: "fill", kernel: "lanczos3" })
+    .jpeg({ quality: 82, mozjpeg: true })
+    .toBuffer();
 }
 
 async function within<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -138,21 +336,54 @@ async function within<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
   }
 }
 
-/** A data URI's picture, kept only where its bytes are intact — react-pdf
- *  hangs the whole render on a PNG whose zlib check fails. */
-function intactDataUri(uri: string | null): string | null {
-  const m = uri ? /^data:(image\/(?:png|jpe?g));base64,([A-Za-z0-9+/=]+)$/.exec(uri) : null;
-  if (!m) return null;
-  return intactImage(Buffer.from(m[2], "base64"), m[1]) ? uri : null;
+// ── The key ─────────────────────────────────────────────────────────────────
+
+/** A key entry: a class the frame shows, in FEMA's words, marked where it is
+ *  the class the building's own zone is drawn in. */
+export interface FloodKeyEntry {
+  key: FloodClassKey;
+  label: string;
+  here: boolean;
 }
 
+/** The key under a crop: the classes it shows, the building's own first. */
+export function floodKeyFor(
+  classes: readonly FloodClassKey[],
+  flood: SiteFlagsResult["flood"] | undefined,
+  legend: readonly NfhlLegendEntry[],
+): FloodKeyEntry[] {
+  const own = flood && flood !== "unavailable" ? floodClassOfZone(legend, flood.zone, flood.subtype) : null;
+  const shown = own && classes.includes(own) ? [own, ...classes.filter((c) => c !== own)] : [...classes];
+  return shown.map((key) => ({ key, label: FLOOD_CLASS_LABEL[key], here: key === own }));
+}
+
+const swatches = new Map<FloodClassKey, string>();
+/** A class's swatch as a PNG data URI, for the report. */
+async function swatchPng(key: FloodClassKey): Promise<string | null> {
+  const hit = swatches.get(key);
+  if (hit) return hit;
+  try {
+    const sharp = (await import("sharp")).default;
+    const png = await sharp(Buffer.from(floodSwatchSvg(floodStyleOf(key)))).png().toBuffer();
+    if (!intactImage(png, "image/png")) return null;
+    const uri = `data:image/png;base64,${png.toString("base64")}`;
+    swatches.set(key, uri);
+    return uri;
+  } catch {
+    return null;
+  }
+}
+
+// ── The flood map as a picture in the full report (#427) ────────────────────
+
 /**
- * The full report's flood map (#427), for a deal with a street address: the
- * aerial and FEMA's zones for the Flood tab's frame composited into one JPEG,
- * FEMA's key with the building's own zone marked, and the zone sentence.
- * Bounded — the report is a download a person is waiting on — and never
- * throws: a slow or failed FEMA leaves the page's words without the picture,
- * and nothing at all where there is nothing to say.
+ * The full report's flood map, for a deal with a street address: the deal's
+ * frame cut to the report's band at twice its points, the key the band shows
+ * with the building's own class marked, and the zone sentence. Bounded — the
+ * report is a download a person is waiting on — and never throws: a frame
+ * that is not drawn in time leaves the page's words without the picture (it
+ * goes on drawing, for the next report and the page), and nothing at all
+ * where there is nothing to say.
  */
 export async function floodMapFor(
   supabase: SupabaseClient,
@@ -163,31 +394,26 @@ export async function floodMapFor(
 ): Promise<FloodMapView | null> {
   if (!address?.street?.trim()) return null;
   const flood = flags && flags.status !== "pending" ? flags.flood : undefined;
-  const picture = within(
-    (async (): Promise<string | null> => {
+  const legend = await within(floodLegend(), 3_000, VENDORED_LEGEND);
+  const picture = await within(
+    (async (): Promise<{ image: string; classes: FloodClassKey[] } | null> => {
       const loc = await resolveDealLocation(supabase, dealId, address, cache);
-      if (!loc) return null;
-      const [aerial, overlay] = await Promise.all([
-        fetchOneImage("aerial", supabase, dealId, address, cache, REPORT_FLOOD_SIZE),
-        fetchFloodOverlay(loc, REPORT_FLOOD_SIZE),
-      ]);
-      if (!aerial || !overlay) return null;
-      const jpeg = await compositeFloodMap(
-        Buffer.from(await aerial.response.arrayBuffer()),
-        Buffer.from(await overlay.arrayBuffer()),
-      );
-      return intactImage(jpeg, "image/jpeg") ? `data:image/jpeg;base64,${jpeg.toString("base64")}` : null;
+      if (!loc || loc.precision === "area") return null;
+      const record = await ensureFloodFrame(supabase, dealId, loc, cache);
+      if (!record) return null;
+      const jpeg = await floodCrop(dealId, record, REPORT_FLOOD_SIZE.width * 2, REPORT_FLOOD_SIZE.height * 2);
+      if (!intactImage(jpeg, "image/jpeg")) return null;
+      return { image: `data:image/jpeg;base64,${jpeg.toString("base64")}`, classes: record.classes.report };
     })(),
-    8_000,
+    20_000,
     null,
   );
-  const legend = await within(floodLegend(), 3_000, [] as NfhlLegendEntry[]);
-  const image = await picture;
   const line = floodZoneLine(flood, legend);
-  if (!image && !line) return null;
-  return {
-    image,
-    key: floodKey(legend, flood).map((k) => ({ ...k, image: intactDataUri(k.image) })),
-    line,
-  };
+  if (!picture && !line) return null;
+  const key = picture
+    ? await Promise.all(
+        floodKeyFor(picture.classes, flood, legend).map(async (k) => ({ label: k.label, image: await swatchPng(k.key), here: k.here })),
+      )
+    : [];
+  return { image: picture?.image ?? null, key, line };
 }

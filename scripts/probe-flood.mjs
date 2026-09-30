@@ -81,41 +81,54 @@ export function overlayUrl(b, width, height, layerId, root = NFHL_ROOT) {
  * zone in words). A first cut keyed the 1% zone on SFHA_TF and drew nothing
  * over Hoboken's and New Orleans' Zone AE, whose polygons do not carry it:
  * FEMA's own classes are the only safe key.
+ *
+ * lib/flood-style.ts is the site's copy (`floodDynamicLayers`); this one is
+ * restated for plain Node and lib/flood-style.test.ts holds the two equal.
  */
 export const CLASS_STYLE = [
-  // [legend label pattern, fill RGBA, outline RGBA, outline width, fill style]
-  [/floodway/i, [229, 57, 53, 190], [183, 28, 28, 255], 2.25, "esriSFSBackwardDiagonal"],
-  [/^1% annual chance/i, [30, 136, 229, 105], [13, 71, 161, 255], 2.25, "esriSFSSolid"],
-  [/^0\.2% annual chance/i, [255, 179, 0, 85], [230, 126, 0, 255], 2, "esriSFSSolid"],
-  [/future conditions/i, [142, 36, 170, 70], [106, 27, 154, 255], 1.75, "esriSFSSolid"],
-  [/reduced risk due to levee/i, [0, 137, 123, 60], [0, 105, 92, 255], 1.75, "esriSFSSolid"],
-  [/risk due to levee/i, [141, 110, 99, 120], [93, 64, 55, 240], 1.75, "esriSFSForwardDiagonal"],
-  [/undetermined/i, [117, 117, 117, 130], [66, 66, 66, 240], 1.75, "esriSFSForwardDiagonal"],
+  // [legend label pattern, fill RGBA, outline RGBA, outline width, hatch [direction, RGBA] or null]
+  [/floodway/i, [30, 136, 229, 105], [183, 28, 28, 255], 2.25, ["backward", [229, 57, 53, 200]]],
+  [/^1% annual chance/i, [30, 136, 229, 105], [13, 71, 161, 255], 2.25, null],
+  [/^0\.2% annual chance/i, [255, 179, 0, 85], [230, 126, 0, 255], 2, null],
+  [/future conditions/i, [142, 36, 170, 70], [106, 27, 154, 255], 1.75, null],
+  [/reduced risk due to levee/i, [0, 137, 123, 60], [0, 105, 92, 255], 1.75, null],
+  [/risk due to levee/i, [141, 110, 99, 60], [93, 64, 55, 240], 1.75, ["forward", [141, 110, 99, 200]]],
+  [/undetermined/i, [117, 117, 117, 60], [66, 66, 66, 240], 1.75, ["forward", [117, 117, 117, 200]]],
 ];
 
 export function restyledLayers(layerId, legend, { transparency = 0 } = {}) {
   const source = { type: "mapLayer", mapLayerId: layerId };
-  // The experiment's variants: `undefined` leaves the key out altogether.
-  const drawing = (renderer) => ({ renderer, ...(transparency === undefined ? {} : { transparency }), showLabels: false });
-  const infos = (casing) =>
+  const line = (color, width) => ({ type: "esriSLS", style: "esriSLSSolid", color, width });
+  const infos = (symbolOf) =>
     legend.flatMap((entry) => {
       const style = CLASS_STYLE.find(([re]) => re.test(String(entry.label ?? "").trim()));
-      if (!style) return [];
-      const [, fill, outline, width, fillStyle] = style;
-      const symbol = casing
-        ? { type: "esriSFS", style: "esriSFSNull", outline: { type: "esriSLS", style: "esriSLSSolid", color: [255, 255, 255, 210], width: width + 2.25 } }
-        : { type: "esriSFS", style: fillStyle, color: fill, outline: { type: "esriSLS", style: "esriSLSSolid", color: outline, width } };
-      return (entry.values ?? []).map((value) => ({ value, label: entry.label, symbol }));
+      if (!style || !(entry.values ?? []).length) return [];
+      const symbol = symbolOf(style);
+      return symbol ? entry.values.map((value) => ({ value, label: entry.label, symbol })) : [];
     });
-  const renderer = (casing) => ({ type: "uniqueValue", field1: "FLD_ZONE", field2: "ZONE_SUBTY", fieldDelimiter: ",", uniqueValueInfos: infos(casing) });
-  // Drawn top first: the tints and outlines over their casings. FEMA's layer
-  // carries a 70% transparency of its own, which a dynamic layer inherits
-  // (the first render's 41% tint came back at 12%); zero hands the symbols
-  // their own alpha.
-  return [
-    { id: 901, source, drawingInfo: drawing(renderer(false)) },
-    { id: 902, source, drawingInfo: drawing(renderer(true)) },
-  ];
+  // Drawn top first: the hatches (with the hatched classes' outlines), the
+  // tints and the other outlines, then the casings. The floodway carries the
+  // 1% tint under its hatch: it is part of the 1% zone.
+  const hatches = infos(([, , outline, width, hatch]) =>
+    hatch
+      ? { type: "esriSFS", style: hatch[0] === "backward" ? "esriSFSBackwardDiagonal" : "esriSFSForwardDiagonal", color: hatch[1], outline: line(outline, width) }
+      : null,
+  );
+  const tints = infos(([, fill, outline, width, hatch]) => ({ type: "esriSFS", style: "esriSFSSolid", color: fill, outline: hatch ? null : line(outline, width) }));
+  const casings = infos(([, , , width]) => ({ type: "esriSFS", style: "esriSFSNull", outline: line([255, 255, 255, 210], width + 2.25) }));
+  if (!tints.length) return null;
+  // FEMA's layer carries a 70% transparency of its own; zero asks for the
+  // symbols' own alpha (the experiment's `undefined` leaves the key out).
+  const layer = (id, uniqueValueInfos) => ({
+    id,
+    source,
+    drawingInfo: {
+      renderer: { type: "uniqueValue", field1: "FLD_ZONE", field2: "ZONE_SUBTY", fieldDelimiter: ",", uniqueValueInfos },
+      ...(transparency === undefined ? {} : { transparency }),
+      showLabels: false,
+    },
+  });
+  return [...(hatches.length ? [layer(901, hatches)] : []), layer(902, tints), layer(903, casings)];
 }
 
 /** The restyled export's form: POSTed, since FEMA's full class list makes

@@ -1,27 +1,38 @@
-// GET /api/deals/[id]/flood — FEMA's flood zones for the deal's aerial frame.
+// GET /api/deals/[id]/flood — the Flood view's picture (#425, #472).
 //
-// Backs the deal page's Flood tab: a transparent PNG of the National Flood
-// Hazard Layer's zones, in FEMA's own symbology, for EXACTLY the frame the
-// aerial route draws at the same `w`, `h` and `z` — the same resolved
-// location, the same Web-Mercator bbox (lib/basemaps) — so the tab lays one
-// over the other. A US federal work, public domain, no key. 404 on any
-// failure, so the tab goes rather than showing a plain aerial as a flood map.
+// The deal's flood frame (lib/flood-map): the USGS aerial, calmed, with
+// FEMA's National Flood Hazard Layer drawn over it in the site's palette,
+// drawn once a deal and kept — cut here, from its centre, to the `w`×`h`
+// asked for, never larger than the frame gives in that shape. A US federal
+// work over another, public domain both, no key.
+//
+// The first ask for a deal whose frame is not drawn yet draws it, and waits
+// up to WAIT_MS for it; a draw that takes longer goes on behind the request,
+// which answers 503 with a Retry-After so the page asks again and finds it.
+// `?meta=1` answers what the frame shows instead of the picture — the
+// classes each crop keys — for a page rendered before the frame existed, and
+// says by its status which of the two a failed picture was: 404 where there
+// is nothing to draw (no street address, no location, a placement no finer
+// than a neighbourhood, whose centre is not the building), 503 where the
+// frame is not drawn yet.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { StructuredAddress } from "@/lib/address";
 import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
-import { FLOOD_MIN_ZOOM, FLOOD_ZOOM } from "@/lib/basemaps";
-import { MAX_SOURCE_ZOOM } from "@/lib/imagery-plan";
-import { fetchFloodOverlay } from "@/lib/flood-map";
+import { ensureFloodFrame, floodCrop } from "@/lib/flood-map";
+import { FLOOD_FRAME } from "@/lib/flood-frame-core";
 
-const SIZE = { min: 48, max: 1280, defaultW: 1280, defaultH: 576 };
+const SIZE = { min: 48, maxW: FLOOD_FRAME.width * FLOOD_FRAME.scale, maxH: FLOOD_FRAME.height * FLOOD_FRAME.scale };
+const WAIT_MS = 50_000;
 
 function clamp(raw: string | null, lo: number, hi: number, fallback: number): number {
   const n = Number(raw);
   if (raw === null || !Number.isFinite(n)) return fallback;
   return Math.min(hi, Math.max(lo, Math.round(n)));
 }
+
+const nothing = () => new NextResponse(null, { status: 404 });
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -35,29 +46,34 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const address = (deal.address as StructuredAddress | null) ?? null;
   // A street address only: a neighbourhood placement's frame would invite
   // reading the zone at its centre as the building's.
-  if (!address?.street?.trim()) return new NextResponse(null, { status: 404 });
+  if (!address?.street?.trim()) return nothing();
+  const cache = (deal.photo as DealVisualCache | null) ?? null;
+  const loc = await resolveDealLocation(supabase, id, address, cache);
+  if (!loc || loc.precision === "area") return nothing();
+
+  const record = await ensureFloodFrame(supabase, id, loc, cache, { waitMs: WAIT_MS });
+  if (!record) {
+    return new NextResponse(null, { status: 503, headers: { "retry-after": "5", "cache-control": "no-store" } });
+  }
 
   const q = new URL(req.url).searchParams;
-  const size = {
-    width: clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW),
-    height: clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH),
-    // Held to the aerial's own cap (#429): the aerial route draws no finer
-    // than the photograph's grain, and an overlay asked for a finer frame
-    // would lie over the wrong ground.
-    zoom: clamp(q.get("z"), FLOOD_MIN_ZOOM, MAX_SOURCE_ZOOM.aerial, FLOOD_ZOOM),
-  };
-
-  const loc = await resolveDealLocation(supabase, id, address, (deal.photo as DealVisualCache | null) ?? null);
-  if (!loc) return new NextResponse(null, { status: 404 });
-  const overlay = await fetchFloodOverlay(loc, size);
-  if (!overlay) return new NextResponse(null, { status: 404 });
-
-  return new NextResponse(overlay.body, {
-    headers: {
-      "content-type": overlay.headers.get("content-type") ?? "image/png",
-      // A day: FEMA revises a map by a letter of map revision, not by the hour.
-      "cache-control": "private, max-age=86400",
-      "x-image-credit": "Flood hazard: FEMA National Flood Hazard Layer",
-    },
-  });
+  if (q.get("meta")) {
+    return NextResponse.json({ classes: record.classes, at: record.at }, { headers: { "cache-control": "private, max-age=300" } });
+  }
+  const w = clamp(q.get("w"), SIZE.min, SIZE.maxW, FLOOD_FRAME.width);
+  const h = clamp(q.get("h"), SIZE.min, SIZE.maxH, Math.round((FLOOD_FRAME.width * 9) / 16));
+  try {
+    const jpeg = await floodCrop(id, record, w, h);
+    return new NextResponse(new Uint8Array(jpeg), {
+      headers: {
+        "content-type": "image/jpeg",
+        // A day: FEMA revises a map by a letter of map revision, not by the
+        // hour, and the page's URL names the point the frame is drawn around.
+        "cache-control": "private, max-age=86400",
+        "x-image-credit": "Flood hazard: FEMA National Flood Hazard Layer; imagery: USGS The National Map",
+      },
+    });
+  } catch {
+    return new NextResponse(null, { status: 503, headers: { "retry-after": "5", "cache-control": "no-store" } });
+  }
 }

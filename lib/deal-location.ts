@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredAddress } from "@/lib/address";
 import type { Point } from "@/lib/basemaps";
 import { geocodeAddress, type Geocoded, type GeocodeSource } from "@/lib/geocode";
+import type { FloodFrameRecord } from "@/lib/flood-frame-core";
 
 /**
  * Where a deal IS, resolved once and cached — the shared dependency of every
@@ -49,6 +50,9 @@ export interface DealVisualCache {
   /** the rules the gallery was read under; see GALLERY_VERSION. Set, with
    *  no gallery, where the memorandum held no other photograph */
   galleryV?: number;
+  /** the Flood view's drawn frame (#472, lib/flood-map) — the picture and
+   *  the classes each crop shows, for the point it was drawn around */
+  floodFrame?: FloodFrameRecord;
 }
 
 /** The building's own photograph — where it came from and where its two sizes live. */

@@ -358,8 +358,9 @@ function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
 
 /**
  * FEMA's flood map at the building (#427): the aerial with FEMA's zones, in
- * FEMA's colours, as one picture the width of the page, with a ring at its
- * centre (the building), FEMA's key under it and the sentence on the zone at
+ * the site's palette (#472, lib/flood-style), as one picture the width of the
+ * page, with a ring at its centre (the building), the key of the zones the
+ * picture shows under it and the sentence on the zone at
  * the building. The same frame and the same words as the deal page's Flood
  * tab, so the report and the page cannot disagree about the map.
  */
@@ -398,14 +399,27 @@ function SiteBlock({ view }: { view: FloodMapView }) {
           <View style={{ position: "relative", width: SITE_MAP_W, height: SITE_MAP_H, marginTop: 2 }}>
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image takes no alt */}
             <Image src={view.image} style={{ width: SITE_MAP_W, height: SITE_MAP_H, borderRadius: 4, objectFit: "cover" }} />
+            {/* The ring over a dark halo, so it reads over the pale tints. */}
             <View
               style={{
                 position: "absolute",
-                left: SITE_MAP_W / 2 - 6,
-                top: SITE_MAP_H / 2 - 6,
-                width: 12,
-                height: 12,
-                borderRadius: 6,
+                left: SITE_MAP_W / 2 - 8,
+                top: SITE_MAP_H / 2 - 8,
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                borderWidth: 1.5,
+                borderColor: "#1f2937",
+              }}
+            />
+            <View
+              style={{
+                position: "absolute",
+                left: SITE_MAP_W / 2 - 6.5,
+                top: SITE_MAP_H / 2 - 6.5,
+                width: 13,
+                height: 13,
+                borderRadius: 6.5,
                 borderWidth: 2,
                 borderColor: "#ffffff",
               }}
@@ -812,8 +826,9 @@ export interface ReportInput {
    *  printed over the grids; absent where the caller built no model, and
    *  then the line prints alone */
   storage?: { line: string; read: string } | null;
-  /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
-   *  the composite, FEMA's key and the zone sentence; null for no page */
+  /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427,
+   *  #472): the deal's flood frame cut to the band, the key of the zones it
+   *  shows and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
   /** the memorandum's other photographs, cut to the page's frame and
    *  credited (lib/memo/cover-aerial `galleryPhotosFor`, #459); fewer than
@@ -1524,7 +1539,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           line in the expenses. */}
       {input.floodMap && (
         <PageChrome title="The site" count="FEMA flood map" dealName={dealName} branding={memo.branding}>
-          <Text style={s.sub}>{"What FEMA's flood insurance rate map shows around the building, drawn the way FEMA draws it."}</Text>
+          <Text style={s.sub}>{"What FEMA's flood insurance rate map shows around the building: FEMA's own zones, drawn in the colours of the key below."}</Text>
           <SiteBlock view={input.floodMap} />
         </PageChrome>
       )}

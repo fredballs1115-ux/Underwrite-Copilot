@@ -14,6 +14,7 @@ import {
 } from "@/lib/storage";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { MAX_PICTURE_BYTES, clearOmPicture, picturePaths, storePicture } from "@/lib/deal-picture";
+import { floodFramePaths } from "@/lib/flood-frame-core";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
@@ -761,7 +762,10 @@ export async function deleteDeal(formData: FormData) {
   // deal's own shapes before the service role removes it — a path on the row
   // that names another deal's object is skipped, never swept.
   const scope = { kind: "deal", dealId } as const;
-  const paths: string[] = [...picturePaths((deal.photo as DealVisualCache | null) ?? null)];
+  const paths: string[] = [
+    ...picturePaths((deal.photo as DealVisualCache | null) ?? null),
+    ...floodFramePaths((deal.photo as DealVisualCache | null) ?? null),
+  ];
   if (deal.om_storage_path) {
     paths.push(deal.om_storage_path as string);
     // A worker-mode reconcile may have parked a model file here; removing a

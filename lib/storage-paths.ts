@@ -11,6 +11,7 @@
  *   documents/<dealId>/<uuid>-<name>                  source documents (deal_documents)
  *   supplements/<dealId>/<uuid>-<name>                tab attachments (deals.supplements)
  *   photos/<dealId>/<stamp>-<hero|thumb>.jpg          the building's own photograph (deals.photo)
+ *   flood/<dealId>/<stamp>.jpg                        the Flood view's drawn frame (deals.photo.floodFrame)
  *   <teamId|userId>/branding-logo-<suffix>.<png|jpg>  report branding
  *
  * Why a gate: the paths are read back off ordinary database columns that the
@@ -24,7 +25,7 @@
  * at the row, so the two layers agree.
  */
 
-export type DealObjectKind = "om" | "model-tmp" | "document" | "supplement" | "photo";
+export type DealObjectKind = "om" | "model-tmp" | "document" | "supplement" | "photo" | "flood";
 
 export type StorageScope =
   | { kind: "deal"; dealId: string; only?: readonly DealObjectKind[] }
@@ -81,8 +82,17 @@ export function classifyDealPath(path: string, dealId: string): DealObjectKind |
     if (parts[0] === "documents") return "document";
     if (parts[0] === "supplements") return "supplement";
     if (parts[0] === "photos" && PHOTO_FILE.test(parts[2])) return "photo";
+    if (parts[0] === "flood" && FLOOD_FILE.test(parts[2])) return "flood";
   }
   return null;
+}
+
+/** A drawn flood frame's file name (#472): a stamp. */
+const FLOOD_FILE = /^[a-z0-9]+\.jpg$/;
+
+/** The deal's flood frame (#472): `flood/<dealId>/<stamp>.jpg`. */
+export function floodFramePath(dealId: string, stamp: string): string {
+  return `flood/${dealId}/${stamp}.jpg`;
 }
 
 /** A photograph derivative's file name: a stamp and which size it is. */

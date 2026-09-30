@@ -3453,45 +3453,67 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(text).not.toContain("Replace photo");
   });
 
-  it("draws FEMA's flood zones over the aerial for the same frame, with a ring at the building, FEMA's key and the zone at the building (#425)", () => {
+  it("draws the deal's flood frame — one picture, drawn on the server — with the zones it shows keyed and the zone at the building (#425, #472)", () => {
     const flood = {
-      key: [
-        { label: "1% Annual Chance Flood Hazard", image: "data:image/png;base64,iVBORw0KGgo=", here: true },
-        { label: "Regulatory Floodway", image: "data:image/png;base64,iVBORw0KGgo=", here: false },
-        { label: "0.2% Annual Chance Flood Hazard", image: null, here: false },
-      ],
+      src: "/api/deals/d1/flood?v=1.39.975000,-75.180000",
+      classes: { page: ["floodway", "sfha", "moderate"] as const, full: ["floodway", "sfha", "moderate", "levee-reduced"] as const },
+      here: "sfha" as const,
+      zone: "Zone AE",
       line: "The building sits in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.",
     };
-    const html = renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null, flood }));
+    const props = { ...base, picture: null, flood: { ...flood, classes: { page: [...flood.classes.page], full: [...flood.classes.full] } } };
+    const html = renderToStaticMarkup(React.createElement(PropertyVisual, props));
     dumpView("property-visual-flood", html);
     expect(a11yIssues(html), "a11y property-visual-flood").toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("Flood");
-    // The aerial and FEMA's zones asked for one frame: the same size and zoom.
-    expect(html).toContain('src="/api/deals/d1/aerial?src=usgs&amp;w=1280&amp;h=576&amp;z=17"');
-    expect(html).toContain('src="/api/deals/d1/flood?w=1280&amp;h=576&amp;z=17"');
-    expect(html).toContain('data-picture="flood-pin"');
-    expect(text).toContain("1% Annual Chance Flood Hazard — at the building");
-    expect(text).toContain("Regulatory Floodway");
-    // Short enough to sit on a phone's picture without covering it.
+    // One picture: the frame cut to the view's own 16:9, at 1x and 2x.
+    expect(html).toContain('src="/api/deals/d1/flood?v=1.39.975000,-75.180000&amp;w=1280&amp;h=720"');
+    expect(html).toContain("/api/deals/d1/flood?v=1.39.975000,-75.180000&amp;w=2560&amp;h=1440 2560w");
+    expect(html).not.toContain("&amp;z=17");
+    // Until it has come, a plate says it is being drawn — never an empty
+    // frame, never the aerial alone under the word "Flood".
+    expect(html).toContain('data-picture="flood-drawing"');
+    expect(text).toContain("Drawing FEMA\u2019s flood map\u2026");
+    // The key: the zones the view's crop shows, the building's own first and
+    // marked, in the palette the frame is drawn in.
+    expect(text).toContain("1% annual chance flood hazard — at the building");
+    expect(text).toContain("Floodway");
+    expect(text).toContain("0.2% annual chance flood hazard");
+    // The viewer's whole frame shows a levee area the view's crop does not:
+    // the view's key does not list it.
+    expect(text).not.toContain("reduced risk due to levee");
+    expect(html).toContain('data-flood-swatch="sfha"');
+    expect(html.indexOf('data-flood-swatch="sfha"')).toBeLessThan(html.indexOf('data-flood-swatch="floodway"'));
     expect(text).toContain("FEMA flood zones · USGS imagery");
     expect(text).toContain("a federally backed loan requires flood insurance");
     // The aerial still leads; the Flood tab waits to be opened.
     expect(html).toMatch(/aria-pressed="true" data-view-thumb="aerial"/);
+    // The filmstrip's thumbnail is the frame's own small crop.
+    expect(html).toContain('data-view-thumb="flood"');
+    expect(html).toContain('src="/api/deals/d1/flood?v=1.39.975000,-75.180000&amp;w=192&amp;h=108"');
+
+    // A frame drawn with no zone in it says so, rather than keying colours
+    // the picture does not have.
+    const clear = renderToStaticMarkup(
+      React.createElement(PropertyVisual, { ...props, flood: { ...props.flood, classes: { page: [], full: [] }, here: null } }),
+    );
+    expect(visibleText(clear)).toContain("FEMA draws no flood hazard zone inside this frame.");
+    // A frame not drawn yet: no key until the picture has come.
+    const pending = renderToStaticMarkup(
+      React.createElement(PropertyVisual, { ...props, flood: { ...props.flood, classes: null } }),
+    );
+    expect(pending).not.toContain("data-flood-swatch");
+    expect(visibleText(pending)).toContain("a federally backed loan requires flood insurance");
 
     // No street address, no Flood tab: a neighbourhood's centre is not the building.
     const area = renderToStaticMarkup(
-      React.createElement(PropertyVisual, { ...base, hasStreetAddress: false, picture: null, flood }),
+      React.createElement(PropertyVisual, { ...base, hasStreetAddress: false, picture: null, flood: props.flood }),
     );
     expect(area).not.toContain("/flood?");
-    // The views are a filmstrip (#432): each one's own picture — the very
-    // URL its view draws, so a thumbnail costs no request of its own — the
-    // Flood thumbnail FEMA's zones over the same frame, the Map a glyph.
     expect(html).toContain('data-view-thumb="aerial"');
-    expect(html).toContain('data-view-thumb="flood"');
     expect(html).toContain('data-view-thumb="map"');
-    expect((html.match(/src="\/api\/deals\/d1\/flood\?w=1280&amp;h=576&amp;z=17"/g) ?? []).length).toBe(2);
     expect(html).toContain('aria-label="Views of the property"');
     // The Aerial tab rings the building too (#429) — a street address's,
     // never a neighbourhood placement's centre.
@@ -3649,7 +3671,10 @@ describe("DealHero — the building's picture beside its name and its figures (#
     googleEnabled: false,
     picture: { credit: "From the offering memorandum", source: "om" as const },
     flood: {
-      key: [{ label: "0.2% Annual Chance Flood Hazard", image: null, here: true }],
+      src: "/api/deals/d1/flood?v=1.39.975000,-75.180000",
+      classes: { page: ["moderate"], full: ["moderate"] },
+      here: "moderate",
+      zone: "Zone X",
       line: "The building sits in Zone X (0.2% annual chance flood hazard), outside the Special Flood Hazard Area.",
     },
   });
