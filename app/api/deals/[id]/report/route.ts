@@ -18,7 +18,7 @@ import { assumableView, readAssumable, type AssumableView } from "@/lib/assumabl
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
-import { staleAfterFailure } from "@/lib/screen-run";
+import { verdictBehind } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
@@ -91,8 +91,9 @@ export async function GET(
       302,
     );
   }
-  // Same gate as the memo: a screen that failed before the verdict left
-  // today's terms beside the previous screen's call — not one report.
+  // Same gate as the memo: a screen that failed before the verdict, or one
+  // still running toward it, leaves this run's terms beside the previous
+  // screen's call — not one report.
   const { data: latestJob } = await supabase
     .from("analysis_jobs")
     .select("status, step")
@@ -100,9 +101,10 @@ export async function GET(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (staleAfterFailure(latestJob).has("verdict")) {
+  const behind = verdictBehind(latestJob);
+  if (behind) {
     return Response.redirect(
-      new URL(`/deals/${id}?error=reportstale`, req.url),
+      new URL(`/deals/${id}?error=${behind === "running" ? "reportrunning" : "reportstale"}`, req.url),
       302,
     );
   }

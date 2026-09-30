@@ -7,7 +7,7 @@ import type {
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
-import { staleAfterFailure } from "@/lib/screen-run";
+import { previousScreenResults, verdictBehind } from "@/lib/screen-run";
 import { SHARE_REFUSAL_COPY, resolveShare } from "@/lib/share-resolve";
 import { Expired, ShareView } from "./share-view";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
@@ -55,9 +55,10 @@ export default async function SharePage({
   if (!resolved.ok) return <Expired reason={SHARE_REFUSAL_COPY[resolved.reason]} />;
   const { dealId, expiresAt, deal } = resolved.share;
 
-  // The sender's latest screen may have failed before reaching the verdict:
-  // the call shown then belongs to the previous completed screen — say so,
-  // the same way the sender's own deal page does.
+  // The sender's latest screen may have failed before reaching the verdict,
+  // or still be running toward it: the call shown then belongs to the
+  // previous completed screen, and so may the comp and market reads — say
+  // so, the same way the sender's own deal page does (lib/screen-run).
   const { data: latestJob } = await admin
     .from("analysis_jobs")
     .select("status, step")
@@ -90,13 +91,17 @@ export default async function SharePage({
       : []),
   ];
   const picture = sources.length > 0 ? { sources, place: address?.label || deal.name } : null;
+  const behind = verdictBehind(latestJob);
+  const previous = previousScreenResults(latestJob);
 
   return (
     <ShareView
       dealName={deal.name}
       assetClass={deal.asset_class ?? null}
       expiresAt={expiresAt}
-      verdictStale={staleAfterFailure(latestJob).has("verdict")}
+      verdictStale={behind != null}
+      staleWhy={behind ?? "failed"}
+      staleReads={(["comps", "market"] as const).filter((k) => previous.has(k))}
       picture={picture}
       extraction={(deal.extraction as ExtractionResult | null) ?? null}
       comps={(deal.comps as BrokerCompsResult | null) ?? null}

@@ -81,7 +81,7 @@ import { parseFactRow, type DealFact } from "@/lib/facts";
 import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
-import { staleAfterFailure } from "@/lib/screen-run";
+import { previousScreenResults, verdictBehind } from "@/lib/screen-run";
 import { StageSelect } from "./stage-select";
 import { OffersDueControl } from "../offers-due";
 import { ShareControl, type ShareRow } from "./share-control";
@@ -319,12 +319,29 @@ export default async function DealPage({
     updated_at?: string | null;
   } | null;
 
-  // A screen that failed midway left a MIXED generation: the results from
-  // the failing step onward still belong to the previous screen. Every
-  // surface below marks them, and the count of finished steps excludes them.
-  const staleResults = [...staleAfterFailure(job)];
+  // A screen that failed midway, or one still running, leaves a MIXED
+  // generation: the results from its step onward still belong to the
+  // previous screen. Every surface below marks them, and the count of
+  // finished steps excludes them (lib/screen-run).
+  const staleResults = [...previousScreenResults(job)];
+  const verdictLag = verdictBehind(job);
 
-  const pill = verdict ? VERDICT_PILL[verdict.verdict] : null;
+  // The call in the header and the sticky bar. While the verdict on file
+  // is the previous screen's, it is drawn dashed and says so, so the header
+  // never presents the last call as this run's.
+  const basePill = verdict ? VERDICT_PILL[verdict.verdict] : null;
+  const pill: { label: string; cls: string; note?: string } | null = basePill
+    ? verdictLag
+      ? {
+          label: basePill.label,
+          cls: `${basePill.cls} border border-dashed border-current`,
+          note:
+            verdictLag === "running"
+              ? "The previous screen's call — a new screen of this deal is running and replaces it when it reaches the verdict"
+              : "The previous screen's call — the latest screen failed before it reached the verdict",
+        }
+      : { label: basePill.label, cls: basePill.cls }
+    : null;
 
   // Retrade watch: once a RE-screen finishes, diff it against the snapshot the
   // pipeline took of the previous run. Hidden while a job is in flight (the
@@ -979,8 +996,13 @@ export default async function DealPage({
         chips={
           <>
             {pill && (
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${pill.cls}`}>
+              <span
+                className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${pill.cls}`}
+                title={pill.note}
+                data-qa={pill.note ? "call-previous" : undefined}
+              >
                 {pill.label}
+                {pill.note ? <span className="sr-only">, the previous screen&apos;s call</span> : null}
               </span>
             )}
             {buyBoxChip && (

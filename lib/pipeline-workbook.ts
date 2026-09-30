@@ -96,6 +96,10 @@ export interface PipelineExportRow {
   yieldOnCost: string | null;
   fit: "fits" | "near" | "outside" | null;
   verdict: string | null; // pass | caution | pass_on
+  /** the call on file is the previous screen's: a re-screen is running, or
+   *  the latest screen failed before its verdict (lib/screen-run
+   *  `verdictBehind`) — the cell says so beside the call it shows */
+  verdictBehind?: "running" | "failed" | null;
   offersDue: string | null; // YYYY-MM-DD
   createdAt: string; // ISO
   addedBy: string | null;
@@ -300,9 +304,14 @@ export async function buildPipelineWorkbook(
         : baseFont;
 
       const v = d.verdict ? VERDICT_LABEL[d.verdict] : null;
-      row.getCell(11).value = v?.label ?? "—";
+      // A call the latest screen has not re-run is the previous screen's,
+      // printed beside this run's terms — said, never passed off as current.
+      const behind = v && d.verdictBehind ? (d.verdictBehind === "running" ? "Re-screening" : "Screen failed") : null;
+      row.getCell(11).value = behind ? `${behind} (was ${v!.label})` : (v?.label ?? "—");
       row.getCell(11).font = v
-        ? { size: 10, bold: true, color: { argb: v.color } }
+        ? behind
+          ? { size: 10, italic: true, color: { argb: v.color } }
+          : { size: 10, bold: true, color: { argb: v.color } }
         : baseFont;
 
       const dueCell = row.getCell(12);

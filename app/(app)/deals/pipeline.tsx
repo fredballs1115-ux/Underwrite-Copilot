@@ -374,10 +374,10 @@ export function Pipeline({
   const [compareMode, setCompareMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // While any deal is mid-screen, refresh the list every few seconds so the
-  // verdict lands without a manual reload.
+  // While any deal is mid-screen — a first screen or a re-screen — refresh
+  // the list every few seconds so the verdict lands without a manual reload.
   const router = useRouter();
-  const anyRunning = deals.some((d) => !d.verdict && d.jobStatus === "running");
+  const anyRunning = deals.some((d) => d.jobStatus === "running");
   useEffect(() => {
     if (!anyRunning) return;
     const t = setInterval(() => router.refresh(), 7000);
@@ -612,10 +612,12 @@ export function Pipeline({
           ? "Failed"
           : d.jobStatus === "stalled"
             ? "Stalled"
-            : d.verdict
-              ? (VERDICT_META[d.verdict]?.label ?? d.verdict)
-              : d.jobStatus === "running"
-                ? "Screening"
+            : d.jobStatus === "running"
+              ? d.verdict
+                ? "Re-screening"
+                : "Screening"
+              : d.verdict
+                ? (VERDICT_META[d.verdict]?.label ?? d.verdict)
                 : "Not screened",
         STAGE_LABEL[normalizeStage(d.stage)],
         d.offersDue ?? "",
@@ -1721,9 +1723,9 @@ const DealRow = memo(function DealRow({
   // the price line instead (#420), because the column's 88px beside a name
   // that also has the building's picture beside it left the name
   // "The Maddox at…".
-  // A failed or stalled run outranks the stored verdict: that verdict was
-  // written about the terms as they were before the run the analyst just
-  // asked for, and the deal page says so.
+  // A failed, stalled or running screen outranks the stored verdict: that
+  // verdict was written about the terms as they were before the run the
+  // analyst just asked for, and the deal page says so (lib/screen-run).
   const status =
     d.jobStatus === "failed" ? (
       <span
@@ -1743,13 +1745,16 @@ const DealRow = memo(function DealRow({
       >
         Stalled
       </span>
+    ) : d.jobStatus === "running" ? (
+      <span
+        className="flex items-center gap-1.5 text-[11px] text-muted"
+        title={v ? `Re-screening — the previous call was ${v.label}` : undefined}
+      >
+        <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
+        {v ? "Re-screening…" : "Screening…"}
+      </span>
     ) : v ? (
       <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}>{v.label}</span>
-    ) : d.jobStatus === "running" ? (
-      <span className="flex items-center gap-1.5 text-[11px] text-muted">
-        <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        Screening…
-      </span>
     ) : (
       // Nothing has run yet: an empty ring where the verdict pill will sit.
       <span className="inline-flex h-6 items-center" title="Not screened yet — open the deal to run the screen">
@@ -1999,15 +2004,17 @@ function TileCall({ d }: { d: DealCard }) {
       </span>
     );
   }
-  if (v && d.verdict) return <span className={`${pill} ${TILE_CALL[d.verdict] ?? "bg-white/95 text-ink"}`}>{v.label}</span>;
+  // A screen in flight outranks the call it will replace: a re-screen's
+  // terms are already rewriting under the old verdict.
   if (d.jobStatus === "running") {
     return (
-      <span className={`${pill} bg-white/95 text-ink`}>
+      <span className={`${pill} bg-white/95 text-ink`} title={v ? `Re-screening — the previous call was ${v.label}` : undefined}>
         <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        Screening…
+        {v ? "Re-screening…" : "Screening…"}
       </span>
     );
   }
+  if (v && d.verdict) return <span className={`${pill} ${TILE_CALL[d.verdict] ?? "bg-white/95 text-ink"}`}>{v.label}</span>;
   return (
     <span className={`${pill} bg-white/90 py-1.5 text-muted`} title="Not screened yet — open the deal to run the screen">
       <span aria-hidden className="h-2.5 w-2.5 rounded-full border-[1.5px] border-dashed border-muted/70" />

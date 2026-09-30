@@ -100,6 +100,21 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(conv.getCell(13).value).toBe("2026-09-08");
   });
 
+  it("a call the latest screen has not re-run says so beside the call it shows", async () => {
+    const ws = (
+      await load([
+        { ...STABILIZED, verdictBehind: "running" },
+        { ...CONVERSION, verdictBehind: "failed" },
+        { ...LEGACY, verdict: null, verdictBehind: "running" },
+      ])
+    ).getWorksheet("Pipeline")!;
+    const cells = [6, 7, 8].map((r) => ws.getRow(r).getCell(11).value);
+    expect(cells).toContain("Re-screening (was Caution)");
+    expect(cells).toContain("Screen failed (was Caution)");
+    // No call on file: a first screen running prints no invented call.
+    expect(cells).toContain("—");
+  });
+
   it("a share's price keeps its figure and carries what it buys as the cell's note; a building's has none (#415)", async () => {
     const ws = (await load([{ ...STABILIZED, interest: "49% share" }, CONVERSION])).getWorksheet("Pipeline")!;
     const share = ws.getRow(6).getCell(7);

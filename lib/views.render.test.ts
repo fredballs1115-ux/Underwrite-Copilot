@@ -1137,7 +1137,7 @@ describe("SubmarketCards and the submarket's band — the metro its owner typed,
 
 // ── The shared screen (the one signed-out surface) ─────────────────────────
 import { Expired, ShareView } from "@/app/share/[token]/share-view";
-import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
+import type { BrokerCompsResult, ExtractionResult, MarketResult, VerdictResult } from "@/lib/anthropic/types";
 
 describe("ShareView — the read-only screen a partner or lender opens", () => {
   it("renders the sample deal: the verdict mark, the flip dots, every range, the killers, key terms and the folded reads", () => {
@@ -1435,6 +1435,34 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // No address, no picture — and no empty frame or credit line either.
     expect(html).not.toContain("<img");
     expect(text).not.toContain("USGS");
+
+    // Mid re-screen (#123): the call and the reads the run has not reached
+    // are the previous screen's, and the page says the sender is running it.
+    const rescreening = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: conversion.dealName ?? "",
+        assetClass: "multifamily",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: true,
+        staleWhy: "running",
+        staleReads: ["market"],
+        picture: null,
+        extraction: conversion,
+        comps: { summary: "Three sales support the basis.", saleComps: [], leaseComps: [], redFlags: [] } as unknown as BrokerCompsResult,
+        market: { summary: "Rents are firm.", checks: [] } as unknown as MarketResult,
+        verdict: { ...verdict, generatedAt: "2026-09-12T14:03:00.000Z" },
+      }),
+    );
+    expect(a11yIssues(rescreening), "a11y share-rescreening").toEqual([]);
+    const rs = visibleText(rescreening);
+    expect(gluedWords(rs)).toEqual([]);
+    expect(rs).toContain("the sender is re-screening this deal");
+    expect(rs).not.toContain("did not finish");
+    // The market read is the last run's; the comp read, already rewritten, is not marked.
+    expect((rescreening.match(/data-qa="previous-read"/g) ?? []).length).toBe(1);
+    expect(rs).toContain("From the previous screen — the sender’s re-screen has not reached it yet.");
+    // The call is dated.
+    expect(rs).toMatch(/First-pass verdict · Sep 12, 2026/);
 
     const expired = renderToStaticMarkup(
       React.createElement(Expired, { reason: "The sender revoked this link." }),

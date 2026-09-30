@@ -225,6 +225,10 @@ const MODEL_ERRORS: Record<string, string> = {
     "The latest screen failed before it reached the verdict — run it again so the memo pairs today’s terms with today’s call.",
   reportstale:
     "The latest screen failed before it reached the verdict — run it again so the report pairs today’s terms with today’s call.",
+  memorunning:
+    "A screen of this deal is still running — the memo waits for its verdict, so it never pairs the new terms with the last call.",
+  reportrunning:
+    "A screen of this deal is still running — the report waits for its verdict, so it never pairs the new terms with the last call.",
 };
 
 // Errors from the Reconciler tab's own upload are shown inline there; every
@@ -339,7 +343,8 @@ export function DealView({
   modelErrorCode: string | null;
   job: Job;
   results: Results;
-  /** results a FAILED latest screen never reached — they belong to the
+  /** results the latest screen has not rewritten — a failed run never
+   *  reached them, or a running one has not yet — so they belong to the
    *  previous screen and every surface here says so (lib/screen-run.ts) */
   staleResults?: ResultKey[];
   /** today's starting rates off the rates table (lib/debt-index) for the
@@ -409,6 +414,9 @@ export function DealView({
   const [stalled, setStalled] = useState(false);
 
   const active = isActive(job?.status);
+  // Why any result below is the previous screen's: a failed run never
+  // reached it, or the run in progress has not yet (lib/screen-run).
+  const staleWhy: "failed" | "running" = job?.status === "error" ? "failed" : "running";
 
   // Poll the lightweight status endpoint while a run is in flight. When the
   // step changes (or the run ends), pull the freshly-written section data.
@@ -780,6 +788,7 @@ export function DealView({
               active={active}
               onNavigate={navigateLegacy}
               stale={staleResults}
+              staleWhy={staleWhy}
             />
             {playground && <SensitivityPlayground data={playground} />}
             {tasks !== null && (
@@ -852,6 +861,7 @@ export function DealView({
             marketSince={marketSince}
             metroDemand={metroDemand}
             staleVerdict={staleResults.includes("verdict")}
+            staleWhy={staleWhy}
             compSubject={subjectBasis(
               results.extraction?.metrics ?? [],
               inferStrategy(results.extraction, firstSignal).kind,
@@ -1259,6 +1269,7 @@ function AnalysesPanel({
   internalComps,
   omUrl,
   staleVerdict = false,
+  staleWhy = "failed",
   compSubject = null,
   marketSince = null,
   metroDemand = null,
@@ -1278,8 +1289,10 @@ function AnalysesPanel({
   supplements: SupplementsMap;
   internalComps: InternalComp[];
   omUrl: string | null;
-  /** the latest screen failed before re-running the verdict */
+  /** the latest screen has not re-run the verdict (lib/screen-run) */
   staleVerdict?: boolean;
+  /** why: that screen failed before the verdict, or is still running */
+  staleWhy?: "failed" | "running";
   /** the subject's own basis, read where the first signal is in scope, so
    *  the comps table's tick and the deal header agree on the deal's kind */
   compSubject?: SubjectBasis | null;
@@ -1340,7 +1353,7 @@ function AnalysesPanel({
   } else if (data) {
     content =
       analysis === "verdict" ? (
-        <VerdictView result={results.verdict!} stale={staleVerdict} />
+        <VerdictView result={results.verdict!} stale={staleVerdict} staleWhy={staleWhy} />
       ) : analysis === "challenger" ? (
         <ChallengerView result={results.challenges!} dealName={dealName} />
       ) : analysis === "comps" ? (

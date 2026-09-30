@@ -20,6 +20,7 @@ Font.registerHyphenationCallback((word) =>
 import type { BuyBoxCheck } from "@/lib/criteria";
 import { pdfSafe } from "./pdf-text";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
+import { screenedOn } from "@/lib/screen-run";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -292,6 +293,10 @@ export type MemoData = {
    *  hazard, no digital map or a lookup that has not answered */
   floodLine?: string;
   dateStr: string;
+  /** the day the verdict was written ("Screened Sep 12, 2026"), so a memo
+   *  printed weeks later never passes an old call off as the day's; "" for
+   *  a verdict saved before the pipeline stamped one */
+  screened?: string;
   verdictWord: string | null;
   verdictColor: string;
   verdictSub: string;
@@ -548,6 +553,7 @@ export function buildMemoData(
     storageLine: pdfSafe(storageLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
+    screened: screenedOn(verdict?.generatedAt) ? `Screened ${screenedOn(verdict?.generatedAt)}` : "",
     verdictWord: vmeta?.word ?? null,
     verdictColor: vmeta?.color ?? C.muted,
     verdictSub: vmeta?.sub ?? "",
@@ -971,6 +977,7 @@ export function MemoPage({ data }: { data: MemoData }) {
           <View>
             <Text style={s.metaRight}>Deal Screening Memo</Text>
             <Text style={s.metaRight}>{data.dateStr}</Text>
+            {data.screened ? <Text style={s.metaRight}>{data.screened}</Text> : null}
           </View>
         </View>
 

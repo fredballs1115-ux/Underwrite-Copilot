@@ -24,8 +24,9 @@ export function DealStickyBar({
 }: {
   dealId: string;
   name: string;
-  /** the call, in the header's own colours */
-  chip?: { label: string; cls: string } | null;
+  /** the call, in the header's own colours; `note` where it is the
+   *  previous screen's (a re-screen running, or one that failed first) */
+  chip?: { label: string; cls: string; note?: string } | null;
   /** the price and the cap (or a plan deal's yield on cost), as the header
    *  prints them */
   figures: { label: string; value: string }[];
@@ -59,7 +60,10 @@ export function DealStickyBar({
           {name}
         </button>
         {chip ? (
-          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.cls}`}>{chip.label}</span>
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.cls}`} title={chip.note}>
+            {chip.label}
+            {chip.note ? <span className="sr-only">, the previous screen&apos;s call</span> : null}
+          </span>
         ) : null}
         {figures.map((f) => (
           <span key={f.label} className="hidden shrink-0 items-baseline gap-1.5 text-xs md:inline-flex">

@@ -368,6 +368,37 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(textOf(render(sampleProps("overview")))).not.toMatch(/previous screen/);
   });
 
+  it("a re-screen still running marks the results it has not reached, and says it is running", () => {
+    // The research pass of 2026-09-30: mid re-screen, the page showed the
+    // run's new terms beside the last run's call as one screen.
+    const running = (tab: string, analysis: string | null = null): Props => ({
+      ...sampleProps(tab, analysis),
+      job: { status: "running", step: "market", progress: 70, error: null },
+      staleResults: ["market", "verdict"],
+    });
+    const html = render(running("overview"));
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/2 of these are from the previous screen — the run in progress replaces each as it reaches it/);
+    expect(text).not.toMatch(/failed before reaching them/);
+    expect(html).toMatch(/title="A new screen of this deal is running\./);
+    expect(textOf(render(running("analyses", "verdict")))).toMatch(/From the previous screen/);
+  });
+
+  it("the verdict says the day it was written", () => {
+    const base = sampleProps("overview");
+    const dated: Props = {
+      ...base,
+      results: { ...base.results, verdict: { ...base.results.verdict!, generatedAt: "2026-09-12T14:03:00.000Z" } },
+    };
+    const html = render(dated);
+    expect(html).toMatch(/data-qa="verdict-date"/);
+    expect(textOf(html)).toMatch(/Verdict\s*·\s*Sep 12, 2026/);
+    // A verdict saved before the stamp says no date rather than a wrong one.
+    expect(render(base)).not.toMatch(/data-qa="verdict-date"/);
+  });
+
   it("the comps tab draws each sale comp's basis against the subject's", () => {
     const html = render(sampleProps("analyses", "comps"));
     // Three sale comps state a per-unit basis ($252k, $298k, $261k) and each

@@ -16,6 +16,7 @@ import { siteReportsTag } from "@/lib/site-reports";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
+import { verdictBehind, type JobLike } from "@/lib/screen-run";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
@@ -78,7 +79,7 @@ export async function GET(req: Request) {
       rows.filter((d) => d.team_id && d.user_id !== user.id).map((d) => d.user_id),
     ),
   );
-  const [{ data: dueRows }, { data: mates }, personalBox, teamBox] =
+  const [{ data: dueRows }, { data: mates }, personalBox, teamBox, { data: jobRows }] =
     await Promise.all([
       rows.length
         ? supabase
@@ -96,7 +97,26 @@ export async function GET(req: Request) {
           }),
       getBuyBoxForDeal(user.id, null).catch(() => null),
       team ? getBuyBoxForDeal("", team.id).catch(() => null) : Promise.resolve(null),
+      // Each deal's latest job, as the pipeline page reads it: a re-screen
+      // running, or one that failed before its verdict, leaves the call on
+      // file the previous screen's beside this run's terms (lib/screen-run).
+      rows.length
+        ? supabase
+            .from("analysis_jobs")
+            .select("deal_id, status, step, created_at")
+            .in(
+              "deal_id",
+              rows.map((d) => d.id),
+            )
+            .order("created_at", { ascending: false })
+            .limit(Math.max(100, rows.length * 3))
+        : Promise.resolve({ data: [] as ({ deal_id: string } & JobLike)[] }),
     ]);
+  // The newest job per deal (rows arrive newest first).
+  const jobByDeal = new Map<string, JobLike>();
+  for (const j of (jobRows ?? []) as ({ deal_id: string } & JobLike)[]) {
+    if (!jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j);
+  }
   // Offers-due dates are best-effort (column arrived in migration 0013).
   const dueById = new Map<string, string>();
   for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
@@ -162,6 +182,7 @@ export async function GET(req: Request) {
         plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
       fit,
       verdict: (d.verdict as { verdict?: string } | null)?.verdict ?? null,
+      verdictBehind: verdictBehind(jobByDeal.get(d.id)),
       offersDue: dueById.get(d.id) ?? null,
       createdAt: d.created_at,
       addedBy:

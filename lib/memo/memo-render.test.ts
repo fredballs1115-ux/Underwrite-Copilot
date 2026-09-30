@@ -88,6 +88,29 @@ describe("MemoDocument (redesigned)", () => {
     expect(plain.interestLine).toBe("");
   }, 30000);
 
+  it("prints the day the verdict was written, so a memo printed later never passes an old call off as the day's", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: { ...SAMPLE_DEAL.verdict, generatedAt: "2026-09-12T14:03:00.000Z" },
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.screened).toBe("Screened Sep 12, 2026");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("September 30, 2026");
+    expect(text).toContain("Screened Sep 12, 2026");
+    // A verdict saved before the pipeline stamped one prints no screen date.
+    expect(buildMemoData({ ...deal, verdict: SAMPLE_DEAL.verdict } as unknown as DealRow, "September 30, 2026", []).screened).toBe("");
+  }, 30000);
+
   it("prints FEMA's flood zone under the title in a Special Flood Hazard Area, and nothing for minimal hazard or a pending lookup (#426)", async () => {
     const base = {
       name: SAMPLE_DEAL.name,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { placedByClause } from "@/lib/placed-by";
+import { screenedOn } from "@/lib/screen-run";
 import type {
   BrokerCompsResult,
   ExtractionResult,
@@ -60,8 +61,14 @@ export interface ShareViewProps {
   assetClass: string | null;
   /** the link's expiry, ISO */
   expiresAt: string;
-  /** the sender's latest screen failed before it reached the verdict */
+  /** the sender's latest screen has not rewritten the verdict: it failed
+   *  before reaching it, or is still running toward it (lib/screen-run) */
   verdictStale: boolean;
+  /** why, when it is stale: a failed run, or a re-screen in progress */
+  staleWhy?: "failed" | "running";
+  /** the comp and market reads the latest screen has not rewritten either —
+   *  the previous screen's, beside this run's terms */
+  staleReads?: ReadonlyArray<"comps" | "market">;
   /** the building (#434): its own photograph where the deal has one, then
    *  the aerial — each a token-scoped route with its credit — and the
    *  place they picture; null when there is neither */
@@ -246,11 +253,25 @@ function splitOf(b: { lines: string[]; national?: number }, local: string, each:
   return nat > 0 ? `${b.lines.length - nat} ${local} and ${nat} the nation's, ${none}` : each;
 }
 
+/** A read the sender's latest screen has not rewritten: the previous
+ *  screen's, beside this run's terms, and said so. */
+function PreviousRead({ why }: { why: "failed" | "running" }) {
+  return (
+    <p className="mt-1 text-xs text-caution" data-qa="previous-read">
+      {why === "running"
+        ? "From the previous screen — the sender\u2019s re-screen has not reached it yet."
+        : "From the previous screen — the sender\u2019s latest run did not reach it."}
+    </p>
+  );
+}
+
 export function ShareView({
   dealName,
   assetClass,
   expiresAt,
   verdictStale,
+  staleWhy = "failed",
+  staleReads = [],
   picture,
   extraction,
   comps,
@@ -394,6 +415,12 @@ export function ShareView({
       >
         <p className="text-xs font-medium uppercase tracking-wider text-muted">
           First-pass verdict
+          {screenedOn(verdict.generatedAt) ? (
+            <span className="normal-case tracking-normal" data-qa="verdict-date">
+              {" · "}
+              {screenedOn(verdict.generatedAt)}
+            </span>
+          ) : null}
         </p>
         <div className="mt-2 flex items-center gap-3">
           <span
@@ -407,8 +434,9 @@ export function ShareView({
         </div>
         {verdictStale && (
           <p className="mt-2 text-xs text-caution">
-            From the previous completed screen — the sender&rsquo;s latest run of this
-            deal did not finish.
+            {staleWhy === "running"
+              ? "From the previous completed screen — the sender is re-screening this deal, and this call is replaced when the run reaches its verdict."
+              : "From the previous completed screen — the sender\u2019s latest run of this deal did not finish."}
           </p>
         )}
         {verdict.reason && (
@@ -575,12 +603,14 @@ export function ShareView({
           {comps?.summary && (
             <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
               <h2 className="text-sm font-semibold tracking-tight">Comp read</h2>
+              {staleReads.includes("comps") && <PreviousRead why={staleWhy} />}
               <Fold text={comps.summary} className="mt-2 text-sm leading-relaxed text-muted" />
             </div>
           )}
           {market?.summary && (
             <div className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
               <h2 className="text-sm font-semibold tracking-tight">Market read</h2>
+              {staleReads.includes("market") && <PreviousRead why={staleWhy} />}
               <Fold text={market.summary} className="mt-2 text-sm leading-relaxed text-muted" />
               {market.liveBrief && market.liveBrief.lines.length > 0 && (
                 <p className="mt-2 text-xs text-muted">
