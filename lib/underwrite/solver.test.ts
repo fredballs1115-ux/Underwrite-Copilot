@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import { scenarioMetrics } from "./playground";
-import { solveMaxBid } from "./solver";
+import { bidFloors, floorWords, floorsWords, fmtBid, solveMaxBid } from "./solver";
 
 /** Same realistic levered base case the playground tests use. */
 function baseInputs(over: Partial<UnderwriteInputs> = {}): UnderwriteInputs {
@@ -158,5 +158,34 @@ describe("solveMaxBid — price that clears the floors", () => {
     expect(s.at).not.toBeNull();
     expect(s.at!.irr).toBeGreaterThanOrEqual(baseIrr - 0.01 - 1e-9);
     expect(s.at!.cap).toBeGreaterThan(0);
+  });
+});
+
+describe("bidFloors — the buy box's floors as the deal page hands them to the solver", () => {
+  it("takes each floor the box sets, percent points over 100, and nothing it leaves blank", () => {
+    expect(bidFloors({ minIrrPct: 13, minCoCPct: 5, minCapPct: 5.75 })).toEqual({ minIrr: 0.13, minCoc: 0.05, minCap: 0.0575 });
+    expect(bidFloors({ minCoCPct: 6 })).toEqual({ minCoc: 0.06 });
+  });
+
+  it("is null where the box sets no floor, or there is no box — no max bid on the page either", () => {
+    expect(bidFloors({})).toBeNull();
+    expect(bidFloors({ minIrrPct: null, minCoCPct: null, minCapPct: null })).toBeNull();
+    expect(bidFloors(null)).toBeNull();
+  });
+});
+
+describe("fmtBid — the bid as the page prints it", () => {
+  it("rounds down at display precision, so the printed bid still clears the floors", () => {
+    expect(fmtBid(55_195_399.98)).toBe("$55.19M");
+    expect(fmtBid(9_738_000)).toBe("$9.73M");
+    expect(fmtBid(1_234_567_890)).toBe("$1.23B");
+    expect(fmtBid(812_999)).toBe("$812k");
+  });
+
+  it("names the floors in the page's words", () => {
+    const f = { minIrr: 0.13, minCoc: 0.05, minCap: 0.0575 };
+    expect(floorsWords(f)).toBe("13% IRR, 5% cash-on-cash, 5.75% going-in cap");
+    expect(floorWords("minCoc", f)).toBe("5% cash-on-cash");
+    expect(floorWords("minCap", { minIrr: 0.13 })).toBe("");
   });
 });

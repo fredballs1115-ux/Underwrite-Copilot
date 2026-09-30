@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import { deriveUnderwriteInputs } from "./inputs";
-import { runScenario } from "./playground";
+import { runScenario, sliderValues } from "./playground";
+import { bidFloors, fmtBid, solveMaxBid } from "./solver";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
+import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import {
   buildCapGrowthGrid,
   buildPriceCapGrid,
@@ -12,6 +15,7 @@ import {
   heatCellIrr,
   heatCellEm,
   heatCellText,
+  maxBidSentence,
   placeholderReturnsLine,
   HEAT_BG,
 } from "./report-grid";
@@ -251,6 +255,54 @@ describe("buildSensitivityData", () => {
     const s = buildSensitivityData(inputs, null);
     expect(s.hurdlePct).toBe(15);
     expect(s.hurdleSource).toBe("default");
+  });
+});
+
+describe("the report's max bid is the deal page's — the buy box's every floor, the binding one named", () => {
+  // The demo page's own model and mandate (lib/sample-derive, SAMPLE_DEMO_BOX).
+  const derived = sampleDerivedInputs();
+  const inputs = derived.inputs;
+
+  it("solves the page's own call: every floor the box sets, under the sliders' base stops", () => {
+    const floors = bidFloors(SAMPLE_DEMO_BOX)!;
+    // The playground's call, spelled out as it makes it.
+    const stop = (lever: "exitCapPct" | "rentGrowthPct" | "vacancyPct") => {
+      const s = sliderValues(lever, inputs[lever]);
+      return s.values[s.baseIdx];
+    };
+    const page = solveMaxBid(inputs, floors, { exitCapPct: stop("exitCapPct"), rentGrowthPct: stop("rentGrowthPct"), vacancyPct: stop("vacancyPct") });
+    const report = buildSensitivityData(inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { floors });
+    expect(report.maxBid?.price).toBe(page.price);
+    expect(report.maxBid?.binding).toBe(page.binding);
+    expect(report.maxBidFloors).toEqual({ floors, from: "buybox" });
+    // The IRR floor alone — what the report solved before — clears a higher
+    // price: the cash-on-cash floor binds first on the sample.
+    const irrOnly = solveMaxBid(inputs, { minIrr: 0.13 });
+    expect(page.binding).toBe("minCoc");
+    expect(irrOnly.price!).toBeGreaterThan(page.price!);
+  });
+
+  it("says the bid as the page prints it, with the floors it clears and the one that binds", () => {
+    const s = buildSensitivityData(inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { floors: bidFloors(SAMPLE_DEMO_BOX) });
+    const line = maxBidSentence(s);
+    expect(line).toMatch(
+      new RegExp(
+        `^Max bid clearing your buy box's floors \\(13% IRR, 5% cash-on-cash, 5\\.75% going-in cap\\): \\${fmtBid(s.maxBid!.price).replace(".", "\\.")} \\(-\\d+\\.\\d% vs the modeled price\\); your 5% cash-on-cash floor binds\\. At that price: IRR \\d+\\.\\d%, year-1 cash-on-cash 5\\.0%, going-in cap \\d\\.\\d\\d%\\.$`,
+      ),
+    );
+  });
+
+  it("falls back to the screening hurdle's IRR where the box sets no floor, and says whose it is", () => {
+    const none = buildSensitivityData(inputs, null, { floors: null });
+    expect(none.maxBidFloors).toEqual({ floors: { minIrr: 0.15 }, from: "screening" });
+    expect(maxBidSentence(none)).toMatch(/^Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modeled price\)\./);
+    // A caller that passes the box's IRR as the hurdle and no floors says
+    // it is the buyer's target, not the screening default.
+    expect(maxBidSentence(buildSensitivityData(inputs, 13))).toMatch(/^Max bid holding your 13% IRR target: /);
+    // Nothing clears: the box's floors named, and why.
+    expect(maxBidSentence({ ...none, maxBid: null, maxBidFloors: { floors: { minCoc: 0.5 }, from: "buybox" } })).toBe(
+      "No price inside the tested range clears your buy box's floors (50% cash-on-cash) under these assumptions: the deal's economics, not its price, are the blocker.",
+    );
   });
 });
 

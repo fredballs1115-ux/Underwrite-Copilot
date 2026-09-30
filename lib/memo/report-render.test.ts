@@ -19,7 +19,9 @@ const tinyDataUri = (rgb: [number, number, number]) => `data:image/png;base64,${
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import { buildSensitivityData } from "@/lib/underwrite/report-grid";
+import { buildSensitivityData, pageBaseLevers } from "@/lib/underwrite/report-grid";
+import { bidFloors, fmtBid, solveMaxBid } from "@/lib/underwrite/solver";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -216,6 +218,33 @@ describe("ReportDocument (full report)", () => {
   afterEach(() => {
     vi.useRealTimers();
   });
+
+  it("prints the deal page's max bid — solved on the buy box's every floor, the binding one named — never the IRR floor's alone", async () => {
+    // The demo report route's own chain, beside the demo page's playground.
+    const derived = sampleDerivedInputs();
+    const floors = bidFloors(SAMPLE_DEMO_BOX)!;
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors });
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input: buildReportData(deal, "September 30, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    // The page's figure, as the page prints it (rounded down).
+    const page = solveMaxBid(derived.inputs, floors, pageBaseLevers(derived.inputs));
+    expect(text).toContain(`Max bid clearing your buy box's floors (13% IRR, 5% cash-on-cash, 5.75% going-in cap): ${fmtBid(page.price!)}`);
+    expect(text).toContain("your 5% cash-on-cash floor binds");
+    expect(text).not.toContain("Max bid holding 13% IRR");
+  }, 45000);
 
   it("labels the retrade grid's base row the modeled price, never the ask, and says what the model priced it at", async () => {
     const render = async (extraction: ExtractionResult) => {

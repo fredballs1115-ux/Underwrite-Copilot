@@ -5,6 +5,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildSensitivityData } from "@/lib/underwrite/report-grid";
+import { bidFloors } from "@/lib/underwrite/solver";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -47,10 +48,12 @@ function getSampleReport(dateStr: string): Promise<Buffer> {
   // extraction + rent roll + T-12 → model inputs → both heat grids, graded
   // against the demo mandate's IRR target.
   const derived = sampleDerivedInputs();
+  // The max bid on the demo mandate's floors, as the demo page's
+  // playground solves it — the two print one bid.
   const sensitivity = buildSensitivityData(
     derived.inputs,
     SAMPLE_DEMO_BOX.minIrrPct ?? null,
-    { sources: derived.sources },
+    { sources: derived.sources, floors: bidFloors(SAMPLE_DEMO_BOX) },
   );
   // Null for the stabilized sample — the plan page only exists on a deal
   // with a plan — but the same call the real route makes.

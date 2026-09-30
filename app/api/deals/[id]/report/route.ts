@@ -24,6 +24,7 @@ import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
+import { bidFloors, type BidFloors } from "@/lib/underwrite/solver";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { coverPictureFor, galleryPhotosFor } from "@/lib/memo/cover-aerial";
@@ -120,6 +121,9 @@ export async function GET(
   // The buy-box target IRR anchors the sensitivity page's color scale, so
   // the grids grade against THIS buyer's hurdle, not a generic threshold.
   let hurdlePct: number | null = null;
+  // The box's return floors — IRR, cash-on-cash, going-in cap — which the
+  // deal page solves its max bid on; the report makes the same call.
+  let floors: BidFloors | null = null;
   try {
     const ownership = deal as unknown as {
       user_id: string;
@@ -142,6 +146,7 @@ export async function GET(
         box,
       );
       hurdlePct = box.minIrrPct ?? null;
+      floors = bidFloors(box);
     }
   } catch {
     buyBoxChecks = [];
@@ -216,8 +221,9 @@ export async function GET(
       );
       // The sources say whether the price and the year-1 NOI are the
       // documents' or placeholders; on a placeholder's model the report
-      // leaves the grids and the max bid out and says why.
-      sensitivity = buildSensitivityData(derived.inputs, hurdlePct, { sources: derived.sources });
+      // leaves the grids and the max bid out and says why. The max bid is
+      // solved on the box's floors, as the deal page solves it.
+      sensitivity = buildSensitivityData(derived.inputs, hurdlePct, { sources: derived.sources, floors });
       // The plan page for the kind the deal page reads — the extraction and
       // the first signal — the same read buildReportData gates the IRR page on.
       plan = buildPlanReport(

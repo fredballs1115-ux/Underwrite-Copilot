@@ -34,6 +34,7 @@ import {
   heatCellIrr,
   heatCellEm,
   heatLegend,
+  maxBidSentence,
   HEAT_BG,
   type SensitivityData,
   type HeatCell,
@@ -1560,14 +1561,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             hurdlePct={sensitivity.hurdlePct}
             rowLabelWidth="19%"
           />
+          {/* The deal page's max bid, solved on the buy box's own floors
+              and named by the one that binds (lib/underwrite/report-grid). */}
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-            {sensitivity.maxBid
-              ? sensitivity.maxBid.unbounded
-                ? `Max bid holding ${fmtHurdle(sensitivity.hurdlePct)} IRR: clears at every tested price — the constraint never binds inside the search range.`
-                : `Max bid holding ${fmtHurdle(sensitivity.hurdlePct)} IRR: ${fmtCompactUsd(sensitivity.maxBid.price)} (${
-                    sensitivity.maxBid.deltaPct > 0 ? "+" : ""
-                  }${(sensitivity.maxBid.deltaPct * 100).toFixed(1)}% vs the modeled price).`
-              : `No price inside the tested range holds ${fmtHurdle(sensitivity.hurdlePct)} IRR under these assumptions.`}
+            {str(maxBidSentence(sensitivity))}
           </Text>
 
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 10 }}>
