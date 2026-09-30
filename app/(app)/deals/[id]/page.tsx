@@ -61,6 +61,7 @@ import { buildingSfRow, findGoingInCap, parsePrice } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
+import { omLinkFor } from "@/lib/om-link";
 import { isPro } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import { type DealDocument } from "@/lib/documents";
@@ -361,7 +362,10 @@ export default async function DealPage({
     files?: { id: string; name: string; path: string; createdAt: string }[];
   };
   const rawSupp = (deal.supplements as Record<string, RawSupp> | null) ?? {};
-  // Signed link so the user can re-open the OM they uploaded (1-hour expiry).
+  // The link to the OM the user uploaded, and the base of every "p. N"
+  // chip: a route that signs the file when it is clicked (lib/om-link), so
+  // a page left open past the signed URL's hour still opens it.
+  const omUrl = omLinkFor(id, deal.om_storage_path);
   // The building's own photograph — the cover of its memorandum, lifted out
   // on the first view and stored — leads the visual below. Null means the
   // overhead leads, as before.
@@ -384,9 +388,6 @@ export default async function DealPage({
         height: g.height,
         fullWidth: g.fullWidth ?? null,
       })));
-  const omUrlPromise = deal.om_storage_path
-    ? signedSupplementUrl(deal.om_storage_path, { kind: "deal", dealId: id })
-    : Promise.resolve(null);
   const supplements: Record<
     string,
     {
@@ -398,8 +399,7 @@ export default async function DealPage({
     user_id: string;
     team_id: string | null;
   };
-  const [omUrl, buyBox] = await Promise.all([
-    omUrlPromise,
+  const [buyBox] = await Promise.all([
     getBuyBoxForDeal(ownership.user_id, ownership.team_id).catch(() => null),
     ...Object.entries(rawSupp).map(async ([tabKey, s]) => {
       const files = await Promise.all(

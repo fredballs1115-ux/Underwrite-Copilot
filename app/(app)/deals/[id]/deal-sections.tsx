@@ -916,6 +916,9 @@ export function BrokerComps({
                 name: c.name,
                 detail: c.detail,
                 sourceLabel: pageNum ? `OM p. ${pageNum}` : "OM",
+                // The OM route signs on click; the #page fragment is kept
+                // across its redirect (the Location carries none), as on the
+                // source chips.
                 sourceHref:
                   pageNum && mapContext.omUrl ? `${mapContext.omUrl}#page=${pageNum}` : null,
                 queries: geocodeCandidates(c.name, c.detail, mapContext.market),

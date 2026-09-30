@@ -1500,7 +1500,7 @@ function DocumentsPanel({
                 href={omUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                title="Opens the uploaded OM (link valid for 1 hour)"
+                title="Opens the uploaded OM"
                 className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
               >
                 View
