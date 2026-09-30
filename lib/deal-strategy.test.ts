@@ -296,6 +296,22 @@ describe("planSummary / capitalBudgetFromMetrics", () => {
     expect(capitalBudgetFromMetrics([metric("Total capitalization", "$40,000,000")], 10_000_000)).toMatchObject({ budget: 30_000_000, allIn: true });
   });
 
+  it("says where the budget's own words include its interest reserve, and reads such a total at all", () => {
+    // "reserve" in the label had thrown the total out entirely.
+    expect(capitalBudgetFromMetrics([metric("Total project cost (incl. interest reserve)", "$180,000,000")], 20_000_000)).toMatchObject({
+      budget: 160_000_000,
+      allIn: true,
+      includesReserve: true,
+    });
+    expect(capitalBudgetFromMetrics([metric("Total project cost", "$180,000,000 including capitalized interest")], 20_000_000)?.includesReserve).toBe(true);
+    expect(budgetFromText("$180 million total project cost, including the interest reserve", 20_000_000)?.includesReserve).toBe(true);
+    // Left out, or not said: no flag, and a reserve row is still no budget.
+    expect(capitalBudgetFromMetrics([metric("Total project cost", "$180,000,000")], 20_000_000)?.includesReserve).toBeUndefined();
+    expect(capitalBudgetFromMetrics([metric("Construction budget", "$160,000,000 excl. financing costs")], 20_000_000)?.includesReserve).toBeUndefined();
+    expect(capitalBudgetFromMetrics([metric("Replacement reserve", "$74,400")], 20_000_000)).toBeNull();
+    expect(capitalBudgetFromMetrics([metric("Interest reserve", "$6,000,000")], 20_000_000)).toBeNull();
+  });
+
   it("with only lines of the budget stated there is no stated total: null, never a sum", () => {
     expect(capitalBudgetFromMetrics([metric("Hard costs", "$18,000,000")], 10_000_000)).toBeNull();
     expect(capitalBudgetFromMetrics([metric("Hard costs", "$18,000,000"), metric("Soft costs", "$4,000,000"), metric("Land cost", "$10,000,000")], 10_000_000)).toBeNull();

@@ -70,6 +70,9 @@ export function ConstructionDebtPanel({
   // An OM that states an all-in total and no price: the total is the works
   // figure seeded above, and there is no price to add to it.
   const price = plan.price ?? (plan.budget?.isTotal ? 0 : null);
+  // A stated budget whose own words include its interest reserve carries the
+  // carry already: no second reserve goes on top of it.
+  const budgetIncludesReserve = plan.budget?.includesReserve === true;
 
   const r = useMemo(
     () =>
@@ -81,6 +84,7 @@ export function ConstructionDebtPanel({
             worksYears,
             ratePct,
             maxLtcPct,
+            budgetIncludesReserve,
             takeOut: {
               ratePct: takeOutRatePct,
               amortYears,
@@ -91,7 +95,7 @@ export function ConstructionDebtPanel({
             },
           })
         : null,
-    [price, budget, noi, worksYears, ratePct, maxLtcPct, takeOutRatePct, amortYears, minDscr, minDebtYieldPct, maxLtvPct, exitCap],
+    [price, budget, noi, worksYears, ratePct, maxLtcPct, budgetIncludesReserve, takeOutRatePct, amortYears, minDscr, minDebtYieldPct, maxLtvPct, exitCap],
   );
 
   return (
@@ -139,7 +143,13 @@ export function ConstructionDebtPanel({
           <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {(
               [
-                ["Total cost, carry included", `${fmtUsd(r.totalCost)}`, `${fmtUsd(r.hardSoftCost)} price + works, ${fmtUsd(r.interestReserve)} interest reserve`],
+                [
+                  "Total cost, carry included",
+                  `${fmtUsd(r.totalCost)}`,
+                  r.reserveInBudget
+                    ? "price + works — the stated budget includes its interest reserve"
+                    : `${fmtUsd(r.hardSoftCost)} price + works, ${fmtUsd(r.interestReserve)} interest reserve`,
+                ],
                 ["Construction loan", fmtUsd(r.constructionLoan), `${maxLtcPct}% of total cost · ${pct(r.equityPctOfCost, 0)} equity = ${fmtUsd(r.equity)}`],
                 [
                   "Take-out the finished NOI carries",
@@ -167,18 +177,26 @@ export function ConstructionDebtPanel({
               </div>
             ))}
           </dl>
-          <p className="mt-2 text-xs leading-relaxed text-muted">
-            Yield on total cost with the carry inside it:{" "}
-            <span className="font-mono font-semibold tabular-nums text-ink">{pct(r.yieldOnCost)}</span>
-            {plan.yieldOnCost != null && (
-              <>
-                {" "}
-                against the OM&apos;s {pct(plan.yieldOnCost)}{" "}on price plus works alone — the reserve is
-                a real cost of the plan and the OM&apos;s figure leaves it out.
-              </>
-            )}{" "}
-            The draw is assumed to average {Math.round(0.55 * 100)}% outstanding across the works.
-          </p>
+          {r.reserveInBudget ? (
+            <p className="mt-2 text-xs leading-relaxed text-muted" data-qa="reserve-in-budget">
+              Yield on total cost with the carry inside it:{" "}
+              <span className="font-mono font-semibold tabular-nums text-ink">{pct(r.yieldOnCost)}</span>
+              {" "}— the stated budget includes its interest reserve, so no second reserve is added on top of it.
+            </p>
+          ) : (
+            <p className="mt-2 text-xs leading-relaxed text-muted">
+              Yield on total cost with the carry inside it:{" "}
+              <span className="font-mono font-semibold tabular-nums text-ink">{pct(r.yieldOnCost)}</span>
+              {plan.yieldOnCost != null && (
+                <>
+                  {" "}
+                  against the OM&apos;s {pct(plan.yieldOnCost)}{" "}on price plus works alone — the reserve is
+                  a real cost of the plan and the OM&apos;s figure leaves it out.
+                </>
+              )}{" "}
+              The draw is assumed to average {Math.round(0.55 * 100)}% outstanding across the works.
+            </p>
+          )}
         </>
       ) : (
         <p className="mt-3 text-sm text-muted">

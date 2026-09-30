@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DRAW_PROFILE,
+  budgetIncludesInterestReserve,
   mortgageConstant,
   sizeConstructionDebt,
   takeOutCapacity,
@@ -100,6 +101,54 @@ describe("sizeConstructionDebt — the loan is sized to cost, with the carry ins
     expect(owned.yieldOnCost).toBeLessThan(0.075); // the carry dilutes the OM's 7.5%
     // A negative price is still nonsense.
     expect(sizeConstructionDebt({ ...BASE, price: -1 })).toBeNull();
+  });
+
+  it("adds no second reserve where the stated budget already carries its interest", () => {
+    expect(r.reserveInBudget).toBe(false);
+    const carried = sizeConstructionDebt({ ...BASE, budgetIncludesReserve: true })!;
+    expect(carried.reserveInBudget).toBe(true);
+    expect(carried.interestReserve).toBe(0);
+    // The loan is the cap on the stated cost itself: 60% of $180M.
+    expect(carried.constructionLoan).toBeCloseTo(0.6 * 180_000_000, 6);
+    expect(carried.totalCost).toBe(180_000_000);
+    expect(carried.yieldOnCost).toBeCloseTo(21 / 180, 9);
+    expect(carried.equity).toBeCloseTo(0.4 * 180_000_000, 6);
+    // Without the flag the reserve goes on top, as before.
+    expect(r.interestReserve).toBeGreaterThan(14_000_000);
+    expect(r.totalCost).toBeGreaterThan(180_000_000);
+  });
+});
+
+describe("budgetIncludesInterestReserve — a budget that already carries the loan's interest", () => {
+  it("reads it from the budget row's own label or its figure's words", () => {
+    for (const [label, value] of [
+      ["Total project cost (incl. interest reserve)", "$180,000,000"],
+      ["Total development cost including capitalized interest", "$180,000,000"],
+      ["Total project cost", "$180,000,000 (includes a $6,000,000 interest reserve)"],
+      ["Total project cost", "$180,000,000, interest reserve included"],
+      ["Construction budget, with carry", "$160,000,000"],
+      ["Total development cost (hard, soft and financing costs)", "$180,000,000"],
+      ["All-in cost inclusive of construction interest", "$180,000,000"],
+    ] as const) {
+      expect(budgetIncludesInterestReserve(label, value), `${label} | ${value}`).toBe(true);
+    }
+  });
+
+  it("is false where the words leave it out, or only name it", () => {
+    for (const [label, value] of [
+      ["Total project cost", "$180,000,000"],
+      ["Total project cost (excl. interest reserve)", "$180,000,000"],
+      ["Construction budget", "$160,000,000 before financing costs"],
+      ["Total project cost", "$180,000,000; financing costs excluded"],
+      ["Total development cost (incl. land, excl. financing)", "$180,000,000"],
+      // Named with nothing saying it is inside the figure: a reserve is added.
+      ["Total project cost", "$180,000,000 (interest reserve $6,000,000)"],
+      // In a figure's words "and" can add to it.
+      ["Total project cost", "$180,000,000 and a $6,000,000 interest reserve"],
+    ] as const) {
+      expect(budgetIncludesInterestReserve(label, value), `${label} | ${value}`).toBe(false);
+    }
+    expect(budgetIncludesInterestReserve(null)).toBe(false);
   });
 });
 

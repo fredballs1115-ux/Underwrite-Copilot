@@ -94,6 +94,32 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     expect(html).toMatch(/Yield on total cost with the carry inside it:.*10\.\d%/);
   });
 
+  it("adds no second interest reserve where the stated budget includes its own, and says so", () => {
+    const carried = planSummary(
+      {
+        ...CONVERSION,
+        metrics: CONVERSION.metrics.map((m) =>
+          m.label === "Total project cost" ? { ...m, label: "Total project cost (incl. interest reserve)" } : m,
+        ),
+      },
+      inferStrategy(CONVERSION),
+    )!;
+    expect(carried.budget?.includesReserve).toBe(true);
+    const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, { ...props, plan: carried }));
+    // 60% of the stated $180M, with nothing added on top of it.
+    expect(html).toContain("$108M");
+    expect(html).not.toContain("$117.29M");
+    expect(html).toContain("the stated budget includes its interest reserve");
+    expect(html).toContain('data-qa="reserve-in-budget"');
+    expect(html).not.toContain("The draw is assumed to average");
+    // The OM's own 11.7% stands: the carry is already inside it.
+    expect(html).toMatch(/Yield on total cost with the carry inside it:.*11\.7%/);
+    // Without the words, the reserve goes on top as before.
+    const plain = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, props));
+    expect(plain).not.toContain("the stated budget includes its interest reserve");
+    expect(plain).toContain("The draw is assumed to average");
+  });
+
   it("says so when the OM states no timeline, and defaults the road to two years", () => {
     const noTimeline = planSummary(
       { ...CONVERSION, strategy: { ...CONVERSION.strategy!, timeline: "" } },

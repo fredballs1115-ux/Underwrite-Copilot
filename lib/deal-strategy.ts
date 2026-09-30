@@ -28,6 +28,7 @@ import { withArticle } from "@/lib/article";
 import { groundRentOf, interestOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
+import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
 import {
   LATER_YEAR,
   METRIC_FIND,
@@ -370,6 +371,11 @@ export interface CapitalBudget {
   /** the renovation program's doors times its cost a door, both as stated,
    *  the memorandum stating no total (#460) — derived, and labelled so */
   program?: boolean;
+  /** the budget's own words say it already carries the construction loan's
+   *  interest reserve — capitalized interest, carry, financing costs (lib/
+   *  construction-debt `budgetIncludesInterestReserve`); set only when true,
+   *  and the construction panel then adds no reserve on top */
+  includesReserve?: boolean;
   label: string;
   page?: string;
 }
@@ -423,7 +429,14 @@ export function capitalBudgetFromMetrics(
   const allIn = statedAllIn && price != null;
   const budget = statedAllIn && price != null ? raw - price : raw;
   if (!budgetPlausible(budget, price, priceIsWholeAsset)) return null;
-  return { budget, allIn, isTotal: statedAllIn && price == null, label: m.label, page: m.page };
+  return {
+    budget,
+    allIn,
+    isTotal: statedAllIn && price == null,
+    ...(budgetIncludesInterestReserve(m.label, m.value) ? { includesReserve: true } : {}),
+    label: m.label,
+    page: m.page,
+  };
 }
 
 /** Whether a price row is the land or site — a development's acquisition
@@ -622,6 +635,7 @@ export function budgetFromText(
     budget,
     allIn,
     isTotal,
+    ...(budgetIncludesInterestReserve(null, text) ? { includesReserve: true } : {}),
     label: isTotal ? "stated total project cost" : "stated capital budget",
   };
 }
