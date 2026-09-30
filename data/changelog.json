@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Your first screen, drawn as it reads",
+      "blurb": "While a new deal's first screen is still reading its memorandum, its card, its row and its page show a figure not yet read as being read, never as the dash that means the memorandum does not state it, and the card shows the first read's asking price. The deal page no longer promises how long a screen takes: once you have run three, it says how long yours usually take, start to finish. ⌘K finds any deal you can see by name, not only the fifty changed last, and the free-deal meter counts a team trial's deals the way adding a deal does.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Research figures, credited one by one",
+      "blurb": "On /market and the homepage, each vacancy rate, asking rent and cap rate from the research tracker now names who published it and the period it covers, and links to its own source, where a market's figures had shared one link and one date. A figure whose period the research does not state says it is undated. Two notes that had lost their dollar signs read $10–15 and $11.04 again.",
+      "href": "/market"
+    },
+    {
+      "date": "2026-09-30",
       "title": "Corporate credit, from the Treasury",
       "blurb": "The rates strip on /tools and /market now reads corporate credit from the Treasury's own high-quality corporate bond curve: its 10-year spot rate, published monthly. The three ICE BofA spreads and Moody's Baa yield it had shown are gone. Their publishers license them to FRED, not to sites that republish them, and Moody's forbids redistribution without its written consent.",
       "href": "/tools"
