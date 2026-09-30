@@ -18,6 +18,12 @@ export type PublicPage = Omit<PageMeta, "image"> & {
   image?: PageMeta["image"];
 };
 
+/** A /market page's one h1: a metro's own page names the metro, as its
+ *  title does; a sector page and the base page are the covered markets. */
+export function marketHeading(metro: { name: string } | null): string {
+  return metro ? `${metro.name} market data` : "The covered markets";
+}
+
 export function publicMetadata(page: PublicPage): Metadata {
   const image = page.image ?? SITE_CARD;
   // The root layout's template adds " · Underwrite Copilot". A title that

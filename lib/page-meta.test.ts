@@ -11,8 +11,8 @@ import { metadata as tools } from "@/app/tools/page";
 import { metadata as login } from "@/app/login/page";
 import { metadata as notFound } from "@/app/not-found";
 import { changelogSince } from "./changelog";
-import { SITE_CARD, marketMeta, marketPageFor, sectorPageFor } from "./public-pages";
-import { SITE_NAME, publicMetadata } from "./page-meta";
+import { SITE_CARD, marketMeta, marketPageFor, marketPages, sectorPageFor } from "./public-pages";
+import { SITE_NAME, marketHeading, publicMetadata } from "./page-meta";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8");
 
@@ -106,6 +106,25 @@ describe("each public page states its own canonical and link preview", () => {
     expect(size, `app/${route}.tsx declares its size`).not.toBeNull();
     expect(Number(size![1])).toBeGreaterThanOrEqual(112);
     expect(Number(size![2])).toBeGreaterThanOrEqual(112);
+  });
+
+  it("names the metro in a metro page's one h1, as its title does", () => {
+    // Forty-odd metro pages shared the h1 "The covered markets", the metro
+    // only a sub-heading further down.
+    expect(marketHeading(marketPageFor("pittsburgh"))).toBe("Pittsburgh PA market data");
+    expect(marketHeading(null)).toBe("The covered markets");
+    for (const p of marketPages()) {
+      expect(marketMeta(p, null).title.startsWith(`${marketHeading(p)}:`), p.id).toBe(true);
+    }
+    const src = read("app/market/page.tsx");
+    expect(src).toContain("const pageMetro = marketPageFor(metroParam);");
+    expect(src).toMatch(/<h1[^>]*>\s*\{marketHeading\(pageMetro\)\}\s*<\/h1>/);
+    // One h1 a page: the signed-in reader's and everyone else's are the two
+    // arms of one choice, and the metro's band keeps its section heading.
+    expect(src.match(/<h1\b/g)?.length).toBe(2);
+    for (const f of ["app/market/page.tsx", "app/market/read-only-metro.tsx"]) {
+      expect(read(f), f).not.toMatch(/<MarketBand[^>]*as="h1"/);
+    }
   });
 
   it("is the market pages' own shape too, which go through the same helper", () => {

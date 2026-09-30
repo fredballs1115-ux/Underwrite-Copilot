@@ -19,7 +19,7 @@ import { BOARD_METRICS, SectorJobsBoard } from "./sector-jobs-board";
 import { SurveyVacancyBoard } from "./survey-vacancy-board";
 import { DATA_METROS } from "@/lib/market-match";
 import { marketMeta, marketPageFor, sectorPageFor } from "@/lib/public-pages";
-import { publicMetadata } from "@/lib/page-meta";
+import { marketHeading, publicMetadata } from "@/lib/page-meta";
 import { heatShade } from "./heat-shade";
 import { MetroLive } from "./metro-live";
 import { ReadOnlyMetroView } from "./read-only-metro";
@@ -227,6 +227,7 @@ export default async function MarketDataPage({
     sector: sectorParam,
     submarketError,
   } = (await searchParams) ?? {};
+  const pageMetro = marketPageFor(metroParam);
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
 
@@ -262,9 +263,12 @@ export default async function MarketDataPage({
         // Anonymous visitors land here from the homepage/why/demo marquee —
         // lead with the research layer itself, not "your" data they don't
         // have yet. The signed-in memory blocks below are user-gated.
+        // A metro's own page (`?metro=`, one of forty-odd a search engine
+        // reads apart) names the metro in its one h1, as its title does; the
+        // band further down keeps its h3, as every section of /market does.
         <div>
           <h1 className="text-3xl font-semibold tracking-tight">
-            The covered markets
+            {marketHeading(pageMetro)}
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted">
             Rules, FMRs, benchmarks and sales coverage for the covered markets.
