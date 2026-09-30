@@ -23,6 +23,7 @@ import { metroForAddress } from "@/lib/market-match";
 import { DC_AREA_METRO, FMR_BEDS, fmrBenchmarkRows, fmrBlock, fmrOf, readFmrMetric } from "@/lib/fmr";
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
+import { benchRowLabel } from "@/app/(app)/deals/[id]/research-panel";
 
 const seeds = seedBenchmarks();
 
@@ -304,6 +305,29 @@ describe("twoToFourMedian — a sale median with its month, from the research fi
     expect(demo).toContain('twoToFourMedian("philadelphia_pa")');
     expect(demo).not.toContain("$363,500");
     expect(demo).not.toContain("+6.9% YoY");
+  });
+});
+
+// The research pass of 2026-09-30: the deal page's research panel set the
+// deal's price PER UNIT against this median, a whole property's sale price,
+// and called every Philadelphia deal priced under it a unit "below market".
+describe("the deal page's research panel keeps the 2–4 unit median as dated context, never a call", () => {
+  const row = seeds.find((b) => b.metro === "Philadelphia, PA" && b.metric === "median_sale_price_2_4_unit")!;
+
+  it("names the figure as a whole property's sale price, with the month it is for", () => {
+    expect(benchRowLabel(row)).toBe(`Median sale price of a 2–4 unit property, ${monthOf(row.as_of)}`);
+    expect(monthOf(row.as_of)).toBe("May 2026");
+    // A row with no date names no month rather than an empty one.
+    expect(benchRowLabel({ ...row, as_of: "" })).toBe("Median sale price of a 2–4 unit property");
+    // Every other row keeps its own name.
+    expect(benchRowLabel({ metric: "monthly_sales_2_4_unit", as_of: row.as_of })).toBe("2–4 unit sales / month");
+  });
+
+  it("sets no price per unit against it, and draws no verdict chip", () => {
+    const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/research-panel.tsx"), "utf8");
+    expect(src).not.toMatch(/vsRange\(/);
+    expect(src).not.toMatch(/deal \{cmp\} market/);
+    expect(src).toContain("{benchRowLabel(b)}");
   });
 });
 

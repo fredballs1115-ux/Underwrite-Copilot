@@ -13,7 +13,6 @@ import {
   asOfLabel,
   evaluateRules,
   isStale,
-  vsRange,
   type Benchmark,
   type RegulatoryRule,
   type RuleEvaluation,
@@ -30,6 +29,7 @@ import {
 } from "@/lib/research-data";
 import { withArticle } from "@/lib/article";
 import { FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrToday, fmrWhen, readFmrMetric, type FmrBed } from "@/lib/fmr";
+import { monthOf } from "@/lib/zori";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
@@ -128,11 +128,27 @@ function metricLabel(metric: string): string {
           : "cap rate";
     return `${sector} ${what}`;
   }
-  if (metric === "median_sale_price_2_4_unit") return "2–4 unit median sale";
   if (metric === "monthly_sales_2_4_unit") return "2–4 unit sales / month";
   if (metric === "active_listings_2_4_unit") return "2–4 unit active listings";
   if (metric === "pmms_30y_fixed") return "30-yr fixed (PMMS)";
   return metric.replace(/__/g, ": ").replace(/_/g, " ");
+}
+
+/**
+ * A benchmark row's name as the panel prints it. The 2–4 unit median is the
+ * sale price of a whole property — a duplex, a triplex or a fourplex, never
+ * one unit — for one month (the row's `as_of` is that month's last day, the
+ * period the tracker states), so it is named as a property's and dated, and
+ * set against nothing: the panel once called a deal "below market" by its
+ * price per unit against it, which every Philadelphia deal priced under the
+ * median a unit read (the research pass of 2026-09-30).
+ */
+export function benchRowLabel(b: Pick<Benchmark, "metric" | "as_of">): string {
+  if (b.metric === "median_sale_price_2_4_unit") {
+    const month = b.as_of ? monthOf(b.as_of) : "";
+    return `Median sale price of a 2–4 unit property${month ? `, ${month}` : ""}`;
+  }
+  return metricLabel(b.metric);
 }
 
 // Where each covered metro sits per sector across the covered markets
@@ -622,10 +638,6 @@ export async function ResearchPanel({
                 );
               }
               const b = item.b;
-              const cmp =
-                ppu && b.metric === "median_sale_price_2_4_unit"
-                  ? vsRange(ppu, b.low, b.high)
-                  : null;
               // Vacancy rows also say where this metro sits in its sector's
               // cross-metro ranking — same builder as the market page.
               const vac = b.metric.match(/^(\w+?)_vacancy_pct$/);
@@ -637,7 +649,7 @@ export async function ResearchPanel({
                   className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
                 >
                   <span>
-                    {metricLabel(b.metric)}
+                    {benchRowLabel(b)}
                     {": "}
                     <span className="font-mono tabular-nums">
                       {fmtBenchValue(b.metric, b.low, b.high)}
@@ -650,19 +662,6 @@ export async function ResearchPanel({
                       >
                         #{rank.rank} of {rank.total}
                       </Link>
-                    )}
-                    {cmp && cmp !== "no_range" && (
-                      <span
-                        className={`ml-2 rounded px-1.5 py-px text-[11px] font-medium ${
-                          cmp === "above"
-                            ? "bg-red-500/10 text-red-600"
-                            : cmp === "below"
-                              ? "bg-emerald-500/10 text-emerald-600"
-                              : "bg-line/60 text-muted"
-                        }`}
-                      >
-                        deal {cmp} market
-                      </span>
                     )}
                   </span>
                   <SourceLink source={b.source} asOf={b.as_of} status={b.status} />
