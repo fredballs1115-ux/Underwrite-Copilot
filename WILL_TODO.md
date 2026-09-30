@@ -3,6 +3,86 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
+
+**Do these (each is yours alone):**
+1. **Run migration 0036** (`supabase/migrations/0036_security_hardening.sql`)
+   in the Supabase SQL editor, then `supabase/CHECK_MIGRATIONS.sql`. Until
+   it runs:
+   - the public anon key can call the two public-record functions, which
+     read owner names and mailing addresses;
+   - a share link minted outside the app keeps whatever expiry and token its
+     minter chose;
+   - an update can dodge the free-deal cap.
+
+   The file's header says what each part closes and why the app's own
+   writes pass unchanged.
+2. **Rotate the six credentials** that appeared in screenshots (the list
+   under 2026-09-16 below). Rotation is the only way to be sure.
+3. **Keys that switch things on**, each optional and free or already
+   budgeted:
+   - `CENSUS_API_KEY`: a deal's own census tract figures;
+   - `GOOGLE_MAPS_API_KEY`: Street View photographs of a building with no
+     memorandum photo;
+   - `HUD_API_TOKEN` (free, huduser.gov): the yearly fair market rent pull
+     (`fmr.yml`) reads it; until it is set, the rents are the ones seeded from
+     HUD's own FY2027 file.
+4. **Your own domain**: steps under 2026-09-25 below. It is a purchase, so
+   it is your move.
+
+**What changed without asking you, and why:**
+- The rates strip's **three ICE BofA credit spreads and Moody's Baa yield
+  are gone.** The runner printed their terms (run 36785223477):
+  - Moody's forbids any copying or redistribution without its written
+    consent;
+  - ICE's indices are ICE's property, used by FRED under licence.
+
+  The "Corporate credit" fold now reads the Treasury's own high-quality
+  corporate bond curve (`HQMCB10YR`, monthly, public). If you ever license
+  ICE or Moody's data, the four series can come back.
+
+**Your call — larger changes held for your permission:**
+- **Model math:**
+  - the exit cap's default, the flat 6% today, could come from the implied
+    cap or the sector band;
+  - transfer and recording taxes could go into the model's closing costs;
+  - expense growth could come from the 5-year breakeven inflation rate;
+  - plan deals could price on SOFR plus a construction spread;
+  - a hotel's reserve could be 4% of revenue;
+  - lease-by-lease cash flow;
+  - a buyer's own NOI could feed the model.
+- **Which model the compare table reads:** the compare table reads the
+  first-draft model while every other surface reads the engine. On the
+  sample that is 9.28% against 8.72%. The labels now say which is which;
+  pick one.
+- **The sample deal's one set of numbers:** the public pages quote 8.7% and
+  9.3% from those same two models.
+- **The workbook's yield on cost** divides by uses plus the capital plan;
+  every other surface divides by price plus budget. It is labelled; the
+  formula is your call.
+- **Deal types that need a new model shape:**
+  - a share of a levered entity (today its price grosses up to the
+    equity, not the building);
+  - development budgets split into hard, soft and contingency, and whether
+    a GMP contract is signed;
+  - preferred equity, mezzanine and JV recapitalizations as positions;
+  - senior housing by operating structure (a lease, a management contract,
+    or owner-operated);
+  - an apartment building still leasing up (a vacancy path, not one flat
+    rate);
+  - life science as its own class;
+  - HUD's mortgage insurance premium in the assumable-loan card's rate;
+  - data centers priced per megawatt;
+  - a bulk condo sell-out.
+- **Wider coverage:**
+  - rent rules for the 26 metro areas read without a brief, and for Oregon;
+  - photographs for rural deals;
+  - Opportunity Zone 2.0 once the new list is published;
+  - Baton Rouge's photograph, whose only good frames are PNGs, which means
+    re-encoding a PNG, a change to the "PNG never served" rule.
+- **Photo credits:** two name a different author from the one in the
+  filename, as Commons states them (Milwaukee, Greenville).
+
 ## 🟢 2026-09-25 — being found, and the site's own address (#430)
 
 The site is already public: anyone can open
