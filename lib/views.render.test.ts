@@ -604,6 +604,42 @@ describe("Pipeline — a deal screened again shows the run, never the call it is
   });
 });
 
+describe("Pipeline — a note's card withholds the collateral's cap (the audit of 2026-09-30)", () => {
+  const props = {
+    errorMessage: null,
+    notice: null,
+    onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
+    billing: BILLING,
+  };
+  // The slots as lib/pipeline-slots reads a note: the collateral's cap is
+  // withheld, and the note's yield to maturity stands in its place.
+  const note = card({
+    id: "n",
+    name: "Harbor Point note",
+    verdict: "caution",
+    slots: { cap: null, price: "$20,000,000", yoc: null, interest: "Note", capWithheld: "note", noteYield: "13.8%" },
+  });
+
+  it("shows the note's yield to maturity where a building shows its cap, in the cards and the list", () => {
+    for (const initialView of ["cards", "list"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([note]), initialView }));
+      expect(a11yIssues(html), initialView).toEqual([]);
+      const text = visibleText(html);
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(text, initialView).toContain("13.8%");
+      expect(html, initialView).toContain("A note has no going-in cap");
+    }
+    const cards = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([note]), initialView: "cards" })));
+    expect(cards).toMatch(/Note yield\s*13\.8%\s*to maturity/);
+  });
+
+  it("says n/a where the note does not pay, never a dash a reader takes for an unstated cap", () => {
+    const unpaid = { ...note, slots: { ...note.slots, noteYield: null } };
+    const cards = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([unpaid]), initialView: "cards" })));
+    expect(cards).toMatch(/Cap\s*n\/a/);
+  });
+});
+
 describe("ModelView — the sample model renders every panel", () => {
   it("renders the returns, stress, sensitivity, assumptions, capex and cash-flow panels", () => {
     const html = render(

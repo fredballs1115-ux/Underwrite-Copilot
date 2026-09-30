@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { compareInterest } from "@/lib/compare-interest";
+import { compareInterest, goingInCapFigure, noteCapSlot } from "@/lib/compare-interest";
 
 const row = (label: string, value: string, page = "p. 5") => ({ label, value, flagged: false, page });
 const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
@@ -77,5 +78,52 @@ describe("compareInterest — the compare table's model figures, read for what t
   it("with no extraction or no model, nothing is invented", () => {
     expect(compareInterest(null, MODEL)).toEqual({ tag: null, cap: 9.5, noteYtmPct: null, withheld: null });
     expect(compareInterest(deal(undefined, []), null)).toEqual({ tag: null, cap: null, noteYtmPct: null, withheld: null });
+  });
+});
+
+// The audit of 2026-09-30: the deal header, the pipeline card and the
+// meeting workbook printed a note's collateral cap as its going-in cap.
+describe("a note's going-in cap slot, wherever the deal is summarized", () => {
+  const AS_OF = new Date(Date.UTC(2025, 8, 30));
+  const terms = [
+    row("Going-in cap rate", "9.50%"),
+    row("Unpaid principal balance", "$24,400,000"),
+    row("Note rate", "5.25%"),
+    row("Maturity date", "March 31, 2028"),
+    row("Amortization", "Interest-only"),
+    row("Payment status", "Performing"),
+  ];
+  const note = deal({ ...blank, kind: "note" }, terms);
+  const npl = deal({ ...blank, kind: "note" }, [...terms.slice(0, 5), row("Payment status", "Non-performing; in foreclosure")]);
+
+  it("withholds the collateral's cap, with the table's own yield to maturity in its place where the note pays", () => {
+    const slot = noteCapSlot(note, AS_OF);
+    expect(slot?.ytmPct).toBe(compareInterest(note, null, AS_OF).noteYtmPct);
+    expect(slot?.ytmPct).not.toBeNull();
+    expect(noteCapSlot(npl, AS_OF)).toEqual({ ytmPct: null });
+    // Anything but a note keeps its cap slot.
+    expect(noteCapSlot(deal(undefined, terms), AS_OF)).toBeNull();
+    expect(noteCapSlot(deal({ ...blank, kind: "leasehold" }, terms), AS_OF)).toBeNull();
+    expect(noteCapSlot(null, AS_OF)).toBeNull();
+  });
+
+  it("the header's slot: the stated cap on a building, the note's yield or the cap withheld on a note", () => {
+    expect(goingInCapFigure(deal(undefined, terms), "9.50%", AS_OF)).toEqual({ label: "Going-in cap", value: "9.50%" });
+    expect(goingInCapFigure(note, "9.50%", AS_OF)).toEqual({
+      label: "Yield to maturity",
+      value: `${compareInterest(note, null, AS_OF).noteYtmPct!.toFixed(1)}%`,
+    });
+    expect(goingInCapFigure(npl, "9.50%", AS_OF)).toEqual({ label: "Going-in cap", value: "n/a — note" });
+  });
+
+  it("the deal page's header reads the slot, and its leverage read never runs on a note's collateral cap", () => {
+    // The page is a loader over the Supabase row, so its wiring is held at
+    // its source (as lib/memo/documents-review.test.ts holds the routes').
+    const src = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
+    expect(src).toMatch(/\{ \.\.\.goingInCapFigure\(extraction, summaryCap \?\? null\), figure: true \}/);
+    expect(src).not.toMatch(/\{ label: "Going-in cap", value: summaryCap \?\? null, figure: true \}/);
+    expect(src).toMatch(/capText=\{noteCap \? null : summaryCap\}/);
+    expect(src).toMatch(/capWithheld=\{noteCap \? "note" : null\}/);
+    expect(readFileSync("app/(app)/deals/[id]/research-panel.tsx", "utf8")).toMatch(/capWithheld === "note"/);
   });
 });

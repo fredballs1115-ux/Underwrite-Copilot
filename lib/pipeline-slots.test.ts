@@ -7,6 +7,7 @@ import { readFileSync } from "node:fs";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassLabel } from "./asset-class";
 import { pickSlots, shownAssetClass } from "./pipeline-slots";
+import { noteCapSlot } from "./compare-interest";
 
 describe("shownAssetClass — a row never says \"Auto\"", () => {
   it("shows the stored class, the extraction's read for an auto-detect deal, and nothing before any read", () => {
@@ -48,7 +49,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, basis: null });
+    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, basis: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -179,6 +180,32 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(ex(base), null).interest).toBeNull();
   });
 
+  it("withholds a note's collateral cap, its yield to maturity in the slot where the note pays (the audit of 2026-09-30)", () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    // A maturity decades out, so the note never matures with the day the test runs.
+    const terms = [
+      m("Asking price", "$20,000,000"),
+      m("Going-in cap rate", "9.50%"),
+      m("Unpaid principal balance", "$24,400,000"),
+      m("Note rate", "5.25%"),
+      m("Maturity date", "March 31, 2060"),
+      m("Amortization", "Interest-only"),
+      m("Payment status", "Performing"),
+    ];
+    const note = ex(terms, { interest: { ...blank, kind: "note" } });
+    const s = pickSlots(note, null);
+    // The collateral's 9.50% is not the buyer's figure (the key terms and
+    // the compare table already say so).
+    expect(s.cap).toBeNull();
+    expect(s.capWithheld).toBe("note");
+    expect(s.noteYield).toBe(`${noteCapSlot(note)!.ytmPct!.toFixed(1)}%`);
+    // A note that is not paying: the cap withheld, no yield nobody earns.
+    const npl = ex([...terms.slice(0, 6), m("Payment status", "Non-performing")], { interest: { ...blank, kind: "note" } });
+    expect(pickSlots(npl, null)).toMatchObject({ cap: null, capWithheld: "note", noteYield: null });
+    // A building's cap stands.
+    expect(pickSlots(ex(terms), null)).toMatchObject({ cap: "9.50%", capWithheld: null, noteYield: null });
+  });
+
   it("says where the seller's loan is offered for assumption (#419) — never on a note, a share or the land", () => {
     const base = [m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%")];
     const loan = [m("Assumable loan balance", "$30,000,000"), m("Assumable loan rate", "3.45%")];
@@ -209,7 +236,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, basis: null });
+    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, basis: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

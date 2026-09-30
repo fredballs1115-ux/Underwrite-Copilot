@@ -9,6 +9,7 @@ import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
 import { findGoingInCap, unitCountRow } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
+import { noteCapSlot } from "@/lib/compare-interest";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
 import { assumableTag } from "@/lib/assumable-debt";
@@ -28,8 +29,15 @@ import { selfStorageTag } from "@/lib/self-storage";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
-   *  none (its stabilized cap or yield on cost is the finished project's) */
+   *  none (its stabilized cap or yield on cost is the finished project's),
+   *  and on a note, whose collateral's cap is not the buyer's (`capWithheld`) */
   cap: string | null;
+  /** "note" where the going-in cap is withheld because the price is a
+   *  loan's (lib/compare-interest `noteCapSlot`); absent or null otherwise */
+  capWithheld?: "note" | null;
+  /** a note's yield to maturity at its price — "13.8%" — where the note pays
+   *  or may: its answer in the cap slot; absent or null otherwise */
+  noteYield?: string | null;
   price: string | null;
   /** a plan deal's yield on total cost — its answer where a stabilized
    *  asset shows a cap — null for a stabilized asset or an unstated plan */
@@ -133,12 +141,14 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind, store
 /**
  * The going-in cap the memorandum states, as a pipeline row's Cap slot
  * shows it: none on a plan deal, whose stabilized cap or yield on cost is the
- * finished project's (its slot carries the yield on total cost). The compare
- * table reads it where a deal's model has no cap (lib/compare-figures), so
- * the card and the table show one figure.
+ * finished project's (its slot carries the yield on total cost), and none on
+ * a note, whose collateral's cap is not the buyer's figure (lib/compare-
+ * interest `noteCapSlot`: its slot carries the note's yield). The compare
+ * table reads it where a deal's model has no cap (lib/compare-figures), and
+ * the meeting workbook's row reads it too, so the three show one figure.
  */
 export function statedCapSlot(extraction: ExtractionResult, planDeal: boolean): string | null {
-  if (planDeal) return null;
+  if (planDeal || interestOf(extraction).kind === "note") return null;
   return findGoingInCap(extraction.metrics ?? [])?.value ?? null;
 }
 
@@ -177,12 +187,17 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
   // so a deal never shows a price on one surface and none on the other.
   const strategy = inferStrategy(extraction, signal);
   const plan = planSummary(extraction, strategy);
+  // A note's cap slot (#423's rule): the collateral's cap withheld, the
+  // note's yield to maturity in its place where the note pays or may.
+  const note = plan ? null : noteCapSlot(extraction);
   return {
     // The going-in cap only, and only on an operating asset: the same rule
     // the meeting .xlsx, the analytics and the comp memory apply, so a
     // value-add's row shows its yield on cost where the export shows "n/a
     // — plan", never a cap on one and a yield on the other.
     cap: statedCapSlot(extraction, plan != null),
+    capWithheld: note ? "note" : null,
+    noteYield: note?.ytmPct != null ? `${note.ytmPct.toFixed(1)}%` : null,
     // The shared price reader; on a development with no asking price the
     // land or site cost is what is being bought. The first signal's ask
     // fills the slot before the extraction lands, as on the deal page —

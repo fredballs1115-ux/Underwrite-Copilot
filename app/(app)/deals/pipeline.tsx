@@ -73,7 +73,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; basis?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; capWithheld?: "note" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -109,6 +109,11 @@ export type DealCard = {
 // and an export of this "use client" module is only a client reference there.
 export type { PipelineView } from "@/lib/pipeline-view";
 
+/** Why a note's cap slot holds its yield, or "n/a" (lib/compare-interest
+ *  `noteCapSlot`): the collateral's cap is not the buyer's figure. */
+const NOTE_CAP_TITLE =
+  "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. The note's yield to maturity at its price stands in its place, where the note pays or may.";
+
 /** A card as the map reads it. */
 function mapDealOf(d: DealCard): MapDeal {
   return {
@@ -116,7 +121,13 @@ function mapDealOf(d: DealCard): MapDeal {
     name: d.name,
     verdict: d.verdict,
     price: d.slots.price ? compactPrice(d.slots.price) : null,
-    figure: d.slots.cap ? `${d.slots.cap} cap` : d.slots.yoc ? `${d.slots.yoc} yield on cost` : null,
+    figure: d.slots.cap
+      ? `${d.slots.cap} cap`
+      : d.slots.yoc
+        ? `${d.slots.yoc} yield on cost`
+        : d.slots.noteYield
+          ? `${d.slots.noteYield} to maturity`
+          : null,
     place: d.place ?? null,
     placeMiss: d.placeMiss,
     hasAddress: d.hasAddress,
@@ -624,7 +635,8 @@ export function Pipeline({
         d.slots.storage ?? "",
         // Every case said; blank only before FEMA's lookup has answered (#426).
         d.flood?.cell ?? "",
-        d.slots.cap ?? "",
+        // A note's cap is withheld, said so rather than left blank (#423).
+        d.slots.cap ?? (d.slots.capWithheld === "note" ? "n/a — note" : ""),
         d.slots.yoc ?? "",
         d.fit ? FIT_META[d.fit].label : "",
         d.score != null ? String(d.score) : "",
@@ -1690,6 +1702,12 @@ const DealRow = memo(function DealRow({
       <span className="font-mono tabular-nums">{d.slots.yoc}</span>{" "}
       <span className="text-[9px] font-medium uppercase">yoc</span>
     </span>
+  ) : d.slots.noteYield ? (
+    // A note has no going-in cap: its yield to maturity takes the slot.
+    <span title={NOTE_CAP_TITLE}>
+      <span className="font-mono tabular-nums">{d.slots.noteYield}</span>{" "}
+      <span className="text-[9px] font-medium uppercase">ytm</span>
+    </span>
   ) : null;
   // The mandate score, when there is one: a call's colour, the words a
   // screen reader gets, and the tooltip — shared by the `lg` column and the
@@ -1881,6 +1899,16 @@ const DealRow = memo(function DealRow({
             <span title="Yield on total cost — a plan deal has no going-in cap" className="text-brand">
               {d.slots.yoc}
               <span className="ml-0.5 text-[9px] font-sans font-medium uppercase">yoc</span>
+            </span>
+          ) : d.slots.noteYield ? (
+            // A note has no going-in cap: its yield to maturity, labelled.
+            <span title={NOTE_CAP_TITLE} className="text-brand">
+              {d.slots.noteYield}{" "}
+              <span className="text-[9px] font-sans font-medium uppercase">ytm</span>
+            </span>
+          ) : d.slots.capWithheld === "note" ? (
+            <span title={NOTE_CAP_TITLE} className="font-sans text-xs text-muted">
+              n/a
             </span>
           ) : (
             <span className="text-line">—</span>
@@ -2221,9 +2249,17 @@ const DealTile = memo(function DealTile({
             {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
           </TileStat>
           {/* A plan deal has no going-in cap; its yield on total cost takes
-              the slot, labelled. */}
-          <TileStat label={!d.slots.cap && d.slots.yoc ? "Yield on cost" : "Cap"}>
-            {d.slots.cap ?? d.slots.yoc ?? <span className="text-line">—</span>}
+              the slot, labelled. Nor has a note: its yield to maturity
+              takes it where the note pays or may, else it says n/a. */}
+          <TileStat
+            label={!d.slots.cap && d.slots.yoc ? "Yield on cost" : !d.slots.cap && d.slots.noteYield ? "Note yield" : "Cap"}
+            title={!d.slots.cap && !d.slots.yoc && d.slots.capWithheld === "note" ? NOTE_CAP_TITLE : undefined}
+            sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? "to maturity" : undefined}
+          >
+            {d.slots.cap ??
+              d.slots.yoc ??
+              d.slots.noteYield ??
+              (d.slots.capWithheld === "note" ? "n/a" : <span className="text-line">—</span>)}
           </TileStat>
           <div className="min-w-0">
             <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>

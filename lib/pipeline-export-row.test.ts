@@ -90,6 +90,36 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(before.planDeal).toBe(false);
   });
 
+  it("withholds a note's collateral cap, as the pipeline card does, and the sheet says so (the audit of 2026-09-30)", async () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const note = {
+      dealName: "Harbor Point note",
+      assetClass: "multifamily",
+      market: "Baltimore, MD",
+      address: "",
+      interest: { ...blank, kind: "note" },
+      metrics: [
+        m("Asking price", "$20,000,000"),
+        m("Going-in cap rate", "9.50%"),
+        m("Unpaid principal balance", "$24,400,000"),
+        m("Note rate", "5.25%"),
+        m("Maturity date", "March 31, 2060"),
+        m("Payment status", "Performing"),
+      ],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: note }), ctx);
+    expect(row.cap).toBeNull();
+    expect(row.capWithheld).toBe("note");
+    expect(row.cap).toBe(pickSlots(note, null).cap);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-09-08T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    // Row 6 is the deal; column 8 the cap — never the collateral's 9.50%.
+    expect(wb.getWorksheet("Pipeline")!.getRow(6).getCell(8).value).toBe("n/a — note");
+    // A building's cap stands.
+    expect(pipelineExportRow(deal(), ctx)).toMatchObject({ cap: "5.90%", capWithheld: null });
+  });
+
   it("judges the buy box on the pipeline page's inputs: the address widens the geography", () => {
     const box: BuyBox = { markets: "Montgomery County" };
     const address = {

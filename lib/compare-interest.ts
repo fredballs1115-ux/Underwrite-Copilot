@@ -24,6 +24,11 @@
 //   EVERYTHING ELSE STANDS. A leasehold's and a leased fee's model runs at
 //   what the price buys (the lease's building, the land's rent), and the
 //   price row says which, with the years to the lease's end.
+//
+// The first rule reaches past the table (the audit of 2026-09-30): the deal
+// header, the pipeline card and the meeting workbook printed a note's
+// collateral cap as its going-in cap, and the deal page's leverage read ran
+// on it. `noteCapSlot` and `goingInCapFigure` say it for them.
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
@@ -81,4 +86,38 @@ export function compareInterest(
   }
 
   return { tag, cap: modelCap, noteYtmPct: null, withheld: null };
+}
+
+/**
+ * A note's going-in cap slot, by the first rule above, wherever a deal's
+ * figures are summarized — the deal header, the pipeline card and the
+ * meeting workbook withhold the cap this table withholds: the collateral's
+ * income over a loan's price is a cap nobody earns. In its place, the
+ * note's yield to maturity at its price, where the note pays or may. Null on
+ * anything but a note, whose cap slot stands.
+ */
+export function noteCapSlot(
+  ex: ExtractionResult | null | undefined,
+  asOf: Date = new Date(),
+): { ytmPct: number | null } | null {
+  if (!ex || interestOf(ex).kind !== "note") return null;
+  return { ytmPct: compareInterest(ex, null, asOf).noteYtmPct };
+}
+
+/**
+ * The going-in cap slot beside a deal's price in its header (and the bar
+ * that repeats it): the cap as the memorandum states it — or, on a note,
+ * its yield to maturity at its price where it pays or may, else the cap
+ * withheld ("n/a — note", the compare table's words).
+ */
+export function goingInCapFigure(
+  ex: ExtractionResult | null | undefined,
+  statedCap: string | null,
+  asOf: Date = new Date(),
+): { label: string; value: string | null } {
+  const note = noteCapSlot(ex, asOf);
+  if (!note) return { label: "Going-in cap", value: statedCap };
+  return note.ytmPct != null
+    ? { label: "Yield to maturity", value: `${note.ytmPct.toFixed(1)}%` }
+    : { label: "Going-in cap", value: "n/a — note" };
 }

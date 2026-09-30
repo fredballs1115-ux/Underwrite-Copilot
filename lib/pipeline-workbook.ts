@@ -90,8 +90,13 @@ export interface PipelineExportRow {
    *  economic occupancy (lib/self-storage `selfStorageTag`, #471); carried
    *  in the price cell's note */
   storage?: string | null;
-  /** the going-in cap on today's income — always null on a plan deal */
+  /** the going-in cap on today's income — always null on a plan deal, and
+   *  on a note (`capWithheld`) */
   cap: string | null;
+  /** "note" where the going-in cap is withheld because the price is a
+   *  loan's: the collateral's income over it is a cap nobody earns
+   *  (lib/compare-interest `noteCapSlot`) — the cell says "n/a — note" */
+  capWithheld?: "note" | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
   yieldOnCost: string | null;
   fit: "fits" | "near" | "outside" | null;
@@ -281,7 +286,7 @@ export async function buildPipelineWorkbook(
         capCell.value = capNum / 100;
         capCell.numFmt = PCT2;
       } else {
-        capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : "—");
+        capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : d.capWithheld === "note" ? "n/a — note" : "—");
       }
       capCell.font = baseFont;
       capCell.alignment = { horizontal: "right" };

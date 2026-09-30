@@ -38,6 +38,7 @@ import { readSiteReports } from "@/lib/site-reports";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
+import { goingInCapFigure, noteCapSlot } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
@@ -845,8 +846,10 @@ export default async function DealPage({
   // rents, expense growth against consumer prices, vacancy against the
   // survey's metro figure inside its margin, and the exit cap's spread over
   // today's 10-year beside the going-in cap's — the same reads as above,
-  // the same cap the summary bar shows, no model call. Null where there is
-  // no model or nothing fresh to read it against.
+  // the memorandum's stated cap (the summary bar's, save on a note, whose
+  // bar withholds it while the model runs the collateral as if bought
+  // outright), no model call. Null where there is no model or nothing fresh
+  // to read it against.
   const modelRead: ModelVsMarket | null =
     derived && reads
       ? modelVsMarketFor({
@@ -958,9 +961,14 @@ export default async function DealPage({
     value: summaryPrice ?? null,
     figure: true,
   };
+  // A note has no going-in cap (lib/compare-interest, #423's rule, which the
+  // key terms and the compare table keep): the collateral's income over a
+  // loan's price is a cap nobody earns, so the slot says the note's yield to
+  // maturity at its price, or that the cap is withheld.
   const returnFigure: HeroFigure = plan
     ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
-    : { label: "Going-in cap", value: summaryCap ?? null, figure: true };
+    : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
+  const noteCap = noteCapSlot(extraction);
 
   return (
     <div className="flex flex-col gap-6">
@@ -1459,7 +1467,11 @@ export default async function DealPage({
           census={siteFlags && siteFlags.status !== "pending" ? { place: siteFlags.place, county: siteFlags.county } : null}
           sizeText={summarySize}
           priceText={subjectPriceNumber != null ? String(Math.round(subjectPriceNumber)) : null}
-          capText={summaryCap}
+          // The leverage read spreads the BUYER's cap against debt, so on a
+          // note it does not run on the collateral's (lib/compare-interest):
+          // the panel says why instead.
+          capText={noteCap ? null : summaryCap}
+          capWithheld={noteCap ? "note" : null}
           planLabel={isPlanDeal(strategy.kind) ? strategy.label : null}
           yearBuilt={summaryYearBuilt}
           sectorFields={

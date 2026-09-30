@@ -239,6 +239,7 @@ export async function ResearchPanel({
   sizeText,
   priceText,
   capText,
+  capWithheld = null,
   yearBuilt,
   sectorFields,
   assetClass,
@@ -262,6 +263,10 @@ export async function ResearchPanel({
   priceText?: string | null;
   /** the deal's going-in cap as displayed (e.g. "5.8%") — for the leverage check */
   capText?: string | null;
+  /** "note" where the deal's price is a loan's: the collateral's income
+   *  over it is a cap nobody earns (lib/compare-interest `noteCapSlot`), so
+   *  the leverage check does not run and says why */
+  capWithheld?: "note" | null;
   /** the screening rate the model was seeded with off today's curve
    *  (lib/debt-index): the index a fact, the class spread an assumption,
    *  the note naming both — the leverage check reads the cap against it */
@@ -496,9 +501,27 @@ export async function ResearchPanel({
           )}
         </div>
       )}
+      {/* A note: its price is a loan's, and the collateral's income over it
+          is a cap nobody earns — there is no buyer's cap to spread against
+          debt. Say so rather than leaving a gap. */}
+      {capPct == null && capWithheld === "note" && (
+        <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3" data-qa="leverage-note">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Leverage check</p>
+            <span className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted">
+              n/a on a note
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            The price is a loan&apos;s, not the building&apos;s: the collateral&apos;s income over it
+            is a cap nobody earns, so there is no cap of the buyer&apos;s to spread against debt. The
+            note is read by its yield to maturity at its price, not by a cap rate.
+          </p>
+        </div>
+      )}
       {/* A plan deal with no going-in cap: a dark building has nothing to
           spread against debt yet. Say so rather than leaving a gap. */}
-      {capPct == null && planLabel && (
+      {capPct == null && capWithheld !== "note" && planLabel && (
         <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold">Leverage check</p>

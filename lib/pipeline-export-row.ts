@@ -4,7 +4,8 @@
 // teammate's name — come in, so a test reads a row as the route builds it.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
-import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap, foldBuyBoxChecks, type BuyBox } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox, foldBuyBoxChecks, type BuyBox } from "@/lib/criteria";
+import { noteCapSlot } from "@/lib/compare-interest";
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
@@ -21,7 +22,7 @@ import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
 import { verdictBehind, type JobLike } from "@/lib/screen-run";
-import { shownAssetClass } from "@/lib/pipeline-slots";
+import { shownAssetClass, statedCapSlot } from "@/lib/pipeline-slots";
 import type { PipelineExportRow } from "@/lib/pipeline-workbook";
 
 /** The deal columns the workbook's row reads. */
@@ -97,7 +98,11 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     student: studentHousingTag(extraction),
     mh: manufacturedHousingTag(extraction),
     storage: selfStorageTag(extraction),
-    cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
+    // The pipeline card's own cap reader: none on a plan deal, none on a
+    // note (its collateral's cap is not the buyer's figure, and the cell
+    // says the cap is withheld).
+    cap: extraction ? statedCapSlot(extraction, plan != null) : null,
+    capWithheld: extraction && !plan && noteCapSlot(extraction) ? "note" : null,
     yieldOnCost: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
     fit,
     verdict: (d.verdict as { verdict?: string } | null)?.verdict ?? null,
