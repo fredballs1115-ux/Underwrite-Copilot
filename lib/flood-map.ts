@@ -37,7 +37,7 @@ import {
   type NfhlLegendEntry,
   type SiteFlagsResult,
 } from "@/lib/site-flags/core";
-import { floodFramePath } from "@/lib/storage-paths";
+import { floodFramePath, scopedPath } from "@/lib/storage-paths";
 import { downloadDealFile, removeStorageFiles, uploadDealPhoto } from "@/lib/storage";
 import { resolveDealLocation, writeCache, type DealLocation, type DealVisualCache } from "@/lib/deal-location";
 import type { StructuredAddress } from "@/lib/address";
@@ -312,10 +312,16 @@ export async function ensureFloodFrame(
 /**
  * The frame cut to `w`×`h` from its centre, as a JPEG — never larger than
  * the stored frame gives in that shape, so nothing is stretched.
+ *
+ * The record's path comes off the deal's photo cache, a column the row's
+ * owner can write, so it is held to this deal's own flood shape BEFORE any
+ * byte is served — the held copy included: a record naming another deal's
+ * frame must not be answered from this process's memory of it.
  */
 export async function floodCrop(dealId: string, record: FloodFrameRecord, w: number, h: number): Promise<Buffer> {
+  const path = scopedPath(record.path, { kind: "deal", dealId, only: ["flood"] });
   const sharp = (await import("sharp")).default;
-  const bytes = held.get(record.path) ?? hold(record.path, await downloadDealFile(record.path, { kind: "deal", dealId, only: ["flood"] }));
+  const bytes = held.get(path) ?? hold(path, await downloadDealFile(path, { kind: "deal", dealId, only: ["flood"] }));
   const box = cropBox(record.width, record.height, w, h);
   const out = servedSize(w, h, record.width, record.height);
   return sharp(bytes)

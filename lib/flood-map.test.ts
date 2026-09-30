@@ -32,6 +32,7 @@ vi.mock("@/lib/storage", () => ({
 import sharp from "sharp";
 import { composeFloodFrame, drawFloodFrame, ensureFloodFrame, floodCrop, floodKeyFor, VENDORED_LEGEND, type FloodFetchers } from "./flood-map";
 import { FLOOD_FRAME, FLOOD_FRAME_VERSION, floodFramePaths, pointKey } from "./flood-frame-core";
+import { StoragePathError } from "./storage-paths";
 import { FEMA_LAYER_OPACITY, floodStyleOf, type Rgba } from "./flood-style";
 import { intactImage } from "@/lib/memo/cover-aerial";
 import type { DealLocation, DealVisualCache } from "./deal-location";
@@ -242,6 +243,20 @@ describe("floodCrop — the frame cut to a surface's shape", { timeout: 60_000 }
     expect(await sharp(huge).metadata()).toMatchObject({ width: OW, height: Math.round((OW * 9) / 16) });
     const whole = await floodCrop("deal-6", record, OW, OH);
     expect(await sharp(whole).metadata()).toMatchObject({ width: OW, height: OH });
+  });
+
+  it("holds the record's path to the deal's own frame before serving a byte, the copy in memory included", async () => {
+    const { client, db } = fakeDb(null);
+    const theirs = (await ensureFloodFrame(client, "deal-7", LOC, db.photo, { fetchers: fetchers() }))!;
+    // Drawing it left deal-7's frame in this process's memory. With the
+    // bucket's copy gone, only that memory could answer — and a record on
+    // another deal's row (a column its owner can write) naming the frame is
+    // refused before it is read, not served from it.
+    store.files.delete(theirs.path);
+    await expect(floodCrop("deal-8", { ...theirs }, 1280, 720)).rejects.toBeInstanceOf(StoragePathError);
+    await expect(floodCrop("deal-8", { ...theirs, path: "flood/deal-8/../deal-7.jpg" }, 1280, 720)).rejects.toBeInstanceOf(StoragePathError);
+    // The deal's own record still cuts from the held copy.
+    expect(await sharp(await floodCrop("deal-7", theirs, 192, 108)).metadata()).toMatchObject({ width: 192, height: 108 });
   });
 });
 
