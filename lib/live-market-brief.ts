@@ -58,6 +58,10 @@ export interface LiveMarketInput {
   /** a plan deal (development, conversion) also reads the construction
    *  lenders' standards */
   plan?: boolean;
+  /** the deal builds something (lib/deal-strategy `buildsSomething`: a
+   *  development, a conversion, or a value-add with a stated budget), so it
+   *  also reads what building costs; a lease-up's building is built */
+  builds?: boolean;
   /** a portfolio OM spanning more than one market (lib/portfolio): how
    *  many properties, how many of them sit in THIS market, and the markets
    *  phrase — so the header says whose figures these are. `role` is
@@ -154,8 +158,9 @@ export const RENT_INDEX_IDS = [
 export const INSURANCE_INDEX_ID = "PCU9241269241265_YOY";
 
 /**
- * What building costs, nationally, for a deal with a plan — a development
- * or a conversion, whose budget is the deal. The BLS producer price index
+ * What building costs, nationally, for a deal that builds something — a
+ * development or a conversion, whose budget is the deal, or a value-add that
+ * states its budget. The BLS producer price index
  * for the goods that go into construction, residential or nonresidential
  * by what is being built, and construction's average hourly earnings, each
  * against a year ago. Both already ride the rates strip (every id was
@@ -513,16 +518,16 @@ function insuranceLine(national: readonly LiveRate[] | undefined, assetClass: st
   };
 }
 
-/** What building costs, for a deal with a plan: the goods that go into what
- *  is being built, and the wages of the people building it, each the
- *  nation's against a year ago. A deal without a plan reads neither — its
- *  building is already built. */
+/** What building costs, for a deal that builds something: the goods that go
+ *  into what is being built, and the wages of the people building it, each
+ *  the nation's against a year ago. A deal that builds nothing — a stabilized
+ *  building, a lease-up, a value-add that states no budget — reads neither. */
 function constructionCostLines(
   national: readonly LiveRate[] | undefined,
   assetClass: string | null | undefined,
-  plan: boolean,
+  builds: boolean,
 ): Said[] {
-  if (!plan || !national) return [];
+  if (!builds || !national) return [];
   const fresh = (id: string) => national.find((x) => x.meta.id === id && x.fresh && Number.isFinite(x.value)) ?? null;
   const residential = assetWords(assetClass ?? undefined).residential;
   const inputs = fresh(residential ? CONSTRUCTION_COST_IDS.residentialInputs : CONSTRUCTION_COST_IDS.nonresidentialInputs);
@@ -633,7 +638,7 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   if (ins) said.push(ins);
   // A plan deal's budget is the deal: what building costs this year against
   // last, the goods and the labor.
-  said.push(...constructionCostLines(input.national, input.assetClass, input.plan ?? false));
+  said.push(...constructionCostLines(input.national, input.assetClass, input.builds ?? false));
   said.push(...debtMarketLines(input.national, input.assetClass, input.plan ?? false));
   if (said.length === 0) return null;
   const national = said.length - local;

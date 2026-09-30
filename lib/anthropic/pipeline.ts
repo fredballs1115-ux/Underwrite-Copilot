@@ -30,6 +30,7 @@ import {
   assessPlausibility,
   inferStrategy,
   isPlanDeal,
+  buildsSomething,
   noiFigures,
   planSummary,
   plausibilityNote,
@@ -396,7 +397,12 @@ async function liveMarketFromDb(
     // deal filed as an office and pitched as mixed-use was checked as one
     // thing and shown as the other.
     const assetClass = shownAssetClass((data?.asset_class as string | null) ?? null, ex) || null;
-    const plan = isPlanDeal(inferStrategy(ex).kind);
+    const kind = inferStrategy(ex).kind;
+    const plan = isPlanDeal(kind);
+    // What building costs is read only where the deal builds something — a
+    // development, a conversion, a value-add with a stated budget — never a
+    // lease-up's finished building (lib/deal-strategy buildsSomething).
+    const builds = buildsSomething(ex, kind);
     const others = otherPortfolioMarkets(ex, metro?.id ?? null);
     if (!metro && !others) return { primary: null, others: [] };
     const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)));
@@ -420,6 +426,7 @@ async function liveMarketFromDb(
         assetClass,
         portfolio,
         plan,
+        builds,
       });
     };
     const whole = portfolioFor(ex, metro?.id ?? "");

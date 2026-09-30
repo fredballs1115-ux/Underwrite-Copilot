@@ -417,7 +417,7 @@ describe("the rents each kind of commercial lessor charges — national, said so
   });
 });
 
-describe("what building costs — national, for a deal with a plan, and for no other", () => {
+describe("what building costs — national, for a deal that builds something, and for no other", () => {
   // The runner's own table: the construction series the dry run of
   // 2026-09-23 printed for August, beside the rest of the national list.
   const national = readRates(REAL_ROWS, FIXTURE_NOW).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
@@ -425,7 +425,7 @@ describe("what building costs — national, for a deal with a plan, and for no o
   const costLines = (b: { lines: string[] } | null) => b?.lines.filter((l) => l.startsWith("Construction costs")) ?? [];
 
   it("a development of apartments reads the goods that go into residential construction and construction wages, each the nation's", () => {
-    const dev = liveMarketBrief({ ...base, assetClass: "multifamily", plan: true })!;
+    const dev = liveMarketBrief({ ...base, assetClass: "multifamily", plan: true, builds: true })!;
     expect(costLines(dev)).toEqual([
       "Construction costs — the goods that go into residential construction, national (BLS producer price index): +7.8% from a year ago (Aug 2026; BLS via FRED) — the nation's, not this project's bids",
       "Construction costs — average hourly earnings in construction, national: +4.2% from a year ago (Aug 2026; BLS via FRED) — the nation's, not this project's labor",
@@ -441,7 +441,7 @@ describe("what building costs — national, for a deal with a plan, and for no o
 
   it("an office or a warehouse being built reads the nonresidential goods", () => {
     for (const cls of ["office", "industrial", "hospitality_str"]) {
-      expect(costLines(liveMarketBrief({ ...base, assetClass: cls, plan: true }))[0], cls).toContain(
+      expect(costLines(liveMarketBrief({ ...base, assetClass: cls, plan: true, builds: true }))[0], cls).toContain(
         "the goods that go into nonresidential construction, national (BLS producer price index): +8.8% from a year ago",
       );
     }
@@ -449,11 +449,16 @@ describe("what building costs — national, for a deal with a plan, and for no o
 
   it("a building already built reads neither, and a stale or missing series has no line", () => {
     for (const cls of ["multifamily", "office"]) expect(costLines(liveMarketBrief({ ...base, assetClass: cls })), cls).toEqual([]);
+    // A lease-up is a plan deal whose building is finished: the construction
+    // lenders' standards, never what building costs (the audit of 2026-09-30).
+    const leaseUp = liveMarketBrief({ ...base, assetClass: "multifamily", plan: true, builds: false })!;
+    expect(costLines(leaseUp)).toEqual([]);
+    expect(leaseUp.lines.some((l) => l.includes("construction and land development loans"))).toBe(true);
     const noWages = national.filter((r) => r.meta.id !== CONSTRUCTION_COST_IDS.wages);
-    expect(costLines(liveMarketBrief({ ...base, national: noWages, assetClass: "multifamily", plan: true }))).toHaveLength(1);
+    expect(costLines(liveMarketBrief({ ...base, national: noWages, assetClass: "multifamily", plan: true, builds: true }))).toHaveLength(1);
     const later = new Date("2027-06-01T00:00:00Z");
     const stale = readRates(REAL_ROWS, later).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
-    expect(costLines(liveMarketBrief({ ...base, now: later, national: stale, assetClass: "multifamily", plan: true }))).toEqual([]);
+    expect(costLines(liveMarketBrief({ ...base, now: later, national: stale, assetClass: "multifamily", plan: true, builds: true }))).toEqual([]);
     // One list, so the pipeline's read and the page's cannot differ.
     for (const id of Object.values(CONSTRUCTION_COST_IDS)) expect(BRIEF_NATIONAL_IDS).toContain(id);
   });

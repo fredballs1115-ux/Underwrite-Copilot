@@ -1135,7 +1135,7 @@ jobs:
           mark "#479 files that open whenever you click them" grep -q "Files that open whenever you click them" p_whats-new.html
           mark "#479 the pipeline, a little quicker" grep -q "The pipeline, a little quicker" p_whats-new.html
           mark "#479 cold storage, outdoor storage and affordable housing" grep -q "Cold storage, outdoor storage and affordable housing read as what they are" p_whats-new.html
-          mark "#480 construction costs and the breakeven in the checks" grep -q "What building costs, and what the bond market expects, read every day" p_whats-new.html
+          mark "#480 construction costs and the breakeven in the checks" grep -q "What building costs, and what the bond market expects, in the checks" p_whats-new.html
           mark "#481 the public pages, held to their own figures" grep -q "The public pages, held to their own figures" p_whats-new.html
           mark "#481 forty more cities, pictured" grep -q "Forty more cities, pictured" p_whats-new.html
           echo ""

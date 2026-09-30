@@ -296,6 +296,21 @@ const NON_STABILIZED: ReadonlySet<StrategyKind> = new Set([
 /** A deal with a plan: the stabilized figures describe the finished project. */
 export const isPlanDeal = (kind: StrategyKind): boolean => NON_STABILIZED.has(kind);
 
+/**
+ * Whether the deal builds something, so what building costs speaks to it:
+ * a development or a conversion, or a value-add that states its budget (in
+ * total, or a door at a time). A lease-up's building is already built, and
+ * a value-add with no budget has none to check an escalation against — the
+ * construction-cost lines of the market check read this, never the wider
+ * `isPlanDeal` (the audit of 2026-09-30).
+ */
+export function buildsSomething(extraction: ExtractionResult | null | undefined, kind: StrategyKind): boolean {
+  if (kind === "development" || kind === "conversion") return true;
+  if (kind !== "value_add" || !extraction) return false;
+  const metrics = extraction.metrics ?? [];
+  return capitalBudgetFromMetrics(metrics, null) != null || renovationProgramBudget(metrics, null) != null;
+}
+
 // ── The plan's cost ──────────────────────────────────────────────────────
 
 const BUDGET_INCLUDE =

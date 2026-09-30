@@ -9,6 +9,7 @@ import {
   findPriceMetric,
   inferStrategy,
   isPlanDeal,
+  buildsSomething,
   noiFigures,
   planSummary,
   plausibilityNote,
@@ -209,6 +210,20 @@ describe("planSummary / capitalBudgetFromMetrics", () => {
     expect(planSummary(null)).toBeNull();
     expect(isPlanDeal("stabilized")).toBe(false);
     expect(isPlanDeal("conversion")).toBe(true);
+  });
+
+  it("builds something only on a development, a conversion, or a value-add that states its budget", () => {
+    expect(buildsSomething(null, "development")).toBe(true);
+    expect(buildsSomething(CONVERSION, "conversion")).toBe(true);
+    // A lease-up's building is already built.
+    expect(buildsSomething(ex([]), "lease_up")).toBe(false);
+    expect(buildsSomething(STABILIZED, "stabilized")).toBe(false);
+    // A value-add builds only where it states what it will spend.
+    expect(buildsSomething(ex([metric("Asking price", "$30,000,000")]), "value_add")).toBe(false);
+    expect(buildsSomething(ex([metric("Renovation budget", "$4,500,000")]), "value_add")).toBe(true);
+    expect(
+      buildsSomething(ex([metric("Units to renovate", "192"), metric("Renovation cost per unit", "$15,000")]), "value_add"),
+    ).toBe(true);
   });
 
   it("carries the OM's own words for the budget and the timeline when the extraction states them", () => {

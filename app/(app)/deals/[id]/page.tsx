@@ -103,6 +103,7 @@ import {
   findPriceMetric,
   inferStrategy,
   isPlanDeal,
+  buildsSomething,
   planSummary,
   signalAskPrice,
   unitCountRow,
@@ -540,6 +541,7 @@ export default async function DealPage({
       national: reads.national.filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id)),
       assetClass: readClass,
       plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
+      builds: buildsSomething(extraction, inferStrategy(extraction, firstSignal).kind),
     });
     marketSince = briefDelta(storedBrief.readOn, storedBrief.figures, today?.figures ?? []);
   }
