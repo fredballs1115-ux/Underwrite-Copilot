@@ -657,6 +657,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           metro={active.id}
           eyebrow={(active as { region?: string }).region ?? "More markets"}
           name={active.name}
+          eager
         />
         <p className="text-sm leading-relaxed">
           {(active.market_notes as { value?: string } | null)?.value}

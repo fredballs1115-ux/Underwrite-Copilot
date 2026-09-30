@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { PlaceBackdrop } from "@/app/place-band";
+import { PAGE_COLUMN_SIZES, PlaceBackdrop } from "@/app/place-band";
 import { rateSeeds, treasuryForTerm } from "@/lib/live-rates";
 import { liveRates } from "@/lib/live-rates-read";
 import { publicMetadata } from "@/lib/page-meta";
@@ -54,7 +54,9 @@ export default async function ToolsPage() {
   return (
     <div className="space-y-8">
       <section className="relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[18rem]">
-        <PlaceBackdrop metro="chicago" height={420} />
+        {/* Inside the page's 72rem column, so it asks for that width, not
+            the screen's; and it opens the page, so it comes first. */}
+        <PlaceBackdrop metro="chicago" height={420} sizes={PAGE_COLUMN_SIZES} eager />
         <div className="on-photo band-words relative w-full px-6 pb-8 pt-12 sm:px-10 sm:pb-10 sm:pt-16">
           <p className="text-[11px] font-semibold uppercase tracking-widest text-accent">
             Deal math

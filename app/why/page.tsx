@@ -117,7 +117,7 @@ export default function WhyPage() {
       <main id="main" className="flex-1">
         {/* The argument opens on a real place: downtown Washington, the
             covered market at the centre of the DMV core. */}
-        <PlaceBand metro="dc">
+        <PlaceBand metro="dc" eager>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             Why Underwrite Copilot
           </h1>

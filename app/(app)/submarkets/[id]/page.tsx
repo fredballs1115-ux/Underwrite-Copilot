@@ -74,7 +74,7 @@ export default async function SubmarketPage({
           ← Market data · your submarkets
         </Link>
         {market ? (
-          <MarketBand metro={market.id} eyebrow={market.name} name={submarket.name} as="h1" />
+          <MarketBand metro={market.id} eyebrow={market.name} name={submarket.name} as="h1" eager />
         ) : (
           <h1 className="text-2xl font-semibold tracking-tight text-ink">{submarket.name}</h1>
         )}

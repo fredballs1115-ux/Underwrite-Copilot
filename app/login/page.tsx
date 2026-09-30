@@ -39,7 +39,7 @@ export default async function LoginPage({
       {/* The door opens on a real place too: Baltimore, a covered market a
           few miles from the DMV core. The centred scrim leaves the harbour
           showing on either side of the card (app/place-band). */}
-      <PlaceBackdrop metro="baltimore" height={900} scrim="center" />
+      <PlaceBackdrop metro="baltimore" height={900} scrim="center" eager />
       <main id="main" className="relative mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
         <Link
           href="/"

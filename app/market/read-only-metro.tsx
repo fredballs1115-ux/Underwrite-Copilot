@@ -38,7 +38,7 @@ export function ReadOnlyMetroView({
 }) {
   return (
     <div className="mt-4 space-y-4" data-qa="read-only-metro">
-      <MarketBand metro={metro.id} eyebrow="Read without a brief" name={metro.name} />
+      <MarketBand metro={metro.id} eyebrow="Read without a brief" name={metro.name} eager />
       {/* One string, so React puts no separators inside a sentence live-verify greps. */}
       <p className="text-sm leading-relaxed text-muted">
         {`A market the site reads but does not brief: the published figures below — the metro area's own, from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com, pulled on their own cadences — are all it holds for it. No research note, no sector tracker, no fair market rent, no comps pull and no metro rules on file; a deal here is screened on these figures and its state's rules, and every sentence on it says so.`}

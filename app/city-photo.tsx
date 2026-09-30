@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
 import { skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline";
 import { SkylineCreditText } from "./photo-credit";
@@ -35,6 +35,13 @@ import { SkylineCreditText } from "./photo-credit";
  * A panorama cropped into a squarer tile is covered by its HEIGHT, so a
  * tile's `sizes` says the width the picture must be drawn at to fill the
  * tile's height, not the tile's own width.
+ *
+ * The page's opening picture (`eager`) is asked for at once and ahead of
+ * everything else on the page; every other one waits until it is near.
+ * Asked for that early, it can fail before the page hydrates, when its
+ * `error` fires with no listener to hear it, so the component also checks
+ * on mount — a finished load with no pixels is a failure too (DealBanner's
+ * rule) — and the fallback to the overhead holds either way.
  */
 export function CityPhoto({
   metro,
@@ -70,6 +77,13 @@ export function CityPhoto({
   const [mode, setMode] = useState<"skyline" | "aerial" | "none">(
     shot ? "skyline" : view ? "aerial" : "none",
   );
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    // A picture that settled before hydration fired its event unheard.
+    const img = ref.current;
+    if (!img?.complete || img.naturalWidth > 0) return;
+    setMode((m) => (m === "skyline" && view ? "aerial" : "none"));
+  }, [mode, view]);
 
   if (mode === "none") return null;
 
@@ -105,6 +119,7 @@ export function CityPhoto({
           that sets its own immutable cache headers; next/image would add a
           second cache layer over it and cannot express the fallback chain */}
       <img
+        ref={ref}
         src={src}
         srcSet={srcSet}
         sizes={srcSet ? sizes : undefined}
@@ -112,6 +127,7 @@ export function CityPhoto({
         width={width}
         height={height}
         loading={eager ? "eager" : "lazy"}
+        fetchPriority={eager ? "high" : undefined}
         decoding="async"
         onError={() => setMode(skyline && view ? "aerial" : "none")}
         className={className}

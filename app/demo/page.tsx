@@ -320,7 +320,7 @@ export default async function DemoPage() {
       <main id="main" className="flex-1">
         {/* The sample deal's own city, from above: Center City, Philadelphia
             — Brewerytown is two miles north-west of the frame. */}
-        <PlaceBand metro="philadelphia" width="max-w-5xl">
+        <PlaceBand metro="philadelphia" width="max-w-5xl" eager>
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
               A complete screen, worked end to end

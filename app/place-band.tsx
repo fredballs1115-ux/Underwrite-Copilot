@@ -155,12 +155,17 @@ export function PhotoScrim({ scrim = "band" }: { scrim?: Scrim }) {
   );
 }
 
+/** How wide a band inside a public page's content column draws: the
+ *  column's 72rem less its gutters, or the screen below that (#451). */
+export const PAGE_COLUMN_SIZES = "(min-width: 1200px) 1104px, 100vw";
+
 /** The picture and its scrim, for a band that positions itself. */
 export function PlaceBackdrop({
   metro,
   height = 600,
   scrim = "band",
   sizes = "100vw",
+  eager = false,
 }: {
   metro: string;
   height?: number;
@@ -168,6 +173,9 @@ export function PlaceBackdrop({
   scrim?: Scrim;
   /** how wide the band draws, for the browser to pick a file by (#451) */
   sizes?: string;
+  /** the first thing on the page: fetched at once and ahead of the rest,
+   *  never lazily — every other picture waits its turn */
+  eager?: boolean;
 }) {
   // Either picture is enough to open on. Gating on the overhead alone was
   // safe only by accident — every market with a skyline happens to have an
@@ -188,6 +196,7 @@ export function PlaceBackdrop({
         width={1400}
         height={height}
         sizes={sizes}
+        eager={eager}
         className="h-full w-full object-cover object-[50%_42%]"
       />
       <PhotoScrim scrim={scrim} />
@@ -214,16 +223,19 @@ export function PlaceBackdrop({
 export function PlaceBand({
   metro,
   width = "max-w-3xl",
+  eager = false,
   children,
 }: {
   metro: string;
   /** the page's content width, so the words line up with what follows */
   width?: string;
+  /** the band opens its page: its picture is fetched first (PlaceBackdrop) */
+  eager?: boolean;
   children: ReactNode;
 }) {
   return (
     <section className="band-dark relative flex min-h-[19rem] items-end overflow-hidden text-white sm:min-h-[23rem]">
-      <PlaceBackdrop metro={metro} />
+      <PlaceBackdrop metro={metro} eager={eager} />
       <div className={`relative mx-auto w-full ${width} px-6 pb-12 pt-16 sm:pb-16 sm:pt-24`}>
         <div className="on-photo band-words">{children}</div>
       </div>
@@ -247,17 +259,20 @@ export function MarketBand({
   eyebrow,
   name,
   as: Heading = "h3",
+  eager = false,
 }: {
   metro: string;
   eyebrow: string;
   name: string;
   /** the name's heading level: a section of /market, or a page's own title */
   as?: "h1" | "h3";
+  /** the page's opening picture: fetched first (PlaceBackdrop) */
+  eager?: boolean;
 }) {
   return (
     <div className="band-dark relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[21rem]">
       {/* Inside a page's column, never wider than its 72rem. */}
-      <PlaceBackdrop metro={metro} height={480} scrim="caption" sizes="(min-width: 1200px) 1104px, 100vw" />
+      <PlaceBackdrop metro={metro} height={480} scrim="caption" sizes={PAGE_COLUMN_SIZES} eager={eager} />
       <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
         {/* Two lines at most: the scrim is measured to the top of a name

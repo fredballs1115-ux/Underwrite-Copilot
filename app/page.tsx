@@ -458,7 +458,8 @@ function SectionHead({
  * treatment washes out costs the same bytes and says nothing.
  */
 function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
-  if (!photo) return <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} scrim="hero" />;
+  // The first picture on the page, so it is asked for first (`eager`).
+  if (!photo) return <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} scrim="hero" eager />;
   return (
     <div aria-hidden className={`pointer-events-none ${HERO_STRIP}`}>
       {/* eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot */}
@@ -467,6 +468,7 @@ function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
         alt=""
         width={photo.width}
         height={photo.height}
+        fetchPriority="high"
         decoding="async"
         className="h-full w-full object-cover object-[50%_42%]"
       />
