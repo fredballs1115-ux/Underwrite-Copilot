@@ -229,7 +229,13 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   [/\b(storage)\b/i, "self_storage"],
   [/\b(manufactured|mobile[- ]home|mhc|rv park|rv resort)\b/i, "manufactured_housing"],
   [/\b(student)\b/i, "student_housing"],
-  [/\b(senior|assisted living|memory care|independent living|skilled nursing)\b/i, "senior_housing"],
+  // A continuing care retirement community (a CCRC, a "life plan
+  // community") and an active adult community are senior housing by their
+  // own names; a 55+ park is read by the manufactured-housing rule above.
+  [
+    /\b(senior|assisted living|memory care|independent living|skilled nursing|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|active[\s-]+adult|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?))\b/i,
+    "senior_housing",
+  ],
   [/\b(medical office|mob\b|medical)\b/i, "medical_office"],
   [/\b(data ?cent(er|re)s?)\b/i, "data_center"],
   [/\b(parking|garage)\b/i, "parking"],

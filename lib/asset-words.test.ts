@@ -189,6 +189,26 @@ describe("the asset-words table", () => {
     expect(assetClassKey("Office tower")).toBe("office");
   });
 
+  it("files a continuing care, life plan or active adult community as senior housing, and a 55+ park as a park", () => {
+    // Each resolved to no class at all.
+    for (const phrase of [
+      "CCRC",
+      "Continuing care retirement community",
+      "Continuing-care community",
+      "Life plan community",
+      "Active adult community",
+      "Active adult (55+) apartments",
+      "Retirement community",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("senior_housing");
+    }
+    // An age-restricted park is a park: the manufactured-housing rule reads
+    // it first.
+    expect(assetClassKey("55+ manufactured home community")).toBe("manufactured_housing");
+    expect(assetClassKey("55+ mobile home park")).toBe("manufactured_housing");
+    expect(assetClassKey("Active adult manufactured housing community")).toBe("manufactured_housing");
+  });
+
   it("gives an unknown phrase the generic words under its own label", () => {
     const w = assetWords("Something else entirely");
     expect(w.label).toBe("Something else entirely");
