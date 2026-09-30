@@ -214,7 +214,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // call once for each width (one stalled run, two failed ones).
     const rows = (html.match(/data-deal-thumb=/g) ?? []).length;
     expect((html.match(/class="flex shrink-0 sm:hidden"/g) ?? []).length).toBe(rows);
-    expect((html.match(/class="hidden w-22 shrink-0 justify-end sm:flex"/g) ?? []).length).toBe(rows);
+    expect((html.match(/class="hidden w-24 shrink-0 justify-end sm:flex"/g) ?? []).length).toBe(rows);
     expect((html.match(/>Stalled</g) ?? []).length).toBe(2);
     expect((html.match(/>Failed</g) ?? []).length).toBe(4);
     // The two exports travel together at the filter row's right edge.
