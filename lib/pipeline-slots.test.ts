@@ -244,6 +244,29 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(bare, { askPrice: "$20,000,000", goingInCap: "", perUnit: "", assetClass: "", market: "", take: "", dealName: "" } as never).price).toBe("$20,000,000");
     expect(pickSlots(bare, { askPrice: "Call for offers", goingInCap: "", perUnit: "", assetClass: "", market: "", take: "", dealName: "" } as never).price).toBeNull();
   });
+
+  it("with no extraction at all — a first screen's first minute — the first signal's ask is the price and nothing else is read yet", () => {
+    const signal = { askPrice: "$20,000,000", goingInCap: "5.2%", perUnit: "$83k/unit", assetClass: "multifamily", market: "Dallas, TX", take: "", dealName: "X", size: "240 units" };
+    // The deal page's summary bar prints the same ask before the extraction
+    // lands; the card printed "Price —" because the page never asked.
+    expect(pickSlots(null, signal)).toEqual({ cap: null, price: "$20,000,000", yoc: null });
+    expect(pickSlots(null, { ...signal, askPrice: "Unpriced" }).price).toBeNull();
+    expect(pickSlots(null, { ...signal, askPrice: "" }).price).toBeNull();
+    // No signal yet either: nothing to show.
+    expect(pickSlots(null, null)).toEqual({ cap: null, price: null, yoc: null });
+  });
+
+  it("the pipeline page asks for the slots whatever the extraction, so the first signal's ask reaches the card", () => {
+    // The page is a loader over the Supabase rows, so it is held at its
+    // source, the way the compare page's class is above: it skipped
+    // pickSlots until the extraction landed, and the promise above never
+    // reached a card.
+    const src = readFileSync("app/(app)/deals/page.tsx", "utf8");
+    expect(src).toMatch(/slots: pickSlots\(extraction, /);
+    expect(src).not.toMatch(/slots: extraction\s*\?/);
+    // …and it marks a fit judged on the first signal the deal page's way.
+    expect(src).toMatch(/fitFirstRead: !extraction && !!d\.first_signal/);
+  });
 });
 
 describe("the basis at a glance (#469)", () => {

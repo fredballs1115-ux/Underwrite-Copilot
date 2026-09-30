@@ -182,8 +182,11 @@ export function shownAssetClass(
 /** The row's slots. `storedClass` is the class the deal was filed under
  *  ("auto" where the analyst left it to the deck), read with the
  *  extraction's through `shownAssetClass` wherever a slot speaks in the
- *  class's terms. */
-export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null, storedClass?: string | null): PipelineSlots {
+ *  class's terms. Before the extraction lands — a first screen's first
+ *  minute — the first signal is all there is: its ask fills the price, as
+ *  on the deal page, and every other slot waits for the terms. */
+export function pickSlots(extraction: ExtractionResult | null, signal: FirstSignal | null, storedClass?: string | null): PipelineSlots {
+  if (!extraction) return { cap: null, price: signalAskPrice(signal), yoc: null };
   const metrics = extraction.metrics ?? [];
   // The same read the deal page makes — extraction plus the first signal —
   // so a deal never shows a price on one surface and none on the other.

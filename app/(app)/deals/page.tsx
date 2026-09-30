@@ -300,6 +300,9 @@ export default async function DealsPage({
           : null,
       score: mandate?.score ?? null,
       mandateVerdict: mandate?.verdict ?? null,
+      // Judged on the first signal alone until the extraction lands — the
+      // deal page's "First read" (its buy-box panel's provisional rule).
+      fitFirstRead: !extraction && !!d.first_signal,
       addedBy:
         d.team_id && d.user_id !== user?.id
           ? (nameById.get(d.user_id) ?? "Teammate")
@@ -314,9 +317,9 @@ export default async function DealsPage({
       readMarket: placement.read?.name ?? null,
       readCounty: placement.placedBy?.county ?? null,
       offersDue: dueById.get(d.id) ?? null,
-      slots: extraction
-        ? pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null, d.asset_class)
-        : { cap: null, price: null, yoc: null },
+      // Before the extraction lands the first signal's ask fills the price,
+      // as on the deal page (lib/pipeline-slots).
+      slots: pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null, d.asset_class),
       // Running, stalled (its process died mid-screen — a deploy, most
       // often) or failed with the verdict left behind; a failure that never
       // touched the verdict leaves the pill alone (lib/screen-run.ts).

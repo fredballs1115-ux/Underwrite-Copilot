@@ -640,6 +640,52 @@ describe("Pipeline — a note's card withholds the collateral's cap (the audit o
   });
 });
 
+describe("Pipeline — a first screen's card reads the first signal, as the deal page does", () => {
+  const props = {
+    errorMessage: null,
+    notice: null,
+    onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
+    billing: BILLING,
+  };
+  // The slots as lib/pipeline-slots reads a deal with a first signal and no
+  // extraction yet (its ask, nothing else), and a fit judged on the signal.
+  const first = card({
+    id: "s",
+    name: "Cedar Court Apartments",
+    jobStatus: "running",
+    fit: "near",
+    score: 64,
+    mandateVerdict: "WATCH",
+    fitFirstRead: true,
+    slots: { cap: null, price: "$20,000,000", yoc: null },
+  });
+
+  it("prints the first signal's ask as the price and marks the fit first read, in the cards and the list", () => {
+    for (const initialView of ["cards", "list"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([first]), initialView }));
+      dumpView(`pipeline-first-read-${initialView}`, html);
+      expect(a11yIssues(html), initialView).toEqual([]);
+      const text = visibleText(html);
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(text, initialView).toContain("$20.0M");
+      expect(text, initialView).toMatch(/first read/i);
+      expect(html, initialView).toContain("First read — judged on the first pass over the memorandum");
+    }
+    const cards = render(React.createElement(Pipeline, { ...props, deals: withThumbs([first]), initialView: "cards" }));
+    expect(visibleText(cards)).toMatch(/Price\s*\$20\.0M/);
+    expect((cards.match(/data-qa="fit-first-read"/g) ?? []).length).toBe(1);
+    // The list says it to a screen reader in the fit's own words.
+    const list = render(React.createElement(Pipeline, { ...props, deals: withThumbs([first]), initialView: "list" }));
+    expect(list).toContain("Fit 64 · Watch, first read");
+    // Once the extraction lands the fit is the screen's own, and unmarked.
+    const read = { ...first, fitFirstRead: false };
+    for (const initialView of ["cards", "list"] as const) {
+      const text = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([read]), initialView })));
+      expect(text, initialView).not.toMatch(/first read/i);
+    }
+  });
+});
+
 describe("ModelView — the sample model renders every panel", () => {
   it("renders the returns, stress, sensitivity, assumptions, capex and cash-flow panels", () => {
     const html = render(

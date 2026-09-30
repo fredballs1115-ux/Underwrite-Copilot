@@ -58,6 +58,9 @@ export type DealCard = {
   /** 0–100 mandate-fit score + its PURSUE/WATCH/PASS call (null pre-screen) */
   score: number | null;
   mandateVerdict: "PURSUE" | "WATCH" | "PASS" | null;
+  /** the fit is judged on the first signal alone — the extraction has not
+   *  landed — and is marked "first read", as the deal page marks it */
+  fitFirstRead?: boolean;
   market: string;
   /** covered-market name when the address maps into the 15-market scope
    *  (computed server-side, lib/market-county's placeDeal) — null outside it */
@@ -167,6 +170,11 @@ const MANDATE_META: Record<
   WATCH: { label: "Watch", cls: "text-caution" },
   PURSUE: { label: "Pursue", cls: "text-pass" },
 };
+
+/** Why a fit wears "First read": it is judged on the first signal, before
+ *  the extraction lands — the deal page's buy-box panel says the same. */
+const FIRST_READ_TITLE =
+  "First read — judged on the first pass over the memorandum; the full screen refines it";
 
 function statusRank(d: DealCard): number {
   if (d.verdict) return (VERDICT_META[d.verdict]?.rank ?? 0) + 2;
@@ -1728,22 +1736,34 @@ const DealRow = memo(function DealRow({
   // page and the deal header's chip — the row doesn't repeat them.
   const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
   const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
+  // A fit judged on the first signal alone says so wherever it is drawn —
+  // the deal page's "First read" — until the extraction lands.
+  const firstRead = !!d.fitFirstRead && (!!scored || !!d.fit);
   const fitWords = scored
-    ? d.fit === "outside"
-      ? `Fit ${scored.score} · Outside box`
-      : `Fit ${scored.score} · ${MANDATE_META[scored.verdict].label}`
+    ? `${
+        d.fit === "outside"
+          ? `Fit ${scored.score} · Outside box`
+          : `Fit ${scored.score} · ${MANDATE_META[scored.verdict].label}`
+      }${firstRead ? ", first read" : ""}`
     : null;
   const fitTitle = scored
-    ? d.fit === "outside"
-      ? `${scored.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
-      : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`
+    ? `${
+        d.fit === "outside"
+          ? `${scored.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
+          : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`
+      }${firstRead ? `. ${FIRST_READ_TITLE}` : ""}`
     : null;
+  const firstReadMark = firstRead ? (
+    <span className="text-[9px] font-medium uppercase text-brand" title={FIRST_READ_TITLE}>
+      first read
+    </span>
+  ) : null;
   // Without a score there is no bar to draw, so the fit stays a word in the
   // meta line; with one, the bar below carries it and the word goes.
   const fitBit =
     !scored && d.fit ? (
-      <span className={`font-medium ${FIT_META[d.fit].cls}`}>
-        {FIT_META[d.fit].label} box
+      <span className={`font-medium ${FIT_META[d.fit].cls}`} title={firstRead ? FIRST_READ_TITLE : undefined}>
+        {FIT_META[d.fit].label} box{firstRead ? ", first read" : ""}
       </span>
     ) : null;
   // Below `lg` the score column is hidden, and as a word at the end of the
@@ -1759,6 +1779,7 @@ const DealRow = memo(function DealRow({
         fit
       </span>
       <FitBar score={scored.score} />
+      {firstRead ? <span aria-hidden>{firstReadMark}</span> : null}
       <span className="sr-only">{fitWords}</span>
     </span>
   ) : null;
@@ -1936,9 +1957,15 @@ const DealRow = memo(function DealRow({
           >
             {scored.score}
             <FitBar score={scored.score} />
+            {firstReadMark}
           </span>
         ) : d.fit ? (
-          <span className={FIT_META[d.fit].cls}>{FIT_META[d.fit].label}</span>
+          <>
+            <span className={FIT_META[d.fit].cls} title={firstRead ? FIRST_READ_TITLE : undefined}>
+              {FIT_META[d.fit].label}
+            </span>
+            {firstReadMark}
+          </>
         ) : (
           <span className="font-normal text-line">—</span>
         )}
@@ -2284,16 +2311,28 @@ const DealTile = memo(function DealTile({
             <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>
             <dd className="mt-0.5 text-sm font-semibold">
               {scored ? (
-                <span className={`flex items-center gap-1.5 tabular-nums ${fitCls}`} title={`${scored.score} / 100 mandate fit`}>
+                <span
+                  className={`flex items-center gap-1.5 tabular-nums ${fitCls}`}
+                  title={d.fitFirstRead ? `${scored.score} / 100 mandate fit. ${FIRST_READ_TITLE}` : `${scored.score} / 100 mandate fit`}
+                >
                   {scored.score}
                   <FitBar score={scored.score} />
                 </span>
               ) : d.fit ? (
-                <span className={FIT_META[d.fit].cls}>{FIT_META[d.fit].label}</span>
+                <span className={FIT_META[d.fit].cls} title={d.fitFirstRead ? FIRST_READ_TITLE : undefined}>
+                  {FIT_META[d.fit].label}
+                </span>
               ) : (
                 <span className="font-normal text-line">—</span>
               )}
             </dd>
+            {/* Judged on the first signal while the extraction is on its
+                way: said under the fit, as the deal page says it. */}
+            {d.fitFirstRead && (scored || d.fit) ? (
+              <dd className="truncate text-[10px] font-medium uppercase tracking-wide text-brand" title={FIRST_READ_TITLE} data-qa="fit-first-read">
+                First read
+              </dd>
+            ) : null}
           </div>
         </dl>
       </div>
