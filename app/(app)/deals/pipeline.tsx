@@ -1035,8 +1035,11 @@ export function Pipeline({
             </form>
           </div>
           <p className="mt-3 text-xs">
+            {/* To the metro explorer itself: /market opens a signed-in
+                reader on their own market data, which an empty pipeline has
+                none of ("No market data yet", and a link back here). */}
             <Link
-              href="/market"
+              href="/market#explorer"
               className="font-medium text-brand hover:text-brand-strong"
             >
               Browse the covered markets →

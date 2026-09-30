@@ -545,6 +545,9 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(empty).toContain("Start your pipeline");
     expect(empty).toContain("Try a sample deal");
     expect(empty).toContain("Browse the covered markets");
+    // …to the metro explorer itself: /market opens a signed-in reader on
+    // their own market data, and an empty pipeline has none.
+    expect(emptyHtml).toMatch(/<a[^>]*href="\/market#explorer"[^>]*>Browse the covered markets →<\/a>/);
     const atLimitHtml = render(
         React.createElement(Pipeline, {
           deals: CARDS.slice(0, 2),
