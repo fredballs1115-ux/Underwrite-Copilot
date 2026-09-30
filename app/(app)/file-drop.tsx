@@ -25,12 +25,16 @@ export function FileDrop({
   accept,
   hint,
   maxBytes,
+  onFile,
 }: {
   name: string;
   accept?: string;
   hint?: string;
   /** reject oversized files before wasting an upload */
   maxBytes?: number;
+  /** told the file now chosen, or null once none is — so the form around
+   *  it can read the file's name (the new-deal form names the deal by it) */
+  onFile?: (file: File | null) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   // dragenter/dragleave fire for every child the cursor crosses — count the
@@ -58,12 +62,14 @@ export function FileDrop({
     setTypeError(null);
     inputRef.current.files = files;
     setFileName(file.name);
+    onFile?.(file);
   }
 
   function clear() {
     if (inputRef.current) inputRef.current.value = "";
     setFileName(null);
     setTypeError(null);
+    onFile?.(null);
   }
 
   return (
@@ -106,11 +112,14 @@ export function FileDrop({
             : "border-line hover:border-brand/50 hover:bg-faint"
         }`}
       >
+        {/* Hidden and driven by the drop zone, but named all the same, as
+            the batch upload's picker is. */}
         <input
           ref={inputRef}
           type="file"
           name={name}
           accept={accept}
+          aria-label={`Choose the file${hint ? ` (${hint})` : ""}`}
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0] ?? null;
@@ -120,10 +129,12 @@ export function FileDrop({
               );
               e.target.value = "";
               setFileName(null);
+              onFile?.(null);
               return;
             }
             setTypeError(null);
             setFileName(f?.name ?? null);
+            onFile?.(f);
           }}
         />
         <svg

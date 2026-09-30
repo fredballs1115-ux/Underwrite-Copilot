@@ -460,6 +460,26 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(a11yIssues(list)).toEqual([]);
   });
 
+  it("opens the new-deal form with its name field still required and editable — a chosen PDF only pre-fills it (lib/deal-name)", () => {
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: withThumbs(CARDS),
+        errorMessage: null,
+        notice: null,
+        openNew: "1",
+        onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+        billing: BILLING,
+      }),
+    );
+    expect(a11yIssues(html), "a11y new-deal form").toEqual([]);
+    const field = html.match(/<input[^>]*aria-label="Deal name"[^>]*>/)?.[0] ?? "";
+    expect(field).toContain('name="name"');
+    expect(field).toContain("required");
+    expect(field).not.toMatch(/readonly|disabled/i);
+    expect(html).toContain('accept="application/pdf"');
+    expect(html).toContain('data-qa="batch-upload"');
+  });
+
   it("opens on the cards unless the reader chose the list, and never lands on the map (#438)", () => {
     expect(landingView(undefined)).toBe("cards");
     expect(landingView("cards")).toBe("cards");

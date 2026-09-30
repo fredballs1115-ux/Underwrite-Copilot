@@ -32,6 +32,7 @@ import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
 import { compareSortValues, type SortDir } from "@/lib/pipeline-sort";
+import { prefillName } from "@/lib/deal-name";
 import {
   STAGES,
   STAGE_LABEL,
@@ -2579,6 +2580,9 @@ function NewDealForm({
   // A Pull Comps hand-off arrives with the address picked: open on manual.
   const [mode, setMode] = useState<"upload" | "manual">(prefill ? "manual" : "upload");
   const [name, setName] = useState("");
+  // The name the last chosen PDF put in the field: a newer file replaces it,
+  // as the batch upload names each deal by its file; a name typed stays.
+  const filledName = useRef<string | null>(null);
   const [assetClass, setAssetClass] = useState("auto");
   // The address field manages its own text; we mirror its latest value here
   // and remount it (key) when a draft restores.
@@ -2626,6 +2630,7 @@ function NewDealForm({
 
   function clearDraft() {
     writeDraft(null);
+    filledName.current = null;
     setName("");
     setAssetClass("auto");
     addressRef.current = null;
@@ -2776,6 +2781,14 @@ function NewDealForm({
           accept="application/pdf"
           hint="PDF offering memorandum, up to 32 MB"
           maxBytes={32 * 1024 * 1024}
+          onFile={(file) => {
+            if (!file) return;
+            const next = prefillName(name, filledName.current, file.name);
+            if (next == null) return;
+            filledName.current = next;
+            setName(next);
+            persist({ name: next });
+          }}
         />
         <PendingButton
           pendingLabel="Uploading your OM — hang tight…"

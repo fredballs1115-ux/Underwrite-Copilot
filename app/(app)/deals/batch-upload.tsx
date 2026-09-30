@@ -6,22 +6,12 @@ import {
   createDealFromBatch,
   type CreateDealResult,
 } from "./actions";
+// Each file's deal is named from its file name — a starting point the user
+// can edit before the batch runs; the single upload pre-fills the same way.
+import { nameFromFile } from "@/lib/deal-name";
 
 const MAX_FILES = 4;
 const MAX_BYTES = 32 * 1024 * 1024;
-
-/** "the-maddox_OM_v2.pdf" → "The maddox OM v2" — a starting point the user
- *  can edit before the batch runs. */
-function nameFromFile(fileName: string): string {
-  const base = fileName
-    .replace(/\.pdf$/i, "")
-    .replace(/[-_]+/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 80);
-  if (!base) return "Untitled OM";
-  return base.charAt(0).toUpperCase() + base.slice(1);
-}
 
 const ERROR_COPY: Record<string, string> = {
   name: "Needs a deal name.",
