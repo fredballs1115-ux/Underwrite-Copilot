@@ -34,6 +34,7 @@ import { StressBench } from "./landing-stress";
 import { TOOL_COUNT, groupedTools } from "@/lib/tools/catalog";
 import metrosSeed from "@/data/research/metros.json";
 import { MARKET_COUNT } from "./markets-marquee";
+import { DATA_METROS } from "@/lib/market-match";
 import { MarketsGallery } from "./markets-gallery";
 import { PhotoScrim, PlaceBackdrop } from "./place-band";
 import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
@@ -51,9 +52,6 @@ const RULES_PHRASE =
 // The sample deal's legal read through the REAL rules engine — feeds the
 // walkthrough widget's Regulation block.
 const LEGAL = sampleLegal();
-const WIRED_MARKETS = (metrosSeed.metros ?? [])
-  .filter((m) => (m as { ingest_market?: string }).ingest_market)
-  .map((m) => m.name);
 // Deliberately FOCUSED coverage (per direction): FIFTEEN markets, full stop
 // — the DMV core (one market, four jurisdiction entries) + the rest of the
 // Mid-Atlantic + the biggest US markets. Research and website coverage stop
@@ -251,7 +249,7 @@ const STATS: { value: number; suffix: string; label: string }[] = [
   { value: ANALYSIS_STAGES, suffix: "", label: "analysis stages" },
   { value: DEAL_KILLERS, suffix: "", label: "deal-killers stressed first" },
   { value: MARKET_COUNT, suffix: "", label: "covered markets" },
-  { value: 0, suffix: "", label: "black-box numbers" },
+  { value: RULES.all, suffix: "", label: "local rules checked by address" },
 ];
 
 // Live-engine rows for the Excel-preview tile: the sample model recomputed
@@ -294,11 +292,11 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Where do the numbers come from?",
-    a: "Every figure traces to a named source — an OM page, your rent roll, a market norm — and conflicting sources are reconciled openly (actuals beat pro forma), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
+    a: "Every figure says where it came from — an OM page, your rent roll, a dated published figure, or a rule of thumb named as one — and conflicting sources are reconciled openly (actuals beat pro forma), never silently merged. The return math is deterministic code, not a language model guessing at arithmetic.",
   },
   {
     q: "Which markets does it cover?",
-    a: `${MARKET_COUNT} markets, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULES_PHRASE}, machine-evaluated at every address), market notes, and data coverage with sources. Outside them the screen still runs: statewide rules are checked, the market check reads the metro area's or the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, extended by the bulk property database (${WIRED_MARKETS.join(", ")} wired).`,
+    a: `${MARKET_COUNT} markets with research briefs, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULES_PHRASE}, machine-evaluated at every address), market notes, and data coverage with sources. ${DATA_METROS.length} more metro areas are read without a brief — their published rents, vacancy, jobs and permits, each dated, with no local rules or notes on file: ${DATA_METROS.map((m) => m.name).join(", ")}. Outside all of them the screen still runs: statewide rules are checked, the market check reads the metro area's or the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}.`,
   },
   {
     q: "Why not just ask ChatGPT?",
@@ -663,7 +661,7 @@ export default function Home() {
                   </span>
                 </h1>
                 <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                  Upload the OM. Every figure sourced, the three deal-killers stressed, a Go / Caution / No-go — in minutes.
+                  Upload the OM. Every figure labelled with where it came from, the three deal-killers stressed, a Go / Caution / No-go — in minutes.
                 </p>
                 <div className="mt-8 flex flex-wrap items-center gap-3">
                   <Link

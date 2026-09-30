@@ -2,19 +2,16 @@ import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { datedLong } from "@/lib/debt-index";
 import { fmrLabel, fmrOf, fmrToday, fmrWhen } from "@/lib/fmr";
+import { MARKET_COUNT } from "@/lib/market-count";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle. Shared by the homepage, /why, and /demo
 // so the across-the-screen markets band is one implementation everywhere.
 
-// DMV core's four jurisdiction entries are ONE market to a human; every
-// other entry counts as itself, whatever its region stamp — an unstamped
-// future metro must move this number, not silently vanish from it.
-export const MARKET_COUNT = new Set(
-  (metrosSeed.metros ?? []).map((m) =>
-    (m as { region?: string }).region === "DMV core" ? "DMV core" : m.id
-  )
-).size;
+// The count every page states lives in lib/market-count (the DMV core's four
+// jurisdiction entries are one market); re-exported for the pages that
+// import it from here.
+export { MARKET_COUNT };
 
 /** The strongest honest fact string for a metro — its leading ASSET-CLASS
  *  read (office / industrial / multifamily / retail, same derivation as the

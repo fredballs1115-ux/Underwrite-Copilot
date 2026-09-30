@@ -37,6 +37,7 @@ export function MarketsGallery() {
         fact: fact?.text ?? entry.region ?? "covered market",
         asOf: fact?.asOf ?? null,
         place: METRO_VIEWS[entry.id]?.place ?? null,
+        dmv: entry.region === "DMV core",
       };
     })
     // A market with no coordinates would render an empty frame — leave it to
@@ -48,6 +49,10 @@ export function MarketsGallery() {
   // a photographer's name behind on the page.
   const credit = galleryCredit(items.map((m) => m.id));
   const anyOverhead = items.some((m) => !hasSkyline(m.id));
+  // The heading counts markets and the grid shows briefs: the Washington
+  // area is one market with a brief a jurisdiction, so the line under the
+  // heading says why there are more tiles than markets.
+  const dmv = items.filter((m) => m.dmv).length;
 
   if (!items.length) return null;
 
@@ -58,7 +63,9 @@ export function MarketsGallery() {
         The {MARKET_COUNT} covered markets.
       </h2>
       <p className="mt-2 max-w-2xl text-sm text-muted">
-        The skyline behind each set of benchmarks — tap one for its brief.
+        {dmv > 1
+          ? `${items.length} briefs: the Washington area's ${dmv} jurisdictions have one each. Tap a skyline for its brief.`
+          : "The skyline behind each set of benchmarks — tap one for its brief."}
       </p>
 
       <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">

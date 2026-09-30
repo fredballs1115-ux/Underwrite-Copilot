@@ -51,7 +51,7 @@ export default async function ToolsPage() {
             The numbers, before the deal
           </h1>
           <p className="mt-3 text-sm text-white">
-            Runs in your browser. Nothing is sent anywhere, nothing is stored.
+            Runs in your browser, and nothing is saved. What you type stays in this page&apos;s link, so a sizing travels as a URL.
           </p>
         </div>
       </section>

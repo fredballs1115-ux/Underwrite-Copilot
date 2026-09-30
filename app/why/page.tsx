@@ -16,9 +16,6 @@ const RULE_COUNT = seedRules().length;
 const MAJOR_MARKET_COUNT = (metrosSeed.metros ?? []).filter(
   (m) => (m as { region?: string }).region === "Major US markets"
 ).length;
-const WIRED_MARKETS = (metrosSeed.metros ?? [])
-  .filter((m) => (m as { ingest_market?: string }).ingest_market)
-  .map((m) => m.name);
 
 // ISR, five-minute window: without a revalidate this page is fully static
 // and browsers may serve a year-stale copy under stale-while-revalidate —
@@ -75,7 +72,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
     h: "It knows the ground",
     body: [
       `Give a deal an address and the app checks the local rules: rent control coverage, small-landlord exemptions, purchase rights — ${RULE_COUNT} machine-evaluable rules focused on the Mid-Atlantic and ${MAJOR_MARKET_COUNT} of the largest US markets, DC to Brooklyn to LA to Chicago. It answers with its source linked where the rule cites one, or names the exact open question — year built, whether you'll live in a unit — and takes your answer right on the deal. Unknown jurisdictions say so — never a silent pass.`,
-      `Recorded sales nearby pull automatically from government records — live county APIs in ${COVERAGE_SUMMARY} today, plus a bulk property database of government deed records with ${WIRED_MARKETS.join(", ")} pipelines wired. Public records, clearly labeled. Not an appraisal.`,
+      `Recorded sales nearby pull automatically from government records — live county APIs in ${COVERAGE_SUMMARY} today. Public records, clearly labeled. Not an appraisal.`,
       `And every covered market carries an asset-type read — office, industrial, multifamily, and retail vacancy where a named research house prints one, with asking rents and cap bands where they are sourced, each figure dated and source-linked. Where the trackers disagree the brief shows the spread instead of averaging it away, and a gap stays a recorded gap. Deal pages benchmark against the same rows automatically, your sector first.`,
     ],
   },
@@ -89,8 +86,8 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "What it is not",
     body: [
-      "This is a screening tool, not a full underwriting model. It works at the annual level.",
-      "It does not replace ARGUS, a monthly cash-flow build, or your own diligence. It gets you to a fast, honest read on whether a deal earns that work.",
+      "This is a screening tool, not a full underwriting model. It runs one rent growth rate, one vacancy and one loan, never lease by lease.",
+      "It does not replace ARGUS, a lease-by-lease cash-flow build, or your own diligence. It gets you to a fast, honest read on whether a deal earns that work.",
     ],
   },
 ];
