@@ -71,6 +71,72 @@ export function overlayUrl(b, width, height, layerId, root = NFHL_ROOT) {
   return `${root}/export?${p}`;
 }
 
+/**
+ * The zones restyled through the service's own dynamic layers (it reports
+ * `supportsDynamicLayers: true`): FEMA's features and FEMA's fields, drawn
+ * in the site's palette instead of FEMA's print styling — a light tint and
+ * a crisp outline a class, FEMA's labels off (the page says the zone in
+ * words), top to bottom:
+ *   - the regulatory floodway, a red hatch over its outline;
+ *   - the Special Flood Hazard Area (the 1% annual chance zones), blue;
+ *   - the 0.2% annual chance zone, amber;
+ *   - an area of undetermined hazard (Zone D), a grey hatch.
+ * Each class is a definition expression over FEMA's own FLD_ZONE,
+ * ZONE_SUBTY and SFHA_TF fields; a field the layer does not have makes the
+ * export answer an error, which this probe prints — so the probe itself is
+ * what proves the fields before any page relies on them.
+ */
+export const RESTYLED_LAYERS = (layerId) => {
+  const source = { type: "mapLayer", mapLayerId: layerId };
+  const fill = (color, outline, width, style = "esriSFSSolid") => ({
+    renderer: {
+      type: "simple",
+      symbol: { type: "esriSFS", style, color, outline: { type: "esriSLS", style: "esriSLSSolid", color: outline, width } },
+    },
+    showLabels: false,
+  });
+  return [
+    { id: 901, source, definitionExpression: "ZONE_SUBTY LIKE '%FLOODWAY%'", drawingInfo: fill([220, 38, 38, 170], [185, 28, 28, 255], 1.75, "esriSFSBackwardDiagonal") },
+    {
+      id: 902,
+      source,
+      definitionExpression: "SFHA_TF = 'T' AND (ZONE_SUBTY IS NULL OR ZONE_SUBTY NOT LIKE '%FLOODWAY%')",
+      drawingInfo: fill([37, 99, 235, 70], [29, 78, 216, 255], 2),
+    },
+    {
+      id: 903,
+      source,
+      definitionExpression: "FLD_ZONE = 'X' AND (ZONE_SUBTY LIKE '%0.2%' OR ZONE_SUBTY LIKE '%1 PCT%' OR ZONE_SUBTY LIKE '%1 PERCENT%')",
+      drawingInfo: fill([245, 158, 11, 60], [217, 119, 6, 240], 1.5),
+    },
+    { id: 904, source, definitionExpression: "FLD_ZONE = 'D'", drawingInfo: fill([107, 114, 128, 120], [75, 85, 99, 230], 1.25, "esriSFSForwardDiagonal") },
+  ];
+};
+
+export function restyledOverlayUrl(b, width, height, layerId, root = NFHL_ROOT) {
+  const p = new URLSearchParams({
+    bbox: bboxParam(b),
+    bboxSR: "3857",
+    imageSR: "3857",
+    size: `${width},${height}`,
+    format: "png32",
+    transparent: "true",
+    dynamicLayers: JSON.stringify(RESTYLED_LAYERS(layerId)),
+    f: "image",
+  });
+  return `${root}/export?${p}`;
+}
+
+/** The building's ring as the page draws it: white over a dark halo. */
+const ringSvg = (width, height) =>
+  Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">` +
+      `<circle cx="${width / 2}" cy="${height / 2}" r="15" fill="none" stroke="rgba(0,0,0,0.55)" stroke-width="7"/>` +
+      `<circle cx="${width / 2}" cy="${height / 2}" r="15" fill="none" stroke="#ffffff" stroke-width="3.5"/>` +
+      `<circle cx="${width / 2}" cy="${height / 2}" r="3" fill="#ffffff"/>` +
+      `</svg>`,
+  );
+
 // Known flood-prone places and one dry control — probe inputs, not data.
 const DEFAULT_POINTS = [
   [40.744, -74.0324, "hoboken"],
@@ -157,6 +223,19 @@ async function main() {
   console.log(`  supportsDynamicLayers: ${json.supportsDynamicLayers}`);
   if (!zones) return;
 
+  // 1b. The zone layer's own description: its fields (the restyle's
+  //     definition expressions name FLD_ZONE, ZONE_SUBTY and SFHA_TF), its
+  //     geometry type and its query limits — printed, never assumed.
+  const lay = await get(`${root}/${zones.id}?f=json`);
+  try {
+    const lj = JSON.parse(lay.buf.toString("utf8"));
+    console.log(`LAYER ${zones.id} · HTTP ${lay.status} · geometry ${lj.geometryType} · maxRecordCount ${lj.maxRecordCount} · capabilities ${lj.capabilities}`);
+    console.log(`  fields: ${(lj.fields ?? []).map((f) => `${f.name}:${String(f.type).replace("esriFieldType", "")}`).join(", ")}`);
+    console.log(`  renderer: ${lj.drawingInfo?.renderer?.type ?? "?"} · labels ${lj.hasLabels ?? "?"}`);
+  } catch (err) {
+    console.log(`LAYER ${zones.id} unreadable — ${err instanceof Error ? err.message : String(err)}`);
+  }
+
   // 2. FEMA's own legend for that layer: each label and its swatch, saved.
   const leg = await get(`${root}/legend?f=json`);
   console.log(`LEGEND · HTTP ${leg.status} · ${leg.type} · ${leg.buf.length} bytes`);
@@ -208,10 +287,28 @@ async function main() {
       else console.log(`    overlay body: ${o.buf.toString("utf8").slice(0, 300)}`);
       if (sharp && a.type.startsWith("image/") && o.type.startsWith("image/")) {
         await sharp(a.buf)
-          .composite([{ input: o.buf }])
+          .composite([{ input: o.buf }, { input: ringSvg(W, H) }])
           .jpeg({ quality: 82 })
           .toFile(join(out, `${base}.jpg`));
         index.frames.push({ place: label, lat, lng, zoom, file: `${base}.jpg`, overlay: `${base}-overlay.png` });
+      }
+      // The same frame restyled (the deal page's zoom only), for the eye to
+      // set beside FEMA's own styling.
+      if (zoom === 17) {
+        const t0 = Date.now();
+        const r = await get(restyledOverlayUrl(b, W, H, zones.id, root));
+        console.log(`  z${zoom} restyled: overlay HTTP ${r.status} ${r.type} ${Math.round(r.buf.length / 1024)} KB in ${Date.now() - t0} ms`);
+        if (!r.type.startsWith("image/")) console.log(`    restyled body: ${r.buf.toString("utf8").slice(0, 400)}`);
+        else {
+          await writeFile(join(out, `${base}-restyled-overlay.png`), r.buf);
+          if (sharp && a.type.startsWith("image/")) {
+            await sharp(a.buf)
+              .composite([{ input: r.buf }, { input: ringSvg(W, H) }])
+              .jpeg({ quality: 82 })
+              .toFile(join(out, `${base}-restyled.jpg`));
+            index.frames.push({ place: label, lat, lng, zoom, file: `${base}-restyled.jpg`, overlay: `${base}-restyled-overlay.png`, restyled: true });
+          }
+        }
       }
     }
   }
