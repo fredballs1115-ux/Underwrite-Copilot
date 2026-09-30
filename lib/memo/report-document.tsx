@@ -286,14 +286,14 @@ function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) 
     <View style={{ marginTop: 12 }} wrap={false}>
       <TitleRow title="Assumptions against the published figures" marginTop={0} />
       <Text style={s.sub}>
-        {`${scope} A trailing year is what an assumption is being asked to beat, not a forecast; ${readGrainNote(read)}`}
+        {str(`${scope} A trailing year is what an assumption is being asked to beat, not a forecast; ${readGrainNote(read)}`)}
       </Text>
       {read.checks.map((c) => (
         <View key={c.key} style={{ marginTop: 3 }}>
           <Text style={{ fontSize: 8.5, color: C.ink }}>
-            {`${c.title} ${c.model} (${c.modelSource}) — ${c.toneLabel}`}
+            {str(`${c.title} ${c.model} (${c.modelSource}) — ${c.toneLabel}`)}
           </Text>
-          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{c.read}</Text>
+          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(c.read)}</Text>
         </View>
       ))}
     </View>
@@ -1466,7 +1466,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             hurdlePct={sensitivity.hurdlePct}
           />
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-            {sensitivity.takeaway}
+            {str(sensitivity.takeaway)}
           </Text>
 
           {/* Legend — shared by both grids. */}
@@ -1483,7 +1483,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                     borderColor: C.line,
                   }}
                 />
-                <Text style={{ fontSize: 7.5, color: C.muted }}>{l.label}</Text>
+                <Text style={{ fontSize: 7.5, color: C.muted }}>{str(l.label)}</Text>
               </View>
             ))}
           </View>

@@ -217,6 +217,45 @@ describe("ReportDocument (full report)", () => {
     vi.useRealTimers();
   });
 
+  it("puts the grid's takeaway and the assumptions read through the WinAnsi filter, so a symbol prints as its stand-in, never as a wrong glyph or nothing", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction as ExtractionResult, SAMPLE_DEAL.name);
+    const sensitivity = { ...buildSensitivityData(derived.inputs, null), takeaway: "The deal holds ≥15% up to a 5.70% exit cap." };
+    const read = {
+      readOn: "2026-09-21",
+      metro: "Philadelphia",
+      checks: [
+        {
+          key: "rent_growth" as const,
+          title: "Rent growth",
+          model: "3.0%/yr",
+          modelSource: "a screening default",
+          published: [],
+          tone: "ahead" as const,
+          toneLabel: "ahead ↑ of the published figures",
+          scope: "metro" as const,
+          read: "Asking rents moved ↓ 0.4 points on the year; the model runs ≈0.7 points ahead.",
+        },
+      ],
+    };
+    const input = buildReportData(deal, "September 21, 2026", [], sensitivity, undefined, null, null, undefined, read as never);
+    const buf = await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]);
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("The deal holds >=15% up to a 5.70% exit cap.");
+    expect(text).toContain("ahead up of the published figures");
+    expect(text).toContain("Asking rents moved down 0.4 points on the year; the model runs ~0.7 points ahead.");
+  }, 45000);
+
   it("on a note, prints what the note itself earns under the model's caveat (#416)", async () => {
     // The day the yield is read on: thirty months before the stated maturity.
     vi.useFakeTimers({ now: new Date(Date.UTC(2025, 8, 30)), toFake: ["Date"] });
