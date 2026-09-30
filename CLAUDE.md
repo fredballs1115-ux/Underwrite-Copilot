@@ -1115,7 +1115,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   cannot import from `lib/deal-strategy`.
 - A market's photograph: `lib/skyline.ts` (pure — one verified Wikimedia
   Commons file per metro with its photographer and licence, plus
-  `commonsUrl` / `creditLine`), served by `app/api/imagery/skyline/[id]`
+  `commonsUrl` / `creditLine`). **Every credit carries what the licence
+  asks** (2026-09-30, CC BY-SA 4.0 §3(a)(1)): the photographer linked to
+  the file's page on Commons, the licence linked to its text, and
+  "cropped to fit", since every surface crops (`skylineCredit`,
+  `galleryCreditParts`; `app/photo-credit.tsx` draws them with their
+  links in `creditLine`'s and `galleryCredit`'s own words, and
+  `lib/photo-credit.test.ts` holds the two to each other). A pipeline
+  card, itself a link, keeps its corner text, and the page carries one
+  linked line under the cards. Served by `app/api/imagery/skyline/[id]`
   (proxied, validated by content-type, cached immutable, 404 on any
   failure). `app/city-photo.tsx` (`CityPhoto`) is the one component every
   market surface draws through: skyline first, the USGS overhead as the
@@ -3891,6 +3899,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   every photographer shown (`galleryCredit`, and
   `OVERHEAD_GRID_CREDIT` where a market shows its overhead — the same
   line the homepage's gallery prints).
+- How many markets (2026-09-30): every count a page states reads
+  `lib/market-count` — `MARKET_COUNT` (15: the Washington area's four
+  briefs are one market), `BRIEF_COUNT` (18, what a grid of tiles shows,
+  and the homepage's gallery says why the two differ) and `MARKETS_READ`
+  (41, with the 26 metro areas read without a brief — /market's search
+  description had said 44 by counting the Washington area four times).
+  `lib/market-scope.test.ts` pins all three.
 - Being found (#430): `lib/public-pages.ts` (pure) is the one catalogue
   of the public market and sector pages — every briefed market and every
   metro area read without a brief (`marketPages`, each once), every
