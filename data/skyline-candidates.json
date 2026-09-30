@@ -1834,6 +1834,12 @@
       "queries": [
         "Rochester, New York skyline panorama",
         "Rochester, New York downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline Rochester, NY.jpg",
+          "note": "Rochester, NY — Evilarry at English Wikipedia, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36781253352)."
+        }
       ]
     },
     {
@@ -1854,6 +1860,12 @@
       "queries": [
         "Albany, New York skyline panorama",
         "Albany, New York downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "EmpireStatePlazaPanorama.jpg",
+          "note": "Albany, NY — UpstateNYer, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36779692322)."
+        }
       ]
     },
     {
@@ -1874,6 +1886,12 @@
       "queries": [
         "El Paso skyline panorama",
         "El Paso downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "El Paso Cityscape (cropped).jpg",
+          "note": "El Paso, TX — WmCheez, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36779692322)."
+        }
       ]
     },
     {
@@ -1914,6 +1932,12 @@
       "queries": [
         "Columbia, South Carolina skyline panorama",
         "Columbia, South Carolina downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Fall skyline of Columbia SC from Arsenal Hill.jpg",
+          "note": "Columbia, SC — Akhenaton06, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36779692322)."
+        }
       ]
     },
     {
@@ -1934,6 +1958,12 @@
       "queries": [
         "Colorado Springs skyline panorama",
         "Colorado Springs downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Colorado Springs, Colorado (cropped).jpg",
+          "note": "Colorado Springs, CO — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36779692322)."
+        }
       ]
     },
     {
@@ -1954,6 +1984,12 @@
       "queries": [
         "Dayton, Ohio skyline panorama",
         "Dayton, Ohio downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Dayton Skyline - Sunset September 2022 (cropped).jpg",
+          "note": "Dayton, OH — Blervis, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
       ]
     },
     {
@@ -1974,6 +2010,12 @@
       "queries": [
         "Worcester, Massachusetts skyline panorama",
         "Worcester, Massachusetts downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Worcester, Massachusetts.jpg",
+          "note": "Worcester, MA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36781435010)."
+        }
       ]
     },
     {
@@ -1994,6 +2036,12 @@
       "queries": [
         "Little Rock skyline panorama",
         "Little Rock downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Little Rock, Arkansas skyline.jpg",
+          "note": "Little Rock, AR — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
       ]
     },
     {
@@ -2014,6 +2062,12 @@
       "queries": [
         "Syracuse, New York skyline panorama",
         "Syracuse, New York downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Syracuse, New York skyline (cropped).jpg",
+          "note": "Syracuse, NY — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
       ]
     },
     {
@@ -2034,6 +2088,12 @@
       "queries": [
         "Chattanooga skyline panorama",
         "Chattanooga downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Chattanooga Skyline.JPG",
+          "note": "Chattanooga, TN — James Pressley, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
       ]
     },
     {
@@ -2054,6 +2114,12 @@
       "queries": [
         "Spokane skyline panorama",
         "Spokane downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Spokane, Washington skyline (cropped).jpg",
+          "note": "Spokane, WA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
       ]
     },
     {
@@ -2074,6 +2140,12 @@
       "queries": [
         "Sarasota skyline panorama",
         "Sarasota downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Ringling Causeway from Bird Key.jpg",
+          "note": "Sarasota, FL — The Grid, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
       ]
     },
     {
@@ -2082,17 +2154,25 @@
       "area": "Cape Coral-Fort Myers, FL",
       "wikipedia": [
         "Fort Myers, Florida",
-        "Downtown Fort Myers"
+        "Downtown Fort Myers",
+        "Cape Coral, Florida",
+        "Caloosahatchee River"
       ],
       "categories": [
         "Skylines of Fort Myers",
         "Fort Myers skyline",
         "Views of Fort Myers",
         "Panoramics of Fort Myers",
-        "Aerial photographs of Fort Myers"
+        "Aerial photographs of Fort Myers",
+        "Downtown Fort Myers",
+        "Cape Coral, Florida",
+        "Views of Cape Coral",
+        "Caloosahatchee River"
       ],
       "queries": [
-        "Fort Myers skyline panorama",
+        "Fort Myers skyline",
+        "Fort Myers riverfront Caloosahatchee",
+        "Cape Coral Florida aerial",
         "Fort Myers downtown cityscape"
       ]
     },
@@ -2114,6 +2194,12 @@
       "queries": [
         "Wichita skyline panorama",
         "Wichita downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Wichita, Kansas skyline.jpg",
+          "note": "Wichita, KS — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
       ]
     },
     {
@@ -2134,6 +2220,12 @@
       "queries": [
         "Toledo, Ohio skyline panorama",
         "Toledo, Ohio downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Anthony Wayne Bridge, Toledo, OH from Middlegrounds Metropark Full Span.jpg",
+          "note": "Toledo, OH — Limpfster94, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
       ]
     },
     {
@@ -2154,6 +2246,12 @@
       "queries": [
         "Lexington, Kentucky skyline panorama",
         "Lexington, Kentucky downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Rupp Arena view from Triangle Park.jpg",
+          "note": "Lexington, KY — Ezugger, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
       ]
     },
     {
@@ -2174,6 +2272,12 @@
       "queries": [
         "Reno, Nevada skyline panorama",
         "Reno, Nevada downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Reno 2.jpg",
+          "note": "Reno, NV — Downtowngal, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
       ]
     }
   ]

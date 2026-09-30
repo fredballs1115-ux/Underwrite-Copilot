@@ -537,6 +537,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     size: [2512, 1844],
   },  // ── Metro areas the site reads no figures for (#472) ──────────────────────
+  // Albany, NY: skyline-sheet run 36779692322 — the plaza the city is known by; the one clear frame of seven.
+  "cbsa:10580": {
+    file: "EmpireStatePlazaPanorama.jpg",
+    place: "The Empire State Plaza's towers, Albany",
+    credit: "UpstateNYer",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Albany, NY",
+    size: [6386, 3130],
+  },
   // Keyed by the metro area's Census code (`areaSkylineId`), each reached
   // through a deal's county (lib/market-picture) — a card and the deal page,
   // never a /market band. Chosen by eye from skyline-sheet runs on
@@ -602,6 +612,46 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Charleston, SC",
     size: [11446, 2950],
   },
+  // Chattanooga, TN: skyline-sheet run 36780772501 — the clearest skyline of five; the article's lead is a mural.
+  "cbsa:16860": {
+    file: "Chattanooga Skyline.JPG",
+    place: "Downtown Chattanooga's towers under a clear sky",
+    credit: "James Pressley",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Chattanooga, TN",
+    size: [4288, 1473],
+  },
+  // Colorado Springs, CO: skyline-sheet run 36779692322 — the article's lead, taken March 2026; the Pikes Peak frame was haze and one search result was Los Angeles.
+  "cbsa:17820": {
+    file: "Colorado Springs, Colorado (cropped).jpg",
+    place: "Downtown Colorado Springs from above, the mountains at its edge",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Colorado Springs, CO",
+    size: [6479, 4322],
+  },
+  // Columbia, SC: skyline-sheet run 36779692322 — the article's lead, over a night frame that goes dark under the card's shade.
+  "cbsa:17900": {
+    file: "Fall skyline of Columbia SC from Arsenal Hill.jpg",
+    place: "Downtown Columbia's skyline in autumn, from Arsenal Hill",
+    credit: "Akhenaton06",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Columbia, SC",
+    size: [1844, 892],
+  },
+  // Dayton, OH: skyline-sheet run 36780772501 — the article's lead; the rest were aerials from a plane and a stadium.
+  "cbsa:19430": {
+    file: "Dayton Skyline - Sunset September 2022 (cropped).jpg",
+    place: "Downtown Dayton's skyline at sunset",
+    credit: "Blervis",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Dayton, OH",
+    size: [3890, 2334],
+  },
   // Des Moines, IA: skyline-sheet run 36751130861 — whole in every crop, where the article's lead lost 801 Grand's crown.
   "cbsa:19780": {
     file: "Skyline downtown Des Moines.jpg",
@@ -611,6 +661,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
     name: "Des Moines, IA",
     size: [2450, 1544],
+  },
+  // El Paso, TX: skyline-sheet run 36779692322 — the article's lead, over a flatter midday aerial.
+  "cbsa:21340": {
+    file: "El Paso Cityscape (cropped).jpg",
+    place: "Downtown El Paso, the mountains behind it",
+    credit: "WmCheez",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "El Paso, TX",
+    size: [3159, 1751],
   },
   // Grand Rapids, MI: skyline-sheet run 36750858237 — blue hour with the lit bridge, sharp and whole.
   "cbsa:24340": {
@@ -652,6 +712,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Knoxville, TN",
     size: [5374, 3583],
   },
+  // Lexington, KY: skyline-sheet run 36780959488 — the landmark the city is known by, sharp at dusk; the downtown aerial was 1544px and dated.
+  "cbsa:30460": {
+    file: "Rupp Arena view from Triangle Park.jpg",
+    place: "Rupp Arena at dusk, from Triangle Park",
+    credit: "Ezugger",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Lexington, KY",
+    size: [6088, 4059],
+  },
+  // Little Rock, AR: skyline-sheet run 36780772501 — the article's lead; one search result was Buffalo.
+  "cbsa:30780": {
+    file: "Little Rock, Arkansas skyline.jpg",
+    place: "Downtown Little Rock from above, the river beyond",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Little Rock, AR",
+    size: [7102, 4735],
+  },
   // Louisville, KY: skyline-sheet run 36750289515 — whole in every crop; the night lead is 1415px wide.
   "cbsa:31140": {
     file: "Panorama de Louisville.jpg",
@@ -692,6 +772,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "New Orleans, LA",
     size: [2762, 2092],
   },
+  // Sarasota, FL: skyline-sheet run 36780959488 — it says Sarasota where the skyline frame was mostly water; one search result was 1963 Pittsburgh.
+  "cbsa:35840": {
+    file: "Ringling Causeway from Bird Key.jpg",
+    place: "The Ringling Causeway from Bird Key, under palms",
+    credit: "The Grid",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Sarasota, FL",
+    size: [4032, 3024],
+  },
   // Oklahoma City, OK: skyline-sheet run 36751888862 — the sharpest frame; the Devon Tower is whole on the card (a strip-safe alternative carries a burned-in watermark).
   "cbsa:36420": {
     file: "Oklahoma City skyline from drone.jpg",
@@ -722,6 +812,56 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Providence, RI",
     size: [4003, 2714],
   },
+  // Reno, NV: skyline-sheet run 36780959488 — the one clear frame; the rest were a freeway and airplane windows.
+  "cbsa:39900": {
+    file: "Downtown Reno 2.jpg",
+    place: "Downtown Reno's towers under a clear sky",
+    credit: "Downtowngal",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Reno, NV",
+    size: [4159, 1254],
+  },
+  // Rochester, NY: skyline-sheet run 36781253352 — a one-market run's pick of twenty-four; the six-market sheet held an airport, a dated overhead and a washed-out sky.
+  "cbsa:40380": {
+    file: "Skyline Rochester, NY.jpg",
+    place: "Downtown Rochester's towers behind an arched river bridge",
+    credit: "Evilarry at English Wikipedia",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Rochester, NY",
+    size: [3601, 1760],
+  },
+  // Spokane, WA: skyline-sheet run 36780772501 — the article's lead.
+  "cbsa:44060": {
+    file: "Spokane, Washington skyline (cropped).jpg",
+    place: "Downtown Spokane and its river gorge from above",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Spokane, WA",
+    size: [6933, 3813],
+  },
+  // Syracuse, NY: skyline-sheet run 36780772501 — the article's lead; the rest were highways and a haze.
+  "cbsa:45060": {
+    file: "Syracuse, New York skyline (cropped).jpg",
+    place: "Downtown Syracuse from above",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Syracuse, NY",
+    size: [10019, 5567],
+  },
+  // Toledo, OH: skyline-sheet run 36780959488 — sharp and vivid; the evening skyline is 354px tall and would be soft on every card.
+  "cbsa:45780": {
+    file: "Anthony Wayne Bridge, Toledo, OH from Middlegrounds Metropark Full Span.jpg",
+    place: "The Anthony Wayne Bridge from Middlegrounds Metropark",
+    credit: "Limpfster94",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Toledo, OH",
+    size: [5184, 3456],
+  },
   // Tucson, AZ: skyline-sheet run 36750496544 — the article's lead image, whole in every crop.
   "cbsa:46060": {
     file: "View of Tucson from Sentinel Peak 2.jpg",
@@ -751,6 +891,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Honolulu, HI",
     size: [6000, 4000],
+  },
+  // Wichita, KS: skyline-sheet run 36780959488 — the article's lead.
+  "cbsa:48620": {
+    file: "Wichita, Kansas skyline.jpg",
+    place: "Downtown Wichita and the river in evening light",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Wichita, KS",
+    size: [4654, 2792],
+  },
+  // Worcester, MA: skyline-sheet run 36781435010 — a one-market run's pick of fifteen; the six-market sheet held storefronts and an overcast panorama.
+  "cbsa:49340": {
+    file: "Worcester, Massachusetts.jpg",
+    place: "Downtown Worcester's towers from above",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Worcester, MA",
+    size: [7154, 3974],
   },
 };
 
