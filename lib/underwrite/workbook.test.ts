@@ -876,6 +876,29 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The value-add program")).toThrow();
   });
 
+  it("a tax abatement (#461): the abatement, then where it ends against the model's sale and the step-up at its exit cap", async () => {
+    const abated = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        metrics: [
+          ...extraction.metrics,
+          { label: "Tax abatement", value: "10-year Philadelphia tax abatement", flagged: false, page: "p. 9" },
+          { label: "Tax abatement expiration", value: "2099", flagged: false, page: "p. 9" },
+          { label: "Abated real estate taxes", value: "$70,000", flagged: false, page: "p. 9" },
+          { label: "Unabated real estate taxes", value: "$520,000", flagged: false, page: "p. 9" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(abated));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The tax abatement");
+    expect(String(cover.getCell(r, 3).value)).toMatch(/^Tax abatement: 10-year Philadelphia tax abatement; ends 2099, [\d.]+ years from today; \$450,000 a year more once it ends/);
+    expect(String(cover.getCell(r + 1, 3).value)).toContain("after its sale, so the next buyer takes the step-up and prices it");
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The tax abatement")).toThrow();
+  });
+
   it("an auction (#456): how it is sold, then the ceiling bid at the screening hurdle", async () => {
     const auction = deriveUnderwriteInputs(
       {

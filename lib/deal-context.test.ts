@@ -203,3 +203,22 @@ describe("dealContextFor — a value-add renovation program (#460)", () => {
     expect(ctx).toContain("No premium achieved on renovated units is stated");
   });
 });
+
+describe("dealContextFor — a property-tax abatement (#461)", () => {
+  it("says the abatement, when it ends and the step-up against the NOI", () => {
+    const abated: ExtractionResult = {
+      dealName: "The Fairmount",
+      assetClass: "multifamily",
+      metrics: [
+        m("NOI (in-place)", "$3,000,000"),
+        m("Tax abatement", "10-year Philadelphia tax abatement"),
+        m("Tax abatement expiration", "2099"),
+        m("Abated real estate taxes", "$70,000"),
+        m("Unabated real estate taxes", "$520,000"),
+      ],
+    };
+    const ctx = dealContextFor(abated)!;
+    expect(ctx).toContain("The tax abatement: The property's taxes are abated under its 10-year Philadelphia tax abatement until 2099");
+    expect(ctx).toContain("$450,000 a year more once it ends, 15% of the in-place NOI");
+  });
+});

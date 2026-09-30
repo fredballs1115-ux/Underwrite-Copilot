@@ -161,6 +161,23 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     ]);
   });
 
+  it("a tax abatement's program, its end and the full bill lead after the price (#461)", () => {
+    const abated = [
+      { label: "Occupancy", value: "94%", flagged: false },
+      { label: "Unabated real estate taxes", value: "$520,000", flagged: false },
+      { label: "Abated real estate taxes", value: "$70,000", flagged: false },
+      { label: "Tax abatement expiration", value: "2031", flagged: false },
+      { label: "Tax abatement", value: "10-year Philadelphia tax abatement", flagged: false },
+      { label: "Asking price", value: "$55,000,000", flagged: false },
+    ];
+    expect(keyTermRows(abated, "stabilized", 4).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Tax abatement",
+      "Tax abatement expiration",
+      "Unabated real estate taxes",
+    ]);
+  });
+
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
     const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
     expect(rows).toHaveLength(3);

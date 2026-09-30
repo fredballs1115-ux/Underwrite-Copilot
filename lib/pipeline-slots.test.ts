@@ -37,7 +37,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null });
+    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -108,6 +108,18 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(ex(rows.slice(0, 1), { strategy }), null).valueAdd).toBeNull();
   });
 
+  it("says a tax abatement's years left and its step-up (#461), and nothing where none is stated", () => {
+    const rows = [
+      m("Asking price", "$55,000,000"),
+      m("Tax abatement", "10-year Philadelphia tax abatement"),
+      m("Tax abatement expiration", "2099"),
+      m("Abated real estate taxes", "$70,000"),
+      m("Unabated real estate taxes", "$520,000"),
+    ];
+    expect(pickSlots(ex(rows), null).abatement).toMatch(/^Tax abated, \d+ yrs left, \+\$450k\/yr$/);
+    expect(pickSlots(ex(rows.slice(0, 1)), null).abatement).toBeNull();
+  });
+
   it("says what the price buys where it is not the building outright (#415)", () => {
     const base = [m("Asking price", "$20,000,000"), m("Going-in cap rate", "5.50%")];
     const with_ = (interest: NonNullable<ExtractionResult["interest"]>) =>
@@ -153,7 +165,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null });
+    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

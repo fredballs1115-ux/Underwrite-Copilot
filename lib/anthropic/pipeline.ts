@@ -43,6 +43,7 @@ import { hotelNote, readHotelDeal } from "@/lib/hotel-deal";
 import { readSale, saleNote } from "@/lib/sale-terms";
 import { readRoster, rosterNote } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddNote } from "@/lib/value-add";
+import { readTaxAbatement, taxAbatementNote } from "@/lib/tax-abatement";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -873,6 +874,11 @@ async function runAnalysisSteps(
         // pace, the cost and the clock — the value-add traps by name.
         const valueAdd = readValueAdd(ex);
         if (valueAdd) notes.push(valueAddNote(valueAdd));
+
+        // A property-tax abatement (#461): the NOI on an abated bill, the
+        // burn-off, the transfer, the conditions and the assessment.
+        const abatement = readTaxAbatement(ex);
+        if (abatement) notes.push(taxAbatementNote(abatement));
 
         // What a hotel is sold with (#455): the flag, the manager, the
         // encumbrance and the PIP, then the contract traps by name.

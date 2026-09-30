@@ -56,6 +56,7 @@ import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
 import { readSale, saleShortLine } from "@/lib/sale-terms";
 import { readRoster, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddShortLine } from "@/lib/value-add";
+import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -772,6 +773,11 @@ export interface ReportInput {
    *  `meta.valueAdd`, #460) — printed over the grids; absent where the
    *  caller built no model, and then the line prints alone */
   valueAdd?: { line: string; read: string } | null;
+  /** a property-tax abatement, and where it ends against the model's sale
+   *  (lib/tax-abatement via the derived model's `meta.taxAbatement`, #461)
+   *  — printed over the grids; absent where the caller built no model, and
+   *  then the line prints alone */
+  taxAbatement?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
@@ -801,6 +807,7 @@ export function buildReportData(
   roster?: { line: string; read: string } | null,
   photos?: MemoCover[] | null,
   valueAdd?: { line: string; read: string } | null,
+  taxAbatement?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -815,6 +822,7 @@ export function buildReportData(
     roster: roster ?? null,
     photos: photos ?? null,
     valueAdd: valueAdd ?? null,
+    taxAbatement: taxAbatement ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1108,6 +1116,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // A value-add renovation program (#460), the same way.
   const valueAddRead = readValueAdd(extraction);
   const valueAdd = input.valueAdd ?? (valueAddRead ? { line: valueAddShortLine(valueAddRead), read: "" } : null);
+  // A property-tax abatement (#461), the same way.
+  const abatementRead = readTaxAbatement(extraction);
+  const taxAbatement = input.taxAbatement ?? (abatementRead ? { line: taxAbatementShortLine(abatementRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1309,6 +1320,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <SingleTenantCaveat lease={sale} />}
           {!sensitivity && <SingleTenantCaveat lease={roster} />}
           {!sensitivity && <SingleTenantCaveat lease={valueAdd} />}
+          {!sensitivity && <SingleTenantCaveat lease={taxAbatement} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <LeaseholdBlock view={input.leasehold} />}
@@ -1348,6 +1360,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <SingleTenantCaveat lease={sale} />
           <SingleTenantCaveat lease={roster} />
           <SingleTenantCaveat lease={valueAdd} />
+          <SingleTenantCaveat lease={taxAbatement} />
 
           <HeatGrid
             axisLabel="EXIT CAP"

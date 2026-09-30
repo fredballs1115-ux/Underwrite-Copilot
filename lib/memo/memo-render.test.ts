@@ -323,6 +323,37 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).valueAddLine).toBe("");
   }, 30000);
 
+  it("says a tax abatement under the title (#461), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Tax abatement", value: "10-year Philadelphia tax abatement", flagged: false, page: "", basis: "na" },
+        { label: "Tax abatement expiration", value: "2099", flagged: false, page: "", basis: "na" },
+        { label: "Abated real estate taxes", value: "$70,000", flagged: false, page: "", basis: "na" },
+        { label: "Unabated real estate taxes", value: "$520,000", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.taxAbatementLine).toMatch(/^Tax abatement: 10-year Philadelphia tax abatement; ends 2099, [\d.]+ years from today; \$450,000 a year more once it ends/);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Tax abatement: 10-year Philadelphia tax abatement; ends 2099");
+    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).taxAbatementLine).toBe("");
+  }, 30000);
+
   it("says how the property is sold under the title (#456), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

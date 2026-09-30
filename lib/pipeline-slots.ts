@@ -16,6 +16,7 @@ import { hotelTag } from "@/lib/hotel-deal";
 import { saleTag } from "@/lib/sale-terms";
 import { rosterTag } from "@/lib/tenant-roster";
 import { valueAddTag } from "@/lib/value-add";
+import { taxAbatementTag } from "@/lib/tax-abatement";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -57,6 +58,10 @@ export interface PipelineSlots {
    *  (lib/value-add `valueAddTag`, #460); absent or null where the
    *  memorandum states no premium */
   valueAdd?: string | null;
+  /** a property-tax abatement — "Tax abated, 4 yrs left, +$450k/yr",
+   *  "Abatement ended" (lib/tax-abatement `taxAbatementTag`, #461); absent
+   *  or null where the memorandum states none */
+  abatement?: string | null;
 }
 
 /**
@@ -123,5 +128,8 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     roster: rosterTag(extraction),
     // A renovation program's premium and its return on cost (#460).
     valueAdd: valueAddTag(extraction),
+    // The NOI is on an abated tax bill that ends (#461): how long it has,
+    // and what the owner pays more once it does.
+    abatement: taxAbatementTag(extraction),
   };
 }

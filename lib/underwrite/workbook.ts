@@ -368,6 +368,21 @@ function buildCover(
       r++;
     }
   }
+  // A property-tax abatement (#461): the abatement, then where it ends
+  // against this model's sale and the step-up at its exit cap.
+  if (meta.taxAbatement) {
+    fact("The tax abatement", meta.taxAbatement.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.taxAbatement.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.taxAbatement.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 64;
+      r++;
+    }
+  }
   // How the property is sold (#456): an auction's bid, premium, reserve
   // and deadline, then the most this model pays all-in at the screening
   // hurdle, backed out of the premium.

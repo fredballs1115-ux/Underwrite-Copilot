@@ -24,6 +24,7 @@ import { readSale, saleShortLine } from "@/lib/sale-terms";
 import { saleCeilingRead } from "@/lib/sale-ceiling";
 import { readRoster, rosterModelLine, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddModelLine, valueAddShortLine } from "@/lib/value-add";
+import { readTaxAbatement, taxAbatementModelLine, taxAbatementShortLine } from "@/lib/tax-abatement";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -134,6 +135,10 @@ export interface WorkbookMeta {
    *  one line, then what a door is worth at this model's exit cap and the
    *  premium the model does not carry; absent where none is stated */
   valueAdd?: { line: string; read: string } | null;
+  /** a property-tax abatement (lib/tax-abatement, #461): the abatement in
+   *  one line, then where it ends against this model's sale and the
+   *  step-up at its exit cap; absent where none is stated */
+  taxAbatement?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -291,6 +296,22 @@ function valueAddMeta(extraction: ExtractionResult | null, inputs: UnderwriteInp
       exitCapPct: inputs.exitCapPct,
       capitalYr1: inputs.capitalImprovementsYr1,
       rentGrowthPct: inputs.rentGrowthPct,
+    }),
+  };
+}
+
+/** The cover's lines about a property-tax abatement (#461): the
+ *  abatement, then where it ends against this model's sale and what the
+ *  step-up is worth at its exit cap. Null where the memorandum states none. */
+function taxAbatementMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["taxAbatement"] {
+  const r = readTaxAbatement(extraction);
+  if (!r) return null;
+  return {
+    line: taxAbatementShortLine(r),
+    read: taxAbatementModelLine(r, {
+      holdMonths: inputs.holdMonths,
+      exitCapPct: inputs.exitCapPct,
+      expenseGrowthPct: inputs.expenseGrowthPct,
     }),
   };
 }
@@ -774,6 +795,7 @@ export function deriveUnderwriteInputs(
       singleTenant: singleTenantMeta(extraction, inputs),
       roster: rosterMeta(extraction, inputs),
       valueAdd: valueAddMeta(extraction, inputs),
+      taxAbatement: taxAbatementMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

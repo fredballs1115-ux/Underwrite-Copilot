@@ -86,7 +86,7 @@ const CARDS: DealCard[] = [
   card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.2%" }, market: "Frisco, TX", coveredMarket: null, readMarket: "Dallas–Fort Worth", readCounty: "Collin County, TX" }),
   // A deal in a metro area the site reads without a brief: named as read, not briefed.
   // …and it carries the seller's loan, offered for assumption (#419).
-  card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null, debt: "Assumable 3.45%" }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
+  card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null, debt: "Assumable 3.45%", abatement: "Tax abated, 4 yrs left, +$450k/yr" }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
   card({ id: "d", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", stage: "dead", fit: "outside", score: 18, mandateVerdict: "PASS", slots: { cap: "8.1%", price: "$60,000,000", yoc: null }, market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
   // …sold at auction, the figure the opening bid (#456), beside an anchor
   // that is not in the sale and a roll before the model's (#457).
@@ -251,6 +251,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // the memorandum's own return on cost.
     expect((text.match(/Reno \$250\/mo, 20% on cost/g) ?? []).length).toBe(4);
     expect(html).toContain("Reno $250/mo, 20% on cost: the renovation program as stated");
+    // A tax abatement, at every width too (#461): the years left and the
+    // step-up when it ends.
+    expect((text.match(/Tax abated, 4 yrs left, \+\$450k\/yr/g) ?? []).length).toBe(4);
+    expect(html).toContain("Tax abated, 4 yrs left, +$450k/yr: the NOI is on an abated tax bill");
   });
 
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
@@ -371,6 +375,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((text.match(/Auction, 5% premium/g) ?? []).length).toBe(1);
     expect((text.match(/Shadow-anchored, 56% rolls in 5 yrs/g) ?? []).length).toBe(1);
     expect((text.match(/Reno \$250\/mo, 20% on cost/g) ?? []).length).toBe(1);
+    expect((text.match(/Tax abated, 4 yrs left, \+\$450k\/yr/g) ?? []).length).toBe(1);
     // The three figures a pipeline is read by; a plan deal's yield on cost
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
@@ -5570,5 +5575,104 @@ describe("ShareView — a value-add renovation program, under the title (#460)",
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("value-add-panel");
+  });
+});
+
+// ── A property-tax abatement (#461) ───────────────────────────────────────
+import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
+import { readTaxAbatement, taxAbatementModelLine } from "@/lib/tax-abatement";
+
+describe("TaxAbatementPanel — the clock against the sale, the bill, and the NOI's share that goes to taxes", () => {
+  const AS_OF = new Date(Date.UTC(2026, 8, 30));
+  const row = (label: string, value: string, page = "p. 9") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const abated = (metrics?: ReturnType<typeof row>[], assetClass = "multifamily") =>
+    ({
+      dealName: "The Fairmount",
+      assetClass,
+      totalPages: 40,
+      metrics: metrics ?? [
+        row("NOI (in-place)", "$3,000,000", "p. 12"),
+        row("Going-in cap rate", "5.50%", "p. 3"),
+        row("Tax abatement", "10-year Philadelphia tax abatement"),
+        row("Tax abatement expiration", "2029"),
+        row("Abated real estate taxes", "$70,000"),
+        row("Unabated real estate taxes", "$520,000"),
+      ],
+    }) as unknown as ExtractionResult;
+
+  it("draws the years abated against the model's sale, the bill today against the full one, and the step-up's share of the NOI", () => {
+    const r = readTaxAbatement(abated(), AS_OF)!;
+    const modelLine = taxAbatementModelLine(r, { holdMonths: 60, exitCapPct: 0.055, expenseGrowthPct: 0.03 });
+    const html = render(React.createElement(TaxAbatementPanel, { abatement: r, holdYears: 5, modelLine }));
+    dumpView("tax-abatement-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="tax-abatement-panel"');
+    expect(text).toContain("Tax abatement");
+    expect(text).toContain("2.3 years left");
+    expect(text).toContain("Ends inside the model's hold");
+    // The clock: the abated years, the full bill after, the sale a line.
+    expect(html.match(/data-bar="abate-left"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="abate-after"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="abate-sale"/g)).toHaveLength(1);
+    expect(text).toContain("Ends 2029");
+    expect(text).toContain("The model's sale, year 5");
+    // The bill: today's against the full one, on one scale.
+    expect(html.match(/data-bar="abate-now"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="abate-full"/g)).toHaveLength(1);
+    expect(text).toContain("$70,000");
+    expect(text).toContain("$520,000");
+    // The NOI: the step-up's share marked.
+    expect(html.match(/data-bar="abate-noi"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="abate-step"/g)).toHaveLength(1);
+    expect(text).toContain("15% goes to taxes when it ends: $450,000 a year");
+    expect(text).toContain("its exit is struck on a NOI the building no longer earns");
+    expect(a11yIssues(html), "tax abatement panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("no end is named as none, no model means no sale line, and nothing without an abatement", () => {
+    const r = readTaxAbatement(abated([row("Tax abatement", "PILOT"), row("Annual tax abatement savings", "$450,000")]), AS_OF)!;
+    const html = render(React.createElement(TaxAbatementPanel, { abatement: r }));
+    const text = visibleText(html);
+    expect(text).toContain("No end stated");
+    expect(html).not.toContain('data-bar="abate-left"');
+    expect(html).not.toContain('data-bar="abate-sale"');
+    expect(html).not.toContain('data-bar="abate-now"');
+    expect(render(React.createElement(TaxAbatementPanel, { abatement: readTaxAbatement(abated([row("NOI (in-place)", "$3,000,000")]), AS_OF) }))).toBe(
+      render(React.createElement(React.Fragment)),
+    );
+  });
+});
+
+describe("ShareView — a property-tax abatement, under the title (#461)", () => {
+  it("draws the abatement and leads the key terms with it, and nothing on the sample", () => {
+    const withAbatement = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Tax abatement", value: "10-year Philadelphia tax abatement", flagged: false, page: "", basis: "na" as const },
+        { label: "Tax abatement expiration", value: "2099", flagged: false, page: "", basis: "na" as const },
+        { label: "Unabated real estate taxes", value: "$520,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Abated real estate taxes", value: "$70,000", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: withAbatement }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="tax-abatement-panel"');
+    expect(text).toContain("The property's taxes are abated under its 10-year Philadelphia tax abatement until 2099");
+    expect(text).toContain("Tax abatement expiration");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("tax-abatement-panel");
   });
 });

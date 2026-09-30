@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
@@ -466,6 +466,38 @@ describe("deriveUnderwriteInputs — a multi-tenant property's listed tenants (#
   it("nothing on housing, or where the memorandum lists fewer than two tenants", () => {
     expect(deriveUnderwriteInputs(ex(base, { assetClass: "multifamily", tenants }), "fallback").meta.roster).toBeNull();
     expect(deriveUnderwriteInputs(ex(base, { assetClass: "retail", tenants: tenants.slice(0, 1) }), "fallback").meta.roster).toBeNull();
+  });
+});
+
+describe("deriveUnderwriteInputs — a property-tax abatement (#461)", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("says where the abatement ends against the model's sale, and the step-up at its exit cap", () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
+    const m = deriveUnderwriteInputs(
+      ex([
+        metric("Asking price", "$55,000,000"),
+        metric("NOI (in-place)", "$3,000,000"),
+        metric("Units", "248"),
+        metric("Tax abatement", "10-year Philadelphia tax abatement"),
+        metric("Tax abatement expiration", "2029"),
+        metric("Abated real estate taxes", "$70,000"),
+        metric("Unabated real estate taxes", "$520,000"),
+      ]),
+      "fallback",
+    );
+    expect(m.meta.taxAbatement?.line).toBe(
+      "Tax abatement: 10-year Philadelphia tax abatement; ends 2029, 2.3 years from today; $450,000 a year more once it ends (15% of the in-place NOI)",
+    );
+    expect(m.meta.taxAbatement?.read).toContain("the abatement ends 2029, 2.3 years into its 5-year hold, so its exit is struck on a NOI the building no longer earns — the step-up is");
+    // The model is untouched: the abatement is read, never modelled.
+    expect(m.inputs.capitalImprovementsYr1).toBe(0);
+  });
+
+  it("nothing where the memorandum states none", () => {
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$55,000,000"), metric("NOI (in-place)", "$3,000,000")]), "fallback").meta.taxAbatement).toBeNull();
   });
 });
 
