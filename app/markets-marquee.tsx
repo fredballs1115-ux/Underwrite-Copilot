@@ -3,6 +3,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { datedLong } from "@/lib/debt-index";
 import { fmrLabel, fmrOf, fmrToday, fmrWhen } from "@/lib/fmr";
 import { MARKET_COUNT } from "@/lib/market-count";
+import { PausableTicker } from "./pausable-ticker";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle. Shared by the homepage, /why, and /demo
@@ -133,15 +134,17 @@ export function MarketsMarquee() {
       ))}
     </div>
   );
+  // The band never stops on its own, so it carries a pause button
+  // (app/pausable-ticker); the heading keeps clear of it at the right.
   return (
-    <div className="overflow-hidden border-y border-line bg-faint/70 py-3">
-      <p className="mb-1.5 text-center text-[11px] font-medium uppercase tracking-wider text-muted">
+    <PausableTicker what="markets band" className="overflow-hidden border-y border-line bg-faint/70 py-3">
+      <p className="mb-1.5 px-10 text-center text-[11px] font-medium uppercase tracking-wider text-muted">
         {`The ${MARKET_COUNT} covered markets — dated research${shared ? `, ${researchAsOf(shared)}` : ""}`}
       </p>
       <div className="ticker-track-reverse flex w-max">
         {row(false)}
         {row(true)}
       </div>
-    </div>
+    </PausableTicker>
   );
 }
