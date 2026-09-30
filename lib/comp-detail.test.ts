@@ -61,6 +61,20 @@ describe("subjectBasis — the deal's own basis from the shared readers", () => 
   it("gives nothing when the OM states no price", () => {
     expect(subjectBasis([{ label: "Units", value: "248" }], "stabilized")).toEqual({ perUnit: null, perSf: null });
   });
+
+  it("gives an outdoor-storage yard no per-SF basis: it trades by the acre, not by its shop building", () => {
+    const yard = [
+      { label: "Asking price", value: "$12,000,000" },
+      { label: "Building SF", value: "4,000" },
+      { label: "Usable acres", value: "8.5" },
+    ];
+    // $12M over a 4,000 SF shop read $3,000/SF, and the comps drew it as a tick.
+    expect(subjectBasis(yard, "stabilized", undefined, "Industrial Outdoor Storage (IOS)")).toEqual({ perUnit: null, perSf: null });
+    expect(subjectBasis(yard, "stabilized", undefined, "Truck terminal").perSf).toBeNull();
+    // A warehouse on the same figures is priced by its feet, as before.
+    expect(subjectBasis(yard, "stabilized", undefined, "Industrial").perSf).toBe(3_000);
+    expect(subjectBasis(yard, "stabilized").perSf).toBe(3_000);
+  });
 });
 
 describe("basisScale — every comp and the subject on one track", () => {

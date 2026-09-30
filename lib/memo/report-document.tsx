@@ -1227,6 +1227,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
       inferStrategy(extraction, firstSignalOf(deal)).kind,
       interestOf(extraction),
+      extraction?.assetClass,
     ),
     planNoun.one,
   );

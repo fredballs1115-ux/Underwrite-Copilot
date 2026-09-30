@@ -873,6 +873,7 @@ export function DealView({
               results.extraction?.metrics ?? [],
               inferStrategy(results.extraction, firstSignal).kind,
               interestOf(results.extraction),
+              results.extraction?.assetClass,
             )}
           />
         )}

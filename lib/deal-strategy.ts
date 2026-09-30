@@ -434,6 +434,25 @@ export function statedBasisIsBuildings(extraction: ExtractionResult | null | und
   return kind !== "note" && kind !== "leased_fee" && kind !== "partial_interest";
 }
 
+// An outdoor-storage yard's words: industrial outdoor storage, a truck
+// terminal or yard, a storage yard.
+const YARD_WORDS = /\b(industrial outdoor storage|outdoor storage|ios|truck (terminal|yard)|storage yard)\b/i;
+const SELF_STORAGE_WORDS = /\b(self[- ]?storage|mini[- ]?storage)\b/i;
+
+/**
+ * Whether the deal's class, in the deck's own words, is an outdoor-storage
+ * yard. A yard trades by the usable acre, and its price over the small shop
+ * building on it is no basis — so the plausibility check holds it to no
+ * per-SF band, and no surface prints, ticks or pools a per-SF figure for it
+ * (the pipeline card's basis, the comps' subject tick, the market memory,
+ * the internal comps). A self-storage facility that also lets outdoor
+ * storage is priced by its buildings' feet, and is not one.
+ */
+export function isOutdoorStorageYard(assetClass: string | null | undefined): boolean {
+  const words = assetClass ?? "";
+  return YARD_WORDS.test(words) && !SELF_STORAGE_WORDS.test(words);
+}
+
 /** The price row a figure is wanted from — the LOI's prefill: among the
  *  price rows the first whose value IS a figure ("Asking price: call for
  *  pricing" above "Purchase price: $42,000,000" gives the $42M), else the
@@ -879,9 +898,7 @@ export function assessPlausibility(
   // pass of 2026-09-30): the data center is held to the band's floor only,
   // the yard to no per-SF band at all.
   const perSfCeiling = assetClassKey(cls) === "data_center" ? Number.POSITIVE_INFINITY : 3_000;
-  const yard = /\b(industrial outdoor storage|outdoor storage|ios|truck (terminal|yard)|storage yard)\b/i.test(
-    extraction.assetClass ?? "",
-  );
+  const yard = isOutdoorStorageYard(extraction.assetClass);
   if (!landOnly && basisTotal != null && cls && words.basis === "unit" && units != null && units >= 1 && units <= 50_000) {
     const perUnit = basisTotal / units;
     if (perUnit < 15_000 || perUnit > 2_500_000) {

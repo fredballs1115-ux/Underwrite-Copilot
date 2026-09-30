@@ -122,14 +122,16 @@ const compactUsd = (n: number) =>
  * building's price (a share's grossed up, none for a note or the land)
  * over the count in the memorandum's own noun, or over the building's
  * area where the class is priced by the foot. None on a conversion or a
- * development, whose basis is the all-in cost, not the shell's price. The
+ * development, whose basis is the all-in cost, not the shell's price, and
+ * none by the foot on an outdoor-storage yard, which trades by the acre
+ * (the deck's own words, lib/deal-strategy `isOutdoorStorageYard`). The
  * class is the deal's one class (`shownAssetClass`): the analyst's where
  * they filed one, the deck's where they left "Auto".
  */
 export function basisTag(extraction: ExtractionResult, kind: StrategyKind, storedClass?: string | null): string | null {
   const metrics = extraction.metrics ?? [];
   const words = assetWords(shownAssetClass(storedClass, extraction));
-  const b = subjectBasis(metrics, kind, interestOf(extraction));
+  const b = subjectBasis(metrics, kind, interestOf(extraction), extraction.assetClass);
   if (words.basis === "sf") return b.perSf != null ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;
   if (words.basis === "unit" && b.perUnit != null) {
     const noun = countNoun(unitCountRow(metrics)?.label, words.key).replace(/s$/, "");

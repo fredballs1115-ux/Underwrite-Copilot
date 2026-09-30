@@ -21,6 +21,7 @@ import {
   buildingPriceOf,
   findPriceMetric,
   inferStrategy,
+  isOutdoorStorageYard,
   planSummary,
   statedBasisIsBuildings,
   unitCountFromMetrics,
@@ -120,6 +121,10 @@ function deriveBasis(
    *  for the building bought outright (a share, a note, a leased fee), whose
    *  per-unit line is on a basis the row never says */
   statedLine = true,
+  /** the price over the building's feet is a basis — false for an
+   *  outdoor-storage yard, which trades by the usable acre, so a yard's shop
+   *  building never puts a per-SF figure into the memory */
+  perSfBasis = true,
 ): { value: number; basis: "unit" | "sf" } | null {
   // The class says the basis (lib/asset-words): apartments, hotels, parks,
   // student beds and garages trade per unit, key, pad, bed or space — one
@@ -141,7 +146,7 @@ function deriveBasis(
     return null;
   }
   // Priced per SF — never per unit, whatever stray per-unit row the OM has.
-  if (price == null) return null;
+  if (price == null || !perSfBasis) return null;
   // The shared size reader: the building, never the land or a unit.
   const n = buildingSfFromMetrics(metrics);
   if (n != null && n > 0) return { value: price / n, basis: "sf" };
@@ -191,11 +196,14 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     // grossed up to the whole, none for a note or a leased fee.
     const priceMetric = findPriceMetric(metrics, strategy.kind);
     const price = buildingPriceOf(ext, priceMetric ? parsePrice(priceMetric.value) : null);
+    // An outdoor-storage yard trades by the acre: its price over the shop
+    // building on it is never pooled as a market's per-SF basis.
+    const perSfBasis = !isOutdoorStorageYard(extraction?.assetClass) && !isOutdoorStorageYard(row.asset_class);
     const basis = plan
       ? plan.totalCost != null
-        ? deriveBasis(metrics, assetClass, plan.totalCost, true)
+        ? deriveBasis(metrics, assetClass, plan.totalCost, true, true, perSfBasis)
         : null
-      : deriveBasis(metrics, assetClass, price, false, statedBasisIsBuildings(ext));
+      : deriveBasis(metrics, assetClass, price, false, statedBasisIsBuildings(ext), perSfBasis);
 
     // Nothing usable → not a comp (never pad the memory with empty rows).
     if (capPct == null && !basis) continue;

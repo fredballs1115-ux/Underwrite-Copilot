@@ -184,6 +184,34 @@ describe("marketMemoryFor — the deal-page strip", () => {
   });
 });
 
+describe("an outdoor-storage yard's shop building is never a market's per-SF basis", () => {
+  const yard = (id: string, metrics: Array<[string, string]>, assetClass = "industrial") => ({
+    ...deal(id, { assetClass, market: "Dallas, TX", metrics }),
+    extraction: { assetClass: "Industrial Outdoor Storage (IOS)", market: "Dallas, TX", metrics: metrics.map(([label, value]) => ({ label, value })) },
+  });
+
+  it("pools the yard's cap and never its price over the shop building", () => {
+    const comps = buildComps([
+      yard("y1", [["Going-in cap rate", "6.0%"], ["Asking price", "$12,000,000"], ["Building SF", "4,000"]]),
+      deal("w1", { assetClass: "industrial", market: "Dallas, TX", metrics: [["Going-in cap rate", "5.5%"], ["Asking price", "$20,000,000"], ["Total SF", "100,000 SF"]] }),
+    ]);
+    const by = Object.fromEntries(comps.map((c) => [c.dealId, c]));
+    expect(by.y1.capPct).toBe(6);
+    expect(by.y1.perUnit).toBeNull();
+    expect(by.y1.perUnitBasis).toBeNull();
+    // The warehouse's $200/SF is the group's whole basis range; the yard's
+    // $3,000/SF never joins it.
+    expect(by.w1.perUnit).toBe(200);
+    expect(summarizeMarkets(comps)[0].perUnit).toEqual({ min: 200, median: 200, max: 200, basis: "sf" });
+  });
+
+  it("a yard with no cap is no comp at all", () => {
+    expect(buildComps([yard("y2", [["Asking price", "$12,000,000"], ["Building SF", "4,000"]])])).toEqual([]);
+    // Filed under the deck's word too.
+    expect(buildComps([yard("y3", [["Asking price", "$12,000,000"], ["Building SF", "4,000"]], "Truck terminal")])).toEqual([]);
+  });
+});
+
 describe("basis is consistent within an asset class (no mixed unit/SF range)", () => {
   it("non-multifamily always uses $/SF, even with a stray per-unit metric", () => {
     const comps = buildComps([

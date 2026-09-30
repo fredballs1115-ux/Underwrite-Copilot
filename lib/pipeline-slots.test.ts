@@ -278,4 +278,14 @@ describe("the basis at a glance (#469)", () => {
     const plan = { kind: "development", summary: "", capitalBudget: "", timeline: "" };
     expect(pickSlots(ex([m("Land price", "$4,000,000"), m("Units (proposed)", "240")], "multifamily", { strategy: plan }), null).basis).toBeNull();
   });
+
+  it("prints no per-SF basis on an outdoor-storage yard, which trades by the acre", () => {
+    const rows = [m("Asking price", "$12,000,000"), m("Building SF", "4,000"), m("Usable acres", "8.5")];
+    // The card had read $12M over the 4,000 SF shop as "$3,000/SF".
+    expect(pickSlots(ex(rows, "Industrial Outdoor Storage (IOS)"), null).basis).toBeNull();
+    // The analyst filed it as industrial: the deck's words still say yard.
+    expect(pickSlots(ex(rows, "Industrial Outdoor Storage (IOS)"), null, "industrial").basis).toBeNull();
+    // A warehouse on the same figures keeps its basis.
+    expect(pickSlots(ex(rows, "industrial"), null).basis).toBe("$3,000/SF");
+  });
 });

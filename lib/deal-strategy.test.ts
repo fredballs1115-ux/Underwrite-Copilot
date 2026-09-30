@@ -8,6 +8,7 @@ import {
   classifyNoi,
   findPriceMetric,
   inferStrategy,
+  isOutdoorStorageYard,
   isPlanDeal,
   buildsSomething,
   noiFigures,
@@ -455,6 +456,18 @@ describe("assessPlausibility", () => {
     expect(codes("Industrial Outdoor Storage", "$18,000,000", "5,000")).not.toContain("basis_out_of_band");
     // A data center under the band's floor is still one.
     expect(codes("Data center", "$400,000", "150,000")).toContain("basis_out_of_band");
+    // A self-storage facility that also lets outdoor storage is priced by
+    // its buildings' feet: held to the band like any storage facility.
+    expect(codes("Self storage with outdoor storage", "$18,000,000", "5,000")).toContain("basis_out_of_band");
+  });
+
+  it("isOutdoorStorageYard reads a yard off the deck's own words, the one test every basis reader shares", () => {
+    for (const cls of ["Industrial Outdoor Storage (IOS)", "IOS", "Outdoor storage yard", "Truck terminal", "Truck yard", "Storage yard"]) {
+      expect(isOutdoorStorageYard(cls), cls).toBe(true);
+    }
+    for (const cls of ["Industrial", "industrial", "Warehouse / distribution", "Self storage with outdoor storage", "Self-Storage", "Portfolios", "Studios", "", null, undefined]) {
+      expect(isOutdoorStorageYard(cls), String(cls)).toBe(false);
+    }
   });
 
   it("reads a zero in-place NOI on a supposedly stabilized deal as a strategy question", () => {

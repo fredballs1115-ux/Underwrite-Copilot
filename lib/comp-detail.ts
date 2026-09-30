@@ -7,7 +7,7 @@
 // beside it is not a basis or a cap, and reads as nothing — the same honesty
 // as the report's rangeRead.
 import { buildingSfFromMetrics, parsePrice } from "@/lib/criteria";
-import { findPricedMetric, unitCountFromMetrics, type StrategyKind } from "@/lib/deal-strategy";
+import { findPricedMetric, isOutdoorStorageYard, unitCountFromMetrics, type StrategyKind } from "@/lib/deal-strategy";
 import type { InterestKind } from "@/lib/interest";
 
 /** The shape every metric reader takes — the extraction's rows or a lighter copy. */
@@ -74,7 +74,9 @@ export interface SubjectBasis {
  *  unit-count and building-size readers, so the comps page never names a
  *  different price than the deal page. A conversion or a development is
  *  judged on its all-in cost, not the shell's price, so it has no price
- *  basis to set against stabilized trades: both come back null. */
+ *  basis to set against stabilized trades: both come back null. An
+ *  outdoor-storage yard has no per-SF basis: it trades by the usable acre,
+ *  and its price over the shop building on it is no figure to tick. */
 export function subjectBasis(
   metrics: MetricLike[],
   kind: StrategyKind,
@@ -83,6 +85,10 @@ export function subjectBasis(
    *  share's is grossed up to the whole the building's count and area
    *  describe — or withheld with no stated share */
   interest?: { kind: InterestKind; sharePct: number | null },
+  /** the deal's class in the deck's own words (`ExtractionResult.assetClass`),
+   *  read for an outdoor-storage yard (lib/deal-strategy
+   *  `isOutdoorStorageYard`) */
+  assetClass?: string | null,
 ): SubjectBasis {
   const none = { perUnit: null, perSf: null };
   if (kind === "conversion" || kind === "development") return none;
@@ -93,7 +99,7 @@ export function subjectBasis(
   if (stated == null || stated < 10_000) return none;
   const price = interest?.sharePct != null ? stated / (interest.sharePct / 100) : stated;
   const units = unitCountFromMetrics(metrics);
-  const sf = buildingSfFromMetrics(metrics);
+  const sf = isOutdoorStorageYard(assetClass) ? null : buildingSfFromMetrics(metrics);
   return {
     perUnit: units != null && units > 0 ? Math.round(price / units) : null,
     perSf: sf != null && sf > 0 ? Math.round(price / sf) : null,
