@@ -36,7 +36,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { MARKET_COUNT } from "./markets-marquee";
 import { DATA_METROS } from "@/lib/market-match";
 import { MarketsGallery } from "./markets-gallery";
-import { PhotoScrim, PlaceBackdrop } from "./place-band";
+import { HERO_STRIP, HERO_WORDS_TOP, PhotoScrim, PlaceBackdrop } from "./place-band";
 import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
 import { photosOnDisk } from "@/lib/photos-fs";
 
@@ -454,9 +454,9 @@ function SectionHead({
  * treatment washes out costs the same bytes and says nothing.
  */
 function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
-  if (!photo) return <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} />;
+  if (!photo) return <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} scrim="hero" />;
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0">
+    <div aria-hidden className={`pointer-events-none ${HERO_STRIP}`}>
       {/* eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot */}
       <img
         src={photoSrc(photo)}
@@ -466,7 +466,7 @@ function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
         decoding="async"
         className="h-full w-full object-cover object-[50%_42%]"
       />
-      <PhotoScrim />
+      <PhotoScrim scrim="hero" />
     </div>
   );
 }
@@ -627,7 +627,9 @@ export default function Home() {
                 "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
             }}
           />
-          <div className="relative mx-auto max-w-6xl px-6 pb-14 pt-16 sm:pt-24">
+          {/* The words start at the foot of the photograph's strip below lg
+              (HERO_WORDS_TOP), so they sit on the band, never on the sky. */}
+          <div className={`relative mx-auto max-w-6xl px-6 pb-14 ${HERO_WORDS_TOP}`}>
             {/* grid-cols-1 matters (same as the walkthrough section): the
                 implicit mobile track is `auto` and cannot shrink below the
                 sample card's intrinsic width, which pushed the whole hero
@@ -677,7 +679,7 @@ export default function Home() {
                     See a full screen
                   </Link>
                 </div>
-                <p className="mt-4 text-xs text-white/55">First {FREE_DEALS} deals free · no card</p>
+                <p className="mt-4 text-xs text-white/70">First {FREE_DEALS} deals free · no card</p>
               </div>
 
               {/* Product preview */}

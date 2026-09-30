@@ -69,7 +69,39 @@ import { hasSkyline } from "@/lib/skyline";
 // failure this whole treatment exists to avoid.
 
 /** How the scrim is shaped, which depends on where the band's words sit. */
-export type Scrim = "band" | "center" | "caption";
+export type Scrim = "band" | "center" | "caption" | "hero";
+
+/**
+ * The homepage hero's photograph below `lg` (2026-09-30): a strip across the
+ * top of the stacked hero, fading into the band at its foot, with the words
+ * starting where it ends. The hero's words sit at its TOP, where the "band"
+ * scrim is clear by design, and measured in Chromium over a white frame
+ * they read 1.9:1 on a phone and 3.0:1 on a laptop — the photograph was
+ * drawn behind the one part of the hero that could not have it. Cut to a
+ * strip, a phone shows three quarters of the skyline's width, where
+ * covering the whole 1,200px stack had shown a sliver of sky.
+ * `HERO_WORDS_TOP` is the padding that starts the words at the strip's
+ * foot; lib/place-band.contrast.test.ts holds the two to each other.
+ */
+export const HERO_STRIP = "absolute inset-x-0 top-0 h-[18rem] sm:h-[22rem] lg:inset-0 lg:h-auto";
+export const HERO_WORDS_TOP = "pt-[18rem] sm:pt-[22rem] lg:pt-24";
+
+/**
+ * The hero's scrim from `lg` up, left to right across the band (0–1 of its
+ * width), with the scrim's alpha at each: dark behind the words' column,
+ * which never passes 49% of the width at any screen (the 72rem container's
+ * left half), clearing across the sample card's column to the photograph
+ * at the right. The "band" gradient stays under it for the stats row.
+ */
+export const HERO_SIDE_SCRIM: ReadonlyArray<{ at: number; alpha: number }> = [
+  { at: 0, alpha: 0.94 },
+  { at: 0.5, alpha: 0.92 },
+  { at: 0.76, alpha: 0 },
+];
+
+const heroSideGradient = `linear-gradient(to right, ${HERO_SIDE_SCRIM.map(
+  (s) => `color-mix(in srgb, var(--color-sidebar) ${Math.round(s.alpha * 100)}%, transparent) ${Math.round(s.at * 100)}%`,
+).join(", ")})`;
 
 /**
  * The caption scrim's stops, in px up from the bottom, with the scrim's
@@ -99,6 +131,15 @@ export function PhotoScrim({ scrim = "band" }: { scrim?: Scrim }) {
       <div className="absolute inset-0 bg-sidebar/20" />
       {scrim === "band" ? (
         <div className="absolute inset-0 bg-gradient-to-t from-sidebar from-0% via-sidebar/85 via-55% to-sidebar/0 to-100%" />
+      ) : scrim === "hero" ? (
+        <>
+          {/* Below lg: the strip fades into the band at its foot, where the
+              words begin. From lg: the band's own gradient for the stats
+              row, and the words' column dark from the left. */}
+          <div className="absolute inset-0 bg-gradient-to-b from-sidebar/0 from-40% to-sidebar to-100% lg:hidden" />
+          <div className="absolute inset-0 hidden bg-gradient-to-t from-sidebar from-0% via-sidebar/85 via-55% to-sidebar/0 to-100% lg:block" />
+          <div className="absolute inset-0 hidden lg:block" style={{ backgroundImage: heroSideGradient }} />
+        </>
       ) : scrim === "caption" ? (
         <div className="absolute inset-0" style={{ backgroundImage: captionGradient }} />
       ) : (
@@ -135,7 +176,7 @@ export function PlaceBackdrop({
   // decides whether there is anything to decide between.
   if (!METRO_VIEWS[metro] && !hasSkyline(metro)) return null;
   return (
-    <div className="pointer-events-none absolute inset-0">
+    <div className={`pointer-events-none ${scrim === "hero" ? HERO_STRIP : "absolute inset-0"}`}>
       {/* Offered at the skyline's widths (#451), each encoded again at a
           fraction of Commons' weight, so a phone takes 1600 and a dense
           laptop 2400 where one 1400px file was stretched twice over; 1400
