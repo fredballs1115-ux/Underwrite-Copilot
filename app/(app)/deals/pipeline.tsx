@@ -914,7 +914,10 @@ export function Pipeline({
               className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50"
             >
               <DownloadIcon />
-              CSV
+              {/* On a phone the two exports are their icons (their names
+                  stay for a screen reader and in the title): with the view
+                  toggle beside them the row ran past a 390px screen. */}
+              <span className="max-sm:sr-only">CSV</span>
             </button>
             <a
               href="/api/pipeline/export"
@@ -922,7 +925,7 @@ export function Pipeline({
               className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium shadow-sm transition-colors hover:bg-faint"
             >
               <SheetIcon />
-              Excel
+              <span className="max-sm:sr-only">Excel</span>
             </a>
           </div>
         </div>
