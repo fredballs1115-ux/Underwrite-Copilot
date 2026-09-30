@@ -602,6 +602,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Buffalo, NY",
     size: [4032, 2268],
   },
+  // Fort Myers, FL: skyline-sheet run 36781668552 — a widened run's pick of twenty-one (Cape Coral and the Caloosahatchee searched beside Fort Myers), over the two downtown buildings the first runs found.
+  "cbsa:15980": {
+    file: "Caloosahatchee River sunset from Ford estate Ft Myers (15510875243).jpg",
+    place: "Sunset over the Caloosahatchee River from the Ford estate, Fort Myers",
+    credit: "Russ",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Fort Myers, FL",
+    size: [5805, 3870],
+  },
   // Charleston, SC: skyline-sheet run 36751130861 — the picture the city is known by; the credit is the name the runner printed, without the talk-page link printed after it.
   "cbsa:16700": {
     file: "Rainbow Row Panorama.jpg",

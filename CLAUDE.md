@@ -1203,14 +1203,25 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  Twenty-one are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Thirty-eight are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
-  Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa), each judged
-  through the card's 16:10 and the deal page's 21:9 crops — never the 4:1
-  band, which a `cbsa:` row never draws; San Jose, Fresno and Madison had
-  nothing usable and keep the aerial, and Birmingham's first search read
-  Birmingham, England's categories (its entry names Alabama's now).
+  Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
+  Chattanooga, Colorado Springs, Columbia, Dayton, El Paso, Fort Myers,
+  Lexington, Little Rock, Reno, Rochester, Sarasota, Spokane, Syracuse,
+  Toledo, Wichita and Worcester), each judged through the card's 16:10 and the deal page's
+  21:9 crops — never the 4:1 band, which a `cbsa:` row never draws; San
+  Jose, Fresno and Madison had nothing usable, and Baton Rouge's best frames
+  are PNGs (never served) with its one JPEG a steep aerial that reads as a
+  map on a card, so each keeps the deal's drawn cover. A search result can
+  be another city entirely (Los Angeles under Colorado Springs, Buffalo
+  under Little Rock, 1963 Pittsburgh under Sarasota), and Birmingham's first
+  search read Birmingham, England's categories (its entry names Alabama's
+  now), which is why a name another place shares is searched under its full
+  name and every candidate is looked at. A six-market sheet spends nine
+  checks a market; Rochester and Worcester found theirs only in a
+  one-market run, and Fort Myers only once its search named Cape Coral and
+  the Caloosahatchee too.
   Milwaukee's and Greenville's credits are the author Commons names, where
   each filename names another (the owner was told). The route
   decodes the key itself (the cards ask for it percent-encoded, and no key

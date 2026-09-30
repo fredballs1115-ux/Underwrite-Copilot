@@ -2174,6 +2174,12 @@
         "Fort Myers riverfront Caloosahatchee",
         "Cape Coral Florida aerial",
         "Fort Myers downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Caloosahatchee River sunset from Ford estate Ft Myers (15510875243).jpg",
+          "note": "Fort Myers, FL — Russ, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36781668552)."
+        }
       ]
     },
     {
