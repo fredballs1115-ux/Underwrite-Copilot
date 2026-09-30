@@ -90,3 +90,46 @@ export function coverSvg(kind: CoverKind, tone: readonly [string, string], width
     `</svg>`
   );
 }
+
+/**
+ * The cover as a wide banner (#464): the screen-complete email's picture
+ * where the building has no photograph. The square's `slice` would crop a
+ * 2:1 frame through the drawing's roof and its ground line, so the banner
+ * lays the same pieces out for its own shape — the ground at the card's
+ * 140 degrees worked out for this box (CSS keeps the angle whatever the
+ * box, and so does this), the same highlight, and the drawing centred at
+ * 62% of the height in the card's weight of line. No words: the email names
+ * the deal under it.
+ */
+export function coverBannerSvg(kind: CoverKind, tone: readonly [string, string], width: number, height: number): string {
+  const [light, dark] = tone;
+  if (!HEX.test(light) || !HEX.test(dark)) throw new Error("coverBannerSvg: a tone is two six-digit hex colours");
+  const w = Math.round(width);
+  const h = Math.round(height);
+  // CSS's gradient line for 140deg: through the centre, along (sin, −cos),
+  // as long as the box's corners are apart along it.
+  const a = (140 * Math.PI) / 180;
+  const [dx, dy] = [Math.sin(a), -Math.cos(a)];
+  const half = (Math.abs(w * dx) + Math.abs(h * dy)) / 2;
+  const f = (n: number) => n.toFixed(2);
+  const scale = (0.62 * h) / 64;
+  const x = (w - 64 * scale) / 2;
+  const y = (h - 64 * scale) / 2;
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">` +
+    `<defs>` +
+    `<linearGradient id="g" gradientUnits="userSpaceOnUse" x1="${f(w / 2 - dx * half)}" y1="${f(h / 2 - dy * half)}" x2="${f(w / 2 + dx * half)}" y2="${f(h / 2 + dy * half)}">` +
+    `<stop offset="0" stop-color="${light}"/><stop offset="1" stop-color="${dark}"/>` +
+    `</linearGradient>` +
+    `<radialGradient id="l" cx="0.12" cy="0.08" r="1" gradientTransform="translate(0.12 0.08) scale(1.2 0.9) translate(-0.12 -0.08)">` +
+    `<stop offset="0" stop-color="#ffffff" stop-opacity="0.16"/><stop offset="0.55" stop-color="#ffffff" stop-opacity="0"/>` +
+    `</radialGradient>` +
+    `</defs>` +
+    `<rect width="${w}" height="${h}" fill="url(#g)"/>` +
+    `<rect width="${w}" height="${h}" fill="url(#l)"/>` +
+    `<g transform="translate(${f(x)} ${f(y)}) scale(${scale.toFixed(4)})" opacity="0.55" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">` +
+    `<path d="${COVER_ART[kind]}"/>` +
+    `</g>` +
+    `</svg>`
+  );
+}

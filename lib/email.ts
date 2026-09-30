@@ -5,6 +5,9 @@ import { buyBoxCheckSource, evaluateBuyBox } from "@/lib/criteria";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { inferStrategy } from "@/lib/deal-strategy";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
+import type { DealVisualCache } from "@/lib/deal-location";
+import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
+import { emailPictureUrl } from "@/lib/email-picture";
 
 /**
  * Analysis-ready email via Resend's REST API (plain fetch — no SDK to carry).
@@ -83,7 +86,7 @@ export async function notifyAnalysisReady(
   try {
     const { data: deal } = await admin
       .from("deals")
-      .select("name, user_id, team_id, asset_class, extraction, verdict, is_sample")
+      .select("name, user_id, team_id, asset_class, extraction, verdict, is_sample, photo, om_storage_path")
       .eq("id", dealId)
       .maybeSingle();
     if (!deal || deal.is_sample) return;
@@ -145,14 +148,20 @@ export async function notifyAnalysisReady(
       label: "Screened",
       color: "#114e54",
     };
+    const dealName = (deal.name as string) ?? "Your deal";
+    const picture = await emailPicture(admin, dealId, dealName, {
+      cache: (deal.photo as DealVisualCache | null) ?? null,
+      omPath: (deal.om_storage_path as string | null) ?? null,
+    });
     const { subject, html, text } = analysisReadyEmail({
-      dealName: (deal.name as string) ?? "Your deal",
+      dealName,
       verdictLabel: v.label,
       verdictColor: v.color,
       buyBoxLabel,
       reason: verdict.reason ?? "",
       dealUrl: `${appUrl()}/deals/${dealId}`,
       settingsUrl: `${appUrl()}/account`,
+      picture,
     });
     await sendEmail(to, subject, html, text);
   } catch (err) {
@@ -162,4 +171,53 @@ export async function notifyAnalysisReady(
       err instanceof Error ? err.message : err,
     );
   }
+}
+
+/** How long the email waits for a turn to read the memorandum's cover. */
+export const EMAIL_PICTURE_WAIT_MS = 15_000;
+
+/**
+ * The building across the top of the screen-complete email (#464): its
+ * photograph where it has one, else the cover its card wears. The screen is
+ * often finished before anyone has opened the deal, so the memorandum's
+ * cover is looked for here first where nobody has yet — the cover alone
+ * (the gallery is left to the deal's first view), bounded, and never a
+ * reason the email is late by more than the wait or not sent at all. The
+ * email's picture link then serves whatever is stored when it is opened.
+ */
+export async function emailPicture(
+  admin: SupabaseClient,
+  dealId: string,
+  dealName: string,
+  deal: { cache: DealVisualCache | null; omPath: string | null },
+): Promise<{ url: string; alt: string } | null> {
+  const url = emailPictureUrl(appUrl(), dealId, "banner");
+  if (!url) return null;
+  let photo = !!deal.cache?.picture;
+  if (pictureMayBeInMemorandum({ omPath: deal.omPath, isSample: false, cache: deal.cache })) {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const found = await Promise.race([
+        ensureDealPicture(admin, dealId, {
+          omPath: deal.omPath,
+          isSample: false,
+          cache: deal.cache,
+          waitMs: EMAIL_PICTURE_WAIT_MS,
+          gallery: false,
+        }),
+        // Past the wait, the email goes on what the cache held.
+        new Promise<undefined>((resolve) => {
+          timer = setTimeout(() => resolve(undefined), EMAIL_PICTURE_WAIT_MS + 10_000);
+        }),
+      ]);
+      // The search's answer is the picture now stored, or none (an old
+      // memorandum picture its rules no longer take for the cover is gone).
+      if (found !== undefined) photo = !!found;
+    } catch {
+      // The cover's drawing stands in; the email goes regardless.
+    } finally {
+      if (timer) clearTimeout(timer);
+    }
+  }
+  return { url, alt: photo ? `Photograph of ${dealName}` : "" };
 }

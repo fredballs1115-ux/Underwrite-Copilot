@@ -18,14 +18,18 @@ import { useState } from "react";
  * start at one x. Lazy, so a long list fires no request for the rows the
  * reader never scrolls to.
  */
-export function DealAvatar({ dealId, dot }: { dealId: string; dot?: string }) {
+export function DealAvatar({ dealId, dot, size = "sm" }: { dealId: string; dot?: string; size?: "sm" | "md" }) {
   const [gone, setGone] = useState(false);
+  // "md" is a page's heading (#464: the deal's bridge, rent roll and
+  // valuations), a step up from a list's 32px.
+  const px = size === "md" ? 40 : 32;
+  const box = size === "md" ? "h-10 w-10 rounded-lg" : "h-8 w-8 rounded-md";
   return (
-    <span aria-hidden className="relative h-8 w-8 shrink-0">
+    <span aria-hidden className={`relative shrink-0 ${size === "md" ? "h-10 w-10" : "h-8 w-8"}`}>
       {gone ? (
         <span
           data-deal-avatar="blank"
-          className="flex h-8 w-8 items-center justify-center rounded-md border border-dashed border-line bg-faint text-muted/60"
+          className={`flex items-center justify-center border border-dashed border-line bg-faint text-muted/60 ${box}`}
         >
           <svg
             viewBox="0 0 24 24"
@@ -43,14 +47,14 @@ export function DealAvatar({ dealId, dot }: { dealId: string; dot?: string }) {
         // eslint-disable-next-line @next/next/no-img-element -- the pipeline row's own proxied route, with its own cache headers
         <img
           data-deal-avatar="picture"
-          src={`/api/deals/${dealId}/image?w=64&h=64&fallback=cover`}
+          src={`/api/deals/${dealId}/image?w=${px * 2}&h=${px * 2}&fallback=cover`}
           alt=""
-          width={32}
-          height={32}
+          width={px}
+          height={px}
           loading="lazy"
           decoding="async"
           onError={() => setGone(true)}
-          className="h-8 w-8 rounded-md bg-faint object-cover"
+          className={`bg-faint object-cover ${box}`}
         />
       )}
       {dot ? <span className={`absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full ring-2 ring-surface ${dot}`} /> : null}

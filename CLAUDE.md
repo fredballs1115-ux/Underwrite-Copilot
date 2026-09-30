@@ -3081,9 +3081,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     deal page's photograph, mosaic tiles and gallery views and the shared
     screen's picture carry it as the `<img>`'s own background. A cover
     stored before previews gets one from the hero bytes the picture route
-    already holds, after the response (`backfillPreview` in `after()`,
-    never over a picture changed since it was read); gallery photographs
-    get theirs when their gallery is next read.
+    already holds, after the response (`backfillPreview` in `after()`: the
+    row read again just before the write, and the preview put only onto the
+    picture stored then if it is still the one the bytes are of, so a
+    photograph replaced while the request ran is never put back); gallery
+    photographs get theirs when their gallery is next read.
+  **And in the emails** (#464): the screen-complete email opens on the
+  building (a 520px banner linked to the deal) and the Monday digest puts
+  each deal's 48px square beside its name, the way a listing alert does. A
+  mail client fetches with no session, so the picture comes from
+  `/api/email/picture/<token>?s=banner|thumb`, public, where the token is
+  the whole permission (`lib/email-picture`: the deal's id and an expiry,
+  `EMAIL_PICTURE_DAYS` 365, signed with an HMAC key derived from the
+  service-role key under a label of its own — no new secret, and rotating
+  that key retires every link already sent). The route serves only what is
+  stored and never searches: the photograph cut to the frame by attention,
+  else the deal's cover (`coverSvg` for the square, `coverBannerSvg` for
+  the banner, laid out for a 2:1 box since the square's `slice` cut the
+  drawing), both as JPEG; a bad token, a deleted deal and the sample
+  answer 404. `/api` is outside the proxy's matcher, so no sign-in bounce
+  reaches it. Before the screen-complete email goes, `emailPicture`
+  (lib/email) looks for the memorandum's cover where nobody has yet
+  (`pictureMayBeInMemorandum`), with `ensureDealPicture`'s `gallery:
+  false` — the cover alone, so the worker never decodes sixteen pages
+  beside the next screen; the gallery waits for the deal's first view —
+  bounded by `EMAIL_PICTURE_WAIT_MS`, and the banner's alt names a
+  photograph only where the search (or the cache) says there is one. The
+  deal's bridge, rent roll and valuations pages head with `DealCrumb`
+  (`app/(app)/deals/[id]/deal-crumb.tsx`: `DealAvatar` at its `md` 40px
+  beside the way back).
   **The memorandum's other photographs are the deal's gallery** (#448): a
   listing shows the building from every side, and a memorandum carries
   those pictures while the site showed one. `decodeOmPhotos`

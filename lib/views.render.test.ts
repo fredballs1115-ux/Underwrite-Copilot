@@ -5786,3 +5786,18 @@ describe("the blur-up preview under a deal's photograph while it loads (#463)", 
     expect(html).toContain("feGaussianBlur");
   });
 });
+
+// ── The building on the deal's own pages (#464) ──────────────────────────────
+import { DealCrumb } from "@/app/(app)/deals/[id]/deal-crumb";
+
+describe("the deal's own pages head with the building (#464)", () => {
+  it("links back to the deal with its picture at a heading's size, the name its words", () => {
+    const html = render(React.createElement(DealCrumb, { dealId: "d1", name: "Smith & Sons Lofts" }));
+    expect(html).toContain('href="/deals/d1"');
+    expect(html).toContain("data-deal-crumb");
+    expect(html).toContain('src="/api/deals/d1/image?w=80&amp;h=80&amp;fallback=cover"');
+    expect(html).toContain('width="40"');
+    expect(visibleText(html).trim()).toBe("← Smith & Sons Lofts");
+    expect(a11yIssues(html)).toEqual([]);
+  });
+});

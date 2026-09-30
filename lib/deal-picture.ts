@@ -610,25 +610,35 @@ function refreshGalleryBehind(
 export async function ensureDealPicture(
   supabase: SupabaseClient,
   dealId: string,
-  opts: { omPath: string | null; isSample: boolean; cache: DealVisualCache | null; waitMs?: number },
+  opts: {
+    omPath: string | null;
+    isSample: boolean;
+    cache: DealVisualCache | null;
+    waitMs?: number;
+    /** false for the cover alone (#464, the worker before a screen's
+     *  email): the gallery is left to the deal's first view, so a worker
+     *  about to run the next screen never decodes sixteen pages beside it */
+    gallery?: boolean;
+  },
 ): Promise<DealPicture | null> {
   const { cache } = opts;
   const waitMs = opts.waitMs ?? 0;
+  const gallery = opts.gallery !== false;
   const current = currentPicture(cache);
   if (current) {
-    refreshGalleryBehind(supabase, dealId, opts);
+    if (gallery) refreshGalleryBehind(supabase, dealId, opts);
     return current;
   }
   const stale = cache?.picture ?? null;
   if (opts.isSample || !opts.omPath) return stale;
   if (!stale && searchedRecently(cache)) {
     // No cover on the first pages, but photographs may sit further in.
-    refreshGalleryBehind(supabase, dealId, opts);
+    if (gallery) refreshGalleryBehind(supabase, dealId, opts);
     return null;
   }
   const running = inFlight.get(dealId);
   if (running) return waitMs > 0 ? running : stale;
-  const search = searchMemorandum(supabase, dealId, opts.omPath, cache, waitMs)
+  const search = searchMemorandum(supabase, dealId, opts.omPath, cache, waitMs, gallery)
     .then((outcome) => (outcome.settled ? outcome.picture : stale))
     .finally(() => inFlight.delete(dealId));
   inFlight.set(dealId, search);
@@ -653,6 +663,7 @@ async function searchMemorandum(
   omPath: string,
   cache: DealVisualCache | null,
   waitMs: number,
+  withGallery = true,
 ): Promise<SearchOutcome> {
   const release = await searches.acquireWithin(waitMs);
   if (!release) return { picture: null, settled: false };
@@ -682,7 +693,7 @@ async function searchMemorandum(
     }
     // The rest of the memorandum's photographs (#448), behind the answer and
     // in the same turn: the cover shows while they are read.
-    if (!galleryCurrent(cache) && !galleryInFlight.has(dealId) && !coverWaiting()) {
+    if (withGallery && !galleryCurrent(cache) && !galleryInFlight.has(dealId) && !coverWaiting()) {
       const hash = cover ? await hashOf(cover) : null;
       held = false;
       galleryInFlight.add(dealId);

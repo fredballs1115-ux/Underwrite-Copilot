@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { downloadDealFile } from "@/lib/storage";
@@ -16,6 +15,7 @@ import { getRentRollImport, latestRentRollImport, listProfiles } from "@/lib/ren
 import { RentRollDashboard } from "./dashboard";
 import { MappingForm } from "./mapping-form";
 import { deleteRentRollImport, saveLeasingProfile, uploadRentRoll } from "./actions";
+import { DealCrumb } from "../deal-crumb";
 
 export const metadata: Metadata = { title: "Rent roll" };
 
@@ -153,12 +153,7 @@ export default async function RentRollPage({
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
       <header className="flex flex-col gap-1">
-        <Link
-          href={`/deals/${id}`}
-          className="text-sm text-muted underline-offset-2 hover:text-brand hover:underline"
-        >
-          ← {deal.name as string}
-        </Link>
+        <DealCrumb dealId={id} name={deal.name as string} />
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Rent roll</h1>
         <p className="max-w-2xl text-sm text-muted">
           Upload the broker&apos;s file, fix the mapping, get WALT, rollover and mark-to-market — and

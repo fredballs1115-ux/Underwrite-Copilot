@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -8,6 +7,7 @@ import { getOrBuildBridge, listDealVersions, snapshotVersion } from "@/lib/bridg
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
 import { BridgeView, type VersionOption } from "./bridge-view";
 import { saveScenarioVersion, deleteDealVersion } from "./actions";
+import { DealCrumb } from "../deal-crumb";
 
 export const metadata: Metadata = { title: "Assumption bridge" };
 
@@ -84,12 +84,7 @@ export default async function BridgePage({
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
       <header className="flex flex-col gap-1">
-        <Link
-          href={`/deals/${id}`}
-          className="text-sm text-muted underline-offset-2 hover:text-brand hover:underline"
-        >
-          ← {deal.name as string}
-        </Link>
+        <DealCrumb dealId={id} name={deal.name as string} />
         <h1 className="text-2xl font-semibold tracking-tight text-ink">Assumption bridge</h1>
         <p className="max-w-2xl text-sm text-muted">
           Which input moved the return, and by how much — Shapley values, so the order of changes

@@ -193,6 +193,26 @@ describe("the memorandum's other photographs, read behind the cover (#448)", () 
     expect(store.removed).toEqual(["photos/d1/xg1-hero.jpg", "photos/d1/xg1-thumb.jpg"]);
   });
 
+  it("is left to the deal's first view where the caller asks for the cover alone (#464, the worker)", async () => {
+    store.oms.set("u/d1.pdf", await memorandum());
+    const { client, db } = fakeDb(null);
+    const got = await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: null, waitMs: 5_000, gallery: false });
+    expect(got?.hero).toBe(db.photo?.picture?.hero);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(db.photo?.gallery).toBeUndefined();
+    expect(db.photo?.galleryV).toBeUndefined();
+    // The cover and its thumb, nothing else.
+    expect(store.uploads).toHaveLength(2);
+    // Current now, the cover is answered with no gallery started behind it.
+    await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: db.photo, gallery: false });
+    await new Promise((r) => setTimeout(r, 300));
+    expect(store.uploads).toHaveLength(2);
+    // The deal's first view reads it.
+    await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: db.photo });
+    await vi.waitFor(() => expect(db.photo?.galleryV).toBe(GALLERY_VERSION), { timeout: 15_000 });
+    expect(db.photo?.gallery?.map((g) => g.page)).toEqual([2, 4]);
+  });
+
   it("is never read for the sample deal", async () => {
     store.oms.set("u/d1.pdf", await memorandum());
     const { client, db } = fakeDb(null);

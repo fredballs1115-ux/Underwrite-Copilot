@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { COVER_ART, coverBackground, coverSvg, type CoverKind } from "./deal-cover-art";
+import { COVER_ART, coverBackground, coverBannerSvg, coverSvg, type CoverKind } from "./deal-cover-art";
 import { COVER_TONES, coverFor } from "./deal-cover";
 import { imagePlan } from "./imagery-plan";
 
@@ -53,6 +53,34 @@ describe("the cover as a picture (#443)", () => {
     }
     expect(() => coverSvg("housing", ["red", "#000000"], 64, 64)).toThrow();
     expect(() => coverSvg("housing", ['#000000"/><script>', "#000000"], 64, 64)).toThrow();
+  });
+
+  it("lays itself out for a banner's shape, the whole drawing inside it (#464, the email)", async () => {
+    for (const kind of KINDS) {
+      const tone = COVER_TONES[KINDS.indexOf(kind) % COVER_TONES.length];
+      const svg = coverBannerSvg(kind, tone, 1040, 520);
+      expect(svg).not.toMatch(/<text|<script|<style|on[a-z]+=|href=/i);
+      const { info, data, at } = await pixels(svg);
+      expect([info.width, info.height], kind).toEqual([1040, 520]);
+      expect(near(at(2, 2), rgb(tone[0]), 40), `${kind} top left`).toBe(true);
+      expect(near(at(1037, 517), rgb(tone[1]), 24), `${kind} bottom right`).toBe(true);
+      // The drawing sits whole in the middle: lit pixels, none in the top or
+      // bottom tenth where a square's slice would have cut it.
+      let lit = 0;
+      let edge = 0;
+      for (let y = 0; y < 520; y++) {
+        for (let x = 0; x < 1040; x++) {
+          const i = (y * 1040 + x) * 3;
+          if (data[i] + data[i + 1] + data[i + 2] > 3 * 150) {
+            lit += 1;
+            if (y < 52 || y > 468) edge += 1;
+          }
+        }
+      }
+      expect(lit, kind).toBeGreaterThan(400);
+      expect(edge, kind).toBe(0);
+    }
+    expect(() => coverBannerSvg("housing", ["red", "#000000"], 1040, 520)).toThrow();
   });
 
   it("paints the same ground the card does", () => {
