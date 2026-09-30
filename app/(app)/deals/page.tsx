@@ -24,6 +24,7 @@ import { floodCell, floodTag, siteFlagsStale, type SiteFlagsResult } from "@/lib
 import { scoreMandateFit } from "@/lib/mandate";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
+import { screenedAnOm } from "@/lib/onboarding";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -419,7 +420,16 @@ export default async function DealsPage({
   const onboarding = {
     hasBuyBox: !!(personalBox || teamBox),
     sampleId: rows.find((d) => d.is_sample)?.id ?? null,
-    hasRealDeal: rows.some((d) => !d.is_sample),
+    // "Screen your first OM" ticks for a memorandum a screen has finished —
+    // never a deal typed in by hand, or a screen still running (lib/onboarding).
+    hasScreenedOm: rows.some((d) =>
+      screenedAnOm({
+        isSample: !!d.is_sample,
+        omPath: d.om_storage_path ?? null,
+        hasVerdict: !!(d.verdict as { verdict?: string } | null)?.verdict,
+        job: jobByDeal.get(d.id),
+      }),
+    ),
   };
 
   return (

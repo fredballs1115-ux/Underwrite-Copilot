@@ -300,7 +300,9 @@ type BillingInfo = {
 export type OnboardingState = {
   hasBuyBox: boolean;
   sampleId: string | null;
-  hasRealDeal: boolean;
+  /** a memorandum a screen has finished (lib/onboarding `screenedAnOm`) —
+   *  not a deal typed in by hand, nor a screen still running */
+  hasScreenedOm: boolean;
 };
 
 export function Pipeline({
@@ -2558,7 +2560,7 @@ function GettingStarted({
     {
       key: "screen",
       label: "Screen your first OM",
-      done: state.hasRealDeal,
+      done: state.hasScreenedOm,
       action: atLimit ? (
         <Link
           href="/billing"

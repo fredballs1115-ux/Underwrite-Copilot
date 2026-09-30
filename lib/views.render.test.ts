@@ -142,7 +142,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         deals: withThumbs(CARDS),
         errorMessage: null,
         notice: null,
-        onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+        onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
         billing: BILLING,
         initialView: "list",
       }),
@@ -304,7 +304,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         deals: withPictures,
         errorMessage: null,
         notice: null,
-        onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+        onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
         billing: BILLING,
       }),
     );
@@ -422,7 +422,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         deals: withMarket,
         errorMessage: null,
         notice: null,
-        onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+        onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
         billing: BILLING,
       }),
     );
@@ -450,7 +450,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
       deals: withThumbs(CARDS),
       errorMessage: null,
       notice: null,
-      onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+      onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
       billing: BILLING,
     };
     const cards = render(React.createElement(Pipeline, props));
@@ -468,7 +468,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         errorMessage: null,
         notice: null,
         openNew: "1",
-        onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+        onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
         billing: BILLING,
       }),
     );
@@ -500,7 +500,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         deals: placed,
         errorMessage: null,
         notice: null,
-        onboarding: { hasBuyBox: true, sampleId: "h", hasRealDeal: true },
+        onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
         billing: BILLING,
         initialView: "map",
       }),
@@ -533,7 +533,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
           deals: [],
           errorMessage: null,
           notice: null,
-          onboarding: { hasBuyBox: false, sampleId: null, hasRealDeal: false },
+          onboarding: { hasBuyBox: false, sampleId: null, hasScreenedOm: false },
           billing: BILLING,
         }),
       );
@@ -550,7 +550,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
           deals: CARDS.slice(0, 2),
           errorMessage: "Could not read that PDF — try a text-based export of the OM.",
           notice: "Your deal was saved.",
-          onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
+          onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
           billing: { isPro: false, canCreateDeal: false, allowance: dealAllowance({ plan: "free", dealCount: 3, team: null }) },
         }),
       );
@@ -568,7 +568,7 @@ describe("Pipeline — the free-deal meter counts what the create action counts 
     deals: withThumbs(CARDS.slice(0, 2)),
     errorMessage: null,
     notice: null,
-    onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
+    onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
   };
   // The link to /billing that carries the count in its title.
   const meter = (html: string) => html.match(/<a\b(?=[^>]*\shref="\/billing")(?=[^>]*\stitle=")[^>]*>[\s\S]*?<\/a>/)?.[0] ?? "";
@@ -625,7 +625,7 @@ describe("Pipeline — a deal screened again shows the run, never the call it is
   const props = {
     errorMessage: null,
     notice: null,
-    onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
+    onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
     billing: BILLING,
   };
 
@@ -655,7 +655,7 @@ describe("Pipeline — a note's card withholds the collateral's cap (the audit o
   const props = {
     errorMessage: null,
     notice: null,
-    onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
+    onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
     billing: BILLING,
   };
   // The slots as lib/pipeline-slots reads a note: the collateral's cap is
@@ -691,7 +691,7 @@ describe("Pipeline — a first screen's card reads the first signal, as the deal
   const props = {
     errorMessage: null,
     notice: null,
-    onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
+    onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
     billing: BILLING,
   };
   // The slots as lib/pipeline-slots reads a deal with a first signal and no
@@ -6897,7 +6897,7 @@ describe("Pipeline — a manufactured-housing park's tag (#470)", () => {
     market: "Lancaster, PA",
     coveredMarket: null,
   });
-  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true }, billing: BILLING };
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING };
 
   it("says the lot rent against the market's on the row and the card, a private system in the warning tone", () => {
     for (const initialView of ["list", "cards"] as const) {
@@ -7006,7 +7006,7 @@ describe("Pipeline — a self-storage facility's tag (#471)", () => {
     market: "Lakewood, CO",
     coveredMarket: null,
   });
-  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true }, billing: BILLING };
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING };
 
   it("says a lease-up in the warning tone on the row and the card", () => {
     for (const initialView of ["list", "cards"] as const) {
