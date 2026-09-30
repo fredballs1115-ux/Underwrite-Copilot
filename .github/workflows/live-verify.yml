@@ -1130,6 +1130,8 @@ jobs:
           mark "#477 building photographs, found sooner and drawn sharper" grep -q "Building photographs, found sooner and drawn sharper" p_whats-new.html
           mark "#478 corrections: what the site says about itself" grep -q "Corrections: what the site says about itself" p_whats-new.html
           mark "#478 current rates, handed to the analysis" grep -q "Current rates, handed to the analysis" p_whats-new.html
+          mark "#479 a re-screen never mixes two runs" grep -q "A re-screen never mixes two runs" p_whats-new.html
+          mark "#479 corrections: rule sources, sales feeds and fair market rent years" grep -q "Corrections: rule sources, sales feeds and fair market rent years" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

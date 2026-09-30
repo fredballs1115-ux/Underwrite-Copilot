@@ -1832,9 +1832,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   source link). Rows are `hud_fmr_fy<fy>_<bed>` (`fmrMetric`), built by
   `fmrRows` / `fmrBenchmarkRows`, which the app's seeds,
   `scripts/seed-research.mjs` and `scripts/fetch-fmr.mjs` all call, so the
-  table and the file are one shape; `newestFmrOnly` drops every row of an
-  older year than the newest present (HUD publishes every area at once),
-  so a database row still keyed to last year is never shown as current.
+  table and the file are one shape; `newestFmrOnly` drops a row where its
+  own metro has a newer year (the Washington rows an older pull filed under
+  "Washington DC" read as `DC_AREA_METRO`'s) and anywhere once its own year
+  has ended and a newer one is on file — never sooner, so a metro the
+  newest pull missed keeps the year still in force rather than showing no
+  rent (it had been global and immediate; the pre-ship audit of
+  2026-09-30). **A year ends everywhere** (#479, `fmrWhen`): past its last
+  day every surface says "ended Sep 30, 2027" — the research panel (whose
+  source badge reads "year ended" rather than the 180-day "stale", which
+  called a year in force stale), the compare card, the ZORI line, the demo,
+  the Mid-Atlantic line and the brief's citation — and the homepage band
+  leaves an ended figure out; each page reads today outside its render
+  (`fmrToday`) and hands it in.
   `lib/fiscal-year-literal.test.ts` fails on a typed "FY20xx" anywhere in
   app/, lib/ or the two scripts. The FY2027 figures were read from HUD's
   FY27_FMRs.xlsx (the Internet Archive's capture of 2026-09-22), effective
@@ -3210,7 +3220,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   lifted under older rules (`staleOmPicture`) is judged again on its next
   ask (`lib/deal-picture.test.ts` drives it with storage faked) —
   replaced by the cover page's, dropped where the first pages hold none,
-  kept where the memorandum cannot be read; a page render shows the old
+  kept while reads of the memorandum are cut short and dropped at the
+  third in a row (#479: it had been stamped with today's rules and kept for
+  good, and it may be a map); a page render shows the old
   one at once and judges behind it, and the pipeline asks for it like one
   never looked for (`pictureMayBeInMemorandum`, the picture faded in over
   the next source). The reader's own upload is never judged again. Searches take turns
@@ -3499,7 +3511,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (`pictureRetry`), the next waits `RETRY_AFTER_MS` (10 minutes, then 2
   hours), and the third in a row (`MAX_CUT_READS`) stands for the month;
   `PICTURE_SEARCH_VERSION` 5 looked again at the old "none" verdicts,
-  while `PHOTO_RULES_SINCE` 4 keeps every photograph already lifted.
+  while `PHOTO_RULES_SINCE` 4 keeps every photograph already lifted. A
+  gallery read the time cut short is counted the same way (#479,
+  `galleryRetry`, `galleryRetryWaiting`): stored as far as it got without
+  `galleryV`, never over a stored gallery it found fewer of, the third in a
+  row taken as the gallery. **A cover is written onto the picture its
+  search began from** (#479, `storePicture` through `swapPicture`, the row
+  read at the write): the screen's lift held its copy of the row through
+  its wait for a turn and replaced a photograph the reader uploaded
+  meanwhile, leaving the upload's files outside every deletion sweep. A
+  memorandum's cover, or a drop of an old one, now loses to a picture
+  stored meanwhile (its own new files go), a reader's upload goes over
+  whatever is there, and the files removed are the picture actually
+  replaced, `full` copy included.
   **JPEG 2000** covers decode: `lib/pdfjs-wasm.ts` hands pdfjs its wasm
   decoder on every `getDocument` (the same value each time — it is
   process-wide), tested on a real JP2 (`lib/test-jpx.ts`). **A full-size
@@ -4200,10 +4224,25 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   log, never the page), and its `structured()` wraps every structured-output
   call so a cut-off, a refusal or unreadable JSON is named. `lib/screen-run.ts`
   reads the job row: a failed run's step says which stored results still
-  belong to the previous screen (`staleAfterFailure`), and the pipeline list's
-  Running / Stalled / Failed (`listJobStatus`); the deal page, the list, the
-  memo and report routes and the shared screen all read it there — never
-  decide "is this result current" anywhere else. In-process runs heartbeat
+  belong to the previous screen (`staleAfterFailure`), and so does a run
+  still GOING (`staleWhileRunning`, #479): a re-screen writes the terms first
+  and the verdict last, so for its minutes the deal holds the new terms
+  beside the last run's call. `previousScreenResults` is the one rule (both
+  cases) and `verdictBehind` says why the call on file is behind, if it is:
+  the memo and report routes refuse (`memostale` / `memorunning`,
+  `reportstale` / `reportrunning`), the shared screen marks the call and the
+  comp and market reads the run has not reached, the deal page marks every
+  such result and draws the header's and sticky bar's call dashed, and the
+  pipeline card, row, CSV and meeting workbook say "Re-screening" over the
+  call, the list refreshing while any deal runs. `listJobStatus` is the
+  pipeline list's Running / Stalled / Failed, and a live job that is no
+  screen (a comp search, a model build, the reconciler before its verdict
+  step) leaves the call alone. Every verdict is dated from its own
+  `generatedAt` (`screenedOn`): the memo prints "Screened Sep 12, 2026"
+  under the export date, the deal page and the shared screen date the call.
+  The deal page, the list, the memo and report routes and the shared screen
+  all read it there — never decide "is this result current" anywhere else.
+  In-process runs heartbeat
   the job row; a Files-API copy of an OM is released when its run ends
   (`releaseOmSource`); one web process runs at most `ANALYSIS_CONCURRENCY`
   (default two) screens at once (`lib/anthropic/run-gate.ts` — the claim is

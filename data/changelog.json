@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "A re-screen never mixes two runs",
+      "blurb": "A screen writes the terms first and the verdict last, so for the minutes a deal was being screened again it held the new run's terms beside the last run's call, and the memo, the full report and a shared link printed the two as one screen. They now wait for the new verdict, the way they already did after a failed run; a shared link says the sender is re-screening and marks the comp and market reads the run has not reached; the deal page marks each result still from the previous screen and draws the call in its header as the previous one; and the pipeline card, row, CSV and meeting workbook say Re-screening, with the list refreshing until the run finishes. A comp search or a model build is not a screen and leaves the call alone. Every verdict now carries the day it was written: the memo and the report's first page print it under the export date, and the deal page and the shared screen date the call.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Corrections: rule sources, sales feeds and fair market rent years",
+      "blurb": "A last read of the batch against its sources. The homepage counted all 29 rules as source-linked, and New Jersey's municipal rent control has no single source, so it says 28 of them are now. The market comparison said a sales feed was documented and not wired for eleven metros whose research names no feed at all; it says none yet. A fiscal year of HUD's fair market rents now says it has ended once it has, on the research panel, the market comparison, the asking-rent line, the demo and the Mid-Atlantic line, where only the market brief knew; the research panel no longer calls a year still in force stale after 180 days; and a newer year for one metro no longer hides another metro's year while that year is in force. A photograph lifted from a memorandum can no longer replace one you added while the screen ran, a gallery read that ran out of time is read again rather than kept as the whole, and a photograph lifted under older rules that could not be judged again is dropped rather than kept for good.",
+      "href": "/"
+    },
+    {
+      "date": "2026-09-30",
       "title": "Current rates, handed to the analysis",
       "href": "/deals",
       "blurb": "The screen's challenger asks whether an OM's financing holds at current rates, and the first-draft model picks a loan rate, but neither was ever given a rate, so each worked from memory. Both are now handed the day's Treasury and SOFR rates from the same feed the site's own model runs on, each with its date, and told to build any rate from them. Where the feed has nothing fresh, they are handed nothing and claim nothing as current."
