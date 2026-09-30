@@ -1000,9 +1000,21 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the pull and a stall there is invisible from the metros' rows. The nightly
   steward's whole-table rule ("no `rates` row newer than five days")
   cannot see a dead monthly pull behind fresh daily rows, and this can;
-  a feed with no rows says "no rows", never "current".
-  `app/(app)/data-health/feeds-card.tsx` draws it, rendered on the
-  runner's fixture in `lib/feeds-card.render.test.ts`.
+  a feed with no rows says "no rows", never "current". Zillow's and
+  Realtor.com's files are judged one file at a time, so a stale one is
+  named. `app/(app)/data-health/feeds-card.tsx` draws it, rendered on the
+  runner's fixture in `lib/feeds-card.render.test.ts`. **The steward never
+  touches a feed's rows** (2026-09-30): `lib/feed-rows.ts` (no imports) is
+  the one list of the metrics a pull writes — Zillow's, Realtor.com's and
+  the `hud_fmr_fy<year>_<bed>` family — and the steward's re-verification
+  leaves them out of its query and both its updates (it had re-dated a
+  year-ago hotness rank), while the pulls refuse to write a metric not on
+  the list. **A pull says its failures on the run's page**
+  (`lib/gh-annotate.ts`): a missing secret is an `::error::` and exit 1 in
+  every fetch script and the intel job, and a partial failure a
+  `::warning::` a series and one summary line. The workflows still skip
+  with exit 0 before the script where a secret is absent — a fresh fork's
+  courtesy — so a deleted secret reads green on GitHub.
 - How the OM reaches the model: `lib/anthropic/om-source.ts` — the deck's
   own text layer, page-tagged (`lib/pdf-text.ts`, pdfjs in-process), when
   it is dense enough to stand in for the pages (`isDenseLayer`: four
@@ -1121,9 +1133,24 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   "cropped to fit", since every surface crops (`skylineCredit`,
   `galleryCreditParts`; `app/photo-credit.tsx` draws them with their
   links in `creditLine`'s and `galleryCredit`'s own words, and
-  `lib/photo-credit.test.ts` holds the two to each other). A pipeline
-  card, itself a link, keeps its corner text, and the page carries one
-  linked line under the cards. Served by `app/api/imagery/skyline/[id]`
+  `lib/photo-credit.test.ts` holds the two to each other). A grid's one
+  line links EVERY photograph it credits, not a photographer's first: one
+  photograph is the name linked to it, several are the name and then each
+  place linked to its own page ("Bruce Emmerling (Downtown Richmond;
+  Downtown Norfolk from the Elizabeth River)"), under "Photographs by".
+  The parts are `lib/credit-parts.ts` (no imports) and
+  `app/credit-parts.tsx`, so a client component draws a linked credit
+  without loading the table; the deal page's Market view links it and says
+  "cropped to fit", and the full-screen viewer, which shows the photograph
+  whole, links it without. **A band's credit comes after its words in the
+  markup** (`PlaceBackdrop` takes the words as children, `CityPhoto` draws
+  picture, words, credit), so Tab reaches "Get started free" before a
+  photographer's name, and a tile's alt says what is on screen, the
+  overhead included (`CityPhoto`'s `describe`). A pipeline card, itself a
+  link, keeps its corner text, and the page carries one linked line under
+  the cards, naming only the market photographs the cards are showing
+  (`shownMarketIds` in lib/deal-banner, each card reporting what it
+  settled on through `DealBanner`'s `onMarket`). Served by `app/api/imagery/skyline/[id]`
   (proxied, validated by content-type, cached immutable, 404 on any
   failure) at `SKYLINE_WIDTHS` alone, the overhead route at `METRO_FRAMES`
   alone — any other size snaps to the nearest, so a public URL cannot make
@@ -1987,6 +2014,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and Apartment List's not to be — its download is gated and its static
   host does not resolve — so that feed was dropped rather than guessed
   at. Realtor.com's condition for use is attribution (`REALTOR_CREDIT`).
+  **A figure is said only while current, under its own month**
+  (2026-09-30): `zoriFor`, `realtorFor` and `hotnessFor` take the
+  reader's date and answer nothing past `ZILLOW_FRESH_DAYS` (55: dated the
+  1st, pulled on the 20th of the next month) or `REALTOR_FRESH_DAYS` (73:
+  dated the 1st, replaced on the 8th of the month after next — 45 had
+  marked a current figure stale), and every figure — the apartment rent,
+  the home value, each year-ago change, the hotness parts — is read only
+  from a row of the month it is shown under, null otherwise, never zero.
   **The same pull reads Realtor.com's hotness file** (#377 — the metro
   HISTORY file, every month back to 2017 for the 300 largest metros,
   8.6 MB, probed by run 35793378647): the rank among the 300 is stored
