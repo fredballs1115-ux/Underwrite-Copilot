@@ -1234,7 +1234,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  Sixty-one are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Seventy-three are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1244,7 +1244,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Asheville, Augusta, Bakersfield, Daytona Beach, Durham, Greensboro,
   Harrisburg, Huntsville, Jackson, Lancaster, McAllen, Modesto, New Haven,
   Oxnard, Pensacola, Portland (Maine), Savannah, Scranton, Stockton and
-  Winston-Salem), each judged through the card's 16:10 and the deal page's
+  Winston-Salem; then Brownsville-Harlingen, Corpus Christi, Fayetteville
+  (Arkansas), Fort Wayne, Killeen-Temple, Lakeland, Myrtle Beach, Ogden,
+  Palm Bay-Melbourne-Titusville, Provo, Salem and Vallejo — runs
+  36786974652, 36787138337 and 36787230817), each judged through the card's 16:10 and the deal page's
   21:9 crops — never the 4:1 band, which a `cbsa:` row never draws; San
   Jose, Fresno and Madison had nothing usable, and Baton Rouge's best frames
   are PNGs (never served) with its one JPEG a steep aerial that reads as a
@@ -1259,9 +1262,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and Fort Myers only once its search named Cape Coral and the
   Caloosahatchee too. Where a place is known by something other than a
   skyline, that is the picture: Savannah's Forsyth Park fountain,
-  Pensacola's beach, Oxnard's harbour. Huntsville's credit is the name
+  Pensacola's beach, Oxnard's harbour. **A photograph of a neighbouring
+  place is named for the metro area**, never for the place it shows: the
+  card's name stands for where the deal is, so Killeen-Temple's picture
+  is downtown Belton, Palm Bay-Melbourne-Titusville's is Cocoa Beach Pier
+  and Brownsville-Harlingen's is South Padre Island's beach, each row's
+  `name` the metro area's title and its `place` saying what is in the
+  frame. Huntsville's credit is the name
   inside Commons' "No machine-readable author provided. … assumed"
-  sentence, which the row's comment quotes whole.
+  sentence, which the row's comment quotes whole, and Provo's the name
+  inside the "Creator: Javin Weaver" the runner printed from Commons'
+  Creator template. Springfield (Missouri), York, Visalia, Santa
+  Rosa-Petaluma, Port St. Lucie and Tallahassee keep the drawn cover until
+  a one-market run each: York's sheet held New York's skyline and
+  Hanover's, Santa Rosa's a view of San Francisco, and
+  Tallahassee's one JPEG whole in both crops was a court building through
+  a filter.
   Milwaukee's and Greenville's credits are the author Commons names, where
   each filename names another (the owner was told). The route
   decodes the key itself (the cards ask for it percent-encoded, and no key

@@ -654,6 +654,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Bridgeport, CT",
     size: [8036, 5357],
   },
+  // Brownsville-Harlingen, TX: skyline-sheet run 36787230817 — whole in both crops in clear daylight, where the other frame's tallest tower loses its crown in the wide crop under a hazy sky; the card names the metro area, since the beach is South Padre Island's.
+  "cbsa:15180": {
+    file: "South Padre Island beach panorama.jpg",
+    place: "The South Padre Island beach, its umbrellas and kites, over the dunes",
+    credit: "Spheroidite",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Brownsville-Harlingen, TX",
+    size: [7328, 3274],
+  },
   // Buffalo, NY: skyline-sheet run 36752030741 — the one usable frame of fourteen; the band would clip Seneca One's top.
   "cbsa:15380": {
     file: "Buffalo, NY skyline.jpg",
@@ -714,6 +724,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Columbia, SC",
     size: [1844, 892],
   },
+  // Corpus Christi, TX: skyline-sheet run 36787138337 — the city article's lead, whole in both crops, over an aerial of the bay shore and hazy views from the bridge.
+  "cbsa:18580": {
+    file: "Corpus Christi skyline.jpg",
+    place: "Downtown Corpus Christi's towers over the marina",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Corpus Christi, TX",
+    size: [8064, 4827],
+  },
   // Dayton, OH: skyline-sheet run 36780772501 — the article's lead; the rest were aerials from a plane and a stadium.
   "cbsa:19430": {
     file: "Dayton Skyline - Sunset September 2022 (cropped).jpg",
@@ -763,6 +783,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "El Paso, TX",
     size: [3159, 1751],
+  },
+  // Fayetteville, AR: skyline-sheet run 36786974652 — the hill and the town hold in both crops, where Old Main loses the top of its cupola in the wide frame and the article's lead is a hazy strip behind trees.
+  "cbsa:22220": {
+    file: "Mount Sequoyah and Fayetteville from University of Arkansas.jpg",
+    place: "Mount Sequoyah and Fayetteville in autumn colour, from the University of Arkansas",
+    credit: "Brandonrush",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Fayetteville, AR",
+    size: [4000, 3000],
+  },
+  // Fort Wayne, IN: skyline-sheet run 36787230817 — its tallest towers and a domed clock tower whole in both crops under a clear sky, over the same skyline smaller behind Promenade Park.
+  "cbsa:23060": {
+    file: "Downtown Fort Wayne, Indiana Skyline from Old Fort, May 2014.jpg",
+    place: "Downtown Fort Wayne's skyline from the Old Fort",
+    credit: "Momoneymoproblemz",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Fort Wayne, IN",
+    size: [2880, 1304],
   },
   // Grand Rapids, MI: skyline-sheet run 36750858237 — blue hour with the lit bridge, sharp and whole.
   "cbsa:24340": {
@@ -834,6 +874,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Jackson, MS",
     size: [2247, 822],
   },
+  // Killeen-Temple, TX: skyline-sheet run 36787138337 — a domed courthouse under a clear sky, whole in both crops and 926px tall, over a distant strip of Temple's towers behind trees and grey street corners; the card names the metro area, since the photograph is Belton's.
+  "cbsa:28660": {
+    file: "Downtown belton.jpg",
+    place: "Downtown Belton",
+    credit: "NativeTexan55",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Killeen-Temple, TX",
+    size: [1491, 926],
+  },
   // Knoxville, TN: skyline-sheet run 36751130861 — keeps the Sunsphere, where the alternative was grey and lost it.
   "cbsa:28940": {
     file: "Knoxville Skyline from Marriott - panoramio.jpg",
@@ -843,6 +893,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/3.0",
     name: "Knoxville, TN",
     size: [5374, 3583],
+  },
+  // Lakeland, FL: skyline-sheet run 36786974652 — the towers, fountain and waterside arches whole in both crops, over a softer daylight frame of the same shore and grey, distant views from Lake Morton.
+  "cbsa:29460": {
+    file: "Downtown-Lakeland.jpg",
+    place: "Downtown Lakeland's lit towers and a fountain across the lake",
+    credit: "Nkadambi",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Lakeland, FL",
+    size: [4032, 2268],
   },
   // Lancaster, PA: skyline-sheet run 36782855933 — the city article's lead, over street scenes on a grey December day.
   "cbsa:29540": {
@@ -924,6 +984,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Modesto, CA",
     size: [3456, 2304],
   },
+  // Myrtle Beach, SC: skyline-sheet run 36787138337 — the towers and the beach whole in both crops in daylight, over a hazy high view up the strand to Cherry Grove Pier.
+  "cbsa:34820": {
+    file: "Panorama of the Myrtle Beach Beachfront 3 (cropped).jpg",
+    place: "The Myrtle Beach beachfront and its hotel towers",
+    credit: "DiscoA340",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Myrtle Beach, SC",
+    size: [6515, 2356],
+  },
   // New Haven, CT: skyline-sheet run 36782733907 — the city article's lead, downtown over the autumn trees.
   "cbsa:35300": {
     file: "New Haven, Connecticut skyline (cropped).jpg",
@@ -953,6 +1023,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Sarasota, FL",
     size: [4032, 3024],
+  },
+  // Ogden, UT: skyline-sheet run 36786974652 — the mountains, downtown and a church spire whole in both crops, over a street view that is half asphalt.
+  "cbsa:36260": {
+    file: "Ogden Utah downtown.jpg",
+    place: "Downtown Ogden under the snow-covered mountains",
+    credit: "Scott Catron from Sandy, Utah, USA",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    name: "Ogden, UT",
+    size: [2805, 1863],
   },
   // Oklahoma City, OK: skyline-sheet run 36751888862 — the sharpest frame; the Devon Tower is whole on the card (a strip-safe alternative carries a burned-in watermark).
   "cbsa:36420": {
@@ -984,6 +1064,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Oxnard, CA",
     size: [3954, 1326],
   },
+  // Palm Bay-Melbourne-Titusville, FL: skyline-sheet run 36786974652 — the pier whole in both crops in clear daylight, over a Titusville pier whose Kennedy Space Center view is a speck on the horizon; the card names the metro area, since the pier is Cocoa Beach's.
+  "cbsa:37340": {
+    file: "Cocoa Beach Pier from the beach 2023-05-19 (2).JPG",
+    place: "Cocoa Beach Pier from the beach",
+    credit: "Benoît Prieur",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Palm Bay-Melbourne-Titusville, FL",
+    size: [4032, 3024],
+  },
   // Pensacola, FL: skyline-sheet run 36783120462 — the white sand the area is known by (an article's lead), over an aerial of the bay.
   "cbsa:37860": {
     file: "Pensacola Beach, United States (Unsplash).jpg",
@@ -1014,6 +1104,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Providence, RI",
     size: [4003, 2714],
   },
+  // Provo, UT: skyline-sheet run 36786974652 — the one ground-level view of the city, whole in both crops, over hazy views down from the hillside, aerials and a plane window. The runner printed the author as "Creator: Javin Weaver" (Commons' Creator template); the credit is the name in it.
+  "cbsa:39340": {
+    file: "Downtown Provo.jpg",
+    place: "Downtown Provo's clock-tower block under snow-capped mountains",
+    credit: "Javin Weaver",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Provo, UT",
+    size: [5248, 2952],
+  },
   // Reno, NV: skyline-sheet run 36780959488 — the one clear frame; the rest were a freeway and airplane windows.
   "cbsa:39900": {
     file: "Downtown Reno 2.jpg",
@@ -1033,6 +1133,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Rochester, NY",
     size: [3601, 1760],
+  },
+  // Salem, OR: skyline-sheet run 36787138337 — the city article's lead, its spire whole in both crops, over buses at the transit centre and railway aerials.
+  "cbsa:41420": {
+    file: "Salem Oregon downtown.JPG",
+    place: "Downtown Salem among the trees, a church spire at its centre and hills behind",
+    credit: "M.O. Stevens",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Salem, OR",
+    size: [3796, 2473],
   },
   // Savannah, GA: skyline-sheet run 36782855933 — the picture the city is known by, over its houses and a park path.
   "cbsa:42340": {
@@ -1123,6 +1233,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Honolulu, HI",
     size: [6000, 4000],
+  },
+  // Vallejo, CA: skyline-sheet run 36787230817 — the ferries and the old brick waterfront whole in both crops under a grey sky, over aerials, a theme park's coasters and San Francisco's Golden Gate.
+  "cbsa:46700": {
+    file: "Mare Island Ferry Terminal from Vallejo, May 2019.JPG",
+    place: "Ferries at the Mare Island Ferry Terminal, from Vallejo",
+    credit: "Pi.1415926535",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Vallejo, CA",
+    size: [4573, 3053],
   },
   // Wichita, KS: skyline-sheet run 36780959488 — the article's lead.
   "cbsa:48620": {

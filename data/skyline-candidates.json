@@ -2953,6 +2953,12 @@
         "Lakeland Florida Lake Mirror skyline",
         "Lakeland Florida downtown lake",
         "Winter Haven Florida lake"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown-Lakeland.jpg",
+          "note": "Lakeland, FL — Nkadambi, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
       ]
     },
     {
@@ -2975,6 +2981,12 @@
         "Ogden Utah downtown mountains",
         "Ogden Utah skyline Wasatch",
         "Ogden Utah 25th Street"
+      ],
+      "candidates": [
+        {
+          "file": "Ogden Utah downtown.jpg",
+          "note": "Ogden, UT — Scott Catron from Sandy, Utah, USA, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
       ]
     },
     {
@@ -2999,6 +3011,12 @@
         "Provo Utah skyline mountains",
         "Provo Utah downtown Mount Timpanogos",
         "Utah Valley Provo Orem aerial"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Provo.jpg",
+          "note": "Provo, UT — Javin Weaver (printed as \"Creator: Javin Weaver\"), CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
       ]
     },
     {
@@ -3026,6 +3044,12 @@
         "Cocoa Beach Florida pier",
         "Titusville Florida Indian River",
         "Palm Bay Florida"
+      ],
+      "candidates": [
+        {
+          "file": "Cocoa Beach Pier from the beach 2023-05-19 (2).JPG",
+          "note": "Palm Bay-Melbourne-Titusville, FL — Benoît Prieur, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
       ]
     },
     {
@@ -3052,6 +3076,12 @@
         "Bentonville Arkansas square",
         "Fayetteville Arkansas Ozarks view",
         "Northwest Arkansas aerial"
+      ],
+      "candidates": [
+        {
+          "file": "Mount Sequoyah and Fayetteville from University of Arkansas.jpg",
+          "note": "Fayetteville, AR — Brandonrush, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
       ]
     },
     {
@@ -3097,6 +3127,12 @@
         "Myrtle Beach South Carolina beach skyline",
         "Myrtle Beach South Carolina oceanfront aerial",
         "Grand Strand South Carolina beach"
+      ],
+      "candidates": [
+        {
+          "file": "Panorama of the Myrtle Beach Beachfront 3 (cropped).jpg",
+          "note": "Myrtle Beach, SC — DiscoA340, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787138337)."
+        }
       ]
     },
     {
@@ -3144,6 +3180,12 @@
         "Temple Texas downtown",
         "Belton Texas downtown",
         "Belton Lake Texas"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown belton.jpg",
+          "note": "Killeen-Temple, TX — NativeTexan55, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787138337)."
+        }
       ]
     },
     {
@@ -3167,6 +3209,12 @@
         "Corpus Christi Texas skyline bay",
         "Corpus Christi Texas bayfront",
         "Corpus Christi Texas downtown aerial"
+      ],
+      "candidates": [
+        {
+          "file": "Corpus Christi skyline.jpg",
+          "note": "Corpus Christi, TX — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787138337)."
+        }
       ]
     },
     {
@@ -3189,6 +3237,12 @@
         "Salem Oregon downtown",
         "Salem Oregon State Capitol",
         "Salem Oregon Willamette River"
+      ],
+      "candidates": [
+        {
+          "file": "Salem Oregon downtown.JPG",
+          "note": "Salem, OR — M.O. Stevens, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787138337)."
+        }
       ]
     },
     {
@@ -3234,6 +3288,12 @@
         "Vallejo California waterfront",
         "Carquinez Bridge Vallejo",
         "Benicia California waterfront"
+      ],
+      "candidates": [
+        {
+          "file": "Mare Island Ferry Terminal from Vallejo, May 2019.JPG",
+          "note": "Vallejo, CA — Pi.1415926535, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787230817)."
+        }
       ]
     },
     {
@@ -3277,6 +3337,12 @@
         "Fort Wayne Indiana skyline",
         "Fort Wayne Indiana downtown",
         "Fort Wayne Indiana riverfront"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Fort Wayne, Indiana Skyline from Old Fort, May 2014.jpg",
+          "note": "Fort Wayne, IN — Momoneymoproblemz, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36787230817)."
+        }
       ]
     },
     {
@@ -3300,6 +3366,12 @@
         "Brownsville Texas downtown",
         "South Padre Island Texas beach",
         "Harlingen Texas downtown"
+      ],
+      "candidates": [
+        {
+          "file": "South Padre Island beach panorama.jpg",
+          "note": "Brownsville-Harlingen, TX — Spheroidite, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787230817)."
+        }
       ]
     },
     {
