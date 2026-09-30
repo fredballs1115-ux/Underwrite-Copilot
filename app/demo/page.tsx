@@ -9,7 +9,8 @@ import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/c
 import { benchmark30 } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
-import { seedBenchmarks } from "@/lib/research-data";
+import { seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
+import { monthOf } from "@/lib/zori";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { sampleLegal } from "@/lib/sample-legal";
 import { scoreMandateFit } from "@/lib/mandate";
@@ -242,6 +243,9 @@ export default async function DemoPage() {
   const phillyRows = seedBenchmarks().filter((b) =>
     b.metro.startsWith("Philadelphia"),
   );
+  // The 2–4 unit median with the month it is for and its change, read from
+  // the research file (Redfin's single-month median) rather than typed here.
+  const phillyMedian = twoToFourMedian("philadelphia_pa");
   const band = (metric: string): string | null => {
     const r = phillyRows.find((b) => b.metric === metric);
     if (!r || typeof r.low !== "number") return null;
@@ -502,10 +506,16 @@ export default async function DemoPage() {
                   <dt className="text-[11px] text-muted">FY2026 2BR fair market rent</dt>
                   <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">$1,810/mo</dd>
                 </div>
-                <div>
-                  <dt className="text-[11px] text-muted">2–4 unit median · +6.9% YoY</dt>
-                  <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">$363,500</dd>
-                </div>
+                {phillyMedian && (
+                  <div>
+                    <dt className="text-[11px] text-muted">
+                      {`2–4 unit median, ${monthOf(phillyMedian.asOf)}${phillyMedian.yoy ? ` · ${phillyMedian.yoy} YoY` : ""}`}
+                    </dt>
+                    <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
+                      {`$${phillyMedian.price.toLocaleString("en-US")}`}
+                    </dd>
+                  </div>
+                )}
               </dl>
               <p className="mt-2 text-[11px] text-muted">
                 Signed in, recorded sales around Brewerytown pull from the city&apos;s OPA records, source-linked.

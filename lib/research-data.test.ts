@@ -8,7 +8,11 @@ import {
   benchmarksForDeal,
   fmtBenchValue,
   seedBenchmarks,
+  twoToFourMedian,
 } from "@/lib/research-data";
+import { monthOf } from "@/lib/zori";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { metroForAddress } from "@/lib/market-match";
 import metrosSeed from "@/data/research/metros.json";
 
@@ -162,5 +166,27 @@ describe("fmtBenchValue", () => {
     expect(fmtBenchValue("median_sale_price_2_4_unit", 450000, 520000)).toBe("$450,000–$520,000");
     expect(fmtBenchValue("hud_fmr_fy2026_2br", 2044, 2044)).toBe("$2,044");
     expect(fmtBenchValue("median_sale_price_2_4_unit", null, null)).toBe("—");
+  });
+});
+
+describe("twoToFourMedian — a sale median with its month, from the research file", () => {
+  it("Philadelphia's May 2026 median and change, the month the file's own period states", () => {
+    const m = twoToFourMedian("philadelphia_pa");
+    expect(m).toEqual({ price: 363_500, yoy: "+6.9%", asOf: "2026-05-31" });
+    expect(monthOf(m!.asOf)).toBe("May 2026");
+    // The benchmark rows the deal pages read carry the same month.
+    const row = seeds.find((b) => b.metro === "Philadelphia, PA" && b.metric === "median_sale_price_2_4_unit");
+    expect(row?.as_of).toBe(m!.asOf);
+    expect(row?.low).toBe(m!.price);
+    // A metro the file states no change for has none; one it lacks is null.
+    expect(twoToFourMedian("reading_pa")?.yoy).toBeNull();
+    expect(twoToFourMedian("nowhere_xx")).toBeNull();
+  });
+
+  it("the demo prints the figure from the file, never a figure typed with no month", () => {
+    const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
+    expect(demo).toContain('twoToFourMedian("philadelphia_pa")');
+    expect(demo).not.toContain("$363,500");
+    expect(demo).not.toContain("+6.9% YoY");
   });
 });

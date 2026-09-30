@@ -24,6 +24,26 @@ export function seedRules(): RegulatoryRule[] {
   );
 }
 
+/** The month the 2–4 unit on-market figures are for: the research file's
+ *  block is `on_market_depth_may_2026`, Redfin's tracker "periods through
+ *  2026-05-31" as its source records — single-month medians for May 2026. */
+const ON_MARKET_DEPTH_AS_OF = "2026-05-31";
+
+/**
+ * A metro's 2–4 unit sale median from the research file, with its change on
+ * a year earlier as the file states it and the month it is for — so a page
+ * printing the figure prints its month from the same place, never a figure
+ * typed on the page. Null where the file carries no median for the metro.
+ */
+export function twoToFourMedian(metroKey: string): { price: number; yoy: string | null; asOf: string } | null {
+  const value = multifamilySeed.supply_demand?.on_market_depth_may_2026?.value as
+    | Record<string, { median_sale_price?: number; yoy?: string }>
+    | undefined;
+  const row = value?.[metroKey];
+  if (!row || typeof row.median_sale_price !== "number") return null;
+  return { price: row.median_sale_price, yoy: typeof row.yoy === "string" && row.yoy.trim() ? row.yoy : null, asOf: ON_MARKET_DEPTH_AS_OF };
+}
+
 /** Benchmarks derived from the sector JSONs. Kept in code (not hand-copied
  *  rows) so a JSON update flows through on the next deploy. */
 export function seedBenchmarks(): Benchmark[] {
@@ -57,7 +77,7 @@ export function seedBenchmarks(): Benchmark[] {
         sector: "multifamily",
         metro: label[key] ?? key,
         source: md.sources?.[0] ?? "",
-        as_of: "2026-05-31",
+        as_of: ON_MARKET_DEPTH_AS_OF,
         status: (md.status as Benchmark["status"]) ?? "sourced",
       };
       if (typeof row.median_sale_price === "number") {
