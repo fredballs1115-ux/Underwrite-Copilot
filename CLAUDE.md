@@ -711,6 +711,36 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   income's unflattering end is its bottom, not its top, so it stays the
   reader of every other figure. The header and the key terms print the
   price row as stated.
+- The offering process (#467): the extraction files when offers are due as
+  a row, "Offers due", exactly as written (never a tour, questions or
+  closing date; "Offers reviewed as received" where so), and the brokers
+  the memorandum names to contact as `ExtractionResult.listingTeam` (name,
+  title, firm, phone, email, page, each as printed, never looked up; at
+  most six). `lib/offering.ts` (pure) reads them. Four rules: **a deadline
+  is a day** (`offersDueOf`: a date with its day AND its year is a
+  deadline, `iso`; "October 15th" or "October 2026" is shown as written and
+  never stored, since a guessed year moves the deadline by a year); **the
+  reader's date wins** (`offersDueUpgrade(current, ex)`: the memorandum's
+  day fills `deals.offers_due` only where it is empty — the pipeline writes
+  it after the extraction, the deal page and the pipeline list write it for
+  deals screened before, each with `.is("offers_due", null)` so a date typed
+  meanwhile survives, and the list only for rows its deadline read answered
+  for); **a broker is as printed** (`listingTeamOf`: a phone links as
+  `tel:` only with a North American number's ten digits, `telOf`, an
+  extension kept in the words and off the link; an email links only where
+  it is one; a page only where the memorandum has it); **a blank is null**.
+  Where it shows: the deal header's deadline control (`OffersDueControl`'s
+  `fromMemorandum` — an "OM" mark, its page in the title and for a screen
+  reader — and `calendarHref`, the deal's `/api/deals/[id]/offers-due.ics`:
+  one all-day event with a two-day reminder, the deal's link in it, its UID
+  the deal's so a second download updates it, built by `lib/ics.ts`, pure,
+  CRLF lines, RFC 5545 text escaping and folding at 75 octets counted in
+  bytes), `app/(app)/deals/[id]/listing-team.tsx` (`ListingTeam`, pure:
+  "Offered by CBRE", the call for offers as written, time of day and all,
+  and a broker a row with an initials badge and the links) under the
+  reports, the pipeline's CSV "Broker" column (`PipelineSlots.broker`,
+  `brokerageOf`) and the compare table's Broker row. Never on the shared
+  screen or in an email: the listing team is the reader's contact list.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

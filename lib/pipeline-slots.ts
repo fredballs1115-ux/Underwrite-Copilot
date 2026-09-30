@@ -19,6 +19,7 @@ import { valueAddTag } from "@/lib/value-add";
 import { taxAbatementTag } from "@/lib/tax-abatement";
 import { sellerFinancingTag } from "@/lib/seller-financing";
 import { siteReportsTag } from "@/lib/site-reports";
+import { brokerageOf } from "@/lib/offering";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -73,6 +74,10 @@ export interface PipelineSlots {
    *  `siteReportsTag`, #465); absent or null where there is nothing to
    *  flag */
   reports?: string | null;
+  /** the brokerage offering the deal, as the memorandum prints it —
+   *  "CBRE", "Newmark · JLL" (lib/offering `brokerageOf`, #467); absent or
+   *  null where it names no firm */
+  broker?: string | null;
 }
 
 /**
@@ -146,5 +151,7 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     sellerNote: sellerFinancingTag(extraction),
     // The most serious thing the third-party reports found (#465).
     reports: siteReportsTag(extraction),
+    // Who is selling it (#467): the brokerage the memorandum names.
+    broker: brokerageOf(extraction),
   };
 }

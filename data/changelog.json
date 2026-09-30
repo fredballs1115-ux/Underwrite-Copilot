@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Who is selling it, and when offers are due",
+      "href": "/deals",
+      "blurb": "The screen now reads the memorandum's call for offers and its listing team. Where the memorandum states the day offers are due, that day becomes the deal's deadline, so the pipeline counts down to it and the Monday digest names it without anyone typing it in. A date you set yourself is never replaced, and a date with no year is shown as written, never guessed. The deadline in the deal's header says when it is the memorandum's, and one click puts it in your calendar with a reminder two days before. Under the deal's reports, a card lists each broker as the memorandum prints them, with their title and firm and a tap to call or email. The pipeline's CSV and the compare table name the brokerage."
+    },
+    {
+      "date": "2026-09-30",
       "title": "A price range is read at its top",
       "href": "/deals",
       "blurb": "Where a memorandum states its price as a range (pricing guidance like \"$40,000,000 – $42,000,000\" or \"$40–42M\"), every reader of the price now takes its top, the end that does not flatter a return. Before, the model, the caps and bases struck on the price, the buy box, the mandate score, the comps and the meeting workbook all read the bottom of the range as the price. The model's source note says which end it runs at and asks you to enter your own price. The pipeline shows the range as one ($40–42M). The buy box judges a ceiling by the range's top and a floor by its bottom."

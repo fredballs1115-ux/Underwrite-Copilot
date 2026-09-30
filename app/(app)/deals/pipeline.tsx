@@ -69,7 +69,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -561,7 +561,7 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -610,6 +610,8 @@ export function Pipeline({
                 : "Not screened",
         STAGE_LABEL[normalizeStage(d.stage)],
         d.offersDue ?? "",
+        // The brokerage the memorandum names (#467).
+        d.slots.broker ?? "",
         // ISO like the deadline column, so both parse as dates in Excel.
         d.createdAt.slice(0, 10),
         d.addedBy ?? "You",

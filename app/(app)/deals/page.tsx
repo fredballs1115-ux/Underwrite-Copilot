@@ -5,6 +5,7 @@ import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
+import { offersDueUpgrade } from "@/lib/offering";
 import { WhatsNewCard } from "./whats-new";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
@@ -185,8 +186,36 @@ export default async function DealsPage({
   }
 
   const dueById = new Map<string, string>();
+  const dueRead = new Set<string>();
   for (const r of (dueRows ?? []) as { id: string; offers_due: string | null }[]) {
+    dueRead.add(r.id);
     if (r.offers_due) dueById.set(r.id, r.offers_due);
+  }
+  // The memorandum's call for offers fills a deadline nobody set (#467) —
+  // a deal screened before the screen wrote it — once, and only where the
+  // column is still empty when the write lands. Only for a row the read
+  // answered for, so a database without the column never reads as "unset".
+  const dueFills: [string, string][] = [];
+  for (const d of rows) {
+    if (d.is_sample || !dueRead.has(d.id) || dueById.has(d.id)) continue;
+    const next = offersDueUpgrade(null, d.extraction as ExtractionResult | null);
+    if (next) dueFills.push([d.id, next]);
+  }
+  if (dueFills.length) {
+    await Promise.all(
+      dueFills.map(([id, offers_due]) =>
+        supabase
+          .from("deals")
+          .update({ offers_due })
+          .eq("id", id)
+          .is("offers_due", null)
+          .then(
+            () => undefined,
+            () => undefined,
+          ),
+      ),
+    );
+    for (const [id, due] of dueFills) dueById.set(id, due);
   }
   const nameById = new Map(
     ((mates ?? []) as { id: string; email: string | null; full_name: string | null }[]).map(
