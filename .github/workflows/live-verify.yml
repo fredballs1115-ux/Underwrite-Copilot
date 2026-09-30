@@ -1080,6 +1080,7 @@ jobs:
           mark "#453 affordable housing is read as affordable" grep -q "Affordable housing, read as affordable housing" p_whats-new.html
           mark "#454 a single tenant is read as one lease" grep -q "Single-tenant deals, read as one lease" p_whats-new.html
           mark "#455 a hotel is read with its flag, manager and PIP" grep -q "Hotels, read with their flag, manager and PIP" p_whats-new.html
+          mark "#456 an auction is read for how it sells" grep -q "Auctions and distressed sales, read for how they sell" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

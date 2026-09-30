@@ -130,9 +130,6 @@ export function solveMaxBid(
   const hi0 = base.purchasePrice * CEILING_X;
   const at = (p: number) => metricsAt(base, levers, p);
 
-  // Even the search floor fails → nothing to report.
-  if (!clears(at(lo0), floors)) return none;
-
   // Still feasible at the ceiling → the box isn't the constraint.
   const ceilingMetrics = at(hi0);
   if (clears(ceilingMetrics, floors)) {
@@ -147,16 +144,20 @@ export function solveMaxBid(
 
   // Grid pass: find the LAST feasible stop so bisection brackets the highest
   // feasibility edge even if a metric misbehaves locally somewhere below it.
-  let lo = lo0;
-  let hi = hi0;
-  let prev = lo0;
+  // The floor stop need not clear: on a high-yield deal (an auction's
+  // starting bid on an 18% cap, #456) the return at 5% of the price is
+  // past the IRR routine's reach and reads as none, and a stop further up
+  // still clears. Only a grid on which NO stop clears has nothing to report.
+  let prev: number | null = clears(at(lo0), floors) ? lo0 : null;
   for (let i = 1; i <= GRID; i++) {
     const p = lo0 + ((hi0 - lo0) * i) / GRID;
     if (clears(at(p), floors)) {
       prev = p;
     }
   }
-  lo = prev; // feasible by construction
+  if (prev == null) return none;
+  let lo = prev; // feasible by construction
+  let hi: number;
   // First infeasible grid stop AFTER the last feasible one:
   hi = Math.min(hi0, lo + (hi0 - lo0) / GRID);
 

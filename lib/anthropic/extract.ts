@@ -85,6 +85,16 @@ const ExtractionSchema = z.object({
     pip: z.string(),
     page: z.string(),
   }),
+  // HOW THE PROPERTY IS SOLD (#456): negotiated, at auction, by a
+  // receiver, out of a bankruptcy or by a lender (REO) — with its terms and
+  // the condition it is sold in, as stated. The auction's figures are rows.
+  // Read by lib/sale-terms.
+  sale: z.object({
+    method: z.enum(["negotiated", "auction", "receivership", "bankruptcy", "reo", "unknown"]),
+    terms: z.string(),
+    condition: z.string(),
+    page: z.string(),
+  }),
   // Each property of a PORTFOLIO OM (two or more separately addressed
   // buildings or sites), with what the OM states for THAT property and ""
   // where it states nothing; an empty list for a single-property OM. The
@@ -196,6 +206,12 @@ export async function extractTerms(
       encumbrance: out.hotel.encumbrance,
       pip: out.hotel.pip.trim(),
       page: out.hotel.page.trim(),
+    },
+    sale: {
+      method: out.sale.method,
+      terms: out.sale.terms.trim(),
+      condition: out.sale.condition.trim(),
+      page: out.sale.page.trim(),
     },
     // A one-entry list is a single property restated, not a portfolio.
     properties:

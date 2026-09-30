@@ -37,7 +37,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null });
+    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -72,6 +72,16 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(ex([...base, m("PIP cost", "$4,200,000")], { hotel }), null).hotel).toBe("Mgmt encumbered, PIP $35k/key");
     expect(pickSlots(ex(base, { hotel: { ...hotel, encumbrance: "unencumbered" } }), null).hotel).toBe("Unencumbered");
     expect(pickSlots(ex(base), null).hotel).toBeNull();
+  });
+
+  it("says how the property is sold (#456), and nothing on a negotiated sale", () => {
+    const rows = [m("NOI (in-place)", "$480,000"), m("Starting bid", "$2,500,000"), m("Buyer's premium", "5%")];
+    const sale = { method: "auction" as const, terms: "", condition: "", page: "" };
+    const s = pickSlots(ex(rows, { sale }), null);
+    expect(s.sale).toBe("Auction, 5% premium");
+    // An auction has no asking price, and the row never shows the starting bid as one.
+    expect(s.price).toBeNull();
+    expect(pickSlots(ex([m("Asking price", "$3,000,000")], { sale: { ...sale, method: "negotiated" } }), null).sale).toBeNull();
   });
 
   it("says what the price buys where it is not the building outright (#415)", () => {
@@ -119,7 +129,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null });
+    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

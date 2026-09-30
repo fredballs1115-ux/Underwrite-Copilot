@@ -696,6 +696,26 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("an auction: the challenger reads the sale's traps, and the deal context says the starting bid is not a price (#456)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      sale: { method: "auction", terms: "", condition: "As-is, where-is", page: "" },
+      metrics: [
+        ...EXTRACTION.metrics.filter((m) => !/price/i.test(m.label)),
+        { label: "Starting bid", value: "$2,500,000", flagged: false, page: "", basis: "na" },
+        { label: "Buyer's premium", value: "5%", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("How it is sold: The property is sold at auction: bidding opens at $2.5M");
+    expect(note).toContain("SALE TRAPS, checked by name");
+    expect(note).toContain("(a) THE STARTING BID IS NOT THE PRICE");
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toContain("How it is sold: The property is sold at auction");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a single-market deal stores no other markets' figures", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];

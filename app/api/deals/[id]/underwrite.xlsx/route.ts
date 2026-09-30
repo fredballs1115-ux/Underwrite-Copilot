@@ -14,6 +14,8 @@ import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { readPortfolio } from "@/lib/portfolio";
+import { getBuyBoxForDeal } from "@/lib/criteria-server";
+import { saleCeilingRead } from "@/lib/sale-ceiling";
 
 export const runtime = "nodejs";
 
@@ -114,6 +116,19 @@ export async function GET(
     // cell and its Sources note match the page the download came from.
     const debt = await liveDebtSeeds(HOLD_MONTHS);
     const model = deriveUnderwriteInputs(extraction, deal.name, actuals, { debtIndex: debt.permanent });
+    // An auction's ceiling bid (#456) is said at the buyer's own hurdle, the
+    // buy box's IRR floor, as the deal page and the report say it; the
+    // model's own read is at the screening default. Asked only of a deal
+    // sold that way, and a failed read keeps the default.
+    if (model.meta.sale) {
+      try {
+        const ownership = deal as unknown as { user_id: string; team_id: string | null };
+        const hurdle = (await getBuyBoxForDeal(ownership.user_id, ownership.team_id))?.minIrrPct ?? null;
+        if (hurdle != null) model.meta.sale = { ...model.meta.sale, read: saleCeilingRead(extraction, model.inputs, hurdle) };
+      } catch (err) {
+        console.warn(`workbook buy box read failed for ${id}:`, err instanceof Error ? err.message : err);
+      }
+    }
     // The model's assumptions against the published figures — the same
     // read the deal page's card and the report make, so the workbook's
     // Market Read tab says what the page says. Its own try: a failed live

@@ -433,6 +433,50 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   meeting workbook's price note (`hotelTag`: "Mgmt encumbered, PIP
   $35k/key", "Unencumbered", "Independent"), the memo under its title
   (`hotelShortLine`) and the compare table's Hotel row.
+- How the property is sold (#456): the extraction reads
+  `ExtractionResult.sale` (`method` — `negotiated`, `auction`,
+  `receivership`, `bankruptcy`, `reo`, `unknown` — with the sale's terms
+  and the condition it is sold in, each as stated) and labels the figures
+  as rows: "Starting bid" (never filed under "Asking price"), "Buyer's
+  premium", "Reserve price", "Bid deadline" and "Stalking horse bid".
+  `lib/sale-terms.ts` (pure) reads them. **A starting bid is not a price**:
+  a cap struck on it is the ceiling of what the building yields.
+  **The premium is part of the price**: `readPremium` reads one percentage
+  (25% at most) and any stated minimum, `allInFor` puts it on top of a bid
+  and `hammerFor` backs it out of an all-in figure, the minimum binding
+  where it must (a test holds them inverse). **A reserve is the seller's**
+  (`none` — "absolute", "no reserve" — `undisclosed`, an amount, or the
+  words), and the reserve's pattern is anchored so a "Replacement reserve"
+  row is never read as one. **A receiver, a trustee or a lender is not an
+  owner**: the headline says who is selling and what that means (as-is, no
+  representations, the court). Auction figures make an auction whatever the
+  method field says; a negotiated sale, and an unknown one with no bid, no
+  premium and no stalking horse, read null. **The model runs at the floor**:
+  where no asking price is stated, `deriveUnderwriteInputs` prices at the
+  starting bid plus the premium (`floorAllIn`, "derived", the note saying
+  every return is therefore a ceiling), after a stated price and a share's
+  gross-up, before the cap-implied price. **The ceiling bid** is
+  `lib/sale-ceiling.ts` (`saleCeiling`): the max-bid solver's all-in
+  ceiling at the hurdle, backed out of the premium, said by
+  `ceilingBidLine` — over or under the starting bid, and, where the model
+  still clears the hurdle at the solver's own ceiling, "the bidding, not
+  the model, sets the ceiling". The hurdle is the buy box's IRR floor, else
+  `SALE_HURDLE_PCT` (the report grid's 15%), on the deal page, the report
+  and the workbook alike (the workbook route reads the buy box only for a
+  deal sold this way). The solver no longer gives up when its search floor
+  (5% of the price) fails: on a high-yield deal the IRR there is past the
+  routine's reach and reads as none while prices further up clear, so only
+  a grid on which no stop clears has nothing to report. Where it shows: the deal context and the
+  challenger (`saleNote`: SALE TRAPS (a)–(d) at auction, (a)–(c) for a
+  receiver, a bankruptcy or a lender), `app/sale-panel.tsx` (`SalePanel`,
+  pure: `data-bar="sale-bid"` + `sale-premium` with a `sale-ceiling` tick,
+  a bids-due chip) on the deal page and the shared screen, the key terms
+  (`saleTermRows`, right after the price), the pipeline row, card and CSV's
+  "Sale" column and the meeting workbook's price note (`saleTag`: "Auction,
+  5% premium", "Receivership sale", "Bankruptcy sale", "Bank-owned
+  (REO)"), the memo under its title (`saleShortLine`), the workbook's cover
+  ("How it is sold", `meta.sale`), the report's caveat and the compare
+  table's Sale row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

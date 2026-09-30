@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Auctions and distressed sales, read for how they sell",
+      "href": "/deals",
+      "blurb": "When a property is sold at auction, by a court-appointed receiver, out of a bankruptcy or by the lender that took it back, the screen now reads how it is sold: the starting bid, the buyer's premium on top of the winning bid, the reserve, when bids are due, any stalking-horse bid and the sale's conditions. A starting bid is no longer taken for the price: where the memorandum states no asking price, the model runs at the starting bid plus the premium — the floor of what a winning bidder pays — and says every return it shows is therefore a ceiling. The deal page draws the opening bid with the premium on top and the most the model pays all-in at your buy box's IRR floor (15% where none is set), with the hammer price that leaves once the premium is backed out. The pipeline, the memo, the report, the workbook and the compare table carry it too, and the assumption review checks the sale's traps by name."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Hotels, read with their flag, manager and PIP",
       "href": "/deals",
       "blurb": "A hotel is now read for what it is sold with: its brand, whether the sale is encumbered by the franchise or the management agreement, when each agreement ends, and the brand's property improvement plan. The deal page stacks the PIP on the price for the basis a key, draws both agreements' years left against the model's five-year sale, and checks that the memorandum's ADR times occupancy ties to its RevPAR, with the RevPAR index against its competitive set. Where the memorandum states a PIP and no other capital budget, the model now carries it as first-year capital; where it states both, the budget is read as including it. The pipeline, the memo, the report, the workbook and the compare table carry it too, and the assumption review checks the hotel's contract traps by name."

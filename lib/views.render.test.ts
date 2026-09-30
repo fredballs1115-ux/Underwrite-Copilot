@@ -87,7 +87,8 @@ const CARDS: DealCard[] = [
   // …and it carries the seller's loan, offered for assumption (#419).
   card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null, debt: "Assumable 3.45%" }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
   card({ id: "d", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", stage: "dead", fit: "outside", score: 18, mandateVerdict: "PASS", slots: { cap: "8.1%", price: "$60,000,000", yoc: null }, market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
-  card({ id: "e", name: "Logan Square Retail", assetClass: "retail", verdict: null, stage: "screening", jobStatus: "running", slots: { cap: null, price: "$12,500,000", yoc: null }, market: "Chicago, IL", coveredMarket: "Chicago", hasAddress: false }),
+  // …sold at auction, the figure the opening bid (#456).
+  card({ id: "e", name: "Logan Square Retail", assetClass: "retail", verdict: null, stage: "screening", jobStatus: "running", slots: { cap: null, price: "$12,500,000", yoc: null, sale: "Auction, 5% premium" }, market: "Chicago, IL", coveredMarket: "Chicago", hasAddress: false }),
   // A hotel sold encumbered by its manager, with the brand's PIP (#455).
   card({ id: "f", name: "Courtyard Newark Airport", assetClass: "hospitality_str", verdict: null, stage: "screening", jobStatus: "failed", slots: { cap: null, price: null, yoc: null, hotel: "Mgmt encumbered, PIP $35k/key" }, market: "Newark, NJ", coveredMarket: "Northern New Jersey" }),
   // A 49% LP interest: the row says what the price buys beside the figure.
@@ -236,6 +237,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // What a hotel is sold with, at every width too (#455).
     expect((text.match(/Mgmt encumbered, PIP \$35k\/key/g) ?? []).length).toBe(4);
     expect(html).toContain("Mgmt encumbered, PIP $35k/key: what the hotel is sold with");
+    // How the property is sold, at every width too (#456): the figure
+    // beside it is where the bidding opens, not a price.
+    expect((text.match(/Auction, 5% premium/g) ?? []).length).toBe(4);
+    expect(html).toContain("Auction, 5% premium: the figure is where the bidding opens or the seller is not an owner");
   });
 
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
@@ -353,6 +358,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((text.match(/LIHTC, 75% restricted/g) ?? []).length).toBe(1);
     expect((text.match(/Single tenant, 6 yrs left/g) ?? []).length).toBe(1);
     expect((text.match(/Mgmt encumbered, PIP \$35k\/key/g) ?? []).length).toBe(1);
+    expect((text.match(/Auction, 5% premium/g) ?? []).length).toBe(1);
     // The three figures a pipeline is read by; a plan deal's yield on cost
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
@@ -5186,5 +5192,95 @@ describe("ShareView — what a hotel is sold with, under the title (#455)", () =
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("hotel-panel");
+  });
+});
+
+// ── How the property is sold (#456) ───────────────────────────────────────
+import { SalePanel } from "@/app/sale-panel";
+import { ceilingBidLine, readSale } from "@/lib/sale-terms";
+
+describe("SalePanel — how the property is sold, drawn", () => {
+  const AS_OF = new Date(Date.UTC(2026, 8, 30));
+  const row = (label: string, value: string, page = "p. 3") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const auction = (over: Partial<NonNullable<ExtractionResult["sale"]>> = {}, metrics?: ExtractionResult["metrics"]) =>
+    ({
+      dealName: "Midtown Office Tower",
+      assetClass: "office",
+      totalPages: 30,
+      sale: { method: "auction", terms: "Online auction; 10% non-refundable deposit; 30-day close", condition: "As-is, where-is", page: "p. 3", ...over },
+      metrics: metrics ?? [
+        row("NOI (in-place)", "$480,000"),
+        row("Starting bid", "$2,500,000"),
+        row("Buyer's premium", "5% of the winning bid"),
+        row("Reserve price", "Undisclosed"),
+        row("Bid deadline", "October 15, 2026"),
+      ],
+    }) as ExtractionResult;
+
+  it("draws the opening bid, the premium on top and the model's ceiling on one track, with the deadline", () => {
+    const sale = readSale(auction(), AS_OF)!;
+    const ceiling = { line: ceilingBidLine(sale, 3_150_000, 15), maxAllIn: 3_150_000, hammer: 3_000_000, unbounded: false, hurdlePct: 15 };
+    const html = render(React.createElement(SalePanel, { sale, ceiling }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="sale-panel"');
+    expect(text).toContain("How it is sold");
+    expect(text).toContain("Auction");
+    expect(text).toContain("Bids due in 15 days");
+    expect(text).toContain("bidding opens at $2.5M, which is where the price starts, not what it is");
+    // One bar: the bid, the premium on it, and a tick at the ceiling.
+    expect(html.match(/data-bar="sale-bid"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="sale-premium"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="sale-ceiling"/g)).toHaveLength(1);
+    expect(text).toContain("Starting bid, $2.5M");
+    expect(text).toContain("Buyer's premium, $125,000 — $2.63M all-in");
+    expect(text).toContain("The model's ceiling at 15%, $3.15M all-in");
+    expect(text).toContain("At a 15% levered IRR the model pays at most $3.15M all-in — a hammer price of $3M with the 5% premium on top");
+    expect(text).toContain("The sale's terms as stated: Online auction; 10% non-refundable deposit; 30-day close");
+    expect(a11yIssues(html), "sale panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("a receiver's sale draws who is selling and no bar; nothing at all on a negotiated sale", () => {
+    const receiver = auction({ method: "receivership", terms: "", condition: "As-is; no representations" }, [row("Asking price", "$4,000,000")]);
+    const html = render(React.createElement(SalePanel, { sale: readSale(receiver, AS_OF) }));
+    const text = visibleText(html);
+    expect(text).toContain("Receiver's sale");
+    expect(text).toContain("A court-appointed receiver is selling it");
+    expect(html).not.toContain('data-bar="sale-bid"');
+    expect(a11yIssues(html)).toEqual([]);
+    const negotiated = auction({ method: "negotiated" }, [row("Asking price", "$4,000,000")]);
+    expect(render(React.createElement(SalePanel, { sale: readSale(negotiated, AS_OF) }))).toBe(render(React.createElement(React.Fragment)));
+  });
+});
+
+describe("ShareView — how the property is sold, under the title (#456)", () => {
+  it("draws the sale and leads the key terms with the bid, and nothing on the sample", () => {
+    const sold = {
+      ...SAMPLE_DEAL.extraction,
+      sale: { method: "auction" as const, terms: "", condition: "", page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Starting bid", value: "$40,000,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Buyer's premium", value: "5%", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: sold }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="sale-panel"');
+    expect(text).toContain("The property is sold at auction: bidding opens at $40M");
+    expect(text).toContain("Starting bid");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("sale-panel");
   });
 });

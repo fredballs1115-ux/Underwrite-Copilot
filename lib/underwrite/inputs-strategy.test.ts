@@ -409,3 +409,33 @@ describe("deriveUnderwriteInputs — a hotel's PIP is the buyer's capital (#455)
     expect(office.meta.hotel).toBeNull();
   });
 });
+
+describe("deriveUnderwriteInputs — an auction's starting bid is where the price starts (#456)", () => {
+  const sale = { method: "auction" as const, terms: "", condition: "As-is", page: "" };
+  const base = [metric("NOI (in-place)", "$480,000"), metric("Total SF", "62,000 SF")];
+
+  it("runs at the starting bid plus the premium, never the $10M placeholder, and says the returns are ceilings", () => {
+    const m = deriveUnderwriteInputs(
+      ex([...base, metric("Starting bid", "$2,500,000", { page: "p. 3" }), metric("Buyer's premium", "5%")], { assetClass: "office", sale, totalPages: 30 }),
+      "fallback",
+    );
+    expect(m.inputs.purchasePrice).toBe(2_625_000);
+    expect(m.sources.purchasePrice?.provenance).toBe("derived");
+    expect(m.sources.purchasePrice?.note).toBe(
+      "The $2,500,000 starting bid plus the 5% buyer's premium — the floor of what a winning bidder pays, so every return here is a ceiling; enter the price you would bid",
+    );
+    expect(m.sources.purchasePrice?.page).toBe("p. 3");
+    expect(m.meta.sale?.line).toBe("Sold at auction: bidding opens at $2.5M; a 5% buyer's premium ($2.63M all-in at the opening bid)");
+    expect(m.meta.sale?.read).toMatch(/^(At a 15% levered IRR the model pays at most|The model still clears a 15% levered IRR)/);
+  });
+
+  it("a stated asking price still wins; a negotiated sale carries no sale line", () => {
+    const asked = deriveUnderwriteInputs(
+      ex([...base, metric("Asking price", "$3,000,000"), metric("Starting bid", "$2,500,000")], { assetClass: "office", sale }),
+      "fallback",
+    );
+    expect(asked.inputs.purchasePrice).toBe(3_000_000);
+    const plain = deriveUnderwriteInputs(ex([...base, metric("Asking price", "$3,000,000")], { assetClass: "office", sale: { ...sale, method: "negotiated" } }), "fallback");
+    expect(plain.meta.sale).toBeNull();
+  });
+});

@@ -33,6 +33,7 @@ import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
 import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
+import { readSale, saleShortLine } from "@/lib/sale-terms";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -141,6 +142,14 @@ function singleTenantLineFor(extraction: ExtractionResult | null): string {
   return r ? singleTenantShortLine(r) : "";
 }
 
+/** How the property is sold (lib/sale-terms, #456), in one line for the
+ *  memo's header: the auction's bid, premium, reserve and deadline, or who
+ *  is selling. "" on a negotiated sale. */
+function saleLineFor(extraction: ExtractionResult | null): string {
+  const r = readSale(extraction);
+  return r ? saleShortLine(r) : "";
+}
+
 /** What a hotel is sold with (lib/hotel-deal, #455), in one line for the
  *  memo's header: the flag, the encumbrance, the PIP, the franchise's end.
  *  "" on anything but a hotel. */
@@ -180,6 +189,9 @@ export type MemoData = {
   /** what a hotel is sold with (lib/hotel-deal, #455), in one line; "" on
    *  anything but a hotel */
   hotelLine?: string;
+  /** how the property is sold (lib/sale-terms, #456), in one line; "" on a
+   *  negotiated sale */
+  saleLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -427,6 +439,7 @@ export function buildMemoData(
     affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
     singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
     hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
+    saleLine: pdfSafe(saleLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -868,6 +881,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.interestLine && (
               <Text style={[s.sub, { color: "#114e54", fontFamily: "Helvetica-Bold" }]}>{data.interestLine}</Text>
             )}
+            {/* How it is sold (#456): an auction's starting bid is where the
+                price starts, and a court's or a lender's sale is as-is. */}
+            {data.saleLine && <Text style={[s.sub, { color: "#8a5a00", fontFamily: "Helvetica-Bold" }]}>{data.saleLine}</Text>}
             {/* The seller's loan offered for assumption (#419), as stated. */}
             {data.assumableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.assumableLine}</Text>}
             {/* A covenant or a contract that sets the rents (#453): the

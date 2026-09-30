@@ -53,6 +53,7 @@ import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } f
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
 import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
+import { readSale, saleShortLine } from "@/lib/sale-terms";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -730,6 +731,11 @@ export interface ReportInput {
    *  absent where the caller built no model, and then the line prints
    *  alone */
   hotel?: { line: string; read: string } | null;
+  /** how the property is sold, and the ceiling bid at the report's hurdle
+   *  (lib/sale-terms + lib/sale-ceiling, #456) — printed over the grids;
+   *  absent where the caller built no model, and then the line prints
+   *  alone */
+  sale?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
@@ -751,6 +757,7 @@ export function buildReportData(
   floodMap?: FloodMapView | null,
   singleTenant?: { line: string; read: string } | null,
   hotel?: { line: string; read: string } | null,
+  sale?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -761,6 +768,7 @@ export function buildReportData(
     floodMap: floodMap ?? null,
     singleTenant: singleTenant ?? null,
     hotel: hotel ?? null,
+    sale: sale ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1045,6 +1053,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // What a hotel is sold with (#455), the same way.
   const hotelRead = readHotelDeal(extraction);
   const hotel = input.hotel ?? (hotelRead ? { line: hotelShortLine(hotelRead), read: "" } : null);
+  // How it is sold (#456), the same way.
+  const saleRead = readSale(extraction);
+  const sale = input.sale ?? (saleRead ? { line: saleShortLine(saleRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1243,6 +1254,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <AffordableCaveat read={affordable} />}
           {!sensitivity && <SingleTenantCaveat lease={singleTenant} />}
           {!sensitivity && <SingleTenantCaveat lease={hotel} />}
+          {!sensitivity && <SingleTenantCaveat lease={sale} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <LeaseholdBlock view={input.leasehold} />}
@@ -1279,6 +1291,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <AffordableCaveat read={affordable} />
           <SingleTenantCaveat lease={singleTenant} />
           <SingleTenantCaveat lease={hotel} />
+          <SingleTenantCaveat lease={sale} />
 
           <HeatGrid
             axisLabel="EXIT CAP"

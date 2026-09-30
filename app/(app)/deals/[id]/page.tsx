@@ -14,9 +14,12 @@ import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { HotelPanel } from "@/app/hotel-panel";
+import { SalePanel } from "@/app/sale-panel";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { readHotelDeal } from "@/lib/hotel-deal";
+import { readSale } from "@/lib/sale-terms";
+import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
@@ -1147,6 +1150,14 @@ export default async function DealPage({
             before any figure is believed, since it changes what the price
             buys (lib/interest). Nothing for a plain fee simple. */}
         <InterestPanel interest={interest} />
+        {/* How it is sold (#456): an auction's starting bid is where the
+            price starts — the bid, the premium on top, the model's ceiling
+            at the buyer's hurdle; a court's or a lender's sale says who is
+            selling (lib/sale-terms). */}
+        <SalePanel
+          sale={readSale(extraction)}
+          ceiling={derived ? saleCeiling(extraction, derived.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT) : null}
+        />
         {/* A covenant or a contract that sets the rents (#453): the units it
             binds, until when, each tier against its limit — said before any
             rent growth is believed (lib/affordable). */}

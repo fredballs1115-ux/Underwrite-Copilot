@@ -828,6 +828,29 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "Affordability")).toThrow();
   });
 
+  it("an auction (#456): how it is sold, then the ceiling bid at the screening hurdle", async () => {
+    const auction = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        sale: { method: "auction", terms: "", condition: "", page: "" },
+        metrics: [
+          ...extraction.metrics.filter((m) => !/price|cap rate/i.test(m.label)),
+          { label: "Starting bid", value: "$2,500,000", flagged: false, page: "p. 3" },
+          { label: "Buyer's premium", value: "5%", flagged: false, page: "p. 3" },
+        ],
+      },
+      "fallback",
+    );
+    expect(auction.inputs.purchasePrice).toBe(2_625_000);
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(auction));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "How it is sold");
+    expect(String(cover.getCell(r, 3).value)).toBe("Sold at auction: bidding opens at $2.5M; a 5% buyer's premium ($2.63M all-in at the opening bid)");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/15% levered IRR/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "How it is sold")).toThrow();
+  });
+
   it("a hotel (#455): what it is sold with, then the PIP against the model's capital line", async () => {
     const withHotel = deriveUnderwriteInputs(
       {
