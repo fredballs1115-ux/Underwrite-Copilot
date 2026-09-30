@@ -194,7 +194,9 @@ export default async function DealPage({
         .order("created_at", { ascending: true }),
       supabase
         .from("analysis_jobs")
-        .select("status, step, progress, error, updated_at")
+        // created_at: when the run was asked for, so the progress clock of a
+        // page reloaded mid-screen counts from the run's start (lib/jobs).
+        .select("status, step, progress, error, updated_at, created_at")
         .eq("deal_id", id)
         .order("created_at", { ascending: false })
         .limit(1)
@@ -319,6 +321,7 @@ export default async function DealPage({
     progress: number;
     error: string | null;
     updated_at?: string | null;
+    created_at?: string | null;
   } | null;
 
   // A screen that failed midway, or one still running, leaves a MIXED

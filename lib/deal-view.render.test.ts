@@ -402,6 +402,28 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(render(base)).not.toMatch(/data-qa="verdict-date"/);
   });
 
+  it("a screen under way draws its rail with the clock; the clock is read after the page mounts, from the run's own start", () => {
+    // The server's markup starts the clock at 0:00 (reading the time during
+    // render would disagree with the client's first render); the effect then
+    // counts from created_at, when the run was asked for (lib/run-clock).
+    const html = render({
+      ...sampleProps("overview"),
+      job: {
+        status: "running",
+        step: "challenge",
+        progress: 40,
+        error: null,
+        updated_at: new Date().toISOString(),
+        created_at: new Date(Date.now() - 170_000).toISOString(),
+      },
+    } as Props);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/Step 3 of 6 · 0:00/);
+    expect(text).toMatch(/typically takes 2–4 minutes/);
+  });
+
   it("the comps tab draws each sale comp's basis against the subject's", () => {
     const html = render(sampleProps("analyses", "comps"));
     // Three sale comps state a per-unit basis ($252k, $298k, $261k) and each

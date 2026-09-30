@@ -72,6 +72,7 @@ import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
 import { findPricedMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
 import { interestOf } from "@/lib/interest";
+import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import type { ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
@@ -87,6 +88,10 @@ type Job = {
   error: string | null;
   /** last write to the job row — used to detect a crashed/stalled run */
   updated_at?: string | null;
+  /** when the run was asked for — restamped by every claim of the deal's
+   *  one job row (lib/jobs) — so the progress clock counts from the run's
+   *  start rather than from the page load */
+  created_at?: string | null;
 } | null;
 
 // A run that hasn't written progress in this long is treated as stalled: the
@@ -1630,17 +1635,25 @@ function TabDot({
   );
 }
 
-/** mm:ss elapsed since mount — a moving number so a long step never reads as
- *  "hung" the way a frozen percentage does. */
-function useElapsed(): string {
-  const [secs, setSecs] = useState(0);
+/** m:ss since the run began — the job row's own start where the page has it
+ *  (lib/run-clock), so a reload mid-screen never reads 0:00 beside
+ *  "typically 2–4 minutes", and since this page began watching where it has
+ *  none. A moving number, so a long step never reads as "hung" the way a
+ *  frozen percentage does. The clock is read in the effect, never in render,
+ *  so the server's markup and the first client render agree. */
+function useElapsed(startedAt: string | null | undefined): string {
+  const [clock, setClock] = useState<{ since: number; now: number } | null>(null);
   useEffect(() => {
-    const t = setInterval(() => setSecs((v) => v + 1), 1000);
-    return () => clearInterval(t);
+    const since = Date.now();
+    const tick = () => setClock({ since, now: Date.now() });
+    const raf = requestAnimationFrame(tick);
+    const t = setInterval(tick, 1000);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(t);
+    };
   }, []);
-  const m = Math.floor(secs / 60);
-  const sec = String(secs % 60).padStart(2, "0");
-  return `${m}:${sec}`;
+  return clock ? elapsedLabel(runStartMs(startedAt, clock.since), clock.now) : "0:00";
 }
 
 /** Where the deal has been: every stage change with its date, newest first.
@@ -1844,7 +1857,7 @@ function NotifyOffer() {
 }
 
 function ProgressRail({ job }: { job: NonNullable<Job> }) {
-  const elapsed = useElapsed();
+  const elapsed = useElapsed(job.created_at);
 
   // Reconcile and model generation run on their own — a simple indicator, not
   // the 6-step pipeline rail.
