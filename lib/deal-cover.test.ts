@@ -6,7 +6,7 @@ import { CARD, THUMB, bannerSources } from "./deal-banner";
 import { DealCover } from "@/app/(app)/deals/deal-cover";
 import { DealBanner } from "@/app/(app)/deals/deal-banner";
 import { DealThumb } from "@/app/(app)/deals/deal-thumb";
-import { a11yIssues, visibleText } from "./render-lint";
+import { a11yIssues, positionConflicts, visibleText } from "./render-lint";
 
 const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
 const luminance = (c: number[]) => {
@@ -122,5 +122,26 @@ describe("the pipeline's pictures, without the overhead (#442)", () => {
     // With no cover handed over, the plate holds the slot, as before.
     const plate = renderToStaticMarkup(React.createElement(DealThumb, { sources: [], label: "Laredo DC" }));
     expect(plate).toContain('data-deal-thumb="blank"');
+  });
+
+  it("lays the cover over the frame while a photograph loads, never in its place (#448)", () => {
+    const cover = coverFor({ seed: "d1", assetClass: "multifamily", place: "Waco, TX" });
+    const own = { ...facts, pictureCredit: "From the offering memorandum", aerial: false };
+    const card = renderToStaticMarkup(
+      React.createElement(DealBanner, { sources: bannerSources(own, CARD), cover, label: "Brazos Flats", aspect: "16/10", flush: true }),
+    );
+    const row = renderToStaticMarkup(
+      React.createElement(DealThumb, { sources: bannerSources(own, THUMB), cover, label: "Brazos Flats" }),
+    );
+    for (const html of [card, row]) {
+      expect(positionConflicts(html)).toEqual([]);
+      // The cover is absolute, over the frame, so the photograph keeps its
+      // place in the flow; the photograph after it is the frame's.
+      expect(html).toMatch(/data-deal-cover="housing"[^>]*class="[^"]*\babsolute inset-0\b/);
+    }
+    // The cover on its own still sets its own frame for its art and words.
+    const alone = renderToStaticMarkup(React.createElement(DealCover, { cover, label: "Brazos Flats", className: "w-full" }));
+    expect(alone).toMatch(/class="overflow-hidden relative w-full"/);
+    expect(positionConflicts(alone)).toEqual([]);
   });
 });

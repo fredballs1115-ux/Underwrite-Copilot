@@ -43,6 +43,12 @@ export interface DealVisualCache {
   pictureCheckedAt?: string;
   /** the search rules that verdict was reached under; see PICTURE_SEARCH_VERSION */
   pictureSearchV?: number;
+  /** the memorandum's other photographs, beside the cover, in page order
+   *  (#448, lib/deal-picture) — each stored as two derivatives */
+  gallery?: DealPicture[];
+  /** the rules the gallery was read under; see GALLERY_VERSION. Set, with
+   *  no gallery, where the memorandum held no other photograph */
+  galleryV?: number;
 }
 
 /** The building's own photograph — where it came from and where its two sizes live. */
@@ -57,6 +63,8 @@ export interface DealPicture {
   /** lifted from the memorandum's cover, or uploaded by the reader */
   source: "om" | "upload";
   at: string;
+  /** the memorandum's page it was lifted from (1-based), where known */
+  page?: number;
 }
 
 // Precision now lives with the framing rules it drives (lib/imagery-plan),

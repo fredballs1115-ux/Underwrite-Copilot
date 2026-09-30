@@ -133,6 +133,55 @@ export function flatShare(pixels: ArrayLike<number>, width: number, height: numb
 }
 
 /**
+ * A picture's difference hash (#448): 64 bits, one a comparison of two
+ * neighbouring cells' brightness on a 9 × 8 grid, each cell the mean of a
+ * 4 × 4 sample. The same photograph placed twice in a memorandum, at two
+ * sizes or two qualities, hashes within a few bits of itself; two different
+ * photographs lie twenty or more apart (`NEAR_BITS`).
+ */
+export function differenceHash(pixels: ArrayLike<number>, width: number, height: number, channels: number): bigint {
+  const cols = 9;
+  const rows = 8;
+  const sub = 4;
+  const cells: number[] = [];
+  for (let cy = 0; cy < rows; cy++) {
+    for (let cx = 0; cx < cols; cx++) {
+      let sum = 0;
+      for (let sy = 0; sy < sub; sy++) {
+        const y = Math.min(height - 1, Math.floor(((cy * sub + sy + 0.5) * height) / (rows * sub)));
+        for (let sx = 0; sx < sub; sx++) {
+          const x = Math.min(width - 1, Math.floor(((cx * sub + sx + 0.5) * width) / (cols * sub)));
+          const o = (y * width + x) * channels;
+          sum += 0.299 * pixels[o] + 0.587 * pixels[o + 1] + 0.114 * pixels[o + 2];
+        }
+      }
+      cells.push(sum / (sub * sub));
+    }
+  }
+  let hash = BigInt(0);
+  for (let cy = 0; cy < rows; cy++) {
+    for (let cx = 0; cx < cols - 1; cx++) {
+      hash = (hash << BigInt(1)) | (cells[cy * cols + cx] > cells[cy * cols + cx + 1] ? BigInt(1) : BigInt(0));
+    }
+  }
+  return hash;
+}
+
+/** How many of two hashes' 64 bits differ. */
+export function hashDistance(a: bigint, b: bigint): number {
+  let x = a ^ b;
+  let n = 0;
+  while (x > BigInt(0)) {
+    n += Number(x & BigInt(1));
+    x >>= BigInt(1);
+  }
+  return n;
+}
+
+/** Two pictures whose hashes differ in no more bits than this are one. */
+export const NEAR_BITS = 10;
+
+/**
  * Whether an image could be the cover: a colour picture of a photograph's
  * size and shape, by the scan's own rules, that is not a handful of flat
  * colours.
@@ -196,24 +245,42 @@ function paintedImage(page: PdfPage, id: string): Promise<PaintedImage | null> {
   });
 }
 
+/** One image a page paints, decoded: its pixels and where it was found. */
+interface PaintedPixels {
+  width: number;
+  height: number;
+  kind: number;
+  channels: 3 | 4;
+  /** a view of pdfjs's own buffer, alive while the visit runs */
+  pixels: Uint8Array;
+  /** 1-based */
+  page: number;
+}
+
 /**
- * The cover photograph of a memorandum as raw pixels (`pickDecodedCover`'s
- * rule), with what the read managed: a file that needs a password to open,
- * one pdfjs cannot parse, or a search out of time finds no cover and says
- * so. Page one is read first, and when it holds a photograph the pages
- * after it are never decoded.
+ * Open a memorandum as a viewer does and hand every image its first `pages`
+ * pages paint to `visit`, decoded, in page order; an image painted on
+ * several pages is visited once. `visit` answers false to end the walk, and
+ * `pageDone` is asked after each page whether to go on. Never throws: says
+ * whether the file opened and which pages were read to their end, inside
+ * the time.
  */
-export async function decodeOmCover(pdf: Uint8Array): Promise<OmCoverRead> {
-  const read: OmCoverRead = { cover: null, opened: false, pageOneRead: false };
+async function walkPaintedImages(
+  pdf: Uint8Array,
+  opts: { pages: number; budgetMs: number },
+  visit: (img: PaintedPixels) => boolean | Promise<boolean>,
+  pageDone?: (page: number) => boolean,
+): Promise<{ opened: boolean; completed: Set<number> }> {
+  const out = { opened: false, completed: new Set<number>() };
   let pdfjs: Pdfjs;
   try {
     pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   } catch {
-    return read;
+    return out;
   }
-  const deadline = Date.now() + DECODE_BUDGET_MS;
+  const deadline = Date.now() + opts.budgetMs;
   let task: ReturnType<Pdfjs["getDocument"]> | null = null;
-  let best: ImageCandidate | null = null;
+  const visited = new Set<string>();
   try {
     task = pdfjs.getDocument({
       // A copy: pdfjs may take ownership of the buffer it is handed.
@@ -226,58 +293,48 @@ export async function decodeOmCover(pdf: Uint8Array): Promise<OmCoverRead> {
       maxImageSize: MAX_DECODE_PIXELS,
     });
     const doc = await before(task.promise, deadline);
-    read.opened = true;
-    const last = Math.min(doc.numPages, COVER_PAGES);
-    for (let p = 1; p <= last; p++) {
+    out.opened = true;
+    const last = Math.min(doc.numPages, opts.pages);
+    let going = true;
+    for (let p = 1; p <= last && going; p++) {
       if (Date.now() >= deadline) break;
       let page: PdfPage | null = null;
       try {
         page = await before(doc.getPage(p), deadline);
         const ops = await before(page.getOperatorList(), deadline);
-        for (let i = 0; i < ops.fnArray.length; i++) {
+        for (let i = 0; i < ops.fnArray.length && going; i++) {
           if (ops.fnArray[i] !== pdfjs.OPS.paintImageXObject) continue;
           const id = ops.argsArray[i]?.[0];
           if (typeof id !== "string") continue;
+          // A document-wide image ("g_…") drawn again on a later page.
+          if (id.startsWith("g_") && visited.has(id)) continue;
+          visited.add(id);
           const img = await before(paintedImage(page, id), deadline);
           if (!img?.data) continue;
           const channels = img.kind === IMAGE_KIND.rgba ? 4 : 3;
           if (img.data.length < img.width * img.height * channels) continue;
-          const photo = img.kind === IMAGE_KIND.rgb || img.kind === IMAGE_KIND.rgba;
-          const candidate: ImageCandidate = {
+          going = await visit({
             width: img.width,
             height: img.height,
             kind: img.kind,
+            channels,
+            pixels: new Uint8Array(img.data.buffer, img.data.byteOffset, img.width * img.height * channels),
             page: p,
-            grey: photo ? isGrey(img.data, channels) : true,
-            flat: photo ? flatShare(img.data, img.width, img.height, channels) : 1,
-          };
-          if (pickDecodedCover(best ? [best, candidate] : [candidate]) === candidate && candidate !== best) {
-            best = candidate;
-            read.cover = {
-              width: img.width,
-              height: img.height,
-              channels,
-              // A view, not a copy: the page's own store is emptied below,
-              // and this reference is the one that keeps the pixels.
-              pixels: new Uint8Array(img.data.buffer, img.data.byteOffset, img.width * img.height * channels),
-              page: p,
-            };
-          }
+          });
         }
-        if (p === 1) read.pageOneRead = true;
+        if (going) out.completed.add(p);
       } catch {
         // A page that fails or runs out of time: keep what earlier pages gave.
         if (Date.now() >= deadline) break;
       } finally {
         page?.cleanup();
       }
-      // The cover page's photograph is the cover: the rest is never decoded.
-      if (p === 1 && read.cover) break;
+      if (going && pageDone && !pageDone(p)) going = false;
     }
-    return read;
+    return out;
   } catch {
     // A password to open, a file pdfjs cannot parse, or no time left to open it.
-    return read;
+    return out;
   } finally {
     try {
       await task?.destroy();
@@ -285,4 +342,110 @@ export async function decodeOmCover(pdf: Uint8Array): Promise<OmCoverRead> {
       // nothing to release
     }
   }
+}
+
+/** Weigh a decoded image the way the pick does. */
+function candidateOf(img: PaintedPixels): ImageCandidate {
+  const photo = img.kind === IMAGE_KIND.rgb || img.kind === IMAGE_KIND.rgba;
+  return {
+    width: img.width,
+    height: img.height,
+    kind: img.kind,
+    page: img.page,
+    grey: photo ? isGrey(img.pixels, img.channels) : true,
+    flat: photo ? flatShare(img.pixels, img.width, img.height, img.channels) : 1,
+  };
+}
+
+/**
+ * The cover photograph of a memorandum as raw pixels (`pickDecodedCover`'s
+ * rule), with what the read managed: a file that needs a password to open,
+ * one pdfjs cannot parse, or a search out of time finds no cover and says
+ * so. Page one is read first, and when it holds a photograph the pages
+ * after it are never decoded.
+ */
+export async function decodeOmCover(pdf: Uint8Array): Promise<OmCoverRead> {
+  const read: OmCoverRead = { cover: null, opened: false, pageOneRead: false };
+  let best: ImageCandidate | null = null;
+  const walk = await walkPaintedImages(
+    pdf,
+    { pages: COVER_PAGES, budgetMs: DECODE_BUDGET_MS },
+    (img) => {
+      const candidate = candidateOf(img);
+      if (pickDecodedCover(best ? [best, candidate] : [candidate]) === candidate && candidate !== best) {
+        best = candidate;
+        // A view, not a copy: the page's own store is emptied after the
+        // page, and this reference is the one that keeps the pixels.
+        read.cover = { width: img.width, height: img.height, channels: img.channels, pixels: img.pixels, page: img.page };
+      }
+      return true;
+    },
+    // The cover page's photograph is the cover: the rest is never decoded.
+    (page) => !(page === 1 && read.cover),
+  );
+  read.opened = walk.opened;
+  read.pageOneRead = walk.completed.has(1);
+  return read;
+}
+
+/** How many pages the gallery is read from (#448). */
+export const GALLERY_PAGES = 16;
+/** The most photographs a gallery keeps beside the cover. */
+export const GALLERY_MAX = 8;
+/** The most the gallery's read may take. */
+export const GALLERY_BUDGET_MS = 12_000;
+
+/** A photograph the gallery read found, with its hash for the next one. */
+export interface OmPhoto extends DecodedCover {
+  hash: bigint;
+}
+
+/**
+ * The memorandum's other photographs (#448): every picture its first
+ * `GALLERY_PAGES` pages paint that is a photograph by the cover's own rules
+ * (colour, a photograph's size and shape, never a map, a plan or a page of
+ * text), in page order, each handed to `onPhoto` while its pixels are
+ * alive — so one decoded picture is held at a time, never the set. A
+ * picture within `NEAR_BITS` of one already taken, or of `skip` (the
+ * cover's hash), is the same photograph placed again and is passed over.
+ * Stops at `GALLERY_MAX` photographs or `GALLERY_BUDGET_MS`, and gives way
+ * the moment `yieldTo` says something more pressing is waiting (`aborted`:
+ * what was found is incomplete). Never throws.
+ */
+export async function decodeOmPhotos(
+  pdf: Uint8Array,
+  onPhoto: (photo: OmPhoto) => Promise<void> | void,
+  opts: {
+    skip?: readonly bigint[];
+    max?: number;
+    pages?: number;
+    budgetMs?: number;
+    yieldTo?: () => boolean;
+  } = {},
+): Promise<{ opened: boolean; found: number; aborted: boolean }> {
+  const max = opts.max ?? GALLERY_MAX;
+  const taken: bigint[] = [...(opts.skip ?? [])];
+  let found = 0;
+  let aborted = false;
+  const give = () => {
+    if (opts.yieldTo?.()) aborted = true;
+    return aborted;
+  };
+  if (max <= 0) return { opened: false, found, aborted };
+  const walk = await walkPaintedImages(
+    pdf,
+    { pages: opts.pages ?? GALLERY_PAGES, budgetMs: opts.budgetMs ?? GALLERY_BUDGET_MS },
+    async (img) => {
+      if (give()) return false;
+      if (!coverShaped(candidateOf(img))) return true;
+      const hash = differenceHash(img.pixels, img.width, img.height, img.channels);
+      if (taken.some((h) => hashDistance(h, hash) <= NEAR_BITS)) return true;
+      taken.push(hash);
+      await onPhoto({ width: img.width, height: img.height, channels: img.channels, pixels: img.pixels, page: img.page, hash });
+      found++;
+      return found < max;
+    },
+    () => !give(),
+  );
+  return { opened: walk.opened, found, aborted };
 }

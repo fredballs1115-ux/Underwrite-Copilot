@@ -64,9 +64,18 @@ import { ReplacePicture } from "./replace-picture";
  * the expand control at its top left, shows the views one at a time at the
  * largest size the site holds them, each with its own credit, the overheads
  * at a taller frame than the header's band.
+ *
+ * The memorandum's other photographs follow the cover (#448, `gallery`),
+ * each a view of its own in the filmstrip and the viewer, credited with its
+ * page, and a count on the picture says how many there are. Each one's
+ * full-size picture is asked for only once its view is opened; the
+ * filmstrip draws the stored 240px crops. None of them ever leads: past the
+ * cover a memorandum's photograph may be the neighbourhood.
  */
 
-type View = "photo" | "street" | "market" | "satellite" | "aerial" | "flood" | "map";
+/** A view's id: the fixed views, and the memorandum's other photographs
+ *  as `g1`, `g2`… (#448). */
+type View = "photo" | "street" | "market" | "satellite" | "aerial" | "flood" | "map" | `g${number}`;
 
 const AERIAL = { w: 1280, h: 576 }; // the route's max width
 /** The overheads' frame in the full-screen viewer: the route's width, 4:3. */
@@ -88,6 +97,7 @@ export function PropertyVisual({
   canReplace = true,
   flood = null,
   market = null,
+  gallery = [],
 }: {
   dealId: string;
   /** the deal's address line — the caption, and the map pin's tooltip */
@@ -113,6 +123,9 @@ export function PropertyVisual({
    *  leading only where the deal has no photograph of its own and no
    *  Street View (#439); null for none */
   market?: MarketPicture | null;
+  /** the memorandum's other photographs, in page order, each with its
+   *  credit (#448); served as `?g=1`, `?g=2`… */
+  gallery?: { page: number | null; credit: string }[];
 }) {
   // Lead with the building's own photograph wherever one exists; the
   // aerial leads only when it is the best picture available.
@@ -125,8 +138,25 @@ export function PropertyVisual({
   const [floodGone, setFloodGone] = useState(false);
   const [marketGone, setMarketGone] = useState(false);
   const [viewing, setViewing] = useState<View | null>(null);
+  // The gallery photographs that failed to load, by their 1-based index, and
+  // the views opened so far: a gallery photograph's full-size picture is
+  // asked for only once its view is, then kept mounted for the way back.
+  const [galleryGone, setGalleryGone] = useState<ReadonlySet<number>>(new Set());
+  const [opened, setOpened] = useState<ReadonlySet<View>>(new Set());
+  const choose = (v: View) => {
+    setView(v);
+    setOpened((o) => (o.has(v) ? o : new Set(o).add(v)));
+  };
+  const loseGallery = (i: number) => setGalleryGone((g) => (g.has(i) ? g : new Set(g).add(i)));
 
   const photoPossible = !!picture && !photoGone;
+  const galleryLive = gallery
+    .map((g, k) => ({ ...g, i: k + 1, id: `g${k + 1}` as View }))
+    .filter((g) => !galleryGone.has(g.i));
+  // The photographs in the order the filmstrip shows them: the cover, then
+  // the rest. Numbered only where there is more than one.
+  const photoIds: View[] = [...(photoPossible ? ["photo" as const] : []), ...galleryLive.map((g) => g.id)];
+  const photoLabel = (id: View) => (photoIds.length > 1 ? `Photo ${photoIds.indexOf(id) + 1}` : "Photo");
   const streetPossible = canStreet && !streetGone;
   const satellitePossible = hasAddress && googleEnabled && !satelliteGone;
   const floodPossible = hasAddress && hasStreetAddress && !!flood && !floodGone;
@@ -134,10 +164,13 @@ export function PropertyVisual({
   // a deal with a photograph or a street view never shows a skyline.
   const marketPossible = !!market && !marketGone && !photoPossible && !streetPossible;
   // Nothing photographic resolved — collapse entirely.
-  if (aerialGone && !photoPossible && !streetPossible && !satellitePossible && !marketPossible) return null;
+  if (aerialGone && !photoPossible && !streetPossible && !satellitePossible && !marketPossible && galleryLive.length === 0) {
+    return null;
+  }
 
   const views: { id: View; label: string }[] = [
-    ...(photoPossible ? [{ id: "photo" as const, label: "Photo" }] : []),
+    ...(photoPossible ? [{ id: "photo" as const, label: photoLabel("photo") }] : []),
+    ...galleryLive.map((g) => ({ id: g.id, label: photoLabel(g.id) })),
     ...(streetPossible ? [{ id: "street" as const, label: "Street" }] : []),
     ...(marketPossible ? [{ id: "market" as const, label: "Market" }] : []),
     ...(satellitePossible ? [{ id: "satellite" as const, label: "Satellite" }] : []),
@@ -155,7 +188,7 @@ export function PropertyVisual({
   const aerialSrc = `/api/deals/${dealId}/aerial?src=usgs&w=${AERIAL.w}&h=${AERIAL.h}`;
   const floodAerialSrc = `${aerialSrc}&z=${FLOOD_ZOOM}`;
   const floodSrc = `/api/deals/${dealId}/flood?w=${AERIAL.w}&h=${AERIAL.h}&z=${FLOOD_ZOOM}`;
-  const thumbs: Record<View, { src: string | null; over?: string; fail: () => void }> = {
+  const thumbs: Record<string, { src: string | null; over?: string; fail: () => void }> = {
     photo: { src: `/api/deals/${dealId}/picture?size=hero`, fail: () => setPhotoGone(true) },
     street: { src: `/api/deals/${dealId}/photo`, fail: () => setStreetGone(true) },
     market: { src: market?.src ?? null, fail: () => setMarketGone(true) },
@@ -163,13 +196,25 @@ export function PropertyVisual({
     aerial: { src: aerialSrc, fail: () => setAerialGone(true) },
     flood: { src: floodAerialSrc, over: floodSrc, fail: () => setFloodGone(true) },
     map: { src: null, fail: () => {} },
+    // A gallery photograph's place in the filmstrip is its stored 240px
+    // crop: its full-size picture waits for its view to be opened.
+    ...Object.fromEntries(
+      galleryLive.map((g) => [g.id, { src: `/api/deals/${dealId}/picture?size=thumb&g=${g.i}`, fail: () => loseGallery(g.i) }]),
+    ),
   };
+  const galleryHero = (i: number) => `/api/deals/${dealId}/picture?size=hero&g=${i}`;
+  const galleryAlt = (g: { page: number | null }) =>
+    g.page ? `Photograph from page ${g.page} of the memorandum for ${label}` : `Photograph from the memorandum for ${label}`;
 
   // The full-screen viewer's pictures (#445): the views the page has, the
   // map apart, each credited exactly as its own view is.
   const viewerAerial = `/api/deals/${dealId}/aerial?src=usgs&w=${VIEWER.w}&h=${VIEWER.h}`;
   const frames: ViewerFrame[] = views.flatMap((v): ViewerFrame[] => {
     const thumb = thumbs[v.id].src ?? "";
+    const photo = galleryLive.find((g) => g.id === v.id);
+    if (photo) {
+      return [{ id: v.id, label: v.label, src: galleryHero(photo.i), alt: galleryAlt(photo), credit: photo.credit, thumb }];
+    }
     switch (v.id) {
       case "photo":
         return [{ id: v.id, label: v.label, src: `/api/deals/${dealId}/picture?size=hero`, alt: `Photograph of ${label}`, credit: picture?.credit ?? "", thumb }];
@@ -232,6 +277,8 @@ export function PropertyVisual({
     }
   });
   const open = () => setViewing(active);
+  // Where the picture on screen sits among the photographs, for the count.
+  const photoAt = photoIds.indexOf(active);
 
   return (
     // The deal header's own picture (#433): no card of its own — the header
@@ -261,6 +308,29 @@ export function PropertyVisual({
               {picture?.credit}
             </span>
           </div>
+        )}
+
+        {/* The memorandum's other photographs (#448): each asked for once its
+            view is opened, and kept for the way back. */}
+        {galleryLive.map((g) =>
+          active === g.id || opened.has(g.id) ? (
+            <div key={g.id} className={active === g.id ? "" : "hidden"} data-gallery-photo={g.i}>
+              {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
+                  auth-scoped route serving the stored derivative */}
+              <img
+                src={galleryHero(g.i)}
+                alt={galleryAlt(g)}
+                width={AERIAL.w}
+                height={AERIAL.h}
+                onClick={open}
+                className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
+                onError={() => loseGallery(g.i)}
+              />
+              <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+                {g.credit}
+              </span>
+            </div>
+          ) : null,
         )}
 
         {marketPossible && market && (
@@ -443,6 +513,29 @@ export function PropertyVisual({
           </button>
         )}
 
+        {/* How many photographs the deal has (#448), beside the expand
+            control: on a photograph, which one this is; on any other view,
+            a way to the first of them. Never over the map. */}
+        {active !== "map" && photoIds.length > 1 && (
+          <button
+            type="button"
+            onClick={() => (photoAt >= 0 ? setViewing(active) : choose(photoIds[0]))}
+            aria-label={
+              photoAt >= 0
+                ? `Photograph ${photoAt + 1} of ${photoIds.length}: see them full screen`
+                : `See the ${photoIds.length} photographs of ${label}`
+            }
+            data-picture="photo-count"
+            className="absolute left-12 top-2 z-[5] flex h-8 items-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-black/70 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-3.5 w-3.5">
+              <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+              <circle cx="12" cy="13" r="3.5" />
+            </svg>
+            <span>{photoAt >= 0 ? `${photoAt + 1} / ${photoIds.length}` : `${photoIds.length} photos`}</span>
+          </button>
+        )}
+
         {/* "That's not the building": on the picture itself, where a cover
             photograph's own control sits — never over the map, whose corner
             belongs to its controls. */}
@@ -465,7 +558,7 @@ export function PropertyVisual({
               <button
                 key={v.id}
                 type="button"
-                onClick={() => setView(v.id)}
+                onClick={() => choose(v.id)}
                 aria-pressed={on}
                 data-view-thumb={v.id}
                 className={`group relative h-14 w-24 shrink-0 overflow-hidden rounded-lg border bg-surface text-left transition ${

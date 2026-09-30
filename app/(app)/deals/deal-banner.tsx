@@ -35,6 +35,10 @@ import { MarketCaption } from "./market-caption";
  * as it arrives shows its progressive scans, blurred, and a slow one an
  * empty frame, where a listing's cards never show either. The first cards
  * on the page (`priority`) are asked for at once and ahead of the rest.
+ *
+ * Over the deal's own photograph, the card counts the photographs its deal
+ * page holds (`photos`, #448) — the cover and the memorandum's others —
+ * the way a listing's card says there are more inside.
  */
 export function DealBanner({
   sources,
@@ -46,6 +50,7 @@ export function DealBanner({
   shade = false,
   cover = null,
   priority = false,
+  photos = 0,
 }: {
   sources: BannerSource[];
   /** the deal's name, for the picture's alt text */
@@ -67,6 +72,9 @@ export function DealBanner({
   cover?: DealCoverFacts | null;
   /** one of the first cards on screen: fetched at once, ahead of the rest */
   priority?: boolean;
+  /** how many photographs the deal page holds, counted over the deal's own
+   *  photograph where there is more than one */
+  photos?: number;
 }) {
   // A photograph nobody has looked for yet (`pending`, #440) is asked for
   // OVER the next picture, which shows at once; it fades in the moment it
@@ -214,6 +222,19 @@ export function DealBanner({
           <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
         </span>
       )}
+      {onScreen.kind === "photo" && photos > 1 ? (
+        <span
+          data-picture="photo-count"
+          className="absolute bottom-1.5 left-1.5 flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-3 w-3">
+            <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
+            <circle cx="12" cy="13" r="3.5" />
+          </svg>
+          <span>{photos}</span>
+          <span className="sr-only">{" photographs"}</span>
+        </span>
+      ) : null}
       {onScreen.kind === "market" && onScreen.market ? (
         // The market's photograph (#438) says so on its face: the market
         // named over a shade at the foot, so a skyline never passes for the

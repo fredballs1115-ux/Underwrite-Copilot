@@ -7,11 +7,22 @@
 // 404 means the deal has no picture of its own — no memorandum, none in it,
 // the sample deal — and the tab hides itself. For "whichever real picture
 // we can get", use /image, which tries this first.
+//
+// `?g=N` is the memorandum's Nth photograph beside the cover (#448, the
+// deal's gallery), served from what is stored and never searched for here:
+// the gallery is read behind the cover (lib/deal-picture).
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { DealVisualCache } from "@/lib/deal-location";
-import { PICTURE_CREDIT, SEARCH_WAIT_MS, ensureDealPicture, readPictureBytes } from "@/lib/deal-picture";
+import {
+  PICTURE_CREDIT,
+  SEARCH_WAIT_MS,
+  ensureDealPicture,
+  memorandumPhotoCredit,
+  readPictureBytes,
+} from "@/lib/deal-picture";
+import type { DealPicture } from "@/lib/deal-location";
 
 export async function GET(
   req: Request,
@@ -30,16 +41,30 @@ export async function GET(
     .maybeSingle();
   if (!deal) return NextResponse.json({ error: "not found" }, { status: 404 });
 
-  const picture = await ensureDealPicture(supabase, id, {
-    omPath: (deal.om_storage_path as string | null) ?? null,
-    isSample: !!(deal as { is_sample?: boolean }).is_sample,
-    cache: (deal.photo as DealVisualCache | null) ?? null,
-    // The page shows the next picture meanwhile; this one may wait its turn.
-    waitMs: SEARCH_WAIT_MS,
-  });
+  const url = new URL(req.url);
+  const cache = (deal.photo as DealVisualCache | null) ?? null;
+  const g = url.searchParams.get("g");
+  let picture: DealPicture | null;
+  let credit: string;
+  if (g !== null) {
+    // A gallery photograph: stored or nothing, never a search.
+    const n = Number(g);
+    picture = Number.isInteger(n) && n >= 1 ? (cache?.gallery?.[n - 1] ?? null) : null;
+    if ((deal as { is_sample?: boolean }).is_sample) picture = null;
+    credit = memorandumPhotoCredit(picture?.page);
+  } else {
+    picture = await ensureDealPicture(supabase, id, {
+      omPath: (deal.om_storage_path as string | null) ?? null,
+      isSample: !!(deal as { is_sample?: boolean }).is_sample,
+      cache,
+      // The page shows the next picture meanwhile; this one may wait its turn.
+      waitMs: SEARCH_WAIT_MS,
+    });
+    credit = picture ? PICTURE_CREDIT[picture.source] : "";
+  }
   if (!picture) return new NextResponse(null, { status: 404 });
 
-  const size = new URL(req.url).searchParams.get("size") === "thumb" ? "thumb" : "hero";
+  const size = url.searchParams.get("size") === "thumb" ? "thumb" : "hero";
   // The stored path carries the stamp of the upload that made it, so it is
   // the picture's identity: a replaced picture is a new path under the SAME
   // URL, and a browser told to revalidate rather than to trust a day's cache
@@ -49,7 +74,7 @@ export async function GET(
     etag,
     "cache-control": "private, no-cache",
     "x-image-source": "photo",
-    "x-image-credit": PICTURE_CREDIT[picture.source],
+    "x-image-credit": credit,
   };
   if (req.headers.get("if-none-match") === etag) {
     return new NextResponse(null, { status: 304, headers });

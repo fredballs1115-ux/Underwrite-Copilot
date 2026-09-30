@@ -345,6 +345,9 @@ export default async function DealsPage({
             assetClass: shownAssetClass(d.asset_class, extraction),
             place: coverPlace(address, market?.name, extraction?.market),
           }),
+          // How many photographs the deal page holds (#448): the cover and
+          // the memorandum's others, counted on the card over its photograph.
+          photos: picture && !d.is_sample ? 1 + (cache?.gallery?.length ?? 0) : 0,
         };
       })(),
     };

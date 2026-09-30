@@ -16,7 +16,7 @@ import { interestTag, readInterest } from "@/lib/interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { readPortfolio } from "@/lib/portfolio";
-import { PICTURE_CREDIT, ensureDealPicture } from "@/lib/deal-picture";
+import { PICTURE_CREDIT, ensureDealPicture, memorandumPhotoCredit } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/pipeline-slots";
@@ -293,6 +293,14 @@ export default async function DealPage({
     isSample: !!(deal as { is_sample?: boolean }).is_sample,
     cache: (deal.photo as DealVisualCache | null) ?? null,
   });
+  // The memorandum's other photographs (#448), as stored: read behind the
+  // cover on an earlier view, never on the sample deal.
+  const gallery = (deal as { is_sample?: boolean }).is_sample
+    ? []
+    : (((deal.photo as DealVisualCache | null)?.gallery ?? []).map((g) => ({
+        page: g.page ?? null,
+        credit: memorandumPhotoCredit(g.page),
+      })));
   const omUrlPromise = deal.om_storage_path
     ? signedSupplementUrl(deal.om_storage_path, { kind: "deal", dealId: id })
     : Promise.resolve(null);
@@ -895,7 +903,7 @@ export default async function DealPage({
              address; the Street and Satellite views need GOOGLE_MAPS_API_KEY
              (two separate Google APIs on the one key) and are where the
              sharp imagery comes from. */
-          dealAddress?.label || picture || marketPicture ? (
+          dealAddress?.label || picture || marketPicture || gallery.length > 0 ? (
             <PropertyVisual
               dealId={id}
               label={dealAddress?.label ?? (deal.name as string)}
@@ -905,6 +913,7 @@ export default async function DealPage({
               picture={picture ? { credit: PICTURE_CREDIT[picture.source], source: picture.source } : null}
               canReplace={!(deal as { is_sample?: boolean }).is_sample}
               market={marketPicture}
+              gallery={gallery}
               flood={
                 floodStreet
                   ? {

@@ -74,16 +74,23 @@ export async function testMemorandum(pages: TestPage[], security: Security = "no
 /**
  * A photograph-like picture — a colour gradient with a ripple through it —
  * as raw RGB, so a test can compare what comes back against what went in.
+ * `variant` gives a different photograph (#448): a band of light across it
+ * at its own angle and count, the same at any size, so a picture and its
+ * resized copy are one photograph to the gallery and two variants are two.
  */
-export function testPixels(width: number, height: number): Buffer {
+export function testPixels(width: number, height: number, variant = 0): Buffer {
   const raw = Buffer.alloc(width * height * 3);
+  const clamp = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 3;
       const ripple = (Math.sin(x * 0.05) + Math.cos(y * 0.07)) * 12;
-      raw[i] = Math.round(40 + (x / width) * 170 + ripple);
-      raw[i + 1] = Math.round(70 + (y / height) * 120 + ripple);
-      raw[i + 2] = Math.round(200 - (x / width) * 90 + ripple);
+      const u = x / width;
+      const v = y / height;
+      const band = variant === 0 ? 0 : Math.sin((u * (variant + 1) + v * variant) * Math.PI * 2) * 70;
+      raw[i] = clamp(40 + u * 170 + ripple + band);
+      raw[i + 1] = clamp(70 + v * 120 + ripple + band);
+      raw[i + 2] = clamp(200 - u * 90 + ripple + band);
     }
   }
   return raw;
@@ -94,8 +101,9 @@ export async function testPicture(
   width: number,
   height: number,
   as: "jpeg" | "png" | "grey-jpeg" | "png-alpha",
+  variant = 0,
 ): Promise<Buffer> {
-  const img = sharp(testPixels(width, height), { raw: { width, height, channels: 3 } });
+  const img = sharp(testPixels(width, height, variant), { raw: { width, height, channels: 3 } });
   if (as === "jpeg") return img.jpeg({ quality: 90 }).toBuffer();
   if (as === "grey-jpeg") return img.greyscale().jpeg({ quality: 90 }).toBuffer();
   if (as === "png") return img.png().toBuffer();
