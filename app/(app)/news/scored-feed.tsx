@@ -147,10 +147,10 @@ export function ScoredFeedView({
         // No box for what has not started: the headlines above are the
         // page; one quiet line says what the sweep will add.
         <p className="text-[12px] leading-relaxed text-muted">
-          The scored feed — every story rated 0–10 for your buy box, law and
-          rule changes flagged — starts with the weekday sweep once its
-          GitHub secret is set. Until then the headlines above are the news,
-          unscored.
+          The scored feed — every story rated 0–10 for a small East Coast
+          buyer of 2–4 unit buildings, law and rule changes flagged — starts
+          with the weekday sweep once its GitHub secret is set. Until then the
+          headlines above are the news, unscored.
         </p>
       ) : (
         [...byDay.entries()].map(([day, list]) => (
@@ -172,7 +172,7 @@ export function ScoredFeedView({
                             ? "bg-brand/10 text-brand"
                             : "bg-faint text-muted"
                         }`}
-                        title={`Relevance to your buy box, ${it.relevance} of 10`}
+                        title={`Relevance ${it.relevance} of 10, scored for one buyer profile (a small East Coast buyer of 2–4 unit buildings), not your buy box`}
                       >
                         {it.relevance}/10
                       </span>
