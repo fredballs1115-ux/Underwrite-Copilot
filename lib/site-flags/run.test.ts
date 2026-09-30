@@ -133,5 +133,12 @@ describe("computeSiteFlags — the Opportunity Zone answer is the tract's own st
     expect(noTract.tractGeoid).toBeNull();
     expect(noTract.opportunityZone).toBe("unchecked");
     expect(noTract.opportunityZoneUnchecked).toBe("no_tract");
+
+    // The Census geocoder failing is not "no tract here": said as the failure.
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("down", { status: 503 })));
+    const failedTract = await computeSiteFlags({ label: "Somewhere, MD", subject: { lat: 39.4, lng: -76.6 } });
+    expect(failedTract.opportunityZone).toBe("unchecked");
+    expect(failedTract.opportunityZoneUnchecked).toBe("tract_failed");
+    expect(failedTract.error).toMatch(/^census tract: /);
   });
 });

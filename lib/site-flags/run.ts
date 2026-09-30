@@ -172,9 +172,10 @@ export async function computeSiteFlags(input: {
     tractError = String(err).slice(0, 200);
   }
 
+  // No tract, no check: said apart from a tract lookup that failed.
   let oz: Pick<SiteFlagsResult, "opportunityZone" | "opportunityZoneUnchecked"> = {
     opportunityZone: "unchecked",
-    opportunityZoneUnchecked: "no_tract",
+    opportunityZoneUnchecked: tractError ? "tract_failed" : "no_tract",
   };
   const stateFips = tractStateFips(tractGeoid);
   if (tractGeoid && stateFips) {

@@ -40,9 +40,10 @@ export interface SiteFlagsResult {
    *  `opportunityZoneUnchecked` */
   opportunityZone: { sourceDataset: string } | null | "unchecked";
   /** why the Opportunity Zone check did not answer: no census tract at the
-   *  point, a registry holding no zones for the tract's state (the ingest
-   *  loads Maryland's unless a national layer is set), or a registry that
-   *  could not be read. Absent on a lookup made before it was recorded. */
+   *  point, a tract lookup that failed, a registry holding no zones for the
+   *  tract's state (the ingest loads Maryland's unless a national layer is
+   *  set), or a registry that could not be read. Absent on a lookup made
+   *  before it was recorded. */
   opportunityZoneUnchecked?: OpportunityZoneUnchecked;
   /** null = query worked, point in no mapped flood polygon (treat as zone X-ish
    *  unknown); "unavailable" = NFHL not reachable/resolvable */
@@ -90,7 +91,7 @@ export function siteFlagsOutdated(
 // renumbered since can sit in a zone and still miss the list — every surface
 // that says "not on the list" says it was checked by the current number.
 
-export type OpportunityZoneUnchecked = "no_tract" | "state_not_loaded" | "lookup_failed";
+export type OpportunityZoneUnchecked = "no_tract" | "tract_failed" | "state_not_loaded" | "lookup_failed";
 
 /** The first rules (`SITE_FLAGS_V`) under which "not on the list" was read
  *  against the tract's own state's zones. */
@@ -121,6 +122,7 @@ export function opportunityZoneFrom(input: {
 
 const OZ_UNCHECKED_WHY: Record<OpportunityZoneUnchecked, string> = {
   no_tract: "no census tract for this point",
+  tract_failed: "the census tract lookup failed",
   state_not_loaded: "no zones on file for this state",
   lookup_failed: "the zone list could not be read",
 };

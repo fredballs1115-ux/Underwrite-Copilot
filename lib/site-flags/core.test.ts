@@ -405,10 +405,11 @@ describe("the Opportunity Zone check — not on the list only where the list hol
     expect(OZ_STATE_RULE_V).toBeLessThanOrEqual(SITE_FLAGS_V);
     expect(opportunityZoneRead({ opportunityZone: null, v: 2 })).toEqual({ kind: "unchecked", label: "Opportunity Zone: not checked", caveat: null });
     expect(opportunityZoneRead({ opportunityZone: null })).toEqual({ kind: "unchecked", label: "Opportunity Zone: not checked", caveat: null });
-    const why = (r: "no_tract" | "state_not_loaded" | "lookup_failed") =>
+    const why = (r: "no_tract" | "tract_failed" | "state_not_loaded" | "lookup_failed") =>
       opportunityZoneRead({ opportunityZone: "unchecked", opportunityZoneUnchecked: r, v: SITE_FLAGS_V }).label;
     expect(why("state_not_loaded")).toBe("Opportunity Zone: not checked (no zones on file for this state)");
     expect(why("no_tract")).toBe("Opportunity Zone: not checked (no census tract for this point)");
+    expect(why("tract_failed")).toBe("Opportunity Zone: not checked (the census tract lookup failed)");
     expect(why("lookup_failed")).toBe("Opportunity Zone: not checked (the zone list could not be read)");
     // An older "unchecked" carries no reason: it names none rather than guess one.
     expect(opportunityZoneRead({ opportunityZone: "unchecked", v: 2 }).label).toBe("Opportunity Zone: not checked");
