@@ -3502,15 +3502,53 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(html.indexOf('data-view-thumb="g2"')).toBeLessThan(html.indexOf('data-view-thumb="aerial"'));
     for (const label of ["Photo 1", "Photo 2", "Photo 3"]) expect(text).toContain(label);
     // The filmstrip draws each one's stored crop; its full-size picture
-    // waits for its view to be opened.
+    // waits for its view to be opened — except the two the mosaic shows.
     expect(html).toContain('src="/api/deals/d1/picture?size=thumb&amp;g=1"');
     expect(html).toContain('src="/api/deals/d1/picture?size=thumb&amp;g=2"');
-    expect(html).not.toContain("size=hero&amp;g=");
     expect(html).not.toContain("data-gallery-photo");
+    // The mosaic (#458): the cover and the next two photographs, each at the
+    // cover's size and lazy (a phone never shows them), each credited with
+    // its page and opening the viewer at itself.
+    expect(html).toContain('data-picture="mosaic"');
+    expect(html.match(/data-mosaic-tile=/g)).toHaveLength(2);
+    expect(html).toMatch(/<img src="\/api\/deals\/d1\/picture\?size=hero&amp;g=1"[^>]*loading="lazy"/);
+    expect(html).toMatch(/<img src="\/api\/deals\/d1\/picture\?size=hero&amp;g=2"[^>]*loading="lazy"/);
+    expect(text).toContain("Memorandum, p. 3");
+    expect(text).toContain("Memorandum, p. 7");
+    expect(html).toContain('aria-label="Photograph 2 of 3: see it full screen"');
+    expect(text).not.toContain("more");
     // The count on the picture: which photograph this is, of how many.
     expect(html).toContain('data-picture="photo-count"');
     expect(text).toContain("1 / 3");
     expect(html).toContain('aria-label="Photograph 1 of 3: see them full screen"');
+  });
+
+  it("says how many more photographs the mosaic does not show, and draws no mosaic with fewer than three (#458)", () => {
+    const four = renderToStaticMarkup(
+      React.createElement(PropertyVisual, {
+        ...base,
+        picture: { credit: "From the offering memorandum", source: "om" as const },
+        gallery: [...gallery, { page: 9, credit: "From the offering memorandum, page 9" }],
+      }),
+    );
+    expect(four.match(/data-mosaic-tile=/g)).toHaveLength(2);
+    expect(visibleText(four)).toContain("+1 more");
+    expect(four).toContain('aria-label="Photograph 3 of 4, and 1 more: see them full screen"');
+    expect(a11yIssues(four)).toEqual([]);
+    // A cover and one more is no mosaic, and the one more waits for its view.
+    const two = renderToStaticMarkup(
+      React.createElement(PropertyVisual, {
+        ...base,
+        picture: { credit: "From the offering memorandum", source: "om" as const },
+        gallery: gallery.slice(0, 1),
+      }),
+    );
+    expect(two).not.toContain('data-picture="mosaic"');
+    expect(two).not.toContain("size=hero&amp;g=");
+    // No cover of the deal's own: the memorandum's other photographs never
+    // lead, so there is no mosaic either.
+    const none = renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null, gallery }));
+    expect(none).not.toContain('data-picture="mosaic"');
   });
 
   it("offers the photographs from a view that is not one, and never leads with them", () => {
@@ -3598,6 +3636,28 @@ describe("DealHero — the building's picture beside its name and its figures (#
   );
   const html = hero(visual, panel);
   const bare = hero(null);
+
+  it("opens a deal with photographs of its own on the mosaic, inside the header (#458)", () => {
+    const withGallery = hero(
+      React.createElement(PropertyVisual, {
+        dealId: "d1",
+        label: "1200 N 31st St, Philadelphia, PA",
+        hasStreetAddress: true,
+        googleEnabled: false,
+        picture: { credit: "From the offering memorandum", source: "om" as const },
+        gallery: [
+          { page: 3, credit: "From the offering memorandum, page 3" },
+          { page: 7, credit: "From the offering memorandum, page 7" },
+          { page: 9, credit: "From the offering memorandum, page 9" },
+        ],
+      }),
+    );
+    dumpView("deal-hero-mosaic", withGallery);
+    expect(withGallery).toContain("data-hero-picture");
+    expect(withGallery).toContain('data-picture="mosaic"');
+    expect(a11yIssues(withGallery), "a11y hero mosaic").toEqual([]);
+    expect(gluedWords(visibleText(withGallery))).toEqual([]);
+  });
 
   it("lays the picture beside the name and the figures, and reads clean", () => {
     dumpView("deal-hero", html);
