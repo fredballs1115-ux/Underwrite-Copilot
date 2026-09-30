@@ -206,6 +206,7 @@ function SourceLink({
   asOf,
   status,
   yearEnded,
+  readOn,
 }: {
   source: string | null;
   asOf: string;
@@ -214,6 +215,9 @@ function SourceLink({
    *  freshness is the year's — true once the year has ended — never the
    *  180 days since it was read, which would call a year in force stale */
   yearEnded?: boolean;
+  /** `asOf` is the day the research was read, not the figure's date (a
+   *  research-tracker row, whose own period rides in its citation) */
+  readOn?: boolean;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.sourced;
   // A figure whose file states no date is undated — flagged in the stale
@@ -232,7 +236,7 @@ function SourceLink({
           {yearEnded ? "year ended" : undated ? "undated" : `stale · ${asOf}`}
         </span>
       )}
-      {!stale && <span>{asOfLabel(asOf)}</span>}
+      {!stale && <span>{readOn ? `read ${asOf}` : asOfLabel(asOf)}</span>}
       {source &&
         (audited === false ? (
           <span title={source}>source on file — link unavailable</span>
@@ -663,8 +667,16 @@ export async function ResearchPanel({
                         #{rank.rank} of {rank.total}
                       </Link>
                     )}
+                    {/* A research-tracker figure's own house, area and
+                        period (lib/tracker-read) — the row's date is the
+                        day the research was read, not the figure's. */}
+                    {b.cite && (
+                      <span className="block text-[11px] text-muted" data-qa="bench-cite">
+                        {b.cite}
+                      </span>
+                    )}
                   </span>
-                  <SourceLink source={b.source} asOf={b.as_of} status={b.status} />
+                  <SourceLink source={b.source} asOf={b.as_of} status={b.status} readOn={!!b.cite} />
                 </li>
               );
             })}

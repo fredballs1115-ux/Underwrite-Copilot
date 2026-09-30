@@ -18,6 +18,7 @@ import mhcSeed from "@/data/research/manufactured_housing.json";
 import specialtySeed from "@/data/research/specialty.json";
 import type { Benchmark, RegulatoryRule, RuleSubject } from "@/lib/research";
 import { fmrBenchmarkRows, fmrOf, newestFmrOnly, type Fmr } from "@/lib/fmr";
+import { figureNote, figureRead } from "@/lib/tracker-read";
 
 export function seedRules(): RegulatoryRule[] {
   return (rulesSeed.rules as unknown as RegulatoryRule[]).filter(
@@ -199,6 +200,13 @@ export function seedBenchmarks(): Benchmark[] {
   // row per figure actually carried, flowing to deal pages and Compare via
   // benchmarksForDeal. Divergent trackers encode as the observed low–high
   // spread, never averaged; a null figure emits no row (a gap is a gap).
+  // A vacancy or cap row carries its OWN figure's link and citation — the
+  // house, the area and the period its block's `vacancy_read` / `cap_read`
+  // states (lib/tracker-read) — never the block's first source, which is
+  // another figure's as often as not (Chicago's cap, Essex Realty's April
+  // average, had been credited to JPMorgan, the vacancy's source); a figure
+  // the file ties to no link carries none. `as_of` stays the day the
+  // research was read, and the citation says so.
   type SnapshotBlock = {
     vacancy_pct?: number | null;
     vacancy_pct_low?: number | null;
@@ -209,6 +217,8 @@ export function seedBenchmarks(): Benchmark[] {
     status?: string;
     sources?: string[];
     note?: string;
+    vacancy_read?: unknown;
+    cap_read?: unknown;
   };
   for (const m of metrosSeed.metros ?? []) {
     const snap = (
@@ -231,12 +241,15 @@ export function seedBenchmarks(): Benchmark[] {
       const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low;
       const vHigh = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
       if (typeof vLow === "number") {
+        const read = figureRead(blk.vacancy_read, blk.sources);
         out.push({
           ...base,
           metric: `${sector}_vacancy_pct`,
           low: vLow,
           high: typeof vHigh === "number" ? vHigh : vLow,
           unit: "pct",
+          source: read.links[0] ?? "",
+          cite: figureNote(read),
         });
       }
       if (typeof blk.asking_rent_psf === "number") {
@@ -252,12 +265,15 @@ export function seedBenchmarks(): Benchmark[] {
         typeof blk.cap_rate_low_pct === "number" &&
         typeof blk.cap_rate_high_pct === "number"
       ) {
+        const read = figureRead(blk.cap_read, blk.sources);
         out.push({
           ...base,
           metric: `${sector}_cap_rate_pct`,
           low: blk.cap_rate_low_pct,
           high: blk.cap_rate_high_pct,
           unit: "pct",
+          source: read.links[0] ?? "",
+          cite: figureNote(read),
         });
       }
     }

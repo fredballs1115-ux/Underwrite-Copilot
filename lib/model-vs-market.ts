@@ -17,7 +17,14 @@ import {
 } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
 import { shownAssetClass } from "@/lib/pipeline-slots";
-import { bandText, trackerFor, type TrackerRead } from "@/lib/tracker-read";
+import {
+  bandText,
+  figureCitation,
+  figureRead,
+  trackerFor,
+  type FigureRead,
+  type TrackerRead,
+} from "@/lib/tracker-read";
 
 /**
  * The model's assumptions against the published figures — pure, no model
@@ -69,8 +76,11 @@ export const TONE_LABEL: Record<CheckTone, string> = {
   ahead: "ahead of the published figures",
   inside: "inside the published range",
   behind: "behind the published figures",
-  tighter: "tighter than the metro",
-  looser: "looser than the metro",
+  // The figures a vacancy is read against may be the metro area's, the
+  // region's, the state's or a tracker's own area (Suburban Maryland's,
+  // Manhattan's), so the chip names none of them.
+  tighter: "tighter than the published figures",
+  looser: "looser than the published figures",
   widens: "spread widens at the exit",
   compresses: "assumes cap compression",
   level: "spread held at the exit",
@@ -84,6 +94,9 @@ export interface PublishedFigure {
   text: string;
   /** the figure in its own unit — a percent change, or a level in percent */
   value: number;
+  /** the figure's own date: a feed's observation day (ISO), or a research
+   *  figure's period as its file states it ("Q2 2026") — "undated" where
+   *  the file states none, never the day the research was read */
   asOf: string;
   /** "Zillow Research", "BLS via FRED", "Census Bureau" */
   publisher: string;
@@ -153,31 +166,47 @@ export interface ModelVsMarketInput {
   now: Date;
 }
 
-/** "as of Aug 25, 2026; colliers.com" — how a tracker figure is dated and sourced in a sentence. */
-function trackerWhen(t: TrackerRead): string {
-  const parts = [t.asOf ? `as of ${datedLong(t.asOf)}` : "undated", t.source ?? "the research tracker"];
-  return parts.join("; ");
+/**
+ * "Colliers, Suburban Maryland (Montgomery and Prince George's together, not
+ * a county split), Q1 2026 (read Aug 25, 2026)" — a tracker figure's own
+ * house, area and period as the file states them (lib/tracker-read's
+ * `figureCitation`, "undated" where it states no period), then the day the
+ * research sweep read it, said as the day read and never as the figure's.
+ */
+function trackerCite(t: TrackerRead, f: FigureRead): string {
+  return `${figureCitation(f)}${t.asOf ? ` (read ${datedLong(t.asOf)})` : ""}`;
 }
 
-function trackerPublisher(t: TrackerRead): string {
-  return `research tracker${t.source ? ` (${t.source})` : ""}`;
+function trackerPublisher(f: FigureRead): string {
+  return f.house ? `research tracker: ${f.house}` : "research tracker";
 }
 
-/** The tracker's vacancy band as published figures — one for a point, the low and the high for a band. */
-function trackerVacancyFigures(t: TrackerRead): PublishedFigure[] {
-  if (t.vacancyLow === null) return [];
-  const hi = t.vacancyHigh ?? t.vacancyLow;
-  const asOf = t.asOf ?? "";
-  const publisher = trackerPublisher(t);
-  const label = `${t.sectorLabel[0].toUpperCase()}${t.sectorLabel.slice(1)} vacancy, metro (tracker)`;
-  if (Math.abs(hi - t.vacancyLow) < 0.005) {
-    return [{ label, text: `${t.vacancyLow.toFixed(1)}%${t.asOf ? ` (as of ${datedLong(t.asOf)})` : ""}`, value: t.vacancyLow, asOf, publisher }];
-  }
-  const suffix = t.asOf ? ` (as of ${datedLong(t.asOf)})` : "";
-  return [
-    { label: `${label}, low read`, text: `${t.vacancyLow.toFixed(1)}%${suffix}`, value: t.vacancyLow, asOf, publisher },
-    { label: `${label}, high read`, text: `${hi.toFixed(1)}%${suffix}`, value: hi, asOf, publisher },
-  ];
+const initialCap = (s: string): string => `${s[0].toUpperCase()}${s.slice(1)}`;
+
+/** A figure with nothing named — for a read built without its provenance. */
+const UNNAMED: FigureRead = figureRead(null, []);
+
+/**
+ * A tracker figure as published figures — one for a point, the low and the
+ * high for a band — each labelled with the area it covers where the file
+ * states one (never "metro" by default) and dated by its own period.
+ */
+function trackerFigures(t: TrackerRead, f: FigureRead, what: "vacancy" | "cap", low: number, high: number): PublishedFigure[] {
+  const dp = what === "cap" ? 2 : 1;
+  const label = `${initialCap(t.sectorLabel)} ${what} (research tracker)${f.area ? `, ${f.area}` : ""}`;
+  const when = f.period ?? "undated";
+  const publisher = trackerPublisher(f);
+  const figure = (value: number, end?: string): PublishedFigure => ({
+    label: end ? `${label}, ${end}` : label,
+    text: `${value.toFixed(dp)}% (${when})`,
+    value,
+    asOf: when,
+    publisher,
+  });
+  if (Math.abs(high - low) < 0.005) return [figure(low)];
+  return what === "cap"
+    ? [figure(low, "low end"), figure(high, "high end")]
+    : [figure(low, "low read"), figure(high, "high read")];
 }
 
 /**
@@ -191,10 +220,14 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
   const t = input.tracker;
   if (!t || t.sector === "multifamily" || t.vacancyLow === null) return null;
   const hi = t.vacancyHigh ?? t.vacancyLow;
-  const published = trackerVacancyFigures(t);
+  const f = t.vacancy ?? UNNAMED;
+  const published = trackerFigures(t, f, "vacancy", t.vacancyLow, hi);
   const band = bandText(t.vacancyLow, hi);
   const tone: CheckTone = v < t.vacancyLow - SAME ? "tighter" : v > hi + SAME ? "looser" : "inside";
-  const stock = `the metro's ${t.sectorLabel} stock`;
+  // The stock the figure covers — the file's area, which is not always the
+  // market's (Suburban Maryland's office figure is filed under both of its
+  // counties) — so the sentence never calls it the metro's.
+  const stock = `the ${t.sectorLabel} stock the figure covers`;
   const clause =
     tone === "tighter"
       ? `The building would run ${pts(t.vacancyLow - v)} tighter than ${stock} — a leased building against a market average, and the figure to hold the rent roll and the rollover to.`
@@ -210,7 +243,7 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
-    read: `The model holds ${v.toFixed(1)}% vacancy. The metro's ${t.sectorLabel} vacancy reads ${band} on the research tracker (${trackerWhen(t)}) — a quarterly print, not a feed. ${clause}`,
+    read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f)} — a research print, not a feed. ${clause}`,
   };
 }
 
@@ -456,7 +489,10 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
   // against the Census Bureau's of every rental), so it is shown, never
   // the anchor.
   const t = input.tracker && input.tracker.sector === "multifamily" && input.tracker.vacancyLow !== null ? input.tracker : null;
-  const trackerTail = t ? ` The research tracker's apartment read for the metro is ${bandText(t.vacancyLow!, t.vacancyHigh)} (${trackerWhen(t)}) — a house's survey of managed stock, shown beside the Census figure rather than in its place.` : "";
+  const tf = t?.vacancy ?? UNNAMED;
+  const trackerTail = t
+    ? ` The research tracker's apartment vacancy reads ${bandText(t.vacancyLow!, t.vacancyHigh)}: ${trackerCite(t, tf)} — research, shown beside the Census figure rather than in its place.`
+    : "";
   if (metro) {
     const when = periodLabel(metro.obsDate, metro.meta.cadence);
     published.push({
@@ -501,7 +537,7 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
     title: "Stabilized vacancy",
     model: `${v.toFixed(1)}%`,
     modelSource: sourceWords(input.sources?.vacancyPct),
-    published: t ? [...published, ...trackerVacancyFigures(t)] : published,
+    published: t ? [...published, ...trackerFigures(t, tf, "vacancy", t.vacancyLow!, t.vacancyHigh ?? t.vacancyLow!)] : published,
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
@@ -510,38 +546,47 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
 }
 
 /**
- * The tracker's cap range for the sector in the metro, where it has one,
- * beside the 10-year read: the published figures it adds and the sentence
- * that sets the exit cap against the range — over its high end is the
- * conservative direction for an exit, under its low end is a cap tighter
- * than the market's own range.
+ * The tracker's cap figure for the sector, where it has one, beside the
+ * 10-year read: the published figures it adds and the sentence that sets
+ * the exit cap against it, with the figure's own house, area and period.
+ * Over a range's high end (or a single figure) is the conservative
+ * direction for an exit; under its low end is a cap tighter than the
+ * market's own figure. A figure the file says is for a narrower stock than
+ * the class (`slice` — Chicago's average is its Class B/C small buildings')
+ * is shown and named, and the exit is not held to it: a Class A exit read
+ * against it would call a sound assumption cap compression.
  */
 function capBandTail(input: ModelVsMarketInput, x: number): { figures: PublishedFigure[]; sentence: string } {
   const t = input.tracker;
   if (!t || t.capLow === null) return { figures: [], sentence: "" };
-  const hi = t.capHigh ?? t.capLow;
-  const asOf = t.asOf ?? "";
-  const publisher = trackerPublisher(t);
-  const label = `${t.sectorLabel[0].toUpperCase()}${t.sectorLabel.slice(1)} cap range, metro (tracker)`;
-  const suffix = t.asOf ? ` (as of ${datedLong(t.asOf)})` : "";
-  const figures: PublishedFigure[] =
-    Math.abs(hi - t.capLow) < 0.005
-      ? [{ label, text: `${t.capLow.toFixed(2)}%${suffix}`, value: t.capLow, asOf, publisher }]
-      : [
-          { label: `${label}, low end`, text: `${t.capLow.toFixed(2)}%${suffix}`, value: t.capLow, asOf, publisher },
-          { label: `${label}, high end`, text: `${hi.toFixed(2)}%${suffix}`, value: hi, asOf, publisher },
-        ];
-  const band = bandText(t.capLow, hi, 2);
+  const lo = t.capLow;
+  const hi = t.capHigh ?? lo;
+  const point = Math.abs(hi - lo) < 0.005;
+  const f = t.cap ?? UNNAMED;
+  const figures = trackerFigures(t, f, "cap", lo, hi);
+  const bps = (n: number): string => `${Math.round(n * 100)} bps`;
+  const head = ` The research tracker's ${t.sectorLabel} cap ${point ? "is" : "range is"} ${bandText(lo, hi, 2)}${
+    f.construct ? ` (${f.construct})` : ""
+  }: ${trackerCite(t, f)}`;
+  const over = point ? "it" : "its high end";
+  const under = point ? "it" : "its low end";
+  if (f.slice) {
+    const where =
+      x > hi + SAME ? `${bps(x - hi)} over ${over}` : x < lo - SAME ? `${bps(lo - x)} under ${under}` : point ? "at it" : "inside it";
+    return {
+      figures,
+      sentence: `${head}. That figure is for ${f.slice}, not the ${t.sectorLabel} market as a whole, so the exit is not held to it; the exit cap sits ${where}.`,
+    };
+  }
   const position =
     x > hi + SAME
-      ? `the exit cap sits ${Math.round((x - hi) * 100)} bps over its high end — the conservative direction for an exit.`
-      : x < t.capLow - SAME
-        ? `the exit cap sits ${Math.round((t.capLow - x) * 100)} bps under its low end — an exit priced tighter than the market's own range today, which is cap compression on top of the spread read.`
-        : "the exit cap sits inside it.";
-  return {
-    figures,
-    sentence: ` The research tracker's ${t.sectorLabel} cap range for the metro is ${band} (${trackerWhen(t)}), and ${position}`,
-  };
+      ? `the exit cap sits ${bps(x - hi)} over ${over} — the conservative direction for an exit.`
+      : x < lo - SAME
+        ? `the exit cap sits ${bps(lo - x)} under ${under} — an exit priced tighter than the market's own ${point ? "figure" : "range"} today, which is cap compression on top of the spread read.`
+        : point
+          ? "the exit cap sits at it."
+          : "the exit cap sits inside it.";
+  return { figures, sentence: `${head}, and ${position}` };
 }
 
 function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {

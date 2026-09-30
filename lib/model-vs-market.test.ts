@@ -135,7 +135,7 @@ describe("modelVsMarket — the model's four assumptions against the published f
     expect(c.read).toContain("9.5%. The model sits inside the survey's margin of the published figure.");
     const tight = check({ ...base, inputs: { ...base.inputs, vacancyPct: 0.03 } }, "vacancy")!;
     expect(tight.tone).toBe("tighter");
-    expect(tight.toneLabel).toBe("tighter than the metro");
+    expect(tight.toneLabel).toBe("tighter than the published figures");
     expect(tight.read).toContain("The building would run 3.2 points tighter than the metro's rental stock as a whole");
     const loose = check({ ...base, inputs: { ...base.inputs, vacancyPct: 0.09 } }, "vacancy")!;
     expect(loose.tone).toBe("looser");
@@ -347,7 +347,9 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     // metro's industrial tracker read, so the metro is named.
     expect(r.metro).toBe("Washington DC");
     expect(r.checks[0].read).toContain("lessors of manufacturing and industrial buildings");
-    expect(r.checks[2].read).toContain("The metro's industrial vacancy reads 7.4% on the research tracker (as of Aug 25, 2026; nmrk.imgix.net)");
+    expect(r.checks[2].read).toContain(
+      "Industrial vacancy reads 7.4% on the research tracker: Newmark, the Washington metro, Q1 2026 (read Aug 25, 2026) — a research print, not a feed.",
+    );
     // The exit cap is derived from the going-in cap, so the spread is held;
     // the industrial tracker carries no cap range for Washington.
     expect(r.checks[3].tone).toBe("level");
@@ -522,7 +524,8 @@ describe("the going-in cap the documents imply where they state none", () => {
 });
 
 // ── The research tracker's read, beside the feeds ───────────────────────────
-import { bandText, trackerFor, trackerSectorFor } from "./tracker-read";
+import { bandText, figureCitation, figureNote, figureRead, trackerFor, trackerSectorFor } from "./tracker-read";
+import metrosSeed from "@/data/research/metros.json";
 
 describe("trackerFor — the sector snapshot's vacancy band and cap range for a deal's kind of building in its metro", () => {
   it("maps a class to its tracker sector, and a class no tracker covers to none", () => {
@@ -588,7 +591,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
     expect(r.checks.map((c) => c.read).join(" ")).not.toContain("research tracker");
   });
 
-  it("reads a band as a band, a point as a point, the snapshot's day and the first source's host", () => {
+  it("reads a band as a band, a point as a point, the day the research was read, and each figure's own provenance", () => {
     expect(trackerFor("dc", "office")).toEqual({
       sector: "office",
       sectorLabel: "office",
@@ -597,8 +600,18 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
       capLow: null,
       capHigh: null,
       asOf: "2026-08-25",
-      source: "colliers.com",
-      sourceUrl: "https://www.colliers.com/en/research/washington-dc/washington-dc-office-market-report-2026-q2",
+      vacancy: {
+        house: "Colliers (21.3%) and CBRE (22.2%)",
+        area: "the District",
+        period: "Q2 2026",
+        links: [
+          "https://www.colliers.com/en/research/washington-dc/washington-dc-office-market-report-2026-q2",
+          "https://www.cbre.com/insights/figures/washington-dc-office-figures-q2-2026",
+        ],
+        construct: null,
+        slice: null,
+      },
+      cap: null,
     });
     expect(trackerFor("dc", "multifamily")).toMatchObject({ sector: "multifamily", sectorLabel: "apartment", vacancyLow: 5.2, vacancyHigh: 5.2, capLow: 4.75, capHigh: 5.5 });
     expect(trackerFor("nova", "industrial")).toMatchObject({ vacancyLow: 3.9, vacancyHigh: 5.0, capLow: null });
@@ -611,41 +624,140 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
     expect(bandText(7.4, 7.4)).toBe("7.4%");
     expect(bandText(4.75, 5.5, 2)).toBe("4.75–5.50%");
   });
+
+  it("credits each figure to its own house, area and period — never the block's first link or the snapshot's day", () => {
+    // Chicago's cap is Essex Realty's April 2026 average for the small-building
+    // stock; the block's first link is JPMorgan's, the vacancy's source.
+    const chicago = trackerFor("chicago", "multifamily")!;
+    expect(chicago.cap).toMatchObject({
+      house: "Essex Realty",
+      area: "Chicago",
+      period: "April 2026",
+      links: ["https://essexrealtygroup.com/chicago-multifamily-report-april-2026/"],
+      construct: "a transaction average of 175 sales, not a quoted band",
+    });
+    expect(chicago.cap!.slice).toContain("Class B/C neighborhood buildings");
+    expect(chicago.vacancy!.links).toEqual(["https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook"]);
+    // Prince George's County's office figure is Colliers' Suburban Maryland survey area, both counties together.
+    expect(trackerFor("pg_county", "office")!.vacancy).toMatchObject({
+      house: "Colliers",
+      area: "Suburban Maryland (Montgomery and Prince George's together, not a county split)",
+      period: "Q1 2026",
+    });
+    // The Washington region's apartment figures name no house: no link is credited, and the cap is undated.
+    const region = trackerFor("pg_county", "multifamily")!;
+    expect(region.vacancy).toMatchObject({ house: null, area: "the Washington DC region", period: "year-end 2025", links: [] });
+    expect(region.cap).toMatchObject({ house: null, period: null, links: [] });
+    expect(figureCitation(region.cap!)).toBe("the Washington DC region, undated");
+    // The Miami retail figure is Colliers' Q2 2026; the block's only Colliers link is its Q1 report, so it is not credited.
+    expect(trackerFor("miami", "retail")!.vacancy).toMatchObject({ house: "Colliers", period: "Q2 2026", links: [] });
+  });
+
+  it("reads a figure's provenance only from its own block: a link outside the block's sources is dropped, and no read names nothing", () => {
+    const sources = ["https://a.example/q2", "https://b.example/q2"];
+    expect(figureRead({ house: "A", period: "Q2 2026", links: ["https://b.example/q2", "https://c.example/other"] }, sources)).toEqual({
+      house: "A",
+      area: null,
+      period: "Q2 2026",
+      links: ["https://b.example/q2"],
+      construct: null,
+      slice: null,
+    });
+    // A block with a figure and no read: nothing named, and never the first source.
+    const bare = figureRead(undefined, sources);
+    expect(bare).toEqual({ house: null, area: null, period: null, links: [], construct: null, slice: null });
+    expect(figureCitation(bare)).toBe("undated");
+    expect(figureNote({ ...bare, house: "Essex Realty", period: "April 2026", construct: "a transaction average", slice: "Class B/C buildings" })).toBe(
+      "Essex Realty, April 2026; a transaction average; for Class B/C buildings",
+    );
+  });
+
+  it("every tracker figure in the research file carries its own read, linked only to its block's sources", () => {
+    const known = new Set(["house", "area", "period", "links", "construct", "slice"]);
+    let figures = 0;
+    for (const m of metrosSeed.metros) {
+      const snap = (m as { sector_snapshot?: Record<string, unknown> | null }).sector_snapshot ?? {};
+      for (const [sector, raw] of Object.entries(snap)) {
+        if (sector === "as_of" || !raw || typeof raw !== "object") continue;
+        const blk = raw as Record<string, unknown>;
+        const sources = (blk.sources as string[] | undefined) ?? [];
+        const where = `${m.id}.${sector}`;
+        const hasVacancy = typeof (blk.vacancy_pct ?? blk.vacancy_pct_low) === "number";
+        const hasCap = typeof blk.cap_rate_low_pct === "number";
+        expect("vacancy_read" in blk, `${where} vacancy_read`).toBe(hasVacancy);
+        expect("cap_read" in blk, `${where} cap_read`).toBe(hasCap);
+        for (const key of ["vacancy_read", "cap_read"]) {
+          const read = blk[key] as Record<string, unknown> | undefined;
+          if (!read) continue;
+          figures++;
+          for (const k of Object.keys(read)) expect(known.has(k), `${where}.${key}.${k}`).toBe(true);
+          for (const link of (read.links as string[] | undefined) ?? []) expect(sources, `${where}.${key}`).toContain(link);
+          // A vacancy is never a slice of its class; the rule is the cap's.
+          if (key === "vacancy_read") expect(read.slice, where).toBeUndefined();
+        }
+      }
+    }
+    expect(figures).toBeGreaterThan(70);
+  });
 });
 
 describe("the tracker inside the model's checks", () => {
   const office = { ...base, assetClass: "office", inputs: { ...base.inputs, vacancyPct: 0.1 }, tracker: trackerFor("dc", "office") };
 
-  it("an office deal's vacancy is read against the tracker's band for its metro, dated and sourced, as a quarterly print", () => {
+  it("an office deal's vacancy is read against the tracker's band, with each figure's own house, area and period and the day it was read", () => {
     const c = check(office, "vacancy")!;
     expect(c.model).toBe("10.0%");
     expect(c.scope).toBe("metro");
     expect(c.published.map((p) => [p.label, p.value, p.asOf, p.publisher])).toEqual([
-      ["Office vacancy, metro (tracker), low read", 21.3, "2026-08-25", "research tracker (colliers.com)"],
-      ["Office vacancy, metro (tracker), high read", 22.2, "2026-08-25", "research tracker (colliers.com)"],
+      ["Office vacancy (research tracker), the District, low read", 21.3, "Q2 2026", "research tracker: Colliers (21.3%) and CBRE (22.2%)"],
+      ["Office vacancy (research tracker), the District, high read", 22.2, "Q2 2026", "research tracker: Colliers (21.3%) and CBRE (22.2%)"],
     ]);
-    expect(c.published[0].text).toBe("21.3% (as of Aug 25, 2026)");
+    expect(c.published[0].text).toBe("21.3% (Q2 2026)");
     expect(c.tone).toBe("tighter");
+    expect(c.toneLabel).toBe("tighter than the published figures");
     expect(c.read).toBe(
-      "The model holds 10.0% vacancy. The metro's office vacancy reads 21.3–22.2% on the research tracker (as of Aug 25, 2026; colliers.com) — a quarterly print, not a feed. The building would run 11.3 points tighter than the metro's office stock — a leased building against a market average, and the figure to hold the rent roll and the rollover to.",
+      "The model holds 10.0% vacancy. Office vacancy reads 21.3–22.2% on the research tracker: Colliers (21.3%) and CBRE (22.2%), the District, Q2 2026 (read Aug 25, 2026) — a research print, not a feed. The building would run 11.3 points tighter than the office stock the figure covers — a leased building against a market average, and the figure to hold the rent roll and the rollover to.",
     );
     // The read names the metro now that a metro row exists.
     expect(modelVsMarket(office)!.metro).toBe("Washington DC");
   });
 
-  it("inside the band is inside; over its high end is looser and conservative; a point band reads as one figure", () => {
+  it("a figure for an area other than the market says its area, never 'the metro's'", () => {
+    // Prince George's County: Colliers' Q1 2026 Suburban Maryland survey, both counties together.
+    const pg = check(
+      { ...base, assetClass: "office", metro: { id: "pg_county", name: "Prince George's County MD" }, inputs: { ...base.inputs, vacancyPct: 0.1 }, tracker: trackerFor("pg_county", "office") },
+      "vacancy",
+    )!;
+    expect(pg.read).toBe(
+      "The model holds 10.0% vacancy. Office vacancy reads 19.2% on the research tracker: Colliers, Suburban Maryland (Montgomery and Prince George's together, not a county split), Q1 2026 (read Aug 25, 2026) — a research print, not a feed. The building would run 9.2 points tighter than the office stock the figure covers — a leased building against a market average, and the figure to hold the rent roll and the rollover to.",
+    );
+    expect(pg.read).not.toContain("metro's");
+    expect(pg.published[0]).toMatchObject({
+      label: "Office vacancy (research tracker), Suburban Maryland (Montgomery and Prince George's together, not a county split)",
+      text: "19.2% (Q1 2026)",
+      asOf: "Q1 2026",
+      publisher: "research tracker: Colliers",
+    });
+  });
+
+  it("inside the band is inside; over its high end is looser and conservative; a point band reads as one figure; an undated figure says so", () => {
     const nova = { ...base, assetClass: "industrial", metro: { id: "nova", name: "Northern Virginia" }, tracker: trackerFor("nova", "industrial") };
     const inside = check({ ...nova, inputs: { ...base.inputs, vacancyPct: 0.045 } }, "vacancy")!;
     expect(inside.tone).toBe("inside");
-    expect(inside.read).toContain("reads 3.9–5.0% on the research tracker");
+    // Northern Virginia's industrial band names no house and no period.
+    expect(inside.read).toContain("reads 3.9–5.0% on the research tracker: Northern Virginia, undated (read Aug 25, 2026)");
+    expect(inside.published.map((p) => [p.asOf, p.publisher])).toEqual([
+      ["undated", "research tracker"],
+      ["undated", "research tracker"],
+    ]);
     expect(inside.read).toContain("The model sits inside the tracker's band.");
     const looser = check({ ...nova, inputs: { ...base.inputs, vacancyPct: 0.08 } }, "vacancy")!;
     expect(looser.tone).toBe("looser");
-    expect(looser.read).toContain("The model runs 3.0 points looser than the metro's industrial stock — conservative against the tracker.");
+    expect(looser.read).toContain("The model runs 3.0 points looser than the industrial stock the figure covers — conservative against the tracker.");
     const point = check({ ...base, assetClass: "industrial", tracker: trackerFor("dc", "industrial"), inputs: { ...base.inputs, vacancyPct: 0.05 } }, "vacancy")!;
     expect(point.published).toHaveLength(1);
-    expect(point.published[0].label).toBe("Industrial vacancy, metro (tracker)");
-    expect(point.read).toContain("reads 7.4% on the research tracker");
+    expect(point.published[0].label).toBe("Industrial vacancy (research tracker), the Washington metro");
+    expect(point.read).toContain("reads 7.4% on the research tracker: Newmark, the Washington metro, Q1 2026 (read Aug 25, 2026)");
   });
 
   it("without a tracker read a commercial deal has no vacancy row, as before", () => {
@@ -657,21 +769,30 @@ describe("the tracker inside the model's checks", () => {
     const apt = { ...base, tracker: trackerFor("dc", "multifamily") };
     const c = check(apt, "vacancy")!;
     expect(c.tone).toBe("inside");
-    expect(c.published.map((p) => p.label)).toEqual(["Rental vacancy, metro area", "Rental vacancy, South Census region", "Apartment vacancy, metro (tracker)"]);
-    expect(c.published[2]).toMatchObject({ value: 5.2, asOf: "2026-08-25", publisher: "research tracker (northmarq.com)" });
-    expect(c.read).toContain("The model sits inside the survey's margin of the published figure. The research tracker's apartment read for the metro is 5.2% (as of Aug 25, 2026; northmarq.com) — a house's survey of managed stock, shown beside the Census figure rather than in its place.");
+    expect(c.published.map((p) => p.label)).toEqual([
+      "Rental vacancy, metro area",
+      "Rental vacancy, South Census region",
+      "Apartment vacancy (research tracker), the Washington DC region",
+    ]);
+    // The region's figure names no house, so no link and no house is credited.
+    expect(c.published[2]).toMatchObject({ value: 5.2, asOf: "year-end 2025", publisher: "research tracker" });
+    expect(c.read).toContain(
+      "The model sits inside the survey's margin of the published figure. The research tracker's apartment vacancy reads 5.2%: the Washington DC region, year-end 2025 (read Aug 25, 2026) — research, shown beside the Census figure rather than in its place.",
+    );
   });
 
   it("the tracker's cap range joins the exit-cap read: over its high end is the conservative direction, under its low end is compression on top of the spread", () => {
     const apt = { ...base, tracker: trackerFor("dc", "multifamily") };
     const c = check(apt, "exit_cap")!;
     expect(c.scope).toBe("metro");
-    expect(c.published.map((p) => [p.label, p.value])).toEqual([
-      ["10-year Treasury", 4.94],
-      ["Apartment cap range, metro (tracker), low end", 4.75],
-      ["Apartment cap range, metro (tracker), high end", 5.5],
+    expect(c.published.map((p) => [p.label, p.value, p.asOf])).toEqual([
+      ["10-year Treasury", 4.94, "2026-09-17"],
+      ["Apartment cap (research tracker), the Washington DC region, low end", 4.75, "undated"],
+      ["Apartment cap (research tracker), the Washington DC region, high end", 5.5, "undated"],
     ]);
-    expect(c.read).toContain("The research tracker's apartment cap range for the metro is 4.75–5.50% (as of Aug 25, 2026; northmarq.com), and the exit cap sits 50 bps over its high end — the conservative direction for an exit.");
+    expect(c.read).toContain(
+      "The research tracker's apartment cap range is 4.75–5.50% (a band on a deal mix leaning Class B / value-add): the Washington DC region, undated (read Aug 25, 2026), and the exit cap sits 50 bps over its high end — the conservative direction for an exit.",
+    );
     const tight = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.045 } }, "exit_cap")!;
     expect(tight.read).toContain("the exit cap sits 25 bps under its low end — an exit priced tighter than the market's own range today, which is cap compression on top of the spread read.");
     const within = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.05 } }, "exit_cap")!;
@@ -680,11 +801,50 @@ describe("the tracker inside the model's checks", () => {
     const plan = check({ ...apt, plan: true }, "exit_cap")!;
     expect(plan.tone).toBe("stated");
     expect(plan.read).toContain("A plan deal has no going-in cap to set it against");
-    expect(plan.read).toContain("cap range for the metro is 4.75–5.50%");
+    expect(plan.read).toContain("apartment cap range is 4.75–5.50%");
     // No range on the tracker: the check reads as it did, national.
     const office = check({ ...base, assetClass: "office", tracker: trackerFor("dc", "office") }, "exit_cap")!;
     expect(office.scope).toBe("national");
-    expect(office.read).not.toContain("cap range");
+    expect(office.read).not.toContain("research tracker");
+  });
+
+  it("a single cap figure is read as one figure, with what its file says it is", () => {
+    const la = { ...base, metro: { id: "los_angeles", name: "Los Angeles" }, tracker: trackerFor("los_angeles", "multifamily") };
+    const c = check(la, "exit_cap")!;
+    expect(c.published.slice(1)).toEqual([
+      { label: "Apartment cap (research tracker)", text: "5.80% (Q2 2026)", value: 5.8, asOf: "Q2 2026", publisher: "research tracker: Kidder Mathews" },
+    ]);
+    expect(c.read).toContain(
+      "The research tracker's apartment cap is 5.80% (a CoStar-sourced transaction average, not a quoted band): Kidder Mathews, Q2 2026 (read Aug 25, 2026), and the exit cap sits 20 bps over it — the conservative direction for an exit.",
+    );
+    expect(check({ ...la, inputs: { ...base.inputs, exitCapPct: 0.058 } }, "exit_cap")!.read).toContain("and the exit cap sits at it.");
+  });
+
+  it("a cap figure for a narrower stock than the class is named and shown, and the exit is not held to it", () => {
+    // Chicago: Essex Realty's April 2026 average for the small-building stock,
+    // 8.30%. A 5.50% exit sits 280 bps under it — which, read against the
+    // metro, would call a sound Class A exit cap compression.
+    const chicago = {
+      ...base,
+      metro: { id: "chicago", name: "Chicago" },
+      inputs: { ...base.inputs, exitCapPct: 0.055 },
+      tracker: trackerFor("chicago", "multifamily"),
+    };
+    const c = check(chicago, "exit_cap")!;
+    expect(c.published.slice(1)).toEqual([
+      { label: "Apartment cap (research tracker), Chicago", text: "8.30% (April 2026)", value: 8.3, asOf: "April 2026", publisher: "research tracker: Essex Realty" },
+    ]);
+    expect(c.read).toContain(
+      "The research tracker's apartment cap is 8.30% (a transaction average of 175 sales, not a quoted band): Essex Realty, Chicago, April 2026 (read Aug 25, 2026). That figure is for the small-building stock, mostly the Class B/C neighborhood buildings that drive Chicago volume, not the apartment market as a whole, so the exit is not held to it; the exit cap sits 280 bps under it.",
+    );
+    expect(c.read).not.toContain("jpmorgan");
+    expect(c.read).not.toContain("cap compression on top of the spread read");
+    // Miami's range is Class A stabilized core, CBRE's H2 2025 read.
+    const miami = check({ ...base, metro: { id: "miami", name: "Miami" }, tracker: trackerFor("miami", "multifamily") }, "exit_cap")!;
+    expect(miami.read).toContain(
+      "The research tracker's apartment cap range is 4.75–5.00%: CBRE, H2 2025 (read Aug 25, 2026). That figure is for Class A stabilized core, not the apartment market as a whole, so the exit is not held to it; the exit cap sits 100 bps over its high end.",
+    );
+    expect(miami.read).not.toContain("the conservative direction for an exit");
   });
 });
 

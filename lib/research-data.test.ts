@@ -116,15 +116,43 @@ describe("sector snapshot benchmark rows", () => {
     expect(philly!.high).toBe(5.7);
   });
 
-  it("every snapshot row carries provenance", () => {
+  it("every snapshot row carries provenance: a vacancy or cap row its own figure's link and citation, never the block's first link", () => {
     const snapRows = seeds.filter((b) =>
       /_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/.test(b.metric),
     );
     expect(snapRows.length).toBeGreaterThanOrEqual(8);
+    const blockOf = (r: Benchmark) => {
+      const m = metrosSeed.metros.find((x) => x.name === r.metro)!;
+      return (m.sector_snapshot as Record<string, { sources?: string[] }>)[r.sector];
+    };
     for (const r of snapRows) {
-      expect(r.source, `${r.metro} ${r.metric}`).toMatch(/^https?:\/\//);
+      // The day the research was read.
       expect(r.as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      if (/_asking_rent_psf$/.test(r.metric)) {
+        expect(r.source, `${r.metro} ${r.metric}`).toMatch(/^https?:\/\//);
+        continue;
+      }
+      // A vacancy or a cap: a link only where the file ties one to the
+      // figure, and then one of its block's own sources; a citation always.
+      if (r.source) expect(blockOf(r).sources, `${r.metro} ${r.metric}`).toContain(r.source);
+      expect(r.cite, `${r.metro} ${r.metric}`).toBeTruthy();
     }
+    // Chicago's cap is Essex Realty's April 2026 average — the block's first
+    // link is JPMorgan's, the vacancy's source.
+    const chicagoCap = snapRows.find((b) => b.metro === "Chicago" && b.metric === "multifamily_cap_rate_pct")!;
+    expect(chicagoCap.source).toBe("https://essexrealtygroup.com/chicago-multifamily-report-april-2026/");
+    expect(chicagoCap.cite).toBe(
+      "Essex Realty, Chicago, April 2026; a transaction average of 175 sales, not a quoted band; for the small-building stock, mostly the Class B/C neighborhood buildings that drive Chicago volume",
+    );
+    const chicagoVacancy = snapRows.find((b) => b.metro === "Chicago" && b.metric === "multifamily_vacancy_pct")!;
+    expect(chicagoVacancy.source).toBe("https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook");
+    // Prince George's County's office figure is Suburban Maryland's, both counties together.
+    const pgOffice = snapRows.find((b) => b.metro === "Prince George's County MD" && b.metric === "office_vacancy_pct")!;
+    expect(pgOffice.cite).toBe("Colliers, Suburban Maryland (Montgomery and Prince George's together, not a county split), Q1 2026");
+    // The Washington region's apartment vacancy names no house: no link, and its own period.
+    const dcVacancy = snapRows.find((b) => b.metro === "Washington DC" && b.metric === "multifamily_vacancy_pct")!;
+    expect(dcVacancy.source).toBe("");
+    expect(dcVacancy.cite).toBe("the Washington DC region, year-end 2025");
   });
   it("the homepage spread board has at least three real divergences to draw", () => {
     // The SpreadBoard derives (metro, sector) pairs where two named trackers

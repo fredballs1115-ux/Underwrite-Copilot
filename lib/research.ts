@@ -37,6 +37,11 @@ export interface Benchmark {
   as_of: string;
   status: ResearchStatus;
   note?: string | null;
+  /** a research-tracker figure's own provenance in one line — its house,
+   *  the area it covers and its period, as its block states them
+   *  (lib/tracker-read's `figureNote`); a row that carries one has `as_of`
+   *  as the day the research was read, not the figure's date */
+  cite?: string | null;
 }
 
 /** What the evaluator knows about this deal + buyer. Every field optional —
