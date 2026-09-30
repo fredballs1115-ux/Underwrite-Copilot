@@ -19,6 +19,8 @@ import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
 import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
 import { SiteReportsPanel } from "@/app/site-reports-panel";
+import { ListingTeam } from "./listing-team";
+import { listingTeamOf, offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { readHotelDeal } from "@/lib/hotel-deal";
@@ -233,9 +235,28 @@ export default async function DealPage({
     : null;
   // Both columns arrived in migration 0013 — select("*") simply won't carry
   // them on an older schema, so these read null/[] gracefully.
-  const offersDue =
+  const offersDueStored =
     ((deal as { offers_due?: string | null }).offers_due as string | null) ??
     null;
+  // The memorandum's call for offers (#467) fills a deadline nobody set —
+  // a deal screened before the screen wrote it — once, and only where the
+  // column is still empty when the write lands: a date the reader typed is
+  // never replaced.
+  const offersDueFilled = (deal as { is_sample?: boolean }).is_sample
+    ? null
+    : offersDueUpgrade(offersDueStored, extraction);
+  if (offersDueFilled) {
+    try {
+      await supabase.from("deals").update({ offers_due: offersDueFilled }).eq("id", id).is("offers_due", null);
+    } catch {
+      // read right on this page all the same
+    }
+  }
+  const offersDue = offersDueStored ?? offersDueFilled;
+  // What the memorandum states about the offering: its call for offers as
+  // written, and the brokers to call (lib/offering).
+  const offeringDue = offersDueOf(extraction);
+  const listingTeam = listingTeamOf(extraction);
   const stageHistory = parseStageHistory(
     (deal as { stage_history?: unknown }).stage_history,
   );
@@ -1149,6 +1170,8 @@ export default async function DealPage({
               key={`due-${offersDue ?? "unset"}`}
               dealId={id}
               value={offersDue}
+              fromMemorandum={offersDue != null && offersDue === offeringDue?.iso ? offeringDue.page : null}
+              calendarHref={offersDue ? `/api/deals/${id}/offers-due.ics` : null}
             />
             <StageSelect
               key={((deal as { stage?: string }).stage as string) ?? "screening"}
@@ -1230,6 +1253,10 @@ export default async function DealPage({
             against the lenders' 20%, and what the model does with the
             immediate repairs. */}
         <SiteReportsPanel reports={readSiteReports(extraction)} modelLine={derived?.meta.siteReports?.read ?? ""} />
+        {/* Who is selling it and when offers are due (#467): the brokers as
+            the memorandum prints them, a tap to call or write, and the call
+            for offers as written (lib/offering). */}
+        <ListingTeam team={listingTeam} offersDue={offeringDue} />
         <PlausibilityPanel findings={plausibility} strategy={strategy} />
         <PlanSensitivity plan={plan} refCap={refCap} />
 

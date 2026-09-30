@@ -178,7 +178,26 @@ export interface ExtractionResult {
    *  `singleTenant`), on housing, a hotel, storage and land. Absent on an
    *  extraction saved before it was read. Read by lib/tenant-roster. */
   tenants?: ExtractedTenant[];
+  /** THE LISTING TEAM (#467): the brokers the OM names to contact, as its
+   *  cover or contacts page prints them. Empty where it names no one, and
+   *  absent on an extraction saved before it was read. Read by
+   *  lib/offering. */
+  listingTeam?: ExtractedBroker[];
   metrics: ExtractedMetric[];
+}
+
+/** One broker of the listing team, as the OM prints them (#467) — every
+ *  field a string, "" where it prints none. Never looked up. */
+export interface ExtractedBroker {
+  name: string;
+  /** "Executive Vice President" */
+  title: string;
+  /** the brokerage */
+  firm: string;
+  /** the direct line or mobile as printed */
+  phone: string;
+  email: string;
+  page: string;
 }
 
 /** One tenant of a multi-tenant property, as the OM lists it (#457) —

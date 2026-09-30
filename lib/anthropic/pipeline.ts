@@ -48,6 +48,7 @@ import { readSellerFinancing, sellerFinancingNote } from "@/lib/seller-financing
 import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
+import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
@@ -696,6 +697,24 @@ async function runAnalysisSteps(
         if (upgrade) await admin.from("deals").update({ address: upgrade }).eq("id", dealId);
       } catch {
         // the deal keeps the address it had
+      }
+      // The memorandum's call for offers fills the deal's deadline (#467) —
+      // only where nobody has set one, and only a whole date — so the
+      // pipeline counts down to it and the Monday digest names it without
+      // anyone typing it in. Best-effort, like the address.
+      try {
+        const due = offersDueOf(extraction)?.iso ?? null;
+        if (due) {
+          const { data: dated } = await admin
+            .from("deals")
+            .select("offers_due, is_sample")
+            .eq("id", dealId)
+            .maybeSingle();
+          const next = dated && !dated.is_sample ? offersDueUpgrade(dated.offers_due as string | null, extraction) : null;
+          if (next) await admin.from("deals").update({ offers_due: next }).eq("id", dealId).is("offers_due", null);
+        }
+      } catch {
+        // the deal keeps the deadline it had
       }
 
       // Citation-level provenance (migration 0018): store one deal_facts row

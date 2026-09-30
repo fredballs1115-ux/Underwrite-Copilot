@@ -5898,3 +5898,57 @@ describe("ShareView — the third-party reports (#465)", () => {
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("site-reports-panel");
   });
 });
+
+import { ListingTeam } from "@/app/(app)/deals/[id]/listing-team";
+import { OffersDueControl } from "@/app/(app)/deals/offers-due";
+import { listingTeamOf, offersDueOf } from "@/lib/offering";
+
+describe("The offering (#467) — the brokers to call and when offers are due", () => {
+  const ex = {
+    dealName: "The Maddox",
+    assetClass: "multifamily",
+    totalPages: 60,
+    metrics: [{ label: "Offers due", value: "Thursday, October 15, 2026 at 5:00 PM ET", page: "p. 2" }],
+    listingTeam: [
+      { name: "Jane Q. Doe", title: "Executive Vice President", firm: "CBRE", phone: "(215) 555-0100", email: "jane.doe@cbre.com", page: "p. 2" },
+      { name: "John Roe", title: "Senior Associate", firm: "CBRE", phone: "+44 20 7946 0958", email: "", page: "p. 2" },
+    ],
+  } as never;
+
+  it("draws each broker as printed with a link to call and one to write, and the call for offers as written", () => {
+    const html = render(React.createElement(ListingTeam, { team: listingTeamOf(ex), offersDue: offersDueOf(ex) }));
+    const text = visibleText(html);
+    expect(a11yIssues(html), "a11y listing team").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain('data-qa="listing-team"');
+    expect(text).toContain("Offered by CBRE");
+    expect(text).toContain("Offers due:");
+    expect(text).toContain("Thursday, October 15, 2026 at 5:00 PM ET");
+    // Spelled apart for a screen reader, not only by the gap between them.
+    expect(html).toMatch(/Offers due:<\/span> <span/);
+    expect(text).toContain("Executive Vice President, CBRE");
+    expect(html).toContain('href="tel:+12155550100"');
+    expect(html).toContain('href="mailto:jane.doe@cbre.com"');
+    // A number the page cannot dial from here is printed, never linked.
+    expect(text).toContain("+44 20 7946 0958");
+    expect(html).not.toContain("tel:+44");
+    // Nothing stated, nothing drawn.
+    expect(renderToStaticMarkup(React.createElement(ListingTeam, { team: [], offersDue: null }))).toBe("");
+  });
+
+  it("marks the memorandum's own date in the header and offers it to a calendar", () => {
+    const html = render(
+      React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-15", fromMemorandum: "p. 2", calendarHref: "/api/deals/d1/offers-due.ics" }),
+    );
+    expect(a11yIssues(html), "a11y deadline control").toEqual([]);
+    expect(html).toContain('data-qa="offers-due-om"');
+    expect(html).toContain("the memorandum&#x27;s date, p. 2");
+    expect(html).toContain('href="/api/deals/d1/offers-due.ics"');
+    expect(html).toContain('aria-label="Add the offers-due date to your calendar"');
+    // A date the reader typed is theirs: no mark; no date, no calendar file.
+    const typed = render(React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-20", calendarHref: "/api/deals/d1/offers-due.ics" }));
+    expect(typed).not.toContain('data-qa="offers-due-om"');
+    const none = render(React.createElement(OffersDueControl, { dealId: "d1", value: null, calendarHref: null }));
+    expect(none).not.toContain("offers-due.ics");
+  });
+});

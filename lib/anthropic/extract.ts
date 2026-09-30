@@ -114,6 +114,19 @@ const ExtractionSchema = z.object({
       page: z.string(),
     }),
   ),
+  // THE LISTING TEAM (#467): the brokers the OM names to contact, each as
+  // printed and "" where it prints nothing; an empty list where it names
+  // no one. Read by lib/offering.
+  listingTeam: z.array(
+    z.object({
+      name: z.string(),
+      title: z.string(),
+      firm: z.string(),
+      phone: z.string(),
+      email: z.string(),
+      page: z.string(),
+    }),
+  ),
   // Each property of a PORTFOLIO OM (two or more separately addressed
   // buildings or sites), with what the OM states for THAT property and ""
   // where it states nothing; an empty list for a single-property OM. The
@@ -251,6 +264,18 @@ export async function extractTerms(
             }))
             .filter((t) => t.name)
         : [],
+    // Every broker named, at most six — a contacts page names two to four.
+    listingTeam: (out.listingTeam ?? [])
+      .map((b) => ({
+        name: b.name.trim(),
+        title: b.title.trim(),
+        firm: b.firm.trim(),
+        phone: b.phone.trim(),
+        email: b.email.trim(),
+        page: b.page.trim(),
+      }))
+      .filter((b) => b.name)
+      .slice(0, 6),
     // A one-entry list is a single property restated, not a portfolio.
     properties:
       (out.properties ?? []).length >= 2

@@ -34,6 +34,8 @@ class FakeQuery {
   private op: "select" | "update" | "insert" | "delete" = "select";
   private patch: Row = {};
   private filters: [string, unknown][] = [];
+  /** `.is(col, null)` guards: an update applies only where they hold */
+  private nulls: string[] = [];
   private cols = "";
   private wantsRows = false;
   private wantsSingle = false;
@@ -65,6 +67,10 @@ class FakeQuery {
     return this;
   }
   in() {
+    return this;
+  }
+  is(col: string, val: unknown) {
+    if (val === null) this.nulls.push(col);
     return this;
   }
   not() {
@@ -108,7 +114,7 @@ class FakeQuery {
         }
         return { data: row, error: null };
       }
-      if (this.op === "update" && row) Object.assign(row, this.patch);
+      if (this.op === "update" && row && this.nulls.every((c) => row[c] == null)) Object.assign(row, this.patch);
       return { data: this.wantsRows ? (row ? [row] : []) : null, error: null };
     }
     if (table === "analysis_jobs") {
@@ -946,6 +952,34 @@ describe("runAnalysis — a deal placed by its address (#441)", () => {
     state.deals.d1.address = { ...picked };
     await runAnalysis("d1");
     expect(state.deals.d1.address).toEqual(picked);
+  });
+});
+
+describe("runAnalysis — the memorandum's call for offers (#467)", () => {
+  const withDue = (value: string) =>
+    ({
+      ...EXTRACTION,
+      metrics: [...EXTRACTION.metrics, { label: "Offers due", value, flagged: false, page: "p. 2", basis: "na", locatorSnippet: "" }],
+    }) as unknown as ExtractionResult;
+
+  it("fills the deal's deadline where nobody has set one", async () => {
+    vi.mocked(extractTerms).mockResolvedValue(withDue("Thursday, October 15, 2026 at 5:00 PM ET"));
+    state.deals.d1.offers_due = null;
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(state.deals.d1.offers_due).toBe("2026-10-15");
+  });
+
+  it("never replaces a date the reader set, and never stores a date with no year", async () => {
+    vi.mocked(extractTerms).mockResolvedValue(withDue("October 15, 2026"));
+    state.deals.d1.offers_due = "2026-10-20";
+    await runAnalysis("d1");
+    expect(state.deals.d1.offers_due).toBe("2026-10-20");
+
+    vi.mocked(extractTerms).mockResolvedValue(withDue("October 15th"));
+    state.deals.d1.offers_due = null;
+    await runAnalysis("d1");
+    expect(state.deals.d1.offers_due).toBeNull();
   });
 });
 
