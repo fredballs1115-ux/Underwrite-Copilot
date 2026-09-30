@@ -106,10 +106,13 @@ export function restyledLayers(layerId, legend) {
       return (entry.values ?? []).map((value) => ({ value, label: entry.label, symbol }));
     });
   const renderer = (casing) => ({ type: "uniqueValue", field1: "FLD_ZONE", field2: "ZONE_SUBTY", fieldDelimiter: ",", uniqueValueInfos: infos(casing) });
-  // Drawn top first: the tints and outlines over their casings.
+  // Drawn top first: the tints and outlines over their casings. FEMA's layer
+  // carries a 70% transparency of its own, which a dynamic layer inherits
+  // (the first render's 41% tint came back at 12%); zero hands the symbols
+  // their own alpha.
   return [
-    { id: 901, source, drawingInfo: { renderer: renderer(false), showLabels: false } },
-    { id: 902, source, drawingInfo: { renderer: renderer(true), showLabels: false } },
+    { id: 901, source, drawingInfo: { renderer: renderer(false), transparency: 0, showLabels: false } },
+    { id: 902, source, drawingInfo: { renderer: renderer(true), transparency: 0, showLabels: false } },
   ];
 }
 
