@@ -2,7 +2,8 @@
  * Test tooling: real memoranda to search for a cover photograph, written by
  * the PDF writer the report and the memo already ship with
  * (`@react-pdf/pdfkit`, under `@react-pdf/renderer`). It embeds a JPEG as
- * the JPEG and a PNG as pixels, and it secures a file the way a broker's
+ * the JPEG and a PNG as pixels (and a JPEG 2000 picture, which pdfkit cannot
+ * read, as its own bytes: `TestJpxImage`), and it secures a file the way a broker's
  * export does: an owner password over an empty user password, with every
  * stream encrypted (RC4 40 and 128, AES 128 and 256 by the version asked
  * for), or a user password that must be typed to open it.
@@ -18,9 +19,26 @@ interface PdfKitDoc {
   image(src: Buffer, x: number, y: number, options?: { width?: number }): PdfKitDoc;
   fontSize(size: number): PdfKitDoc;
   text(text: string, x?: number, y?: number): PdfKitDoc;
+  /** an indirect object; a stream once `end` writes its bytes */
+  ref(data: object): { end(chunk?: Buffer): void };
+  page: { xobjects: Record<string, unknown> };
+  save(): PdfKitDoc;
+  restore(): PdfKitDoc;
+  transform(a: number, b: number, c: number, d: number, e: number, f: number): PdfKitDoc;
+  addContent(content: string): PdfKitDoc;
   end(): void;
 }
 type PdfKit = new (options?: object) => PdfKitDoc;
+
+/**
+ * A picture stored as JPEG 2000 (`/JPXDecode`, lib/test-jpx), which pdfkit
+ * cannot read: its size is said, and its bytes go into the file as they are.
+ */
+export interface TestJpxImage {
+  jpx: Buffer;
+  width: number;
+  height: number;
+}
 
 /** How the file is secured, if it is. */
 export type Security = "none" | "rc4-40" | "rc4-128" | "aes-128" | "aes-256" | "user-password";
@@ -35,7 +53,7 @@ const VERSION: Record<Exclude<Security, "none">, string> = {
 
 /** One page: the pictures it draws, in order, and a line of text. */
 export interface TestPage {
-  images?: Buffer[];
+  images?: (Buffer | TestJpxImage)[];
   text?: string;
 }
 
@@ -57,11 +75,13 @@ export async function testMemorandum(pages: TestPage[], security: Security = "no
   const chunks: Buffer[] = [];
   doc.on("data", (chunk) => chunks.push(chunk));
   const done = new Promise<void>((resolve) => doc.on("end", resolve));
+  let jpx = 0;
   for (const page of pages) {
     doc.addPage({ size: "LETTER", layout: "landscape" });
     let y = 36;
     for (const img of page.images ?? []) {
-      doc.image(img, 36, y, { width: 360 });
+      if (Buffer.isBuffer(img)) doc.image(img, 36, y, { width: 360 });
+      else placeJpx(doc, img, 36, y, 360, `Jpx${++jpx}`);
       y += 240;
     }
     if (page.text) doc.fontSize(12).text(page.text, 420, 36);
@@ -69,6 +89,24 @@ export async function testMemorandum(pages: TestPage[], security: Security = "no
   doc.end();
   await done;
   return new Uint8Array(Buffer.concat(chunks));
+}
+
+/**
+ * Draw a JPEG 2000 picture the way pdfkit draws a JPEG: its own image
+ * XObject, filtered `/JPXDecode` alone (so pdfkit neither deflates it nor
+ * claims a colour space — the JP2 header says it), encrypted with the rest
+ * of the file where it is secured, and painted into the page's top-down
+ * frame flipped, as pdfkit's own `image()` does.
+ */
+function placeJpx(doc: PdfKitDoc, img: TestJpxImage, x: number, y: number, width: number, name: string): void {
+  const height = (width * img.height) / img.width;
+  const ref = doc.ref({ Type: "XObject", Subtype: "Image", Width: img.width, Height: img.height, Filter: "JPXDecode" });
+  ref.end(img.jpx);
+  doc.page.xobjects[name] = ref;
+  doc.save();
+  doc.transform(width, 0, 0, -height, x, y + height);
+  doc.addContent(`/${name} Do`);
+  doc.restore();
 }
 
 /**

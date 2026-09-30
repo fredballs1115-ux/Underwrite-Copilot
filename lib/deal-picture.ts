@@ -118,15 +118,19 @@ const RECHECK_MS = 30 * 86_400_000;
  * one that enlarges a small cover's hero cleanly rather than leaving the
  * browser to stretch it (#446), 5 the one that says nothing where the time
  * budget cut its read short — so a verdict of none reached before, which may
- * have been exactly that, is looked at again.
+ * have been exactly that, is looked at again — and 6 the one that decodes a
+ * photograph stored as JPEG 2000 (lib/pdfjs-wasm), which every search before
+ * it passed over, so a verdict of none reached before is looked at again.
  */
-export const PICTURE_SEARCH_VERSION = 5;
+export const PICTURE_SEARCH_VERSION = 6;
 /**
  * The oldest rules a photograph lifted from the memorandum still stands
  * under. A photograph lifted before 3 could be a map and is judged again
  * (#444), and one before 4 had its hero left for the browser to stretch
- * (#446); the rules since change only what it takes to say there is none,
- * so the photographs they would lift are the ones already stored.
+ * (#446). The rules since change what it takes to say there is none, and
+ * find a cover stored as JPEG 2000 where none was found; a photograph
+ * already lifted — the cover page's, or one from the pages after it — is
+ * still a photograph of the building, so it is not judged again.
  */
 export const PHOTO_RULES_SINCE = 4;
 /**

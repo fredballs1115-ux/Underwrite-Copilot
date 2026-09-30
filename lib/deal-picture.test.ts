@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DealPicture, DealVisualCache } from "./deal-location";
 import { testMap, testMemorandum, testPicture } from "./test-memorandum";
+import { TEST_JPX } from "./test-jpx";
 
 // Storage faked: the memorandum each deal holds, what is written, what is removed.
 const store = vi.hoisted(() => ({
@@ -242,6 +243,31 @@ describe("a read the time budget cut short writes no verdict", () => {
     await clearOmPicture(client, "d1", cache);
     expect(db.photo?.pictureRetry).toBeUndefined();
     expect(retryWaiting(db.photo)).toBe(false);
+  });
+});
+
+describe("a cover stored as JPEG 2000", () => {
+  beforeEach(() => {
+    store.oms.clear();
+    store.files.clear();
+    store.uploads = [];
+    store.removed = [];
+    decodeBudget.ms = undefined;
+  });
+
+  it("is found where a verdict of none reached under the rules before was written, and stored as any cover is", async () => {
+    // A secured memorandum whose cover is JPEG 2000: the byte scan sees
+    // nothing, and the read before the decoders were found passed it over.
+    store.oms.set("u/d1.pdf", await testMemorandum([{ images: [TEST_JPX], text: "The Maddox" }], "aes-128"));
+    const judged: DealVisualCache = { pictureCheckedAt: new Date().toISOString(), pictureSearchV: PICTURE_SEARCH_VERSION - 1 };
+    expect(searchedRecently(judged)).toBe(false);
+    expect(pictureMayBeInMemorandum({ omPath: "u/d1.pdf", isSample: false, cache: judged })).toBe(true);
+    const { client, db } = fakeDb(judged);
+    const got = await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: judged, waitMs: 5_000, gallery: false });
+    expect(got).toMatchObject({ source: "om", width: 1200, height: 750 });
+    expect(db.photo?.picture?.hero).toBe(got!.hero);
+    expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
+    expect(store.uploads).toHaveLength(2);
   });
 });
 

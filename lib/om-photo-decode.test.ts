@@ -1,5 +1,8 @@
+import { existsSync } from "node:fs";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
+import { PDFJS_JPX_DECODER, pdfjsWasmUrl } from "./pdfjs-wasm";
+import { TEST_JPX } from "./test-jpx";
 import {
   COVER_PAGES,
   FLAT_SHARE,
@@ -171,6 +174,45 @@ describe("the cover of a memorandum the byte scan cannot read", () => {
     const logoOnly = await testMemorandum([{ images: [await logo()], text: "Offering Memorandum" }], "aes-128");
     expect((await decodeOmCover(logoOnly)).cover).toBeNull();
     expect((await decodeOmCover(new TextEncoder().encode("%PDF-1.7\nnot a pdf at all"))).cover).toBeNull();
+  });
+});
+
+describe("a cover stored as JPEG 2000", () => {
+  const SOURCE_JPX = means(testPixels(TEST_JPX.width, TEST_JPX.height, TEST_JPX.variant), 3);
+
+  it("is told where pdfjs's decoders are: the package's own wasm folder, with the slash pdfjs wants", () => {
+    const url = pdfjsWasmUrl();
+    expect(url).toBeDefined();
+    expect(url!.endsWith("/")).toBe(true);
+    expect(existsSync(`${url}${PDFJS_JPX_DECODER}`)).toBe(true);
+  });
+
+  for (const security of ["none", "aes-128"] as const) {
+    it(`decodes it ${security === "none" ? "plain" : "secured"}, into the photograph's own pixels`, async () => {
+      // Without the decoders' location pdfjs could not decode it at all,
+      // and this cover page read as holding no photograph.
+      const pdf = await testMemorandum([{ images: [TEST_JPX], text: "The Maddox" }, { text: "Executive summary" }], security);
+      expect(findOmImages(pdf)).toEqual([]);
+      const read = await decodeOmCover(pdf);
+      expect(read).toMatchObject({ opened: true, pageOneRead: true, complete: true });
+      expect(read.cover).toMatchObject({ width: TEST_JPX.width, height: TEST_JPX.height, page: 1 });
+      // The picture that went in, less the wavelet's loss.
+      means(read.cover!.pixels, read.cover!.channels).forEach((m, c) => expect(Math.abs(m - SOURCE_JPX[c])).toBeLessThan(3));
+    });
+  }
+
+  it("is lifted as pixels, since the file stores no JPEG of it, and its two sizes are made as any cover's are", async () => {
+    const got = await coverOf(await testMemorandum([{ images: [TEST_JPX] }]));
+    expect(got && !Buffer.isBuffer(got) ? { w: got.width, h: got.height } : null).toEqual({ w: TEST_JPX.width, h: TEST_JPX.height });
+    const derived = await derivePicture(got!);
+    // 640 across, enlarged cleanly to the hero's floor (#446).
+    expect({ w: derived.width, h: derived.height }).toEqual({ w: HERO_MIN_PX, h: 750 });
+    expect((await sharp(derived.thumb).metadata()).width).toBe(240);
+  });
+
+  it("takes the cover page's JPEG 2000 photograph over a larger JPEG further in, as it would a JPEG", async () => {
+    const pdf = await testMemorandum([{ images: [TEST_JPX] }, { images: [await testPicture(1920, 1200, "jpeg", 2)] }]);
+    expect((await decodeOmCover(pdf)).cover).toMatchObject({ width: TEST_JPX.width, page: 1 });
   });
 });
 

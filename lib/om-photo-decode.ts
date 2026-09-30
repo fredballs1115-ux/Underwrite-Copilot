@@ -32,6 +32,10 @@
  * - A photograph stored as PIXELS (`/FlateDecode`, usually with PNG
  *   predictors): a PNG, or an image a layout tool flattened or edited,
  *   rather than the camera's JPEG.
+ * - A photograph stored as JPEG 2000 (`/JPXDecode`), which Acrobat's
+ *   optimiser writes. pdfjs decodes it with its WebAssembly decoder, and
+ *   only once it is told where that lives (`lib/pdfjs-wasm`): before, every
+ *   such picture failed to decode and was passed over.
  *
  * It never throws: a file it cannot read, or one that runs past its time,
  * reads as no photograph, and says whether the file was read at all
@@ -43,6 +47,7 @@
  */
 
 import { COVER_ASPECT, COVER_MIN } from "@/lib/om-photo";
+import { pdfjsWasmUrl } from "@/lib/pdfjs-wasm";
 
 /** How many pages are searched: the cover, and a page or three after it. */
 export const COVER_PAGES = 4;
@@ -304,6 +309,9 @@ async function walkPaintedImages(
       isOffscreenCanvasSupported: false,
       isImageDecoderSupported: false,
       maxImageSize: MAX_DECODE_PIXELS,
+      // Its WebAssembly decoders, without which a photograph stored as JPEG
+      // 2000 (`/JPXDecode`) cannot be decoded at all (lib/pdfjs-wasm).
+      wasmUrl: pdfjsWasmUrl(),
     });
     const doc = await before(task.promise, deadline);
     out.opened = true;
