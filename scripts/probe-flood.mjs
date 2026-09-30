@@ -93,8 +93,10 @@ export const CLASS_STYLE = [
   [/undetermined/i, [117, 117, 117, 130], [66, 66, 66, 240], 1.75, "esriSFSForwardDiagonal"],
 ];
 
-export function restyledLayers(layerId, legend) {
+export function restyledLayers(layerId, legend, { transparency = 0 } = {}) {
   const source = { type: "mapLayer", mapLayerId: layerId };
+  // The experiment's variants: `undefined` leaves the key out altogether.
+  const drawing = (renderer) => ({ renderer, ...(transparency === undefined ? {} : { transparency }), showLabels: false });
   const infos = (casing) =>
     legend.flatMap((entry) => {
       const style = CLASS_STYLE.find(([re]) => re.test(String(entry.label ?? "").trim()));
@@ -111,25 +113,70 @@ export function restyledLayers(layerId, legend) {
   // (the first render's 41% tint came back at 12%); zero hands the symbols
   // their own alpha.
   return [
-    { id: 901, source, drawingInfo: { renderer: renderer(false), transparency: 0, showLabels: false } },
-    { id: 902, source, drawingInfo: { renderer: renderer(true), transparency: 0, showLabels: false } },
+    { id: 901, source, drawingInfo: drawing(renderer(false)) },
+    { id: 902, source, drawingInfo: drawing(renderer(true)) },
   ];
 }
 
 /** The restyled export's form: POSTed, since FEMA's full class list makes
  *  the dynamic layers some 50 KB — past what a URL carries. */
-export function restyledOverlayForm(b, width, height, layerId, legend) {
+export function restyledOverlayForm(b, width, height, layerId, legend, { transparency, format = "png32", dpi } = {}) {
   return new URLSearchParams({
     bbox: bboxParam(b),
     bboxSR: "3857",
     imageSR: "3857",
     size: `${width},${height}`,
-    format: "png32",
+    format,
     transparent: "true",
-    dynamicLayers: JSON.stringify(restyledLayers(layerId, legend)),
+    dynamicLayers: JSON.stringify(restyledLayers(layerId, legend, transparency === undefined ? {} : { transparency })),
+    ...(dpi ? { dpi: String(dpi) } : {}),
     f: "image",
   });
 }
+
+/**
+ * Where a frame is drawn in a colour near `rgb`, and the alpha its interior
+ * carries (the mode over those pixels) — the measurement the restyle's
+ * transparency turns on, read off the picture rather than assumed.
+ */
+async function alphaOf(sharp, png, rgb, tol = 16) {
+  const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+  const hist = new Map();
+  let n = 0;
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue;
+    if (Math.abs(data[i] - rgb[0]) > tol || Math.abs(data[i + 1] - rgb[1]) > tol || Math.abs(data[i + 2] - rgb[2]) > tol) continue;
+    n++;
+    hist.set(data[i + 3], (hist.get(data[i + 3]) ?? 0) + 1);
+  }
+  const mode = [...hist.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null;
+  return { share: n / (info.width * info.height), alpha: mode, width: info.width, height: info.height };
+}
+
+/** FEMA's own polygons for a frame, from the zones layer's query: every zone
+ *  (Zone X of minimal hazard included — the drawing decides what to leave
+ *  undrawn), in the frame's own projection, generalised to half a pixel. */
+export function frameQuery(b, zoom, { quantize = false } = {}) {
+  const env = { xmin: b.minX, ymin: b.minY, xmax: b.maxX, ymax: b.maxY, spatialReference: { wkid: 3857 } };
+  const res = RES_Z0 / 2 ** zoom;
+  return new URLSearchParams({
+    f: "json",
+    where: "1=1",
+    geometry: JSON.stringify(env),
+    geometryType: "esriGeometryEnvelope",
+    inSR: "3857",
+    spatialRel: "esriSpatialRelIntersects",
+    outFields: "FLD_ZONE,ZONE_SUBTY,SFHA_TF,STATIC_BFE,DEPTH,V_DATUM,LEN_UNIT",
+    returnGeometry: "true",
+    outSR: "3857",
+    ...(quantize
+      ? { quantizationParameters: JSON.stringify({ mode: "view", originPosition: "upperLeft", tolerance: res / 2, extent: env }) }
+      : { maxAllowableOffset: (res / 2).toFixed(3), geometryPrecision: "1" }),
+  });
+}
+
+const vertexCount = (features) =>
+  features.reduce((n, f) => n + (f.geometry?.rings ?? []).reduce((m, r) => m + r.length, 0), 0);
 
 /** The building's ring as the page draws it: white over a dark halo. */
 const ringSvg = (width, height) =>
@@ -248,6 +295,10 @@ async function main() {
   for (const l of layers) console.log(`    ${l.id}: ${l.name}${l.minScale || l.maxScale ? ` (scales ${l.minScale}–${l.maxScale})` : ""}`);
   console.log(`  copyrightText: ${JSON.stringify(json.copyrightText ?? null)}`);
   console.log(`  supportsDynamicLayers: ${json.supportsDynamicLayers}`);
+  // The export's own limits: a frame at twice the pixels for the same ground
+  // needs maxImageWidth / maxImageHeight to allow it.
+  console.log(`  maxImageWidth ${json.maxImageWidth} · maxImageHeight ${json.maxImageHeight} · maxRecordCount ${json.maxRecordCount}`);
+  console.log(`  supportedImageFormatTypes: ${json.supportedImageFormatTypes}`);
   if (!zones) return;
 
   // 1b. The zone layer's own description: its fields (the restyle's
@@ -259,6 +310,10 @@ async function main() {
     console.log(`LAYER ${zones.id} · HTTP ${lay.status} · geometry ${lj.geometryType} · maxRecordCount ${lj.maxRecordCount} · capabilities ${lj.capabilities}`);
     console.log(`  fields: ${(lj.fields ?? []).map((f) => `${f.name}:${String(f.type).replace("esriFieldType", "")}`).join(", ")}`);
     console.log(`  renderer: ${lj.drawingInfo?.renderer?.type ?? "?"} · labels ${lj.hasLabels ?? "?"}`);
+    const rr = lj.drawingInfo?.renderer ?? {};
+    console.log(`  renderer fields: ${JSON.stringify([rr.field1, rr.field2, rr.field3])} · delimiter ${JSON.stringify(rr.fieldDelimiter)} · defaultSymbol ${rr.defaultSymbol ? JSON.stringify(rr.defaultSymbol).slice(0, 200) : "none"} · defaultLabel ${JSON.stringify(rr.defaultLabel ?? null)}`);
+    console.log(`  drawingInfo.transparency ${JSON.stringify(lj.drawingInfo?.transparency ?? null)} · first symbol ${JSON.stringify(rr.uniqueValueInfos?.[0]?.symbol ?? null).slice(0, 300)}`);
+    console.log(`  supportedQueryFormats ${lj.supportedQueryFormats} · supportsCoordinatesQuantization ${lj.supportsCoordinatesQuantization} · advancedQueryCapabilities ${JSON.stringify(lj.advancedQueryCapabilities ?? null)}`);
   } catch (err) {
     console.log(`LAYER ${zones.id} unreadable — ${err instanceof Error ? err.message : String(err)}`);
   }
@@ -345,6 +400,58 @@ async function main() {
             index.frames.push({ place: label, lat, lng, zoom, file: `${base}-restyled.jpg`, overlay: `${base}-restyled-overlay.png`, restyled: true });
             index.frames.push({ place: label, lat, lng, zoom, file: `${base}-restyled-muted.jpg`, overlay: `${base}-restyled-overlay.png`, restyled: true, muted: true });
           }
+        }
+      }
+      // 4. The experiment (#472), at the deal page's zoom. Three questions,
+      //    each answered by what comes back rather than by the docs:
+      if (zoom === 17 && sharp) {
+        if (a.type.startsWith("image/")) await writeFile(join(out, `${base}-aerial.jpg`), a.buf);
+        //  (a) what a dynamic layer's `transparency` does to FEMA's 70%:
+        //      the 1% zone's fill is asked at alpha 105; the interior's alpha
+        //      is read back for each variant.
+        for (const t of [undefined, 0, 1, 25]) {
+          const r = await post(`${root}/export`, restyledOverlayForm(b, W, H, zones.id, index.legend, { transparency: t }));
+          const m = r.type.startsWith("image/") ? await alphaOf(sharp, r.buf, [30, 136, 229]) : null;
+          console.log(`  z17 transparency ${t === undefined ? "omitted" : t}: HTTP ${r.status} ${r.type}${m ? ` · 1% fill on ${(m.share * 100).toFixed(1)}% of the frame at alpha ${m.alpha}` : ` · ${r.buf.toString("utf8").slice(0, 200)}`}`);
+        }
+        //  (b) the same ground at twice the pixels (dpi 192): a crisp edge on
+        //      a 2x screen, if the service allows the size.
+        {
+          const t0 = Date.now();
+          const r = await post(`${root}/export`, restyledOverlayForm(b, W * 2, H * 2, zones.id, index.legend, { dpi: 192 }));
+          const m = r.type.startsWith("image/") ? await alphaOf(sharp, r.buf, [30, 136, 229]) : null;
+          console.log(`  z17 at 2x (dpi 192): HTTP ${r.status} ${r.type} ${Math.round(r.buf.length / 1024)} KB in ${Date.now() - t0} ms${m ? ` · ${m.width}×${m.height} · 1% fill on ${(m.share * 100).toFixed(1)}%` : ` · ${r.buf.toString("utf8").slice(0, 200)}`}`);
+          if (m) await writeFile(join(out, `${base}-restyled-2x.png`), r.buf);
+        }
+        //  (c) FEMA's own polygons for the frame, to draw them ourselves:
+        //      the size, the time, the classes — and the features saved so
+        //      the sandbox can draw them over the aerial saved above.
+        for (const quantize of [false, true]) {
+          const t0 = Date.now();
+          const r = await post(`${root}/${zones.id}/query`, frameQuery(b, zoom, { quantize }));
+          try {
+            const qj = JSON.parse(r.buf.toString("utf8"));
+            if (qj.error) throw new Error(JSON.stringify(qj.error).slice(0, 300));
+            const feats = qj.features ?? [];
+            const classes = new Map();
+            for (const f of feats) {
+              const k = `${f.attributes?.FLD_ZONE ?? "?"},${f.attributes?.ZONE_SUBTY ?? "<Null>"}`;
+              classes.set(k, (classes.get(k) ?? 0) + 1);
+            }
+            console.log(`  z17 query${quantize ? " (quantized)" : ""}: HTTP ${r.status} · ${Math.round(r.buf.length / 1024)} KB in ${Date.now() - t0} ms · ${feats.length} features · ${vertexCount(feats)} vertices · exceededTransferLimit ${qj.exceededTransferLimit ?? false}`);
+            console.log(`    classes: ${[...classes.entries()].map(([k, n]) => `${k} ×${n}`).join("; ")}`);
+            if (quantize) console.log(`    transform: ${JSON.stringify(qj.transform ?? null)}`);
+            await writeFile(join(out, `${base}-features${quantize ? "-q" : ""}.json`), r.buf);
+          } catch (err) {
+            console.log(`  z17 query${quantize ? " (quantized)" : ""}: HTTP ${r.status} ${r.type} in ${Date.now() - t0} ms — ${err instanceof Error ? err.message : String(err)} · ${r.buf.toString("utf8").slice(0, 200)}`);
+          }
+        }
+        //  (d) the restyle as SVG: FEMA clips and projects, the drawing is
+        //      text a server could rewrite — saved to be read, never served.
+        {
+          const r = await post(`${root}/export`, restyledOverlayForm(b, W, H, zones.id, index.legend, { format: "svg" }));
+          console.log(`  z17 svg: HTTP ${r.status} ${r.type} ${Math.round(r.buf.length / 1024)} KB · starts ${JSON.stringify(r.buf.toString("utf8").slice(0, 120))}`);
+          if (r.buf.length) await writeFile(join(out, `${base}-restyled.svg.txt`), r.buf);
         }
       }
     }
