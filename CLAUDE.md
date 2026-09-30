@@ -636,6 +636,47 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   only), the workbook's cover ("The seller's note", `meta.sellerNote`), the
   report beside the grids (`buildReportData`'s twentieth argument) and the
   compare table's Seller financing row.
+- What the third-party reports found (#465): the extraction labels each
+  finding a memorandum cites as a row of its own, each only as stated —
+  "Phase I ESA date", "Phase I ESA findings", "Phase II ESA", "PCA date",
+  "PCA immediate repairs" (one dollar total, never per unit or a range),
+  "PCA replacement reserves", "Seismic PML" and "Zoning conformance"
+  (never the district alone). `lib/site-reports.ts` (pure) reads them
+  (`readSiteReports(ex, asOf)`; null where none is cited). A Phase I or II
+  row must name the environmental report, so a development's "Phase I
+  units" is never one. Five rules: **the seller's reports are the
+  seller's** (reliance is the buyer's lender's question); **a Phase I is
+  good for a year** (40 CFR 312 / ASTM E1527-21: completed within the year
+  before the purchase, its interviews, searches and site visit within 180
+  days — `esaAge`: current, update, redo; the date read as early as its
+  words allow, a month or a year alone its first day, `reportDate`); **a
+  finding is what the words say** (`esaFinding`: a REC, a CREC, an HREC,
+  de minimis, none — a denial like "no RECs", "did not identify any RECs"
+  or "RECs: none" struck out before the rest is read, so "No RECs; one
+  HREC" is the historical one; a "no further action" letter is said as
+  stated, never as clean); **the immediate repairs are capital at
+  closing** (the model's `capitalImprovementsYr1` carries them, extracted,
+  where the memorandum states no budget and no PIP; a stated budget or PIP
+  is read as including them, never the two added); **a blank is null**
+  ("None" repairs is a finding of zero; an uncited report is absent). The
+  zoning reader strikes "no violations" before it reads. Tags, most serious
+  first: "Phase I: REC", "PML 24%", "Phase I: CREC", "Non-conforming",
+  "Legal non-conforming", "Repairs $630k", "Phase I over a year old".
+  `PML_LENDER_PCT` (20) is the line most lenders ask for earthquake
+  insurance at. Where it shows: the deal context and the challenger
+  (`siteReportsNote`: SITE-REPORT TRAPS (a)–(e) — reliance, the Phase I's
+  age and findings, the immediate repairs, the reserves, seismic and
+  zoning), `app/site-reports-panel.tsx` (`SiteReportsPanel`, pure: a tile a
+  report in the tone of what it found, `data-report`; the Phase I's age on
+  a track with the 180-day and one-year marks, `data-bar="esa-age"`,
+  `esa-180`, `esa-year`; the PML against 20%, `pml`, `pml-line`; the first
+  report's read, the rest folded) on the deal page and the shared screen,
+  the key terms, the pipeline row, card and CSV's "Reports" column and the
+  meeting workbook's price note (`siteReportsTag`, its own `reports`
+  slot), the memo under its title (`siteReportsShortLine`), the workbook's
+  cover ("The reports", `meta.siteReports`), the report's caveat
+  (`buildReportData`'s twenty-first argument) and the compare table's
+  Reports row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

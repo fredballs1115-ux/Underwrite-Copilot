@@ -37,7 +37,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null });
+    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -120,6 +120,15 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(ex(rows.slice(0, 1)), null).abatement).toBeNull();
   });
 
+  it("says the most serious thing the reports found (#465), and nothing where they found none", () => {
+    const rows = [m("Asking price", "$42,000,000"), m("Phase I ESA findings", "No RECs"), m("Seismic PML", "24%")];
+    expect(pickSlots(ex(rows), null).reports).toBe("PML 24%");
+    expect(pickSlots(ex([...rows, m("Phase I ESA date", "2019"), m("PCA immediate repairs", "None")].filter((r) => r.label !== "Seismic PML")), null).reports).toBe(
+      "Phase I over a year old",
+    );
+    expect(pickSlots(ex([m("Asking price", "$42,000,000"), m("Phase I ESA findings", "No RECs")]), null).reports).toBeNull();
+  });
+
   it("says a note the seller will carry and its rate (#462), and nothing where none is offered", () => {
     const rows = [m("Asking price", "$20,000,000"), m("Seller financing amount", "$14,000,000"), m("Seller financing rate", "5.00%")];
     expect(pickSlots(ex(rows), null).sellerNote).toBe("Seller financing 5.00%");
@@ -171,7 +180,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null });
+    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

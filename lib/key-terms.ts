@@ -26,6 +26,7 @@ import { rosterTermRows } from "./tenant-roster";
 import { valueAddTermRows } from "./value-add";
 import { taxAbatementTermRows } from "./tax-abatement";
 import { sellerFinancingTermRows } from "./seller-financing";
+import { siteReportTermRows } from "./site-reports";
 
 export interface KeyTermMetric {
   label: string;
@@ -97,6 +98,9 @@ export function keyTermRows<M extends KeyTermMetric>(
   for (const row of sellerFinancingTermRows(rows)) lead(row);
   // What a hotel is sold with (#455): the PIP, the flag's end, RevPAR.
   for (const row of hotelTermRows(rows)) lead(row);
+  // What the third-party reports found (#465): the Phase I's finding and
+  // date, the immediate repairs, the seismic PML and the zoning.
+  for (const row of siteReportTermRows(rows)) lead(row);
   const rest = rows.filter((m) => !head.includes(m));
   return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
 }

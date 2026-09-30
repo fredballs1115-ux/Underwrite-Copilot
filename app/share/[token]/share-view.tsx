@@ -27,7 +27,9 @@ import { readRoster } from "@/lib/tenant-roster";
 import { ValueAddPanel } from "@/app/value-add-panel";
 import { readValueAdd } from "@/lib/value-add";
 import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
+import { SiteReportsPanel } from "@/app/site-reports-panel";
 import { readTaxAbatement } from "@/lib/tax-abatement";
+import { readSiteReports } from "@/lib/site-reports";
 import { readSale } from "@/lib/sale-terms";
 import { readHotelDeal } from "@/lib/hotel-deal";
 import { keyTermRows } from "@/lib/key-terms";
@@ -333,6 +335,10 @@ export function ShareView({
       {/* What a hotel is sold with (#455): the flag, the manager, the
           encumbrance, the PIP and the rooms. */}
       <HotelPanel hotel={readHotelDeal(safeExtraction)} />
+
+      {/* What the third-party reports found (#465): a tile a report, the
+          Phase I's age and the seismic PML against the lenders' lines. */}
+      <SiteReportsPanel reports={readSiteReports(safeExtraction)} />
 
       {assumable && (
         <p

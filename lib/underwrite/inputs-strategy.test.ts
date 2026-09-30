@@ -410,6 +410,51 @@ describe("deriveUnderwriteInputs — a hotel's PIP is the buyer's capital (#455)
   });
 });
 
+describe("deriveUnderwriteInputs — the PCA's immediate repairs are capital at closing (#465)", () => {
+  const base = [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,520,000"), metric("Units", "240")];
+
+  it("carries the stated immediate repairs as the first year's capital where no budget is stated, and the returns pay for them", () => {
+    const m = deriveUnderwriteInputs(ex([...base, metric("PCA immediate repairs", "$630,000", { page: "p. 48" })], { totalPages: 80 }), "fallback");
+    expect(m.inputs.capitalImprovementsYr1).toBe(630_000);
+    expect(m.sources.capitalImprovementsYr1?.provenance).toBe("extracted");
+    expect(m.sources.capitalImprovementsYr1?.note).toMatch(/PCA immediate repairs — the property condition report's work the building needs now, as stated/);
+    expect(computeUnderwrite(m.inputs).cashFlow[0].capitalImprovements).toBe(630_000);
+    expect(m.meta.siteReports?.line).toBe("Reports: PCA immediate repairs $630,000");
+    expect(m.meta.siteReports?.read).toBe(
+      "The model carries the PCA's $630,000 of immediate repairs as its year-1 capital, as stated; a lender may hold more than that in escrow at closing.",
+    );
+  });
+
+  it("a stated budget is read as including the repairs — never the two added", () => {
+    const m = deriveUnderwriteInputs(
+      ex([...base, metric("PCA immediate repairs", "$630,000"), metric("Renovation budget", "$2,400,000")]),
+      "fallback",
+    );
+    expect(m.inputs.capitalImprovementsYr1).toBe(2_400_000);
+    expect(m.meta.siteReports?.read).toContain("The model's year-1 capital of $2.4M is read as including the PCA's $630,000 of immediate repairs");
+  });
+
+  it("a hotel's PIP is read as including them too", () => {
+    const hotel = { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "management" as const, pip: "", page: "" };
+    const m = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$26,000,000"), metric("NOI (in-place)", "$2,080,000"), metric("Keys", "120"), metric("PIP cost", "$4,200,000"), metric("PCA immediate repairs", "$300,000")], {
+        assetClass: "hospitality_str",
+        hotel,
+      }),
+      "fallback",
+    );
+    expect(m.inputs.capitalImprovementsYr1).toBe(4_200_000);
+    expect(m.meta.siteReports?.read).toContain("read as including the PCA's $300,000 of immediate repairs");
+  });
+
+  it("no repairs, no capital; no reports, no read", () => {
+    const none = deriveUnderwriteInputs(ex([...base, metric("PCA immediate repairs", "None"), metric("Phase I ESA findings", "No RECs")]), "fallback");
+    expect(none.inputs.capitalImprovementsYr1).toBe(0);
+    expect(none.meta.siteReports?.read).toBe("");
+    expect(deriveUnderwriteInputs(ex(base), "fallback").meta.siteReports).toBeNull();
+  });
+});
+
 describe("deriveUnderwriteInputs — an auction's starting bid is where the price starts (#456)", () => {
   const sale = { method: "auction" as const, terms: "", condition: "As-is", page: "" };
   const base = [metric("NOI (in-place)", "$480,000"), metric("Total SF", "62,000 SF")];

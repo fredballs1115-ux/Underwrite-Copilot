@@ -194,6 +194,22 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     ]);
   });
 
+  it("what the third-party reports found leads after the price (#465)", () => {
+    const reported = [
+      { label: "Occupancy", value: "94%", flagged: false },
+      { label: "Seismic PML", value: "24%", flagged: false },
+      { label: "PCA immediate repairs", value: "$630,000", flagged: false },
+      { label: "Phase I ESA findings", value: "One REC", flagged: false },
+      { label: "Asking price", value: "$42,000,000", flagged: false },
+    ];
+    expect(keyTermRows(reported, "stabilized", 4).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Phase I ESA findings",
+      "PCA immediate repairs",
+      "Seismic PML",
+    ]);
+  });
+
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
     const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
     expect(rows).toHaveLength(3);

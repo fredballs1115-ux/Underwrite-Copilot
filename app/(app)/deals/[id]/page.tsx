@@ -18,6 +18,7 @@ import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
 import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
+import { SiteReportsPanel } from "@/app/site-reports-panel";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { readHotelDeal } from "@/lib/hotel-deal";
@@ -25,6 +26,7 @@ import { readSale } from "@/lib/sale-terms";
 import { readRoster } from "@/lib/tenant-roster";
 import { readValueAdd } from "@/lib/value-add";
 import { readTaxAbatement } from "@/lib/tax-abatement";
+import { readSiteReports } from "@/lib/site-reports";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
@@ -1223,6 +1225,11 @@ export default async function DealPage({
           holdYears={derived ? derived.inputs.holdMonths / 12 : null}
           modelLine={derived?.meta.hotel?.read ?? ""}
         />
+        {/* What the third-party reports found (#465): a tile a report, the
+            Phase I's age against the 180-day and one-year marks, the PML
+            against the lenders' 20%, and what the model does with the
+            immediate repairs. */}
+        <SiteReportsPanel reports={readSiteReports(extraction)} modelLine={derived?.meta.siteReports?.read ?? ""} />
         <PlausibilityPanel findings={plausibility} strategy={strategy} />
         <PlanSensitivity plan={plan} refCap={refCap} />
 

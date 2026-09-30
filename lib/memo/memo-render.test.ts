@@ -323,6 +323,38 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).valueAddLine).toBe("");
   }, 30000);
 
+  it("says what the third-party reports found under the title (#465), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Phase I ESA date", value: "June 2019", flagged: false, page: "", basis: "na" },
+        { label: "Phase I ESA findings", value: "One REC: former dry cleaner", flagged: false, page: "", basis: "na" },
+        { label: "Seismic PML", value: "24%", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.siteReportsLine).toBe(
+      "Reports: Phase I Jun 2019, a recognized environmental condition (over a year old: a new report); seismic PML 24%",
+    );
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Reports: Phase I Jun 2019, a recognized environmental condition");
+    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).siteReportsLine).toBe("");
+  }, 30000);
+
   it("says a tax abatement under the title (#461), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

@@ -240,3 +240,22 @@ describe("dealContextFor — a note the seller offers to carry (#462)", () => {
     expect(ctx).toContain("has usually priced the difference into the ask");
   });
 });
+
+describe("dealContextFor — the third-party reports (#465)", () => {
+  it("says what the reports found, report by report, each as stated", () => {
+    const reported: ExtractionResult = {
+      dealName: "Harbor Point",
+      assetClass: "multifamily",
+      metrics: [
+        m("Asking price", "$42,000,000"),
+        m("Phase I ESA findings", "No RECs"),
+        m("PCA immediate repairs", "$630,000"),
+        m("Zoning conformance", "Legal non-conforming (density)"),
+      ],
+    };
+    const ctx = dealContextFor(reported)!;
+    expect(ctx).toContain('The third-party reports: The seller\'s Phase I found no recognized environmental conditions ("No RECs").');
+    expect(ctx).toContain("puts the immediate repairs at $630,000, 1.5% of the asking price");
+    expect(ctx).toContain("law-and-ordinance cover");
+  });
+});

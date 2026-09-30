@@ -18,6 +18,7 @@ import { rosterTag } from "@/lib/tenant-roster";
 import { valueAddTag } from "@/lib/value-add";
 import { taxAbatementTag } from "@/lib/tax-abatement";
 import { sellerFinancingTag } from "@/lib/seller-financing";
+import { siteReportsTag } from "@/lib/site-reports";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -67,6 +68,11 @@ export interface PipelineSlots {
    *  (lib/seller-financing `sellerFinancingTag`, #462); absent or null
    *  where the memorandum offers none */
   sellerNote?: string | null;
+  /** what the third-party reports found — "Phase I: REC", "PML 24%",
+   *  "Legal non-conforming", "Repairs $630k" (lib/site-reports
+   *  `siteReportsTag`, #465); absent or null where there is nothing to
+   *  flag */
+  reports?: string | null;
 }
 
 /**
@@ -138,5 +144,7 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     abatement: taxAbatementTag(extraction),
     // A note the seller will carry, and its rate (#462).
     sellerNote: sellerFinancingTag(extraction),
+    // The most serious thing the third-party reports found (#465).
+    reports: siteReportsTag(extraction),
   };
 }

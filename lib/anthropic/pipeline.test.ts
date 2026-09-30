@@ -780,6 +780,27 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("the third-party reports: the challenger reads what they found and the site-report traps (#465)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Phase I ESA date", value: "June 2019", flagged: false, page: "", basis: "na" },
+        { label: "Phase I ESA findings", value: "One REC: former dry cleaner on the adjacent parcel", flagged: false, page: "", basis: "na" },
+        { label: "PCA immediate repairs", value: "$630,000", flagged: false, page: "", basis: "na" },
+        { label: "Seismic PML", value: "24%", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("THE THIRD-PARTY REPORTS AS STATED: The seller's Phase I, dated Jun 2019, found a recognized environmental condition");
+    expect(note).toContain("past the year a Phase I is good for before a purchase");
+    expect(note).toContain("SITE-REPORT TRAPS, checked by name");
+    expect(note).toContain("(e) SEISMIC AND ZONING");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a seller's note: the challenger reads the note and the seller-financing traps (#462)", async () => {
     vi.mocked(extractTerms).mockResolvedValue({
       ...EXTRACTION,
