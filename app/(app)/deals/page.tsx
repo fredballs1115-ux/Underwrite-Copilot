@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
@@ -7,6 +6,7 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueUpgrade } from "@/lib/offering";
 import { WhatsNewCard } from "./whats-new";
+import { NewsStrip, type NewsStripItem } from "./news-strip";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
 import { cookies } from "next/headers";
@@ -438,61 +438,24 @@ export default async function DealsPage({
   );
 }
 
-/** Compact stories strip under the pipeline: the highest-scored recent
- *  headlines from the weekday sweep, each linking to its source. Renders
- *  nothing at all until the intel cron has stories — no filler card. */
+/** Compact stories strip under the pipeline: the newest headlines the
+ *  weekday sweep scored 5 or more, each linking to its source and dated. The
+ *  sweep's table is shared by every account and carries no market, so the
+ *  strip is titled for what it is (`NewsStrip`). Renders nothing at all
+ *  until the intel cron has stories — no filler card. */
 async function TodaysNews() {
-  let items: {
-    url: string;
-    title: string;
-    source: string | null;
-    relevance: number | null;
-  }[] = [];
+  let items: NewsStripItem[] = [];
   try {
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase
       .from("market_intel_items")
-      .select("url, title, source, relevance")
+      .select("url, title, source, relevance, published_at")
       .gte("relevance", 5)
       .order("created_at", { ascending: false })
       .limit(4);
-    items = (data as typeof items | null) ?? [];
+    items = (data as NewsStripItem[] | null) ?? [];
   } catch {
     // table absent — no card
   }
-  if (items.length === 0) return null;
-
-  return (
-    <section className="mt-6 rounded-xl border border-line bg-surface p-4">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold">News for your markets</h2>
-        <Link
-          href="/news"
-          className="text-xs font-medium text-brand underline decoration-dotted underline-offset-2"
-        >
-          All stories →
-        </Link>
-      </div>
-      <ul className="mt-2 space-y-1.5">
-        {items.map((it) => (
-          <li key={it.url} className="text-sm leading-snug">
-            {it.relevance !== null && (
-              <span className="mr-2 rounded bg-faint px-1.5 py-px font-mono text-[11px] tabular-nums text-muted">
-                {it.relevance}/10
-              </span>
-            )}
-            <a
-              href={it.url}
-              target="_blank"
-              rel="noreferrer"
-              className="underline decoration-dotted underline-offset-2 hover:text-brand"
-            >
-              {it.title}
-            </a>
-            {it.source && <span className="ml-1.5 text-[11px] text-muted">{it.source}</span>}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
+  return <NewsStrip items={items} />;
 }
