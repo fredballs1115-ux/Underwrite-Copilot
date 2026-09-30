@@ -23,7 +23,16 @@ import type { StructuredAddress } from "@/lib/address";
 import { metroAliasOf } from "@/lib/live-rates";
 import { dataMetroForAddress, metroForAddress, metroForName } from "@/lib/market-match";
 import { marketPageFor } from "@/lib/public-pages";
-import { areaSkylineId, photographerLine, SKYLINE_WIDTH, skylineFor, skylineTag, type SkylineShot } from "@/lib/skyline";
+import {
+  areaSkylineId,
+  photographerLine,
+  SKYLINE_WIDTH,
+  skylineCredit,
+  skylineFor,
+  skylineTag,
+  type CreditLink,
+  type SkylineShot,
+} from "@/lib/skyline";
 
 /**
  * The width a card asks the skyline route for. The files are panoramas, up
@@ -67,8 +76,17 @@ export interface MarketPicture {
   /** the skyline route, versioned by the file so a changed photograph is
    *  fetched anew */
   src: string;
-  /** the photographer and the licence, which the licence obliges */
+  /** the photographer and the licence, which the licence obliges, and that
+   *  the picture is cropped (lib/skyline `photographerLine`) — plain words,
+   *  for a caption that cannot hold a link: a pipeline card is itself one */
   credit: string;
+  /** the same credit's links (lib/skyline `skylineCredit`): the photographer
+   *  to the file's page on Commons and the licence to its text, for a
+   *  caption that can hold them — the deal page's picture, which crops the
+   *  photograph, and its full-screen viewer, which shows it whole
+   *  (lib/credit-parts `photographerParts`) */
+  author: CreditLink;
+  license: CreditLink;
 }
 
 /**
@@ -113,11 +131,14 @@ export function marketPictureFor(
 }
 
 function picture(id: string, name: string, shot: SkylineShot): MarketPicture {
+  const { author, license } = skylineCredit(shot);
   return {
     id,
     name,
     place: shot.place,
     src: `/api/imagery/skyline/${encodeURIComponent(id)}?w=${marketPhotoWidth(shot)}&v=${skylineTag(id)}`,
     credit: photographerLine(shot),
+    author,
+    license,
   };
 }

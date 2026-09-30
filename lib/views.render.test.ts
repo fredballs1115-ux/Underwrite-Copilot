@@ -3711,6 +3711,23 @@ describe("a metro's for-sale market, from Realtor.com", () => {
 import { PropertyVisual } from "@/app/(app)/deals/[id]/property-visual";
 import { PhotoViewerBody } from "@/app/(app)/deals/[id]/photo-viewer";
 import type { SiteFlagsResult as SiteFlagsResultForTest } from "@/lib/site-flags/core";
+import { photographerParts } from "@/lib/credit-parts";
+
+/** Links and buttons drawn inside another link or button: invalid HTML, and
+ *  a control a reader meets only by accident. */
+function controlsInsideControls(html: string): string[] {
+  const out: string[] = [];
+  const open: string[] = [];
+  for (const m of html.matchAll(/<(\/?)(a|button)\b[^>]*>/gi)) {
+    if (m[1]) {
+      open.pop();
+      continue;
+    }
+    if (open.length) out.push(`<${m[2]}> inside <${open[open.length - 1]}>: ${m[0].slice(0, 80)}`);
+    open.push(m[2].toLowerCase());
+  }
+  return out;
+}
 
 describe("PropertyVisual — the building's own photograph leads, then the overhead", () => {
   const base = {
@@ -3805,11 +3822,60 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(html).toMatch(/aria-pressed="true" data-view-thumb="market"/);
     // Said on its face as the market's, credited, never passed for the building.
     expect(text.replace(/\s+/g, " ")).toContain(`Market photo ${market.name}`);
-    expect(text).toContain(market.credit);
+    // The credit carries what the licence asks (visibleText breaks a line
+    // after each link): the photographer linked to the file's page, the
+    // licence to its text, and "cropped to fit", since the frame crops it.
+    expect(text.replace(/\n/g, "")).toContain(market.credit);
+    expect(market.credit).toMatch(/cropped to fit$/);
+    const shot = SKYLINES[market.id];
+    expect(html).toContain(`href="${commonsPage(shot.file)}"`);
+    if (shot.licenseUrl) expect(html).toContain(`href="${shot.licenseUrl}"`);
+    // The caption lets a click through to the picture; its links take theirs back.
+    const caption = /<span data-picture="market"[\s\S]*?<\/div>/.exec(html)?.[0] ?? "";
+    expect(caption).toContain("pointer-events-none");
+    for (const a of caption.match(/<a\b[^>]*>/g) ?? []) expect(a).toContain("pointer-events-auto");
+    expect((caption.match(/<a\b/g) ?? []).length).toBe(shot.licenseUrl ? 2 : 1);
+    // No link sits inside another link or a button: the picture's own click
+    // opens the viewer from the <img>, never from a wrapper.
+    expect(controlsInsideControls(html)).toEqual([]);
     expect(html).toContain("No photograph of the building yet.");
     // The site itself is one step along the filmstrip, and a photograph can be added.
     expect(html).toContain('data-view-thumb="aerial"');
     expect(text).toContain("Add photo");
+  });
+
+  it("credits a market's photograph full screen with its links, whole, so never as cropped, and lets a long credit wrap", () => {
+    const market = marketPictureFor({ city: "Philadelphia", state: "PA" })!;
+    const frames = [
+      {
+        id: "market",
+        label: "Market",
+        src: market.src,
+        alt: `${market.place}: the market this deal is in, ${market.name}. No photograph of the building yet.`,
+        // As PropertyVisual builds it: the viewer shows the photograph whole.
+        credit: [`Market photo: ${market.name} · `, ...photographerParts(market.author, market.license, false)],
+        thumb: market.src,
+      },
+      { id: "aerial", label: "Aerial", src: "/api/deals/d1/aerial?src=usgs&w=1280&h=960", alt: "Aerial photograph of 1200 N 31st St", credit: "Imagery: USGS The National Map", thumb: "/api/deals/d1/aerial?src=usgs&w=1280&h=576" },
+    ];
+    const html = renderToStaticMarkup(React.createElement(PhotoViewerBody, { frames, start: 0, title: "1200 N 31st St", onClose: () => {} }));
+    dumpView("photo-viewer-market", html);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(controlsInsideControls(html)).toEqual([]);
+    const caption = /<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/.exec(html);
+    expect(caption, "the viewer's caption").not.toBeNull();
+    const words = visibleText(caption![1]).replace(/\n/g, "");
+    expect(words).toBe(`Market photo: ${market.name} · ${market.author.name} · ${market.license.name}`);
+    expect(words).not.toContain("cropped");
+    const shot = SKYLINES[market.id];
+    expect(caption![1]).toContain(`href="${commonsPage(shot.file)}"`);
+    if (shot.licenseUrl) expect(caption![1]).toContain(`href="${shot.licenseUrl}"`);
+    // Wrapped, never cut to one line, so a phone keeps the licence.
+    expect(caption![0]).not.toContain("truncate");
+    expect(caption![0]).toContain("break-words");
+    // A plain credit reads as before.
+    const aerial = renderToStaticMarkup(React.createElement(PhotoViewerBody, { frames, start: 1, title: "1200 N 31st St", onClose: () => {} }));
+    expect(visibleText(aerial)).toContain("Imagery: USGS The National Map");
   });
 
   it("never shows the market's photograph where the building has its own picture", () => {

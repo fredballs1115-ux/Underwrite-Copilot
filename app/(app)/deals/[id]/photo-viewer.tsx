@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import type { CreditPart } from "@/lib/credit-parts";
+import { CreditPartsText } from "@/app/credit-parts";
 
 /** One picture the viewer can show: a view of the property at its size. */
 export interface ViewerFrame {
@@ -18,8 +20,11 @@ export interface ViewerFrame {
   /** a layer drawn over it in the same frame (FEMA's zones), if any */
   over?: string;
   alt: string;
-  /** who the picture is credited to, exactly as its view credits it */
-  credit: string;
+  /** who the picture is credited to, as its view credits it: words, or the
+   *  credit's parts with the links a licence asks for (a market
+   *  photograph's photographer and licence, lib/credit-parts) — never
+   *  "cropped to fit" here, where the picture is shown whole */
+  credit: string | readonly CreditPart[];
   /** the filmstrip's picture of the view, for the strip along the foot */
   thumb: string;
   /** the strip's layer over it, as the filmstrip draws it (FEMA's zones) */
@@ -103,9 +108,16 @@ export function PhotoViewerBody({ frames, start = 0, title, onClose }: ViewerPro
       e.preventDefault();
       step(-1);
     } else if (e.key === "Tab") {
-      // The focus stays inside the viewer while it is open.
-      const focusable = dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled])");
-      if (!focusable || focusable.length === 0) return;
+      // The focus stays inside the viewer while it is open: its buttons and
+      // the credit's links, in the order Tab meets them. The dark behind the
+      // picture is left out (tabIndex -1). Counted as the first stop, it let
+      // Shift+Tab from Close leave the viewer; and with one picture, Close
+      // was the last button, so a Tab from it wrapped to the dark and never
+      // reached the credit's links after it.
+      const focusable = [
+        ...(dialogRef.current?.querySelectorAll<HTMLElement>("a[href], button:not([disabled])") ?? []),
+      ].filter((el) => el.tabIndex >= 0);
+      if (focusable.length === 0) return;
       const first = focusable[0];
       const last = focusable[focusable.length - 1];
       if (e.shiftKey && document.activeElement === first) {
@@ -197,7 +209,17 @@ export function PhotoViewerBody({ frames, start = 0, title, onClose }: ViewerPro
               />
             ) : null}
           </div>
-          <figcaption className="mt-2 max-w-full truncate text-center text-[11px] text-white/80">{frame.credit}</figcaption>
+          {/* Wrapped, never cut: on a phone a long credit cut to one line
+              lost its licence ("Tony Webster from Minneapolis, Minnesota,
+              United States · …"). Its links are no one's child but the
+              caption's: the dark behind the picture is a sibling. */}
+          <figcaption className="mt-2 max-w-full break-words text-center text-[11px] text-white/80">
+            {typeof frame.credit === "string" ? (
+              frame.credit
+            ) : (
+              <CreditPartsText parts={frame.credit} linkClassName="underline decoration-dotted underline-offset-2 hover:text-white" />
+            )}
+          </figcaption>
         </figure>
 
         {n > 1 ? (

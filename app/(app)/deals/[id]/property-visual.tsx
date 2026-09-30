@@ -9,6 +9,8 @@ import {
   floodSwatchBorder,
   type FloodClassKey,
 } from "@/lib/flood-style";
+import { photographerParts } from "@/lib/credit-parts";
+import { CreditPartsText } from "@/app/credit-parts";
 import { MarketCaption } from "../market-caption";
 import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
@@ -76,7 +78,10 @@ import {
  * the picture leads with the photograph its market is known by (#439), the
  * one its pipeline card shows (#438): named on its face as the market's,
  * never passed for the building, with the aerial, the flood map and the map
- * one step along the filmstrip. The reader's "Add photo" sits on it.
+ * one step along the filmstrip. The reader's "Add photo" sits on it. Its
+ * credit carries what the licence asks — the photographer linked to the
+ * file's page on Commons, the licence to its text, and "cropped to fit" in
+ * the frame that crops it, never in the viewer, which shows it whole.
  *
  * Every picture opens full screen (#445, `PhotoViewer`): a click on it, or
  * the expand control at its top left, shows the views one at a time at the
@@ -381,7 +386,9 @@ export function PropertyVisual({
                 label: v.label,
                 src: market.src,
                 alt: `${market.place}: the market this deal is in, ${market.name}. No photograph of the building yet.`,
-                credit: `Market photo: ${market.name} · ${market.credit}`,
+                // Linked, and never "cropped to fit": the viewer shows the
+                // photograph whole.
+                credit: [`Market photo: ${market.name} · `, ...photographerParts(market.author, market.license, false)],
                 thumb,
               },
             ]
@@ -585,7 +592,20 @@ export function PropertyVisual({
               className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
               onError={() => setMarketGone(true)}
             />
-            <MarketCaption market={market.name} credit={market.credit} size="hero" />
+            {/* The photographer linked to the file's page and the licence to
+                its text, and "cropped to fit": the frame crops it. The
+                picture under the caption is no link, so the links stand on
+                their own, each taking its click back from the caption. */}
+            <MarketCaption
+              market={market.name}
+              credit={
+                <CreditPartsText
+                  parts={photographerParts(market.author, market.license, true)}
+                  linkClassName="pointer-events-auto underline decoration-dotted underline-offset-2 hover:text-white"
+                />
+              }
+              size="hero"
+            />
           </div>
         )}
 
