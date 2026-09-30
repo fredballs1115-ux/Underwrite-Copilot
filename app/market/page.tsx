@@ -4,6 +4,7 @@ import Link from "next/link";
 import { MarketBand } from "@/app/place-band";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import {
+  basisLabel,
   buildComps,
   summarizeMarkets,
   fmtCapRange,
@@ -1440,10 +1441,7 @@ function MarketCard({ g }: { g: MarketGroup }) {
 
       <dl className="mt-4 space-y-2.5">
         <Stat label="Going-in cap" value={g.cap ? fmtCapRange(g.cap) : null} />
-        <Stat
-          label={g.perUnit?.basis === "sf" ? "Basis / SF" : "Basis / unit"}
-          value={g.perUnit ? fmtBasisRange(g.perUnit) : null}
-        />
+        <Stat label={basisLabel(g)} value={g.perUnit ? fmtBasisRange(g.perUnit) : null} />
       </dl>
 
       {calls.length > 0 && (

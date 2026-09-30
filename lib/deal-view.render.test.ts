@@ -531,6 +531,25 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toMatch(
       /You've screened\s+3\s+other Philadelphia, PA Multifamily\s+deals with a cap or basis on file: going-in cap 5\.2–5\.6% · basis \$240–262k\/unit\s*\./,
     );
+    // A hotel's basis is per key (lib/market-memory's group noun).
+    const hotel = textOf(
+      render({
+        ...sampleProps("overview"),
+        marketMemory: {
+          assetClass: "hospitality_str",
+          market: "Nashville, TN",
+          marketKey: "nashville tn",
+          count: 1,
+          cap: null,
+          perUnit: { min: 225_000, median: 225_000, max: 225_000, basis: "unit", noun: "key" },
+          calls: { pass: 0, caution: 1, pass_on: 0 },
+          dealIds: ["h"],
+        },
+      } as unknown as Props),
+    );
+    const strip = hotel.match(/You've screened[\s\S]*?\/key/)?.[0] ?? "";
+    expect(strip).toMatch(/other Nashville, TN Hospitality \/ STR\s+deal with a cap or basis on file: basis \$225k\/key/);
+    expect(strip).not.toMatch(/\/unit/);
   });
 
   it("the overview carries the verdict and the buy-box fit; the financials carry the price", () => {

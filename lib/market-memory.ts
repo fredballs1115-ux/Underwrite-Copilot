@@ -25,9 +25,10 @@ import {
   planSummary,
   statedBasisIsBuildings,
   unitCountFromMetrics,
+  unitCountRow,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
-import { assetWords } from "@/lib/asset-words";
+import { assetWords, countNoun, perSuffix } from "@/lib/asset-words";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export interface MarketComp {
@@ -48,6 +49,10 @@ export interface MarketComp {
    *  never the shell's or the site's price (see `allIn`) */
   perUnit: number | null;
   perUnitBasis: "unit" | "sf" | null;
+  /** what one of it is called on a unit basis — the count row's own noun
+   *  ("key", "pad", "room"), else the class's (lib/asset-words
+   *  `countNoun`); null on a per-SF basis or with no basis */
+  perUnitNoun: string | null;
   /** the basis is total cost, not the price — a plan deal's figure */
   allIn: boolean;
 }
@@ -57,6 +62,10 @@ export interface Stat {
   median: number;
   max: number;
 }
+/** A group's basis range: one basis and, on a unit basis, one noun for the
+ *  whole group — the members' own where they all agree, the class's where
+ *  they do not — so a range is never "$180k/key–$240k/room". */
+export type BasisStat = Stat & { basis: "unit" | "sf"; noun?: string | null };
 export interface MarketGroup {
   assetClass: string;
   /** a representative display market for the group */
@@ -64,7 +73,7 @@ export interface MarketGroup {
   marketKey: string;
   count: number;
   cap: Stat | null;
-  perUnit: (Stat & { basis: "unit" | "sf" }) | null;
+  perUnit: BasisStat | null;
   calls: { pass: number; caution: number; pass_on: number };
   dealIds: string[];
 }
@@ -220,6 +229,10 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
       capPct,
       perUnit: basis ? basis.value : null,
       perUnitBasis: basis ? basis.basis : null,
+      // The memorandum's own noun wins where it counted in one ("212
+      // keys", "Pads"); the class's stands in for a bare count.
+      perUnitNoun:
+        basis?.basis === "unit" ? countNoun(unitCountRow(metrics)?.label, assetClass).replace(/s$/, "") : null,
       allIn: plan != null && basis != null,
     });
   }
@@ -264,12 +277,24 @@ export function summarizeMarkets(comps: MarketComp[]): MarketGroup[] {
   return out;
 }
 
+/** The one noun a group's unit-basis range wears. A group is one class
+ *  (it is keyed by it), so its basis is one; its members' memoranda may
+ *  still name the count differently — a hotel's "Keys" beside another's
+ *  "Guest rooms" — and a range never mixes them: every member's own noun
+ *  where they agree, else the class's. */
+function groupNoun(assetClass: string, withBasis: readonly MarketComp[]): string {
+  const own = new Set(withBasis.map((c) => c.perUnitNoun).filter((n): n is string => !!n));
+  if (own.size === 1) return [...own][0];
+  return assetWords(assetClass).noun?.one ?? "unit";
+}
+
 function groupStat(members: MarketComp[]): MarketGroup {
   const caps = members.map((c) => c.capPct).filter((n): n is number => n != null);
   // Basis is consistent within an asset class; take the members that carry it.
   const withBasis = members.filter((c) => c.perUnit != null && c.perUnitBasis);
   const basisVals = withBasis.map((c) => c.perUnit!);
   const perUnitStat = statOf(basisVals);
+  const basis = withBasis[0]?.perUnitBasis ?? null;
   const calls = { pass: 0, caution: 0, pass_on: 0 };
   for (const c of members) {
     if (c.call && c.call in calls) calls[c.call as keyof typeof calls]++;
@@ -284,7 +309,14 @@ function groupStat(members: MarketComp[]): MarketGroup {
     marketKey: members[0].marketKey,
     count: members.length,
     cap: statOf(caps),
-    perUnit: perUnitStat ? { ...perUnitStat, basis: withBasis[0].perUnitBasis! } : null,
+    perUnit:
+      perUnitStat && basis
+        ? {
+            ...perUnitStat,
+            basis,
+            noun: basis === "unit" ? groupNoun(members[0].assetClass, withBasis) : null,
+          }
+        : null,
     calls,
     dealIds: members.map((c) => c.dealId),
   };
@@ -351,12 +383,26 @@ export function marketMemoryFor(
 
 // ---- Display helpers (pure formatting) ------------------------------------
 
-export const fmtBasis = (dollars: number, basis: "unit" | "sf") =>
+/** "$274k/unit", "$200k/key", "$60k/pad", "$212/SF" — a unit basis wears the
+ *  noun it was counted in (lib/asset-words), never "unit" for a hotel's keys. */
+export const fmtBasis = (dollars: number, basis: "unit" | "sf", noun: string | null = "unit") =>
   basis === "unit"
     ? dollars >= 1e3
-      ? `$${Math.round(dollars / 1e3)}k/unit`
-      : `$${Math.round(dollars)}/unit`
+      ? `$${Math.round(dollars / 1e3)}k/${noun ?? "unit"}`
+      : `$${Math.round(dollars)}/${noun ?? "unit"}`
     : `$${Math.round(dollars)}/SF`;
+
+/** "Basis / key", "Basis / SF": the group's own noun where it carries a
+ *  basis, else the class's (lib/asset-words `perSuffix` — "/acre" on land,
+ *  which the memory has no figure for). */
+export function basisLabel(g: Pick<MarketGroup, "assetClass" | "perUnit">): string {
+  const suffix = g.perUnit
+    ? g.perUnit.basis === "sf"
+      ? "/SF"
+      : `/${g.perUnit.noun ?? "unit"}`
+    : perSuffix(assetWords(g.assetClass));
+  return `Basis / ${suffix.slice(1)}`;
+}
 
 /** "4.9–5.5%" or "5.2%" when the ends coincide. */
 export function fmtCapRange(s: Stat): string {
@@ -365,13 +411,14 @@ export function fmtCapRange(s: Stat): string {
   return lo === hi ? `${lo}%` : `${lo}–${hi}%`;
 }
 
-export function fmtBasisRange(s: Stat & { basis: "unit" | "sf" }): string {
-  if (s.min === s.max) return fmtBasis(s.min, s.basis);
-  // Share the "/unit" or "/SF" suffix across the range.
+export function fmtBasisRange(s: BasisStat): string {
+  const noun = s.noun ?? "unit";
+  if (s.min === s.max) return fmtBasis(s.min, s.basis, noun);
+  // Share the "/key" or "/SF" suffix across the range.
   if (s.basis === "unit") {
     const lo = s.min >= 1e3 ? `$${Math.round(s.min / 1e3)}` : `$${Math.round(s.min)}`;
     const hi = s.max >= 1e3 ? `${Math.round(s.max / 1e3)}k` : `${Math.round(s.max)}`;
-    return `${lo}–${hi}/unit`;
+    return `${lo}–${hi}/${noun}`;
   }
   return `$${Math.round(s.min)}–${Math.round(s.max)}/SF`;
 }
