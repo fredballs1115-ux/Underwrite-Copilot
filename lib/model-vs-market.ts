@@ -392,6 +392,25 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   const insuranceClause = insurance
     ? ` Insurance is the line that reprices hardest: commercial property premiums are ${signed(insurance.value)}% nationally over the year to ${periodLabel(insurance.obsDate, insurance.meta.cadence)} (the BLS's index of commercial multiple peril premiums), and a memorandum's premium is the seller's expiring policy, so the index is the floor for the other lines and this is the one to re-quote.`
     : " Insurance and taxes reprice on their own cycles, so the index is the floor for the other lines, not the whole answer.";
+  // The bond market's own forecast beside the trailing year (2026-09-30):
+  // what inflation is expected to average over the next ten years, the
+  // 10-year breakeven (the Treasury yield less the inflation-protected
+  // one), already on the rates strip. A ten-year horizon, not the hold's,
+  // and never in the tone's range: the assumption is read against what
+  // prices did, and this says what the market expects them to do.
+  const breakeven = fresh(input.national, (r) => r.meta.id === "T10YIE");
+  if (breakeven) {
+    published.push({
+      label: "Expected inflation, next ten years (10-year breakeven)",
+      text: `${breakeven.value.toFixed(2)}% a year (${periodLabel(breakeven.obsDate, breakeven.meta.cadence)})`,
+      value: breakeven.value,
+      asOf: breakeven.obsDate,
+      publisher: "FRED",
+    });
+  }
+  const breakevenClause = breakeven
+    ? ` The bond market expects inflation to average ${breakeven.value.toFixed(2)}% a year over the next ten years (the 10-year breakeven, ${periodLabel(breakeven.obsDate, breakeven.meta.cadence)}; FRED) — its forecast over ten years, not the hold's.`
+    : "";
   return {
     key: "expense_growth",
     title: "Expense growth",
@@ -401,7 +420,7 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "national",
-    read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause}${insuranceClause}`,
+    read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause}${insuranceClause}${breakevenClause}`,
   };
 }
 

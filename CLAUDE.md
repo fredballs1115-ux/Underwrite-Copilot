@@ -1787,7 +1787,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   speaks to it from the same cached reads the deal page makes for "since
   this screen": rent growth against Zillow's asking rents (all homes and
   apartments alone) and the CPI rent sitting tenants pay, expense growth
-  against CPI and core, vacancy against the survey's metro figure INSIDE
+  against CPI and core (with the 10-year breakeven beside them since
+  2026-09-30: the bond market's own forecast, said as a ten-year horizon
+  and never folded into the tone's range), vacancy against the survey's metro figure INSIDE
   ITS MARGIN and then the region's, and the exit cap's spread over
   today's 10-year beside the going-in cap's (a widening is the
   conservative direction; a compression "is not a plan"). Four rules:
