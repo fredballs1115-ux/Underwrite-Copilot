@@ -69,7 +69,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -557,7 +557,7 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Affordability", "Tenancy", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Affordability", "Tenancy", "Hotel", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -573,6 +573,8 @@ export function Pipeline({
         d.slots.affordable ?? "",
         // Blank unless one tenant leases the whole property (#454).
         d.slots.tenancy ?? "",
+        // Blank on anything but a hotel (#455).
+        d.slots.hotel ?? "",
         // Every case said; blank only before FEMA's lookup has answered (#426).
         d.flood?.cell ?? "",
         d.slots.cap ?? "",
@@ -1503,6 +1505,16 @@ const DealRow = memo(function DealRow({
       {d.slots.tenancy}
     </span>
   ) : null;
+  // What a hotel is sold with (#455): the encumbrance and the PIP change
+  // what the price buys.
+  const hotelBit = d.slots.hotel ? (
+    <span
+      className="whitespace-nowrap font-medium text-brand"
+      title={`${d.slots.hotel}: what the hotel is sold with — the deal page reads the flag, the manager and the PIP`}
+    >
+      {d.slots.hotel}
+    </span>
+  ) : null;
   // A Special Flood Hazard Area (#426): a federally backed loan requires
   // flood insurance there, which is a cost and a lender's condition — said
   // beside the price, where a list of deals is read.
@@ -1671,19 +1683,19 @@ const DealRow = memo(function DealRow({
             the call has its own column and the line is the figures alone. */}
         <div className="mt-1 flex items-center gap-2 md:hidden">
           <span className="flex shrink-0 sm:hidden">{status}</span>
-          <MetaLine flush className="min-w-0" bits={[priceBit, interestBit, debtBit, affordableBit, tenancyBit, floodBit, capBit, fitBit]} />
+          <MetaLine flush className="min-w-0" bits={[priceBit, interestBit, debtBit, affordableBit, tenancyBit, hotelBit, floodBit, capBit, fitBit]} />
         </div>
         <MetaLine
           className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, debtBit, affordableBit, tenancyBit, floodBit, fitBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, debtBit, affordableBit, tenancyBit, hotelBit, floodBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden lg:block xl:hidden"
-          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, affordableBit, tenancyBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, affordableBit, tenancyBit, hotelBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden xl:block"
-          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, affordableBit, tenancyBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, affordableBit, tenancyBit, hotelBit, addedByBit]}
         />
         {fitBar}
       </div>
@@ -1950,6 +1962,7 @@ const DealTile = memo(function DealTile({
     d.slots.debt ? { text: d.slots.debt, cls: "text-brand", title: `${d.slots.debt}: the seller's loan is offered for assumption` } : null,
     d.slots.affordable ? { text: d.slots.affordable, cls: "text-brand", title: `${d.slots.affordable}: a covenant or a contract sets these rents` } : null,
     d.slots.tenancy ? { text: d.slots.tenancy, cls: "text-brand", title: `${d.slots.tenancy}: one lease is the whole income` } : null,
+    d.slots.hotel ? { text: d.slots.hotel, cls: "text-brand", title: `${d.slots.hotel}: what the hotel is sold with` } : null,
   ].filter((t): t is { text: string; cls: string; title: string } => t !== null);
 
   const inner = (

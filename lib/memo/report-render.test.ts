@@ -378,6 +378,36 @@ describe("ReportDocument (full report)", () => {
     expect(bareText).not.toContain("At the model's sale in 5 years");
   }, 60000);
 
+  it("prints what a hotel is sold with over the grids, and the PIP the model carries (#455)", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 6", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      hotel: { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "unencumbered" as const, pip: "", page: "" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("PIP cost", "$4,200,000")],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "September 30, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, derived.meta.hotel ?? null);
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Hotel: flagged Courtyard by Marriott, sold unencumbered; PIP $4.2M");
+    expect(text).toContain("The model carries the $4.2M PIP as its first year's capital");
+  }, 60000);
+
   it("prints a leasehold's exit on the term its lease has left at the sale, with the term and the two exits drawn (#422)", async () => {
     vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 25)), toFake: ["Date"] });
     const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });

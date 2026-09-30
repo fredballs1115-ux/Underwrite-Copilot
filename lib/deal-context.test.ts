@@ -131,3 +131,19 @@ describe("dealContextFor — a single tenant's lease is said before any figure (
     expect(dealContextFor({ ...nnn, singleTenant: { ...nnn.singleTenant!, tenant: "" } })).toBe("Deal type: Stabilized.");
   });
 });
+
+describe("dealContextFor — what a hotel is sold with (#455)", () => {
+  it("names the flag, the encumbrance and the PIP, and says nothing on anything but a hotel", () => {
+    const hotel: ExtractionResult = {
+      dealName: "Courtyard Nashville Downtown",
+      assetClass: "hospitality_str",
+      strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+      hotel: { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "unencumbered", pip: "", page: "" },
+      metrics: [m("Asking price", "$26,000,000"), m("Keys", "120"), m("PIP cost", "$4,200,000")],
+    };
+    const ctx = dealContextFor(hotel)!;
+    expect(ctx).toContain("Hotel: The hotel is flagged Courtyard by Marriott, as stated. It is sold unencumbered");
+    expect(ctx).toContain("The brand's property improvement plan is $4.2M, $35k a key across its 120 keys");
+    expect(dealContextFor({ ...hotel, hotel: undefined })).toBe("Deal type: Stabilized.");
+  });
+});

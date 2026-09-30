@@ -371,3 +371,41 @@ describe("the area a deal states none of", () => {
     expect(stated.sources.rsf?.provenance).toBe("extracted");
   });
 });
+
+describe("deriveUnderwriteInputs — a hotel's PIP is the buyer's capital (#455)", () => {
+  const hotel = { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "management" as const, pip: "", page: "" };
+  const base = [metric("Asking price", "$26,000,000"), metric("NOI (in-place)", "$2,080,000"), metric("Keys", "120")];
+
+  it("carries a stated PIP as the first year's capital where no other budget is stated, and the returns pay for it", () => {
+    const m = deriveUnderwriteInputs(ex([...base, metric("PIP cost", "$4,200,000")], { assetClass: "hospitality_str", hotel }), "fallback");
+    expect(m.inputs.capitalImprovementsYr1).toBe(4_200_000);
+    expect(m.sources.capitalImprovementsYr1?.provenance).toBe("extracted");
+    expect(m.sources.capitalImprovementsYr1?.note).toMatch(/^PIP cost — the brand's property improvement plan, as stated/);
+    expect(computeUnderwrite(m.inputs).cashFlow[0].capitalImprovements).toBe(4_200_000);
+    expect(m.meta.hotel?.line).toBe("Hotel: flagged Courtyard by Marriott, sold encumbered by management; PIP $4.2M ($35k a key)");
+    expect(m.meta.hotel?.read).toContain("The model carries the $4.2M PIP as its first year's capital");
+  });
+
+  it("a PIP stated per key is multiplied out over the keys", () => {
+    const m = deriveUnderwriteInputs(ex([...base, metric("PIP cost per key", "$35,000")], { assetClass: "hospitality_str", hotel }), "fallback");
+    expect(m.inputs.capitalImprovementsYr1).toBe(4_200_000);
+  });
+
+  it("a stated renovation budget is read as including the PIP — never the two added", () => {
+    const m = deriveUnderwriteInputs(
+      ex([...base, metric("PIP cost", "$4,200,000"), metric("Renovation budget", "$6,000,000")], { assetClass: "hospitality_str", hotel }),
+      "fallback",
+    );
+    expect(m.inputs.capitalImprovementsYr1).toBe(6_000_000);
+    expect(m.sources.capitalImprovementsYr1?.note).toMatch(/Renovation budget/);
+    expect(m.meta.hotel?.read).toContain("read as including the $4.2M PIP rather than added to it");
+  });
+
+  it("nothing changes on a hotel with no PIP, or on anything but a hotel", () => {
+    const none = deriveUnderwriteInputs(ex(base, { assetClass: "hospitality_str", hotel }), "fallback");
+    expect(none.inputs.capitalImprovementsYr1).toBe(0);
+    expect(none.meta.hotel?.line).toBe("Hotel: flagged Courtyard by Marriott, sold encumbered by management; no PIP stated");
+    const office = deriveUnderwriteInputs(ex([metric("Asking price", "$30,000,000"), metric("NOI (in-place)", "$1,800,000")], { assetClass: "office" }), "fallback");
+    expect(office.meta.hotel).toBeNull();
+  });
+});

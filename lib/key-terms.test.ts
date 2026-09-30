@@ -102,6 +102,25 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     ]);
   });
 
+  it("a hotel's PIP, its franchise's end and its RevPAR lead after the count (#455)", () => {
+    const hotel = [
+      { label: "RevPAR", value: "$140.23", flagged: false },
+      { label: "Franchise expiration", value: "June 30, 2034", flagged: false },
+      { label: "Keys", value: "120", flagged: false },
+      { label: "PIP cost", value: "$4,200,000", flagged: false },
+      { label: "Going-in cap rate", value: "8.00%", flagged: false },
+      { label: "Asking price", value: "$26,000,000", flagged: false },
+    ];
+    expect(keyTermRows(hotel, "stabilized", 6).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "Keys",
+      "PIP cost",
+      "Franchise expiration",
+      "RevPAR",
+    ]);
+  });
+
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
     const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
     expect(rows).toHaveLength(3);

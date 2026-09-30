@@ -158,6 +158,7 @@ export async function GET(
   // the deal page's own read (#422).
   let leasehold: LeaseholdExitView | null = null;
   let singleTenant: { line: string; read: string } | null = null;
+  let hotel: { line: string; read: string } | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -212,6 +213,8 @@ export async function GET(
       // The one lease a single-tenant property is (#454), read against this
       // model — the workbook cover's own two lines.
       singleTenant = derived.meta.singleTenant ?? null;
+      // What a hotel is sold with (#455), read against this model.
+      hotel = derived.meta.hotel ?? null;
 
       // The model's assumptions against the published figures — the same
       // read the deal page's card and the workbook make (lib/model-vs-market,
@@ -290,7 +293,7 @@ export async function GET(
         ((deal as unknown as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
       ).catch(() => null),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

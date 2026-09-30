@@ -19,6 +19,8 @@ import { AffordablePanel } from "@/app/affordable-panel";
 import { readAffordable } from "@/lib/affordable";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { readSingleTenant } from "@/lib/single-tenant";
+import { HotelPanel } from "@/app/hotel-panel";
+import { readHotelDeal } from "@/lib/hotel-deal";
 import { keyTermRows } from "@/lib/key-terms";
 import { readPortfolio } from "@/lib/portfolio";
 import { PortfolioCard } from "@/app/portfolio-card";
@@ -301,6 +303,10 @@ export function ShareView({
       {/* One tenant leases the whole property (#454): the guarantor, the
           term left and the options, the increases — the lease is the deal. */}
       <SingleTenantPanel lease={readSingleTenant(safeExtraction)} />
+
+      {/* What a hotel is sold with (#455): the flag, the manager, the
+          encumbrance, the PIP and the rooms. */}
+      <HotelPanel hotel={readHotelDeal(safeExtraction)} />
 
       {assumable && (
         <p

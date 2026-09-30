@@ -675,6 +675,27 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a hotel: the challenger reads the contract traps, and the deal context says what it is sold with (#455)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "hospitality_str",
+      hotel: { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "management", pip: "", page: "" },
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Keys", value: "120", flagged: false, page: "", basis: "na" },
+        { label: "PIP cost", value: "$4,200,000", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("Hotel: The hotel is flagged Courtyard by Marriott, as stated.");
+    expect(note).toContain("HOTEL CONTRACT TRAPS, checked by name");
+    expect(note).toContain("(b) THE MANAGEMENT ENCUMBRANCE");
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toContain("Hotel: The hotel is flagged Courtyard by Marriott");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a single-market deal stores no other markets' figures", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];

@@ -52,6 +52,7 @@ import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
+import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -724,6 +725,11 @@ export interface ReportInput {
    *  — printed over the grids; absent where the caller built no model, and
    *  then the lease's own line prints alone */
   singleTenant?: { line: string; read: string } | null;
+  /** what a hotel is sold with, and the model's read of it (lib/hotel-deal
+   *  via the derived model's `meta.hotel`, #455) — printed over the grids;
+   *  absent where the caller built no model, and then the line prints
+   *  alone */
+  hotel?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
@@ -744,6 +750,7 @@ export function buildReportData(
   leasehold?: LeaseholdExitView | null,
   floodMap?: FloodMapView | null,
   singleTenant?: { line: string; read: string } | null,
+  hotel?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -753,6 +760,7 @@ export function buildReportData(
     leasehold: leasehold ?? null,
     floodMap: floodMap ?? null,
     singleTenant: singleTenant ?? null,
+    hotel: hotel ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1034,6 +1042,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   const singleTenantRead = readSingleTenant(extraction);
   const singleTenant =
     input.singleTenant ?? (singleTenantRead ? { line: singleTenantShortLine(singleTenantRead), read: "" } : null);
+  // What a hotel is sold with (#455), the same way.
+  const hotelRead = readHotelDeal(extraction);
+  const hotel = input.hotel ?? (hotelRead ? { line: hotelShortLine(hotelRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1231,6 +1242,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               lands here, under the grid it is judged on. */}
           {!sensitivity && <AffordableCaveat read={affordable} />}
           {!sensitivity && <SingleTenantCaveat lease={singleTenant} />}
+          {!sensitivity && <SingleTenantCaveat lease={hotel} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <LeaseholdBlock view={input.leasehold} />}
@@ -1266,6 +1278,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           ) : null}
           <AffordableCaveat read={affordable} />
           <SingleTenantCaveat lease={singleTenant} />
+          <SingleTenantCaveat lease={hotel} />
 
           <HeatGrid
             axisLabel="EXIT CAP"

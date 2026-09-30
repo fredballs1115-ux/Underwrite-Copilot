@@ -20,6 +20,7 @@ import {
 import { noteTermRows } from "./note-yield";
 import { affordableTermRows } from "./affordable";
 import { singleTenantTermRows } from "./single-tenant";
+import { hotelTermRows } from "./hotel-deal";
 
 export interface KeyTermMetric {
   label: string;
@@ -76,6 +77,8 @@ export function keyTermRows<M extends KeyTermMetric>(
   // The one lease a single-tenant property is (#454): when it ends, how its
   // rent grows and the tenant's options — what the price is paid for.
   for (const row of singleTenantTermRows(rows)) lead(row);
+  // What a hotel is sold with (#455): the PIP, the flag's end, RevPAR.
+  for (const row of hotelTermRows(rows)) lead(row);
   const rest = rows.filter((m) => !head.includes(m));
   return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
 }

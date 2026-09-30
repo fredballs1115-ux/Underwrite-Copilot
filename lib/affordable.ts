@@ -157,14 +157,16 @@ const FROM_A_START = /\b(?:from|commenc\w*|begin\w*|start\w*|after|since|placed 
 const isoOf = (d: Date) => d.toISOString().slice(0, 10);
 
 /**
- * A row's end, on a day. A stated date is taken as written. A year alone is
- * read on the side that does not flatter the buyer: a rent restriction as
+ * A row's end, on a day — the affordable clocks' and, through
+ * lib/hotel-deal, a hotel's franchise and management agreement's (#455).
+ * A stated date is taken as written. A year alone is read on the side that
+ * does not flatter the buyer: a rent restriction as
  * the year's LAST day (the market rents it holds back are never counted
  * early), a HAP contract as its FIRST (the subsidy is never counted for
  * months it may not run). Null where the row states no end — including a
  * term counted from a start, which is kept as stated.
  */
-function endOf(row: MetricRow | null, side: "first" | "last", asOf: Date, pageCount: number | null): DatedEnd | null {
+export function datedEnd(row: MetricRow | null, side: "first" | "last", asOf: Date, pageCount: number | null): DatedEnd | null {
   if (!row) return null;
   const value = row.value.trim();
   if (COUNT_OF_YEARS.test(value) && FROM_A_START.test(value)) return null;
@@ -392,9 +394,9 @@ export function readAffordable(ex: ExtractionResult | null | undefined, asOf: Da
   const restrictedSharePct =
     !countsDisagree && totalUnits != null && totalUnits > 0 && restrictedUnits != null ? (restrictedUnits / totalUnits) * 100 : null;
 
-  const restrictionEnds = endOf(rows.restrictionEndRow, "last", asOf, pageCount);
-  const complianceEnds = programs.includes("lihtc") ? endOf(rows.complianceRow, "last", asOf, pageCount) : null;
-  const hapEnds = endOf(rows.hapEndRow, "first", asOf, pageCount);
+  const restrictionEnds = datedEnd(rows.restrictionEndRow, "last", asOf, pageCount);
+  const complianceEnds = programs.includes("lihtc") ? datedEnd(rows.complianceRow, "last", asOf, pageCount) : null;
+  const hapEnds = datedEnd(rows.hapEndRow, "first", asOf, pageCount);
   const unreadEnds = [
     rows.restrictionEndRow && !restrictionEnds ? `The restriction's term as stated: ${rows.restrictionEndRow.value.trim()}` : "",
     rows.hapEndRow && !hapEnds ? `The HAP contract's term as stated: ${rows.hapEndRow.value.trim()}` : "",

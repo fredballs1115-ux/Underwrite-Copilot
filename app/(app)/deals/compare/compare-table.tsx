@@ -79,6 +79,9 @@ export type Col = {
   /** one tenant leases the whole property ("Single tenant, 9 yrs left" —
    *  lib/single-tenant `singleTenantTag`, #454); absent otherwise */
   tenancy?: string | null;
+  /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
+   *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
+  hotel?: string | null;
   /** the building's pictures to try, best first, each with its own credit
    *  (lib/deal-banner, #418) — absent where the caller draws none */
   pictures?: BannerSource[];
@@ -197,6 +200,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // was read did not look.
     { label: "Affordability", get: (c) => c.affordable || "—" },
     { label: "Tenancy", get: (c) => c.tenancy || "—" },
+    { label: "Hotel", get: (c) => c.hotel || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },

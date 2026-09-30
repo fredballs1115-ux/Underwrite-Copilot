@@ -32,6 +32,7 @@ import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
+import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -140,6 +141,14 @@ function singleTenantLineFor(extraction: ExtractionResult | null): string {
   return r ? singleTenantShortLine(r) : "";
 }
 
+/** What a hotel is sold with (lib/hotel-deal, #455), in one line for the
+ *  memo's header: the flag, the encumbrance, the PIP, the franchise's end.
+ *  "" on anything but a hotel. */
+function hotelLineFor(extraction: ExtractionResult | null): string {
+  const r = readHotelDeal(extraction);
+  return r ? hotelShortLine(r) : "";
+}
+
 /** FEMA's flood zone at the building, from the stored site-flags lookup,
  *  in one line for the memo's header (#426): "" where there is nothing to
  *  say — minimal hazard, no digital map, a lookup still pending. */
@@ -168,6 +177,9 @@ export type MemoData = {
   /** the one lease a single-tenant property is (lib/single-tenant, #454),
    *  in one line; "" on anything else */
   singleTenantLine?: string;
+  /** what a hotel is sold with (lib/hotel-deal, #455), in one line; "" on
+   *  anything but a hotel */
+  hotelLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -414,6 +426,7 @@ export function buildMemoData(
     assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
     affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
     singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
+    hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -863,6 +876,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* The one lease a single-tenant property is (#454): the
                 tenant, its guarantor, the term and the increases. */}
             {data.singleTenantLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.singleTenantLine}</Text>}
+            {/* What a hotel is sold with (#455): the flag, the encumbrance,
+                the PIP and the franchise's end. */}
+            {data.hotelLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.hotelLine}</Text>}
             {/* FEMA's flood zone at the building (#426): a Special Flood
                 Hazard Area is a cost and a lender's condition. */}
             {data.floodLine && <Text style={[s.sub, { color: "#9b1c1c" }]}>{data.floodLine}</Text>}

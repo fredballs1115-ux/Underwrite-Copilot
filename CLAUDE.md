@@ -395,6 +395,44 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `meta.singleTenant`: the line and the model read), the report over its
   grids (`SingleTenantCaveat`, from the route's derived model; the line
   alone where a caller built none) and the compare table's Tenancy row.
+- What a hotel is sold with (#455): the extraction reads
+  `ExtractionResult.hotel` (the flag as stated or "Independent", the
+  franchise and the management as stated, `encumbrance` —
+  `unencumbered`, `brand`, `management`, `brand_and_management`,
+  `unknown` — and the PIP's own words; blank on anything but a hotel) and
+  labels the figures as rows: "PIP cost", "PIP cost per key" (each only as
+  stated, never one derived from the other), "Franchise expiration",
+  "Management agreement expiration", "ADR", "RevPAR" (today's — a pro
+  forma or budget figure under its own label, which the reader never
+  takes), "RevPAR index" and "FF&E reserve". `lib/hotel-deal.ts` (pure)
+  reads them: the PIP total and per key (the other multiplied or divided
+  over the key count, in the count's own noun — "rooms" where the OM counts
+  rooms), the building's price a key (`buildingPriceOf`, none on a note or
+  the land) and the all-in basis a key with the PIP on top; the two clocks
+  through the affordable reader's `datedEnd` (a year alone: the franchise's
+  FIRST day, the management agreement's LAST — the side that does not
+  flatter the buyer); ADR × occupancy against the stated RevPAR (tied
+  within 2%, or said not to tie, never choosing one; ADR and RevPAR read to
+  the cent, since `parseUsd` rounds); and the RevPAR index against 100.
+  **The model takes a stated PIP** as its first-year capital where no other
+  capital budget is stated (`capitalImprovementsYr1`, extracted, "PIP cost —
+  the brand's property improvement plan, as stated…"); a stated renovation
+  budget is read as including it and never added to it.
+  `hotelModelLine` says which, plus a franchise ending inside the hold (a
+  relicensing brings its own PIP) and a management agreement outlasting the
+  sale on an encumbered hotel; it rides in `meta.hotel` (the workbook
+  cover's "The hotel", the report's caveat through the route's derived
+  model, the deal page's panel), so the three say the same sentence. Where
+  it shows: the deal context and the challenger (`hotelNote`, the contract
+  traps (a)–(d) beside the class's own HOTEL_TRAPS), `app/hotel-panel.tsx`
+  (`HotelPanel`, pure: `data-bar="hotel-price"` + `hotel-pip` for the basis
+  a key, `hotel-clock` with the model's sale as `hotel-hold`, the rooms
+  equation and `hotel-index` against a 100 line) on the deal page and the
+  shared screen, the key terms (`hotelTermRows`: the PIP, the franchise's
+  end, RevPAR), the pipeline row, card and CSV's "Hotel" column and the
+  meeting workbook's price note (`hotelTag`: "Mgmt encumbered, PIP
+  $35k/key", "Unencumbered", "Independent"), the memo under its title
+  (`hotelShortLine`) and the compare table's Hotel row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

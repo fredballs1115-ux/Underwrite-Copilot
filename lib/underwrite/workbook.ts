@@ -336,6 +336,22 @@ function buildCover(
       r++;
     }
   }
+  // What a hotel is sold with (#455): the flag, the encumbrance, the PIP
+  // and the franchise's end, then the PIP against this model's capital
+  // line and the agreements' clocks against its hold.
+  if (meta.hotel) {
+    fact("The hotel", meta.hotel.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.hotel.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.hotel.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
   // A leasehold's exit (#422): this model's sale valued on the years its
   // lease has left then, and the Exit Cap that runs the workbook on the
   // term — the input stays the model's; the reader decides. The lease's

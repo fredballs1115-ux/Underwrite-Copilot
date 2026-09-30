@@ -73,6 +73,18 @@ const ExtractionSchema = z.object({
     tenantRights: z.string(),
     page: z.string(),
   }),
+  // WHAT A HOTEL IS SOLD WITH (#455): the flag, the franchise, the
+  // management, whether the sale is encumbered by them, and the brand's
+  // PIP — as stated; blank on anything but a hotel. The PIP, the
+  // agreements' ends and the room figures are rows. Read by lib/hotel-deal.
+  hotel: z.object({
+    brand: z.string(),
+    franchise: z.string(),
+    management: z.string(),
+    encumbrance: z.enum(["unencumbered", "brand", "management", "brand_and_management", "unknown"]),
+    pip: z.string(),
+    page: z.string(),
+  }),
   // Each property of a PORTFOLIO OM (two or more separately addressed
   // buildings or sites), with what the OM states for THAT property and ""
   // where it states nothing; an empty list for a single-property OM. The
@@ -176,6 +188,14 @@ export async function extractTerms(
       landlordObligations: out.singleTenant.landlordObligations.trim(),
       tenantRights: out.singleTenant.tenantRights.trim(),
       page: out.singleTenant.page.trim(),
+    },
+    hotel: {
+      brand: out.hotel.brand.trim(),
+      franchise: out.hotel.franchise.trim(),
+      management: out.hotel.management.trim(),
+      encumbrance: out.hotel.encumbrance,
+      pip: out.hotel.pip.trim(),
+      page: out.hotel.page.trim(),
     },
     // A one-entry list is a single property restated, not a portfolio.
     properties:
