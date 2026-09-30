@@ -21,6 +21,7 @@ import { getActiveBranding, saveBrandingValue } from "@/lib/branding-server";
 import { sanitizeBranding, LOGO_MAX_BYTES } from "@/lib/branding";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { picturePaths } from "@/lib/deal-picture";
+import { floodFramePaths } from "@/lib/flood-frame-core";
 
 export type PwState = { error?: string; ok?: boolean } | null;
 
@@ -268,10 +269,11 @@ export async function deleteAccount(formData: FormData) {
   for (const d of dealRows) {
     // Worker-mode reconciles park a model file next to the OM — sweep that
     // slot too (removing a nonexistent path is a no-op). The building's
-    // photographs go with the deal: the cover and the memorandum's others,
-    // every size of each (the deal's own delete counts them the same way).
+    // photographs go with the deal — the cover and the memorandum's others,
+    // every size of each — and so does its drawn flood map (#472): the
+    // deal's own delete counts them the same way.
     const paths: string[] = [modelTmpPath(omStoragePath(user.id, d.id))];
-    paths.push(...picturePaths(d.photo));
+    paths.push(...picturePaths(d.photo), ...floodFramePaths(d.photo));
     if (d.om_storage_path) {
       paths.push(d.om_storage_path);
       paths.push(modelTmpPath(d.om_storage_path));

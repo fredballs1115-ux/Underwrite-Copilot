@@ -37,7 +37,7 @@ import { asOfLabel } from "@/lib/research";
 import { linkOk } from "@/lib/link-audit";
 import { assetClassLabel } from "@/lib/asset-class";
 import { looseValue, SECTORS } from "@/lib/research-sectors";
-import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS } from "@/lib/public-comps/core";
+import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS, compsFeedLive } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
 import {
@@ -626,12 +626,17 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   // block's own, so the row cannot print one year's rents as another's.
   const fmr = fmrOf(active);
   const providers = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
+  // "Live" only where the provider registry runs the feed (compsFeedLive): a
+  // provider documented and waiting on its fields is said as that.
+  const compsProvider = providers[active.comps_provider as string] ?? null;
   const compsLine =
     active.comps_provider === null
       ? "No live sales feed for this metro yet."
       : active.comps_provider === "discovery"
         ? "Recorded-sales comps staged in discovery mode — the health check resolves the endpoints."
-        : `Recorded-sales comps LIVE via ${providers[active.comps_provider as string]?.name ?? active.comps_provider}.`;
+        : compsFeedLive(active.comps_provider)
+          ? `Recorded-sales comps LIVE via ${compsProvider?.name ?? active.comps_provider}.`
+          : `Recorded-sales comps: ${compsProvider?.name ?? active.comps_provider} is documented, not yet wired.`;
   // Explicit metro-id → research-metro mapping: name-prefix matching missed
   // the DMV entry (its metro string is "DMV core (DC / PG County MD / NoVA)")
   // for the three DMV metros.

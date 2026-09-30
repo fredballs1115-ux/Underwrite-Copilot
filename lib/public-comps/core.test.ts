@@ -367,3 +367,24 @@ describe("how much a comp set can actually support", () => {
     expect(one.high).toBe(400_000);
   });
 });
+
+describe("which metros' recorded-sales feeds are live", () => {
+  it("is the provider registry's word, never the research file's naming a provider", async () => {
+    const { compsFeedLive } = await import("./core");
+    expect(compsFeedLive("philly_opa")).toBe(true);
+    expect(compsFeedLive("md_sdat")).toBe(true);
+    // Washington's extract is documented and waiting on its fields.
+    expect(compsFeedLive("dc_its")).toBe(false);
+    expect(compsFeedLive("discovery")).toBe(false);
+    expect(compsFeedLive(null)).toBe(false);
+    expect(compsFeedLive("no_such_feed")).toBe(false);
+  });
+
+  it("is what the market compare card says, metro by metro", async () => {
+    const { COMPARE_METROS } = await import("@/app/market/compare-metros");
+    const live = Object.fromEntries(COMPARE_METROS.map((m) => [m.id, m.compsLive]));
+    expect(live.dc).toBe(false);
+    expect(live.philadelphia).toBe(true);
+    expect(live.baltimore).toBe(true);
+  });
+});

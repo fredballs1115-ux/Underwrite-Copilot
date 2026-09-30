@@ -571,6 +571,17 @@ export const PROVIDERS: ProviderConfig[] = [
   richmondVa,
 ];
 
+/**
+ * Whether a metro's recorded-sales feed is live: its provider is one this
+ * module runs (`configured`), not one documented and waiting on its fields
+ * (Washington's Integrated Tax System extract), nor a discovery stub. The
+ * research file names each metro's provider; only this registry says
+ * whether it answers, so every page that says "live" asks here.
+ */
+export function compsFeedLive(providerId: string | null | undefined): boolean {
+  return PROVIDERS.some((p) => p.id === providerId && p.configured);
+}
+
 /** Human-readable coverage, derived from the configs so copy can't drift. */
 export const COVERAGE_LIVE = PROVIDERS.filter((p) => p.configured);
 export const COVERAGE_DISCOVERY = PROVIDERS.filter((p) => !p.configured);

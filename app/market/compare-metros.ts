@@ -1,5 +1,6 @@
 import metrosSeed from "@/data/research/metros.json";
 import { FMR_BEDS, fmrOf } from "@/lib/fmr";
+import { compsFeedLive } from "@/lib/public-comps/core";
 import type { CompareMetro, CompareSector } from "./market-compare";
 
 // The compare tool's compact per-metro facts, derived once from the research
@@ -61,7 +62,9 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
     fmr: beds,
     sectors,
     ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
-    compsLive:
-      typeof m.comps_provider === "string" && m.comps_provider !== "discovery",
+    // Live only where the provider registry runs the feed, never merely
+    // because the research file names one (Washington's is documented, not
+    // wired).
+    compsLive: compsFeedLive(m.comps_provider as string | null),
   };
 });
