@@ -569,7 +569,7 @@
       "date": "2026-09-22",
       "title": "The apartment asking rent, and what a home costs in years of it",
       "href": "/market?metro=dc",
-      "blurb": "Zillow's all-homes asking rent runs over houses, condos and apartments together, so in a market of dear houses it sits well above what an apartment actually lets for. Each market's brief now shows the same index over apartment listings alone — the figure an apartment underwrite should be reading — as a third bar beside the all-homes rent and the fair market rent HUD pays, with the gap said. And beside it the typical home value, said against a year of asking rent as the price-to-rent ratio in years, which is the arithmetic that keeps a renter renting. Both come from two more of Zillow's monthly files, read by the same pull and verified from the runner before they were trusted; a figure the pull does not have is simply absent, never a zero."
+      "blurb": "Zillow's all-homes asking rent runs over houses, condos and apartments together, so in a market of dear houses it sits well above what an apartment actually lets for. Each market's brief now shows the same index over apartment listings alone — the figure an apartment underwrite should be reading — as a third bar beside the all-homes rent and HUD's fair market rent, with the gap said. And beside it the typical home value, said against a year of asking rent as the price-to-rent ratio in years, which is the arithmetic that keeps a renter renting. Both come from two more of Zillow's monthly files, read by the same pull and verified from the runner before they were trusted; a figure the pull does not have is simply absent, never a zero."
     },
     {
       "date": "2026-09-22",
@@ -591,9 +591,9 @@
     },
     {
       "date": "2026-09-21",
-      "title": "What landlords are asking, against what HUD pays",
+      "title": "What landlords are asking, beside HUD's fair market rent",
       "href": "/market",
-      "blurb": "Each covered market's brief now shows this month's asking rent from Zillow's Observed Rent Index — all home types, refreshed monthly, with its change from a year ago and Zillow's credit — drawn on one scale against the two-bedroom fair market rent HUD pays, with the gap said in words. They are different numbers about different things: the fair market rent is set once a year from survey data two years old by the time it applies, the asking rent is this month's listings before concessions, and an underwrite that mistakes either for the other is wrong in a known direction. A suburb that shares its metro area's figure says so. Pulled on the 20th of each month from Zillow Research's public file; the file's shape and every metro's name in it were checked from the runner before a number was trusted."
+      "blurb": "Each covered market's brief now shows this month's asking rent from Zillow's Observed Rent Index — all home types, refreshed monthly, with its change from a year ago and Zillow's credit — drawn on one scale beside HUD's two-bedroom fair market rent, with the gap said in words. They are different numbers about different things: the fair market rent is set once a year from survey data two years old by the time it applies, the asking rent is this month's listings before concessions, and an underwrite that mistakes either for the other is wrong in a known direction. A suburb that shares its metro area's figure says so. Pulled on the 20th of each month from Zillow Research's public file; the file's shape and every metro's name in it were checked from the runner before a number was trusted."
     },
     {
       "date": "2026-09-21",

@@ -352,7 +352,7 @@ export function deriveRisks(results: Results): RiskItem[] {
       risks.push({
         severity: "medium",
         title: `Aggressive vs. market: ${c.assumption}`,
-        detail: `${c.note} (OM ${c.omSays} vs. typical ${c.typicalRange})`,
+        detail: `${c.note} (OM ${c.omSays} vs. typical ${c.typicalRange}, a rule of thumb)`,
         source: "Market",
         tab: "market",
       });
