@@ -2310,7 +2310,12 @@
         "Bethlehem Pennsylvania SteelStacks",
         "Lehigh Valley aerial"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "2017 - Hamilton Street Christmas Skyline - Allentown PA.jpg",
+          "note": "Allentown, PA — Atwngirl, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:35300",
@@ -2334,7 +2339,12 @@
         "New Haven from East Rock",
         "New Haven Green aerial"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "New Haven, Connecticut skyline (cropped).jpg",
+          "note": "New Haven, CT — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:12540",
@@ -2355,7 +2365,12 @@
         "Bakersfield California downtown",
         "Bakersfield California aerial"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "BakersfieldSkyline.jpg",
+          "note": "Bakersfield, CA — Robert Hale, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783419278)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:32580",
@@ -2379,7 +2394,12 @@
         "McAllen Texas aerial",
         "McAllen Texas downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Skyline of McAllen.jpg",
+          "note": "McAllen, TX — Theunderratedtaco, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:37100",
@@ -2407,7 +2427,12 @@
         "Thousand Oaks California hills",
         "Ventura County coast aerial"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "CI Harbor Panorama (cropped).jpg",
+          "note": "Oxnard, CA — Fettlemap, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:24660",
@@ -2429,7 +2454,12 @@
         "Greensboro North Carolina skyline",
         "Greensboro North Carolina downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Greensboro skyline from the Depot.jpg",
+          "note": "Greensboro, NC — Mx._Granger, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:49180",
@@ -2450,7 +2480,12 @@
         "Winston-Salem North Carolina skyline",
         "Winston-Salem downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Winston-Salem skyline.jpg",
+          "note": "Winston-Salem, NC — Indy beetle, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:10420",
@@ -2471,7 +2506,12 @@
         "Akron Ohio skyline",
         "Akron Ohio downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "AkronPanorama.jpg",
+          "note": "Akron, OH — Sleepydre, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:25420",
@@ -2494,7 +2534,12 @@
         "Harrisburg skyline from City Island",
         "Pennsylvania State Capitol Harrisburg"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Harrisburg, PA Skyline 2021.jpg",
+          "note": "Harrisburg, PA — Jeffrey Hayes, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:29540",
@@ -2517,7 +2562,12 @@
         "Lancaster Pennsylvania downtown",
         "Lancaster County Pennsylvania farmland"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Lancaster Pennsylvania downtown.jpg",
+          "note": "Lancaster, PA — Randolph Carney, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:38860",
@@ -2541,7 +2591,12 @@
         "Portland Maine waterfront Old Port",
         "Portland Maine harbor aerial"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Skyline waterfront.jpg",
+          "note": "Portland, ME — Metrodogmedia, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:42340",
@@ -2567,7 +2622,12 @@
         "Savannah Georgia Forsyth Park fountain",
         "Savannah Georgia River Street waterfront"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Forsyth fountain 2019.jpeg",
+          "note": "Savannah, GA — Seasider53, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:11700",
@@ -2588,7 +2648,12 @@
         "Asheville skyline Blue Ridge",
         "Asheville North Carolina downtown mountains"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Asheville North Carolina Skyline July 2023.jpg",
+          "note": "Asheville, NC — Asheville Photography, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:26620",
@@ -2610,7 +2675,12 @@
         "Huntsville Alabama skyline",
         "Huntsville Alabama downtown Big Spring Park"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Huntsville, Alabama.jpg",
+          "note": "Huntsville, AL — No machine-readable author provided. Anivron assumed (based on copyright claims)., CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:11260",
@@ -2631,7 +2701,12 @@
         "Anchorage Alaska skyline Chugach",
         "Anchorage Alaska skyline from Earthquake Park"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Anchorage eastward view from Hotel Captain Cook.jpg",
+          "note": "Anchorage, AK — Joseph, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:20500",
@@ -2654,7 +2729,12 @@
         "Durham North Carolina skyline",
         "Durham North Carolina downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Skyline Panorama of Durham, North Carolina.jpg",
+          "note": "Durham, NC — DiscoA340, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:12260",
@@ -2677,7 +2757,12 @@
         "Augusta Georgia skyline Savannah River",
         "Augusta Georgia downtown Broad Street"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Augusta, GA Downtown Skyline 2017.jpg",
+          "note": "Augusta, GA — c_live_lee, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:27140",
@@ -2698,7 +2783,12 @@
         "Jackson Mississippi skyline",
         "Jackson Mississippi downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "JacksonMS Downtown Panorama.jpg",
+          "note": "Jackson, MS — chmeredith from Jackson, MS, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:37860",
@@ -2722,7 +2812,12 @@
         "Pensacola Beach Florida aerial",
         "Pensacola Florida downtown Palafox"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Pensacola Beach, United States (Unsplash).jpg",
+          "note": "Pensacola, FL — Fede Casanova fedecasanova, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783120462)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:42540",
@@ -2745,7 +2840,12 @@
         "Scranton Pennsylvania skyline",
         "Wilkes-Barre Pennsylvania skyline Susquehanna"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Scranton - Downtown (48472890492).jpg",
+          "note": "Scranton, PA — Ajay Suresh from New York, NY, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783120462)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:44700",
@@ -2768,7 +2868,12 @@
         "Stockton California skyline waterfront",
         "Stockton California downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Aerial view of Stockton, California skyline.jpg",
+          "note": "Stockton, CA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783120462)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:33700",
@@ -2790,7 +2895,12 @@
         "Modesto California downtown arch",
         "Modesto California skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Modesto Arch.JPG",
+          "note": "Modesto, CA — Carl Skaggs, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36783579706)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:19660",
@@ -2815,7 +2925,12 @@
         "Daytona Beach Florida aerial ocean",
         "Ormond Beach Florida"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Daytona Beach looking north from pier.jpg",
+          "note": "Daytona Beach, FL — Dough4872, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783120462)."
+        }
+      ]
     }
   ]
 }

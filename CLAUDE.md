@@ -1203,13 +1203,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  Thirty-eight are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Sixty-one are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
   Chattanooga, Colorado Springs, Columbia, Dayton, El Paso, Fort Myers,
   Lexington, Little Rock, Reno, Rochester, Sarasota, Spokane, Syracuse,
-  Toledo, Wichita and Worcester), each judged through the card's 16:10 and the deal page's
+  Toledo, Wichita and Worcester; then Akron, Allentown, Anchorage,
+  Asheville, Augusta, Bakersfield, Daytona Beach, Durham, Greensboro,
+  Harrisburg, Huntsville, Jackson, Lancaster, McAllen, Modesto, New Haven,
+  Oxnard, Pensacola, Portland (Maine), Savannah, Scranton, Stockton and
+  Winston-Salem), each judged through the card's 16:10 and the deal page's
   21:9 crops — never the 4:1 band, which a `cbsa:` row never draws; San
   Jose, Fresno and Madison had nothing usable, and Baton Rouge's best frames
   are PNGs (never served) with its one JPEG a steep aerial that reads as a
@@ -1219,9 +1223,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   search read Birmingham, England's categories (its entry names Alabama's
   now), which is why a name another place shares is searched under its full
   name and every candidate is looked at. A six-market sheet spends nine
-  checks a market; Rochester and Worcester found theirs only in a
-  one-market run, and Fort Myers only once its search named Cape Coral and
-  the Caloosahatchee too.
+  checks a market; Rochester, Worcester, Bakersfield (a skyline at
+  twilight) and Modesto (its arch) found theirs only in a one-market run,
+  and Fort Myers only once its search named Cape Coral and the
+  Caloosahatchee too. Where a place is known by something other than a
+  skyline, that is the picture: Savannah's Forsyth Park fountain,
+  Pensacola's beach, Oxnard's harbour. Huntsville's credit is the name
+  inside Commons' "No machine-readable author provided. … assumed"
+  sentence, which the row's comment quotes whole.
   Milwaukee's and Greenville's credits are the author Commons names, where
   each filename names another (the owner was told). The route
   decodes the key itself (the cards ask for it percent-encoded, and no key

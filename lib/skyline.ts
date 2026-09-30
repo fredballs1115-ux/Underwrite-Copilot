@@ -537,6 +537,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     size: [2512, 1844],
   },  // ── Metro areas the site reads no figures for (#472) ──────────────────────
+  // Akron, OH: skyline-sheet run 36782855933 — the skyline at a card's full height, over a warmer panorama too short for the deal page's frame.
+  "cbsa:10420": {
+    file: "AkronPanorama.jpg",
+    place: "The Akron skyline",
+    credit: "Sleepydre",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Akron, OH",
+    size: [3296, 1679],
+  },
   // Albany, NY: skyline-sheet run 36779692322 — the plaza the city is known by; the one clear frame of seven.
   "cbsa:10580": {
     file: "EmpireStatePlazaPanorama.jpg",
@@ -561,6 +571,56 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Albuquerque, NM",
     size: [6560, 3690],
+  },
+  // Allentown, PA: skyline-sheet run 36782733907 — the city's own skyline, lit for Christmas, over a hazy distant view and street scenes of Bethlehem.
+  "cbsa:10900": {
+    file: "2017 - Hamilton Street Christmas Skyline - Allentown PA.jpg",
+    place: "The Hamilton Street skyline at Christmas, Allentown",
+    credit: "Atwngirl",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Allentown, PA",
+    size: [2048, 1151],
+  },
+  // Anchorage, AK: skyline-sheet run 36782967654 — the snow on the mountains behind downtown, over the city article's lead, a view from above whose card crop loses the mountains.
+  "cbsa:11260": {
+    file: "Anchorage eastward view from Hotel Captain Cook.jpg",
+    place: "Looking east over downtown Anchorage from the Hotel Captain Cook",
+    credit: "Joseph",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    name: "Anchorage, AK",
+    size: [3663, 2108],
+  },
+  // Asheville, NC: skyline-sheet run 36782967654 — the city under its mountains, over a grey-sky cityscape and a washed-out panorama.
+  "cbsa:11700": {
+    file: "Asheville North Carolina Skyline July 2023.jpg",
+    place: "The Asheville skyline and the mountains beyond",
+    credit: "Asheville Photography",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Asheville, NC",
+    size: [5679, 3838],
+  },
+  // Augusta, GA: skyline-sheet run 36782967654 — the city article's lead, the skyline in the evening light, over HDR street scenes.
+  "cbsa:12260": {
+    file: "Augusta, GA Downtown Skyline 2017.jpg",
+    place: "Downtown Augusta across the Savannah River",
+    credit: "c_live_lee",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Augusta, GA",
+    size: [5448, 3737],
+  },
+  // Bakersfield, CA: skyline-sheet run 36783419278 — a one-market run's find, the city's skyline against the evening sky, over single buildings, the Fox Theater and a hazy panorama from the six-market sheet.
+  "cbsa:12540": {
+    file: "BakersfieldSkyline.jpg",
+    place: "The Bakersfield skyline at twilight",
+    credit: "Robert Hale",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    name: "Bakersfield, CA",
+    size: [3088, 2048],
   },
   // Birmingham, AL: skyline-sheet run 36754192984 — the Alabama article's lead, sharp under a clear sky, every tower whole on the card and the deal page's crop; the first run searched Birmingham, England's categories.
   "cbsa:13820": {
@@ -662,6 +722,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Dayton, OH",
     size: [3890, 2334],
   },
+  // Daytona Beach, FL: skyline-sheet run 36783120462 — the beach and its towers, over the airport's runway, a city hall and a launch.
+  "cbsa:19660": {
+    file: "Daytona Beach looking north from pier.jpg",
+    place: "Daytona Beach looking north from the pier",
+    credit: "Dough4872",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Daytona Beach, FL",
+    size: [4032, 3024],
+  },
   // Des Moines, IA: skyline-sheet run 36751130861 — whole in every crop, where the article's lead lost 801 Grand's crown.
   "cbsa:19780": {
     file: "Skyline downtown Des Moines.jpg",
@@ -671,6 +741,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
     name: "Des Moines, IA",
     size: [2450, 1544],
+  },
+  // Durham, NC: skyline-sheet run 36782967654 — the skyline panorama, over the transit station, a highway and a night view.
+  "cbsa:20500": {
+    file: "Skyline Panorama of Durham, North Carolina.jpg",
+    place: "The Durham skyline",
+    credit: "DiscoA340",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Durham, NC",
+    size: [11884, 3064],
   },
   // El Paso, TX: skyline-sheet run 36779692322 — the article's lead, over a flatter midday aerial.
   "cbsa:21340": {
@@ -692,6 +772,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Grand Rapids, MI",
     size: [4000, 1475],
   },
+  // Greensboro, NC: skyline-sheet run 36782733907 — the skyline from the Depot at 2,703px wide, over the city article's 1,500px lead of the same towers.
+  "cbsa:24660": {
+    file: "Greensboro skyline from the Depot.jpg",
+    place: "The Greensboro skyline from the Depot",
+    credit: "Mx._Granger",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Greensboro, NC",
+    size: [2703, 953],
+  },
   // Greenville, SC: skyline-sheet run 36750858237 — the picture the city is known by and its only usable file; credited as Commons names the author (the filename names Yousef AbdulHusain).
   "cbsa:24860": {
     file: "2024-4-12-Falls Park Waterfall Greenville South Carolina by Yousef AbdulHusain.jpg",
@@ -701,6 +791,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Greenville, SC",
     size: [4080, 3072],
+  },
+  // Harrisburg, PA: skyline-sheet run 36782855933 — the view the city is known by, 10,824px wide.
+  "cbsa:25420": {
+    file: "Harrisburg, PA Skyline 2021.jpg",
+    place: "The Harrisburg skyline over the Susquehanna River",
+    credit: "Jeffrey Hayes",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Harrisburg, PA",
+    size: [10824, 3608],
   },
   // Hartford, CT: skyline-sheet run 36750496544 — the article's lead image, whole in every crop.
   "cbsa:25540": {
@@ -712,6 +812,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Hartford, CT",
     size: [7096, 3548],
   },
+  // Huntsville, AL: skyline-sheet run 36782967654 — the downtown towers over the park's water, over two aerials of the interstate. The runner printed the author as "No machine-readable author provided. Anivron assumed (based on copyright claims)."; the credit is the name in it, without Commons' sentence around it.
+  "cbsa:26620": {
+    file: "Downtown Huntsville, Alabama.jpg",
+    place: "Downtown Huntsville across the water",
+    credit: "Anivron",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "http://creativecommons.org/licenses/by-sa/3.0/",
+    name: "Huntsville, AL",
+    size: [2032, 1524],
+  },
+  // Jackson, MS: skyline-sheet run 36782967654 — the Capitol with downtown behind it, over a parking deck's view and a foggy parking lot.
+  "cbsa:27140": {
+    file: "JacksonMS Downtown Panorama.jpg",
+    place: "Downtown Jackson and the State Capitol",
+    credit: "chmeredith from Jackson, MS, USA",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Jackson, MS",
+    size: [2247, 822],
+  },
   // Knoxville, TN: skyline-sheet run 36751130861 — keeps the Sunsphere, where the alternative was grey and lost it.
   "cbsa:28940": {
     file: "Knoxville Skyline from Marriott - panoramio.jpg",
@@ -721,6 +841,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/3.0",
     name: "Knoxville, TN",
     size: [5374, 3583],
+  },
+  // Lancaster, PA: skyline-sheet run 36782855933 — the city article's lead, over street scenes on a grey December day.
+  "cbsa:29540": {
+    file: "Lancaster Pennsylvania downtown.jpg",
+    place: "Downtown Lancaster",
+    credit: "Randolph Carney",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Lancaster, PA",
+    size: [2011, 1114],
   },
   // Lexington, KY: skyline-sheet run 36780959488 — the landmark the city is known by, sharp at dusk; the downtown aerial was 1544px and dated.
   "cbsa:30460": {
@@ -752,6 +882,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Louisville, KY",
     size: [9640, 2304],
   },
+  // McAllen, TX: skyline-sheet run 36782733907 — the city article's lead, over a cityscape led by a parking lot.
+  "cbsa:32580": {
+    file: "Skyline of McAllen.jpg",
+    place: "The McAllen skyline",
+    credit: "Theunderratedtaco",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "McAllen, TX",
+    size: [4032, 2268],
+  },
   // Memphis, TN: skyline-sheet run 36750289515 — the article's lead image, whole in every crop.
   "cbsa:32820": {
     file: "Skyline of Memphis, TN.jpg",
@@ -771,6 +911,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Milwaukee, WI",
     size: [2048, 1338],
+  },
+  // Modesto, CA: skyline-sheet run 36783579706 — the city article's lead and the landmark the city is known by, found only in a one-market run, over ten street views with a date stamp in the corner.
+  "cbsa:33700": {
+    file: "Modesto Arch.JPG",
+    place: "The Modesto Arch",
+    credit: "Carl Skaggs",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Modesto, CA",
+    size: [3456, 2304],
+  },
+  // New Haven, CT: skyline-sheet run 36782733907 — the city article's lead, downtown over the autumn trees.
+  "cbsa:35300": {
+    file: "New Haven, Connecticut skyline (cropped).jpg",
+    place: "The New Haven skyline in autumn",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "New Haven, CT",
+    size: [6818, 3409],
   },
   // New Orleans, LA: skyline-sheet run 36752856482 — the frame that keeps the towers is a 1704x558 phone panorama.
   "cbsa:35380": {
@@ -812,6 +972,36 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Omaha, NE",
     size: [7279, 4652],
   },
+  // Oxnard, CA: skyline-sheet run 36782733907 — the harbour's boats and palms, over an aerial of the Ventura coast in oversaturated colour.
+  "cbsa:37100": {
+    file: "CI Harbor Panorama (cropped).jpg",
+    place: "Channel Islands Harbor, Oxnard",
+    credit: "Fettlemap",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Oxnard, CA",
+    size: [3954, 1326],
+  },
+  // Pensacola, FL: skyline-sheet run 36783120462 — the white sand the area is known by (an article's lead), over an aerial of the bay.
+  "cbsa:37860": {
+    file: "Pensacola Beach, United States (Unsplash).jpg",
+    place: "Pensacola Beach",
+    credit: "Fede Casanova fedecasanova",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Pensacola, FL",
+    size: [5832, 3888],
+  },
+  // Portland, ME: skyline-sheet run 36782855933 — a picture from the city's own article, the marina in front of downtown, over an aerial and a grey view from the islands.
+  "cbsa:38860": {
+    file: "Skyline waterfront.jpg",
+    place: "The Portland skyline over the waterfront",
+    credit: "Metrodogmedia",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Portland, ME",
+    size: [4323, 1431],
+  },
   // Providence, RI: skyline-sheet run 36750289515 — the article's lead image; the river, bridge and skyline stay whole in every crop.
   "cbsa:39300": {
     file: "Providence RI skyline.jpg",
@@ -842,6 +1032,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Rochester, NY",
     size: [3601, 1760],
   },
+  // Savannah, GA: skyline-sheet run 36782855933 — the picture the city is known by, over its houses and a park path.
+  "cbsa:42340": {
+    file: "Forsyth fountain 2019.jpeg",
+    place: "The fountain in Forsyth Park, Savannah",
+    credit: "Seasider53",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Savannah, GA",
+    size: [3869, 2248],
+  },
+  // Scranton, PA: skyline-sheet run 36783120462 — the city article's lead, downtown in warm light, over a night traffic view and two purple-tinted aerials.
+  "cbsa:42540": {
+    file: "Scranton - Downtown (48472890492).jpg",
+    place: "Downtown Scranton",
+    credit: "Ajay Suresh from New York, NY, USA",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Scranton, PA",
+    size: [4177, 2350],
+  },
   // Spokane, WA: skyline-sheet run 36780772501 — the article's lead.
   "cbsa:44060": {
     file: "Spokane, Washington skyline (cropped).jpg",
@@ -851,6 +1061,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Spokane, WA",
     size: [6933, 3813],
+  },
+  // Stockton, CA: skyline-sheet run 36783120462 — the city article's lead, downtown in the evening light, over six crops of one waterfront view.
+  "cbsa:44700": {
+    file: "Aerial view of Stockton, California skyline.jpg",
+    place: "An aerial view of downtown Stockton",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Stockton, CA",
+    size: [5068, 3126],
   },
   // Syracuse, NY: skyline-sheet run 36780772501 — the article's lead; the rest were highways and a haze.
   "cbsa:45060": {
@@ -911,6 +1131,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Wichita, KS",
     size: [4654, 2792],
+  },
+  // Winston-Salem, NC: skyline-sheet run 36782855933 — the city article's lead, over aerials of an interchange.
+  "cbsa:49180": {
+    file: "Winston-Salem skyline.jpg",
+    place: "The Winston-Salem skyline",
+    credit: "Indy beetle",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Winston-Salem, NC",
+    size: [3660, 2306],
   },
   // Worcester, MA: skyline-sheet run 36781435010 — a one-market run's pick of fifteen; the six-market sheet held storefronts and an overcast panorama.
   "cbsa:49340": {
