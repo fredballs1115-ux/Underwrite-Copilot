@@ -331,9 +331,21 @@ describe("the building's municipality and county from the Census geocoder (#452)
 
   it("an answered lookup made before the place was read is made again; one that never geocoded is not", () => {
     expect(siteFlagsOutdated({ status: "ok" })).toBe(true);
-    expect(siteFlagsOutdated({ status: "ok", v: 2 })).toBe(false);
+    // Made before the lookup took the deal's own point (#472).
+    expect(siteFlagsOutdated({ status: "ok", v: 2 })).toBe(true);
+    expect(siteFlagsOutdated({ status: "ok", v: 3 })).toBe(false);
     expect(siteFlagsOutdated({ status: "geocode_failed" })).toBe(false);
     expect(siteFlagsOutdated({ status: "pending" })).toBe(false);
     expect(siteFlagsOutdated(null)).toBe(false);
+  });
+
+  it("asks FEMA again for a flood zone it did not answer, once the retry wait has passed (#472)", () => {
+    const at = "2026-09-30T00:00:00.000Z";
+    const missed = { status: "ok" as const, v: 3, flood: "unavailable" as const, retrievedAt: at };
+    expect(siteFlagsOutdated(missed, Date.parse(at) + 60 * 60 * 1000)).toBe(false);
+    expect(siteFlagsOutdated(missed, Date.parse(at) + 7 * 60 * 60 * 1000)).toBe(true);
+    // An answered zone is not asked again.
+    const answered = { ...missed, flood: { zone: "AE", subtype: null, isHighRisk: true } };
+    expect(siteFlagsOutdated(answered, Date.parse(at) + 7 * 60 * 60 * 1000)).toBe(false);
   });
 });

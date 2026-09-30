@@ -1,6 +1,8 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { geocode } from "@/lib/public-comps/run";
+import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
+import type { StructuredAddress } from "@/lib/address";
 import { NFHL_ROOT as NFHL_DEFAULT_ROOT } from "@/lib/basemaps";
 import {
   parseCensusCounty,
@@ -29,13 +31,25 @@ import {
 const NFHL_ROOT = process.env.NFHL_SERVICE_ROOT ?? NFHL_DEFAULT_ROOT;
 const PENDING_STALE_MS = 10 * 60 * 1000;
 
+/** Asked twice, with a timeout sized to a cold answer: the runner measured
+ *  FEMA's first request of a run at 20–30 s (#472), and one timeout here used
+ *  to store the flood zone as unavailable for good. */
 const fetchJson = async (url: string): Promise<unknown> => {
-  const res = await fetch(url, {
-    headers: { accept: "application/json", "user-agent": "underwrite-copilot/1.0" },
-    signal: AbortSignal.timeout(12000),
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} from ${new URL(url).host}`);
-  return res.json();
+  let last: unknown = null;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch(url, {
+        headers: { accept: "application/json", "user-agent": "underwrite-copilot/1.0" },
+        signal: AbortSignal.timeout(25_000),
+      });
+      if (res.ok) return await res.json();
+      last = new Error(`HTTP ${res.status} from ${new URL(url).host}`);
+      if (res.status < 500) break;
+    } catch (err) {
+      last = err;
+    }
+  }
+  throw last instanceof Error ? last : new Error(String(last));
 };
 
 /** Same conditional-claim protocol as claimRecordComps — see that function
@@ -103,7 +117,9 @@ async function floodFor(lat: number, lng: number): Promise<SiteFlagsResult["floo
       geometryType: "esriGeometryPoint",
       inSR: "4326",
       spatialRel: "esriSpatialRelIntersects",
-      outFields: "FLD_ZONE,ZONE_SUBTY",
+      // The zone and what FEMA states about the flood's height there (#472;
+      // the fields the runner printed for the layer).
+      outFields: "FLD_ZONE,ZONE_SUBTY,STATIC_BFE,DEPTH,LEN_UNIT,V_DATUM",
       returnGeometry: "false",
     });
     return parseNfhlFlood(await fetchJson(`${NFHL_ROOT}/${layerId}/query?${params}`));
@@ -114,13 +130,16 @@ async function floodFor(lat: number, lng: number): Promise<SiteFlagsResult["floo
 
 export async function computeSiteFlags(input: {
   label: string;
+  /** the deal's own geocoded point — the one its aerial and flood map are
+   *  drawn around (#472), so the zone said is the zone under the ring */
+  point?: { lat: number; lng: number } | null;
   /** reuse the comps pull's geocode when the deal already has one */
   subject?: { lat: number; lng: number } | null;
 }): Promise<SiteFlagsResult> {
   const admin = createSupabaseAdminClient();
   const base = { retrievedAt: new Date().toISOString(), note: SITE_FLAGS_NOTE };
 
-  let point = input.subject ?? null;
+  let point = input.point ?? input.subject ?? null;
   if (!point) {
     const g = await geocode(input.label);
     if (g) point = { lat: g.lat, lng: g.lng };
@@ -204,11 +223,11 @@ export async function runSiteFlags(dealId: string): Promise<void> {
   try {
     const { data: deal } = await admin
       .from("deals")
-      .select("id, address, public_comps")
+      .select("id, address, public_comps, photo")
       .eq("id", dealId)
       .maybeSingle();
     if (!deal) return;
-    const address = deal.address as { label?: string } | null;
+    const address = deal.address as StructuredAddress | null;
     if (!address?.label) {
       await store({
         status: "geocode_failed",
@@ -223,7 +242,16 @@ export async function runSiteFlags(dealId: string): Promise<void> {
     }
     const subject =
       (deal.public_comps as { subject?: { lat: number; lng: number } } | null)?.subject ?? null;
-    await store(await computeSiteFlags({ label: address.label, subject }));
+    // The deal's own point (#472): the location its pictures are drawn
+    // around, resolved (and cached) the way the aerial route resolves it.
+    let point: { lat: number; lng: number } | null = null;
+    try {
+      const loc = await resolveDealLocation(admin, dealId, address, (deal.photo as DealVisualCache | null) ?? null);
+      if (loc) point = { lat: loc.lat, lng: loc.lng };
+    } catch {
+      // the comps pull's point, or a geocode of the line, instead
+    }
+    await store(await computeSiteFlags({ label: address.label, point, subject }));
   } catch (err) {
     await store({
       status: "lookup_failed",

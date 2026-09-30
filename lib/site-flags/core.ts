@@ -45,14 +45,28 @@ export interface SiteFlagsResult {
 }
 
 /** The rules a lookup is made under: 2 reads the incorporated place and the
- *  county beside the tract (#452). An answered lookup under older rules is
- *  made again on the deal's next view, so its rules can read the place. */
-export const SITE_FLAGS_V = 2;
+ *  county beside the tract (#452); 3 looks up at the deal's own geocoded
+ *  point — the one its aerial and flood map are drawn around, so the zone
+ *  said and the ring drawn are one place — and reads FEMA's base flood
+ *  elevation (#472). An answered lookup under older rules is made again on
+ *  the deal's next view. */
+export const SITE_FLAGS_V = 3;
 
-/** Whether answered flags predate the place (#452) and should be looked up
- *  again. A lookup that never geocoded is left alone: it has no point. */
-export function siteFlagsOutdated(flags: Pick<SiteFlagsResult, "status" | "v"> | null | undefined): boolean {
-  return !!flags && flags.status === "ok" && (flags.v ?? 1) < SITE_FLAGS_V;
+/** How long a lookup whose flood zone FEMA did not answer stands before it
+ *  is asked again (#472): a cold FEMA answer outlasted the old timeout, and
+ *  one miss was kept for good. */
+export const FLOOD_RETRY_MS = 6 * 60 * 60 * 1000;
+
+/** Whether answered flags should be looked up again: made under older rules
+ *  (#452, #472), or answered without the flood zone long enough ago to ask
+ *  FEMA again. A lookup that never geocoded is left alone: it has no point. */
+export function siteFlagsOutdated(
+  flags: (Pick<SiteFlagsResult, "status" | "v"> & Partial<Pick<SiteFlagsResult, "flood" | "retrievedAt">>) | null | undefined,
+  now = Date.now(),
+): boolean {
+  if (!flags || flags.status !== "ok") return false;
+  if ((flags.v ?? 1) < SITE_FLAGS_V) return true;
+  return flags.flood === "unavailable" && now - Date.parse(flags.retrievedAt ?? "") > FLOOD_RETRY_MS;
 }
 
 /**
