@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getTeam, memberLabel, TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { TEAM_PRICE_LABEL, teamMonthlyTotal, fmtUsd } from "@/lib/billing";
 import {
@@ -63,9 +63,8 @@ export default async function TeamPage({
         : null;
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-cached: the (app) layout's own auth call, not a second hop.
+  const user = await getCurrentUser();
   const team = user ? await getTeam(supabase, user.id) : null;
   // Whether the owner personally pays for Pro — decides which upgrade path
   // the Start-Team button takes (in-place conversion vs a new checkout).

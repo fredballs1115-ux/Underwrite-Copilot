@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
 import { signOut } from "@/app/login/actions";
 import { ChangePasswordForm } from "./change-password-form";
@@ -29,6 +29,28 @@ const DELETE_ERRORS: Record<string, string> = {
   brandlogotype: "Logos must be a PNG or JPG file.",
 };
 
+/** The two email preferences, ON by default. One read of the profile row:
+ *  `*` returns whichever columns the schema has, so a pre-0014/0017 schema
+ *  missing one toggle's column still reads the other — the per-toggle
+ *  degradation the old column-at-a-time reads bought, in one round trip.
+ *  A missing row or a failed read reads as ON, as the senders assume. */
+async function emailPrefsOf(userId: string): Promise<{ onAnalysis: boolean; weeklyDigest: boolean }> {
+  try {
+    const { data, error } = await createSupabaseAdminClient()
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+    const row = !error && data ? (data as { email_on_analysis?: unknown; email_weekly_digest?: unknown }) : null;
+    return {
+      onAnalysis: row?.email_on_analysis !== false,
+      weeklyDigest: row?.email_weekly_digest !== false,
+    };
+  } catch {
+    return { onAnalysis: true, weeklyDigest: true };
+  }
+}
+
 export default async function AccountPage({
   searchParams,
 }: {
@@ -37,44 +59,15 @@ export default async function AccountPage({
   const { reset, error, branding: brandingParam } = await searchParams;
   const deleteError = error ? (DELETE_ERRORS[error] ?? null) : null;
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const billing = user ? await getBilling(supabase, user.id) : null;
+  // Request-cached: the (app) layout's own auth call, not a second hop.
+  const user = await getCurrentUser();
+  // The billing read and the email preferences don't wait on each other.
+  const [billing, prefs] = user
+    ? await Promise.all([getBilling(supabase, user.id), emailPrefsOf(user.id)])
+    : [null, { onAnalysis: true, weeklyDigest: true }];
   const isPro = billing?.isPro ?? false;
-
-  // Email preferences — ON by default; pre-0014/0017 schemas (columns
-  // missing) read as ON too, matching what the senders assume. Queried one
-  // column at a time so a half-migrated schema degrades per-toggle.
-  let emailOnAnalysis = true;
-  let emailWeeklyDigest = true;
-  if (user) {
-    const admin = createSupabaseAdminClient();
-    try {
-      const { data: prefs, error: prefErr } = await admin
-        .from("profiles")
-        .select("email_on_analysis")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (!prefErr && prefs && prefs.email_on_analysis === false) {
-        emailOnAnalysis = false;
-      }
-    } catch {
-      // default stands
-    }
-    try {
-      const { data: prefs, error: prefErr } = await admin
-        .from("profiles")
-        .select("email_weekly_digest")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (!prefErr && prefs && prefs.email_weekly_digest === false) {
-        emailWeeklyDigest = false;
-      }
-    } catch {
-      // default stands
-    }
-  }
+  const emailOnAnalysis = prefs.onAnalysis;
+  const emailWeeklyDigest = prefs.weeklyDigest;
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import {
   getBilling,
   FREE_DEAL_LIMIT,
@@ -66,9 +66,8 @@ export default async function BillingPage({
     rentroll: "export the live-formula rent-roll workbook",
   };
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-cached: the (app) layout's own auth call, not a second hop.
+  const user = await getCurrentUser();
   const billing = user ? await getBilling(supabase, user.id) : null;
   const isPro = billing?.isPro ?? false;
   const dealCount = billing?.dealCount ?? 0;

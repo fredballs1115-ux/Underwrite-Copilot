@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getTeam } from "@/lib/teams";
 import { joinTeam } from "../../actions";
 import { PendingButton } from "../../../pending-button";
@@ -25,9 +25,8 @@ export default async function JoinTeamPage({
   const { error } = await searchParams;
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-cached: the (app) layout's own auth call, not a second hop.
+  const user = await getCurrentUser();
   const team = user ? await getTeam(supabase, user.id) : null;
 
   // Which team is this? (Migration 0015's definer RPC returns the name only

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getActiveBuyBox } from "@/lib/criteria-server";
 import { buyBoxLines, geoTargets, priceBand } from "@/lib/criteria";
 import {
@@ -31,9 +31,8 @@ export default async function CriteriaPage({
 }) {
   const { saved, error } = await searchParams;
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-cached: the (app) layout's own auth call, not a second hop.
+  const user = await getCurrentUser();
   const active = user
     ? await getActiveBuyBox(supabase, user.id)
     : {
