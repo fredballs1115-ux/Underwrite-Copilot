@@ -358,7 +358,7 @@ export default async function DealsPage({
         // again like one not yet looked for (#444): over the next picture,
         // taking over only if today's search keeps it.
         const picture = unread ? null : (cache?.picture ?? null);
-        const market = marketPictureFor(address, extraction?.market ?? null, placement.briefed ?? placement.read);
+        const market = marketPictureFor(address, extraction?.market ?? null, placement.briefed ?? placement.read, placement.county);
         const facts = {
           dealId: d.id,
           pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,

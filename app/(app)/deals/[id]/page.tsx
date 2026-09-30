@@ -931,7 +931,7 @@ export default async function DealPage({
   // The photograph the deal's market is known by, leading the picture where
   // the building has none of its own and no Street View (#439) — the one its
   // pipeline card shows (#438), from the same reader.
-  const marketPicture = marketPictureFor(dealAddress, extraction?.market ?? null, placement.briefed ?? placement.read);
+  const marketPicture = marketPictureFor(dealAddress, extraction?.market ?? null, placement.briefed ?? placement.read, placement.county);
 
   // A development's price row is its land cost, and a plan deal's cap slot is
   // its yield on total cost — the same words the pipeline row and the meeting

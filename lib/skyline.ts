@@ -37,7 +37,16 @@ export interface SkylineShot {
   license: string;
   /** where the licence text lives; empty for public domain */
   licenseUrl: string;
+  /** a metro area's name as a card shows it ("San Jose, CA"), for an entry
+   *  keyed by its Census code (`areaSkylineId`, #472) — a market the site
+   *  reads has its own name */
+  name?: string;
 }
+
+/** The table's key for a metro area the site reads no figures for (#472):
+ *  its five-digit Census code, so a deal placed by its county wears its
+ *  metro area's photograph (lib/market-picture). */
+export const areaSkylineId = (cbsa: string): string => `cbsa:${cbsa}`;
 
 /**
  * Keyed by the `id` in data/research/metros.json. A market with no entry

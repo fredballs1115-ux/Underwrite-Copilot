@@ -11,8 +11,11 @@
 // (lib/skyline), credited to its photographer, with the market named on the
 // picture so it never passes for the building. A suburb with no photograph
 // of its own (Montgomery County) shows the metro its figures are borrowed
-// from (`metroAliasOf`). Outside every photographed market there is nothing
-// to borrow, and the aerial stays the picture: the site itself, from above.
+// from (`metroAliasOf`). A deal in a metro area the site reads no figures
+// for wears that metro area's own photograph where one has been chosen
+// (#472), keyed by its Census code (`areaSkylineId`) and reached through the
+// county the deal sits in. Outside every photographed place there is
+// nothing to borrow, and the deal's drawn cover stays the picture.
 //
 // Pure: the page resolves it server-side and hands the card a plain source.
 
@@ -20,7 +23,7 @@ import type { StructuredAddress } from "@/lib/address";
 import { metroAliasOf } from "@/lib/live-rates";
 import { dataMetroForAddress, metroForAddress, metroForName } from "@/lib/market-match";
 import { marketPageFor } from "@/lib/public-pages";
-import { photographerLine, skylineFor, skylineTag } from "@/lib/skyline";
+import { areaSkylineId, photographerLine, skylineFor, skylineTag, type SkylineShot } from "@/lib/skyline";
 
 /**
  * The width a card asks the skyline route for. The files are panoramas, up
@@ -67,22 +70,34 @@ export function marketPictureFor(
   address: Partial<StructuredAddress> | null,
   marketText?: string | null,
   placed?: { id: string; name: string } | null,
+  county?: { cbsa: string | null; area: string | null } | null,
 ): MarketPicture | null {
   const addr = address ?? {};
   const fromAddress = placed !== undefined ? placed : (metroForAddress(addr) ?? dataMetroForAddress(addr));
   const market = fromAddress ?? metroForName(marketText ?? null);
-  if (!market) return null;
-  for (const id of [market.id, metroAliasOf(market.id)]) {
+  for (const id of market ? [market.id, metroAliasOf(market.id)] : []) {
     if (!id) continue;
     const shot = skylineFor(id);
     if (!shot) continue;
-    return {
-      id,
-      name: marketPageFor(id)?.name ?? market.name,
-      place: shot.place,
-      src: `/api/imagery/skyline/${encodeURIComponent(id)}?w=${MARKET_PHOTO_WIDTH}&v=${skylineTag(id)}`,
-      credit: photographerLine(shot),
-    };
+    return picture(id, marketPageFor(id)?.name ?? market!.name, shot);
+  }
+  // The metro area the deal's county sits in, where the site reads no
+  // figures for it but has chosen its photograph (#472), under the name the
+  // table gives it, else the delineation's own title.
+  if (county?.cbsa) {
+    const id = areaSkylineId(county.cbsa);
+    const shot = skylineFor(id);
+    if (shot) return picture(id, shot.name ?? county.area ?? "", shot);
   }
   return null;
+}
+
+function picture(id: string, name: string, shot: SkylineShot): MarketPicture {
+  return {
+    id,
+    name,
+    place: shot.place,
+    src: `/api/imagery/skyline/${encodeURIComponent(id)}?w=${MARKET_PHOTO_WIDTH}&v=${skylineTag(id)}`,
+    credit: photographerLine(shot),
+  };
 }

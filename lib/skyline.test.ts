@@ -16,6 +16,8 @@ import { gluedWords } from "./render-lint";
 import metrosSeed from "@/data/research/metros.json";
 import candidateFile from "@/data/skyline-candidates.json";
 import { DATA_METROS } from "@/lib/market-match";
+import { BRIEFED_CBSA, cbsaOfMarket } from "@/lib/market-county";
+import delineation from "@/data/cbsa-counties.json";
 
 const METRO_IDS = new Set([
   ...(metrosSeed.metros ?? []).map((m) => (m as { id: string }).id),
@@ -25,8 +27,19 @@ const METRO_IDS = new Set([
 ]);
 
 describe("the market photograph table", () => {
-  it("only names markets the research layer actually covers", () => {
-    for (const id of Object.keys(SKYLINES)) {
+  it("only names markets the research layer actually covers, or a metro area by its Census code (#472)", () => {
+    const titles = (delineation as { titles: Record<string, string> }).titles;
+    // The metro areas the site reads: their own markets' entries serve them.
+    const read = new Set([...Object.values(BRIEFED_CBSA), ...[...METRO_IDS].map((id) => cbsaOfMarket(id))].filter(Boolean));
+    for (const [id, shot] of Object.entries(SKYLINES)) {
+      const code = /^cbsa:(\d{5})$/.exec(id)?.[1];
+      if (code) {
+        expect(titles[code], `${id} is not a metro area in the Census delineation`).toBeTruthy();
+        // A card names the place it shows: "San Jose, CA".
+        expect(shot.name ?? "", `${id} has no name for its card`).toMatch(/^[A-Z][A-Za-z .'-]+, [A-Z]{2}$/);
+        expect(read.has(code), `${id} is a metro area the site reads: its market's own entry serves it`).toBe(false);
+        continue;
+      }
       expect(METRO_IDS.has(id), `${id} is not a covered market`).toBe(true);
     }
   });

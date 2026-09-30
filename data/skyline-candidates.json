@@ -1209,6 +1209,486 @@
           "note": "The Cleveland skyline across Lake Erie from Lakewood Park — Erik Drost, CC BY 4.0. The chosen file, in lib/skyline.ts (contact sheet 11, run 35943831078)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:41940",
+      "city": "San Jose, California",
+      "area": "San Jose-Sunnyvale-Santa Clara, CA",
+      "wikipedia": [
+        "San Jose, California",
+        "Downtown San Jose"
+      ],
+      "categories": [
+        "Skylines of San Jose",
+        "San Jose skyline",
+        "Views of San Jose",
+        "Panoramics of San Jose",
+        "Aerial photographs of San Jose"
+      ],
+      "queries": [
+        "San Jose skyline panorama",
+        "San Jose downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:39300",
+      "city": "Providence, Rhode Island",
+      "area": "Providence-Warwick, RI-MA",
+      "wikipedia": [
+        "Providence, Rhode Island",
+        "Downtown Providence, Rhode Island"
+      ],
+      "categories": [
+        "Skylines of Providence",
+        "Providence skyline",
+        "Views of Providence",
+        "Panoramics of Providence",
+        "Aerial photographs of Providence"
+      ],
+      "queries": [
+        "Providence skyline panorama",
+        "Providence downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:33340",
+      "city": "Milwaukee",
+      "area": "Milwaukee-Waukesha, WI",
+      "wikipedia": [
+        "Milwaukee",
+        "Downtown Milwaukee"
+      ],
+      "categories": [
+        "Skylines of Milwaukee",
+        "Milwaukee skyline",
+        "Views of Milwaukee",
+        "Panoramics of Milwaukee",
+        "Aerial photographs of Milwaukee"
+      ],
+      "queries": [
+        "Milwaukee skyline panorama",
+        "Milwaukee downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:36420",
+      "city": "Oklahoma City",
+      "area": "Oklahoma City, OK",
+      "wikipedia": [
+        "Oklahoma City",
+        "Downtown Oklahoma City"
+      ],
+      "categories": [
+        "Skylines of Oklahoma City",
+        "Oklahoma City skyline",
+        "Views of Oklahoma City",
+        "Panoramics of Oklahoma City",
+        "Aerial photographs of Oklahoma City"
+      ],
+      "queries": [
+        "Oklahoma City skyline panorama",
+        "Oklahoma City downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:31140",
+      "city": "Louisville, Kentucky",
+      "area": "Louisville/Jefferson County, KY-IN",
+      "wikipedia": [
+        "Louisville, Kentucky",
+        "Downtown Louisville"
+      ],
+      "categories": [
+        "Skylines of Louisville",
+        "Louisville skyline",
+        "Views of Louisville",
+        "Panoramics of Louisville",
+        "Aerial photographs of Louisville"
+      ],
+      "queries": [
+        "Louisville skyline panorama",
+        "Louisville downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:32820",
+      "city": "Memphis, Tennessee",
+      "area": "Memphis, TN-MS-AR",
+      "wikipedia": [
+        "Memphis, Tennessee",
+        "Downtown Memphis, Tennessee"
+      ],
+      "categories": [
+        "Skylines of Memphis",
+        "Memphis skyline",
+        "Views of Memphis",
+        "Panoramics of Memphis",
+        "Aerial photographs of Memphis"
+      ],
+      "queries": [
+        "Memphis skyline panorama",
+        "Memphis downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:13820",
+      "city": "Birmingham, Alabama",
+      "area": "Birmingham, AL",
+      "wikipedia": [
+        "Birmingham, Alabama",
+        "Downtown Birmingham, Alabama"
+      ],
+      "categories": [
+        "Skylines of Birmingham",
+        "Birmingham skyline",
+        "Views of Birmingham",
+        "Panoramics of Birmingham",
+        "Aerial photographs of Birmingham"
+      ],
+      "queries": [
+        "Birmingham skyline panorama",
+        "Birmingham downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:25540",
+      "city": "Hartford, Connecticut",
+      "area": "Hartford-West Hartford-East Hartford, CT",
+      "wikipedia": [
+        "Hartford, Connecticut",
+        "Downtown Hartford"
+      ],
+      "categories": [
+        "Skylines of Hartford",
+        "Hartford skyline",
+        "Views of Hartford",
+        "Panoramics of Hartford",
+        "Aerial photographs of Hartford"
+      ],
+      "queries": [
+        "Hartford skyline panorama",
+        "Hartford downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:15380",
+      "city": "Buffalo, New York",
+      "area": "Buffalo-Cheektowaga, NY",
+      "wikipedia": [
+        "Buffalo, New York",
+        "Downtown Buffalo"
+      ],
+      "categories": [
+        "Skylines of Buffalo",
+        "Buffalo skyline",
+        "Views of Buffalo",
+        "Panoramics of Buffalo",
+        "Aerial photographs of Buffalo"
+      ],
+      "queries": [
+        "Buffalo skyline panorama",
+        "Buffalo downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:35380",
+      "city": "New Orleans",
+      "area": "New Orleans-Metairie, LA",
+      "wikipedia": [
+        "New Orleans",
+        "Central Business District, New Orleans"
+      ],
+      "categories": [
+        "Skylines of New Orleans",
+        "New Orleans skyline",
+        "Views of New Orleans",
+        "Panoramics of New Orleans",
+        "Aerial photographs of New Orleans"
+      ],
+      "queries": [
+        "New Orleans skyline panorama",
+        "New Orleans downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:46060",
+      "city": "Tucson, Arizona",
+      "area": "Tucson, AZ",
+      "wikipedia": [
+        "Tucson, Arizona",
+        "Downtown Tucson"
+      ],
+      "categories": [
+        "Skylines of Tucson",
+        "Tucson skyline",
+        "Views of Tucson",
+        "Panoramics of Tucson",
+        "Aerial photographs of Tucson"
+      ],
+      "queries": [
+        "Tucson skyline panorama",
+        "Tucson downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:46140",
+      "city": "Tulsa, Oklahoma",
+      "area": "Tulsa, OK",
+      "wikipedia": [
+        "Tulsa, Oklahoma",
+        "Downtown Tulsa, Oklahoma"
+      ],
+      "categories": [
+        "Skylines of Tulsa",
+        "Tulsa skyline",
+        "Views of Tulsa",
+        "Panoramics of Tulsa",
+        "Aerial photographs of Tulsa"
+      ],
+      "queries": [
+        "Tulsa skyline panorama",
+        "Tulsa downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:46520",
+      "city": "Honolulu",
+      "area": "Urban Honolulu, HI",
+      "wikipedia": [
+        "Honolulu",
+        "Downtown Honolulu"
+      ],
+      "categories": [
+        "Skylines of Honolulu",
+        "Honolulu skyline",
+        "Views of Honolulu",
+        "Panoramics of Honolulu",
+        "Aerial photographs of Honolulu"
+      ],
+      "queries": [
+        "Honolulu skyline panorama",
+        "Honolulu downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:36540",
+      "city": "Omaha, Nebraska",
+      "area": "Omaha, NE-IA",
+      "wikipedia": [
+        "Omaha, Nebraska",
+        "Downtown Omaha"
+      ],
+      "categories": [
+        "Skylines of Omaha",
+        "Omaha skyline",
+        "Views of Omaha",
+        "Panoramics of Omaha",
+        "Aerial photographs of Omaha"
+      ],
+      "queries": [
+        "Omaha skyline panorama",
+        "Omaha downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:14860",
+      "city": "Stamford, Connecticut",
+      "area": "Bridgeport-Stamford-Danbury, CT",
+      "wikipedia": [
+        "Stamford, Connecticut",
+        "Bridgeport, Connecticut"
+      ],
+      "categories": [
+        "Skylines of Stamford",
+        "Stamford skyline",
+        "Views of Stamford",
+        "Panoramics of Stamford",
+        "Aerial photographs of Stamford"
+      ],
+      "queries": [
+        "Stamford skyline panorama",
+        "Stamford downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:24340",
+      "city": "Grand Rapids, Michigan",
+      "area": "Grand Rapids-Wyoming-Kentwood, MI",
+      "wikipedia": [
+        "Grand Rapids, Michigan",
+        "Downtown Grand Rapids"
+      ],
+      "categories": [
+        "Skylines of Grand Rapids",
+        "Grand Rapids skyline",
+        "Views of Grand Rapids",
+        "Panoramics of Grand Rapids",
+        "Aerial photographs of Grand Rapids"
+      ],
+      "queries": [
+        "Grand Rapids skyline panorama",
+        "Grand Rapids downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:23420",
+      "city": "Fresno, California",
+      "area": "Fresno, CA",
+      "wikipedia": [
+        "Fresno, California",
+        "Downtown Fresno"
+      ],
+      "categories": [
+        "Skylines of Fresno",
+        "Fresno skyline",
+        "Views of Fresno",
+        "Panoramics of Fresno",
+        "Aerial photographs of Fresno"
+      ],
+      "queries": [
+        "Fresno skyline panorama",
+        "Fresno downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:24860",
+      "city": "Greenville, South Carolina",
+      "area": "Greenville-Anderson-Greer, SC",
+      "wikipedia": [
+        "Greenville, South Carolina",
+        "Downtown Greenville, South Carolina"
+      ],
+      "categories": [
+        "Skylines of Greenville",
+        "Greenville skyline",
+        "Views of Greenville",
+        "Panoramics of Greenville",
+        "Aerial photographs of Greenville"
+      ],
+      "queries": [
+        "Greenville skyline panorama",
+        "Greenville downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:10740",
+      "city": "Albuquerque, New Mexico",
+      "area": "Albuquerque, NM",
+      "wikipedia": [
+        "Albuquerque, New Mexico",
+        "Downtown Albuquerque"
+      ],
+      "categories": [
+        "Skylines of Albuquerque",
+        "Albuquerque skyline",
+        "Views of Albuquerque",
+        "Panoramics of Albuquerque",
+        "Aerial photographs of Albuquerque"
+      ],
+      "queries": [
+        "Albuquerque skyline panorama",
+        "Albuquerque downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:14260",
+      "city": "Boise, Idaho",
+      "area": "Boise City, ID",
+      "wikipedia": [
+        "Boise, Idaho",
+        "Downtown Boise"
+      ],
+      "categories": [
+        "Skylines of Boise",
+        "Boise skyline",
+        "Views of Boise",
+        "Panoramics of Boise",
+        "Aerial photographs of Boise"
+      ],
+      "queries": [
+        "Boise skyline panorama",
+        "Boise downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:16700",
+      "city": "Charleston, South Carolina",
+      "area": "Charleston-North Charleston, SC",
+      "wikipedia": [
+        "Charleston, South Carolina",
+        "Charleston Historic District"
+      ],
+      "categories": [
+        "Skylines of Charleston",
+        "Charleston skyline",
+        "Views of Charleston",
+        "Panoramics of Charleston",
+        "Aerial photographs of Charleston"
+      ],
+      "queries": [
+        "Charleston skyline panorama",
+        "Charleston downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:28940",
+      "city": "Knoxville, Tennessee",
+      "area": "Knoxville, TN",
+      "wikipedia": [
+        "Knoxville, Tennessee",
+        "Downtown Knoxville"
+      ],
+      "categories": [
+        "Skylines of Knoxville",
+        "Knoxville skyline",
+        "Views of Knoxville",
+        "Panoramics of Knoxville",
+        "Aerial photographs of Knoxville"
+      ],
+      "queries": [
+        "Knoxville skyline panorama",
+        "Knoxville downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:19780",
+      "city": "Des Moines, Iowa",
+      "area": "Des Moines-West Des Moines, IA",
+      "wikipedia": [
+        "Des Moines, Iowa",
+        "Downtown Des Moines"
+      ],
+      "categories": [
+        "Skylines of Des Moines",
+        "Des Moines skyline",
+        "Views of Des Moines",
+        "Panoramics of Des Moines",
+        "Aerial photographs of Des Moines"
+      ],
+      "queries": [
+        "Des Moines skyline panorama",
+        "Des Moines downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:31540",
+      "city": "Madison, Wisconsin",
+      "area": "Madison, WI",
+      "wikipedia": [
+        "Madison, Wisconsin",
+        "Downtown Madison"
+      ],
+      "categories": [
+        "Skylines of Madison",
+        "Madison skyline",
+        "Views of Madison",
+        "Panoramics of Madison",
+        "Aerial photographs of Madison"
+      ],
+      "queries": [
+        "Madison skyline panorama",
+        "Madison downtown cityscape"
+      ]
     }
   ]
 }

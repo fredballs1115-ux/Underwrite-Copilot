@@ -63,3 +63,15 @@ describe("marketPictureFor — the photograph a card shows where the building ha
     }
   });
 });
+
+describe("a metro area the site reads no figures for (#472)", () => {
+  it("wears its own photograph only where one has been chosen, and nothing where none has", () => {
+    // Reached through the county, never through the address's words: a
+    // metro area with no entry gives nothing, and the card keeps its cover.
+    expect(marketPictureFor({ label: "1 Main St, Nowhere, ZZ" }, null, null, { cbsa: "99999", area: "Nowhere, ZZ" })).toBeNull();
+    expect(marketPictureFor({ label: "1 Main St, Nowhere, ZZ" }, null, null, null)).toBeNull();
+    // A market the site reads keeps its own photograph whatever the county says.
+    const pitt = marketPictureFor(null, null, { id: "pittsburgh", name: "Pittsburgh PA" }, { cbsa: "38300", area: "Pittsburgh, PA" });
+    expect(pitt?.id).toBe("pittsburgh");
+  });
+});
