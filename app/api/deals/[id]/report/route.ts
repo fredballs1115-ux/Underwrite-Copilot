@@ -214,7 +214,10 @@ export async function GET(
         },
         modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
       );
-      sensitivity = buildSensitivityData(derived.inputs, hurdlePct);
+      // The sources say whether the price and the year-1 NOI are the
+      // documents' or placeholders; on a placeholder's model the report
+      // leaves the grids and the max bid out and says why.
+      sensitivity = buildSensitivityData(derived.inputs, hurdlePct, { sources: derived.sources });
       // The plan page for the kind the deal page reads — the extraction and
       // the first signal — the same read buildReportData gates the IRR page on.
       plan = buildPlanReport(

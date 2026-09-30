@@ -50,6 +50,7 @@ function getSampleReport(dateStr: string): Promise<Buffer> {
   const sensitivity = buildSensitivityData(
     derived.inputs,
     SAMPLE_DEMO_BOX.minIrrPct ?? null,
+    { sources: derived.sources },
   );
   // Null for the stabilized sample — the plan page only exists on a deal
   // with a plan — but the same call the real route makes.

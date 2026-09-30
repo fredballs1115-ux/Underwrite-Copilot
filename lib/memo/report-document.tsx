@@ -749,6 +749,12 @@ export interface ReportInput {
    *  color scale, the takeaway, and the max bid; null when the deal has no
    *  extraction to derive a model from */
   sensitivity?: SensitivityData | null;
+  /** why the IRR page and the max bid are left out where the model runs on
+   *  a placeholder price or an assumed year-1 NOI (lib/underwrite/report-grid
+   *  `placeholderReturnsLine`); printed on the page the grids would have
+   *  been on. Null where the grids print, and on a plan deal, whose plan
+   *  page says why its IRR page is left out. */
+  withheld?: string | null;
   /** the plan page for a conversion / development / lease-up / value-add:
    *  the plan as the OM states it and yield on total cost stressed across
    *  NOI shortfall and budget overrun; null for a stabilized asset or when
@@ -873,35 +879,45 @@ export function buildReportData(
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
+  // On a plan deal the annual screening model books the budget in year 1
+  // and anchors year 1 on in-place income, so its IRR grid is not the
+  // plan's return — it once printed a -48% IRR and a -17.9x multiple as
+  // the base case. The plan page carries the sensitivity such a deal is
+  // judged on; the IRR page is omitted rather than caveated. The kind is
+  // the deal page's read: the extraction and the first signal.
+  const planDeal = isPlanDeal(inferStrategy(extraction, firstSignalOf(deal)).kind);
+  // A model on a placeholder price or an assumed year-1 NOI (the route's
+  // sources say which) has no returns worth printing: the IRR page and the
+  // max bid are left out the same way, with the line that says why — and
+  // nothing else it computed prints either, so its reads fall back to the
+  // lines the memorandum states, as for a caller that built no model. A
+  // plan deal's page already says why its IRR page is left out.
+  const withheld = planDeal ? null : (sensitivity?.withheld ?? null);
+  const modelRead = <T,>(v: T | null | undefined): T | null => (withheld ? null : (v ?? null));
   return {
     modelVsMarket: modelVsMarket ?? null,
-    assumable: assumable ?? null,
-    leasehold: leasehold ?? null,
+    assumable: modelRead(assumable),
+    leasehold: modelRead(leasehold),
     floodMap: floodMap ?? null,
-    singleTenant: singleTenant ?? null,
-    hotel: hotel ?? null,
-    sale: sale ?? null,
-    roster: roster ?? null,
+    singleTenant: modelRead(singleTenant),
+    hotel: modelRead(hotel),
+    sale: modelRead(sale),
+    roster: modelRead(roster),
     photos: photos ?? null,
-    valueAdd: valueAdd ?? null,
-    taxAbatement: taxAbatement ?? null,
-    sellerNote: sellerNote ?? null,
-    siteReports: siteReports ?? null,
-    student: student ?? null,
-    mh: mh ?? null,
-    storage: storage ?? null,
+    valueAdd: modelRead(valueAdd),
+    taxAbatement: modelRead(taxAbatement),
+    sellerNote: modelRead(sellerNote),
+    siteReports: modelRead(siteReports),
+    student: modelRead(student),
+    mh: modelRead(mh),
+    storage: modelRead(storage),
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
     // report as they do with the standalone memo.
     memo: buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover),
-    // On a plan deal the annual screening model books the budget in year 1
-    // and anchors year 1 on in-place income, so its IRR grid is not the
-    // plan's return — it once printed a -48% IRR and a -17.9x multiple as
-    // the base case. The plan page carries the sensitivity such a deal is
-    // judged on; the IRR page is omitted rather than caveated. The kind is
-    // the deal page's read: the extraction and the first signal.
-    sensitivity: isPlanDeal(inferStrategy(extraction, firstSignalOf(deal)).kind) ? null : (sensitivity ?? null),
+    sensitivity: planDeal || withheld ? null : (sensitivity ?? null),
+    withheld,
     plan: plan ?? null,
     totalPages: typeof pages === "number" && Number.isFinite(pages) && pages > 0 ? Math.round(pages) : null,
   };
@@ -1530,6 +1546,18 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <AssumableBlock view={input.assumable} />
           <AssumableBlock view={input.sellerNote} />
           <LeaseholdBlock view={input.leasehold} />
+        </PageChrome>
+      )}
+
+      {/* A model on a placeholder price or an assumed year-1 NOI: its grids
+          and its max bid would be the placeholder's, so the page says why
+          they are left out where they would have been — and keeps the
+          model's assumptions against the published figures, which no price
+          enters. */}
+      {!sensitivity && input.withheld && (
+        <PageChrome title="Sensitivity analysis" count="left out" dealName={dealName} branding={memo.branding}>
+          <Text style={{ fontSize: 9, color: C.ink, marginBottom: 6 }}>{str(input.withheld)}</Text>
+          <AssumptionsBlock read={modelVsMarket} />
         </PageChrome>
       )}
 

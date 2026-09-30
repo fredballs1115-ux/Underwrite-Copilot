@@ -6,8 +6,12 @@
 
 import { withArticle } from "@/lib/article";
 import type { UnderwriteInputs } from "./engine";
+import type { DerivedModel } from "./inputs";
 import { leverValues, runScenario } from "./playground";
 import { solveMaxBid } from "./solver";
+
+/** Where each of the model's inputs came from (lib/underwrite/inputs). */
+export type ModelSources = DerivedModel["sources"];
 
 export interface HeatCell {
   irrPct: number | null; // decimal
@@ -244,12 +248,53 @@ export interface SensitivityData {
   takeaway: string;
   /** max price holding ≥ hurdle IRR (solver), null when unattainable */
   maxBid: MaxBidLine | null;
+  /** why the report leaves the model's returns out, or null where it may
+   *  print them (`placeholderReturnsLine`); null where no sources were given */
+  withheld?: string | null;
+}
+
+/** What the caller knows beside the inputs. */
+export interface SensitivityOptions {
+  /** where each input came from — the derived model's own sources, which
+   *  say whether the price and the year-1 NOI are the documents' or
+   *  placeholders */
+  sources?: ModelSources | null;
+}
+
+const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/**
+ * Why the report leaves the model's returns out, or null where it may print
+ * them. A price or a year-1 NOI the model had to assume (lib/underwrite/inputs
+ * marks it "assumption": the $10M placeholder price where none was read, an
+ * assumed 6% going-in NOI where no NOI the price supports was) makes every
+ * IRR and every bid solved on it the placeholder's — printed beside a real
+ * deal's grids, "$10M (ask)" read as the ask. Said from the sources alone:
+ * an assumed price means no price was read from the memorandum, which is all
+ * this line claims.
+ */
+export function placeholderReturnsLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
+  if (!sources) return null;
+  const price = sources.purchasePrice?.provenance === "assumption";
+  const noi = sources.inPlaceRentAnnual?.provenance === "assumption";
+  const out = "The IRR grids and the max bid are left out:";
+  if (price && noi) {
+    return `${out} no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns would be a placeholder's.`;
+  }
+  if (price) {
+    return `${out} no price was read from the memorandum, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder`)} and its returns would be the placeholder's.`;
+  }
+  if (noi) {
+    return `${out} no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.`;
+  }
+  return null;
 }
 
 /** Everything the report's sensitivity page renders, in one pure build. */
 export function buildSensitivityData(
   inputs: UnderwriteInputs,
   hurdlePct?: number | null,
+  opts: SensitivityOptions = {},
 ): SensitivityData {
   const hurdle =
     hurdlePct != null && Number.isFinite(hurdlePct) && hurdlePct > 0
@@ -268,5 +313,6 @@ export function buildSensitivityData(
       solved.price != null && solved.deltaPct != null
         ? { price: solved.price, deltaPct: solved.deltaPct, unbounded: solved.unbounded }
         : null,
+    withheld: placeholderReturnsLine(inputs, opts.sources),
   };
 }

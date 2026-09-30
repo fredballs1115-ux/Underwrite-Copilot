@@ -217,6 +217,66 @@ describe("ReportDocument (full report)", () => {
     vi.useRealTimers();
   });
 
+  it("leaves the IRR grids, the max bid and every model read out of an unpriced memorandum's report, and says why where the grids would have been", async () => {
+    const row = (label: string, value: string, page = "p. 3") => ({ label, value, flagged: false, page, basis: "na" as const });
+    const unpriced = {
+      dealName: "Unpriced — Call for Offers",
+      assetClass: "multifamily",
+      market: "Philadelphia, PA",
+      totalPages: 60,
+      metrics: [
+        row("Asking price", "Unpriced — call for offers", "p. 2"),
+        row("NOI (in-place)", "$3,880,000", "p. 8"),
+        row("Units", "248"),
+        // An assumable loan is priced against the model's own new loan —
+        // on a placeholder price, a placeholder's figure too.
+        row("Assumable loan balance", "$30,000,000"),
+        row("Assumable loan rate", "3.45%"),
+        row("Assumable loan maturity", "March 31, 2031"),
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: unpriced.dealName,
+      asset_class: "multifamily",
+      extraction: unpriced,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    // The route's own chain.
+    const derived = deriveUnderwriteInputs(unpriced, unpriced.dealName!);
+    expect(derived.sources.purchasePrice?.provenance).toBe("assumption");
+    const sensitivity = buildSensitivityData(derived.inputs, null, { sources: derived.sources });
+    const a = readAssumable(unpriced, derived.inputs)!;
+    const view = assumableView(a, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed);
+    const input = buildReportData(deal, "September 30, 2026", [], sensitivity, undefined, null, null, undefined, null, view);
+    expect(input.sensitivity).toBeNull();
+    expect(input.assumable).toBeNull();
+    const buf = await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]);
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Sensitivity analysis");
+    expect(text).toContain("left out");
+    expect(text).toContain(
+      "The IRR grids and the max bid are left out: no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on a $10,000,000 placeholder price and an assumed NOI, and its returns would be a placeholder's.",
+    );
+    expect(text).not.toContain("(ask)");
+    expect(text).not.toContain("Max bid");
+    expect(text).not.toContain("The retrade grid");
+    expect(text).not.toContain("The seller's loan, offered for assumption");
+    // Page one still says the loan is offered, as the memorandum states it.
+    expect(text).toContain("The seller's loan is offered for assumption: $30.0M at 3.45% to Mar 2031");
+
+    // The same deal with its price stated prints its grids.
+    const priced = { ...unpriced, metrics: unpriced.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$68,000,000" } : m)) } as ExtractionResult;
+    const pd = deriveUnderwriteInputs(priced, priced.dealName!);
+    const pricedInput = buildReportData({ ...deal, extraction: priced } as unknown as DealRow, "September 30, 2026", [], buildSensitivityData(pd.inputs, null, { sources: pd.sources }));
+    expect(pricedInput.sensitivity).not.toBeNull();
+    expect(pricedInput.withheld).toBeNull();
+  }, 45000);
+
   it("puts the grid's takeaway and the assumptions read through the WinAnsi filter, so a symbol prints as its stand-in, never as a wrong glyph or nothing", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,

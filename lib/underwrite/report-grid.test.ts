@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
+import { deriveUnderwriteInputs } from "./inputs";
 import { runScenario } from "./playground";
 import {
   buildCapGrowthGrid,
@@ -11,6 +12,7 @@ import {
   heatCellIrr,
   heatCellEm,
   heatCellText,
+  placeholderReturnsLine,
   HEAT_BG,
 } from "./report-grid";
 
@@ -249,5 +251,61 @@ describe("buildSensitivityData", () => {
     const s = buildSensitivityData(inputs, null);
     expect(s.hurdlePct).toBe(15);
     expect(s.hurdleSource).toBe("default");
+  });
+});
+
+describe("placeholderReturnsLine — a model on a placeholder prints none of its returns", () => {
+  const x = (provenance: "extracted" | "derived" | "assumption") => ({ provenance, note: "" });
+  const inputs = baseInputs();
+
+  it("says why from the sources alone: a placeholder price, an assumed NOI, or both", () => {
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("assumption"), inPlaceRentAnnual: x("derived") })).toBe(
+      "The IRR grids and the max bid are left out: no price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns would be the placeholder's.",
+    );
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("extracted"), inPlaceRentAnnual: x("assumption") })).toBe(
+      "The IRR grids and the max bid are left out: no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.",
+    );
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("assumption"), inPlaceRentAnnual: x("assumption") })).toMatch(
+      /^The IRR grids and the max bid are left out: no price was read from the memorandum, nor a year-1 NOI the model could run on/,
+    );
+  });
+
+  it("prints the returns of a model whose price and NOI came from the documents, a derivation included", () => {
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("extracted"), inPlaceRentAnnual: x("derived") })).toBeNull();
+    // An auction's floor, a share grossed up, NOI over the going-in cap.
+    expect(placeholderReturnsLine(inputs, { purchasePrice: x("derived"), inPlaceRentAnnual: x("derived") })).toBeNull();
+    // A caller that passed no sources is read as before.
+    expect(placeholderReturnsLine(inputs, null)).toBeNull();
+    expect(buildSensitivityData(inputs, null).withheld).toBeNull();
+  });
+
+  it("reads the derived model's own sources: an unpriced memorandum's model is a placeholder's", () => {
+    const unpriced = deriveUnderwriteInputs(
+      {
+        dealName: "Unpriced",
+        assetClass: "multifamily",
+        metrics: [
+          { label: "Asking price", value: "Unpriced — call for offers", flagged: false, page: "p. 2" },
+          { label: "NOI (in-place)", value: "$3,880,000", flagged: false, page: "p. 8" },
+        ],
+      },
+      "Unpriced",
+    );
+    expect(unpriced.sources.purchasePrice?.provenance).toBe("assumption");
+    expect(buildSensitivityData(unpriced.inputs, null, { sources: unpriced.sources }).withheld).toMatch(
+      /^The IRR grids and the max bid are left out: no price was read/,
+    );
+    const priced = deriveUnderwriteInputs(
+      {
+        dealName: "Priced",
+        assetClass: "multifamily",
+        metrics: [
+          { label: "Asking price", value: "$60,000,000", flagged: false, page: "p. 2" },
+          { label: "NOI (in-place)", value: "$3,300,000", flagged: false, page: "p. 8" },
+        ],
+      },
+      "Priced",
+    );
+    expect(buildSensitivityData(priced.inputs, null, { sources: priced.sources }).withheld).toBeNull();
   });
 });
