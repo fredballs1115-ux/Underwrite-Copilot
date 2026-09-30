@@ -422,7 +422,10 @@ describe("DealView — the sample deal renders every section without a runtime e
     const text = textOf(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/Step 3 of 6 · 0:00/);
-    expect(text).toMatch(/typically takes 2–4 minutes/);
+    // No measured runs handed in: the rail claims no duration of its own
+    // (lib/screen-duration) — the clock says the time.
+    expect(text).toMatch(/Finished sections open as they land/);
+    expect(text).not.toMatch(/typically takes/);
   });
 
   it("the comps tab draws each sale comp's basis against the subject's", () => {
@@ -507,6 +510,31 @@ describe("DealView — the sample deal renders every section without a runtime e
     const challenger = render(sampleProps("analyses", "challenger"));
     expect((challenger.match(/data-split-bar/g) ?? []).length).toBeGreaterThanOrEqual(1);
     expect(challenger).toMatch(/title="\d+ high/);
+  });
+
+  it("a running screen's rail claims a duration only as the reader's own runs measured it", () => {
+    const now = new Date().toISOString();
+    const running = (step: string, typicalScreen: string | null): Props =>
+      ({
+        ...sampleProps("overview"),
+        job: { status: "running", step, progress: 30, error: null, updated_at: now, created_at: now },
+        typicalScreen,
+      }) as unknown as Props;
+    const measured = textOf(render(running("challenge", "about 3 minutes")));
+    expect(measured).toMatch(/Your screens usually take about 3 minutes — finished sections open as they land/);
+    // Fewer than three measured runs: no duration at all, the clock says the time.
+    const html = render(running("challenge", null));
+    expect(a11yIssues(html)).toEqual([]);
+    const bare = textOf(html);
+    expect(gluedWords(bare)).toEqual([]);
+    expect(bare).toMatch(/Finished sections open as they land/);
+    expect(bare).not.toMatch(/2–4 minutes|typically takes|a minute or two|a few minutes|Your screens usually/);
+    // The reconciler runs on its own, and the screens' median is not its time.
+    const recon = textOf(render(running("reconcile", "about 3 minutes")));
+    expect(recon).toMatch(/You can keep browsing; a toast will tell you when it lands\./);
+    expect(recon).not.toMatch(/about 3 minutes|a minute or two/);
+    // The first step claims no time either.
+    expect(textOf(render(running("signal", null)))).not.toMatch(/half a minute/);
   });
 
   it("the past-screens strip counts what it counts: the screens with a cap or basis on file", () => {

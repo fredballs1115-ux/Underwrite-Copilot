@@ -84,6 +84,12 @@ import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { previousScreenResults, verdictBehind } from "@/lib/screen-run";
+import {
+  SCREEN_DURATION_SAMPLE,
+  isScreenJob,
+  typicalScreenMs,
+  typicalScreenPhrase,
+} from "@/lib/screen-duration";
 import { StageSelect } from "./stage-select";
 import { OffersDueControl } from "../offers-due";
 import { ShareControl, type ShareRow } from "./share-control";
@@ -389,6 +395,26 @@ export default async function DealPage({
   // after a FAILED run (a half-new extraction would diff against the old
   // snapshot under a verdict that never re-ran).
   const jobActive = job?.status === "queued" || job?.status === "running";
+  // How long the reader's own screens have taken (lib/screen-duration):
+  // read only while a screen is running, and only its newest finished runs'
+  // stored wall-clocks — one small query, overlapped with the rest of the
+  // page. Fewer than three and the rail says no duration at all.
+  const typicalScreenRead: Promise<string | null> =
+    jobActive && user && isScreenJob(job?.step)
+      ? (async () => {
+          const { data } = await supabase
+            .from("analysis_jobs")
+            .select("ms:usage->ms, deals!inner(user_id)")
+            .eq("deals.user_id", user.id)
+            .eq("status", "done")
+            .eq("step", "verdict")
+            .not("usage", "is", null)
+            .order("updated_at", { ascending: false })
+            .limit(SCREEN_DURATION_SAMPLE);
+          const ms = ((data ?? []) as Array<{ ms?: unknown }>).map((r) => r.ms);
+          return typicalScreenPhrase(typicalScreenMs(ms));
+        })().catch(() => null)
+      : Promise.resolve(null);
   const priorScreen = (deal.prior_screen as PriorScreen | undefined) ?? null;
   const screenDiff =
     !jobActive && job?.status !== "error" && priorScreen && extraction
@@ -979,6 +1005,7 @@ export default async function DealPage({
 
   const floodLegendEntries = await floodLegendRead;
   const marketMemory = await memoryRead;
+  const typicalScreen = await typicalScreenRead;
 
   // The photograph the deal's market is known by, leading the picture where
   // the building has none of its own and no Street View (#439) — the one its
@@ -1436,6 +1463,7 @@ export default async function DealPage({
         hasOm={!!deal.om_storage_path}
         modelErrorCode={errorCode ?? null}
         job={job}
+        typicalScreen={typicalScreen}
         results={{ extraction, challenges, comps, reconciliation, market, verdict }}
         staleResults={staleResults}
         firstSignal={firstSignal}

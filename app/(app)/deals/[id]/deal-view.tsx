@@ -161,7 +161,7 @@ const LEGACY_TABS: Record<string, { section: SectionKey; analysis?: AnalysisKey 
 const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"];
 
 const STEP_LABELS: Record<string, string> = {
-  signal: "First pass — the headline read lands in about half a minute…",
+  signal: "First pass — reading the headline figures…",
   extract: "Reading the OM and extracting the key terms…",
   challenge: "Grilling the assumptions the way an investment committee would…",
   comps: "Weighing the OM’s comps — sell-side sets tend to lean favorable…",
@@ -308,6 +308,7 @@ export function DealView({
   hasOm,
   modelErrorCode,
   job: initialJob,
+  typicalScreen = null,
   results,
   supplements,
   model,
@@ -349,6 +350,10 @@ export function DealView({
   hasOm: boolean;
   modelErrorCode: string | null;
   job: Job;
+  /** how long the reader's own screens usually take — "about 3 minutes",
+   *  the median of their stored run times (lib/screen-duration); null under
+   *  three runs, and then the rail claims no duration */
+  typicalScreen?: string | null;
   results: Results;
   /** results the latest screen has not rewritten — a failed run never
    *  reached them, or a running one has not yet — so they belong to the
@@ -661,7 +666,7 @@ export function DealView({
     <div className="flex flex-col gap-5">
       {active && !stalled && (
         <div className="flex flex-col gap-2">
-          <ProgressRail job={job!} />
+          <ProgressRail job={job!} typicalScreen={typicalScreen} />
           <NotifyOffer />
         </div>
       )}
@@ -1668,10 +1673,10 @@ function TabDot({
 
 /** m:ss since the run was asked for — the job row's own claim where the
  *  page has it (lib/run-clock), queue wait included, so a reload mid-screen
- *  picks up the run's time rather than starting again beside "typically 2–4
- *  minutes" once the page has loaded; since this page began watching where
- *  it has none. A moving number, so a long step never reads as "hung" the way a
- *  frozen percentage does. The clock is read in the effect, never in render,
+ *  picks up the run's time rather than starting again once the page has
+ *  loaded; since this page began watching where it has none. A moving
+ *  number, so a long step never reads as "hung" the way a frozen
+ *  percentage does. The clock is read in the effect, never in render,
  *  so the server's markup and the first client render agree. */
 function useElapsed(startedAt: string | null | undefined): string {
   const [clock, setClock] = useState<{ since: number; now: number } | null>(null);
@@ -1883,12 +1888,20 @@ function NotifyOffer() {
       }}
       className="w-fit text-xs font-medium text-brand transition-colors hover:text-brand-strong"
     >
-      Notify me when it&apos;s done — it&apos;ll be a few minutes
+      Notify me when it&apos;s done
     </button>
   );
 }
 
-function ProgressRail({ job }: { job: NonNullable<Job> }) {
+function ProgressRail({
+  job,
+  typicalScreen = null,
+}: {
+  job: NonNullable<Job>;
+  /** the reader's own screens' measured median, said — or null, and no
+   *  duration is claimed (lib/screen-duration) */
+  typicalScreen?: string | null;
+}) {
   const elapsed = useElapsed(job.created_at);
 
   // Reconcile and model generation run on their own — a simple indicator, not
@@ -1912,8 +1925,7 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
           </span>
         </div>
         <p className="mt-2 text-xs text-muted">
-          Usually a minute or two — you can keep browsing; a toast will tell
-          you when it lands.
+          You can keep browsing; a toast will tell you when it lands.
         </p>
       </div>
     );
@@ -1968,8 +1980,9 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
         })}
       </ol>
       <p className="mt-3 text-xs text-muted">
-        A full screen typically takes 2–4 minutes — finished sections open as
-        they land, so feel free to explore them meanwhile.
+        {typicalScreen
+          ? `Your screens usually take ${typicalScreen} — finished sections open as they land, so feel free to explore them meanwhile.`
+          : "Finished sections open as they land, so feel free to explore them meanwhile."}
       </p>
     </div>
   );
