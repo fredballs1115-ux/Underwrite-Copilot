@@ -6152,3 +6152,112 @@ describe("Pipeline — a manufactured-housing park's tag (#470)", () => {
     }
   });
 });
+
+import { SelfStoragePanel } from "@/app/self-storage-panel";
+import { readSelfStorage, storageModelLine } from "@/lib/self-storage";
+
+describe("SelfStoragePanel (#471) — the occupancies against the 85% line, the in-place rent against the street rate", () => {
+  const row = (label: string, value: string, page = "p. 5") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const facility = (metrics: ReturnType<typeof row>[]) =>
+    ({ dealName: "Lakewood Self Storage", assetClass: "self_storage", totalPages: 50, metrics: [row("Asking price", "$9,800,000", "p. 2"), ...metrics] }) as unknown as ExtractionResult;
+
+  it("draws a bar an occupancy, the rates on one scale and a tile a fact, then the model's read", () => {
+    const r = readSelfStorage(
+      facility([
+        row("Physical occupancy", "91%"),
+        row("SF occupancy", "86%"),
+        row("Economic occupancy", "84%"),
+        row("In-place rent", "$1.38/SF/month"),
+        row("Street rate", "$1.14/SF/month"),
+        row("Climate-controlled", "38% of NRSF"),
+        row("Tenant insurance", "62% penetration"),
+        row("Management", "Third-party managed by Extra Space at 6% of revenue"),
+        row("Expansion", "1.8 acres entitled for 25,000 SF"),
+        row("Storage SF per capita", "7.2 SF within 3 miles"),
+      ]),
+    )!;
+    const html = render(React.createElement(SelfStoragePanel, { storage: r, modelLine: storageModelLine(r, { rentAnnual: 1_000_000, exitCapPct: 0.06, vacancyPct: 9 }) }));
+    dumpView("self-storage-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="storage-panel"');
+    expect(text).toContain("84% economic occupancy");
+    for (const bar of ["storage-units", "storage-area", "storage-economic", "storage-inplace", "storage-street"]) {
+      expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    }
+    expect(html.match(/data-bar="storage-stabilized"/g)).toHaveLength(3);
+    expect(text).toContain("85%, past which a facility is read as stabilized");
+    expect(text).toContain("Street $1.14/SF/month (in-place 21.1% over it)");
+    for (const key of ["climate", "insurance", "management", "expansion", "per-capita"]) expect(html).toContain(`data-storage="${key}"`);
+    expect(text).toContain("Third party, 6%");
+    expect(text).toContain("a downside it does not run");
+    expect(a11yIssues(html), "storage panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("says a lease-up first, draws no rates it cannot compare, and nothing on anything else", () => {
+    const r = readSelfStorage(facility([row("Occupancy", "72%"), row("In-place rent", "$118 per unit per month"), row("Street rate", "$1.05/SF/month")]))!;
+    const html = render(React.createElement(SelfStoragePanel, { storage: r }));
+    const text = visibleText(html);
+    expect(text).toContain("In lease-up, 72% of units let");
+    expect(html).not.toContain('data-qa="storage-rates"');
+    expect(text).toContain("are not stated on one basis");
+    expect(renderToStaticMarkup(React.createElement(SelfStoragePanel, { storage: null }))).toBe("");
+  });
+});
+
+describe("ShareView — a self-storage facility (#471)", () => {
+  it("draws the facility, and nothing on the sample", () => {
+    const withStorage = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "self_storage",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics.filter((m) => !/in-place rent/i.test(m.label)),
+        { label: "Economic occupancy", value: "84%", flagged: false, page: "", basis: "in_place" as const },
+        { label: "In-place rent", value: "$1.38/SF/month", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Street rate", value: "$1.14/SF/month", flagged: false, page: "", basis: "in_place" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: "self_storage",
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: withStorage }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="storage-panel"');
+    expect(text).toContain("Street $1.14/SF/month (in-place 21.1% over it)");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain("storage-panel");
+  });
+});
+
+describe("Pipeline — a self-storage facility's tag (#471)", () => {
+  const facility = card({
+    id: "s",
+    name: "Lakewood Self Storage",
+    assetClass: "self_storage",
+    verdict: "pass",
+    slots: { cap: "6.4%", price: "$9,800,000", yoc: null, storage: "Lease-up, 72% occupied, In-place 20% over street" },
+    market: "Lakewood, CO",
+    coveredMarket: null,
+  });
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true }, billing: BILLING };
+
+  it("says a lease-up in the warning tone on the row and the card", () => {
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([facility]), initialView }));
+      const text = visibleText(html);
+      expect(text, initialView).toContain("Lease-up, 72% occupied, In-place 20% over street");
+      const tag = html.match(/<span[^>]*title="Lease-up, 72% occupied, In-place 20% over street:[^"]*"[^>]*>/)?.[0] ?? "";
+      expect(tag, initialView).toContain("text-caution");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+  });
+});

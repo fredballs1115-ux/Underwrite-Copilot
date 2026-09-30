@@ -86,6 +86,10 @@ export interface PipelineExportRow {
    *  (lib/manufactured-housing `manufacturedHousingTag`, #470); carried in
    *  the price cell's note */
   mh?: string | null;
+  /** a self-storage facility's lease-up, the premium over street and its
+   *  economic occupancy (lib/self-storage `selfStorageTag`, #471); carried
+   *  in the price cell's note */
+  storage?: string | null;
   /** the going-in cap on today's income — always null on a plan deal */
   cap: string | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
@@ -260,6 +264,7 @@ export async function buildPipelineWorkbook(
         d.reports ? `${d.reports}: from the third-party reports the memorandum cites — the deal page reads them.` : null,
         d.student ? `${d.student}: a student building's leasing for the coming year — the deal page reads the pace, the beds and the walk to campus.` : null,
         d.mh ? `${d.mh}: a manufactured-housing park — the deal page reads the lot rent against the market's, the park-owned homes and the water and sewer.` : null,
+        d.storage ? `${d.storage}: a self-storage facility — the deal page reads its two occupancies and the rent sitting tenants pay against the street rate.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 

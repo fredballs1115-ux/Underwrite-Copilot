@@ -60,7 +60,10 @@ describe("blurbExcerpt — a note's opening, in whole sentences", () => {
  * what is really on the page.
  */
 describe("a note's link", () => {
-  const entries = changelogEntries(100);
+  // Every entry, the archive's included: /whats-new links each archived
+  // title too ("See it live"), and the newest hundred ran out of /tools
+  // anchors once the calculators' notes aged into the archive.
+  const entries = changelogEntries(Number.MAX_SAFE_INTEGER);
 
   it("is a path on this site, never bare or external", () => {
     for (const e of entries) {

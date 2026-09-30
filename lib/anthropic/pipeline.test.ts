@@ -828,6 +828,26 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a self-storage facility: the challenger reads its occupancies and rates and what to check by name (#471)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "self_storage",
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Economic occupancy", value: "84%", flagged: false, page: "", basis: "in_place" },
+        { label: "In-place rent", value: "$1.38/SF/month", flagged: false, page: "", basis: "in_place" },
+        { label: "Street rate", value: "$1.14/SF/month", flagged: false, page: "", basis: "in_place" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("SELF-STORAGE AS STATED:");
+    expect(note).toContain("21.1% over it, the premium years of rate increases built");
+    expect(note).toContain("the street rate against the rates the facility's own recent move-ins signed at");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("the third-party reports: the challenger reads what they found and the site-report traps (#465)", async () => {
     vi.mocked(extractTerms).mockResolvedValue({
       ...EXTRACTION,

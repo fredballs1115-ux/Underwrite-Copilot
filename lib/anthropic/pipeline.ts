@@ -48,6 +48,7 @@ import { readSellerFinancing, sellerFinancingNote } from "@/lib/seller-financing
 import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
 import { readStudentHousing, studentNote } from "@/lib/student-housing";
 import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
+import { readSelfStorage, storageNote } from "@/lib/self-storage";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -933,6 +934,11 @@ async function runAnalysisSteps(
         // park runs, the rent rules and the age restriction's compliance.
         const park = readManufacturedHousing(ex);
         if (park) notes.push(mhNote(park));
+        // A self-storage facility (#471): the street rate against recent
+        // move-ins, the premium sitting tenants pay, the economic
+        // occupancy's definition, new supply and the platform's income.
+        const storage = readSelfStorage(ex);
+        if (storage) notes.push(storageNote(storage));
 
         if (flagged.length) {
           notes.push(

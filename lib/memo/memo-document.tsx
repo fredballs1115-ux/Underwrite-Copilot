@@ -41,6 +41,7 @@ import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing
 import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
+import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -199,6 +200,14 @@ function mhLineFor(extraction: ExtractionResult | null): string {
   return r ? mhShortLine(r) : "";
 }
 
+/** A self-storage facility (lib/self-storage, #471) in one line for the
+ *  memo's header: the occupancies, the in-place rent against the street
+ *  rate and the platform. "" otherwise. */
+function storageLineFor(extraction: ExtractionResult | null): string {
+  const r = readSelfStorage(extraction);
+  return r ? storageShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -275,6 +284,9 @@ export type MemoData = {
   /** a manufactured-housing park's pads, lot rent, homes and utilities
    *  (lib/manufactured-housing, #470), in one line; "" on anything else */
   mhLine?: string;
+  /** a self-storage facility's occupancies, rates and platform
+   *  (lib/self-storage, #471), in one line; "" on anything else */
+  storageLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -530,6 +542,7 @@ export function buildMemoData(
     siteReportsLine: pdfSafe(siteReportsLineFor(extraction ?? null)),
     studentLine: pdfSafe(studentLineFor(extraction ?? null)),
     mhLine: pdfSafe(mhLineFor(extraction ?? null)),
+    storageLine: pdfSafe(storageLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -1002,6 +1015,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A manufactured-housing park (#470): the lot rent against the
                 market's, the park-owned homes and the water and sewer. */}
             {data.mhLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.mhLine}</Text>}
+            {/* A self-storage facility (#471): the two occupancies and the
+                in-place rent against the street rate. */}
+            {data.storageLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.storageLine}</Text>}
             {/* What a hotel is sold with (#455): the flag, the encumbrance,
                 the PIP and the franchise's end. */}
             {data.hotelLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.hotelLine}</Text>}

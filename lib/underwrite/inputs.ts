@@ -55,6 +55,7 @@ import { assetClassLabel } from "@/lib/asset-class";
 import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/student-housing";
 import { mhModelLine, mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
+import { readSelfStorage, storageModelLine, storageShortLine } from "@/lib/self-storage";
 import { allInPct, debtRateNote, type DebtIndex, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -161,6 +162,11 @@ export interface WorkbookMeta {
    *  does with the gap to market, the park-owned homes and a private
    *  system. Absent on anything else. */
   mh?: { line: string; read: string } | null;
+  /** a self-storage facility (lib/self-storage, #471): its occupancies,
+   *  rates and platform in a line, then what the model does with the
+   *  premium sitting tenants pay over street and with a lease-up. Absent on
+   *  anything else. */
+  storage?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -308,6 +314,17 @@ function mhMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): 
   const r = readManufacturedHousing(extraction);
   if (!r) return null;
   return { line: mhShortLine(r), read: mhModelLine(r, { rentGrowthPct: inputs.rentGrowthPct, exitCapPct: inputs.exitCapPct }) };
+}
+
+/** The cover's lines about a self-storage facility (#471): the read, then
+ *  what the model does with the premium over street and with a lease-up. */
+function storageMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["storage"] {
+  const r = readSelfStorage(extraction);
+  if (!r) return null;
+  return {
+    line: storageShortLine(r),
+    read: storageModelLine(r, { rentAnnual: inputs.inPlaceRentAnnual, exitCapPct: inputs.exitCapPct, vacancyPct: inputs.vacancyPct * 100 }),
+  };
 }
 
 /** The cover's lines about a multi-tenant property's listed tenants
@@ -874,6 +891,7 @@ export function deriveUnderwriteInputs(
         : null,
       student: studentMeta(extraction, inputs),
       mh: mhMeta(extraction, inputs),
+      storage: storageMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

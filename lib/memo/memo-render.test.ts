@@ -386,6 +386,36 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, asset_class: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).mhLine).toBe("");
   }, 30000);
 
+  it("says a self-storage facility's occupancies and rates under the title (#471), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "self_storage",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Economic occupancy", value: "84%", flagged: false, page: "", basis: "in_place" },
+        { label: "Street rate", value: "$1.14/SF/month", flagged: false, page: "", basis: "in_place" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "self_storage",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.storageLine).toMatch(/^Self-storage: .*84% economic; street \$1\.14\/SF a month$/);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("84% economic; street $1.14/SF a month");
+    expect(buildMemoData({ ...deal, asset_class: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).storageLine).toBe("");
+  }, 30000);
+
   it("says what the third-party reports found under the title (#465), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

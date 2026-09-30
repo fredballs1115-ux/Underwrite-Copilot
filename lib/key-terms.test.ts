@@ -215,6 +215,17 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(park, "stabilized", 4).map((m) => m.label)).toEqual(["Asking price", "Lot rent", "Market lot rent", "Water and sewer"]);
   });
 
+  it("a storage facility's economic occupancy and rates lead after the price (#471)", () => {
+    const storage = [
+      { label: "Occupancy", value: "91%", flagged: false },
+      { label: "In-place rent", value: "$1.38/SF/month", flagged: false },
+      { label: "Street rate", value: "$1.14/SF/month", flagged: false },
+      { label: "Economic occupancy", value: "84%", flagged: false },
+      { label: "Asking price", value: "$9,800,000", flagged: false },
+    ];
+    expect(keyTermRows(storage, "stabilized", 4).map((m) => m.label)).toEqual(["Asking price", "Economic occupancy", "Street rate", "In-place rent"]);
+  });
+
   it("what the third-party reports found leads after the price (#465)", () => {
     const reported = [
       { label: "Occupancy", value: "94%", flagged: false },

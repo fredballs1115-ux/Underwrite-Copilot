@@ -29,6 +29,7 @@ import { sellerFinancingTermRows } from "./seller-financing";
 import { siteReportTermRows } from "./site-reports";
 import { studentTermRows } from "./student-housing";
 import { mhTermRows } from "./manufactured-housing";
+import { storageTermRows } from "./self-storage";
 
 export interface KeyTermMetric {
   label: string;
@@ -109,6 +110,9 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A manufactured-housing park (#470): the lot rent and the market's, the
   // park-owned homes, the water and sewer and the age restriction.
   for (const row of mhTermRows(rows)) lead(row);
+  // A self-storage facility (#471): the economic occupancy, the street rate
+  // and the in-place rent.
+  for (const row of storageTermRows(rows)) lead(row);
   const rest = rows.filter((m) => !head.includes(m));
   return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
 }

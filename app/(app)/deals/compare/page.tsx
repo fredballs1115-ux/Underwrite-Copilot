@@ -30,6 +30,7 @@ import { siteReportsTag } from "@/lib/site-reports";
 import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
+import { selfStorageTag } from "@/lib/self-storage";
 import { compareInterest } from "@/lib/compare-interest";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
@@ -149,6 +150,7 @@ function toCol(
     broker: brokerageOf(ex),
     student: studentHousingTag(ex),
     mh: manufacturedHousingTag(ex, Infinity),
+    storage: selfStorageTag(ex, Infinity),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
     noteYtm: ci.noteYtmPct,

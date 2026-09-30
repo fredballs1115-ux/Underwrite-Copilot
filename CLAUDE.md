@@ -835,6 +835,45 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   figure divided by the RV sites before — and a park or a build-to-rent
   portfolio wears a drawing of homes as its cover (`COVER_ART.homes`,
   lib/deal-cover-art), never the apartment block.
+- A self-storage facility (#471): the extraction labels its figures as
+  rows of their own, each only as stated — "Physical occupancy" (units),
+  "SF occupancy" (area), "Economic occupancy", "In-place rent" and "Street
+  rate" (each with its basis and period as written), "Climate-controlled",
+  "Tenant insurance", "Management", "Expansion" and "Storage SF per
+  capita" — and `lib/self-storage.ts` (pure) reads them
+  (`readSelfStorage`; null unless the class is storage, or no class was
+  read and a street rate sits beside an in-place rent — an apartment
+  memorandum speaks of street rents too, so a deal read as another class
+  is never storage by its rows). Six rules: **physical is units, economic
+  is rent** (the gap in points is discounts, concessions and delinquency;
+  by area it runs lower where small units fill first); **in-place over
+  street is the increases' premium, and a move-out gives it back** (the
+  premium over the street rate, and the rent with every tenant at street
+  as the downside — compared only on one footing: `storageRateOf` reads a
+  rate's basis, per SF or per unit, and its period only from its words; a
+  monthly and a yearly figure are converted, a per-unit one is never set
+  against a per-foot one, and two bare figures compare as stated); **under
+  `STABILIZED_UNITS_PCT` (85) by units is a lease-up**; **the platform's
+  income is the platform's** (tenant insurance and a manager's brand and
+  pricing system are not bought with the building); **supply is as
+  stated** (per capita with its radius, never held to a norm the site
+  does not read); **a blank is null**. The model is untouched:
+  `storageModelLine` (`meta.storage.read`) says the premium's worth in
+  year-one rent and at the exit cap, a downside it does not run, and — on
+  a lease-up — that its one vacancy is held flat across its years. Where
+  it shows: the deal context and the challenger (`storageNote`, beside
+  STORAGE_TRAPS), `app/self-storage-panel.tsx` (`SelfStoragePanel`, pure:
+  `data-bar="storage-units"` / `storage-area` / `storage-economic` against
+  a `storage-stabilized` line at 85%, `storage-inplace` against
+  `storage-street` on one scale, a tile each `data-storage`) on the deal
+  page and the shared screen, the key terms (`storageTermRows`, only
+  where a street rate is stated), the pipeline row, card and CSV's
+  "Self-storage" column and the meeting workbook's price note
+  (`selfStorageTag`: "Lease-up, 72% occupied", "In-place 21.1% over
+  street, Economic 84%"; a lease-up in the warning tone), the memo under
+  its title (`storageShortLine`), the workbook's cover ("The facility",
+  `meta.storage`), the report's caveat (`buildReportData`'s
+  twenty-fourth argument) and the compare table's row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

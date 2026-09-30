@@ -617,6 +617,40 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("so closing the gap is in none of its returns");
   }, 60000);
 
+  it("prints a self-storage facility over the grids, and what the model does with the premium over street (#471)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "self_storage",
+      metrics: [
+        // The sample's apartment rent is no storage rate.
+        ...SAMPLE_DEAL.extraction.metrics.filter((m) => !/in-place rent/i.test(m.label)),
+        { label: "In-place rent", value: "$1.38/SF/month", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Street rate", value: "$1.14/SF/month", flagged: false, page: "", basis: "in_place" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "self_storage",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "September 30, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.storage ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("in-place $1.38/SF a month against street $1.14/SF a month (+21.1%)");
+    expect(text).toContain("a downside it does not run");
+  }, 60000);
+
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

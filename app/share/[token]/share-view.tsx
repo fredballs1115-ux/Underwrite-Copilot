@@ -25,6 +25,8 @@ import { StudentHousingPanel } from "@/app/student-housing-panel";
 import { readStudentHousing } from "@/lib/student-housing";
 import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
 import { readManufacturedHousing } from "@/lib/manufactured-housing";
+import { SelfStoragePanel } from "@/app/self-storage-panel";
+import { readSelfStorage } from "@/lib/self-storage";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -347,6 +349,10 @@ export function ShareView({
       {/* A manufactured-housing park (#470): whose homes stand on the pads,
           the lot rent against the market's and the water and sewer. */}
       <ManufacturedHousingPanel park={readManufacturedHousing(safeExtraction)} />
+
+      {/* A self-storage facility (#471): its occupancies and the in-place
+          rent against the street rate. */}
+      <SelfStoragePanel storage={readSelfStorage(safeExtraction)} />
 
       {/* What the third-party reports found (#465): a tile a report, the
           Phase I's age and the seismic PML against the lenders' lines. */}

@@ -109,6 +109,11 @@ export type Col = {
    *  — lib/manufactured-housing `manufacturedHousingTag`, #470); absent
    *  otherwise */
   mh?: string | null;
+  /** a self-storage facility's lease-up, premium over street, economic
+   *  occupancy and management ("In-place 21.1% over street, Economic 84%,
+   *  3rd-party managed" — lib/self-storage `selfStorageTag`, #471); absent
+   *  otherwise */
+  storage?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -254,6 +259,8 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // A manufactured-housing park's lot rent and utilities (#470): every
     // part of the read, since the table has the width a card does not.
     { label: "Manufactured housing", get: (c) => c.mh || "—" },
+    // A self-storage facility's occupancy and rates (#471).
+    { label: "Self-storage", get: (c) => c.storage || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },

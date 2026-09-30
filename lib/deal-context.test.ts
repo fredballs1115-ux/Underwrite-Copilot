@@ -283,6 +283,25 @@ describe("dealContextFor — a manufactured-housing park (#470)", () => {
   });
 });
 
+describe("dealContextFor — a self-storage facility (#471)", () => {
+  it("says the two occupancies and the in-place rent against the street rate, each as stated", () => {
+    const storage: ExtractionResult = {
+      dealName: "Lakewood Self Storage",
+      assetClass: "self_storage",
+      metrics: [
+        m("Asking price", "$9,800,000"),
+        m("Physical occupancy", "91%"),
+        m("Economic occupancy", "84%"),
+        m("In-place rent", "$1.38/SF/month"),
+        m("Street rate", "$1.14/SF/month"),
+      ],
+    };
+    const ctx = dealContextFor(storage)!;
+    expect(ctx).toContain("Self-storage: It is 91% occupied by units, 84% economically: the 7 points between the units let and the rent collected");
+    expect(ctx).toContain("21.1% over it, the premium years of rate increases built");
+  });
+});
+
 describe("dealContextFor — the third-party reports (#465)", () => {
   it("says what the reports found, report by report, each as stated", () => {
     const reported: ExtractionResult = {

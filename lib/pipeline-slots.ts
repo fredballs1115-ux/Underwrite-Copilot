@@ -24,6 +24,7 @@ import { siteReportsTag } from "@/lib/site-reports";
 import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
+import { selfStorageTag } from "@/lib/self-storage";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -91,6 +92,11 @@ export interface PipelineSlots {
    *  (lib/manufactured-housing `manufacturedHousingTag`, #470); absent or
    *  null on anything else */
   mh?: string | null;
+  /** a self-storage facility's lease-up, the premium sitting tenants pay
+   *  over street and its economic occupancy — "In-place 21.1% over street,
+   *  Economic 84%", "Lease-up, 72% occupied" (lib/self-storage
+   *  `selfStorageTag`, #471); absent or null on anything else */
+  storage?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
@@ -200,6 +206,8 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // A park's lot rent against the market's, and its private utilities
     // (#470).
     mh: manufacturedHousingTag(extraction),
+    // A storage facility's lease-up and the premium over street (#471).
+    storage: selfStorageTag(extraction),
     // The price by the unit or the foot, as a listing card shows it (#469).
     basis: basisTag(extraction, strategy.kind),
   };

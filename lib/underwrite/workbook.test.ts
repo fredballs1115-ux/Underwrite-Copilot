@@ -924,6 +924,29 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The park")).toThrow();
   });
 
+  it("a self-storage facility (#471): its occupancies and rates, then what the model does with the premium over street", async () => {
+    const storage = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "self_storage",
+        metrics: [
+          ...extraction.metrics,
+          { label: "Economic occupancy", value: "84%", flagged: false, page: "p. 5" },
+          { label: "In-place rent", value: "$1.38/SF/month", flagged: false, page: "p. 5" },
+          { label: "Street rate", value: "$1.14/SF/month", flagged: false, page: "p. 5" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(storage));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The facility");
+    expect(String(cover.getCell(r, 3).value)).toMatch(/84% economic; in-place \$1\.38\/SF a month against street \$1\.14\/SF a month \(\+21\.1%\)$/);
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model grows today's rent, the rate increases' premium included/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The facility")).toThrow();
+  });
+
   it("the third-party reports (#465): what they found, then what the model does with the immediate repairs", async () => {
     const reported = deriveUnderwriteInputs(
       {

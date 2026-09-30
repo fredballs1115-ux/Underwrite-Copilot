@@ -69,7 +69,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; basis?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -561,7 +561,7 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Manufactured housing", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Manufactured housing", "Self-storage", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -599,6 +599,8 @@ export function Pipeline({
         d.slots.student ?? "",
         // Blank on anything but a manufactured-housing park (#470).
         d.slots.mh ?? "",
+        // Blank on anything but self-storage (#471).
+        d.slots.storage ?? "",
         // Every case said; blank only before FEMA's lookup has answered (#426).
         d.flood?.cell ?? "",
         d.slots.cap ?? "",
@@ -1590,6 +1592,15 @@ const DealRow = memo(function DealRow({
       {d.slots.mh}
     </span>
   ) : null;
+  // A self-storage facility (#471): a lease-up in the warning tone.
+  const storageBit = d.slots.storage ? (
+    <span
+      className={`whitespace-nowrap font-medium ${/Lease-up/.test(d.slots.storage) ? "text-caution" : "text-brand"}`}
+      title={`${d.slots.storage}: a self-storage facility — the deal page reads its two occupancies and the rent sitting tenants pay against the street rate`}
+    >
+      {d.slots.storage}
+    </span>
+  ) : null;
   // What the third-party reports found (#465): the most serious finding.
   const reportsBit = d.slots.reports ? (
     <span
@@ -1787,19 +1798,19 @@ const DealRow = memo(function DealRow({
             the call has its own column and the line is the figures alone. */}
         <div className="mt-1 flex items-center gap-2 md:hidden">
           <span className="flex shrink-0 sm:hidden">{status}</span>
-          <MetaLine flush className="min-w-0" bits={[priceBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, floodBit, capBit, fitBit]} />
+          <MetaLine flush className="min-w-0" bits={[priceBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, storageBit, floodBit, capBit, fitBit]} />
         </div>
         <MetaLine
           className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, floodBit, fitBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, assetBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, storageBit, floodBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden lg:block xl:hidden"
-          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, storageBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden xl:block"
-          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, storageBit, addedByBit]}
         />
         {fitBar}
       </div>
@@ -2084,6 +2095,9 @@ const DealTile = memo(function DealTile({
       ? { text: d.slots.student, cls: /−|Drive-to/.test(d.slots.student) ? "text-caution" : "text-brand", title: `${d.slots.student}: a student building's leasing for the coming year` }
       : null,
     d.slots.mh ? { text: d.slots.mh, cls: /Private/.test(d.slots.mh) ? "text-caution" : "text-brand", title: `${d.slots.mh}: a manufactured-housing park's lot rent and utilities` } : null,
+    d.slots.storage
+      ? { text: d.slots.storage, cls: /Lease-up/.test(d.slots.storage) ? "text-caution" : "text-brand", title: `${d.slots.storage}: a self-storage facility's occupancy and rates` }
+      : null,
   ].filter((t): t is { text: string; cls: string; title: string } => t !== null);
 
   const inner = (

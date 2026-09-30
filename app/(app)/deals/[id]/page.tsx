@@ -18,6 +18,8 @@ import { StudentHousingPanel } from "@/app/student-housing-panel";
 import { readStudentHousing } from "@/lib/student-housing";
 import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
 import { readManufacturedHousing } from "@/lib/manufactured-housing";
+import { SelfStoragePanel } from "@/app/self-storage-panel";
+import { readSelfStorage } from "@/lib/self-storage";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
@@ -1265,6 +1267,10 @@ export default async function DealPage({
             sewer, and what the model does with each
             (lib/manufactured-housing). */}
         <ManufacturedHousingPanel park={readManufacturedHousing(extraction)} modelLine={derived?.meta.mh?.read ?? ""} />
+        {/* A self-storage facility (#471): its units, area and rent let
+            against the 85% line, the in-place rent against the street rate,
+            and whose platform it rides on (lib/self-storage). */}
+        <SelfStoragePanel storage={readSelfStorage(extraction)} modelLine={derived?.meta.storage?.read ?? ""} />
         {/* What the third-party reports found (#465): a tile a report, the
             Phase I's age against the 180-day and one-year marks, the PML
             against the lenders' 20%, and what the model does with the

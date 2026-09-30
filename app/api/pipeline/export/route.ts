@@ -15,6 +15,7 @@ import { sellerFinancingTag } from "@/lib/seller-financing";
 import { siteReportsTag } from "@/lib/site-reports";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
+import { selfStorageTag } from "@/lib/self-storage";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
@@ -155,6 +156,7 @@ export async function GET(req: Request) {
       reports: siteReportsTag(extraction),
       student: studentHousingTag(extraction),
       mh: manufacturedHousingTag(extraction),
+      storage: selfStorageTag(extraction),
       cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
       yieldOnCost:
         plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
