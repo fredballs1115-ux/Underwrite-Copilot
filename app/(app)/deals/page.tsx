@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { FREE_DEAL_LIMIT, getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
@@ -455,7 +456,11 @@ export default async function DealsPage({
         }
         initialView={initialView}
       />
-      <TodaysNews />
+      {/* The strip's own read streams after the pipeline rather than
+          holding it back; nothing is drawn until it has stories. */}
+      <Suspense fallback={null}>
+        <TodaysNews />
+      </Suspense>
       <WhatsNewCard />
     </>
   );

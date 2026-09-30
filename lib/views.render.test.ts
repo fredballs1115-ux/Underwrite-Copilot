@@ -769,6 +769,50 @@ describe("Pipeline — a first screen's card reads the first signal, as the deal
   });
 });
 
+import { readFileSync } from "node:fs";
+import PipelineLoading from "@/app/(app)/deals/loading";
+import CompareLoading from "@/app/(app)/deals/compare/loading";
+import AppLoading from "@/app/(app)/loading";
+
+describe("Pipeline — its loading state, and the reads that stream after it", () => {
+  it("draws the pipeline's own shape while it loads: the cards view's grid, each card led by a 16:10 picture", () => {
+    const html = render(React.createElement(PipelineLoading));
+    dumpView("pipeline-loading", html);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(positionConflicts(html)).toEqual([]);
+    expect(html).toMatch(/<div role="status" aria-label="Loading your pipeline"/);
+    expect(visibleText(html)).toContain("Pipeline");
+    expect((html.match(/<div class="skeleton aspect-\[16\/10\] w-full" data-card-picture="true">/g) ?? []).length).toBe(6);
+    // Column for column the grid the cards view draws, so nothing jumps
+    // when the pipeline replaces it (the view's own `stagger` aside).
+    const cards = render(
+      React.createElement(Pipeline, {
+        deals: withThumbs(CARDS.slice(0, 2)),
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
+        billing: BILLING,
+      }),
+    );
+    const grid = cards.match(/<ul class="stagger ([^"]*)" data-view="cards">/)?.[1];
+    expect(grid).toBeTruthy();
+    expect(html).toContain(`<ul class="${grid}" data-loading="cards">`);
+  });
+
+  it("leaves the compare page the signed-in area's generic skeleton, rather than a grid of cards", () => {
+    expect(CompareLoading).toBe(AppLoading);
+  });
+
+  it("streams the layout's alert banner and the pipeline's news strip in boundaries of their own", () => {
+    // A layout's own reads are out of loading.js's reach: a hard load waited
+    // on the banner's cookie and table before anything streamed.
+    const layout = readFileSync("app/(app)/layout.tsx", "utf8");
+    expect(layout).toMatch(/<Suspense fallback=\{null\}>\s*<RegulatoryAlertBanner \/>\s*<\/Suspense>/);
+    const page = readFileSync("app/(app)/deals/page.tsx", "utf8");
+    expect(page).toMatch(/<Suspense fallback=\{null\}>\s*<TodaysNews \/>\s*<\/Suspense>/);
+  });
+});
+
 describe("ModelView — the sample model renders every panel", () => {
   it("renders the returns, stress, sensitivity, assumptions, capex and cash-flow panels", () => {
     const html = render(
