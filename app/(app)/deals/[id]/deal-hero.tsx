@@ -45,6 +45,7 @@ export function DealHero({
   actions,
   controls,
   children,
+  reading = false,
 }: {
   title: string;
   /** the call and the buy-box fit, beside the name */
@@ -61,6 +62,10 @@ export function DealHero({
   controls?: ReactNode;
   /** the panels under the toolbar: each is a boxed card of its own */
   children?: ReactNode;
+  /** the deal's screen is still reading the memorandum (lib/screen-reading):
+   *  a figure not read yet shimmers in place of the dash a finished screen
+   *  gives a figure its memorandum does not state */
+  reading?: boolean;
 }) {
   return (
     // No overflow-hidden on the card: the share panel and the deal's menu open
@@ -89,7 +94,20 @@ export function DealHero({
                   }`}
                   title={f.title}
                 >
-                  {f.value ?? "—"}
+                  {f.value ??
+                    (reading ? (
+                      // Not read yet, rather than not stated: a quiet
+                      // shimmer (still under prefers-reduced-motion — the
+                      // .skeleton sweep only runs where motion is welcome).
+                      <span
+                        role="status"
+                        aria-label="Reading the memorandum"
+                        data-qa="figure-reading"
+                        className="skeleton inline-block h-[1.1em] w-20 max-w-full rounded align-middle"
+                      />
+                    ) : (
+                      "—"
+                    ))}
                 </dd>
               </div>
             ))}

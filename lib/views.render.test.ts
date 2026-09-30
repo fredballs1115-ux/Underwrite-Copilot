@@ -4239,6 +4239,32 @@ describe("DealHero — the building's picture beside its name and its figures (#
     // The panels' slot is empty and hides itself rather than leaving a gap.
     expect(bare).toMatch(/<div class="[^"]*empty:hidden[^"]*"><\/div>/);
   });
+
+  it("a figure the live screen has not read yet shimmers; a finished screen's missing figure keeps its dash", () => {
+    const unread = figures.map((f) => (f.label === "Price" ? f : { ...f, value: null }));
+    const heroOf = (reading: boolean) =>
+      renderToStaticMarkup(
+        React.createElement(DealHero, {
+          title: "The Maddox",
+          subtitle: "Philadelphia, PA · Multifamily",
+          figures: unread,
+          reading,
+        }),
+      );
+    const live = heroOf(true);
+    dumpView("deal-hero-reading", live);
+    expect(a11yIssues(live)).toEqual([]);
+    // Three figures not read yet, each a named shimmer, never a dash.
+    expect((live.match(/data-qa="figure-reading"/g) ?? []).length).toBe(3);
+    expect((live.match(/role="status" aria-label="Reading the memorandum"/g) ?? []).length).toBe(3);
+    expect(live).toMatch(/data-qa="figure-reading" class="skeleton /);
+    expect(visibleText(live)).not.toContain("—");
+    expect(visibleText(live)).toContain("$48,500,000");
+    // Finished: the memorandum stated no such figure, and the dash says so.
+    const done = heroOf(false);
+    expect(done).not.toContain("figure-reading");
+    expect((visibleText(done).match(/—/g) ?? []).length).toBe(3);
+  });
 });
 
 // ── The deal, kept in view once its header scrolls away (#437) ─────────────

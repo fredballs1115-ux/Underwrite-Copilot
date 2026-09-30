@@ -380,12 +380,17 @@ export function deriveRisks(results: Results): RiskItem[] {
 export function OverviewView({
   results,
   active,
+  screening = false,
   onNavigate,
   stale = [],
   staleWhy = "failed",
 }: {
   results: Results;
   active: boolean;
+  /** a screen (not a side job) is running: the progress rail above counts
+   *  its six steps, so the meter's own count of five results stands down —
+   *  "0/5" under "Step 2 of 6" read as two answers to one question */
+  screening?: boolean;
   onNavigate: (tab: string) => void;
   /** results the latest screen has not rewritten — the previous screen's
    *  (lib/screen-run `previousScreenResults`) */
@@ -435,9 +440,18 @@ export function OverviewView({
         </div>
       )}
 
-      {/* Completeness meter — a progress cue while screening; a single quiet
-          line once everything is done (it earns no card space forever). */}
-      {active || done < steps.length ? (
+      {/* Completeness meter — a card while results are missing or a side job
+          runs; a single quiet line once everything is done (it earns no card
+          space forever). While a screen runs, the rail above is the progress
+          cue: the meter stands down, and only a re-screen's previous-screen
+          results are said, in a line of their own. */}
+      {screening ? (
+        staleCount > 0 ? (
+          <p className="px-1 text-xs leading-relaxed text-caution">
+            {`Until the run in progress reaches ${staleCount === 1 ? "it" : "them"}, ${staleCount} of this deal's results ${staleCount === 1 ? "is" : "are"} the previous screen's.`}
+          </p>
+        ) : null
+      ) : active || done < steps.length ? (
         <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs font-medium uppercase tracking-wider text-muted">

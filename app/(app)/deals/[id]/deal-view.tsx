@@ -159,6 +159,9 @@ const LEGACY_TABS: Record<string, { section: SectionKey; analysis?: AnalysisKey 
 
 // The automatic pass, in order — drives the progress rail and pending logic.
 const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"];
+// The jobs that run on their own, outside the six-step screen: the rail draws
+// them as one indicator, and the overview keeps its meter while they run.
+const SIDE_JOBS = new Set(["reconcile", "model", "comps_search"]);
 
 const STEP_LABELS: Record<string, string> = {
   signal: "First pass — reading the headline figures…",
@@ -429,6 +432,9 @@ export function DealView({
   // Why any result below is the previous screen's: a failed run never
   // reached it, or the run in progress has not yet (lib/screen-run).
   const staleWhy: "failed" | "running" = job?.status === "error" ? "failed" : "running";
+  // A screen, not a side job, is under way: the rail's "Step N of 6" is the
+  // progress cue, and the overview's own count of results stands down.
+  const screening = active && !SIDE_JOBS.has(job?.step ?? "");
 
   // Poll the lightweight status endpoint while a run is in flight. When the
   // step changes (or the run ends), pull the freshly-written section data.
@@ -798,6 +804,7 @@ export function DealView({
             <OverviewView
               results={results}
               active={active}
+              screening={screening}
               onNavigate={navigateLegacy}
               stale={staleResults}
               staleWhy={staleWhy}
@@ -1906,11 +1913,7 @@ function ProgressRail({
 
   // Reconcile and model generation run on their own — a simple indicator, not
   // the 6-step pipeline rail.
-  if (
-    job.step === "reconcile" ||
-    job.step === "model" ||
-    job.step === "comps_search"
-  ) {
+  if (SIDE_JOBS.has(job.step ?? "")) {
     return (
       <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
         <div className="flex items-center gap-3">
@@ -1918,7 +1921,7 @@ function ProgressRail({
           <span className="text-sm">
             {job.status === "queued"
               ? "Queued — waiting for an open analyst slot…"
-              : (STEP_LABELS[job.step] ?? "Working…")}
+              : (STEP_LABELS[job.step ?? ""] ?? "Working…")}
           </span>
           <span className="ml-auto font-mono text-xs tabular-nums text-muted">
             {elapsed}

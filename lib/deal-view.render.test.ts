@@ -384,7 +384,12 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(a11yIssues(html)).toEqual([]);
     const text = textOf(html);
     expect(gluedWords(text)).toEqual([]);
-    expect(text).toMatch(/2 of these are from the previous screen — the run in progress replaces each as it reaches it/);
+    // The rail above counts the run's six steps; the meter's own count of
+    // five results stands down while it runs, and the previous screen's
+    // results are said in a line of their own.
+    expect(text).toMatch(/Until the run in progress reaches them, 2 of this deal's results are the previous screen's\./);
+    expect(text).not.toMatch(/Screening progress/);
+    expect(text).not.toMatch(/\b\d\/5\b/);
     expect(text).not.toMatch(/failed before reaching them/);
     expect(html).toMatch(/title="A new screen of this deal is running\./);
     expect(textOf(render(running("analyses", "verdict")))).toMatch(/From the previous screen/);
@@ -510,6 +515,25 @@ describe("DealView — the sample deal renders every section without a runtime e
     const challenger = render(sampleProps("analyses", "challenger"));
     expect((challenger.match(/data-split-bar/g) ?? []).length).toBeGreaterThanOrEqual(1);
     expect(challenger).toMatch(/title="\d+ high/);
+  });
+
+  it("the overview's meter stands down while a screen runs — never '0/5' under 'Step 2 of 6' — and stays for a side job", () => {
+    const now = new Date().toISOString();
+    const running = (step: string): Props =>
+      ({
+        ...sampleProps("overview"),
+        job: { status: "running", step, progress: 20, error: null, updated_at: now, created_at: now },
+      }) as unknown as Props;
+    const screen = textOf(render(running("extract")));
+    expect(screen).toMatch(/Step 2 of 6/);
+    expect(screen).not.toMatch(/Screening progress/);
+    expect(screen).not.toMatch(/\b\d\/5\b/);
+    // The reconciler runs on its own (no six-step rail), and the meter stays.
+    const recon = textOf(render(running("reconcile")));
+    expect(recon).toMatch(/Screening progress/);
+    expect(recon).toMatch(/5\/5/);
+    // A finished deal keeps its quiet line.
+    expect(textOf(render(sampleProps("overview")))).toMatch(/Screened · 5\/5/);
   });
 
   it("a running screen's rail claims a duration only as the reader's own runs measured it", () => {

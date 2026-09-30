@@ -84,6 +84,7 @@ import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { previousScreenResults, verdictBehind } from "@/lib/screen-run";
+import { readingMemorandum } from "@/lib/screen-reading";
 import {
   SCREEN_DURATION_SAMPLE,
   isScreenJob,
@@ -1081,6 +1082,9 @@ export default async function DealPage({
           returnFigure,
           { label: "Deal type", value: summaryStrategy ?? null, title: strategy.summary || undefined },
         ]}
+        // While the screen has not yet written the terms, a figure not read
+        // yet shimmers; once they are written, a missing one keeps its dash.
+        reading={readingMemorandum(job)}
         picture={
           /* What the place actually looks like. The USGS aerial needs no
              API key, so something real renders for every deal with an
