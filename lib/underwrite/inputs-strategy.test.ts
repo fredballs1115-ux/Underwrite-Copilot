@@ -439,3 +439,32 @@ describe("deriveUnderwriteInputs — an auction's starting bid is where the pric
     expect(plain.meta.sale).toBeNull();
   });
 });
+
+describe("deriveUnderwriteInputs — a multi-tenant property's listed tenants (#457)", () => {
+  // Years counted from the day the test runs, so the roll never moves with it.
+  const y = new Date().getUTCFullYear();
+  const t = (name: string, over: Record<string, string>) => ({
+    name, role: "inline" as const, inSale: "yes" as const, sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "", ...over,
+  });
+  const tenants = [
+    t("Staples", { sf: "10,000 SF", rent: "$300,000", leaseExpiration: String(y + 2) }),
+    t("Kroger", { sf: "40,000 SF", rent: "$600,000", leaseExpiration: String(y + 30) }),
+  ];
+  const base = [metric("Asking price", "$14,000,000"), metric("NOI (in-place)", "$900,000"), metric("Total SF", "60,000 SF")];
+
+  it("says the leasing capital the model does not carry for the roll before its sale", () => {
+    const m = deriveUnderwriteInputs(ex(base, { assetClass: "retail", tenants }), "fallback");
+    expect(m.inputs.tiPsf).toBe(0);
+    expect(m.inputs.lcPct).toBe(0);
+    expect(m.meta.roster?.line).toBe("Two tenants listed on 83% of the building; 33% of their rent expires before year 5, the most in year 2; Kroger pays 67% of the listed rent");
+    expect(m.meta.roster?.read).toContain(
+      "The model carries no leasing capital — its tenant improvements and commissions are placeholders of zero — while 33% of the listed rent expires before its sale in year 5",
+    );
+    expect(m.meta.roster?.read).toContain("through year 2, when 33% rolls at once.");
+  });
+
+  it("nothing on housing, or where the memorandum lists fewer than two tenants", () => {
+    expect(deriveUnderwriteInputs(ex(base, { assetClass: "multifamily", tenants }), "fallback").meta.roster).toBeNull();
+    expect(deriveUnderwriteInputs(ex(base, { assetClass: "retail", tenants: tenants.slice(0, 1) }), "fallback").meta.roster).toBeNull();
+  });
+});

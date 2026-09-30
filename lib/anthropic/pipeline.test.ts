@@ -716,6 +716,30 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a shopping center: the challenger reads the listed tenants and the multi-tenant traps (#457)", async () => {
+    const t = (name: string, over: Record<string, string> = {}) => ({
+      name, role: "inline", inSale: "yes", sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "", ...over,
+    });
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "retail",
+      tenants: [
+        t("Kroger", { role: "anchor", sf: "58,000 SF", rent: "$725,000", leaseExpiration: "January 31, 2124", rights: "Right to go dark" }),
+        t("Staples", { sf: "20,000 SF", rent: "$360,000", leaseExpiration: "June 30, 2124", rights: "Co-tenancy tied to Kroger" }),
+        { ...t("Target", { sf: "125,000 SF" }), role: "anchor", inSale: "no" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("The tenants: The memorandum lists two tenants");
+    expect(note).toContain("MULTI-TENANT TRAPS, checked by name");
+    expect(note).toContain("(g) THE SHADOW ANCHOR — Target is not bought");
+    expect(note).toContain("(h) CO-TENANCY AND GO-DARK");
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toContain("The tenants: The memorandum lists two tenants");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a single-market deal stores no other markets' figures", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];

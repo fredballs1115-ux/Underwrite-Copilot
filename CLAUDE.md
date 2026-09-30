@@ -477,6 +477,52 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (REO)"), the memo under its title (`saleShortLine`), the workbook's cover
   ("How it is sold", `meta.sale`), the report's caveat and the compare
   table's Sale row.
+- The tenants of a multi-tenant property (#457): the extraction lists
+  them in `ExtractionResult.tenants` as the memorandum's tenant summary
+  does, largest first, twelve at most — each tenant's name, `role`
+  (`anchor`, `inline`, `outparcel`, `other`), `inSale` (`no` is an anchor
+  the memorandum says is NOT part of the offering: a shadow anchor), its
+  area, its rent (a year's, a foot's or a month's, as stated), its lease's
+  end as written, its options, its first date to leave early and the
+  rights it holds, each "" where the memorandum states nothing — and
+  labels a quoted WALT "WALT". Empty on a single-tenant property, housing,
+  a hotel, storage, parking and land; a one-entry list is dropped.
+  `lib/tenant-roster.ts` (pure) reads them through the rollover card's own
+  arithmetic (`readRollover` in lib/tools/rollover), at
+  `ROSTER_HOLD_YEARS` (5, held to `HOLD_MONTHS` by a test, kept apart so a
+  pipeline slot never loads the model). Six rules: **the roll is the
+  risk** (the share of the listed rent — or area, where the list states
+  no rents — expiring each year before the model's sale, the worst year
+  named with its tenants); **weight by rent** (the memorandum's quoted
+  WALT against the listed leases' rent-weighted term); **a break is an
+  expiry** (a stated early termination date is the lease's end, and a
+  year alone is read as its FIRST day through the affordable reader's
+  `datedEnd`); **a shadow anchor is not bought** (named apart, never in the
+  roll); **co-tenancy rides on the anchor** (the rent under co-tenancy
+  clauses as a share, and a tenant that may go dark named); **the list is
+  not the building** (every figure is said as the listed tenants', with
+  the share of the building's area they cover). Null where one tenant
+  leases the whole property (lib/single-tenant reads it), on a leased fee
+  and on a class whose income is not business tenants. `rentOf` reads a
+  rent to the cent (`parseUsd` rounds). The model is untouched; its read
+  (`rosterModelLine`, in `meta.roster`) says it carries no leasing capital
+  — TI and commissions are placeholders of zero — while the roll lands
+  inside its hold, and that its vacancy stays flat through a worst year of
+  25% or more. Where it shows: the deal context and the challenger
+  (`rosterNote`: MULTI-TENANT TRAPS (a)–(f), (g) the shadow anchor, (h)
+  co-tenancy and go-dark), `app/roster-panel.tsx` (`RosterPanel`, pure:
+  `data-bar="roster-roll"` a column a year to the sale, `roster-tenant` a
+  segment a listed tenant of the building's area with `roster-shadow`
+  dashed apart, and a three-column list — each lease's end in the warning
+  tone before the sale, the area and rights under the name, so it fits a
+  phone — under the read's first two sentences, the rest folded) on the
+  deal page and the shared screen, the key terms
+  (the quoted WALT), the pipeline row, card and CSV's "Tenants" column and
+  the meeting workbook's price note (`rosterTag`: "Shadow-anchored", "56%
+  rolls in 5 yrs", or both — its own `roster` slot, apart from the single
+  tenant's `tenancy`), the memo under its title (`rosterShortLine`), the
+  workbook's cover ("The tenants", `meta.roster`), the report's caveat and
+  the compare table's Tenants row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

@@ -95,6 +95,25 @@ const ExtractionSchema = z.object({
     condition: z.string(),
     page: z.string(),
   }),
+  // THE MAJOR TENANTS OF A MULTI-TENANT PROPERTY (#457), as its tenant
+  // summary lists them — each with what the OM states for THAT tenant and
+  // "" where it states nothing, an anchor the OM says is not part of the
+  // offering marked so; an empty list on a single-tenant property, housing,
+  // a hotel, storage and land. Read by lib/tenant-roster.
+  tenants: z.array(
+    z.object({
+      name: z.string(),
+      role: z.enum(["anchor", "inline", "outparcel", "other"]),
+      inSale: z.enum(["yes", "no", "unknown"]),
+      sf: z.string(),
+      rent: z.string(),
+      leaseExpiration: z.string(),
+      options: z.string(),
+      earlyTermination: z.string(),
+      rights: z.string(),
+      page: z.string(),
+    }),
+  ),
   // Each property of a PORTFOLIO OM (two or more separately addressed
   // buildings or sites), with what the OM states for THAT property and ""
   // where it states nothing; an empty list for a single-property OM. The
@@ -213,6 +232,25 @@ export async function extractTerms(
       condition: out.sale.condition.trim(),
       page: out.sale.page.trim(),
     },
+    // A one-entry list is one tenant restated, not a roster; the roster's
+    // reader drops it too, and a nameless entry.
+    tenants:
+      (out.tenants ?? []).length >= 2
+        ? out.tenants
+            .map((t) => ({
+              name: t.name.trim(),
+              role: t.role,
+              inSale: t.inSale,
+              sf: t.sf.trim(),
+              rent: t.rent.trim(),
+              leaseExpiration: t.leaseExpiration.trim(),
+              options: t.options.trim(),
+              earlyTermination: t.earlyTermination.trim(),
+              rights: t.rights.trim(),
+              page: t.page.trim(),
+            }))
+            .filter((t) => t.name)
+        : [],
     // A one-entry list is a single property restated, not a portfolio.
     properties:
       (out.properties ?? []).length >= 2

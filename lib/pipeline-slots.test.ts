@@ -37,7 +37,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null });
+    expect(s).toEqual({ cap: "5.50%", price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -82,6 +82,23 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     // An auction has no asking price, and the row never shows the starting bid as one.
     expect(s.price).toBeNull();
     expect(pickSlots(ex([m("Asking price", "$3,000,000")], { sale: { ...sale, method: "negotiated" } }), null).sale).toBeNull();
+  });
+
+  it("says a multi-tenant property's shadow anchor and its roll (#457), and nothing on a quiet roster", () => {
+    // Years counted from the day the test runs, so the roll never moves with it.
+    const y = new Date().getUTCFullYear();
+    const t = (name: string, over: Record<string, string>) => ({
+      name, role: "inline" as const, inSale: "yes" as const, sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "", ...over,
+    });
+    const tenants = [
+      t("Staples", { sf: "10,000 SF", rent: "$300,000", leaseExpiration: String(y + 2) }),
+      t("Kroger", { sf: "40,000 SF", rent: "$600,000", leaseExpiration: String(y + 30) }),
+      { ...t("Target", { sf: "125,000 SF" }), role: "anchor" as const, inSale: "no" as const },
+    ];
+    const rows = [m("Asking price", "$14,000,000"), m("Total SF", "60,000 SF")];
+    expect(pickSlots(ex(rows, { assetClass: "retail", tenants } as Partial<ExtractionResult>), null).roster).toBe("Shadow-anchored, 33% rolls in 5 yrs");
+    const quiet = [tenants[1], t("Staples", { sf: "10,000 SF", rent: "$300,000", leaseExpiration: String(y + 20) })];
+    expect(pickSlots(ex(rows, { assetClass: "retail", tenants: quiet } as Partial<ExtractionResult>), null).roster).toBeNull();
   });
 
   it("says what the price buys where it is not the building outright (#415)", () => {
@@ -129,7 +146,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null });
+    expect(s).toEqual({ cap: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

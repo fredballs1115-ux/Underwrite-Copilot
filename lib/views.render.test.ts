@@ -87,8 +87,9 @@ const CARDS: DealCard[] = [
   // …and it carries the seller's loan, offered for assumption (#419).
   card({ id: "p", name: "Strip District Lofts", verdict: "pass", stage: "screening", fit: "near", score: 60, mandateVerdict: "WATCH", slots: { cap: "6.4%", price: "$18,000,000", yoc: null, debt: "Assumable 3.45%" }, market: "Strip District, Pittsburgh, PA", coveredMarket: null, readMarket: "Pittsburgh PA" }),
   card({ id: "d", name: "Tysons Corner Plaza", assetClass: "office", verdict: "pass_on", stage: "dead", fit: "outside", score: 18, mandateVerdict: "PASS", slots: { cap: "8.1%", price: "$60,000,000", yoc: null }, market: "Tysons, VA", coveredMarket: "Northern Virginia" }),
-  // …sold at auction, the figure the opening bid (#456).
-  card({ id: "e", name: "Logan Square Retail", assetClass: "retail", verdict: null, stage: "screening", jobStatus: "running", slots: { cap: null, price: "$12,500,000", yoc: null, sale: "Auction, 5% premium" }, market: "Chicago, IL", coveredMarket: "Chicago", hasAddress: false }),
+  // …sold at auction, the figure the opening bid (#456), beside an anchor
+  // that is not in the sale and a roll before the model's (#457).
+  card({ id: "e", name: "Logan Square Retail", assetClass: "retail", verdict: null, stage: "screening", jobStatus: "running", slots: { cap: null, price: "$12,500,000", yoc: null, sale: "Auction, 5% premium", roster: "Shadow-anchored, 56% rolls in 5 yrs" }, market: "Chicago, IL", coveredMarket: "Chicago", hasAddress: false }),
   // A hotel sold encumbered by its manager, with the brand's PIP (#455).
   card({ id: "f", name: "Courtyard Newark Airport", assetClass: "hospitality_str", verdict: null, stage: "screening", jobStatus: "failed", slots: { cap: null, price: null, yoc: null, hotel: "Mgmt encumbered, PIP $35k/key" }, market: "Newark, NJ", coveredMarket: "Northern New Jersey" }),
   // A 49% LP interest: the row says what the price buys beside the figure.
@@ -241,6 +242,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // beside it is where the bidding opens, not a price.
     expect((text.match(/Auction, 5% premium/g) ?? []).length).toBe(4);
     expect(html).toContain("Auction, 5% premium: the figure is where the bidding opens or the seller is not an owner");
+    // The listed tenants, at every width too (#457): an anchor not in the
+    // sale, and the rent rolling before the model's.
+    expect((text.match(/Shadow-anchored, 56% rolls in 5 yrs/g) ?? []).length).toBe(4);
+    expect(html).toContain("Shadow-anchored, 56% rolls in 5 yrs: the listed tenants against the model&#x27;s sale");
   });
 
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
@@ -359,6 +364,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((text.match(/Single tenant, 6 yrs left/g) ?? []).length).toBe(1);
     expect((text.match(/Mgmt encumbered, PIP \$35k\/key/g) ?? []).length).toBe(1);
     expect((text.match(/Auction, 5% premium/g) ?? []).length).toBe(1);
+    expect((text.match(/Shadow-anchored, 56% rolls in 5 yrs/g) ?? []).length).toBe(1);
     // The three figures a pipeline is read by; a plan deal's yield on cost
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
@@ -5282,5 +5288,112 @@ describe("ShareView — how the property is sold, under the title (#456)", () =>
     expect(gluedWords(text)).toEqual([]);
     expect(a11yIssues(html)).toEqual([]);
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("sale-panel");
+  });
+});
+
+// ── A multi-tenant property's listed tenants (#457) ───────────────────────
+import { RosterPanel } from "@/app/roster-panel";
+import { readRoster } from "@/lib/tenant-roster";
+
+describe("RosterPanel — the listed tenants against the model's sale, drawn", () => {
+  const AS_OF = new Date(Date.UTC(2026, 8, 30));
+  const t = (name: string, over: Record<string, string> = {}) => ({
+    name, role: "inline" as "anchor" | "inline", inSale: "yes" as "yes" | "no", sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "p. 12", ...over,
+  });
+  const center = (tenants?: ReturnType<typeof t>[]) =>
+    ({
+      dealName: "Maple Grove Crossing",
+      assetClass: "retail",
+      totalPages: 40,
+      metrics: [{ label: "Total SF", value: "112,000 SF", flagged: false, page: "p. 2", basis: "na" as const }],
+      tenants: tenants ?? [
+        { ...t("Kroger", { sf: "58,000 SF", rent: "$725,000", leaseExpiration: "January 31, 2034", rights: "Right to go dark" }), role: "anchor" as const },
+        { ...t("Target", { sf: "125,000 SF" }), role: "anchor" as const, inSale: "no" as const },
+        t("Staples", { sf: "20,000 SF", rent: "$18.00/SF", leaseExpiration: "June 30, 2029" }),
+        t("PetSmart", { sf: "18,000 SF", rent: "$310,000", leaseExpiration: "2029" }),
+        t("Chipotle", { sf: "2,400 SF", rent: "$96,000", leaseExpiration: "March 31, 2031", rights: "Co-tenancy" }),
+        t("Great Clips", { sf: "1,200 SF", rent: "$28.50/SF", leaseExpiration: "Month-to-month", rights: "Co-tenancy tied to Kroger" }),
+        t("Mattress Firm", { sf: "4,000 SF", rent: "$26/SF", leaseExpiration: "December 31, 2032", earlyTermination: "December 31, 2027", rights: "Sales kick-out" }),
+      ],
+    }) as unknown as ExtractionResult;
+
+  it("draws the roll a year at a time to the sale, the building by tenant with the shadow anchor apart, and each tenant's end and rights", () => {
+    const html = render(
+      React.createElement(RosterPanel, {
+        roster: readRoster(center(), AS_OF),
+        modelLine: "The model carries no leasing capital — its tenant improvements and commissions are placeholders of zero.",
+      }),
+    );
+    dumpView("roster-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="roster-panel"');
+    expect(text).toContain("Tenants");
+    expect(text).toContain("6 listed");
+    expect(text).toContain("93% of the building");
+    expect(text).toContain("Shadow-anchored");
+    // The roll: a column a year to the sale, the sale marked after them.
+    expect(html.match(/data-bar="roster-roll"/g)).toHaveLength(5);
+    expect(text).toContain("Year 3");
+    expect(text).toContain("41%");
+    expect(text).toContain("Sale");
+    // The building: a segment a listed tenant, the shadow anchor apart.
+    expect(html.match(/data-bar="roster-tenant"/g)).toHaveLength(6);
+    expect(html.match(/data-bar="roster-shadow"/g)).toHaveLength(1);
+    expect(text).toContain("Target, 125,000 SF — an anchor not in the sale");
+    // The list: each tenant's end, its first date to leave and its rights.
+    expect(text).toContain("Month to month");
+    expect(text).toContain("May leave Dec 2027");
+    expect(text).toContain("Co-tenancy");
+    expect(text).toContain("May go dark");
+    expect(text).toContain("Kick-out");
+    expect(text).toContain("The model carries no leasing capital");
+    expect(a11yIssues(html), "roster panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("nothing at all on one tenant or on housing", () => {
+    expect(render(React.createElement(RosterPanel, { roster: readRoster(center([t("Kroger", { sf: "58,000 SF" })]), AS_OF) }))).toBe(
+      render(React.createElement(React.Fragment)),
+    );
+    expect(render(React.createElement(RosterPanel, { roster: readRoster({ ...center(), assetClass: "multifamily" } as ExtractionResult, AS_OF) }))).toBe(
+      render(React.createElement(React.Fragment)),
+    );
+  });
+});
+
+describe("ShareView — a multi-tenant property's listed tenants, under the title (#457)", () => {
+  it("draws the roster and leads the key terms with the quoted WALT, and nothing on the sample", () => {
+    const tenant = (name: string, over: Record<string, string>) => ({
+      name, role: "inline" as const, inSale: "yes" as const, sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "", ...over,
+    });
+    const office = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "office",
+      tenants: [
+        tenant("Acme Law", { sf: "12,000 SF", rent: "$420,000", leaseExpiration: "2124" }),
+        tenant("Birch Health", { sf: "8,000 SF", rent: "$280,000", leaseExpiration: "2125" }),
+      ],
+      metrics: [...SAMPLE_DEAL.extraction.metrics, { label: "WALT", value: "6.8 years", flagged: false, page: "", basis: "na" as const }],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: "office",
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: office }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="roster-panel"');
+    expect(text).toContain("The memorandum lists two tenants");
+    expect(text).toContain("WALT");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain(
+      "roster-panel",
+    );
   });
 });

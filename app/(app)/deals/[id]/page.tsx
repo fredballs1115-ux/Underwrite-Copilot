@@ -15,10 +15,12 @@ import { AffordablePanel } from "@/app/affordable-panel";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { HotelPanel } from "@/app/hotel-panel";
 import { SalePanel } from "@/app/sale-panel";
+import { RosterPanel } from "@/app/roster-panel";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { readHotelDeal } from "@/lib/hotel-deal";
 import { readSale } from "@/lib/sale-terms";
+import { readRoster } from "@/lib/tenant-roster";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
@@ -1178,6 +1180,11 @@ export default async function DealPage({
               : null
           }
         />
+        {/* A multi-tenant property's listed tenants (#457): the roll to the
+            model's sale a year at a time, the building by the space each
+            leases with an anchor outside the sale drawn apart, and each
+            tenant's end and rights. */}
+        <RosterPanel roster={readRoster(extraction)} modelLine={derived?.meta.roster?.read ?? ""} />
         {/* What a hotel is sold with (#455): the flag, the manager, the
             encumbrance and the PIP — the basis a key with the PIP on top,
             the agreements' clocks against the model's sale, the rooms. */}

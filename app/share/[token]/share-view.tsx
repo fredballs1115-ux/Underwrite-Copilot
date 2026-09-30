@@ -21,6 +21,8 @@ import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { HotelPanel } from "@/app/hotel-panel";
 import { SalePanel } from "@/app/sale-panel";
+import { RosterPanel } from "@/app/roster-panel";
+import { readRoster } from "@/lib/tenant-roster";
 import { readSale } from "@/lib/sale-terms";
 import { readHotelDeal } from "@/lib/hotel-deal";
 import { keyTermRows } from "@/lib/key-terms";
@@ -309,6 +311,10 @@ export function ShareView({
       {/* One tenant leases the whole property (#454): the guarantor, the
           term left and the options, the increases — the lease is the deal. */}
       <SingleTenantPanel lease={readSingleTenant(safeExtraction)} />
+
+      {/* A multi-tenant property's listed tenants (#457): the roll to the
+          model's sale, the anchors in and out of it, each tenant's end. */}
+      <RosterPanel roster={readRoster(safeExtraction)} />
 
       {/* What a hotel is sold with (#455): the flag, the manager, the
           encumbrance, the PIP and the rooms. */}

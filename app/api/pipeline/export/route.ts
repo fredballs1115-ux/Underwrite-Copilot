@@ -8,6 +8,7 @@ import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
 import { hotelTag } from "@/lib/hotel-deal";
 import { saleTag } from "@/lib/sale-terms";
+import { rosterTag } from "@/lib/tenant-roster";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
@@ -141,6 +142,7 @@ export async function GET(req: Request) {
       tenancy: singleTenantTag(extraction),
       hotel: hotelTag(extraction),
       sale: saleTag(extraction),
+      roster: rosterTag(extraction),
       cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
       yieldOnCost:
         plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,

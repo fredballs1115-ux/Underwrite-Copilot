@@ -14,6 +14,7 @@ import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
 import { hotelTag } from "@/lib/hotel-deal";
 import { saleTag } from "@/lib/sale-terms";
+import { rosterTag } from "@/lib/tenant-roster";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -47,6 +48,10 @@ export interface PipelineSlots {
    *  sale", "Bank-owned (REO)" (lib/sale-terms `saleTag`, #456); absent or
    *  null on a negotiated sale */
   sale?: string | null;
+  /** a multi-tenant property's listed tenants — "Shadow-anchored", "56%
+   *  rolls in 5 yrs" or both (lib/tenant-roster `rosterTag`, #457); absent
+   *  or null where the roll is small and every anchor is in the sale */
+  roster?: string | null;
 }
 
 /**
@@ -108,5 +113,8 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // An auction's price is whatever clears; a court's or a lender's sale
     // is as-is — said beside the price.
     sale: saleTag(extraction),
+    // A shadow anchor is not bought, and a roll inside the hold is the
+    // income the model counts and the buyer may not have.
+    roster: rosterTag(extraction),
   };
 }

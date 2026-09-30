@@ -133,6 +133,16 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(auction, "stabilized", 4).map((m) => m.label)).toEqual(["Starting bid", "Buyer's premium", "Reserve price", "Bid deadline"]);
   });
 
+  it("a multi-tenant property's quoted WALT leads after the price (#457)", () => {
+    const center = [
+      { label: "Total SF", value: "112,000 SF", flagged: false },
+      { label: "Occupancy", value: "94%", flagged: false },
+      { label: "WALT", value: "6.8 years", flagged: false },
+      { label: "Asking price", value: "$21,500,000", flagged: false },
+    ];
+    expect(keyTermRows(center, "stabilized", 2).map((m) => m.label)).toEqual(["Asking price", "WALT"]);
+  });
+
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
     const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
     expect(rows).toHaveLength(3);

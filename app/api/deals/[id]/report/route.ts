@@ -161,6 +161,7 @@ export async function GET(
   let singleTenant: { line: string; read: string } | null = null;
   let hotel: { line: string; read: string } | null = null;
   let sale: { line: string; read: string } | null = null;
+  let roster: { line: string; read: string } | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -217,6 +218,9 @@ export async function GET(
       singleTenant = derived.meta.singleTenant ?? null;
       // What a hotel is sold with (#455), read against this model.
       hotel = derived.meta.hotel ?? null;
+      // A multi-tenant property's listed tenants (#457), read against this
+      // model — the workbook cover's own two lines.
+      roster = derived.meta.roster ?? null;
       // How it is sold (#456): the ceiling bid at this report's own hurdle,
       // the buy box's where set — the same one its grids are coloured by.
       sale = derived.meta.sale
@@ -300,7 +304,7 @@ export async function GET(
         ((deal as unknown as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
       ).catch(() => null),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

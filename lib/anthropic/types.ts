@@ -171,7 +171,47 @@ export interface ExtractionResult {
    *  the condition it is sold in, as the OM states them. Absent on an
    *  extraction saved before it was read. Read by lib/sale-terms. */
   sale?: ExtractedSale;
+  /** THE MAJOR TENANTS OF A MULTI-TENANT PROPERTY (#457) — an office, a
+   *  shopping center, a multi-tenant industrial park, a medical office
+   *  building — as its tenant summary lists them, each with what the OM
+   *  states for THAT tenant. Empty on a single-tenant property (read by
+   *  `singleTenant`), on housing, a hotel, storage and land. Absent on an
+   *  extraction saved before it was read. Read by lib/tenant-roster. */
+  tenants?: ExtractedTenant[];
   metrics: ExtractedMetric[];
+}
+
+/** One tenant of a multi-tenant property, as the OM lists it (#457) —
+ *  every field a string, "" where it states none. */
+export interface ExtractedTenant {
+  /** the tenant as the OM names it */
+  name: string;
+  /** "anchor" (an anchor or junior anchor the property is built around),
+   *  "inline" (a shop or suite tenant), "outparcel" (a pad or outparcel
+   *  building) or "other" */
+  role: "anchor" | "inline" | "outparcel" | "other";
+  /** whether its space is part of what is sold: "no" is an anchor the OM
+   *  says is not part of the offering — it owns its store or leases its
+   *  own parcel (a shadow anchor) */
+  inSale: "yes" | "no" | "unknown";
+  /** its leased area as stated ("58,000 SF") */
+  sf: string;
+  /** its rent as stated — the year's ("$725,000"), a figure a foot
+   *  ("$12.50/SF") or a month's */
+  rent: string;
+  /** its lease's current term end exactly as written — never a date that
+   *  assumes a renewal option is exercised; "Month-to-month" where so */
+  leaseExpiration: string;
+  /** its renewal options as stated */
+  options: string;
+  /** the first date it may end its lease early, exactly as written */
+  earlyTermination: string;
+  /** rights it holds that reach the owner or the other tenants, exactly as
+   *  stated — a co-tenancy right, a right to go dark, a kick-out, an
+   *  exclusive, a radius restriction, a right of first refusal */
+  rights: string;
+  /** the OM's page for the tenant */
+  page: string;
 }
 
 /** How a property is sold (#456). */

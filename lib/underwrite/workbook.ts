@@ -336,6 +336,22 @@ function buildCover(
       r++;
     }
   }
+  // A multi-tenant property's listed tenants (#457): the roster, then what
+  // this model does not carry for its roll — the leasing capital, and its
+  // vacancy flat through the worst year.
+  if (meta.roster) {
+    fact("The tenants", meta.roster.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.roster.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.roster.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 64;
+      r++;
+    }
+  }
   // How the property is sold (#456): an auction's bid, premium, reserve
   // and deadline, then the most this model pays all-in at the screening
   // hurdle, backed out of the premium.
