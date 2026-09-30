@@ -3065,6 +3065,25 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `fetchPriority="high"` (React also emits a preload link for them), the
     rest lazy, and a card's picture zooms a little on hover
     (`motion-safe:`).
+  - **Its own colours first** (#463, the blur-up): every stored photograph
+    carries a `preview` (`DealPicture.preview`) — the hero `PREVIEW_PX`
+    (24) px on its long side as a WebP data URI, a few hundred characters,
+    made by `previewOf` in `derivePicture` for the cover and each gallery
+    photograph and kept in the photo cache — and `lib/photo-preview.ts`
+    (pure) turns it into ONE CSS value, `blurredBackground`: an SVG with a
+    Gaussian blur over the preview (next/image's blur-placeholder
+    technique, with `edgeMode='duplicate'` and an opaque alpha so the edges
+    never fade to white), guarded by `isPreview` (a small base64 image data
+    URI and nothing else, since it lands in a style attribute).
+    `DealBanner` and `DealThumb` paint it (`data-preview`) in place of the
+    cover while the deal's own photograph loads (`bannerSources`'
+    `picturePreview`, on the stored photo only, never a pending one); the
+    deal page's photograph, mosaic tiles and gallery views and the shared
+    screen's picture carry it as the `<img>`'s own background. A cover
+    stored before previews gets one from the hero bytes the picture route
+    already holds, after the response (`backfillPreview` in `after()`,
+    never over a picture changed since it was read); gallery photographs
+    get theirs when their gallery is next read.
   **The memorandum's other photographs are the deal's gallery** (#448): a
   listing shows the building from every side, and a memorandum carries
   those pictures while the site showed one. `decodeOmPhotos`

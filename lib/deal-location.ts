@@ -65,6 +65,10 @@ export interface DealPicture {
   at: string;
   /** the memorandum's page it was lifted from (1-based), where known */
   page?: number;
+  /** a blur-up preview (#463): a WebP a couple of dozen pixels long, as a
+   *  data URI kept inline so a page has the photograph's colours before it
+   *  fetches the photograph (lib/photo-preview) */
+  preview?: string;
 }
 
 // Precision now lives with the framing rules it drives (lib/imagery-plan),

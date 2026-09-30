@@ -7,6 +7,7 @@ import { MarketCaption } from "../market-caption";
 import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
+import { previewStyle } from "@/lib/photo-preview";
 
 /**
  * The real property, at the top of its deal page: the building's OWN
@@ -125,8 +126,9 @@ export function PropertyVisual({
   googleEnabled: boolean;
   /** the deal has an address at all — without one there is no overhead and no map */
   hasAddress?: boolean;
-  /** the deal's own photograph, with what it is credited as; null for none */
-  picture?: { credit: string; source: "om" | "upload" } | null;
+  /** the deal's own photograph, with what it is credited as and its
+   *  blur-up preview (#463); null for none */
+  picture?: { credit: string; source: "om" | "upload"; preview?: string | null } | null;
   /** the reader may put their own picture on the deal (never on the sample) */
   canReplace?: boolean;
   /** the Flood tab's key and sentence (lib/site-flags `floodKey`,
@@ -141,7 +143,7 @@ export function PropertyVisual({
   market?: MarketPicture | null;
   /** the memorandum's other photographs, in page order, each with its
    *  credit (#448); served as `?g=1`, `?g=2`… */
-  gallery?: { page: number | null; credit: string }[];
+  gallery?: { page: number | null; credit: string; preview?: string | null }[];
 }) {
   // Lead with the building's own photograph wherever one exists; the
   // aerial leads only when it is the best picture available.
@@ -324,6 +326,10 @@ export function PropertyVisual({
                   width={AERIAL.w}
                   height={AERIAL.h}
                   onClick={open}
+                  // Its blur-up preview paints the frame until the
+                  // photograph covers it (#463): its colours, never grey.
+                  style={previewStyle(picture?.preview)}
+                  data-preview={picture?.preview ? "hero" : undefined}
                   className={`${mosaic ? MOSAIC_COVER : FRAME} w-full cursor-zoom-in bg-faint object-cover`}
                   onError={() => setPhotoGone(true)}
                 />
@@ -369,6 +375,7 @@ export function PropertyVisual({
                           width={AERIAL.w}
                           height={AERIAL.h}
                           loading="lazy"
+                          style={previewStyle(g.preview)}
                           className="h-full w-full object-cover transition-transform duration-300 motion-safe:group-hover/tile:scale-[1.04]"
                           onError={() => loseGallery(g.i)}
                         />
@@ -402,6 +409,7 @@ export function PropertyVisual({
                 width={AERIAL.w}
                 height={AERIAL.h}
                 onClick={open}
+                style={previewStyle(g.preview)}
                 className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
                 onError={() => loseGallery(g.i)}
               />

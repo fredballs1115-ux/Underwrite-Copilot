@@ -29,6 +29,7 @@
 // show one skyline twice, where their overheads tell the buildings apart.
 
 import { IMAGE_CREDIT } from "@/lib/imagery-plan";
+import { isPreview } from "@/lib/photo-preview";
 import type { MarketPicture } from "@/lib/market-picture";
 
 export interface BannerSource {
@@ -48,6 +49,9 @@ export interface BannerSource {
    *  (#440): the next source shows at once and this one takes over the
    *  moment it loads, or is dropped if the route has none */
   pending?: boolean;
+  /** the photograph's blur-up preview (#463, lib/photo-preview): drawn
+   *  blurred in the frame until the photograph has loaded whole */
+  preview?: string;
 }
 
 export interface BannerFacts {
@@ -55,6 +59,8 @@ export interface BannerFacts {
   /** the deal's own photograph's credit (lib/deal-picture's
    *  PICTURE_CREDIT, resolved server-side) — null where it has none */
   pictureCredit: string | null;
+  /** its blur-up preview, where the photo cache holds one (#463) */
+  picturePreview?: string | null;
   /** no picture is cached but the deal's memorandum may hold one nobody has
    *  looked for (lib/deal-picture `pictureMayBeInMemorandum`): the picture
    *  route lifts the cover on this first ask, or answers 404 and the next
@@ -102,7 +108,14 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
   const out: BannerSource[] = [];
   // A thumbnail's frame takes the stored 240px crop; anything larger the hero.
   const size = frame.w <= 240 && frame.h <= 240 ? "thumb" : "hero";
-  if (f.pictureCredit) out.push({ kind: "photo", src: `/api/deals/${id}/picture?size=${size}`, credit: f.pictureCredit });
+  if (f.pictureCredit) {
+    out.push({
+      kind: "photo",
+      src: `/api/deals/${id}/picture?size=${size}`,
+      credit: f.pictureCredit,
+      ...(isPreview(f.picturePreview) ? { preview: f.picturePreview } : {}),
+    });
+  }
   else if (f.memorandumUnread) {
     out.push({ kind: "photo", src: `/api/deals/${id}/picture?size=${size}`, credit: IMAGE_CREDIT.photo, pending: true });
   }

@@ -5,6 +5,7 @@ import type { BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealCover } from "./deal-cover";
 import { MarketCaption } from "./market-caption";
+import { previewStyle } from "@/lib/photo-preview";
 
 /**
  * The building's picture at card size (#418) — the compare page's columns.
@@ -210,9 +211,13 @@ export function DealBanner({
       className={`relative overflow-hidden ${flush ? "" : "rounded-lg"} bg-faint ${className}`}
       data-deal-banner={onScreen.kind}
     >
-      {/* What holds the frame while the picture loads: the deal's cover,
+      {/* What holds the frame while the picture loads: the photograph's own
+          blur-up preview where the cache has one (#463) — its colours at
+          once, the way a listing's card arrives — else the deal's cover,
           without its words, or the plain plate. */}
-      {cover ? (
+      {base?.preview ? (
+        <span aria-hidden data-preview="banner" className="absolute inset-0" style={previewStyle(base.preview)} />
+      ) : cover ? (
         <DealCover cover={cover} label={label} words={false} className="absolute inset-0 h-full w-full" />
       ) : null}
       {base ? (
