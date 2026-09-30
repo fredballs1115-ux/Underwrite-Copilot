@@ -1369,15 +1369,21 @@
         "Downtown Birmingham, Alabama"
       ],
       "categories": [
-        "Skylines of Birmingham",
-        "Birmingham skyline",
-        "Views of Birmingham",
-        "Panoramics of Birmingham",
-        "Aerial photographs of Birmingham"
+        "Skylines of Birmingham, Alabama",
+        "Views of Birmingham, Alabama",
+        "Panoramics of Birmingham, Alabama",
+        "Aerial photographs of Birmingham, Alabama"
       ],
       "queries": [
-        "Birmingham skyline panorama",
-        "Birmingham downtown cityscape"
+        "Birmingham Alabama skyline",
+        "Birmingham Alabama downtown",
+        "Birmingham Alabama Vulcan view"
+      ],
+      "candidates": [
+        {
+          "file": "Birmingham, Alabama.jpg",
+          "note": "The Birmingham, Alabama article's lead, which run 36752474149 printed and never checked: the three unqualified categories were Birmingham, England's and sorted forty English files ahead of it."
+        }
       ]
     },
     {
