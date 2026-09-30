@@ -481,8 +481,10 @@ export default async function DemoPage() {
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
             <div className="rounded-xl border border-line bg-surface p-4">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded bg-kill/10 px-2 py-0.5 text-[11px] font-semibold text-kill">
-                  Applies
+                {/* Dormant, as the rules panel below evaluates it: the rule
+                    keys off an eviction filing, never the purchase. */}
+                <span className="rounded bg-caution/10 px-2 py-0.5 text-[11px] font-semibold text-caution">
+                  Dormant until an eviction
                 </span>
                 <span className="text-[11px] uppercase tracking-wide text-muted">
                   eviction procedure · Philadelphia
@@ -492,7 +494,7 @@ export default async function DemoPage() {
                 </span>
               </div>
               <p className="mt-2 text-sm leading-relaxed">
-                Philadelphia Code § 9-811: 30 days in the Eviction Diversion Program before any filing. The screen prices that delay in.
+                Philadelphia Code § 9-811: 30 days in the Eviction Diversion Program before any filing — a month to add to any eviction the owner files.
               </p>
               <a
                 href="https://codelibrary.amlegal.com/codes/philadelphia/latest/philadelphia_pa/0-0-0-278160"

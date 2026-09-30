@@ -95,9 +95,10 @@ function Icon({ children, className = "h-5 w-5" }: { children: ReactNode; classN
   );
 }
 
-// The actual six-stage pipeline every OM runs through — a word or two each;
-// the trace band under the rail shows what each stage produces.
-const STAGES: { title: string; icon: ReactNode }[] = [
+// The actual six-stage pipeline — a word or two each; the trace band under
+// the rail shows what each stage produces. Reconcile runs only where the
+// buyer adds their own model (lib/screen-run), and its tile says so.
+const STAGES: { title: string; note?: string; icon: ReactNode }[] = [
   {
     title: "Extract",
     icon: (
@@ -128,6 +129,7 @@ const STAGES: { title: string; icon: ReactNode }[] = [
   },
   {
     title: "Reconcile",
+    note: "with your model",
     icon: (
       <Icon>
         <path d="M12 4v16M5 20h14M6 8h12" />
@@ -274,7 +276,7 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
   "Unlimited deals",
-  "Excel models — first-draft + institutional underwrite.xlsx",
+  "Excel models with live formulas — the underwrite and the rent roll",
   "IC memo, full PDF report, and LOI draft",
   "Your firm's branding on memos, reports, workbooks & LOI",
   "Public-web comp search",
@@ -292,11 +294,11 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Which markets does it cover?",
-    a: `${MARKET_COUNT} markets, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and the ${MAJOR_MARKET_COUNT} biggest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULE_COUNT} statute-linked, machine-evaluated at every address), market notes, and data coverage with sources. Outside those markets the screener says "unscreened — not unregulated" and stops; it never guesses. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, extended by the bulk property database (${WIRED_MARKETS.join(", ")} wired).`,
+    a: `${MARKET_COUNT} markets, deliberately: the DMV core (DC, Prince George's, Montgomery County, Northern Virginia), Baltimore, Richmond, Hampton Roads, Philadelphia (incl. Wilmington), Newark/Jersey City — and ${MAJOR_MARKET_COUNT} of the largest US metros: ${MAJOR_MARKETS.map((m) => m.name).join(", ")}. Each carries its rent rules (${RULE_COUNT} source-linked, machine-evaluated at every address), market notes, and data coverage with sources. Outside them the screen still runs: statewide rules are checked, the market check reads the metro area's or the state's published figures, and where no local rule is on file it says "unscreened — not unregulated" rather than guessing. Recorded-sales comps run via county APIs in ${COMPS_JURISDICTIONS}, extended by the bulk property database (${WIRED_MARKETS.join(", ")} wired).`,
   },
   {
     q: "Why not just ask ChatGPT?",
-    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, every assumption is a sourced range, and every OM runs the same six stages in the same order. The AI reads documents; it never does the arithmetic.",
+    a: "Underwriting is a precision problem, not a language problem. A 10% drift reads perfectly fine in a sentence while it quietly kills the deal — so the cash-flow and return math here is deterministic code, every assumption is a sourced range, and every OM runs the same stages in the same order. The AI reads the documents; the cash flows, returns, loan sizing and scores are computed in code.",
   },
   {
     q: "Are my documents private?",
@@ -308,7 +310,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What's in the Excel model?",
-    a: "A multi-tab first-draft workbook: deal summary with sources & uses and returns, an exit-cap × price IRR sensitivity grid, a year-by-year cash flow, every assumption with its source and confidence, and a conflicts sheet showing how disagreements between your documents were resolved.",
+    a: "A live-formula workbook: a cover, a deal summary with sources & uses and returns, every assumption with its source, annual and monthly cash flows, a debt schedule, operating metrics, and sensitivity grids across the exit cap, hold, price, leverage and rate — change an input and the whole model recalculates. A portfolio gets a tab of its properties, and where today's published figures were read, a Market Read tab sets the model's assumptions against them.",
   },
   {
     q: "Can my team share one pipeline?",
@@ -761,7 +763,7 @@ export default function Home() {
         {/* The six-stage screen — a rail of icons, then the trace of it running. */}
         <section id="screen" className="scroll-mt-16 border-t border-line bg-faint">
           <div className="mx-auto max-w-6xl px-6 py-16 sm:py-20">
-            <SectionHead eyebrow="How it works" title="Six stages, same order, every OM." />
+            <SectionHead eyebrow="How it works" title="Six stages, same order." />
             <Reveal delay={60}>
               <ol className="stage-rail mt-8 grid grid-cols-3 gap-3 sm:grid-cols-6">
                 {STAGES.map((s, i) => (
@@ -777,6 +779,7 @@ export default function Home() {
                       {s.icon}
                     </span>
                     <span className="text-sm font-medium">{s.title}</span>
+                    {s.note && <span className="-mt-2 text-[11px] leading-tight text-muted">{s.note}</span>}
                   </li>
                 ))}
               </ol>
@@ -960,7 +963,7 @@ export default function Home() {
                     {[
                       ["The Brixton", "Supports", "text-pass bg-pass/10"],
                       ["Parkside", "Leans favorable", "text-caution bg-caution/10"],
-                      ["Vue at Legacy", "Stretched", "text-kill bg-kill/10"],
+                      ["Vue at Girard", "Stretched", "text-kill bg-kill/10"],
                     ].map(([n, r, c]) => (
                       <div
                         key={n}
@@ -981,10 +984,12 @@ export default function Home() {
                   <div className="mt-4 flex flex-wrap gap-1.5 text-[10px] font-medium">
                     {(
                       [
-                        ["✓", "Market", "text-pass border-line"],
-                        ["✓", "Price", "text-pass border-line"],
+                        // The sample deal's own checks against its demo buy box
+                        // (lib/sample-deal SAMPLE_DEMO_BOX, as /demo draws them).
                         ["✓", "Asset class", "text-pass border-line"],
+                        ["✓", "Units", "text-pass border-line"],
                         ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
+                        ["—", "Target return", "text-muted border-line"],
                       ] as const
                     ).map(([mark, label, cls]) => (
                       <span
@@ -1426,9 +1431,11 @@ async function FooterTrustLine() {
   // so "is the site actually on the latest code" is answerable by comparing
   // this stamp to the repo's main tip. Absent locally; omitted then.
   const buildSha = (process.env.RENDER_GIT_COMMIT ?? "").slice(0, 7);
+  // The year is the render's, never typed: a typed one goes stale on Jan 1.
+  const rendered = new Date();
   return (
     <p className="mx-auto max-w-6xl px-6 py-4 text-xs text-muted">
-      © 2026 Underwrite Copilot · page rendered {fmt(new Date())}
+      {`© ${rendered.getFullYear()} Underwrite Copilot · page rendered ${fmt(rendered)}`}
       {buildSha && (
         <>
           {" · build "}
