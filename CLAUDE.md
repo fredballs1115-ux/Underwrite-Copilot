@@ -3014,6 +3014,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   primaryPointerType=…`: headless Chromium reports no hover and no
   pointer, and `Emulation.setEmulatedMedia` ignores both features, so
   without the flag every hover style reads as broken).
+  **And the deal page opens on them as a mosaic** (#458, `MOSAIC` in
+  `PropertyVisual`): where the deal has a photograph of its own and two
+  more from the memorandum, the Photo view splits its frame from the
+  header's 42rem up — the cover across two thirds, the next two stacked
+  beside it (`data-picture="mosaic"`, `data-mosaic-tile`), each asked for
+  at the cover's size (`size=hero&g=N`, lazy, since a phone keeps the one
+  picture), each credited with its page ("Memorandum, p. 7", the full
+  credit as its title), each opening the viewer at itself, the last
+  saying "+N more". The reader's Replace photo moves onto the cover tile,
+  and a tile that fails drops the mosaic back to the one picture. Checked
+  in Chromium at 390, 820 and 1280.
   **The deal
   page opens the way a listing does** (#433, `app/(app)/deals/[id]/deal-hero.tsx`,
   `DealHero`, pure): the picture is the header's own — no card of its

@@ -71,6 +71,13 @@ import { ReplacePicture } from "./replace-picture";
  * full-size picture is asked for only once its view is opened; the
  * filmstrip draws the stored 240px crops. None of them ever leads: past the
  * cover a memorandum's photograph may be the neighbourhood.
+ *
+ * Where the deal has its own cover and two more photographs, the cover opens
+ * as a mosaic from the header's 42rem up (#458), the way a listing does: the
+ * cover across two thirds of the frame and the next two stacked beside it,
+ * each asked for at the cover's size (lazily, since a phone keeps the one
+ * picture), each credited, each opening the viewer at itself, the last saying
+ * how many more there are.
  */
 
 /** A view's id: the fixed views, and the memorandum's other photographs
@@ -86,6 +93,15 @@ const VIEWER = { w: 1280, h: 960 };
  *  the name and the figures stay on the first screen), and 16:9 again in the
  *  split, where the picture takes the left of the header. */
 const FRAME = "aspect-[16/9] @2xl:aspect-[21/9] @3xl:aspect-[16/9]";
+
+/** The mosaic (#458): the same frame split the way a listing opens — the
+ *  cover across two thirds, two more photographs stacked beside it — from
+ *  the header's 42rem up; a phone keeps the one picture. */
+const MOSAIC =
+  "@2xl:grid @2xl:aspect-[21/9] @3xl:aspect-[16/9] @2xl:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] @2xl:gap-0.5";
+/** The cover inside the mosaic: the frame's own shape on a phone, the
+ *  mosaic's full height beside the tiles. */
+const MOSAIC_COVER = "aspect-[16/9] @2xl:aspect-auto @2xl:h-full";
 
 export function PropertyVisual({
   dealId,
@@ -279,6 +295,11 @@ export function PropertyVisual({
   const open = () => setViewing(active);
   // Where the picture on screen sits among the photographs, for the count.
   const photoAt = photoIds.indexOf(active);
+  // The mosaic (#458): the cover with the next two photographs beside it,
+  // where the deal has both; how many more the viewer holds.
+  const tiles = photoPossible ? galleryLive.slice(0, 2) : [];
+  const mosaic = tiles.length === 2;
+  const moreCount = photoIds.length - 3;
 
   return (
     // The deal header's own picture (#433): no card of its own — the header
@@ -292,21 +313,79 @@ export function PropertyVisual({
       <div className="relative">
         {photoPossible && (
           <div className={active === "photo" ? "" : "hidden"}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
-                auth-scoped route serving the stored derivative; next/image
-                adds nothing over a route with its own cache headers */}
-            <img
-              src={`/api/deals/${dealId}/picture?size=hero`}
-              alt={`Photograph of ${label}`}
-              width={AERIAL.w}
-              height={AERIAL.h}
-              onClick={open}
-              className={`${FRAME} w-full cursor-zoom-in bg-faint object-cover`}
-              onError={() => setPhotoGone(true)}
-            />
-            <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
-              {picture?.credit}
-            </span>
+            <div className={mosaic ? MOSAIC : ""} data-picture={mosaic ? "mosaic" : undefined}>
+              <div className="relative min-h-0 min-w-0">
+                {/* eslint-disable-next-line @next/next/no-img-element -- proxied,
+                    auth-scoped route serving the stored derivative; next/image
+                    adds nothing over a route with its own cache headers */}
+                <img
+                  src={`/api/deals/${dealId}/picture?size=hero`}
+                  alt={`Photograph of ${label}`}
+                  width={AERIAL.w}
+                  height={AERIAL.h}
+                  onClick={open}
+                  className={`${mosaic ? MOSAIC_COVER : FRAME} w-full cursor-zoom-in bg-faint object-cover`}
+                  onError={() => setPhotoGone(true)}
+                />
+                <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+                  {picture?.credit}
+                </span>
+                {/* On the mosaic, the reader's Replace photo sits on the
+                    cover it replaces, never over the next photograph. */}
+                {mosaic && canReplace && (
+                  <div className="absolute right-2 top-2 z-[5]">
+                    <ReplacePicture dealId={dealId} hasPicture={!!picture} tone="overlay" />
+                  </div>
+                )}
+              </div>
+              {/* The next two photographs, each at the size the cover is
+                  held at, so neither is a stretched crop; lazy, so a phone,
+                  which does not show them, need not fetch them. Each opens
+                  the viewer at itself, and the last says how many more there
+                  are. */}
+              {mosaic && (
+                <div className="hidden min-h-0 min-w-0 @2xl:grid @2xl:grid-rows-2 @2xl:gap-0.5">
+                  {tiles.map((g, k) => {
+                    const at = photoIds.indexOf(g.id) + 1;
+                    const more = k === tiles.length - 1 && moreCount > 0;
+                    return (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => setViewing(g.id)}
+                        aria-label={
+                          more
+                            ? `Photograph ${at} of ${photoIds.length}, and ${moreCount} more: see them full screen`
+                            : `Photograph ${at} of ${photoIds.length}: see it full screen`
+                        }
+                        title={g.credit}
+                        data-mosaic-tile={g.i}
+                        className="group/tile relative min-h-0 cursor-zoom-in overflow-hidden bg-faint focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-white"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element -- proxied, auth-scoped route serving the stored derivative */}
+                        <img
+                          src={galleryHero(g.i)}
+                          alt=""
+                          width={AERIAL.w}
+                          height={AERIAL.h}
+                          loading="lazy"
+                          className="h-full w-full object-cover transition-transform duration-300 motion-safe:group-hover/tile:scale-[1.04]"
+                          onError={() => loseGallery(g.i)}
+                        />
+                        {more && (
+                          <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-sm font-semibold text-white">
+                            {`+${moreCount} more`}
+                          </span>
+                        )}
+                        <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
+                          {g.page ? `Memorandum, p. ${g.page}` : "Memorandum"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 
@@ -539,7 +618,7 @@ export function PropertyVisual({
         {/* "That's not the building": on the picture itself, where a cover
             photograph's own control sits — never over the map, whose corner
             belongs to its controls. */}
-        {canReplace && active !== "map" && (
+        {canReplace && active !== "map" && !(mosaic && active === "photo") && (
           <div className="absolute right-2 top-2 z-[5]">
             <ReplacePicture dealId={dealId} hasPicture={!!picture} tone="overlay" />
           </div>

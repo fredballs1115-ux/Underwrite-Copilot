@@ -1082,6 +1082,7 @@ jobs:
           mark "#455 a hotel is read with its flag, manager and PIP" grep -q "Hotels, read with their flag, manager and PIP" p_whats-new.html
           mark "#456 an auction is read for how it sells" grep -q "Auctions and distressed sales, read for how they sell" p_whats-new.html
           mark "#457 a multi-tenant property is read tenant by tenant" grep -q "Shopping centers and offices, read tenant by tenant" p_whats-new.html
+          mark "#458 a deal's photographs open as a mosaic" grep -q "A deal&#x27;s photographs, laid out like a listing" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
