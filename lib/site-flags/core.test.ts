@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   isHighRiskZone,
+  parseCensusCounty,
+  parseCensusPlace,
   parseCensusTract,
   parseNfhlFlood,
   resolveNfhlLayerId,
+  siteFlagsOutdated,
   siteFlagsStale,
 } from "./core";
 
@@ -283,5 +286,48 @@ describe("siteFlagsStale — flags looked up for an address the deal no longer h
     expect(siteFlagsStale(flags, " 100 Elm St, Dallas, TX 75201 ")).toBe(false);
     expect(siteFlagsStale({}, "5000 Main St, Frisco, TX 75034")).toBe(false);
     expect(siteFlagsStale(null, "5000 Main St, Frisco, TX 75034")).toBe(false);
+  });
+});
+
+describe("the building's municipality and county from the Census geocoder (#452)", () => {
+  // The shapes the runner printed (zori.yml probe run 36658903671), trimmed
+  // to the layers read.
+  const geo = (layers: Record<string, unknown[]>) => ({ result: { input: {}, geographies: { States: [{ NAME: "California" }], ...layers } } });
+  const place = (BASENAME: string, NAME: string, GEOID: string) => ({ BASENAME, NAME, GEOID, LSADC: "25", FUNCSTAT: "A" });
+  const county = (NAME: string, GEOID: string) => ({ NAME, GEOID, BASENAME: NAME.replace(/ County$/, ""), LSADC: "06" });
+
+  it("names the incorporated place — the municipality, not the postal city", () => {
+    const vanNuys = geo({ "Incorporated Places": [place("Los Angeles", "Los Angeles city", "0644000")], Counties: [county("Los Angeles County", "06037")] });
+    expect(parseCensusPlace(vanNuys)).toEqual({ name: "Los Angeles", geoid: "0644000" });
+    expect(parseCensusCounty(vanNuys)).toEqual({ name: "Los Angeles County", geoid: "06037" });
+    const pasadena = geo({ "Incorporated Places": [place("Pasadena", "Pasadena city", "0656000")], Counties: [county("Los Angeles County", "06037")] });
+    expect(parseCensusPlace(pasadena)?.name).toBe("Pasadena");
+  });
+
+  it("an unincorporated point is in no place, and a county-equivalent city keeps its own name", () => {
+    // Towson: no Incorporated Places layer at all, and Baltimore County.
+    const towson = geo({ Counties: [county("Baltimore County", "24005")] });
+    expect(parseCensusPlace(towson)).toBeNull();
+    expect(parseCensusCounty(towson)).toEqual({ name: "Baltimore County", geoid: "24005" });
+    const baltimore = geo({ "Incorporated Places": [place("Baltimore", "Baltimore city", "2404000")], Counties: [county("Baltimore city", "24510")] });
+    expect(parseCensusCounty(baltimore)).toEqual({ name: "Baltimore city", geoid: "24510" });
+    // An empty layer says the same as none.
+    expect(parseCensusPlace(geo({ "Incorporated Places": [], Counties: [county("Baltimore County", "24005")] }))).toBeNull();
+  });
+
+  it("a response that is not a geographies answer says nothing either way", () => {
+    expect(parseCensusPlace({ result: {} })).toBeUndefined();
+    expect(parseCensusPlace(null)).toBeUndefined();
+    // Geographies with no county answered nothing a "none" can be read from.
+    expect(parseCensusPlace(geo({}))).toBeUndefined();
+    expect(parseCensusCounty({ result: {} })).toBeNull();
+  });
+
+  it("an answered lookup made before the place was read is made again; one that never geocoded is not", () => {
+    expect(siteFlagsOutdated({ status: "ok" })).toBe(true);
+    expect(siteFlagsOutdated({ status: "ok", v: 2 })).toBe(false);
+    expect(siteFlagsOutdated({ status: "geocode_failed" })).toBe(false);
+    expect(siteFlagsOutdated({ status: "pending" })).toBe(false);
+    expect(siteFlagsOutdated(null)).toBe(false);
   });
 });

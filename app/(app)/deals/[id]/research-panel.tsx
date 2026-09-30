@@ -121,6 +121,7 @@ const UNKNOWN_LABELS: Record<string, string> = {
   occupancy: "current occupancy status",
   owner_occupied_with_units_lte: "whether you'll owner-occupy (and unit count)",
   owner_total_rental_units_in_state_lte: "total rental units you own in this state",
+  within_city_limits: "whether the building sits inside the city's limits",
 };
 
 /** Condition keys the Deal-facts panel can actually answer — only these earn
@@ -191,8 +192,13 @@ export async function ResearchPanel({
   tenYear = null,
   survey30 = null,
   placement,
+  census = null,
 }: {
   address: StructuredAddress | null;
+  /** what the Census geocoder read at the building (the deal's site flags,
+   *  #452): its incorporated place and county, which decide whether a
+   *  city's or a county's rules reach it; null before the lookup answers */
+  census?: { place?: { name: string } | null; county?: { name: string } | null } | null;
   /** where the page placed the deal (lib/market-county's `placeDeal`): its
    *  briefed market, a metro area whose figures are read, and how — the
    *  address matchers answer where it is not given */
@@ -248,6 +254,7 @@ export async function ResearchPanel({
   const words = assetWords(assetClass);
   const subject = buildSubject({
     address,
+    census,
     sizeText,
     yearBuilt,
     sectorFields,

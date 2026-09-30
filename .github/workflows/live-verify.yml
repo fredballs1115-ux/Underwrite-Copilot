@@ -1075,6 +1075,8 @@ jobs:
           mark "#451 city photos, lighter and sharper" grep -q "City photos, lighter and sharper" p_whats-new.html
           # #447 — a suburb placed in its metro area by its county (signed-in): its card.
           mark "#447 suburbs read their metro area" grep -q "Suburbs read their metro area" p_whats-new.html
+          # #452 — a city's rent rules read the building's municipality (signed-in): its card.
+          mark "#452 rent rules reach the right city" grep -q "Rent rules reach the right city" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

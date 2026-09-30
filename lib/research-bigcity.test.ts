@@ -216,3 +216,76 @@ describe("buildSubject portfolio totals", () => {
     expect(o["ny-good-cause-eviction"]).toBe("possibly_applies");
   });
 });
+
+describe("a city's rules reach the city, not a county or a neighbour of its name (#452)", () => {
+  const la = { ...BASE, state: "CA", units: 4, built_year: 1965 };
+  const withUnknowns = (subject: RuleSubject, id: string) => evaluateRules(seedRules(), subject).find((e) => e.rule.id === id);
+
+  it("Los Angeles County is not the City of Los Angeles: Pasadena reads no RSO once the Census names its city", () => {
+    const pasadena = buildSubject({
+      address: { state: "CA", city: "Pasadena", county: "Los Angeles County" },
+      census: { place: { name: "Pasadena" }, county: { name: "Los Angeles County" } },
+      sizeText: "4 units",
+      yearBuilt: 1965,
+    });
+    expect(outcomes({ ...BASE, ...pasadena })["ca-la-rso-coverage"]).toBeUndefined();
+    // AB 1482 is the state's and still reaches it.
+    expect(outcomes({ ...BASE, ...pasadena })["ca-ab1482-rent-cap"]).toBeDefined();
+  });
+
+  it("a Van Nuys address is inside the City of Los Angeles whatever its postal city says", () => {
+    const vanNuys = buildSubject({
+      address: { state: "CA", city: "Van Nuys", county: "Los Angeles County" },
+      census: { place: { name: "Los Angeles" }, county: { name: "Los Angeles County" } },
+      sizeText: "4 units",
+      yearBuilt: 1965,
+    });
+    expect(outcomes({ ...BASE, ...vanNuys })["ca-la-rso-coverage"]).toBe("applies");
+  });
+
+  it("before the Census answers, a Los Angeles County address that names another place is asked, not decided", () => {
+    const e = withUnknowns({ ...la, locality: ["Van Nuys", "Los Angeles County"] }, "ca-la-rso-coverage");
+    expect(e?.outcome).toBe("possibly_applies");
+    expect(e?.unknowns[0]).toBe("within_city_limits");
+    // The city itself, named: no question.
+    expect(outcomes({ ...la, locality: ["Los Angeles", "Los Angeles County"] })["ca-la-rso-coverage"]).toBe("applies");
+    // An unincorporated point is in no city.
+    expect(outcomes({ ...la, locality: ["East Los Angeles", "Los Angeles County"], place: null })["ca-la-rso-coverage"]).toBeUndefined();
+  });
+
+  it("a neighbour whose name contains the city's is not the city", () => {
+    expect(outcomes({ ...BASE, state: "CA", locality: ["South San Francisco", "San Mateo County"], units: 6, built_year: 1925 })["ca-sf-rent-ordinance"]).toBeUndefined();
+    expect(outcomes({ ...BASE, state: "IL", locality: ["Chicago Heights", "Cook County"], units: 3 })["il-chicago-rlto-owner-occupied-exemption"]).toBeUndefined();
+    expect(outcomes({ ...BASE, state: "NJ", locality: ["East Newark", "Hudson County"], units: 4 })["nj-newark-rent-control"]).toBeUndefined();
+    expect(outcomes({ ...BASE, state: "NY", locality: ["New York Mills", "Oneida County"], units: 8, built_year: 1930 })["ny-nyc-rent-stabilization-coverage"]).toBeUndefined();
+    expect(outcomes({ ...BASE, state: "NY", locality: ["York", "Livingston County"], units: 8, built_year: 1930 })["ny-nyc-rent-stabilization-coverage"]).toBeUndefined();
+  });
+
+  it("Baltimore County is not Baltimore City, and the Census's own county name places a Baltimore address", () => {
+    const towson = { ...BASE, state: "MD", units: 4 };
+    // A Parkville address mails as "Baltimore" and sits in Baltimore County.
+    expect(outcomes({ ...towson, locality: ["Baltimore", "Baltimore County"] })["md-baltimore-rental-license"]).toBeUndefined();
+    expect(outcomes({ ...towson, locality: ["Towson"], place: null })["md-baltimore-rental-license"]).toBeUndefined();
+    const city = buildSubject({ address: { state: "MD", city: "Baltimore" }, census: { place: { name: "Baltimore" }, county: { name: "Baltimore city" } }, sizeText: "4 units" });
+    expect(outcomes({ ...BASE, ...city })["md-baltimore-rental-license"]).toBeDefined();
+  });
+
+  it("a county's rules read the county the Census names where the address names none", () => {
+    const rockville = buildSubject({
+      address: { state: "MD", city: "Rockville" },
+      census: { place: { name: "Rockville" }, county: { name: "Montgomery County" } },
+      sizeText: "4 units",
+      yearBuilt: 1990,
+      currentYear: 2026,
+    });
+    expect(rockville.locality).toEqual(["Rockville", "Montgomery County"]);
+    expect(outcomes({ ...BASE, ...rockville })["md-moco-rent-stabilization"]).toBeDefined();
+  });
+
+  it("a consolidated city-county's county name is the city, and a borough is New York", () => {
+    expect(outcomes({ ...BASE, state: "PA", locality: ["Philadelphia County"], units: 4 })["pa-philadelphia-eviction-diversion"]).toBeDefined();
+    expect(outcomes({ ...BASE, state: "NY", locality: ["Kings County"], units: 8, built_year: 1930 })["ny-nyc-rent-stabilization-coverage"]).toBeDefined();
+    const brooklyn = buildSubject({ address: { state: "NY", city: "Brooklyn" }, census: { place: { name: "New York" }, county: { name: "Kings County" } }, sizeText: "8 units", yearBuilt: 1930 });
+    expect(outcomes({ ...BASE, ...brooklyn })["ny-nyc-rent-stabilization-coverage"]).toBe("applies");
+  });
+});

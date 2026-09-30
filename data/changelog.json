@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Rent rules reach the right city",
+      "href": "/deals",
+      "blurb": "The rent-control and landlord rules on a deal now go by the city the building actually sits in, which the site reads from the Census Bureau at the building's location. Before, a city's rule could reach an address whose county shared the city's name, or whose own name contained it: a Pasadena deal read Los Angeles's rent stabilization, and a South San Francisco deal read San Francisco's rent ordinance. Where the city is not known yet, a rule that may reach the deal says so and asks whether the building sits inside the city's limits."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Suburbs read their metro area's figures",
       "href": "/deals",
       "blurb": "A deal whose address names a suburb the site's market lists do not know, such as Frisco, Irvine, Fort Lauderdale or Cranberry Township, used to read its state's figures. The site now finds the county the building sits in, from its census tract or the county its address names, and places it in that county's metro area using the Census Bureau's list of every county in every metro area. The market check, the deal page, the report and the workbook then read the metro area's published figures, and each says the deal was placed there by its county. A county in no metro area the site reads keeps the state's figures, and an address word naming a place in another metro area is no longer taken for it."

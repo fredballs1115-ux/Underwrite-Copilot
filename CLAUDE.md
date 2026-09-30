@@ -2420,6 +2420,38 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   today's (`storedBrief.metro === liveMarket.name`). A check stored for
   the state before the county placed the deal is a different market's
   figures, and no move between the two is a move.
+- A rule's jurisdiction (#452). `jurisdictionOf` in `lib/research.ts` answers
+  "yes", "no" or "unknown", comparing names WHOLE. The first version
+  matched any name containing another, and let a county stand in for a
+  city: "Los Angeles County" read the City of Los Angeles's rent
+  stabilization onto Pasadena, "Baltimore County" Baltimore City's rental
+  license onto Towson, and South San Francisco, Chicago Heights and East
+  Newark each read their neighbour's rules. The rules:
+  - a county's rule holds where the deal's county is that county;
+  - a city's rule reads the building's municipality where the Census
+    geocoder named it (`RuleSubject.place`);
+  - without it, the address's own place names decide. A county of the
+    city's name places the deal in the city only where the county IS the
+    city (`CONSOLIDATED`: San Francisco, Philadelphia, New York's five).
+    Elsewhere it is "unknown", which `evaluateRules` shows as "possibly
+    applies" with `within_city_limits` asked;
+  - a rule filed under "… City" is an independent city, which a county of
+    its name does not contain.
+
+  The municipality comes free with the tract. The site flags' one
+  `geographies/coordinates` call carries "Incorporated Places" and
+  "Counties" beside the tract (`parseCensusPlace`, `parseCensusCounty`;
+  the runner printed the shape in zori.yml probe run 36658903671, through
+  `scripts/probe-url.mjs`'s JSON describer):
+  - Van Nuys is "Los Angeles city";
+  - Pasadena is "Pasadena city";
+  - Brooklyn is "New York city";
+  - Towson has no place layer at all, which is unincorporated (null),
+    never unknown.
+
+  Flags carry `v: SITE_FLAGS_V` (2). An answered lookup from before is
+  made again on the deal's next view (`siteFlagsOutdated`), and
+  `buildSubject` takes the Census county over the address's own.
 - Each building's own photograph: `lib/om-photo.ts` (pure) reads the JPEG
   image objects out of the deal's memorandum — a `/DCTDecode` stream IS the
   JPEG's bytes, verbatim, and `jpegInfo` reads its width, height and

@@ -3,10 +3,14 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { geocode } from "@/lib/public-comps/run";
 import { NFHL_ROOT as NFHL_DEFAULT_ROOT } from "@/lib/basemaps";
 import {
+  parseCensusCounty,
+  parseCensusPlace,
   parseCensusTract,
   parseNfhlFlood,
   resolveNfhlLayerId,
   SITE_FLAGS_NOTE,
+  SITE_FLAGS_V,
+  type CensusPlace,
   type SiteFlagsResult,
 } from "./core";
 
@@ -73,14 +77,20 @@ export async function claimSiteFlags(dealId: string, force = false): Promise<boo
   return (data?.length ?? 0) > 0;
 }
 
-async function tractFor(lat: number, lng: number): Promise<string | null> {
+/** The point's census tract, incorporated place and county — one call, the
+ *  three layers of the same `geographies/coordinates` answer (#452). */
+async function geographiesFor(
+  lat: number,
+  lng: number,
+): Promise<{ tract: string | null; place: CensusPlace | null | undefined; county: CensusPlace | null }> {
   const u = new URL("https://geocoding.geo.census.gov/geocoder/geographies/coordinates");
   u.searchParams.set("x", String(lng));
   u.searchParams.set("y", String(lat));
   u.searchParams.set("benchmark", "Public_AR_Current");
   u.searchParams.set("vintage", "Current_Current");
   u.searchParams.set("format", "json");
-  return parseCensusTract(await fetchJson(u.toString()));
+  const json = await fetchJson(u.toString());
+  return { tract: parseCensusTract(json), place: parseCensusPlace(json), county: parseCensusCounty(json) };
 }
 
 async function floodFor(lat: number, lng: number): Promise<SiteFlagsResult["flood"]> {
@@ -128,9 +138,15 @@ export async function computeSiteFlags(input: {
   const subject = { ...point, label: input.label };
 
   let tractGeoid: string | null = null;
+  // Undefined until the Census answers: an unread place is not "in none".
+  let place: CensusPlace | null | undefined;
+  let county: CensusPlace | null = null;
   let tractError: string | null = null;
   try {
-    tractGeoid = await tractFor(point.lat, point.lng);
+    const g = await geographiesFor(point.lat, point.lng);
+    tractGeoid = g.tract;
+    place = g.place;
+    county = g.county;
   } catch (err) {
     tractError = String(err).slice(0, 200);
   }
@@ -169,8 +185,11 @@ export async function computeSiteFlags(input: {
     status: allFailed ? "lookup_failed" : "ok",
     subject,
     tractGeoid,
+    ...(place !== undefined ? { place } : {}),
+    ...(county ? { county } : {}),
     opportunityZone,
     flood,
+    v: SITE_FLAGS_V,
     ...(tractError ? { error: `census tract: ${tractError}` } : {}),
   };
 }
