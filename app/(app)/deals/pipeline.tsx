@@ -29,6 +29,7 @@ import { PendingButton } from "../pending-button";
 import { AddressAutocomplete } from "../address-autocomplete";
 import type { StructuredAddress } from "@/lib/address";
 import { ASSET_CLASS_OPTIONS, assetClassLabel } from "@/lib/asset-class";
+import { rowMarketLabel } from "@/lib/placed-by";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
@@ -584,7 +585,10 @@ export function Pipeline({
         d.name,
         assetClassLabel(d.assetClass),
         d.market,
-        d.coveredMarket ?? "",
+        // What the row itself names (lib/placed-by): the briefed market, or
+        // the metro area read for it and how — never blank where the row
+        // says "Pittsburgh PA · read" or "Dallas–Fort Worth · Collin County".
+        rowMarketLabel(d) ?? "",
         d.slots.price ?? "",
         // The price by the unit, the key or the foot (#469); blank where
         // the count or the area is not stated, and on a plan deal.
@@ -1507,7 +1511,7 @@ const DealRow = memo(function DealRow({
       }
     >
       <span aria-hidden className="h-1.5 w-1.5 rounded-full border border-muted" />
-      {d.readCounty ? `${d.readMarket} · ${d.readCounty.split(",")[0]}` : `${d.readMarket} · read`}
+      {rowMarketLabel(d)}
     </span>
   ) : null;
   const asset = assetMeta(d.assetClass ?? "");
