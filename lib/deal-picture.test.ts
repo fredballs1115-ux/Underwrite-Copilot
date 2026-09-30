@@ -11,6 +11,18 @@ const store = vi.hoisted(() => ({
   removed: [] as string[],
 }));
 
+// The cover's read, given no time at all where a test asks for a read the
+// time budget cuts short; the real reader otherwise.
+const decodeBudget = vi.hoisted(() => ({ ms: undefined as number | undefined }));
+vi.mock("@/lib/om-photo-decode", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("./om-photo-decode")>();
+  return {
+    ...orig,
+    decodeOmCover: (pdf: Uint8Array, opts?: { budgetMs?: number }) =>
+      orig.decodeOmCover(pdf, decodeBudget.ms === undefined ? opts : { budgetMs: decodeBudget.ms }),
+  };
+});
+
 vi.mock("@/lib/storage", () => ({
   dealPhotoPath: (dealId: string, stamp: string, size: string) => `photos/${dealId}/${stamp}-${size}.jpg`,
   downloadDealFile: async (path: string) => store.files.get(path) ?? Buffer.alloc(0),
@@ -31,13 +43,20 @@ vi.mock("@/lib/storage", () => ({
 
 import {
   GALLERY_VERSION,
+  MAX_CUT_READS,
+  PHOTO_RULES_SINCE,
   PICTURE_SEARCH_VERSION,
+  RETRY_AFTER_MS,
   backfillPreview,
   clearOmPicture,
+  currentPicture,
   derivePicture,
   ensureDealPicture,
+  pictureMayBeInMemorandum,
   picturePaths,
   previewOf,
+  retryWaiting,
+  searchedRecently,
 } from "./deal-picture";
 import { PREVIEW_PX, isPreview } from "./photo-preview";
 import sharp from "sharp";
@@ -68,7 +87,7 @@ const OLD: DealPicture = {
   source: "om",
   at: "2026-09-01T00:00:00Z",
 };
-const staleCache = (): DealVisualCache => ({ picture: OLD, pictureCheckedAt: OLD.at, pictureSearchV: PICTURE_SEARCH_VERSION - 1 });
+const staleCache = (): DealVisualCache => ({ picture: OLD, pictureCheckedAt: OLD.at, pictureSearchV: PHOTO_RULES_SINCE - 1 });
 
 describe("a memorandum photograph lifted under older rules, judged again (#444)", () => {
   beforeEach(() => {
@@ -127,6 +146,102 @@ describe("a memorandum photograph lifted under older rules, judged again (#444)"
     const { client } = fakeDb(cache);
     expect(await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache, waitMs: 5_000 })).toBe(own);
     expect(store.uploads).toEqual([]);
+  });
+});
+
+describe("a read the time budget cut short writes no verdict", () => {
+  beforeEach(() => {
+    store.oms.clear();
+    store.files.clear();
+    store.uploads = [];
+    store.removed = [];
+    decodeBudget.ms = undefined;
+  });
+
+  // A secured memorandum: every stream encrypted, so the byte scan cannot
+  // see its cover and only the pages' read can find it.
+  const locked = async () => testMemorandum([{ images: [await testPicture(800, 500, "jpeg")] }], "aes-128");
+  const ask = (client: SupabaseClient, cache: DealVisualCache | null) =>
+    ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache, waitMs: 5_000, gallery: false });
+  const ago = (ms: number) => new Date(Date.now() - ms).toISOString();
+  /** The last read cut short, moved back past its wait. */
+  const waited = (cache: DealVisualCache): DealVisualCache => ({
+    ...cache,
+    pictureRetry: { ...cache.pictureRetry!, at: ago(RETRY_AFTER_MS[RETRY_AFTER_MS.length - 1] + 1_000) },
+  });
+
+  it("says nothing, holds the next read back for its wait, and takes the third in a row as the verdict", async () => {
+    store.oms.set("u/d1.pdf", await locked());
+    decodeBudget.ms = 0;
+    const { client, db } = fakeDb(null);
+    expect(await ask(client, null)).toBeNull();
+    // No verdict: the memorandum was never looked at. The read is counted.
+    expect(db.photo?.pictureCheckedAt).toBeUndefined();
+    expect(db.photo?.pictureRetry).toMatchObject({ n: 1, v: PICTURE_SEARCH_VERSION });
+    expect(searchedRecently(db.photo)).toBe(false);
+    // Inside its wait no read is made, and the pipeline's cards do not ask.
+    expect(retryWaiting(db.photo)).toBe(true);
+    expect(retryWaiting(db.photo, Date.now() + RETRY_AFTER_MS[0] + 1_000)).toBe(false);
+    expect(pictureMayBeInMemorandum({ omPath: "u/d1.pdf", isSample: false, cache: db.photo })).toBe(false);
+    const first = db.photo!.pictureRetry!.at;
+    expect(await ask(client, db.photo)).toBeNull();
+    expect(db.photo?.pictureRetry).toMatchObject({ n: 1, at: first });
+    // Its wait over, the second read; cut short too, it holds the next back longer.
+    db.photo = { ...db.photo!, pictureRetry: { ...db.photo!.pictureRetry!, at: ago(RETRY_AFTER_MS[0] + 1_000) } };
+    expect(pictureMayBeInMemorandum({ omPath: "u/d1.pdf", isSample: false, cache: db.photo })).toBe(true);
+    expect(await ask(client, db.photo)).toBeNull();
+    expect(db.photo?.pictureRetry?.n).toBe(2);
+    expect(retryWaiting(db.photo, Date.now() + RETRY_AFTER_MS[0] + 1_000)).toBe(true);
+    // The third in a row stands as the verdict for the month: a file the
+    // reader can never finish is not decoded on every view.
+    expect(MAX_CUT_READS).toBe(3);
+    db.photo = waited(db.photo!);
+    expect(await ask(client, db.photo)).toBeNull();
+    expect(db.photo?.pictureRetry).toBeUndefined();
+    expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
+    expect(searchedRecently(db.photo)).toBe(true);
+    expect(store.uploads).toEqual([]);
+  });
+
+  it("finds the photograph on a later read given its time, and forgets the reads cut short", async () => {
+    store.oms.set("u/d1.pdf", await locked());
+    decodeBudget.ms = 0;
+    const { client, db } = fakeDb(null);
+    await ask(client, null);
+    expect(db.photo?.pictureRetry?.n).toBe(1);
+    decodeBudget.ms = undefined;
+    const got = await ask(client, waited(db.photo!));
+    expect(got).toMatchObject({ source: "om", width: 1200, height: 750 });
+    expect(db.photo?.picture?.hero).toBe(got!.hero);
+    expect(db.photo?.pictureRetry).toBeUndefined();
+  });
+
+  it("neither drops nor replaces a photograph lifted under older rules, and keeps it after the third", async () => {
+    store.oms.set("u/d1.pdf", await locked());
+    decodeBudget.ms = 0;
+    const { client, db } = fakeDb(staleCache());
+    expect(await ask(client, staleCache())).toEqual(OLD);
+    expect(db.photo?.picture).toEqual(OLD);
+    expect(db.photo?.pictureRetry?.n).toBe(1);
+    // The card shows it as it is while the next read waits.
+    expect(pictureMayBeInMemorandum({ omPath: "u/d1.pdf", isSample: false, cache: db.photo })).toBe(false);
+    for (let n = 2; n <= MAX_CUT_READS; n++) {
+      expect(await ask(client, waited(db.photo!))).toEqual(OLD);
+    }
+    // No read could judge it, so it stands as the deal's photograph.
+    expect(db.photo?.picture).toEqual(OLD);
+    expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
+    expect(currentPicture(db.photo)).toEqual(OLD);
+    expect(store.removed).toEqual([]);
+    expect(store.uploads).toEqual([]);
+  });
+
+  it("is forgotten with the memorandum it was read from", async () => {
+    const cache: DealVisualCache = { pictureRetry: { n: 2, at: new Date().toISOString(), v: PICTURE_SEARCH_VERSION } };
+    const { client, db } = fakeDb(cache);
+    await clearOmPicture(client, "d1", cache);
+    expect(db.photo?.pictureRetry).toBeUndefined();
+    expect(retryWaiting(db.photo)).toBe(false);
   });
 });
 

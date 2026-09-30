@@ -44,6 +44,11 @@ export interface DealVisualCache {
   pictureCheckedAt?: string;
   /** the search rules that verdict was reached under; see PICTURE_SEARCH_VERSION */
   pictureSearchV?: number;
+  /** reads of the memorandum in a row that the time budget cut short before
+   *  they found a photograph (lib/deal-picture): how many, when the last one
+   *  ended, under which search rules. Such a read writes no verdict; the
+   *  next one waits, and the third in a row is taken as the verdict */
+  pictureRetry?: { n: number; at: string; v: number };
   /** the memorandum's other photographs, beside the cover, in page order
    *  (#448, lib/deal-picture) — each stored as two derivatives */
   gallery?: DealPicture[];

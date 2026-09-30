@@ -53,6 +53,16 @@ import {
  * (`PICTURE_SEARCH_VERSION`), so a memorandum searched before a rule
  * changed is searched again on its next view rather than a month later.
  *
+ * A READ CUT SHORT SAYS NOTHING. The pages are read inside a time budget,
+ * and a secured memorandum or a photograph stored as pixels is exactly what
+ * the byte scan cannot see into, so a read the budget cut short on a busy
+ * process used to be written down as "no photograph" and trusted for a
+ * month. The verdict is written now only after a complete read (`readCover`'s
+ * `complete`); a read cut short is counted instead (`pictureRetry`), the next
+ * waits ten minutes, then two hours, and the third in a row stands as the
+ * verdict — so a file the reader can never finish costs three decodes a
+ * month, not one a view.
+ *
  * THE COVER PAGE'S PHOTOGRAPH, NEVER A MAP (#444). The pages decide now
  * (`coverOf`): the old scan took the largest JPEG anywhere in the file, and
  * a memorandum's largest pictures are its aerial and its location maps. A
@@ -102,13 +112,36 @@ export const MAX_ENLARGE = 2;
 const RECHECK_MS = 30 * 86_400_000;
 /**
  * The memorandum search's rules. A "no photograph" verdict reached under
- * older rules is stale, and so is a photograph lifted under them: 2 is the
- * search that opens a locked file and decodes a photograph stored as pixels
- * (#440), 3 the one that reads the cover page first and refuses a map, a
- * plan or a page of text (#444), 4 the one that enlarges a small cover's
- * hero cleanly rather than leaving the browser to stretch it (#446).
+ * older rules is stale: 2 is the search that opens a locked file and
+ * decodes a photograph stored as pixels (#440), 3 the one that reads the
+ * cover page first and refuses a map, a plan or a page of text (#444), 4 the
+ * one that enlarges a small cover's hero cleanly rather than leaving the
+ * browser to stretch it (#446), 5 the one that says nothing where the time
+ * budget cut its read short — so a verdict of none reached before, which may
+ * have been exactly that, is looked at again.
  */
-export const PICTURE_SEARCH_VERSION = 4;
+export const PICTURE_SEARCH_VERSION = 5;
+/**
+ * The oldest rules a photograph lifted from the memorandum still stands
+ * under. A photograph lifted before 3 could be a map and is judged again
+ * (#444), and one before 4 had its hero left for the browser to stretch
+ * (#446); the rules since change only what it takes to say there is none,
+ * so the photographs they would lift are the ones already stored.
+ */
+export const PHOTO_RULES_SINCE = 4;
+/**
+ * Reads cut short by the time budget, in a row, before the last of them is
+ * taken as the verdict. A read the time cuts short writes nothing — it never
+ * looked, so it cannot say the memorandum holds no photograph — but a file
+ * that runs out of time on every read must not be decoded on every view for
+ * ever: the next read waits `RETRY_AFTER_MS` (ten minutes after the first,
+ * two hours after the second, so a process that was merely busy gets its
+ * answer the same day), and the third in a row stands as the verdict for
+ * the month, as a complete read that found nothing does. So a memorandum
+ * the reader can never finish costs at most three decodes a month.
+ */
+export const MAX_CUT_READS = 3;
+export const RETRY_AFTER_MS: readonly number[] = [10 * 60_000, 2 * 3_600_000];
 /** Extractions in flight per process. */
 const MAX_IN_FLIGHT = 2;
 /** How long an ask waits for its turn before it answers "not yet". */
@@ -273,6 +306,7 @@ export async function storePicture(
     picture,
     pictureCheckedAt: picture.at,
     pictureSearchV: PICTURE_SEARCH_VERSION,
+    pictureRetry: undefined,
   });
   // The previous pair is orphaned now — best effort, never fatal.
   if (cache?.picture) {
@@ -297,10 +331,16 @@ export async function clearOmPicture(
   const galleryPatch =
     cache?.galleryV !== undefined || galleryFiles.length > 0 ? { gallery: undefined, galleryV: undefined } : {};
   if (!pic || pic.source !== "om") {
-    // No memorandum picture to drop, but a "nothing in there" verdict is
-    // stale the moment the file changes.
-    if (cache?.pictureCheckedAt || "galleryV" in galleryPatch) {
-      await writeCache(supabase, dealId, cache, { pictureCheckedAt: undefined, pictureSearchV: undefined, ...galleryPatch });
+    // No memorandum picture to drop, but a "nothing in there" verdict — and
+    // a count of reads the time cut short — is stale the moment the file
+    // changes.
+    if (cache?.pictureCheckedAt || cache?.pictureRetry || "galleryV" in galleryPatch) {
+      await writeCache(supabase, dealId, cache, {
+        pictureCheckedAt: undefined,
+        pictureSearchV: undefined,
+        pictureRetry: undefined,
+        ...galleryPatch,
+      });
     }
     if (galleryFiles.length > 0) await removeStorageFiles(galleryFiles, photoScope(dealId)).catch(() => {});
     return;
@@ -309,6 +349,7 @@ export async function clearOmPicture(
     picture: undefined,
     pictureCheckedAt: undefined,
     pictureSearchV: undefined,
+    pictureRetry: undefined,
     ...galleryPatch,
   });
   await removeStorageFiles([pic.hero, pic.thumb, ...galleryFiles], photoScope(dealId)).catch(() => {});
@@ -340,10 +381,24 @@ export function searchedRecently(cache: DealVisualCache | null, now = Date.now()
 }
 
 /**
+ * Whether a read the time budget cut short still holds the next one back:
+ * one or two such reads in a row under today's rules, the last of them
+ * inside its wait (`RETRY_AFTER_MS`). The third in a row is written as the
+ * verdict and never counted here.
+ */
+export function retryWaiting(cache: DealVisualCache | null | undefined, now = Date.now()): boolean {
+  const r = cache?.pictureRetry;
+  if (!r || r.v !== PICTURE_SEARCH_VERSION || !(r.n >= 1)) return false;
+  const wait = RETRY_AFTER_MS[Math.min(r.n, RETRY_AFTER_MS.length) - 1];
+  return now - Date.parse(r.at) < wait;
+}
+
+/**
  * Whether the deal's memorandum may still hold a photograph nobody has
  * looked for: it has a memorandum, it is not the sample, no picture is
  * cached, and none was looked for in the last thirty days under today's
- * search rules. A surface that pins its sources (the pipeline's cards,
+ * search rules — nor is a read the time cut short still waiting to be made
+ * again. A surface that pins its sources (the pipeline's cards,
  * #428) tries the picture route first where this is true — the route lifts
  * the cover on that first ask, or answers 404 and the next source follows.
  * `ensureDealPicture`'s own rules, without its turn-taking.
@@ -355,18 +410,22 @@ export function pictureMayBeInMemorandum(opts: {
 }): boolean {
   const { cache } = opts;
   if (opts.isSample || !opts.omPath || currentPicture(cache)) return false;
+  // A read the time cut short is made again only once its wait is over;
+  // meanwhile an old photograph is shown as it is.
+  if (retryWaiting(cache)) return false;
   // A photograph lifted under older rules is looked for again (#444).
   if (staleOmPicture(cache)) return true;
   return !searchedRecently(cache);
 }
 
 /**
- * A photograph lifted from the memorandum under an older search's rules
- * (#444): those could take a map for the cover, so it is judged again on
- * its next ask. A picture the reader put there is theirs and never is.
+ * A photograph lifted from the memorandum under rules older than
+ * `PHOTO_RULES_SINCE` (#444): those could take a map for the cover, so it
+ * is judged again on its next ask. A picture the reader put there is theirs
+ * and never is.
  */
 export function staleOmPicture(cache: DealVisualCache | null | undefined): boolean {
-  return cache?.picture?.source === "om" && cache.pictureSearchV !== PICTURE_SEARCH_VERSION;
+  return cache?.picture?.source === "om" && (cache.pictureSearchV ?? 0) < PHOTO_RULES_SINCE;
 }
 
 /** The deal's picture as today's rules stand behind it: the reader's own,
@@ -432,23 +491,39 @@ async function storedJpegOf(images: readonly OmImage[], cover: DecodedCover): Pr
  * its cover.
  */
 export async function coverOf(pdf: Uint8Array): Promise<PictureInput | null> {
-  const read = await decodeOmCover(pdf);
+  return (await readCover(pdf)).cover;
+}
+
+/**
+ * `coverOf`, and whether "none" is an answer (`complete`). A search that
+ * finds no cover says so for a month only where the read reached its end —
+ * every page it covers read, or a file that cannot be opened at all — and
+ * the byte scan, where it had to guess, found nothing either. Where the time
+ * budget cut the read short (a secured memorandum's pages, or a photograph
+ * stored as pixels, on a slow or busy process: exactly the files the scan
+ * cannot see into), it never looked, so it says nothing.
+ */
+export async function readCover(
+  pdf: Uint8Array,
+  opts: { budgetMs?: number } = {},
+): Promise<{ cover: PictureInput | null; complete: boolean }> {
+  const read = await decodeOmCover(pdf, opts);
   const stored = findOmImages(pdf);
   if (read.cover) {
     const jpeg = await storedJpegOf(stored, read.cover);
-    if (jpeg) return Buffer.from(jpeg.bytes);
+    if (jpeg) return { cover: Buffer.from(jpeg.bytes), complete: true };
     const { width, height, channels, pixels } = read.cover;
-    return { width, height, channels, pixels };
+    return { cover: { width, height, channels, pixels }, complete: true };
   }
-  if (read.opened && read.pageOneRead) return null;
+  if (read.opened && read.pageOneRead) return { cover: null, complete: read.complete };
   const early = stored
     .filter((im) => pdf.length > 0 && im.offset / pdf.length < EARLY_SHARE && scanShaped(im))
     .sort((a, b) => a.offset - b.offset);
   for (const im of early) {
     const sample = await jpegSample(im.bytes, 64);
-    if (sample && flatShare(sample, 64, 64, 3) < FLAT_SHARE) return Buffer.from(im.bytes);
+    if (sample && flatShare(sample, 64, 64, 3) < FLAT_SHARE) return { cover: Buffer.from(im.bytes), complete: true };
   }
-  return null;
+  return { cover: null, complete: read.complete };
 }
 
 /**
@@ -608,7 +683,13 @@ function refreshGalleryBehind(
  * A memorandum photograph lifted under older rules (#444) is judged again:
  * a route waits for the verdict; a page render gets the old photograph at
  * once and the search runs behind it. Where the search cannot run (no turn,
- * no memorandum, a storage failure), the old photograph stands.
+ * no memorandum, a storage failure, a read the time cut short), the old
+ * photograph stands.
+ *
+ * A read the time budget cut short says nothing (`readCover`'s
+ * `complete`): no verdict is written, and the next ask reads again once its
+ * wait is over (`retryWaiting`), the third such read in a row standing as
+ * the verdict (`MAX_CUT_READS`).
  *
  * A caller that already holds the memorandum's bytes — the screen, which
  * lifts the cover right after its extraction so a new deal's first view
@@ -643,6 +724,8 @@ export async function ensureDealPicture(
   }
   const stale = cache?.picture ?? null;
   if (opts.isSample || !opts.omPath) return stale;
+  // A read the time cut short waits its turn to be made again.
+  if (retryWaiting(cache)) return stale;
   if (!stale && searchedRecently(cache)) {
     // No cover on the first pages, but photographs may sit further in.
     if (gallery) refreshGalleryBehind(supabase, dealId, opts);
@@ -684,19 +767,45 @@ async function searchMemorandum(
   let held = true;
   try {
     const pdf = given ?? (await downloadOmPdf(omPath, { kind: "deal", dealId, only: ["om"] }));
-    const cover = await coverOf(pdf);
+    const { cover, complete } = await readCover(pdf);
     let outcome: SearchOutcome;
-    if (!cover) {
-      // A photograph lifted under older rules that today's search does not
-      // find on the cover pages was not the cover (#444): it goes.
-      const dropped = cache?.picture?.source === "om" ? cache.picture : null;
+    // The memorandum picture already stored, lifted under older rules (#444).
+    const older = cache?.picture?.source === "om" ? cache.picture : null;
+    if (!cover && !complete) {
+      // The time budget cut the read short: it never looked, so it says
+      // nothing — no verdict, and an older photograph is neither dropped nor
+      // replaced. The read is counted, and the next waits its turn; the
+      // third in a row stands as the verdict, so a file the reader can never
+      // finish is not decoded on every view for ever.
+      const prior = cache?.pictureRetry?.v === PICTURE_SEARCH_VERSION ? cache.pictureRetry.n : 0;
+      const n = prior + 1;
+      const at = new Date().toISOString();
+      if (n < MAX_CUT_READS) {
+        await writeCache(supabase, dealId, cache, { pictureRetry: { n, at, v: PICTURE_SEARCH_VERSION } });
+        outcome = { picture: null, settled: false };
+      } else {
+        // An older photograph stands as the deal's for good, since no read
+        // can judge it ("kept while the search cannot run"); none stays none
+        // for the month.
+        await writeCache(supabase, dealId, cache, {
+          pictureCheckedAt: at,
+          pictureSearchV: PICTURE_SEARCH_VERSION,
+          pictureRetry: undefined,
+        });
+        outcome = { picture: older, settled: true };
+      }
+    } else if (!cover) {
+      // Read to its end, and none on the cover pages. A photograph lifted
+      // under older rules that today's search does not find there was not
+      // the cover (#444): it goes.
       await writeCache(supabase, dealId, cache, {
-        ...(dropped ? { picture: undefined } : {}),
+        ...(older ? { picture: undefined } : {}),
         pictureCheckedAt: new Date().toISOString(),
         pictureSearchV: PICTURE_SEARCH_VERSION,
+        pictureRetry: undefined,
       });
-      if (dropped) {
-        await removeStorageFiles([dropped.hero, dropped.thumb], photoScope(dealId)).catch(() => {});
+      if (older) {
+        await removeStorageFiles([older.hero, older.thumb], photoScope(dealId)).catch(() => {});
       }
       outcome = { picture: null, settled: true };
     } else {
@@ -705,8 +814,16 @@ async function searchMemorandum(
       outcome = { picture: await storePicture(supabase, dealId, cache, cover, "om"), settled: true };
     }
     // The rest of the memorandum's photographs (#448), behind the answer and
-    // in the same turn: the cover shows while they are read.
-    if (withGallery && !galleryCurrent(cache) && !galleryInFlight.has(dealId) && !coverWaiting()) {
+    // in the same turn: the cover shows while they are read. Not behind a
+    // read the time cut short: a file that slow would only run out of time
+    // again on sixteen pages.
+    if (
+      withGallery &&
+      (cover || complete) &&
+      !galleryCurrent(cache) &&
+      !galleryInFlight.has(dealId) &&
+      !coverWaiting()
+    ) {
       const hash = cover ? await hashOf(cover) : null;
       held = false;
       galleryInFlight.add(dealId);
