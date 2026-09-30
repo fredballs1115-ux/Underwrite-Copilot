@@ -22,6 +22,7 @@ import { readSingleTenant, singleTenantModelLine, singleTenantShortLine } from "
 import { hotelModelLine, hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
 import { readSale, saleShortLine } from "@/lib/sale-terms";
 import { saleCeilingRead } from "@/lib/sale-ceiling";
+import { readRoster, rosterModelLine, rosterShortLine } from "@/lib/tenant-roster";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -122,6 +123,11 @@ export interface WorkbookMeta {
    *  out of the buyer's premium (lib/sale-ceiling); absent on a negotiated
    *  sale */
   sale?: { line: string; read: string } | null;
+  /** a multi-tenant property's listed tenants (lib/tenant-roster, #457):
+   *  the roster in one line, then what this model does not carry for the
+   *  roll — its leasing capital, its flat vacancy; absent where the
+   *  memorandum lists fewer than two tenants */
+  roster?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -245,6 +251,23 @@ function singleTenantMeta(extraction: ExtractionResult | null, inputs: Underwrit
       rentGrowthPct: inputs.rentGrowthPct,
       vacancyPct: inputs.vacancyPct,
       exitCapPct: inputs.exitCapPct,
+    }),
+  };
+}
+
+/** The cover's lines about a multi-tenant property's listed tenants
+ *  (#457): the roster, then what this model does not carry for its roll.
+ *  Null where the memorandum lists fewer than two tenants. */
+function rosterMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["roster"] {
+  const r = readRoster(extraction);
+  if (!r) return null;
+  return {
+    line: rosterShortLine(r),
+    read: rosterModelLine(r, {
+      holdMonths: inputs.holdMonths,
+      tiPsf: inputs.tiPsf,
+      lcPct: inputs.lcPct,
+      vacancyPct: inputs.vacancyPct,
     }),
   };
 }
@@ -720,6 +743,7 @@ export function deriveUnderwriteInputs(
       leasehold: leaseholdMeta(extraction, inputs),
       affordable: affordableMeta(extraction),
       singleTenant: singleTenantMeta(extraction, inputs),
+      roster: rosterMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

@@ -165,3 +165,27 @@ describe("dealContextFor — how the property is sold (#456)", () => {
     );
   });
 });
+
+describe("dealContextFor — a multi-tenant property's listed tenants (#457)", () => {
+  it("says what the list covers and the anchor outside the sale; nothing on housing", () => {
+    const t = (name: string, over: Record<string, string> = {}) => ({
+      name, role: "inline" as const, inSale: "yes" as const, sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "", ...over,
+    });
+    const center: ExtractionResult = {
+      dealName: "Maple Grove Crossing",
+      assetClass: "retail",
+      strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+      tenants: [
+        t("Kroger", { sf: "58,000 SF", rent: "$725,000", leaseExpiration: "January 31, 2124" }),
+        t("Staples", { sf: "20,000 SF", rent: "$360,000", leaseExpiration: "June 30, 2124" }),
+        { ...t("Target", { sf: "125,000 SF" }), role: "anchor" as const, inSale: "no" as const },
+      ],
+      metrics: [m("Total SF", "90,000 SF"), m("NOI (in-place)", "$1,000,000")],
+    };
+    const ctx = dealContextFor(center)!;
+    expect(ctx).toContain("The tenants: The memorandum lists two tenants on 78,000 SF, 87% of the building's 90,000 SF");
+    expect(ctx).toContain("Target anchors the property but is not part of the offering, as stated");
+    expect(ctx).toContain("As listed: Kroger (58,000 SF, $725,000 a year, ends Jan 2124)");
+    expect(dealContextFor({ ...center, assetClass: "multifamily" })).toBe("Deal type: Stabilized.");
+  });
+});

@@ -41,6 +41,7 @@ import { affordableNote, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantNote } from "@/lib/single-tenant";
 import { hotelNote, readHotelDeal } from "@/lib/hotel-deal";
 import { readSale, saleNote } from "@/lib/sale-terms";
+import { readRoster, rosterNote } from "@/lib/tenant-roster";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -860,6 +861,12 @@ async function runAnalysisSteps(
         // guarantor, the term at the exit, dark value, the increases.
         const singleTenant = readSingleTenant(ex);
         if (singleTenant) notes.push(singleTenantNote(singleTenant));
+
+        // The listed tenants of a multi-tenant property (#457): the roll
+        // against the sale, the anchors in and out of it, the rights that
+        // ride on them — then the multi-tenant traps by name.
+        const roster = readRoster(ex);
+        if (roster) notes.push(rosterNote(roster));
 
         // What a hotel is sold with (#455): the flag, the manager, the
         // encumbrance and the PIP, then the contract traps by name.

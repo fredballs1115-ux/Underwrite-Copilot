@@ -260,6 +260,38 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).hotelLine).toBe("");
   }, 30000);
 
+  it("says a multi-tenant property's listed tenants under the title (#457), and nothing on the sample", async () => {
+    const t = (name: string, over: Record<string, string>) => ({
+      name, role: "inline", inSale: "yes", sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "", ...over,
+    });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "office",
+      tenants: [
+        t("Acme Law", { sf: "12,000 SF", rent: "$420,000", leaseExpiration: "2124" }),
+        t("Birch Health", { sf: "8,000 SF", rent: "$280,000", leaseExpiration: "2125" }),
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "office",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.rosterLine).toBe("Two tenants listed; none of their rent expires before year 5; Acme Law pays 60% of the listed rent");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Two tenants listed; none of their rent expires before year 5");
+    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).rosterLine).toBe("");
+  }, 30000);
+
   it("says how the property is sold under the title (#456), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

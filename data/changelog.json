@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Shopping centers and offices, read tenant by tenant",
+      "href": "/deals",
+      "blurb": "For a multi-tenant property — an office building, a shopping center, a multi-tenant industrial park, a medical office building — the screen now reads the memorandum's tenant list: each tenant's space, rent, lease end, options, the first date it may leave early and the rights it holds, and whether an anchor is part of the sale at all. The deal page draws how much of the listed rent expires in each year before the model's five-year sale, with the worst year marked; the building by the space each tenant leases, with an anchor outside the sale drawn apart; and each tenant's lease end and rights. It sets the memorandum's quoted WALT against the listed leases weighted by rent, counts a stated early termination date as the lease's end, names co-tenancy and go-dark rights, and says plainly when the model carries no leasing capital while the roll lands inside its hold. The pipeline, the memo, the report, the workbook and the compare table carry it too, and the assumption review checks the multi-tenant traps by name."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Auctions and distressed sales, read for how they sell",
       "href": "/deals",
       "blurb": "When a property is sold at auction, by a court-appointed receiver, out of a bankruptcy or by the lender that took it back, the screen now reads how it is sold: the starting bid, the buyer's premium on top of the winning bid, the reserve, when bids are due, any stalking-horse bid and the sale's conditions. A starting bid is no longer taken for the price: where the memorandum states no asking price, the model runs at the starting bid plus the premium — the floor of what a winning bidder pays — and says every return it shows is therefore a ceiling. The deal page draws the opening bid with the premium on top and the most the model pays all-in at your buy box's IRR floor (15% where none is set), with the hammer price that leaves once the premium is backed out. The pipeline, the memo, the report, the workbook and the compare table carry it too, and the assumption review checks the sale's traps by name."

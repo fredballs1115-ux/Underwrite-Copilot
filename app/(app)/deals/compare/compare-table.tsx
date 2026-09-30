@@ -79,6 +79,10 @@ export type Col = {
   /** one tenant leases the whole property ("Single tenant, 9 yrs left" —
    *  lib/single-tenant `singleTenantTag`, #454); absent otherwise */
   tenancy?: string | null;
+  /** a multi-tenant property's listed tenants ("Shadow-anchored, 56% rolls
+   *  in 5 yrs" — lib/tenant-roster `rosterTag`, #457); absent where the roll
+   *  is small and every anchor is in the sale */
+  roster?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -203,6 +207,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // was read did not look.
     { label: "Affordability", get: (c) => c.affordable || "—" },
     { label: "Tenancy", get: (c) => c.tenancy || "—" },
+    // A shadow anchor is not bought, and a roll before the sale is income
+    // the model counts and the buyer may not keep (#457).
+    { label: "Tenants", get: (c) => c.roster || "—" },
     { label: "Hotel", get: (c) => c.hotel || "—" },
     { label: "Sale", get: (c) => c.sale || "—" },
     // A conversion and a stabilized building are not the same kind of thing,

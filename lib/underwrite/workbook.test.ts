@@ -828,6 +828,31 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "Affordability")).toThrow();
   });
 
+  it("a shopping center (#457): the listed tenants, then the leasing capital the model does not carry", async () => {
+    const y = new Date().getUTCFullYear();
+    const t = (name: string, over: Record<string, string>) => ({
+      name, role: "inline" as const, inSale: "yes" as const, sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "", ...over,
+    });
+    const center = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "retail",
+        tenants: [
+          t("Staples", { sf: "10,000 SF", rent: "$300,000", leaseExpiration: String(y + 2) }),
+          t("Kroger", { sf: "40,000 SF", rent: "$600,000", leaseExpiration: String(y + 30) }),
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(center));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The tenants");
+    expect(String(cover.getCell(r, 3).value)).toMatch(/^Two tenants listed on \d+% of the building; 33% of their rent expires before year 5/);
+    expect(String(cover.getCell(r + 1, 3).value)).toContain("The model carries no leasing capital");
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The tenants")).toThrow();
+  });
+
   it("an auction (#456): how it is sold, then the ceiling bid at the screening hurdle", async () => {
     const auction = deriveUnderwriteInputs(
       {

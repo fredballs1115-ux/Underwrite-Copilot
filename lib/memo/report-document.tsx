@@ -54,6 +54,7 @@ import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
 import { hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
 import { readSale, saleShortLine } from "@/lib/sale-terms";
+import { readRoster, rosterShortLine } from "@/lib/tenant-roster";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -736,6 +737,11 @@ export interface ReportInput {
    *  absent where the caller built no model, and then the line prints
    *  alone */
   sale?: { line: string; read: string } | null;
+  /** a multi-tenant property's listed tenants, and what the model does not
+   *  carry for their roll (lib/tenant-roster via the derived model's
+   *  `meta.roster`, #457) — printed over the grids; absent where the caller
+   *  built no model, and then the line prints alone */
+  roster?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
@@ -758,6 +764,7 @@ export function buildReportData(
   singleTenant?: { line: string; read: string } | null,
   hotel?: { line: string; read: string } | null,
   sale?: { line: string; read: string } | null,
+  roster?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -769,6 +776,7 @@ export function buildReportData(
     singleTenant: singleTenant ?? null,
     hotel: hotel ?? null,
     sale: sale ?? null,
+    roster: roster ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1056,6 +1064,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // How it is sold (#456), the same way.
   const saleRead = readSale(extraction);
   const sale = input.sale ?? (saleRead ? { line: saleShortLine(saleRead), read: "" } : null);
+  // A multi-tenant property's listed tenants (#457), the same way.
+  const rosterRead = readRoster(extraction);
+  const roster = input.roster ?? (rosterRead ? { line: rosterShortLine(rosterRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1255,6 +1266,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <SingleTenantCaveat lease={singleTenant} />}
           {!sensitivity && <SingleTenantCaveat lease={hotel} />}
           {!sensitivity && <SingleTenantCaveat lease={sale} />}
+          {!sensitivity && <SingleTenantCaveat lease={roster} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <LeaseholdBlock view={input.leasehold} />}
@@ -1292,6 +1304,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <SingleTenantCaveat lease={singleTenant} />
           <SingleTenantCaveat lease={hotel} />
           <SingleTenantCaveat lease={sale} />
+          <SingleTenantCaveat lease={roster} />
 
           <HeatGrid
             axisLabel="EXIT CAP"
