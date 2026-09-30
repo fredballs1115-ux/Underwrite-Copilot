@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "The price per unit on every card",
+      "href": "/deals",
+      "blurb": "Each pipeline card now prints the price per unit under the price, the way a listing card does: $274k/unit on an apartment building, $200k/key on a hotel, $100k/bed on student housing, $212/SF on an office. It uses the memorandum's own word for what it counts and the same price, count and area the deal's comps page reads, so the card and the comps agree. A range reads at its top. It is left out where the price does not buy the building (a note, the land, a share with no stated percentage), on a development, whose basis is its all-in cost, and where the memorandum states no count or area. The list row's tooltip and the CSV's Basis column carry it too."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Student housing, read by the bed",
       "href": "/deals",
       "blurb": "A student deal's year is decided by how much of it is leased for the fall, and the screen now reads that. The deal page draws the share pre-leased for the coming term on a track, with last year's share at the same point as a tick and, where the deal has a model, the occupancy the model runs at as a dashed line; the gap between them is the leasing still to sign. It also shows the beds and a unit's worth of them, the price and the rent by the bed, the parents' guarantees, and the walk to campus: pedestrian within half a mile, and a distance is read only where the memorandum states one. The pipeline flags the pace against last year (\"Pre-leased 87%, +5 pts y/y\"), and the memo, the report, the workbook and the compare table carry it."

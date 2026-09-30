@@ -774,6 +774,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (`studentShortLine`), the workbook's cover ("Student housing",
   `meta.student`), the report's caveat (`buildReportData`'s twenty-second
   argument) and the compare table's Pre-leasing row.
+- The basis at a glance (#469): each pipeline card prints the price per
+  unit under the price, as a listing card does — `PipelineSlots.basis`,
+  `basisTag` in `lib/pipeline-slots.ts`: "$274k/unit", "$200k/key",
+  "$100k/bed", "$212/SF". It reads through the comps page's
+  `subjectBasis` (lib/comp-detail), so the card and the comps' subject
+  tick are one figure: the building's price (a range's top, a share's
+  grossed up, none for a note, the land or a share of no stated
+  percentage) over the count in the memorandum's own noun (`countNoun`),
+  or over the building's area where the class is priced by the foot
+  (`assetWords(cls).basis`). None on a conversion or a development, whose
+  basis is the all-in cost. `TileStat`'s `sub` draws it under the price
+  (`data-qa="tile-sub"`); the list row's price tooltip and the CSV's
+  "Basis" column carry it too.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

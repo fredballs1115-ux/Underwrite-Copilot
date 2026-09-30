@@ -80,7 +80,7 @@ const card = (over: Partial<DealCard> & Pick<DealCard, "id" | "name">): DealCard
 
 const CARDS: DealCard[] = [
   // A renovation program stated a door at a time (#460).
-  card({ id: "a", name: "The Maddox at Brewerytown", verdict: "caution", stage: "underwriting", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null, valueAdd: "Reno $250/mo, 20% on cost" }, offersDue: "2026-09-30" }),
+  card({ id: "a", name: "The Maddox at Brewerytown", verdict: "caution", stage: "underwriting", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null, valueAdd: "Reno $250/mo, 20% on cost", basis: "$274k/unit" }, offersDue: "2026-09-30" }),
   card({ id: "b", name: "1400 Market — office to residential", verdict: "pass", stage: "loi", fit: "fits", score: 88, mandateVerdict: "PURSUE", slots: { cap: null, price: "$20,000,000", yoc: "11.7%" }, market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
   // Frisco names no place the Dallas market's list knows: its county placed it (#447).
   card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.2%" }, market: "Frisco, TX", coveredMarket: null, readMarket: "Dallas–Fort Worth", readCounty: "Collin County, TX" }),
@@ -313,6 +313,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(gluedWords(text)).toEqual([]);
     expect(html).toContain('data-view="cards"');
     expect(html).not.toContain('data-view="list"');
+    // The price by the unit under the price, as a listing card prints it
+    // (#469) — only where the deal has one.
+    expect(text).toContain("$274k/unit");
+    expect((html.match(/data-qa="tile-sub"/g) ?? []).length).toBe(1);
     // A card a live deal (the dead one is folded away), each under its name.
     const live = CARDS.filter((c) => c.stage !== "dead");
     expect((html.match(/data-deal-tile=/g) ?? []).length).toBe(live.length);
