@@ -615,4 +615,32 @@ describe("MemoDocument (redesigned)", () => {
     // Still one page, with the footer band now reserved.
     expect((withBars.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
   }, 45000);
+
+  it("labels a market flag's typical range as the rule of thumb it is, as the deal page and the report do", async () => {
+    // A verdict without the pre-model screen keeps the comp & market flags.
+    const { screen: _screen, ...verdict } = SAMPLE_DEAL.verdict as unknown as Record<string, unknown>;
+    void _screen;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: {
+        checks: [{ assumption: "Rent growth", omSays: "4.0%", typicalRange: "2.5%–3.5%", assessment: "aggressive", note: "Above the index.", page: "" }],
+        summary: "One aggressive assumption.",
+      },
+      verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    const market = data.flags.find((f) => f.label === "Market");
+    // (The memo's text is PDF-safe: the range's en dash prints as a hyphen.)
+    expect(market?.text).toBe("Rent growth: OM 4.0% vs. typical 2.5%-3.5% (a rule of thumb, not a live comps feed)");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("a rule of thumb, not a live comps feed");
+  }, 30000);
 });

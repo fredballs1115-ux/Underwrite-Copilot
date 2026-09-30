@@ -437,9 +437,12 @@ export function buildMemoData(
   for (const f of list(comps?.redFlags)) flags.push({ label: "Comps", text: str(f) });
   for (const c of list(market?.checks) as MarketResult["checks"]) {
     if (c?.assessment === "aggressive") {
+      // The typical range is the market check's rule of thumb, never a comps
+      // feed — the deal page's market section and the report's market page
+      // say so, and a flag lifted out of them says so too.
       flags.push({
         label: "Market",
-        text: `${str(c.assumption)}: OM ${str(c.omSays)} vs. typical ${str(c.typicalRange)}`,
+        text: `${str(c.assumption)}: OM ${str(c.omSays)} vs. typical ${str(c.typicalRange)} (a rule of thumb, not a live comps feed)`,
       });
     }
   }
