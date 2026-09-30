@@ -29,6 +29,7 @@ import {
   seedRules,
 } from "@/lib/research-data";
 import { withArticle } from "@/lib/article";
+import { FMR_BEDS, fmrEffectiveOf, fmrLabel, readFmrMetric, type FmrBed } from "@/lib/fmr";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
@@ -62,16 +63,55 @@ const STATUS_META: Record<string, { label: string; cls: string }> = {
   unverified_not_found: { label: "unverified", cls: "bg-amber-500/10 text-amber-600" },
 };
 
-/** Friendly names for benchmark metrics — raw keys like "hud_fmr_fy2026_0br"
- *  read like plumbing. Unknown metrics fall back to de-underscored text. */
-function metricLabel(metric: string): string {
-  // Any fiscal year — the FMR cron (scripts/fetch-fmr.mjs) writes fy2027+
-  // rows when HUD rolls forward; those must not fall to the raw-key fallback.
-  const fmr = metric.match(/^hud_fmr_fy(\d{4})_(\w+)$/);
-  if (fmr) {
-    const br = fmr[2] === "0br" ? "studio" : fmr[2].toUpperCase();
-    return `FY${fmr[1]} fair market rent · ${br}`;
+/** A bedroom count as the panel says it. */
+function bedLabel(bed: FmrBed): string {
+  return bed === "0br" ? "studio" : bed.toUpperCase();
+}
+
+/** A metro's fair market rents for one fiscal year, read as ONE line — the
+ *  bedroom row with one provenance link — rather than five rows naming the
+ *  same source five times. The year is the rows' own (lib/fmr reads it out
+ *  of the metric), so a row HUD's next year replaces is never relabelled. */
+export type BenchItem =
+  | { kind: "row"; b: Benchmark }
+  | { kind: "fmr"; metro: string; fy: number; rows: { bed: FmrBed; b: Benchmark }[] };
+
+export function benchItems(rows: readonly Benchmark[]): BenchItem[] {
+  const items: BenchItem[] = [];
+  for (const b of rows) {
+    const f = readFmrMetric(b.metric);
+    if (!f) {
+      items.push({ kind: "row", b });
+      continue;
+    }
+    const group = items.find(
+      (i): i is Extract<BenchItem, { kind: "fmr" }> => i.kind === "fmr" && i.metro === b.metro && i.fy === f.fy,
+    );
+    if (group) group.rows.push({ bed: f.bed, b });
+    else items.push({ kind: "fmr", metro: b.metro, fy: f.fy, rows: [{ bed: f.bed, b }] });
   }
+  for (const i of items) if (i.kind === "fmr") i.rows.sort((x, y) => FMR_BEDS.indexOf(x.bed) - FMR_BEDS.indexOf(y.bed));
+  return items;
+}
+
+/** One metro's fair market rent line: the year and the day it takes effect
+ *  (read back out of the headline row's note), the bedroom row, and the
+ *  headline two-bedroom row whose provenance the line shows — the rows of
+ *  one year and one metro come from one source. */
+export function fmrLine(item: Extract<BenchItem, { kind: "fmr" }>): { heading: string; figures: string; head: Benchmark } {
+  const head = (item.rows.find((r) => r.bed === "2br") ?? item.rows[0]).b;
+  const effective = fmrEffectiveOf(head.note);
+  return {
+    heading: `${fmrLabel(item.fy)} fair market rent${effective ? `, effective ${datedLong(effective)}` : ""}`,
+    figures: item.rows.map((r) => `${bedLabel(r.bed)} ${fmtBenchValue(r.b.metric, r.b.low, r.b.high)}`).join(" · "),
+    head,
+  };
+}
+
+/** Friendly names for benchmark metrics — raw keys read like plumbing.
+ *  Unknown metrics fall back to de-underscored text. (A fair market rent is
+ *  never one row here: `benchItems` reads a metro's as one line.) */
+function metricLabel(metric: string): string {
   const snap = metric.match(/^(\w+?)_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/);
   if (snap) {
     const sector = snap[1].replace(/_/g, " ");
@@ -530,7 +570,23 @@ export async function ResearchPanel({
             vs. market{ppu ? ` — this deal ≈ $${ppu.toLocaleString()}/unit` : ""}
           </h3>
           <ul className="mt-2 space-y-2">
-            {metroBench.map((b) => {
+            {benchItems(metroBench).map((item) => {
+              if (item.kind === "fmr") {
+                const line = fmrLine(item);
+                return (
+                  <li
+                    key={`${item.metro}|fmr`}
+                    className="flex flex-wrap items-baseline justify-between gap-2 text-sm"
+                  >
+                    <span>
+                      {`${line.heading}: `}
+                      <span className="font-mono tabular-nums">{line.figures}</span>
+                    </span>
+                    <SourceLink source={line.head.source} asOf={line.head.as_of} status={line.head.status} />
+                  </li>
+                );
+              }
+              const b = item.b;
               const cmp =
                 ppu && b.metric === "median_sale_price_2_4_unit"
                   ? vsRange(ppu, b.low, b.high)
