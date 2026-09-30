@@ -4,6 +4,7 @@ import { geocode } from "@/lib/public-comps/run";
 import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
 import type { StructuredAddress } from "@/lib/address";
 import { NFHL_ROOT as NFHL_DEFAULT_ROOT } from "@/lib/basemaps";
+import { designatedTract, designatedInState, QOZ_DATASET } from "@/lib/qoz";
 import {
   opportunityZoneFrom,
   parseCensusCounty,
@@ -208,34 +209,28 @@ export async function computeSiteFlags(input: {
   };
   const stateFips = tractStateFips(ozGeoid);
   if (ozGeoid && stateFips) {
-    try {
-      const { data, error } = await admin
-        .from("incentive_zones")
-        .select("source_dataset")
-        .eq("zone_type", "opportunity_zone")
-        .eq("tract_geoid", ozGeoid)
-        .limit(1);
-      if (error) throw new Error(error.message);
-      const hit = data && data.length > 0 ? { sourceDataset: String(data[0].source_dataset) } : null;
-      // In-zone vs registry-not-loaded must read differently, and a registry
-      // holding another state's zones is not loaded for this one: the ingest
-      // loads Maryland's unless a national layer is set, so a Texas tract
-      // missing from it proves nothing. The tract's state is its GEOID's
-      // first two digits, the same for every tract the registry holds.
-      let zonesInState: number | null = null;
-      if (!hit) {
-        const { count, error: countError } = await admin
+    // The CDFI Fund's list of every designated tract answers for every
+    // state (lib/qoz); the registry is asked too, for a tract it holds that
+    // the list does not name, and a registry that cannot be read leaves the
+    // list's answer standing.
+    let hit: { sourceDataset: string } | null = designatedTract(ozGeoid) ? { sourceDataset: QOZ_DATASET } : null;
+    if (!hit) {
+      try {
+        const { data, error } = await admin
           .from("incentive_zones")
-          .select("id", { count: "exact", head: true })
+          .select("source_dataset")
           .eq("zone_type", "opportunity_zone")
-          .like("tract_geoid", `${stateFips}%`);
-        if (countError) throw new Error(countError.message);
-        zonesInState = typeof count === "number" ? count : null;
+          .eq("tract_geoid", ozGeoid)
+          .limit(1);
+        if (error) throw new Error(error.message);
+        if (data && data.length > 0) hit = { sourceDataset: String(data[0].source_dataset) };
+      } catch {
+        // the list's answer stands
       }
-      oz = opportunityZoneFrom({ hit, zonesInState });
-    } catch {
-      oz = { opportunityZone: "unchecked", opportunityZoneUnchecked: "lookup_failed" };
     }
+    // Every state and territory has designated tracts on the list, so a
+    // tract off it is off it; the count is the list's own.
+    oz = opportunityZoneFrom({ hit, zonesInState: designatedInState(stateFips) });
   }
 
   const flood = await floodFor(point.lat, point.lng);

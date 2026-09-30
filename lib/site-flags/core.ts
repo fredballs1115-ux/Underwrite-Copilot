@@ -33,11 +33,11 @@ export interface SiteFlagsResult {
   county?: CensusPlace | null;
   /** the rules the lookup was made under; absent on the first version */
   v?: number;
-  /** the tract's current number on the registry's list (its source); null =
-   *  its current number is not on the list, which holds zones for the
-   *  tract's own state (from `SITE_FLAGS_V` 3 — before, a registry holding
-   *  any state's zones answered null); "unchecked" = no answer, the reason in
-   *  `opportunityZoneUnchecked` */
+  /** the tract on a list of designated zones (its source: the CDFI Fund's
+   *  list or the registry); null = the tract (`ozTract`) is on neither, which
+   *  hold zones for the tract's own state (from `SITE_FLAGS_V` 3 — before, a
+   *  registry holding any state's zones answered null); "unchecked" = no
+   *  answer, the reason in `opportunityZoneUnchecked` */
   opportunityZone: { sourceDataset: string } | null | "unchecked";
   /** the tract number the Opportunity Zone check read (#473): its 2010
    *  number, the one the zones were designated on, where the Census geocoder
@@ -45,10 +45,10 @@ export interface SiteFlagsResult {
    *  lookup made before the 2010 number was read. */
   ozTract?: { geoid: string; vintage: "2010" | "current" };
   /** why the Opportunity Zone check did not answer: no census tract at the
-   *  point, a tract lookup that failed, a registry holding no zones for the
-   *  tract's state (the ingest loads Maryland's unless a national layer is
-   *  set), or a registry that could not be read. Absent on a lookup made
-   *  before it was recorded. */
+   *  point, a tract lookup that failed, a list holding no zones for the
+   *  tract's state (before #473 the registry alone, Maryland's unless a
+   *  national layer was set), or a registry that could not be read. Absent
+   *  on a lookup made before it was recorded. */
   opportunityZoneUnchecked?: OpportunityZoneUnchecked;
   /** null = query worked, point in no mapped flood polygon (treat as zone X-ish
    *  unknown); "unavailable" = NFHL not reachable/resolvable */
@@ -88,15 +88,18 @@ export function siteFlagsOutdated(
 
 // ── The Opportunity Zone check ──────────────────────────────────────────────
 //
-// The registry (incentive_zones) is loaded by scripts/ingest/opportunity_zones.ts,
-// which loads Maryland's designated tracts unless a national layer is set. A
-// tract missing from it is "not in a zone" only where the registry holds the
-// tract's own state; anywhere else the check did not run. The zones were
-// designated on 2010 tract numbers, so the check reads the point's 2010
-// number — the Census geocoder answers it under its Census2010_Current
-// vintage, a call of its own (#473) — and where that call fails, the
-// current number, which a tract split or renumbered since 2010 can miss the
-// list by: a miss read that way says so.
+// The CDFI Fund's list of every designated tract (lib/qoz, vendored from the
+// Fund's workbook, #473) answers for every state; the registry
+// (incentive_zones, which scripts/ingest/opportunity_zones.ts loads with
+// Maryland's tracts unless a national layer is set) is asked for a tract the
+// list does not name. A tract off both is "not in a zone" only where the
+// list holds the tract's own state — every state and territory — and the
+// check did not run where there is no tract. The zones were designated on
+// 2010 tract numbers, so the check reads the point's 2010 number — the Census
+// geocoder answers it under its Census2010_Current vintage, a call of its
+// own — and where that call fails, the current number, which a tract split
+// or renumbered since 2010 can miss the list by: a miss read that way says
+// so.
 
 export type OpportunityZoneUnchecked = "no_tract" | "tract_failed" | "state_not_loaded" | "lookup_failed";
 
