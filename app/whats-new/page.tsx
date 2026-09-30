@@ -1,17 +1,20 @@
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { MarketsMarquee } from "@/app/markets-marquee";
-import { FULL_NOTES, LONG_NOTE, blurbExcerpt, changelogArchive, changelogEntries } from "@/lib/changelog";
+import { FULL_NOTES, LONG_NOTE, blurbExcerpt, changelogArchive, changelogEntries, changelogSince } from "@/lib/changelog";
 import { publicMetadata } from "@/lib/page-meta";
 
 // ISR, five-minute window — same freshness cap as the homepage, so a new
 // changelog entry shows here within minutes of deploying.
 export const revalidate = 300;
 
+// The log does not reach back to launch, so the description says how far
+// it does — the month of its oldest entry, read from the log itself.
+const since = changelogSince();
+
 export const metadata = publicMetadata({
   title: "What's new",
-  description:
-    "Every product improvement to Underwrite Copilot, newest first — the same log the homepage and the app draw from.",
+  description: `Product improvements to Underwrite Copilot${since ? ` since ${since}` : ""}, newest first — the same log the homepage and the app draw from.`,
   canonical: "/whats-new",
 });
 

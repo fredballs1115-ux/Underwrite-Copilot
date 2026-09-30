@@ -9,6 +9,7 @@ import { metadata as privacy } from "@/app/privacy/page";
 import { metadata as terms } from "@/app/terms/page";
 import { metadata as tools } from "@/app/tools/page";
 import { metadata as login } from "@/app/login/page";
+import { changelogSince } from "./changelog";
 import { SITE_CARD, marketMeta, marketPageFor, sectorPageFor } from "./public-pages";
 import { SITE_NAME, publicMetadata } from "./page-meta";
 
@@ -72,6 +73,15 @@ describe("each public page states its own canonical and link preview", () => {
     // Its links carry the figures typed into it in the query string.
     expect(tools.referrer).toBe("no-referrer");
     expect((tools.description as string).length).toBeLessThanOrEqual(160);
+  });
+
+  it("says how far /whats-new's log reaches back, from the log", () => {
+    // The log starts mid-way through the product's life, so "every
+    // improvement" was not true; the month is read off its oldest entry.
+    const since = changelogSince();
+    expect(since).not.toBeNull();
+    expect(whatsNew.description).toContain(`Product improvements to Underwrite Copilot since ${since},`);
+    expect(whatsNew.description).not.toMatch(/\bevery\b/i);
   });
 
   it("titles /tools and /why the way a reader sees them", () => {

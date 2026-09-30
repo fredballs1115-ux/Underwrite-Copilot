@@ -2,8 +2,19 @@
 // must be whole sentences, never a mid-word cut, and a short note must come
 // back untouched.
 import { describe, expect, it } from "vitest";
-import { FULL_NOTES, LONG_NOTE, blurbExcerpt, changelogArchive, changelogEntries } from "./changelog";
+import { FULL_NOTES, LONG_NOTE, blurbExcerpt, changelogArchive, changelogEntries, changelogSince, oldestChange } from "./changelog";
 import { TOOL_INDEX } from "./tools/catalog";
+import changelogSeed from "@/data/changelog.json";
+
+describe("how far the log reaches back", () => {
+  it("is its oldest entry by date, and that entry's month and year", () => {
+    const dates = (changelogSeed.entries as Array<{ date: string }>).map((e) => e.date).sort();
+    expect(oldestChange()?.date).toBe(dates[0]);
+    const [y, m] = dates[0].split("-").map(Number);
+    const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    expect(changelogSince()).toBe(`${MONTHS[m - 1]} ${y}`);
+  });
+});
 
 describe("blurbExcerpt — a note's opening, in whole sentences", () => {
   it("returns a short note whole", () => {
