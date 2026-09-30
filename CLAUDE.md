@@ -3024,7 +3024,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   credit as its title), each opening the viewer at itself, the last
   saying "+N more". The reader's Replace photo moves onto the cover tile,
   and a tile that fails drops the mosaic back to the one picture. Checked
-  in Chromium at 390, 820 and 1280.
+  in Chromium at 390, 820 and 1280. **The full report prints them too**
+  (#459): `galleryPhotosFor` (lib/memo/cover-aerial) reads up to
+  `PHOTO_PAGE_MAX` (4) stored gallery heroes, cuts each to
+  `PHOTO_PAGE_SIZE` (512 × 340, twice the 256 × 170 pt frame) by
+  attention, bounds each as the cover is and credits it with its page;
+  the report's "The property" page (`PhotosBlock`, two to a row) sits
+  before the site's, and fewer than two photographs — the memo's cover
+  already prints one — makes no page. It reads only what is stored, never
+  the memorandum.
   **The deal
   page opens the way a listing does** (#433, `app/(app)/deals/[id]/deal-hero.tsx`,
   `DealHero`, pure): the picture is the header's own — no card of its
