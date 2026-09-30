@@ -126,6 +126,15 @@ describe("DealView — the sample deal renders every section without a runtime e
     });
   }
 
+  it("draws where each range's base sits in one neutral colour, and calls no end of a range optimistic", () => {
+    // The sample's vacancy base, 9.0% between 6.0% and 9.5%, hugs the high
+    // end — the buyer's end on a vacancy, not the sponsor's.
+    const html = render(sampleProps("analyses", "verdict"));
+    expect(html.match(/title="Where the base sits inside the range"/g)?.length).toBe(SAMPLE_DEAL.verdict.screen?.ranges.length);
+    expect(html).not.toContain("optimistic end of the range");
+    expect(html).not.toMatch(/class="[^"]*\bbg-caution\b(?!\/)[^"]*"\s+style="left:/);
+  });
+
   it("a portfolio across markets folds each market's figures under its own line, saying how many of the properties sit there (#413)", () => {
     const p = sampleProps("analyses", "market");
     const props: Props = {

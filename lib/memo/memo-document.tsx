@@ -381,8 +381,9 @@ function firstNum(sv: string): number | null {
 }
 
 /** Where the base sits inside low → high, 0..1 — the deal page's positional
- *  read (a base hugging the sponsor's end is a tell); null when the three
- *  figures do not parse as one scale. */
+ *  read; null when the three figures do not parse as one scale. Which end
+ *  is the sponsor's depends on the assumption (a higher rent is theirs, a
+ *  higher vacancy the buyer's), so the position is drawn, never graded. */
 export function basePosition(r: { low: string; base: string; high: string }): number | null {
   const lo = firstNum(r.low);
   const hi = firstNum(r.high);
@@ -840,9 +841,11 @@ const s = StyleSheet.create({
     borderRadius: 3,
   },
   // Where the base sits inside the range, as the deal page and the shared
-  // screen draw it: a track, the span up to the base, and a dot — in the
-  // caution colour when the base hugs the optimistic end. Plain Views, so
-  // nothing to decode and no height beyond the row's text.
+  // screen draw it: a track, the span up to the base, and a dot, in one
+  // neutral colour. The higher figure is not always the sponsor's end (a
+  // higher vacancy or exit cap is the buyer's), so the dot never grades
+  // the position. Plain Views, so nothing to decode and no height beyond
+  // the row's text.
   rangeBar: { width: "9%", paddingTop: 4, paddingRight: 8 },
   barTrack: { height: 2.5, borderRadius: 1.25, backgroundColor: C.line, position: "relative" },
   barFill: { position: "absolute", left: 0, top: 0, height: 2.5, borderRadius: 1.25, backgroundColor: "#b5cdc9" },
@@ -1151,7 +1154,7 @@ export function MemoPage({ data }: { data: MemoData }) {
                             s.barDot,
                             {
                               left: pos * track - 3,
-                              backgroundColor: pos > 0.7 ? C.caution : C.brand,
+                              backgroundColor: C.brand,
                             },
                           ]}
                         />

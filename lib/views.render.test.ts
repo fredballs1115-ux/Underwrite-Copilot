@@ -1665,9 +1665,14 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(text).toMatch(/Sponsor\s*Go/);
     for (const r of SAMPLE_DEAL.verdict.screen?.ranges ?? []) expect(text, r.label).toContain(r.label);
     // Each range carries the deal page's positional read of where the base
-    // sits; the vacancy base at 9.0% between 6.0% and 9.5% hugs the high end.
-    expect(html).toContain('aria-label="Base sits near the optimistic end of the range"');
-    expect(html).toContain('aria-label="Where the base sits inside the range"');
+    // sits, in one neutral colour: the vacancy base at 9.0% between 6.0% and
+    // 9.5% hugs the high end, which on a vacancy is the buyer's end, not the
+    // sponsor's — so nothing calls it optimistic or paints it in caution.
+    expect(html).not.toContain("optimistic end");
+    expect(html.match(/aria-label="Where the base sits inside the range"/g)?.length).toBe(SAMPLE_DEAL.verdict.screen?.ranges.length);
+    // No dot on a range's track wears the caution colour (a chip's
+    // `bg-caution/10` is the confidence, not the position).
+    expect(html).not.toMatch(/class="[^"]*\bbg-caution\b(?!\/)[^"]*"\s+style="left:/);
     expect(text).toContain("Basis");
     expect(text).toContain("Breaks if:");
     expect(text).toContain("Key terms");

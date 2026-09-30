@@ -2188,7 +2188,9 @@ function firstNum(sv: string): number | null {
 function RangeCard({ r }: { r: ScreenRange }) {
   const conf = RANGE_CONF[r.confidence] ?? RANGE_CONF.medium;
   // Positional encoding: WHERE the base sits inside low→high is the most
-  // diagnostic fact about a range (hugging the sponsor's end is a tell).
+  // diagnostic fact about a range. The dot is one neutral colour: the
+  // higher figure is not always the sponsor's (a higher vacancy is the
+  // buyer's end), so the position is drawn, never graded.
   const lo = firstNum(r.low);
   const hi = firstNum(r.high);
   const base = firstNum(r.base);
@@ -2218,15 +2220,9 @@ function RangeCard({ r }: { r: ScreenRange }) {
             style={{ width: `${pos * 100}%` }}
           />
           <span
-            className={`absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface ${
-              pos > 0.7 ? "bg-caution" : "bg-brand"
-            }`}
+            className="absolute top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand ring-2 ring-surface"
             style={{ left: `${pos * 100}%` }}
-            title={
-              pos > 0.7
-                ? "Base sits near the optimistic end of the range"
-                : "Where the base sits inside the range"
-            }
+            title="Where the base sits inside the range"
           />
         </div>
       )}

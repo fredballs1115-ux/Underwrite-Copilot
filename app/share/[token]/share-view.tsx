@@ -477,14 +477,11 @@ export function ShareView({
             {ranges.map((r, i) => {
               // The honesty markers the deal page shows on every range card:
               // the model's confidence, where the base sits inside the range
-              // (hugging the sponsor's end is a tell), and what drives the
-              // spread.
+              // (drawn in one neutral colour — the higher figure is not
+              // always the sponsor's end), and what drives the spread.
               const conf = RANGE_CONF[r.confidence];
               const pos = basePosition(r);
-              const posLabel =
-                pos != null && pos > 0.7
-                  ? "Base sits near the optimistic end of the range"
-                  : "Where the base sits inside the range";
+              const posLabel = "Where the base sits inside the range";
               return (
                 <li key={i} className="rounded-xl border border-line p-3">
                   <div className="flex items-center justify-between gap-2">
@@ -524,9 +521,7 @@ export function ShareView({
                         style={{ width: `${pos * 100}%` }}
                       />
                       <span
-                        className={`absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-surface ${
-                          pos > 0.7 ? "bg-caution" : "bg-brand"
-                        }`}
+                        className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand ring-2 ring-surface"
                         style={{ left: `${pos * 100}%` }}
                       />
                     </span>
