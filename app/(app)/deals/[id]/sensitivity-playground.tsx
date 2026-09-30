@@ -73,6 +73,12 @@ function withScenarioReturns(
  * mandate verdict + fit score, move live. Pure math (the tested engine); the
  * LLM pipeline is never re-run from here.
  */
+/** On a plan deal the screening model books the budget in year 1 and runs
+ *  year-1 income as modelled, so its returns are not the plan's — the full
+ *  report omits its IRR page for that reason, and the page says it here. */
+export const PLAN_RETURNS_CAVEAT =
+  "On a plan deal these returns run the screening model — the budget booked in year 1, year-1 income as modelled — not the plan's return, which is judged on its yield on cost. The full report leaves them out for that reason, and a bid solved on them is a screening figure.";
+
 export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const { inputs, dealAssetClass, checkSource, box } = data;
   const planDeal = PLAN_KINDS.has(data.strategy ?? "");
@@ -246,6 +252,13 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">
         {costAssumptionsLine(inputs)}
       </p>
+      {planDeal && (
+        // The full report leaves these out on a plan deal for this reason
+        // (lib/memo/report-document); the page says it beside them.
+        <p className="mt-1.5 text-[11px] leading-relaxed text-caution" data-qa="playground-plan-caveat">
+          {PLAN_RETURNS_CAVEAT}
+        </p>
+      )}
 
       {bid && (
         <MaxBidCard
@@ -407,7 +420,7 @@ function PriceCapControls({
         </label>
         <label className="block">
           <span className="text-[11px] uppercase tracking-wide text-muted">
-            {planDeal ? "Cap on Yr-1 income (as modelled)" : "Going-in cap"}
+            {planDeal ? "Cap on Yr-1 income (as modelled)" : "Cap on Yr-1 NOI (as modelled)"}
           </span>
           <input
             inputMode="decimal"

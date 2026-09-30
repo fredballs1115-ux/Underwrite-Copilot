@@ -1236,18 +1236,22 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   if (planDeal) {
     // A plan deal has no going-in cap: year-1 income here is in-place or
     // assumed, so the cell says what it is. The yield the plan is judged on
-    // is the OM's stabilized NOI over total cost (uses + the capital plan) —
-    // the same figure the deal page, the memo and the report print — never
-    // year-1 NOI over uses that leave the budget out.
+    // is the OM's stabilized NOI over total cost — never year-1 NOI over
+    // uses that leave the budget out. This cell's total cost is the uses
+    // (price, closing, fees) plus the capital plan, so it reads a little
+    // under the deal page's, the memo's and the report's, which divide by
+    // the price plus the budget; the label says which.
     ret("Cap on Yr-1 Income (as modelled)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
     ret(
-      "Yield on Cost (OM stabilized NOI / total cost)",
+      "Yield on Cost (OM stabilized NOI / uses + capital plan)",
       `IF(OR(NOT(ISNUMBER(StabilizedNOI)),TotalCost=0),"n/a",StabilizedNOI/TotalCost)`,
       FMT.pct2,
       "YieldOnCost",
     );
   } else {
-    ret("Going-In Cap", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    // The model's year-1 NOI over the price — not the OM's stated cap, which
+    // the deal's header and cards print; the label says which it is.
+    ret("Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
     ret("Stabilized Yield (on cost)", `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
   }
   ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);

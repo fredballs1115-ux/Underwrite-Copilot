@@ -483,10 +483,10 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     // figure over uses plus the capital plan, and the year-1 cap says it is
     // the cap on modelled year-1 income.
     const summary = wb.getWorksheet("Deal Summary")!;
-    expect(() => findRow(summary, 4, "Going-In Cap")).toThrow();
+    expect(() => findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)")).toThrow();
     expect(() => findRow(summary, 4, "Stabilized Yield (on cost)")).toThrow();
     findRow(summary, 4, "Cap on Yr-1 Income (as modelled)");
-    findRow(summary, 4, "Yield on Cost (OM stabilized NOI / total cost)");
+    findRow(summary, 4, "Yield on Cost (OM stabilized NOI / uses + capital plan)");
     const noiRow = findRow(summary, 1, "OM Stabilized NOI (pro forma)");
     expect(summary.getCell(noiRow, 2).value).toBe(21_000_000);
     expect(String(summary.getCell(noiRow, 3).value)).toBe("OM p. 12");
@@ -496,7 +496,7 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     expect(totalCost).toBeCloseTo(planEngine.sourcesUses.totalUses + 160_000_000, 0);
     expect(Number(named(hf, "YieldOnCost"))).toBeCloseTo(21_000_000 / totalCost, 6);
     // Live: the yield reads through the named cells, not a pasted number.
-    const yocRow = findRow(summary, 4, "Yield on Cost (OM stabilized NOI / total cost)");
+    const yocRow = findRow(summary, 4, "Yield on Cost (OM stabilized NOI / uses + capital plan)");
     expect(String((summary.getCell(yocRow, 5).value as { formula?: string }).formula)).toMatch(/StabilizedNOI\/TotalCost/);
   });
 

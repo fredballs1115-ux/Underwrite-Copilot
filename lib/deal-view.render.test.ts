@@ -24,6 +24,7 @@ import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { DealView } from "@/app/(app)/deals/[id]/deal-view";
+import { PLAN_RETURNS_CAVEAT, SensitivityPlayground } from "@/app/(app)/deals/[id]/sensitivity-playground";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -627,5 +628,30 @@ describe("the add-a-note box says what it does", () => {
     expect(body).toMatch(/placeholder="A note to keep with this deal…"/);
     expect(body).toMatch(/the analysis does not read\s+notes or files added here/);
     expect(body).not.toMatch(/correction|the analysis missed/i);
+  });
+});
+
+describe("the sensitivity playground says whose figures it runs", () => {
+  // The documents-against-the-page audit (2026-09-30): on a plan deal the
+  // report omits its IRR page as not the plan's return, while the page
+  // printed the same returns with no word; and the playground called the
+  // model's year-1 NOI over the price "Going-in cap" beside a header that
+  // prints the OM's stated cap.
+  const playground = (strategy: string | null) => {
+    const p = sampleProps(null) as unknown as { playground: Record<string, unknown> };
+    return renderToStaticMarkup(
+      React.createElement(SensitivityPlayground, { data: { ...p.playground, strategy } as never }),
+    );
+  };
+
+  it("says a plan deal's returns are the screening model's, not the plan's", () => {
+    const plan = textOf(playground("conversion"));
+    expect(plan).toContain(PLAN_RETURNS_CAVEAT);
+    expect(plan).toContain("Cap on Yr-1 income (as modelled)");
+    const held = textOf(playground("stabilized"));
+    expect(held).not.toContain(PLAN_RETURNS_CAVEAT);
+    // The model's cap is named as the model's, never "Going-in cap".
+    expect(held).toContain("Cap on Yr-1 NOI (as modelled)");
+    expect(held).not.toMatch(/Going-in cap/);
   });
 });

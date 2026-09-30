@@ -1004,9 +1004,12 @@ function FinancialsPanel({
       >
         <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold tracking-tight [&::-webkit-details-marker]:hidden">
           <span className="flex items-center justify-between gap-2">
-            Excel model {model ? "— ready" : ""}
+            {/* The card holds the first-draft model built from the documents;
+                its Excel download is the underwrite's own workbook, a separate
+                model (model-view says so) — so the heading names the model. */}
+            First-draft model {model ? "— ready" : ""}
             <span className="text-xs font-normal text-muted">
-              {model ? "download or regenerate" : "generate from your documents"}
+              {model ? "the Excel workbook, or regenerate" : "generate from your documents"}
             </span>
           </span>
         </summary>
