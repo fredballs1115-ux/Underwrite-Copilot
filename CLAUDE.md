@@ -313,6 +313,43 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Withheld cells say "n/a — note" or "n/a — share", the way a plan deal's
   say "n/a — plan", and the price row carries the pipeline's
   `interestTag`. The leverage rows follow the corrected cap.
+- Affordable housing (#453): the extraction reads whether a covenant or a
+  contract sets the rents (`ExtractionResult.affordable`: `programs` —
+  `lihtc`, `section8`, `bond`, `tax_exemption`, `inclusionary`, `other`;
+  the agreement and the assistance as stated; the unit mix by income tier
+  with each tier's rent and stated limit) and labels its figures as rows:
+  "Restricted units", "Market-rate units", "Units under HAP contract",
+  "Affordability expiration", "Compliance period end", "HAP contract
+  expiration". Only a RECORDED restriction or a contract is listed —
+  "workforce" or "naturally occurring affordable" is marketing, and the
+  multifamily trap list says so. `lib/affordable.ts` (pure) reads them:
+  counts (a tier sum only where every tier states its units; counts that
+  cannot all be true are said, and no share is read off them; 239 of 240 is
+  99%, never 100%), the three clocks (a year alone read on the side that
+  does not flatter the buyer — a restriction's last day, a HAP contract's
+  first; an end stated as a term from a start, "30 years from 2011", kept
+  as stated rather than added up), each tier's rent against its limit (at
+  it, rents grow only as the limits do; over it, a compliance finding, not
+  income) and the restricted tiers' average against the market tier's on
+  the memorandum's own averages. Its rules: a restricted rent moves with
+  HUD's income limits, not the market; a gap to market is the
+  restriction's cost, not loss to lease; a HAP contract renews on HUD's
+  terms; the restriction outlasts the credits' compliance period, and a
+  qualified-contract release is never read as its end. The model is NOT
+  changed — its one rent growth rate is said to be the market-rate units'
+  (`modelCaveat`), since HUD's limit growth is a feed not yet read. Where
+  it shows: the deal context and the challenger (`affordableNote`, each
+  program's traps by name — the LIHTC list includes the value-add capped
+  by the limit), `app/affordable-panel.tsx` (`AffordablePanel`, pure: the
+  units by tier `data-bar="affordable-units"`, a HAP contract's units
+  `affordable-hap`, the clocks `affordable-clock`, each tier's rent against
+  its limit `affordable-rent`) on the deal page and the shared screen, the
+  key terms (`affordableTermRows` after the unit count), the pipeline row,
+  card and CSV and the meeting workbook's price note (`affordableTag`:
+  "LIHTC, 75% restricted", "Section 8, 34% of units"), the memo under its
+  title and the workbook cover (`affordableShortLine`), the report over its
+  grids (`AffordableCaveat`) and the compare table's Affordability row (a
+  dash, never "market-rate", for a screen saved before it was read).
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

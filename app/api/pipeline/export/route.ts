@@ -4,6 +4,7 @@ import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap } from "@/lib/criteri
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
+import { affordableTag } from "@/lib/affordable";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
@@ -133,6 +134,7 @@ export async function GET(req: Request) {
       price: findPriceMetric(metrics, strategy.kind)?.value ?? null,
       interest: interestTag(extraction),
       debt: assumableTag(extraction),
+      affordable: affordableTag(extraction),
       cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
       yieldOnCost:
         plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,

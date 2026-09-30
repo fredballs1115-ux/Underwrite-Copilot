@@ -40,6 +40,26 @@ const ExtractionSchema = z.object({
     loan: z.string(),
     page: z.string(),
   }),
+  // WHETHER A COVENANT OR A CONTRACT SETS THE RENTS (#453): a LIHTC
+  // regulatory agreement, a Section 8 HAP contract, a bond set-aside, a tax
+  // exemption's covenant — only a recorded restriction or a contract, never
+  // marketing words, and an empty list on a market-rate deal. Read by
+  // lib/affordable.
+  affordable: z.object({
+    programs: z.array(z.enum(["lihtc", "section8", "bond", "tax_exemption", "inclusionary", "other"])),
+    summary: z.string(),
+    agreement: z.string(),
+    assistance: z.string(),
+    tiers: z.array(
+      z.object({
+        label: z.string(),
+        units: z.string(),
+        rent: z.string(),
+        maxRent: z.string(),
+      }),
+    ),
+    page: z.string(),
+  }),
   // Each property of a PORTFOLIO OM (two or more separately addressed
   // buildings or sites), with what the OM states for THAT property and ""
   // where it states nothing; an empty list for a single-property OM. The
@@ -124,6 +144,17 @@ export async function extractTerms(
       groundLease: out.interest.groundLease.trim(),
       loan: out.interest.loan.trim(),
       page: out.interest.page.trim(),
+    },
+    affordable: {
+      // Each program once, whatever the model repeated.
+      programs: [...new Set(out.affordable.programs)],
+      summary: out.affordable.summary.trim(),
+      agreement: out.affordable.agreement.trim(),
+      assistance: out.affordable.assistance.trim(),
+      tiers: out.affordable.tiers
+        .map((t) => ({ label: t.label.trim(), units: t.units.trim(), rent: t.rent.trim(), maxRent: t.maxRent.trim() }))
+        .filter((t) => t.label || t.units),
+      page: out.affordable.page.trim(),
     },
     // A one-entry list is a single property restated, not a portfolio.
     properties:

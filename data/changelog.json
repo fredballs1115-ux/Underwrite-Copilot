@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Affordable housing, read as affordable housing",
+      "href": "/deals",
+      "blurb": "A deal whose rents a tax-credit regulatory agreement, a Section 8 HAP contract, a bond set-aside or a similar covenant sets is now read that way. The screen reads how many units are restricted, at which income limits, and when the restriction and any HAP contract end, and the deal page draws the units by tier, each tier's rent against its limit, and the years left on each clock. It says that restricted rents move with the published income limits rather than the market, that a gap to market on those units is not upside until the restriction ends, and that the model's single rent-growth rate should be read as the market-rate units' alone. The pipeline, the memo, the report, the workbook and the compare table carry it too, and the assumption review checks each program's own traps."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Rent rules reach the right city",
       "href": "/deals",
       "blurb": "The rent-control and landlord rules on a deal now go by the city the building actually sits in, which the site reads from the Census Bureau at the building's location. Before, a city's rule could reach an address whose county shared the city's name, or whose own name contained it: a Pasadena deal read Los Angeles's rent stabilization, and a South San Francisco deal read San Francisco's rent ordinance. Where the city is not known yet, a rule that may reach the deal says so and asks whether the building sits inside the city's limits."

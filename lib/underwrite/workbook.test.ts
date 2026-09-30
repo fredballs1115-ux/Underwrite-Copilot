@@ -804,4 +804,27 @@ describe("the cover says what is being sold, and what the model is and is not on
     const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "What is being sold")).toThrow();
   });
+
+  it("a covenant on the rents (#453): the restriction, then what the model's one growth rate is not on it", async () => {
+    const units = extraction.metrics.find((m) => m.label === "Units")?.value;
+    const restricted = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        affordable: { programs: ["lihtc"], summary: "", agreement: "", assistance: "", tiers: [], page: "" },
+        metrics: [
+          ...extraction.metrics,
+          { label: "Restricted units", value: String(units ? Math.round(Number(units.replace(/,/g, "")) / 2) : 100), flagged: false, page: "p. 3" },
+          { label: "Affordability expiration", value: "December 31, 2054", flagged: false, page: "p. 3" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(restricted));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "Affordability");
+    expect(String(cover.getCell(r, 3).value)).toMatch(/^Affordable housing: .*rent-restricted under LIHTC until Dec 2054$/);
+    expect(String(cover.getCell(r + 1, 3).value)).toContain("The screening model grows every unit's rent at one rate");
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "Affordability")).toThrow();
+  });
 });

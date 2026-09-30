@@ -97,7 +97,8 @@ const CARDS: DealCard[] = [
   // A run whose process died mid-screen, and a re-screen that failed before
   // its verdict — the stored verdict must not read as the current call.
   card({ id: "k", name: "Arlington Flex Park", assetClass: "industrial", stage: "screening", jobStatus: "stalled", slots: { cap: null, price: "$9,100,000", yoc: null }, market: "Arlington, TX", coveredMarket: "Dallas–Fort Worth", hasAddress: false }),
-  card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "underwriting", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth", flood: { tag: "Flood AE", cell: "AE (SFHA)" } }),
+  // …and a LIHTC regulatory agreement on three units in four (#453).
+  card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "underwriting", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null, affordable: "LIHTC, 75% restricted" }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth", flood: { tag: "Flood AE", cell: "AE (SFHA)" } }),
 ];
 
 const BILLING = { isPro: false, canCreateDeal: true, dealCount: 9, dealLimit: 25 };
@@ -222,6 +223,10 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // at every width too (#419); a deal financed fresh says nothing.
     expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(4);
     expect(html).toContain("Assumable 3.45%: the seller&#x27;s loan is offered for assumption");
+    // A covenant on the rents is said beside the figure at every width too
+    // (#453); a market-rate deal says nothing.
+    expect((text.match(/LIHTC, 75% restricted/g) ?? []).length).toBe(4);
+    expect(html).toContain("LIHTC, 75% restricted: a covenant or a contract sets these rents");
   });
 
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
@@ -336,6 +341,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((text.match(/Flood AE/g) ?? []).length).toBe(1);
     expect((text.match(/49% share/g) ?? []).length).toBe(1);
     expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(1);
+    expect((text.match(/LIHTC, 75% restricted/g) ?? []).length).toBe(1);
     // The three figures a pipeline is read by; a plan deal's yield on cost
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
@@ -1186,6 +1192,48 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // The sample itself offers no loan to assume.
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain(
       "share-assumable",
+    );
+  });
+
+  it("says a covenant on the rents under the title, and nothing on a market-rate deal (#453)", () => {
+    const restricted = {
+      ...SAMPLE_DEAL.extraction,
+      affordable: {
+        programs: ["lihtc" as const],
+        summary: "",
+        agreement: "Extended Use Agreement with the state housing finance agency",
+        assistance: "",
+        tiers: [],
+        page: "",
+      },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Restricted units", value: "180", flagged: false, page: "", basis: "na" as const },
+        { label: "Affordability expiration", value: "December 31, 2054", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const props = {
+      dealName: SAMPLE_DEAL.name,
+      assetClass: SAMPLE_DEAL.asset_class,
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: restricted }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="affordable-panel"');
+    expect(text).toContain("This is an affordable-housing deal: 180 of the");
+    expect(text).toContain("rent-restricted under a LIHTC regulatory agreement until Dec 2054");
+    expect(text).toContain("The regulatory agreement as stated: Extended Use Agreement with the state housing finance agency");
+    // The key terms lead with the restriction's rows after the unit count.
+    expect(text).toContain("Restricted units");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain(
+      "affordable-panel",
     );
   });
 
@@ -4813,5 +4861,96 @@ describe("LeaseholdExitCard — the term, the two exits, and the model's returns
     );
     expect(year).toContain("Left today, 44.3 years (to 2071)");
     expect(year).toContain("The ground lease ends in 2071, 44.3 years from today — the memorandum states the year alone, read as its first day.");
+  });
+});
+
+// ── Affordable housing (#453) ──────────────────────────────────────────────
+import { AffordablePanel } from "@/app/affordable-panel";
+import { readAffordable } from "@/lib/affordable";
+
+describe("AffordablePanel — a covenant or a contract that sets the rents, drawn", () => {
+  const AS_OF = new Date(Date.UTC(2026, 8, 30));
+  const row = (label: string, value: string, page = "p. 14") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const maple = (over: Partial<NonNullable<ExtractionResult["affordable"]>> = {}, metrics: ExtractionResult["metrics"] = []) =>
+    ({
+      dealName: "Maple Court",
+      assetClass: "multifamily",
+      totalPages: 60,
+      affordable: {
+        programs: ["lihtc", "section8"],
+        summary: "A 2011 LIHTC property with a project-based Section 8 contract on 82 units.",
+        agreement: "Extended Use Agreement with the state housing finance agency",
+        assistance: "Project-based HAP contract on 82 units",
+        tiers: [
+          { label: "50% AMI", units: "60", rent: "$1,020", maxRent: "$1,090" },
+          { label: "60% AMI", units: "120", rent: "$1,310", maxRent: "$1,310" },
+          { label: "Market", units: "60", rent: "$1,657", maxRent: "" },
+        ],
+        page: "p. 14",
+        ...over,
+      },
+      metrics: [
+        row("Asking price", "$38,000,000", "p. 2"),
+        row("Units", "240", "p. 2"),
+        row("Restricted units", "180"),
+        row("Units under HAP contract", "82", "p. 15"),
+        row("Affordability expiration", "December 31, 2054"),
+        row("Compliance period end", "2025"),
+        row("HAP contract expiration", "June 30, 2029", "p. 15"),
+        ...metrics,
+      ],
+    }) as ExtractionResult;
+
+  it("draws the units by tier, the contract's units, the three clocks and each tier against its limit", () => {
+    const html = render(React.createElement(AffordablePanel, { affordable: readAffordable(maple(), AS_OF) }));
+    const text = visibleText(html);
+    expect(text).toContain("Affordable housing");
+    expect(text).toContain("Housing tax credits (LIHTC) · Section 8 HAP contract");
+    expect(text).toContain("p. 14");
+    // The units: a segment a tier, deepest limit first, the market last.
+    expect(html.match(/data-bar="affordable-units"/g)).toHaveLength(3);
+    expect(text).toContain("50% AMI · 60 units");
+    expect(text).toContain("60% AMI · 120 units");
+    expect(text).toContain("Market · 60 units");
+    expect(html.match(/data-bar="affordable-hap"/g)).toHaveLength(1);
+    expect(text).toContain("Under the HAP contract · 82 of 240");
+    // The clocks: the restriction and the contract drawn, the compliance
+    // period's passed end said.
+    expect(html.match(/data-bar="affordable-clock"/g)).toHaveLength(2);
+    expect(text).toContain("Rent restriction");
+    expect(text).toContain("to Dec 2054 · 28.3 years");
+    expect(text).toContain("to Jun 2029 · 2.8 years");
+    expect(text).toContain("Stated end 2025 — passed");
+    // The rents: each restricted tier against the limit it states.
+    expect(html.match(/data-bar="affordable-rent"/g)).toHaveLength(2);
+    expect(text).toContain("$1,020 of a $1,090 limit");
+    expect(text).toContain("$1,310 — at the limit");
+    expect(text).toContain("$444 a month apart");
+    expect(text).toContain("read its rent growth as the 60 market-rate units");
+    expect(a11yIssues(html), "affordable panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("says a rent over its limit in the warning tone, with a tick at the limit", () => {
+    const over = maple({ tiers: [{ label: "50% AMI", units: "60", rent: "$1,150", maxRent: "$1,090" }] });
+    const html = render(React.createElement(AffordablePanel, { affordable: readAffordable(over, AS_OF) }));
+    expect(visibleText(html)).toContain("$1,150 — over the $1,090 limit");
+    expect(html).toContain("text-kill");
+    expect(html).toContain("bg-kill/60");
+  });
+
+  it("draws restricted and market-rate as two segments where no tiers are stated, and nothing on a market-rate deal", () => {
+    const html = render(React.createElement(AffordablePanel, { affordable: readAffordable(maple({ tiers: [] }), AS_OF) }));
+    expect(html.match(/data-bar="affordable-units"/g)).toHaveLength(2);
+    expect(visibleText(html)).toContain("Rent-restricted · 180");
+    expect(visibleText(html)).toContain("Market-rate · 60");
+    expect(html).not.toContain('data-bar="affordable-rent"');
+    expect(render(React.createElement(AffordablePanel, { affordable: readAffordable(maple({ programs: [] }, []), AS_OF) }))).toContain(
+      "affordable-panel",
+    );
+    const marketRate = { dealName: "Maple Court", assetClass: "multifamily", metrics: [row("Units", "240")] } as ExtractionResult;
+    expect(render(React.createElement(AffordablePanel, { affordable: readAffordable(marketRate, AS_OF) }))).toBe(
+      render(React.createElement(React.Fragment)),
+    );
   });
 });

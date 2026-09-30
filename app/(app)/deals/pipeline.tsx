@@ -69,7 +69,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -557,7 +557,7 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Affordability", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -569,6 +569,8 @@ export function Pipeline({
         d.slots.interest ?? "",
         // Blank where no loan is offered for assumption (#419).
         d.slots.debt ?? "",
+        // Blank on a market-rate deal (#453).
+        d.slots.affordable ?? "",
         // Every case said; blank only before FEMA's lookup has answered (#426).
         d.flood?.cell ?? "",
         d.slots.cap ?? "",
@@ -1478,6 +1480,17 @@ const DealRow = memo(function DealRow({
       {d.slots.debt}
     </span>
   ) : null;
+  // A covenant or a contract that sets the rents (#453): a restricted
+  // building's rents move with the limits, not the market — said beside the
+  // price, where the pipeline is scanned.
+  const affordableBit = d.slots.affordable ? (
+    <span
+      className="whitespace-nowrap font-medium text-brand"
+      title={`${d.slots.affordable}: a covenant or a contract sets these rents — the deal page says until when`}
+    >
+      {d.slots.affordable}
+    </span>
+  ) : null;
   // A Special Flood Hazard Area (#426): a federally backed loan requires
   // flood insurance there, which is a cost and a lender's condition — said
   // beside the price, where a list of deals is read.
@@ -1646,19 +1659,19 @@ const DealRow = memo(function DealRow({
             the call has its own column and the line is the figures alone. */}
         <div className="mt-1 flex items-center gap-2 md:hidden">
           <span className="flex shrink-0 sm:hidden">{status}</span>
-          <MetaLine flush className="min-w-0" bits={[priceBit, interestBit, debtBit, floodBit, capBit, fitBit]} />
+          <MetaLine flush className="min-w-0" bits={[priceBit, interestBit, debtBit, affordableBit, floodBit, capBit, fitBit]} />
         </div>
         <MetaLine
           className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, debtBit, floodBit, fitBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, assetBit, interestBit, debtBit, affordableBit, floodBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden lg:block xl:hidden"
-          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, affordableBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden xl:block"
-          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, interestBit, debtBit, affordableBit, addedByBit]}
         />
         {fitBar}
       </div>
@@ -1917,11 +1930,13 @@ const DealTile = memo(function DealTile({
   const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
   const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
   // What the picture must not hide: a Special Flood Hazard Area, what the
-  // price buys where it is not the building, the seller's loan.
+  // price buys where it is not the building, the seller's loan, a covenant
+  // on the rents.
   const tags = [
     d.flood?.tag ? { text: d.flood.tag, cls: "text-kill", title: `${d.flood.tag}: FEMA's Special Flood Hazard Area — a federally backed loan requires flood insurance` } : null,
     d.slots.interest ? { text: d.slots.interest, cls: "text-brand", title: `${d.slots.interest}: the price does not buy the building outright` } : null,
     d.slots.debt ? { text: d.slots.debt, cls: "text-brand", title: `${d.slots.debt}: the seller's loan is offered for assumption` } : null,
+    d.slots.affordable ? { text: d.slots.affordable, cls: "text-brand", title: `${d.slots.affordable}: a covenant or a contract sets these rents` } : null,
   ].filter((t): t is { text: string; cls: string; title: string } => t !== null);
 
   const inner = (

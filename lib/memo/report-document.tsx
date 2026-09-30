@@ -50,6 +50,7 @@ import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
+import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -295,6 +296,18 @@ function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) 
  * card draws, so the report and the page never disagree. Nothing where no
  * loan is offered.
  */
+/** A covenant or a contract that sets the rents (#453), printed over the
+ *  grids its rent growth axis would otherwise mislead: the restriction in
+ *  one line, then what the model's one growth rate is not on it. */
+function AffordableCaveat({ read }: { read: AffordableRead | null }) {
+  if (!read?.modelCaveat) return null;
+  return (
+    <Text style={{ fontSize: 8, color: C.caution, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>
+      {str(`${affordableShortLine(read)}. ${read.modelCaveat}`)}
+    </Text>
+  );
+}
+
 function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
   if (!view) return null;
   const rate =
@@ -991,6 +1004,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   const noteFigures = interest?.note
     ? [noteYieldSentence(interest.note), noteCollateralSentence(interest.note)].filter(Boolean).join(" ")
     : "";
+  // A covenant or a contract that sets the rents (#453): the grids grow
+  // every rent at one rate, which the restricted units' rents do not.
+  const affordable = readAffordable(extraction);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1186,6 +1202,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
 
           {/* The plan deal has no sensitivity page, so its assumptions read
               lands here, under the grid it is judged on. */}
+          {!sensitivity && <AffordableCaveat read={affordable} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <LeaseholdBlock view={input.leasehold} />}
@@ -1219,6 +1236,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               {str(`The note, on its own terms: ${noteFigures}`)}
             </Text>
           ) : null}
+          <AffordableCaveat read={affordable} />
 
           <HeatGrid
             axisLabel="EXIT CAP"
