@@ -5,6 +5,7 @@ import { resolveDealLocation, type DealVisualCache } from "@/lib/deal-location";
 import type { StructuredAddress } from "@/lib/address";
 import { NFHL_ROOT as NFHL_DEFAULT_ROOT } from "@/lib/basemaps";
 import {
+  opportunityZoneFrom,
   parseCensusCounty,
   parseCensusPlace,
   parseCensusTract,
@@ -12,6 +13,7 @@ import {
   resolveNfhlLayerId,
   SITE_FLAGS_NOTE,
   SITE_FLAGS_V,
+  tractStateFips,
   type CensusPlace,
   type SiteFlagsResult,
 } from "./core";
@@ -170,8 +172,12 @@ export async function computeSiteFlags(input: {
     tractError = String(err).slice(0, 200);
   }
 
-  let opportunityZone: SiteFlagsResult["opportunityZone"] = "unchecked";
-  if (tractGeoid) {
+  let oz: Pick<SiteFlagsResult, "opportunityZone" | "opportunityZoneUnchecked"> = {
+    opportunityZone: "unchecked",
+    opportunityZoneUnchecked: "no_tract",
+  };
+  const stateFips = tractStateFips(tractGeoid);
+  if (tractGeoid && stateFips) {
     try {
       const { data, error } = await admin
         .from("incentive_zones")
@@ -180,19 +186,25 @@ export async function computeSiteFlags(input: {
         .eq("tract_geoid", tractGeoid)
         .limit(1);
       if (error) throw new Error(error.message);
-      if (data && data.length > 0) {
-        opportunityZone = { sourceDataset: String(data[0].source_dataset) };
-      } else {
-        // In-zone vs registry-not-loaded must read differently: only a
-        // non-empty registry can honestly say "not in a zone".
-        const { count } = await admin
+      const hit = data && data.length > 0 ? { sourceDataset: String(data[0].source_dataset) } : null;
+      // In-zone vs registry-not-loaded must read differently, and a registry
+      // holding another state's zones is not loaded for this one: the ingest
+      // loads Maryland's unless a national layer is set, so a Texas tract
+      // missing from it proves nothing. The tract's state is its GEOID's
+      // first two digits, the same for every tract the registry holds.
+      let zonesInState: number | null = null;
+      if (!hit) {
+        const { count, error: countError } = await admin
           .from("incentive_zones")
           .select("id", { count: "exact", head: true })
-          .eq("zone_type", "opportunity_zone");
-        opportunityZone = (count ?? 0) > 0 ? null : "unchecked";
+          .eq("zone_type", "opportunity_zone")
+          .like("tract_geoid", `${stateFips}%`);
+        if (countError) throw new Error(countError.message);
+        zonesInState = typeof count === "number" ? count : null;
       }
+      oz = opportunityZoneFrom({ hit, zonesInState });
     } catch {
-      opportunityZone = "unchecked";
+      oz = { opportunityZone: "unchecked", opportunityZoneUnchecked: "lookup_failed" };
     }
   }
 
@@ -206,7 +218,8 @@ export async function computeSiteFlags(input: {
     tractGeoid,
     ...(place !== undefined ? { place } : {}),
     ...(county ? { county } : {}),
-    opportunityZone,
+    opportunityZone: oz.opportunityZone,
+    ...(oz.opportunityZoneUnchecked ? { opportunityZoneUnchecked: oz.opportunityZoneUnchecked } : {}),
     flood,
     v: SITE_FLAGS_V,
     ...(tractError ? { error: `census tract: ${tractError}` } : {}),

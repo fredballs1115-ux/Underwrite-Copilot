@@ -3840,6 +3840,26 @@ describe("SiteFlagsCard — the flood chip says what FEMA's map says, and no mor
     expect(chip({ zone: "X", subtype: "0.2 PCT ANNUAL CHANCE FLOOD HAZARD", isHighRisk: false })).toContain("Flood zone X · 0.2 pct annual chance flood hazard");
     expect(chip({ zone: "AE", subtype: null, isHighRisk: true })).toContain("Flood zone AE — SFHA");
   });
+
+  it("says a tract off the Opportunity Zone list was checked by its current number, and a check that did not run says why", () => {
+    const card = (oz: Partial<SiteFlagsResultForTest>) =>
+      renderToStaticMarkup(React.createElement(SiteFlagsCard, { result: { ...result(null), ...oz }, hasAddress: true }));
+    const off = card({ opportunityZone: null, v: 3 });
+    const offText = visibleText(off);
+    expect(offText).toContain("Tract's current number not on the Opportunity Zone list");
+    expect(offText).toContain("Opportunity Zones were checked by the tract's current number.");
+    expect(offText).not.toMatch(/not in an opportunity zone/i);
+    expect(a11yIssues(off), "site flags card, off the list").toEqual([]);
+    expect(gluedWords(offText)).toEqual([]);
+    // A Texas deal against a registry of Maryland's zones.
+    const unloaded = visibleText(card({ opportunityZone: "unchecked", opportunityZoneUnchecked: "state_not_loaded", v: 3 }));
+    expect(unloaded).toContain("Opportunity Zone: not checked (no zones on file for this state)");
+    expect(unloaded).not.toContain("current number");
+    // A miss stored under the old rule is no answer until it is looked up again.
+    expect(visibleText(card({ opportunityZone: null, v: 2 }))).toContain("Opportunity Zone: not checked");
+    expect(visibleText(card({ opportunityZone: null, v: 2 }))).not.toContain("not on the Opportunity Zone list");
+    expect(visibleText(card({ opportunityZone: { sourceDataset: "Maryland Opportunity Zones" }, v: 3 }))).toContain("Opportunity Zone tract");
+  });
 });
 
 // ── A deal of another kind on the shared screen ─────────────────────────────

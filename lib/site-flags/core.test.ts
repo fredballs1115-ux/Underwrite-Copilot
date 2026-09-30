@@ -1,13 +1,19 @@
 import { describe, expect, it } from "vitest";
 import {
   isHighRiskZone,
+  opportunityZoneFrom,
+  opportunityZoneRead,
+  OZ_CURRENT_NUMBER_CAVEAT,
+  OZ_STATE_RULE_V,
   parseCensusCounty,
   parseCensusPlace,
   parseCensusTract,
   parseNfhlFlood,
   resolveNfhlLayerId,
+  SITE_FLAGS_V,
   siteFlagsOutdated,
   siteFlagsStale,
+  tractStateFips,
 } from "./core";
 
 describe("isHighRiskZone", () => {
@@ -329,11 +335,12 @@ describe("the building's municipality and county from the Census geocoder (#452)
     expect(parseCensusCounty({ result: {} })).toBeNull();
   });
 
-  it("an answered lookup made before the place was read is made again; one that never geocoded is not", () => {
+  it("an answered lookup made under older rules is made again; one that never geocoded is not", () => {
     expect(siteFlagsOutdated({ status: "ok" })).toBe(true);
-    // Made before the lookup took the deal's own point (#472).
+    // v2 read the place, but looked up at the address's own geocode (#472)
+    // and said "not in a zone" against any state's zones.
     expect(siteFlagsOutdated({ status: "ok", v: 2 })).toBe(true);
-    expect(siteFlagsOutdated({ status: "ok", v: 3 })).toBe(false);
+    expect(siteFlagsOutdated({ status: "ok", v: SITE_FLAGS_V })).toBe(false);
     expect(siteFlagsOutdated({ status: "geocode_failed" })).toBe(false);
     expect(siteFlagsOutdated({ status: "pending" })).toBe(false);
     expect(siteFlagsOutdated(null)).toBe(false);
@@ -347,5 +354,63 @@ describe("the building's municipality and county from the Census geocoder (#452)
     // An answered zone is not asked again.
     const answered = { ...missed, flood: { zone: "AE", subtype: null, isHighRisk: true } };
     expect(siteFlagsOutdated(answered, Date.parse(at) + 7 * 60 * 60 * 1000)).toBe(false);
+  });
+});
+
+describe("the Opportunity Zone check — not on the list only where the list holds the tract's state", () => {
+  it("reads a tract's state off its GEOID's first two digits, and nothing off anything else", () => {
+    expect(tractStateFips("24033805903")).toBe("24"); // Maryland
+    expect(tractStateFips("48085030100")).toBe("48"); // Texas
+    expect(tractStateFips("06037")).toBeNull(); // a county, not a tract
+    expect(tractStateFips("2403380590X")).toBeNull();
+    expect(tractStateFips(null)).toBeNull();
+    expect(tractStateFips(undefined)).toBeNull();
+  });
+
+  it("a tract off a list that holds its state's zones is not listed; a list without them did not check", () => {
+    const md = { sourceDataset: "Maryland Opportunity Zones (Socrata hu7s-ph9b)" };
+    expect(opportunityZoneFrom({ hit: md, zonesInState: null })).toEqual({ opportunityZone: md });
+    expect(opportunityZoneFrom({ hit: null, zonesInState: 149 })).toEqual({ opportunityZone: null });
+    // A Texas tract against a registry of Maryland's zones: no answer.
+    expect(opportunityZoneFrom({ hit: null, zonesInState: 0 })).toEqual({
+      opportunityZone: "unchecked",
+      opportunityZoneUnchecked: "state_not_loaded",
+    });
+    // The state's count could not be read: no answer either.
+    expect(opportunityZoneFrom({ hit: null, zonesInState: null })).toEqual({
+      opportunityZone: "unchecked",
+      opportunityZoneUnchecked: "lookup_failed",
+    });
+  });
+
+  it("says a miss was checked by the tract's current number, and never that the site is outside a zone", () => {
+    const off = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V });
+    expect(off.kind).toBe("not_listed");
+    expect(off.label).toBe("Tract's current number not on the Opportunity Zone list");
+    expect(off.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);
+    expect(off.caveat).toContain("checked by the tract's current number");
+    for (const text of [off.label, off.caveat ?? ""]) {
+      expect(text).not.toMatch(/not in an opportunity zone/i);
+      expect(text).not.toMatch(/outside (an|the) opportunity zone/i);
+    }
+    expect(opportunityZoneRead({ opportunityZone: { sourceDataset: "x" }, v: SITE_FLAGS_V })).toEqual({
+      kind: "listed",
+      label: "Opportunity Zone tract",
+      caveat: null,
+    });
+  });
+
+  it("a 'not on the list' stored before the state rule is no answer, and a check that did not run says why", () => {
+    // v2 and earlier read the miss against whatever state the registry held.
+    expect(OZ_STATE_RULE_V).toBeLessThanOrEqual(SITE_FLAGS_V);
+    expect(opportunityZoneRead({ opportunityZone: null, v: 2 })).toEqual({ kind: "unchecked", label: "Opportunity Zone: not checked", caveat: null });
+    expect(opportunityZoneRead({ opportunityZone: null })).toEqual({ kind: "unchecked", label: "Opportunity Zone: not checked", caveat: null });
+    const why = (r: "no_tract" | "state_not_loaded" | "lookup_failed") =>
+      opportunityZoneRead({ opportunityZone: "unchecked", opportunityZoneUnchecked: r, v: SITE_FLAGS_V }).label;
+    expect(why("state_not_loaded")).toBe("Opportunity Zone: not checked (no zones on file for this state)");
+    expect(why("no_tract")).toBe("Opportunity Zone: not checked (no census tract for this point)");
+    expect(why("lookup_failed")).toBe("Opportunity Zone: not checked (the zone list could not be read)");
+    // An older "unchecked" carries no reason: it names none rather than guess one.
+    expect(opportunityZoneRead({ opportunityZone: "unchecked", v: 2 }).label).toBe("Opportunity Zone: not checked");
   });
 });

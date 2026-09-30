@@ -33,8 +33,17 @@ export interface SiteFlagsResult {
   county?: CensusPlace | null;
   /** the rules the lookup was made under; absent on the first version */
   v?: number;
-  /** null = tract known, not in a zone; "unchecked" = registry empty/unavailable */
+  /** the tract's current number on the registry's list (its source); null =
+   *  its current number is not on the list, which holds zones for the
+   *  tract's own state (from `SITE_FLAGS_V` 3 — before, a registry holding
+   *  any state's zones answered null); "unchecked" = no answer, the reason in
+   *  `opportunityZoneUnchecked` */
   opportunityZone: { sourceDataset: string } | null | "unchecked";
+  /** why the Opportunity Zone check did not answer: no census tract at the
+   *  point, a registry holding no zones for the tract's state (the ingest
+   *  loads Maryland's unless a national layer is set), or a registry that
+   *  could not be read. Absent on a lookup made before it was recorded. */
+  opportunityZoneUnchecked?: OpportunityZoneUnchecked;
   /** null = query worked, point in no mapped flood polygon (treat as zone X-ish
    *  unknown); "unavailable" = NFHL not reachable/resolvable */
   flood: FloodFlag | null | "unavailable";
@@ -47,9 +56,10 @@ export interface SiteFlagsResult {
 /** The rules a lookup is made under: 2 reads the incorporated place and the
  *  county beside the tract (#452); 3 looks up at the deal's own geocoded
  *  point — the one its aerial and flood map are drawn around, so the zone
- *  said and the ring drawn are one place — and reads FEMA's base flood
- *  elevation (#472). An answered lookup under older rules is made again on
- *  the deal's next view. */
+ *  said and the ring drawn are one place — reads FEMA's base flood
+ *  elevation (#472), and says a tract is not in an Opportunity Zone only
+ *  where the registry holds zones for the tract's own state. An answered
+ *  lookup under older rules is made again on the deal's next view. */
 export const SITE_FLAGS_V = 3;
 
 /** How long a lookup whose flood zone FEMA did not answer stands before it
@@ -67,6 +77,78 @@ export function siteFlagsOutdated(
   if (!flags || flags.status !== "ok") return false;
   if ((flags.v ?? 1) < SITE_FLAGS_V) return true;
   return flags.flood === "unavailable" && now - Date.parse(flags.retrievedAt ?? "") > FLOOD_RETRY_MS;
+}
+
+// ── The Opportunity Zone check ──────────────────────────────────────────────
+//
+// The registry (incentive_zones) is loaded by scripts/ingest/opportunity_zones.ts,
+// which loads Maryland's designated tracts unless a national layer is set. A
+// tract missing from it is "not in a zone" only where the registry holds the
+// tract's own state; anywhere else the check did not run. And a miss is read
+// by the tract's CURRENT number, the one the Census geocoder returns: the
+// zones were designated on older tract numbers, so a tract split or
+// renumbered since can sit in a zone and still miss the list — every surface
+// that says "not on the list" says it was checked by the current number.
+
+export type OpportunityZoneUnchecked = "no_tract" | "state_not_loaded" | "lookup_failed";
+
+/** The first rules (`SITE_FLAGS_V`) under which "not on the list" was read
+ *  against the tract's own state's zones. */
+export const OZ_STATE_RULE_V = 3;
+
+/** The state a census tract lies in: an 11-digit tract GEOID opens on its
+ *  state's two-digit FIPS code. Null for anything that is not one. */
+export function tractStateFips(tractGeoid: string | null | undefined): string | null {
+  const g = String(tractGeoid ?? "");
+  return /^\d{11}$/.test(g) ? g.slice(0, 2) : null;
+}
+
+/**
+ * The Opportunity Zone answer from the registry's two reads: the tract's own
+ * row (`hit`), and — where there is none — how many zones the registry holds
+ * in the tract's state (`zonesInState`, null where that read failed). Only a
+ * registry that holds the state's zones can say the tract is not on its list.
+ */
+export function opportunityZoneFrom(input: {
+  hit: { sourceDataset: string } | null;
+  zonesInState: number | null;
+}): Pick<SiteFlagsResult, "opportunityZone" | "opportunityZoneUnchecked"> {
+  if (input.hit) return { opportunityZone: input.hit };
+  if (input.zonesInState === null) return { opportunityZone: "unchecked", opportunityZoneUnchecked: "lookup_failed" };
+  if (input.zonesInState <= 0) return { opportunityZone: "unchecked", opportunityZoneUnchecked: "state_not_loaded" };
+  return { opportunityZone: null };
+}
+
+const OZ_UNCHECKED_WHY: Record<OpportunityZoneUnchecked, string> = {
+  no_tract: "no census tract for this point",
+  state_not_loaded: "no zones on file for this state",
+  lookup_failed: "the zone list could not be read",
+};
+
+/** What the site-flags card says about the Opportunity Zone, from a stored
+ *  lookup: the chip, and for a tract off the list the one caveat it owes. */
+export interface OpportunityZoneRead {
+  kind: "listed" | "not_listed" | "unchecked";
+  label: string;
+  /** said under the chips where the tract's current number is off the list */
+  caveat: string | null;
+}
+
+export const OZ_CURRENT_NUMBER_CAVEAT =
+  "Opportunity Zones were checked by the tract's current number. The zones were designated on older tract numbers, so a tract split or renumbered since can sit in a zone and still miss the list.";
+
+export function opportunityZoneRead(
+  flags: Pick<SiteFlagsResult, "opportunityZone" | "opportunityZoneUnchecked" | "v">,
+): OpportunityZoneRead {
+  const oz = flags.opportunityZone;
+  if (oz && typeof oz === "object") return { kind: "listed", label: "Opportunity Zone tract", caveat: null };
+  // A "not on the list" stored before the state rule may have been read
+  // against another state's zones: not an answer.
+  if (oz === null && (flags.v ?? 1) >= OZ_STATE_RULE_V) {
+    return { kind: "not_listed", label: "Tract's current number not on the Opportunity Zone list", caveat: OZ_CURRENT_NUMBER_CAVEAT };
+  }
+  const why = oz === "unchecked" && flags.opportunityZoneUnchecked ? OZ_UNCHECKED_WHY[flags.opportunityZoneUnchecked] : null;
+  return { kind: "unchecked", label: `Opportunity Zone: not checked${why ? ` (${why})` : ""}`, caveat: null };
 }
 
 /**
