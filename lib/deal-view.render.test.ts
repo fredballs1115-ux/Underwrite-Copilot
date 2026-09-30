@@ -580,6 +580,7 @@ describe("the Documents tab opens each source document", () => {
     };
     const stray = { ...doc, id: "d2", filename: "Elsewhere.pdf", storage_path: "documents/another-deal/x.pdf" };
     const html = render({ ...base, dealId, documents: [doc, stray] } as Props);
+    dumpView("deal-documents", html);
     expect(a11yIssues(html)).toEqual([]);
     const href = `/api/deals/${dealId}/file?p=${encodeURIComponent(doc.storage_path)}`;
     expect(html).toContain(`href="${href.replace(/&/g, "&amp;")}"`);
