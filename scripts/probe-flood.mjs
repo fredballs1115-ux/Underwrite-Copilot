@@ -73,56 +73,59 @@ export function overlayUrl(b, width, height, layerId, root = NFHL_ROOT) {
 
 /**
  * The zones restyled through the service's own dynamic layers (it reports
- * `supportsDynamicLayers: true`): FEMA's features and FEMA's fields, drawn
- * in the site's palette instead of FEMA's print styling — a light tint and
- * a crisp outline a class, FEMA's labels off (the page says the zone in
- * words), top to bottom:
- *   - the regulatory floodway, a red hatch over its outline;
- *   - the Special Flood Hazard Area (the 1% annual chance zones), blue;
- *   - the 0.2% annual chance zone, amber;
- *   - an area of undetermined hazard (Zone D), a grey hatch.
- * Each class is a definition expression over FEMA's own FLD_ZONE,
- * ZONE_SUBTY and SFHA_TF fields; a field the layer does not have makes the
- * export answer an error, which this probe prints — so the probe itself is
- * what proves the fields before any page relies on them.
+ * `supportsDynamicLayers: true`): FEMA's features, classified EXACTLY as
+ * FEMA's own legend classifies them — every legend entry's FLD_ZONE,ZONE_SUBTY
+ * values, "<Null>" and all — and only the drawing changed: a light tint and
+ * a crisp outline a class in the site's palette, over a wide white casing so
+ * an edge reads over a busy roofscape, FEMA's labels off (the page says the
+ * zone in words). A first cut keyed the 1% zone on SFHA_TF and drew nothing
+ * over Hoboken's and New Orleans' Zone AE, whose polygons do not carry it:
+ * FEMA's own classes are the only safe key.
  */
-export const RESTYLED_LAYERS = (layerId) => {
-  const source = { type: "mapLayer", mapLayerId: layerId };
-  const fill = (color, outline, width, style = "esriSFSSolid") => ({
-    renderer: {
-      type: "simple",
-      symbol: { type: "esriSFS", style, color, outline: { type: "esriSLS", style: "esriSLSSolid", color: outline, width } },
-    },
-    showLabels: false,
-  });
-  // Each class twice: its tint and outline on top, and beneath it a wide
-  // white casing, so an edge still reads over a busy roofscape. The array
-  // is drawn top first.
-  const casing = { renderer: { type: "simple", symbol: { type: "esriSFS", style: "esriSFSNull", outline: { type: "esriSLS", style: "esriSLSSolid", color: [255, 255, 255, 210], width: 4.5 } } }, showLabels: false };
-  const classes = [
-    ["ZONE_SUBTY LIKE '%FLOODWAY%'", fill([229, 57, 53, 190], [183, 28, 28, 255], 2.25, "esriSFSBackwardDiagonal")],
-    ["SFHA_TF = 'T' AND (ZONE_SUBTY IS NULL OR ZONE_SUBTY NOT LIKE '%FLOODWAY%')", fill([30, 136, 229, 105], [13, 71, 161, 255], 2.25)],
-    ["FLD_ZONE = 'X' AND (ZONE_SUBTY LIKE '%0.2%' OR ZONE_SUBTY LIKE '%1 PCT%' OR ZONE_SUBTY LIKE '%1 PERCENT%')", fill([255, 179, 0, 85], [230, 126, 0, 255], 2)],
-    ["FLD_ZONE = 'D'", fill([117, 117, 117, 130], [66, 66, 66, 240], 1.75, "esriSFSForwardDiagonal")],
-  ];
-  return classes.flatMap(([definitionExpression, drawingInfo], i) => [
-    { id: 901 + i * 2, source, definitionExpression, drawingInfo },
-    { id: 902 + i * 2, source, definitionExpression, drawingInfo: casing },
-  ]);
-};
+export const CLASS_STYLE = [
+  // [legend label pattern, fill RGBA, outline RGBA, outline width, fill style]
+  [/floodway/i, [229, 57, 53, 190], [183, 28, 28, 255], 2.25, "esriSFSBackwardDiagonal"],
+  [/^1% annual chance/i, [30, 136, 229, 105], [13, 71, 161, 255], 2.25, "esriSFSSolid"],
+  [/^0\.2% annual chance/i, [255, 179, 0, 85], [230, 126, 0, 255], 2, "esriSFSSolid"],
+  [/future conditions/i, [142, 36, 170, 70], [106, 27, 154, 255], 1.75, "esriSFSSolid"],
+  [/reduced risk due to levee/i, [0, 137, 123, 60], [0, 105, 92, 255], 1.75, "esriSFSSolid"],
+  [/risk due to levee/i, [141, 110, 99, 120], [93, 64, 55, 240], 1.75, "esriSFSForwardDiagonal"],
+  [/undetermined/i, [117, 117, 117, 130], [66, 66, 66, 240], 1.75, "esriSFSForwardDiagonal"],
+];
 
-export function restyledOverlayUrl(b, width, height, layerId, root = NFHL_ROOT) {
-  const p = new URLSearchParams({
+export function restyledLayers(layerId, legend) {
+  const source = { type: "mapLayer", mapLayerId: layerId };
+  const infos = (casing) =>
+    legend.flatMap((entry) => {
+      const style = CLASS_STYLE.find(([re]) => re.test(String(entry.label ?? "").trim()));
+      if (!style) return [];
+      const [, fill, outline, width, fillStyle] = style;
+      const symbol = casing
+        ? { type: "esriSFS", style: "esriSFSNull", outline: { type: "esriSLS", style: "esriSLSSolid", color: [255, 255, 255, 210], width: width + 2.25 } }
+        : { type: "esriSFS", style: fillStyle, color: fill, outline: { type: "esriSLS", style: "esriSLSSolid", color: outline, width } };
+      return (entry.values ?? []).map((value) => ({ value, label: entry.label, symbol }));
+    });
+  const renderer = (casing) => ({ type: "uniqueValue", field1: "FLD_ZONE", field2: "ZONE_SUBTY", fieldDelimiter: ",", uniqueValueInfos: infos(casing) });
+  // Drawn top first: the tints and outlines over their casings.
+  return [
+    { id: 901, source, drawingInfo: { renderer: renderer(false), showLabels: false } },
+    { id: 902, source, drawingInfo: { renderer: renderer(true), showLabels: false } },
+  ];
+}
+
+/** The restyled export's form: POSTed, since FEMA's full class list makes
+ *  the dynamic layers some 50 KB — past what a URL carries. */
+export function restyledOverlayForm(b, width, height, layerId, legend) {
+  return new URLSearchParams({
     bbox: bboxParam(b),
     bboxSR: "3857",
     imageSR: "3857",
     size: `${width},${height}`,
     format: "png32",
     transparent: "true",
-    dynamicLayers: JSON.stringify(RESTYLED_LAYERS(layerId)),
+    dynamicLayers: JSON.stringify(restyledLayers(layerId, legend)),
     f: "image",
   });
-  return `${root}/export?${p}`;
 }
 
 /** The building's ring as the page draws it: white over a dark halo. */
@@ -162,6 +165,29 @@ async function get(url, timeoutMs = 30_000) {
     } catch (err) {
       const cause = err instanceof Error && err.cause instanceof Error ? ` (${err.cause.message})` : "";
       last = `${err instanceof Error ? err.message : String(err)}${cause}`;
+      console.log(`    attempt ${attempt} failed: ${last}`);
+      await new Promise((r) => setTimeout(r, 1500 * attempt));
+    }
+  }
+  return { status: 0, type: "", buf: Buffer.alloc(0), error: last };
+}
+
+/** A POST of a form, asked three times like `get`. */
+async function post(url, form, timeoutMs = 30_000) {
+  let last = "";
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { ...UA, "content-type": "application/x-www-form-urlencoded" },
+        body: form.toString(),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      const type = res.headers.get("content-type") ?? "";
+      const buf = Buffer.from(await res.arrayBuffer());
+      return { status: res.status, type, buf, error: null };
+    } catch (err) {
+      last = err instanceof Error ? err.message : String(err);
       console.log(`    attempt ${attempt} failed: ${last}`);
       await new Promise((r) => setTimeout(r, 1500 * attempt));
     }
@@ -294,7 +320,9 @@ async function main() {
       // set beside FEMA's own styling.
       if (zoom === 17) {
         const t0 = Date.now();
-        const r = await get(restyledOverlayUrl(b, W, H, zones.id, root));
+        const form = restyledOverlayForm(b, W, H, zones.id, index.legend);
+        const r = await post(`${root}/export`, form);
+        console.log(`  z${zoom} restyled form: ${Math.round(form.toString().length / 1024)} KB`);
         console.log(`  z${zoom} restyled: overlay HTTP ${r.status} ${r.type} ${Math.round(r.buf.length / 1024)} KB in ${Date.now() - t0} ms`);
         if (!r.type.startsWith("image/")) console.log(`    restyled body: ${r.buf.toString("utf8").slice(0, 400)}`);
         else {
