@@ -144,7 +144,7 @@ const ACTIONS: Item[] = [
   {
     key: "a-whats-new",
     label: "What's new",
-    hint: "every product improvement, newest first",
+    hint: "product improvements, newest first",
     href: "/whats-new",
     group: "actions",
     search: "whats new changelog improvements updates shipped",
