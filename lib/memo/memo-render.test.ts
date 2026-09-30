@@ -354,6 +354,36 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).taxAbatementLine).toBe("");
   }, 30000);
 
+  it("says a seller's note under the title (#462), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Seller financing amount", value: "$40,000,000", flagged: false, page: "", basis: "na" },
+        { label: "Seller financing rate", value: "5.00%", flagged: false, page: "", basis: "na" },
+        { label: "Seller financing term", value: "5 years", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.sellerNoteLine).toBe("The seller offers to carry financing: $40.0M at 5.00% for 5 years");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("The seller offers to carry financing: $40.0M at 5.00% for 5 years");
+    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).sellerNoteLine).toBe("");
+  }, 30000);
+
   it("says how the property is sold under the title (#456), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

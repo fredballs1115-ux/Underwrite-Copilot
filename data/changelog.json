@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Seller financing, priced against today's loan",
+      "href": "/deals",
+      "blurb": "Where a memorandum says the seller will carry part of the price — seller financing, a carryback or a purchase-money note — the screen now reads the note's terms as stated: its size or its share of the price, its rate, term and amortization, and whether it sits behind new senior debt. The deal page prices it the way it prices an assumable loan: both positions run whole on the deal's own model against the model's new loan at today's rate, with the note's rate and year-one coverage drawn against the new loan's, what the note is worth in price, and how much more or less equity it takes. A note that balloons inside the hold is refinanced at today's rate after, a second behind new senior debt is read but not run, and a term the memorandum does not state is named rather than assumed. The pipeline, the memo, the report, the workbook, the shared screen and the compare table carry it too, and the assumption review checks the seller-financing traps by name."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Tax abatements, read to the day they end",
       "href": "/deals",
       "blurb": "Where a memorandum states a property-tax abatement — a ten-year abatement on new construction, a PILOT, 421-a or a county incentive — the screen now reads it: the program, when it ends, the bill paid today and the full bill without it, or the savings where only those are stated. The deal page draws how many years stay abated against the model's five-year sale, today's bill against the full one, and the share of the in-place NOI that goes to taxes when the abatement ends, and says that step-up as a sum of the price at the going-in cap. An end stated as a year alone is read as that year opens, and a term counted from a stated start is added up and said so. A full bill the memorandum does not state is never estimated. The page says plainly that the screening model grows today's abated taxes, and where the abatement ends against its sale. On a commercial building it notes that leases passing taxes through put the step-up on the tenants. The pipeline, the memo, the report, the workbook, the shared screen and the compare table carry it too, and the assumption review checks the abatement's traps by name."

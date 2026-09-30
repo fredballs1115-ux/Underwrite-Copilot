@@ -15,6 +15,7 @@ import { countyOf, placeDeal } from "@/lib/market-county";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { assumableView, readAssumable, type AssumableView } from "@/lib/assumable-debt";
+import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { staleAfterFailure } from "@/lib/screen-run";
@@ -155,6 +156,7 @@ export async function GET(
   // The seller's loan offered for assumption, priced against the model's
   // new loan — the deal page's own read (#419).
   let assumable: AssumableView | null = null;
+  let sellerNote: AssumableView | null = null;
   // A leasehold's exit on the term its lease has left at the model's sale —
   // the deal page's own read (#422).
   let leasehold: LeaseholdExitView | null = null;
@@ -210,6 +212,10 @@ export async function GET(
         provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
       });
       const assumableRead = readAssumable(extraction, derived.inputs);
+      // A note the seller offers to carry (#462), priced against this
+      // model's own new loan the way the deal page prices it.
+      const sellerRead = readSellerFinancing(extraction, derived.inputs);
+      sellerNote = sellerRead ? sellerFinancingView(sellerRead, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed) : null;
       assumable = assumableRead
         ? assumableView(assumableRead, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed)
         : null;
@@ -313,7 +319,7 @@ export async function GET(
       // a failed read is no page, never a failed report.
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

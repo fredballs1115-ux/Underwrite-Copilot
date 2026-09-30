@@ -330,15 +330,18 @@ function SingleTenantCaveat({ lease }: { lease: { line: string; read: string } |
 
 function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
   if (!view) return null;
+  // A note the seller offers to carry (#462) is the same arithmetic in the
+  // seller's loan's place; only the words change.
+  const seller = view.kind === "seller";
   const rate =
     view.couponPct != null && view.marketPct != null && view.underMarketBps != null
-      ? `The loan's ${view.couponPct.toFixed(2)}% against ${view.marketPct.toFixed(2)}% for a new one — ${Math.abs(view.underMarketBps)} bps ${
+      ? `The ${seller ? "note" : "loan"}'s ${view.couponPct.toFixed(2)}% against ${view.marketPct.toFixed(2)}% for a new one — ${Math.abs(view.underMarketBps)} bps ${
           view.underMarketBps >= 0 ? "under" : "over"
         }.`
       : "";
   return (
     <View style={{ marginTop: 12 }} wrap={false}>
-      <TitleRow title="The seller's loan, offered for assumption" marginTop={0} />
+      <TitleRow title={seller ? "The seller's note, offered to carry the price" : "The seller's loan, offered for assumption"} marginTop={0} />
       <Text style={s.sub}>{str(view.termsLine)}</Text>
       {rate ? <Text style={{ fontSize: 8.5, color: C.ink, marginTop: 2 }}>{str(rate)}</Text> : null}
       <Text style={{ fontSize: 8.5, color: C.ink, marginTop: 2 }}>{str(view.sentence)}</Text>
@@ -778,6 +781,10 @@ export interface ReportInput {
    *  — printed over the grids; absent where the caller built no model, and
    *  then the line prints alone */
   taxAbatement?: { line: string; read: string } | null;
+  /** a note the seller offers to carry, priced against the model's new loan
+   *  (lib/seller-financing `sellerFinancingView`, #462); null where none is
+   *  offered */
+  sellerNote?: AssumableView | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
@@ -808,6 +815,7 @@ export function buildReportData(
   photos?: MemoCover[] | null,
   valueAdd?: { line: string; read: string } | null,
   taxAbatement?: { line: string; read: string } | null,
+  sellerNote?: AssumableView | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -823,6 +831,7 @@ export function buildReportData(
     photos: photos ?? null,
     valueAdd: valueAdd ?? null,
     taxAbatement: taxAbatement ?? null,
+    sellerNote: sellerNote ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1323,6 +1332,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <SingleTenantCaveat lease={taxAbatement} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
+          {!sensitivity && <AssumableBlock view={input.sellerNote} />}
           {!sensitivity && <LeaseholdBlock view={input.leasehold} />}
         </PageChrome>
       )}
@@ -1435,6 +1445,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
 
           <AssumptionsBlock read={modelVsMarket} />
           <AssumableBlock view={input.assumable} />
+          <AssumableBlock view={input.sellerNote} />
           <LeaseholdBlock view={input.leasehold} />
         </PageChrome>
       )}

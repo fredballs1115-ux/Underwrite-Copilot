@@ -222,3 +222,21 @@ describe("dealContextFor — a property-tax abatement (#461)", () => {
     expect(ctx).toContain("$450,000 a year more once it ends, 15% of the in-place NOI");
   });
 });
+
+describe("dealContextFor — a note the seller offers to carry (#462)", () => {
+  it("says the note as stated, struck on the ask, and that its rate is paid for in the price", () => {
+    const note: ExtractionResult = {
+      dealName: "Maple Court",
+      assetClass: "multifamily",
+      metrics: [
+        m("Asking price", "$20,000,000"),
+        m("Seller financing amount", "70% of the purchase price"),
+        m("Seller financing rate", "5.00%"),
+        m("Seller financing term", "5 years"),
+      ],
+    };
+    const ctx = dealContextFor(note)!;
+    expect(ctx).toContain("The memorandum says the seller will carry financing: $14.0M (70% of the price) at 5.00% for 5 years.");
+    expect(ctx).toContain("has usually priced the difference into the ask");
+  });
+});

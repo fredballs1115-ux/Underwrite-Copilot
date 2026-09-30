@@ -12,6 +12,7 @@ import { readSale, saleContextLine } from "@/lib/sale-terms";
 import { readRoster, rosterContextLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddContextLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementContextLine } from "@/lib/tax-abatement";
+import { readSellerFinancing, sellerFinancingContextLine } from "@/lib/seller-financing";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -68,6 +69,9 @@ export function dealContextFor(
   // A property-tax abatement (#461): the NOI is on an abated bill, when it
   // ends and what the owner pays more once it does.
   const abatement = readTaxAbatement(extraction);
+  // A note the seller offers to carry (#462): its terms, and what its value
+  // turns on — never its rate alone.
+  const sellerNote = readSellerFinancing(extraction, null);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
@@ -76,6 +80,7 @@ export function dealContextFor(
     ...(interest ? [interestContextLine(interest)] : []),
     ...(sale ? [saleContextLine(sale)] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
+    ...(sellerNote ? [sellerFinancingContextLine(sellerNote)] : []),
     ...(affordable ? [affordableContextLine(affordable)] : []),
     ...(singleTenant ? [singleTenantContextLine(singleTenant)] : []),
     ...(roster ? [rosterContextLine(roster)] : []),

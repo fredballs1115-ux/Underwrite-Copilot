@@ -17,6 +17,7 @@ import { saleTag } from "@/lib/sale-terms";
 import { rosterTag } from "@/lib/tenant-roster";
 import { valueAddTag } from "@/lib/value-add";
 import { taxAbatementTag } from "@/lib/tax-abatement";
+import { sellerFinancingTag } from "@/lib/seller-financing";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -62,6 +63,10 @@ export interface PipelineSlots {
    *  "Abatement ended" (lib/tax-abatement `taxAbatementTag`, #461); absent
    *  or null where the memorandum states none */
   abatement?: string | null;
+  /** a note the seller offers to carry — "Seller financing 5.00%"
+   *  (lib/seller-financing `sellerFinancingTag`, #462); absent or null
+   *  where the memorandum offers none */
+  sellerNote?: string | null;
 }
 
 /**
@@ -131,5 +136,7 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // The NOI is on an abated tax bill that ends (#461): how long it has,
     // and what the owner pays more once it does.
     abatement: taxAbatementTag(extraction),
+    // A note the seller will carry, and its rate (#462).
+    sellerNote: sellerFinancingTag(extraction),
   };
 }

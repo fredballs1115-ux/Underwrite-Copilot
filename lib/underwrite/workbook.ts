@@ -303,6 +303,17 @@ function buildCover(
     ws.getRow(r).height = 40;
     r++;
   }
+  // A note the seller offers to carry (#462): as stated, then what it is
+  // worth against this model's own new loan.
+  if (meta.sellerNote) {
+    fact("The seller's note", meta.sellerNote.line);
+    const c = ws.getCell(r, 3);
+    c.value = meta.sellerNote.read;
+    c.font = { name: ARIAL, size: 9, color: MUTED };
+    c.alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r).height = 40;
+    r++;
+  }
   // A covenant or a contract that sets the rents (#453): how much of the
   // building is restricted and until when, then what this model's one rent
   // growth rate is not on it.

@@ -14,6 +14,7 @@ import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestOf, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
+import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { readAffordable } from "@/lib/affordable";
@@ -266,6 +267,7 @@ export function ShareView({
   // states it — the pricing against today's rate needs the model, which a
   // shared screen does not carry.
   const assumable = readAssumable(safeExtraction, null);
+  const sellerNote = readSellerFinancing(safeExtraction, null);
   const ranges = (screen?.ranges ?? []).slice(0, 6);
   const killers = (screen?.dealKillers ?? []).slice(0, 3);
   // One OM, several properties (#411): the deal page's own card, read by
@@ -338,6 +340,17 @@ export function ShareView({
           className="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm leading-relaxed shadow-sm"
         >
           {assumableLine(assumable)}
+        </p>
+      )}
+
+      {/* A note the seller offers to carry (#462), as stated — the pricing
+          needs the model, which the sender's deal page carries. */}
+      {sellerNote && (
+        <p
+          data-qa="share-seller-note"
+          className="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm leading-relaxed shadow-sm"
+        >
+          {sellerFinancingLine(sellerNote.terms)}
         </p>
       )}
 

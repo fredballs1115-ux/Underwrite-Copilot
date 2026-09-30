@@ -29,6 +29,7 @@ import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
+import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { readPortfolio } from "@/lib/portfolio";
 import { PICTURE_CREDIT, ensureDealPicture, memorandumPhotoCredit } from "@/lib/deal-picture";
@@ -600,6 +601,12 @@ export default async function DealPage({
   const assumableRead = extraction ? readAssumable(extraction, derived?.inputs ?? null) : null;
   const assumable = assumableRead
     ? assumableView(assumableRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed)
+    : null;
+  // A note the seller offers to carry (#462): the same comparison, the
+  // note in the seller's loan's place.
+  const sellerRead = extraction ? readSellerFinancing(extraction, derived?.inputs ?? null) : null;
+  const sellerNote = sellerRead
+    ? sellerFinancingView(sellerRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed)
     : null;
   // A leasehold's exit, valued on the term its ground lease has left at the
   // model's sale (#421) — only where the memorandum states when it ends.
@@ -1255,6 +1262,7 @@ export default async function DealPage({
         marketSince={marketSince}
         modelVsMarket={modelRead}
         assumable={assumable}
+        sellerNote={sellerNote}
         leaseholdExit={leaseholdExit}
         metroDemand={
           reads && liveMarket

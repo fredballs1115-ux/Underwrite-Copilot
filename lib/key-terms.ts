@@ -25,6 +25,7 @@ import { saleTermRows } from "./sale-terms";
 import { rosterTermRows } from "./tenant-roster";
 import { valueAddTermRows } from "./value-add";
 import { taxAbatementTermRows } from "./tax-abatement";
+import { sellerFinancingTermRows } from "./seller-financing";
 
 export interface KeyTermMetric {
   label: string;
@@ -92,6 +93,8 @@ export function keyTermRows<M extends KeyTermMetric>(
   for (const row of valueAddTermRows(rows)) lead(row);
   // A tax abatement (#461): the program, when it ends and the full bill.
   for (const row of taxAbatementTermRows(rows)) lead(row);
+  // A note the seller offers to carry (#462): its size, rate and term.
+  for (const row of sellerFinancingTermRows(rows)) lead(row);
   // What a hotel is sold with (#455): the PIP, the flag's end, RevPAR.
   for (const row of hotelTermRows(rows)) lead(row);
   const rest = rows.filter((m) => !head.includes(m));

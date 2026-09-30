@@ -90,6 +90,10 @@ export type Col = {
    *  lib/tax-abatement `taxAbatementTag`, #461); absent where none is
    *  stated */
   abatement?: string | null;
+  /** a note the seller offers to carry ("Seller financing 5.00%" —
+   *  lib/seller-financing `sellerFinancingTag`, #462); absent where none
+   *  is offered */
+  sellerNote?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -221,6 +225,8 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Value-add", get: (c) => c.valueAdd || "—" },
     // An abated tax bill that ends, and what it costs when it does (#461).
     { label: "Tax abatement", get: (c) => c.abatement || "—" },
+    // A note the seller will carry, and its rate (#462).
+    { label: "Seller financing", get: (c) => c.sellerNote || "—" },
     { label: "Hotel", get: (c) => c.hotel || "—" },
     { label: "Sale", get: (c) => c.sale || "—" },
     // A conversion and a stabilized building are not the same kind of thing,

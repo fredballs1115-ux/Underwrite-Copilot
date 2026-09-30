@@ -501,6 +501,25 @@ describe("deriveUnderwriteInputs — a property-tax abatement (#461)", () => {
   });
 });
 
+describe("deriveUnderwriteInputs — a note the seller offers to carry (#462)", () => {
+  it("says the note as stated, then what it is worth against the model's own new loan", () => {
+    const m = deriveUnderwriteInputs(
+      ex([
+        metric("Asking price", "$20,000,000"),
+        metric("NOI (in-place)", "$1,300,000"),
+        metric("Units", "120"),
+        metric("Seller financing amount", "$14,000,000"),
+        metric("Seller financing rate", "5.00%"),
+        metric("Seller financing term", "5 years"),
+        metric("Seller financing amortization", "25 years"),
+      ]),
+      "fallback",
+    );
+    expect(m.meta.sellerNote?.line).toBe("The seller offers to carry financing: $14.0M at 5.00% for 5 years, amortizing over 25 years");
+    expect(m.meta.sellerNote?.read).toMatch(/^The seller's note (is worth|returns)/);
+  });
+});
+
 describe("deriveUnderwriteInputs — a value-add renovation program (#460)", () => {
   const strategy = { kind: "value_add" as const, summary: "", capitalBudget: "", timeline: "" };
   const program = [

@@ -424,6 +424,10 @@ export function assumableSentence(a: AssumableRead): string {
  * arithmetic out of the browser bundle (metroDemand's rule).
  */
 export interface AssumableView {
+  /** whose loan the card prices: the seller's loan offered for assumption
+   *  (the default), or a note the seller offers to carry (lib/seller-
+   *  financing, #462) — the card's words follow it */
+  kind?: "assumption" | "seller";
   termsLine: string;
   page: string;
   sentence: string;

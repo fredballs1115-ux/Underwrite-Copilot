@@ -601,6 +601,41 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   slot), the memo under its title (`taxAbatementShortLine`), the workbook's
   cover ("The tax abatement"), the report's caveat and the compare table's
   Tax abatement row.
+- A note the seller offers to carry (#462): the extraction labels its
+  terms as rows of their own, each only as stated — "Seller financing
+  amount" (dollars, or the share of the price as stated), "… rate", "…
+  term" (from closing), "… amortization" (years or "Interest-only") and
+  "… position" where it sits behind new senior debt — never a lender's
+  quote and never the seller's existing loan (#417's rows).
+  `lib/seller-financing.ts` (pure) reads them and runs the assumption
+  card's arithmetic with the note in the seller's loan's place:
+  `readAssumption` (lib/tools/loan-assumption) against the model's own new
+  loan, through lib/assumable-debt's `modelForAssumption`, only where the
+  price buys the building (`assumableApplies`). A share of the price is
+  struck on the model's price, or on the stated ask where there is no
+  model (`askingPriceOf`), and said. Five rules: the rate is paid for
+  somewhere (a below-market note is usually in the price, so it is priced
+  by what it is worth against the new loan, never by its rate); the note's
+  size sets the cheque (a larger note takes less equity, and its lower
+  coverage is said: "Its year-one coverage is 1.16× against the model's
+  loan's 1.31×"); a short term is a refinance (whole years at the note's
+  rate, then today's); a second is not a first (read, never run against
+  the model's loan); a term not stated is named. The card is the
+  assumable card itself: `AssumableView.kind` ("assumption" | "seller")
+  switches its words ("The seller's note, offered to carry the price",
+  `data-qa="seller-note"`) and the report's `AssumableBlock`'s, and the
+  equity tile's sub now follows the sign ("a larger loan, a smaller
+  cheque") for both. Where it shows: the Financials tab under the
+  assumable card (`sellerFinancingView`, plain data through `DealView`'s
+  `sellerNote`), the deal context and the challenger (`sellerFinancingNote`:
+  SELLER-FINANCING TRAPS (a)–(e) — the price, the balloon, the underlying
+  loan, the second, the paper), the key terms, the pipeline row, card and
+  CSV's "Seller financing" column and the meeting workbook's price note
+  (`sellerFinancingTag`: "Seller financing 5.00%", its own `sellerNote`
+  slot), the memo and the shared screen (`sellerFinancingLine`, the terms
+  only), the workbook's cover ("The seller's note", `meta.sellerNote`), the
+  report beside the grids (`buildReportData`'s twentieth argument) and the
+  compare table's Seller financing row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

@@ -25,6 +25,7 @@ import { saleCeilingRead } from "@/lib/sale-ceiling";
 import { readRoster, rosterModelLine, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddModelLine, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementModelLine, taxAbatementShortLine } from "@/lib/tax-abatement";
+import { readSellerFinancing, sellerFinancingLine, sellerFinancingSentence } from "@/lib/seller-financing";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -100,6 +101,10 @@ export interface WorkbookMeta {
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
   assumable?: { line: string; read: string } | null;
+  /** a note the seller offers to carry (lib/seller-financing, #462): the
+   *  note as stated, then what it is worth against this model's own new
+   *  loan; absent where none is offered */
+  sellerNote?: { line: string; read: string } | null;
   /** a leasehold's exit valued on the years its ground lease has left at
    *  this model's sale (lib/leasehold-exit, #422) — the read, with the
    *  exit cap that runs this workbook on the term, then the financing and
@@ -236,6 +241,11 @@ function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["intere
 /** The cover's lines about the seller's loan offered for assumption
  *  (#419): the loan as stated, and the deal page's own read of it against
  *  this model's new loan. Null where none is offered. */
+function sellerNoteMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["sellerNote"] {
+  const s = extraction ? readSellerFinancing(extraction, inputs) : null;
+  return s ? { line: sellerFinancingLine(s.terms), read: sellerFinancingSentence(s) } : null;
+}
+
 function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["assumable"] {
   const a = readAssumable(extraction, inputs);
   return a ? { line: assumableLine(a), read: assumableSentence(a) } : null;
@@ -790,6 +800,7 @@ export function deriveUnderwriteInputs(
       unitNoun: assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" },
       interest: interestMeta(extraction),
       assumable: assumableMeta(extraction, inputs),
+      sellerNote: sellerNoteMeta(extraction, inputs),
       leasehold: leaseholdMeta(extraction, inputs),
       affordable: affordableMeta(extraction),
       singleTenant: singleTenantMeta(extraction, inputs),

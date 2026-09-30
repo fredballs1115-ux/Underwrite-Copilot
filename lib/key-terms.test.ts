@@ -178,6 +178,22 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     ]);
   });
 
+  it("a seller's note leads with its size, rate and term after the price (#462)", () => {
+    const note = [
+      { label: "Occupancy", value: "94%", flagged: false },
+      { label: "Seller financing term", value: "5 years", flagged: false },
+      { label: "Seller financing rate", value: "5.00%", flagged: false },
+      { label: "Seller financing amount", value: "$14,000,000", flagged: false },
+      { label: "Asking price", value: "$20,000,000", flagged: false },
+    ];
+    expect(keyTermRows(note, "stabilized", 4).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Seller financing amount",
+      "Seller financing rate",
+      "Seller financing term",
+    ]);
+  });
+
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
     const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
     expect(rows).toHaveLength(3);
