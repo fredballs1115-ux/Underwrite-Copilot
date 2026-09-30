@@ -207,7 +207,15 @@ export const ASSET_CLASS_KEYS = Object.keys(ASSET_CLASS_LABEL) as readonly strin
  *  is filed — by the words it used, first match wins, longest tells first. */
 const PHRASE_TO_KEY: readonly (readonly [RegExp, string])[] = [
   [/\b(hotel|hospitality|lodging|motel|resort|short[- ]term rental|str)\b/i, "hospitality_str"],
-  [/\b(self[- ]?storage|storage)\b/i, "self_storage"],
+  [/\b(self[- ]?storage|mini[- ]?storage)\b/i, "self_storage"],
+  // Storage that is a warehouse or a yard — refrigerated buildings and
+  // industrial outdoor storage — is industrial, and is read before the bare
+  // word "storage" can file a cold-storage warehouse as a self-storage
+  // facility (the site-researcher's pass of 2026-09-30 ran "Cold Storage
+  // Warehouse" and "Industrial Outdoor Storage" through this table and got
+  // self-storage for both).
+  [/\b(cold[- ]storage|refrigerated|freezer|industrial outdoor storage|outdoor storage|ios)\b/i, "industrial"],
+  [/\b(storage)\b/i, "self_storage"],
   [/\b(manufactured|mobile[- ]home|mhc|rv park|rv resort)\b/i, "manufactured_housing"],
   [/\b(student)\b/i, "student_housing"],
   [/\b(senior|assisted living|memory care|independent living|skilled nursing)\b/i, "senior_housing"],
@@ -222,6 +230,10 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp, string])[] = [
   [/\b(industrial|warehouse|logistics|distribution|flex|manufacturing|cold storage|ios|outdoor storage)\b/i, "industrial"],
   [/\b(retail|shopping|strip|grocery|restaurant|qsr)\b/i, "retail"],
   [/\b(multifamily|multi[- ]family|apartment|residential|condo|garden|mid[- ]rise|high[- ]rise|walk[- ]up)\b/i, "multifamily"],
+  // Rental housing named by its program or its tenants ("Affordable Housing
+  // (LIHTC)", "Workforce Housing") — last, so a student, senior,
+  // manufactured or single-family phrase is read by its own rule first.
+  [/\b(affordable|workforce|lihtc|section 8|housing)\b/i, "multifamily"],
 ];
 
 /** The known key a stored class or a phrase of the model's resolves to;

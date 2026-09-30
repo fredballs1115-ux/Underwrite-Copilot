@@ -134,6 +134,27 @@ describe("the asset-words table", () => {
     expect(assetClassKey("Medical office building")).toBe("medical_office");
     expect(assetClassKey("Mixed-use")).toBe("mixed_use");
     expect(assetClassKey("HOSPITALITY_STR")).toBe("hospitality_str");
+    // A warehouse or a yard that stores things is industrial; only storage
+    // rented to the public by the unit is self-storage (the pass of
+    // 2026-09-30 found the bare word "storage" filing both as self-storage).
+    expect(assetClassKey("Cold Storage Warehouse")).toBe("industrial");
+    expect(assetClassKey("Refrigerated distribution")).toBe("industrial");
+    expect(assetClassKey("Industrial Outdoor Storage (IOS)")).toBe("industrial");
+    expect(assetClassKey("IOS")).toBe("industrial");
+    expect(assetClassKey("Self-Storage")).toBe("self_storage");
+    expect(assetClassKey("Self storage with outdoor storage")).toBe("self_storage");
+    expect(assetClassKey("Climate-controlled storage")).toBe("self_storage");
+    expect(assetClassKey("Mini-storage")).toBe("self_storage");
+    // Rental housing named by its program is rental housing; a student,
+    // senior, manufactured or single-family phrase keeps its own class.
+    expect(assetClassKey("Affordable Housing (LIHTC)")).toBe("multifamily");
+    expect(assetClassKey("Workforce Housing")).toBe("multifamily");
+    expect(assetClassKey("Section 8 housing")).toBe("multifamily");
+    expect(assetClassKey("Senior housing")).toBe("senior_housing");
+    expect(assetClassKey("Manufactured housing community")).toBe("manufactured_housing");
+    expect(assetClassKey("Single-family housing portfolio")).toBe("sfr_btr");
+    // "Portfolios" and "studios" hold "ios" inside a word, never as one.
+    expect(assetClassKey("Studios")).toBeNull();
     // A stored key is itself.
     for (const key of ASSET_CLASS_KEYS) expect(assetClassKey(key)).toBe(key);
     // Nothing, "auto" and a phrase naming no class resolve to nothing.
