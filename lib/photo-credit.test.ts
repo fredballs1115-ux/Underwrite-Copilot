@@ -37,17 +37,44 @@ describe("a market photograph's credit, with its links", () => {
     expect(skylineCredit(pd!).license.url).toBe("");
   });
 
-  it("gives a grid one line: each photographer and licence once, each linked where it can be, the same words as galleryCredit", () => {
+  it("gives a grid one line: every photograph shown linked to its own page, each photographer and licence named once, the same words as galleryCredit", () => {
     const ids = Object.keys(SKYLINES);
     const markup = html(React.createElement(GalleryCreditText, { ids }));
     expect(words(markup)).toBe(galleryCredit(ids));
-    const parts = galleryCreditParts(ids)!;
     const links = hrefs(markup);
-    for (const a of parts.authors) expect(links).toContain(a.url);
+    // Every photograph the grid shows, not only each photographer's first:
+    // a photographer with several had the rest linked nowhere.
+    for (const id of ids) expect(links, id).toContain(commonsPage(SKYLINES[id].file));
+    const pages = links.filter((l) => l.startsWith("https://commons.wikimedia.org/"));
+    expect(new Set(pages).size, "each page linked once").toBe(pages.length);
+    const parts = galleryCreditParts(ids)!;
     for (const l of parts.licenses) if (l.url) expect(links).toContain(l.url);
     expect(new Set(parts.authors.map((a) => a.name)).size).toBe(parts.authors.length);
+    expect(parts.authors.some((a) => a.photos.length > 1), "the table has a photographer with several files").toBe(true);
     expect(a11yIssues(markup)).toEqual([]);
+    expect(gluedWords(visibleText(markup))).toEqual([]);
     expect(html(React.createElement(GalleryCreditText, { ids: ["atlantis"] }))).toBe("");
+  });
+
+  it("names a photographer with several photographs shown once, and links each photograph by what it shows", () => {
+    // The homepage's case: one photographer took both of these, and the
+    // second was linked nowhere.
+    const [a, b] = [SKYLINES.richmond, SKYLINES.norfolk_hampton_roads];
+    expect(a.credit, "the table's own photographer for both").toBe(b.credit);
+    const markup = html(React.createElement(GalleryCreditText, { ids: ["richmond", "norfolk_hampton_roads"] }));
+    const text = words(markup);
+    expect(text).toContain(`${a.credit} (${a.place}; ${b.place})`);
+    expect(text.split(a.credit).length - 1).toBe(1);
+    const links = hrefs(markup);
+    expect(links).toContain(commonsPage(a.file));
+    expect(links).toContain(commonsPage(b.file));
+    // Each place is the link to its own photograph.
+    expect(markup).toContain(`href="${commonsPage(a.file)}" target="_blank" rel="noreferrer" class="underline decoration-dotted underline-offset-2">${a.place}</a>`);
+    expect(markup).toContain(`href="${commonsPage(b.file)}" target="_blank" rel="noreferrer" class="underline decoration-dotted underline-offset-2">${b.place}</a>`);
+    // One photograph alone is its photographer's name, linked.
+    const one = html(React.createElement(GalleryCreditText, { ids: ["richmond"] }));
+    expect(one).toContain(`>${a.credit}</a>`);
+    expect(words(one)).not.toContain(a.place);
   });
 
   it("draws the linked credit under a market's band", () => {

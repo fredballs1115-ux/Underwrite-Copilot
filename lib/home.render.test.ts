@@ -9,6 +9,7 @@ import { prerenderToNodeStream } from "react-dom/static";
 import { a11yIssues } from "./render-lint";
 import { buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
+import { SKYLINES, commonsPage } from "./skyline";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -45,6 +46,17 @@ describe("the homepage, as a screen reader hears it", () => {
       SAMPLE_DEMO_BOX,
     ).chip.label;
     expect(card).toContain(`<span class="sr-only">Buy-box </span>${chip}</span>`);
+  }, 60_000);
+
+  it("links every photograph the coverage gallery shows to its own page, not only each photographer's first", async () => {
+    const html = await renderHome();
+    const start = html.indexOf(">Coverage<");
+    expect(start).toBeGreaterThan(-1);
+    const gallery = html.slice(start, html.indexOf("</section>", start));
+    const tiles = [...gallery.matchAll(/href="\/market\?metro=([^"]+)"/g)].map((m) => m[1]);
+    const pictured = tiles.filter((id) => SKYLINES[id]);
+    expect(pictured.length).toBeGreaterThan(1);
+    for (const id of pictured) expect(gallery, id).toContain(`href="${commonsPage(SKYLINES[id].file)}"`);
   }, 60_000);
 
   it("reads each stat once, its label as the term and its figure as the value", async () => {

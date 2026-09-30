@@ -25,6 +25,8 @@
 // joins this table after that run showed it resolving to a real image.
 // `scripts/probe-skylines.mjs` is that probe — run it before adding a market.
 
+import { CROPPED_WORDS, creditText, photographerParts, type CreditLink, type CreditPart } from "./credit-parts";
+
 /** One market's photograph, with everything its licence obliges us to show. */
 export interface SkylineShot {
   /** exact Commons filename, no "File:" prefix — the route resolves it */
@@ -1284,34 +1286,23 @@ export function skylineSrcSet(id: string): string {
  * photograph changed can never leave a name behind on the page.
  */
 export function galleryCredit(ids: readonly string[]): string {
-  const parts = galleryCreditParts(ids);
-  if (!parts) return "";
-  return `Skyline photographs by ${parts.authors.map((a) => a.name).join(", ")} — via Wikimedia Commons, ${parts.licenses
-    .map((l) => l.name)
-    .join(" / ")}, ${CROPPED_WORDS}.`;
+  const line = galleryCreditLine(ids);
+  return line ? creditText(line) : "";
 }
 
 /**
  * What a Creative Commons licence asks a credit to carry (CC BY-SA 4.0
  * §3(a)(1)): the creator, a link to the work "to the extent reasonably
  * practicable", the licence with a link to it, and whether the work was
- * modified — and every surface here crops these photographs to its frame.
- * The credits said the name and the licence's short name as plain text and
- * nothing else (the pre-ship pass of 2026-09-30); `app/photo-credit.tsx`
- * draws these parts with the links, and the plain lines below say the same
- * words, so a caption and its test read one sentence.
+ * modified — and every surface here but the full-screen viewer crops these
+ * photographs to its frame. The credits said the name and the licence's
+ * short name as plain text and nothing else (the pre-ship pass of
+ * 2026-09-30); `app/photo-credit.tsx` draws these parts with the links, and
+ * the plain lines below say the same words, so a caption and its test read
+ * one sentence. The parts themselves are lib/credit-parts', which imports
+ * nothing, so a client handed a credit as data never loads this table.
  */
-export interface CreditLink {
-  name: string;
-  /** where it links: the file's page on Commons for an author, the
-   *  licence's text for a licence — "" where there is nothing to link
-   *  (public domain asks for no licence link) */
-  url: string;
-}
-
-/** The words every credit ends on: these photographs are cropped to the
- *  frame of whatever draws them. */
-export const CROPPED_WORDS = "cropped to fit";
+export { CROPPED_WORDS, type CreditLink, type CreditPart } from "./credit-parts";
 
 /** One photograph's credit, in parts. */
 export function skylineCredit(shot: SkylineShot): { place: string; author: CreditLink; license: CreditLink } {
@@ -1322,16 +1313,38 @@ export function skylineCredit(shot: SkylineShot): { place: string; author: Credi
   };
 }
 
-/** A grid's credit, in parts: each photographer once, linked to the first of
- *  their files shown, and each licence once, linked to its text. Null where
- *  no market shown has a photograph. */
-export function galleryCreditParts(ids: readonly string[]): { authors: CreditLink[]; licenses: CreditLink[] } | null {
+/** `creditLine`'s words as parts: the place, then the photographer linked
+ *  to the file's page and the licence to its text, and that it is cropped. */
+export function skylineCreditParts(shot: SkylineShot): CreditPart[] {
+  const c = skylineCredit(shot);
+  return [`${c.place} · `, ...photographerParts(c.author, c.license, true)];
+}
+
+/** One photographer in a grid's credit, with every one of their photographs
+ *  the grid shows, each by what it shows and linked to its own page. */
+export interface GalleryAuthor {
+  name: string;
+  photos: CreditLink[];
+}
+
+/**
+ * A grid's credit, in parts: each photographer once, with every photograph
+ * of theirs the grid shows linked to its own file's page — the first cut
+ * linked a photographer's name to their first file only, so on the
+ * homepage, where Bruce Emmerling took both Richmond's and Norfolk's,
+ * Norfolk's photograph was linked nowhere — and each licence once, linked to
+ * its text. Null where no market shown has a photograph.
+ */
+export function galleryCreditParts(ids: readonly string[]): { authors: GalleryAuthor[]; licenses: CreditLink[] } | null {
   const shots = ids.map((id) => skylineFor(id)).filter((s): s is SkylineShot => Boolean(s));
   if (shots.length === 0) return null;
-  const authors = new Map<string, CreditLink>();
+  const authors = new Map<string, GalleryAuthor>();
   for (const s of shots) {
     const name = authorOf(s);
-    if (!authors.has(name)) authors.set(name, { name, url: commonsPage(s.file) });
+    const author = authors.get(name) ?? { name, photos: [] };
+    const url = commonsPage(s.file);
+    if (!author.photos.some((p) => p.url === url)) author.photos.push({ name: s.place, url });
+    authors.set(name, author);
   }
   const licenses = new Map<string, CreditLink>();
   for (const s of shots) if (!licenses.has(s.license) || (!licenses.get(s.license)!.url && s.licenseUrl)) licenses.set(s.license, { name: s.license, url: s.licenseUrl });
@@ -1339,6 +1352,41 @@ export function galleryCreditParts(ids: readonly string[]): { authors: CreditLin
     authors: [...authors.values()],
     licenses: [...licenses.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
   };
+}
+
+/**
+ * The grid's one line, as parts: a photographer with one photograph shown is
+ * their name linked to it; one with several is their name, then each of
+ * those photographs by what it shows, linked to its own page — "Bruce
+ * Emmerling (Downtown Richmond; Downtown Norfolk from the Elizabeth River)",
+ * semicolons because a place can hold a comma. Then each licence, linked to
+ * its text, and that the photographs are cropped. Null where no market shown
+ * has a photograph.
+ */
+export function galleryCreditLine(ids: readonly string[]): CreditPart[] | null {
+  const parts = galleryCreditParts(ids);
+  if (!parts) return null;
+  const out: CreditPart[] = ["Skyline photographs by "];
+  parts.authors.forEach((a, i) => {
+    if (i) out.push(", ");
+    if (a.photos.length === 1) {
+      out.push({ name: a.name, url: a.photos[0].url });
+      return;
+    }
+    out.push(`${a.name} (`);
+    a.photos.forEach((p, j) => {
+      if (j) out.push("; ");
+      out.push(p);
+    });
+    out.push(")");
+  });
+  out.push(" — via Wikimedia Commons, ");
+  parts.licenses.forEach((l, i) => {
+    if (i) out.push(" / ");
+    out.push(l);
+  });
+  out.push(`, ${CROPPED_WORDS}.`);
+  return out;
 }
 
 function authorOf(shot: SkylineShot): string {
@@ -1364,7 +1412,7 @@ export function commonsPage(file: string): string {
  * page, in the memo, and in any export that ever embeds one of these.
  */
 export function creditLine(shot: SkylineShot): string {
-  return `${shot.place} · ${photographerLine(shot)}`;
+  return creditText(skylineCreditParts(shot));
 }
 
 /**
@@ -1374,7 +1422,8 @@ export function creditLine(shot: SkylineShot): string {
  * photographer and the licence, which are what the licence obliges.
  */
 export function photographerLine(shot: SkylineShot): string {
-  return `${authorOf(shot)} · ${shot.license} · ${CROPPED_WORDS}`;
+  const c = skylineCredit(shot);
+  return creditText(photographerParts(c.author, c.license, true));
 }
 
 /**

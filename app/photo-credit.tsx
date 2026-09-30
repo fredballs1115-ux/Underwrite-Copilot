@@ -1,5 +1,5 @@
-import type { ReactNode } from "react";
-import { CROPPED_WORDS, galleryCreditParts, skylineCredit, type CreditLink, type SkylineShot } from "@/lib/skyline";
+import { galleryCreditLine, skylineCreditParts, type SkylineShot } from "@/lib/skyline";
+import { CreditPartsText } from "./credit-parts";
 
 // The credit a market photograph owes, drawn with its links (2026-09-30).
 //
@@ -11,50 +11,22 @@ import { CROPPED_WORDS, galleryCreditParts, skylineCredit, type CreditLink, type
 // These draw lib/skyline's parts — the same words `creditLine` and
 // `galleryCredit` say — with the photographer linked to the file's page on
 // Commons and the licence to its text. No hooks, so a server page and a
-// client component (`CityPhoto`) draw the same markup.
-
-const LINK = "underline decoration-dotted underline-offset-2";
-
-function Linked({ link, className }: { link: CreditLink; className: string }) {
-  if (!link.url) return <>{link.name}</>;
-  return (
-    <a href={link.url} target="_blank" rel="noreferrer" className={className}>
-      {link.name}
-    </a>
-  );
-}
+// client component (`CityPhoto`) draw the same markup. A client that is
+// handed a credit as data rather than a table id draws it with
+// `CreditPartsText` (app/credit-parts) directly.
 
 /** One photograph's credit: the place, the photographer, the licence and
  *  that it is cropped — lib/skyline `creditLine`'s words, linked. */
-export function SkylineCreditText({ shot, linkClassName = LINK }: { shot: SkylineShot; linkClassName?: string }) {
-  const c = skylineCredit(shot);
-  return (
-    <>
-      {`${c.place} · `}
-      <Linked link={c.author} className={linkClassName} />
-      {" · "}
-      <Linked link={c.license} className={linkClassName} />
-      {` · ${CROPPED_WORDS}`}
-    </>
-  );
+export function SkylineCreditText({ shot, linkClassName }: { shot: SkylineShot; linkClassName?: string }) {
+  return <CreditPartsText parts={skylineCreditParts(shot)} linkClassName={linkClassName} />;
 }
 
-/** A grid's one credit line: every photographer shown and every licence,
- *  each once — lib/skyline `galleryCredit`'s words, linked. Nothing where no
- *  market shown has a photograph. */
-export function GalleryCreditText({ ids, linkClassName = LINK }: { ids: readonly string[]; linkClassName?: string }) {
-  const parts = galleryCreditParts(ids);
-  if (!parts) return null;
-  const out: ReactNode[] = ["Skyline photographs by "];
-  parts.authors.forEach((a, i) => {
-    if (i) out.push(", ");
-    out.push(<Linked key={`a${i}`} link={a} className={linkClassName} />);
-  });
-  out.push(" — via Wikimedia Commons, ");
-  parts.licenses.forEach((l, i) => {
-    if (i) out.push(" / ");
-    out.push(<Linked key={`l${i}`} link={l} className={linkClassName} />);
-  });
-  out.push(`, ${CROPPED_WORDS}.`);
-  return <>{out}</>;
+/** A grid's one credit line: every photographer shown, each photograph of
+ *  theirs linked to its own page, and every licence, each once —
+ *  lib/skyline `galleryCredit`'s words, linked. Nothing where no market shown
+ *  has a photograph. */
+export function GalleryCreditText({ ids, linkClassName }: { ids: readonly string[]; linkClassName?: string }) {
+  const line = galleryCreditLine(ids);
+  if (!line) return null;
+  return <CreditPartsText parts={line} linkClassName={linkClassName} />;
 }
