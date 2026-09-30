@@ -2680,7 +2680,27 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   elsewhere (a way to the first), and the viewer steps through them all.
   The pipeline card counts them over the deal's own photograph
   (`DealBanner`'s `photos`, a camera and the number, "photographs" for a
-  screen reader).
+  screen reader). **And flips through them there** (#450, a listing
+  card's habit): `DealCard.slides` (the gallery's heroes, each with its
+  page's credit, only where the card leads with the deal's own
+  photograph), and `DealTile` holds which is on screen. The arrows are
+  buttons OUTSIDE the card's link (`data-flip="photos"`, an overlay of the
+  picture's shape with `pointer-events-none` and the buttons re-enabled,
+  since a button inside an anchor is invalid), hidden at rest and shown on
+  hover or focus, and always on a touch screen (`pointer-coarse:`); a
+  horizontal swipe across the picture flips too, and a dot a photograph
+  (five at most, a window round the one on screen) says where you are.
+  `DealBanner` lays the one asked for (`slide`) over the lead photograph,
+  fades it in once whole and moves the credit and the count ("2 / 5") to
+  it only then; one that fails is dropped from the card's set
+  (`onSlideGone`), so the arrows, dots and count never point at a picture
+  the card cannot show, and a card whose own photograph failed offers
+  nothing (`onPhoto`). The next photograph is asked for on the first hover
+  or touch, one ahead of the reader. Checked in Chromium with the device's
+  own hover and pointer (`--blink-settings=primaryHoverType=…,
+  primaryPointerType=…`: headless Chromium reports no hover and no
+  pointer, and `Emulation.setEmulatedMedia` ignores both features, so
+  without the flag every hover style reads as broken).
   **The deal
   page opens the way a listing does** (#433, `app/(app)/deals/[id]/deal-hero.tsx`,
   `DealHero`, pure): the picture is the header's own — no card of its

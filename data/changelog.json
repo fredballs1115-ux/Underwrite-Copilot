@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Flip through a deal's photos on its card",
+      "href": "/deals",
+      "blurb": "On your pipeline, a card showing the deal's own photo now lets you flip through the other photos from its memorandum without opening the deal: arrows on the picture when you point at it (always there on a phone or tablet), a swipe, and dots that show where you are. Each photo keeps its own credit and page, and the next one loads before you ask for it."
+    },
+    {
+      "date": "2026-09-30",
       "title": "The memorandum's other photos, on the deal",
       "href": "/deals",
       "blurb": "A deal now shows the other photographs in its memorandum, not just the cover. Up to eight more from its first sixteen pages sit after the cover in the deal page's filmstrip and in full screen, each credited with the page it came from. Maps, site plans and repeats of the same photo are left out, and the cover stays the building's picture on your pipeline, where the card now counts how many photos the deal holds."

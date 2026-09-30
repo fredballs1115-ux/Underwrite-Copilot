@@ -86,6 +86,9 @@ export type DealCard = {
   /** the photographs the deal page holds — its cover and the memorandum's
    *  others (#448); 0 where the card shows none of them */
   photos?: number;
+  /** the memorandum's other photographs, the card flips through over its
+   *  own photograph (#450), each pinned to its route with its credit */
+  slides?: BannerSource[];
   /** where the deal is, from the location its pictures were drawn at
    *  (lib/deal-location's cache, #431); null until one is resolved */
   place?: MapPlace | null;
@@ -1875,6 +1878,30 @@ const DealTile = memo(function DealTile({
   checked: boolean;
   onToggle: (id: string) => void;
 }) {
+  // The deal's photographs, flipped through on the card (#450): which one is
+  // on screen, and whether the deal's own photograph is the picture at all
+  // (a card whose photograph failed shows its market's or its cover, and
+  // offers nothing to flip through).
+  // A photograph that fails to load is dropped from the set, so the arrows,
+  // the dots and the count never point at a picture the card cannot show.
+  const [dead, setDead] = useState<ReadonlySet<string>>(new Set());
+  const slides = useMemo(() => (d.slides ?? []).filter((s) => !dead.has(s.src)), [d.slides, dead]);
+  const [slideAsked, setSlide] = useState(0);
+  const [photoOn, setPhotoOn] = useState(d.pictures?.[0]?.kind === "photo" && !d.pictures[0].pending);
+  const canFlip = !compareMode && photoOn && slides.length > 0;
+  const count = slides.length + 1;
+  const slide = slideAsked < count ? slideAsked : 0;
+  const go = (step: number) => setSlide((s) => ((s < count ? s : 0) + step + count) % count);
+  const dropSlide = useCallback((src: string) => setDead((g) => new Set(g).add(src)), []);
+  // The next photograph is asked for before it is wanted: on the first
+  // hover, then one ahead of wherever the reader is.
+  const [warm, setWarm] = useState(false);
+  useEffect(() => {
+    if (!canFlip || !warm) return;
+    const next = slides[slide % slides.length];
+    if (next) new Image().src = next.src;
+  }, [canFlip, warm, slide, slides]);
+  const touch = useRef<{ x: number; y: number } | null>(null);
   const isDead = normalizeStage(d.stage) === "dead";
   const asset = assetMeta(d.assetClass ?? "");
   const place = d.coveredMarket ?? d.readMarket ?? d.market;
@@ -1899,7 +1926,11 @@ const DealTile = memo(function DealTile({
           flush
           shade
           priority={i < 4}
-          photos={d.photos ?? 0}
+          photos={d.photos ? d.photos - dead.size : 0}
+          slides={slides}
+          slide={canFlip ? slide : 0}
+          onPhoto={setPhotoOn}
+          onSlideGone={dropSlide}
           sizes="(min-width: 1536px) 24vw, (min-width: 1280px) 31vw, (min-width: 640px) 47vw, 100vw"
         />
         {/* The call, and in compare mode the pick beside it: the foot of the
@@ -1989,6 +2020,30 @@ const DealTile = memo(function DealTile({
     <li
       style={{ "--i": i } as React.CSSProperties}
       data-deal-tile={d.id}
+      onPointerEnter={canFlip && !warm ? () => setWarm(true) : undefined}
+      onTouchStart={
+        canFlip
+          ? (e) => {
+              const t = e.touches[0];
+              const inPicture = (e.target as Element).closest("[data-deal-banner],[data-flip]");
+              touch.current = t && inPicture ? { x: t.clientX, y: t.clientY } : null;
+              setWarm(true);
+            }
+          : undefined
+      }
+      onTouchEnd={
+        canFlip
+          ? (e) => {
+              const from = touch.current;
+              const t = e.changedTouches[0];
+              touch.current = null;
+              if (!from || !t) return;
+              const dx = t.clientX - from.x;
+              // A swipe across the picture, not a scroll down the page.
+              if (Math.abs(dx) > 40 && Math.abs(dx) > 1.5 * Math.abs(t.clientY - from.y)) go(dx < 0 ? 1 : -1);
+            }
+          : undefined
+      }
       className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
         checked ? "border-brand ring-2 ring-brand/40" : "border-line"
       } ${isDead ? "opacity-60" : ""}`}
@@ -2002,6 +2057,40 @@ const DealTile = memo(function DealTile({
           <Link href={`/deals/${d.id}`} className="flex flex-1 flex-col">
             {inner}
           </Link>
+          {/* The deal's other photographs (#450), flipped through where a
+              listing's card lets you: arrows on the picture, shown on hover
+              or focus and always on a touch screen, a swipe, and a dot a
+              photograph. Outside the link, over the picture: a button inside
+              an anchor is invalid, and the card's click still opens the deal. */}
+          {canFlip ? (
+            <div data-flip="photos" className="pointer-events-none absolute inset-x-0 top-0 flex aspect-[16/10] items-center justify-between px-2">
+              {[-1, 1].map((step) => (
+                <button
+                  key={step}
+                  type="button"
+                  onClick={() => go(step)}
+                  aria-label={`${step < 0 ? "Previous" : "Next"} photo of ${d.name}`}
+                  data-flip-step={step}
+                  className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-ink shadow-md opacity-0 transition hover:bg-white focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand group-hover:opacity-100 pointer-coarse:opacity-90"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
+                    <path d={step < 0 ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
+                  </svg>
+                </button>
+              ))}
+              <span aria-hidden className="absolute bottom-7 left-1/2 flex -translate-x-1/2 gap-1">
+                {Array.from({ length: Math.min(count, 5) }, (_, k) => {
+                  const first = Math.min(Math.max(0, slide - 2), Math.max(0, count - 5));
+                  return (
+                    <span
+                      key={first + k}
+                      className={`h-1.5 w-1.5 rounded-full shadow-sm ${first + k === slide ? "bg-white" : "bg-white/55"}`}
+                    />
+                  );
+                })}
+              </span>
+            </div>
+          ) : null}
           {/* Outside the link: a select inside an anchor is invalid, and the
               stage is changed here without leaving the pipeline. */}
           <div className="flex items-center gap-2 border-t border-line bg-faint/60 px-4 py-2 text-[11px] text-muted">
