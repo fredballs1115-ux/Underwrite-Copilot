@@ -29,6 +29,12 @@ import { MarketCaption } from "./market-caption";
  *
  * Where the surface passes a `cover` (the pipeline, #442), the deal's cover
  * takes the blank plate's place: its gradient, its building type, its place.
+ *
+ * A picture shows only once it has loaded whole (#446), fading in over the
+ * deal's cover without its words (or the plain plate): a photograph drawn
+ * as it arrives shows its progressive scans, blurred, and a slow one an
+ * empty frame, where a listing's cards never show either. The first cards
+ * on the page (`priority`) are asked for at once and ahead of the rest.
  */
 export function DealBanner({
   sources,
@@ -39,6 +45,7 @@ export function DealBanner({
   sizes,
   shade = false,
   cover = null,
+  priority = false,
 }: {
   sources: BannerSource[];
   /** the deal's name, for the picture's alt text */
@@ -58,6 +65,8 @@ export function DealBanner({
   /** what the frame shows when no picture is left: the deal's cover
    *  (lib/deal-cover) where the surface has one, the blank plate otherwise */
   cover?: DealCoverFacts | null;
+  /** one of the first cards on screen: fetched at once, ahead of the rest */
+  priority?: boolean;
 }) {
   // A photograph nobody has looked for yet (`pending`, #440) is asked for
   // OVER the next picture, which shows at once; it fades in the moment it
@@ -66,12 +75,17 @@ export function DealBanner({
   const lift = sources[0]?.pending ? sources[0] : null;
   const rest = lift ? sources.slice(1) : sources;
   const [at, setAt] = useState(0);
+  // Which source has loaded whole: the picture fades in only then.
+  const [loaded, setLoaded] = useState<string | null>(null);
   const [lifted, setLifted] = useState<"trying" | "shown" | "gone">("trying");
   const ref = useRef<HTMLImageElement>(null);
   const liftRef = useRef<HTMLImageElement>(null);
   useEffect(() => {
+    // A picture that settled before hydration fired its event unheard.
     const img = ref.current;
-    if (img && img.complete && img.naturalWidth === 0) setAt((i) => i + 1);
+    if (!img?.complete) return;
+    if (img.naturalWidth === 0) setAt((i) => i + 1);
+    else setLoaded(img.currentSrc || img.src);
   }, [at]);
   useEffect(() => {
     // A picture that settled before hydration fired its event unheard.
@@ -80,6 +94,7 @@ export function DealBanner({
   }, []);
 
   const base = rest[at];
+  const baseLoaded = !!base && loaded !== null && loaded.endsWith(base.src);
   const shown = !!lift && lifted === "shown";
   const trying = !!lift && lifted === "trying";
   const shape = aspect === "16/10" ? "aspect-[16/10]" : "aspect-[16/9]";
@@ -105,7 +120,7 @@ export function DealBanner({
       decoding="async"
       onLoad={() => setLifted("shown")}
       onError={() => setLifted("gone")}
-      className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-500 ease-out group-hover:scale-[1.03] ${
+      className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-500 ease-out motion-safe:group-hover:scale-[1.03] ${
         shown ? "opacity-100" : "opacity-0"
       }`}
     />
@@ -154,6 +169,11 @@ export function DealBanner({
       className={`relative overflow-hidden ${flush ? "" : "rounded-lg"} bg-faint ${className}`}
       data-deal-banner={onScreen.kind}
     >
+      {/* What holds the frame while the picture loads: the deal's cover,
+          without its words, or the plain plate. */}
+      {cover ? (
+        <DealCover cover={cover} label={label} words={false} className="absolute inset-0 h-full w-full" />
+      ) : null}
       {base ? (
         /* eslint-disable-next-line @next/next/no-img-element -- proxied,
            auth-scoped routes with their own cache headers; next/image adds
@@ -167,10 +187,14 @@ export function DealBanner({
           width={640}
           height={aspect === "16/10" ? 400 : 360}
           sizes={sizes}
-          loading="lazy"
+          loading={priority ? "eager" : "lazy"}
+          fetchPriority={priority ? "high" : undefined}
           decoding="async"
+          onLoad={(e) => setLoaded(e.currentTarget.currentSrc || e.currentTarget.src)}
           onError={() => setAt((i) => i + 1)}
-          className={`${shape} w-full object-cover transition-transform duration-500 ease-out group-hover:scale-[1.03]`}
+          className={`relative ${shape} w-full object-cover transition-[opacity,transform] duration-500 ease-out motion-safe:group-hover:scale-[1.03] ${
+            baseLoaded ? "opacity-100" : "opacity-0"
+          }`}
         />
       ) : (
         <span aria-hidden className={`block ${shape} w-full`} />

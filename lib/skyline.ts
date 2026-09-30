@@ -539,6 +539,23 @@ export function skylineTag(id: string): string {
 }
 
 /**
+ * The widths a skyline is offered at where a surface says how wide its slot
+ * draws (#446), so the browser takes the smallest file that covers the slot
+ * on its own screen: a dense screen gets the pixels it draws, a plain one
+ * does not pay for them. A tile asked for at one fixed 480px was stretched
+ * twice over on every phone and every laptop with a dense screen. 1600 is
+ * the width the deploy probe measures every file at.
+ */
+export const SKYLINE_SRCSET = [480, 960, 1600] as const;
+
+/** A market's skyline as an `<img srcset>`: one candidate a width, each
+ *  carrying the photograph's cache token. */
+export function skylineSrcSet(id: string): string {
+  const tag = skylineTag(id);
+  return SKYLINE_SRCSET.map((w) => `/api/imagery/skyline/${id}?w=${w}&v=${tag} ${w}w`).join(", ");
+}
+
+/**
  * One attribution line for a GRID of these photographs.
  *
  * A tile 240px wide has no room for a photographer's name under it, but

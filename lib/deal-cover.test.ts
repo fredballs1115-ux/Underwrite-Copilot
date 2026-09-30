@@ -78,6 +78,12 @@ describe("a deal's cover (#442)", () => {
     const thumb = renderToStaticMarkup(React.createElement(DealCover, { cover, label: "Brazos Flats", size: "thumb" }));
     expect(thumb).toContain('aria-hidden="true"');
     expect(visibleText(thumb).trim()).toBe("");
+    // Holding a card's frame while a photograph loads (#446): the gradient
+    // and the drawing, and nothing said, since the photo is on its way.
+    const holding = renderToStaticMarkup(React.createElement(DealCover, { cover, label: "Brazos Flats", words: false }));
+    expect(holding).toContain('aria-hidden="true"');
+    expect(holding).not.toContain('role="img"');
+    expect(visibleText(holding).trim()).toBe("");
   });
 });
 

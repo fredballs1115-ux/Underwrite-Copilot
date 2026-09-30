@@ -70,7 +70,8 @@ describe("a memorandum photograph lifted under older rules, judged again (#444)"
     const got = await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: staleCache(), waitMs: 5_000 });
     expect(got).not.toBeNull();
     expect(got!.hero).not.toBe(OLD.hero);
-    expect({ w: got!.width, h: got!.height, source: got!.source }).toEqual({ w: 800, h: 500, source: "om" });
+    // The cover page's 800 x 500 photograph, its hero enlarged cleanly (#446).
+    expect({ w: got!.width, h: got!.height, source: got!.source }).toEqual({ w: 1200, h: 750, source: "om" });
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
     expect(db.photo?.picture?.hero).toBe(got!.hero);
     expect(store.uploads).toHaveLength(2);
@@ -103,7 +104,7 @@ describe("a memorandum photograph lifted under older rules, judged again (#444)"
     const got = await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: staleCache() });
     expect(got).toEqual(OLD);
     await vi.waitFor(() => expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION), { timeout: 10_000 });
-    expect(db.photo?.picture?.width).toBe(800);
+    expect(db.photo?.picture?.width).toBe(1200);
   });
 
   it("never touches the reader's own picture, whatever rules it was stored under", async () => {

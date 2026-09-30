@@ -20,6 +20,9 @@ import { DealCover } from "./deal-cover";
  * never a map and never another building. A memorandum nobody has looked in
  * yet is searched over the cover, and its photograph fades in when found.
  *
+ * A photograph shows only once it has loaded whole, fading in over the
+ * deal's cover (#446), never half-drawn.
+ *
  * The slot is always the same size — 56px on a phone, 48px from `sm` —
  * so the names down the list start at one x. Lazy, so a long pipeline asks
  * for no picture the reader never scrolls to. A picture that failed before
@@ -40,12 +43,16 @@ export function DealThumb({
   const lift = sources[0]?.pending ? sources[0] : null;
   const rest = lift ? sources.slice(1) : sources;
   const [at, setAt] = useState(0);
+  // Which source has loaded whole: the picture fades in only then (#446).
+  const [loaded, setLoaded] = useState<string | null>(null);
   const [lifted, setLifted] = useState<"trying" | "shown" | "gone">("trying");
   const ref = useRef<HTMLImageElement>(null);
   const liftRef = useRef<HTMLImageElement>(null);
   useEffect(() => {
     const img = ref.current;
-    if (img && img.complete && img.naturalWidth === 0) setAt((i) => i + 1);
+    if (!img?.complete) return;
+    if (img.naturalWidth === 0) setAt((i) => i + 1);
+    else setLoaded(img.currentSrc || img.src);
   }, [at]);
   useEffect(() => {
     const img = liftRef.current;
@@ -54,6 +61,7 @@ export function DealThumb({
 
   const box = "relative block h-14 w-14 shrink-0 overflow-hidden rounded-lg sm:h-12 sm:w-12";
   const base = rest[at];
+  const baseLoaded = !!base && loaded !== null && loaded.endsWith(base.src);
   const shown = !!lift && lifted === "shown";
   const overlay = lift && lifted !== "gone" && (
     // eslint-disable-next-line @next/next/no-img-element -- the deal's own picture route, auth-scoped, with its own cache headers
@@ -106,6 +114,9 @@ export function DealThumb({
   }
   return (
     <span aria-hidden data-deal-thumb="photo" className={`${box} border border-line bg-faint`}>
+      {/* The deal's cover holds the slot until the photograph has loaded
+          whole (#446), so a row never shows a half-drawn picture. */}
+      {cover ? <DealCover cover={cover} label={label} size="thumb" className="absolute inset-0 h-full w-full" /> : null}
       {base ? (
         /* eslint-disable-next-line @next/next/no-img-element -- proxied,
            auth-scoped routes with their own cache headers */
@@ -119,8 +130,9 @@ export function DealThumb({
           height={96}
           loading="lazy"
           decoding="async"
+          onLoad={(e) => setLoaded(e.currentTarget.currentSrc || e.currentTarget.src)}
           onError={() => setAt((i) => i + 1)}
-          className="h-full w-full object-cover"
+          className={`relative h-full w-full object-cover transition-opacity duration-500 ${baseLoaded ? "opacity-100" : "opacity-0"}`}
         />
       ) : null}
       {overlay}

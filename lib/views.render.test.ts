@@ -267,6 +267,15 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(html).toContain('data-deal-cover="housing"');
     expect(html).toContain('data-deal-cover="storage"');
     expect((text.match(/No photo yet/g) ?? []).length).toBe(live.length - 1);
+    // A photograph shows only once it has loaded whole (#446), over the
+    // deal's cover without its words, and the first cards on screen are
+    // fetched at once, ahead of the rest.
+    const photo = html.match(/<img[^>]*src="\/api\/deals\/b\/picture\?size=hero"[^>]*>/)?.[0] ?? "";
+    expect(photo).toContain("opacity-0");
+    expect(photo).toContain('loading="eager"');
+    expect(photo).toContain('fetchPriority="high"');
+    expect(photo).toContain("motion-safe:group-hover:scale-[1.03]");
+    expect((html.match(/data-deal-cover=/g) ?? []).length).toBe(live.length);
     // A memorandum nobody has read the cover of yet is searched OVER the
     // next picture (#440): the Maddox shows its cover at once, and the
     // memorandum's is asked for on top of it, unseen and unannounced until
@@ -971,7 +980,7 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
 import { SubmarketCards } from "@/app/market/submarket-cards";
 import { MarketBand } from "@/app/place-band";
 import { EMPTY_RULES, type Submarket } from "@/lib/market/types";
-import { galleryCredit } from "@/lib/skyline";
+import { galleryCredit, skylineSrcSet } from "@/lib/skyline";
 
 describe("SubmarketCards and the submarket's band — the metro its owner typed, pictured only where the text says which (#424)", () => {
   const sub = (over: Partial<Submarket> & Pick<Submarket, "id" | "name">): Submarket => ({
@@ -1000,6 +1009,10 @@ describe("SubmarketCards and the submarket's band — the metro its owner typed,
     expect(gluedWords(text)).toEqual([]);
     // Two of the four name a market; the other two keep the plain card.
     expect(html.match(/data-picture="submarket"/g)?.length).toBe(2);
+    // Each strip offers the widths a dense screen needs (#446), rather than
+    // one 480px file stretched twice over on a phone.
+    expect(html).toContain(`srcSet="${skylineSrcSet("richmond").replaceAll("&", "&amp;")}"`);
+    expect(html).toContain('sizes="(min-width: 1024px) 360px, (min-width: 640px) 47vw, 92vw"');
     expect(text).toContain("Richmond VA");
     expect(text).toContain("Northern Virginia");
     for (const s of SUBS) expect(html).toContain(`href="/submarkets/${s.id}"`);

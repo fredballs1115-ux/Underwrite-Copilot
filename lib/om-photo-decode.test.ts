@@ -13,6 +13,8 @@ import {
 } from "./om-photo-decode";
 import { findOmImages, scanShaped } from "./om-photo";
 import {
+  HERO_MAX_PX,
+  HERO_MIN_PX,
   PICTURE_SEARCH_VERSION,
   coverOf,
   currentPicture,
@@ -175,7 +177,9 @@ describe("the deal's picture out of its memorandum", () => {
   it("writes the two sizes from pixels as from a file, laying transparency on white", async () => {
     const pixels = testPixels(W, H);
     const derived = await derivePicture({ width: W, height: H, channels: 3, pixels });
-    expect({ w: derived.width, h: derived.height }).toEqual({ w: W, h: H });
+    // A small cover is enlarged cleanly to the hero's floor (#446): 800 x 500
+    // is drawn at 1200 x 750 rather than left for the browser to stretch.
+    expect({ w: derived.width, h: derived.height }).toEqual({ w: HERO_MIN_PX, h: 750 });
     const thumb = await sharp(derived.thumb).metadata();
     expect({ w: thumb.width, h: thumb.height, format: thumb.format }).toEqual({ w: 240, h: 240, format: "jpeg" });
     // Fully transparent pixels come out white, not black.
@@ -183,6 +187,18 @@ describe("the deal's picture out of its memorandum", () => {
     const onWhite = await derivePicture({ width: W, height: H, channels: 4, pixels: clear });
     const stats = await sharp(onWhite.hero).stats();
     expect(stats.channels.slice(0, 3).every((c) => c.mean > 250)).toBe(true);
+  });
+
+  it("enlarges a small photograph at most twice, keeps a mid-size one, and reduces a large one (#446)", async () => {
+    const size = async (w: number, h: number) => {
+      const jpeg = await testPicture(w, h, "jpeg");
+      const d = await derivePicture(jpeg);
+      return [d.width, d.height];
+    };
+    // 500 x 320 reaches only 1000 x 640: twice its size, never more.
+    expect(await size(500, 320)).toEqual([1000, 640]);
+    expect(await size(1300, 800)).toEqual([1300, 800]);
+    expect(await size(2400, 1500)).toEqual([HERO_MAX_PX, 1000]);
   });
 
   it("searches again a memorandum judged photograph-free under older rules", () => {

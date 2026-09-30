@@ -374,6 +374,15 @@ jobs:
           done
           echo "PHOTOGRAPHS: $live live, $dead dead — a DEAD market is showing an aerial, not a skyline"
 
+          # The widths a tile's srcset offers (#446, SKYLINE_SRCSET in
+          # lib/skyline.ts): the loop above asks at 1600 only, so a width
+          # Commons refused would show as a soft or missing tile on exactly
+          # the screens that pick it, and nowhere here. One market at each.
+          echo "SRCSET WIDTHS, one market at each width a tile may ask for:"
+          for w in 480 960 1600; do
+            probe_img "dc?w=$w" "https://underwrite-copilot.onrender.com/api/imagery/skyline/dc?w=$w" || true
+          done
+
           # The markets that keep an overhead ON PURPOSE — a suburban
           # submarket has no skyline, so Montgomery County is deliberately
           # out of lib/skyline.ts (PG County was too, until National
@@ -1054,6 +1063,8 @@ jobs:
           mark "#444 the building's photo, never the memorandum's map" grep -q "never the memorandum" p_whats-new.html
           # #445 — the deal page's pictures full screen (signed-in): its card.
           mark "#445 the building full screen" grep -q "See the building full screen" p_whats-new.html
+          # #446 — sharp pictures, loaded whole: its card (the widths are the PHOTOGRAPHS step's).
+          mark "#446 sharper pictures on your cards" grep -q "Sharper pictures on your cards" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

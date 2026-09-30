@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
-import { creditLine, skylineFor, skylineTag } from "@/lib/skyline";
+import { creditLine, skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline";
 
 /**
  * The picture of a covered market, and the honest sentence under it.
@@ -27,6 +27,13 @@ import { creditLine, skylineFor, skylineTag } from "@/lib/skyline";
  * glyph, no grey placeholder box, no caption for an absent photograph.
  * The band's own background carries on, which is what `AerialImg` has
  * always done and what the operator's "never a placeholder" rule asks for.
+ *
+ * Where the surface says how wide its slot draws (`sizes`, #446), the
+ * skyline is offered at several widths and the overhead at twice its size
+ * too, so the browser draws a dense screen's picture from enough pixels.
+ * A panorama cropped into a squarer tile is covered by its HEIGHT, so a
+ * tile's `sizes` says the width the picture must be drawn at to fill the
+ * tile's height, not the tile's own width.
  */
 export function CityPhoto({
   metro,
@@ -37,6 +44,7 @@ export function CityPhoto({
   alt,
   eager = false,
   showCredit = true,
+  sizes,
 }: {
   /** a metro id from data/research/metros.json */
   metro: string;
@@ -50,6 +58,9 @@ export function CityPhoto({
   /** the page's opening picture paints with the page; every other one waits */
   eager?: boolean;
   showCredit?: boolean;
+  /** how wide the slot draws, for the browser to pick a file by; unset,
+   *  the one file at `width`, as before */
+  sizes?: string;
 }) {
   const shot = skylineFor(metro);
   const view = METRO_VIEWS[metro];
@@ -72,6 +83,16 @@ export function CityPhoto({
     : view
       ? `${view.place} from above · USGS`
       : "";
+  // The overhead is drawn at the size asked for, so twice the size is the
+  // same frame at twice the grain, inside the route's 1600px ceiling.
+  const double = width * 2 <= 1600 && height * 2 <= 1600;
+  const srcSet = !sizes
+    ? undefined
+    : skyline
+      ? skylineSrcSet(metro)
+      : double
+        ? `${src} 1x, /api/imagery/metro/${metro}?w=${width * 2}&h=${height * 2} 2x`
+        : undefined;
 
   return (
     <>
@@ -80,6 +101,8 @@ export function CityPhoto({
           second cache layer over it and cannot express the fallback chain */}
       <img
         src={src}
+        srcSet={srcSet}
+        sizes={srcSet ? sizes : undefined}
         alt={alt ?? ""}
         width={width}
         height={height}
