@@ -106,6 +106,32 @@ export const CARD: BannerFrame = { w: 720, h: 450 };
 /** A list row's thumbnail (#442): square, three times a phone's 56px slot. */
 export const THUMB: BannerFrame = { w: 168, h: 168 };
 
+/** The market photograph a card leads with before anything has loaded: its
+ *  first source, a pending memorandum photograph aside (that one is asked
+ *  for OVER the next and shows only once it loads). */
+export function leadMarketId(sources: BannerSource[]): string | null {
+  const lead = sources.find((s) => !s.pending);
+  return lead?.kind === "market" ? (lead.marketId ?? null) : null;
+}
+
+/** The market photographs on screen, for the page's one credit line (#438),
+ *  in the cards' order, each once: a card's own report where it has made
+ *  one (the picture it settled on — a market photograph that failed, or one
+ *  a memorandum photograph loaded over, is no longer on screen, and its
+ *  photographer is not credited for it), else the photograph it leads with,
+ *  which is what the server drew. */
+export function shownMarketIds(
+  cards: { id: string; pictures?: BannerSource[] }[],
+  reported: ReadonlyMap<string, string | null>,
+): string[] {
+  const out: string[] = [];
+  for (const c of cards) {
+    const id = reported.has(c.id) ? (reported.get(c.id) ?? null) : leadMarketId(c.pictures ?? []);
+    if (id && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
+
 export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): BannerSource[] {
   const id = encodeURIComponent(f.dealId);
   const out: BannerSource[] = [];

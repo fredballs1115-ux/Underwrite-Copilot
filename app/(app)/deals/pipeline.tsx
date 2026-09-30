@@ -18,7 +18,7 @@ import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
 import { DealBanner } from "./deal-banner";
 import { GalleryCreditText } from "@/app/photo-credit";
-import type { BannerSource } from "@/lib/deal-banner";
+import { shownMarketIds, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
@@ -517,17 +517,21 @@ export function Pipeline({
     [deals],
   );
 
-  // The market photographs the cards may show, for the one credit line
-  // under them: a card has no room for the links a Creative Commons credit
-  // carries, and a link inside the card's own link is not one.
-  const marketPhotoIds = useMemo(
-    () => [
-      ...new Set(
-        filtered.flatMap((d) => (d.pictures ?? []).flatMap((p) => (p.kind === "market" && p.marketId ? [p.marketId] : []))),
-      ),
-    ],
-    [filtered],
-  );
+  // Which market photograph each card settled on (DealBanner's report), for
+  // the one credit line under the cards: a card has no room for the links a
+  // Creative Commons credit carries, and a link inside the card's own link
+  // is not one. Only the photographs on screen are credited — never one a
+  // card fell past, one a memorandum photograph loaded over, or one in a
+  // folded stage.
+  const [marketShown, setMarketShown] = useState<ReadonlyMap<string, string | null>>(new Map());
+  const reportMarket = useCallback((id: string, marketId: string | null) => {
+    setMarketShown((prev) => {
+      if (prev.has(id) && prev.get(id) === marketId) return prev;
+      const next = new Map(prev);
+      next.set(id, marketId);
+      return next;
+    });
+  }, []);
 
   /** A section is open unless the user collapsed it; an EMPTY section starts
    *  collapsed until the user opens it. */
@@ -536,6 +540,15 @@ export function Pipeline({
     if (explicit !== undefined) return !explicit;
     return (groups.get(s)?.length ?? 0) > 0;
   }
+  /** A stage drawn at all: dead lives behind its toggle, and an empty rung
+   *  is the funnel's to show. */
+  function sectionDrawn(s: Stage): boolean {
+    if (s === "dead" && !showDead && stage !== "dead") return false;
+    return (groups.get(s)?.length ?? 0) > 0;
+  }
+  const cardsOnScreen =
+    view === "cards" ? STAGES.flatMap((s) => (sectionDrawn(s) && isOpen(s) ? (groups.get(s) ?? []) : [])) : [];
+  const marketPhotoIds = shownMarketIds(cardsOnScreen, marketShown);
   function toggleSection(s: Stage) {
     setCollapsed((c) => ({ ...c, [s]: isOpen(s) }));
   }
@@ -1092,9 +1105,8 @@ export function Pipeline({
                 const sectionDeals = groups.get(s) ?? [];
                 // Dead lives behind its toggle; an empty rung is the funnel's
                 // to show — no header with a zero in it here.
-                if (s === "dead" && !showDead && stage !== "dead") return null;
-                if (sectionDeals.length === 0) return null;
-                const open = isOpen(s) && sectionDeals.length > 0;
+                if (!sectionDrawn(s)) return null;
+                const open = isOpen(s);
                 return (
                   <section key={s}>
                     <button
@@ -1141,6 +1153,7 @@ export function Pipeline({
                             compareMode={compareMode}
                             checked={selected.has(d.id)}
                             onToggle={toggleSelected}
+                            onMarket={reportMarket}
                           />
                         ))}
                       </ul>
@@ -2107,13 +2120,18 @@ const DealTile = memo(function DealTile({
   compareMode,
   checked,
   onToggle,
+  onMarket,
 }: {
   d: DealCard;
   i: number;
   compareMode: boolean;
   checked: boolean;
   onToggle: (id: string) => void;
+  /** told which market photograph the card shows, for the page's credit */
+  onMarket?: (dealId: string, marketId: string | null) => void;
 }) {
+  const dealId = d.id;
+  const reportMarket = useCallback((marketId: string | null) => onMarket?.(dealId, marketId), [dealId, onMarket]);
   // The deal's photographs, flipped through on the card (#450): which one is
   // on screen, and whether the deal's own photograph is the picture at all
   // (a card whose photograph failed shows its market's or its cover, and
@@ -2184,6 +2202,7 @@ const DealTile = memo(function DealTile({
           slide={canFlip ? slide : 0}
           onPhoto={setPhotoOn}
           onSlideGone={dropSlide}
+          onMarket={reportMarket}
           sizes="(min-width: 1536px) 24vw, (min-width: 1280px) 31vw, (min-width: 640px) 47vw, 100vw"
         />
         {/* The call, and in compare mode the pick beside it: the foot of the

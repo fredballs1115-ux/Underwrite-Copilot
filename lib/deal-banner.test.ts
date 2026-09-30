@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BANNER, CARD, bannerSources } from "./deal-banner";
+import { BANNER, CARD, bannerSources, leadMarketId, shownMarketIds } from "./deal-banner";
 import { IMAGE_CREDIT, imagePlan } from "./imagery-plan";
 import { marketPictureFor } from "./market-picture";
 
@@ -93,5 +93,43 @@ describe("bannerSources — the deal's own photograph carries its blur-up previe
     expect(bannerSources({ ...base, memorandumUnread: true, picturePreview: PREVIEW })[0].preview).toBeUndefined();
     // Anything that is not a small image data URI is dropped, never styled.
     expect(bannerSources({ ...base, pictureCredit: "x", picturePreview: 'data:image/webp;base64,a");}' })[0].preview).toBeUndefined();
+  });
+});
+
+describe("the pipeline's one credit line names the market photographs on screen, and only those", () => {
+  const pitt = marketPictureFor({ city: "Pittsburgh", state: "PA" })!;
+  const phx = marketPictureFor({ city: "Phoenix", state: "AZ" })!;
+  const at = (market: typeof pitt, over: Partial<Parameters<typeof bannerSources>[0]> = {}) =>
+    bannerSources({ ...base, aerial: false, market, ...over }, CARD);
+
+  it("a card leads with its market's photograph only where nothing of the building's own comes first", () => {
+    expect(leadMarketId(at(pitt))).toBe(pitt.id);
+    // Its own photograph leads, and the market's is only a fallback behind it.
+    expect(leadMarketId(at(pitt, { pictureCredit: "From the offering memorandum" }))).toBeNull();
+    // Street View reaches the street: it leads, the market's photograph behind it.
+    expect(leadMarketId(at(pitt, { googleEnabled: true }))).toBeNull();
+    // A memorandum not yet searched is asked for OVER the market's photograph,
+    // which shows until it loads.
+    expect(leadMarketId(at(pitt, { memorandumUnread: true }))).toBe(pitt.id);
+    expect(leadMarketId([])).toBeNull();
+  });
+
+  it("each card's own report wins over its lead, in the cards' order, each photograph once", () => {
+    const cards = [
+      { id: "a", pictures: at(pitt) },
+      { id: "b", pictures: at(phx) },
+      { id: "c", pictures: at(pitt) },
+      { id: "d", pictures: at(phx, { pictureCredit: "From the offering memorandum" }) },
+    ];
+    // Before any card has reported, the leads — what the server drew.
+    expect(shownMarketIds(cards, new Map())).toEqual([pitt.id, phx.id]);
+    // Phoenix's card found its memorandum photograph: no Phoenix credit.
+    expect(shownMarketIds(cards, new Map([["b", null]]))).toEqual([pitt.id]);
+    // A card whose own photograph failed and fell to its market is credited.
+    expect(shownMarketIds(cards, new Map([["b", null], ["d", phx.id]]))).toEqual([pitt.id, phx.id]);
+    // Both Pittsburgh cards fell past it: nobody is credited for it.
+    expect(shownMarketIds(cards, new Map<string, string | null>([["a", null], ["b", null], ["c", null]]))).toEqual([]);
+    // A card not on screen is not passed in at all.
+    expect(shownMarketIds([], new Map())).toEqual([]);
   });
 });
