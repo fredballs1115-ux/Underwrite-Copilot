@@ -12,6 +12,8 @@ export interface ColumnData {
   extracted: boolean;
   /** the user's own underwriting, pinned last and not editable here */
   internal: boolean;
+  /** the source document's link: the route that signs it when it is
+   *  clicked (lib/deal-file-link) */
   documentUrl: string | null;
   note: string | null;
   values: Partial<Record<ValuationField, number | null>>;

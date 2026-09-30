@@ -60,8 +60,8 @@ import { PublicRecordCard } from "./public-record-card";
 import { buildingSfRow, findGoingInCap, parsePrice } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import { signedSupplementUrl } from "@/lib/storage";
 import { omLinkFor } from "@/lib/om-link";
+import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { isPro } from "@/lib/billing";
 import { type DealRow } from "@/lib/deals";
 import { type DealDocument } from "@/lib/documents";
@@ -360,7 +360,7 @@ export default async function DealPage({
       ? computeScreenDiff(priorScreen, extraction, verdict)
       : null;
 
-  // User-added supplements, with short-lived signed URLs minted for any files.
+  // User-added supplements (deals.supplements): a note or a file per tab.
   type RawSupp = {
     notes?: { id: string; text: string; createdAt: string }[];
     files?: { id: string; name: string; path: string; createdAt: string }[];
@@ -403,20 +403,21 @@ export default async function DealPage({
     user_id: string;
     team_id: string | null;
   };
-  const [buyBox] = await Promise.all([
-    getBuyBoxForDeal(ownership.user_id, ownership.team_id).catch(() => null),
-    ...Object.entries(rawSupp).map(async ([tabKey, s]) => {
-      const files = await Promise.all(
-        (s.files ?? []).map(async (f) => ({
-          id: f.id,
-          name: f.name,
-          createdAt: f.createdAt,
-          url: await signedSupplementUrl(f.path, { kind: "deal", dealId: id }),
-        })),
-      );
-      supplements[tabKey] = { notes: s.notes ?? [], files };
-    }),
-  ]);
+  const buyBox = await getBuyBoxForDeal(ownership.user_id, ownership.team_id).catch(() => null);
+  // Each file links to the route that signs it when it is clicked
+  // (lib/deal-file-link), as the OM's link does, so a page left open past a
+  // signed URL's hour still opens it. Nothing is signed at render.
+  for (const [tabKey, s] of Object.entries(rawSupp)) {
+    supplements[tabKey] = {
+      notes: s.notes ?? [],
+      files: (s.files ?? []).map((f) => ({
+        id: f.id,
+        name: f.name,
+        createdAt: f.createdAt,
+        url: dealFileLinkFor(id, f.path),
+      })),
+    };
+  }
 
   // Delete is the creator's or the team owner's (the RLS delete policy); a
   // teammate is not offered it rather than refused after the fact.

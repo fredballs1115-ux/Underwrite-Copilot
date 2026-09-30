@@ -2279,6 +2279,8 @@ function DealKillerCard({ k, index }: { k: DealKiller; index: number }) {
 
 export type TabSupplement = {
   notes: { id: string; text: string; createdAt: string }[];
+  /** `url` is the route that signs the file when it is clicked
+   *  (lib/deal-file-link), null where the path is not the deal's own. */
   files: { id: string; name: string; createdAt: string; url: string | null }[];
 };
 

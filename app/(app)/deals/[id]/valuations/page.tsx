@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import { signedSupplementUrl } from "@/lib/storage";
+import { dealFileLinkFor } from "@/lib/deal-file-link";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { computeUnderwrite } from "@/lib/underwrite/engine";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
@@ -129,23 +129,22 @@ export default async function ValuationsPage({
       })()
     : null;
 
-  // Signed URLs for the extracted BOVs, so a page citation can open its source.
+  // The extracted BOVs' own documents, so a page citation can open its
+  // source: each through the route that signs the file when it is clicked
+  // (lib/deal-file-link), never a signed URL minted here, which expired an
+  // hour after the page rendered. Only this deal's documents are linked.
   const docIds = valuations.map((v) => v.sourceDocumentId).filter((x): x is string => !!x);
   const docUrls = new Map<string, string>();
   if (docIds.length) {
     const { data: docs } = await supabase
       .from("deal_documents")
-      .select("id, deal_id, storage_path")
+      .select("id, storage_path")
+      .eq("deal_id", id)
       .in("id", docIds);
-    await Promise.all(
-      (docs ?? []).map(async (d) => {
-        const url = await signedSupplementUrl(d.storage_path as string, {
-          kind: "deal",
-          dealId: String(d.deal_id),
-        });
-        if (url) docUrls.set(String(d.id), url);
-      }),
-    );
+    for (const d of (docs ?? []) as { id: string; storage_path: string | null }[]) {
+      const url = dealFileLinkFor(id, d.storage_path);
+      if (url) docUrls.set(String(d.id), url);
+    }
   }
 
   const columns: ColumnData[] = [
