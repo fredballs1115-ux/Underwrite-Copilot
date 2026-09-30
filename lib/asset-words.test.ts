@@ -163,6 +163,32 @@ describe("the asset-words table", () => {
     expect(assetClassKey("Something else entirely")).toBeNull();
   });
 
+  it("files a site as land only where no lease comes with it, and scattered-site housing as housing", () => {
+    // The land rule's bare "site" ran first and filed all three as land: no
+    // NOI, no rate seed, the land traps.
+    expect(assetClassKey("Scattered-site SFR portfolio")).toBe("sfr_btr");
+    expect(assetClassKey("Scattered site single-family rentals")).toBe("sfr_btr");
+    // A site sold with its lease is income: one tenant named or implied is
+    // a net lease.
+    expect(assetClassKey("Retail pad site (ground lease)")).toBe("net_lease");
+    expect(assetClassKey("Ground-leased parcel, leased to Chick-fil-A")).toBe("net_lease");
+    expect(assetClassKey("Land leased to a single tenant")).toBe("net_lease");
+    expect(assetClassKey("Cell tower site")).toBe("net_lease");
+    expect(assetClassKey("Billboard site")).toBe("net_lease");
+    // A site under lease to several tenants is no net lease and no land.
+    expect(assetClassKey("Retail pad sites leased to three tenants")).toBe("retail");
+    expect(assetClassKey("Pad sites leased to tenants")).toBeNull();
+    // A bare pad or development site, with no lease words, stays land.
+    expect(assetClassKey("Pad site")).toBe("land_infill");
+    expect(assetClassKey("Development site")).toBe("land_infill");
+    expect(assetClassKey("Infill parcel")).toBe("land_infill");
+    // What a net lease already was, it stays.
+    expect(assetClassKey("NNN pad site")).toBe("net_lease");
+    // A class the site's words never reached keeps its own rule.
+    expect(assetClassKey("Parking lot")).toBe("parking");
+    expect(assetClassKey("Office tower")).toBe("office");
+  });
+
   it("gives an unknown phrase the generic words under its own label", () => {
     const w = assetWords("Something else entirely");
     expect(w.label).toBe("Something else entirely");

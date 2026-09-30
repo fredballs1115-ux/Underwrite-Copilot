@@ -203,9 +203,20 @@ const WORDS: Record<string, Row> = {
 /** The keys the table knows, in the label map's order. */
 export const ASSET_CLASS_KEYS = Object.keys(ASSET_CLASS_LABEL) as readonly string[];
 
+// Land is what a phrase names when it names a site, a parcel or a lot —
+// unless the site is sold WITH a lease, which makes it income rather than
+// land: a pad on a ground lease, land leased to a tenant, a NNN site. One
+// tenant named or implied is a net lease; several are no net lease, and no
+// land either. "Scattered-site" is a kind of housing, not a site.
+const LAND_WORDS = /\b(land|site|parcel|lot|acreage|infill|entitled)\b/i;
+const LEASE_WORDS = /\bground[- ]?leas(?:e|ed|es|ing)\b|\bleased\b|\blease\b|\bnnn\b|\btenant(?:s|ed)?\b/i;
+const MANY_TENANTS = /\bmulti[- ]?tenant(?:ed)?\b|\btenants\b/i;
+const leasedSite = (s: string) => LAND_WORDS.test(s) && LEASE_WORDS.test(s) && !MANY_TENANTS.test(s);
+const bareLand = (s: string) => LAND_WORDS.test(s) && !LEASE_WORDS.test(s);
+
 /** Where a class the model phrased itself ("NNN retail", "boutique hotel")
  *  is filed — by the words it used, first match wins, longest tells first. */
-const PHRASE_TO_KEY: readonly (readonly [RegExp, string])[] = [
+const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean), string])[] = [
   [/\b(hotel|hospitality|lodging|motel|resort|short[- ]term rental|str)\b/i, "hospitality_str"],
   [/\b(self[- ]?storage|mini[- ]?storage)\b/i, "self_storage"],
   // Storage that is a warehouse or a yard — refrigerated buildings and
@@ -224,7 +235,16 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp, string])[] = [
   [/\b(parking|garage)\b/i, "parking"],
   [/\b(mixed[- ]use)\b/i, "mixed_use"],
   [/\b(net[- ]lease|nnn|single[- ]tenant)\b/i, "net_lease"],
-  [/\b(land|site|parcel|lot|acreage|infill|entitled)\b/i, "land_infill"],
+  // Housing on scattered sites is single-family rental, never a site (the
+  // land rule's "site" had filed "Scattered-site SFR portfolio" as land).
+  [/\bscattered[- ]sites?\b/i, "sfr_btr"],
+  // A cell tower or a billboard stands on land let to the one company that
+  // owns it: its site is a net lease.
+  [/\b(?:cell(?:ular)?|wireless|telecom(?:munications?)?|communications?)[\s-]+towers?\b|\bcell[\s-]+sites?\b|\bbillboards?\b/i, "net_lease"],
+  // A site sold with its lease to one tenant is a net lease ("Retail pad
+  // site (ground lease)"), and a site under lease to several is no land.
+  [leasedSite, "net_lease"],
+  [bareLand, "land_infill"],
   [/\b(sfr|single[- ]family|btr|build[- ]to[- ]rent|townhomes?|scattered)\b/i, "sfr_btr"],
   [/\b(office|creative|life science|lab)\b/i, "office"],
   [/\b(industrial|warehouse|logistics|distribution|flex|manufacturing|cold storage|ios|outdoor storage)\b/i, "industrial"],
@@ -244,7 +264,7 @@ export function assetClassKey(key: string | null | undefined): string | null {
   const lower = k.toLowerCase();
   if (lower === "auto") return null;
   if (WORDS[lower]) return lower;
-  for (const [re, known] of PHRASE_TO_KEY) if (re.test(k)) return known;
+  for (const [test, known] of PHRASE_TO_KEY) if (typeof test === "function" ? test(k) : test.test(k)) return known;
   return null;
 }
 
