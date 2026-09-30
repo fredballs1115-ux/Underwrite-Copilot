@@ -17,12 +17,14 @@ import { HotelPanel } from "@/app/hotel-panel";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
+import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
 import { readAffordable } from "@/lib/affordable";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { readHotelDeal } from "@/lib/hotel-deal";
 import { readSale } from "@/lib/sale-terms";
 import { readRoster } from "@/lib/tenant-roster";
 import { readValueAdd } from "@/lib/value-add";
+import { readTaxAbatement } from "@/lib/tax-abatement";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
@@ -1195,6 +1197,14 @@ export default async function DealPage({
           program={readValueAdd(extraction)}
           exitCapPct={derived ? derived.inputs.exitCapPct : null}
           modelLine={derived?.meta.valueAdd?.read ?? ""}
+        />
+        {/* A property-tax abatement (#461): the years still abated against
+            the model's sale, the bill today against the full one, and the
+            share of the NOI that goes to taxes when it ends. */}
+        <TaxAbatementPanel
+          abatement={readTaxAbatement(extraction)}
+          holdYears={derived ? derived.inputs.holdMonths / 12 : null}
+          modelLine={derived?.meta.taxAbatement?.read ?? ""}
         />
         {/* What a hotel is sold with (#455): the flag, the manager, the
             encumbrance and the PIP — the basis a key with the PIP on top,

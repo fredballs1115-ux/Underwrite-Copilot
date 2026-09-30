@@ -760,6 +760,26 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a tax abatement: the challenger reads when it ends and the tax-abatement traps (#461)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Tax abatement", value: "10-year Philadelphia tax abatement", flagged: false, page: "", basis: "na" },
+        { label: "Tax abatement expiration", value: "2099", flagged: false, page: "", basis: "na" },
+        { label: "Unabated real estate taxes", value: "$520,000", flagged: false, page: "", basis: "na" },
+        { label: "Abated real estate taxes", value: "$70,000", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("THE TAX ABATEMENT AS STATED: The property's taxes are abated under its 10-year Philadelphia tax abatement until 2099");
+    expect(note).toContain("TAX-ABATEMENT TRAPS, checked by name");
+    expect(note).toContain("(c) THE TRANSFER");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a single-market deal stores no other markets' figures", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];

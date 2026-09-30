@@ -1085,6 +1085,7 @@ jobs:
           mark "#458 a deal's photographs open as a mosaic" grep -q "A deal&#x27;s photographs, laid out like a listing" p_whats-new.html
           mark "#459 the full report shows the property's photographs" grep -q "The full report shows the property&#x27;s photographs" p_whats-new.html
           mark "#460 a value-add program is read door by door" grep -q "Value-add programs, read door by door" p_whats-new.html
+          mark "#461 a tax abatement is read to the day it ends" grep -q "Tax abatements, read to the day they end" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

@@ -11,6 +11,7 @@ import { hotelContextLine, readHotelDeal } from "@/lib/hotel-deal";
 import { readSale, saleContextLine } from "@/lib/sale-terms";
 import { readRoster, rosterContextLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddContextLine } from "@/lib/value-add";
+import { readTaxAbatement, taxAbatementContextLine } from "@/lib/tax-abatement";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -64,6 +65,9 @@ export function dealContextFor(
   // A value-add renovation program (#460): the doors, what a door costs,
   // the premium and whether it is proven, and the pace turnover allows.
   const valueAdd = readValueAdd(extraction);
+  // A property-tax abatement (#461): the NOI is on an abated bill, when it
+  // ends and what the owner pays more once it does.
+  const abatement = readTaxAbatement(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
@@ -76,6 +80,7 @@ export function dealContextFor(
     ...(singleTenant ? [singleTenantContextLine(singleTenant)] : []),
     ...(roster ? [rosterContextLine(roster)] : []),
     ...(valueAdd ? [valueAddContextLine(valueAdd)] : []),
+    ...(abatement ? [taxAbatementContextLine(abatement)] : []),
     ...(hotel ? [hotelContextLine(hotel)] : []),
     ...(flood ? [flood] : []),
   ];

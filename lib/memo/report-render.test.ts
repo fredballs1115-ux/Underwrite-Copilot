@@ -513,6 +513,40 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("the premium is in none of its returns");
   }, 60000);
 
+  it("prints a tax abatement over the grids, and where it ends against the model's sale (#461)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Tax abatement", value: "10-year Philadelphia tax abatement", flagged: false, page: "", basis: "na" as const },
+        { label: "Tax abatement expiration", value: "2099", flagged: false, page: "", basis: "na" as const },
+        { label: "Abated real estate taxes", value: "$70,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Unabated real estate taxes", value: "$520,000", flagged: false, page: "", basis: "na" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "September 30, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, derived.meta.taxAbatement ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Tax abatement: 10-year Philadelphia tax abatement; ends 2099");
+    expect(text).toContain("so the next buyer takes the step-up and prices it");
+  }, 60000);
+
   it("prints a leasehold's exit on the term its lease has left at the sale, with the term and the two exits drawn (#422)", async () => {
     vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 25)), toFake: ["Date"] });
     const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });

@@ -69,7 +69,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -557,7 +557,7 @@ export function Pipeline({
     };
     // A plan deal's cap cell is empty and its yield on cost sits in its own
     // column — the same two columns the meeting .xlsx carries.
-    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Affordability", "Tenancy", "Tenants", "Value-add", "Hotel", "Sale", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Covered market", "Price", "What the price buys", "Assumable debt", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -578,6 +578,8 @@ export function Pipeline({
         d.slots.roster ?? "",
         // Blank unless the memorandum states a renovation premium (#460).
         d.slots.valueAdd ?? "",
+        // Blank unless the memorandum states a tax abatement (#461).
+        d.slots.abatement ?? "",
         // Blank on anything but a hotel (#455).
         d.slots.hotel ?? "",
         // Blank on a negotiated sale (#456).
@@ -1542,6 +1544,16 @@ const DealRow = memo(function DealRow({
       {d.slots.valueAdd}
     </span>
   ) : null;
+  // A tax abatement (#461): the NOI is on an abated bill, how long it has
+  // and what the owner pays more once it ends.
+  const abatementBit = d.slots.abatement ? (
+    <span
+      className="whitespace-nowrap font-medium text-caution"
+      title={`${d.slots.abatement}: the NOI is on an abated tax bill — the deal page reads when it ends and what it is worth`}
+    >
+      {d.slots.abatement}
+    </span>
+  ) : null;
   // How it is sold (#456): an auction's figure is where the bidding opens,
   // and a court's or a lender's sale is as-is.
   const saleBit = d.slots.sale ? (
@@ -1720,19 +1732,19 @@ const DealRow = memo(function DealRow({
             the call has its own column and the line is the figures alone. */}
         <div className="mt-1 flex items-center gap-2 md:hidden">
           <span className="flex shrink-0 sm:hidden">{status}</span>
-          <MetaLine flush className="min-w-0" bits={[priceBit, saleBit, interestBit, debtBit, affordableBit, tenancyBit, rosterBit, valueAddBit, hotelBit, floodBit, capBit, fitBit]} />
+          <MetaLine flush className="min-w-0" bits={[priceBit, saleBit, interestBit, debtBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, floodBit, capBit, fitBit]} />
         </div>
         <MetaLine
           className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, saleBit, interestBit, debtBit, affordableBit, tenancyBit, rosterBit, valueAddBit, hotelBit, floodBit, fitBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, assetBit, saleBit, interestBit, debtBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, floodBit, fitBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden lg:block xl:hidden"
-          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, affordableBit, tenancyBit, rosterBit, valueAddBit, hotelBit, dateBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, dateBit, addedByBit]}
         />
         <MetaLine
           className="hidden xl:block"
-          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, affordableBit, tenancyBit, rosterBit, valueAddBit, hotelBit, addedByBit]}
+          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, addedByBit]}
         />
         {fitBar}
       </div>
@@ -2001,6 +2013,7 @@ const DealTile = memo(function DealTile({
     d.slots.tenancy ? { text: d.slots.tenancy, cls: "text-brand", title: `${d.slots.tenancy}: one lease is the whole income` } : null,
     d.slots.roster ? { text: d.slots.roster, cls: "text-caution", title: `${d.slots.roster}: the listed tenants against the model's sale` } : null,
     d.slots.valueAdd ? { text: d.slots.valueAdd, cls: "text-brand", title: `${d.slots.valueAdd}: the renovation program as stated` } : null,
+    d.slots.abatement ? { text: d.slots.abatement, cls: "text-caution", title: `${d.slots.abatement}: the NOI is on an abated tax bill` } : null,
     d.slots.hotel ? { text: d.slots.hotel, cls: "text-brand", title: `${d.slots.hotel}: what the hotel is sold with` } : null,
     d.slots.sale ? { text: d.slots.sale, cls: "text-caution", title: `${d.slots.sale}: the figure is where the bidding opens or the seller is not an owner` } : null,
   ].filter((t): t is { text: string; cls: string; title: string } => t !== null);

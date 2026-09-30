@@ -25,6 +25,8 @@ import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
 import { ValueAddPanel } from "@/app/value-add-panel";
 import { readValueAdd } from "@/lib/value-add";
+import { TaxAbatementPanel } from "@/app/tax-abatement-panel";
+import { readTaxAbatement } from "@/lib/tax-abatement";
 import { readSale } from "@/lib/sale-terms";
 import { readHotelDeal } from "@/lib/hotel-deal";
 import { keyTermRows } from "@/lib/key-terms";
@@ -321,6 +323,10 @@ export function ShareView({
       {/* A value-add renovation program (#460): the doors, the premium and
           its proof, the pace. */}
       <ValueAddPanel program={readValueAdd(safeExtraction)} />
+
+      {/* A property-tax abatement (#461): when it ends, the bill today
+          against the full one, and the NOI's share that goes to taxes. */}
+      <TaxAbatementPanel abatement={readTaxAbatement(safeExtraction)} />
 
       {/* What a hotel is sold with (#455): the flag, the manager, the
           encumbrance, the PIP and the rooms. */}

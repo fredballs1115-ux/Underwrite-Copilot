@@ -86,6 +86,10 @@ export type Col = {
   /** a value-add renovation program ("Reno $250/mo, 20% on cost" —
    *  lib/value-add `valueAddTag`, #460); absent where none is stated */
   valueAdd?: string | null;
+  /** a property-tax abatement ("Tax abated, 4 yrs left, +$450k/yr" —
+   *  lib/tax-abatement `taxAbatementTag`, #461); absent where none is
+   *  stated */
+  abatement?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -215,6 +219,8 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Tenants", get: (c) => c.roster || "—" },
     // A renovation program's premium and its return on cost (#460).
     { label: "Value-add", get: (c) => c.valueAdd || "—" },
+    // An abated tax bill that ends, and what it costs when it does (#461).
+    { label: "Tax abatement", get: (c) => c.abatement || "—" },
     { label: "Hotel", get: (c) => c.hotel || "—" },
     { label: "Sale", get: (c) => c.sale || "—" },
     // A conversion and a stabilized building are not the same kind of thing,

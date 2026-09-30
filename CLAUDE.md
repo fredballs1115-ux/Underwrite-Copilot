@@ -566,6 +566,41 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   title (`valueAddShortLine`), the workbook's cover ("The value-add
   program", `meta.valueAdd`), the report's caveat and the compare table's
   Value-add row.
+- A property-tax abatement (#461): the extraction labels its figures as
+  rows of their own, each only as stated — "Tax abatement" (the program as
+  named), "Tax abatement expiration" (the last phase's end as written, or
+  a term counted from a start as written), "Abated real estate taxes",
+  "Unabated real estate taxes", "Annual tax abatement savings" and "Tax
+  abatement phase-out" — and `lib/tax-abatement.ts` (pure) reads them
+  (`readTaxAbatement(ex, asOf)`; a "None" or "N/A" row is no row, a bare
+  "Yes" names no program). Five rules: **the NOI is on abated taxes**;
+  **the step-up is said as a price** (the full bill less the abated one,
+  else the stated savings, over the going-in cap — the tax-reassessment
+  card's rule); **the end is read early** (a year alone is its FIRST day,
+  through lib/affordable's `datedEnd`; a term from a stated start is the
+  start plus the term, `from: "term"`, said as counted); **the sale is the
+  clock** (`taxAbatementModelLine`: ending inside the model's hold leaves
+  its exit on a NOI the building no longer earns, the step-up at its exit
+  cap; ending after the sale is the next buyer's to price); **a blank is
+  null** (no full bill is never estimated). `taxBillOf` refuses a range and
+  a bill per unit or per foot. `ownerPays` is true for housing, a hotel,
+  storage and parking (gross leases); elsewhere the read says leases that
+  pass taxes through put the step-up on the tenants. The model is
+  untouched: it grows today's abated taxes with its expenses, and its read
+  (`meta.taxAbatement`) says where the abatement ends against its sale.
+  Where it shows: the deal context and the challenger (`taxAbatementNote`:
+  TAX-ABATEMENT TRAPS (a)–(e) — the NOI on abated taxes, the burn-off, the
+  transfer, the conditions, the assessment), `app/tax-abatement-panel.tsx`
+  (`TaxAbatementPanel`, pure: `data-bar="abate-left"` / `abate-after` the
+  clock with `abate-sale` the model's sale as a line, `abate-now` /
+  `abate-full` the bill on one scale, `abate-noi` / `abate-step` the NOI
+  with the step-up's share; the first sentence, the rest folded) on the
+  deal page and the shared screen, the key terms, the pipeline row, card
+  and CSV and the meeting workbook's price note (`taxAbatementTag`: "Tax
+  abated, 4 yrs left, +$450k/yr", "Abatement ended", its own `abatement`
+  slot), the memo under its title (`taxAbatementShortLine`), the workbook's
+  cover ("The tax abatement"), the report's caveat and the compare table's
+  Tax abatement row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
