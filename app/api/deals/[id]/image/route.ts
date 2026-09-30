@@ -28,7 +28,7 @@ import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT, SEARCH_WAIT_MS, ensureDealPicture, pictureSizeFor } from "@/lib/deal-picture";
 import { IMAGE_CREDIT, fetchBestBuildingImage } from "@/lib/imagery";
 import { coverFor } from "@/lib/deal-cover";
-import { coverSvg } from "@/lib/deal-cover-art";
+import { COVER_EDITION, coverSvg } from "@/lib/deal-cover-art";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 
 const SIZE = { min: 48, max: 1280, defaultW: 800, defaultH: 450 };
@@ -82,7 +82,7 @@ export async function GET(
   // deals' pictures the next day rather than after a week of aerials.
   const etag = picture
     ? `W/"${picture[pictureSizeFor({ width, height })]}"`
-    : `W/"map:${cache?.geoAt ?? ""}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? ":cover" : ""}"`;
+    : `W/"map:${cache?.geoAt ?? ""}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? `:cover${COVER_EDITION}` : ""}"`;
   const revalidate = { etag, "cache-control": "private, no-cache" };
   if (req.headers.get("if-none-match") === etag) {
     return new NextResponse(null, { status: 304, headers: revalidate });

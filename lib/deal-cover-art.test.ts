@@ -1,6 +1,6 @@
 import sharp from "sharp";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { COVER_KINDS, COVER_TONES, SMALL_FRAME_PX, coverImage, coverLayout, coverSvg, type CoverKind, type CoverScene } from "./deal-cover-art";
+import { COVER_EDITION, COVER_KINDS, COVER_TONES, SMALL_FRAME_PX, coverImage, coverLayout, coverSvg, type CoverKind, type CoverScene } from "./deal-cover-art";
 import { coverFor } from "./deal-cover";
 import { imagePlan } from "./imagery-plan";
 
@@ -236,6 +236,21 @@ describe("the image route's cover (#443)", () => {
     expect(svg).toBe(coverSvg(cover, 64, 64));
     const { info } = await pixels(svg);
     expect([info.width, info.height]).toEqual([64, 64]);
+  });
+
+  it("sends a browser holding an earlier edition of the drawing this one, and today's a 304", async () => {
+    const etag = (await ask("w=64&h=64&fallback=cover")).headers.get("etag") ?? "";
+    expect(etag).toContain(`:cover${COVER_EDITION}"`);
+    const again = (tag: string) =>
+      GET(new Request("http://x/api/deals/d1/image?w=64&h=64&fallback=cover", { headers: { "if-none-match": tag } }), {
+        params: Promise.resolve({ id: "d1" }),
+      });
+    expect((await again(etag)).status).toBe(304);
+    // The line drawing's own validator, from the day this edition ships.
+    const earlier = etag.replace(`:cover${COVER_EDITION}"`, ':cover"');
+    const res = await again(earlier);
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe(coverSvg(coverFor({ seed: "d1", assetClass: "self_storage" }), 64, 64));
   });
 
   it("still leads with the building's photograph when one answers", async () => {

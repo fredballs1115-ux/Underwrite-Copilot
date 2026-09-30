@@ -191,6 +191,10 @@ export interface CoverScene {
   variant: number;
 }
 
+/** The drawing's edition, in the image route's validator: a browser holding
+ *  a cover drawn to an earlier edition is sent this one, never a 304. */
+export const COVER_EDITION = 2;
+
 /** At or under this many pixels on its short side a frame is drawn simply:
  *  the building larger, fewer and larger windows, no clouds, and no lights
  *  in the distant city. */
