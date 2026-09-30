@@ -39,6 +39,13 @@ import { MarketCaption } from "./market-caption";
  * Over the deal's own photograph, the card counts the photographs its deal
  * page holds (`photos`, #448) — the cover and the memorandum's others —
  * the way a listing's card says there are more inside.
+ *
+ * And the card flips through them (#450, `slides` and `slide`, the card's
+ * own arrows and swipe): the photograph asked for is laid over the lead
+ * one and fades in once whole, credited with its own page; one that fails
+ * leaves the lead photograph on screen. The card is told whether the
+ * deal's own photograph is the picture on screen (`onPhoto`), so it offers
+ * the others only over it.
  */
 export function DealBanner({
   sources,
@@ -51,6 +58,10 @@ export function DealBanner({
   cover = null,
   priority = false,
   photos = 0,
+  slides = [],
+  slide = 0,
+  onPhoto,
+  onSlideGone,
 }: {
   sources: BannerSource[];
   /** the deal's name, for the picture's alt text */
@@ -75,6 +86,15 @@ export function DealBanner({
   /** how many photographs the deal page holds, counted over the deal's own
    *  photograph where there is more than one */
   photos?: number;
+  /** the deal's other photographs, each pinned to its route with its own
+   *  credit, shown over its own photograph when `slide` asks (#450) */
+  slides?: BannerSource[];
+  /** which photograph to show: 0 the lead one, n the nth of `slides` */
+  slide?: number;
+  /** told whether the deal's own photograph is the picture on screen */
+  onPhoto?: (shown: boolean) => void;
+  /** told of another photograph that failed to load, by its route */
+  onSlideGone?: (src: string) => void;
 }) {
   // A photograph nobody has looked for yet (`pending`, #440) is asked for
   // OVER the next picture, which shows at once; it fades in the moment it
@@ -100,6 +120,13 @@ export function DealBanner({
     const img = liftRef.current;
     if (img?.complete) setLifted(img.naturalWidth > 0 ? "shown" : "gone");
   }, []);
+  // The other photographs (#450): which has loaded whole, and which failed.
+  const [slideLoaded, setSlideLoaded] = useState<string | null>(null);
+  const [slideGone, setSlideGone] = useState<ReadonlySet<string>>(new Set());
+  const photoOnScreen = (lifted === "shown" ? lift : rest[at])?.kind === "photo";
+  useEffect(() => {
+    onPhoto?.(photoOnScreen);
+  }, [photoOnScreen, onPhoto]);
 
   const base = rest[at];
   const baseLoaded = !!base && loaded !== null && loaded.endsWith(base.src);
@@ -172,6 +199,12 @@ export function DealBanner({
   // The picture on screen, whose credit and caption the card wears: the
   // lifted photograph once it has loaded, the next picture until then.
   const onScreen = shown ? lift! : base!;
+  // The other photograph asked for (#450), over the deal's own photograph
+  // only; its credit once it is whole on screen.
+  const asked = !shown && onScreen.kind === "photo" && slide > 0 ? (slides[slide - 1] ?? null) : null;
+  const other = asked && !slideGone.has(asked.src) ? asked : null;
+  const otherLoaded = !!other && slideLoaded === other.src;
+  const credit = other && otherLoaded ? other.credit : onScreen.credit;
   return (
     <div
       className={`relative overflow-hidden ${flush ? "" : "rounded-lg"} bg-faint ${className}`}
@@ -207,6 +240,28 @@ export function DealBanner({
       ) : (
         <span aria-hidden className={`block ${shape} w-full`} />
       )}
+      {other ? (
+        /* eslint-disable-next-line @next/next/no-img-element -- the deal's own picture route, auth-scoped */
+        <img
+          key={other.src}
+          src={other.src}
+          alt={otherLoaded ? (other.alt ?? `Photograph of ${label}`) : ""}
+          aria-hidden={otherLoaded ? undefined : true}
+          data-slide={slide}
+          width={640}
+          height={aspect === "16/10" ? 400 : 360}
+          sizes={sizes}
+          decoding="async"
+          onLoad={() => setSlideLoaded(other.src)}
+          onError={() => {
+            setSlideGone((g) => new Set(g).add(other.src));
+            onSlideGone?.(other.src);
+          }}
+          className={`absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-300 ease-out motion-safe:group-hover:scale-[1.03] ${
+            otherLoaded ? "opacity-100" : "opacity-0"
+          }`}
+        />
+      ) : null}
       {overlay}
       {shade && (
         <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-black/30 to-transparent" />
@@ -231,8 +286,14 @@ export function DealBanner({
             <path d="M4 8h3l2-3h6l2 3h3v11H4z" />
             <circle cx="12" cy="13" r="3.5" />
           </svg>
-          <span>{photos}</span>
-          <span className="sr-only">{" photographs"}</span>
+          {other ? (
+            <span>{`${slide + 1} / ${photos}`}</span>
+          ) : (
+            <>
+              <span>{photos}</span>
+              <span className="sr-only">{" photographs"}</span>
+            </>
+          )}
         </span>
       ) : null}
       {onScreen.kind === "market" && onScreen.market ? (
@@ -242,7 +303,7 @@ export function DealBanner({
         <MarketCaption market={onScreen.market} credit={onScreen.credit} />
       ) : (
         <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[9px] leading-tight text-white">
-          {onScreen.credit}
+          {credit}
         </span>
       )}
     </div>

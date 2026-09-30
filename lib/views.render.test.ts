@@ -240,8 +240,18 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         CARD,
       ),
       cover: coverFor({ seed: c.id, assetClass: c.assetClass, place: c.market || null }),
-      // The deal with its own photograph holds five on its page (#448).
+      // The deal with its own photograph holds five on its page (#448),
+      // four of them flipped through on the card (#450).
       photos: c.id === "b" ? 5 : 0,
+      slides:
+        c.id === "b"
+          ? [3, 5, 8, 11].map((page, k) => ({
+              kind: "photo" as const,
+              src: `/api/deals/b/picture?size=hero&g=${k + 1}`,
+              credit: `From the offering memorandum, page ${page}`,
+              alt: `Photograph from page ${page} of the memorandum for ${c.name}`,
+            }))
+          : [],
     }));
     const html = render(
       React.createElement(Pipeline, {
@@ -287,6 +297,18 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // deal page holds (#448), and a reader hears the word; nowhere else.
     expect((html.match(/data-picture="photo-count"/g) ?? []).length).toBe(1);
     expect(html).toMatch(/data-picture="photo-count"[^>]*>[\s\S]*?<span>5<\/span><span class="sr-only"> photographs<\/span>/);
+    // …and flips through them there (#450): two arrows over the picture,
+    // outside the card's link, named for the deal, and a dot a photograph.
+    const flip = html.match(/<div data-flip="photos"[\s\S]*?<\/div>/)?.[0] ?? "";
+    expect(flip).not.toBe("");
+    expect((html.match(/data-flip="photos"/g) ?? []).length).toBe(1);
+    expect(flip).toContain('aria-label="Previous photo of 1400 Market — office to residential"');
+    expect(flip).toContain('aria-label="Next photo of 1400 Market — office to residential"');
+    expect((flip.match(/rounded-full shadow-sm bg-white/g) ?? []).length).toBe(5);
+    expect(html).toMatch(/<\/a><div data-flip="photos"/);
+    // Nothing is asked for before it is wanted: the other photographs load
+    // on a flip, never with the page.
+    expect(html).not.toContain("picture?size=hero&amp;g=");
     // A memorandum nobody has read the cover of yet is searched OVER the
     // next picture (#440): the Maddox shows its cover at once, and the
     // memorandum's is asked for on top of it, unseen and unannounced until

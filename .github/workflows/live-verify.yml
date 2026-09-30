@@ -1067,6 +1067,8 @@ jobs:
           mark "#446 sharper pictures on your cards" grep -q "Sharper pictures on your cards" p_whats-new.html
           # #448 — the memorandum's other photographs on the deal (signed-in): its card.
           mark "#448 the memorandum's other photos" grep -q "other photos, on the deal" p_whats-new.html
+          # #450 — a deal's photos flipped through on its card (signed-in): its card.
+          mark "#450 flip through a deal's photos" grep -q "photos on its card" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
