@@ -7,9 +7,12 @@ import { describe, expect, it } from "vitest";
 import {
   benchmarksForDeal,
   fmtBenchValue,
+  mergeRules,
   seedBenchmarks,
+  seedRules,
   twoToFourMedian,
 } from "@/lib/research-data";
+import type { RegulatoryRule } from "@/lib/research";
 import { monthOf } from "@/lib/zori";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -188,5 +191,48 @@ describe("twoToFourMedian — a sale median with its month, from the research fi
     expect(demo).toContain('twoToFourMedian("philadelphia_pa")');
     expect(demo).not.toContain("$363,500");
     expect(demo).not.toContain("+6.9% YoY");
+  });
+});
+
+describe("mergeRules — a rule's words are the file's; the database adds only a later re-check of those words", () => {
+  const seed = seedRules();
+  const ca = seed.find((r) => r.id === "ca-ab1482-rent-cap") ?? seed.find((r) => r.jurisdiction_state === "CA")!;
+  // Postgres's jsonb hands keys back by length, then bytes: never the
+  // file's order. The words are the same rule for all that.
+  const reordered = (o: Record<string, unknown> | null) =>
+    o ? Object.fromEntries(Object.entries(o).sort(([a], [b]) => a.length - b.length || (a < b ? -1 : 1))) : o;
+
+  it("keeps the file's corrected conditions over a copy seeded before the correction", () => {
+    const stale: RegulatoryRule = {
+      ...ca,
+      exempt_if: { any_of: [{ building_permit_issued_after: "2011-01-01" }, { owner_occupied_with_units_lte: 2 }] },
+      as_of: "2026-09-20",
+    };
+    const merged = mergeRules([stale]).find((r) => r.id === ca.id)!;
+    expect(merged.exempt_if).toEqual(ca.exempt_if);
+    // A re-check of other words does not date these.
+    expect(merged.as_of).toBe(ca.as_of);
+  });
+
+  it("takes a later re-verification of the same words, whatever order their keys come back in", () => {
+    const rechecked: RegulatoryRule = {
+      ...ca,
+      applies_if: reordered(ca.applies_if),
+      exempt_if: reordered(ca.exempt_if),
+      as_of: "2026-12-01",
+    };
+    const merged = mergeRules([rechecked]).find((r) => r.id === ca.id)!;
+    expect(merged.as_of).toBe("2026-12-01");
+    expect(merged.effect).toBe(ca.effect);
+    // An earlier stamp never moves the file's back.
+    expect(mergeRules([{ ...ca, as_of: "2026-01-01" }]).find((r) => r.id === ca.id)!.as_of).toBe(ca.as_of);
+  });
+
+  it("keeps a rule only the database holds, and every rule the file holds", () => {
+    const extra: RegulatoryRule = { ...ca, id: "db-only-rule", effect: "A rule added in the database." };
+    const merged = mergeRules([extra]);
+    expect(merged.find((r) => r.id === "db-only-rule")?.effect).toBe("A rule added in the database.");
+    expect(merged.length).toBe(seed.length + 1);
+    expect(mergeRules(null)).toEqual(seed);
   });
 });

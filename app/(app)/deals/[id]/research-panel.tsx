@@ -23,6 +23,7 @@ import {
   buildSubject,
   fmtBenchValue,
   mergeBenchmarks,
+  mergeRules,
   pricePerUnit,
   seedBenchmarks,
   seedRules,
@@ -230,8 +231,10 @@ export async function ResearchPanel({
   /** the deal's asset class — same-sector benchmark rows sort first */
   assetClass?: string | null;
 }) {
-  // DB first, seeds as fallback — a missing table (migration not yet run)
-  // must degrade silently to the checked-in research layer.
+  // The checked-in research layer, with the database's rows merged in — a
+  // missing table (migration not yet run) degrades silently to the files.
+  // A rule's words are always the file's (mergeRules: nothing else writes
+  // them); a benchmark's figures may be the steward's correction.
   let rules: RegulatoryRule[] = seedRules();
   let benchmarks: Benchmark[] = seedBenchmarks();
   try {
@@ -240,11 +243,7 @@ export async function ResearchPanel({
       supabase.from("regulatory_rules").select("*"),
       supabase.from("benchmarks").select("*"),
     ]);
-    if (dbRules?.length) {
-      const byId = new Map(rules.map((r) => [r.id, r]));
-      for (const r of dbRules as unknown as RegulatoryRule[]) byId.set(r.id, r);
-      rules = [...byId.values()];
-    }
+    if (dbRules?.length) rules = mergeRules(dbRules as unknown as RegulatoryRule[]);
     if (dbBench?.length) {
       benchmarks = mergeBenchmarks(dbBench as unknown as Benchmark[]);
     }

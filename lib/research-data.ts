@@ -24,6 +24,66 @@ export function seedRules(): RegulatoryRule[] {
   );
 }
 
+/** A value's JSON with every object's keys sorted, so a rule's conditions
+ *  compare equal whatever order they come back in — Postgres's jsonb stores
+ *  keys by length before byte order, never as the file wrote them. */
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+    return `{${entries.map(([k, v]) => `${JSON.stringify(k)}:${canonicalJson(v)}`).join(",")}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+/** What a rule says: everything but the dates and the status its source was
+ *  last checked under. */
+function ruleText(r: RegulatoryRule): string {
+  return canonicalJson({
+    jurisdiction_state: r.jurisdiction_state,
+    jurisdiction_local: r.jurisdiction_local ?? null,
+    rule_type: r.rule_type,
+    applies_if: r.applies_if ?? null,
+    exempt_if: r.exempt_if ?? null,
+    effect: r.effect,
+    quote: r.quote ?? null,
+    source: r.source ?? null,
+  });
+}
+
+/**
+ * The rules a deal is read against: the checked-in file's, with the
+ * database's copy consulted only for what the database alone writes.
+ * Nothing writes a rule's TEXT to the database but scripts/seed-research.mjs
+ * — the steward stamps `as_of` when it re-verifies a rule against its source
+ * and never edits legal text, the daily intel job only reads the ids — so a
+ * row there is the file as it stood when last seeded, and taking it over the
+ * file kept a rule the file had since corrected (California's and
+ * Washington's new-building exemptions, read as rolling ages) until someone
+ * reseeded. So a rule in the file takes the file's words, and the
+ * database's later `as_of` only where its words are the file's own, since a
+ * re-verification dates the words it checked. A rule only the database
+ * holds is kept as it is.
+ */
+export function mergeRules(dbRows: RegulatoryRule[] | null | undefined): RegulatoryRule[] {
+  const seeds = seedRules();
+  const byId = new Map(seeds.map((r) => [r.id, r]));
+  for (const row of dbRows ?? []) {
+    if (!row?.id) continue;
+    const seed = byId.get(row.id);
+    if (!seed) {
+      byId.set(row.id, row);
+      continue;
+    }
+    if (ruleText(row) === ruleText(seed) && typeof row.as_of === "string" && row.as_of > seed.as_of) {
+      byId.set(row.id, { ...seed, as_of: row.as_of });
+    }
+  }
+  return [...byId.values()];
+}
+
 /** The month the 2–4 unit on-market figures are for: the research file's
  *  block is `on_market_depth_may_2026`, Redfin's tracker "periods through
  *  2026-05-31" as its source records — single-month medians for May 2026. */
