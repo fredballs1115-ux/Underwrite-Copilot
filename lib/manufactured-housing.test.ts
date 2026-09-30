@@ -92,6 +92,17 @@ describe("a manufactured-housing park, read as stated (#470)", () => {
     expect(utilityLabel(readUtilities("Private well and septic"))).toBe("Private water & sewer");
   });
 
+  it("reads a bare source word by what the row's label names (#471)", () => {
+    const both = readManufacturedHousing(park([row("Pads", "80"), row("Water/Sewer", "Public")]))!;
+    expect(both.utilities).toMatchObject({ water: "public", sewer: "public", kind: "public", stated: "Public" });
+    // Rows of their own are read together.
+    const apart = readManufacturedHousing(park([row("Pads", "80"), row("Water", "City"), row("Sewer", "Septic system")]))!;
+    expect(apart.utilities).toMatchObject({ water: "public", sewer: "private", kind: "mixed", stated: "Water: City; Sewer: Septic system" });
+    expect(readManufacturedHousing(park([row("Pads", "80"), row("Utilities", "Private")]))!.utilities).toMatchObject({ kind: "private" });
+    // A bare word under a label that names neither is no source.
+    expect(readManufacturedHousing(park([row("Pads", "80"), row("Utilities", "$48,000")]))).toBeNull();
+  });
+
   it("reads a monthly rent to the cent, never a range as an average, and a market range at its low end", () => {
     expect(monthlyRentOf("$432.50/month")).toBe(432.5);
     expect(monthlyRentOf("$5,160 annually")).toBe(430);

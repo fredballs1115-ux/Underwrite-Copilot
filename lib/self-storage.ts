@@ -79,22 +79,24 @@ export interface StorageRate {
 
 /** A storage rate as stated — "$1.38/SF/month", "$16.56 per SF per year",
  *  "$118 per unit per month" — with its basis and period read only from the
- *  words. Null for a range, which is no average. */
-export function storageRateOf(stated: string): StorageRate | null {
+ *  words: the value's, and the row's label where it carries them ("In-place
+ *  rent/SF/mo: $1.38"). Null for a range, which is no average. */
+export function storageRateOf(stated: string, label = ""): StorageRate | null {
   const s = stated.trim();
   if (/\d\s*(?:[-–—]|to)\s*\$?\s*\d/.test(s)) return null;
   const m = /\$\s*(\d[\d,]*(?:\.\d{1,2})?)/.exec(s);
   if (!m) return null;
   const value = Number(m[1].replace(/,/g, ""));
   if (!Number.isFinite(value) || value <= 0) return null;
-  const basis = /(?:\/|\bper\s+|\ba\s+)(?:sf|nrsf|sq\.?\s*ft\.?|square\s+f(?:oo|ee)t)\b|\bpsf\b/i.test(s)
+  const words = `${label} ${s}`;
+  const basis = /(?:\/|\bper\s+|\ba\s+)(?:sf|nrsf|sq\.?\s*ft\.?|square\s+f(?:oo|ee)t)\b|\bpsf\b/i.test(words)
     ? "sf"
-    : /(?:\/|\bper\s+|\ba\s+)(?:unit|space)\b/i.test(s)
+    : /(?:\/|\bper\s+|\ba\s+)(?:unit|space)\b/i.test(words)
       ? "unit"
       : null;
-  const period = /(?:\/|\bper\s+|\ba\s+)(?:mo|month)\b|\bmonthly\b/i.test(s)
+  const period = /(?:\/|\bper\s+|\ba\s+)(?:mo|month)\b|\bmonthly\b/i.test(words)
     ? "month"
-    : /(?:\/|\bper\s+|\ba\s+)(?:yr|year|annum)\b|\bannual(?:ly)?\b/i.test(s)
+    : /(?:\/|\bper\s+|\ba\s+)(?:yr|year|annum)\b|\bannual(?:ly)?\b/i.test(words)
       ? "year"
       : null;
   return { value, basis, period, stated: s };
@@ -191,8 +193,8 @@ export function readSelfStorage(ex: ExtractionResult | null | undefined): SelfSt
   const economicPct = pctOf(economicRow);
   const inPlaceRow = find(IN_PLACE);
   const streetRow = find(STREET);
-  const inPlace = inPlaceRow ? storageRateOf(inPlaceRow.value) : null;
-  const street = streetRow ? storageRateOf(streetRow.value) : null;
+  const inPlace = inPlaceRow ? storageRateOf(inPlaceRow.value, inPlaceRow.label) : null;
+  const street = streetRow ? storageRateOf(streetRow.value, streetRow.label) : null;
   const footing = inPlace && street ? onOneFooting(inPlace, street) : null;
   const climateRow = find(CLIMATE);
   const managementRow = find(MANAGEMENT);

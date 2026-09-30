@@ -73,6 +73,10 @@ describe("a self-storage facility, read as stated (#471)", () => {
     const apart = readSelfStorage(facility([row("In-place rent", "$118 per unit per month"), row("Street rate", "$1.15/SF/mo")]))!;
     expect(apart.premiumPct).toBeNull();
     expect(apart.headline).toContain("are not stated on one basis, so they are not compared");
+    // …a basis or period the row's label carries counts ("In-place rent/SF")…
+    const labelled = readSelfStorage(facility([row("In-place rent/SF", "$16.56 annually"), row("Street rate", "$1.15/SF/mo")]))!;
+    expect(labelled.inPlace).toMatchObject({ basis: "sf", period: "year", stated: "$16.56 annually" });
+    expect(labelled.premiumPct).toBe(20);
     // …and two figures stated the same bare way compare as stated.
     expect(readSelfStorage(facility([row("In-place rent", "$1.20"), row("Street rate", "$1.00")]))!.premiumPct).toBe(20);
   });
