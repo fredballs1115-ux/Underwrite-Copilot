@@ -572,7 +572,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   at all, because the skyline loop only walks the skyline table — and a
   market whose only picture is the aerial has no fallback left if that
   route breaks, which makes it the one most worth watching rather than
-  least. Prefer those steps' lines over a round marker:
+  least. It caught exactly that on 2026-09-30 (#449): USGS's export ran
+  past the route's 10-second timeout on two runs in a row, a day after
+  answering in time, so Montgomery County showed no picture at all. The
+  overhead is fetched through `lib/metro-overhead` now as the skyline is:
+  held per process by frame (count- and byte-bounded), one fetch per frame
+  at a time however many visitors ask, a failure kept by nobody, and
+  `OVERHEAD_TIMEOUT_MS` 20 seconds. Prefer those steps' lines over a round marker:
   a marker greps the served HTML, and the credit line is in the HTML whether
   or not the picture resolves (the fallback to the overhead is client-side,
   in `CityPhoto`, by design). Its doors, best first: a city's **Wikipedia article
