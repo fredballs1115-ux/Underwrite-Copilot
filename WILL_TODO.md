@@ -88,6 +88,18 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
     re-encoding a PNG, a change to the "PNG never served" rule.
 - **Photo credits:** two name a different author from the one in the
   filename, as Commons states them (Milwaukee, Greenville).
+- **The deal page on a phone** (research pass 13, 2026-09-30): every
+  deal-type panel sits in the header, above the tabs, so at 390px a deal's
+  header runs 1,340–2,280px, and a deal with several panels 3,290px (about
+  four screens) before the verdict. The fix agents fold each panel's read
+  after its first sentence within today's design; folding each panel to a
+  headline, or moving the panels into Overview, is a layout change and
+  yours.
+- **Header slots on two deal types:** a value-add whose memorandum states
+  no stabilized NOI shows "Yield on cost —" (a plan deal shows yield on
+  cost, never a cap), and an auction shows "Price —" beside a stated
+  starting bid. Showing the going-in cap, or the starting bid labelled as
+  one, changes the slot rule.
 
 ## 🟢 2026-09-25 — being found, and the site's own address (#430)
 
