@@ -3,6 +3,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { datedLong } from "@/lib/debt-index";
 import { fmrLabel, fmrOf, fmrToday, fmrWhen } from "@/lib/fmr";
 import { MARKET_COUNT } from "@/lib/market-count";
+import { blockCitations, figuresTitle } from "@/lib/tracker-read";
 import { PausableTicker } from "./pausable-ticker";
 
 // Server-component module only: it pulls a research seed JSON, which must
@@ -24,9 +25,10 @@ export { MARKET_COUNT };
  *  never describe the same market differently.
  *
  *  These are dated research — the tracker's snapshot of brokerages'
- *  quarterly prints — never a live feed, so the fact carries the research
- *  file's own date for its figure (the snapshot's `as_of`), and every
- *  surface prints it; a file that states no date gets none printed. */
+ *  quarterly prints — never a live feed, so each figure carries its own
+ *  period, the one its block's read states (lib/tracker-read), "undated"
+ *  where the file states none; the snapshot's `as_of` is the day the
+ *  research was read, said as that and never as a figure's date. */
 const SECTOR_LABEL: Record<string, string> = {
   office: "Office",
   industrial: "Industrial",
@@ -35,17 +37,22 @@ const SECTOR_LABEL: Record<string, string> = {
 };
 
 export interface MetroFact {
+  /** the sector's figures, each with the period its own read states —
+   *  "Office 21.3–22.2% vac (Q2 2026) · 3 rules on file" — or HUD's fair
+   *  market rent with its fiscal year, or the rules count alone */
   text: string;
-  /** the research file's own date for the figure in `text` — the sector
-   *  snapshot's `as_of`; null where the text dates itself (a fair market
-   *  rent names its fiscal year), carries no figure (the rules count alone)
-   *  or the file states none */
-  asOf: string | null;
+  /** who published each figure in `text`, for what area and when — a
+   *  title's words; null where `text` carries no tracker figure */
+  cite: string | null;
+  /** the day the research sweep read the snapshot (its `as_of`), never a
+   *  figure's date; null where `text` carries no tracker figure or the file
+   *  states none */
+  readOn: string | null;
 }
 
-/** "as of Aug 25, 2026" — the research file's date, as every page says it. */
-export function researchAsOf(asOf: string): string {
-  return `as of ${datedLong(asOf)}`;
+/** "read Aug 25, 2026" — the day the research was read, as every page says it. */
+export function researchReadOn(day: string): string {
+  return `read ${datedLong(day)}`;
 }
 
 export function metroFact(m: unknown, rotate = 0): MetroFact | null {
@@ -75,14 +82,18 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
     const lo = b.vacancy_pct ?? b.vacancy_pct_low;
     const hi = b.vacancy_pct ?? b.vacancy_pct_high ?? lo;
     const vac = lo === hi ? `${lo}%` : `${lo}–${hi}%`;
+    // Each figure's own period, never the day the research was read.
+    const shown = blockCitations(b).filter((f) => f.label !== "Cap");
+    const when = (label: string) => shown.find((f) => f.label === label)?.read.period ?? "undated";
     const rent =
-      typeof b.asking_rent_psf === "number" ? ` · $${b.asking_rent_psf.toFixed(2)}/SF` : "";
+      typeof b.asking_rent_psf === "number" ? ` · $${b.asking_rent_psf.toFixed(2)}/SF (${when("Rent")})` : "";
     const snapAsOf = (entry.sector_snapshot as Record<string, unknown>).as_of;
     return {
-      text: [`${SECTOR_LABEL[sector]} ${vac} vac${rent}`, rulesPart]
+      text: [`${SECTOR_LABEL[sector]} ${vac} vac (${when("Vacancy")})${rent}`, rulesPart]
         .filter((x): x is string => x !== null)
         .join(" · "),
-      asOf: typeof snapAsOf === "string" && snapAsOf.trim() ? snapAsOf : null,
+      cite: figuresTitle(shown),
+      readOn: typeof snapAsOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(snapAsOf) ? snapAsOf : null,
     };
   }
 
@@ -96,20 +107,18 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
     fmr && twoBed !== null && inForce ? `${fmrLabel(fmr.fy)} 2BR FMR $${twoBed.toLocaleString("en-US")}/mo` : null,
     rulesPart,
   ].filter((x): x is string => x !== null);
-  return parts.length ? { text: parts.join(" · "), asOf: null } : null;
+  return parts.length ? { text: parts.join(" · "), cite: null, readOn: null } : null;
 }
 
 export function MarketsMarquee() {
   const facts = (metrosSeed.metros ?? []).map((m, i) => ({ entry: m as { id: string; name: string; region?: string }, fact: metroFact(m, i) }));
-  // One date for the strip where every figure carries the same one; each
-  // figure its own where they differ — never a date a figure does not have.
-  const first = facts[0]?.fact?.asOf ?? null;
-  const shared = first && facts.every((f) => f.fact?.asOf === first) ? first : null;
+  // Each figure carries its own period in its text; the heading says the
+  // day the research was read where every market's was read the same day.
+  const first = facts[0]?.fact?.readOn ?? null;
+  const shared = first && facts.every((f) => f.fact?.readOn === first) ? first : null;
   const items = facts.map(({ entry, fact }) => {
-    const text = fact
-      ? `${fact.text}${!shared && fact.asOf ? ` · ${researchAsOf(fact.asOf)}` : ""}`
-      : (entry.region ?? "covered market");
-    return [entry.id, entry.name, text] as const;
+    const text = fact ? fact.text : (entry.region ?? "covered market");
+    return [entry.id, entry.name, text, fact?.cite ?? undefined] as const;
   });
   // Each item is a real link into that market's brief — the marquee is a
   // navigation surface, not just decoration. Duplicate row is aria-hidden,
@@ -119,11 +128,12 @@ export function MarketsMarquee() {
       aria-hidden={hidden || undefined}
       className="flex shrink-0 items-center gap-10 pr-10"
     >
-      {items.map(([id, k, v]) => (
+      {items.map(([id, k, v, cite]) => (
         <Link
           key={k}
           href={`/market?metro=${id}`}
           tabIndex={hidden ? -1 : undefined}
+          title={cite}
           className="group inline-flex items-baseline gap-2 whitespace-nowrap text-sm outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
         >
           <span className="font-medium underline-offset-2 group-hover:underline">
@@ -139,7 +149,7 @@ export function MarketsMarquee() {
   return (
     <PausableTicker what="markets band" className="overflow-hidden border-y border-line bg-faint/70 py-3">
       <p className="mb-1.5 px-10 text-center text-[11px] font-medium uppercase tracking-wider text-muted">
-        {`The ${MARKET_COUNT} covered markets — dated research${shared ? `, ${researchAsOf(shared)}` : ""}`}
+        {`The ${MARKET_COUNT} covered markets — dated research${shared ? `, ${researchReadOn(shared)}` : ""}`}
       </p>
       <div className="ticker-track-reverse flex w-max">
         {row(false)}

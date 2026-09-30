@@ -186,6 +186,96 @@ export function figureNote(read: FigureRead): string {
     .join("; ");
 }
 
+/**
+ * One of a snapshot block's figures, credited: its label, its own read, and
+ * the words that credit it on a line — a vacancy or an asking rent by who,
+ * where and when (a rent's basis is printed beside the figure itself), a
+ * cap with what kind of figure it is and whose stock it covers.
+ */
+export interface CitedFigure {
+  label: "Vacancy" | "Rent" | "Cap";
+  read: FigureRead;
+  words: string;
+}
+
+type CitedBlock = {
+  vacancy_pct?: unknown;
+  vacancy_pct_low?: unknown;
+  asking_rent_psf?: unknown;
+  cap_rate_low_pct?: unknown;
+  cap_rate_high_pct?: unknown;
+  vacancy_read?: unknown;
+  rent_read?: unknown;
+  cap_read?: unknown;
+  sources?: unknown;
+};
+
+/**
+ * Each figure a snapshot block carries — its vacancy, its asking rent, its
+ * cap, in that order — with its own read; a figure the block does not carry
+ * is left out. The one reader the market brief's "By asset type" panel, the
+ * sector leaderboard, the coverage board, the compare card and the
+ * homepage's band and gallery credit a block's figures through, so none of
+ * them dates a figure by the day the research was read or credits it to
+ * the block's first link.
+ */
+export function blockCitations(raw: unknown): CitedFigure[] {
+  const b = (raw && typeof raw === "object" ? raw : {}) as CitedBlock;
+  const sources = Array.isArray(b.sources) ? b.sources.filter((s): s is string => typeof s === "string") : [];
+  const out: CitedFigure[] = [];
+  if (num(b.vacancy_pct) !== null || num(b.vacancy_pct_low) !== null) {
+    const read = figureRead(b.vacancy_read, sources);
+    out.push({ label: "Vacancy", read, words: figureCitation(read) });
+  }
+  if (num(b.asking_rent_psf) !== null) {
+    const read = figureRead(b.rent_read, sources);
+    out.push({ label: "Rent", read, words: figureCitation(read) });
+  }
+  if (num(b.cap_rate_low_pct) !== null && num(b.cap_rate_high_pct) !== null) {
+    const read = figureRead(b.cap_read, sources);
+    out.push({ label: "Cap", read, words: figureNote(read) });
+  }
+  return out;
+}
+
+/** Every figure's whole credit, for a title: "Vacancy: Colliers (21.3%) and
+ *  CBRE (22.2%), the District, Q2 2026 · Rent: …". */
+export function figuresTitle(figs: readonly CitedFigure[]): string {
+  return figs.map((f) => `${f.label}: ${figureNote(f.read)}`).join(" · ");
+}
+
+/** A link for one or more of a row's figures. */
+export interface FigureSource {
+  href: string;
+  /** "source" where one link carries every figure the row shows; otherwise
+   *  the figures it carries — "vacancy", "rent & cap" */
+  label: string;
+  /** the whole credit of each figure it carries */
+  title: string;
+}
+
+/**
+ * The links a row of figures carries: one for each distinct link among the
+ * figures' own first links, labelled by the figures it carries, or "source"
+ * where one link carries them all. A link `ok` refuses (one the link audit
+ * found dead) is left out. Empty where no figure is linked — the surface
+ * says the figures are on file, never a link that is not theirs.
+ */
+export function figureSources(figs: readonly CitedFigure[], ok: (href: string) => boolean = () => true): FigureSource[] {
+  const groups = new Map<string, CitedFigure[]>();
+  for (const f of figs) {
+    const href = f.read.links[0];
+    if (!href || !ok(href)) continue;
+    groups.set(href, [...(groups.get(href) ?? []), f]);
+  }
+  const one = groups.size === 1 && [...groups.values()][0].length === figs.length;
+  return [...groups].map(([href, fs]) => ({
+    href,
+    label: one ? "source" : fs.map((f) => f.label.toLowerCase()).join(" & "),
+    title: figuresTitle(fs),
+  }));
+}
+
 /** The tracker's read for a metro and a class — null where either has none,
  *  or where the class or the deck's own class words (`deckWords`) name a
  *  building the tracker does not describe. */

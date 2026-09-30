@@ -2,6 +2,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { FMR_BEDS, fmrOf } from "@/lib/fmr";
 import { compsFeedState } from "@/lib/public-comps/core";
 import { datedLong } from "@/lib/debt-index";
+import { blockCitations, figuresTitle } from "@/lib/tracker-read";
 import type { CompareMetro, CompareSector } from "./market-compare";
 
 // The compare tool's compact per-metro facts, derived once from the research
@@ -20,11 +21,12 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
     if (v !== null) beds[k] = v;
   }
   // Sector fundamentals for the compare table, from the same snapshot blocks
-  // the "By asset type" panel renders — nulls simply produce no entry.
+  // the "By asset type" panel renders — nulls simply produce no entry — each
+  // cell credited to its figures' own house, area and period
+  // (lib/tracker-read), never the day the research was read.
   const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
     .sector_snapshot;
-  // The snapshot's own date, said beside its figures (a quarterly print is
-  // research as of a day, not a feed).
+  // The day the research sweep read the snapshot, said as that.
   const snapAsOf = typeof snap?.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(snap.as_of) ? snap.as_of : null;
   let sectors: CompareMetro["sectors"];
   if (snap) {
@@ -56,6 +58,9 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
         s.capLow = blk.cap_rate_low_pct;
         s.capHigh = blk.cap_rate_high_pct;
       }
+      // The cell shows its rent and cap only beside a vacancy, and so does
+      // its title.
+      if (typeof s.vLow === "number") s.cite = figuresTitle(blockCitations(blk));
       if (Object.keys(s).length > 0) sectors[sec] = s;
     }
   }
@@ -66,7 +71,7 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
     fmr: beds,
     sectors,
     ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
-    researchAsOf: snapAsOf ? datedLong(snapAsOf) : null,
+    researchReadOn: snapAsOf ? datedLong(snapAsOf) : null,
     // Live only where the provider registry runs the feed, never merely
     // because the research file names one (Washington's is documented, not
     // wired); none where the file names no source at all.

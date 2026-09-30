@@ -13,6 +13,9 @@ export type CompareSector = {
   rent?: number;
   capLow?: number;
   capHigh?: number;
+  /** the cell's figures' own house, area and period (lib/tracker-read), for
+   *  its title — never the day the research was read */
+  cite?: string;
 };
 
 export type CompareMetro = {
@@ -31,9 +34,10 @@ export type CompareMetro = {
   ruleCount: number;
   /** the recorded-sales feed: running, a source named but not wired, or none */
   compsFeed: "live" | "documented" | "none";
-  /** the research snapshot's date, said ("Aug 25, 2026"); null where the
-   *  file states none */
-  researchAsOf?: string | null;
+  /** the day the research sweep read the snapshot, said ("Aug 25, 2026") —
+   *  never the figures' own date, which each cell's title states; null where
+   *  the file states none */
+  researchReadOn?: string | null;
 };
 
 const SECTOR_ROWS = ["office", "industrial", "multifamily", "retail"] as const;
@@ -54,14 +58,15 @@ function sectorCell(s: CompareSector | undefined): string {
   return extras.length > 0 ? `${v} · ${extras.join(" · ")}` : v;
 }
 
-/** The two metros' research snapshot dates, said once where they agree:
- *  the figures are a quarter's print, dated, never a feed. */
+/** The days the research was read for the two metros, said once where they
+ *  agree — the day read, never the figures' own period, which is each
+ *  house's print's and rides in each cell's title. */
 function researchDates(a: CompareMetro, b: CompareMetro): string {
-  const da = a.researchAsOf ?? null;
-  const db = b.researchAsOf ?? null;
-  if (da && db && da !== db) return `research as of ${da} (${a.name}) and ${db} (${b.name})`;
+  const da = a.researchReadOn ?? null;
+  const db = b.researchReadOn ?? null;
+  if (da && db && da !== db) return `research read ${da} (${a.name}) and ${db} (${b.name})`;
   const d = da ?? db;
-  return d ? `research as of ${d}` : "research undated";
+  return d ? `research read ${d}` : "research undated";
 }
 
 /** "FY… fair market rent" with the year the block states; no year typed —
@@ -233,6 +238,7 @@ export function MarketCompare({ metros, today }: { metros: CompareMetro[]; today
                     <td
                       key={m.id}
                       className="py-1.5 pr-2 font-mono tabular-nums text-muted"
+                      title={m.sectors?.[sec]?.cite}
                     >
                       {sectorCell(m.sectors?.[sec])}
                     </td>

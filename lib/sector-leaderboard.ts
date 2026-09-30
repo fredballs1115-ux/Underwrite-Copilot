@@ -1,9 +1,12 @@
 import metrosSeed from "@/data/research/metros.json";
+import { blockCitations, type CitedFigure } from "@/lib/tracker-read";
 
 /** One sector block inside a metro's `sector_snapshot` — the research layer's
  *  per-asset-class read: vacancy (a band when trackers diverge — the
  *  divergence is carried, never averaged), asking rent with its declared
- *  basis, cap-rate band, plus status/sources/note provenance. */
+ *  basis, cap-rate band, plus status/sources/note provenance, and each
+ *  figure's own read (`vacancy_read`, `rent_read`, `cap_read` — the house,
+ *  area, period and links lib/tracker-read credits it by). */
 export type SnapBlock = {
   vacancy_pct?: number | null;
   vacancy_pct_low?: number | null;
@@ -15,6 +18,9 @@ export type SnapBlock = {
   status?: string;
   sources?: string[];
   note?: string;
+  vacancy_read?: unknown;
+  rent_read?: unknown;
+  cap_read?: unknown;
 };
 
 export type LeaderRow = {
@@ -26,7 +32,10 @@ export type LeaderRow = {
   rentBasis: string | null;
   capLow: number | null;
   capHigh: number | null;
-  source: string | null;
+  /** each figure the row carries, credited to its own house, area, period
+   *  and link (lib/tracker-read `blockCitations`) — never the block's first
+   *  link, which is another figure's as often as not */
+  figures: CitedFigure[];
 };
 
 // Cross-metro view of one asset class: every covered market with a numeric
@@ -64,7 +73,7 @@ export function sectorLeaderboard(sector: string): {
       rentBasis: blk.rent_basis ?? null,
       capLow,
       capHigh,
-      source: blk.sources?.[0] ?? null,
+      figures: blockCitations(blk),
     });
   }
   rows.sort((a, b) => {

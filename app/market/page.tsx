@@ -48,6 +48,7 @@ import {
   sectorLeaderboard,
   type SnapBlock,
 } from "@/lib/sector-leaderboard";
+import { blockCitations, figureNote, figureSources, figuresTitle, type CitedFigure } from "@/lib/tracker-read";
 import { SubmarketsPanel } from "./submarkets-panel";
 import { listSubmarkets } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
@@ -59,7 +60,10 @@ import { FmrRow } from "./fmr-row";
 /** "By asset type" — the metro's sector fundamentals from the research
  *  layer's snapshot blocks: vacancy (a spread when trackers diverge — the
  *  divergence is shown, never averaged), asking rent, and cap-rate bands,
- *  each with its status chip and provenance note. Metros without a snapshot
+ *  each with its status chip and provenance note, and each figure credited
+ *  to its own house, area and period and linked to its own source
+ *  (lib/tracker-read `blockCitations`) — the snapshot's day is the day the
+ *  research was read, never the figures' date. Metros without a snapshot
  *  say so honestly. */
 const SECTOR_LABEL: Record<string, string> = {
   multifamily: "Multifamily",
@@ -85,6 +89,37 @@ const SECTOR_RANKS: Record<
     ];
   }),
 );
+/** A block's figures, each credited on one line to its own house, area and
+ *  period, and linked to its own source where the file ties one to it. */
+function FigureCredits({ figures }: { figures: CitedFigure[] }) {
+  if (figures.length === 0) return null;
+  return (
+    <p className="mt-1 text-[11px] leading-relaxed text-muted" data-qa="figure-credits">
+      {figures.map((f, i) => {
+        const href = f.read.links[0];
+        return (
+          <Fragment key={f.label}>
+            {i > 0 ? " · " : null}
+            {`${f.label}: `}
+            {href && linkOk(href) !== false ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-dotted underline-offset-2 hover:text-ink"
+              >
+                {f.words}
+              </a>
+            ) : (
+              f.words
+            )}
+          </Fragment>
+        );
+      })}
+    </p>
+  );
+}
+
 function SectorSnapshotPanel({
   snapshot,
   metroId,
@@ -105,14 +140,17 @@ function SectorSnapshotPanel({
   const entries = Object.entries(snapshot ?? {}).filter(
     (e): e is [string, SnapBlock] => e[0] !== "as_of" && typeof e[1] === "object",
   );
-  const asOf = typeof snapshot?.as_of === "string" ? snapshot.as_of : null;
+  // The day the research sweep read the blocks — never the figures' own
+  // date, which each figure's credit line states.
+  const readOn =
+    typeof snapshot?.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(snapshot.as_of) ? snapshot.as_of : null;
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
         By asset type
-        {asOf && (
+        {readOn && (
           <span className="ml-1.5 font-normal normal-case tracking-normal">
-            · fundamentals as of {asOf}
+            {`· research read ${datedLong(readOn)}`}
           </span>
         )}
       </p>
@@ -142,7 +180,11 @@ function SectorSnapshotPanel({
               typeof b.cap_rate_low_pct === "number" &&
               typeof b.cap_rate_high_pct === "number"
             ) {
-              bits.push(`cap ${b.cap_rate_low_pct}–${b.cap_rate_high_pct}%`);
+              bits.push(
+                b.cap_rate_low_pct === b.cap_rate_high_pct
+                  ? `cap ${b.cap_rate_low_pct}%`
+                  : `cap ${b.cap_rate_low_pct}–${b.cap_rate_high_pct}%`,
+              );
             }
             return (
               <li key={sector} className="rounded-lg border border-line/70 p-2.5">
@@ -173,17 +215,8 @@ function SectorSnapshotPanel({
                   >
                     {b.status ?? "sourced"}
                   </span>
-                  {b.sources?.[0] && (
-                    <a
-                      href={b.sources[0]}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="text-[10px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-                    >
-                      source
-                    </a>
-                  )}
                 </div>
+                <FigureCredits figures={blockCitations(b)} />
                 <SectorJobsLine rates={metroRates} sector={sector} />
                 <LessorRentLine national={national} sector={sector} />
                 {b.note && (
@@ -838,15 +871,18 @@ const HEAT_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
 function SectorHeatGrid() {
   // Rank position per (sector, metro) drives the shade; the shared builder is
   // the same one the leaderboard, the rank chips, and /demo read.
-  const ranks = new Map<string, { t: number; label: string }>();
+  const ranks = new Map<string, { t: number; label: string; credit: string }>();
   for (const sec of HEAT_SECTORS) {
     const rows = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
     rows.forEach((r, i) => {
       const hi = r.vHigh ?? r.vLow!;
+      const vacancy = r.figures.find((f) => f.label === "Vacancy");
       ranks.set(`${sec}|${r.id}`, {
         // 0 = tightest in this column, 1 = loosest.
         t: rows.length > 1 ? i / (rows.length - 1) : 0,
         label: r.vLow === hi ? `${r.vLow}` : `${r.vLow}–${hi}`,
+        // The figure's own house, area and period, for the cell's title.
+        credit: vacancy ? figureNote(vacancy.read) : "undated",
       });
     });
   }
@@ -862,8 +898,9 @@ function SectorHeatGrid() {
   }
   const filled = ranks.size;
   const total = metros.length * HEAT_SECTORS.length;
-  // The snapshots' own dates: the board is dated research, a quarter's
-  // prints, and says as of when — one date, or the span where they differ.
+  // The days the research sweep read the snapshots — one day, or the span
+  // where they differ. Never the figures' own date: each figure is a house's
+  // print of its own period, which the cell's title and the metro brief say.
   const snapDates = [
     ...new Set(
       (metrosSeed.metros ?? [])
@@ -875,8 +912,8 @@ function SectorHeatGrid() {
     snapDates.length === 0
       ? "undated"
       : snapDates.length === 1
-        ? `as of ${datedLong(snapDates[0])}`
-        : `as of ${datedLong(snapDates[0])} to ${datedLong(snapDates[snapDates.length - 1])}`;
+        ? `read ${datedLong(snapDates[0])}`
+        : `read ${datedLong(snapDates[0])} to ${datedLong(snapDates[snapDates.length - 1])}`;
   // Emerald (tight) → amber (loose), low alpha so the figure stays readable
   // — the one shade every board on this page uses (app/market/heat-shade).
   const shade = heatShade;
@@ -941,7 +978,7 @@ function SectorHeatGrid() {
                               <div
                                 className="rounded-md px-1.5 py-1 text-center font-mono text-xs tabular-nums text-ink"
                                 style={{ backgroundColor: shade(cell.t) }}
-                                title={`${SECTOR_LABEL[s]} vacancy — shaded by rank within this column, tightest first`}
+                                title={`${SECTOR_LABEL[s]} vacancy, ${cell.credit} — shaded by rank within this column, tightest first`}
                               >
                                 {cell.label}
                               </div>
@@ -1090,6 +1127,14 @@ async function SectorLeaderboard({ sector }: { sector: string }) {
           </thead>
           <tbody>
             {rows.map((r, i) => {
+              // Each figure's own house, area and period, for its cell's
+              // title, and its own link in the Src column — never the
+              // block's first link, which is another figure's as often as not.
+              const credit = (label: CitedFigure["label"]) => {
+                const f = r.figures.filter((x) => x.label === label);
+                return f.length > 0 ? figuresTitle(f) : undefined;
+              };
+              const links = figureSources(r.figures, (href) => linkOk(href) !== false);
               // Sorted with every vacancy-ranked row first, so index = rank.
               return (
                 <tr key={r.id} className="border-b border-line/60">
@@ -1105,36 +1150,42 @@ async function SectorLeaderboard({ sector }: { sector: string }) {
                       {r.name}
                     </Link>
                   </td>
-                  <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">
+                  <td className="py-1.5 pr-3 font-mono text-xs tabular-nums" title={credit("Vacancy")}>
                     {r.vLow !== null ? band(r.vLow, r.vHigh) : "level open"}
                   </td>
                   {anyRent && (
                     <td
                       className="py-1.5 pr-3 font-mono text-xs tabular-nums"
-                      title={r.rentBasis ?? undefined}
+                      title={credit("Rent")}
                     >
                       {r.rent !== null ? `$${r.rent.toFixed(2)}` : "—"}
                     </td>
                   )}
                   {anyCap && (
-                    <td className="py-1.5 pr-3 font-mono text-xs tabular-nums">
+                    <td className="py-1.5 pr-3 font-mono text-xs tabular-nums" title={credit("Cap")}>
                       {r.capLow !== null && r.capHigh !== null
                         ? band(r.capLow, r.capHigh)
                         : "—"}
                     </td>
                   )}
                   <td className="py-1.5 text-[11px] text-muted">
-                    {r.source && linkOk(r.source) !== false ? (
-                      <a
-                        href={r.source}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                      >
-                        source
-                      </a>
+                    {links.length > 0 ? (
+                      <span className="inline-flex flex-wrap gap-x-1.5">
+                        {links.map((l) => (
+                          <a
+                            key={l.href}
+                            href={l.href}
+                            target="_blank"
+                            rel="noreferrer"
+                            title={l.title}
+                            className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                          >
+                            {l.label}
+                          </a>
+                        ))}
+                      </span>
                     ) : (
-                      "on file"
+                      <span title={figuresTitle(r.figures)}>on file</span>
                     )}
                   </td>
                 </tr>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { metroView } from "@/lib/metro-imagery";
-import { MARKET_COUNT, metroFact, researchAsOf } from "./markets-marquee";
+import { MARKET_COUNT, metroFact } from "./markets-marquee";
 import { CityPhoto } from "./city-photo";
 import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
 import { GalleryCreditText } from "./photo-credit";
@@ -19,9 +19,10 @@ import { GalleryCreditText } from "./photo-credit";
  * Every tile is the photograph its market is known by (lib/skyline), or,
  * where none is chosen, a USGS frame of its business district from above
  * (see lib/metro-imagery for why USGS is sharp at this scale and needs no
- * key), carrying the same research fact the marquee shows, with the research
- * file's own date for it (dated research, not a feed), and linking to the
- * same market brief. It is navigation with a picture on it, not decoration.
+ * key), carrying the same research fact the marquee shows, each figure with
+ * its own period (dated research, not a feed) and the tile's title naming
+ * who published it, and linking to the same market brief. It is navigation
+ * with a picture on it, not decoration.
  *
  * A tile whose image 404s still renders: the name and the fact are the
  * content, the photograph is the context. That is also why the <img> sits
@@ -36,7 +37,7 @@ export function MarketsGallery() {
         id: entry.id,
         name: entry.name,
         fact: fact?.text ?? entry.region ?? "covered market",
-        asOf: fact?.asOf ?? null,
+        cite: fact?.cite ?? null,
         place: metroView(entry.id)?.place ?? null,
         dmv: entry.region === "DMV core",
       };
@@ -78,6 +79,7 @@ export function MarketsGallery() {
           <li key={m.id}>
             <Link
               href={`/market?metro=${m.id}`}
+              title={m.cite ?? undefined}
               className="group relative block overflow-hidden rounded-xl border border-line outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
               {/* A 4:3 tile filled by a panorama up to 2.5:1 wide is covered by
@@ -106,14 +108,11 @@ export function MarketsGallery() {
                 <p className="text-sm font-semibold leading-tight text-white">
                   {m.name}
                 </p>
-                <p className="mt-0.5 font-mono text-[11px] leading-snug text-white/80">
+                {/* Each figure with its own period, never the day the
+                    research was read. */}
+                <p className="mt-0.5 font-mono text-[11px] leading-snug text-white/80" data-qa="fact">
                   {m.fact}
                 </p>
-                {m.asOf && (
-                  <p className="mt-0.5 text-[10px] leading-snug text-white/80" data-qa="fact-date">
-                    {researchAsOf(m.asOf)}
-                  </p>
-                )}
               </div>
             </Link>
           </li>
