@@ -183,7 +183,7 @@
             "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf",
             "https://www.colliers.com/en/research/washington-dc/maryland-industrial-market-report-2026-q1"
           ],
-          "note": "Two bases, recorded as the spread: the close-in Central PG corridor runs ~6.0% (Newmark 1Q26 Washington-metro survey / WareSpace small-bay), while Colliers’ Maryland report prints the WHOLE county at 10.1% for Q1 2026 (down 110bps QoQ) — outer big-box product loosens the county-wide number. Ask which submarket your deal sits in before picking a benchmark. Asking ~0-15/SF NNN; the encoded 2.50 is the band midpoint, labeled as such — a 30-40% discount to close-in NoVA.",
+          "note": "Two bases, recorded as the spread: the close-in Central PG corridor runs ~6.0% (Newmark 1Q26 Washington-metro survey / WareSpace small-bay), while Colliers’ Maryland report prints the WHOLE county at 10.1% for Q1 2026 (down 110bps QoQ) — outer big-box product loosens the county-wide number. Ask which submarket your deal sits in before picking a benchmark. Asking ~$10-15/SF NNN; the encoded $12.50 is the band midpoint, labeled as such — a 30-40% discount to close-in NoVA.",
           "vacancy_read": {
             "house": "Newmark / WareSpace (6.0%) and Colliers (10.1%)",
             "area": "the close-in Central PG corridor (6.0%) to the whole county (10.1%)",
@@ -492,7 +492,7 @@
           "sources": [
             "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2026-investment-forecast-retail-market-report"
           ],
-          "note": "NUMERIC FIELD HELD OPEN — direction sourced, level not yet. Marcus & Millichap’s 2026 Baltimore retail forecast: development at its LOWEST since at least 2007, but a contraction in gross metro product plus below-average population growth keep net absorption negative, lifting vacancy to a comparatively HIGH level among major U.S. metros — the limited pipeline insulates neighborhood centers from legacy big-box closures. A digest print of “1.04/SF NNN with BW-Corridor transport slots at 2.84” was REJECTED as industrial-shaped warehouse figures spliced under a retail heading (sixth sector-conflation catch). A dated vacancy level from a named house has not cleared the bar."
+          "note": "NUMERIC FIELD HELD OPEN — direction sourced, level not yet. Marcus & Millichap’s 2026 Baltimore retail forecast: development at its LOWEST since at least 2007, but a contraction in gross metro product plus below-average population growth keep net absorption negative, lifting vacancy to a comparatively HIGH level among major U.S. metros — the limited pipeline insulates neighborhood centers from legacy big-box closures. A digest print of “$11.04/SF NNN with BW-Corridor transport slots at $12.84” was REJECTED as industrial-shaped warehouse figures spliced under a retail heading (sixth sector-conflation catch). A dated vacancy level from a named house has not cleared the bar."
         }
       }
     },

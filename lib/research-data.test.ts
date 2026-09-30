@@ -17,7 +17,7 @@ import {
 } from "@/lib/research-data";
 import type { Benchmark, RegulatoryRule } from "@/lib/research";
 import { monthOf } from "@/lib/zori";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { metroForAddress } from "@/lib/market-match";
 import { DC_AREA_METRO, FMR_BEDS, fmrBenchmarkRows, fmrBlock, fmrOf, readFmrMetric } from "@/lib/fmr";
@@ -412,6 +412,36 @@ describe("ruleCounts — the homepage's claim about the rules on file", () => {
     // control, as of this writing) keeps the two counts apart.
     const unsourced = seedRules().filter((r) => !r.source || r.source.trim() === "").length;
     expect(all - sourced).toBe(unsourced);
+  });
+});
+
+describe("the research files' per-foot figures keep their dollar signs", () => {
+  // An edit that read "$1" as a back-reference ate it out of two notes /market
+  // prints: Prince George's industrial read "Asking ~0-15/SF NNN; the encoded
+  // 2.50 is the band midpoint" for ~$10-15 and $12.50, and Baltimore retail's
+  // rejected digest print read "1.04/SF … at 2.84" for $11.04 and $12.84.
+  const strings = (v: unknown): string[] =>
+    typeof v === "string"
+      ? [v]
+      : Array.isArray(v)
+        ? v.flatMap(strings)
+        : v && typeof v === "object"
+          ? Object.values(v).flatMap(strings)
+          : [];
+
+  it("a figure before /SF carries its $, or is the far end of a $ range", () => {
+    const dir = join(process.cwd(), "data/research");
+    const lost: string[] = [];
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
+      for (const s of strings(JSON.parse(readFileSync(join(dir, file), "utf8")))) {
+        for (const m of s.matchAll(/\d[\d,]*(?:\.\d+)?\/SF/g)) {
+          const before = s.slice(0, m.index);
+          if (/\$$/.test(before) || /\$\d[\d,]*(?:\.\d+)?\s*[-–]\s*$/.test(before)) continue;
+          lost.push(`${file}: …${s.slice(Math.max(0, m.index - 40), m.index + m[0].length)}`);
+        }
+      }
+    }
+    expect(lost).toEqual([]);
   });
 });
 
