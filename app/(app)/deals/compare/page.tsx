@@ -33,6 +33,7 @@ import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
 import { compareReturns } from "@/lib/compare-figures";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { verdictBehind, type JobLike } from "@/lib/screen-run";
@@ -119,7 +120,10 @@ function toCol(
   return {
     id: deal.id,
     name: deal.name,
-    assetClass: deal.asset_class,
+    // The deal's one class, as every surface shows it: the analyst's where
+    // they filed one, the deck's where they left "Auto" — never a dash for
+    // a deal the extraction has read.
+    assetClass: shownAssetClass(deal.asset_class, ex),
     market: ex?.market || "—",
     // The same placement the pipeline and the deal page make (lib/market-
     // county, #447) — all three surfaces agree, a county-placed deal naming

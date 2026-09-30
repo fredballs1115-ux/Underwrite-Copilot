@@ -114,11 +114,13 @@ const compactUsd = (n: number) =>
  * building's price (a share's grossed up, none for a note or the land)
  * over the count in the memorandum's own noun, or over the building's
  * area where the class is priced by the foot. None on a conversion or a
- * development, whose basis is the all-in cost, not the shell's price.
+ * development, whose basis is the all-in cost, not the shell's price. The
+ * class is the deal's one class (`shownAssetClass`): the analyst's where
+ * they filed one, the deck's where they left "Auto".
  */
-export function basisTag(extraction: ExtractionResult, kind: StrategyKind): string | null {
+export function basisTag(extraction: ExtractionResult, kind: StrategyKind, storedClass?: string | null): string | null {
   const metrics = extraction.metrics ?? [];
-  const words = assetWords(extraction.assetClass);
+  const words = assetWords(shownAssetClass(storedClass, extraction));
   const b = subjectBasis(metrics, kind, interestOf(extraction));
   if (words.basis === "sf") return b.perSf != null ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;
   if (words.basis === "unit" && b.perUnit != null) {
@@ -165,7 +167,11 @@ export function shownAssetClass(
   return norm(stored) || norm(extraction?.assetClass);
 }
 
-export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null): PipelineSlots {
+/** The row's slots. `storedClass` is the class the deal was filed under
+ *  ("auto" where the analyst left it to the deck), read with the
+ *  extraction's through `shownAssetClass` wherever a slot speaks in the
+ *  class's terms. */
+export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | null, storedClass?: string | null): PipelineSlots {
   const metrics = extraction.metrics ?? [];
   // The same read the deal page makes — extraction plus the first signal —
   // so a deal never shows a price on one surface and none on the other.
@@ -220,7 +226,8 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     mh: manufacturedHousingTag(extraction),
     // A storage facility's lease-up and the premium over street (#471).
     storage: selfStorageTag(extraction),
-    // The price by the unit or the foot, as a listing card shows it (#469).
-    basis: basisTag(extraction, strategy.kind),
+    // The price by the unit or the foot, as a listing card shows it (#469),
+    // in the deal's one class.
+    basis: basisTag(extraction, strategy.kind, storedClass),
   };
 }

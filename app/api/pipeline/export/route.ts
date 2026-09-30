@@ -1,29 +1,13 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap } from "@/lib/criteria";
-import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
-import { interestTag } from "@/lib/interest";
-import { assumableTag } from "@/lib/assumable-debt";
-import { affordableTag } from "@/lib/affordable";
-import { singleTenantTag } from "@/lib/single-tenant";
-import { hotelTag } from "@/lib/hotel-deal";
-import { saleTag } from "@/lib/sale-terms";
-import { rosterTag } from "@/lib/tenant-roster";
-import { valueAddTag } from "@/lib/value-add";
-import { taxAbatementTag } from "@/lib/tax-abatement";
-import { sellerFinancingTag } from "@/lib/seller-financing";
-import { siteReportsTag } from "@/lib/site-reports";
-import { studentHousingTag } from "@/lib/student-housing";
-import { manufacturedHousingTag } from "@/lib/manufactured-housing";
-import { selfStorageTag } from "@/lib/self-storage";
-import { verdictBehind, type JobLike } from "@/lib/screen-run";
+import type { JobLike } from "@/lib/screen-run";
 import { getTeam } from "@/lib/teams";
 import { getActiveBranding } from "@/lib/branding-server";
 import {
   buildPipelineWorkbook,
   type PipelineExportRow,
 } from "@/lib/pipeline-workbook";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import { pipelineExportRow } from "@/lib/pipeline-export-row";
 
 // exceljs needs the Node runtime.
 export const runtime = "nodejs";
@@ -131,66 +115,19 @@ export async function GET(req: Request) {
     nameById.set(m.id, m.full_name || m.email || "Teammate");
   }
 
-  const exportRows: PipelineExportRow[] = rows.map((d) => {
-    const extraction = d.extraction as ExtractionResult | null;
-    const metrics = extraction?.metrics ?? [];
-    // The deal's kind first. A plan deal (value-add, lease-up, conversion,
-    // development) has no going-in cap — its stabilized figure is the
-    // finished project's, judged on yield on total cost — and a development's
-    // price is its land cost when the OM states no asking price.
-    const strategy = inferStrategy(extraction ? { ...extraction, metrics } : null);
-    const plan = planSummary(extraction ? { ...extraction, metrics } : null, strategy);
-    const box = d.team_id ? teamBox : personalBox;
-    let fit: PipelineExportRow["fit"] = null;
-    if (box && extraction) {
-      // The inferred kind rides along, as on the pipeline page, so the fit
-      // column judges the land cost this row prints as a development's price.
-      const source = buyBoxCheckSource(extraction, null, null, strategy.kind);
-      const checks = source ? evaluateBuyBox(d.asset_class, source, box) : [];
-      fit = checks.some((c) => c.status === "miss")
-        ? "outside"
-        : checks.some((c) => c.status === "near")
-          ? "near"
-          : checks.some((c) => c.status === "pass")
-            ? "fits"
-            : null;
-    }
-    return {
-      name: d.name,
-      stage: d.stage ?? "screening",
-      assetClass: d.asset_class,
-      market: extraction?.market ?? "",
-      dealType: strategy.kind === "unknown" ? null : strategy.label,
-      planDeal: plan != null,
-      price: findPriceMetric(metrics, strategy.kind)?.value ?? null,
-      interest: interestTag(extraction),
-      debt: assumableTag(extraction),
-      affordable: affordableTag(extraction),
-      tenancy: singleTenantTag(extraction),
-      hotel: hotelTag(extraction),
-      sale: saleTag(extraction),
-      roster: rosterTag(extraction),
-      valueAdd: valueAddTag(extraction),
-      abatement: taxAbatementTag(extraction),
-      sellerNote: sellerFinancingTag(extraction),
-      reports: siteReportsTag(extraction),
-      student: studentHousingTag(extraction),
-      mh: manufacturedHousingTag(extraction),
-      storage: selfStorageTag(extraction),
-      cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
-      yieldOnCost:
-        plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
-      fit,
-      verdict: (d.verdict as { verdict?: string } | null)?.verdict ?? null,
-      verdictBehind: verdictBehind(jobByDeal.get(d.id)),
+  // Each row read through the readers every other surface uses
+  // (lib/pipeline-export-row, pure and tested).
+  const exportRows: PipelineExportRow[] = rows.map((d) =>
+    pipelineExportRow(d, {
+      box: d.team_id ? teamBox : personalBox,
+      job: jobByDeal.get(d.id),
       offersDue: dueById.get(d.id) ?? null,
-      createdAt: d.created_at,
       addedBy:
         d.team_id && d.user_id !== user.id
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
-    };
-  });
+    }),
+  );
 
   // Firm branding (Feature 6) — the caller's own identity (this is an
   // account-level export, not a deal-level one). Best-effort.

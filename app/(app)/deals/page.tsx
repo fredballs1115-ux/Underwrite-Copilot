@@ -315,7 +315,7 @@ export default async function DealsPage({
       readCounty: placement.placedBy?.county ?? null,
       offersDue: dueById.get(d.id) ?? null,
       slots: extraction
-        ? pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null)
+        ? pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null, d.asset_class)
         : { cap: null, price: null, yoc: null },
       // Running, stalled (its process died mid-screen — a deploy, most
       // often) or failed with the verdict left behind; a failure that never

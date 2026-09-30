@@ -3,6 +3,7 @@
 // and no cap; a stabilized asset its going-in cap; the price reads through
 // the shared reader with the first signal as the fallback.
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassLabel } from "./asset-class";
 import { pickSlots, shownAssetClass } from "./pipeline-slots";
@@ -27,6 +28,16 @@ describe("shownAssetClass — a row never says \"Auto\"", () => {
     expect(assetClassLabel(shownAssetClass("auto", { assetClass: "NNN retail" }))).toBe("NNN retail");
     expect(assetClassLabel(shownAssetClass("auto", { assetClass: "SFR portfolio" }))).toBe("SFR portfolio");
     expect(assetClassLabel(shownAssetClass("auto", { assetClass: "Self_Storage" }))).toBe("Self-storage");
+  });
+
+  it("the compare page prints the deal's one class, never the stored \"auto\" that reads as a dash", () => {
+    // The page's column is a loader over the Supabase row, so it is held at
+    // its source, the way the document routes' buy-box reads are
+    // (lib/memo/documents-review.test.ts). The workbook's row is
+    // lib/pipeline-export-row, tested there.
+    const src = readFileSync("app/(app)/deals/compare/page.tsx", "utf8");
+    expect(src).toMatch(/assetClass: shownAssetClass\(deal\.asset_class, ex\)/);
+    expect(src).not.toMatch(/assetClass: deal\.asset_class\b/);
   });
 });
 
@@ -220,6 +231,17 @@ describe("the basis at a glance (#469)", () => {
     expect(pickSlots(ex([m("Asking price", "$42,000,000"), m("Rentable SF", "198,000")], "office"), null).basis).toBe("$212/SF");
     // A range reads at its top (#466), as every price does.
     expect(pickSlots(ex([m("Pricing guidance", "$60,000,000 – $62,000,000"), m("Units", "248")], "multifamily"), null).basis).toBe("$250k/unit");
+  });
+
+  it("speaks in the deal's one class: the analyst's where they filed one, the deck's where they left it to the deck", () => {
+    // A deck read as apartments that the analyst filed as an office: the
+    // header and every other surface say office (shownAssetClass), so the
+    // basis is by the foot, never by the unit.
+    const rows = [m("Asking price", "$42,000,000"), m("Rentable SF", "198,000"), m("Units", "248")];
+    expect(pickSlots(ex(rows, "multifamily"), null, "office").basis).toBe("$212/SF");
+    expect(pickSlots(ex(rows, "multifamily"), null, "auto").basis).toBe("$169k/unit");
+    // A caller that names no filed class reads the deck's, as before.
+    expect(pickSlots(ex(rows, "multifamily"), null).basis).toBe("$169k/unit");
   });
 
   it("prints none where the price is not the building's or the count is not stated", () => {
