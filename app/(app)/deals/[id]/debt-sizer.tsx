@@ -600,15 +600,15 @@ export function DebtSizer({
                       <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
                         <th className="py-1.5 pr-3 font-medium">Rate</th>
                         <th className="py-1.5 pr-3 text-right font-medium">Max loan re-sized</th>
-                        <th className="py-1.5 pr-3 text-right font-medium">Δ vs today</th>
-                        <th className="py-1.5 text-right font-medium">DSCR holding today&rsquo;s loan</th>
+                        <th className="py-1.5 pr-3 text-right font-medium">Δ vs entered rate</th>
+                        <th className="py-1.5 text-right font-medium">DSCR holding the sized loan</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
                       {rateStrip.map((s) => (
                         <tr key={s.rate} className={s.d === 0 ? "bg-faint/60" : undefined}>
                           <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-xs tabular-nums">
-                            {s.rate.toFixed(2)}%{s.d === 0 ? " (today)" : ""}
+                            {s.rate.toFixed(2)}%{s.d === 0 ? " (entered)" : ""}
                           </td>
                           <td className="whitespace-nowrap py-1.5 pr-3 text-right font-mono text-xs tabular-nums">
                             {s.sizedLoan != null ? fmtUsdCol(s.sizedLoan) : "—"}
