@@ -24,6 +24,7 @@ import { DC_AREA_METRO, FMR_BEDS, fmrBenchmarkRows, fmrBlock, fmrOf, readFmrMetr
 import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
 import { benchRowLabel } from "@/app/(app)/deals/[id]/research-panel";
+import { SECTORS, looseValue } from "@/lib/research-sectors";
 
 const seeds = seedBenchmarks();
 
@@ -383,5 +384,27 @@ describe("ruleCounts — the homepage's claim about the rules on file", () => {
     // control, as of this writing) keeps the two counts apart.
     const unsourced = seedRules().filter((r) => !r.source || r.source.trim() === "").length;
     expect(all - sourced).toBe(unsourced);
+  });
+});
+
+describe("the multifamily debt terms /market prints", () => {
+  // The sector explorer's "Debt terms" once said the survey's value was
+  // "pending live FRED fetch" while the rates strip on the same page drew it
+  // from FRED. The file points at the strip, in the strip's own words, and
+  // files no rate of its own.
+  it("points at the survey on the rates strip and states no PMMS figure", () => {
+    const mf = SECTORS.find((s) => s.id === "multifamily")!.doc;
+    const text = looseValue((mf.debt_terms as Record<string, unknown>).conventional_investor_2_4)!;
+    const fred = JSON.parse(readFileSync(join(process.cwd(), "data/fred-series.json"), "utf8")) as {
+      groups: { id: string; label: string }[];
+      series: { id: string; short: string; group: string }[];
+    };
+    const survey = fred.series.find((s) => s.id === "MORTGAGE30US")!;
+    const group = fred.groups.find((g) => g.id === survey.group)!;
+    expect(text).toContain(`the ${survey.short} tile under ${group.label} in Rates today`);
+    expect(readFileSync(join(process.cwd(), "app/rates-strip.tsx"), "utf8")).toContain("Rates today");
+    expect(text).not.toMatch(/pending|in progress/i);
+    // The down payment is the file's claim; no rate is.
+    expect(text.replace(/\d+-\d+% down/, "")).not.toMatch(/\d\s*%/);
   });
 });

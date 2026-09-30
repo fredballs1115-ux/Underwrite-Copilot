@@ -131,12 +131,12 @@
   },
   "debt_terms": {
     "conventional_investor_2_4": {
-      "value": "15-25% down investor conventional; rate premium over Freddie PMMS varies by LLPA grid. Current PMMS value pending live FRED fetch (MORTGAGE30US).",
+      "value": "15-25% down investor conventional; rate premium over Freddie PMMS varies by LLPA grid. The PMMS itself is on this page, from FRED with its date: the 30-yr fixed tile under Mortgage & bank lending in Rates today, a residential survey rather than an investor quote.",
       "status": "unverified_not_found",
       "sources": [
         "https://fred.stlouisfed.org/series/MORTGAGE30US"
       ],
-      "note": "Parameter fetch in progress; grid specifics (LLPAs by LTV/property type) queued."
+      "note": "No PMMS figure is filed here: the rates strip reads MORTGAGE30US from FRED every weekday and dates it. Grid specifics (LLPAs by LTV/property type) queued."
     },
     "fha_house_hack_3_4_unit": {
       "value": "FHA owner-occupant on 3-4 units requires the HUD 4000.1 self-sufficiency test (net rental income from all units must cover PITI at the prescribed vacancy factor); CY2026 FHA loan limits for the DC metro by unit count reported via ML 2025-23 but dollar values did not survive verification.",
