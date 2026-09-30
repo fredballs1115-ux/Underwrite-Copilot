@@ -1,22 +1,31 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import sharp from "sharp";
 import { describe, expect, it } from "vitest";
-import { COVER_TONES, coverFor, coverKindFor, coverPlace, coverToneFor } from "./deal-cover";
+import { COVER_TONES, coverFor, coverKindFor, coverPlace, coverToneFor, coverVariantFor } from "./deal-cover";
+import { COVER_KINDS, coverImage, coverSvg } from "./deal-cover-art";
 import { CARD, THUMB, bannerSources } from "./deal-banner";
-import { DealCover } from "@/app/(app)/deals/deal-cover";
+import { COVER_FRAME, DealCover } from "@/app/(app)/deals/deal-cover";
 import { DealBanner } from "@/app/(app)/deals/deal-banner";
 import { DealThumb } from "@/app/(app)/deals/deal-thumb";
 import { a11yIssues, positionConflicts, visibleText } from "./render-lint";
 
-const rgb = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
-const luminance = (c: number[]) => {
-  const [r, g, b] = c.map((x) => x / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
-const contrast = (fg: number[], bg: number[]) => {
+/** sRGB to linear light, a channel value at a time. */
+const LINEAR = Array.from({ length: 256 }, (_, v) => (v / 255 <= 0.03928 ? v / 255 / 12.92 : ((v / 255 + 0.055) / 1.055) ** 2.4));
+const luminance = (c: readonly number[]) => 0.2126 * LINEAR[Math.round(c[0])] + 0.7152 * LINEAR[Math.round(c[1])] + 0.0722 * LINEAR[Math.round(c[2])];
+const contrast = (fg: readonly number[], bg: readonly number[]) => {
   const [hi, lo] = [luminance(fg), luminance(bg)].sort((a, b) => b - a);
   return (hi + 0.05) / (lo + 0.05);
 };
+
+/** Where a card's words sit, measured from its foot in CSS pixels: the
+ *  caption's `pb-2` under the place's 13px line at `leading-tight`, under
+ *  the eyebrow's 9px line at the page's 1.5. */
+const WORDS = { place: [8, 8 + 16.25], eyebrow: [8 + 16.25, 8 + 16.25 + 13.5] } as const;
+/** The heights a card's picture is drawn at: the smallest the pipeline
+ *  draws (two columns beside the sidebar at 768px, 224 × 140), a desktop
+ *  card, a phone's and the widest. */
+const CARD_HEIGHTS = [140, 187, 224, 262];
 
 describe("a deal's cover (#442)", () => {
   it("draws each building type a pipeline holds, and a plain building for the rest", () => {
@@ -40,25 +49,60 @@ describe("a deal's cover (#442)", () => {
     expect(coverKindFor(null)).toBe("building");
   });
 
-  it("gives the same deal the same gradient, and the pipeline many", () => {
+  it("gives the same deal the same sky and the same draw, and the pipeline many of each", () => {
     expect(coverToneFor("deal-1")).toBe(coverToneFor("deal-1"));
-    const seen = new Set(Array.from({ length: 60 }, (_, i) => coverToneFor(`d${i}`)));
-    for (const tone of seen) expect(COVER_TONES).toContain(tone);
-    expect(seen.size).toBeGreaterThanOrEqual(6);
+    expect(coverVariantFor("deal-1")).toBe(coverVariantFor("deal-1"));
+    const ids = Array.from({ length: 60 }, (_, i) => `d${i}`);
+    const tones = new Set(ids.map(coverToneFor));
+    for (const tone of tones) expect(Number.isInteger(tone) && tone >= 0 && tone < COVER_TONES.length).toBe(true);
+    expect(tones.size).toBeGreaterThanOrEqual(6);
+    // The draw varies apart from the sky: deals under one sky still differ.
+    expect(new Set(ids.map(coverVariantFor)).size).toBe(ids.length);
+    const underOne = ids.filter((id) => coverToneFor(id) === coverToneFor(ids[0]));
+    expect(new Set(underOne.map(coverVariantFor)).size).toBe(underOne.length);
+    expect(coverFor({ seed: "deal-1", assetClass: "office" })).toEqual({
+      kind: "office",
+      tone: coverToneFor("deal-1"),
+      variant: coverVariantFor("deal-1"),
+      place: null,
+    });
   });
 
-  it("reads white at AAA where its words sit, before the shade under them", () => {
-    // The words sit at the foot's left, about 40% of the way down the
-    // 140-degree gradient; a third of the way is the stricter place to hold
-    // them to. The radial highlight fades out well above them.
-    for (const [light, dark] of COVER_TONES) {
-      const a = rgb(light);
-      const b = rgb(dark);
-      const behind = a.map((x, i) => x + (b[i] - x) * 0.3);
-      expect(contrast([255, 255, 255], behind), `${light} → ${dark}`).toBeGreaterThanOrEqual(7);
-      // The eyebrow is white at 90%: AA at its size.
-      const eyebrow = behind.map((x) => 255 * 0.9 + x * 0.1);
-      expect(contrast(eyebrow, behind), `${light} → ${dark} eyebrow`).toBeGreaterThanOrEqual(4.5);
+  it("reads white where a card's words sit, on the smallest card and up, before the shade under them", async () => {
+    // Every kind under every sky, drawn for real at the card's frame; the
+    // worst pixel under each line across the card's whole width. The place
+    // is white at 13px: AAA. The eyebrow is white at 90% and 9px: AA, as
+    // before.
+    const [w, h] = COVER_FRAME.card;
+    for (const kind of COVER_KINDS) {
+      for (let tone = 0; tone < COVER_TONES.length; tone++) {
+        const { data } = await sharp(Buffer.from(coverSvg({ kind, tone, variant: 7919 * (tone + 1) }, w, h)))
+          .removeAlpha()
+          .raw()
+          .toBuffer({ resolveWithObject: true });
+        // Each row's brightest pixel: the one the words read worst on.
+        const brightest = Array.from({ length: h }, (_, y) => {
+          let best = [0, 0, 0];
+          for (let x = 0; x < w; x++) {
+            const i = (y * w + x) * 3;
+            const px = [data[i], data[i + 1], data[i + 2]];
+            if (luminance(px) > luminance(best)) best = px;
+          }
+          return best;
+        });
+        const worst = (card: number, [from, to]: readonly [number, number], alpha: number) => {
+          let least = Infinity;
+          for (let y = Math.floor((1 - to / card) * h); y < Math.ceil((1 - from / card) * h); y++) {
+            const bg = brightest[y];
+            least = Math.min(least, contrast(bg.map((v) => 255 * alpha + v * (1 - alpha)), bg));
+          }
+          return least;
+        };
+        for (const card of CARD_HEIGHTS) {
+          expect(worst(card, WORDS.place, 1), `${kind} ${tone} place at ${card}px`).toBeGreaterThanOrEqual(7);
+          expect(worst(card, WORDS.eyebrow, 0.9), `${kind} ${tone} eyebrow at ${card}px`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
     }
   });
 
@@ -82,6 +126,19 @@ describe("a deal's cover (#442)", () => {
     const thumb = renderToStaticMarkup(React.createElement(DealCover, { cover, label: "Brazos Flats", size: "thumb" }));
     expect(thumb).toContain('aria-hidden="true"');
     expect(visibleText(thumb).trim()).toBe("");
+    // One drawing wherever the deal is shown: the card and the row paint the
+    // very documents the image route and the emails serve, laid out for
+    // their frames, anchored at the foot where the words sit.
+    const painted = (html: string) => {
+      const style = html.match(/style="([^"]*)"/)?.[1].replace(/&quot;/g, '"').replace(/&amp;/g, "&") ?? "";
+      expect(style).toContain("background-size:cover");
+      expect(style).toContain("background-position:50% 100%");
+      return style.match(/background-image:(url\("[^"]*"\))/)?.[1];
+    };
+    expect(painted(card)).toBe(coverImage(cover, ...COVER_FRAME.card));
+    expect(painted(thumb)).toBe(coverImage(cover, ...COVER_FRAME.thumb));
+    const payload = coverImage(cover, ...COVER_FRAME.card).match(/^url\("data:image\/svg\+xml;charset=utf-8,([^"]*)"\)$/)?.[1] ?? "";
+    expect(decodeURIComponent(payload)).toBe(coverSvg(cover, ...COVER_FRAME.card));
     // Holding a card's frame while a photograph loads (#446): the gradient
     // and the drawing, and nothing said, since the photo is on its way.
     const holding = renderToStaticMarkup(React.createElement(DealCover, { cover, label: "Brazos Flats", words: false }));

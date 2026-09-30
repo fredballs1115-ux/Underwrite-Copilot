@@ -17,8 +17,9 @@
 // from the reader's own pipeline, the deal page's sticky bar and the
 // pipeline map's hover card: the overheads are never tried, and where no
 // photograph of the building answers, the deal's cover is drawn instead
-// (lib/deal-cover-art `coverSvg`: its gradient and its kind of building,
-// the one the pipeline's card wears). A cover, plainly not a photograph.
+// (lib/deal-cover-art `coverSvg`: its kind of building under its own sky,
+// the one the pipeline's card wears, laid out for the frame asked for). An
+// illustration, plainly not a photograph.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
@@ -101,7 +102,7 @@ export async function GET(
       seed: id,
       assetClass: shownAssetClass(row.asset_class ?? null, { assetClass: row.extracted_class ?? null }),
     });
-    return new NextResponse(coverSvg(cover.kind, cover.tone, width, height), {
+    return new NextResponse(coverSvg(cover, width, height), {
       headers: {
         "content-type": "image/svg+xml; charset=utf-8",
         // An SVG opened on its own is a document: this one carries no script

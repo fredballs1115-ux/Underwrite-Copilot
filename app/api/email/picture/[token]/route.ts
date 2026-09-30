@@ -6,7 +6,7 @@
 //
 // What is stored and nothing else — this never searches a memorandum: the
 // deal's own photograph cut to the email's frame, else the deal's cover
-// (its gradient and its kind of building, the one its card wears), as a
+// (its kind of building under its own sky, the one its card wears), as a
 // JPEG, which every mail client draws. A token that does not verify, a deal
 // that is gone and the sample deal answer 404, and the email shows its alt
 // text.
@@ -17,7 +17,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { readPictureBytes } from "@/lib/deal-picture";
 import { coverFor } from "@/lib/deal-cover";
-import { coverBannerSvg, coverSvg } from "@/lib/deal-cover-art";
+import { coverSvg } from "@/lib/deal-cover-art";
 import { EMAIL_PICTURE, readEmailPictureToken, type EmailPictureShape } from "@/lib/email-picture";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 
@@ -72,9 +72,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ token: s
       assetClass: (deal.extracted_class as string | null) ?? null,
     }),
   });
-  const svg = shape === "thumb" ? coverSvg(cover.kind, cover.tone, w, h) : coverBannerSvg(cover.kind, cover.tone, w, h);
   try {
-    const out = await sharp(Buffer.from(svg)).jpeg({ quality: 90, mozjpeg: true }).toBuffer();
+    // Laid out for the frame: the banner's scene wide, the square's simpler.
+    const out = await sharp(Buffer.from(coverSvg(cover, w, h))).jpeg({ quality: 90, mozjpeg: true }).toBuffer();
     return new NextResponse(new Uint8Array(out), { headers: { ...HEADERS, "x-image-source": "cover" } });
   } catch {
     return new NextResponse(null, { status: 404 });

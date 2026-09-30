@@ -6,46 +6,29 @@
 // its market is known by (#438); before this, a deal with none of those fell
 // to the USGS overhead, which at card size reads as a map, and the list's
 // thumbnails were overheads for every deal without a photograph. The last
-// resort is now a COVER: a deep gradient of its own, the building type drawn
-// in line art, and the place named at the foot. It is plainly a cover, not a
-// photograph, so it can never pass for the building, or for another one; the
-// overhead stays on the deal page, one step along its filmstrip.
+// resort is now a COVER: an illustration of the deal's kind of building
+// under a sky of its own, and the place named at the foot. It is plainly an
+// illustration, not a photograph, so it can never pass for the building, or
+// for another one; the overhead stays on the deal page, one step along its
+// filmstrip.
 //
 // Pure: the page resolves the facts server-side (the class through
-// lib/asset-words) and hands the component plain data; the drawings are
-// lib/deal-cover-art, which the image route also draws its SVG cover from
-// (#443), so every surface shows one cover for one deal.
+// lib/asset-words) and hands the component plain data — a kind, a sky's
+// number and a draw, never the colours themselves; the drawing is
+// lib/deal-cover-art, which the image route and the emails draw their cover
+// from too (#443, #464), so every surface shows one cover for one deal.
 
 import type { StructuredAddress } from "@/lib/address";
 import { assetClassKey } from "@/lib/asset-words";
-import type { CoverKind } from "@/lib/deal-cover-art";
+import { COVER_TONES, type CoverKind, type CoverScene } from "@/lib/deal-cover-art";
 
 export type { CoverKind };
+export { COVER_TONES };
 
-export interface DealCoverFacts {
-  kind: CoverKind;
-  /** the gradient's two stops, light to dark */
-  tone: readonly [string, string];
+export interface DealCoverFacts extends CoverScene {
   /** where the deal is, as a card names it: "Waco, TX" — null where nothing says */
   place: string | null;
 }
-
-/**
- * The gradients, each a deep pair that white words read on at AAA over the
- * whole frame (held by the test). Dusk, harbour, forest, slate, plum, brick,
- * teal, bronze: the pipeline's cards get told apart by colour without any
- * one of them shouting over the photographs beside it.
- */
-export const COVER_TONES: readonly (readonly [string, string])[] = [
-  ["#1f5f5b", "#0b2e2c"],
-  ["#2f5d8a", "#12263d"],
-  ["#3d6b45", "#172c1b"],
-  ["#4b5a6e", "#1c2430"],
-  ["#6a4c7d", "#2a1c33"],
-  ["#8a4f3d", "#3a1d14"],
-  ["#2d6f86", "#0f2c38"],
-  ["#7a6036", "#302310"],
-];
 
 /** Which drawing a class gets. */
 const KIND_BY_CLASS: Record<string, CoverKind> = {
@@ -75,14 +58,30 @@ export function coverKindFor(assetClass: string | null | undefined): CoverKind {
   return (key && KIND_BY_CLASS[key]) || "building";
 }
 
-/** A deal's gradient: the same deal always wears the same one. */
-export function coverToneFor(seed: string): readonly [string, string] {
+/** FNV-1a over the deal's id: the one hash its cover is drawn from. */
+function hashOf(seed: string): number {
   let h = 2166136261;
   for (let i = 0; i < seed.length; i++) {
     h ^= seed.charCodeAt(i);
     h = Math.imul(h, 16777619);
   }
-  return COVER_TONES[(h >>> 0) % COVER_TONES.length];
+  return h >>> 0;
+}
+
+/** A deal's sky, as its number in `COVER_TONES`: the same deal always
+ *  wears the same one (the one its gradient had before the drawing). */
+export function coverToneFor(seed: string): number {
+  return hashOf(seed) % COVER_TONES.length;
+}
+
+/** A deal's own draw of its cover's details — where the sun sits, which
+ *  windows are lit — mixed from the same hash so it varies apart from the
+ *  sky: two deals under one sky still differ. */
+export function coverVariantFor(seed: string): number {
+  let h = hashOf(seed);
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return (h ^ (h >>> 16)) >>> 0;
 }
 
 /**
@@ -110,5 +109,10 @@ export function coverFor(opts: {
   assetClass?: string | null;
   place?: string | null;
 }): DealCoverFacts {
-  return { kind: coverKindFor(opts.assetClass), tone: coverToneFor(opts.seed), place: opts.place ?? null };
+  return {
+    kind: coverKindFor(opts.assetClass),
+    tone: coverToneFor(opts.seed),
+    variant: coverVariantFor(opts.seed),
+    place: opts.place ?? null,
+  };
 }

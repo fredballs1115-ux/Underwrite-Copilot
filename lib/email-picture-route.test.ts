@@ -32,6 +32,7 @@ vi.mock("@/lib/deal-picture", () => ({
 import { GET } from "@/app/api/email/picture/[token]/route";
 import { emailPictureToken } from "./email-picture";
 import { coverFor } from "./deal-cover";
+import { coverSvg } from "./deal-cover-art";
 
 const DEAL = "3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b";
 const PICTURE: DealPicture = {
@@ -97,24 +98,28 @@ describe("the email's picture route (#464)", () => {
   });
 
   it("draws the deal's cover where it has no photograph, or the stored one cannot be read", async () => {
+    // The cover the card wears for this deal, laid out for each frame: the
+    // JPEG is that document drawn, within the JPEG's own loss.
+    const cover = coverFor({ seed: DEAL, assetClass: "multifamily" });
+    const same = async (res: Response, w: number, h: number) => {
+      const got = await sharp(Buffer.from(await res.arrayBuffer())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+      const want = await sharp(Buffer.from(coverSvg(cover, w, h))).removeAlpha().raw().toBuffer();
+      expect([got.info.width, got.info.height]).toEqual([w, h]);
+      let diff = 0;
+      for (let i = 0; i < want.length; i++) diff += Math.abs(got.data[i] - want[i]);
+      expect(diff / want.length).toBeLessThan(3);
+    };
     route.row = { ...route.row!, photo: null };
     const res = await ask(emailPictureToken(DEAL)!, "banner");
     expect(res.status).toBe(200);
     expect(res.headers.get("x-image-source")).toBe("cover");
-    const { data, info } = await sharp(Buffer.from(await res.arrayBuffer())).raw().toBuffer({ resolveWithObject: true });
-    expect([info.width, info.height]).toEqual([1040, 520]);
-    // The ground is the card's own gradient for this deal: its corner is
-    // near the tone's light stop, never white or black.
-    const [light] = coverFor({ seed: DEAL, assetClass: "multifamily" }).tone;
-    const hex = (i: number) => parseInt(light.slice(1 + 2 * i, 3 + 2 * i), 16);
-    for (let c = 0; c < 3; c++) expect(Math.abs(data[c] - hex(c))).toBeLessThan(40);
+    await same(res, 1040, 520);
 
     route.row = { ...route.row!, photo: { picture: PICTURE } };
     route.bytes = null;
     const unreadable = await ask(emailPictureToken(DEAL)!, "thumb");
     expect(unreadable.headers.get("x-image-source")).toBe("cover");
-    const meta = await sharp(Buffer.from(await unreadable.arrayBuffer())).metadata();
-    expect([meta.width, meta.height]).toEqual([96, 96]);
+    await same(unreadable, 96, 96);
   });
 
   it("answers 404 to a token that does not verify, a deal that is gone and the sample deal", async () => {
