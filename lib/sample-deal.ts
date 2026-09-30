@@ -70,6 +70,8 @@ const bpsFrom = (v: number | null): string => {
   const base = returns.leveredIrrPct;
   return v == null || base == null ? "—" : `${Math.round(Math.abs(v - base) * 10) * 10} bps`;
 };
+/** The OM's own case: its exit cap, rent growth and stabilized vacancy. */
+const OM_CASE = { exitCapPct: 5.25, rentGrowthPct: 4, vacancyPct: 6 } as const;
 /** The OM's stated NOI less the T-12's, the gap the reconciliation names. */
 const NOI_GAP = 3_880_000 - 3_706_500;
 
@@ -309,7 +311,10 @@ const challenges: ChallengerResult = {
       question: "What's the absorption schedule to get from 9% to 6%?",
     },
   ],
-  stressTest: `At a flat 5.5% exit, a real 9% vacancy, and a heavier expense load, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith({ exitCapPct: 5.25, rentGrowthPct: 4, vacancyPct: 6 }))} at the OM's own exit cap, rent growth and vacancy.`,
+  // Both runs carry the T-12's expenses, so the drop is the exit, the rent
+  // growth and the vacancy — rent growth the largest of the three — and never
+  // the expense load (the audit of 2026-09-30).
+  stressTest: `At a flat ${inputs.exitCapPct}% exit, ${inputs.rentGrowthPct}% rent growth and a real ${inputs.vacancyPct}% vacancy, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the T-12's expenses.`,
 };
 
 const comps: BrokerCompsResult = {

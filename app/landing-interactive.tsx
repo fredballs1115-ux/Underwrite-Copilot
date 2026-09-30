@@ -332,7 +332,7 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
           <Killer
             n={2}
             name="Exit"
-            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — the spread does the returns' heavy lifting."
+            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — a return that leans on cap compression."
             severity="caution"
           />
           <LegalBlock legal={legal} />
