@@ -1215,7 +1215,7 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
 import { SubmarketCards } from "@/app/market/submarket-cards";
 import { MarketBand } from "@/app/place-band";
 import { EMPTY_RULES, type Submarket } from "@/lib/market/types";
-import { galleryCredit, skylineSrcSet } from "@/lib/skyline";
+import { SKYLINES, commonsPage, galleryCredit, skylineSrcSet } from "@/lib/skyline";
 
 describe("SubmarketCards and the submarket's band — the metro its owner typed, pictured only where the text says which (#424)", () => {
   const sub = (over: Partial<Submarket> & Pick<Submarket, "id" | "name">): Submarket => ({
@@ -1255,7 +1255,10 @@ describe("SubmarketCards and the submarket's band — the metro its owner typed,
     // The one credit line names the photographers of the pictures shown.
     const credit = galleryCredit(["richmond", "nova"]);
     expect(credit).not.toBe("");
-    expect(text).toContain(credit);
+    // Its photographers and licences are links (visibleText breaks a line
+    // after each), so the words are read with those breaks taken out.
+    expect(text.replace(/\n/g, "")).toContain(credit);
+    expect(html).toContain(`href="${commonsPage(SKYLINES.richmond.file)}"`);
 
     // No market named, no picture and no credit owed.
     const plain = render(React.createElement(SubmarketCards, { submarkets: SUBS.slice(2) }));

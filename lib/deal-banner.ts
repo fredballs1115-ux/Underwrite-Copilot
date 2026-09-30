@@ -43,6 +43,9 @@ export interface BannerSource {
   /** a market photograph's market, named on the picture so it never
    *  passes for the building (#438) */
   market?: string;
+  /** a market photograph's table id (lib/skyline), for the page's one
+   *  credit line with the photographer's and the licence's links */
+  marketId?: string;
   /** a market photograph's alt text: what it shows, and whose it is */
   alt?: string;
   /** the deal's own photograph, not yet looked for in its memorandum
@@ -128,6 +131,7 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
       src: f.market.src,
       credit: f.market.credit,
       market: f.market.name,
+      marketId: f.market.id,
       alt: `${f.market.place}: the market this deal is in, ${f.market.name}. No photograph of the building yet.`,
     });
   }

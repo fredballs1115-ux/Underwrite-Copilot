@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { METRO_VIEWS } from "@/lib/metro-imagery";
-import { creditLine, skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline";
+import { skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline";
+import { SkylineCreditText } from "./photo-credit";
 
 /**
  * The picture of a covered market, and the honest sentence under it.
@@ -40,7 +41,9 @@ export function CityPhoto({
   width,
   height,
   className,
-  creditClassName = "absolute bottom-3 right-4 z-10 text-[10px] text-white/75",
+  // pointer-events-auto: the credit's links sit inside a backdrop that
+  // lets clicks through to the band's own words
+  creditClassName = "pointer-events-auto absolute bottom-3 right-4 z-10 text-[10px] text-white/75",
   alt,
   eager = false,
   showCredit = true,
@@ -78,11 +81,13 @@ export function CityPhoto({
   const src = skyline
     ? `/api/imagery/skyline/${metro}?w=${width}&v=${skylineTag(metro)}`
     : `/api/imagery/metro/${metro}?w=${width}&h=${height}`;
-  const credit = skyline
-    ? creditLine(shot)
-    : view
-      ? `${view.place} from above · USGS`
-      : "";
+  // The photographer linked to the file's page and the licence to its
+  // text, and "cropped to fit": what a Creative Commons credit carries.
+  const credit = skyline ? (
+    <SkylineCreditText shot={shot} linkClassName="underline decoration-dotted underline-offset-2 hover:text-white" />
+  ) : view ? (
+    `${view.place} from above · USGS`
+  ) : null;
   // The overhead is drawn at the size asked for, so twice the size is the
   // same frame at twice the grain, inside the route's 1600px ceiling.
   const double = width * 2 <= 1600 && height * 2 <= 1600;

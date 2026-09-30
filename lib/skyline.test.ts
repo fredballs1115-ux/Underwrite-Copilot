@@ -161,7 +161,7 @@ describe("the credit line", () => {
       license: "CC BY-SA 4.0",
       licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     });
-    expect(line).toBe("Downtown Dallas · Jane Roe · CC BY-SA 4.0");
+    expect(line).toBe("Downtown Dallas · Jane Roe · CC BY-SA 4.0 · cropped to fit");
   });
 
   it("falls back to the archive rather than printing the word unknown", () => {

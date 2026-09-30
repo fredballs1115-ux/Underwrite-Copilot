@@ -844,11 +844,65 @@ export function skylineSrcSet(id: string): string {
  * photograph changed can never leave a name behind on the page.
  */
 export function galleryCredit(ids: readonly string[]): string {
+  const parts = galleryCreditParts(ids);
+  if (!parts) return "";
+  return `Skyline photographs by ${parts.authors.map((a) => a.name).join(", ")} — via Wikimedia Commons, ${parts.licenses
+    .map((l) => l.name)
+    .join(" / ")}, ${CROPPED_WORDS}.`;
+}
+
+/**
+ * What a Creative Commons licence asks a credit to carry (CC BY-SA 4.0
+ * §3(a)(1)): the creator, a link to the work "to the extent reasonably
+ * practicable", the licence with a link to it, and whether the work was
+ * modified — and every surface here crops these photographs to its frame.
+ * The credits said the name and the licence's short name as plain text and
+ * nothing else (the pre-ship pass of 2026-09-30); `app/photo-credit.tsx`
+ * draws these parts with the links, and the plain lines below say the same
+ * words, so a caption and its test read one sentence.
+ */
+export interface CreditLink {
+  name: string;
+  /** where it links: the file's page on Commons for an author, the
+   *  licence's text for a licence — "" where there is nothing to link
+   *  (public domain asks for no licence link) */
+  url: string;
+}
+
+/** The words every credit ends on: these photographs are cropped to the
+ *  frame of whatever draws them. */
+export const CROPPED_WORDS = "cropped to fit";
+
+/** One photograph's credit, in parts. */
+export function skylineCredit(shot: SkylineShot): { place: string; author: CreditLink; license: CreditLink } {
+  return {
+    place: shot.place,
+    author: { name: authorOf(shot), url: commonsPage(shot.file) },
+    license: { name: shot.license, url: shot.licenseUrl },
+  };
+}
+
+/** A grid's credit, in parts: each photographer once, linked to the first of
+ *  their files shown, and each licence once, linked to its text. Null where
+ *  no market shown has a photograph. */
+export function galleryCreditParts(ids: readonly string[]): { authors: CreditLink[]; licenses: CreditLink[] } | null {
   const shots = ids.map((id) => SKYLINES[id]).filter((s): s is SkylineShot => Boolean(s));
-  if (shots.length === 0) return "";
-  const names = [...new Set(shots.map((s) => (s.credit && s.credit !== "unknown" ? s.credit : "Wikimedia Commons")))];
-  const licenses = [...new Set(shots.map((s) => s.license))].sort();
-  return `Skyline photographs by ${names.join(", ")} — via Wikimedia Commons, ${licenses.join(" / ")}.`;
+  if (shots.length === 0) return null;
+  const authors = new Map<string, CreditLink>();
+  for (const s of shots) {
+    const name = authorOf(s);
+    if (!authors.has(name)) authors.set(name, { name, url: commonsPage(s.file) });
+  }
+  const licenses = new Map<string, CreditLink>();
+  for (const s of shots) if (!licenses.has(s.license) || (!licenses.get(s.license)!.url && s.licenseUrl)) licenses.set(s.license, { name: s.license, url: s.licenseUrl });
+  return {
+    authors: [...authors.values()],
+    licenses: [...licenses.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
+  };
+}
+
+function authorOf(shot: SkylineShot): string {
+  return shot.credit && shot.credit !== "unknown" ? shot.credit : "Wikimedia Commons";
 }
 
 /**
@@ -880,8 +934,7 @@ export function creditLine(shot: SkylineShot): string {
  * photographer and the licence, which are what the licence obliges.
  */
 export function photographerLine(shot: SkylineShot): string {
-  const author = shot.credit && shot.credit !== "unknown" ? shot.credit : "Wikimedia Commons";
-  return `${author} · ${shot.license}`;
+  return `${authorOf(shot)} · ${shot.license} · ${CROPPED_WORDS}`;
 }
 
 /**

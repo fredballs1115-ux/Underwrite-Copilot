@@ -17,6 +17,7 @@ import { createDeal, createSampleDeal } from "./actions";
 import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
 import { DealBanner } from "./deal-banner";
+import { GalleryCreditText } from "@/app/photo-credit";
 import type { BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
@@ -502,6 +503,18 @@ export function Pipeline({
   const deadCount = useMemo(
     () => deals.filter((d) => normalizeStage(d.stage) === "dead").length,
     [deals],
+  );
+
+  // The market photographs the cards may show, for the one credit line
+  // under them: a card has no room for the links a Creative Commons credit
+  // carries, and a link inside the card's own link is not one.
+  const marketPhotoIds = useMemo(
+    () => [
+      ...new Set(
+        filtered.flatMap((d) => (d.pictures ?? []).flatMap((p) => (p.kind === "market" && p.marketId ? [p.marketId] : []))),
+      ),
+    ],
+    [filtered],
   );
 
   /** A section is open unless the user collapsed it; an EMPTY section starts
@@ -1134,6 +1147,11 @@ export function Pipeline({
                 );
               })}
             </div>
+            {view === "cards" && marketPhotoIds.length > 0 ? (
+              <p className="mt-6 text-[11px] leading-relaxed text-muted" data-qa="market-photo-credit">
+                <GalleryCreditText ids={marketPhotoIds} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />
+              </p>
+            ) : null}
           </div>
           )}
         </>

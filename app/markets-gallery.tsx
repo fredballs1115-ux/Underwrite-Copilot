@@ -4,6 +4,7 @@ import { METRO_VIEWS } from "@/lib/metro-imagery";
 import { MARKET_COUNT, metroFact, researchAsOf } from "./markets-marquee";
 import { CityPhoto } from "./city-photo";
 import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
+import { GalleryCreditText } from "./photo-credit";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle.
@@ -112,7 +113,11 @@ export function MarketsGallery() {
           publication that runs a photo grid handles it. The USGS line stays
           only while some market still shows its overhead frame. */}
       <p className="mt-4 text-[11px] leading-relaxed text-muted">
-        {credit ? <>{credit} </> : null}
+        {credit ? (
+            <>
+              <GalleryCreditText ids={items.map((m) => m.id)} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />{" "}
+            </>
+          ) : null}
         {anyOverhead ? OVERHEAD_GRID_CREDIT : null}
       </p>
     </section>
