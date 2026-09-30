@@ -648,11 +648,14 @@ describe("Pipeline — a first screen's card reads the first signal, as the deal
     billing: BILLING,
   };
   // The slots as lib/pipeline-slots reads a deal with a first signal and no
-  // extraction yet (its ask, nothing else), and a fit judged on the signal.
+  // extraction yet (its ask, nothing else), and a fit judged on the signal;
+  // the rest of its terms are still being read.
   const first = card({
     id: "s",
     name: "Cedar Court Apartments",
     jobStatus: "running",
+    reading: true,
+    hasBox: true,
     fit: "near",
     score: 64,
     mandateVerdict: "WATCH",
@@ -682,6 +685,36 @@ describe("Pipeline — a first screen's card reads the first signal, as the deal
     for (const initialView of ["cards", "list"] as const) {
       const text = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([read]), initialView })));
       expect(text, initialView).not.toMatch(/first read/i);
+    }
+  });
+
+  it("draws an empty slot as not read yet while the screen reads the memorandum, and keeps the dash for a finished read's", () => {
+    // A first screen before even the first signal: no figure, no fit, no
+    // class read yet, a buy box standing.
+    const blank = card({ id: "t", name: "Maple Row Townhomes", assetClass: "", jobStatus: "running", reading: true, hasBox: true, slots: { cap: null, price: null, yoc: null } });
+    const shimmers = (html: string) => (html.match(/<span role="img" aria-label="Reading the memorandum"[^>]*data-reading[^>]*class="skeleton /g) ?? []).length;
+    const tiles = (html: string) => html.match(/<dl class="grid[\s\S]*?<\/dl>/)?.[0] ?? "";
+    const cards = render(React.createElement(Pipeline, { ...props, deals: withThumbs([blank]), initialView: "cards" }));
+    dumpView("pipeline-reading-cards", cards);
+    expect(a11yIssues(cards)).toEqual([]);
+    expect(gluedWords(visibleText(cards))).toEqual([]);
+    // Price, cap and fit: each a shimmer, none a dash.
+    expect(shimmers(tiles(cards))).toBe(3);
+    expect(visibleText(tiles(cards))).not.toContain("—");
+    // The list's columns wait the same way: the class, the price, the cap, the fit.
+    const list = render(React.createElement(Pipeline, { ...props, deals: withThumbs([blank]), initialView: "list" }));
+    expect(a11yIssues(list)).toEqual([]);
+    expect(shimmers(list)).toBe(4);
+    // With no buy box the fit's dash is final, reading or not.
+    expect(shimmers(tiles(render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...blank, hasBox: false }]), initialView: "cards" }))))).toBe(2);
+    // The first signal's ask and fit are in; the cap is still being read.
+    expect(shimmers(tiles(render(React.createElement(Pipeline, { ...props, deals: withThumbs([first]), initialView: "cards" }))))).toBe(1);
+    // A finished read that found no figure keeps its dash, and draws no shimmer.
+    for (const initialView of ["cards", "list"] as const) {
+      const done = render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...blank, jobStatus: null, reading: false }]), initialView }));
+      expect(shimmers(done), initialView).toBe(0);
+      expect(done, initialView).not.toContain("Reading the memorandum");
+      expect(visibleText(initialView === "cards" ? tiles(done) : done), initialView).toContain("—");
     }
   });
 });

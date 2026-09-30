@@ -26,6 +26,7 @@ import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
+import type { ListJobStatus } from "@/lib/screen-run";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -177,6 +178,19 @@ export function shownAssetClass(
     return ASSET_CLASS_LABEL[lower] ? lower : t;
   };
   return norm(stored) || norm(extraction?.assetClass);
+}
+
+/**
+ * Whether a card's empty slots are still being read rather than not stated:
+ * a screen is live (`listJobStatus`'s "running") on a memorandum whose terms
+ * nothing has read yet — a first screen before its extraction lands. A
+ * figure a finished read did not find keeps its dash, a re-screen's
+ * included (its slots are the last finished read's until the new terms
+ * land); a deal typed in by hand has no memorandum to read; a stalled run
+ * is reading nothing.
+ */
+export function readingTerms(status: ListJobStatus | undefined, hasExtraction: boolean, hasOm: boolean): boolean {
+  return status === "running" && !hasExtraction && hasOm;
 }
 
 /** The row's slots. `storedClass` is the class the deal was filed under

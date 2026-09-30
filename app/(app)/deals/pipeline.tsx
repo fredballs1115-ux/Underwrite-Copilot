@@ -80,6 +80,14 @@ export type DealCard = {
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
+  /** a live screen has not read the memorandum's terms yet (lib/pipeline-
+   *  slots `readingTerms`): an empty slot is "not read yet" and shimmers,
+   *  where a finished read's empty slot keeps the dash that says "not
+   *  stated" */
+  reading?: boolean;
+  /** a buy box stands against the deal, so a fit is scored once the terms
+   *  are read — without one, the fit's dash is final */
+  hasBox?: boolean;
   /** the deal has an address, so an aerial thumbnail can be attempted */
   hasAddress: boolean;
   /** FEMA's flood zone at the building (lib/site-flags, #426): `tag` only in
@@ -1484,6 +1492,27 @@ function MetaLine({
   );
 }
 
+/** A slot the live screen has not read yet: a quiet shimmer where the figure
+ *  will land (`.skeleton` moves only where motion is welcome), named for a
+ *  screen reader — never the dash that says the memorandum states none. */
+function Reading({ width }: { width: string }) {
+  return (
+    <span
+      role="img"
+      aria-label="Reading the memorandum"
+      title="Reading the memorandum"
+      data-reading
+      className={`skeleton inline-block h-3.5 rounded align-middle ${width}`}
+    />
+  );
+}
+
+/** A figure's empty slot: the shimmer while the terms are being read, the
+ *  dash once a read has found none. */
+function Unstated({ reading, width, className = "text-line" }: { reading: boolean; width: string; className?: string }) {
+  return reading ? <Reading width={width} /> : <span className={className}>—</span>;
+}
+
 /** The mandate score drawn: a 0–100 bar in the current text colour (the
  *  call's), so a row reads its fit before the number does. */
 function FitBar({ score }: { score: number }) {
@@ -1914,7 +1943,8 @@ const DealRow = memo(function DealRow({
             </span>
           </>
         ) : (
-          <span className="text-line">—</span>
+          // An "Auto-detect" deal's class is the deck's, read with the terms.
+          <Unstated reading={!!d.reading} width="w-16" />
         )}
       </span>
       <span
@@ -1925,7 +1955,7 @@ const DealRow = memo(function DealRow({
             : undefined
         }
       >
-        {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
+        {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
       </span>
       <span className="hidden w-12 shrink-0 text-right font-mono text-sm tabular-nums md:block">
         {d.slots.cap ??
@@ -1945,7 +1975,7 @@ const DealRow = memo(function DealRow({
               n/a
             </span>
           ) : (
-            <span className="text-line">—</span>
+            <Unstated reading={!!d.reading} width="w-10" />
           ))}
       </span>
       <span className="hidden w-16 shrink-0 flex-col items-end text-right text-xs font-semibold lg:flex">
@@ -1967,7 +1997,7 @@ const DealRow = memo(function DealRow({
             {firstReadMark}
           </>
         ) : (
-          <span className="font-normal text-line">—</span>
+          <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
         )}
       </span>
       <span className="hidden w-24 shrink-0 justify-end sm:flex">{status}</span>
@@ -2291,8 +2321,11 @@ const DealTile = memo(function DealTile({
         {/* The price is the longest figure ("$9–9.5M", "$124.5M"), so its
             column is the widest. */}
         <dl className="grid grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,3fr)] gap-3 border-t border-line pt-3">
+          {/* While a first screen has not read the terms, an empty slot
+              shimmers ("not read yet"); once a read finds none, the dash
+              ("not stated"). */}
           <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
-            {d.slots.price ? compactPrice(d.slots.price) : <span className="text-line">—</span>}
+            {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
           </TileStat>
           {/* A plan deal has no going-in cap; its yield on total cost takes
               the slot, labelled. Nor has a note: its yield to maturity
@@ -2305,7 +2338,7 @@ const DealTile = memo(function DealTile({
             {d.slots.cap ??
               d.slots.yoc ??
               d.slots.noteYield ??
-              (d.slots.capWithheld === "note" ? "n/a" : <span className="text-line">—</span>)}
+              (d.slots.capWithheld === "note" ? "n/a" : <Unstated reading={!!d.reading} width="w-10" />)}
           </TileStat>
           <div className="min-w-0">
             <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>
@@ -2323,7 +2356,7 @@ const DealTile = memo(function DealTile({
                   {FIT_META[d.fit].label}
                 </span>
               ) : (
-                <span className="font-normal text-line">—</span>
+                <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
               )}
             </dd>
             {/* Judged on the first signal while the extraction is on its

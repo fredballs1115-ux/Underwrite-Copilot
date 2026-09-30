@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassLabel } from "./asset-class";
-import { pickSlots, shownAssetClass } from "./pipeline-slots";
+import { pickSlots, readingTerms, shownAssetClass } from "./pipeline-slots";
 import { noteCapSlot } from "./compare-interest";
 
 describe("shownAssetClass — a row never says \"Auto\"", () => {
@@ -266,6 +266,26 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(src).not.toMatch(/slots: extraction\s*\?/);
     // …and it marks a fit judged on the first signal the deal page's way.
     expect(src).toMatch(/fitFirstRead: !extraction && !!d\.first_signal/);
+    // …and says which empty slots are still being read.
+    expect(src).toMatch(/reading: readingTerms\(jobStatus, !!extraction, !!d\.om_storage_path\)/);
+  });
+});
+
+describe("readingTerms — an empty slot is not read yet only while a first screen reads the memorandum", () => {
+  it("a live screen on a memorandum nothing has read yet", () => {
+    expect(readingTerms("running", false, true)).toBe(true);
+  });
+
+  it("a finished read's empty slot is not stated, a re-screen's included; a typed deal has no memorandum; a stalled or failed run reads nothing", () => {
+    // The terms are in (a first screen past its extraction, or a re-screen
+    // holding the last finished read's): the dash.
+    expect(readingTerms("running", true, true)).toBe(false);
+    // Typed facts, no memorandum.
+    expect(readingTerms("running", false, false)).toBe(false);
+    expect(readingTerms("stalled", false, true)).toBe(false);
+    expect(readingTerms("failed", false, true)).toBe(false);
+    expect(readingTerms(null, false, true)).toBe(false);
+    expect(readingTerms(undefined, false, true)).toBe(false);
   });
 });
 

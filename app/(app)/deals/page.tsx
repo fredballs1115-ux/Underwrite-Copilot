@@ -18,7 +18,7 @@ import { cacheFresh, type DealVisualCache } from "@/lib/deal-location";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
-import { pickSlots, shownAssetClass } from "@/lib/pipeline-slots";
+import { pickSlots, readingTerms, shownAssetClass } from "@/lib/pipeline-slots";
 import { floodCell, floodTag, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { scoreMandateFit } from "@/lib/mandate";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -283,6 +283,10 @@ export default async function DealsPage({
     const storedFlags = (d as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
     const flags = siteFlagsStale(storedFlags, rowAddress?.label) ? null : storedFlags;
     const placement = placeDeal(rowAddress, countyOf(rowAddress, flags));
+    // Running, stalled (its process died mid-screen — a deploy, most
+    // often) or failed with the verdict left behind; a failure that never
+    // touched the verdict leaves the pill alone (lib/screen-run.ts).
+    const jobStatus = listJobStatus(job, !!verdict?.verdict);
     return {
       id: d.id,
       name: d.name,
@@ -320,10 +324,13 @@ export default async function DealsPage({
       // Before the extraction lands the first signal's ask fills the price,
       // as on the deal page (lib/pipeline-slots).
       slots: pickSlots(extraction, (d.first_signal as FirstSignal | null) ?? null, d.asset_class),
-      // Running, stalled (its process died mid-screen — a deploy, most
-      // often) or failed with the verdict left behind; a failure that never
-      // touched the verdict leaves the pill alone (lib/screen-run.ts).
-      jobStatus: listJobStatus(job, !!verdict?.verdict),
+      jobStatus,
+      // A first screen before its terms are read: an empty slot is "not
+      // read yet" and shimmers, never the dash that says "not stated"
+      // (lib/pipeline-slots). The fit waits with them only where a buy box
+      // stands — without one its dash is final.
+      reading: readingTerms(jobStatus, !!extraction, !!d.om_storage_path),
+      hasBox: !!box,
       // Gate the aerial thumbnail here rather than letting every row fire a
       // request that can only 404: no address, no possible photograph.
       hasAddress: !!(d.address as StructuredAddress | null)?.label?.trim(),
