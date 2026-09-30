@@ -60,6 +60,13 @@
 -- All of them are idempotent and safe to re-run. 0029 in particular is
 -- DELETE-only (it trims regulatory rules to the 15-market scope) — if the
 -- database was seeded before that cut, run 0029 again; it cannot double-delete.
+--
+-- 0036 adds no table or column either, so it is read two other ways: by the
+-- four triggers it creates, and by the grants it takes away. On its grants
+-- row, "still_missing" names each public-record RPC a signed-out caller can
+-- still run — the thing 0036 closes — or that does not exist yet, since a
+-- grant on a function 0028 never made has not been taken away: run 0028 and
+-- 0030_public_data_layer, then 0036 again (it is idempotent).
 -- ============================================================================
 
 with
@@ -145,6 +152,23 @@ with
             array['deals_storage_guard', 'deal_documents_storage_guard'])
   ),
 
+  -- Triggers, for a migration whose work is a guard on a table that exists.
+  trg (seq, migration, unblocks, needs) as (
+    values
+      (360, '0036_security_hardening.sql',
+            'Share links held to 30 days with a token the database makes; the free-deal cap on sample flips and team moves; the worker’s queue in the order runs were asked for; Ask’s question cap',
+            array['deal_shares_mint_guard', 'enforce_free_deal_cap_update',
+                  'analysis_jobs_queue_guard', 'deal_qa_append_only'])
+  ),
+
+  -- Grants: a function a signed-out caller must not be able to run.
+  priv (seq, migration, unblocks, needs) as (
+    values
+      (361, '0036_security_hardening.sql (grants half)',
+            'Owner names and mailing addresses kept behind sign-in: the public-record RPCs closed to the anon key. ❌ names each one a signed-out caller can still run — or that does not exist yet: then run 0028 and 0030_public_data_layer first, and 0036 again.',
+            array['nearby_sales', 'nearest_property'])
+  ),
+
   tbl_res as (
     select
       t.seq,
@@ -185,6 +209,37 @@ with
         where to_regproc('public.' || x) is null
       ) as missing
     from fn f
+  ),
+
+  trg_res as (
+    select
+      t.seq,
+      t.migration,
+      t.unblocks,
+      array(
+        select x from unnest(t.needs) as x
+        where not exists (
+          select 1
+          from pg_trigger g
+          join pg_class c on c.oid = g.tgrelid
+          join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and g.tgname = x and not g.tgisinternal
+        )
+      ) as missing
+    from trg t
+  ),
+
+  priv_res as (
+    select
+      p.seq,
+      p.migration,
+      p.unblocks,
+      array(
+        select x from unnest(p.needs) as x
+        where to_regproc('public.' || x) is null
+           or has_function_privilege('anon', to_regproc('public.' || x)::oid, 'execute')
+      ) as missing
+    from priv p
   )
 
 select
@@ -196,5 +251,7 @@ from (
   select * from tbl_res
   union all select * from col_res
   union all select * from fn_res
+  union all select * from trg_res
+  union all select * from priv_res
 ) r
 order by r.seq;
