@@ -116,6 +116,16 @@ describe("claimJob — a retry after a failed worker run keeps the steps that fi
     expect("attempts" in update).toBe(false);
   });
 
+  it("a claim restamps the row's created_at: the deal's one job row says when THIS run was asked for, never the first screen's day", async () => {
+    const before = Date.now();
+    const { db, calls } = fakeDb({ id: "j1", status: "done", updated_at: HOUR_AGO, created_at: "2026-01-05T09:00:00.000Z" });
+    expect((await claimJob(db, "d1", "signal")).outcome).toBe("claimed");
+    const update = calls.find((c) => c.update)!.update as { created_at: string; updated_at: string };
+    expect(update.created_at).toBe(update.updated_at);
+    expect(Date.parse(update.created_at)).toBeGreaterThanOrEqual(before);
+    expect(Date.parse(update.created_at)).toBeLessThanOrEqual(Date.now());
+  });
+
   it("a live, fresh row is busy; a live row past the stale window is reclaimable", async () => {
     const fresh = fakeDb({ id: "j1", status: "running", updated_at: new Date().toISOString() });
     expect((await claimJob(fresh.db, "d1", "signal")).outcome).toBe("busy");

@@ -197,6 +197,11 @@ export async function claimJob(
   // The WHERE clause re-checks the observed state inside the UPDATE itself,
   // so the decision and the write are one statement — a racing claimant's
   // update changes the row and this one matches zero rows.
+  // A claimed row is a new run on the deal's one job row, so its created_at
+  // is restamped: it says when THIS run was asked for (the deal page's clock
+  // counts from it; the worker's queue takes the oldest first). Left alone,
+  // a re-screen's row carried the first screen's date.
+  const now = new Date().toISOString();
   let query = supabase
     .from("analysis_jobs")
     .update({
@@ -204,7 +209,8 @@ export async function claimJob(
       step,
       progress: 0,
       error: null,
-      updated_at: new Date().toISOString(),
+      created_at: now,
+      updated_at: now,
       ...(workerPayload !== undefined
         ? {
             payload: workerPayload
