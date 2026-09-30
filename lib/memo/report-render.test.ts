@@ -241,6 +241,10 @@ describe("ReportDocument (full report)", () => {
     ).replace(/\s+/g, " ");
     expect(text).toContain("The pro forma's assumptions, challenged most severe first, each with the exact question to put to the broker.");
     expect(text).not.toContain("in the order deals die");
+    // The challenger's stress test estimates what a revert does to the
+    // returns without the engine, and its box says whose estimate it is.
+    expect(text).toContain("STRESS TEST — THE SCREEN'S ESTIMATE, NOT THE MODEL'S");
+    expect(text).toContain(SAMPLE_DEAL.challenges.stressTest.slice(0, 40));
   }, 45000);
 
   it("prints the call in full after the memo: the whole rationale, every risk and step, each range's source, basis and confidence", async () => {
@@ -283,7 +287,7 @@ describe("ReportDocument (full report)", () => {
       expect(text).toContain(`Source: ${r.source}`);
       expect(text).toContain(`What drives the spread: ${r.basis}`);
     }
-    for (const k of verdict.screen!.dealKillers) expect(text).toContain(`Breaks if: ${k.risk}`);
+    for (const k of verdict.screen!.dealKillers) expect(text).toContain(`Breaks if (screen's estimate): ${k.risk}`);
     for (const f of verdict.screen!.sensitivity) expect(text).toContain(f.note);
     // No verdict, no page.
     const bare = buildReportData({ ...deal, verdict: null } as unknown as DealRow, "September 30, 2026", []);

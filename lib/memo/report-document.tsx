@@ -848,14 +848,14 @@ function CallInFullPage({
                 {str(`${i + 1}. ${LEVER_WORD[str(k?.lever)] ?? str(k?.lever)}`)}
               </Text>
               {str(k?.read) ? <Text style={item}>{str(k?.read)}</Text> : null}
-              {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`Breaks if: ${str(k?.risk)}`)}</Text> : null}
+              {str(k?.risk) ? <Text style={[item, { color: C.kill }]}>{str(`Breaks if (screen's estimate): ${str(k?.risk)}`)}</Text> : null}
             </View>
           ))}
         </View>
       ) : null}
       {flips.length > 0 ? (
         <View wrap={false}>
-          <TitleRow title="Where the call flips" marginTop={10} />
+          <TitleRow title="Where the call flips" count="the screen's estimate, not the model's" marginTop={10} />
           {flips.map((f, i) => {
             const call = CALL_WORD[str(f?.call)] ?? str(f?.call);
             return (
@@ -1858,9 +1858,11 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               ) : null}
             </View>
           ))}
+          {/* The challenger estimates what reverting an assumption does to
+              the returns without running the engine; the box says so. */}
           {str(challenges?.stressTest) ? (
             <View style={s.summaryBox} wrap={false}>
-              <Text style={[s.headText, { marginBottom: 3 }]}>Stress test</Text>
+              <Text style={[s.headText, { marginBottom: 3 }]}>Stress test — the screen&apos;s estimate, not the model&apos;s</Text>
               <Text style={s.summaryText}>{str(challenges?.stressTest)}</Text>
             </View>
           ) : null}

@@ -1248,8 +1248,10 @@ export function MemoPage({ data }: { data: MemoData }) {
                       {i + 1}. {k.label}
                     </Text>
                     <Text style={s.killerRead}>{k.read}</Text>
+                    {/* The verdict step reads what breaks the deal without
+                        the engine: its IRR moves are estimates, said so. */}
                     {k.risk ? (
-                      <Text style={s.killerRisk}>Breaks if: {k.risk}</Text>
+                      <Text style={s.killerRisk}>Breaks if (screen&apos;s estimate): {k.risk}</Text>
                     ) : null}
                   </View>
                 ))}
@@ -1258,7 +1260,7 @@ export function MemoPage({ data }: { data: MemoData }) {
 
             {data.sensitivity.length > 0 && (
               <View style={s.sensBlock} wrap={false}>
-                <Text style={s.sensLabel}>Where the call flips</Text>
+                <Text style={s.sensLabel}>Where the call flips — the screen&apos;s estimate, not the model&apos;s</Text>
                 <View style={s.sensRow}>
                   {data.sensitivity.map((sc, i) => (
                     <View key={i} style={s.sensCell}>

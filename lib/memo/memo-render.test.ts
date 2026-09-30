@@ -799,6 +799,28 @@ describe("MemoDocument (redesigned)", () => {
     expect(killersAtBreak[1]).toMatch(/screening memo, continued 1\. Basis/);
   }, 60000);
 
+  it("says the deal-killers' and the flips' IRR moves are the screen's estimates, never the model's", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data: buildMemoData(deal, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    // The sample's exit killer: "A flat 5.5% exit knocks roughly N bps off
+    // the IRR" — the verdict step's estimate, computed by no engine.
+    expect(text).toMatch(/Breaks if \(screen's estimate\): A flat 5\.5% exit knocks roughly \d+ bps off the IRR\./);
+    expect(text).not.toContain("Breaks if: ");
+    expect(text).toContain("WHERE THE CALL FLIPS — THE SCREEN'S ESTIMATE, NOT THE MODEL'S");
+  }, 30000);
+
   it("clamps a line to its box at a word boundary, never inside a figure or on a word that leaves the clause hanging", () => {
     const reason =
       "The going-in basis is rich for a receivership sale and the returns lean on an aggressive exit, a rent ramp the LIHTC limits cap, and an assumable HUD loan whose rate advantage mostly sits in the price. Worth a closer look only if the receiver moves on price or the ramp is de-risked.";
