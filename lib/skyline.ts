@@ -41,6 +41,11 @@ export interface SkylineShot {
    *  keyed by its Census code (`areaSkylineId`, #472) — a market the site
    *  reads has its own name */
   name?: string;
+  /** the original's width and height in pixels, as the run that chose it
+   *  printed them — where known, a card asks for enough width that a wide
+   *  panorama cut to the card by its height stays sharp
+   *  (lib/market-picture's `marketPhotoWidth`) */
+  size?: readonly [number, number];
 }
 
 /** The table's key for a metro area the site reads no figures for (#472):
@@ -502,6 +507,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Albuquerque, NM",
+    size: [6560, 3690],
   },
   // Birmingham, AL: skyline-sheet run 36754192984 — the Alabama article's lead, sharp under a clear sky, every tower whole on the card and the deal page's crop; the first run searched Birmingham, England's categories.
   "cbsa:13820": {
@@ -511,6 +517,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Birmingham, AL",
+    size: [11551, 5574],
   },
   // Boise, ID: skyline-sheet run 36751130861 — the article's lead image, whole in every crop.
   "cbsa:14260": {
@@ -520,6 +527,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Boise, ID",
+    size: [3600, 2504],
   },
   // Bridgeport, CT: skyline-sheet run 36750858237 — the principal city's lead image, whole in every crop.
   "cbsa:14860": {
@@ -529,6 +537,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Bridgeport, CT",
+    size: [8036, 5357],
   },
   // Buffalo, NY: skyline-sheet run 36752030741 — the one usable frame of fourteen; the band would clip Seneca One's top.
   "cbsa:15380": {
@@ -538,6 +547,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Buffalo, NY",
+    size: [4032, 2268],
   },
   // Charleston, SC: skyline-sheet run 36751130861 — the picture the city is known by; the credit is the name the runner printed, without the talk-page link printed after it.
   "cbsa:16700": {
@@ -547,6 +557,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 3.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Charleston, SC",
+    size: [11446, 2950],
   },
   // Des Moines, IA: skyline-sheet run 36751130861 — whole in every crop, where the article's lead lost 801 Grand's crown.
   "cbsa:19780": {
@@ -556,6 +567,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
     name: "Des Moines, IA",
+    size: [2450, 1544],
   },
   // Grand Rapids, MI: skyline-sheet run 36750858237 — blue hour with the lit bridge, sharp and whole.
   "cbsa:24340": {
@@ -565,6 +577,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC0",
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     name: "Grand Rapids, MI",
+    size: [4000, 1475],
   },
   // Greenville, SC: skyline-sheet run 36750858237 — the picture the city is known by and its only usable file; credited as Commons names the author (the filename names Yousef AbdulHusain).
   "cbsa:24860": {
@@ -574,6 +587,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Greenville, SC",
+    size: [4080, 3072],
   },
   // Hartford, CT: skyline-sheet run 36750496544 — the article's lead image, whole in every crop.
   "cbsa:25540": {
@@ -583,6 +597,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Hartford, CT",
+    size: [7096, 3548],
   },
   // Knoxville, TN: skyline-sheet run 36751130861 — keeps the Sunsphere, where the alternative was grey and lost it.
   "cbsa:28940": {
@@ -592,6 +607,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 3.0",
     licenseUrl: "https://creativecommons.org/licenses/by/3.0",
     name: "Knoxville, TN",
+    size: [5374, 3583],
   },
   // Louisville, KY: skyline-sheet run 36750289515 — whole in every crop; the night lead is 1415px wide.
   "cbsa:31140": {
@@ -601,6 +617,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 3.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Louisville, KY",
+    size: [9640, 2304],
   },
   // Memphis, TN: skyline-sheet run 36750289515 — the article's lead image, whole in every crop.
   "cbsa:32820": {
@@ -610,6 +627,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Memphis, TN",
+    size: [5979, 2988],
   },
   // Milwaukee, WI: skyline-sheet run 36750289515 — the one frame that keeps every tower whole; credited as Commons names the author (the filename names Isaac Rowlett).
   "cbsa:33340": {
@@ -619,6 +637,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Milwaukee, WI",
+    size: [2048, 1338],
   },
   // New Orleans, LA: skyline-sheet run 36752856482 — the frame that keeps the towers is a 1704x558 phone panorama.
   "cbsa:35380": {
@@ -628,6 +647,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     name: "New Orleans, LA",
+    size: [2762, 2092],
   },
   // Oklahoma City, OK: skyline-sheet run 36751888862 — the sharpest frame; the Devon Tower is whole on the card (a strip-safe alternative carries a burned-in watermark).
   "cbsa:36420": {
@@ -637,6 +657,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Oklahoma City, OK",
+    size: [7357, 4157],
   },
   // Omaha, NE: skyline-sheet run 36750858237 — the article's lead image, at ground level, whole in every crop.
   "cbsa:36540": {
@@ -646,6 +667,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 2.0",
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     name: "Omaha, NE",
+    size: [7279, 4652],
   },
   // Providence, RI: skyline-sheet run 36750289515 — the article's lead image; the river, bridge and skyline stay whole in every crop.
   "cbsa:39300": {
@@ -655,6 +677,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Providence, RI",
+    size: [4003, 2714],
   },
   // Tucson, AZ: skyline-sheet run 36750496544 — the article's lead image, whole in every crop.
   "cbsa:46060": {
@@ -664,6 +687,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "Public domain",
     licenseUrl: "",
     name: "Tucson, AZ",
+    size: [4000, 3000],
   },
   // Tulsa, OK: skyline-sheet run 36752971792 — whole in every crop, where a ground-level frame cut the BOK Tower.
   "cbsa:46140": {
@@ -673,6 +697,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Tulsa, OK",
+    size: [4000, 3000],
   },
   // Honolulu, HI: skyline-sheet run 36750858237 — the article's lead image, whole in every crop.
   "cbsa:46520": {
@@ -682,6 +707,7 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Honolulu, HI",
+    size: [6000, 4000],
   },
 };
 

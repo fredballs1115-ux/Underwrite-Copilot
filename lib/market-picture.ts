@@ -23,7 +23,7 @@ import type { StructuredAddress } from "@/lib/address";
 import { metroAliasOf } from "@/lib/live-rates";
 import { dataMetroForAddress, metroForAddress, metroForName } from "@/lib/market-match";
 import { marketPageFor } from "@/lib/public-pages";
-import { areaSkylineId, photographerLine, skylineFor, skylineTag, type SkylineShot } from "@/lib/skyline";
+import { areaSkylineId, photographerLine, SKYLINE_WIDTH, skylineFor, skylineTag, type SkylineShot } from "@/lib/skyline";
 
 /**
  * The width a card asks the skyline route for. The files are panoramas, up
@@ -35,6 +35,26 @@ import { areaSkylineId, photographerLine, skylineFor, skylineTag, type SkylineSh
  * picture (#446); at 1600 the stretch is 1.05x, which no eye sees.
  */
 export const MARKET_PHOTO_WIDTH = 1600;
+
+/** A phone's full-width card at 3x, in device pixels tall (#475): what the
+ *  picture's height has to reach. */
+export const CARD_DEVICE_HEIGHT = 672;
+
+/**
+ * The width a card asks for a photograph whose size the table knows: the
+ * route's widest step, 2400 (a width it already serves in every srcset,
+ * SKYLINE_SRCSET), where 1600 would leave a panorama cut to the card by its
+ * height short of a phone card's 672 device pixels — Louisville's 4.2:1
+ * river panorama is 383px tall at 1600 wide and 574 at 2400 — and 1600
+ * otherwise, as for a photograph whose size is not recorded.
+ */
+export function marketPhotoWidth(shot: Pick<SkylineShot, "size">): number {
+  const [w, h] = shot.size ?? [0, 0];
+  if (!(w > 0 && h > 0)) return MARKET_PHOTO_WIDTH;
+  return Math.round((MARKET_PHOTO_WIDTH * h) / w) < CARD_DEVICE_HEIGHT && w > MARKET_PHOTO_WIDTH
+    ? SKYLINE_WIDTH.max
+    : MARKET_PHOTO_WIDTH;
+}
 
 export interface MarketPicture {
   /** the market whose photograph it is (the skyline table's key) */
@@ -97,7 +117,7 @@ function picture(id: string, name: string, shot: SkylineShot): MarketPicture {
     id,
     name,
     place: shot.place,
-    src: `/api/imagery/skyline/${encodeURIComponent(id)}?w=${MARKET_PHOTO_WIDTH}&v=${skylineTag(id)}`,
+    src: `/api/imagery/skyline/${encodeURIComponent(id)}?w=${marketPhotoWidth(shot)}&v=${skylineTag(id)}`,
     credit: photographerLine(shot),
   };
 }

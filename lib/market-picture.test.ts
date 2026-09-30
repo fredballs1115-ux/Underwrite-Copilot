@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MARKET_PHOTO_WIDTH, marketPictureFor } from "./market-picture";
+import { MARKET_PHOTO_WIDTH, marketPhotoWidth, marketPictureFor } from "./market-picture";
 import { photographerLine, skylineFor, skylineTag } from "./skyline";
 import { marketPageFor, marketPages } from "./public-pages";
 import { metroAliasOf } from "./live-rates";
@@ -73,5 +73,25 @@ describe("a metro area the site reads no figures for (#472)", () => {
     // A market the site reads keeps its own photograph whatever the county says.
     const pitt = marketPictureFor(null, null, { id: "pittsburgh", name: "Pittsburgh PA" }, { cbsa: "38300", area: "Pittsburgh, PA" });
     expect(pitt?.id).toBe("pittsburgh");
+  });
+});
+
+describe("the width a card asks for (#475)", () => {
+  it("asks for the widest step where a panorama cut to the card would fall short of a phone card's height", () => {
+    // Louisville's river panorama, 9640x2304: 383px tall at 1600 wide.
+    expect(marketPhotoWidth({ size: [9640, 2304] })).toBe(2400);
+    // Grand Rapids at dusk, 4000x1475: 590px tall at 1600.
+    expect(marketPhotoWidth({ size: [4000, 1475] })).toBe(2400);
+    // A 3:2 frame reaches the card's height at 1600.
+    expect(marketPhotoWidth({ size: [6000, 4000] })).toBe(1600);
+    // A size not recorded, and an original under 1600 wide, ask as before.
+    expect(marketPhotoWidth({})).toBe(MARKET_PHOTO_WIDTH);
+    expect(marketPhotoWidth({ size: [1500, 400] })).toBe(MARKET_PHOTO_WIDTH);
+  });
+
+  it("puts that width in the card's source", () => {
+    const pic = marketPictureFor(null, null, null, { cbsa: "31140", area: "Louisville/Jefferson County, KY-IN" });
+    expect(pic?.src).toContain("?w=2400&");
+    expect(pic?.src).toContain(encodeURIComponent("cbsa:31140"));
   });
 });
