@@ -72,6 +72,7 @@ import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
 import { findPricedMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
 import { interestOf } from "@/lib/interest";
+import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import type { ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
@@ -1531,17 +1532,34 @@ function DocumentsPanel({
               </span>
             </li>
           )}
-          {documents.map((d) => (
-            <li
-              key={d.id}
-              className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
-            >
-              <span className="min-w-0 flex-1 truncate">{d.filename}</span>
-              <span className="shrink-0 text-xs text-muted">
-                {KIND_LABEL[d.kind] ?? d.kind}
-              </span>
-            </li>
-          ))}
+          {documents.map((d) => {
+            // Signed when it is clicked (app/api/deals/[id]/file), so a page
+            // left open never hands over an expired link.
+            const href = dealFileLinkFor(dealId, d.storage_path);
+            return (
+              <li
+                key={d.id}
+                className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
+              >
+                <span className="min-w-0 flex-1 truncate">{d.filename}</span>
+                <span className="shrink-0 text-xs text-muted">
+                  {KIND_LABEL[d.kind] ?? d.kind}
+                </span>
+                {href && (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Opens ${d.filename}`}
+                    aria-label={`View ${d.filename}`}
+                    className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
+                  >
+                    View
+                  </a>
+                )}
+              </li>
+            );
+          })}
         </ul>
         {hasVerdict && (
           <div className="mt-3">

@@ -565,6 +565,33 @@ describe("DealView — the sample deal renders every section without a runtime e
   });
 });
 
+describe("the Documents tab opens each source document", () => {
+  it("links a document the deal lists through the route that signs it on click", () => {
+    const base = sampleProps("documents");
+    const dealId = "0b5c6c1e-2f7a-4b8e-9d3c-5a1e7f2b9c40";
+    const doc = {
+      id: "d1",
+      deal_id: dealId,
+      kind: "rent_roll",
+      filename: "Rent roll June.xlsx",
+      storage_path: `documents/${dealId}/1c9a2f3e-rent_roll_june.xlsx`,
+      content_type: null,
+      created_at: "2026-09-12T14:03:00.000Z",
+    };
+    const stray = { ...doc, id: "d2", filename: "Elsewhere.pdf", storage_path: "documents/another-deal/x.pdf" };
+    const html = render({ ...base, dealId, documents: [doc, stray] } as Props);
+    expect(a11yIssues(html)).toEqual([]);
+    const href = `/api/deals/${dealId}/file?p=${encodeURIComponent(doc.storage_path)}`;
+    expect(html).toContain(`href="${href.replace(/&/g, "&amp;")}"`);
+    expect(html).toMatch(/aria-label="View Rent roll June\.xlsx"/);
+    // A path that is not this deal's own draws its name and no link.
+    expect(textOf(html)).toMatch(/Elsewhere\.pdf/);
+    expect(html).not.toMatch(/aria-label="View Elsewhere\.pdf"/);
+    // Never a storage host's signed URL minted at render.
+    expect(html).not.toMatch(/token=|\/storage\/v1\/object\/sign/);
+  });
+});
+
 describe("the add-a-note box says what it does", () => {
   // Its note and file are kept with the deal (deals.supplements) and read by
   // nothing in the analysis, so the box never promises a correction.
