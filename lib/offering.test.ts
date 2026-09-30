@@ -92,6 +92,24 @@ describe("the call for offers in a calendar (#467)", () => {
     expect(allDayEventIcs({ uid: "u", date: "2026-12-31", summary: "x", now: new Date(0) })).toContain("DTEND;VALUE=DATE:20270101");
   });
 
+  it("escapes every line break, a lone carriage return included, and drops the controls TEXT forbids", () => {
+    expect(icsText("a\rb")).toBe("a\\nb");
+    expect(icsText("a\r\nb\nc\rd")).toBe("a\\nb\\nc\\nd");
+    expect(icsText("a\u0000b\u0007c\u001bd\u007fe\tf")).toBe("abcde\tf");
+    // A deal's name is whatever its owner typed: a CR in it must not start a
+    // content line of its own.
+    const ics = allDayEventIcs({
+      uid: "u",
+      date: "2026-10-15",
+      summary: "Offers due — The Maddox\rATTENDEE:mailto:someone@example.test",
+      now: new Date(0),
+    });
+    const lines = ics.split("\r\n");
+    expect(lines.every((l) => !/[\r\n]/.test(l))).toBe(true);
+    expect(lines.some((l) => l.startsWith("ATTENDEE"))).toBe(false);
+    expect(ics).toContain("SUMMARY:Offers due — The Maddox\\nATTENDEE:mailto:someone@example.test\r\n");
+  });
+
   it("escapes text and folds a long line at 75 octets without splitting a character", () => {
     expect(icsText("a;b,c\\d\ne")).toBe("a\\;b\\,c\\\\d\\ne");
     const long = `SUMMARY:${"Offers due — ".repeat(10)}`;
