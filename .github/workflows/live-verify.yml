@@ -502,6 +502,11 @@ jobs:
           both() { grep -q "on-photo" p_why.html && grep -q "band-words" p_why.html; }
           copies() { [ "$(grep -o "Copy as table" p_tools2.html | wc -l)" -ge 2 ]; }
           bidtwice() { [ "$(grep -o "What you can pay" p_tools2.html | wc -l)" -ge 2 ]; }
+          # The strip renders (its money market heading is there) and carries no
+          # series its publisher licenses to FRED alone (#482). grep -c, not
+          # -q: the marker guard reads every -q/-o pattern as a phrase that
+          # must be ON the page.
+          noice() { grep -q "Money market" p_tools2.html && [ "$(grep -c "ICE BofA\|Moody" p_tools2.html)" -eq 0 ]; }
           echo "ROUND MARKERS — what the live site is actually serving:"
           mark "#302 photo treatment (on-photo + band-words on /why)" both
           mark "#302 deal math reads the shorthand (seeded \$20M on /tools)" grep -q 'value="\$20M"' p_tools2.html
@@ -1138,6 +1143,10 @@ jobs:
           mark "#480 construction costs and the breakeven in the checks" grep -q "What building costs, and what the bond market expects, in the checks" p_whats-new.html
           mark "#481 the public pages, held to their own figures" grep -q "The public pages, held to their own figures" p_whats-new.html
           mark "#481 forty more cities, pictured" grep -q "Forty more cities, pictured" p_whats-new.html
+          mark "#482 the documents say what the deal page says" grep -q "The documents say what the deal page says" p_whats-new.html
+          mark "#482 an alert you dismiss is dismissed for you" grep -q "An alert you dismiss is dismissed for you" p_whats-new.html
+          mark "#482 corporate credit, from the Treasury" grep -q "Corporate credit, from the Treasury" p_whats-new.html
+          mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

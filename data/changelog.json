@@ -3,6 +3,24 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Corporate credit, from the Treasury",
+      "blurb": "The rates strip on /tools and /market now reads corporate credit from the Treasury's own high-quality corporate bond curve: its 10-year spot rate, published monthly. The three ICE BofA spreads and Moody's Baa yield it had shown are gone. Their publishers license them to FRED, not to sites that republish them, and Moody's forbids redistribution outright.",
+      "href": "/tools"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "An alert you dismiss is dismissed for you",
+      "blurb": "Dismissing a regulatory alert now hides it for you, in the browser you dismissed it in, and for no one else. Before, the dismissal was written to the alert itself, so one reader's click hid it from every account.",
+      "href": "/news"
+    },
+    {
+      "date": "2026-09-30",
+      "title": "The documents say what the deal page says",
+      "blurb": "The memo, the full report, the shared screen, the meeting workbook, the pipeline's CSV and the compare page now read each deal the way its own page does: its kind from the same first signal, its class from the same one choice. A note's collateral is never shown as a cap rate on the note's price. A flood zone is printed only from a lookup made for the deal's current address. The compare page marks a call that a re-screen is replacing rather than ranking it, and says which figures are the first-draft model's. The research panel shows the median sale price of a two-to-four-unit property as that, dated, and no longer sets a deal's price per unit against it.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-09-30",
       "title": "Forty more cities, pictured",
       "blurb": "A deal with no photograph of its own now opens on a photograph of its city in forty more metro areas, from Akron and Albany to Winston-Salem and Worcester. Where a place is known by something other than its skyline, that is the picture: Savannah's Forsyth Park fountain, Pensacola's beach, Modesto's arch. Each was chosen by eye through the pipeline card's and the deal page's own crops, and each credit names its photographer, links to the photograph and its licence, and says the picture is cropped to fit.",
       "href": "/deals"
