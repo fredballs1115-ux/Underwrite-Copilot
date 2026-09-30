@@ -3,10 +3,12 @@ import {
   buildComps,
   summarizeMarkets,
   marketMemoryFor,
+  memoryCandidates,
   median,
   normalizeMarketKey,
   fmtCapRange,
   fmtBasisRange,
+  type MemoryKeyRow,
 } from "./market-memory";
 
 function deal(
@@ -209,6 +211,58 @@ describe("an outdoor-storage yard's shop building is never a market's per-SF bas
     expect(buildComps([yard("y2", [["Asking price", "$12,000,000"], ["Building SF", "4,000"]])])).toEqual([]);
     // Filed under the deck's word too.
     expect(buildComps([yard("y3", [["Asking price", "$12,000,000"], ["Building SF", "4,000"]], "Truck terminal")])).toEqual([]);
+  });
+});
+
+describe("memoryCandidates — the reader's own deals in this deal's group, read light", () => {
+  const key = (id: string, over: Partial<MemoryKeyRow> = {}): MemoryKeyRow => ({
+    id,
+    asset_class: "multifamily",
+    is_sample: false,
+    market: "Dallas, TX",
+    ext_class: "Multifamily",
+    ...over,
+  });
+
+  it("finds every same-class, same-market deal the way buildComps groups them", () => {
+    const rows = [
+      key("self"),
+      key("a"),
+      key("b", { market: "Dallas TX" }), // punctuation variant, same group
+      key("c", { asset_class: "auto", ext_class: "multifamily" }), // Auto reads the deck's class
+      key("d", { market: "Austin, TX" }),
+      key("e", { asset_class: "office" }),
+      key("f", { asset_class: "auto", ext_class: null }),
+      key("sample", { is_sample: true }),
+      key("g", { market: null }),
+    ];
+    expect(memoryCandidates(rows, "self", "multifamily", "Dallas, TX")).toEqual(["a", "b", "c"]);
+  });
+
+  it("the ids it finds are the group marketMemoryFor aggregates — none left out, whoever else the team screened", () => {
+    const full = [
+      deal("a", { market: "Dallas, TX", metrics: [["Going-in cap rate", "5.0%"], ["Purchase price", "$50,000,000"], ["Units", "200"]] }),
+      deal("b", { market: "Dallas TX", metrics: [["Going-in cap rate", "5.4%"], ["Purchase price", "$60,000,000"], ["Units", "200"]] }),
+      deal("x", { market: "Dallas, TX", metrics: [["Year built", "1985"]] }), // no cap, no basis
+    ];
+    const rows: MemoryKeyRow[] = full.map((d) => ({
+      id: d.id,
+      asset_class: d.asset_class,
+      is_sample: d.is_sample,
+      market: d.extraction?.market ?? null,
+      ext_class: null,
+    }));
+    const ids = memoryCandidates(rows, "self", "multifamily", "Dallas, TX");
+    expect(ids).toEqual(["a", "b", "x"]);
+    const g = marketMemoryFor(buildComps(full.filter((d) => ids.includes(d.id))), "self", "multifamily", "Dallas, TX")!;
+    // Two of the three left a cap or a basis behind — the count the strip
+    // prints, "with a cap or basis on file".
+    expect(g.count).toBe(2);
+  });
+
+  it("finds nothing without a class or a market to match", () => {
+    expect(memoryCandidates([key("a")], "self", "", "Dallas, TX")).toEqual([]);
+    expect(memoryCandidates([key("a")], "self", "multifamily", "  ")).toEqual([]);
   });
 });
 

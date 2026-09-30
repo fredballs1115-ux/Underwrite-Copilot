@@ -509,6 +509,30 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(challenger).toMatch(/title="\d+ high/);
   });
 
+  it("the past-screens strip counts what it counts: the screens with a cap or basis on file", () => {
+    const html = render({
+      ...sampleProps("overview"),
+      marketMemory: {
+        assetClass: "multifamily",
+        market: "Philadelphia, PA",
+        marketKey: "philadelphia pa",
+        count: 3,
+        cap: { min: 5.2, median: 5.4, max: 5.6 },
+        perUnit: { min: 240_000, median: 250_000, max: 262_000, basis: "unit" },
+        calls: { pass: 1, caution: 2, pass_on: 0 },
+        dealIds: ["a", "b", "c"],
+      },
+    } as unknown as Props);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    // The text tool breaks a line at each element's edge; the reader's
+    // sentence runs straight through.
+    expect(text).toMatch(
+      /You've screened\s+3\s+other Philadelphia, PA Multifamily\s+deals with a cap or basis on file: going-in cap 5\.2–5\.6% · basis \$240–262k\/unit\s*\./,
+    );
+  });
+
   it("the overview carries the verdict and the buy-box fit; the financials carry the price", () => {
     const overview = textOf(render(sampleProps("overview")));
     expect(overview).toMatch(/Caution/);

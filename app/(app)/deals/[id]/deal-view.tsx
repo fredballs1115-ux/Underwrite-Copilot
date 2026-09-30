@@ -1108,7 +1108,9 @@ function MandateScoreHeader({
 /** Deal memory (Feature 6): what this account's OWN past screens of the same
  *  market + asset class looked like — a one-line read at the point of decision,
  *  linking to the full Market data page. Never a teammate's or another
- *  account's deals. */
+ *  account's deals. The count is of the screens that left a going-in cap or a
+ *  basis behind (lib/market-memory `buildComps` keeps no other), and the
+ *  sentence says so. */
 function MarketMemoryStrip({ group }: { group: MarketGroup }) {
   const bits: string[] = [];
   if (group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
@@ -1130,7 +1132,7 @@ function MarketMemoryStrip({ group }: { group: MarketGroup }) {
         You&apos;ve screened{" "}
         <span className="font-medium text-ink">{group.count}</span> other{" "}
         {group.market} <span>{assetClassLabel(group.assetClass)}</span>{" "}
-        deal{group.count === 1 ? "" : "s"}
+        deal{group.count === 1 ? "" : "s"}{" "}with a cap or basis on file
         {bits.length ? (
           <>
             : <span className="text-ink">{bits.join(" · ")}</span>

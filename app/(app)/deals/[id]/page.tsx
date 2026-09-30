@@ -90,7 +90,13 @@ import { ShareControl, type ShareRow } from "./share-control";
 import { parseStageHistory } from "@/lib/stages";
 import { parseDealNotes, parseDealQa } from "@/lib/deals";
 import { deriveInternalComps } from "@/lib/internal-comps";
-import { buildComps, marketMemoryFor } from "@/lib/market-memory";
+import {
+  buildComps,
+  marketMemoryFor,
+  memoryCandidates,
+  type MarketGroup,
+  type MemoryKeyRow,
+} from "@/lib/market-memory";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
@@ -184,6 +190,7 @@ export default async function DealPage({
     siblings,
     sharesRes,
     factsRes,
+    ownKeys,
   ] = await Promise.all([
       user ? isPro(supabase, user.id) : Promise.resolve(false),
       supabase.from("deals").select("*").eq("id", id).maybeSingle(),
@@ -229,6 +236,20 @@ export default async function DealPage({
         .select("id, field, value, unit, doc_label, page_number, located, locator_snippet, confidence, provenance")
         .eq("deal_id", id)
         .order("id", { ascending: true }),
+      // Deal memory's own read: every deal the READER screened, never a
+      // teammate's — the forty newest above are the whole team's, so a
+      // busy team pushed the reader's own screens out of the count. Light:
+      // the class and the market only, the rows the strip needs in full
+      // are read once this deal's own class and market are known.
+      user
+        ? supabase
+            .from("deals")
+            .select("id, asset_class, is_sample, market:extraction->>market, ext_class:extraction->>assetClass")
+            .eq("user_id", user.id)
+            .neq("id", id)
+            .not("extraction", "is", null)
+            .limit(1000)
+        : Promise.resolve({ data: null }),
     ]);
 
   if (error) {
@@ -297,23 +318,35 @@ export default async function DealPage({
   );
 
   // Deal memory (Feature 6): the account's OWN prior screens of this exact
-  // market + asset class, aggregated. Own-account only — filter the siblings
-  // (which RLS may include team deals in) to this user's deals.
-  const ownSiblings = ((siblings.data ?? []) as Array<{ user_id?: string }>).filter(
-    (s) => s.user_id === user?.id,
-  );
+  // market + asset class, aggregated — found in the reader's own deals
+  // (lib/market-memory `memoryCandidates`), then read in full. Started now
+  // and awaited where the view is built, so the second read overlaps the
+  // page's other work rather than adding a round trip.
   const currentClass =
     deal.asset_class && deal.asset_class !== "auto"
       ? (deal.asset_class as string)
       : (extraction?.assetClass ?? "");
-  const marketMemory = extraction?.market
-    ? marketMemoryFor(
-        buildComps(ownSiblings as Parameters<typeof buildComps>[0]),
-        deal.id,
-        currentClass,
-        extraction.market,
-      )
-    : null;
+  const memoryIds =
+    extraction?.market && ownKeys.data
+      ? memoryCandidates(ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction.market)
+      : [];
+  const memoryRead: Promise<MarketGroup | null> = memoryIds.length
+    ? (async () => {
+        // A hundred ids a request keeps each URL well inside a proxy's limit.
+        const batches: string[][] = [];
+        for (let i = 0; i < memoryIds.length; i += 100) batches.push(memoryIds.slice(i, i + 100));
+        const reads = await Promise.all(
+          batches.map((ids) =>
+            supabase
+              .from("deals")
+              .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
+              .in("id", ids),
+          ),
+        );
+        const rows = reads.flatMap((r) => (r.data ?? []) as Parameters<typeof buildComps>[0]);
+        return marketMemoryFor(buildComps(rows), deal.id, currentClass, extraction!.market!);
+      })().catch(() => null)
+    : Promise.resolve(null);
 
   const documents = (docsData ?? []) as DealDocument[];
 
@@ -945,6 +978,7 @@ export default async function DealPage({
     null;
 
   const floodLegendEntries = await floodLegendRead;
+  const marketMemory = await memoryRead;
 
   // The photograph the deal's market is known by, leading the picture where
   // the building has none of its own and no Street View (#439) — the one its

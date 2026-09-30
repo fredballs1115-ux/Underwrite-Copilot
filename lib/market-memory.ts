@@ -290,6 +290,46 @@ function groupStat(members: MarketComp[]): MarketGroup {
   };
 }
 
+/** One of the account's own deals, read light: its class and market out of
+ *  the extraction (`extraction->>assetClass`, `extraction->>market`) and
+ *  none of the rest, so the deal page can find every screen of the same
+ *  class × market without loading every extraction the account holds. */
+export interface MemoryKeyRow {
+  id: string;
+  asset_class: string | null;
+  is_sample: boolean | null;
+  /** `extraction->>market` */
+  market: string | null;
+  /** `extraction->>assetClass` */
+  ext_class: string | null;
+}
+
+/** The ids of the account's other deals in one deal's (asset class ×
+ *  market) group — grouped as `buildComps` and `marketMemoryFor` group
+ *  them, the sample never — whose full rows the strip then reads. The
+ *  deal page used to take them from the forty newest deals the reader
+ *  could see, which a teammate's deals filled, so the strip undercounted
+ *  the reader's own screens. */
+export function memoryCandidates(
+  rows: readonly MemoryKeyRow[],
+  dealId: string,
+  assetClass: string,
+  market: string,
+): string[] {
+  const cls = assetClass.toLowerCase();
+  const key = normalizeMarketKey(market);
+  if (!cls || !key) return [];
+  return rows
+    .filter(
+      (r) =>
+        r.id !== dealId &&
+        !r.is_sample &&
+        effectiveClass(r.asset_class, { assetClass: r.ext_class ?? undefined }) === cls &&
+        normalizeMarketKey(r.market ?? "") === key,
+    )
+    .map((r) => r.id);
+}
+
 /** The group matching one deal's (asset class × market), excluding that deal —
  *  the "across your past screens" strip for the deal page. Null when there's no
  *  comparable prior screen. */
