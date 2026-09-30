@@ -13,6 +13,8 @@ import { metroFmr, seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
 import { fmrLabel, fmrToday, fmrWhen } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
 import { sectorLeaderboard } from "@/lib/sector-leaderboard";
+import { blockCitations } from "@/lib/tracker-read";
+import metrosSeed from "@/data/research/metros.json";
 import { sampleLegal } from "@/lib/sample-legal";
 import { scoreMandateFit } from "@/lib/mandate";
 import { findPriceMetric, inferStrategy, unitCountRow } from "@/lib/deal-strategy";
@@ -257,6 +259,17 @@ export default async function DemoPage() {
     const r = phillyRows.find((b) => b.metric === metric);
     if (!r || typeof r.low !== "number") return null;
     return r.high !== r.low ? `${r.low}–${r.high}%` : `${r.low}%`;
+  };
+  // Each figure's own period in view and its whole credit as its title —
+  // who published it, for what area and when (lib/tracker-read), the way
+  // the homepage's band and gallery and /market's panel credit the same
+  // figures; "undated" where the research states no period.
+  const phillySnapshot = (metrosSeed.metros ?? []).find((m) => m.id === "philadelphia")?.sector_snapshot as
+    | Record<string, unknown>
+    | undefined;
+  const credit = (sector: string, label: "Vacancy" | "Rent") => {
+    const fig = blockCitations(phillySnapshot?.[sector]).find((f) => f.label === label);
+    return { period: fig?.read.period ?? "undated", title: fig?.words };
   };
   const phillySectors = {
     office: band("office_vacancy_pct"),
@@ -543,49 +556,46 @@ export default async function DemoPage() {
                   {phillySectors.office && (
                     <>
                       office vacancy{" "}
-                      <span className="font-mono tabular-nums text-ink">
+                      <span className="font-mono tabular-nums text-ink" title={credit("office", "Vacancy").title}>
                         {phillySectors.office}
                       </span>
-                      {phillyRanks.office && <> ({phillyRanks.office})</>}
+                      {` (${[credit("office", "Vacancy").period, phillyRanks.office].filter(Boolean).join(", ")})`}
                     </>
                   )}
                   {phillySectors.industrial && (
                     <>
                       {" · "}industrial{" "}
-                      <span className="font-mono tabular-nums text-ink">
+                      <span className="font-mono tabular-nums text-ink" title={credit("industrial", "Vacancy").title}>
                         {phillySectors.industrial}
                       </span>
+                      {` (${[credit("industrial", "Vacancy").period, phillyRanks.industrial].filter(Boolean).join(", ")})`}
                       {typeof phillySectors.industrialRent === "number" && (
                         <>
                           {" at "}
-                          <span className="font-mono tabular-nums text-ink">
+                          <span className="font-mono tabular-nums text-ink" title={credit("industrial", "Rent").title}>
                             ${phillySectors.industrialRent.toFixed(2)}/SF
                           </span>
+                          {` (${credit("industrial", "Rent").period})`}
                         </>
-                      )}
-                      {phillyRanks.industrial && (
-                        <> ({phillyRanks.industrial})</>
                       )}
                     </>
                   )}
                   {phillySectors.multifamily && (
                     <>
                       {" · "}multifamily{" "}
-                      <span className="font-mono tabular-nums text-ink">
+                      <span className="font-mono tabular-nums text-ink" title={credit("multifamily", "Vacancy").title}>
                         {phillySectors.multifamily}
                       </span>
-                      {phillyRanks.multifamily && (
-                        <> ({phillyRanks.multifamily})</>
-                      )}
+                      {` (${[credit("multifamily", "Vacancy").period, phillyRanks.multifamily].filter(Boolean).join(", ")})`}
                     </>
                   )}
                   {phillySectors.retail && (
                     <>
                       {" · "}retail{" "}
-                      <span className="font-mono tabular-nums text-ink">
+                      <span className="font-mono tabular-nums text-ink" title={credit("retail", "Vacancy").title}>
                         {phillySectors.retail}
                       </span>
-                      {phillyRanks.retail && <> ({phillyRanks.retail})</>}
+                      {` (${[credit("retail", "Vacancy").period, phillyRanks.retail].filter(Boolean).join(", ")})`}
                     </>
                   )}{" "}
                   — ranges are tracker spreads, never averaged; ranks run

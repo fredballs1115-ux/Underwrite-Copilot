@@ -6,7 +6,7 @@
       "jurisdiction": "Washington DC",
       "system": "OTR ITS Public Extract + property sales (Open Data DC, ArcGIS)",
       "url_pattern": "https://opendata.dc.gov/datasets/integrated-tax-system-public-extract-property-sales — ArcGIS FeatureServer query; per-parcel human lookup at https://mytax.dc.gov (Real Property search by SSL)",
-      "access": "wired (dc_its; field names pending health check)",
+      "access": "discovery (dc_its; not configured: the ITS Public Extract sales dataset's FeatureServer is not yet confirmed, and /api/comps/health asks Open Data DC's catalogue for it)",
       "notes": "CAMA Residential/Commercial/Condo datasets carry building characteristics; daily updates."
     },
     {

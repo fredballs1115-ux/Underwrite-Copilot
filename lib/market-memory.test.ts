@@ -207,7 +207,7 @@ describe("an outdoor-storage yard's shop building is never a market's per-SF bas
     // The warehouse's $200/SF is the group's whole basis range; the yard's
     // $3,000/SF never joins it.
     expect(by.w1.perUnit).toBe(200);
-    expect(summarizeMarkets(comps)[0].perUnit).toEqual({ min: 200, median: 200, max: 200, basis: "sf" });
+    expect(summarizeMarkets(comps)[0].perUnit).toEqual({ min: 200, median: 200, max: 200, basis: "sf", noun: null });
   });
 
   it("a yard with no cap is no comp at all", () => {
