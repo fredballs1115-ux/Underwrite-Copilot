@@ -4,6 +4,7 @@ import {
   buildComps,
   summarizeMarkets,
   marketMemoryFor,
+  marketsIn,
   memoryCandidates,
   median,
   normalizeMarketKey,
@@ -351,6 +352,22 @@ describe("a basis wears its class's noun — a hotel's keys, a park's pads — n
     expect(basisLabel(office)).toBe("Basis / SF");
     expect(basisLabel({ assetClass: "land_infill", perUnit: null })).toBe("Basis / acre");
     expect(basisLabel({ assetClass: "hospitality_str", perUnit: null })).toBe("Basis / key");
+  });
+});
+
+describe("marketsIn — /market's 'N screens across M markets' counts markets, not cards", () => {
+  it("three classes screened in one market are three cards and one market", () => {
+    const groups = summarizeMarkets(
+      buildComps([
+        deal("m1", { market: "Dallas, TX", metrics: [["Going-in cap rate", "5.0%"], ["Purchase price", "$50,000,000"], ["Units", "200"]] }),
+        deal("o1", { assetClass: "office", market: "Dallas TX", metrics: [["Cap rate", "6.5%"], ["Purchase price", "$30,000,000"], ["Total SF", "150,000 SF"]] }),
+        deal("i1", { assetClass: "industrial", market: "dallas, tx", metrics: [["Cap rate", "5.9%"], ["Purchase price", "$20,000,000"], ["Total SF", "200,000 SF"]] }),
+        deal("m2", { market: "Austin, TX", metrics: [["Going-in cap rate", "5.2%"], ["Purchase price", "$40,000,000"], ["Units", "160"]] }),
+      ]),
+    );
+    expect(groups).toHaveLength(4);
+    expect(marketsIn(groups)).toBe(2);
+    expect(marketsIn([])).toBe(0);
   });
 });
 

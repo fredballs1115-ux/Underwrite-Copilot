@@ -9,6 +9,7 @@ import {
   summarizeMarkets,
   fmtCapRange,
   fmtBasisRange,
+  marketsIn,
   type MarketGroup,
 } from "@/lib/market-memory";
 import { RatesStrip } from "@/app/rates-strip";
@@ -249,6 +250,8 @@ export default async function MarketDataPage({
     ? summarizeMarkets(buildComps(data as Parameters<typeof buildComps>[0]))
     : [];
   const totalScreens = groups.reduce((n, g) => n + g.count, 0);
+  // A card is one market × one asset class; the line counts the markets.
+  const marketCount = marketsIn(groups);
 
   return (
     <div className="space-y-6">
@@ -307,9 +310,12 @@ export default async function MarketDataPage({
         </div>
       ) : (
         <>
+          {/* The memory keeps only the screens that left a cap or a basis
+              behind (lib/market-memory `buildComps`), so that is what the
+              count says it counts. */}
           <p className="text-xs text-muted">
-            {totalScreens} screen{totalScreens === 1 ? "" : "s"} across{" "}
-            {groups.length} market{groups.length === 1 ? "" : "s"}.
+            {totalScreens} screen{totalScreens === 1 ? "" : "s"} with a cap or basis on file, across{" "}
+            {marketCount} market{marketCount === 1 ? "" : "s"}.
           </p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {groups.map((g) => (

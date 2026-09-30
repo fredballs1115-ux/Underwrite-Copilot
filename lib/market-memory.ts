@@ -288,6 +288,13 @@ function groupNoun(assetClass: string, withBasis: readonly MarketComp[]): string
   return assetWords(assetClass).noun?.one ?? "unit";
 }
 
+/** How many markets the groups span. A group is one market × one asset
+ *  class, so three classes screened in Dallas are three groups and one
+ *  market — /market's "N screens across M markets" counted the groups. */
+export function marketsIn(groups: readonly Pick<MarketGroup, "marketKey">[]): number {
+  return new Set(groups.map((g) => g.marketKey)).size;
+}
+
 function groupStat(members: MarketComp[]): MarketGroup {
   const caps = members.map((c) => c.capPct).filter((n): n is number => n != null);
   // Basis is consistent within an asset class; take the members that carry it.
