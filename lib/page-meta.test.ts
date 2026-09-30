@@ -10,7 +10,8 @@ import { metadata as terms } from "@/app/terms/page";
 import { metadata as tools } from "@/app/tools/page";
 import { metadata as login } from "@/app/login/page";
 import { metadata as notFound } from "@/app/not-found";
-import { changelogSince } from "./changelog";
+import sitemap from "@/app/sitemap";
+import { changelogSince, latestChange } from "./changelog";
 import { SITE_CARD, marketMeta, marketPageFor, marketPages, sectorPageFor } from "./public-pages";
 import { SITE_NAME, marketHeading, publicMetadata } from "./page-meta";
 
@@ -88,6 +89,22 @@ describe("each public page states its own canonical and link preview", () => {
   it("titles /tools and /why the way a reader sees them", () => {
     expect(renderedTitle(tools)).toBe(`Deal math · ${SITE_NAME}`);
     expect(renderedTitle(why)).toBe("Why Underwrite Copilot");
+  });
+
+  it("dates a sitemap entry only where the page can say when it changed", () => {
+    // Every entry had been stamped with the moment of the request, telling a
+    // crawler that every page changed on every fetch. /whats-new can say:
+    // its newest entry is the day it last changed.
+    const entries = sitemap();
+    const whatsNewEntry = entries.find((e) => e.url.endsWith("/whats-new"));
+    expect(whatsNewEntry?.lastModified).toBe(latestChange()?.date);
+    for (const e of entries) {
+      if (e !== whatsNewEntry) expect(e.lastModified, e.url).toBeUndefined();
+    }
+    // The rest of each entry is as it was, and the market pages are all
+    // still there, from the one catalogue.
+    expect(entries.every((e) => e.changeFrequency && typeof e.priority === "number")).toBe(true);
+    expect(entries.filter((e) => e.url.includes("/market?metro=")).length).toBe(marketPages().length);
   });
 
   it("keeps the 404 out of the index, and says nothing else about it", () => {
