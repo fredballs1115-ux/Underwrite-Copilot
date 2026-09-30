@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+import { ProcessorList } from "@/app/processor-list";
 
 export const metadata: Metadata = {
   title: "Privacy policy",
@@ -9,7 +10,9 @@ export const metadata: Metadata = {
   alternates: { canonical: "/privacy" },
 };
 
-const SECTIONS: { h: string; body: string[] }[] = [
+// The outside services are lib/data-processors, the security page's list
+// too, held to the hosts the code sends a user's data to.
+const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "What we collect",
     body: [
@@ -50,8 +53,9 @@ const SECTIONS: { h: string; body: string[] }[] = [
   {
     h: "Third parties we rely on",
     body: [
-      "Supabase (database, authentication, and document storage), Anthropic (AI analysis via the Claude API), Stripe (payments), Render (hosting), and Photon by OpenStreetMap (address autocomplete — it receives only the address text you type into an address field, never your documents). Each receives only what it needs to do its job.",
+      "Each receives only what it needs to do its job. Your documents themselves are stored with Supabase and read by Anthropic; every other service receives only what is named beside it.",
     ],
+    processors: true,
   },
   {
     h: "Changes",
@@ -91,7 +95,7 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-semibold tracking-tight">
           Privacy policy
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: July 7, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: September 30, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
           Deal documents are sensitive — most OMs travel under confidentiality
           terms. This page says exactly what we collect, where it goes, and
@@ -110,6 +114,7 @@ export default function PrivacyPage() {
                   {p}
                 </p>
               ))}
+              {s.processors && <ProcessorList />}
             </section>
           ))}
         </div>

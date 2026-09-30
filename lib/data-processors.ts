@@ -1,0 +1,97 @@
+// Every outside service that receives something of a user's, and what it
+// receives — the one list the security page and the privacy policy both
+// print, so the two can never disagree. PURE (a string or two derived from
+// the public-records config, nothing else), so a test can hold it to the
+// hosts the code actually sends a user's data to (lib/data-processors.test.ts).
+//
+// Read from the code, not from intent: the geocoders get a deal's address,
+// the map services a deal's map point, Photon also the addresses of the comps
+// an OM lists (the comps map places them from the browser), and the browser
+// itself loads map tiles and news pictures straight from their hosts.
+
+import { COVERAGE_SUMMARY } from "@/lib/public-comps/core";
+
+export interface DataProcessor {
+  /** who it is, as the page names it */
+  name: string;
+  /** what it receives, in one short phrase */
+  receives: string;
+  /** the hosts the code reaches it on — held to the code by the test; empty
+   *  where an SDK or the platform picks the host */
+  hosts: readonly string[];
+}
+
+/** Said once under the list: the services a browser reaches directly see
+ *  what any site sees. */
+export const BROWSER_DIRECT_NOTE =
+  "Your browser reaches some of these directly — Supabase, Photon, the map tiles and a news story's picture — and those see your IP address, as any site you visit does.";
+
+export const DATA_PROCESSORS: readonly DataProcessor[] = [
+  {
+    name: "Supabase",
+    receives: "the database, sign-in and file storage: your account, your deals and the documents you upload",
+    hosts: ["supabase.co"],
+  },
+  {
+    name: "Render",
+    receives: "hosts the app and its background worker, so every request and upload passes through it",
+    hosts: [],
+  },
+  {
+    name: "Anthropic (the Claude API)",
+    receives:
+      "the documents you upload and the questions you ask about them, to write the analysis; for a public-web comp search, a deal's name, address and market, for its web search to look up",
+    hosts: [],
+  },
+  {
+    name: "Stripe",
+    receives: "your email address, and a team's name for a team plan, when you subscribe; card details go to Stripe's checkout, never to us",
+    hosts: [],
+  },
+  {
+    name: "Resend",
+    receives: "your email address, and the deal names, screening calls and deadlines in the emails you choose to get",
+    hosts: ["api.resend.com"],
+  },
+  {
+    name: "Photon (photon.komoot.io, a geocoder over OpenStreetMap data)",
+    receives:
+      "address text only: what you type into an address field, a deal's address, and the addresses of the comps an OM lists, to put them on a map",
+    hosts: ["photon.komoot.io"],
+  },
+  {
+    name: "The US Census Bureau's geocoder",
+    receives: "a deal's address and its map point, to place the building and read its census tract, county and city",
+    hosts: ["geocoding.geo.census.gov"],
+  },
+  {
+    name: "FEMA's flood map service",
+    receives: "a deal's map point, for the flood zone there and the flood map around it",
+    hosts: ["hazards.fema.gov"],
+  },
+  {
+    name: "USGS (The National Map)",
+    receives: "a deal's map point, for the aerial photograph of it; and the area a map shows, as your browser loads its map tiles",
+    hosts: ["basemap.nationalmap.gov"],
+  },
+  {
+    name: "OpenStreetMap's tile servers",
+    receives: "the area a map shows, when you switch a map to the street map and your browser loads its tiles",
+    hosts: ["tile.openstreetmap.org"],
+  },
+  {
+    name: `Public-records open-data services for ${COVERAGE_SUMMARY}`,
+    receives: "the area around a deal's map point, to find recorded sales nearby",
+    hosts: ["phl.carto.com", "opendata.maryland.gov", "services2.arcgis.com"],
+  },
+  {
+    name: "Google Maps Platform",
+    receives: "only if we have switched it on (it needs our key): a deal's map point, for a street-level photograph and a satellite view",
+    hosts: ["maps.googleapis.com"],
+  },
+  {
+    name: "News publishers",
+    receives: "a request for a story's picture, which your browser loads from the publisher's own site on the News page",
+    hosts: [],
+  },
+];
