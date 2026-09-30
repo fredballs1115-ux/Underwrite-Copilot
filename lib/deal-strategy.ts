@@ -310,6 +310,9 @@ export interface CapitalBudget {
   /** the OM stated an all-in total but no price, so nothing could be taken
    *  out: `budget` IS the stated total cost, with the acquisition inside it */
   isTotal?: boolean;
+  /** the renovation program's doors times its cost a door, both as stated,
+   *  the memorandum stating no total (#460) — derived, and labelled so */
+  program?: boolean;
   label: string;
   page?: string;
 }
@@ -534,6 +537,64 @@ export function budgetFromText(
   };
 }
 
+// ── A renovation program stated a door at a time (#460) ─────────────────
+// A value-add memorandum states its program as "192 units to renovate at
+// $15,000 per unit" and often no total, so the plan had no budget, no total
+// cost and no yield on cost, and the report had neither the IRR page (a
+// plan deal's is omitted) nor the plan's. The rows' patterns live here,
+// beside the plan's other rows, so the plan and lib/value-add read the same
+// two rows and multiply the same two figures.
+
+/** The doors the program has left to renovate. */
+export const RENOVATION_DOORS_ROW =
+  /\b(?:units?|doors?)\s+(?:to\s+(?:be\s+)?renovate|remaining\s+to\s+renovate|left\s+to\s+renovate)|\bclassic\s+units?\s+remaining\b|\bunrenovated\s+units?\b/i;
+/** What one door's renovation costs — per door, never a total. */
+export const RENOVATION_COST_PER_DOOR_ROW =
+  /\brenovation\s+(?:cost|budget|spend)\s+(?:per|\/)\s*(?:unit|door)\b|\b(?:per|\/)[- ](?:unit|door)\s+renovation\b|\binterior\s+(?:upgrade|renovation)\s+cost\s+(?:per|\/)\s*(?:unit|door)\b/i;
+
+// A door's renovation runs from a paint-and-fixtures turn to a gut; past
+// this it is not one door's cost (a total typed into the row, or a misread).
+const DOOR_COST_CEILING = 250_000;
+const RANGE_IN_VALUE = /\d\s*[-–—]\s*\$?\d|\d\s+to\s+\$?\d/i;
+
+/** One door's renovation cost as stated: "$15,000", "$15k per unit". A
+ *  range is two figures and reads as none; so is a figure past a door's. */
+export function renovationCostPerDoor(value: string | null | undefined): number | null {
+  const v = (value ?? "").trim();
+  if (!v || RANGE_IN_VALUE.test(v)) return null;
+  const n = parseMoney(v);
+  return n != null && n >= 500 && n <= DOOR_COST_CEILING ? n : null;
+}
+
+/**
+ * The program's cost where the memorandum states the doors and a door's
+ * cost and no total: the two stated figures multiplied, marked `program`
+ * and labelled with the arithmetic, so no surface prints it as a figure the
+ * memorandum stated. Null where either row is absent or unreadable, and
+ * bounded as any budget is.
+ */
+export function renovationProgramBudget(
+  metrics: MetricLike[],
+  price: number | null,
+  priceIsWholeAsset = true,
+): CapitalBudget | null {
+  const doorsRow = metrics.find((m) => RENOVATION_DOORS_ROW.test(m.label)) ?? null;
+  const costRow = metrics.find((m) => RENOVATION_COST_PER_DOOR_ROW.test(m.label)) ?? null;
+  if (!doorsRow || !costRow) return null;
+  const doors = parseCount(doorsRow.value);
+  const cost = renovationCostPerDoor(costRow.value);
+  if (doors == null || !(doors > 0) || cost == null) return null;
+  const budget = doors * cost;
+  if (!budgetPlausible(budget, price, priceIsWholeAsset)) return null;
+  return {
+    budget,
+    allIn: false,
+    program: true,
+    label: `${doors.toLocaleString("en-US")} ${doors === 1 ? "door" : "doors"} × $${Math.round(cost).toLocaleString("en-US")} a door, the renovation program as stated`,
+    page: doorsRow.page || costRow.page || undefined,
+  };
+}
+
 const TIMELINE_ROW =
   /construction (period|timeline|duration|schedule|start|completion)|(lease|rent)[- ]?up (period|duration|timeline)|(months|years) to (stabili[sz]|complet)|stabili[sz](ation|ed)? (year|date|in|by)|delivery (date|year)|completion (date|year)/i;
 
@@ -618,10 +679,14 @@ export function planSummary(
   // budget appears nowhere else. Against a land price the works are bounded
   // by the absolute ceiling only — a site is a fraction of what is built.
   const wholeAsset = !priceRowIsLand(priceMetric);
+  // A value-add stating its program a door at a time and no total (#460):
+  // the doors times a door's cost, derived and said so — never added to a
+  // total the memorandum does state.
   const budget = landOnly
     ? null
     : (capitalBudgetFromMetrics(metrics, price, wholeAsset) ??
-      budgetFromText(extraction.strategy?.capitalBudget, price, wholeAsset));
+      budgetFromText(extraction.strategy?.capitalBudget, price, wholeAsset) ??
+      (strategy.kind === "value_add" ? renovationProgramBudget(metrics, price, wholeAsset) : null));
   // Price plus the works; or, when the OM states an all-in total and no
   // price, that total itself — a yield on cost needs no split of the two.
   const totalCost =

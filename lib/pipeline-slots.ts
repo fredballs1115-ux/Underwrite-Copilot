@@ -15,6 +15,7 @@ import { singleTenantTag } from "@/lib/single-tenant";
 import { hotelTag } from "@/lib/hotel-deal";
 import { saleTag } from "@/lib/sale-terms";
 import { rosterTag } from "@/lib/tenant-roster";
+import { valueAddTag } from "@/lib/value-add";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -52,6 +53,10 @@ export interface PipelineSlots {
    *  rolls in 5 yrs" or both (lib/tenant-roster `rosterTag`, #457); absent
    *  or null where the roll is small and every anchor is in the sale */
   roster?: string | null;
+  /** a value-add renovation program — "Reno $250/mo, 20% on cost"
+   *  (lib/value-add `valueAddTag`, #460); absent or null where the
+   *  memorandum states no premium */
+  valueAdd?: string | null;
 }
 
 /**
@@ -116,5 +121,7 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // A shadow anchor is not bought, and a roll inside the hold is the
     // income the model counts and the buyer may not have.
     roster: rosterTag(extraction),
+    // A renovation program's premium and its return on cost (#460).
+    valueAdd: valueAddTag(extraction),
   };
 }

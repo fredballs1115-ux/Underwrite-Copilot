@@ -42,6 +42,7 @@ import { readSingleTenant, singleTenantNote } from "@/lib/single-tenant";
 import { hotelNote, readHotelDeal } from "@/lib/hotel-deal";
 import { readSale, saleNote } from "@/lib/sale-terms";
 import { readRoster, rosterNote } from "@/lib/tenant-roster";
+import { readValueAdd, valueAddNote } from "@/lib/value-add";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -867,6 +868,11 @@ async function runAnalysisSteps(
         // ride on them — then the multi-tenant traps by name.
         const roster = readRoster(ex);
         if (roster) notes.push(rosterNote(roster));
+
+        // A value-add renovation program (#460): the premium's proof, the
+        // pace, the cost and the clock — the value-add traps by name.
+        const valueAdd = readValueAdd(ex);
+        if (valueAdd) notes.push(valueAddNote(valueAdd));
 
         // What a hotel is sold with (#455): the flag, the manager, the
         // encumbrance and the PIP, then the contract traps by name.

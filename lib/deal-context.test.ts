@@ -189,3 +189,17 @@ describe("dealContextFor — a multi-tenant property's listed tenants (#457)", (
     expect(dealContextFor({ ...center, assetClass: "multifamily" })).toBe("Deal type: Stabilized.");
   });
 });
+
+describe("dealContextFor — a value-add renovation program (#460)", () => {
+  it("says the program's return on cost and whether its premium is proven", () => {
+    const program: ExtractionResult = {
+      dealName: "The Parkline",
+      assetClass: "multifamily",
+      strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [m("Units to renovate", "192"), m("Renovation cost per unit", "$15,000"), m("Renovation premium", "$250")],
+    };
+    const ctx = dealContextFor(program)!;
+    expect(ctx).toContain("The renovation program: The program renovates 192 doors at $15,000 each for $250 a month more rent: 20% a year");
+    expect(ctx).toContain("No premium achieved on renovated units is stated");
+  });
+});

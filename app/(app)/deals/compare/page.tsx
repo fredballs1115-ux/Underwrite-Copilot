@@ -23,6 +23,7 @@ import { singleTenantTag } from "@/lib/single-tenant";
 import { hotelTag } from "@/lib/hotel-deal";
 import { saleTag } from "@/lib/sale-terms";
 import { rosterTag } from "@/lib/tenant-roster";
+import { valueAddTag } from "@/lib/value-add";
 import { compareInterest } from "@/lib/compare-interest";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
@@ -135,6 +136,7 @@ function toCol(
     affordable: affordableTag(ex),
     tenancy: singleTenantTag(ex),
     roster: rosterTag(ex),
+    valueAdd: valueAddTag(ex),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
     noteYtm: ci.noteYtmPct,

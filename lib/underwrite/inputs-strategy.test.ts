@@ -468,3 +468,47 @@ describe("deriveUnderwriteInputs — a multi-tenant property's listed tenants (#
     expect(deriveUnderwriteInputs(ex(base, { assetClass: "retail", tenants: tenants.slice(0, 1) }), "fallback").meta.roster).toBeNull();
   });
 });
+
+describe("deriveUnderwriteInputs — a value-add renovation program (#460)", () => {
+  const strategy = { kind: "value_add" as const, summary: "", capitalBudget: "", timeline: "" };
+  const program = [
+    metric("Asking price", "$48,000,000"),
+    metric("NOI (in-place)", "$2,500,000"),
+    metric("Units", "248"),
+    metric("Renovation budget", "$2,880,000"),
+    metric("Units to renovate", "192"),
+    metric("Renovation cost per unit", "$15,000"),
+    metric("Renovation premium", "$250"),
+  ];
+
+  it("says what a door is worth at the model's exit cap, and that the model spends the budget but carries none of the premium", () => {
+    const m = deriveUnderwriteInputs(ex(program, { strategy }), "fallback");
+    expect(m.inputs.capitalImprovementsYr1).toBe(2_880_000);
+    expect(m.meta.valueAdd?.line).toBe("Value-add program: 192 doors to renovate; $15,000 a door; $250 a month premium (20% on cost); no achieved premium stated");
+    expect(m.meta.valueAdd?.read).toContain("and the premium breaks even at");
+    expect(m.meta.valueAdd?.read).toContain(
+      "The screening model spends $2.88M of capital in its first year and grows today's rent at 3.0%: the premium is in none of its returns, so its IRR is not the program's.",
+    );
+  });
+
+  it("nothing where the memorandum states no program", () => {
+    expect(deriveUnderwriteInputs(ex(program.slice(0, 3), { strategy }), "fallback").meta.valueAdd).toBeNull();
+  });
+
+  it("with no total stated, spends the doors times a door's cost — derived, and the note says the arithmetic", () => {
+    const perDoor = program.filter((m) => m.label !== "Renovation budget");
+    const m = deriveUnderwriteInputs(ex(perDoor, { strategy }), "fallback");
+    expect(m.inputs.capitalImprovementsYr1).toBe(2_880_000);
+    expect(m.sources.capitalImprovementsYr1?.provenance).toBe("derived");
+    expect(m.sources.capitalImprovementsYr1?.note).toContain(
+      "192 doors × $15,000 a door, the renovation program as stated — spent in year 1 in this annual model",
+    );
+    expect(m.meta.valueAdd?.read).toContain("The screening model spends $2.88M of capital in its first year");
+    // A deal the memorandum calls stabilized carries no program it lists.
+    const stabilized = deriveUnderwriteInputs(
+      ex(perDoor, { strategy: { ...strategy, kind: "stabilized" as const } }),
+      "fallback",
+    );
+    expect(stabilized.inputs.capitalImprovementsYr1).toBe(0);
+  });
+});

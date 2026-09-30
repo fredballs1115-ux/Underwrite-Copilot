@@ -62,6 +62,9 @@ export interface PipelineExportRow {
    *  rolls in 5 yrs" (lib/tenant-roster `rosterTag`, #457); carried in the
    *  price cell's note */
   roster?: string | null;
+  /** a value-add renovation program — "Reno $250/mo, 20% on cost"
+   *  (lib/value-add `valueAddTag`, #460); carried in the price cell's note */
+  valueAdd?: string | null;
   /** the going-in cap on today's income — always null on a plan deal */
   cap: string | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
@@ -226,6 +229,7 @@ export async function buildPipelineWorkbook(
         d.hotel ? `${d.hotel}: what the hotel is sold with — the deal page reads the flag, the manager and the PIP.` : null,
         d.sale ? `${d.sale}: the figure is where the bidding opens or the seller is not an owner — the deal page reads the sale.` : null,
         d.roster ? `${d.roster}: the listed tenants against the model's sale — the deal page reads the roll, the anchors and their rights.` : null,
+        d.valueAdd ? `${d.valueAdd}: the renovation program as stated — the deal page reads its proof, its pace and what the model does not carry.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 
