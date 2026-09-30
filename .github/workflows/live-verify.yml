@@ -209,6 +209,28 @@ jobs:
             if (Array.isArray(j.held) && j.held.length) console.log("NEWS HELD: " + j.held.map((h) => `${h.host} until ${h.until} after ${h.failures} failures`).join(" · "));
             else if (Array.isArray(j.held)) console.log("NEWS HELD: none");
           ' || true
+      - name: The flood map's sources from the deployment's own network (diagnostic, non-gating)
+        # The Flood view's picture (#472) is drawn on Render from FEMA's
+        # flood service and USGS's imagery, which the sandbox cannot reach
+        # and whose cold answers the runner measured at 20–30 s. The health
+        # route draws a small restyled frame of a public place and names each
+        # step: the layer list, the legend against the runner's copy the
+        # drawings fall back on, the overlay (and whether FEMA sent it at its
+        # own 30%), the aerial. Kept ten minutes a process, so this answers
+        # at once after the first run.
+        run: |
+          code=$(curl -sS -o flood.json -w "%{http_code}" --max-time 120 "https://underwrite-copilot.onrender.com/api/flood/health" || echo "FETCH-FAILED")
+          echo "FLOOD HEALTH: HTTP $code"
+          node -e '
+            const fs = require("fs");
+            let j; try { j = JSON.parse(fs.readFileSync("flood.json", "utf8")); } catch { console.log("FLOOD HEALTH: no JSON (pre-#472 build, or the route failed)"); process.exit(0); }
+            console.log("FLOOD HEALTH: " + j.summary);
+            const part = (name, p, extra) => console.log(`  ${p.ok ? "ok  " : "FAIL"} ${String(p.ms).padStart(6)} ms  ${name}${extra ? " — " + extra : ""}${p.error ? " — " + p.error : ""}`);
+            part("layer list", j.layer, j.layer.id != null ? "zones layer " + j.layer.id : "");
+            part("legend", j.legend, `${j.legend.entries} entries, ${j.legend.values} values` + (j.legend.matchesCopy === false ? `; added ${JSON.stringify(j.legend.added)}; dropped ${JSON.stringify(j.legend.removed)}` : ""));
+            part("restyled overlay", j.overlay, `${Math.round(j.overlay.bytes / 1024)} KB, alpha scale ${j.overlay.scale}, classes ${JSON.stringify(j.overlay.classes)}`);
+            part("aerial", j.aerial, `${Math.round(j.aerial.bytes / 1024)} KB`);
+          ' || true
       - name: The search doors, from the runner (diagnostic, non-gating)
         # Every Google News read has a Bing News read behind it (#278). The
         # sandbox that writes this code cannot reach either host, so the

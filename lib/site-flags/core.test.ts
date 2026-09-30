@@ -174,36 +174,42 @@ describe("legendEntryFor and floodZoneLine — what the map says at the building
     expect(floodZoneLine(undefined, legend)).toBeNull();
     // Without the legend the zone is still said, without FEMA's name for it.
     expect(floodZoneLine(flag("VE", null))).toBe(
-      "The building sits in Zone VE, a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.",
+      "The building sits in Zone VE, a coastal high-hazard area where storm waves add to the flood, a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.",
     );
   });
-});
 
-import { floodKey } from "./core";
-
-describe("floodKey — the key under the Flood tab's map", () => {
-  const legend = parseNfhlLegend(LEGEND_JSON, 28);
-  const flag = (zone: string, subtype: string | null) => ({ zone, subtype, isHighRisk: /^[AV]/.test(zone) });
-
-  it("leads with the building's own zone, marked, then FEMA's common three, each once", () => {
-    const key = floodKey(legend, flag("X", "AREA WITH REDUCED FLOOD RISK DUE TO LEVEE"));
-    expect(key.map((k) => [k.label, k.here])).toEqual([
-      ["Area with Reduced Risk Due to Levee", true],
-      ["1% Annual Chance Flood Hazard", false],
-      ["Regulatory Floodway", false],
-      ["0.2% Annual Chance Flood Hazard", false],
-    ]);
-    // A building in the 1% zone is not listed twice.
-    const ae = floodKey(legend, flag("AE", null));
-    expect(ae.map((k) => k.label)).toEqual(["1% Annual Chance Flood Hazard", "Regulatory Floodway", "0.2% Annual Chance Flood Hazard"]);
-    expect(ae[0].here).toBe(true);
+  it("says open water, an area the map leaves out, an unstudied Zone D and a plain Zone X as what they are (#472)", () => {
+    // A building's point in the river is a point off the building.
+    const water = floodZoneLine(flag("OPEN WATER", null), legend)!;
+    expect(water).toContain("open water");
+    expect(water).not.toContain("Zone OPEN WATER");
+    const excluded = floodZoneLine(flag("AREA NOT INCLUDED", null), legend)!;
+    expect(excluded).toContain("does not include");
+    expect(excluded).not.toContain("Zone AREA");
+    // Zone D is a hazard FEMA has not studied — never "mapped".
+    const d = floodZoneLine(flag("D", null), legend)!;
+    expect(d).toContain("where FEMA has not determined the flood hazard");
+    expect(d).not.toContain("the hazard is mapped");
+    // A Zone X with no subtype is not one of the shaded hazards.
+    const x = floodZoneLine(flag("X", null), legend)!;
+    expect(x).toBe("The building sits in Zone X, outside the Special Flood Hazard Area: flood insurance is not required by a federally backed lender.");
+    // The regulatory floodway says what it is.
+    expect(floodZoneLine(flag("AE", "FLOODWAY"), legend)).toContain("in the regulatory floodway, a Special Flood Hazard Area where new building and fill are restricted");
   });
 
-  it("marks nothing where the building's zone is not drawn, and is empty with no legend", () => {
-    expect(floodKey(legend, flag("X", "AREA OF MINIMAL FLOOD HAZARD")).some((k) => k.here)).toBe(false);
-    expect(floodKey(legend, null).length).toBe(3);
-    expect(floodKey(legend, "unavailable").some((k) => k.here)).toBe(false);
-    expect(floodKey([], flag("AE", null))).toEqual([]);
+  it("says FEMA's base flood elevation where FEMA states one, and nothing where it writes -9999 (#472)", () => {
+    // The runner's frame query (flood-sheet run 36745937081): Hoboken's AE
+    // at 9 feet NAVD88, New Orleans' at -1, a Philadelphia AE with none.
+    const hoboken = parseNfhlFlood({ features: [{ attributes: { FLD_ZONE: "AE", ZONE_SUBTY: null, STATIC_BFE: 9, LEN_UNIT: "Feet", V_DATUM: "NAVD88", DEPTH: -9999 } }] })!;
+    expect(hoboken.bfe).toEqual({ value: 9, unit: "Feet", datum: "NAVD88" });
+    expect(floodZoneLine(hoboken, legend)).toContain("FEMA's base flood elevation there is 9 feet (NAVD88).");
+    const nola = parseNfhlFlood({ features: [{ attributes: { FLD_ZONE: "AE", STATIC_BFE: -1, LEN_UNIT: "Feet", V_DATUM: "NAVD88", DEPTH: -9999 } }] })!;
+    expect(floodZoneLine(nola, legend)).toContain("there is -1 foot (NAVD88).");
+    const none = parseNfhlFlood({ features: [{ attributes: { FLD_ZONE: "AE", STATIC_BFE: -9999, LEN_UNIT: null, V_DATUM: null, DEPTH: -9999 } }] })!;
+    expect(none.bfe).toBeUndefined();
+    expect(floodZoneLine(none, legend)).not.toContain("base flood elevation");
+    const ao = parseNfhlFlood({ features: [{ attributes: { FLD_ZONE: "AO", STATIC_BFE: -9999, DEPTH: 2, LEN_UNIT: "Feet" } }] })!;
+    expect(floodZoneLine(ao, legend)).toContain("FEMA maps the flood there at 2 feet deep.");
   });
 });
 

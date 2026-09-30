@@ -417,3 +417,130 @@ export async function floodMapFor(
     : [];
   return { image: picture?.image ?? null, key, line };
 }
+
+// ── How FEMA and USGS answer from the site's own network (#472) ────────────
+
+export interface FloodHealthPart {
+  ok: boolean;
+  ms: number;
+  error?: string;
+}
+
+export interface FloodHealth {
+  checkedAt: string;
+  summary: string;
+  layer: FloodHealthPart & { id: number | null };
+  legend: FloodHealthPart & { entries: number; values: number; matchesCopy: boolean | null; added: string[]; removed: string[] };
+  overlay: FloodHealthPart & { bytes: number; scale: number | null; classes: FloodClassKey[] };
+  aerial: FloodHealthPart & { bytes: number };
+}
+
+/** The frame the check draws: Hoboken, a public place the runner's flood
+ *  sheets drew, in Zone AE beside the 0.2% zone. */
+const HEALTH_POINT = { lat: 40.744, lng: -74.0324 };
+const HEALTH_TTL_MS = 10 * 60 * 1000;
+
+const healthState = ((globalThis as { [k: symbol]: unknown })[Symbol.for("uc.floodHealth")] ??= {
+  at: 0,
+  result: null as FloodHealth | null,
+  running: null as Promise<FloodHealth> | null,
+}) as { at: number; result: FloodHealth | null; running: Promise<FloodHealth> | null };
+
+const errText = (err: unknown) => (err instanceof Error ? err.message : String(err)).slice(0, 200);
+
+async function timed<T>(fn: () => Promise<T>): Promise<{ value: T | null; ms: number; error?: string }> {
+  const t0 = Date.now();
+  try {
+    return { value: await fn(), ms: Date.now() - t0 };
+  } catch (err) {
+    return { value: null, ms: Date.now() - t0, error: errText(err) };
+  }
+}
+
+/**
+ * Whether FEMA's flood service and USGS's imagery answer from this
+ * deployment, and how fast: the layer list, the legend (held against the
+ * runner's copy the drawings fall back on — a value FEMA added or dropped is
+ * named), a restyled overlay for a small frame (its alpha measured, the
+ * classes it shows read) and the aerial for the same frame. Uncached reads,
+ * so it measures the services rather than this process's memory; the answer
+ * is kept ten minutes, so the check never hammers either host.
+ */
+export async function floodHealth(): Promise<FloodHealth> {
+  if (healthState.result && Date.now() - healthState.at < HEALTH_TTL_MS) return healthState.result;
+  if (healthState.running) return healthState.running;
+  healthState.running = (async (): Promise<FloodHealth> => {
+    const layer = await timed(async () => {
+      const id = resolveNfhlLayerId(await fetchJson(`${FLOOD_ROOT}?f=json`));
+      if (id === null) throw new Error("no Flood Hazard Zones layer listed");
+      return id;
+    });
+    const layerId = layer.value ?? vendoredLegend.layerId;
+    const legend = await timed(async () => {
+      const entries = parseNfhlLegend(await fetchJson(`${FLOOD_ROOT}/legend?f=json`), layerId);
+      if (!entries.length) throw new Error("no legend entries for the zones layer");
+      return entries;
+    });
+    const live = new Set((legend.value ?? []).flatMap((e) => e.values));
+    const copy = new Set(VENDORED_LEGEND.flatMap((e) => e.values));
+    const added = legend.value ? [...live].filter((v) => !copy.has(v)) : [];
+    const removed = legend.value ? [...copy].filter((v) => !live.has(v)) : [];
+    const frame = { center: HEALTH_POINT, zoom: FLOOD_FRAME.zoom, width: 640, height: 360 };
+    const dynamicLayers = floodDynamicLayers(layerId, legend.value ?? VENDORED_LEGEND);
+    const [overlay, aerial] = await Promise.all([
+      timed(async () => {
+        if (!dynamicLayers) throw new Error("no legend entry matches a class the palette draws");
+        const png = await defaultFetchers.overlay(`${FLOOD_ROOT}/export`, nfhlRestyledForm({ ...frame, dynamicLayers, scale: 2 }));
+        const sharp = (await import("sharp")).default;
+        const { data, info } = await sharp(png).ensureAlpha().raw().toBuffer({ resolveWithObject: true });
+        const px = new Uint8Array(data.buffer, data.byteOffset, data.length);
+        const scale = overlayAlphaScale(px, info.width, info.height);
+        if (scale) unscaleAlpha(px, scale);
+        return { bytes: png.length, scale, classes: classesIn(px, info.width, info.height, { w: 1, h: 1 }, 150) };
+      }),
+      timed(async () => (await defaultFetchers.aerial(usgsAerialUrl(frame))).length),
+    ]);
+    const result: FloodHealth = {
+      checkedAt: new Date().toISOString(),
+      summary: "",
+      layer: { ok: layer.value !== null, ms: layer.ms, id: layer.value, ...(layer.error ? { error: layer.error } : {}) },
+      legend: {
+        ok: legend.value !== null,
+        ms: legend.ms,
+        entries: legend.value?.length ?? 0,
+        values: live.size,
+        matchesCopy: legend.value ? added.length === 0 && removed.length === 0 : null,
+        added,
+        removed,
+        ...(legend.error ? { error: legend.error } : {}),
+      },
+      overlay: {
+        ok: overlay.value !== null,
+        ms: overlay.ms,
+        bytes: overlay.value?.bytes ?? 0,
+        scale: overlay.value?.scale ?? null,
+        classes: overlay.value?.classes ?? [],
+        ...(overlay.error ? { error: overlay.error } : {}),
+      },
+      aerial: { ok: aerial.value !== null, ms: aerial.ms, bytes: aerial.value ?? 0, ...(aerial.error ? { error: aerial.error } : {}) },
+    };
+    const s = (x: number) => `${(x / 1000).toFixed(1)} s`;
+    result.summary = [
+      result.overlay.ok
+        ? `FEMA drew the restyled zones in ${s(result.overlay.ms)}${result.overlay.scale && result.overlay.scale !== 1 ? " (at its own 30%, corrected)" : ""}`
+        : `FEMA's restyled zones FAILED after ${s(result.overlay.ms)}`,
+      result.legend.matchesCopy === true
+        ? "its legend matches the runner's copy"
+        : result.legend.matchesCopy === false
+          ? `its legend DIFFERS from the runner's copy (${added.length} added, ${removed.length} dropped)`
+          : "its legend did not answer",
+      result.aerial.ok ? `USGS answered in ${s(result.aerial.ms)}` : `USGS FAILED after ${s(result.aerial.ms)}`,
+    ].join("; ");
+    healthState.result = result;
+    healthState.at = Date.now();
+    return result;
+  })().finally(() => {
+    healthState.running = null;
+  });
+  return healthState.running;
+}

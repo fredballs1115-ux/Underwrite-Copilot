@@ -13,7 +13,7 @@ import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { pdfFillCountOf, pdfTextOf } from "./pdf-text-of";
 import { TINY_PNG_DATA_URI, tinyPng } from "./test-png";
-import { floodKey, floodZoneLine, type FloodMapView } from "@/lib/site-flags/core";
+import { floodZoneLine, type FloodMapView } from "@/lib/site-flags/core";
 
 const tinyDataUri = (rgb: [number, number, number]) => `data:image/png;base64,${tinyPng(rgb).toString("base64")}`;
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
@@ -998,7 +998,7 @@ describe("ReportDocument (full report)", () => {
     expect(withPlan).toBe(without + 1);
   }, 45000);
 
-  it("gives the site a page of its own: FEMA's flood map as one picture, the ring on the building, FEMA's key with the building's zone marked, and the zone's sentence (#427)", async () => {
+  it("gives the site a page of its own: FEMA's flood map as one picture, the ring on the building, the key with the building's zone marked, and the zone's sentence (#427, #472)", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,
       asset_class: SAMPLE_DEAL.asset_class,
@@ -1017,7 +1017,17 @@ describe("ReportDocument (full report)", () => {
       { label: "0.2% Annual Chance Flood Hazard", image: tinyDataUri([240, 150, 40]), values: ["X,0.2 PCT ANNUAL CHANCE FLOOD HAZARD"] },
     ];
     const line = floodZoneLine(flag, legend)!;
-    const view: FloodMapView = { image: tinyDataUri([90, 120, 80]), key: floodKey(legend, flag), line };
+    // The key as lib/flood-map's floodMapFor builds it (#472): the classes
+    // the band shows, in the site's words, each with its swatch.
+    const view: FloodMapView = {
+      image: tinyDataUri([90, 120, 80]),
+      key: [
+        { label: "1% annual chance flood hazard", image: TINY_PNG_DATA_URI, here: true },
+        { label: "Floodway", image: tinyDataUri([200, 40, 40]), here: false },
+        { label: "0.2% annual chance flood hazard", image: tinyDataUri([240, 150, 40]), here: false },
+      ],
+      line,
+    };
     const render = (floodMap: FloodMapView | null) =>
       renderToBuffer(
         React.createElement(ReportDocument, {
@@ -1032,9 +1042,9 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("The site");
     expect(text).toContain("FEMA flood map");
     expect(text).toContain("FEMA National Flood Hazard Layer over USGS The National Map; the ring marks the building.");
-    expect(text).toContain("1% Annual Chance Flood Hazard - at the building");
-    expect(text).toContain("Regulatory Floodway");
-    expect(text).toContain("0.2% Annual Chance Flood Hazard");
+    expect(text).toContain("1% annual chance flood hazard - at the building");
+    expect(text).toContain("Floodway");
+    expect(text).toContain("0.2% annual chance flood hazard");
     expect(text).toContain(
       "The building sits in Zone AE (1% annual chance flood hazard), a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.",
     );

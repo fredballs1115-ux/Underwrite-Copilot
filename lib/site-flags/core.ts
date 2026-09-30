@@ -11,6 +11,13 @@ export interface FloodFlag {
   /** A- and V-prefixed zones = Special Flood Hazard Area (mandatory flood
    *  insurance on federally-backed lending) */
   isHighRisk: boolean;
+  /** FEMA's base flood elevation for the zone where it states one (#472):
+   *  STATIC_BFE in its own unit and datum, as the runner printed them
+   *  ("9, Feet, NAVD88" in Hoboken; -9999 is FEMA's "none" and is read as
+   *  absent). A lookup stored before it was read has none. */
+  bfe?: { value: number; unit: string; datum: string | null } | null;
+  /** the depth FEMA maps an AO zone's flood at, where it states one */
+  depth?: { value: number; unit: string } | null;
 }
 
 export interface SiteFlagsResult {
@@ -149,7 +156,20 @@ export function parseNfhlFlood(json: unknown): FloodFlag | null {
     const zone = zoneKey ? String(a[zoneKey] ?? "").trim() : "";
     if (!zone) continue;
     const subtype = subKey ? String(a[subKey] ?? "").trim() || null : null;
-    flags.push({ zone, subtype, isHighRisk: isHighRiskZone(zone) });
+    const field = (name: string) => a[Object.keys(a).find((k) => k.toUpperCase() === name) ?? ""];
+    // FEMA writes -9999 where a zone states no figure.
+    const figure = (v: unknown) => (typeof v === "number" && Number.isFinite(v) && v > -9000 ? v : null);
+    const unit = String(field("LEN_UNIT") ?? "").trim();
+    const bfe = figure(field("STATIC_BFE"));
+    const depth = figure(field("DEPTH"));
+    const datum = String(field("V_DATUM") ?? "").trim() || null;
+    flags.push({
+      zone,
+      subtype,
+      isHighRisk: isHighRiskZone(zone),
+      ...(bfe !== null && unit ? { bfe: { value: bfe, unit, datum } } : {}),
+      ...(depth !== null && depth > 0 && unit ? { depth: { value: depth, unit } } : {}),
+    });
   }
   if (!flags.length) return null;
   return flags.find((f) => f.isHighRisk) ?? flags[0];
@@ -231,12 +251,33 @@ export function isMinimalHazard(flood: FloodFlag): boolean {
   return flood.zone.trim().toUpperCase() === "X" && /minimal/i.test(flood.subtype ?? "");
 }
 
+/** A length FEMA states, in words: "9 feet", "-1 foot". */
+function lengthWords(value: number, unit: string): string {
+  const u = unit.trim().toLowerCase();
+  const n = Number.isInteger(value) ? String(value) : value.toFixed(1);
+  if (u === "feet" || u === "foot" || u === "ft") return `${n} ${Math.abs(value) === 1 ? "foot" : "feet"}`;
+  return `${n} ${u}`;
+}
+
+/** What FEMA states about the flood's height there, where it states it. */
+function elevationWords(flood: FloodFlag): string {
+  if (flood.bfe) {
+    return ` FEMA's base flood elevation there is ${lengthWords(flood.bfe.value, flood.bfe.unit)}${flood.bfe.datum ? ` (${flood.bfe.datum})` : ""}.`;
+  }
+  if (flood.depth) return ` FEMA maps the flood there at ${lengthWords(flood.depth.value, flood.depth.unit)} deep.`;
+  return "";
+}
+
 /**
  * What the map says at the building, in one sentence, from the site-flags
  * lookup at the geocoded point: the zone, what FEMA's legend calls it, and
  * what it means for a loan. A point with no zone polygon is said to be off
  * FEMA's digital map — every digitally mapped area carries a zone, Zone X
- * included — never "no hazard".
+ * included — never "no hazard". Open water and an area the map does not
+ * include are said as what they are, never as a zone (#472): a building's
+ * point in the river is a point off the building. Zone D is a hazard FEMA
+ * has not studied, never a mapped one. Where FEMA states the base flood
+ * elevation, or an AO zone's depth, it is said too.
  */
 export function floodZoneLine(
   flood: SiteFlagsResult["flood"] | undefined,
@@ -246,43 +287,35 @@ export function floodZoneLine(
   if (flood === null) {
     return "FEMA's digital flood map has no zone at the building's point — the area may not be mapped digitally; check the effective paper map with FEMA's Map Service Center.";
   }
+  const z = flood.zone.trim().toUpperCase();
+  if (z === "OPEN WATER") {
+    return "FEMA's map puts the building's point in open water, so the point is likely off the building: read the zone on FEMA's map at the building itself.";
+  }
+  if (z === "AREA NOT INCLUDED") {
+    return "FEMA's map marks the building's point as an area this flood map does not include: another community's map, or one not yet digital, covers it — check FEMA's Map Service Center.";
+  }
   const zone = `Zone ${flood.zone}`;
   if (isMinimalHazard(flood)) {
     return `The building sits in ${zone}, an area of minimal flood hazard, which FEMA maps and leaves undrawn — the shading, where there is any, is the hazard nearby.`;
   }
   const entry = legendEntryFor(legend, flood);
-  // FEMA's own name for what the building's zone is drawn as.
-  const called = entry ? ` (${entry.label.toLowerCase()})` : "";
+  const insurance = "a federally backed loan requires flood insurance, and the premium belongs in the expense line.";
   if (flood.isHighRisk) {
-    return `The building sits in ${zone}${called}, a Special Flood Hazard Area: a federally backed loan requires flood insurance, and the premium belongs in the expense line.`;
+    if (entry && /^regulatory floodway/i.test(entry.label)) {
+      return `The building sits in ${zone} in the regulatory floodway, a Special Flood Hazard Area where new building and fill are restricted to keep the channel clear: ${insurance}${elevationWords(flood)}`;
+    }
+    const called = entry ? ` (${entry.label.toLowerCase()})` : "";
+    const coastal = z.startsWith("V") ? ", a coastal high-hazard area where storm waves add to the flood," : ",";
+    return `The building sits in ${zone}${called}${coastal} a Special Flood Hazard Area: ${insurance}${elevationWords(flood)}`;
+  }
+  const called = entry ? ` (${entry.label.toLowerCase()})` : "";
+  if (z === "D") {
+    return `The building sits in ${zone}${called}, where FEMA has not determined the flood hazard: the map neither shows one nor rules one out, and a federally backed lender does not require flood insurance.`;
+  }
+  if (!flood.subtype || !entry) {
+    return `The building sits in ${zone}${called}, outside the Special Flood Hazard Area: flood insurance is not required by a federally backed lender.`;
   }
   return `The building sits in ${zone}${called}, outside the Special Flood Hazard Area: flood insurance is not required by a federally backed lender, though the hazard is mapped.`;
-}
-
-/** The pairs that pick FEMA's three common entries out of the legend: the
- *  1% annual chance zone, the regulatory floodway and the 0.2% zone. Chosen
- *  by FEMA's own zone values, not by label, so a relabelled entry still
- *  lands. */
-const COMMON_KEYS = ["AE,<NULL>", "AE,FLOODWAY", "X,0.2 PCT ANNUAL CHANCE FLOOD HAZARD"];
-
-/**
- * The key the Flood tab draws under the map: the building's own zone first,
- * marked, then the common three FEMA draws most often, each once, in FEMA's
- * swatches. Four at most — the other entries (levees, future conditions, an
- * undetermined area) show up only as the building's own.
- */
-export function floodKey(
-  legend: readonly NfhlLegendEntry[],
-  flood: SiteFlagsResult["flood"] | undefined,
-): { label: string; image: string | null; here: boolean }[] {
-  const own = flood && flood !== "unavailable" ? legendEntryFor(legend, flood) : null;
-  const common = COMMON_KEYS.map((k) => legend.find((e) => e.values.some((v) => v.trim().toUpperCase() === k)) ?? null);
-  const out: { label: string; image: string | null; here: boolean }[] = [];
-  for (const e of [own, ...common]) {
-    if (!e || out.some((o) => o.label === e.label)) continue;
-    out.push({ label: e.label, image: e.image, here: e === own });
-  }
-  return out;
 }
 
 // ── The flood zone wherever the deal is summarized (#426) ───────────────────
