@@ -316,6 +316,11 @@ const num = (s: string | null | undefined): number | undefined => {
  *  the defaults — an explicit answer always beats an assumption. */
 export function buildSubject(input: {
   address: { state?: string; city?: string; county?: string; submarket?: string } | null;
+  /** what the Census geocoder read at the building (#452, the site flags):
+   *  the incorporated place it sits in — null where none, absent where no
+   *  lookup has answered — and its county, which stands in for the
+   *  address's own county name */
+  census?: { place?: { name: string } | null; county?: { name: string } | null } | null;
   sizeText?: string | null;
   yearBuilt?: number | null;
   sectorFields?: Record<string, string | number | boolean> | null;
@@ -336,12 +341,14 @@ export function buildSubject(input: {
     typeof sf[k] === "boolean" ? (sf[k] as boolean) : undefined;
   const otherUnits = numField("owner_units_in_jurisdiction");
   const willOccupy = boolField("will_owner_occupy");
+  const census = input.census ?? null;
   return {
     ...BUYER_DEFAULTS,
     state: input.address?.state || undefined,
-    locality: [input.address?.city, input.address?.county, input.address?.submarket].filter(
+    locality: [input.address?.city, census?.county?.name || input.address?.county, input.address?.submarket].filter(
       (s): s is string => !!s
     ),
+    ...(census && census.place !== undefined ? { place: census.place ? census.place.name : null } : {}),
     units,
     // The deal-facts answer beats the OM/manual claim — the buyer may be
     // correcting a wrong listing figure.

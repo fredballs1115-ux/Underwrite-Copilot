@@ -24,7 +24,7 @@ import type { DealVisualCache } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
-import { floodKey, floodZoneLine, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { floodKey, floodZoneLine, siteFlagsOutdated, siteFlagsStale, type NfhlLegendEntry, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { floodLegend } from "@/lib/flood-map";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
@@ -396,10 +396,14 @@ export default async function DealPage({
     ((deal as { site_flags?: SiteFlagsResult | null }).site_flags) ?? null;
   const flagsStale = siteFlagsStale(storedFlags, dealAddress?.label);
   const siteFlags = flagsStale ? null : storedFlags;
-  if (dealAddress?.label && (!siteFlags || siteFlags.status === "pending")) {
+  // A lookup made before the place was read (#452) still stands for its
+  // tract and flood zone, and is made again behind the page so the rules
+  // can read the building's municipality.
+  const flagsOutdated = siteFlagsOutdated(siteFlags);
+  if (dealAddress?.label && (!siteFlags || siteFlags.status === "pending" || flagsOutdated)) {
     after(async () => {
       try {
-        if (await claimSiteFlags(id, flagsStale)) await runSiteFlags(id);
+        if (await claimSiteFlags(id, flagsStale || flagsOutdated)) await runSiteFlags(id);
       } catch {
         // pre-0030 DB — nothing to store onto yet
       }
@@ -1252,6 +1256,7 @@ export default async function DealPage({
         <ResearchPanel
           address={dealAddress}
           placement={placement}
+          census={siteFlags && siteFlags.status !== "pending" ? { place: siteFlags.place, county: siteFlags.county } : null}
           sizeText={summarySize}
           priceText={subjectPriceNumber != null ? String(Math.round(subjectPriceNumber)) : null}
           capText={summaryCap}

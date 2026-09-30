@@ -18,6 +18,14 @@ export interface SiteFlagsResult {
   subject?: { lat: number; lng: number; label: string };
   /** 11-digit census tract GEOID, null when the geocoder had no tract */
   tractGeoid: string | null;
+  /** the incorporated place the building sits in (#452): its municipality,
+   *  which decides whether a city's rules reach it; null where it sits in
+   *  none; absent on a lookup made before it was read (`SITE_FLAGS_V`) */
+  place?: CensusPlace | null;
+  /** the county the Census geocoder puts the point in */
+  county?: CensusPlace | null;
+  /** the rules the lookup was made under; absent on the first version */
+  v?: number;
   /** null = tract known, not in a zone; "unchecked" = registry empty/unavailable */
   opportunityZone: { sourceDataset: string } | null | "unchecked";
   /** null = query worked, point in no mapped flood polygon (treat as zone X-ish
@@ -27,6 +35,17 @@ export interface SiteFlagsResult {
   error?: string;
   /** honesty line rendered under the card, verbatim */
   note: string;
+}
+
+/** The rules a lookup is made under: 2 reads the incorporated place and the
+ *  county beside the tract (#452). An answered lookup under older rules is
+ *  made again on the deal's next view, so its rules can read the place. */
+export const SITE_FLAGS_V = 2;
+
+/** Whether answered flags predate the place (#452) and should be looked up
+ *  again. A lookup that never geocoded is left alone: it has no point. */
+export function siteFlagsOutdated(flags: Pick<SiteFlagsResult, "status" | "v"> | null | undefined): boolean {
+  return !!flags && flags.status === "ok" && (flags.v ?? 1) < SITE_FLAGS_V;
 }
 
 /**
@@ -70,6 +89,51 @@ export function parseCensusTract(json: unknown): string | null {
   const first = key ? (geogs[key] as { GEOID?: unknown }[])[0] : undefined;
   const geoid = String(first?.GEOID ?? "").replace(/\D/g, "");
   return geoid.length === 11 ? geoid : null;
+}
+
+/** A place the Census geocoder names: its name without the kind ("Pasadena",
+ *  not "Pasadena city") and its GEOID. */
+export interface CensusPlace {
+  name: string;
+  geoid: string;
+}
+
+/**
+ * The incorporated place a point sits in (#452), from the same
+ * `geographies/coordinates` response the tract comes from — the building's
+ * municipality, which decides whether a city's rent rules reach it. The
+ * runner printed the response (zori.yml probe run 36658903671): an
+ * "Incorporated Places" layer with BASENAME "Pasadena", NAME "Pasadena
+ * city", GEOID "0656000" for Pasadena City Hall; "Los Angeles city" for a
+ * point in Van Nuys, whose postal city is not its municipality; "New York
+ * city" in Brooklyn; and NO such layer for Towson, which is unincorporated
+ * (its county is Baltimore County). So: the place where the layer names one,
+ * null where the response answered and names none (the point is in no
+ * incorporated place), undefined where the response is not a geographies
+ * answer at all and says nothing either way.
+ */
+export function parseCensusPlace(json: unknown): CensusPlace | null | undefined {
+  const geogs = (json as { result?: { geographies?: Record<string, unknown> } })?.result?.geographies;
+  if (!geogs || typeof geogs !== "object") return undefined;
+  // A response that names no county answered nothing we can read a "none" from.
+  if (!Object.keys(geogs).some((k) => /^counties$/i.test(k))) return undefined;
+  const key = Object.keys(geogs).find((k) => /^incorporated places$/i.test(k));
+  const first = key && Array.isArray(geogs[key]) ? (geogs[key] as { BASENAME?: unknown; GEOID?: unknown }[])[0] : undefined;
+  const name = String(first?.BASENAME ?? "").trim();
+  const geoid = String(first?.GEOID ?? "").replace(/\D/g, "");
+  return name && geoid ? { name, geoid } : null;
+}
+
+/** The county a point sits in, from the same response: its full name
+ *  ("Los Angeles County", "Baltimore city") and its five-digit GEOID. */
+export function parseCensusCounty(json: unknown): CensusPlace | null {
+  const geogs = (json as { result?: { geographies?: Record<string, unknown> } })?.result?.geographies;
+  if (!geogs || typeof geogs !== "object") return null;
+  const key = Object.keys(geogs).find((k) => /^counties$/i.test(k));
+  const first = key && Array.isArray(geogs[key]) ? (geogs[key] as { NAME?: unknown; GEOID?: unknown }[])[0] : undefined;
+  const name = String(first?.NAME ?? "").trim();
+  const geoid = String(first?.GEOID ?? "").replace(/\D/g, "");
+  return name && geoid.length === 5 ? { name, geoid } : null;
 }
 
 /** NFHL flood-hazard-zones query response → the FloodFlag for the point.

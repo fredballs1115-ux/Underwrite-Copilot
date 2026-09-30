@@ -44,6 +44,11 @@ export interface Benchmark {
 export interface RuleSubject {
   state?: string; // 2-letter or full; normalized internally
   locality?: string[]; // city, county, submarket — all names the deal has
+  /** the incorporated place the Census geocoder put the building in (#452):
+   *  its municipality ("Los Angeles" for a Van Nuys address), null where it
+   *  is in none (unincorporated), undefined where no lookup has answered —
+   *  a city's rules then read the address's own names */
+  place?: string | null;
   units?: number;
   building_permit_year?: number;
   built_year?: number;
@@ -117,23 +122,80 @@ const LOCALITY_ALIASES: Record<string, Record<string, string>> = {
   },
 };
 
-/** DC's dual identity: the address layer yields state "DC" and city names like
- *  "Washington" / "District of Columbia"; rules store state "DC", local "Washington". */
-export function jurisdictionMatches(rule: RegulatoryRule, subject: RuleSubject): boolean {
-  if (!subject.state) return false;
+/** Cities whose county IS the city, so the county's name places a deal in
+ *  the city: San Francisco, Philadelphia, and New York's five counties (the
+ *  boroughs reach it through the alias table). Everywhere else a county of
+ *  the city's name holds other cities too — Los Angeles County holds
+ *  Pasadena, Long Beach and 85 more. */
+const CONSOLIDATED: Record<string, readonly string[]> = {
+  CA: ["san francisco"],
+  PA: ["philadelphia"],
+  NY: ["new york"],
+};
+
+/** What kind of place a name is, read before `norm` strips the kind word: a
+ *  county ("Prince George's County", "Orleans Parish"), a name ending in
+ *  "city" ("Baltimore City" as a rule files it, the Census's "Baltimore
+ *  city", and a place like "Jersey City"), or a place. */
+function kindOf(name: string): "county" | "city" | "place" {
+  const s = name.trim();
+  if (/\b(county|parish)$/i.test(s)) return "county";
+  if (/\bcity$/i.test(s)) return "city";
+  return "place";
+}
+
+/**
+ * Whether a rule's jurisdiction holds the deal (#452): "yes", "no", or
+ * "unknown" where the names the deal has cannot say. Names are compared
+ * WHOLE — the first version matched any name containing another, so South
+ * San Francisco read San Francisco's rent ordinance, Chicago Heights
+ * Chicago's landlord ordinance and East Newark Newark's rent control — and a
+ * county never stands in for a city: "Los Angeles County" read the City of
+ * Los Angeles's rent stabilization onto Pasadena and every other city in
+ * the county, and "Baltimore County" Baltimore City's rental license onto
+ * Towson.
+ *
+ *   - A statewide rule holds anywhere in its state; DC is one jurisdiction.
+ *   - A county's rule holds where the deal's county is that county.
+ *   - A city's rule reads the building's municipality where the Census
+ *     geocoder named it (`subject.place`: Van Nuys is in the City of Los
+ *     Angeles; an unincorporated point is in no city). Without it, the
+ *     address's own place names decide; a county of the city's name places
+ *     the deal in the city only where the county is the city (`CONSOLIDATED`)
+ *     and otherwise leaves it "unknown" — a Van Nuys address, whose postal
+ *     city is not its municipality, is asked rather than dropped. A rule
+ *     filed under "… City" is an independent city (Baltimore City), which a
+ *     county of its name does not contain.
+ */
+export function jurisdictionOf(rule: RegulatoryRule, subject: RuleSubject): Tri {
+  if (!subject.state) return "no";
   const state = abbrevState(subject.state).toUpperCase();
-  if (state !== rule.jurisdiction_state.toUpperCase()) {
-    return false;
-  }
-  if (!rule.jurisdiction_local) return true; // statewide rule
-  const want = norm(rule.jurisdiction_local);
+  if (state !== rule.jurisdiction_state.toUpperCase()) return "no";
+  if (!rule.jurisdiction_local) return "yes"; // statewide rule
+  if (state === "DC") return "yes"; // one jurisdiction
   const aliases = LOCALITY_ALIASES[state] ?? {};
-  const have = (subject.locality ?? [])
-    .map(norm)
-    .filter(Boolean)
-    .flatMap((h) => (aliases[h] ? [h, aliases[h]] : [h]));
-  if (rule.jurisdiction_state.toUpperCase() === "DC") return true; // one jurisdiction
-  return have.some((h) => h === want || h.includes(want) || want.includes(h));
+  const named = (x: string) => {
+    const n = norm(x);
+    return aliases[n] ?? n;
+  };
+  const want = named(rule.jurisdiction_local);
+  const ruleKind = kindOf(rule.jurisdiction_local);
+  const entries = (subject.locality ?? []).filter((x) => norm(x)).map((x) => ({ kind: kindOf(x), name: named(x) }));
+  const counties = entries.filter((e) => e.kind === "county").map((e) => e.name);
+  const places = entries.filter((e) => e.kind !== "county").map((e) => e.name);
+  if (ruleKind === "county") return counties.includes(want) ? "yes" : "no";
+  // A city's rule: the building's municipality, where the Census named it.
+  if (subject.place !== undefined) return subject.place !== null && named(subject.place) === want ? "yes" : "no";
+  // An independent city is not in the county of its name.
+  if (ruleKind === "city" && counties.includes(want)) return "no";
+  if (places.includes(want)) return "yes";
+  if (counties.includes(want)) return (CONSOLIDATED[state] ?? []).includes(want) ? "yes" : "unknown";
+  return "no";
+}
+
+/** Whether a rule's jurisdiction can hold the deal ("yes" or "unknown"). */
+export function jurisdictionMatches(rule: RegulatoryRule, subject: RuleSubject): boolean {
+  return jurisdictionOf(rule, subject) !== "no";
 }
 
 const yearOf = (iso: unknown): number | undefined => {
@@ -239,12 +301,19 @@ function evalConditions(
   return { result: acc, unknowns };
 }
 
+/** The open question a rule carries where the deal's names cannot say
+ *  whether it sits inside the rule's city (`jurisdictionOf` "unknown"). */
+export const WITHIN_CITY_LIMITS = "within_city_limits";
+
 /** Evaluate every jurisdiction-matched rule. Rules outside the deal's
- *  jurisdiction are omitted entirely (they're noise, not unknowns). */
+ *  jurisdiction are omitted entirely (they're noise, not unknowns); a rule
+ *  whose city the deal's names cannot place it in or out of (#452) reads
+ *  at most "possibly applies", with that question named. */
 export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): RuleEvaluation[] {
   const out: RuleEvaluation[] = [];
   for (const rule of rules) {
-    if (!jurisdictionMatches(rule, subject)) continue;
+    const where = jurisdictionOf(rule, subject);
+    if (where === "no") continue;
     const applies = evalConditions(rule.applies_if, subject);
     const exempt = evalConditions(rule.exempt_if ?? null, subject);
     // exempt_if of null/{} means "no exemption path", not "always exempt":
@@ -256,13 +325,16 @@ export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): Ru
     else if (exemptTri === "yes") outcome = "exempt";
     else if (applies.result === "yes" && exemptTri === "no") outcome = "applies";
     else outcome = "possibly_applies";
+    // Only a rule that would otherwise reach the deal asks where it is.
+    const asks = where === "unknown" && (outcome === "applies" || outcome === "possibly_applies");
+    if (asks) outcome = "possibly_applies";
 
     out.push({
       rule,
       applies: applies.result,
       exempt: exemptTri,
       outcome,
-      unknowns: [...applies.unknowns, ...(hasExemption ? exempt.unknowns : [])],
+      unknowns: [...(asks ? [WITHIN_CITY_LIMITS] : []), ...applies.unknowns, ...(hasExemption ? exempt.unknowns : [])],
     });
   }
   return out;
