@@ -3,6 +3,30 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Opportunity Zones, checked in every state",
+      "href": "/deals",
+      "blurb": "The site-check card could say a tract was not in an Opportunity Zone anywhere outside Maryland, because the list it checked held only Maryland's zones. It now checks the Treasury CDFI Fund's list of all 8,764 designated tracts, in every state and territory, and it checks each deal by the tract number the zones were designated on — the 2010 census tract, which is not always today's, since a tract split or renumbered since could sit in a zone and still miss the list. Where the check cannot run, the card says why."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "A picture for every deal, even before its photograph",
+      "href": "/deals",
+      "blurb": "A deal with no photograph now wears an illustration of its kind of building at dusk rather than an icon on a gradient: an apartment block, a house and a manufactured home, an office tower, a warehouse, a storefront, a hotel, storage doors or a staked parcel, lit from a low sun with a few windows glowing. Each deal keeps its own colours, and two deals of one kind are two different buildings. The same picture shows on its card, its list row, ⌘K, the deal's sticky bar, the map and the emails."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Twenty more cities, pictured",
+      "href": "/deals",
+      "blurb": "A deal in a metro area the site reads no market figures for — Albuquerque, Boise, Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville, Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New Orleans, Oklahoma City, Omaha, Providence, Tucson or Tulsa — now shows the photograph its city is known by on its card and its deal page until a photograph of the building itself is found, placed by the deal's county, chosen by eye and credited to its photographer."
+    },
+    {
+      "date": "2026-09-30",
+      "title": "Corrections: dates, rules and who sees your data",
+      "href": "/security",
+      "blurb": "Every research figure on the market pages now carries the date it is as of, and a file with no date says undated rather than borrowing one. California's and Washington's exemptions for new buildings are read as the rolling ages their statutes set, 15 and 12 years, so they move each January on their own. The security and privacy pages list every outside service that receives your data and what each receives, from one list checked against the code. And a few sentences are corrected: the gap between Zillow's asking rent and HUD's fair market rent is between two measures, not a premium over what HUD pays; FRED, not every publisher, lacks a multi-unit permit series for a metro; and a typical range in the memo or a risk is labelled a rule of thumb."
+    },
+    {
+      "date": "2026-09-30",
       "title": "The flood map, drawn once and kept",
       "href": "/deals",
       "blurb": "The Flood view on a deal page could vanish when FEMA's map service or the USGS aerial answered slowly, which they often do on a first request. Each deal's flood map is now drawn once on the server, as soon as the deal page is first opened, and kept: the aerial, calmed, with FEMA's flood zones drawn over it in clear colours at twice the pixels, so edges stay sharp on a high-resolution screen. The 1% annual chance zone is blue, its floodway a red hatch over the blue, the 0.2% zone amber and levee areas teal. While the map is being drawn the view says so; a slow answer is asked for again; and if it never comes, the key and the sentence stay. The key lists only the zones the picture actually shows. The sentence names the zone at the building correctly for every zone FEMA returns, with FEMA's base flood elevation where it states one. It is now looked up at the same point the map is drawn around. The full report prints the same picture."
