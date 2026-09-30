@@ -68,4 +68,13 @@ describe("dealAllowance — the deals left before a plan, counted by the create 
     expect(billing).toMatch(/const canCreateDeal = teamAllowed \|\| personalAllowed;/);
     expect(billing).toMatch(/export const FREE_DEAL_LIMIT = FREE_DEALS;/);
   });
+
+  it("the pipeline's limit messages read the constants the gates count by, never a typed figure", () => {
+    // The page said "the 3-deal limit" and "Your team’s 3 trial deals" in
+    // typed words: a changed allowance would have left both saying three.
+    const src = readFileSync("app/(app)/deals/page.tsx", "utf8");
+    expect(src).toMatch(/limit: `You’ve reached the \$\{FREE_DEAL_LIMIT\}-deal limit/);
+    expect(src).toMatch(/teamlimit: `Your team’s \$\{TEAM_TRIAL_DEALS\} trial deals/);
+    expect(src).not.toMatch(/\b\d+(?:-deal limit| free deals?| trial deals?)\b/);
+  });
 });

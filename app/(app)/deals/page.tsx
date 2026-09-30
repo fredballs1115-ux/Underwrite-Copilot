@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import { getBilling } from "@/lib/billing";
+import { FREE_DEAL_LIMIT, getBilling } from "@/lib/billing";
+import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { dealAllowance } from "@/lib/deal-allowance";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -35,14 +36,14 @@ const ERRORS: Record<string, string> = {
   size: "That PDF is larger than 32 MB — please try a smaller file for now.",
   save: "Couldn’t save the deal. Please try again.",
   upload: "The upload didn’t complete — nothing was saved. Please try again.",
-  limit:
-    "You’ve reached the 3-deal limit on the Free plan. Upgrade to Pro for unlimited deals.",
+  // The limits read from the constants the gates count by (lib/billing,
+  // lib/teams), never typed: a changed allowance changes the sentence.
+  limit: `You’ve reached the ${FREE_DEAL_LIMIT}-deal limit on the Free plan. Upgrade to Pro for unlimited deals.`,
   exportfail:
     "Couldn’t build that export just now — please try again in a moment.",
   auth:
     "You were signed out, so the upload didn’t start. You’re back in now — everything you typed is still filled in below; just re-attach the PDF.",
-  teamlimit:
-    "Your team’s 3 trial deals and your personal free deals are used up. Start the Team plan for unlimited shared deals, or upgrade to Pro.",
+  teamlimit: `Your team’s ${TEAM_TRIAL_DEALS} trial deals and your personal free deals are used up. Start the Team plan for unlimited shared deals, or upgrade to Pro.`,
 };
 
 // Fixed metric slots for the pipeline table — every row fills the SAME
