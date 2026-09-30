@@ -10,13 +10,13 @@
     {
       "date": "2026-09-30",
       "title": "Files that open whenever you click them",
-      "blurb": "A file added with a note, a BOV's page citation and each source document now open through a link signed at the moment you click it. Before, these links were signed when the page loaded and expired an hour later, so a deal page left open showed the storage host's error. The Documents tab also has a View link beside each rent roll, T-12 or BOV, where it listed the file's name alone.",
+      "blurb": "A file added with a note and a BOV's page citation now open through a link signed at the moment you click it. Before, those links were signed when the page loaded and expired an hour later, so a page left open showed the storage host's error. The Documents tab now links each source document the same way, where it listed the file's name alone: a PDF opens in the browser, and a spreadsheet such as a rent roll downloads.",
       "href": "/deals"
     },
     {
       "date": "2026-09-30",
       "title": "The pipeline, a little quicker",
-      "blurb": "The pipeline sorts by when offers are due, soonest first, and deals with no deadline go last. Choosing a PDF for a new deal fills the name from the file, as the batch upload does, and never replaces a name you typed. On a phone, the first tap on a map pin shows the deal's card and a second tap opens it. The compare table leaves out a row that is blank for every deal compared. A screen's clock counts from when the run began, so reloading the page mid-screen no longer resets it to 0:00.",
+      "blurb": "The pipeline can sort by when offers are due, earliest first, with deals that have no deadline last. Choosing a PDF for a new deal fills the name from the file, as the batch upload does, and never replaces a name you typed. On a phone, the first tap on a map pin shows the deal's card and a second tap opens it. The compare table leaves out a row that is blank for every deal compared. A screen's clock counts from when the run was asked for, so reloading the page mid-screen picks up its time rather than starting again at 0:00.",
       "href": "/deals"
     },
     {

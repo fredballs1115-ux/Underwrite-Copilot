@@ -76,6 +76,12 @@ export function PipelineMap({
   // open as it did: read when the click lands, after Leaflet has already
   // toggled the card, so a finger's second tap on a pin still opens it.
   const tapRef = useRef<{ id: string; pointer: string; open: boolean } | null>(null);
+  // The deal whose card is open on a touch screen. The pins are rebuilt
+  // whenever the list re-renders — the pipeline refreshes every few seconds
+  // while a deal screens, and the map places pins as they resolve — and a
+  // rebuild removes the open card with its marker, so the second tap only
+  // showed the card again. The card is re-opened on the rebuilt pin.
+  const openRef = useRef<string | null>(null);
 
   const points = useMemo(() => {
     const out: { deal: MapDeal; place: MapPlace }[] = part.placed.map((d) => ({ deal: d, place: d.place! }));
@@ -154,10 +160,18 @@ export function PipelineMap({
     const map = mapRef.current;
     const group = pinsRef.current;
     if (!ready || !L || !map || !group) return;
+    // Read before the clear: removing a marker closes its card, and the
+    // close would forget which one was open.
+    const reopen = openRef.current;
     group.clearLayers();
+    openRef.current = reopen;
     // A touch screen has no hover to show a card on: there the card is a
-    // popup a pin's first tap opens, and the card itself is a way in.
+    // popup a pin's first tap opens, and the card itself is a way in. In
+    // compare mode a tap picks at once, so no card is bound to flash open
+    // and pan the map on every pick.
     const coarse = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+    const withCard = coarse && !compareMode;
+    let reopened: Leaflet.Marker | null = null;
     for (const { deal, place } of points) {
       const isSelected = !!selected?.has(deal.id);
       const size = isSelected ? 30 : 22;
@@ -174,11 +188,15 @@ export function PipelineMap({
         keyboard: true,
         riseOnHover: true,
       });
-      if (coarse) {
+      if (withCard) {
         marker.bindPopup(previewHtml(deal), { closeButton: false, className: "uc-maptip-pop", maxWidth: 280, autoPanPadding: [16, 16] });
+        marker.on("popupclose", () => {
+          if (openRef.current === deal.id) openRef.current = null;
+        });
         // Leaflet writes the card afresh on every open, so its link is
         // wired on every open. A click with a modifier is the browser's.
         marker.on("popupopen", (e: Leaflet.PopupEvent) => {
+          openRef.current = deal.id;
           const link = e.popup.getElement()?.querySelector<HTMLAnchorElement>("a[data-maptip-link]");
           if (!link) return;
           link.onclick = (ev) => {
@@ -187,7 +205,7 @@ export function PipelineMap({
             clickRef.current(deal.id);
           };
         });
-      } else {
+      } else if (!coarse) {
         marker.bindTooltip(tooltipHtml(deal), { direction: "top", className: "uc-maptip-wrap", opacity: 1 });
       }
       marker.on("click", () => {
@@ -200,7 +218,12 @@ export function PipelineMap({
           previewOpen: tap?.open ?? false,
         });
         // "preview": Leaflet's own click handler has just opened the card.
-        if (action === "open") clickRef.current(deal.id);
+        // "open" with a card bound (a mouse on a touch-first device) closes
+        // the card it opened on the way out.
+        if (action === "open") {
+          if (withCard) marker.closePopup();
+          clickRef.current(deal.id);
+        }
       });
       marker.on("keypress", (e: Leaflet.LeafletKeyboardEvent) => {
         if (e.originalEvent.key === "Enter") clickRef.current(deal.id);
@@ -209,6 +232,19 @@ export function PipelineMap({
       marker.getElement()?.addEventListener("pointerdown", (ev) => {
         tapRef.current = { id: deal.id, pointer: ev.pointerType, open: marker.isPopupOpen() };
       });
+      if (withCard && reopen === deal.id) reopened = marker;
+    }
+    // The card that was open before the rebuild, open again where it was —
+    // without the pan an open asks for, since the reader has not moved.
+    if (reopened) {
+      const popup = reopened.getPopup();
+      if (popup) {
+        popup.options.autoPan = false;
+        reopened.openPopup();
+        popup.options.autoPan = true;
+      }
+    } else if (reopen) {
+      openRef.current = null;
     }
     if (touchedRef.current || points.length === 0) return;
     if (points.length === 1) {
@@ -219,7 +255,7 @@ export function PipelineMap({
         maxZoom: 14,
       });
     }
-  }, [ready, points, selected]);
+  }, [ready, points, selected, compareMode]);
 
   // Basemap switch: swap the tile layer in place, keeping the view and pins.
   useEffect(() => {

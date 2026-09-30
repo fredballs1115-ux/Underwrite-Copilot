@@ -73,11 +73,12 @@ import { findPricedMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
 import { interestOf } from "@/lib/interest";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
+import { servedInline } from "@/lib/inline-types";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import type { ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
-import type { DealDocument } from "@/lib/documents";
+import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
@@ -1477,6 +1478,7 @@ function DocumentsPanel({
     t12: "T-12",
     financials: "Financials",
     loan_terms: "Loan terms",
+    bov: "BOV",
     other: "Document",
   };
   const SUPP_LABEL: Record<string, string> = {
@@ -1536,6 +1538,11 @@ function DocumentsPanel({
             // Signed when it is clicked (app/api/deals/[id]/file), so a page
             // left open never hands over an expired link.
             const href = dealFileLinkFor(dealId, d.storage_path);
+            // A PDF or an image opens in the browser; anything else — a rent
+            // roll's spreadsheet — is stored to download (lib/inline-types).
+            const opens = d.content_type
+              ? servedInline(d.content_type)
+              : /\.(pdf|png|jpe?g|gif|webp)$/i.test(d.filename);
             return (
               <li
                 key={d.id}
@@ -1543,18 +1550,18 @@ function DocumentsPanel({
               >
                 <span className="min-w-0 flex-1 truncate">{d.filename}</span>
                 <span className="shrink-0 text-xs text-muted">
-                  {KIND_LABEL[d.kind] ?? d.kind}
+                  {KIND_LABEL[d.kind] ?? DOC_KIND_LABEL[d.kind] ?? d.kind}
                 </span>
                 {href && (
                   <a
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Opens ${d.filename}`}
-                    aria-label={`View ${d.filename}`}
+                    title={opens ? `Opens ${d.filename}` : `Downloads ${d.filename}`}
+                    aria-label={`${opens ? "View" : "Download"} ${d.filename}`}
                     className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
                   >
-                    View
+                    {opens ? "View" : "Download"}
                   </a>
                 )}
               </li>
@@ -1653,10 +1660,11 @@ function TabDot({
   );
 }
 
-/** m:ss since the run began — the job row's own start where the page has it
- *  (lib/run-clock), so a reload mid-screen never reads 0:00 beside
- *  "typically 2–4 minutes", and since this page began watching where it has
- *  none. A moving number, so a long step never reads as "hung" the way a
+/** m:ss since the run was asked for — the job row's own claim where the
+ *  page has it (lib/run-clock), queue wait included, so a reload mid-screen
+ *  picks up the run's time rather than starting again beside "typically 2–4
+ *  minutes" once the page has loaded; since this page began watching where
+ *  it has none. A moving number, so a long step never reads as "hung" the way a
  *  frozen percentage does. The clock is read in the effect, never in render,
  *  so the server's markup and the first client render agree. */
 function useElapsed(startedAt: string | null | undefined): string {

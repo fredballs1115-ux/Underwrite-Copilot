@@ -579,12 +579,25 @@ describe("the Documents tab opens each source document", () => {
       created_at: "2026-09-12T14:03:00.000Z",
     };
     const stray = { ...doc, id: "d2", filename: "Elsewhere.pdf", storage_path: "documents/another-deal/x.pdf" };
-    const html = render({ ...base, dealId, documents: [doc, stray] } as Props);
+    const bov = {
+      ...doc,
+      id: "d3",
+      kind: "bov",
+      filename: "CBRE BOV.pdf",
+      storage_path: `documents/${dealId}/5b2e-cbre_bov.pdf`,
+      content_type: "application/pdf",
+    };
+    const html = render({ ...base, dealId, documents: [doc, stray, bov] } as Props);
     dumpView("deal-documents", html);
     expect(a11yIssues(html)).toEqual([]);
     const href = `/api/deals/${dealId}/file?p=${encodeURIComponent(doc.storage_path)}`;
     expect(html).toContain(`href="${href.replace(/&/g, "&amp;")}"`);
-    expect(html).toMatch(/aria-label="View Rent roll June\.xlsx"/);
+    // A spreadsheet is stored to download, so its link says so; a PDF opens.
+    expect(html).toMatch(/aria-label="Download Rent roll June\.xlsx"/);
+    expect(html).toMatch(/aria-label="View CBRE BOV\.pdf"/);
+    // A BOV's kind is said as a word, never its raw key.
+    expect(textOf(html)).toMatch(/CBRE BOV\.pdf\s*BOV/);
+    expect(textOf(html)).not.toMatch(/\bbov\b/);
     // A path that is not this deal's own draws its name and no link.
     expect(textOf(html)).toMatch(/Elsewhere\.pdf/);
     expect(html).not.toMatch(/aria-label="View Elsewhere\.pdf"/);

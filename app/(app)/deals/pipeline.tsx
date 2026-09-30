@@ -32,7 +32,7 @@ import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
 import { compareSortValues, type SortDir } from "@/lib/pipeline-sort";
-import { prefillName } from "@/lib/deal-name";
+import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
   STAGES,
   STAGE_LABEL,
@@ -896,7 +896,7 @@ export function Pipeline({
             options={[
               ["added:desc", "Newest"],
               ["added:asc", "Oldest"],
-              ["due:asc", "Offers due, soonest"],
+              ["due:asc", "Offers due, earliest"],
               ["price:desc", "Price: high to low"],
               ["cap:desc", "Cap: high to low"],
               ["fit:desc", "Mandate fit: high to low"],
@@ -2540,6 +2540,10 @@ interface DealDraft {
   address: StructuredAddress | null;
   /** set when a submit starts; a return WITHOUT an error means it succeeded */
   submittedAt: number | null;
+  /** the name is the one the last chosen PDF gave it, so a newer file may
+   *  replace it after a reload or an upload error, as it could before; a
+   *  name the reader typed is never marked */
+  nameFromFile?: boolean;
 }
 
 const DRAFT_KEY = "uc:new-deal-draft";
@@ -2603,7 +2607,12 @@ function NewDealForm({
         writeDraft(null);
         return;
       }
-      if (d.name) setName(d.name);
+      if (d.name) {
+        setName(d.name);
+        // A name a PDF gave stays the file's to replace; the file itself
+        // cannot be restored, so the next one chosen names the deal.
+        filledName.current = restoredFileName(d);
+      }
       if (d.assetClass) setAssetClass(d.assetClass);
       if (d.address) {
         addressRef.current = d.address;
@@ -2619,12 +2628,14 @@ function NewDealForm({
   }, []);
 
   function persist(next: Partial<DealDraft>) {
+    const draftName = next.name ?? name;
     writeDraft({
       name,
       assetClass,
       address: addressRef.current,
       submittedAt: null,
       ...next,
+      nameFromFile: nameIsFromFile(draftName, filledName.current),
     });
   }
 
@@ -2715,6 +2726,7 @@ function NewDealForm({
             assetClass,
             address: addressRef.current,
             submittedAt: Date.now(),
+            nameFromFile: nameIsFromFile(name, filledName.current),
           })
         }
         className="mt-4 space-y-3"

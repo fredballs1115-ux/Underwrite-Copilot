@@ -304,7 +304,15 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     },
     // The plan's yardstick: stabilized NOI over everything it cost to get
     // there. Blank for a stabilized asset — its going-in cap is the answer.
-    { label: "Yield on cost (stabilized)", get: (c) => pct(c.yoc), mono: true, num: (c) => c.yoc },
+    {
+      label: "Yield on cost (stabilized)",
+      // A plan deal's other cells send the reader here ("judged on yield on
+      // cost"), so the row stays while one is compared; a plan deal whose
+      // model has no yield on cost says so rather than leaving a dash.
+      get: (c) => pct(c.yoc) ?? (c.planDeal ? "not stated" : null),
+      mono: true,
+      num: (c) => c.yoc,
+    },
     {
       label: "Leverage vs 30-yr",
       // Signed spread only — the full sentence lives on each deal's page.

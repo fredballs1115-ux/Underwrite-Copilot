@@ -1,6 +1,7 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { isScopedPath, scopedPath, type StorageScope } from "@/lib/storage-paths";
+import { INLINE_SAFE_TYPES } from "@/lib/inline-types";
 
 export {
   StoragePathError,
@@ -91,17 +92,9 @@ export async function downloadDealFile(path: string, scope: StorageScope): Promi
   return Buffer.from(await data.arrayBuffer());
 }
 
-// Content types safe to serve inline from a signed URL. Everything else is
-// stored as octet-stream so the browser downloads it rather than rendering it
-// — a user-uploaded text/html or SVG must never execute inline on the storage
-// origin (stored-XSS defense). Note SVG is deliberately excluded (script vector).
-const INLINE_SAFE_TYPES = new Set([
-  "application/pdf",
-  "image/png",
-  "image/jpeg",
-  "image/gif",
-  "image/webp",
-]);
+// Content types served inline from a signed URL: lib/inline-types, one
+// list with the page that labels a link View or Download.
+
 
 /** Magic-byte check for the formats we recognize by extension: a file whose
  *  NAME claims a known format must carry that format's signature (the same

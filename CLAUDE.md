@@ -4265,10 +4265,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   A deal keeps ONE `analysis_jobs` row that every run claims again
   (`claimJob`), so the claim restamps its `created_at` with the claim's
   moment: the worker's oldest-first queue orders a re-screen by when it was
-  asked for, and the deal page's progress clock counts from the run's start
-  (`lib/run-clock.ts`, read in an effect, so a reload mid-screen never reads
-  0:00; a start over `MAX_RUN_MS` back is a row stamped before the restamp,
-  and the page's own moment stands in). In-process runs heartbeat
+  asked for, and the deal page's progress clock counts from that moment,
+  queue wait included (`lib/run-clock.ts`, read in an effect once the page
+  has loaded — the server's markup and the first frame show 0:00 — so a
+  reload mid-screen picks up the run's time rather than starting again; a
+  start over `MAX_RUN_MS` back is a row stamped before the restamp, and the
+  page's own moment stands in). In-process runs heartbeat
   the job row; a Files-API copy of an OM is released when its run ends
   (`releaseOmSource`); one web process runs at most `ANALYSIS_CONCURRENCY`
   (default two) screens at once (`lib/anthropic/run-gate.ts` — the claim is

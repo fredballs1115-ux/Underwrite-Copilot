@@ -132,12 +132,14 @@ export function previewHtml(d: MapDeal): string {
 }
 
 /**
- * What a click on a pin does. With a mouse the card shows on hover and a
- * click opens the deal — or picks it, in compare mode. A touch screen (a
- * coarse pointer) has no hover, so a finger's first tap on a pin shows the
- * card, and a second tap — on the same pin, or on the card — opens the deal.
- * A click with no finger behind it (a keyboard, a screen reader, a mouse on
- * a tablet) opens at once, and compare mode picks at once as it always has.
+ * What a click on a pin does. On a device whose main pointer is a mouse the
+ * card shows on hover and a click opens the deal — or picks it, in compare
+ * mode. A touch screen (a coarse pointer) has no hover, so a finger's first
+ * tap on a pin shows the card, and a second tap — on the same pin, or on the
+ * card — opens the deal. A click with no finger behind it (a keyboard, a
+ * screen reader, a mouse on a touch-first tablet, which gets no hover card)
+ * opens at once, and compare mode picks at once, with no card, as it always
+ * has.
  */
 export function pinTapAction(t: {
   /** the device's main pointer is coarse: `(pointer: coarse)` */

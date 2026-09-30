@@ -25,3 +25,17 @@ export function prefillName(current: string, lastFilled: string | null, fileName
   if (current.trim() && current !== lastFilled) return null;
   return nameFromFile(fileName);
 }
+
+/** Whether the name in the field is the one the last chosen file gave it —
+ *  what the new-deal draft marks, so a reload or an upload error keeps the
+ *  file's name the next file's to replace (the file itself cannot be
+ *  restored), while a name the reader typed is never marked. */
+export function nameIsFromFile(name: string, lastFilled: string | null): boolean {
+  return lastFilled != null && name === lastFilled;
+}
+
+/** The name a restored draft hands back as a file's own: its name where the
+ *  draft marked it so, else null — a typed name stays the reader's. */
+export function restoredFileName(d: { name?: string | null; nameFromFile?: boolean } | null): string | null {
+  return d?.nameFromFile && d.name ? d.name : null;
+}

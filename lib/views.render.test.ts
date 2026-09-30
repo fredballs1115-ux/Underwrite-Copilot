@@ -453,7 +453,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
       billing: BILLING,
     };
     const cards = render(React.createElement(Pipeline, props));
-    expect(cards).toContain('<option value="due:asc">Offers due, soonest</option>');
+    expect(cards).toContain('<option value="due:asc">Offers due, earliest</option>');
     const list = render(React.createElement(Pipeline, { ...props, initialView: "list" as const }));
     expect(list).toContain('aria-label="Sort by offers due"');
     expect(list).toMatch(/aria-label="Sort by deal"[^>]*>Deal<\/button><button[^>]*aria-label="Sort by offers due"[^>]*>Offers due<\/button>/);
@@ -803,6 +803,16 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(visibleText(withHotel)).toContain("Mgmt encumbered, PIP $35k/key");
     expect(tableRows(withHotel)).not.toContain("Sale");
     expect(a11yIssues(withHotel)).toEqual([]);
+    // A plan deal's cells send the reader to its yield on cost, so that row
+    // stays even where no model states one (the audit of 2026-09-30), and the
+    // plan deal's cell says so rather than a dash.
+    const plan = COLS.find((c) => c.planDeal)!;
+    const noYoc = renderToStaticMarkup(
+      React.createElement(CompareTable, { cols: [{ ...COLS.find((c) => !c.planDeal)!, yoc: null }, { ...plan, yoc: null }] }),
+    );
+    expect(visibleText(noYoc)).toContain("judged on yield on cost");
+    expect(tableRows(noYoc)).toContain("Yield on cost (stabilized)");
+    expect(visibleText(noYoc)).toContain("not stated");
   });
 
   it("reads a note's and a share's price for what it buys (#423): the note's yield, the share's cap on the whole, returns withheld", () => {

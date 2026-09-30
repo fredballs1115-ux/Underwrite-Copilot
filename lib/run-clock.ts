@@ -9,10 +9,11 @@
 export const MAX_RUN_MS = 2 * 60 * 60 * 1000;
 
 /**
- * When the run began, in ms: the job row's own start where the page has one
- * (its created_at, restamped by every claim — lib/jobs `claimJob`), else the
- * moment the page began watching. A reload mid-screen then reads the time
- * the run has really taken, never 0:00 beside "typically 2–4 minutes". A
+ * When the run was asked for, in ms: the job row's own claim where the page
+ * has one (its created_at, restamped by every claim — lib/jobs `claimJob` —
+ * so a worker's queue wait is counted), else the moment the page began
+ * watching. Once the page has loaded, a reload mid-screen reads the time the
+ * run has really taken, not a fresh 0:00 beside "typically 2–4 minutes". A
  * start more than `MAX_RUN_MS` before the page began watching is a row
  * stamped before the restamp, and the page's own moment stands in.
  */
