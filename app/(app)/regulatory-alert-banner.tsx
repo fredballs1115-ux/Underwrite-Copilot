@@ -1,11 +1,26 @@
-// Red banner for undismissed regulatory alerts (research build, Phase 2
-// item 5): when the daily intel job flags a likely law/regulation change,
-// it stays visible on every signed-in screen until someone dismisses it.
+// Red banner for regulatory alerts (research build, Phase 2 item 5): when
+// the daily intel job flags a likely law/regulation change, it shows on every
+// signed-in screen until the reader dismisses it.
 // Server component + server action — no client JS.
+//
+// THE RULE: an alert shows where it was detected in the last
+// ALERT_WINDOW_DAYS (30) days and THIS BROWSER has not dismissed it. The
+// shared row's `dismissed_at` is ignored: every signed-in user may write it
+// (migration 0034's column grant), so it was one reader's click — or anyone's
+// direct PATCH — hiding an alert from every customer. A dismissal is the
+// alert's id in this browser's cookie (lib/dismissed-alerts), nothing shared
+// is written, and /news keeps every alert whatever a banner did.
 
-import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { safeHttpUrl } from "@/lib/safe-url";
+import {
+  DISMISSED_ALERTS_COOKIE,
+  alertWindowStart,
+  dismissedCookie,
+  parseDismissed,
+  undismissed,
+} from "@/lib/dismissed-alerts";
 
 interface AlertRow {
   id: string;
@@ -15,31 +30,36 @@ interface AlertRow {
   detail: string | null;
 }
 
+/** The banner shows the newest few. */
+const SHOWN = 3;
+
 async function dismissAlert(formData: FormData) {
   "use server";
   const id = String(formData.get("id") ?? "");
   if (!id) return;
   const user = await getCurrentUser();
   if (!user) return;
-  const supabase = await createSupabaseServerClient();
-  await supabase
-    .from("regulatory_alerts")
-    .update({ dismissed_at: new Date().toISOString(), dismissed_by: user.id })
-    .eq("id", id);
-  revalidatePath("/", "layout");
+  const store = await cookies();
+  const next = dismissedCookie(store.get(DISMISSED_ALERTS_COOKIE)?.value, id, process.env.NODE_ENV === "production");
+  // Setting a cookie in a server action re-renders the page it was called
+  // from, so the banner redraws without the alert — in this browser only.
+  if (next) store.set(next.name, next.value, next.options);
 }
 
 export async function RegulatoryAlertBanner() {
   let alerts: AlertRow[] = [];
   try {
+    const dismissed = parseDismissed((await cookies()).get(DISMISSED_ALERTS_COOKIE)?.value);
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase
       .from("regulatory_alerts")
       .select("id, rule_id, headline, url, detail")
-      .is("dismissed_at", null)
+      .gte("detected_at", alertWindowStart(new Date()))
       .order("detected_at", { ascending: false })
-      .limit(3);
-    alerts = (data as AlertRow[] | null) ?? [];
+      // Enough rows that the newest few this browser has not dismissed are
+      // among them.
+      .limit(SHOWN + dismissed.length);
+    alerts = undismissed((data as AlertRow[] | null) ?? [], dismissed, SHOWN);
   } catch {
     // 0023 not migrated yet — no banner, no crash.
   }

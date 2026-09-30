@@ -13,7 +13,8 @@ export interface ItemRow {
   created_at: string;
 }
 
-/** A law or rule change the sweep detected and the user has not dismissed. */
+/** A law or rule change the sweep detected — dismissed from a banner or not;
+ *  this strip is the record. */
 export interface AlertRow {
   id: string;
   rule_id: string | null;
