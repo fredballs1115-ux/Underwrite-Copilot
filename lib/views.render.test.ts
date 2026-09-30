@@ -3644,6 +3644,47 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(visibleText(html)).toContain("From the offering memorandum, page 3");
     expect(html).toContain('src="/api/deals/d1/picture?size=hero&amp;g=1"');
   });
+
+  it("offers a dense screen each stored photograph's full-size copy, at the width it is drawn", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(PropertyVisual, {
+        ...base,
+        picture: { credit: "From the offering memorandum", source: "om" as const, width: 1600, height: 1067, fullWidth: 2560 },
+        gallery: [
+          { ...gallery[0], width: 1600, height: 1000, fullWidth: 2400 },
+          // A photograph no larger than its hero has only the hero.
+          { ...gallery[1], width: 1200, height: 800 },
+        ],
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    // The cover: the hero and the full copy, drawn at the header's frame.
+    expect(html).toContain('srcSet="/api/deals/d1/picture?size=hero 1600w, /api/deals/d1/picture?size=full 2560w"');
+    expect(html).toMatch(/src="\/api\/deals\/d1\/picture\?size=hero" srcSet="[^"]+" sizes="\(min-width: 1264px\) 557px,/);
+    // A mosaic tile at a third of the frame; one with no copy keeps its src alone.
+    expect(html).toContain('srcSet="/api/deals/d1/picture?size=hero&amp;g=1 1600w, /api/deals/d1/picture?size=full&amp;g=1 2400w"');
+    expect(html).toMatch(/src="\/api\/deals\/d1\/picture\?size=hero&amp;g=1" srcSet="[^"]+" sizes="\(min-width: 1264px\) calc\(557px \* 0\.4/);
+    expect(html).toMatch(/<img src="\/api\/deals\/d1\/picture\?size=hero&amp;g=2" alt=""/);
+    // In the viewer, the picture's box, by the window's shape.
+    const frames = [
+      {
+        id: "photo",
+        label: "Photo 1",
+        src: "/api/deals/d1/picture?size=hero",
+        srcSet: "/api/deals/d1/picture?size=hero 1600w, /api/deals/d1/picture?size=full 2560w",
+        sizes: "(min-aspect-ratio: 1600/1067) calc((100vh - 11rem) * 1.5), (min-width: 640px) calc(100vw - 8rem), calc(100vw - 1rem)",
+        alt: "Photograph of 1200 N 31st St",
+        credit: "From the offering memorandum",
+        thumb: "/api/deals/d1/picture?size=hero",
+      },
+      { id: "aerial", label: "Aerial", src: "/api/deals/d1/aerial?src=usgs&w=1280&h=960", alt: "Aerial photograph of 1200 N 31st St", credit: "Imagery: USGS The National Map", thumb: "/api/deals/d1/aerial?src=usgs&w=1280&h=576" },
+    ];
+    const viewer = renderToStaticMarkup(React.createElement(PhotoViewerBody, { frames, start: 0, title: "1200 N 31st St", onClose: () => {} }));
+    expect(viewer).toMatch(/data-viewer-frame="photo"/);
+    expect(viewer).toContain('sizes="(min-aspect-ratio: 1600/1067) calc((100vh - 11rem) * 1.5)');
+    const aerial = renderToStaticMarkup(React.createElement(PhotoViewerBody, { frames, start: 1, title: "1200 N 31st St", onClose: () => {} }));
+    expect(aerial).not.toContain("sizes=");
+  });
 });
 
 // ── The deal header, laid out the way a listing opens (#433) ───────────────

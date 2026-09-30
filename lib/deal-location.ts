@@ -38,7 +38,7 @@ export interface DealVisualCache {
   geoFor?: string;
   /** a geocode that definitively found nothing, so we stop re-asking */
   geoMiss?: boolean;
-  /** the building's own photograph, stored as two derivatives (lib/deal-picture) */
+  /** the building's own photograph, stored as its derivatives (lib/deal-picture) */
   picture?: DealPicture;
   /** when the memorandum was last searched for one and none was found */
   pictureCheckedAt?: string;
@@ -50,7 +50,7 @@ export interface DealVisualCache {
    *  next one waits, and the third in a row is taken as the verdict */
   pictureRetry?: { n: number; at: string; v: number };
   /** the memorandum's other photographs, beside the cover, in page order
-   *  (#448, lib/deal-picture) — each stored as two derivatives */
+   *  (#448, lib/deal-picture) — each stored as the cover's derivatives are */
   gallery?: DealPicture[];
   /** the rules the gallery was read under; see GALLERY_VERSION. Set, with
    *  no gallery, where the memorandum held no other photograph */
@@ -60,7 +60,7 @@ export interface DealVisualCache {
   floodFrame?: FloodFrameRecord;
 }
 
-/** The building's own photograph — where it came from and where its two sizes live. */
+/** The building's own photograph — where it came from and where its sizes live. */
 export interface DealPicture {
   /** `photos/<dealId>/<stamp>-hero.jpg`, up to 1600px on the long side */
   hero: string;
@@ -69,6 +69,16 @@ export interface DealPicture {
   /** the hero's pixel size */
   width: number;
   height: number;
+  /** `photos/<dealId>/<stamp>-full.jpg`, up to 2560px on the long side:
+   *  kept only where the source is larger than the hero, for a dense screen
+   *  and the full-screen viewer (lib/deal-picture) */
+  full?: string;
+  /** the full derivative's pixel size */
+  fullWidth?: number;
+  fullHeight?: number;
+  /** the derivatives' rules it was made under (lib/deal-picture's
+   *  DERIVED_VERSION); absent on one made before they were counted */
+  derivedV?: number;
   /** lifted from the memorandum's cover, or uploaded by the reader */
   source: "om" | "upload";
   at: string;

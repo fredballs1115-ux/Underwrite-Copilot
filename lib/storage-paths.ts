@@ -10,7 +10,7 @@
  *   <userId>/<dealId>.model-tmp                       a worker-mode reconcile's parked model
  *   documents/<dealId>/<uuid>-<name>                  source documents (deal_documents)
  *   supplements/<dealId>/<uuid>-<name>                tab attachments (deals.supplements)
- *   photos/<dealId>/<stamp>-<hero|thumb>.jpg          the building's own photograph (deals.photo)
+ *   photos/<dealId>/<stamp>-<hero|thumb|full>.jpg     the building's own photograph (deals.photo)
  *   flood/<dealId>/<stamp>.jpg                        the Flood view's drawn frame (deals.photo.floodFrame)
  *   <teamId|userId>/branding-logo-<suffix>.<png|jpg>  report branding
  *
@@ -96,7 +96,7 @@ export function floodFramePath(dealId: string, stamp: string): string {
 }
 
 /** A photograph derivative's file name: a stamp and which size it is. */
-const PHOTO_FILE = /^[a-z0-9]+-(hero|thumb)\.jpg$/;
+const PHOTO_FILE = /^[a-z0-9]+-(hero|thumb|full)\.jpg$/;
 
 /** True when the path is a branding logo in the account's or team's folder. */
 export function isBrandingPath(
@@ -161,8 +161,9 @@ export function supplementPath(dealId: string, id: string, fileName: string): st
   return `supplements/${dealId}/${id}-${safeFileName(fileName)}`;
 }
 
-/** The building's photograph at one of its two sizes: `photos/<dealId>/<stamp>-hero.jpg`. */
-export function dealPhotoPath(dealId: string, stamp: string, size: "hero" | "thumb"): string {
+/** The building's photograph at one of its sizes: `photos/<dealId>/<stamp>-hero.jpg`,
+ *  the square `-thumb`, and the `-full` kept where the source is larger than the hero. */
+export function dealPhotoPath(dealId: string, stamp: string, size: "hero" | "thumb" | "full"): string {
   return `photos/${dealId}/${stamp}-${size}.jpg`;
 }
 

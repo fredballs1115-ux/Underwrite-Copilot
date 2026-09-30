@@ -19,6 +19,8 @@ import { syncTeamSeats } from "@/lib/stripe/seats";
 import { isPro } from "@/lib/billing";
 import { getActiveBranding, saveBrandingValue } from "@/lib/branding-server";
 import { sanitizeBranding, LOGO_MAX_BYTES } from "@/lib/branding";
+import type { DealVisualCache } from "@/lib/deal-location";
+import { picturePaths } from "@/lib/deal-picture";
 
 export type PwState = { error?: string; ok?: boolean } | null;
 
@@ -260,15 +262,16 @@ export async function deleteAccount(formData: FormData) {
     id: string;
     om_storage_path: string | null;
     supplements: Record<string, { files?: { path: string }[] }> | null;
-    photo: { picture?: { hero: string; thumb: string } } | null;
+    photo: DealVisualCache | null;
   }[];
   const byDeal = new Map<string, string[]>();
   for (const d of dealRows) {
     // Worker-mode reconciles park a model file next to the OM — sweep that
     // slot too (removing a nonexistent path is a no-op). The building's
-    // photograph, both sizes, goes with the deal.
+    // photographs go with the deal: the cover and the memorandum's others,
+    // every size of each (the deal's own delete counts them the same way).
     const paths: string[] = [modelTmpPath(omStoragePath(user.id, d.id))];
-    if (d.photo?.picture) paths.push(d.photo.picture.hero, d.photo.picture.thumb);
+    paths.push(...picturePaths(d.photo));
     if (d.om_storage_path) {
       paths.push(d.om_storage_path);
       paths.push(modelTmpPath(d.om_storage_path));

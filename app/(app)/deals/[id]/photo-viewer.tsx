@@ -10,6 +10,11 @@ export interface ViewerFrame {
   label: string;
   /** the picture at the viewer's size */
   src: string;
+  /** a stored photograph's hero and full-size copy, each at its width, with
+   *  the width the viewer draws it at (lib/photo-srcset's `viewerSizes`):
+   *  a dense screen takes the full copy the hero would be stretched to */
+  srcSet?: string;
+  sizes?: string;
   /** a layer drawn over it in the same frame (FEMA's zones), if any */
   over?: string;
   alt: string;
@@ -166,6 +171,8 @@ export function PhotoViewerBody({ frames, start = 0, title, onClose }: ViewerPro
             <img
               key={frame.id}
               src={frame.src}
+              srcSet={frame.srcSet}
+              sizes={frame.srcSet ? frame.sizes : undefined}
               alt={frame.alt}
               data-viewer-frame={frame.id}
               onError={() => fail(frame.id)}

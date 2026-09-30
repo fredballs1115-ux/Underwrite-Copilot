@@ -10,6 +10,8 @@ const store = vi.hoisted(() => ({
   files: new Map<string, Buffer>(),
   uploads: [] as string[],
   removed: [] as string[],
+  /** a memorandum download held until the test lets it go */
+  gate: null as Promise<void> | null,
 }));
 
 // The cover's read, given no time at all where a test asks for a read the
@@ -28,6 +30,7 @@ vi.mock("@/lib/storage", () => ({
   dealPhotoPath: (dealId: string, stamp: string, size: string) => `photos/${dealId}/${stamp}-${size}.jpg`,
   downloadDealFile: async (path: string) => store.files.get(path) ?? Buffer.alloc(0),
   downloadOmPdf: async (path: string) => {
+    if (store.gate) await store.gate;
     const om = store.oms.get(path);
     if (!om) throw new Error("no such object");
     if (om instanceof Error) throw om;
@@ -43,7 +46,10 @@ vi.mock("@/lib/storage", () => ({
 }));
 
 import {
+  DERIVED_VERSION,
+  FULL_MAX_PX,
   GALLERY_VERSION,
+  HERO_MAX_PX,
   MAX_CUT_READS,
   PHOTO_RULES_SINCE,
   PICTURE_SEARCH_VERSION,
@@ -52,10 +58,13 @@ import {
   clearOmPicture,
   currentPicture,
   derivePicture,
+  derivedOutdated,
   ensureDealPicture,
   pictureMayBeInMemorandum,
+  picturePathFor,
   picturePaths,
   previewOf,
+  readPictureBytes,
   retryWaiting,
   searchedRecently,
 } from "./deal-picture";
@@ -268,6 +277,123 @@ describe("a cover stored as JPEG 2000", () => {
     expect(db.photo?.picture?.hero).toBe(got!.hero);
     expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
     expect(store.uploads).toHaveLength(2);
+  });
+});
+
+const resetStore = () => {
+  store.oms.clear();
+  store.files.clear();
+  store.uploads = [];
+  store.removed = [];
+  store.gate = null;
+  decodeBudget.ms = undefined;
+};
+
+describe("a full-size copy, where the source is larger than the hero", () => {
+  beforeEach(resetStore);
+
+  it("is made only where there is more of the photograph than the hero holds, and never enlarged", async () => {
+    const big = await derivePicture(await testPicture(3200, 2000, "jpeg", 1));
+    expect({ w: big.width, h: big.height }).toEqual({ w: HERO_MAX_PX, h: 1000 });
+    expect(big.full && { w: big.full.width, h: big.full.height }).toEqual({ w: FULL_MAX_PX, h: 1600 });
+    expect((await sharp(big.full!.bytes).metadata()).format).toBe("jpeg");
+    // Larger than the hero, smaller than the full copy's cap: kept at its size.
+    const mid = await derivePicture(await testPicture(2000, 1250, "jpeg", 1));
+    expect(mid.full && { w: mid.full.width, h: mid.full.height }).toEqual({ w: 2000, h: 1250 });
+    // No larger than the hero: no second copy of it.
+    expect((await derivePicture(await testPicture(1300, 800, "jpeg", 1))).full).toBeNull();
+    expect((await derivePicture(await testPicture(800, 500, "jpeg", 1))).full).toBeNull();
+  });
+
+  it("is stored beside the hero and the thumbnail, served as the `full` size, and swept with them", async () => {
+    store.oms.set("u/d1.pdf", await testMemorandum([{ images: [await testPicture(3200, 2000, "jpeg", 1)] }]));
+    const { client, db } = fakeDb(null);
+    const got = await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: null, waitMs: 5_000, gallery: false });
+    expect(got).toMatchObject({ width: 1600, height: 1000, fullWidth: 2560, fullHeight: 1600, derivedV: DERIVED_VERSION });
+    expect(got!.full).toMatch(/^photos\/d1\/[a-z0-9]+-full\.jpg$/);
+    expect(db.photo?.picture).toEqual(got);
+    expect(store.uploads).toHaveLength(3);
+    expect(picturePaths(db.photo)).toEqual([got!.hero, got!.thumb, got!.full]);
+    // What the route serves for each size: the full copy where one is
+    // stored, the hero where none is.
+    expect(picturePathFor(got!, "full")).toBe(got!.full);
+    expect((await sharp(await readPictureBytes("d1", got!, "full")).metadata()).width).toBe(2560);
+    expect(picturePathFor({ ...got!, full: undefined }, "full")).toBe(got!.hero);
+    expect(picturePathFor(got!, "hero")).toBe(got!.hero);
+    expect(picturePathFor(got!, "thumb")).toBe(got!.thumb);
+  });
+});
+
+describe("a memorandum's photograph derived before the full-size copy, made again behind a view", () => {
+  beforeEach(resetStore);
+
+  const COVER = () => testPicture(3200, 2000, "jpeg", 1);
+  /** As it was stored before: the same photograph's hero, no derivation rules. */
+  const before = async (source: DealPicture["source"] = "om") => {
+    store.files.set(OLD.hero, await sharp(await COVER()).resize(1600).jpeg({ quality: 82 }).toBuffer());
+    const was: DealPicture = { ...OLD, height: 1000, source };
+    const cache: DealVisualCache = { picture: was, pictureSearchV: PICTURE_SEARCH_VERSION, galleryV: GALLERY_VERSION };
+    return { was, cache };
+  };
+  const ask = (client: SupabaseClient, cache: DealVisualCache | null) =>
+    ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache });
+
+  it("keeps showing the stored photograph, and replaces it behind the render with the full set", async () => {
+    store.oms.set("u/d1.pdf", await testMemorandum([{ images: [await COVER()] }]));
+    const { was, cache } = await before();
+    expect(derivedOutdated(was)).toBe(true);
+    // Current under today's search rules: shown, and never asked for as missing.
+    expect(pictureMayBeInMemorandum({ omPath: "u/d1.pdf", isSample: false, cache })).toBe(false);
+    const { client, db } = fakeDb(cache);
+    expect(await ask(client, cache)).toEqual(was);
+    await vi.waitFor(() => expect(db.photo?.picture?.derivedV).toBe(DERIVED_VERSION), { timeout: 15_000 });
+    expect(db.photo?.picture).toMatchObject({ source: "om", width: 1600, height: 1000, fullWidth: 2560 });
+    expect(db.photo?.picture?.hero).not.toBe(was.hero);
+    expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
+    expect(store.removed).toEqual([was.hero, was.thumb]);
+    // Made again once: the next view reads nothing.
+    const uploads = store.uploads.length;
+    await ask(client, db.photo);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(store.uploads).toHaveLength(uploads);
+  });
+
+  it("never swaps in another photograph: the stored one is kept, and marked so it is tried once", async () => {
+    store.oms.set("u/d1.pdf", await testMemorandum([{ images: [await testPicture(3200, 2000, "jpeg", 2)] }]));
+    const { was, cache } = await before();
+    const { client, db } = fakeDb(cache);
+    await ask(client, cache);
+    await vi.waitFor(() => expect(db.photo?.picture?.derivedV).toBe(DERIVED_VERSION), { timeout: 15_000 });
+    expect(db.photo?.picture).toEqual({ ...was, derivedV: DERIVED_VERSION });
+    expect(store.uploads).toEqual([]);
+    expect(store.removed).toEqual([]);
+  });
+
+  it("never makes the reader's own upload again: its original is not kept", async () => {
+    store.oms.set("u/d1.pdf", await testMemorandum([{ images: [await COVER()] }]));
+    const { was, cache } = await before("upload");
+    expect(derivedOutdated(was)).toBe(false);
+    const { client, db } = fakeDb(cache);
+    expect(await ask(client, cache)).toEqual(was);
+    await new Promise((r) => setTimeout(r, 300));
+    expect(db.photo?.picture).toEqual(was);
+    expect(store.uploads).toEqual([]);
+  });
+
+  it("is never put over a picture the reader added while it ran: its own new files go instead", async () => {
+    store.oms.set("u/d1.pdf", await testMemorandum([{ images: [await COVER()] }]));
+    const { cache } = await before();
+    const { client, db } = fakeDb(cache);
+    let open!: () => void;
+    store.gate = new Promise<void>((resolve) => (open = resolve));
+    await ask(client, cache);
+    // Meanwhile the reader puts a photograph of their own on the deal.
+    const own: DealPicture = { ...OLD, hero: "photos/d1/own-hero.jpg", thumb: "photos/d1/own-thumb.jpg", source: "upload" };
+    db.photo = { ...db.photo!, picture: own };
+    open();
+    await vi.waitFor(() => expect(store.removed).toHaveLength(3), { timeout: 15_000 });
+    expect(db.photo?.picture).toEqual(own);
+    expect([...store.removed].sort()).toEqual([...store.uploads].sort());
   });
 });
 

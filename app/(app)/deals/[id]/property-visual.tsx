@@ -14,6 +14,14 @@ import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 import { previewStyle } from "@/lib/photo-preview";
+import {
+  headerPhotoSizes,
+  mosaicTileSizes,
+  photoAspect,
+  photoSrcSet,
+  viewerSizes,
+  type StoredPhotoSizes,
+} from "@/lib/photo-srcset";
 
 /**
  * The real property, at the top of its deal page: the building's OWN
@@ -88,6 +96,13 @@ import { previewStyle } from "@/lib/photo-preview";
  * each asked for at the cover's size (lazily, since a phone keeps the one
  * picture), each credited, each opening the viewer at itself, the last saying
  * how many more there are.
+ *
+ * A stored photograph whose source was larger than its hero has a full-size
+ * copy too (lib/deal-picture), and every picture of it here — the cover, a
+ * mosaic tile, a gallery view, the viewer — names both in a srcset with the
+ * width it is drawn at (lib/photo-srcset), so a dense screen, a panorama
+ * covering the frame by its height and the viewer take the full copy where
+ * the hero would be stretched, and every other screen the hero it had.
  */
 
 /** A view's id: the fixed views, and the memorandum's other photographs
@@ -138,9 +153,10 @@ export function PropertyVisual({
   googleEnabled: boolean;
   /** the deal has an address at all — without one there is no overhead and no map */
   hasAddress?: boolean;
-  /** the deal's own photograph, with what it is credited as and its
-   *  blur-up preview (#463); null for none */
-  picture?: { credit: string; source: "om" | "upload"; preview?: string | null } | null;
+  /** the deal's own photograph, with what it is credited as, its blur-up
+   *  preview (#463) and its stored sizes (the hero's, and the full-size
+   *  copy's width where one is stored); null for none */
+  picture?: ({ credit: string; source: "om" | "upload"; preview?: string | null } & StoredPhotoSizes) | null;
   /** the reader may put their own picture on the deal (never on the sample) */
   canReplace?: boolean;
   /** the Flood tab (#472): the frame's URL stem (the route, with the point
@@ -161,8 +177,8 @@ export function PropertyVisual({
    *  Street View (#439); null for none */
   market?: MarketPicture | null;
   /** the memorandum's other photographs, in page order, each with its
-   *  credit (#448); served as `?g=1`, `?g=2`… */
-  gallery?: { page: number | null; credit: string; preview?: string | null }[];
+   *  credit (#448) and its stored sizes; served as `?g=1`, `?g=2`… */
+  gallery?: ({ page: number | null; credit: string; preview?: string | null } & StoredPhotoSizes)[];
 }) {
   // Lead with the building's own photograph wherever one exists; the
   // aerial leads only when it is the best picture available.
@@ -315,6 +331,12 @@ export function PropertyVisual({
   const galleryHero = (i: number) => `/api/deals/${dealId}/picture?size=hero&g=${i}`;
   const galleryAlt = (g: { page: number | null }) =>
     g.page ? `Photograph from page ${g.page} of the memorandum for ${label}` : `Photograph from the memorandum for ${label}`;
+  // Each stored photograph at its hero's width and, where one is stored, its
+  // full-size copy's (lib/photo-srcset): the browser takes whichever the
+  // width it is drawn at on this screen needs.
+  const coverSrcSet = photoSrcSet((size) => `/api/deals/${dealId}/picture?size=${size}`, picture);
+  const gallerySrcSet = (g: StoredPhotoSizes & { i: number }) =>
+    photoSrcSet((size) => `/api/deals/${dealId}/picture?size=${size}&g=${g.i}`, g);
 
   // The full-screen viewer's pictures (#445): the views the page has, the
   // map apart, each credited exactly as its own view is.
@@ -323,11 +345,32 @@ export function PropertyVisual({
     const thumb = thumbs[v.id].src ?? "";
     const photo = galleryLive.find((g) => g.id === v.id);
     if (photo) {
-      return [{ id: v.id, label: v.label, src: galleryHero(photo.i), alt: galleryAlt(photo), credit: photo.credit, thumb }];
+      const srcSet = gallerySrcSet(photo);
+      return [
+        {
+          id: v.id,
+          label: v.label,
+          src: galleryHero(photo.i),
+          ...(srcSet ? { srcSet, sizes: viewerSizes(photo) } : {}),
+          alt: galleryAlt(photo),
+          credit: photo.credit,
+          thumb,
+        },
+      ];
     }
     switch (v.id) {
       case "photo":
-        return [{ id: v.id, label: v.label, src: `/api/deals/${dealId}/picture?size=hero`, alt: `Photograph of ${label}`, credit: picture?.credit ?? "", thumb }];
+        return [
+          {
+            id: v.id,
+            label: v.label,
+            src: `/api/deals/${dealId}/picture?size=hero`,
+            ...(coverSrcSet ? { srcSet: coverSrcSet, sizes: viewerSizes(picture) } : {}),
+            alt: `Photograph of ${label}`,
+            credit: picture?.credit ?? "",
+            thumb,
+          },
+        ];
       case "street":
         return [{ id: v.id, label: v.label, src: `/api/deals/${dealId}/photo`, alt: `Street view of ${label}`, credit: "Street View imagery © Google", thumb }];
       case "market":
@@ -424,6 +467,8 @@ export function PropertyVisual({
                     adds nothing over a route with its own cache headers */}
                 <img
                   src={`/api/deals/${dealId}/picture?size=hero`}
+                  srcSet={coverSrcSet}
+                  sizes={coverSrcSet ? headerPhotoSizes(photoAspect(picture)) : undefined}
                   alt={`Photograph of ${label}`}
                   width={AERIAL.w}
                   height={AERIAL.h}
@@ -456,6 +501,7 @@ export function PropertyVisual({
                   {tiles.map((g, k) => {
                     const at = photoIds.indexOf(g.id) + 1;
                     const more = k === tiles.length - 1 && moreCount > 0;
+                    const srcSet = gallerySrcSet(g);
                     return (
                       <button
                         key={g.id}
@@ -473,6 +519,8 @@ export function PropertyVisual({
                         {/* eslint-disable-next-line @next/next/no-img-element -- proxied, auth-scoped route serving the stored derivative */}
                         <img
                           src={galleryHero(g.i)}
+                          srcSet={srcSet}
+                          sizes={srcSet ? mosaicTileSizes(photoAspect(g)) : undefined}
                           alt=""
                           width={AERIAL.w}
                           height={AERIAL.h}
@@ -507,6 +555,8 @@ export function PropertyVisual({
                   auth-scoped route serving the stored derivative */}
               <img
                 src={galleryHero(g.i)}
+                srcSet={gallerySrcSet(g)}
+                sizes={gallerySrcSet(g) ? headerPhotoSizes(photoAspect(g)) : undefined}
                 alt={galleryAlt(g)}
                 width={AERIAL.w}
                 height={AERIAL.h}

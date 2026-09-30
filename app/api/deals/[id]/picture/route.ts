@@ -1,8 +1,12 @@
-// GET /api/deals/[id]/picture?size=hero|thumb — the building's OWN
+// GET /api/deals/[id]/picture?size=hero|thumb|full — the building's OWN
 // photograph, and only that: the cover of its memorandum, lifted out of the
 // file on the first ask (lib/deal-picture), or the picture the reader put
 // on the deal. Single-source on purpose, so the Photo tab's credit is always
 // exactly what is on screen.
+//
+// `full` is the full-size copy a srcset asks for on a dense screen and in
+// the full-screen viewer, kept where the source was larger than the hero;
+// a picture with none answers with its hero.
 //
 // 404 means the deal has no picture of its own — no memorandum, none in it,
 // the sample deal — and the tab hides itself. For "whichever real picture
@@ -21,7 +25,9 @@ import {
   backfillPreview,
   ensureDealPicture,
   memorandumPhotoCredit,
+  picturePathFor,
   readPictureBytes,
+  type PictureSize,
 } from "@/lib/deal-picture";
 import type { DealPicture } from "@/lib/deal-location";
 
@@ -65,12 +71,13 @@ export async function GET(
   }
   if (!picture) return new NextResponse(null, { status: 404 });
 
-  const size = url.searchParams.get("size") === "thumb" ? "thumb" : "hero";
+  const asked = url.searchParams.get("size");
+  const size: PictureSize = asked === "thumb" ? "thumb" : asked === "full" ? "full" : "hero";
   // The stored path carries the stamp of the upload that made it, so it is
   // the picture's identity: a replaced picture is a new path under the SAME
   // URL, and a browser told to revalidate rather than to trust a day's cache
   // sees it at once — while an unchanged one costs a 304 and no bytes.
-  const etag = `W/"${picture[size]}"`;
+  const etag = `W/"${picturePathFor(picture, size)}"`;
   const headers = {
     etag,
     "cache-control": "private, no-cache",
