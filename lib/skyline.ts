@@ -544,9 +544,11 @@ export function skylineTag(id: string): string {
  * on its own screen: a dense screen gets the pixels it draws, a plain one
  * does not pay for them. A tile asked for at one fixed 480px was stretched
  * twice over on every phone and every laptop with a dense screen. 1600 is
- * the width the deploy probe measures every file at.
+ * the width the deploy probe measures every file at; 2400 (#451) is for a
+ * page's full-width band on a dense laptop screen, 2,880 device pixels
+ * across at 1440, which 1400 had stretched twice over.
  */
-export const SKYLINE_SRCSET = [480, 960, 1600] as const;
+export const SKYLINE_SRCSET = [480, 960, 1600, 2400] as const;
 
 /** A market's skyline as an `<img srcset>`: one candidate a width, each
  *  carrying the photograph's cache token. */

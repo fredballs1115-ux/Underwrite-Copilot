@@ -2622,7 +2622,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     Chromium at seven screens against a 2.5:1 file, the homepage's gallery
     and the submarket cards draw no tile past 1.09× its pixels; the one
     480px file had been stretched 1.9–2.2× on every phone and dense
-    laptop. The place bands keep their one 1400px file.
+    laptop. **The bands too, and lighter** (#451): every Commons JPEG is
+    encoded again before it is held or served (`lighten` in
+    lib/skyline-fetch: upright, sRGB, no metadata, mozjpeg at
+    `SKYLINE_QUALITY` 82, kept as Commons sent it where that would not be
+    smaller or cannot run) — Commons renders at an archive's quality
+    (Washington's 1600px frame was 616 KB) and real photographs from the
+    contact sheets came out at 53–57% of their bytes — which makes a 2400px
+    width affordable, so `SKYLINE_SRCSET` is 480 / 960 / 1600 / 2400 and
+    `PlaceBackdrop` offers it (`sizes`: the full width for a page's band,
+    the 72rem column for `MarketBand`): a phone takes 1600 and a dense
+    laptop 2400 where one 1400px file had been stretched twice over. The
+    PHOTOGRAPHS step's byte counts are what a visitor downloads.
   - **A small photograph enlarged by us, not the browser.** A memorandum
     exported for email carries its cover at 600–900px; `derivePicture`
     enlarges a hero under `HERO_MIN_PX` (1200) with Lanczos and a light

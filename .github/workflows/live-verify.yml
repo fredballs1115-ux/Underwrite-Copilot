@@ -378,8 +378,10 @@ jobs:
           # lib/skyline.ts): the loop above asks at 1600 only, so a width
           # Commons refused would show as a soft or missing tile on exactly
           # the screens that pick it, and nowhere here. One market at each.
+          # Each is encoded again before it is served (#451), so these byte
+          # counts, and the loop's above, are what a visitor downloads.
           echo "SRCSET WIDTHS, one market at each width a tile may ask for:"
-          for w in 480 960 1600; do
+          for w in 480 960 1600 2400; do
             probe_img "dc?w=$w" "https://underwrite-copilot.onrender.com/api/imagery/skyline/dc?w=$w" || true
           done
 
@@ -1069,6 +1071,8 @@ jobs:
           mark "#448 the memorandum's other photos" grep -q "other photos, on the deal" p_whats-new.html
           # #450 — a deal's photos flipped through on its card (signed-in): its card.
           mark "#450 flip through a deal's photos" grep -q "photos on its card" p_whats-new.html
+          # #451 — the city photographs encoded again, and a 2400px band: its card (the bytes are the PHOTOGRAPHS step's).
+          mark "#451 city photos, lighter and sharper" grep -q "City photos, lighter and sharper" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
