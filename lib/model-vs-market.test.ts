@@ -703,21 +703,43 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
         const sources = (blk.sources as string[] | undefined) ?? [];
         const where = `${m.id}.${sector}`;
         const hasVacancy = typeof (blk.vacancy_pct ?? blk.vacancy_pct_low) === "number";
+        const hasRent = typeof blk.asking_rent_psf === "number";
         const hasCap = typeof blk.cap_rate_low_pct === "number";
         expect("vacancy_read" in blk, `${where} vacancy_read`).toBe(hasVacancy);
+        expect("rent_read" in blk, `${where} rent_read`).toBe(hasRent);
         expect("cap_read" in blk, `${where} cap_read`).toBe(hasCap);
-        for (const key of ["vacancy_read", "cap_read"]) {
+        for (const key of ["vacancy_read", "rent_read", "cap_read"]) {
           const read = blk[key] as Record<string, unknown> | undefined;
           if (!read) continue;
           figures++;
           for (const k of Object.keys(read)) expect(known.has(k), `${where}.${key}.${k}`).toBe(true);
           for (const link of (read.links as string[] | undefined) ?? []) expect(sources, `${where}.${key}`).toContain(link);
-          // A vacancy is never a slice of its class; the rule is the cap's.
+          // A vacancy is never a slice of its class; a cap or a rent may be.
           if (key === "vacancy_read") expect(read.slice, where).toBeUndefined();
         }
       }
     }
-    expect(figures).toBeGreaterThan(70);
+    expect(figures).toBeGreaterThan(95);
+  });
+
+  it("an asking rent is credited to its own house and period, never the block's first link", () => {
+    const rentRead = (id: string, sector: string) => {
+      const blk = (metrosSeed.metros.find((m) => m.id === id)!.sector_snapshot as unknown as Record<string, { rent_read?: unknown; sources?: string[] }>)[sector];
+      return figureRead(blk.rent_read, blk.sources);
+    };
+    // Chicago's office rent is Cushman's CBD MarketBeat for Q2 2026; the
+    // block's first link is Tenantbase's Q1 print, the vacancy's.
+    const chicago = rentRead("chicago", "office");
+    expect(chicago).toMatchObject({ house: "Cushman & Wakefield", area: "the CBD", period: "Q2 2026" });
+    expect(chicago.links).toEqual(["https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/cbd-office"]);
+    // A house the note names with no source in the block is named and left unlinked.
+    expect(rentRead("atlanta", "industrial")).toMatchObject({ house: "Cushman & Wakefield", period: "Q2 2026", links: [] });
+    // Miami retail's rent is Colliers' Q2 2026 figure; the only Colliers link is its Q1 report.
+    expect(rentRead("miami", "retail")).toMatchObject({ house: "Colliers", area: "Miami-Dade", period: "Q2 2026", links: [] });
+    // A rent whose house the note does not name names none and links nothing.
+    expect(rentRead("dallas", "industrial")).toMatchObject({ house: null, period: "Q2 2026", links: [] });
+    // A Class A figure says so.
+    expect(figureNote(rentRead("philadelphia", "industrial"))).toBe("Colliers, Q2 2026; average asking; for Class A space");
   });
 });
 

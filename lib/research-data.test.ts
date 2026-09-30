@@ -116,7 +116,7 @@ describe("sector snapshot benchmark rows", () => {
     expect(philly!.high).toBe(5.7);
   });
 
-  it("every snapshot row carries provenance: a vacancy or cap row its own figure's link and citation, never the block's first link", () => {
+  it("every snapshot row carries provenance: its own figure's link and citation, never the block's first link", () => {
     const snapRows = seeds.filter((b) =>
       /_(vacancy_pct|asking_rent_psf|cap_rate_pct)$/.test(b.metric),
     );
@@ -128,15 +128,23 @@ describe("sector snapshot benchmark rows", () => {
     for (const r of snapRows) {
       // The day the research was read.
       expect(r.as_of).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      if (/_asking_rent_psf$/.test(r.metric)) {
-        expect(r.source, `${r.metro} ${r.metric}`).toMatch(/^https?:\/\//);
-        continue;
-      }
-      // A vacancy or a cap: a link only where the file ties one to the
-      // figure, and then one of its block's own sources; a citation always.
+      // A vacancy, a rent or a cap: a link only where the file ties one to
+      // the figure, and then one of its block's own sources; a citation always.
       if (r.source) expect(blockOf(r).sources, `${r.metro} ${r.metric}`).toContain(r.source);
       expect(r.cite, `${r.metro} ${r.metric}`).toBeTruthy();
     }
+    expect(snapRows.filter((r) => /_asking_rent_psf$/.test(r.metric)).length).toBeGreaterThanOrEqual(20);
+    // Chicago's office rent is Cushman's CBD MarketBeat; the block's first
+    // link is Tenantbase's Q1 print.
+    const chicagoRent = snapRows.find((b) => b.metro === "Chicago" && b.metric === "office_asking_rent_psf")!;
+    expect(chicagoRent.low).toBe(43.9);
+    expect(chicagoRent.source).toBe("https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/cbd-office");
+    expect(chicagoRent.cite).toBe("Cushman & Wakefield, the CBD, Q2 2026; average gross asking");
+    // Miami retail's rent is Colliers' Q2 2026; the block's Colliers link is
+    // its Q1 report, so the figure is unlinked.
+    const miamiRent = snapRows.find((b) => b.metro === "Miami" && b.metric === "retail_asking_rent_psf")!;
+    expect(miamiRent.source).toBe("");
+    expect(miamiRent.cite).toBe("Colliers, Miami-Dade, Q2 2026; average asking");
     // Chicago's cap is Essex Realty's April 2026 average — the block's first
     // link is JPMorgan's, the vacancy's source.
     const chicagoCap = snapRows.find((b) => b.metro === "Chicago" && b.metric === "multifamily_cap_rate_pct")!;

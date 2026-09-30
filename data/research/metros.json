@@ -193,6 +193,9 @@
               "https://warespace.com/resources/market-reports/washington-dc",
               "https://www.colliers.com/en/research/washington-dc/maryland-industrial-market-report-2026-q1"
             ]
+          },
+          "rent_read": {
+            "construct": "the midpoint of a $10–15/SF NNN asking band"
           }
         },
         "multifamily": {
@@ -277,7 +280,16 @@
             "https://www.colliers.com/en/research/washington-dc/maryland-industrial-report-q4-2024",
             "https://klnb.com/wp-content/uploads/2025/04/NAIKLNB_MD_Industrial_Q1_2025-1.pdf"
           ],
-          "note": "County-specific print from the Colliers/KLNB Maryland industrial series, Q4 2024 VINTAGE (declared — the newest MoCo-specific level to clear the bar): asking $6.94/SF, up $0.09 QoQ; +15,360 SF Q4 absorption (2024 total −12,839 SF); NO projects under construction, so new supply pressure is nil and absorption works straight against vacancy. A vacancy RATE for the county has not cleared the bar: Colliers’ Q1 2026 “Maryland 10.1%” runs on a Baltimore/I-95-corridor-shaped base (its own narrative ties the print to that corridor) and is rejected as a MoCo read; Transwestern’s 6.9% suburban-MD figure is Q2 2025 vintage on the two-county base. Both stay recorded, neither is a county vacancy."
+          "note": "County-specific print from the Colliers/KLNB Maryland industrial series, Q4 2024 VINTAGE (declared — the newest MoCo-specific level to clear the bar): asking $6.94/SF, up $0.09 QoQ; +15,360 SF Q4 absorption (2024 total −12,839 SF); NO projects under construction, so new supply pressure is nil and absorption works straight against vacancy. A vacancy RATE for the county has not cleared the bar: Colliers’ Q1 2026 “Maryland 10.1%” runs on a Baltimore/I-95-corridor-shaped base (its own narrative ties the print to that corridor) and is rejected as a MoCo read; Transwestern’s 6.9% suburban-MD figure is Q2 2025 vintage on the two-county base. Both stay recorded, neither is a county vacancy.",
+          "rent_read": {
+            "house": "the Colliers/KLNB Maryland industrial series",
+            "area": "Montgomery County",
+            "period": "Q4 2024",
+            "links": [
+              "https://www.colliers.com/en/research/washington-dc/maryland-industrial-report-q4-2024"
+            ],
+            "construct": "average asking"
+          }
         },
         "multifamily": {
           "vacancy_pct": 5.2,
@@ -368,6 +380,10 @@
           "note": "NoVA is among the tightest small-bay markets in the country: ~3.9-5.0% vacancy (roughly half the national average), $17.44/SF NNN asking; close-in Alexandria ~$17-20 NNN. Infill small-bay under 50k SF intensely supply-constrained.",
           "vacancy_read": {
             "area": "Northern Virginia"
+          },
+          "rent_read": {
+            "area": "Northern Virginia",
+            "construct": "NNN asking"
           }
         },
         "multifamily": {
@@ -466,6 +482,14 @@
             "links": [
               "https://www.nmrk.com/insights/market-report/baltimore-market-reports"
             ]
+          },
+          "rent_read": {
+            "house": "CBRE",
+            "period": "Q2 2026",
+            "links": [
+              "https://www.cbre.com/insights/figures/baltimore-industrial-figures-q2-2026"
+            ],
+            "construct": "average asking"
           }
         },
         "multifamily": {
@@ -568,6 +592,14 @@
             "links": [
               "https://www.cbre.com/insights/figures/richmond-industrial-figures-q2-2026"
             ]
+          },
+          "rent_read": {
+            "house": "CBRE",
+            "period": "Q2 2026",
+            "links": [
+              "https://www.cbre.com/insights/figures/richmond-industrial-figures-q2-2026"
+            ],
+            "construct": "average asking"
           }
         },
         "multifamily": {
@@ -798,6 +830,15 @@
               "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-industrial-report",
               "https://www.kbcadvisors.com/insights/q2-2026-greater-philadelphia-market-report"
             ]
+          },
+          "rent_read": {
+            "house": "Colliers",
+            "period": "Q2 2026",
+            "links": [
+              "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-industrial-report"
+            ],
+            "construct": "average asking",
+            "slice": "Class A space"
           }
         },
         "multifamily": {
@@ -958,6 +999,15 @@
             "links": [
               "https://www.roi-nj.com/2024/08/15/real_estate_development/marcus-millichap-report-finds-record-low-vacancy-and-strong-rent-growth-in-north-jersey-retail-market/"
             ]
+          },
+          "rent_read": {
+            "house": "Marcus & Millichap",
+            "area": "North Jersey",
+            "period": "2024",
+            "links": [
+              "https://www.roi-nj.com/2024/08/15/real_estate_development/marcus-millichap-report-finds-record-low-vacancy-and-strong-rent-growth-in-north-jersey-retail-market/"
+            ],
+            "construct": "average asking"
           }
         }
       }
@@ -1019,6 +1069,15 @@
               "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/new-york-city-area-marketbeats/manhattan-office",
               "https://www.propertyshark.com/Real-Estate-Reports/2026/07/28/nyc-office-market-report-q2-2026/"
             ]
+          },
+          "rent_read": {
+            "house": "Cushman & Wakefield",
+            "area": "Manhattan",
+            "period": "Q2 2026",
+            "links": [
+              "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/new-york-city-area-marketbeats/manhattan-office"
+            ],
+            "construct": "average gross asking, overall"
           }
         },
         "industrial": {
@@ -1038,6 +1097,15 @@
             "links": [
               "https://www.matthews.com/insights/new-york-industrial-market-report-q2-2026"
             ]
+          },
+          "rent_read": {
+            "house": "Matthews",
+            "area": "the New York metro",
+            "period": "Q2 2026",
+            "links": [
+              "https://www.matthews.com/insights/new-york-industrial-market-report-q2-2026"
+            ],
+            "construct": "average asking"
           }
         },
         "multifamily": {
@@ -1079,6 +1147,15 @@
             "links": [
               "https://www.matthews.com/insights/new-york-retail-market-report-q2-2026"
             ]
+          },
+          "rent_read": {
+            "house": "Matthews",
+            "area": "Manhattan",
+            "period": "Q2 2026",
+            "links": [
+              "https://www.matthews.com/insights/new-york-retail-market-report-q2-2026"
+            ],
+            "construct": "average asking"
           }
         }
       }
@@ -1195,6 +1272,14 @@
             "links": [
               "https://www.matthews.com/insights/boston-retail-2025"
             ]
+          },
+          "rent_read": {
+            "house": "Matthews",
+            "period": "year-end 2025",
+            "links": [
+              "https://www.matthews.com/insights/boston-retail-2025"
+            ],
+            "construct": "average asking"
           }
         }
       }
@@ -1250,6 +1335,15 @@
           "rent_basis": "avg gross asking, CBD (Cushman)",
           "vacancy_read": {
             "period": "Q1 2026"
+          },
+          "rent_read": {
+            "house": "Cushman & Wakefield",
+            "area": "the CBD",
+            "period": "Q2 2026",
+            "links": [
+              "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/cbd-office"
+            ],
+            "construct": "average gross asking"
           }
         },
         "industrial": {
@@ -1265,6 +1359,10 @@
           "note": "2026: market vacancy holding at 4.7%, avg asking $6.57/SF; big-box (>500k SF) vacancy compressed to 6.5% in Q2 with big-box rents +6.6% YoY (Avison Young).",
           "vacancy_read": {
             "period": "2026"
+          },
+          "rent_read": {
+            "period": "2026",
+            "construct": "average asking"
           }
         },
         "multifamily": {
@@ -1386,6 +1484,14 @@
             "links": [
               "https://www.cbre.com/insights/figures/los-angeles-industrial-figures-q2-2026"
             ]
+          },
+          "rent_read": {
+            "house": "Kidder Mathews",
+            "period": "Q2 2026",
+            "links": [
+              "https://kidder.com/market-reports/los-angeles-industrial-market-report/"
+            ],
+            "construct": "average direct NNN asking, $1.37/SF a month × 12"
           }
         },
         "multifamily": {
@@ -1504,6 +1610,15 @@
             "links": [
               "https://www.matthews.com/insights/san-francisco-industrial-q2-2026"
             ]
+          },
+          "rent_read": {
+            "house": "Matthews",
+            "area": "San Francisco city proper",
+            "period": "Q2 2026",
+            "links": [
+              "https://www.matthews.com/insights/san-francisco-industrial-q2-2026"
+            ],
+            "construct": "average asking"
           }
         },
         "multifamily": {
@@ -1657,6 +1772,14 @@
             "links": [
               "https://kidder.com/market-reports/seattle-retail-market-report/"
             ]
+          },
+          "rent_read": {
+            "house": "Kidder Mathews",
+            "period": "Q1 2026",
+            "links": [
+              "https://kidder.com/market-reports/seattle-retail-market-report/"
+            ],
+            "construct": "NNN asking, $1.95/SF a month × 12"
           }
         }
       }
@@ -1732,6 +1855,15 @@
             "links": [
               "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-industrial"
             ]
+          },
+          "rent_read": {
+            "house": "Colliers",
+            "area": "Miami-Dade County",
+            "period": "Q2 2026",
+            "links": [
+              "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-industrial"
+            ],
+            "construct": "NNN asking"
           }
         },
         "multifamily": {
@@ -1774,6 +1906,12 @@
             "house": "Colliers",
             "area": "Miami-Dade",
             "period": "Q2 2026"
+          },
+          "rent_read": {
+            "house": "Colliers",
+            "area": "Miami-Dade",
+            "period": "Q2 2026",
+            "construct": "average asking"
           }
         }
       }
@@ -1847,6 +1985,11 @@
               "https://www.cbre.com/insights/figures/atlanta-industrial-figures-report-q2-2026",
               "https://www.jll.com/en-us/insights/market-dynamics/atlanta-industrial"
             ]
+          },
+          "rent_read": {
+            "house": "Cushman & Wakefield",
+            "period": "Q2 2026",
+            "construct": "direct asking, all product"
           }
         },
         "multifamily": {
@@ -1884,6 +2027,10 @@
             "links": [
               "https://partnersrealestate.com/research/atlanta-retail-q1-2026-quarterly-market-report/"
             ]
+          },
+          "rent_read": {
+            "period": "Q2 2026",
+            "construct": "average asking"
           }
         }
       }
@@ -1956,6 +2103,10 @@
               "https://www.cbre.com/insights/figures/dallas-fort-worth-industrial-figures-q2-2026",
               "https://www.jll.com/en-us/insights/market-dynamics/dallas-fort-worth-industrial"
             ]
+          },
+          "rent_read": {
+            "period": "Q2 2026",
+            "construct": "average asking"
           }
         },
         "multifamily": {
@@ -1999,6 +2150,11 @@
           "vacancy_read": {
             "house": "CoStar-derived tracking",
             "period": "Q2 2026"
+          },
+          "rent_read": {
+            "house": "CoStar-derived tracking",
+            "period": "Q2 2026",
+            "construct": "average asking"
           }
         }
       }

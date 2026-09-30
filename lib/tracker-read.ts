@@ -12,7 +12,7 @@ import { assetClassKey } from "@/lib/asset-words";
  * Pure. This is research — a house's print, not a feed that moves every
  * weekday — so each figure is said with its own period, the area it covers
  * and the house that published it, as the block's note and source list
- * state them (`vacancy_read` and `cap_read`, the vacancy's and the cap's
+ * state them (`vacancy_read`, `rent_read` and `cap_read`, each figure's
  * apart). The snapshot's day is the day it was read, never the figures'
  * date; a figure whose period the file does not state is undated; and a
  * figure is credited only to a link the file ties to it, never to the
@@ -44,12 +44,13 @@ export interface FigureRead {
   /** the figure's own links — only the block's sources the file ties to it;
    *  empty where it ties none */
   links: string[];
-  /** a cap figure's kind where the note says — "a transaction average, not a
-   *  quoted band" — or null */
+  /** what kind of figure it is where the file says — a cap's "a transaction
+   *  average, not a quoted band", a rent's "average gross asking" or "NNN
+   *  asking" — or null */
   construct: string | null;
-  /** a stock narrower than the deal's class the cap figure is for — "Class A
-   *  stabilized core" — or null; such a figure is shown and named, never
-   *  held to an exit */
+  /** a stock narrower than the sector the figure is for — a cap's "Class A
+   *  stabilized core", a rent's "Class A space" — or null; such a cap is
+   *  shown and named, never held to an exit */
   slice: string | null;
 }
 
@@ -134,17 +135,19 @@ type SnapBlock = {
   cap_rate_high_pct?: number | null;
   sources?: string[];
   vacancy_read?: unknown;
+  rent_read?: unknown;
   cap_read?: unknown;
 };
 
-const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+const num =(v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
 const words = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 /**
- * A figure's provenance out of its block (`vacancy_read` / `cap_read`). A
- * link counts only where it is one of the block's own sources; a block that
- * carries no read gives a figure with nothing named — undated, no house, no
- * link — rather than borrowing the block's first source.
+ * A figure's provenance out of its block (`vacancy_read` / `rent_read` /
+ * `cap_read`). A link counts only where it is one of the block's own
+ * sources; a block that carries no read gives a figure with nothing named —
+ * undated, no house, no link — rather than borrowing the block's first
+ * source.
  */
 export function figureRead(raw: unknown, sources: readonly string[] | undefined): FigureRead {
   const r = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;

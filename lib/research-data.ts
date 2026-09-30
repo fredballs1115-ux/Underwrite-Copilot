@@ -200,13 +200,14 @@ export function seedBenchmarks(): Benchmark[] {
   // row per figure actually carried, flowing to deal pages and Compare via
   // benchmarksForDeal. Divergent trackers encode as the observed low–high
   // spread, never averaged; a null figure emits no row (a gap is a gap).
-  // A vacancy or cap row carries its OWN figure's link and citation — the
-  // house, the area and the period its block's `vacancy_read` / `cap_read`
-  // states (lib/tracker-read) — never the block's first source, which is
-  // another figure's as often as not (Chicago's cap, Essex Realty's April
-  // average, had been credited to JPMorgan, the vacancy's source); a figure
-  // the file ties to no link carries none. `as_of` stays the day the
-  // research was read, and the citation says so.
+  // Every row carries its OWN figure's link and citation — the house, the
+  // area and the period its block's `vacancy_read` / `rent_read` /
+  // `cap_read` states (lib/tracker-read) — never the block's first source,
+  // which is another figure's as often as not (Chicago's cap, Essex
+  // Realty's April average, had been credited to JPMorgan, the vacancy's
+  // source, and its office rent, Cushman's CBD MarketBeat, to Tenantbase's
+  // Q1 print); a figure the file ties to no link carries none. `as_of`
+  // stays the day the research was read, and the citation says so.
   type SnapshotBlock = {
     vacancy_pct?: number | null;
     vacancy_pct_low?: number | null;
@@ -218,6 +219,7 @@ export function seedBenchmarks(): Benchmark[] {
     sources?: string[];
     note?: string;
     vacancy_read?: unknown;
+    rent_read?: unknown;
     cap_read?: unknown;
   };
   for (const m of metrosSeed.metros ?? []) {
@@ -235,7 +237,6 @@ export function seedBenchmarks(): Benchmark[] {
         metro: m.name,
         as_of: snapAsOf,
         status: (blk.status as Benchmark["status"]) ?? "sourced",
-        source: blk.sources?.[0] ?? "",
         note: blk.note ?? null,
       };
       const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low;
@@ -253,12 +254,15 @@ export function seedBenchmarks(): Benchmark[] {
         });
       }
       if (typeof blk.asking_rent_psf === "number") {
+        const read = figureRead(blk.rent_read, blk.sources);
         out.push({
           ...base,
           metric: `${sector}_asking_rent_psf`,
           low: blk.asking_rent_psf,
           high: blk.asking_rent_psf,
           unit: "usd_sf_yr",
+          source: read.links[0] ?? "",
+          cite: figureNote(read),
         });
       }
       if (
