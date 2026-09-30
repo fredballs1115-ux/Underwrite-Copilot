@@ -50,7 +50,8 @@ export const DATA_PROCESSORS: readonly DataProcessor[] = [
   },
   {
     name: "Resend",
-    receives: "your email address, and the deal names, screening calls and deadlines in the emails you choose to get",
+    receives:
+      "your email address, and what the emails you choose to get carry: deal names, their screening calls with a line of why and their buy-box fit, pipeline counts and offer deadlines",
     hosts: ["api.resend.com"],
   },
   {
