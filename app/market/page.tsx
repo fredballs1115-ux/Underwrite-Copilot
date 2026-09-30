@@ -270,9 +270,13 @@ export default async function MarketDataPage({
           <h1 className="text-3xl font-semibold tracking-tight">
             {marketHeading(pageMetro)}
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted">
-            Rules, FMRs, benchmarks and sales coverage for the covered markets.
-          </p>
+          {/* A metro area read without a brief has no rules, fair market
+              rents or sales coverage; its own view says what it holds. */}
+          {pageMetro && !pageMetro.briefed ? null : (
+            <p className="mt-1 max-w-2xl text-sm text-muted">
+              Rules, FMRs, benchmarks and sales coverage for the covered markets.
+            </p>
+          )}
         </div>
       )}
 

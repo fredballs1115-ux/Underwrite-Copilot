@@ -113,6 +113,9 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A self-storage facility (#471): the economic occupancy, the street rate
   // and the in-place rent.
   for (const row of storageTermRows(rows)) lead(row);
-  const rest = rows.filter((m) => !head.includes(m));
+  // On a note the collateral's cap is not printed at all: among the rows a
+  // reader would take it for a cap on the note's price, which it is not.
+  const collateralCap = interest === "note" ? findGoingInCap(rows) : null;
+  const rest = rows.filter((m) => !head.includes(m) && m !== collateralCap);
   return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
 }

@@ -16,6 +16,7 @@ import {
   noiFigures,
 } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
+import { interestOf } from "@/lib/interest";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import {
   bandText,
@@ -731,8 +732,13 @@ export function modelVsMarketFor(args: {
 }): ModelVsMarket | null {
   const { derived, extraction, storedAssetClass, metro, reads } = args;
   const planDeal = isPlanDeal(inferStrategy(extraction, args.firstSignal ?? null).kind);
-  const capText =
-    args.goingInCapText !== undefined
+  // A note's price is a loan's (#414): the cap its memorandum states is the
+  // collateral's, never the buyer's, so the exit is set against no going-in
+  // cap on a note — stated, passed in or implied — on every surface.
+  const note = interestOf(extraction).kind === "note";
+  const capText = note
+    ? null
+    : args.goingInCapText !== undefined
       ? args.goingInCapText
       : planDeal
         ? null
@@ -743,7 +749,7 @@ export function modelVsMarketFor(args: {
   // price imply: without it a deal whose NOI is 7.50% of its price read "no
   // going-in cap to set it against" while the model's 6.00% default exit
   // priced 150 bps of compression unsaid. Never on a plan deal.
-  const implied = stated == null && !planDeal ? impliedGoingInCap(extraction) : null;
+  const implied = stated == null && !planDeal && !note ? impliedGoingInCap(extraction) : null;
   const assetClass = shownAssetClass(storedAssetClass ?? null, extraction) || null;
   return modelVsMarket({
     inputs: derived.inputs,

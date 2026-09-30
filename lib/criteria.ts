@@ -505,6 +505,9 @@ interface ExtractionLike {
   /** the deal's strategy as the extraction read it; a plan deal (value-add,
    *  lease-up, conversion, development) has no going-in cap to check */
   strategy?: { kind?: string } | null;
+  /** what the price buys (#414); a note's price is a loan's, so the
+   *  collateral's cap is not the buyer's and no cap floor is checked on it */
+  interest?: { kind?: string | null } | null;
 }
 
 export function findMetric(
@@ -1278,7 +1281,15 @@ export function evaluateBuyBox(
     const metric = findGoingInCap(metrics);
     const pct = metric ? parsePct(metric.value) : null;
     const planKind = planKindLabel(extraction);
-    if (pct == null) {
+    if (extraction?.interest?.kind === "note") {
+      // A note's price is a loan's: the cap the memorandum states is the
+      // collateral's, which the buyer of the note does not earn (#414).
+      checks.push({
+        label: "Going-in cap",
+        status: "unknown",
+        detail: `Mandate wants ≥${box.minCapPct}% going-in, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`,
+      });
+    } else if (pct == null) {
       checks.push({
         label: "Going-in cap",
         status: "unknown",

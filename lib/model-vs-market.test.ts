@@ -430,6 +430,26 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     const without = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads });
     expect(exitOf(without)?.read).toContain("The going-in cap 6.00%");
   });
+
+  it("a note reads no going-in cap — stated, passed in or implied — since its price is a loan's (the audit of 2026-09-30)", () => {
+    const note: ExtractionResult = {
+      ...extraction,
+      interest: { kind: "note", summary: "The first mortgage note secured by the property", share: "", groundLease: "", loan: "", page: "p. 2" },
+    };
+    const exitOf = (r: ReturnType<typeof modelVsMarketFor>) => r?.checks.find((c) => c.key === "exit_cap");
+    for (const r of [
+      // the report's and the workbook's call: the extraction's own stated cap
+      modelVsMarketFor({ derived, extraction: note, storedAssetClass: "industrial", metro: null, reads }),
+      // the deal page's call, handing in the cap its summary reads
+      modelVsMarketFor({ derived, extraction: note, storedAssetClass: "industrial", metro: null, reads, goingInCapText: "6.0%" }),
+      // no cap shown: the NOI over the note's price is no cap either
+      modelVsMarketFor({ derived, extraction: note, storedAssetClass: "industrial", metro: null, reads, goingInCapText: null }),
+    ]) {
+      expect(exitOf(r)?.tone).toBe("stated");
+      expect(exitOf(r)?.read).toContain("No going-in cap to set it against; the spread is the claim.");
+      expect(exitOf(r)?.read).not.toContain("The going-in cap");
+    }
+  });
 });
 
 describe("the going-in cap the documents imply where they state none", () => {

@@ -49,6 +49,15 @@ describe("evaluateBuyBox — reads the expected figures", () => {
     expect(check(r, "Going-in cap")?.status).toBe("pass");
   });
 
+  it("checks no cap floor on a note: the stated cap is the collateral's, not the buyer's (the audit of 2026-09-30)", () => {
+    const box: BuyBox = { minCapPct: 5.0 };
+    const note = { ...ex([["Going-in cap rate", "7.00%"]]), interest: { kind: "note" } };
+    const r = evaluateBuyBox("auto", note, box);
+    expect(check(r, "Going-in cap")?.status).toBe("unknown");
+    expect(check(r, "Going-in cap")?.detail).toContain("this is a note: its price is a loan's");
+    expect(check(r, "Going-in cap")?.detail).not.toContain("7.00%");
+  });
+
   it("does not read the exit cap as the going-in cap", () => {
     const box: BuyBox = { minCapPct: 5.0 };
     // Only an exit cap present → the going-in check has no figure → unknown.

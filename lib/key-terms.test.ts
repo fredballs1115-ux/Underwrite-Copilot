@@ -68,8 +68,9 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Note rate", value: "5.25%", flagged: false },
       { label: "Unpaid principal balance", value: "$24,400,000", flagged: false },
     ];
-    // The collateral's size still says what secures the loan; its cap
-    // comes after, among the flagged rows.
+    // The collateral's size still says what secures the loan; its cap is
+    // not printed at all, flagged or not — among the rows it would read as
+    // a cap on the note's price (the audit of 2026-09-30).
     expect(keyTermRows(note, "stabilized", 7, "note").map((m) => m.label)).toEqual([
       "Asking price",
       "Unpaid principal balance",
@@ -77,8 +78,9 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       "Maturity date",
       "Payment status",
       "Units",
-      "Going-in cap rate",
+      "Yield to maturity (at ask)",
     ]);
+    expect(keyTermRows(note, "stabilized", 20, "note").map((m) => m.label)).not.toContain("Going-in cap rate");
     // The same rows read as a building lead with its cap and count.
     expect(keyTermRows(note, "stabilized", 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Units"]);
   });
