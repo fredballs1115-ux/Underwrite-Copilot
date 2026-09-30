@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   basisLabel,
   buildComps,
+  explorerLeads,
   summarizeMarkets,
   marketMemoryFor,
   marketsIn,
@@ -352,6 +353,21 @@ describe("a basis wears its class's noun — a hotel's keys, a park's pads — n
     expect(basisLabel(office)).toBe("Basis / SF");
     expect(basisLabel({ assetClass: "land_infill", perUnit: null })).toBe("Basis / acre");
     expect(basisLabel({ assetClass: "hospitality_str", perUnit: null })).toBe("Basis / key");
+  });
+});
+
+describe("explorerLeads — /market opens on the covered markets for a reader with nothing of their own", () => {
+  const base = { signedIn: true, memoryFailed: false, groups: 0, submarkets: 0 };
+  it("a signed-in reader with no screens on file and no submarkets gets the explorer first", () => {
+    expect(explorerLeads(base)).toBe(true);
+  });
+  it("anything of their own keeps it in its place, and so does a memory that failed to load", () => {
+    expect(explorerLeads({ ...base, groups: 1 })).toBe(false);
+    expect(explorerLeads({ ...base, submarkets: 2 })).toBe(false);
+    expect(explorerLeads({ ...base, memoryFailed: true })).toBe(false);
+  });
+  it("a visitor signed out has no memory above it to move past", () => {
+    expect(explorerLeads({ ...base, signedIn: false })).toBe(false);
   });
 });
 

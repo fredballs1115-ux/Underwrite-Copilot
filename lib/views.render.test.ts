@@ -1412,6 +1412,32 @@ describe("SubmarketCards and the submarket's band — the metro its owner typed,
   });
 });
 
+// ── /market in outline while it loads, and the explorer's anchor ───────────
+import MarketLoading from "@/app/market/loading";
+import { readFileSync as readSource } from "node:fs";
+import { join as joinPath } from "node:path";
+
+describe("/market's loading outline, and the metro explorer as its #explorer", () => {
+  it("draws the page's own shape — the explorer's chips over the band, the cards — named for a screen reader", () => {
+    const html = render(React.createElement(MarketLoading));
+    dumpView("market-loading", html);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(html).toContain('role="status" aria-label="Loading the markets"');
+    // The band at MarketBand's own heights, 15rem and 21rem from sm.
+    expect(html).toContain('class="skeleton mt-4 h-60 w-full rounded-2xl sm:h-84"');
+    expect((html.match(/skeleton h-7 w-24 rounded-full/g) ?? []).length).toBe(10);
+    // An outline, not words.
+    expect(visibleText(html).trim()).toBe("");
+  });
+
+  it("the explorer's section is the page's #explorer, a briefed market's and a read-only one's alike", () => {
+    const src = readSource(joinPath(process.cwd(), "app/market/page.tsx"), "utf8");
+    expect(src.match(/<section id="explorer" className="[^"]*scroll-mt-6/g)?.length).toBe(2);
+    // Its reads run together, never one after another.
+    expect(src).not.toMatch(/const (live|national|zori|realtor) = await live/);
+  });
+});
+
 // ── The shared screen (the one signed-out surface) ─────────────────────────
 import { Expired, ShareView } from "@/app/share/[token]/share-view";
 import type { BrokerCompsResult, ExtractionResult, MarketResult, VerdictResult } from "@/lib/anthropic/types";

@@ -1,5 +1,3 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { listSubmarkets } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
 import { createSubmarket } from "@/app/(app)/submarkets/actions";
 import { SubmarketCards } from "./submarket-cards";
@@ -22,22 +20,17 @@ const ERRORS: Record<string, string> = {
   notfound: "That submarket no longer exists.",
 };
 
-export async function SubmarketsPanel({
-  userId,
+export function SubmarketsPanel({
+  submarkets,
   errorCode,
 }: {
-  userId: string;
+  /** the reader's own submarkets, read by the page beside its memory (the
+   *  page orders its sections by whether there are any); empty on a schema
+   *  without migration 0033, and the empty state stands */
+  submarkets: readonly Submarket[];
   /** carried across from a create/delete redirect — see ERRORS */
   errorCode?: string;
 }) {
-  const supabase = await createSupabaseServerClient();
-  let submarkets: Submarket[] = [];
-  try {
-    submarkets = await listSubmarkets(supabase, userId);
-  } catch {
-    // Migration 0033 not applied yet: the table is missing. The empty state
-    // stands; a create attempt surfaces its own "couldn't create" message.
-  }
   const message = errorCode ? ERRORS[errorCode] : undefined;
 
   return (

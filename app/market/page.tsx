@@ -8,6 +8,7 @@ import {
   buildComps,
   summarizeMarkets,
   fmtCapRange,
+  explorerLeads,
   fmtBasisRange,
   marketsIn,
   type MarketGroup,
@@ -48,6 +49,8 @@ import {
   type SnapBlock,
 } from "@/lib/sector-leaderboard";
 import { SubmarketsPanel } from "./submarkets-panel";
+import { listSubmarkets } from "@/lib/market/store";
+import type { Submarket } from "@/lib/market/types";
 import { MarketCompare } from "./market-compare";
 import { COMPARE_METROS } from "./compare-metros";
 import { Fold } from "./fold";
@@ -236,15 +239,22 @@ export default async function MarketDataPage({
   // Own-account only (Feature 6): the deals THIS user created — never a
   // teammate's, never another account's. RLS also allows team deals, so the
   // explicit user_id filter is what keeps this memory private to the buyer.
-  const { data, error } = user
-    ? await supabase
-        .from("deals")
-        .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
-        .eq("user_id", user.id)
-        .not("extraction", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(500)
-    : { data: null, error: null };
+  // The reader's own submarkets are read beside it: the page puts the
+  // covered markets first for a reader with neither.
+  const [{ data, error }, submarkets] = user
+    ? await Promise.all([
+        supabase
+          .from("deals")
+          .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
+          .eq("user_id", user.id)
+          .not("extraction", "is", null)
+          .order("created_at", { ascending: false })
+          .limit(500),
+        // Migration 0033 not applied yet: the table is missing, the list
+        // is empty, and a create attempt says so itself.
+        listSubmarkets(supabase, user.id).catch((): Submarket[] => []),
+      ])
+    : [{ data: null, error: null }, [] as Submarket[]];
 
   const groups = data
     ? summarizeMarkets(buildComps(data as Parameters<typeof buildComps>[0]))
@@ -252,6 +262,16 @@ export default async function MarketDataPage({
   const totalScreens = groups.reduce((n, g) => n + g.count, 0);
   // A card is one market × one asset class; the line counts the markets.
   const marketCount = marketsIn(groups);
+  // A reader with no screens on file and no submarkets came for the covered
+  // markets ("Browse the covered markets →"): the explorer leads, and the
+  // two empty states follow it rather than pushing it below the fold.
+  const explorerFirst = explorerLeads({
+    signedIn: !!user,
+    memoryFailed: !!error,
+    groups: groups.length,
+    submarkets: submarkets.length,
+  });
+  const explorer = <MetroExplorer selected={metroParam} />;
 
   return (
     <div className="space-y-6">
@@ -283,6 +303,8 @@ export default async function MarketDataPage({
           )}
         </div>
       )}
+
+      {explorerFirst ? explorer : null}
 
       {!user ? null : error && /relation|does not exist|schema/i.test(error.message) ? (
         <p className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
@@ -329,9 +351,9 @@ export default async function MarketDataPage({
           own market exports, checked against deal assumptions. Part of the
           market picture, so it lives here rather than in a section of its own;
           /submarkets redirects to this anchor. */}
-      {user ? <SubmarketsPanel userId={user.id} errorCode={submarketError} /> : null}
+      {user ? <SubmarketsPanel submarkets={submarkets} errorCode={submarketError} /> : null}
 
-      <MetroExplorer selected={metroParam} />
+      {explorerFirst ? null : explorer}
       {/* Side-by-side: any two covered markets on one shared dollar scale,
           straight off the research layer. */}
       <MarketCompare metros={COMPARE_METROS} today={todayIso()} />
@@ -569,7 +591,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
       liveRealtor(readOnly.name),
     ]);
     return (
-      <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+      <section id="explorer" className="shadow-card scroll-mt-6 rounded-2xl border border-line bg-surface p-5">
         <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
         <MetroChips active={readOnly.id} />
         <ReadOnlyMetroView metro={readOnly} rates={rates} zori={zori} realtor={realtor} />
@@ -586,8 +608,8 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   // real rows replace hand-entered stats; zero rows renders nothing rather
   // than a hollow "0".
   const ingestMarket = (active as { ingest_market?: string }).ingest_market;
-  let stock: { parcels: number; sales: number } | null = null;
-  if (ingestMarket) {
+  const stockRead = async (): Promise<{ parcels: number; sales: number } | null> => {
+    if (!ingestMarket) return null;
     try {
       const supabase = await createSupabaseServerClient();
       const [p, s] = await Promise.all([
@@ -600,26 +622,30 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           .select("id", { count: "exact", head: true })
           .eq("market", ingestMarket),
       ]);
-      if ((p.count ?? 0) > 0 || (s.count ?? 0) > 0) {
-        stock = { parcels: p.count ?? 0, sales: s.count ?? 0 };
-      }
+      return (p.count ?? 0) > 0 || (s.count ?? 0) > 0 ? { parcels: p.count ?? 0, sales: s.count ?? 0 } : null;
     } catch {
       // migration 0028 not run — no line
+      return null;
     }
-  }
-  // The metro's own figures, live from FRED — its unemployment, jobs,
-  // permits and house prices, read the way the rates strip is and cached
-  // per metro. A metro FRED does not publish for gets no panel.
-  const live = await liveMetroRates(active.id);
-  // The national table too (the strip's own cached read): each commercial
-  // sector's lessor rent index rides under its tracker fundamentals.
-  const national = await liveRates();
-  // What landlords are asking this month (Zillow's index, monthly), beside
-  // HUD's two-bedroom fair market rent — two different measures, both shown.
-  const zori = await liveZori(active.name);
-  // The for-sale market this month (Realtor.com's inventory, monthly) —
-  // the demand side an apartment underwrite is quietly assuming.
-  const realtor = await liveRealtor(active.name);
+  };
+  // None of the reads waits on another, so they run together — one read's
+  // wall clock, not five, as the read-only branch above already does.
+  const [stock, live, national, zori, realtor] = await Promise.all([
+    stockRead(),
+    // The metro's own figures, live from FRED — its unemployment, jobs,
+    // permits and house prices, read the way the rates strip is and cached
+    // per metro. A metro FRED does not publish for gets no panel.
+    liveMetroRates(active.id),
+    // The national table too (the strip's own cached read): each commercial
+    // sector's lessor rent index rides under its tracker fundamentals.
+    liveRates(),
+    // What landlords are asking this month (Zillow's index, monthly), beside
+    // HUD's two-bedroom fair market rent — two different measures, both shown.
+    liveZori(active.name),
+    // The for-sale market this month (Realtor.com's inventory, monthly) —
+    // the demand side an apartment underwrite is quietly assuming.
+    liveRealtor(active.name),
+  ]);
   // HUD's fair market rent through the one reader (lib/fmr): the fiscal
   // year, the day it takes effect and HUD's name for the area are the
   // block's own, so the row cannot print one year's rents as another's.
@@ -660,7 +686,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
       : "bg-brand/10 text-brand";
 
   return (
-    <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
+    <section id="explorer" className="shadow-card scroll-mt-6 rounded-2xl border border-line bg-surface p-5">
       <h2 className="text-sm font-semibold tracking-tight">Metro explorer</h2>
       <MetroChips active={active.id} />
 

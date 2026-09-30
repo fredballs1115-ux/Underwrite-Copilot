@@ -288,6 +288,21 @@ function groupNoun(assetClass: string, withBasis: readonly MarketComp[]): string
   return assetWords(assetClass).noun?.one ?? "unit";
 }
 
+/** Whether /market opens on the covered markets. A signed-in reader with no
+ *  screen on file and no submarket of their own came for the markets — the
+ *  pipeline's "Browse the covered markets →" lands here — and found two
+ *  empty states and an open form above them, the markets below the fold;
+ *  for that reader the explorer leads. A memory that failed to load says
+ *  nothing about the reader, and keeps the usual order. */
+export function explorerLeads(r: {
+  signedIn: boolean;
+  memoryFailed: boolean;
+  groups: number;
+  submarkets: number;
+}): boolean {
+  return r.signedIn && !r.memoryFailed && r.groups === 0 && r.submarkets === 0;
+}
+
 /** How many markets the groups span. A group is one market × one asset
  *  class, so three classes screened in Dallas are three groups and one
  *  market — /market's "N screens across M markets" counted the groups. */
