@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
+import { dealAllowance } from "@/lib/deal-allowance";
 import { type DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
@@ -435,8 +436,9 @@ export default async function DealsPage({
             ? {
                 isPro: billing.isPro,
                 canCreateDeal: billing.canCreateDeal,
-                dealCount: billing.dealCount,
-                dealLimit: billing.dealLimit,
+                // The meter counts what the create action counts: a team
+                // trial's deals first, then the reader's own (lib/deal-allowance).
+                allowance: dealAllowance(billing),
               }
             : null
         }

@@ -34,6 +34,7 @@ import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
 import { compareSortValues, type SortDir } from "@/lib/pipeline-sort";
+import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
   STAGES,
@@ -291,8 +292,9 @@ const PERSIST_KEY = "uc-pipeline-view";
 type BillingInfo = {
   isPro: boolean;
   canCreateDeal: boolean;
-  dealCount: number;
-  dealLimit: number;
+  /** the free deals left and where the next one lands, by the create
+   *  action's own rule (lib/deal-allowance, read by the page) */
+  allowance: DealAllowance;
 };
 
 export type OnboardingState = {
@@ -471,7 +473,10 @@ export function Pipeline({
 
   // Free users who've hit the cap can't open the create form — they upgrade.
   const atLimit = !!billing && !billing.canCreateDeal;
-  const showUsage = !!billing && !billing.isPro;
+  // The meter shows wherever a cap applies to the next deal: the reader's
+  // own free deals, and a team trial's before them.
+  const allowance = billing?.allowance ?? null;
+  const showUsage = allowance?.left != null;
 
   const assets = useMemo(
     () => Array.from(new Set(deals.map((d) => d.assetClass).filter(Boolean))).sort(),
@@ -718,28 +723,24 @@ export function Pipeline({
                   {deals.length} {deals.length === 1 ? "deal" : "deals"}
                 </span>
               )}
-              {showUsage && (
-                // The free allowance as a meter with the number, not a sentence.
+              {showUsage && allowance && allowance.left != null && (
+                // The free allowance as a meter with the number, not a
+                // sentence: a track a pool, the team's trial first — the
+                // create action takes the next deal from it — then the
+                // reader's own (lib/deal-allowance).
                 <Link
                   href="/billing"
-                  title={`${billing!.dealCount} of ${billing!.dealLimit} free deals used`}
+                  title={allowance.line ?? undefined}
                   className={`inline-flex items-center gap-1.5 font-medium underline-offset-2 hover:underline ${
                     atLimit ? "text-caution" : ""
                   }`}
                 >
-                  <span
-                    aria-hidden
-                    className="h-1.5 w-12 overflow-hidden rounded-full bg-faint ring-1 ring-inset ring-line"
-                  >
-                    <span
-                      className={`block h-full rounded-full ${atLimit ? "bg-caution" : "bg-brand/70"}`}
-                      style={{
-                        width: `${Math.min(100, Math.round((billing!.dealCount / Math.max(1, billing!.dealLimit)) * 100))}%`,
-                      }}
-                    />
+                  <span aria-hidden className="flex w-12 items-center gap-0.5">
+                    {allowance.teamTrial ? <MeterPool pool={allowance.teamTrial} atLimit={atLimit} which="team" /> : null}
+                    {allowance.personal ? <MeterPool pool={allowance.personal} atLimit={atLimit} which="personal" /> : null}
                   </span>
-                  {Math.max(0, billing!.dealLimit - billing!.dealCount)} free{" "}
-                  {billing!.dealLimit - billing!.dealCount === 1 ? "deal" : "deals"} left
+                  {allowance.left} free {allowance.left === 1 ? "deal" : "deals"} left
+                  {allowance.teamTrial ? <span className="sr-only">. {allowance.line}</span> : null}
                 </Link>
               )}
             </p>
@@ -1347,6 +1348,24 @@ function VerdictSplit({
         })}
       </div>
     </div>
+  );
+}
+
+/** One pool of free deals drawn as a track, as wide as its share of the
+ *  allowance and filled as far as it is used: the team's trial, or the
+ *  reader's own. */
+function MeterPool({ pool, atLimit, which }: { pool: AllowancePool; atLimit: boolean; which: "team" | "personal" }) {
+  return (
+    <span
+      data-meter={which}
+      className="h-1.5 overflow-hidden rounded-full bg-faint ring-1 ring-inset ring-line"
+      style={{ flexGrow: pool.of, flexBasis: 0 }}
+    >
+      <span
+        className={`block h-full rounded-full ${atLimit ? "bg-caution" : "bg-brand/70"}`}
+        style={{ width: `${Math.min(100, Math.round((pool.used / Math.max(1, pool.of)) * 100))}%` }}
+      />
+    </span>
   );
 }
 

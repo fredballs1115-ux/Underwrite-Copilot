@@ -50,6 +50,7 @@ import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
 import { coverFor } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
 import { landingView, remembersView } from "@/lib/pipeline-view";
+import { dealAllowance } from "@/lib/deal-allowance";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { ScoredFeedView, type AlertRow, type ItemRow } from "@/app/(app)/news/scored-feed";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
@@ -108,7 +109,7 @@ const CARDS: DealCard[] = [
   card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "underwriting", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null, affordable: "LIHTC, 75% restricted" }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth", flood: { tag: "Flood AE", cell: "AE (SFHA)" } }),
 ];
 
-const BILLING = { isPro: false, canCreateDeal: true, dealCount: 9, dealLimit: 25 };
+const BILLING = { isPro: false, canCreateDeal: true, allowance: dealAllowance({ plan: "free", dealCount: 1, team: null }) };
 
 /**
  * The cards as the pipeline page hands them over (#442): each row's
@@ -550,7 +551,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
           errorMessage: "Could not read that PDF — try a text-based export of the OM.",
           notice: "Your deal was saved.",
           onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
-          billing: { isPro: false, canCreateDeal: false, dealCount: 25, dealLimit: 25 },
+          billing: { isPro: false, canCreateDeal: false, allowance: dealAllowance({ plan: "free", dealCount: 3, team: null }) },
         }),
       );
     dumpView("pipeline-at-limit", atLimitHtml);
@@ -559,6 +560,52 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(gluedWords(atLimit)).toEqual([]);
     expect(atLimit).toContain("Could not read that PDF");
     expect(atLimit).toContain("Your deal was saved.");
+  });
+});
+
+describe("Pipeline — the free-deal meter counts what the create action counts (lib/deal-allowance)", () => {
+  const props = {
+    deals: withThumbs(CARDS.slice(0, 2)),
+    errorMessage: null,
+    notice: null,
+    onboarding: { hasBuyBox: true, sampleId: null, hasRealDeal: true },
+  };
+  // The link to /billing that carries the count in its title.
+  const meter = (html: string) => html.match(/<a\b(?=[^>]*\shref="\/billing")(?=[^>]*\stitle=")[^>]*>[\s\S]*?<\/a>/)?.[0] ?? "";
+
+  it("a member on a team trial: the team's trial first, where the next deal comes from, then their own", () => {
+    const allowance = dealAllowance({ plan: "free", dealCount: 0, team: { active: false, dealCount: 1 } });
+    const html = render(React.createElement(Pipeline, { ...props, billing: { isPro: false, canCreateDeal: true, allowance } }));
+    expect(a11yIssues(html)).toEqual([]);
+    const m = meter(html);
+    // It said "3 free deals left" through every deal the trial took.
+    expect(visibleText(m)).toContain("5 free deals left");
+    expect(m).toContain('title="Team trial: 1 of 3 deals used · Your own: 0 of 3 free deals used"');
+    // Two tracks, the team's first, each as wide as its share.
+    expect([...m.matchAll(/data-meter="(\w+)"/g)].map((x) => x[1])).toEqual(["team", "personal"]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("off a team: one track of the reader's own; at the cap, none left; on a plan, no meter", () => {
+    const own = render(React.createElement(Pipeline, { ...props, billing: BILLING }));
+    expect(visibleText(meter(own))).toContain("2 free deals left");
+    expect([...meter(own).matchAll(/data-meter="(\w+)"/g)].map((x) => x[1])).toEqual(["personal"]);
+    expect(meter(own)).toContain('title="1 of 3 free deals used"');
+    const spent = render(
+      React.createElement(Pipeline, {
+        ...props,
+        billing: { isPro: false, canCreateDeal: false, allowance: dealAllowance({ plan: "free", dealCount: 3, team: { active: false, dealCount: 3 } }) },
+      }),
+    );
+    expect(visibleText(meter(spent))).toContain("0 free deals left");
+    const team = render(
+      React.createElement(Pipeline, {
+        ...props,
+        billing: { isPro: true, canCreateDeal: true, allowance: dealAllowance({ plan: "free", dealCount: 3, team: { active: true, dealCount: 9 } }) },
+      }),
+    );
+    expect(visibleText(team)).not.toMatch(/free deals? left/);
+    expect(team).not.toContain("data-meter=");
   });
 });
 
