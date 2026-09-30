@@ -2,14 +2,16 @@
  * A covered metro's asking rent, apartment asking rent and typical home
  * value, from Zillow's indices.
  *
- * The FMR row on the market brief is what HUD will PAY — a fair market rent
- * set once a year from survey data two years old by the time it applies.
- * The ZORI figure is what landlords are ASKING this month, across the
- * listings Zillow sees, refreshed monthly. They are different numbers
- * about different things, which is why both are shown and neither stands
- * in for the other: an underwrite that takes the FMR for the market rent
- * is a year or two behind, and one that takes the asking rent for the
- * achievable rent has not priced the concessions.
+ * The FMR row on the market brief is HUD's fair market rent — a yearly
+ * two-bedroom figure, utilities included, set from survey data two years old
+ * by the time it applies; it is not what HUD pays, and the gap to an asking
+ * rent is not a premium over it. The ZORI figure is what landlords are
+ * ASKING this month, across the listings Zillow sees of every type and size,
+ * before concessions, refreshed monthly. They are different numbers about
+ * different things, which is why both are shown and neither stands in for
+ * the other: an underwrite that takes the FMR for the market rent is a year
+ * or two behind, and one that takes the asking rent for the achievable rent
+ * has not priced the concessions.
  *
  * THE APARTMENT FIGURE IS ITS OWN NUMBER. Zillow's all-homes index runs
  * over houses, condos and apartments together, so in a market of dear

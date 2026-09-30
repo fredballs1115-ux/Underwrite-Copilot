@@ -1,13 +1,19 @@
 import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori";
 
 /**
- * What landlords are asking this month, against what HUD will pay — the
- * asking rent from Zillow's Observed Rent Index beside the metro's 2BR fair
- * market rent, on one scale, so the gap between the two is a picture. And
- * two more of Zillow's figures where the pull had them: the APARTMENT
- * asking rent (the same index over multifamily listings alone, the one an
- * apartment underwrite should read, drawn as a third bar) and the typical
- * home value, said against a year of rent as the price-to-rent ratio.
+ * What landlords are asking this month, beside HUD's fair market rent — the
+ * asking rent from Zillow's Observed Rent Index and the metro's 2BR fair
+ * market rent on one scale, as two bars. And two more of Zillow's figures
+ * where the pull had them: the APARTMENT asking rent (the same index over
+ * multifamily listings alone, the one an apartment underwrite should read,
+ * drawn as a third bar) and the typical home value, said against a year of
+ * rent as the price-to-rent ratio.
+ *
+ * The bars are two different measures, and the words say so: the asking
+ * rent is listings of every type and size of home before concessions, the
+ * fair market rent a yearly two-bedroom figure with utilities included. The
+ * gap between them is not a premium over what HUD pays — the first version
+ * called it "above the fair market rent HUD pays", which was not true.
  *
  * Pure: the page reads the rows and hands the figure in, so this renders on
  * a fixture. Nothing renders with no figure — a metro with no ZORI row gets
@@ -15,13 +21,10 @@ import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori
  * simply absent. Zillow's condition for using the data is attribution, so
  * the credit is part of the component and not the page's to forget.
  *
- * The numbers are about different things. The FMR is set once a year from
- * survey data two years old by the time it applies; the asking rent is
- * this month's listings, all home types, before concessions; the apartment
- * figure is those listings that are apartments. An asking rent well above
- * the FMR is the ordinary case in a tight market and says nothing about a
- * building — it says which figure an underwrite should not mistake for
- * the other.
+ * The apartment figure is those listings that are apartments. An asking
+ * rent well above the FMR is the ordinary case in a tight market and says
+ * nothing about a building — it says which figure an underwrite should not
+ * mistake for the other.
  */
 export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: number | null }) {
   if (!z) return null;
@@ -34,9 +37,9 @@ export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: number | n
   // One string, so React puts no separators inside a sentence live-verify greps.
   const sentence =
     (gapPct !== null
-      ? `Asking rent ${gapPct >= 0 ? "runs" : "sits"} ${Math.abs(gapPct).toFixed(1)}% ${gapPct >= 0 ? "above" : "below"} the fair market rent HUD pays for a two-bedroom — `
-      : "") +
-    "the asking figure is this month's listings before concessions, the fair market rent a year's survey applied a year later, and neither is the other." +
+      ? "Two different measures on one scale, and neither is the other: the asking rent is this month's listings of every type and size of home, before concessions; HUD's fair market rent is a yearly figure for a two-bedroom, utilities included. " +
+        `The asking rent reads ${Math.abs(gapPct).toFixed(1)}% ${gapPct >= 0 ? "above" : "below"} it, a gap between the two measures and not a premium over what HUD pays.`
+      : "The asking rent is this month's listings of every type and size of home, before concessions.") +
     (z.shared ? " The asking rent is the metro area's, shared across the MSA." : "") +
     (mfrGapPct !== null
       ? ` The apartment figure is Zillow's multifamily listings alone, ${Math.abs(mfrGapPct).toFixed(1)}% ${mfrGapPct < 0 ? "under" : "over"} the all-homes one, which adds houses and condos and runs higher wherever the houses are dear.`

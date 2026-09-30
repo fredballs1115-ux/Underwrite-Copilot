@@ -3190,12 +3190,21 @@ describe("a metro's asking rent, against the FMR", () => {
     expect(html).toContain("https://www.zillow.com/research/data/");
   });
 
-  it("draws the asking rent against the 2BR fair market rent on one scale, and says the gap", () => {
+  it("draws the asking rent beside the 2BR fair market rent on one scale, and says they are two measures", () => {
     expect((html.match(/data-bar="zori"/g) ?? []).length).toBe(2);
     expect(text).toContain("HUD 2BR");
+    // Zillow's asking rent (every size of home, before concessions) and HUD's
+    // two-bedroom FMR (a yearly figure, utilities included) are different
+    // measures: the gap is said as one, never as a premium over what HUD pays.
+    expect(text).toContain("Two different measures on one scale");
+    // live-verify's #364 marker greps this phrase on /market.
+    expect(renderToString(React.createElement(ZoriLine, { z, fmr2br: 2100 }))).toContain("neither is the other");
+    expect(text).toContain("before concessions");
+    expect(text).toContain("utilities included");
     // (2412 − 2100) / 2100 = 14.857…%
-    expect(text).toContain("runs 14.9% above the fair market rent");
-    expect(text).toContain("neither is the other");
+    expect(text).toContain("The asking rent reads 14.9% above it, a gap between the two measures and not a premium over what HUD pays.");
+    expect(text).not.toContain("the fair market rent HUD pays");
+    expect(text).not.toMatch(/HUD pays for a two-bedroom/);
   });
 
   it("draws the apartment rent as a third bar and says the home value in years of rent", () => {
@@ -3225,9 +3234,12 @@ describe("a metro's asking rent, against the FMR", () => {
   it("says when the figure is the metro area's, shared with a suburb", () => {
     const out = visibleText(render(React.createElement(ZoriLine, { z: { ...z, shared: true }, fmr2br: null })));
     expect(out).toContain("shared across the MSA");
-    // No FMR to draw against: no bars, no gap sentence.
+    // No FMR to draw against: no bars, no gap sentence, and no word about a
+    // fair market rent the line does not show.
     expect(out).not.toContain("HUD 2BR");
-    expect(out).not.toContain("above the fair market rent");
+    expect(out).not.toContain("above it");
+    expect(out).not.toContain("fair market rent");
+    expect(out).toContain("The asking rent is this month's listings of every type and size of home, before concessions.");
   });
 
   it("renders nothing with no figure", () => {

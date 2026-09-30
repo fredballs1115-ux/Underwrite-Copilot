@@ -665,8 +665,8 @@ async function MetroExplorer({ selected }: { selected?: string }) {
   // The national table too (the strip's own cached read): each commercial
   // sector's lessor rent index rides under its tracker fundamentals.
   const national = await liveRates();
-  // What landlords are asking this month (Zillow's index, monthly), set
-  // against what HUD will pay — two different numbers, both shown.
+  // What landlords are asking this month (Zillow's index, monthly), beside
+  // HUD's two-bedroom fair market rent — two different measures, both shown.
   const zori = await liveZori(active.name);
   // The for-sale market this month (Realtor.com's inventory, monthly) —
   // the demand side an apartment underwrite is quietly assuming.
