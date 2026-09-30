@@ -2931,6 +2931,420 @@
           "note": "Daytona Beach, FL — Dough4872, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783120462)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:29460",
+      "city": "Lakeland, Florida",
+      "area": "Lakeland-Winter Haven, FL",
+      "wikipedia": [
+        "Lakeland, Florida",
+        "Lake Mirror",
+        "Winter Haven, Florida"
+      ],
+      "categories": [
+        "Skylines of Lakeland, Florida",
+        "Views of Lakeland, Florida",
+        "Panoramics of Lakeland, Florida",
+        "Aerial photographs of Lakeland, Florida",
+        "Lake Mirror",
+        "Views of Winter Haven, Florida"
+      ],
+      "queries": [
+        "Lakeland Florida Lake Mirror skyline",
+        "Lakeland Florida downtown lake",
+        "Winter Haven Florida lake"
+      ]
+    },
+    {
+      "metroId": "cbsa:36260",
+      "city": "Ogden, Utah",
+      "area": "Ogden, UT",
+      "wikipedia": [
+        "Ogden, Utah",
+        "Ogden Union Station",
+        "Historic 25th Street"
+      ],
+      "categories": [
+        "Skylines of Ogden, Utah",
+        "Views of Ogden, Utah",
+        "Panoramics of Ogden, Utah",
+        "Aerial photographs of Ogden, Utah",
+        "Ogden Union Station"
+      ],
+      "queries": [
+        "Ogden Utah downtown mountains",
+        "Ogden Utah skyline Wasatch",
+        "Ogden Utah 25th Street"
+      ]
+    },
+    {
+      "metroId": "cbsa:39340",
+      "city": "Provo, Utah",
+      "area": "Provo-Orem-Lehi, UT",
+      "wikipedia": [
+        "Provo, Utah",
+        "Orem, Utah",
+        "Utah Lake",
+        "Mount Timpanogos"
+      ],
+      "categories": [
+        "Skylines of Provo, Utah",
+        "Views of Provo, Utah",
+        "Panoramics of Provo, Utah",
+        "Aerial photographs of Provo, Utah",
+        "Views of Orem, Utah",
+        "Utah Valley"
+      ],
+      "queries": [
+        "Provo Utah skyline mountains",
+        "Provo Utah downtown Mount Timpanogos",
+        "Utah Valley Provo Orem aerial"
+      ]
+    },
+    {
+      "metroId": "cbsa:37340",
+      "city": "Melbourne, Florida",
+      "area": "Palm Bay-Melbourne-Titusville, FL",
+      "wikipedia": [
+        "Melbourne, Florida",
+        "Palm Bay, Florida",
+        "Titusville, Florida",
+        "Cocoa Beach, Florida",
+        "Indian River Lagoon"
+      ],
+      "categories": [
+        "Skylines of Melbourne, Florida",
+        "Views of Melbourne, Florida",
+        "Panoramics of Melbourne, Florida",
+        "Aerial photographs of Melbourne, Florida",
+        "Views of Palm Bay, Florida",
+        "Views of Cocoa Beach, Florida",
+        "Views of Titusville, Florida"
+      ],
+      "queries": [
+        "Melbourne Florida Indian River",
+        "Cocoa Beach Florida pier",
+        "Titusville Florida Indian River",
+        "Palm Bay Florida"
+      ]
+    },
+    {
+      "metroId": "cbsa:22220",
+      "city": "Fayetteville, Arkansas",
+      "area": "Fayetteville-Springdale-Rogers, AR",
+      "wikipedia": [
+        "Fayetteville, Arkansas",
+        "Bentonville, Arkansas",
+        "Rogers, Arkansas",
+        "Springdale, Arkansas",
+        "Northwest Arkansas"
+      ],
+      "categories": [
+        "Skylines of Fayetteville, Arkansas",
+        "Views of Fayetteville, Arkansas",
+        "Panoramics of Fayetteville, Arkansas",
+        "Aerial photographs of Fayetteville, Arkansas",
+        "Views of Bentonville, Arkansas",
+        "Views of Rogers, Arkansas"
+      ],
+      "queries": [
+        "Fayetteville Arkansas downtown square",
+        "Bentonville Arkansas square",
+        "Fayetteville Arkansas Ozarks view",
+        "Northwest Arkansas aerial"
+      ]
+    },
+    {
+      "metroId": "cbsa:44180",
+      "city": "Springfield, Missouri",
+      "area": "Springfield, MO",
+      "wikipedia": [
+        "Springfield, Missouri",
+        "Park Central Square"
+      ],
+      "categories": [
+        "Skylines of Springfield, Missouri",
+        "Views of Springfield, Missouri",
+        "Panoramics of Springfield, Missouri",
+        "Aerial photographs of Springfield, Missouri",
+        "Park Central Square (Springfield, Missouri)"
+      ],
+      "queries": [
+        "Springfield Missouri skyline",
+        "Springfield Missouri downtown",
+        "Springfield Missouri Park Central Square"
+      ]
+    },
+    {
+      "metroId": "cbsa:34820",
+      "city": "Myrtle Beach, South Carolina",
+      "area": "Myrtle Beach-Conway-North Myrtle Beach, SC",
+      "wikipedia": [
+        "Myrtle Beach, South Carolina",
+        "North Myrtle Beach, South Carolina",
+        "SkyWheel Myrtle Beach",
+        "Grand Strand"
+      ],
+      "categories": [
+        "Skylines of Myrtle Beach, South Carolina",
+        "Views of Myrtle Beach, South Carolina",
+        "Panoramics of Myrtle Beach, South Carolina",
+        "Aerial photographs of Myrtle Beach, South Carolina",
+        "Grand Strand",
+        "Views of North Myrtle Beach, South Carolina"
+      ],
+      "queries": [
+        "Myrtle Beach South Carolina beach skyline",
+        "Myrtle Beach South Carolina oceanfront aerial",
+        "Grand Strand South Carolina beach"
+      ]
+    },
+    {
+      "metroId": "cbsa:49620",
+      "city": "York, Pennsylvania",
+      "area": "York-Hanover, PA",
+      "wikipedia": [
+        "York, Pennsylvania",
+        "Hanover, Pennsylvania",
+        "York County, Pennsylvania"
+      ],
+      "categories": [
+        "Skylines of York, Pennsylvania",
+        "Views of York, Pennsylvania",
+        "Panoramics of York, Pennsylvania",
+        "Aerial photographs of York, Pennsylvania",
+        "Views of Hanover, Pennsylvania"
+      ],
+      "queries": [
+        "York Pennsylvania downtown",
+        "York Pennsylvania skyline",
+        "York County Pennsylvania farmland"
+      ]
+    },
+    {
+      "metroId": "cbsa:28660",
+      "city": "Killeen, Texas",
+      "area": "Killeen-Temple, TX",
+      "wikipedia": [
+        "Killeen, Texas",
+        "Temple, Texas",
+        "Belton, Texas",
+        "Belton Lake"
+      ],
+      "categories": [
+        "Skylines of Killeen, Texas",
+        "Views of Killeen, Texas",
+        "Panoramics of Killeen, Texas",
+        "Aerial photographs of Killeen, Texas",
+        "Views of Temple, Texas",
+        "Views of Belton, Texas"
+      ],
+      "queries": [
+        "Killeen Texas",
+        "Temple Texas downtown",
+        "Belton Texas downtown",
+        "Belton Lake Texas"
+      ]
+    },
+    {
+      "metroId": "cbsa:18580",
+      "city": "Corpus Christi, Texas",
+      "area": "Corpus Christi, TX",
+      "wikipedia": [
+        "Corpus Christi, Texas",
+        "Corpus Christi Bay",
+        "Harbor Bridge (Corpus Christi, Texas)"
+      ],
+      "categories": [
+        "Skylines of Corpus Christi, Texas",
+        "Views of Corpus Christi, Texas",
+        "Panoramics of Corpus Christi, Texas",
+        "Aerial photographs of Corpus Christi, Texas",
+        "Corpus Christi Bay",
+        "Harbor Bridge (Corpus Christi)"
+      ],
+      "queries": [
+        "Corpus Christi Texas skyline bay",
+        "Corpus Christi Texas bayfront",
+        "Corpus Christi Texas downtown aerial"
+      ]
+    },
+    {
+      "metroId": "cbsa:41420",
+      "city": "Salem, Oregon",
+      "area": "Salem, OR",
+      "wikipedia": [
+        "Salem, Oregon",
+        "Oregon State Capitol",
+        "Willamette River"
+      ],
+      "categories": [
+        "Skylines of Salem, Oregon",
+        "Views of Salem, Oregon",
+        "Panoramics of Salem, Oregon",
+        "Aerial photographs of Salem, Oregon",
+        "Oregon State Capitol"
+      ],
+      "queries": [
+        "Salem Oregon downtown",
+        "Salem Oregon State Capitol",
+        "Salem Oregon Willamette River"
+      ]
+    },
+    {
+      "metroId": "cbsa:47300",
+      "city": "Visalia, California",
+      "area": "Visalia, CA",
+      "wikipedia": [
+        "Visalia, California",
+        "Tulare County, California"
+      ],
+      "categories": [
+        "Skylines of Visalia, California",
+        "Views of Visalia, California",
+        "Panoramics of Visalia, California",
+        "Aerial photographs of Visalia, California",
+        "Views of Tulare County, California"
+      ],
+      "queries": [
+        "Visalia California downtown",
+        "Visalia California Sierra Nevada",
+        "Tulare County California"
+      ]
+    },
+    {
+      "metroId": "cbsa:46700",
+      "city": "Vallejo, California",
+      "area": "Vallejo, CA",
+      "wikipedia": [
+        "Vallejo, California",
+        "Carquinez Bridge",
+        "Mare Island",
+        "Benicia, California"
+      ],
+      "categories": [
+        "Skylines of Vallejo, California",
+        "Views of Vallejo, California",
+        "Panoramics of Vallejo, California",
+        "Aerial photographs of Vallejo, California",
+        "Carquinez Bridge",
+        "Views of Benicia, California"
+      ],
+      "queries": [
+        "Vallejo California waterfront",
+        "Carquinez Bridge Vallejo",
+        "Benicia California waterfront"
+      ]
+    },
+    {
+      "metroId": "cbsa:42220",
+      "city": "Santa Rosa, California",
+      "area": "Santa Rosa-Petaluma, CA",
+      "wikipedia": [
+        "Santa Rosa, California",
+        "Petaluma, California",
+        "Sonoma County, California"
+      ],
+      "categories": [
+        "Skylines of Santa Rosa, California",
+        "Views of Santa Rosa, California",
+        "Panoramics of Santa Rosa, California",
+        "Aerial photographs of Santa Rosa, California",
+        "Views of Petaluma, California",
+        "Vineyards in Sonoma County, California"
+      ],
+      "queries": [
+        "Santa Rosa California downtown",
+        "Petaluma California river downtown",
+        "Sonoma County California vineyards"
+      ]
+    },
+    {
+      "metroId": "cbsa:23060",
+      "city": "Fort Wayne, Indiana",
+      "area": "Fort Wayne, IN",
+      "wikipedia": [
+        "Fort Wayne, Indiana",
+        "Promenade Park (Fort Wayne)"
+      ],
+      "categories": [
+        "Skylines of Fort Wayne, Indiana",
+        "Views of Fort Wayne, Indiana",
+        "Panoramics of Fort Wayne, Indiana",
+        "Aerial photographs of Fort Wayne, Indiana"
+      ],
+      "queries": [
+        "Fort Wayne Indiana skyline",
+        "Fort Wayne Indiana downtown",
+        "Fort Wayne Indiana riverfront"
+      ]
+    },
+    {
+      "metroId": "cbsa:15180",
+      "city": "Brownsville, Texas",
+      "area": "Brownsville-Harlingen, TX",
+      "wikipedia": [
+        "Brownsville, Texas",
+        "Harlingen, Texas",
+        "South Padre Island, Texas"
+      ],
+      "categories": [
+        "Skylines of Brownsville, Texas",
+        "Views of Brownsville, Texas",
+        "Panoramics of Brownsville, Texas",
+        "Aerial photographs of Brownsville, Texas",
+        "Views of South Padre Island, Texas",
+        "Views of Harlingen, Texas"
+      ],
+      "queries": [
+        "Brownsville Texas downtown",
+        "South Padre Island Texas beach",
+        "Harlingen Texas downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:38940",
+      "city": "Port St. Lucie, Florida",
+      "area": "Port St. Lucie, FL",
+      "wikipedia": [
+        "Port St. Lucie, Florida",
+        "Stuart, Florida",
+        "Fort Pierce, Florida"
+      ],
+      "categories": [
+        "Skylines of Port St. Lucie, Florida",
+        "Views of Port St. Lucie, Florida",
+        "Panoramics of Port St. Lucie, Florida",
+        "Aerial photographs of Port St. Lucie, Florida",
+        "Views of Stuart, Florida",
+        "Views of Fort Pierce, Florida"
+      ],
+      "queries": [
+        "Port St. Lucie Florida",
+        "Stuart Florida waterfront",
+        "Fort Pierce Florida waterfront"
+      ]
+    },
+    {
+      "metroId": "cbsa:45220",
+      "city": "Tallahassee, Florida",
+      "area": "Tallahassee, FL",
+      "wikipedia": [
+        "Tallahassee, Florida",
+        "Florida State Capitol"
+      ],
+      "categories": [
+        "Skylines of Tallahassee, Florida",
+        "Views of Tallahassee, Florida",
+        "Panoramics of Tallahassee, Florida",
+        "Aerial photographs of Tallahassee, Florida",
+        "Florida State Capitol"
+      ],
+      "queries": [
+        "Tallahassee Florida skyline",
+        "Tallahassee Florida Capitol",
+        "Tallahassee Florida downtown"
+      ]
     }
   ]
 }
