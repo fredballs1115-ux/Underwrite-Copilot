@@ -25,10 +25,11 @@ import type {
   ExtractionResult,
   ChallengerResult,
   BrokerCompsResult,
+  FirstSignal,
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
-import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { askingPriceOf, inferStrategy, planSummary, type DealStrategy } from "@/lib/deal-strategy";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -103,9 +104,10 @@ export const STATUS_CHIP: Record<
  * headline in one clause: the stabilized NOI over the total cost it takes to
  * earn it. A stabilized asset adds nothing (the subtitle already says what
  * the building is); an unknown strategy adds nothing rather than a guess.
+ * The strategy is the deal page's own read (the extraction and the first
+ * signal).
  */
-function strategyLineFor(extraction: ExtractionResult | null): string {
-  const strategy = inferStrategy(extraction);
+function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStrategy): string {
   if (strategy.kind === "unknown" || strategy.kind === "stabilized") return "";
   const plan = planSummary(extraction, strategy);
   const m = (n: number) =>
@@ -419,10 +421,15 @@ export function buildMemoData(
     : null;
 
   const metrics = list(extraction?.metrics) as ExtractionResult["metrics"];
+  // The deal's kind as its page reads it — the extraction and the first
+  // signal — so the memo never calls a deal stabilized that the page calls
+  // a conversion, nor orders its key terms by a different kind.
+  const firstSignal = (deal.first_signal as FirstSignal | null | undefined) ?? null;
+  const strategy = inferStrategy(extraction ?? null, firstSignal);
   // The deal-defining rows first (price, cap or the plan's figures, units),
   // then the flagged ones — so the block never opens on four speculative
   // pro-forma figures and omits the asking price (lib/key-terms.ts).
-  const keyTerms = keyTermRows(metrics, inferStrategy(extraction ?? null).kind, 8, interestOf(extraction ?? null).kind).map((m) => ({
+  const keyTerms = keyTermRows(metrics, strategy.kind, 8, interestOf(extraction ?? null).kind).map((m) => ({
     label: str(m.label),
     value: str(m.value),
     flagged: !!m.flagged,
@@ -536,7 +543,7 @@ export function buildMemoData(
     market: str(extraction?.market),
     // On a deal filed "Auto-detect", what the deck turned out to be.
     assetClass: shownAssetClass(str(deal.asset_class), extraction ?? null),
-    strategyLine: pdfSafe(strategyLineFor(extraction ?? null)),
+    strategyLine: pdfSafe(strategyLineFor(extraction ?? null, strategy)),
     interestLine: pdfSafe(interestLineFor(extraction ?? null)),
     assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
     affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),

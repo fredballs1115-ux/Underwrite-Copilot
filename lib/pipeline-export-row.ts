@@ -2,8 +2,9 @@
 // through the readers every other surface uses. Pure: the deal row and what
 // the route read beside it — the buy box, the latest job, the deadline, the
 // teammate's name — come in, so a test reads a row as the route builds it.
-import type { ExtractionResult } from "@/lib/anthropic/types";
-import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap, type BuyBox } from "@/lib/criteria";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import { addressUpgrade, type StructuredAddress } from "@/lib/address";
+import { buyBoxCheckSource, evaluateBuyBox, findGoingInCap, foldBuyBoxChecks, type BuyBox } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
@@ -30,6 +31,12 @@ export interface ExportDeal {
   created_at: string;
   verdict: unknown;
   extraction: unknown;
+  /** the screen's fast first read (FirstSignal), which the pipeline page
+   *  reads beside the extraction for the deal's kind and its buy-box fit */
+  first_signal?: unknown;
+  /** the deal's address as stored (StructuredAddress), which widens the
+   *  buy box's geography as it does on the pipeline page */
+  address?: unknown;
   stage: string | null;
 }
 
@@ -47,27 +54,24 @@ export interface ExportRowContext {
 export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): PipelineExportRow {
   const extraction = d.extraction as ExtractionResult | null;
   const metrics = extraction?.metrics ?? [];
-  // The deal's kind first. A plan deal (value-add, lease-up, conversion,
-  // development) has no going-in cap — its stabilized figure is the
-  // finished project's, judged on yield on total cost — and a development's
-  // price is its land cost when the OM states no asking price.
-  const strategy = inferStrategy(extraction ? { ...extraction, metrics } : null);
+  const signal = (d.first_signal as FirstSignal | null | undefined) ?? null;
+  // The deal's kind first, read as the pipeline card and the deal page read
+  // it: the extraction and the first signal. A plan deal (value-add,
+  // lease-up, conversion, development) has no going-in cap — its stabilized
+  // figure is the finished project's, judged on yield on total cost — and a
+  // development's price is its land cost when the OM states no asking price.
+  const strategy = inferStrategy(extraction ? { ...extraction, metrics } : null, signal);
   const plan = planSummary(extraction ? { ...extraction, metrics } : null, strategy);
-  const box = ctx.box;
-  let fit: PipelineExportRow["fit"] = null;
-  if (box && extraction) {
-    // The inferred kind rides along, as on the pipeline page, so the fit
-    // column judges the land cost this row prints as a development's price.
-    const source = buyBoxCheckSource(extraction, null, null, strategy.kind);
-    const checks = source ? evaluateBuyBox(d.asset_class, source, box) : [];
-    fit = checks.some((c) => c.status === "miss")
-      ? "outside"
-      : checks.some((c) => c.status === "near")
-        ? "near"
-        : checks.some((c) => c.status === "pass")
-          ? "fits"
-          : null;
-  }
+  // The buy-box fit on the pipeline page's own inputs: the extraction, else
+  // the first signal, with the address widening the geography (a typed
+  // line read for its city and state, a blank one the memorandum's), and
+  // the inferred kind, so the fit column judges the land cost this row
+  // prints as a development's price.
+  const address =
+    addressUpgrade(d.address, extraction) ?? ((d.address as StructuredAddress | null | undefined) ?? null);
+  const source = ctx.box ? buyBoxCheckSource(extraction, signal, address, strategy.kind) : null;
+  const fit: PipelineExportRow["fit"] =
+    ctx.box && source ? foldBuyBoxChecks(evaluateBuyBox(d.asset_class, source, ctx.box)) : null;
   return {
     name: d.name,
     stage: d.stage ?? "screening",

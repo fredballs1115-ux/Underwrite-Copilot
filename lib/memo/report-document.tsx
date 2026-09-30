@@ -10,6 +10,7 @@ import type {
   ExtractionResult,
   ChallengerResult,
   BrokerCompsResult,
+  FirstSignal,
   ReconciliationResult,
   MarketResult,
 } from "@/lib/anthropic/types";
@@ -837,6 +838,12 @@ export interface ReportInput {
   photos?: MemoCover[] | null;
 }
 
+/** The deal's first signal, which the deal page reads beside the
+ *  extraction to infer the deal's kind; null on a row screened before it. */
+function firstSignalOf(deal: DealRow): FirstSignal | null {
+  return (deal.first_signal as FirstSignal | null | undefined) ?? null;
+}
+
 /** Everything the deal screen produced, shaped for the multi-page report. */
 export function buildReportData(
   deal: DealRow,
@@ -892,8 +899,9 @@ export function buildReportData(
     // and anchors year 1 on in-place income, so its IRR grid is not the
     // plan's return — it once printed a -48% IRR and a -17.9x multiple as
     // the base case. The plan page carries the sensitivity such a deal is
-    // judged on; the IRR page is omitted rather than caveated.
-    sensitivity: isPlanDeal(inferStrategy(extraction).kind) ? null : (sensitivity ?? null),
+    // judged on; the IRR page is omitted rather than caveated. The kind is
+    // the deal page's read: the extraction and the first signal.
+    sensitivity: isPlanDeal(inferStrategy(extraction, firstSignalOf(deal)).kind) ? null : (sensitivity ?? null),
     plan: plan ?? null,
     totalPages: typeof pages === "number" && Number.isFinite(pages) && pages > 0 ? Math.round(pages) : null,
   };
@@ -1217,7 +1225,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     saleComps,
     subjectBasis(
       metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
-      inferStrategy(extraction).kind,
+      inferStrategy(extraction, firstSignalOf(deal)).kind,
       interestOf(extraction),
     ),
     planNoun.one,

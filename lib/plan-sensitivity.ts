@@ -16,7 +16,7 @@
  * see and change. Pure — no I/O, no LLM, no defaults invented for a figure
  * the OM did not state (a missing budget or NOI yields null, never a grid).
  */
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import {
   inferStrategy,
   planSummary,
@@ -188,12 +188,16 @@ export interface PlanReport {
   refCap: RefCapInput;
 }
 
+/** `signal` is the deal's first signal, which the deal page reads beside the
+ *  extraction to infer the deal's kind, so the report's plan page and the
+ *  page agree on whether the deal is a plan. */
 export function buildPlanReport(
   extraction: ExtractionResult | null,
   refCap: RefCapInput | null,
+  signal?: FirstSignal | null,
 ): PlanReport | null {
   if (!extraction || !refCap) return null;
-  const strategy = inferStrategy(extraction);
+  const strategy = inferStrategy(extraction, signal ?? null);
   const plan = planSummary(extraction, strategy);
   const grid = buildYieldOnCostGrid(plan, refCap.pct);
   const breakevens = planBreakevens(plan, refCap.pct);

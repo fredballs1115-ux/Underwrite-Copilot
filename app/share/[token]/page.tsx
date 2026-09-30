@@ -4,6 +4,7 @@ import type { StructuredAddress } from "@/lib/address";
 import type {
   ExtractionResult,
   BrokerCompsResult,
+  FirstSignal,
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
@@ -107,6 +108,9 @@ export default async function SharePage({
       staleReads={(["comps", "market"] as const).filter((k) => previous.has(k))}
       picture={picture}
       extraction={(deal.extraction as ExtractionResult | null) ?? null}
+      // The kind of deal as the sender's page reads it: the extraction and
+      // the first signal.
+      firstSignal={(deal.first_signal as FirstSignal | null) ?? null}
       comps={(deal.comps as BrokerCompsResult | null) ?? null}
       market={(deal.market as MarketResult | null) ?? null}
       verdict={deal.verdict as VerdictResult}

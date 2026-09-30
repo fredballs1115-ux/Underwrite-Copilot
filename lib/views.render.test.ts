@@ -1483,6 +1483,59 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     );
   });
 
+  it("reads the deal's kind as the sender's page does, from the extraction and the first signal", () => {
+    // Nothing in the extraction names a plan; the first signal names the
+    // conversion (the audit of 2026-09-30), so the page, and now the shared
+    // screen, call it one.
+    const wexley = {
+      dealName: "The Wexley",
+      assetClass: "multifamily",
+      market: "Washington, DC",
+      address: "",
+      metrics: [
+        { label: "Asking price", value: "$20,000,000", flagged: false, page: "" },
+        { label: "In-place NOI", value: "$900,000", flagged: false, page: "" },
+        { label: "Hard costs", value: "$18,000,000", flagged: false, page: "" },
+        { label: "Stabilized NOI", value: "$2,660,000", flagged: false, page: "" },
+        { label: "Units", value: "180", flagged: false, page: "" },
+      ],
+    } as ExtractionResult;
+    const signal = {
+      dealName: "The Wexley",
+      assetClass: "multifamily",
+      market: "Washington, DC",
+      askPrice: "$20,000,000",
+      size: "180 units",
+      goingInCap: "",
+      perUnit: "",
+      take: "An office-to-residential conversion of a 1962 tower, sold vacant.",
+    };
+    const props = {
+      dealName: "The Wexley",
+      assetClass: "multifamily",
+      expiresAt: "2026-09-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      extraction: wexley,
+      comps: null,
+      market: null,
+      verdict: SAMPLE_DEAL.verdict,
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, firstSignal: signal }));
+    dumpView("share-signal-kind", html);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Washington, DC · Multifamily · Conversion");
+    // The plan block, as the page draws it, with its yield on total cost.
+    expect(html).toContain('aria-label="The plan"');
+    expect(text).toMatch(/Yield on cost\s*7\.0%/i);
+    // A row screened before the first signal existed reads as before.
+    const beforeHtml = renderToStaticMarkup(React.createElement(ShareView, props));
+    expect(visibleText(beforeHtml)).toContain("Washington, DC · Multifamily · Stabilized");
+    expect(beforeHtml).not.toContain('aria-label="The plan"');
+  });
+
   it("says a covenant on the rents under the title, and nothing on a market-rate deal (#453)", () => {
     const restricted = {
       ...SAMPLE_DEAL.extraction,

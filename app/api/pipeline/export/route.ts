@@ -34,8 +34,10 @@ export async function GET(req: Request) {
   const [{ data, error }, team] = await Promise.all([
     supabase
       .from("deals")
+      // The first signal and the address too: the row reads the deal's kind
+      // and its buy-box fit on the pipeline page's own inputs.
       .select(
-        "id, name, asset_class, created_at, verdict, extraction, user_id, team_id, stage, is_sample",
+        "id, name, asset_class, created_at, verdict, extraction, first_signal, address, user_id, team_id, stage, is_sample",
       )
       .order("created_at", { ascending: false }),
     getTeam(supabase, user.id).catch(() => null),
@@ -49,6 +51,8 @@ export async function GET(req: Request) {
     created_at: string;
     verdict: unknown;
     extraction: unknown;
+    first_signal: unknown;
+    address: unknown;
     user_id: string;
     team_id: string | null;
     stage: string | null;

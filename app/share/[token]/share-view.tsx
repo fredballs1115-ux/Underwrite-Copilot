@@ -4,6 +4,7 @@ import { screenedOn } from "@/lib/screen-run";
 import type {
   BrokerCompsResult,
   ExtractionResult,
+  FirstSignal,
   MarketResult,
   ScreenRange,
   VerdictCall,
@@ -74,6 +75,9 @@ export interface ShareViewProps {
    *  place they picture; null when there is neither */
   picture: { sources: SharePictureSource[]; place: string } | null;
   extraction: ExtractionResult | null;
+  /** the deal's first signal, which the sender's deal page reads beside the
+   *  extraction to infer the deal's kind; absent on a row screened before it */
+  firstSignal?: FirstSignal | null;
   comps: BrokerCompsResult | null;
   market: MarketResult | null;
   verdict: VerdictResult;
@@ -274,6 +278,7 @@ export function ShareView({
   staleReads = [],
   picture,
   extraction,
+  firstSignal = null,
   comps,
   market,
   verdict,
@@ -285,10 +290,12 @@ export function ShareView({
   const screen = verdict.screen;
   // The deal's kind first — a partner reading "$21M stabilized NOI" beside a
   // $20M price needs to know it is a conversion's finished-project figure.
+  // The sender's deal page reads it from the extraction and the first
+  // signal, and so does this screen.
   const safeExtraction = extraction
     ? { ...extraction, metrics: extraction.metrics ?? [] }
     : null;
-  const strategy = inferStrategy(safeExtraction);
+  const strategy = inferStrategy(safeExtraction, firstSignal);
   const plan = planSummary(safeExtraction, strategy);
   // The deal-defining rows first, as the memo orders them (lib/key-terms.ts).
   const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, 8, interestOf(safeExtraction).kind);

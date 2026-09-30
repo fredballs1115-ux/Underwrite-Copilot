@@ -213,10 +213,16 @@ export async function GET(
         { debtIndex: debt.permanent },
       );
       sensitivity = buildSensitivityData(derived.inputs, hurdlePct);
-      plan = buildPlanReport(extraction, {
-        pct: derived.inputs.exitCapPct,
-        provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
-      });
+      // The plan page for the kind the deal page reads — the extraction and
+      // the first signal — the same read buildReportData gates the IRR page on.
+      plan = buildPlanReport(
+        extraction,
+        {
+          pct: derived.inputs.exitCapPct,
+          provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
+        },
+        (deal.first_signal as FirstSignal | null) ?? null,
+      );
       const assumableRead = readAssumable(extraction, derived.inputs);
       // A note the seller offers to carry (#462), priced against this
       // model's own new loan the way the deal page prices it.
