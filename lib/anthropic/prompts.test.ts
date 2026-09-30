@@ -238,6 +238,18 @@ describe("sector-aware challenger traps", () => {
     }
   });
 
+  it("computes a tax reset only from the OM's own figures, and never invents a local rate", () => {
+    const p = challengerInstruction("multifamily");
+    // The first version told the model to estimate the reset "at a
+    // plausible assessment ratio and millage" — a local fact it does not have.
+    expect(p).not.toMatch(/plausible assessment ratio/i);
+    expect(p).toContain("put a figure on the reset only from what the OM states");
+    expect(p).toContain("the current tax bill over the assessed value the OM gives is the rate it implies");
+    expect(p).toContain("at a lower assessment ratio only where the OM states one");
+    expect(p).toContain("the buyer must get the rate from the assessor");
+    expect(p).toContain("never assume an assessment ratio or a millage");
+  });
+
   it("names the class as a page does, in its own noun and basis — never a stored key", () => {
     const hotel = challengerInstruction("hospitality_str");
     expect(hotel).toContain(
