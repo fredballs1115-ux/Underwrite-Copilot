@@ -60,6 +60,7 @@ import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
 import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
@@ -387,10 +388,14 @@ async function liveMarketFromDb(
     // under `state:PA`), said as the state's. A deal with no readable state
     // or county reads nothing of its own, as before.
     const metro = placeDeal(address, countyOf(address, flags)).live;
-    // The debt-market lines read the class the deck turned out to be, and
-    // whether the deal is a plan, so the lending-standards series is the
-    // one a bank reports for this kind of loan.
-    const assetClass = ex?.assetClass || (data?.asset_class as string | null) || null;
+    // The debt-market lines read the deal's class, and whether the deal is
+    // a plan, so the lending-standards series is the one a bank reports for
+    // this kind of loan. The class is the one every page shows
+    // (`shownAssetClass`): the analyst's where they filed one, the deck's
+    // where they left it to "Auto" — it had read the deck's first, so a
+    // deal filed as an office and pitched as mixed-use was checked as one
+    // thing and shown as the other.
+    const assetClass = shownAssetClass((data?.asset_class as string | null) ?? null, ex) || null;
     const plan = isPlanDeal(inferStrategy(ex).kind);
     const others = otherPortfolioMarkets(ex, metro?.id ?? null);
     if (!metro && !others) return { primary: null, others: [] };

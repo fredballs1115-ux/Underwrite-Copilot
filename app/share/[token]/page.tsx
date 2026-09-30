@@ -8,6 +8,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import { previousScreenResults, verdictBehind } from "@/lib/screen-run";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 import { SHARE_REFUSAL_COPY, resolveShare } from "@/lib/share-resolve";
 import { Expired, ShareView } from "./share-view";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
@@ -97,7 +98,9 @@ export default async function SharePage({
   return (
     <ShareView
       dealName={deal.name}
-      assetClass={deal.asset_class ?? null}
+      // The class as every page shows it: the sender's where they filed one,
+      // the deck's where they left "Auto" (which read as no class here).
+      assetClass={shownAssetClass(deal.asset_class ?? null, (deal.extraction as ExtractionResult | null) ?? null) || null}
       expiresAt={expiresAt}
       verdictStale={behind != null}
       staleWhy={behind ?? "failed"}

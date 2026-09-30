@@ -525,6 +525,11 @@ export default async function DealPage({
   // county placed the deal in its metro area, or for an address since
   // edited, is a different market's figures, and no move between the two
   // is a move.
+  // The deal's class as every surface shows it (shownAssetClass): the
+  // analyst's where they filed one, the deck's where they left "Auto". The
+  // market check reads the same (lib/anthropic/pipeline), so the page's
+  // since-this-screen, demand card and portfolio card read one class.
+  const readClass = shownAssetClass(deal.asset_class as string | null, extraction) || null;
   if (storedBrief?.figures && storedBrief.figures.length > 0 && liveMarket && reads && storedBrief.metro === liveMarket.name) {
     const today = liveMarketBrief({
       metro: liveMarket,
@@ -533,7 +538,7 @@ export default async function DealPage({
       realtor: reads.realtor,
       now: reads.now,
       national: reads.national.filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id)),
-      assetClass: extraction?.assetClass || (deal.asset_class as string | null) || null,
+      assetClass: readClass,
       plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
     });
     marketSince = briefDelta(storedBrief.readOn, storedBrief.figures, today?.figures ?? []);
@@ -1354,7 +1359,7 @@ export default async function DealPage({
           for a single-property memorandum. */}
       <PortfolioCard
         portfolio={readPortfolio(extraction)}
-        assetClass={extraction?.assetClass || (deal.asset_class as string | null) || null}
+        assetClass={readClass}
       />
 
       {/* Submarket supply (Phase 4): the deal's rent growth, exit cap and
@@ -1378,7 +1383,7 @@ export default async function DealPage({
         leaseholdExit={leaseholdExit}
         metroDemand={
           reads && liveMarket
-            ? metroDemand(reads.rates, extraction?.assetClass || (deal.asset_class as string | null) || null)
+            ? metroDemand(reads.rates, readClass)
             : null
         }
         initialTab={tab ?? null}

@@ -453,6 +453,29 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("reads the debt market for the class the deal is filed as, not the deck's word for it", async () => {
+    // The analyst filed an office; the deck calls itself multifamily. Every
+    // page shows the office (shownAssetClass), so the check reads a
+    // nonresidential loan's standards, never a multifamily loan's.
+    state.deals.d1.asset_class = "office";
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+      { series_id: "SUBLPDRCSM", obs_date: "2026-07-01", value: -5.7 },
+      { series_id: "SUBLPDRCSN", obs_date: "2026-07-01", value: 3.1 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3];
+    expect(handed).toContain("banks tightening standards for nonfarm nonresidential loans");
+    expect(handed).not.toContain("banks tightening standards for multifamily loans");
+  });
+
   it("a suburb its address's words miss reads its metro area's figures, placed by its tract's county and said so (#447)", async () => {
     const label = "5000 Main St, Frisco, TX 75034";
     state.deals.d1.address = { label, street: "5000 Main St", city: "Frisco", state: "TX", zip: "75034", county: "", submarket: "" };
