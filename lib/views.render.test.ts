@@ -546,6 +546,30 @@ describe("ModelView — the sample model renders every panel", () => {
     // The cash-flow panel itself (it used to be matched by accident through
     // a "Cash Flow tab" phrase in the inputs list, which is a tooltip now).
     expect(text).toMatch(/Operating cash flow/);
+    // The first-draft workbook and its Conflicts sheet were retired: the card
+    // names no sheet, claims no shared math with the Excel, and says the
+    // download is a separate model.
+    expect(text).not.toMatch(/Conflicts sheet/);
+    expect(text).not.toMatch(/same math as the Excel/);
+    expect(text).toMatch(/Upgrade to Pro to download the OM underwrite model \(\.xlsx\)/);
+    expect(text).toMatch(/The workbook is a separate model, built from the memorandum’s terms/);
+  });
+
+  it("labels its download as the OM underwrite, a separate model from the card's returns", () => {
+    const html = render(
+      React.createElement(ModelView, {
+        dealId: "d1",
+        model: SAMPLE_DEAL.model,
+        documents: [],
+        active: false,
+        isPro: true,
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(html).toMatch(
+      /<a href="\/api\/deals\/d1\/underwrite\.xlsx"[^>]*>[\s\S]*?Download the OM underwrite model \(\.xlsx\)<\/a>/,
+    );
+    expect(visibleText(html)).toMatch(/The workbook is a separate model/);
   });
 
   it("renders the no-model state without a runtime error", () => {

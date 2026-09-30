@@ -62,16 +62,24 @@ export function ModelView({
           <CapexPanel model={model} />
           <CashFlow cashFlow={model.cashFlow} />
           <SummaryCaveats summary={model.summary} caveats={model.caveats} />
-          {isPro ? (
-            <DownloadRow dealId={dealId} />
-          ) : (
-            <Link
-              href="/billing?upsell=underwrite"
-              className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-4 py-2.5 text-sm font-medium text-caution transition-colors hover:bg-caution/10"
-            >
-              Upgrade to Pro to download the Excel model
-            </Link>
-          )}
+          <div className="flex flex-col gap-1.5">
+            {isPro ? (
+              <DownloadRow dealId={dealId} />
+            ) : (
+              <Link
+                href="/billing?upsell=underwrite"
+                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-4 py-2.5 text-sm font-medium text-caution transition-colors hover:bg-caution/10"
+              >
+                Upgrade to Pro to download the OM underwrite model (.xlsx)
+              </Link>
+            )}
+            {/* Two models, said as two: the card's returns are this
+                first draft's; the workbook's are the OM underwrite's. */}
+            <p data-qa="workbook-note" className="max-w-2xl text-xs leading-relaxed text-muted">
+              The workbook is a separate model, built from the memorandum’s
+              terms — its returns can differ from the ones above.
+            </p>
+          </div>
         </>
       ) : (
         <Intro />
@@ -96,8 +104,7 @@ function Intro() {
       </h2>
       <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
         Upload what you have — one document is enough to start. Actuals beat
-        pro forma, every conflict is shown, and the Excel comes with every
-        number sourced.
+        pro forma, and every conflict is shown with its sources.
       </p>
     </div>
   );
@@ -147,13 +154,17 @@ function InputsNeeded({ documents }: { documents: DealDocument[] }) {
   );
 }
 
+// The first-draft workbook this card once exported, and its Conflicts sheet,
+// were retired (2d036c4): the one Excel download is the OM underwrite
+// (lib/underwrite/workbook.ts), a separate model built from the
+// memorandum's figures. The card says so beside its download button.
 function FirstDraftBanner() {
   return (
     <div className="rounded-xl border border-line border-l-4 border-l-caution bg-caution/5 px-4 py-3">
       <p className="text-sm font-medium">First-draft model — verify before relying on it</p>
       <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        Every number traces to a source; conflicts are listed below and on the
-        Excel’s Conflicts sheet.
+        Built from your documents: every number traces to a source, and
+        conflicts are listed below.
       </p>
     </div>
   );
@@ -277,14 +288,14 @@ function irrTone(v: number | null): string {
   return "text-kill";
 }
 
-// Live exit-cap × price IRR grid — re-runs the deterministic cash-flow engine
-// at each grid point (same math the Excel sensitivity table uses).
+// Live exit-cap × price IRR grid — re-runs this model's own cash-flow engine
+// (lib/model/compute) at each grid point. The Excel download is the OM
+// underwrite (lib/underwrite), a separate model with its own grids.
 export function Sensitivity({ model }: { model: UnderwritingModel }) {
   const base = model.inputs;
   if (!base?.exitCapPct || !base?.purchasePrice) return null;
 
-  // Same shared engine + grid definition the Excel builder uses — "same math
-  // as the workbook" is true by construction.
+  // The grid definition lib/model/sensitivity keeps once for this card.
   const rows = computeSensitivityGrid(base).map((g) => ({
     exit: g.exitCapPct,
     cells: g.cells.map((c) => ({ irr: c.irrPct, isBase: c.isBase })),
@@ -347,7 +358,8 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
 
 /* ------------------------------------------------------------------ */
 /* Stress the assumptions — the four levers a screen turns on,         */
-/* recomputed live through the same deterministic engine as the Excel. */
+/* recomputed live through this model's own engine (lib/model/compute; */
+/* the Excel download is lib/underwrite's, a separate model).          */
 /* ------------------------------------------------------------------ */
 
 type StressAdjust = {
@@ -446,7 +458,7 @@ export function StressPanel({ model }: { model: UnderwritingModel }) {
         <h2 className="text-sm font-semibold tracking-tight">
           Stress the assumptions{" "}
           <span className="font-normal text-muted">
-            · live, same math as the Excel
+            · live, on this model
           </span>
         </h2>
         {dirty && (
@@ -877,7 +889,7 @@ function DownloadRow({ dealId }: { dealId: string }) {
         <path d="m7 10 5 5 5-5" />
         <path d="M12 15V3" />
       </svg>
-      Download Excel model (.xlsx)
+      Download the OM underwrite model (.xlsx)
     </a>
   );
 }
@@ -983,7 +995,7 @@ function DocumentsPanel({
       ) : (
         <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">
-            Building the Excel model is a{" "}
+            Building this model from your documents is a{" "}
             <span className="font-medium text-ink">Pro</span> feature.
           </p>
           <Link
