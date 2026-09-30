@@ -54,8 +54,14 @@ export interface UsageSummary {
   usd: number | null;
   /** the models the price table does not know (their dollars are blank) */
   unpriced: string[];
-  /** the whole run's wall-clock across its calls, ms */
+  /** the whole run's wall-clock across its calls, ms — the calls' own times
+   *  summed, so none of the run's other work */
   ms: number;
+  /** the run's own time, start to finish, ms: its wait for a turn, its model
+   *  calls and everything between them — what the deal page's clock shows a
+   *  reader. Written by a screen (`runAnalysis`) from 2026-09-30; a ledger
+   *  written before has none. */
+  wallMs?: number;
   /** when the ledger closed, ISO */
   at: string;
 }

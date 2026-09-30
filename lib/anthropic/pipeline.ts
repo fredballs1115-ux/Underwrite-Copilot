@@ -524,9 +524,12 @@ async function regenerateVerdict(
  * said once in the log. Best-effort: a deployment without the column
  * (migration 0035) or a deal deleted under the run records nothing.
  */
-async function writeUsage(dealId: string, ledger: UsageLedger): Promise<void> {
+async function writeUsage(dealId: string, ledger: UsageLedger, wallMs?: number): Promise<void> {
   if (ledger.calls.length === 0) return;
-  const summary = summarizeUsage(ledger);
+  const summary = {
+    ...summarizeUsage(ledger),
+    ...(wallMs != null && Number.isFinite(wallMs) && wallMs > 0 ? { wallMs: Math.round(wallMs) } : {}),
+  };
   console.log(usageLogLine(dealId, summary));
   try {
     const admin = createSupabaseAdminClient();
@@ -548,12 +551,15 @@ export async function runAnalysis(
     resume?: boolean;
   },
 ): Promise<void> {
-  // Every model call inside the run records its meters into this ledger.
+  // Every model call inside the run records its meters into this ledger,
+  // and the run's own time rides with it (the deal page's "your screens
+  // usually take", lib/screen-duration): its wait for a turn included.
   const ledger = newLedger();
+  const started = Date.now();
   try {
     await withUsageLedger(ledger, () => runAnalysisSteps(dealId, opts));
   } finally {
-    await writeUsage(dealId, ledger);
+    await writeUsage(dealId, ledger, Date.now() - started);
   }
 }
 

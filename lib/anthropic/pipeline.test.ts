@@ -322,6 +322,8 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     });
     vi.mocked(extractTerms).mockImplementation(async () => {
       meter("Extraction", { cacheRead: 300_000, output: 6_000 });
+      // A run that takes time, so its own start-to-finish time is measurable.
+      await new Promise((r) => setTimeout(r, 25));
       return EXTRACTION;
     });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -332,6 +334,10 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     expect(usage?.totals).toEqual({ input: 2_000, cacheWrite: 300_000, cacheRead: 300_000, output: 6_500 });
     expect(usage?.usd).toBeGreaterThan(0);
     expect(usage?.unpriced).toEqual([]);
+    // The run's own time, start to finish — what "your screens usually take"
+    // reads (lib/screen-duration) — never the calls' metered times summed.
+    expect(usage?.wallMs).toBeGreaterThanOrEqual(15);
+    expect(usage?.wallMs).not.toBe(usage?.ms);
     expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[pipeline\] screen usage for deal d1: 2 calls/));
     logSpy.mockRestore();
   });

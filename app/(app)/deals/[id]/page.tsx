@@ -399,14 +399,16 @@ export default async function DealPage({
   const jobActive = job?.status === "queued" || job?.status === "running";
   // How long the reader's own screens have taken (lib/screen-duration):
   // read only while a screen is running, and only its newest finished runs'
-  // stored wall-clocks — one small query, overlapped with the rest of the
+  // stored times, start to finish (`usage.wallMs` — a reconciliation keeps
+  // the row's step at "verdict" but never writes a ledger, so the time read
+  // is the screen's) — one small query, overlapped with the rest of the
   // page. Fewer than three and the rail says no duration at all.
   const typicalScreenRead: Promise<string | null> =
     jobActive && user && isScreenJob(job?.step)
       ? (async () => {
           const { data } = await supabase
             .from("analysis_jobs")
-            .select("ms:usage->ms, deals!inner(user_id)")
+            .select("ms:usage->wallMs, deals!inner(user_id)")
             .eq("deals.user_id", user.id)
             .eq("status", "done")
             .eq("step", "verdict")
