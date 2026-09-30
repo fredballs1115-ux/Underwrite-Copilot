@@ -272,6 +272,9 @@ export async function GET(
         assumptions = modelVsMarketFor({
           derived,
           extraction,
+          // The kind the page reads — the extraction and the first signal —
+          // so a plan the signal names reads no going-in cap here either.
+          firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
           storedAssetClass: deal.asset_class as string | null,
           metro,
           reads: await todayReads(metro),

@@ -296,7 +296,7 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
 // ── One read for every surface ──────────────────────────────────────────────
 import { modelVsMarketFor } from "./model-vs-market";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
 describe("modelVsMarketFor — the deal page, the report and the workbook call one function", () => {
   const extraction: ExtractionResult = {
@@ -368,6 +368,27 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     const exit = r?.checks.find((c) => c.key === "exit_cap");
     expect(exit?.tone).toBe("stated");
     expect(exit?.read).toContain("A plan deal has no going-in cap to set it against");
+  });
+
+  it("reads the plan the first signal names, as the page does (the audit of 2026-09-30)", () => {
+    // Nothing in the extraction names a plan; the first signal does. The
+    // page hands the signal in, and so must the report and the workbook.
+    const signal: FirstSignal = {
+      dealName: "Meridian Logistics Center",
+      assetClass: "industrial",
+      market: "Inland Empire, CA",
+      askPrice: "$50,000,000",
+      size: "300,000 SF",
+      goingInCap: "6.0%",
+      perUnit: "",
+      take: "A conversion of a vacant plant to last-mile logistics — check the budget against the clear height.",
+    };
+    const exitOf = (r: ReturnType<typeof modelVsMarketFor>) => r?.checks.find((c) => c.key === "exit_cap");
+    const withSignal = modelVsMarketFor({ derived, extraction, firstSignal: signal, storedAssetClass: "industrial", metro: null, reads });
+    expect(exitOf(withSignal)?.tone).toBe("stated");
+    expect(exitOf(withSignal)?.read).toContain("A plan deal has no going-in cap to set it against");
+    const without = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads });
+    expect(exitOf(without)?.read).toContain("The going-in cap 6.00%");
   });
 });
 

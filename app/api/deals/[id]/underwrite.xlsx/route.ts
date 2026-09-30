@@ -6,7 +6,7 @@ import { buildUnderwriteWorkbook } from "@/lib/underwrite/workbook";
 import { getBrandingForDeal } from "@/lib/branding-server";
 import type { ExportBranding } from "@/lib/excel-branding";
 import type { DealRow } from "@/lib/deals";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -145,6 +145,9 @@ export async function GET(
       marketRead = modelVsMarketFor({
         derived: model,
         extraction,
+        // The kind the page reads — the extraction and the first signal —
+        // so a plan the signal names reads no going-in cap here either.
+        firstSignal: (deal.first_signal as FirstSignal | null) ?? null,
         storedAssetClass: deal.asset_class as string | null,
         metro,
         reads: await todayReads(metro),

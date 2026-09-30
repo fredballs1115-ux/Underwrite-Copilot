@@ -305,4 +305,14 @@ describe("the documents read the deal's kind as its page does — the extraction
     const src = readFileSync("app/api/deals/[id]/report/route.ts", "utf8");
     expect(src).toMatch(/buildPlanReport\(\s*extraction,[\s\S]*?\(deal\.first_signal as FirstSignal \| null\) \?\? null,\s*\)/);
   });
+
+  it("the report's and the workbook's market read take the first signal too, as the deal page's does", () => {
+    // modelVsMarketFor reads no going-in cap on a plan deal; without the
+    // signal a plan the signal names read the cap in the documents alone.
+    for (const route of ["app/api/deals/[id]/report/route.ts", "app/api/deals/[id]/underwrite.xlsx/route.ts"]) {
+      const src = readFileSync(route, "utf8");
+      expect(src, route).toMatch(/modelVsMarketFor\(\{[^}]*firstSignal: \(deal\.first_signal as FirstSignal \| null\) \?\? null,/);
+    }
+    expect(readFileSync("app/(app)/deals/[id]/page.tsx", "utf8")).toMatch(/modelVsMarketFor\(\{[^}]*\bfirstSignal,/);
+  });
 });
