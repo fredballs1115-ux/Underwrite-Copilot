@@ -77,7 +77,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
 
   it("a year of permits is summed against the year before it — a month alone is the season — with the multi-unit part said as the total less the single-family series", () => {
     expect(brief.lines).toContain(
-      "Housing units permitted, twelve months to Aug 2026, Washington MSA: 12,000 (-20.0% against the twelve months before), of which 7,200 in buildings of two or more units (-29.4%) — the total less the single-family series, the only split published for a metro or a state; FRED",
+      "Housing units permitted, twelve months to Aug 2026, Washington MSA: 12,000 (-20.0% against the twelve months before), of which 7,200 in buildings of two or more units (-29.4%) — the total less the single-family series, since FRED carries no multi-unit series for a metro or a state; FRED",
     );
     // The single-family series is never a line of its own.
     expect(brief.lines.filter((l) => l.startsWith("Housing units permitted"))).toHaveLength(1);

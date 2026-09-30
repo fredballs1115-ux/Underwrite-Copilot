@@ -4072,7 +4072,8 @@ describe("SampleDemandCard — the sample market's payrolls by sector, read toda
     expect(t).toContain("Census Bureau building permits via FRED,");
     expect(t).toContain("all units");
     expect(t).toContain("single-family");
-    expect(t).toContain(", the only split published for a metro");
+    expect(t).toContain(" — FRED carries no multi-unit series for a metro or a state");
+    expect(t).not.toContain("the only split published");
     expect(withSupply).toContain("https://fred.stlouisfed.org/series/PHIL942BP1FH\"");
     expect(a11yIssues(withSupply), "sample demand card with supply").toEqual([]);
     expect(gluedWords(t)).toEqual([]);
@@ -4108,7 +4109,9 @@ describe("MetroLive — the supply side, twelve months against the twelve before
     expect(text).toContain("40.0%");
     expect(text).toContain("on the twelve months before)");
     expect(text).toContain("58.3% of the units permitted");
-    expect(text).toContain("the only split published for a metro");
+    expect(text).toContain(" — FRED carries no multi-unit series for a metro or a state");
+    expect(text).toContain("the total less the single-family series, since FRED carries no multi-unit series for a metro or a state, and they are the pipeline");
+    expect(text).not.toContain("the only split");
     expect(html).toContain("https://fred.stlouisfed.org/series/WASH911BPPRIV\"");
     expect(html).toContain("https://fred.stlouisfed.org/series/WASH911BP1FH\"");
     // The single-family series is not a tile of its own; the total's tile stays.

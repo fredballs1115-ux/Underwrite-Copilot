@@ -7,6 +7,7 @@ import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, verdictInstruction } from "./prompts";
 import { assessPlausibility, inferStrategy, planSummary, plausibilityNote } from "@/lib/deal-strategy";
 import { placedBySentence } from "@/lib/placed-by";
+import { currentBriefLine } from "@/lib/permit-split";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -203,7 +204,7 @@ export function buildBrief(input: VerdictInputs): string {
         ? `## The state of ${live.metro}'s published figures the market check read on ${live.readOn} — the deal lies outside the metros the site tracks`
         : `## The ${live.metro} market's published figures the market check read on ${live.readOn}`,
       [
-        ...live.lines.map((l) => `- ${l}`),
+        ...live.lines.map((l) => `- ${currentBriefLine(l)}`),
         (live.grain === "state"
           ? "Each is dated and is the state's, not any metro's, the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source, and say it is the state's."
           : `Each is dated and is the metro's, not the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source.${placedBySentence(live.placedBy)}`) +
@@ -223,7 +224,7 @@ export function buildBrief(input: VerdictInputs): string {
         ? `## The state of ${o.metro}'s published figures${where}, read on ${o.readOn}`
         : `## The ${o.metro} market's published figures${where}, read on ${o.readOn}`,
       [
-        ...o.lines.map((l) => `- ${l}`),
+        ...o.lines.map((l) => `- ${currentBriefLine(l)}`),
         `Each is dated and is ${o.grain === "state" ? "the state's" : "the metro's"} — it speaks for the properties in ${o.metro} alone, never for the portfolio or for another market's properties. Where a range, a risk or a next step turns on one, name the figure, its date and its market.` +
           nationalNote(o),
       ].join("\n"),

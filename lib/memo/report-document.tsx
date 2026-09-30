@@ -4,6 +4,7 @@ import type { DealRow } from "@/lib/deals";
 import type { BuyBoxCheck } from "@/lib/criteria";
 import type { FloodMapView } from "@/lib/site-flags/core";
 import { placedBySentence } from "@/lib/placed-by";
+import { currentBriefLine } from "@/lib/permit-split";
 import { REPORT_FLOOD_SIZE } from "@/lib/basemaps";
 import type {
   ExtractionResult,
@@ -1232,7 +1233,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     ...(liveBrief ? [{ rec: liveBrief, first: true }] : []),
     ...list(market?.otherBriefs).map((rec) => ({ rec: rec as NonNullable<MarketResult["liveBrief"]>, first: false })),
   ]
-    .map((b) => ({ ...b, lines: list(b.rec?.lines).map(str).filter(Boolean) }))
+    .map((b) => ({ ...b, lines: list(b.rec?.lines).map(str).filter(Boolean).map(currentBriefLine) }))
     .filter((b) => b.lines.length > 0);
   const rows = list(reconciliation?.rows) as NonNullable<
     ReconciliationResult["rows"]

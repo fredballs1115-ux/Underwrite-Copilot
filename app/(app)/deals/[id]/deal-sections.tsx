@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
 import { placedByClause } from "@/lib/placed-by";
+import { currentBriefLine } from "@/lib/permit-split";
 import { PendingButton } from "../../pending-button";
 import {
   addSupplementNote,
@@ -1656,7 +1657,7 @@ function LiveBriefRead({ brief }: { brief: NonNullable<MarketResult["liveBrief"]
       </summary>
       <ul className="mt-3 space-y-1.5 text-muted">
         {brief.lines.map((line) => (
-          <li key={line} className="leading-relaxed">{line}</li>
+          <li key={line} className="leading-relaxed">{currentBriefLine(line)}</li>
         ))}
       </ul>
     </details>

@@ -12,6 +12,7 @@ import { HOTNESS_METROS, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { isDataMetro, isStateMarket } from "@/lib/market-match";
 import { placedByClause, type CountyPlacedBy } from "@/lib/placed-by";
+import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
 
 export type { CountyPlacedBy } from "@/lib/placed-by";
 
@@ -361,7 +362,7 @@ function rateLine(r: LiveRate, sector: SectorJobs | null, supply: MetroSupply | 
         supply && supply.fresh && supply.to === year.to
           ? `, of which ${whole(supply.multi)} in buildings of two or more units${
               supply.multiChangePct !== null ? ` (${signed(supply.multiChangePct)}%)` : ""
-            } — the total less the single-family series, the only split published for a metro or a state`
+            } — the total less the single-family series, since ${NO_MULTI_UNIT_SERIES}`
           : "";
       return {
         line: `Housing units permitted, twelve months to ${monthOf(year.to)}${where}: ${whole(year.units)}${
