@@ -1346,7 +1346,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // but still on the page.
     expect(html).toContain("<details");
     expect(text).toContain("sell-side selections usually do.");
-    expect(text).toContain("the basis looks 8–12% rich.");
+    expect(text).toContain("the $274k ask is 7% rich");
     // Nothing editable, nothing of the buyer's.
     expect(text).not.toMatch(/Buy box|Notes|Documents/);
     expect(html).not.toMatch(/<(button|input|textarea|select)\b/);

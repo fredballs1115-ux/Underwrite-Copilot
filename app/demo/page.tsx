@@ -509,7 +509,7 @@ export default async function DemoPage() {
             </div>
             <div className="rounded-xl border border-line bg-surface p-4">
               <p className="text-[11px] uppercase tracking-wide text-muted">
-                Real benchmarks for this submarket
+                Published benchmarks · Philadelphia-wide, not the submarket&apos;s
               </p>
               <dl className="mt-2 grid grid-cols-2 gap-3">
                 {phillyFmr && phillyFmr2br !== null && (

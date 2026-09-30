@@ -360,7 +360,7 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
             low="5.25%"
             base={`${INPUTS.exitCapPct.toFixed(2)}%`}
             high="5.75%"
-            src="submarket trades 5.25–5.75%; broker holds 5.25%."
+            src="the market check's typical range, a rule of thumb; the OM holds 5.25%."
           />
           <RangeRow
             label="Market rent / unit"

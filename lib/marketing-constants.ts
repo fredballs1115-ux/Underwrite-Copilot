@@ -107,13 +107,6 @@ export const FREE_DEALS = 3;
 // The comp-premium line matches the sample's comp scrutiny narrative.
 export const SAMPLE_COMP_PREMIUM_LINE =
   "$274k/unit is 7% above the last two comparable trades with no renovation premium to justify it.";
-// The retrade tile: broker cut the sample deal's price in a reissued deck.
-export const SAMPLE_RETRADE_DELTA = "−$1.8M (−2.5%)";
-// The your-model-vs-OM tile rows (sample reconciliation story).
-export const SAMPLE_RECONCILE_ROWS: [string, string, string][] = [
-  ["Exit cap", "you 5.75 · OM 5.25", "+50 bps"],
-  ["Yr-1 rents", "you $1.41k · OM $1.54k", "−8.4%"],
-];
 
 // NOTE deliberately absent: the Excel-preview IRR figures. Those are COMPUTED
 // from the live engine on the sample model at render time (app/page.tsx
