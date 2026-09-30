@@ -38,70 +38,72 @@ export default async function LoginPage({
     <div className="band-dark relative flex flex-1 flex-col overflow-hidden">
       {/* The door opens on a real place too: Baltimore, a covered market a
           few miles from the DMV core. The centred scrim leaves the harbour
-          showing on either side of the card (app/place-band). */}
-      <PlaceBackdrop metro="baltimore" height={900} scrim="center" eager />
-      <main id="main" className="relative mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
-        <Link
-          href="/"
-          className="flex items-center justify-center gap-2.5 transition-opacity hover:opacity-80"
-        >
-          <LogoMark className="h-8 w-8" />
-          <span className="on-photo font-semibold tracking-tight text-white">
-            Underwrite Copilot
-          </span>
-        </Link>
-
-        {deleted && (
-          <p className="mt-6 rounded-lg bg-surface/95 px-3 py-2 text-center text-sm text-ink shadow-card">
-            Your account and all its data have been deleted. Thanks for trying
-            Underwrite Copilot.
-          </p>
-        )}
-        {linkBanner && (
-          <p
-            role={linkBanner.tone === "warn" ? "alert" : "status"}
-            className={`mt-6 rounded-lg px-3 py-2 text-center text-sm shadow-card ${
-              linkBanner.tone === "warn"
-                ? "bg-caution/15 text-white"
-                : "bg-surface/95 text-ink"
-            }`}
-          >
-            {linkBanner.text}
-          </p>
-        )}
-        <div className="shadow-float mt-8 rounded-2xl border border-line bg-surface p-7">
-          <h1 className="text-xl font-semibold tracking-tight">Welcome</h1>
-          <p className="mt-2 text-sm leading-relaxed text-muted">
-            Screen your first deal in minutes. Your first {FREE_DEALS} deals
-            are free — no card required, and a fully-worked sample deal is
-            waiting inside.
-          </p>
-          <LoginForm initialMode={initialLoginMode(params)} next={next ?? null} />
-        </div>
-
-        {/* The login wall is a doorway, not a dead end — the public research
-            surfaces stay one tap away for a prospect who isn't ready. */}
-        <p className="on-photo mt-6 text-center text-xs leading-relaxed text-white/75">
-          Not ready to sign in? Browse the{" "}
+          showing on either side of the card (app/place-band). The page goes
+          through it, so the photograph's credit follows the form. */}
+      <PlaceBackdrop metro="baltimore" height={900} scrim="center" eager>
+        <main id="main" className="relative mx-auto flex w-full max-w-sm flex-1 flex-col justify-center px-6 py-16">
           <Link
-            href="/market"
-            className="font-medium text-white/80 underline decoration-dotted underline-offset-2 hover:text-white"
+            href="/"
+            className="flex items-center justify-center gap-2.5 transition-opacity hover:opacity-80"
           >
-            {MARKET_COUNT} covered markets
-          </Link>{" "}
-          or the{" "}
-          <Link
-            href="/demo"
-            className="font-medium text-white/80 underline decoration-dotted underline-offset-2 hover:text-white"
-          >
-            fully worked sample screen
-          </Link>{" "}
-          — no account needed.
-        </p>
-        <p className="on-photo mt-3 text-center text-xs leading-relaxed text-white/70">
-          First-pass screen, not investment advice.
-        </p>
-      </main>
+            <LogoMark className="h-8 w-8" />
+            <span className="on-photo font-semibold tracking-tight text-white">
+              Underwrite Copilot
+            </span>
+          </Link>
+
+          {deleted && (
+            <p className="mt-6 rounded-lg bg-surface/95 px-3 py-2 text-center text-sm text-ink shadow-card">
+              Your account and all its data have been deleted. Thanks for trying
+              Underwrite Copilot.
+            </p>
+          )}
+          {linkBanner && (
+            <p
+              role={linkBanner.tone === "warn" ? "alert" : "status"}
+              className={`mt-6 rounded-lg px-3 py-2 text-center text-sm shadow-card ${
+                linkBanner.tone === "warn"
+                  ? "bg-caution/15 text-white"
+                  : "bg-surface/95 text-ink"
+              }`}
+            >
+              {linkBanner.text}
+            </p>
+          )}
+          <div className="shadow-float mt-8 rounded-2xl border border-line bg-surface p-7">
+            <h1 className="text-xl font-semibold tracking-tight">Welcome</h1>
+            <p className="mt-2 text-sm leading-relaxed text-muted">
+              Screen your first deal in minutes. Your first {FREE_DEALS} deals
+              are free — no card required, and a fully-worked sample deal is
+              waiting inside.
+            </p>
+            <LoginForm initialMode={initialLoginMode(params)} next={next ?? null} />
+          </div>
+
+          {/* The login wall is a doorway, not a dead end — the public research
+              surfaces stay one tap away for a prospect who isn't ready. */}
+          <p className="on-photo mt-6 text-center text-xs leading-relaxed text-white/75">
+            Not ready to sign in? Browse the{" "}
+            <Link
+              href="/market"
+              className="font-medium text-white/80 underline decoration-dotted underline-offset-2 hover:text-white"
+            >
+              {MARKET_COUNT} covered markets
+            </Link>{" "}
+            or the{" "}
+            <Link
+              href="/demo"
+              className="font-medium text-white/80 underline decoration-dotted underline-offset-2 hover:text-white"
+            >
+              fully worked sample screen
+            </Link>{" "}
+            — no account needed.
+          </p>
+          <p className="on-photo mt-3 text-center text-xs leading-relaxed text-white/70">
+            First-pass screen, not investment advice.
+          </p>
+        </main>
+      </PlaceBackdrop>
     </div>
   );
 }

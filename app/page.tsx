@@ -455,24 +455,38 @@ function SectionHead({
  * bands). Both draw at full strength under the SAME scrim (PhotoScrim):
  * dark under the left-hand type, clear over the picture. A photograph the
  * treatment washes out costs the same bytes and says nothing.
+ *
+ * The hero's words are its `children`, drawn after the picture and, where
+ * the picture owes a credit, before it: the credit sits at the band's foot,
+ * and first in the markup it was the first thing Tab reached, ahead of "Get
+ * started free" (PlaceBackdrop).
  */
-function HeroBackdrop({ photo }: { photo: PhotoSlot | undefined }) {
+function HeroBackdrop({ photo, children }: { photo: PhotoSlot | undefined; children: ReactNode }) {
   // The first picture on the page, so it is asked for first (`eager`).
-  if (!photo) return <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} scrim="hero" eager />;
+  if (!photo) {
+    return (
+      <PlaceBackdrop metro={HERO_AERIAL.metro} height={HERO_AERIAL.height} scrim="hero" eager>
+        {children}
+      </PlaceBackdrop>
+    );
+  }
   return (
-    <div aria-hidden className={`pointer-events-none ${HERO_STRIP}`}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot */}
-      <img
-        src={photoSrc(photo)}
-        alt=""
-        width={photo.width}
-        height={photo.height}
-        fetchPriority="high"
-        decoding="async"
-        className="h-full w-full object-cover object-[50%_42%]"
-      />
-      <PhotoScrim scrim="hero" />
-    </div>
+    <>
+      <div aria-hidden className={`pointer-events-none ${HERO_STRIP}`}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- a static file under public/, sized by the slot */}
+        <img
+          src={photoSrc(photo)}
+          alt=""
+          width={photo.width}
+          height={photo.height}
+          fetchPriority="high"
+          decoding="async"
+          className="h-full w-full object-cover object-[50%_42%]"
+        />
+        <PhotoScrim scrim="hero" />
+      </div>
+      {children}
+    </>
   );
 }
 
@@ -613,111 +627,114 @@ export default function Home() {
         {/* Hero — dark navy with soft accent glows; the product is the visual. */}
         <section className="band-dark relative overflow-hidden text-white">
           {/* A real photograph behind the headline — the operator's, or a
-              USGS aerial of a covered downtown until it arrives. */}
-          <HeroBackdrop photo={photos.hero} />
-          {/* Ambient glows: pure CSS, no layout shift, subtle by design. */}
-          <div
-            aria-hidden
-            className="glow-drift pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full opacity-25 blur-3xl"
-            style={{
-              background:
-                "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
-            }}
-          />
-          <div
-            aria-hidden
-            className="glow-drift-2 pointer-events-none absolute bottom-[-8rem] left-[-6%] h-[22rem] w-[22rem] rounded-full opacity-15 blur-3xl"
-            style={{
-              background:
-                "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
-            }}
-          />
-          {/* The words start at the foot of the photograph's strip below lg
-              (HERO_WORDS_TOP), so they sit on the band, never on the sky. */}
-          <div className={`relative mx-auto max-w-6xl px-6 pb-14 ${HERO_WORDS_TOP}`}>
-            {/* grid-cols-1 matters (same as the walkthrough section): the
-                implicit mobile track is `auto` and cannot shrink below the
-                sample card's intrinsic width, which pushed the whole hero
-                wider than small phones — masked by the section's
-                overflow-hidden, so the page didn't scroll, it just clipped. */}
-            <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
-              <div className="on-photo">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-accent">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                  AI deal screening for CRE acquisitions
-                </span>
-                <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
-                  Stop underwriting like a{" "}
-                  <span className="relative inline-block whitespace-nowrap">
-                    coin flip.
-                    <svg
-                      viewBox="0 0 220 12"
-                      preserveAspectRatio="none"
-                      className="absolute -bottom-2 inset-x-0 h-3 w-full"
-                      aria-hidden
-                    >
-                      <path
-                        d="M3 9c40-6 84-7 112-4s72 5 102-3"
-                        fill="none"
-                        stroke="#7fd6cc"
-                        strokeWidth="4"
-                        strokeLinecap="round"
-                        opacity="0.75"
-                      />
-                    </svg>
+              covered market's photograph until it arrives — and the words
+              through it, so its credit comes after them and Tab reaches
+              "Get started free" first. */}
+          <HeroBackdrop photo={photos.hero}>
+            {/* Ambient glows: pure CSS, no layout shift, subtle by design. */}
+            <div
+              aria-hidden
+              className="glow-drift pointer-events-none absolute -top-32 right-[-10%] h-[28rem] w-[28rem] rounded-full opacity-25 blur-3xl"
+              style={{
+                background:
+                  "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
+              }}
+            />
+            <div
+              aria-hidden
+              className="glow-drift-2 pointer-events-none absolute bottom-[-8rem] left-[-6%] h-[22rem] w-[22rem] rounded-full opacity-15 blur-3xl"
+              style={{
+                background:
+                  "radial-gradient(closest-side, #7fd6cc 0%, transparent 70%)",
+              }}
+            />
+            {/* The words start at the foot of the photograph's strip below lg
+                (HERO_WORDS_TOP), so they sit on the band, never on the sky. */}
+            <div className={`relative mx-auto max-w-6xl px-6 pb-14 ${HERO_WORDS_TOP}`}>
+              {/* grid-cols-1 matters (same as the walkthrough section): the
+                  implicit mobile track is `auto` and cannot shrink below the
+                  sample card's intrinsic width, which pushed the whole hero
+                  wider than small phones — masked by the section's
+                  overflow-hidden, so the page didn't scroll, it just clipped. */}
+              <div className="grid grid-cols-1 items-center gap-12 lg:grid-cols-2">
+                <div className="on-photo">
+                  <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-xs font-medium text-accent">
+                    <span className="h-1.5 w-1.5 rounded-full bg-accent" />
+                    AI deal screening for CRE acquisitions
                   </span>
-                </h1>
-                <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                  Upload the OM. Every figure labelled with where it came from, the three deal-killers stressed, a Go / Caution / No-go — in minutes.
-                </p>
-                <div className="mt-8 flex flex-wrap items-center gap-3">
-                  <Link
-                    href="/login?mode=signup"
-                    className="cta-breathe rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
-                  >
-                    Get started free
-                  </Link>
-                  <Link
-                    href="/demo"
-                    className="rounded-lg border border-white/25 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
-                  >
-                    See a full screen
-                  </Link>
+                  <h1 className="mt-6 text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl lg:text-[3.4rem]">
+                    Stop underwriting like a{" "}
+                    <span className="relative inline-block whitespace-nowrap">
+                      coin flip.
+                      <svg
+                        viewBox="0 0 220 12"
+                        preserveAspectRatio="none"
+                        className="absolute -bottom-2 inset-x-0 h-3 w-full"
+                        aria-hidden
+                      >
+                        <path
+                          d="M3 9c40-6 84-7 112-4s72 5 102-3"
+                          fill="none"
+                          stroke="#7fd6cc"
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                          opacity="0.75"
+                        />
+                      </svg>
+                    </span>
+                  </h1>
+                  <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
+                    Upload the OM. Every figure labelled with where it came from, the three deal-killers stressed, a Go / Caution / No-go — in minutes.
+                  </p>
+                  <div className="mt-8 flex flex-wrap items-center gap-3">
+                    <Link
+                      href="/login?mode=signup"
+                      className="cta-breathe rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-brand-strong transition-colors hover:bg-accent"
+                    >
+                      Get started free
+                    </Link>
+                    <Link
+                      href="/demo"
+                      className="rounded-lg border border-white/25 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-white/10"
+                    >
+                      See a full screen
+                    </Link>
+                  </div>
+                  <p className="mt-4 text-xs text-white/70">First {FREE_DEALS} deals free · no card</p>
                 </div>
-                <p className="mt-4 text-xs text-white/70">First {FREE_DEALS} deals free · no card</p>
+
+                {/* Product preview */}
+                <div>
+                  <DealPreview />
+                  <p className="mt-4 text-center text-[11px] text-white/55">
+                    Illustrative sample deal ·{" "}
+                    <Link
+                      href="/demo"
+                      className="font-medium text-white/70 underline-offset-2 hover:text-white hover:underline"
+                    >
+                      open the whole screen →
+                    </Link>
+                  </p>
+                </div>
               </div>
 
-              {/* Product preview */}
-              <div>
-                <DealPreview />
-                <p className="mt-4 text-center text-[11px] text-white/55">
-                  Illustrative sample deal ·{" "}
-                  <Link
-                    href="/demo"
-                    className="font-medium text-white/70 underline-offset-2 hover:text-white hover:underline"
-                  >
-                    open the whole screen →
-                  </Link>
-                </p>
-              </div>
+              {/* Stat strip — the screen, quantified, two words each. */}
+              <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-4">
+                {/* Each stat read once: the label is the term, the figure
+                    its value, and the column reversed so the figure still
+                    sits on top. (A hidden term above a second copy of the
+                    label as a value had a screen reader say it twice.) */}
+                {STATS.map((st) => (
+                  <div key={st.label} className="flex flex-col-reverse">
+                    <dt className="mt-1 text-xs text-white/60">{st.label}</dt>
+                    <dd className="font-mono text-3xl font-semibold tabular-nums text-accent">
+                      <CountUp value={st.value} suffix={st.suffix} />
+                    </dd>
+                  </div>
+                ))}
+              </dl>
             </div>
-
-            {/* Stat strip — the screen, quantified, two words each. */}
-            <dl className="mt-16 grid grid-cols-2 gap-x-6 gap-y-8 border-t border-white/10 pt-8 sm:grid-cols-4">
-              {/* Each stat read once: the label is the term, the figure
-                  its value, and the column reversed so the figure still
-                  sits on top. (A hidden term above a second copy of the
-                  label as a value had a screen reader say it twice.) */}
-              {STATS.map((st) => (
-                <div key={st.label} className="flex flex-col-reverse">
-                  <dt className="mt-1 text-xs text-white/60">{st.label}</dt>
-                  <dd className="font-mono text-3xl font-semibold tabular-nums text-accent">
-                    <CountUp value={st.value} suffix={st.suffix} />
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </div>
+          </HeroBackdrop>
         </section>
 
         <PeopleStrip photos={stripPhotos(photos)} />

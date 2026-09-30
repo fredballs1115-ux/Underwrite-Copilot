@@ -161,13 +161,20 @@ export function PhotoScrim({ scrim = "band" }: { scrim?: Scrim }) {
  *  column's 72rem less its gutters, or the screen below that (#451). */
 export const PAGE_COLUMN_SIZES = "(min-width: 1200px) 1104px, 100vw";
 
-/** The picture and its scrim, for a band that positions itself. */
+/**
+ * The picture and its scrim, for a band that positions itself, with the
+ * band's words passed in as `children`: they are drawn between the picture
+ * and its credit, so the credit, drawn at the foot of the picture, comes
+ * after the words in the markup, and Tab and a screen reader meet the words
+ * first (CityPhoto's `layer`). A band with no picture draws its words alone.
+ */
 export function PlaceBackdrop({
   metro,
   height = 600,
   scrim = "band",
   sizes = "100vw",
   eager = false,
+  children,
 }: {
   metro: string;
   height?: number;
@@ -178,31 +185,33 @@ export function PlaceBackdrop({
   /** the first thing on the page: fetched at once and ahead of the rest,
    *  never lazily — every other picture waits its turn */
   eager?: boolean;
+  /** the band's words, before the picture's credit in the markup */
+  children?: ReactNode;
 }) {
   // Either picture is enough to open on. Gating on the overhead alone was
   // safe only by accident — every market with a skyline happens to have an
   // aerial too — and would have blanked the band for the first market that
   // got a photograph without one. CityPhoto decides between them; this only
   // decides whether there is anything to decide between.
-  if (!metroView(metro) && !hasSkyline(metro)) return null;
+  if (!metroView(metro) && !hasSkyline(metro)) return <>{children}</>;
+  // Offered at the skyline's widths (#451), each encoded again at a fraction
+  // of Commons' weight, so a phone takes 1600 and a dense laptop 2400 where
+  // one 1400px file was stretched twice over; 1400 stays the file a browser
+  // without srcset gets. Above centre, because a skyline's subject is its
+  // tower line and the bottom of the frame is usually road or water.
   return (
-    <div className={`pointer-events-none ${scrim === "hero" ? HERO_STRIP : "absolute inset-0"}`}>
-      {/* Offered at the skyline's widths (#451), each encoded again at a
-          fraction of Commons' weight, so a phone takes 1600 and a dense
-          laptop 2400 where one 1400px file was stretched twice over; 1400
-          stays the file a browser without srcset gets. Above centre,
-          because a skyline's subject is its tower line and the bottom of
-          the frame is usually road or water. */}
-      <CityPhoto
-        metro={metro}
-        width={1400}
-        height={height}
-        sizes={sizes}
-        eager={eager}
-        className="h-full w-full object-cover object-[50%_42%]"
-      />
-      <PhotoScrim scrim={scrim} />
-    </div>
+    <CityPhoto
+      metro={metro}
+      width={1400}
+      height={height}
+      sizes={sizes}
+      eager={eager}
+      className="h-full w-full object-cover object-[50%_42%]"
+      layer={scrim === "hero" ? HERO_STRIP : "absolute inset-0"}
+      overlay={<PhotoScrim scrim={scrim} />}
+    >
+      {children}
+    </CityPhoto>
   );
 }
 
@@ -237,10 +246,11 @@ export function PlaceBand({
 }) {
   return (
     <section className="band-dark relative flex min-h-[19rem] items-end overflow-hidden text-white sm:min-h-[23rem]">
-      <PlaceBackdrop metro={metro} eager={eager} />
-      <div className={`relative mx-auto w-full ${width} px-6 pb-12 pt-16 sm:pb-16 sm:pt-24`}>
-        <div className="on-photo band-words">{children}</div>
-      </div>
+      <PlaceBackdrop metro={metro} eager={eager}>
+        <div className={`relative mx-auto w-full ${width} px-6 pb-12 pt-16 sm:pb-16 sm:pt-24`}>
+          <div className="on-photo band-words">{children}</div>
+        </div>
+      </PlaceBackdrop>
     </section>
   );
 }
@@ -274,14 +284,15 @@ export function MarketBand({
   return (
     <div className="band-dark relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[21rem]">
       {/* Inside a page's column, never wider than its 72rem. */}
-      <PlaceBackdrop metro={metro} height={480} scrim="caption" sizes={PAGE_COLUMN_SIZES} eager={eager} />
-      <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
-        {/* Two lines at most: the scrim is measured to the top of a name
-            wrapped to two lines on a phone, and a submarket's name is
-            whatever its owner typed. The whole name stays in the text. */}
-        <Heading className="mt-1 line-clamp-2 text-2xl font-semibold tracking-tight sm:text-3xl">{name}</Heading>
-      </div>
+      <PlaceBackdrop metro={metro} height={480} scrim="caption" sizes={PAGE_COLUMN_SIZES} eager={eager}>
+        <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
+          {/* Two lines at most: the scrim is measured to the top of a name
+              wrapped to two lines on a phone, and a submarket's name is
+              whatever its owner typed. The whole name stays in the text. */}
+          <Heading className="mt-1 line-clamp-2 text-2xl font-semibold tracking-tight sm:text-3xl">{name}</Heading>
+        </div>
+      </PlaceBackdrop>
     </div>
   );
 }

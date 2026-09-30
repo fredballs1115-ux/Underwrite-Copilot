@@ -55,19 +55,21 @@ export default async function ToolsPage() {
     <div className="space-y-8">
       <section className="relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[18rem]">
         {/* Inside the page's 72rem column, so it asks for that width, not
-            the screen's; and it opens the page, so it comes first. */}
-        <PlaceBackdrop metro="chicago" height={420} sizes={PAGE_COLUMN_SIZES} eager />
-        <div className="on-photo band-words relative w-full px-6 pb-8 pt-12 sm:px-10 sm:pb-10 sm:pt-16">
-          <p className="text-[11px] font-semibold uppercase tracking-widest text-accent">
-            Deal math
-          </p>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
-            The numbers, before the deal
-          </h1>
-          <p className="mt-3 text-sm text-white">
-            Runs in your browser, and nothing is saved. What you type stays in this page&apos;s link, so a sizing travels as a URL; a field left at today&apos;s rate reads the rate of the day it is opened.
-          </p>
-        </div>
+            the screen's; and it opens the page, so it comes first. The
+            words go through it, so its credit follows them. */}
+        <PlaceBackdrop metro="chicago" height={420} sizes={PAGE_COLUMN_SIZES} eager>
+          <div className="on-photo band-words relative w-full px-6 pb-8 pt-12 sm:px-10 sm:pb-10 sm:pt-16">
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-accent">
+              Deal math
+            </p>
+            <h1 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+              The numbers, before the deal
+            </h1>
+            <p className="mt-3 text-sm text-white">
+              Runs in your browser, and nothing is saved. What you type stays in this page&apos;s link, so a sizing travels as a URL; a field left at today&apos;s rate reads the rate of the day it is opened.
+            </p>
+          </div>
+        </PlaceBackdrop>
       </section>
 
       <RatesStrip rates={rates} seeds={seeded} />

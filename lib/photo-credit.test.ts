@@ -1,8 +1,11 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { GalleryCreditText, SkylineCreditText } from "@/app/photo-credit";
 import { CityPhoto } from "@/app/city-photo";
+import { HERO_STRIP, MarketBand, PlaceBackdrop, PlaceBand } from "@/app/place-band";
 import { a11yIssues, gluedWords, visibleText } from "@/lib/render-lint";
 import { SKYLINES, commonsPage, creditLine, galleryCredit, galleryCreditParts, skylineCredit } from "@/lib/skyline";
 
@@ -75,6 +78,43 @@ describe("a market photograph's credit, with its links", () => {
     const one = html(React.createElement(GalleryCreditText, { ids: ["richmond"] }));
     expect(one).toContain(`>${a.credit}</a>`);
     expect(words(one)).not.toContain(a.place);
+  });
+
+  it("puts a band's credit after the band's words, so Tab and a screen reader meet the words first", () => {
+    // The credit is drawn at the band's foot but sat first in the markup:
+    // on the homepage Tab reached the photographer before "Get started free".
+    const shot = SKYLINES.chicago;
+    const cta = React.createElement("a", { href: "/login?mode=signup" }, "Get started free");
+    const bands: Array<[string, string]> = [
+      ["PlaceBand", html(React.createElement(PlaceBand, { metro: "chicago" } as React.ComponentProps<typeof PlaceBand>, cta))],
+      ["PlaceBackdrop", html(React.createElement(PlaceBackdrop, { metro: "chicago", scrim: "hero" }, cta))],
+      ["MarketBand", html(React.createElement(MarketBand, { metro: "chicago", eyebrow: "Midwest", name: "Chicago" }))],
+    ];
+    for (const [name, markup] of bands) {
+      const picture = markup.indexOf("<img");
+      const said = name === "MarketBand" ? markup.indexOf(">Chicago</h3>") : markup.indexOf(">Get started free</a>");
+      const credit = markup.indexOf(`href="${commonsPage(shot.file)}"`);
+      expect(picture, name).toBeGreaterThan(-1);
+      expect(said, name).toBeGreaterThan(picture);
+      expect(credit, name).toBeGreaterThan(said);
+      expect(words(markup), name).toContain(creditLine(shot));
+      expect(a11yIssues(markup), name).toEqual([]);
+    }
+    // Drawn where it always was: in a box of the picture's own shape, which
+    // lets clicks through to the words under it; the credit takes its own.
+    const hero = bands[1][1];
+    const box = `<div class="pointer-events-none ${HERO_STRIP}">`;
+    expect(hero.split(box).length - 1, "the picture's box and the credit's").toBe(2);
+    expect(hero.slice(hero.lastIndexOf(box))).toMatch(/^<div[^>]*><p class="pointer-events-auto absolute bottom-3 right-4/);
+    expect(bands[0][1]).toContain('<div class="pointer-events-none absolute inset-0"><p class="pointer-events-auto');
+    // A market with no picture at all draws its words alone.
+    expect(html(React.createElement(PlaceBackdrop, { metro: "atlantis" }, cta))).toBe('<a href="/login?mode=signup">Get started free</a>');
+    // Every page that draws a backdrop hands it its words.
+    for (const file of ["app/page.tsx", "app/tools/page.tsx", "app/login/page.tsx", "app/place-band.tsx"]) {
+      const src = readFileSync(join(process.cwd(), file), "utf8");
+      expect(src, file).toMatch(/<PlaceBackdrop\b/);
+      expect(src, file).not.toMatch(/<PlaceBackdrop\b[^>]*\/>/);
+    }
   });
 
   it("draws the linked credit under a market's band", () => {

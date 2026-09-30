@@ -48,6 +48,20 @@ describe("the homepage, as a screen reader hears it", () => {
     expect(card).toContain(`<span class="sr-only">Buy-box </span>${chip}</span>`);
   }, 60_000);
 
+  it("reads the hero's words before its photograph's credit, so Tab reaches Get started free first", async () => {
+    const html = await renderHome();
+    const start = html.indexOf('<section class="band-dark relative overflow-hidden text-white">');
+    expect(start).toBeGreaterThan(-1);
+    const hero = html.slice(start, html.indexOf("</section>", start));
+    // The credit is drawn at the band's foot; it sat first in the markup.
+    const credits = [...hero.matchAll(/<a\b[^>]*href="https:\/\/(?:commons\.wikimedia\.org|creativecommons\.org)\/[^"]*"/g)].map((m) => m.index!);
+    if (hero.includes("/api/imagery/skyline/")) expect(credits.length, "a market's photograph owes its credit").toBeGreaterThan(0);
+    const controls = [...hero.matchAll(/<(?:a|button)\b[^>]*>/g)].map((m) => m.index!).filter((i) => !credits.includes(i));
+    expect(hero.indexOf(">Get started free<")).toBeGreaterThan(-1);
+    expect(controls.length).toBeGreaterThan(1);
+    if (credits.length) expect(Math.max(...controls)).toBeLessThan(Math.min(...credits));
+  }, 60_000);
+
   it("links every photograph the coverage gallery shows to its own page, not only each photographer's first", async () => {
     const html = await renderHome();
     const start = html.indexOf(">Coverage<");
