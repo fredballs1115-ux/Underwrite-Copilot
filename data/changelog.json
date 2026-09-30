@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Photographs arrive softly, in their own colours",
+      "href": "/deals",
+      "blurb": "Each deal photograph stored from today carries a tiny preview of itself, a few hundred bytes kept with the deal, and the page draws it blurred in the frame the moment the page opens — the way a listing's photographs arrive — before the photograph itself has loaded. The pipeline's cards and rows, the deal page's photograph and mosaic, and the shared screen show the building's own colours at once and the photograph over them as it arrives, where they used to show a plain grey plate or the deal's drawn cover while it loaded. A deal's cover photograph stored before today gets its preview the first time it is shown again, and shows it from the next visit on."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Seller financing, priced against today's loan",
       "href": "/deals",
       "blurb": "Where a memorandum says the seller will carry part of the price — seller financing, a carryback or a purchase-money note — the screen now reads the note's terms as stated: its size or its share of the price, its rate, term and amortization, and whether it sits behind new senior debt. The deal page prices it the way it prices an assumable loan: both positions run whole on the deal's own model against the model's new loan at today's rate, with the note's rate and year-one coverage drawn against the new loan's, what the note is worth in price, and how much more or less equity it takes. A note that balloons inside the hold is refinanced at today's rate after, a second behind new senior debt is read but not run, and a term the memorandum does not state is named rather than assumed. The pipeline, the memo, the report, the workbook, the shared screen and the compare table carry it too, and the assumption review checks the seller-financing traps by name."

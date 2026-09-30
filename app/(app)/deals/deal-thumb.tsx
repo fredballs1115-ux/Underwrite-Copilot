@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealCover } from "./deal-cover";
+import { previewStyle } from "@/lib/photo-preview";
 
 /**
  * The building's picture at list-row size — its "logo", in the sense that
@@ -114,9 +115,15 @@ export function DealThumb({
   }
   return (
     <span aria-hidden data-deal-thumb="photo" className={`${box} border border-line bg-faint`}>
-      {/* The deal's cover holds the slot until the photograph has loaded
-          whole (#446), so a row never shows a half-drawn picture. */}
-      {cover ? <DealCover cover={cover} label={label} size="thumb" className="absolute inset-0 h-full w-full" /> : null}
+      {/* What holds the slot until the photograph has loaded whole (#446):
+          its own blur-up preview where the cache has one (#463) — its
+          colours at once — else the deal's cover, so a row never shows a
+          half-drawn picture. */}
+      {base?.preview ? (
+        <span aria-hidden data-preview="thumb" className="absolute inset-0" style={previewStyle(base.preview)} />
+      ) : cover ? (
+        <DealCover cover={cover} label={label} size="thumb" className="absolute inset-0 h-full w-full" />
+      ) : null}
       {base ? (
         /* eslint-disable-next-line @next/next/no-img-element -- proxied,
            auth-scoped routes with their own cache headers */

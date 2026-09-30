@@ -12,12 +12,13 @@
 // deal's gallery), served from what is stored and never searched for here:
 // the gallery is read behind the cover (lib/deal-picture).
 
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { DealVisualCache } from "@/lib/deal-location";
 import {
   PICTURE_CREDIT,
   SEARCH_WAIT_MS,
+  backfillPreview,
   ensureDealPicture,
   memorandumPhotoCredit,
   readPictureBytes,
@@ -84,6 +85,13 @@ export async function GET(
     bytes = await readPictureBytes(id, picture, size);
   } catch {
     return new NextResponse(null, { status: 404 });
+  }
+  // A cover stored before previews existed (#463) gets its blur-up from the
+  // hero bytes this request already holds, after the response: the next
+  // page that draws it has its colours before its pixels.
+  if (g === null && size === "hero" && !picture.preview) {
+    const cover = picture;
+    after(() => backfillPreview(supabase, id, cover, bytes));
   }
   return new NextResponse(new Uint8Array(bytes), {
     headers: { "content-type": "image/jpeg", ...headers },

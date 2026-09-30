@@ -32,10 +32,15 @@ vi.mock("@/lib/storage", () => ({
 import {
   GALLERY_VERSION,
   PICTURE_SEARCH_VERSION,
+  backfillPreview,
   clearOmPicture,
+  derivePicture,
   ensureDealPicture,
   picturePaths,
+  previewOf,
 } from "./deal-picture";
+import { PREVIEW_PX, isPreview } from "./photo-preview";
+import sharp from "sharp";
 
 /** A deals table of one row's photo cache, read and written as the code does. */
 function fakeDb(photo: DealVisualCache | null) {
@@ -195,5 +200,65 @@ describe("the memorandum's other photographs, read behind the cover (#448)", () 
     await new Promise((r) => setTimeout(r, 200));
     expect(db.photo).toBeNull();
     expect(store.uploads).toEqual([]);
+  });
+});
+
+describe("the blur-up preview each stored photograph carries (#463)", () => {
+  beforeEach(() => {
+    store.oms.clear();
+    store.files.clear();
+    store.uploads = [];
+    store.removed = [];
+  });
+
+  it("is a WebP a couple of dozen pixels long, inline, made beside the hero and the thumb", async () => {
+    const photo = await testPicture(1600, 1000, "jpeg", 1);
+    const d = await derivePicture(Buffer.from(photo));
+    expect(isPreview(d.preview)).toBe(true);
+    expect(d.preview!.startsWith("data:image/webp;base64,")).toBe(true);
+    const px = await sharp(Buffer.from(d.preview!.split(",")[1], "base64")).metadata();
+    expect(Math.max(px.width ?? 0, px.height ?? 0)).toBe(PREVIEW_PX);
+    expect(px.width! / px.height!).toBeCloseTo(1.6, 0);
+    // A few hundred bytes: small enough to ride in the page for every card.
+    expect(d.preview!.length).toBeLessThan(1_000);
+    expect(await previewOf(Buffer.from("not a picture"))).toBeNull();
+  });
+
+  it("is stored with the cover and with every gallery photograph", async () => {
+    store.oms.set(
+      "u/d1.pdf",
+      await testMemorandum([
+        { images: [await testPicture(800, 500, "jpeg", 1)] },
+        { images: [await testPicture(800, 500, "jpeg", 2)] },
+        { images: [await testPicture(640, 480, "jpeg", 3)] },
+      ]),
+    );
+    const { client, db } = fakeDb(null);
+    const got = await ensureDealPicture(client, "d1", { omPath: "u/d1.pdf", isSample: false, cache: null, waitMs: 5_000 });
+    expect(isPreview(got?.preview)).toBe(true);
+    await vi.waitFor(() => expect(db.photo?.galleryV).toBe(GALLERY_VERSION), { timeout: 15_000 });
+    expect(isPreview(db.photo?.picture?.preview)).toBe(true);
+    for (const g of db.photo!.gallery!) expect(isPreview(g.preview)).toBe(true);
+  });
+
+  it("is backfilled for a photograph stored before previews, from the hero bytes a route holds, and never over a newer picture", async () => {
+    const hero = await testPicture(1600, 1000, "jpeg", 4);
+    const cache: DealVisualCache = { picture: OLD, pictureSearchV: PICTURE_SEARCH_VERSION, gallery: [] };
+    const { client, db } = fakeDb(cache);
+    await backfillPreview(client, "d1", OLD, Buffer.from(hero));
+    expect(isPreview(db.photo?.picture?.preview)).toBe(true);
+    expect(db.photo?.picture?.hero).toBe(OLD.hero);
+    expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
+    // The route read OLD, then the photograph was replaced before the
+    // backfill ran: the replacement stays, with no preview of the old one.
+    const replaced: DealPicture = { ...OLD, hero: "photos/d1/new-hero.jpg", source: "upload" };
+    const second = fakeDb({ picture: replaced });
+    await backfillPreview(second.client, "d1", OLD, Buffer.from(hero));
+    expect(second.db.photo?.picture).toEqual(replaced);
+    // A preview already stored is never overwritten.
+    const kept = "data:image/webp;base64,AAAA";
+    const third = fakeDb({ picture: { ...OLD, preview: kept } });
+    await backfillPreview(third.client, "d1", OLD, Buffer.from(hero));
+    expect(third.db.photo?.picture?.preview).toBe(kept);
   });
 });

@@ -316,6 +316,8 @@ export default async function DealPage({
     : (((deal.photo as DealVisualCache | null)?.gallery ?? []).map((g) => ({
         page: g.page ?? null,
         credit: memorandumPhotoCredit(g.page),
+        // Its colours before its pixels (#463).
+        preview: g.preview ?? null,
       })));
   const omUrlPromise = deal.om_storage_path
     ? signedSupplementUrl(deal.om_storage_path, { kind: "deal", dealId: id })
@@ -950,7 +952,7 @@ export default async function DealPage({
               hasStreetAddress={!!dealAddress?.street}
               googleEnabled={!!process.env.GOOGLE_MAPS_API_KEY}
               hasAddress={!!dealAddress?.label}
-              picture={picture ? { credit: PICTURE_CREDIT[picture.source], source: picture.source } : null}
+              picture={picture ? { credit: PICTURE_CREDIT[picture.source], source: picture.source, preview: picture.preview ?? null } : null}
               canReplace={!(deal as { is_sample?: boolean }).is_sample}
               market={marketPicture}
               gallery={gallery}

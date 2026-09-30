@@ -82,3 +82,16 @@ describe("bannerSources — the pictures a card tries, best first, each with its
     expect(bannerSources(base, CARD).map((x) => x.kind)).toEqual(["aerial"]);
   });
 });
+
+describe("bannerSources — the deal's own photograph carries its blur-up preview (#463)", () => {
+  const PREVIEW = "data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAAAwAgCdASoYABAAPm0wkkWkIqGYBABABsSgCdMoRwBAbAhvCgAA/vy3qgA=";
+  it("on the stored photograph only, and only a preview this site made", () => {
+    const got = bannerSources({ ...base, pictureCredit: "From the offering memorandum", picturePreview: PREVIEW }, CARD);
+    expect(got[0]).toMatchObject({ kind: "photo", preview: PREVIEW });
+    expect(got.slice(1).every((x) => x.preview === undefined)).toBe(true);
+    // A photograph not yet looked for has no preview to paint.
+    expect(bannerSources({ ...base, memorandumUnread: true, picturePreview: PREVIEW })[0].preview).toBeUndefined();
+    // Anything that is not a small image data URI is dropped, never styled.
+    expect(bannerSources({ ...base, pictureCredit: "x", picturePreview: 'data:image/webp;base64,a");}' })[0].preview).toBeUndefined();
+  });
+});

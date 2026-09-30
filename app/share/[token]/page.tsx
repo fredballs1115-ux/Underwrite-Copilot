@@ -75,7 +75,15 @@ export default async function SharePage({
   const stored = ((deal.photo as DealVisualCache | null) ?? null)?.picture ?? null;
   const sources: SharePictureSource[] = [
     ...(stored
-      ? [{ kind: "photo" as const, src: `/api/share/${token}/picture?size=hero`, credit: PICTURE_CREDIT[stored.source] }]
+      ? [
+          {
+            kind: "photo" as const,
+            src: `/api/share/${token}/picture?size=hero`,
+            credit: PICTURE_CREDIT[stored.source],
+            // Its colours before its pixels (#463).
+            preview: stored.preview ?? null,
+          },
+        ]
       : []),
     ...(address?.label
       ? [{ kind: "aerial" as const, src: `/api/share/${token}/aerial?w=960&h=400`, credit: SHARE_AERIAL_CREDIT }]

@@ -333,6 +333,9 @@ export default async function DealsPage({
         const facts = {
           dealId: d.id,
           pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
+          // Its colours before its pixels (#463): the blur-up the frame
+          // shows until the photograph has loaded whole.
+          picturePreview: picture?.preview ?? null,
           memorandumUnread: unread,
           googleEnabled,
           hasStreetAddress: !!address?.street?.trim(),

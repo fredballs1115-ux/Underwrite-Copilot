@@ -5744,3 +5744,45 @@ describe("ShareView — a property-tax abatement, under the title (#461)", () =>
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("tax-abatement-panel");
   });
 });
+
+// ── Photographs that arrive softly (#463) ───────────────────────────────────
+import { DealBanner } from "@/app/(app)/deals/deal-banner";
+import { DealThumb } from "@/app/(app)/deals/deal-thumb";
+import { PropertyVisual as PropertyVisualForPreview } from "@/app/(app)/deals/[id]/property-visual";
+
+describe("the blur-up preview under a deal's photograph while it loads (#463)", () => {
+  const PREVIEW = "data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAAAwAgCdASoYABAAPm0wkkWkIqGYBABABsSgCdMoRwBAbAhvCgAA/vy3qgA=";
+  const photo = { kind: "photo" as const, src: "/api/deals/d1/picture?size=hero", credit: "From the offering memorandum", preview: PREVIEW };
+  const cover = coverFor({ seed: "d1", assetClass: "multifamily", place: "Philadelphia, PA" });
+
+  it("paints the preview blurred in the card's frame instead of the cover, and the cover where there is none", () => {
+    const html = render(React.createElement(DealBanner, { sources: [photo], label: "The Fairmount", aspect: "16/10", cover }));
+    expect(html).toContain('data-preview="banner"');
+    expect(html).toMatch(/data-preview="banner"[^>]*style="background-image:url\(&quot;data:image\/svg\+xml/);
+    expect(html).toContain("feGaussianBlur");
+    const plain = render(React.createElement(DealBanner, { sources: [{ ...photo, preview: undefined }], label: "The Fairmount", aspect: "16/10", cover }));
+    expect(plain).not.toContain("data-preview");
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("paints it in the list row's thumbnail too", () => {
+    const html = render(React.createElement(DealThumb, { sources: [{ ...photo, src: "/api/deals/d1/picture?size=thumb" }], label: "The Fairmount", cover }));
+    expect(html).toContain('data-preview="thumb"');
+  });
+
+  it("paints it under the deal page's photograph", () => {
+    const html = render(
+      React.createElement(PropertyVisualForPreview, {
+        dealId: "d1",
+        label: "1 Fairmount Ave, Philadelphia, PA",
+        hasStreetAddress: true,
+        googleEnabled: false,
+        hasAddress: true,
+        picture: { credit: "From the offering memorandum", source: "om", preview: PREVIEW },
+      }),
+    );
+    expect(html).toContain('data-preview="hero"');
+    expect(html).toMatch(/data-preview="hero"/);
+    expect(html).toContain("feGaussianBlur");
+  });
+});

@@ -3,6 +3,7 @@ import sharp from "sharp";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeCache, type DealPicture, type DealVisualCache } from "@/lib/deal-location";
 import { RunGate } from "@/lib/anthropic/run-gate";
+import { PREVIEW_PX, isPreview } from "@/lib/photo-preview";
 import { EARLY_SHARE, findOmImages, scanShaped, type OmImage } from "@/lib/om-photo";
 import {
   FLAT_SHARE,
@@ -147,6 +148,8 @@ export async function derivePicture(input: PictureInput): Promise<{
   thumb: Buffer;
   width: number;
   height: number;
+  /** the blur-up preview (#463), null where it could not be made */
+  preview: string | null;
 }> {
   // `rotate()` with no angle honours the EXIF orientation a phone writes;
   // `failOn: "none"` lets a slightly damaged broker JPEG through rather than
@@ -178,7 +181,58 @@ export async function derivePicture(input: PictureInput): Promise<{
     .resize({ width: THUMB_PX, height: THUMB_PX, fit: "cover", position: "attention" })
     .jpeg({ quality: 78 })
     .toBuffer();
-  return { hero: hero.data, thumb, width: hero.info.width, height: hero.info.height };
+  return { hero: hero.data, thumb, width: hero.info.width, height: hero.info.height, preview: await previewOf(hero.data) };
+}
+
+/**
+ * The photograph's blur-up preview (#463): the whole frame a couple of
+ * dozen pixels long, a WebP of a few hundred bytes as a data URI, kept in
+ * the photo cache beside the stored pair so the page that draws the
+ * photograph paints its colours first. Made from the hero — the frame the
+ * cards and the deal page show. Null on any failure: a preview is a nicety,
+ * never a reason a picture is not stored.
+ */
+export async function previewOf(bytes: Buffer): Promise<string | null> {
+  try {
+    const webp = await sharp(bytes, { failOn: "none" })
+      .resize({ width: PREVIEW_PX, height: PREVIEW_PX, fit: "inside" })
+      .webp({ quality: 40 })
+      .toBuffer();
+    const uri = `data:image/webp;base64,${webp.toString("base64")}`;
+    return isPreview(uri) ? uri : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Give a photograph stored before previews existed its preview, from the
+ * hero bytes a request already holds (#463) — the picture route's, so no
+ * photograph is ever fetched for its preview alone. The row is read again
+ * just before the write and the preview goes onto the picture stored THEN,
+ * only where it is still the one the bytes are of: a photograph replaced
+ * while the request ran is never put back. Never throws.
+ */
+export async function backfillPreview(
+  supabase: SupabaseClient,
+  dealId: string,
+  picture: DealPicture,
+  heroBytes: Buffer,
+): Promise<void> {
+  if (picture.preview) return;
+  const preview = await previewOf(heroBytes);
+  if (!preview) return;
+  try {
+    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
+    const current = (data as { photo?: DealVisualCache | null } | null)?.photo ?? null;
+    if (!current?.picture || current.picture.hero !== picture.hero || current.picture.preview) return;
+    await supabase
+      .from("deals")
+      .update({ photo: { ...current, picture: { ...current.picture, preview } } })
+      .eq("id", dealId);
+  } catch {
+    // A preview is a nicety: never fail a request over one.
+  }
 }
 
 /** The scope every photo path is read and written under. */
@@ -210,6 +264,7 @@ export async function storePicture(
     height: derived.height,
     source,
     at: new Date().toISOString(),
+    ...(derived.preview ? { preview: derived.preview } : {}),
   };
   await writeCache(supabase, dealId, cache, {
     picture,
@@ -418,6 +473,7 @@ interface DerivedPhoto {
   thumb: Buffer;
   width: number;
   height: number;
+  preview: string | null;
   page: number;
 }
 
@@ -489,7 +545,7 @@ async function readGallery(
       const thumb = dealPhotoPath(dealId, stamp, "thumb");
       await uploadDealPhoto(hero, d.hero, photoScope(dealId));
       await uploadDealPhoto(thumb, d.thumb, photoScope(dealId));
-      gallery.push({ hero, thumb, width: d.width, height: d.height, source: "om", at, page: d.page });
+      gallery.push({ hero, thumb, width: d.width, height: d.height, source: "om", at, page: d.page, ...(d.preview ? { preview: d.preview } : {}) });
     }
     await writeCache(supabase, dealId, cache, {
       gallery: gallery.length > 0 ? gallery : undefined,
