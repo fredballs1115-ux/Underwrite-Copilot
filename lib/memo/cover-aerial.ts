@@ -114,13 +114,51 @@ export function coverAerialFor(
  *  printed box, as the aerial is asked for — so the memo does not carry a
  *  megabyte for a picture an inch and a half wide. Cropped by attention, the
  *  way the pipeline's thumbnail is, so the building stays in the frame. */
-export async function fitCover(bytes: Buffer): Promise<Buffer> {
+export async function fitCover(bytes: Buffer, size: { width: number; height: number } = COVER_SIZE): Promise<Buffer> {
   const sharp = (await import("sharp")).default;
   return sharp(bytes)
     .rotate()
-    .resize(COVER_SIZE.width, COVER_SIZE.height, { fit: "cover", position: sharp.strategy.attention })
+    .resize(size.width, size.height, { fit: "cover", position: sharp.strategy.attention })
     .jpeg({ quality: 84, mozjpeg: true })
     .toBuffer();
+}
+
+/** A photograph's pixels on the report's photographs page (#459): twice
+ *  the 256 × 170 pt frame it prints in, two to a row across the page. */
+export const PHOTO_PAGE_SIZE = { width: 512, height: 340 };
+
+/** The most photographs the page prints: two rows of two. */
+export const PHOTO_PAGE_MAX = 4;
+
+/**
+ * The memorandum's other photographs for the full report's photographs page
+ * (#459) — the ones the deal page's mosaic and filmstrip show, each cut to
+ * the page's frame and credited with its page, in the memorandum's order.
+ * Only the stored pictures: the report never reads the memorandum. Each is
+ * bounded as the cover is, and one that fails is left out; fewer than two
+ * is no page, since one photograph is what the memo's cover already prints.
+ */
+export async function galleryPhotosFor(dealId: string, cache: DealVisualCache | null): Promise<MemoCover[]> {
+  const gallery = (cache?.gallery ?? []).slice(0, PHOTO_PAGE_MAX);
+  if (gallery.length < 2) return [];
+  const { memorandumPhotoCredit, readPictureBytes } = await import("@/lib/deal-picture");
+  const photos = await Promise.all(
+    gallery.map((g) =>
+      coverFrom(
+        async () => {
+          const framed = await fitCover(await readPictureBytes(dealId, g, "hero"), PHOTO_PAGE_SIZE);
+          return {
+            source: "photo",
+            response: new Response(new Uint8Array(framed), { headers: { "content-type": "image/jpeg" } }),
+          };
+        },
+        4_000,
+        memorandumPhotoCredit(g.page),
+      ),
+    ),
+  );
+  const kept = photos.filter((p): p is MemoCover => p != null);
+  return kept.length >= 2 ? kept : [];
 }
 
 /**

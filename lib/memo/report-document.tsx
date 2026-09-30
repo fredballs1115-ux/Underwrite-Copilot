@@ -12,7 +12,7 @@ import type {
   ReconciliationResult,
   MarketResult,
 } from "@/lib/anthropic/types";
-import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoData } from "./memo-document";
+import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type MemoData } from "./memo-document";
 
 /** The OM's figure placed on the typical range — "5.25%" on "5.25–5.75%" —
  *  as the memo places a base between its low and high: 0..1, clamped, so a
@@ -356,6 +356,30 @@ function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
  */
 const SITE_MAP_W = 524; // the page's content width: LETTER less 44pt a side
 const SITE_MAP_H = Math.round((SITE_MAP_W * REPORT_FLOOD_SIZE.height) / REPORT_FLOOD_SIZE.width);
+
+/**
+ * The memorandum's other photographs (#459), two to a row across the page,
+ * each with its page's credit under it — the building from more than one
+ * side, the way a broker's package opens and the deal page's mosaic shows
+ * it. Cut to one frame by attention (lib/memo/cover-aerial
+ * `galleryPhotosFor`), so the rows line up.
+ */
+const PHOTO_W = 256;
+const PHOTO_H = 170;
+
+function PhotosBlock({ photos }: { photos: MemoCover[] }) {
+  return (
+    <View style={{ flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between", marginTop: 4 }}>
+      {photos.map((p, i) => (
+        <View key={i} style={{ width: PHOTO_W, marginBottom: 12 }} wrap={false}>
+          {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image takes no alt */}
+          <Image src={p.dataUri} style={{ width: PHOTO_W, height: PHOTO_H, borderRadius: 4, objectFit: "cover" }} />
+          <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3, textAlign: "right" }}>{str(p.credit)}</Text>
+        </View>
+      ))}
+    </View>
+  );
+}
 
 function SiteBlock({ view }: { view: FloodMapView }) {
   return (
@@ -745,6 +769,10 @@ export interface ReportInput {
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
+  /** the memorandum's other photographs, cut to the page's frame and
+   *  credited (lib/memo/cover-aerial `galleryPhotosFor`, #459); fewer than
+   *  two is no page */
+  photos?: MemoCover[] | null;
 }
 
 /** Everything the deal screen produced, shaped for the multi-page report. */
@@ -765,6 +793,7 @@ export function buildReportData(
   hotel?: { line: string; read: string } | null,
   sale?: { line: string; read: string } | null,
   roster?: { line: string; read: string } | null,
+  photos?: MemoCover[] | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -777,6 +806,7 @@ export function buildReportData(
     hotel: hotel ?? null,
     sale: sale ?? null,
     roster: roster ?? null,
+    photos: photos ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1380,6 +1410,20 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <AssumptionsBlock read={modelVsMarket} />
           <AssumableBlock view={input.assumable} />
           <LeaseholdBlock view={input.leasehold} />
+        </PageChrome>
+      )}
+
+      {/* The property (#459): the memorandum's other photographs, before
+          the site — the building from more than one side. */}
+      {input.photos && input.photos.length >= 2 && (
+        <PageChrome
+          title="The property"
+          count={`${input.photos.length} photographs from the memorandum`}
+          dealName={dealName}
+          branding={memo.branding}
+        >
+          <Text style={s.sub}>{"The offering memorandum's own photographs of the property, each with the page it came from."}</Text>
+          <PhotosBlock photos={input.photos} />
         </PageChrome>
       )}
 

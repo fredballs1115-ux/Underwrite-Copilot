@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "The full report shows the property's photographs",
+      "href": "/deals",
+      "blurb": "Where a deal's memorandum holds two or more photographs beyond its cover, the full report now gives them a page of their own before the site map: up to four, two to a row, each cut to one frame and credited with the memorandum page it came from, so an investment committee sees the building from more than one side, the way a broker's package opens. The report reads only the photographs already stored for the deal and never waits long on them: one that fails to load is left out, and fewer than two makes no page."
+    },
+    {
+      "date": "2026-09-30",
       "title": "A deal's photographs, laid out like a listing",
       "href": "/deals",
       "blurb": "Where a deal has a photograph of its own and at least two more from its memorandum, the deal page now opens on a mosaic, the way a listing does: the cover across two thirds of the picture and the next two photographs stacked beside it, each at the same resolution as the cover and credited with its page, the last one saying how many more there are. A click on any of them opens that photograph full screen, and the reader's Replace photo stays on the cover. On a phone the page keeps the single photograph."

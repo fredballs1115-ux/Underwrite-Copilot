@@ -19,9 +19,10 @@ const state = vi.hoisted(() => ({
 // The stored photograph (#434), and the aerial behind it.
 vi.mock("@/lib/deal-picture", () => ({
   PICTURE_CREDIT: { om: "From the offering memorandum", upload: "Photograph added to the deal" },
-  readPictureBytes: async (dealId: string, _picture: unknown, size: string) => {
+  memorandumPhotoCredit: (page?: number | null) => (page ? `From the offering memorandum, page ${page}` : "From the offering memorandum"),
+  readPictureBytes: async (dealId: string, picture: { hero?: string }, size: string) => {
     state.pictureReads.push(`${dealId}:${size}`);
-    if (!state.pictureBytes) throw new Error("the stored file is gone");
+    if (!state.pictureBytes || picture?.hero?.includes("gone")) throw new Error("the stored file is gone");
     return state.pictureBytes;
   },
 }));
@@ -41,7 +42,7 @@ vi.mock("@/lib/imagery", () => ({
   },
 }));
 
-import { COVER_SIZE, coverFrom, coverPictureFor, fitCover, intactImage } from "./cover-aerial";
+import { COVER_SIZE, PHOTO_PAGE_SIZE, coverFrom, coverPictureFor, fitCover, galleryPhotosFor, intactImage } from "./cover-aerial";
 
 const image = (type: string, body: Buffer | null = TINY_PNG) =>
   new Response(body ? new Uint8Array(body) : null, { headers: { "content-type": type } });
@@ -164,5 +165,50 @@ describe("coverPictureFor — the building's own photograph on the cover, the ae
     expect((await coverPictureFor(supabase, "d1", null, { picture } as never))?.credit).toBe("From the offering memorandum");
     state.pictureBytes = null;
     expect(await coverPictureFor(supabase, "d1", null, null)).toBeNull();
+  });
+});
+
+describe("galleryPhotosFor — the memorandum's other photographs for the report's page (#459)", () => {
+  const photo = (n: number, page: number | null) => ({
+    hero: `photos/d1/170000000000${n}-hero.jpg`,
+    thumb: `photos/d1/170000000000${n}-thumb.jpg`,
+    width: 1600,
+    height: 1067,
+    source: "om" as const,
+    at: "2026-09-20T12:00:00Z",
+    ...(page != null ? { page } : {}),
+  });
+  beforeEach(() => {
+    state.pictureReads = [];
+    state.pictureBytes = null;
+  });
+  const hero = () =>
+    sharp({ create: { width: 1600, height: 1067, channels: 3, background: { r: 90, g: 120, b: 150 } } })
+      .jpeg()
+      .toBuffer();
+
+  it("cuts each stored photograph to the page's frame, credited with its page, four at most", async () => {
+    state.pictureBytes = await hero();
+    const gallery = [photo(1, 3), photo(2, 7), photo(3, null), photo(4, 11), photo(5, 12)];
+    const photos = await galleryPhotosFor("d1", { gallery } as never);
+    expect(photos.map((p) => p.credit)).toEqual([
+      "From the offering memorandum, page 3",
+      "From the offering memorandum, page 7",
+      "From the offering memorandum",
+      "From the offering memorandum, page 11",
+    ]);
+    expect(state.pictureReads).toEqual(["d1:hero", "d1:hero", "d1:hero", "d1:hero"]);
+    const bytes = Buffer.from(photos[0].dataUri.split(",")[1], "base64");
+    const meta = await sharp(bytes).metadata();
+    expect([meta.width, meta.height]).toEqual([PHOTO_PAGE_SIZE.width, PHOTO_PAGE_SIZE.height]);
+  });
+
+  it("leaves out a photograph whose file is gone, and makes no page of fewer than two", async () => {
+    state.pictureBytes = await hero();
+    const kept = await galleryPhotosFor("d1", { gallery: [photo(1, 3), { ...photo(2, 7), hero: "photos/d1/gone-hero.jpg" }, photo(3, 9)] } as never);
+    expect(kept.map((p) => p.credit)).toEqual(["From the offering memorandum, page 3", "From the offering memorandum, page 9"]);
+    expect(await galleryPhotosFor("d1", { gallery: [photo(1, 3), { ...photo(2, 7), hero: "photos/d1/gone-hero.jpg" }] } as never)).toEqual([]);
+    expect(await galleryPhotosFor("d1", { gallery: [photo(1, 3)] } as never)).toEqual([]);
+    expect(await galleryPhotosFor("d1", null)).toEqual([]);
   });
 });

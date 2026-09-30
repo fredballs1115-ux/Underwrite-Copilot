@@ -806,4 +806,44 @@ describe("ReportDocument (full report)", () => {
     expect(wordsOnly).toContain("a Special Flood Hazard Area");
     expect(wordsOnly).not.toContain("the ring marks the building");
   }, 45000);
+
+  it("gives the memorandum's other photographs a page of their own, each with its page's credit, and none for fewer than two (#459)", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const photos = [
+      { dataUri: tinyDataUri([120, 90, 60]), credit: "From the offering memorandum, page 3" },
+      { dataUri: tinyDataUri([60, 90, 120]), credit: "From the offering memorandum, page 7" },
+      { dataUri: tinyDataUri([90, 120, 60]), credit: "From the offering memorandum, page 9" },
+    ];
+    const render = (p: typeof photos | null) =>
+      renderToBuffer(
+        React.createElement(ReportDocument, {
+          input: buildReportData(deal, "September 30, 2026", [], null, undefined, undefined, undefined, undefined, null, null, null, null, null, null, null, null, p),
+        }) as unknown as Parameters<typeof renderToBuffer>[0],
+      );
+    const pagesOf = (buf: Buffer) => (buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+    const imagesOf = (buf: Buffer) => (buf.toString("latin1").match(/\/Subtype\s*\/Image/g) ?? []).length;
+    const buf = await render(photos);
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("The property");
+    expect(text).toContain("3 photographs from the memorandum");
+    expect(text).toContain("From the offering memorandum, page 3");
+    expect(text).toContain("From the offering memorandum, page 9");
+    const without = await render(null);
+    expect(pagesOf(buf)).toBe(pagesOf(without) + 1);
+    expect(imagesOf(buf) - imagesOf(without)).toBe(3);
+    // One photograph is what the memo's cover already prints: no page.
+    const one = await render(photos.slice(0, 1));
+    expect(pagesOf(one)).toBe(pagesOf(without));
+    expect(await pdfTextOf(one)).not.toContain("photographs from the memorandum");
+  }, 45000);
 });

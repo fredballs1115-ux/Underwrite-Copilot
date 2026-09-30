@@ -24,7 +24,7 @@ import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
-import { coverPictureFor } from "@/lib/memo/cover-aerial";
+import { coverPictureFor, galleryPhotosFor } from "@/lib/memo/cover-aerial";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { floodMapFor } from "@/lib/flood-map";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
@@ -294,7 +294,7 @@ export async function GET(
     // neither holds the report up.
     const address = (deal.address as StructuredAddress | null) ?? null;
     const visualCache = (deal as unknown as { photo?: DealVisualCache | null }).photo ?? null;
-    const [cover, floodMap] = await Promise.all([
+    const [cover, floodMap, photos] = await Promise.all([
       coverPictureFor(supabase, id, address, visualCache),
       floodMapFor(
         supabase,
@@ -303,8 +303,11 @@ export async function GET(
         visualCache,
         ((deal as unknown as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
       ).catch(() => null),
+      // The memorandum's other photographs (#459), bounded as the cover is;
+      // a failed read is no page, never a failed report.
+      galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];
