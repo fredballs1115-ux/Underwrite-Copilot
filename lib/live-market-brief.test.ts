@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
-import { BRIEF_NATIONAL_IDS, CRE_PRICE_ID, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor, sectorPayrollMetric } from "./live-market-brief";
+import { CONSTRUCTION_COST_IDS, BRIEF_NATIONAL_IDS, CRE_PRICE_ID, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor, sectorPayrollMetric } from "./live-market-brief";
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
 
@@ -414,6 +414,48 @@ describe("the rents each kind of commercial lessor charges — national, said so
     // Without the series on hand, nothing claims a figure.
     const without = liveMarketBrief({ ...base, assetClass: "office", national: national.filter((r) => r.meta.id !== "PCU9241269241265_YOY") })!;
     expect(without.lines.some((l) => l.startsWith("Commercial property insurance premiums"))).toBe(false);
+  });
+});
+
+describe("what building costs — national, for a deal with a plan, and for no other", () => {
+  // The runner's own table: the construction series the dry run of
+  // 2026-09-23 printed for August, beside the rest of the national list.
+  const national = readRates(REAL_ROWS, FIXTURE_NOW).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
+  const base = { metro: { id: "dc", name: "Washington DC" }, rates: [], zori: null, realtor: null, now: FIXTURE_NOW, national };
+  const costLines = (b: { lines: string[] } | null) => b?.lines.filter((l) => l.startsWith("Construction costs")) ?? [];
+
+  it("a development of apartments reads the goods that go into residential construction and construction wages, each the nation's", () => {
+    const dev = liveMarketBrief({ ...base, assetClass: "multifamily", plan: true })!;
+    expect(costLines(dev)).toEqual([
+      "Construction costs — the goods that go into residential construction, national (BLS producer price index): +7.8% from a year ago (Aug 2026; BLS via FRED) — the nation's, not this project's bids",
+      "Construction costs — average hourly earnings in construction, national: +4.2% from a year ago (Aug 2026; BLS via FRED) — the nation's, not this project's labor",
+    ]);
+    expect(dev.figures.filter((f) => f.key.startsWith("construction_"))).toEqual([
+      { key: "construction_inputs_yoy", label: "Goods into residential construction, national", value: 7.78375, unit: "pts", asOf: "2026-08-01" },
+      { key: "construction_wages_yoy", label: "Construction wages, national", value: 4.2021, unit: "pts", asOf: "2026-08-01" },
+    ]);
+    // They are national lines, counted with the rest, ahead of the debt market.
+    expect(dev.national).toBe(dev.lines.length);
+    expect(dev.lines.findIndex((l) => l.startsWith("Construction costs"))).toBeLessThan(dev.lines.findIndex((l) => l.startsWith("Debt market")));
+  });
+
+  it("an office or a warehouse being built reads the nonresidential goods", () => {
+    for (const cls of ["office", "industrial", "hospitality_str"]) {
+      expect(costLines(liveMarketBrief({ ...base, assetClass: cls, plan: true }))[0], cls).toContain(
+        "the goods that go into nonresidential construction, national (BLS producer price index): +8.8% from a year ago",
+      );
+    }
+  });
+
+  it("a building already built reads neither, and a stale or missing series has no line", () => {
+    for (const cls of ["multifamily", "office"]) expect(costLines(liveMarketBrief({ ...base, assetClass: cls })), cls).toEqual([]);
+    const noWages = national.filter((r) => r.meta.id !== CONSTRUCTION_COST_IDS.wages);
+    expect(costLines(liveMarketBrief({ ...base, national: noWages, assetClass: "multifamily", plan: true }))).toHaveLength(1);
+    const later = new Date("2027-06-01T00:00:00Z");
+    const stale = readRates(REAL_ROWS, later).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
+    expect(costLines(liveMarketBrief({ ...base, now: later, national: stale, assetClass: "multifamily", plan: true }))).toEqual([]);
+    // One list, so the pipeline's read and the page's cannot differ.
+    for (const id of Object.values(CONSTRUCTION_COST_IDS)) expect(BRIEF_NATIONAL_IDS).toContain(id);
   });
 });
 

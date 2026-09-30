@@ -153,10 +153,32 @@ export const RENT_INDEX_IDS = [
  */
 export const INSURANCE_INDEX_ID = "PCU9241269241265_YOY";
 
+/**
+ * What building costs, nationally, for a deal with a plan — a development
+ * or a conversion, whose budget is the deal. The BLS producer price index
+ * for the goods that go into construction, residential or nonresidential
+ * by what is being built, and construction's average hourly earnings, each
+ * against a year ago. Both already ride the rates strip (every id was
+ * printed by the runner before it went into data/fred-series.json); here
+ * they are the figures a budget's escalation and contingency are checked
+ * against. The nation's, a trailing year — never this project's bids.
+ */
+export const CONSTRUCTION_COST_IDS = {
+  residentialInputs: "WPUIP2311001_YOY",
+  nonresidentialInputs: "WPUIP2312001_YOY",
+  wages: "CES2000000003_YOY",
+} as const;
+
 /** The national series the brief reads for a deal: the debt market's, the
- *  rent index for the deal's kind of lessor, and the insurance premium
- *  index. One list, so the pipeline's read and the page's cannot differ. */
-export const BRIEF_NATIONAL_IDS: readonly string[] = [...DEBT_MARKET_IDS, ...RENT_INDEX_IDS, INSURANCE_INDEX_ID];
+ *  rent index for the deal's kind of lessor, the insurance premium index
+ *  and, for a plan deal, what building costs. One list, so the pipeline's
+ *  read and the page's cannot differ. */
+export const BRIEF_NATIONAL_IDS: readonly string[] = [
+  ...DEBT_MARKET_IDS,
+  ...RENT_INDEX_IDS,
+  INSURANCE_INDEX_ID,
+  ...Object.values(CONSTRUCTION_COST_IDS),
+];
 
 export interface RentIndex {
   id: (typeof RENT_INDEX_IDS)[number];
@@ -491,6 +513,39 @@ function insuranceLine(national: readonly LiveRate[] | undefined, assetClass: st
   };
 }
 
+/** What building costs, for a deal with a plan: the goods that go into what
+ *  is being built, and the wages of the people building it, each the
+ *  nation's against a year ago. A deal without a plan reads neither — its
+ *  building is already built. */
+function constructionCostLines(
+  national: readonly LiveRate[] | undefined,
+  assetClass: string | null | undefined,
+  plan: boolean,
+): Said[] {
+  if (!plan || !national) return [];
+  const fresh = (id: string) => national.find((x) => x.meta.id === id && x.fresh && Number.isFinite(x.value)) ?? null;
+  const residential = assetWords(assetClass ?? undefined).residential;
+  const inputs = fresh(residential ? CONSTRUCTION_COST_IDS.residentialInputs : CONSTRUCTION_COST_IDS.nonresidentialInputs);
+  const wages = fresh(CONSTRUCTION_COST_IDS.wages);
+  const out: Said[] = [];
+  if (inputs) {
+    const kind = residential ? "residential" : "nonresidential";
+    out.push({
+      line: `Construction costs — the goods that go into ${kind} construction, national (BLS producer price index): ${signed(inputs.value)}% from a year ago (${periodLabel(inputs.obsDate, inputs.meta.cadence)}; BLS via FRED) — the nation's, not this project's bids`,
+      figures: [
+        { key: "construction_inputs_yoy", label: `Goods into ${kind} construction, national`, value: inputs.value, unit: "pts", asOf: inputs.obsDate },
+      ],
+    });
+  }
+  if (wages) {
+    out.push({
+      line: `Construction costs — average hourly earnings in construction, national: ${signed(wages.value)}% from a year ago (${periodLabel(wages.obsDate, wages.meta.cadence)}; BLS via FRED) — the nation's, not this project's labor`,
+      figures: [{ key: "construction_wages_yoy", label: "Construction wages, national", value: wages.value, unit: "pts", asOf: wages.obsDate }],
+    });
+  }
+  return out;
+}
+
 const SLOOS_LABEL: Record<string, { key: string; loan: string }> = {
   SUBLPDRCSM: { key: "sloos_multifamily", loan: "multifamily loans" },
   SUBLPDRCSN: { key: "sloos_nonres", loan: "nonfarm nonresidential loans" },
@@ -576,6 +631,9 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   // building carries costs this year against last.
   const ins = insuranceLine(input.national, input.assetClass);
   if (ins) said.push(ins);
+  // A plan deal's budget is the deal: what building costs this year against
+  // last, the goods and the labor.
+  said.push(...constructionCostLines(input.national, input.assetClass, input.plan ?? false));
   said.push(...debtMarketLines(input.national, input.assetClass, input.plan ?? false));
   if (said.length === 0) return null;
   const national = said.length - local;

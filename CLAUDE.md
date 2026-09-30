@@ -4224,7 +4224,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   estate prices against a year ago, a "Capital markets —" line said as
   the nation's, a trailing year, not this market's and not a cap rate,
   and the clause sets an exit value that leans on prices rising against
-  it. **A
+  it. **A deal with a plan reads what building costs** (2026-09-30,
+  `CONSTRUCTION_COST_IDS`): the BLS producer price index for the goods
+  that go into residential or nonresidential construction, by the class
+  being built, and construction's average hourly earnings, each against a
+  year ago — series the strip already carried, verified when they joined
+  the table. Two "Construction costs —" lines after the insurance line,
+  counted with the national ones, said as the nation's and never the
+  project's bids; the clause checks a budget's escalation and contingency
+  against them. A building already built reads neither. **A
   commercial deal's rents ride just ahead of them** (#390): the national
   index of rents its kind of lessor charges (`rentIndexFor`,
   `RENT_INDEX_IDS`), one line said as the nation's lessors and never the
