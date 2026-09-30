@@ -85,10 +85,21 @@ function readShareWords(words: string): "share" | "not" | null {
  *  interest: 49%"); null where no single percentage under 100 is stated AS a
  *  share. A percentage counts only where the words right after it — or,
  *  where those name nothing, the words right before it in its clause — name
- *  an ownership share and no return, rate or occupancy; a bare "49%" names
- *  nothing and is withheld, and so is a range ("49–51%"). */
+ *  an ownership share and no return, rate or occupancy; a percentage among
+ *  other words that name nothing is withheld, and so is a range ("49–51%").
+ *  A field that is ONE percentage and nothing else is the share, since the
+ *  field is the share's. */
 export function parseSharePct(text: string | null | undefined): number | null {
   const t = text ?? "";
+  // The share field is filled only on a partial interest, so a field that
+  // is nothing but one percentage ("49%", read off a table's "Interest
+  // offered" cell) IS the share: there are no words beside it to be a
+  // return's or a rate's.
+  const lone = t.trim().match(/^(\d{1,2}(?:\.\d+)?)\s*(?:%|percent|per cent)$/i);
+  if (lone) {
+    const n = Number(lone[1]);
+    return n > 0 && n < 100 ? n : null;
+  }
   const hits = [...t.matchAll(PCT_MENTION)].map((m, i, all) => {
     const start = m.index ?? 0;
     const end = start + m[0].length;

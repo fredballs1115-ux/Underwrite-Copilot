@@ -449,9 +449,11 @@ export function buildSubject(input: {
     // Portfolio totals ALWAYS include this deal's own units — the ≤N-unit
     // small-landlord tests (PG ≤5, NY Good Cause ≤10) must fail on an
     // acquisition that alone exceeds the cap, even with the default
-    // "no other units" assumption the panel declares.
-    owner_total_rental_units_in_county: (otherUnits ?? 0) + (units ?? 0),
-    owner_total_rental_units_in_state: (otherUnits ?? 0) + (units ?? 0),
+    // "no other units" assumption the panel declares. With the deal's own
+    // count unknown the total is unknown too: counted as none, a building
+    // of any size had passed the ≤5 test as a small landlord's.
+    owner_total_rental_units_in_county: units === undefined ? undefined : (otherUnits ?? 0) + units,
+    owner_total_rental_units_in_state: units === undefined ? undefined : (otherUnits ?? 0) + units,
     ...(otherUnits !== undefined ? { owner_other_rental_units_in_dc: otherUnits } : {}),
     transaction: "sale_of_rental_housing_accommodation",
     // An office, a hotel, a storage facility: the rules conditioned on

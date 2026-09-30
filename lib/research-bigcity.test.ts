@@ -354,3 +354,41 @@ describe("a city's rules reach the city, not a county or a neighbour of its name
     expect(outcomes({ ...BASE, ...brooklyn })["ny-nyc-rent-stabilization-coverage"]).toBe("applies");
   });
 });
+
+describe("Prince George's rent cap follows the county's small-landlord exemption (see_rule, the guards pass of 2026-09-30)", () => {
+  const pg = (sizeText: string | null, sectorFields?: Record<string, string | number | boolean>) =>
+    outcomes(
+      buildSubject({
+        address: { state: "MD", city: "Hyattsville", county: "Prince George's County" },
+        census: { place: { name: "Hyattsville" }, county: { name: "Prince George's County" } },
+        sizeText,
+        sectorFields,
+        currentYear: 2026,
+      }),
+    );
+
+  it("a 120-unit building is under the cap: its owner is no small landlord", () => {
+    // The cross-reference read as "yes" and filed every rental deal in the
+    // county as exempt, while the exemption rule beside it said applies.
+    const o = pg("120 units");
+    expect(o["md-pg-prsa-cap"]).toBe("applies");
+    expect(o["md-pg-prsa-small-landlord-exemption"]).toBe("applies");
+  });
+
+  it("a natural person's fourplex, with no other units in the county, is exempt from the cap", () => {
+    const o = pg("4 units", { owner_units_in_jurisdiction: 0 });
+    expect(o["md-pg-prsa-cap"]).toBe("exempt");
+    expect(o["md-pg-prsa-small-landlord-exemption"]).toBe("exempt");
+  });
+
+  it("a building of unknown size is asked about, never filed as a small landlord's", () => {
+    const o = pg(null);
+    expect(o["md-pg-prsa-cap"]).toBe("possibly_applies");
+  });
+
+  it("a cross-reference to a rule the list does not hold is an open question, not an exemption", () => {
+    const cap = seedRules().find((r) => r.id === "md-pg-prsa-cap")!;
+    const [only] = evaluateRules([cap], { ...BASE, state: "MD", locality: ["Prince George's County"], units: 120 } as RuleSubject);
+    expect(only.outcome).toBe("possibly_applies");
+  });
+});

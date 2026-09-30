@@ -218,7 +218,10 @@ function evalCondition(key: string, want: unknown, s: RuleSubject): Tri {
       .map((w) => evalConditions(w as Record<string, unknown>, s).result)
       .reduce<Tri>((acc, t) => or(acc, t), "no");
   }
-  if (key === "see_rule") return "yes"; // cross-reference, informational only
+  // A cross-reference `evaluateRules` could not resolve to the rule it names
+  // is an open question, never a pass: read as "yes", it had exempted every
+  // rental deal in Prince George's County from the county's rent cap.
+  if (key === "see_rule") return "unknown";
 
   // permit/built-date comparisons operate on years — the deal stores a year
   if (key === "building_permit_issued_after") {
@@ -318,6 +321,28 @@ function evalConditions(
  *  whether it sits inside the rule's city (`jurisdictionOf` "unknown"). */
 export const WITHIN_CITY_LIMITS = "within_city_limits";
 
+/**
+ * A rule's exemption conditions with its cross-reference resolved: an
+ * `exempt_if` of `{ see_rule: "<id>" }` means "exempt where the rule it names
+ * exempts", so the named rule's own `exempt_if` conditions stand in its
+ * place (Prince George's rent cap is lifted exactly where the county's
+ * small-landlord exemption holds). One level only; a reference to a rule the
+ * list does not hold, or one with no conditions, stays and reads "unknown".
+ */
+export function exemptionConditions(
+  rule: RegulatoryRule,
+  rules: readonly RegulatoryRule[],
+): Record<string, unknown> | null {
+  const conds = rule.exempt_if ?? null;
+  const ref = conds?.see_rule;
+  if (!conds || typeof ref !== "string") return conds;
+  const named = rules.find((r) => r.id === ref);
+  const theirs = named && named.id !== rule.id ? named.exempt_if : null;
+  if (!theirs || Object.keys(theirs).length === 0) return conds;
+  const rest = Object.fromEntries(Object.entries(conds).filter(([k]) => k !== "see_rule"));
+  return { ...rest, ...theirs };
+}
+
 /** Evaluate every jurisdiction-matched rule. Rules outside the deal's
  *  jurisdiction are omitted entirely (they're noise, not unknowns); a rule
  *  whose city the deal's names cannot place it in or out of (#452) reads
@@ -328,9 +353,10 @@ export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): Ru
     const where = jurisdictionOf(rule, subject);
     if (where === "no") continue;
     const applies = evalConditions(rule.applies_if, subject);
-    const exempt = evalConditions(rule.exempt_if ?? null, subject);
+    const exemptIf = exemptionConditions(rule, rules);
+    const exempt = evalConditions(exemptIf, subject);
     // exempt_if of null/{} means "no exemption path", not "always exempt":
-    const hasExemption = !!rule.exempt_if && Object.keys(rule.exempt_if).length > 0;
+    const hasExemption = !!exemptIf && Object.keys(exemptIf).length > 0;
     const exemptTri: Tri = hasExemption ? exempt.result : "no";
 
     let outcome: RuleEvaluation["outcome"];

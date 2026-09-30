@@ -92,9 +92,15 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
     expect(parseSharePct("a 49% LP interest; 8% preferred return; 20% promote over a 12% IRR")).toBe(49);
     expect(parseSharePct("a 49% interest in a property that is 95% leased")).toBe(49);
     expect(parseSharePct("a 90% stake (10% retained by the sponsor)")).toBe(90);
-    // A percentage that names nothing, or a range, is no share.
-    expect(parseSharePct("49%")).toBeNull();
+    // A percentage among words that name nothing, or a range, is no share.
+    expect(parseSharePct("roughly 49% of it")).toBeNull();
     expect(parseSharePct("a 49%–51% interest")).toBeNull();
+    // The field is the share's: one percentage and nothing else is the share
+    // (a table's "Interest offered: 49%" cell), and a range still is not.
+    expect(parseSharePct("49%")).toBe(49);
+    expect(parseSharePct(" 12.5 percent ")).toBe(12.5);
+    expect(parseSharePct("49–51%")).toBeNull();
+    expect(parseSharePct("100%")).toBeNull();
     // Two different shares remain two: withheld.
     expect(parseSharePct("a 49% LP interest (the sponsor keeps a 51% GP interest)")).toBeNull();
   });
