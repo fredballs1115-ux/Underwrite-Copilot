@@ -66,6 +66,7 @@ import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
 import type { AssumableView } from "@/lib/assumable-debt";
+import type { InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
@@ -934,6 +935,25 @@ export function citedPage(page: unknown, totalPages: number | null): string {
 
 const fmtPct = (d: number, dp = 1): string => `${(d * 100).toFixed(dp)}%`;
 const fmtDelta = (d: number): string => `${d > 0 ? "+" : ""}${Math.round(d * 100)}%`;
+const fmtUsd0 = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
+
+/**
+ * Where one of the model's inputs came from, as the workbook's Sources
+ * column marks it (lib/underwrite/workbook): its note — which names the
+ * document for a figure read from one ("OM asking / purchase price", "Rent
+ * roll actual …") — then in brackets its page where it falls inside the
+ * memorandum (lib/facts' rule), "derived" for a figure computed from stated
+ * ones, "assumption" for a default, so a default never reads as the
+ * sponsor's case. "" where the model carries no source for it.
+ */
+export function sourceSays(src: InputSource | null | undefined, totalPages: number | null): string {
+  if (!src) return "";
+  const note = (src.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  const page = citedPage(src.page, totalPages);
+  const tag =
+    src.provenance === "extracted" ? (page === "—" ? "" : page) : src.provenance === "derived" ? "derived" : "assumption";
+  return tag ? `${note} (${tag})` : note;
+}
 /** What the overrun axis and sentence call the figure they stress. When the
  *  OM stated only an all-in total and no price, the "budget" IS that total
  *  with the acquisition inside it — the strip above declines to call it a
@@ -1510,6 +1530,20 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             returns at each exit cap. Rows re-size the loan, fees, and equity
             from the new price.
           </Text>
+          {/* The base row is the MODELED price, which is the ask only where
+              the ask is what the model runs at: a share's price grossed up
+              to the whole, an auction's floor and a price backed out of NOI
+              and the cap are not. The source says which. */}
+          {sensitivity.priceSource ? (
+            <Text style={{ fontSize: 7.5, color: C.muted, marginTop: -6, marginBottom: 4 }}>
+              {str(
+                `The modeled price is ${fmtUsd0(sensitivity.priceGrid.priceRows[sensitivity.priceGrid.baseRow]?.price ?? 0)}: ${sourceSays(
+                  sensitivity.priceSource,
+                  totalPages,
+                )}.`,
+              )}
+            </Text>
+          ) : null}
           <HeatGrid
             axisLabel="PRICE"
             spanLabel="EXIT CAP"
@@ -1517,7 +1551,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             rowLabels={sensitivity.priceGrid.priceRows.map(
               (p) =>
                 `${fmtCompactUsd(p.price)}  ${
-                  p.deltaPct === 0 ? "(ask)" : `(${p.deltaPct > 0 ? "+" : ""}${Math.round(p.deltaPct * 100)}%)`
+                  p.deltaPct === 0 ? "(modeled)" : `(${p.deltaPct > 0 ? "+" : ""}${Math.round(p.deltaPct * 100)}%)`
                 }`,
             )}
             cells={sensitivity.priceGrid.cells}

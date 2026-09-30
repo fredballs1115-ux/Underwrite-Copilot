@@ -217,6 +217,42 @@ describe("ReportDocument (full report)", () => {
     vi.useRealTimers();
   });
 
+  it("labels the retrade grid's base row the modeled price, never the ask, and says what the model priced it at", async () => {
+    const render = async (extraction: ExtractionResult) => {
+      const deal = {
+        name: extraction.dealName ?? SAMPLE_DEAL.name,
+        asset_class: SAMPLE_DEAL.asset_class,
+        extraction,
+        challenges: null,
+        comps: null,
+        market: null,
+        reconciliation: null,
+        verdict: SAMPLE_DEAL.verdict,
+        prior_screen: null,
+      } as unknown as DealRow;
+      const derived = deriveUnderwriteInputs(extraction, deal.name);
+      const input = buildReportData(deal, "September 30, 2026", [], buildSensitivityData(derived.inputs, null, { sources: derived.sources }));
+      const buf = await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]);
+      return (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    };
+    // The sample: the ask is what the model runs at, cited to its page.
+    const sample = await render({ ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 });
+    expect(sample).toContain("$68M (modeled)");
+    expect(sample).toContain("The modeled price is $68,000,000: OM asking / purchase price (p. 3).");
+    expect(sample).not.toContain("(ask)");
+    // A 49% share: the $33.3M ask grossed up to the $68M whole the model runs.
+    const share = await render({
+      ...(SAMPLE_DEAL.extraction as ExtractionResult),
+      dealName: "49% LP interest — The Maddox",
+      interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest in the owning entity", groundLease: "", loan: "", page: "" },
+      metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
+    } as ExtractionResult);
+    expect(share).toContain("$68M (modeled)");
+    expect(share).toContain("The modeled price is $68,000,000: The OM's $33,320,000 for a 49% share, grossed up to the whole asset");
+    expect(share).toContain("(derived).");
+    expect(share).not.toContain("(ask)");
+  }, 60000);
+
   it("leaves the IRR grids, the max bid and every model read out of an unpriced memorandum's report, and says why where the grids would have been", async () => {
     const row = (label: string, value: string, page = "p. 3") => ({ label, value, flagged: false, page, basis: "na" as const });
     const unpriced = {

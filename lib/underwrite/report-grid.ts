@@ -251,6 +251,10 @@ export interface SensitivityData {
   /** why the report leaves the model's returns out, or null where it may
    *  print them (`placeholderReturnsLine`); null where no sources were given */
   withheld?: string | null;
+  /** what the modeled price is — the ask, a share grossed up to the whole,
+   *  an auction's floor, NOI over the going-in cap — as the derived model
+   *  marks it; null where no sources were given */
+  priceSource?: ModelSources["purchasePrice"] | null;
 }
 
 /** What the caller knows beside the inputs. */
@@ -314,5 +318,6 @@ export function buildSensitivityData(
         ? { price: solved.price, deltaPct: solved.deltaPct, unbounded: solved.unbounded }
         : null,
     withheld: placeholderReturnsLine(inputs, opts.sources),
+    priceSource: opts.sources?.purchasePrice ?? null,
   };
 }
