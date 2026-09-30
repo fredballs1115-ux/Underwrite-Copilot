@@ -955,6 +955,28 @@ export function sourceSays(src: InputSource | null | undefined, totalPages: numb
     src.provenance === "extracted" ? (page === "—" ? "" : page) : src.provenance === "derived" ? "derived" : "assumption";
   return tag ? `${note} (${tag})` : note;
 }
+/**
+ * The max bid, or why there is none, for what the price buys (lib/interest).
+ * A note's model runs the collateral at the loan's price, so a bid solved on
+ * it is a price for the building, never for the note: none prints. A share's
+ * model runs the whole asset its price implies, so its bid is the whole
+ * building's, and says so. A share whose percentage the memorandum does not
+ * state cannot be grossed up to the whole at all, so a bid solved on it is
+ * neither the share's price nor the building's: none prints.
+ */
+function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestOf>): string {
+  if (interest.kind === "note") {
+    return "No max bid: the model's price is the collateral's, run as if the building were bought at the loan's price, so a bid solved on it is not a price for the note.";
+  }
+  if (interest.kind === "partial_interest" && interest.sharePct == null) {
+    return "No max bid: the memorandum states no single percentage for the share, so the model cannot gross its price up to the whole building, and a bid solved on it would be neither the share's price nor the building's.";
+  }
+  const line = maxBidSentence(s);
+  return interest.kind === "partial_interest" && s.maxBid && !s.maxBid.unbounded
+    ? `${line} It is the whole building's price, not the share's.`
+    : line;
+}
+
 /** What the overrun axis and sentence call the figure they stress. When the
  *  OM stated only an all-in total and no price, the "budget" IS that total
  *  with the acquisition inside it — the strip above declines to call it a
@@ -1562,9 +1584,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             rowLabelWidth="19%"
           />
           {/* The deal page's max bid, solved on the buy box's own floors
-              and named by the one that binds (lib/underwrite/report-grid). */}
+              and named by the one that binds (lib/underwrite/report-grid) —
+              none on a note, the whole building's on a share. */}
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-            {str(maxBidSentence(sensitivity))}
+            {str(maxBidLineFor(sensitivity, interestOf(extraction)))}
           </Text>
 
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 10 }}>

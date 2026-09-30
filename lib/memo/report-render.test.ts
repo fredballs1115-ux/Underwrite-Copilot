@@ -246,6 +246,49 @@ describe("ReportDocument (full report)", () => {
     expect(text).not.toContain("Max bid holding 13% IRR");
   }, 45000);
 
+  it("prints no max bid on a note, whose model is the collateral's, and says a share's is the whole building's", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const render = async (extraction: ExtractionResult) => {
+      const deal = {
+        name: SAMPLE_DEAL.name,
+        asset_class: SAMPLE_DEAL.asset_class,
+        extraction,
+        challenges: null,
+        comps: null,
+        market: null,
+        reconciliation: null,
+        verdict: SAMPLE_DEAL.verdict,
+        prior_screen: null,
+      } as unknown as DealRow;
+      const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+      const sensitivity = buildSensitivityData(derived.inputs, null, { sources: derived.sources });
+      const buf = await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(deal, "September 30, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      );
+      return (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    };
+    const note = await render({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("Unpaid principal balance", "$80,000,000"), row("Note rate", "5.25%"), row("Maturity date", "March 31, 2028")],
+    } as ExtractionResult);
+    expect(note).toContain("No max bid: the model's price is the collateral's");
+    expect(note).not.toMatch(/Max bid (clearing|holding)/);
+    const share = await render({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest", groundLease: "", loan: "", page: "" },
+      metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
+    } as ExtractionResult);
+    expect(share).toMatch(/Max bid holding the 15% screening hurdle: \$[\d.]+M \([-+]?\d+\.\d% vs the modeled price\)\..* It is the whole building's price, not the share's\./);
+    const unstated = await render({
+      ...SAMPLE_DEAL.extraction,
+      interest: { kind: "partial_interest", summary: "", share: "A minority interest in the owning entity", groundLease: "", loan: "", page: "" },
+    } as ExtractionResult);
+    expect(unstated).toContain("No max bid: the memorandum states no single percentage for the share");
+    expect(unstated).not.toMatch(/Max bid (clearing|holding)/);
+  }, 60000);
+
   it("labels the retrade grid's base row the modeled price, never the ask, and says what the model priced it at", async () => {
     const render = async (extraction: ExtractionResult) => {
       const deal = {
