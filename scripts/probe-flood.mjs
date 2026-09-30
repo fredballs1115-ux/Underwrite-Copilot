@@ -95,22 +95,20 @@ export const RESTYLED_LAYERS = (layerId) => {
     },
     showLabels: false,
   });
-  return [
-    { id: 901, source, definitionExpression: "ZONE_SUBTY LIKE '%FLOODWAY%'", drawingInfo: fill([220, 38, 38, 170], [185, 28, 28, 255], 1.75, "esriSFSBackwardDiagonal") },
-    {
-      id: 902,
-      source,
-      definitionExpression: "SFHA_TF = 'T' AND (ZONE_SUBTY IS NULL OR ZONE_SUBTY NOT LIKE '%FLOODWAY%')",
-      drawingInfo: fill([37, 99, 235, 70], [29, 78, 216, 255], 2),
-    },
-    {
-      id: 903,
-      source,
-      definitionExpression: "FLD_ZONE = 'X' AND (ZONE_SUBTY LIKE '%0.2%' OR ZONE_SUBTY LIKE '%1 PCT%' OR ZONE_SUBTY LIKE '%1 PERCENT%')",
-      drawingInfo: fill([245, 158, 11, 60], [217, 119, 6, 240], 1.5),
-    },
-    { id: 904, source, definitionExpression: "FLD_ZONE = 'D'", drawingInfo: fill([107, 114, 128, 120], [75, 85, 99, 230], 1.25, "esriSFSForwardDiagonal") },
+  // Each class twice: its tint and outline on top, and beneath it a wide
+  // white casing, so an edge still reads over a busy roofscape. The array
+  // is drawn top first.
+  const casing = { renderer: { type: "simple", symbol: { type: "esriSFS", style: "esriSFSNull", outline: { type: "esriSLS", style: "esriSLSSolid", color: [255, 255, 255, 210], width: 4.5 } } }, showLabels: false };
+  const classes = [
+    ["ZONE_SUBTY LIKE '%FLOODWAY%'", fill([229, 57, 53, 190], [183, 28, 28, 255], 2.25, "esriSFSBackwardDiagonal")],
+    ["SFHA_TF = 'T' AND (ZONE_SUBTY IS NULL OR ZONE_SUBTY NOT LIKE '%FLOODWAY%')", fill([30, 136, 229, 105], [13, 71, 161, 255], 2.25)],
+    ["FLD_ZONE = 'X' AND (ZONE_SUBTY LIKE '%0.2%' OR ZONE_SUBTY LIKE '%1 PCT%' OR ZONE_SUBTY LIKE '%1 PERCENT%')", fill([255, 179, 0, 85], [230, 126, 0, 255], 2)],
+    ["FLD_ZONE = 'D'", fill([117, 117, 117, 130], [66, 66, 66, 240], 1.75, "esriSFSForwardDiagonal")],
   ];
+  return classes.flatMap(([definitionExpression, drawingInfo], i) => [
+    { id: 901 + i * 2, source, definitionExpression, drawingInfo },
+    { id: 902 + i * 2, source, definitionExpression, drawingInfo: casing },
+  ]);
 };
 
 export function restyledOverlayUrl(b, width, height, layerId, root = NFHL_ROOT) {
@@ -306,7 +304,15 @@ async function main() {
               .composite([{ input: r.buf }, { input: ringSvg(W, H) }])
               .jpeg({ quality: 82 })
               .toFile(join(out, `${base}-restyled.jpg`));
+            // …and over a calmer photograph: the aerial a little muted, so
+            // the zones carry the colour and the photo the place.
+            const muted = await sharp(a.buf).modulate({ saturation: 0.55, brightness: 0.96 }).toBuffer();
+            await sharp(muted)
+              .composite([{ input: r.buf }, { input: ringSvg(W, H) }])
+              .jpeg({ quality: 82 })
+              .toFile(join(out, `${base}-restyled-muted.jpg`));
             index.frames.push({ place: label, lat, lng, zoom, file: `${base}-restyled.jpg`, overlay: `${base}-restyled-overlay.png`, restyled: true });
+            index.frames.push({ place: label, lat, lng, zoom, file: `${base}-restyled-muted.jpg`, overlay: `${base}-restyled-overlay.png`, restyled: true, muted: true });
           }
         }
       }
