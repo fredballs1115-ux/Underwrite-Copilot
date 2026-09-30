@@ -1180,15 +1180,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   market the site reads, never instead of it); the table's test holds such a
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
-  id, and the sheet's folder takes the id with the colon replaced. Twenty
-  are served (2026-09-30: Albuquerque, Boise, Bridgeport, Buffalo,
+  id, and the sheet's folder takes the id with the colon replaced.
+  Twenty-one are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Bridgeport, Buffalo,
   Charleston, Des Moines, Grand Rapids, Greenville, Hartford, Honolulu,
   Knoxville, Louisville, Memphis, Milwaukee, New Orleans, Oklahoma City,
   Omaha, Providence, Tucson, Tulsa), each judged through the card's 16:10
   and the deal page's 21:9 crops — never the 4:1 band, which a `cbsa:` row
   never draws; San Jose, Fresno and Madison had nothing usable and keep the
   aerial, and Birmingham's first search read Birmingham, England's
-  categories. Milwaukee's and Greenville's credits are the author Commons
+  categories (its entry names Alabama's now). Milwaukee's and Greenville's credits are the author Commons
   names, where each filename names another (the owner was told). The route
   decodes the key itself (the cards ask for it percent-encoded, and no key
   holds a "%"), and live-verify's PHOTOGRAPHS step reads the quoted keys

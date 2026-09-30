@@ -503,6 +503,15 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Albuquerque, NM",
   },
+  // Birmingham, AL: skyline-sheet run 36754192984 — the Alabama article's lead, sharp under a clear sky, every tower whole on the card and the deal page's crop; the first run searched Birmingham, England's categories.
+  "cbsa:13820": {
+    file: "Birmingham, Alabama.jpg",
+    place: "Downtown Birmingham's skyline beyond the rail corridor",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Birmingham, AL",
+  },
   // Boise, ID: skyline-sheet run 36751130861 — the article's lead image, whole in every crop.
   "cbsa:14260": {
     file: "Boise, Idaho.jpg",
