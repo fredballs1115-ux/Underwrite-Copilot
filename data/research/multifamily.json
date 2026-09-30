@@ -98,7 +98,7 @@
       "sources": [
         "https://api.census.gov/data/2023/acs/acs5/groups/B25024.html"
       ],
-      "note": "Method verified (B25024_004E = 2-unit structures, B25024_005E = 3-4 unit structures, place-level queries documented); api.census.gov 403-blocked from this environment in prior passes — live re-fetch in progress; per-city counts land here when it succeeds."
+      "note": "Method verified (B25024_004E = 2-unit structures, B25024_005E = 3-4 unit structures, place-level queries documented). Not filed: no per-city count has been read, and nothing is fetching one. The Census Bureau's ACS data API answers a request without a key with a redirect to its missing_key.html page, so the counts wait on a Census API key (CENSUS_API_KEY, the operator's to set)."
     },
     "nova_scarcity": {
       "value": "Zillow category page 'Prince William County VA Duplex & Triplex Homes For Sale - 0 Homes' (July 2026); zero on-market 2-4 unit inventory in the county at snippet date.",
@@ -221,7 +221,7 @@
   },
   "gaps": [
     "Cap-rate series for the 2-4 unit segment (no primary source verified)",
-    "ACS B25024 per-city stock counts (API 403-blocked; re-fetch in progress)",
+    "ACS B25024 per-city stock counts (not filed; the ACS data API refuses a request without a key, so they wait on a Census API key)",
     "Small Area FMR dollar values by ZIP for FY2027 (not yet read; huduser.gov does not serve the runner)",
     "CY2026 FHA loan limits by unit count for DC metro (ML 2025-23 values unconfirmed)",
     "Fannie Mae 5%-down owner-occupant 2-4 unit policy parameters (unconfirmed this pass)",

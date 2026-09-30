@@ -453,6 +453,23 @@ describe("the research files' per-foot figures keep their dollar signs", () => {
   });
 });
 
+describe("the multifamily file's ACS stock counts", () => {
+  // The entry's note and the gaps list /market prints said a live re-fetch
+  // was "in progress". None was: the ACS data API answers a request without
+  // a key with a redirect to its missing_key.html page, so the counts wait
+  // on a Census API key.
+  it("says the counts are not filed and wait on a Census API key, and claims no fetch", () => {
+    const entry = multifamilySeed.supply_demand.stock_counts_acs_b25024;
+    expect(entry.value).toBeNull();
+    expect(entry.note).toContain("Not filed");
+    expect(entry.note).toContain("Census API key");
+    const gap = multifamilySeed.gaps.find((g) => g.includes("B25024"))!;
+    expect(gap).toContain("not filed");
+    expect(gap).toContain("Census API key");
+    for (const text of [entry.note, gap]) expect(text).not.toMatch(/in progress|re-fetch|403/i);
+  });
+});
+
 describe("the multifamily debt terms /market prints", () => {
   // The sector explorer's "Debt terms" once said the survey's value was
   // "pending live FRED fetch" while the rates strip on the same page drew it
