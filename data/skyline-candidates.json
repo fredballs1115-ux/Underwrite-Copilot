@@ -1815,6 +1815,366 @@
         "Madison skyline panorama",
         "Madison downtown cityscape"
       ]
+    },
+    {
+      "metroId": "cbsa:40380",
+      "city": "Rochester, New York",
+      "area": "Rochester, NY",
+      "wikipedia": [
+        "Rochester, New York",
+        "Downtown Rochester"
+      ],
+      "categories": [
+        "Skylines of Rochester, New York",
+        "Views of Rochester, New York",
+        "Panoramics of Rochester, New York",
+        "Aerial photographs of Rochester, New York",
+        "Downtown Rochester, New York"
+      ],
+      "queries": [
+        "Rochester, New York skyline panorama",
+        "Rochester, New York downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:10580",
+      "city": "Albany, New York",
+      "area": "Albany-Schenectady-Troy, NY",
+      "wikipedia": [
+        "Albany, New York",
+        "Downtown Albany"
+      ],
+      "categories": [
+        "Skylines of Albany, New York",
+        "Views of Albany, New York",
+        "Panoramics of Albany, New York",
+        "Aerial photographs of Albany, New York",
+        "Downtown Albany, New York"
+      ],
+      "queries": [
+        "Albany, New York skyline panorama",
+        "Albany, New York downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:21340",
+      "city": "El Paso, Texas",
+      "area": "El Paso, TX",
+      "wikipedia": [
+        "El Paso, Texas",
+        "Downtown El Paso"
+      ],
+      "categories": [
+        "Skylines of El Paso",
+        "El Paso skyline",
+        "Views of El Paso",
+        "Panoramics of El Paso",
+        "Aerial photographs of El Paso"
+      ],
+      "queries": [
+        "El Paso skyline panorama",
+        "El Paso downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:12940",
+      "city": "Baton Rouge, Louisiana",
+      "area": "Baton Rouge, LA",
+      "wikipedia": [
+        "Baton Rouge, Louisiana",
+        "Downtown Baton Rouge"
+      ],
+      "categories": [
+        "Skylines of Baton Rouge",
+        "Baton Rouge skyline",
+        "Views of Baton Rouge",
+        "Panoramics of Baton Rouge",
+        "Aerial photographs of Baton Rouge"
+      ],
+      "queries": [
+        "Baton Rouge skyline panorama",
+        "Baton Rouge downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:17900",
+      "city": "Columbia, South Carolina",
+      "area": "Columbia, SC",
+      "wikipedia": [
+        "Columbia, South Carolina",
+        "Downtown Columbia, South Carolina"
+      ],
+      "categories": [
+        "Skylines of Columbia, South Carolina",
+        "Views of Columbia, South Carolina",
+        "Panoramics of Columbia, South Carolina",
+        "Aerial photographs of Columbia, South Carolina",
+        "Downtown Columbia, South Carolina"
+      ],
+      "queries": [
+        "Columbia, South Carolina skyline panorama",
+        "Columbia, South Carolina downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:17820",
+      "city": "Colorado Springs, Colorado",
+      "area": "Colorado Springs, CO",
+      "wikipedia": [
+        "Colorado Springs, Colorado",
+        "Downtown Colorado Springs"
+      ],
+      "categories": [
+        "Skylines of Colorado Springs",
+        "Colorado Springs skyline",
+        "Views of Colorado Springs",
+        "Panoramics of Colorado Springs",
+        "Aerial photographs of Colorado Springs"
+      ],
+      "queries": [
+        "Colorado Springs skyline panorama",
+        "Colorado Springs downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:19430",
+      "city": "Dayton, Ohio",
+      "area": "Dayton-Kettering-Beavercreek, OH",
+      "wikipedia": [
+        "Dayton, Ohio",
+        "Downtown Dayton"
+      ],
+      "categories": [
+        "Skylines of Dayton, Ohio",
+        "Views of Dayton, Ohio",
+        "Panoramics of Dayton, Ohio",
+        "Aerial photographs of Dayton, Ohio",
+        "Downtown Dayton, Ohio"
+      ],
+      "queries": [
+        "Dayton, Ohio skyline panorama",
+        "Dayton, Ohio downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:49340",
+      "city": "Worcester, Massachusetts",
+      "area": "Worcester, MA",
+      "wikipedia": [
+        "Worcester, Massachusetts",
+        "Downtown Worcester"
+      ],
+      "categories": [
+        "Skylines of Worcester, Massachusetts",
+        "Views of Worcester, Massachusetts",
+        "Panoramics of Worcester, Massachusetts",
+        "Aerial photographs of Worcester, Massachusetts",
+        "Downtown Worcester, Massachusetts"
+      ],
+      "queries": [
+        "Worcester, Massachusetts skyline panorama",
+        "Worcester, Massachusetts downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:30780",
+      "city": "Little Rock, Arkansas",
+      "area": "Little Rock-North Little Rock-Conway, AR",
+      "wikipedia": [
+        "Little Rock, Arkansas",
+        "Downtown Little Rock"
+      ],
+      "categories": [
+        "Skylines of Little Rock",
+        "Little Rock skyline",
+        "Views of Little Rock",
+        "Panoramics of Little Rock",
+        "Aerial photographs of Little Rock"
+      ],
+      "queries": [
+        "Little Rock skyline panorama",
+        "Little Rock downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:45060",
+      "city": "Syracuse, New York",
+      "area": "Syracuse, NY",
+      "wikipedia": [
+        "Syracuse, New York",
+        "Downtown Syracuse"
+      ],
+      "categories": [
+        "Skylines of Syracuse, New York",
+        "Views of Syracuse, New York",
+        "Panoramics of Syracuse, New York",
+        "Aerial photographs of Syracuse, New York",
+        "Downtown Syracuse, New York"
+      ],
+      "queries": [
+        "Syracuse, New York skyline panorama",
+        "Syracuse, New York downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:16860",
+      "city": "Chattanooga, Tennessee",
+      "area": "Chattanooga, TN-GA",
+      "wikipedia": [
+        "Chattanooga, Tennessee",
+        "Downtown Chattanooga"
+      ],
+      "categories": [
+        "Skylines of Chattanooga",
+        "Chattanooga skyline",
+        "Views of Chattanooga",
+        "Panoramics of Chattanooga",
+        "Aerial photographs of Chattanooga"
+      ],
+      "queries": [
+        "Chattanooga skyline panorama",
+        "Chattanooga downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:44060",
+      "city": "Spokane, Washington",
+      "area": "Spokane-Spokane Valley, WA",
+      "wikipedia": [
+        "Spokane, Washington",
+        "Downtown Spokane"
+      ],
+      "categories": [
+        "Skylines of Spokane",
+        "Spokane skyline",
+        "Views of Spokane",
+        "Panoramics of Spokane",
+        "Aerial photographs of Spokane"
+      ],
+      "queries": [
+        "Spokane skyline panorama",
+        "Spokane downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:35840",
+      "city": "Sarasota, Florida",
+      "area": "North Port-Bradenton-Sarasota, FL",
+      "wikipedia": [
+        "Sarasota, Florida",
+        "Downtown Sarasota"
+      ],
+      "categories": [
+        "Skylines of Sarasota",
+        "Sarasota skyline",
+        "Views of Sarasota",
+        "Panoramics of Sarasota",
+        "Aerial photographs of Sarasota"
+      ],
+      "queries": [
+        "Sarasota skyline panorama",
+        "Sarasota downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:15980",
+      "city": "Fort Myers, Florida",
+      "area": "Cape Coral-Fort Myers, FL",
+      "wikipedia": [
+        "Fort Myers, Florida",
+        "Downtown Fort Myers"
+      ],
+      "categories": [
+        "Skylines of Fort Myers",
+        "Fort Myers skyline",
+        "Views of Fort Myers",
+        "Panoramics of Fort Myers",
+        "Aerial photographs of Fort Myers"
+      ],
+      "queries": [
+        "Fort Myers skyline panorama",
+        "Fort Myers downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:48620",
+      "city": "Wichita, Kansas",
+      "area": "Wichita, KS",
+      "wikipedia": [
+        "Wichita, Kansas",
+        "Downtown Wichita"
+      ],
+      "categories": [
+        "Skylines of Wichita",
+        "Wichita skyline",
+        "Views of Wichita",
+        "Panoramics of Wichita",
+        "Aerial photographs of Wichita"
+      ],
+      "queries": [
+        "Wichita skyline panorama",
+        "Wichita downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:45780",
+      "city": "Toledo, Ohio",
+      "area": "Toledo, OH",
+      "wikipedia": [
+        "Toledo, Ohio",
+        "Downtown Toledo"
+      ],
+      "categories": [
+        "Skylines of Toledo, Ohio",
+        "Views of Toledo, Ohio",
+        "Panoramics of Toledo, Ohio",
+        "Aerial photographs of Toledo, Ohio",
+        "Downtown Toledo, Ohio"
+      ],
+      "queries": [
+        "Toledo, Ohio skyline panorama",
+        "Toledo, Ohio downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:30460",
+      "city": "Lexington, Kentucky",
+      "area": "Lexington-Fayette, KY",
+      "wikipedia": [
+        "Lexington, Kentucky",
+        "Downtown Lexington, Kentucky"
+      ],
+      "categories": [
+        "Skylines of Lexington, Kentucky",
+        "Views of Lexington, Kentucky",
+        "Panoramics of Lexington, Kentucky",
+        "Aerial photographs of Lexington, Kentucky",
+        "Downtown Lexington, Kentucky"
+      ],
+      "queries": [
+        "Lexington, Kentucky skyline panorama",
+        "Lexington, Kentucky downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:39900",
+      "city": "Reno, Nevada",
+      "area": "Reno, NV",
+      "wikipedia": [
+        "Reno, Nevada",
+        "Downtown Reno"
+      ],
+      "categories": [
+        "Skylines of Reno, Nevada",
+        "Views of Reno, Nevada",
+        "Panoramics of Reno, Nevada",
+        "Aerial photographs of Reno, Nevada",
+        "Downtown Reno, Nevada"
+      ],
+      "queries": [
+        "Reno, Nevada skyline panorama",
+        "Reno, Nevada downtown cityscape"
+      ]
     }
   ]
 }
