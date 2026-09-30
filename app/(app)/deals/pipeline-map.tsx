@@ -11,8 +11,10 @@ import {
   PIN_UNSCREENED,
   pinColor,
   pinHtml,
+  pinTapAction,
   placementLine,
   partitionForMap,
+  previewHtml,
   tooltipHtml,
   type MapDeal,
   type MapPlace,
@@ -29,7 +31,9 @@ import {
  * location yet is placed here through the same cached route — a few at a
  * time, `MAX_TO_PLACE` at most — and joins the map as it resolves; one no
  * geocoder could place is counted, never guessed. In compare mode a click
- * selects instead of opening, as a card's does.
+ * selects instead of opening, as a card's does. On a touch screen, which has
+ * no hover, a pin's first tap shows its card and a second tap — on the pin
+ * or on the card — opens the deal (`pinTapAction`).
  */
 const BASE_DEFAULT: BasemapId = "hybrid";
 const CONCURRENCY = 3;
@@ -60,12 +64,18 @@ export function PipelineMap({
   // The latest click behaviour, read by the pins without rebuilding them;
   // kept current in an effect, never written during render.
   const clickRef = useRef<(id: string) => void>(() => {});
+  const compareRef = useRef(compareMode);
   useEffect(() => {
+    compareRef.current = compareMode;
     clickRef.current = (id: string) => {
       if (compareMode && onToggle) onToggle(id);
       else router.push(`/deals/${id}`);
     };
   }, [compareMode, onToggle, router]);
+  // The pointer that last pressed a pin, and whether that pin's card was
+  // open as it did: read when the click lands, after Leaflet has already
+  // toggled the card, so a finger's second tap on a pin still opens it.
+  const tapRef = useRef<{ id: string; pointer: string; open: boolean } | null>(null);
 
   const points = useMemo(() => {
     const out: { deal: MapDeal; place: MapPlace }[] = part.placed.map((d) => ({ deal: d, place: d.place! }));
@@ -145,6 +155,9 @@ export function PipelineMap({
     const group = pinsRef.current;
     if (!ready || !L || !map || !group) return;
     group.clearLayers();
+    // A touch screen has no hover to show a card on: there the card is a
+    // popup a pin's first tap opens, and the card itself is a way in.
+    const coarse = typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
     for (const { deal, place } of points) {
       const isSelected = !!selected?.has(deal.id);
       const size = isSelected ? 30 : 22;
@@ -155,17 +168,47 @@ export function PipelineMap({
           iconSize: [size, size],
           iconAnchor: [size / 2, size / 2],
           tooltipAnchor: [0, -size / 2 - 1],
+          popupAnchor: [0, -size / 2],
         }),
         title: deal.name,
         keyboard: true,
         riseOnHover: true,
       });
-      marker.bindTooltip(tooltipHtml(deal), { direction: "top", className: "uc-maptip-wrap", opacity: 1 });
-      marker.on("click", () => clickRef.current(deal.id));
+      if (coarse) {
+        marker.bindPopup(previewHtml(deal), { closeButton: false, className: "uc-maptip-pop", maxWidth: 280, autoPanPadding: [16, 16] });
+        // Leaflet writes the card afresh on every open, so its link is
+        // wired on every open. A click with a modifier is the browser's.
+        marker.on("popupopen", (e: Leaflet.PopupEvent) => {
+          const link = e.popup.getElement()?.querySelector<HTMLAnchorElement>("a[data-maptip-link]");
+          if (!link) return;
+          link.onclick = (ev) => {
+            if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return;
+            ev.preventDefault();
+            clickRef.current(deal.id);
+          };
+        });
+      } else {
+        marker.bindTooltip(tooltipHtml(deal), { direction: "top", className: "uc-maptip-wrap", opacity: 1 });
+      }
+      marker.on("click", () => {
+        const tap = tapRef.current?.id === deal.id ? tapRef.current : null;
+        tapRef.current = null;
+        const action = pinTapAction({
+          coarse,
+          compare: compareRef.current,
+          pointer: tap?.pointer ?? null,
+          previewOpen: tap?.open ?? false,
+        });
+        // "preview": Leaflet's own click handler has just opened the card.
+        if (action === "open") clickRef.current(deal.id);
+      });
       marker.on("keypress", (e: Leaflet.LeafletKeyboardEvent) => {
         if (e.originalEvent.key === "Enter") clickRef.current(deal.id);
       });
       group.addLayer(marker);
+      marker.getElement()?.addEventListener("pointerdown", (ev) => {
+        tapRef.current = { id: deal.id, pointer: ev.pointerType, open: marker.isPopupOpen() };
+      });
     }
     if (touchedRef.current || points.length === 0) return;
     if (points.length === 1) {
