@@ -1136,6 +1136,8 @@ jobs:
           mark "#479 the pipeline, a little quicker" grep -q "The pipeline, a little quicker" p_whats-new.html
           mark "#479 cold storage, outdoor storage and affordable housing" grep -q "Cold storage, outdoor storage and affordable housing read as what they are" p_whats-new.html
           mark "#480 construction costs and the breakeven in the checks" grep -q "What building costs, and what the bond market expects, read every day" p_whats-new.html
+          mark "#481 the public pages, held to their own figures" grep -q "The public pages, held to their own figures" p_whats-new.html
+          mark "#481 seventeen more cities, pictured" grep -q "Seventeen more cities, pictured" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then
