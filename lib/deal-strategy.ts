@@ -27,7 +27,7 @@
 import { withArticle } from "@/lib/article";
 import { groundRentOf, interestOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { assetWords } from "@/lib/asset-words";
+import { assetClassKey, assetWords } from "@/lib/asset-words";
 import {
   LATER_YEAR,
   METRIC_FIND,
@@ -857,6 +857,16 @@ export function assessPlausibility(
   // A leased fee's price buys the land alone: over the building's units or
   // feet it is no basis any building market trades at, and never a misread.
   const landOnly = interest.kind === "leased_fee";
+  // A data center is priced by its power, not its floor, so a fitted one
+  // runs past the ceiling any warehouse sets; and an outdoor-storage yard's
+  // price over the small building on it says nothing about the yard, which
+  // trades by the usable acre. Neither is a misread (the site-researcher's
+  // pass of 2026-09-30): the data center is held to the band's floor only,
+  // the yard to no per-SF band at all.
+  const perSfCeiling = assetClassKey(cls) === "data_center" ? Number.POSITIVE_INFINITY : 3_000;
+  const yard = /\b(industrial outdoor storage|outdoor storage|ios|truck (terminal|yard)|storage yard)\b/i.test(
+    extraction.assetClass ?? "",
+  );
   if (!landOnly && basisTotal != null && cls && words.basis === "unit" && units != null && units >= 1 && units <= 50_000) {
     const perUnit = basisTotal / units;
     if (perUnit < 15_000 || perUnit > 2_500_000) {
@@ -867,9 +877,9 @@ export function assessPlausibility(
         detail: misread(`${noun.one} count`),
       });
     }
-  } else if (!landOnly && basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
+  } else if (!landOnly && !yard && basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
     const perSf = basisTotal / sf;
-    if (perSf < 5 || perSf > 3_000) {
+    if (perSf < 5 || perSf > perSfCeiling) {
       findings.push({
         code: "basis_out_of_band",
         severity: "medium",

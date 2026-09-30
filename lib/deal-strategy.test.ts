@@ -427,6 +427,21 @@ describe("assessPlausibility", () => {
     expect(f[0].title).toContain("per SF");
   });
 
+  it("never calls a fitted data center or an outdoor-storage yard a misread for its price per foot", () => {
+    const codes = (assetClass: string, price: string, sf: string) =>
+      assessPlausibility(
+        ex([metric("Asking price", price), metric("Rentable square feet", sf)], { assetClass }),
+      ).map((f) => f.code);
+    // $600M over 150,000 SF is $4,000/SF: a data center's price is its power.
+    expect(codes("Data center", "$600,000,000", "150,000")).not.toContain("basis_out_of_band");
+    // The same figures on an office are no market's.
+    expect(codes("Office", "$600,000,000", "150,000")).toContain("basis_out_of_band");
+    // A yard trades by the acre: $18M over a 5,000 SF shop is no misread.
+    expect(codes("Industrial Outdoor Storage", "$18,000,000", "5,000")).not.toContain("basis_out_of_band");
+    // A data center under the band's floor is still one.
+    expect(codes("Data center", "$400,000", "150,000")).toContain("basis_out_of_band");
+  });
+
   it("reads a zero in-place NOI on a supposedly stabilized deal as a strategy question", () => {
     const f = assessPlausibility(
       ex([metric("Asking price", "$12,000,000"), metric("NOI (in-place)", "$0", { basis: "in_place" })]),
