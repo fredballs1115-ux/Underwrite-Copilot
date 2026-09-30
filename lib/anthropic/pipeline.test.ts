@@ -647,6 +647,34 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a single-tenant building: the challenger reads the lease's traps, and the deal context names the tenant (#454)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      singleTenant: {
+        tenant: "Walgreens Co.",
+        guarantor: "",
+        leaseType: "Absolute NNN",
+        landlordObligations: "",
+        tenantRights: "Tenant holds a right of first refusal on any sale",
+        page: "",
+      },
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Lease expiration", value: "December 31, 2046", flagged: false, page: "", basis: "na" },
+        { label: "Rent increases", value: "Flat", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("Single tenant: Walgreens Co. leases the whole property, and the memorandum names no guarantor.");
+    expect(note).toContain("SINGLE-TENANT TRAPS, checked by name");
+    expect(note).toContain("a right of first refusal on a sale: every bid at the exit can be matched by the tenant");
+    expect(note).toContain("(e) A FLAT RENT");
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toContain("Single tenant: Walgreens Co. leases the whole property");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a single-market deal stores no other markets' figures", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];

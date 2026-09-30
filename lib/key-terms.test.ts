@@ -83,6 +83,25 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(note, "stabilized", 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Units"]);
   });
 
+  it("a single tenant's lease leads after the cap (#454): when it ends, how its rent grows, the tenant's options", () => {
+    const nnn = [
+      { label: "Tenant credit rating", value: "BBB- (S&P)", flagged: false },
+      { label: "Renewal options", value: "Eight 5-year options", flagged: false },
+      { label: "NOI (in-place)", value: "$390,000", flagged: false },
+      { label: "Rent increases", value: "10% every 5 years", flagged: false },
+      { label: "Going-in cap rate", value: "6.00%", flagged: false },
+      { label: "Lease expiration", value: "March 31, 2036", flagged: false },
+      { label: "Asking price", value: "$6,500,000", flagged: false },
+    ];
+    expect(keyTermRows(nnn, "stabilized", 5).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "Lease expiration",
+      "Rent increases",
+      "Renewal options",
+    ]);
+  });
+
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
     const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
     expect(rows).toHaveLength(3);

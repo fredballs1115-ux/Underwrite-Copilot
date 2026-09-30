@@ -19,6 +19,7 @@ import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/de
 import { bannerSources } from "@/lib/deal-banner";
 import { floodCell, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { affordableTag } from "@/lib/affordable";
+import { singleTenantTag } from "@/lib/single-tenant";
 import { compareInterest } from "@/lib/compare-interest";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
@@ -129,6 +130,7 @@ function toCol(
     capOverTenYear: cap != null && tenYearPct != null ? capSpreadRead(cap, tenYearPct) : null,
     interest: ci.tag,
     affordable: affordableTag(ex),
+    tenancy: singleTenantTag(ex),
     noteYtm: ci.noteYtmPct,
     withheld: ci.withheld,
     // FEMA's zone at the building from the stored site-flags lookup (#426);

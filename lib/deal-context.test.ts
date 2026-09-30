@@ -110,3 +110,24 @@ describe("dealContextFor — a portfolio OM says what it offers", () => {
     expect(dealContextFor({ ...PORTFOLIO, strategy: undefined, metrics: [], properties: [PORTFOLIO.properties![0]] })).toBeNull();
   });
 });
+
+describe("dealContextFor — a single tenant's lease is said before any figure (#454)", () => {
+  it("names the tenant, its guarantor, the term and the increases, and says nothing on a multi-tenant deal", () => {
+    const nnn: ExtractionResult = {
+      dealName: "Walgreens | Tulsa, OK",
+      assetClass: "net_lease",
+      strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+      singleTenant: { tenant: "Walgreens Co.", guarantor: "Walgreens Boots Alliance, Inc.", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" },
+      // A lease a century out, so the years left read the same whatever day the test runs.
+      metrics: [m("Asking price", "$6,500,000"), m("Lease expiration", "December 31, 2126"), m("Rent increases", "Flat")],
+    };
+    const ctx = dealContextFor(nnn)!;
+    expect(ctx).toContain("Single tenant: Walgreens Co. leases the whole property, the rent guaranteed by Walgreens Boots Alliance, Inc. as stated.");
+    expect(ctx).toContain("The lease ends Dec 2126");
+    expect(ctx).toContain("The rent is flat until Dec 2126, as stated");
+    expect(ctx).toContain("Lease type as stated: Absolute NNN.");
+    // Said even where the strategy is unknown.
+    expect(dealContextFor({ ...nnn, strategy: undefined })!.startsWith("Single tenant: Walgreens Co.")).toBe(true);
+    expect(dealContextFor({ ...nnn, singleTenant: { ...nnn.singleTenant!, tenant: "" } })).toBe("Deal type: Stabilized.");
+  });
+});

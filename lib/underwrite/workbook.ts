@@ -319,6 +319,23 @@ function buildCover(
       r++;
     }
   }
+  // The one lease a single-tenant property is (#454): the tenant, the
+  // term and the increases, then what they mean for this model — the years
+  // left at its sale, and "enter 1.92% as the rent growth" where the
+  // lease's own increases differ from the Rent Growth input.
+  if (meta.singleTenant) {
+    fact("The single tenant", meta.singleTenant.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.singleTenant.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.singleTenant.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 64;
+      r++;
+    }
+  }
   // A leasehold's exit (#422): this model's sale valued on the years its
   // lease has left then, and the Exit Cap that runs the workbook on the
   // term — the input stays the model's; the reader decides. The lease's

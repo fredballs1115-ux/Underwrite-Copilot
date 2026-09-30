@@ -60,6 +60,19 @@ const ExtractionSchema = z.object({
     ),
     page: z.string(),
   }),
+  // WHETHER ONE TENANT LEASES THE WHOLE PROPERTY (#454): a single-tenant
+  // net lease, a build-to-suit, a sale-leaseback — the tenant, its
+  // guarantor and the lease's own words; a blank tenant on a multi-tenant
+  // or vacant property and on a leased fee. The lease's figures are rows.
+  // Read by lib/single-tenant.
+  singleTenant: z.object({
+    tenant: z.string(),
+    guarantor: z.string(),
+    leaseType: z.string(),
+    landlordObligations: z.string(),
+    tenantRights: z.string(),
+    page: z.string(),
+  }),
   // Each property of a PORTFOLIO OM (two or more separately addressed
   // buildings or sites), with what the OM states for THAT property and ""
   // where it states nothing; an empty list for a single-property OM. The
@@ -155,6 +168,14 @@ export async function extractTerms(
         .map((t) => ({ label: t.label.trim(), units: t.units.trim(), rent: t.rent.trim(), maxRent: t.maxRent.trim() }))
         .filter((t) => t.label || t.units),
       page: out.affordable.page.trim(),
+    },
+    singleTenant: {
+      tenant: out.singleTenant.tenant.trim(),
+      guarantor: out.singleTenant.guarantor.trim(),
+      leaseType: out.singleTenant.leaseType.trim(),
+      landlordObligations: out.singleTenant.landlordObligations.trim(),
+      tenantRights: out.singleTenant.tenantRights.trim(),
+      page: out.singleTenant.page.trim(),
     },
     // A one-entry list is a single property restated, not a portfolio.
     properties:

@@ -51,6 +51,7 @@ import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
+import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -304,6 +305,20 @@ function AffordableCaveat({ read }: { read: AffordableRead | null }) {
   return (
     <Text style={{ fontSize: 8, color: C.caution, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>
       {str(`${affordableShortLine(read)}. ${read.modelCaveat}`)}
+    </Text>
+  );
+}
+
+/** The one lease a single-tenant property is (#454), printed over the grids
+ *  whose rent-growth axis and exit cap it speaks to: the lease in one line,
+ *  then what it means for the model — the years left at its sale, or the
+ *  lease ending inside its hold, and the lease's increases against the
+ *  model's growth (the workbook cover's own two lines). */
+function SingleTenantCaveat({ lease }: { lease: { line: string; read: string } | null }) {
+  if (!lease?.line) return null;
+  return (
+    <Text style={{ fontSize: 8, color: C.caution, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>
+      {str(lease.read ? `${lease.line}. ${lease.read}` : `${lease.line}.`)}
     </Text>
   );
 }
@@ -704,6 +719,11 @@ export interface ReportInput {
    *  model's sale (lib/leasehold-exit, #422) — printed beside the
    *  assumptions read; null unless a leasehold states when its lease ends */
   leasehold?: LeaseholdExitView | null;
+  /** the one lease a single-tenant property is, and the model's read of it
+   *  (lib/single-tenant via the derived model's `meta.singleTenant`, #454)
+   *  — printed over the grids; absent where the caller built no model, and
+   *  then the lease's own line prints alone */
+  singleTenant?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
@@ -723,6 +743,7 @@ export function buildReportData(
   assumable?: AssumableView | null,
   leasehold?: LeaseholdExitView | null,
   floodMap?: FloodMapView | null,
+  singleTenant?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -731,6 +752,7 @@ export function buildReportData(
     assumable: assumable ?? null,
     leasehold: leasehold ?? null,
     floodMap: floodMap ?? null,
+    singleTenant: singleTenant ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1007,6 +1029,11 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // A covenant or a contract that sets the rents (#453): the grids grow
   // every rent at one rate, which the restricted units' rents do not.
   const affordable = readAffordable(extraction);
+  // The one lease a single-tenant property is (#454): the model's read of
+  // it where the caller derived the model, else the lease's line alone.
+  const singleTenantRead = readSingleTenant(extraction);
+  const singleTenant =
+    input.singleTenant ?? (singleTenantRead ? { line: singleTenantShortLine(singleTenantRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1203,6 +1230,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {/* The plan deal has no sensitivity page, so its assumptions read
               lands here, under the grid it is judged on. */}
           {!sensitivity && <AffordableCaveat read={affordable} />}
+          {!sensitivity && <SingleTenantCaveat lease={singleTenant} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <LeaseholdBlock view={input.leasehold} />}
@@ -1237,6 +1265,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             </Text>
           ) : null}
           <AffordableCaveat read={affordable} />
+          <SingleTenantCaveat lease={singleTenant} />
 
           <HeatGrid
             axisLabel="EXIT CAP"

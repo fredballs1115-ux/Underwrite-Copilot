@@ -19,6 +19,7 @@ import {
 } from "./deal-strategy";
 import { noteTermRows } from "./note-yield";
 import { affordableTermRows } from "./affordable";
+import { singleTenantTermRows } from "./single-tenant";
 
 export interface KeyTermMetric {
   label: string;
@@ -72,6 +73,9 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A covenant or a contract that sets the rents (#453): how many units it
   // binds and until when, right after the count it is a share of.
   for (const row of affordableTermRows(rows)) lead(row);
+  // The one lease a single-tenant property is (#454): when it ends, how its
+  // rent grows and the tenant's options — what the price is paid for.
+  for (const row of singleTenantTermRows(rows)) lead(row);
   const rest = rows.filter((m) => !head.includes(m));
   return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
 }

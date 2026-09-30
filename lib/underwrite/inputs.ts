@@ -18,6 +18,7 @@ import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
+import { readSingleTenant, singleTenantModelLine, singleTenantShortLine } from "@/lib/single-tenant";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -102,6 +103,11 @@ export interface WorkbookMeta {
    *  the restriction in one line, and what this model's one rent growth
    *  rate is not on it; absent on a market-rate deal */
   affordable?: { line: string; modelCaveat: string | null } | null;
+  /** the one lease a single-tenant property is (lib/single-tenant, #454):
+   *  the lease in one line, and what it means for this model — the years
+   *  left at its sale or the lease ending inside its hold, then the lease's
+   *  increases against its rent growth; absent on anything else */
+  singleTenant?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -210,6 +216,23 @@ function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteIn
 function affordableMeta(extraction: ExtractionResult | null): WorkbookMeta["affordable"] {
   const r = readAffordable(extraction);
   return r ? { line: affordableShortLine(r), modelCaveat: r.modelCaveat } : null;
+}
+
+/** The cover's lines about the one lease a single-tenant property is
+ *  (#454): the lease, then the deal page's own read of it against this
+ *  model. Null on anything else. */
+function singleTenantMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["singleTenant"] {
+  const r = readSingleTenant(extraction);
+  if (!r) return null;
+  return {
+    line: singleTenantShortLine(r),
+    read: singleTenantModelLine(r, {
+      holdMonths: inputs.holdMonths,
+      rentGrowthPct: inputs.rentGrowthPct,
+      vacancyPct: inputs.vacancyPct,
+      exitCapPct: inputs.exitCapPct,
+    }),
+  };
 }
 
 /** The cover's lines about a leasehold's exit (#422): the deal page's own
@@ -653,6 +676,7 @@ export function deriveUnderwriteInputs(
       assumable: assumableMeta(extraction, inputs),
       leasehold: leaseholdMeta(extraction, inputs),
       affordable: affordableMeta(extraction),
+      singleTenant: singleTenantMeta(extraction, inputs),
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,

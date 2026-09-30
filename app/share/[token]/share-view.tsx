@@ -17,6 +17,8 @@ import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { readAffordable } from "@/lib/affordable";
+import { SingleTenantPanel } from "@/app/single-tenant-panel";
+import { readSingleTenant } from "@/lib/single-tenant";
 import { keyTermRows } from "@/lib/key-terms";
 import { readPortfolio } from "@/lib/portfolio";
 import { PortfolioCard } from "@/app/portfolio-card";
@@ -295,6 +297,10 @@ export function ShareView({
       {/* A covenant or a contract that sets the rents (#453): how much of the
           building is restricted, until when, and what the model is not. */}
       <AffordablePanel affordable={readAffordable(safeExtraction)} />
+
+      {/* One tenant leases the whole property (#454): the guarantor, the
+          term left and the options, the increases — the lease is the deal. */}
+      <SingleTenantPanel lease={readSingleTenant(safeExtraction)} />
 
       {assumable && (
         <p

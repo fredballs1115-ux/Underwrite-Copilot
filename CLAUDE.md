@@ -350,6 +350,51 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   title and the workbook cover (`affordableShortLine`), the report over its
   grids (`AffordableCaveat`) and the compare table's Affordability row (a
   dash, never "market-rate", for a screen saved before it was read).
+- One tenant leases the whole property (#454): the extraction reads
+  `ExtractionResult.singleTenant` (the tenant, its guarantor, the lease
+  type, the landlord's obligations and the tenant's rights, each as stated;
+  a blank tenant on a multi-tenant or vacant property and on a leased fee,
+  whose lease is the ground lease) and labels the lease's figures as rows:
+  "Lease expiration" (the primary term, never one that assumes an option),
+  "Lease term remaining" (only a stated count), "Renewal options", "Rent
+  increases", "Annual base rent", "Tenant credit rating" and "Early
+  termination date". `lib/single-tenant.ts` (pure) reads them through
+  `readLeaseTerm` — the ground-lease reader's own core
+  (`lib/ground-lease-term`), so a tenant's lease and a ground lease share
+  one copy of the three readings of an end and of the options — and never
+  from a ground lease's, a loan's or a note's row. Its rules: the term is
+  the asset (years left today and at the model's sale; a lease that ends
+  inside the hold leaves years the model counts as rent and the buyer does
+  not have); the options are the tenant's, drawn dashed after the term;
+  an early termination is the lease's end (`effective`, the rollover
+  card's break rule); the increases are the growth — "10% every 5 years"
+  compounds to 1.92% a year, "flat" is 0%, only the primary term's words
+  are read and whatever turns to the options is the options', CPI and
+  anything else stay as stated (`readIncreases`); the guarantor is the
+  credit, and a stated rating is graded by its own letters (BBB- / Baa3
+  and above investment grade, a disagreement across the line a split,
+  "N/A" unrated — `readRating`). The model is NOT changed:
+  `singleTenantModelLine` says the years left at its sale (or the lease
+  ending inside its hold, with its vacancy "a market's allowance, not a
+  single tenant's all-or-nothing") and the lease's increases against its
+  Rent Growth input — "enter 1.92% as the rent growth to run the model on
+  the lease" — only where the lease outlasts the sale. Where it shows: the
+  deal context and the challenger (`singleTenantNote`, traps (a)–(g) keyed
+  to the facts, the tenant's rights named by their words — a right of
+  first refusal, a first offer, a termination, a purchase option, going
+  dark), `app/single-tenant-panel.tsx` (`SingleTenantPanel`, pure: the term
+  through `LeaseTermBar` with `optionsWord="Renewal options"`, the hold
+  where the page has the model, `data-bar="lease-increase"` against
+  `model-growth`, the facts as stated) on the deal page (with the derived
+  model) and the shared screen (without), the key terms
+  (`singleTenantTermRows` — the end, the increases, the options — after
+  the count), the pipeline row, card and CSV's "Tenancy" column and the
+  meeting workbook's price note (`singleTenantTag`: "Single tenant, 9 yrs
+  left", "Single tenant, may leave in 4 yrs"), the memo under its title
+  (`singleTenantShortLine`), the workbook cover ("The single tenant",
+  `meta.singleTenant`: the line and the model read), the report over its
+  grids (`SingleTenantCaveat`, from the route's derived model; the line
+  alone where a caller built none) and the compare table's Tenancy row.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

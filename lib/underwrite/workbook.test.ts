@@ -827,4 +827,29 @@ describe("the cover says what is being sold, and what the model is and is not on
     const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "Affordability")).toThrow();
   });
+
+  it("a single tenant (#454): the lease, then the years left at the sale and its increases against the Rent Growth input", async () => {
+    const leased = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        singleTenant: { tenant: "Walgreens Co.", guarantor: "", leaseType: "NNN", landlordObligations: "", tenantRights: "", page: "" },
+        metrics: [
+          ...extraction.metrics,
+          // Far enough out that the lease outlasts the model's sale whatever day this runs.
+          { label: "Lease expiration", value: "December 31, 2046", flagged: false, page: "p. 4" },
+          { label: "Rent increases", value: "Flat", flagged: false, page: "p. 4" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(leased));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The single tenant");
+    expect(String(cover.getCell(r, 3).value)).toMatch(/^Single tenant: Walgreens Co\., NNN; the lease ends Dec 2046, [\d.]+ years from today; the rent is flat$/);
+    const read = String(cover.getCell(r + 1, 3).value);
+    expect(read).toContain("At the model's sale in 5 years the lease has");
+    expect(read).toContain("enter 0% as the rent growth to run the model on the lease");
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The single tenant")).toThrow();
+  });
 });
