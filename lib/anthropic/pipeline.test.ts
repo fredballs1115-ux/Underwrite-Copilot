@@ -806,6 +806,28 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a manufactured-housing park: the challenger reads its lot rent, homes and utilities and what to check by name (#470)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "manufactured_housing",
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Pads", value: "150", flagged: false, page: "", basis: "na" },
+        { label: "Lot rent", value: "$430", flagged: false, page: "", basis: "in_place" },
+        { label: "Market lot rent", value: "$525", flagged: true, page: "", basis: "pro_forma" },
+        { label: "Park-owned homes", value: "18", flagged: false, page: "", basis: "na" },
+        { label: "Water and sewer", value: "Private well and septic", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("MANUFACTURED HOUSING AS STATED: It has 150 pads");
+    expect(note).toContain("The average lot rent is $430 a month against the memorandum's market $525");
+    expect(note).toContain("who owns the water and sewer systems, how old they are");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("the third-party reports: the challenger reads what they found and the site-report traps (#465)", async () => {
     vi.mocked(extractTerms).mockResolvedValue({
       ...EXTRACTION,

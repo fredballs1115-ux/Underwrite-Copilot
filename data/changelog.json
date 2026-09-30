@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "Mobile-home parks, read by the lot",
+      "href": "/deals",
+      "blurb": "A manufactured-housing park is now read as a park rather than an apartment building counted in pads. The deal page draws the pads as one bar: the homes residents own, the homes the park owns, and today's occupancy as a line. It puts the average lot rent on one scale with the memorandum's market lot rent (a range is read at its low end, the smaller gap) and a park-owned home's rent beside it, showing how much of that rent is the home's rather than the land's. It reads the water and the sewer separately, city or the park's own well, septic or treatment plant, only from words that name a source, and says who pays for them. It reads a 55+ restriction (the Fair Housing Act exemption needs at least 80% of occupied homes to have a resident 55 or older), RV sites counted apart from the pads, and any rent rules the memorandum names. Where the deal has a model, the panel adds three points. The gap to market, closed by the sale, is worth this much at the model's exit cap, but the model does not include it. The model values the park-owned homes' rent at the same cap as the lots'. Its reserve is a default, not a figure for a private water system. The pipeline card shows \"Lot rent $430 vs $525 mkt, Private water & sewer\", and a park and a build-to-rent portfolio now show a drawing of homes rather than an apartment block when there is no photograph."
+    },
+    {
+      "date": "2026-09-30",
       "title": "The price per unit on every card",
       "href": "/deals",
       "blurb": "Each pipeline card now prints the price per unit under the price, the way a listing card does: $274k/unit on an apartment building, $200k/key on a hotel, $100k/bed on student housing, $212/SF on an office. It uses the memorandum's own word for what it counts and the same price, count and area the deal's comps page reads, so the card and the comps agree. A range reads at its top. It is left out where the price does not buy the building (a note, the land, a share with no stated percentage), on a development, whose basis is its all-in cost, and where the memorandum states no count or area. The list row's tooltip and the CSV's Basis column carry it too."

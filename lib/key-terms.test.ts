@@ -204,6 +204,17 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(student, "stabilized", 3).map((m) => m.label)).toEqual(["Asking price", "Pre-leased", "Distance to campus"]);
   });
 
+  it("a park's lot rent, the market's and its water and sewer lead after the price (#470)", () => {
+    const park = [
+      { label: "Occupancy", value: "88%", flagged: false },
+      { label: "Water and sewer", value: "Private well and septic", flagged: false },
+      { label: "Market lot rent", value: "$525", flagged: false },
+      { label: "Lot rent", value: "$430", flagged: false },
+      { label: "Asking price", value: "$9,300,000", flagged: false },
+    ];
+    expect(keyTermRows(park, "stabilized", 4).map((m) => m.label)).toEqual(["Asking price", "Lot rent", "Market lot rent", "Water and sewer"]);
+  });
+
   it("what the third-party reports found leads after the price (#465)", () => {
     const reported = [
       { label: "Occupancy", value: "94%", flagged: false },

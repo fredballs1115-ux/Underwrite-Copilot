@@ -581,6 +581,42 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("of the fall's leasing is still to sign");
   }, 60000);
 
+  it("prints a manufactured-housing park over the grids, and what the model does with its gap to market (#470)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "manufactured_housing",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Pads", value: "150", flagged: false, page: "", basis: "na" as const },
+        { label: "Occupied pads", value: "132", flagged: false, page: "", basis: "na" as const },
+        { label: "Lot rent", value: "$430", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Market lot rent", value: "$525", flagged: true, page: "", basis: "pro_forma" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "manufactured_housing",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "September 30, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.mh ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Manufactured housing: 150 pads");
+    expect(text).toContain("lot rent $430 (market $525)");
+    expect(text).toContain("so closing the gap is in none of its returns");
+  }, 60000);
+
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

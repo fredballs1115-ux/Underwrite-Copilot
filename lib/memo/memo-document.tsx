@@ -40,6 +40,7 @@ import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
 import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing";
 import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
+import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -190,6 +191,14 @@ function studentLineFor(extraction: ExtractionResult | null): string {
   return r ? studentShortLine(r) : "";
 }
 
+/** A manufactured-housing park (lib/manufactured-housing, #470) in one line
+ *  for the memo's header: the pads, the lot rent against the market's, the
+ *  park-owned homes and the water and sewer. "" otherwise. */
+function mhLineFor(extraction: ExtractionResult | null): string {
+  const r = readManufacturedHousing(extraction);
+  return r ? mhShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -263,6 +272,9 @@ export type MemoData = {
   /** a student building's pre-leasing, beds and walk (lib/student-housing,
    *  #468), in one line; "" on anything else */
   studentLine?: string;
+  /** a manufactured-housing park's pads, lot rent, homes and utilities
+   *  (lib/manufactured-housing, #470), in one line; "" on anything else */
+  mhLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -517,6 +529,7 @@ export function buildMemoData(
     sellerNoteLine: pdfSafe(sellerNoteLineFor(extraction ?? null)),
     siteReportsLine: pdfSafe(siteReportsLineFor(extraction ?? null)),
     studentLine: pdfSafe(studentLineFor(extraction ?? null)),
+    mhLine: pdfSafe(mhLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -986,6 +999,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A student building (#468): the pre-leasing against last
                 year's, the beds and the walk to campus. */}
             {data.studentLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.studentLine}</Text>}
+            {/* A manufactured-housing park (#470): the lot rent against the
+                market's, the park-owned homes and the water and sewer. */}
+            {data.mhLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.mhLine}</Text>}
             {/* What a hotel is sold with (#455): the flag, the encumbrance,
                 the PIP and the franchise's end. */}
             {data.hotelLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.hotelLine}</Text>}

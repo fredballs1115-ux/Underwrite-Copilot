@@ -899,6 +899,31 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "Student housing")).toThrow();
   });
 
+  it("a manufactured-housing park (#470): its pads, lot rent, homes and utilities, then what the model does with each", async () => {
+    const park = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "manufactured_housing",
+        metrics: [
+          ...extraction.metrics,
+          { label: "Pads", value: "150", flagged: false, page: "p. 4" },
+          { label: "Occupied pads", value: "132", flagged: false, page: "p. 4" },
+          { label: "Lot rent", value: "$430", flagged: false, page: "p. 4" },
+          { label: "Market lot rent", value: "$525", flagged: true, page: "p. 4" },
+          { label: "Water and sewer", value: "Private well and septic", flagged: false, page: "p. 4" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(park));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The park");
+    expect(String(cover.getCell(r, 3).value)).toMatch(/^Manufactured housing: 150 pads at \$[\d.,]+[kM] a pad, 88% occupied; lot rent \$430 \(market \$525\); private water & sewer$/);
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^Closed by the sale, the gap to the memorandum's market lot rent is \$150k a year of income/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The park")).toThrow();
+  });
+
   it("the third-party reports (#465): what they found, then what the model does with the immediate repairs", async () => {
     const reported = deriveUnderwriteInputs(
       {

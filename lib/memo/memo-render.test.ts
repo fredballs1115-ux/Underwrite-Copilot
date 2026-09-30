@@ -354,6 +354,38 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, asset_class: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).studentLine).toBe("");
   }, 30000);
 
+  it("says a manufactured-housing park's lot rent and utilities under the title (#470), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "manufactured_housing",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Pads", value: "150", flagged: false, page: "", basis: "na" },
+        { label: "Lot rent", value: "$430", flagged: false, page: "", basis: "in_place" },
+        { label: "Market lot rent", value: "$525", flagged: true, page: "", basis: "pro_forma" },
+        { label: "Water and sewer", value: "City water; septic", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "manufactured_housing",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.mhLine).toMatch(/^Manufactured housing: 150 pads at \$[\d.,]+[kM] a pad; lot rent \$430 \(market \$525\); public water, private sewer$/);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("lot rent $430 (market $525); public water, private sewer");
+    expect(buildMemoData({ ...deal, asset_class: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).mhLine).toBe("");
+  }, 30000);
+
   it("says what the third-party reports found under the title (#465), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

@@ -59,6 +59,7 @@ import { readValueAdd, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
 import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
+import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -798,6 +799,12 @@ export interface ReportInput {
    *  absent where the caller built no model, and then the line prints
    *  alone */
   student?: { line: string; read: string } | null;
+  /** a manufactured-housing park's pads, lot rent, homes and utilities,
+   *  and what the model does with the gap to market, the park-owned homes
+   *  and a private system (lib/manufactured-housing via the derived
+   *  model's `meta.mh`, #470) — printed over the grids; absent where the
+   *  caller built no model, and then the line prints alone */
+  mh?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427):
    *  the composite, FEMA's key and the zone sentence; null for no page */
   floodMap?: FloodMapView | null;
@@ -831,6 +838,7 @@ export function buildReportData(
   sellerNote?: AssumableView | null,
   siteReports?: { line: string; read: string } | null,
   student?: { line: string; read: string } | null,
+  mh?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -849,6 +857,7 @@ export function buildReportData(
     sellerNote: sellerNote ?? null,
     siteReports: siteReports ?? null,
     student: student ?? null,
+    mh: mh ?? null,
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1151,6 +1160,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // A student building (#468), the same way.
   const studentRead = readStudentHousing(extraction);
   const student = input.student ?? (studentRead ? { line: studentShortLine(studentRead), read: "" } : null);
+  // A manufactured-housing park (#470), the same way.
+  const mhRead = readManufacturedHousing(extraction);
+  const mh = input.mh ?? (mhRead ? { line: mhShortLine(mhRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1355,6 +1367,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <SingleTenantCaveat lease={taxAbatement} />}
           {!sensitivity && <SingleTenantCaveat lease={siteReports} />}
           {!sensitivity && <SingleTenantCaveat lease={student} />}
+          {!sensitivity && <SingleTenantCaveat lease={mh} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <AssumableBlock view={input.sellerNote} />}
@@ -1398,6 +1411,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <SingleTenantCaveat lease={taxAbatement} />
           <SingleTenantCaveat lease={siteReports} />
           <SingleTenantCaveat lease={student} />
+          <SingleTenantCaveat lease={mh} />
 
           <HeatGrid
             axisLabel="EXIT CAP"

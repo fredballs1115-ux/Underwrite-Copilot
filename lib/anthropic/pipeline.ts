@@ -47,6 +47,7 @@ import { readTaxAbatement, taxAbatementNote } from "@/lib/tax-abatement";
 import { readSellerFinancing, sellerFinancingNote } from "@/lib/seller-financing";
 import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
 import { readStudentHousing, studentNote } from "@/lib/student-housing";
+import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -927,6 +928,11 @@ async function runAnalysisSteps(
         // sign against the model's vacancy, the rent per bed, the walk.
         const student = readStudentHousing(ex);
         if (student) notes.push(studentNote(student));
+        // A manufactured-housing park (#470): the lot rent against the
+        // comparable parks', the park-owned homes, the water and sewer the
+        // park runs, the rent rules and the age restriction's compliance.
+        const park = readManufacturedHousing(ex);
+        if (park) notes.push(mhNote(park));
 
         if (flagged.length) {
           notes.push(

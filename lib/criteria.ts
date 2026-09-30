@@ -774,12 +774,21 @@ export function parseCount(value: string): number | null {
  *  that show the OM's own wording ("248 units", "612 (proposed)") or cite
  *  its page. */
 export function unitCountRow<M extends MetricLike>(metrics: readonly M[]): M | null {
+  let rv: M | null = null;
   for (const m of metrics) {
     if (!isCountLabel(m.label)) continue;
     const n = parseCount(m.value);
-    if (n != null && n >= 1 && n <= 50_000) return m;
+    if (n == null || n < 1 || n > 50_000) continue;
+    // An RV site is not a pad (#470): a park that states both is counted by
+    // its pads, whichever row comes first; an RV resort's sites are its
+    // count where nothing else is.
+    if (/^\s*(?:rv|r\.v\.)\s/i.test(m.label)) {
+      rv ??= m;
+      continue;
+    }
+    return m;
   }
-  return null;
+  return rv;
 }
 
 /** The unit count — on a plan deal the finished product's ("Units

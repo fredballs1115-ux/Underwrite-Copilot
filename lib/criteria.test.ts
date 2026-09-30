@@ -18,6 +18,7 @@ import {
   resolveBuyBoxStore,
   sanitizeGeoTargets,
   serializeBuyBoxStore,
+  unitCountFromMetrics,
   activeBox,
   type BuyBox,
   type BuyBoxStore,
@@ -191,6 +192,14 @@ describe("the count band — units, keys, pads, in the deal's own noun", () => {
     const park = check(evaluateBuyBox("manufactured_housing", ex([["Pads", "480"]]), box), "Pads")!;
     expect(park.status).toBe("miss");
     expect(park.detail).toContain("this is 480 pads. Too many for the mandate");
+  });
+
+  it("an RV site is not a pad: a park that states both is counted by its pads, whichever row comes first (#470)", () => {
+    const mixed = check(evaluateBuyBox("manufactured_housing", ex([["RV sites", "40"], ["Pads", "150"]]), box), "Pads")!;
+    expect(mixed.detail).toContain("this is 150 pads");
+    expect(unitCountFromMetrics([{ label: "RV sites", value: "40" }, { label: "Pads", value: "150" }])).toBe(150);
+    // An RV resort's sites are its count where nothing else is.
+    expect(unitCountFromMetrics([{ label: "RV sites", value: "220" }])).toBe(220);
   });
 
   it("the class's noun stands in where the OM stated no count, and the check is unknown", () => {

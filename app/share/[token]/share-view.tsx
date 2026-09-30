@@ -23,6 +23,8 @@ import { readSingleTenant } from "@/lib/single-tenant";
 import { HotelPanel } from "@/app/hotel-panel";
 import { StudentHousingPanel } from "@/app/student-housing-panel";
 import { readStudentHousing } from "@/lib/student-housing";
+import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
+import { readManufacturedHousing } from "@/lib/manufactured-housing";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -341,6 +343,10 @@ export function ShareView({
       {/* A student building (#468): the pre-leasing against last year's,
           the beds and the walk to campus. */}
       <StudentHousingPanel student={readStudentHousing(safeExtraction)} />
+
+      {/* A manufactured-housing park (#470): whose homes stand on the pads,
+          the lot rent against the market's and the water and sewer. */}
+      <ManufacturedHousingPanel park={readManufacturedHousing(safeExtraction)} />
 
       {/* What the third-party reports found (#465): a tile a report, the
           Phase I's age and the seismic PML against the lenders' lines. */}
