@@ -2,6 +2,12 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-09-30",
+      "title": "Sharper pictures on your cards",
+      "href": "/deals",
+      "blurb": "The city photographs on your pipeline's cards, the homepage's gallery and your submarket cards are now drawn from enough pixels for a phone's or a laptop's dense screen, where they had been stretched up to twice their size. A small photograph from a memorandum is enlarged cleanly before it reaches the card, and a pipeline card's picture appears only once it has loaded whole, fading in over the deal's cover instead of appearing half-drawn. The first cards on the page load first."
+    },
+    {
       "date": "2026-09-29",
       "title": "See the building full screen",
       "href": "/deals",

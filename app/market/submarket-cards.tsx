@@ -46,10 +46,14 @@ export function SubmarketCards({ submarkets }: { submarkets: readonly Submarket[
               >
                 {market ? (
                   <div className="relative h-24 shrink-0 bg-faint" data-picture="submarket">
+                    {/* A strip wider than the panorama is covered by its
+                        width: one card a row on a phone, two, then three
+                        (#446). */}
                     <CityPhoto
                       metro={market.id}
                       width={480}
                       height={192}
+                      sizes="(min-width: 1024px) 360px, (min-width: 640px) 47vw, 92vw"
                       showCredit={false}
                       className="h-full w-full object-cover object-[50%_42%]"
                     />

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   SKYLINES,
+  SKYLINE_SRCSET,
   SKYLINE_WIDTH,
   commonsPage,
   commonsUrl,
@@ -8,6 +9,7 @@ import {
   hasSkyline,
   headerSafe,
   skylineFor,
+  skylineSrcSet,
   skylineTag,
 } from "./skyline";
 import { gluedWords } from "./render-lint";
@@ -90,6 +92,20 @@ describe("the Commons URLs", () => {
     }
     // A market with no photograph has nothing to bust.
     expect(skylineTag("definitely-not-a-metro")).toBe("0");
+  });
+
+  it("offers a tile the widths a dense screen needs, each inside what the route serves (#446)", () => {
+    for (const w of SKYLINE_SRCSET) {
+      expect(w).toBeGreaterThanOrEqual(SKYLINE_WIDTH.min);
+      expect(w).toBeLessThanOrEqual(SKYLINE_WIDTH.max);
+    }
+    // The width the deploy probe measures every file at is on the list.
+    expect(SKYLINE_SRCSET).toContain(1600);
+    const set = skylineSrcSet("pittsburgh");
+    const tag = skylineTag("pittsburgh");
+    expect(set.split(", ")).toEqual(
+      SKYLINE_SRCSET.map((w) => `/api/imagery/skyline/pittsburgh?w=${w}&v=${tag} ${w}w`),
+    );
   });
 
   it("escapes a name on the way into the file's own page", () => {

@@ -1895,6 +1895,7 @@ const DealTile = memo(function DealTile({
           aspect="16/10"
           flush
           shade
+          priority={i < 4}
           sizes="(min-width: 1536px) 24vw, (min-width: 1280px) 31vw, (min-width: 640px) 47vw, 100vw"
         />
         {/* The call, and in compare mode the pick beside it: the foot of the

@@ -2602,7 +2602,38 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   ancestor would hold a fixed layer to its own box; `PhotoViewerBody` is
   the markup, which the render test draws with no page to portal into.
   Checked in Chromium over CDP: keys, wrap, the focus trap, the return of
-  focus and scroll, the backdrop, at 1280 and 390. **The deal
+  focus and scroll, the backdrop, at 1280 and 390. **A picture is never
+  soft and never half-drawn** (#446), a listing site's three habits:
+  - **Enough pixels for the screen.** A market photograph on a card is
+    asked at `MARKET_PHOTO_WIDTH` 1600 (it was 1280, the link previews'
+    width): a panorama cropped into a 16:10 card is covered by its HEIGHT,
+    and a phone's full-width card is ~224px tall, 672 device pixels at 3×,
+    which a 2.5:1 panorama reaches only near 1,680px wide. `CityPhoto`
+    takes a `sizes` and offers the skyline at `SKYLINE_SRCSET` (480 / 960
+    / 1600, `skylineSrcSet` in lib/skyline) and an overhead at twice its
+    size; a tile's `sizes` says the width the picture must be drawn at to
+    fill the tile's HEIGHT, up to 1.9× a 4:3 tile's own width. Measured in
+    Chromium at seven screens against a 2.5:1 file, the homepage's gallery
+    and the submarket cards draw no tile past 1.09× its pixels; the one
+    480px file had been stretched 1.9–2.2× on every phone and dense
+    laptop. The place bands keep their one 1400px file.
+  - **A small photograph enlarged by us, not the browser.** A memorandum
+    exported for email carries its cover at 600–900px; `derivePicture`
+    enlarges a hero under `HERO_MIN_PX` (1200) with Lanczos and a light
+    unsharp mask, never past `MAX_ENLARGE` (2×) — compared by eye against
+    the browser's stretch of the same file — and
+    `PICTURE_SEARCH_VERSION` 4 re-derives the memorandum pictures lifted
+    before.
+  - **Shown only once whole.** `DealBanner` and `DealThumb` hold the frame
+    with the deal's cover (`DealCover`'s `words={false}`: the gradient and
+    the drawing, `aria-hidden`, no "No photo yet" over a photo on its way)
+    and fade the picture in on `load` — never its progressive scans, never
+    an empty frame; the mount check catches a load that finished before
+    hydration. The first four cards are `loading="eager"` and
+    `fetchPriority="high"` (React also emits a preload link for them), the
+    rest lazy, and a card's picture zooms a little on hover
+    (`motion-safe:`).
+  **The deal
   page opens the way a listing does** (#433, `app/(app)/deals/[id]/deal-hero.tsx`,
   `DealHero`, pure): the picture is the header's own — no card of its
   own, marked `data-hero-picture` — beside the name, the call and the

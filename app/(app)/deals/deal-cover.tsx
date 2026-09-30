@@ -13,6 +13,7 @@ export function DealCover({
   cover,
   label,
   size = "card",
+  words = true,
   className = "",
 }: {
   cover: DealCoverFacts;
@@ -20,6 +21,10 @@ export function DealCover({
   label: string;
   /** a card's cover, or a list row's thumbnail (no words at that size) */
   size?: "card" | "thumb";
+  /** false where the cover only holds the frame while a photograph loads
+   *  (#446): no "No photo yet" over a photo on its way, and no name for a
+   *  reader, since the photograph carries its own */
+  words?: boolean;
   className?: string;
 }) {
   const background = coverBackground(cover.tone);
@@ -35,6 +40,13 @@ export function DealCover({
       >
         <CoverArt kind={cover.kind} stroke={2.6} className="h-[78%] w-[78%] opacity-80" />
       </span>
+    );
+  }
+  if (!words) {
+    return (
+      <div aria-hidden data-deal-cover={cover.kind} style={{ background }} className={`relative overflow-hidden ${className}`}>
+        <CoverArt kind={cover.kind} className="absolute right-[5%] top-[8%] h-[64%] w-auto opacity-40" />
+      </div>
     );
   }
   return (

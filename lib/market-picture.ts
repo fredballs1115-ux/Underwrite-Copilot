@@ -24,12 +24,14 @@ import { photographerLine, skylineFor, skylineTag } from "@/lib/skyline";
 
 /**
  * The width a card asks the skyline route for. The files are panoramas, up
- * to 2.5:1, and a 16:10 card crops them to its own shape, so the picture is
- * asked wide enough that its height still covers a card on a dense screen
- * without being upscaled — and at the width the market pages' link previews
- * already ask Commons for (#436), so the route's copy is shared.
+ * to 2.5:1, and a 16:10 card crops them to its own shape, so it is the
+ * picture's HEIGHT that has to cover the card: a phone's full-width card is
+ * about 224px tall, 672 device pixels at 3x, which a 2.5:1 panorama only
+ * reaches at 1,680px wide. At 1280 (the link previews' width, #436) it was
+ * stretched 1.3x on every phone, soft where the site promises a crisp
+ * picture (#446); at 1600 the stretch is 1.05x, which no eye sees.
  */
-export const MARKET_PHOTO_WIDTH = 1280;
+export const MARKET_PHOTO_WIDTH = 1600;
 
 export interface MarketPicture {
   /** the market whose photograph it is (the skyline table's key) */

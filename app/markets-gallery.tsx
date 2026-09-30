@@ -64,10 +64,19 @@ export function MarketsGallery() {
               href={`/market?metro=${m.id}`}
               className="group relative block overflow-hidden rounded-xl border border-line outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
             >
+              {/* A 4:3 tile filled by a panorama up to 2.5:1 wide is covered by
+                  its height, so the width a tile must be drawn at is up to
+                  1.9 times the tile's own (#446): a phone's two columns, a
+                  tablet's three, a laptop's four inside the 72rem column.
+                  Measured in Chromium at seven screens against a 2.5:1 file:
+                  no tile is drawn more than 1.09 times its pixels, where the
+                  one 480px file had been stretched 1.9 to 2.2 times on every
+                  phone and dense laptop. */}
               <CityPhoto
                 metro={m.id}
                 width={480}
                 height={360}
+                sizes="(min-width: 1200px) 400px, (min-width: 1024px) calc(37.5vw - 32px), (min-width: 640px) calc(50vw - 36px), calc(94vw - 56px)"
                 alt={`${m.name} skyline`}
                 showCredit={false}
                 className="aspect-[4/3] w-full bg-faint object-cover transition-transform duration-300 group-hover:scale-105"

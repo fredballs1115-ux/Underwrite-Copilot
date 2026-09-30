@@ -65,6 +65,16 @@ import {
 /** The hero's long side, in pixels; the thumbnail's square. */
 export const HERO_MAX_PX = 1600;
 export const THUMB_PX = 240;
+/**
+ * The long side a small photograph's hero is enlarged to (#446). A
+ * memorandum exported for email carries its cover at 600 to 900 pixels,
+ * and a browser stretching that across a card on a dense screen draws it
+ * soft. Enlarged here with Lanczos and a light unsharp mask it holds its
+ * edges (compared by eye against a plain stretch of the same file), and
+ * never by more than `MAX_ENLARGE`, past which no filter adds detail.
+ */
+export const HERO_MIN_PX = 1200;
+export const MAX_ENLARGE = 2;
 /** How long a memorandum with no photograph stays unsearched. */
 const RECHECK_MS = 30 * 86_400_000;
 /**
@@ -72,9 +82,10 @@ const RECHECK_MS = 30 * 86_400_000;
  * older rules is stale, and so is a photograph lifted under them: 2 is the
  * search that opens a locked file and decodes a photograph stored as pixels
  * (#440), 3 the one that reads the cover page first and refuses a map, a
- * plan or a page of text (#444).
+ * plan or a page of text (#444), 4 the one that enlarges a small cover's
+ * hero cleanly rather than leaving the browser to stretch it (#446).
  */
-export const PICTURE_SEARCH_VERSION = 3;
+export const PICTURE_SEARCH_VERSION = 4;
 /** Extractions in flight per process. */
 const MAX_IN_FLIGHT = 2;
 /** How long an ask waits for its turn before it answers "not yet". */
@@ -115,11 +126,22 @@ export async function derivePicture(input: PictureInput): Promise<{
     : sharp(input.pixels, {
         raw: { width: input.width, height: input.height, channels: input.channels },
       }).flatten({ background: "#ffffff" });
-  const hero = await base
-    .clone()
-    .resize({ width: HERO_MAX_PX, height: HERO_MAX_PX, fit: "inside", withoutEnlargement: true })
-    .jpeg({ quality: 82, mozjpeg: true })
-    .toBuffer({ resolveWithObject: true });
+  const long = Buffer.isBuffer(input)
+    ? await sharp(input, { failOn: "none", limitInputPixels: 80_000_000 })
+        .metadata()
+        .then((m) => Math.max(m.width ?? 0, m.height ?? 0))
+    : Math.max(input.width, input.height);
+  const sized =
+    long >= HERO_MIN_PX
+      ? base.clone().resize({ width: HERO_MAX_PX, height: HERO_MAX_PX, fit: "inside", withoutEnlargement: true })
+      : (() => {
+          const target = Math.min(HERO_MIN_PX, Math.round(long * MAX_ENLARGE));
+          return base
+            .clone()
+            .resize({ width: target, height: target, fit: "inside", kernel: "lanczos3" })
+            .sharpen({ sigma: 0.8, m1: 0.6, m2: 2.2 });
+        })();
+  const hero = await sized.jpeg({ quality: 82, mozjpeg: true }).toBuffer({ resolveWithObject: true });
   const thumb = await base
     .clone()
     .resize({ width: THUMB_PX, height: THUMB_PX, fit: "cover", position: "attention" })
