@@ -166,10 +166,13 @@ function deriveSeed(
   const plausible = (noi: number | null, price: number | null) =>
     noi != null && noi > 0 && (price == null || noi / price < IMPLIED_CAP_CEILING) ? noi : null;
   if (model?.inputs) {
-    // A note's or the land's price is no property loan's basis (#415), and
-    // the model's price is not the building's where the interest is either.
+    // A note's or the land's price is no property loan's basis (#415), and a
+    // share's is not the building's: the first-draft model runs at the
+    // share's price while its NOI is the whole building's, so the price the
+    // loan is tested on is the whole the share implies — the same reader
+    // the branch without a model takes below.
     const modelPrice = model.inputs.purchasePrice || null;
-    const price = buildingPriceOf(extraction, modelPrice) == null ? null : modelPrice;
+    const price = buildingPriceOf(extraction, modelPrice);
     // A loan the documents state outranks the day's index: a term sheet's
     // rate is a quote, and a quote beats a benchmark. The first-draft model
     // carries a rate whether or not a document states one, so only a rate a
