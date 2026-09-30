@@ -19,8 +19,10 @@ function ButtonSpinner() {
   );
 }
 
+// 16px below `sm`: iPhone Safari zooms the page into any field set smaller
+// than that the moment it takes the focus.
 const inputCls =
-  "rounded-lg border border-line bg-surface px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40";
+  "rounded-lg border border-line bg-surface px-3 py-2 text-base outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40 sm:text-sm";
 
 type Mode = "signin" | "signup" | "reset";
 

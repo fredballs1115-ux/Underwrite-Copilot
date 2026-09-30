@@ -113,7 +113,9 @@ function Field({
           value={value}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
-          className={`w-full rounded-lg border border-line bg-white px-3 py-2 text-sm tabular-nums outline-none transition-colors focus:border-brand ${
+          // 16px below `sm`: iPhone Safari zooms the page into any field
+          // set smaller than that the moment it takes the focus.
+          className={`w-full rounded-lg border border-line bg-white px-3 py-2 text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm ${
             suffix ? "pr-9" : ""
           }`}
         />
@@ -326,7 +328,7 @@ function Choice<T extends string>({
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-lg border border-line bg-white px-3 py-2 text-sm outline-none transition-colors focus:border-brand"
+        className="w-full rounded-lg border border-line bg-white px-3 py-2 text-base outline-none transition-colors focus:border-brand sm:text-sm"
       >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
@@ -862,7 +864,7 @@ function CashFlowStrip() {
               onChange={(e) => setRaw(e.target.value)}
               rows={8}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -2384,7 +2386,7 @@ function PercentageRent() {
             onChange={(e) => setRaw(e.target.value)}
             rows={8}
             spellCheck={false}
-            className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+            className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm"
           />
           <span className="mt-1.5 block text-[11px] leading-relaxed text-muted">
             Twelve figures in the lease year&apos;s order. The monthly shape is
@@ -5415,7 +5417,7 @@ function TrailingWindow() {
               onChange={(e) => setRaw(e.target.value)}
               rows={9}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -5761,7 +5763,7 @@ function Rollover() {
               onChange={(e) => setRaw(e.target.value)}
               rows={7}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -5952,7 +5954,7 @@ function UnitMix() {
               onChange={(e) => setRaw(e.target.value)}
               rows={7}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -6101,7 +6103,7 @@ function Waterfall() {
               onChange={(e) => setRaw(e.target.value)}
               rows={6}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm"
             />
           </label>
           <div className="mt-3 grid grid-cols-2 gap-3">
@@ -7522,7 +7524,7 @@ function CompGrid() {
               onChange={(e) => setRaw(e.target.value)}
               rows={7}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-xs tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-xs"
             />
           </label>
           <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
@@ -8016,7 +8018,7 @@ function FeeDrag() {
               onChange={(e) => setRaw(e.target.value)}
               rows={6}
               spellCheck={false}
-              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-sm tabular-nums outline-none transition-colors focus:border-brand"
+              className="w-full rounded-lg border border-line bg-white px-3 py-2 font-mono text-base tabular-nums outline-none transition-colors focus:border-brand sm:text-sm"
             />
           </label>
           <div className="mt-3 grid grid-cols-2 gap-3">
