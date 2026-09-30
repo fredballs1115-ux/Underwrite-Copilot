@@ -1,7 +1,8 @@
 /**
- * A regulatory alert's dismissal is one browser's (lib/dismissed-alerts): the
- * cookie's list is read as untrusted text — uuids only, each once, the newest
- * MAX_DISMISSED_ALERTS — and written back bounded, newest first.
+ * A regulatory alert's dismissal is one reader's, in one browser
+ * (lib/dismissed-alerts): a cookie named for the account, whose list is read
+ * as untrusted text — uuids only, each once, the newest MAX_DISMISSED_ALERTS
+ * — and written back bounded, newest first.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -11,6 +12,7 @@ import {
   MAX_DISMISSED_ALERTS,
   alertWindowStart,
   dismissedCookie,
+  dismissedCookieName,
   isAlertId,
   parseDismissed,
   undismissed,
@@ -19,6 +21,9 @@ import {
 
 /** The n-th alert id, a well-formed uuid. */
 const id = (n: number) => `00000000-0000-4000-8000-${n.toString(16).padStart(12, "0")}`;
+/** Two accounts' ids. */
+const ALICE = "11111111-1111-4111-8111-111111111111";
+const BOB = "22222222-2222-4222-8222-222222222222";
 
 describe("the cookie's list", () => {
   it("reads uuids only, each once, in the cookie's order", () => {
@@ -56,21 +61,28 @@ describe("the cookie's list", () => {
 
 describe("the cookie the dismissal sets", () => {
   it("is the whole site's, unreadable by script, lax, secure in production, a year", () => {
-    const c = dismissedCookie(`${id(1)},junk`, id(2), true)!;
-    expect(c.name).toBe(DISMISSED_ALERTS_COOKIE);
+    const c = dismissedCookie(`${id(1)},junk`, id(2), true, ALICE)!;
+    expect(c.name).toBe(`${DISMISSED_ALERTS_COOKIE}_${ALICE}`);
     expect(c.value).toBe(`${id(2)},${id(1)}`);
     expect(c.options).toEqual({ path: "/", httpOnly: true, sameSite: "lax", secure: true, maxAge: DISMISSED_ALERTS_MAX_AGE });
     expect(DISMISSED_ALERTS_MAX_AGE).toBe(365 * 24 * 60 * 60);
-    expect(dismissedCookie(undefined, id(2), false)!.options.secure).toBe(false);
+    expect(dismissedCookie(undefined, id(2), false, ALICE)!.options.secure).toBe(false);
     // Fifty ids and their commas — encoded, as Next writes a cookie's value —
     // stay well inside a cookie's 4 KB.
     const full = Array.from({ length: MAX_DISMISSED_ALERTS + 10 }, (_, i) => id(i + 1)).join(",");
-    expect(encodeURIComponent(dismissedCookie(full, id(999), true)!.value).length).toBeLessThan(2048);
+    expect(encodeURIComponent(dismissedCookie(full, id(999), true, ALICE)!.value).length).toBeLessThan(2048);
+  });
+
+  it("is named for the account, so a second account on the same browser keeps its own list (the audit of 2026-09-30)", () => {
+    expect(dismissedCookieName(ALICE)).not.toBe(dismissedCookieName(BOB));
+    expect(dismissedCookie(undefined, id(1), true, BOB)!.name).toBe(dismissedCookieName(BOB));
+    // Only a uuid's characters reach the name, whatever the id holds.
+    expect(dismissedCookieName("A;b=c\r\n1")).toBe(`${DISMISSED_ALERTS_COOKIE}_abc1`);
   });
 
   it("is not set for an id that is not an alert's", () => {
-    expect(dismissedCookie(id(1), "", true)).toBeNull();
-    expect(dismissedCookie(id(1), "x\r\nSet-Cookie: a=b", true)).toBeNull();
+    expect(dismissedCookie(id(1), "", true, ALICE)).toBeNull();
+    expect(dismissedCookie(id(1), "x\r\nSet-Cookie: a=b", true, ALICE)).toBeNull();
   });
 });
 

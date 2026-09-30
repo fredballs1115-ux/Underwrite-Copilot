@@ -1,18 +1,27 @@
 /**
- * Which regulatory alerts THIS browser has dismissed — pure, so the list's
- * parsing and bounding are tested.
+ * Which regulatory alerts a reader has dismissed, in this browser — pure, so
+ * the list's parsing and bounding are tested.
  *
  * The banner's Dismiss used to write the shared row's `dismissed_at`, and
  * every signed-in user may update that column (migration 0034's column
  * grant), so one reader's click — or anyone's direct PATCH — hid an alert
  * from every customer. A dismissal is the reader's own now: the alert's id in
  * a cookie on this site, newest first, at most `MAX_DISMISSED_ALERTS` of
- * them, for a year. Nothing reads `dismissed_at` any more; an alert asks for
- * attention for `ALERT_WINDOW_DAYS` after it was detected, and then only in a
- * browser that has not dismissed it.
+ * them, for a year. The cookie is named for the account (`dismissedCookieName`),
+ * so a second account signed in on the same browser keeps its own list: one
+ * reader's dismissal is never another's. Nothing reads `dismissed_at` any
+ * more; an alert asks for attention for `ALERT_WINDOW_DAYS` after it was
+ * detected, and then only for a reader who has not dismissed it.
  */
 
 export const DISMISSED_ALERTS_COOKIE = "uc_dismissed_alerts";
+
+/** The cookie for one account's dismissals: the base name and the account's
+ *  id, kept to the characters a uuid has, so it is always a valid name. */
+export function dismissedCookieName(userId: string): string {
+  const key = userId.toLowerCase().replace(/[^0-9a-f-]/g, "");
+  return `${DISMISSED_ALERTS_COOKIE}_${key}`;
+}
 
 /** The newest this many dismissals are kept: 50 ids of 36 characters and
  *  their commas are under 2 KB, well inside a cookie's 4. */
@@ -56,15 +65,17 @@ export function withDismissed(list: readonly string[], id: string): string[] {
 }
 
 /**
- * What the server action sets when a browser dismisses `id`: the cookie's
- * new value and its options — the whole site, never read by script, sent on
- * a top-level navigation but not on a cross-site subrequest, HTTPS-only in
- * production, a year. Null for an id that is not an alert's.
+ * What the server action sets when a reader dismisses `id`: the account's
+ * cookie's new value and its options — the whole site, never read by
+ * script, sent on a top-level navigation but not on a cross-site
+ * subrequest, HTTPS-only in production, a year. Null for an id that is not
+ * an alert's.
  */
 export function dismissedCookie(
   current: string | null | undefined,
   id: string,
   production: boolean,
+  userId: string,
 ): {
   name: string;
   value: string;
@@ -72,7 +83,7 @@ export function dismissedCookie(
 } | null {
   if (!isAlertId(id.trim().toLowerCase())) return null;
   return {
-    name: DISMISSED_ALERTS_COOKIE,
+    name: dismissedCookieName(userId),
     value: withDismissed(parseDismissed(current), id).join(","),
     options: { path: "/", httpOnly: true, sameSite: "lax", secure: production, maxAge: DISMISSED_ALERTS_MAX_AGE },
   };
@@ -84,8 +95,8 @@ export function alertWindowStart(now: Date): string {
   return new Date(now.getTime() - ALERT_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
 }
 
-/** The rows this browser has not dismissed, in their order, at most
- *  `limit` of them. */
+/** The rows the reader has not dismissed, in their order, at most `limit`
+ *  of them. */
 export function undismissed<T extends { id: string }>(
   rows: readonly T[],
   dismissed: readonly string[],

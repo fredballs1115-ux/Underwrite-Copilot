@@ -2,10 +2,10 @@
  * Today's rates, and which of them may become a number in a box.
  *
  * Every figure on the site that moves with the market comes through one
- * table: the Treasury curve, SOFR and its averages, the policy rates, the
- * credit spreads, the mortgage survey, bank CRE lending and its standards,
+ * table: the Treasury curve, SOFR and its averages, the policy rates,
+ * corporate credit, the mortgage survey, bank CRE lending and its standards,
  * inflation and the cost of building, jobs, and the multifamily supply
- * pipeline — forty-odd FRED series the weekday cron writes
+ * pipeline — the fifty national FRED series the weekday cron writes
  * (`scripts/fetch-rates.mjs` → the `rates` table) and this module reads back
  * for the strip across the top of `/tools` and the bottom of `/market`, and
  * for the seeds that pre-fill a calculator field.

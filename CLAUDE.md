@@ -1459,7 +1459,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   spreads and Moody's Baa yield the strip had carried came off it, once
   the probe's terms line (run 36785223477) showed their publishers license
   them to FRED, not to a site that republishes them, Moody's forbidding
-  any redistribution outright; `lib/live-rates.test.ts` holds every table,
+  any copying or redistribution without its written consent; `lib/live-rates.test.ts` holds every table,
   national and local, free of ICE, Moody's, S&P and Case-Shiller), mortgage
   and bank lending (the two
   PMMS surveys, bank CRE loans y/y, delinquency, the three SLOOS
@@ -4471,7 +4471,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   database's and its expiry clamped, a job's `created_at` the database's
   clock, `deals.qa` append-only). **A regulatory alert's dismissal is the
   reader's own** (`lib/dismissed-alerts.ts`, a cookie of up to 50 ids for
-  a year, alerts inside `ALERT_WINDOW_DAYS`): the banner's Dismiss had
+  a year, alerts inside `ALERT_WINDOW_DAYS`, named for the account by
+  `dismissedCookieName` so a second account on the same browser keeps its
+  own list): the banner's Dismiss had
   written the shared row's `dismissed_at`, so one customer dismissing an
   alert hid it from every other. **A page never signs a
   link at render** (#479): a signed URL lasts an hour, so a page left open

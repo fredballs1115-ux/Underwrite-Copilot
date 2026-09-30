@@ -4,7 +4,7 @@
     {
       "date": "2026-09-30",
       "title": "Corporate credit, from the Treasury",
-      "blurb": "The rates strip on /tools and /market now reads corporate credit from the Treasury's own high-quality corporate bond curve: its 10-year spot rate, published monthly. The three ICE BofA spreads and Moody's Baa yield it had shown are gone. Their publishers license them to FRED, not to sites that republish them, and Moody's forbids redistribution outright.",
+      "blurb": "The rates strip on /tools and /market now reads corporate credit from the Treasury's own high-quality corporate bond curve: its 10-year spot rate, published monthly. The three ICE BofA spreads and Moody's Baa yield it had shown are gone. Their publishers license them to FRED, not to sites that republish them, and Moody's forbids redistribution without its written consent.",
       "href": "/tools"
     },
     {

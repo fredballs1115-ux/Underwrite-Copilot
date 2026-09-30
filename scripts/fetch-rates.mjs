@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Weekday FRED pull → the `rates` table. Every figure on the site that
-// changes with the market — the Treasury curve, SOFR, the credit spreads,
+// changes with the market — the Treasury curve, SOFR, corporate credit,
 // the mortgage survey, inflation, the supply pipeline — comes through here,
 // so the pages read today's number rather than one somebody typed.
 //
@@ -103,6 +103,13 @@ async function fred(path, params, retried = false) {
     // The limit is per minute; wait most of one out and ask once more,
     // so a burst reads as a pause rather than as a missing series.
     await sleep(20_000);
+    return fred(path, params, true);
+  }
+  if (res.status >= 500 && !retried) {
+    // A 500 or a 502 is FRED's server, not the series: run 36786467096
+    // lost Oregon's education and leisure payrolls to one of each, ids
+    // that answer on every other run. A pause, and one more ask.
+    await sleep(5_000);
     return fred(path, params, true);
   }
   if (!res.ok) {

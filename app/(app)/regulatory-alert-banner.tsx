@@ -4,20 +4,21 @@
 // Server component + server action — no client JS.
 //
 // THE RULE: an alert shows where it was detected in the last
-// ALERT_WINDOW_DAYS (30) days and THIS BROWSER has not dismissed it. The
+// ALERT_WINDOW_DAYS (30) days and THIS READER has not dismissed it. The
 // shared row's `dismissed_at` is ignored: every signed-in user may write it
 // (migration 0034's column grant), so it was one reader's click — or anyone's
 // direct PATCH — hiding an alert from every customer. A dismissal is the
-// alert's id in this browser's cookie (lib/dismissed-alerts), nothing shared
-// is written, and /news keeps every alert whatever a banner did.
+// alert's id in a cookie named for the reader's account (lib/dismissed-
+// alerts), so a second account on the same browser keeps its own; nothing
+// shared is written, and /news keeps every alert whatever a banner did.
 
 import { cookies } from "next/headers";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { safeHttpUrl } from "@/lib/safe-url";
 import {
-  DISMISSED_ALERTS_COOKIE,
   alertWindowStart,
   dismissedCookie,
+  dismissedCookieName,
   parseDismissed,
   undismissed,
 } from "@/lib/dismissed-alerts";
@@ -40,23 +41,30 @@ async function dismissAlert(formData: FormData) {
   const user = await getCurrentUser();
   if (!user) return;
   const store = await cookies();
-  const next = dismissedCookie(store.get(DISMISSED_ALERTS_COOKIE)?.value, id, process.env.NODE_ENV === "production");
+  const next = dismissedCookie(
+    store.get(dismissedCookieName(user.id))?.value,
+    id,
+    process.env.NODE_ENV === "production",
+    user.id,
+  );
   // Setting a cookie in a server action re-renders the page it was called
-  // from, so the banner redraws without the alert — in this browser only.
+  // from, so the banner redraws without the alert — for this reader only.
   if (next) store.set(next.name, next.value, next.options);
 }
 
 export async function RegulatoryAlertBanner() {
   let alerts: AlertRow[] = [];
   try {
-    const dismissed = parseDismissed((await cookies()).get(DISMISSED_ALERTS_COOKIE)?.value);
+    const user = await getCurrentUser();
+    if (!user) return null;
+    const dismissed = parseDismissed((await cookies()).get(dismissedCookieName(user.id))?.value);
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase
       .from("regulatory_alerts")
       .select("id, rule_id, headline, url, detail")
       .gte("detected_at", alertWindowStart(new Date()))
       .order("detected_at", { ascending: false })
-      // Enough rows that the newest few this browser has not dismissed are
+      // Enough rows that the newest few this reader has not dismissed are
       // among them.
       .limit(SHOWN + dismissed.length);
     alerts = undismissed((data as AlertRow[] | null) ?? [], dismissed, SHOWN);

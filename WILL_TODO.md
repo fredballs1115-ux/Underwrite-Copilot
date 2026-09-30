@@ -16,7 +16,11 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
    - an update can dodge the free-deal cap.
 
    The file's header says what each part closes and why the app's own
-   writes pass unchanged.
+   writes pass unchanged. In the same editor, delete the rows the rates
+   pull wrote for the four licensed series before it stopped asking for
+   them. No page shows them, but migration 0023's read policy lets any
+   signed-in account select them through the API:
+   `delete from public.rates where series_id in ('BAMLC0A0CM','BAMLC0A4CBBB','BAMLH0A0HYM2','DBAA');`
 2. **Rotate the six credentials** that appeared in screenshots (the list
    under 2026-09-16 below). Rotation is the only way to be sure.
 3. **Keys that switch things on**, each optional and free or already
@@ -43,8 +47,9 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 
 **Your call — larger changes held for your permission:**
 - **Model math:**
-  - the exit cap's default, the flat 6% today, could come from the implied
-    cap or the sector band;
+  - the exit cap's default: it is the going-in cap where the memorandum
+    states one, and a flat 6% where it states none; the 6% could come from
+    the cap the memorandum's NOI implies on its price, or the sector band;
   - transfer and recording taxes could go into the model's closing costs;
   - expense growth could come from the 5-year breakeven inflation rate;
   - plan deals could price on SOFR plus a construction spread;
@@ -53,7 +58,8 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
   - a buyer's own NOI could feed the model.
 - **Which model the compare table reads:** the compare table reads the
   first-draft model while every other surface reads the engine. On the
-  sample that is 9.28% against 8.72%. The labels now say which is which;
+  sample the compare table's first-draft model gives 8.72% and the engine
+  9.28%. The labels now say which is which;
   pick one.
 - **The sample deal's one set of numbers:** the public pages quote 8.7% and
   9.3% from those same two models.
