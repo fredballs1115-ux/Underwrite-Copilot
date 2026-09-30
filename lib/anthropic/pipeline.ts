@@ -55,6 +55,8 @@ import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
+import { debtSeeds, isDebtSeedSeries, ratesPromptLine } from "@/lib/debt-index";
+import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
 import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
@@ -283,6 +285,23 @@ function liftPictureBeside(
       }
     })
     .finally(() => limit.cancel());
+}
+
+/**
+ * Today's debt indices for the challenger (lib/debt-index `ratesPromptLine`):
+ * it is told to judge the OM's financing at current rates, so it is handed
+ * them — the same figures the site's own model is seeded from, read bare
+ * because the worker has no Next cache. Best-effort: a read that fails, or a
+ * table with nothing fresh, hands the step no rates, and it reasons as it
+ * did before.
+ */
+async function todaysRatesLine(admin: ReturnType<typeof createSupabaseAdminClient>): Promise<string | null> {
+  try {
+    const rows = await fetchSeriesRows(admin, SERIES.filter(isDebtSeedSeries));
+    return ratesPromptLine(debtSeeds(readRates(rows, new Date()), HOLD_MONTHS), HOLD_MONTHS);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -1030,6 +1049,10 @@ async function runAnalysisSteps(
       } catch {
         // no discrepancies stored — the challenger runs on the OM alone
       }
+      // Today's rates, dated: the challenger judges the financing against
+      // them rather than against a rate it remembers as current.
+      const ratesLine = await todaysRatesLine(admin);
+      if (ratesLine) reconNote = reconNote ? `${reconNote} ${ratesLine}` : ratesLine;
       const challenges = await challengeAssumptions(om(), assetClass, reconNote);
       await admin
         .from("deals")

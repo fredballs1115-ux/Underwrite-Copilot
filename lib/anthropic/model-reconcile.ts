@@ -76,6 +76,10 @@ export type ReconciliationOutput = z.infer<typeof ReconSchema>;
  */
 export async function reconcileDocs(
   allFacts: DocFacts[],
+  /** today's debt indices, dated (lib/debt-index `ratesPromptLine`): the loan
+   *  rate the model picks is built from them, never remembered; null where
+   *  the table seeds none */
+  ratesLine?: string | null,
 ): Promise<ReconciliationOutput> {
   const client = getAnthropic();
   const factsJson = JSON.stringify(allFacts, null, 2);
@@ -93,6 +97,16 @@ export async function reconcileDocs(
             type: "text",
             text: `Facts extracted from each source document:\n\n${factsJson}`,
           },
+          // Where no document states the loan's rate, the model's is its
+          // index today plus a spread — never a rate remembered as current.
+          ...(ratesLine?.trim()
+            ? [
+                {
+                  type: "text" as const,
+                  text: `${ratesLine.trim()} Where no document states the loan's rate, set ratePct from these — the index nearest the hold plus a spread you name in a caveat — and say in a caveat that the buyer's quote replaces it.`,
+                },
+              ]
+            : []),
         ],
       },
     ],

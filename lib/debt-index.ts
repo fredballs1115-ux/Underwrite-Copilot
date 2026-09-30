@@ -165,6 +165,47 @@ function floatingIndex(rates: readonly LiveRate[]): DebtIndex | null {
   return null;
 }
 
+/**
+ * The series the debt seeds read: every Treasury tenor, and SOFR with its
+ * 30-day average — what a caller with no cached table (the screen, in the
+ * worker) fetches bare before `debtSeeds`.
+ */
+export function isDebtSeedSeries(s: { id: string; tenorMonths: number | null }): boolean {
+  return s.tenorMonths !== null || s.id === "SOFR" || s.id === "SOFR30DAYAVG";
+}
+
+/**
+ * Today's debt indices as one line a Claude step reads (the audit of
+ * 2026-09-30): the challenger was told to judge the OM's financing "at
+ * current rates" and the first-draft model to pick a "market-reasonable"
+ * loan rate, and neither was handed a rate, so each stated one from what
+ * it remembered as current. Now each is handed the same figures the site's
+ * own model is seeded from — the Treasury tenor nearest the hold (a
+ * fixed-rate permanent loan's index), the 10-year, and 30-day average SOFR
+ * (a floating, bridge or construction loan's index) — each with its date.
+ * Only a fresh contract rate is read (`debtSeeds`' own rule), and null
+ * where the table seeds none: then the step reasons as before, with
+ * nothing claimed.
+ */
+export function ratesPromptLine(seeds: DebtSeeds, holdMonths: number): string | null {
+  const said = (i: DebtIndex) => `${i.pct.toFixed(2)}% (${datedLong(i.asOf)})`;
+  const parts: string[] = [];
+  if (seeds.permanent) {
+    const years = Math.round(holdMonths / 12);
+    parts.push(
+      `the ${indexName(seeds.permanent)} ${said(seeds.permanent)}, which the site's model prices a fixed-rate permanent loan off for its hold of ${years} years`,
+    );
+  }
+  if (seeds.tenYear && seeds.tenYear.id !== seeds.permanent?.id) {
+    parts.push(`the ${indexName(seeds.tenYear)} ${said(seeds.tenYear)}, the benchmark a cap rate's spread is quoted over`);
+  }
+  if (seeds.floating) {
+    parts.push(`${indexName(seeds.floating)} ${said(seeds.floating)}, a floating, bridge or construction loan's index`);
+  }
+  if (parts.length === 0) return null;
+  return `TODAY'S RATES (FRED, read for this screen): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.`;
+}
+
 /** Index plus spread, as a percent to two places — the figure a term sheet prints. */
 export function allInPct(index: DebtIndex, spreadBps: number): number {
   return Math.round((index.pct + spreadBps / 100) * 100) / 100;

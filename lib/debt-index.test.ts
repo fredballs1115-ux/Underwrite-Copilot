@@ -11,8 +11,11 @@ import {
   debtRateNote,
   debtSeeds,
   indexName,
+  isDebtSeedSeries,
+  ratesPromptLine,
   type SurveyRate,
 } from "./debt-index";
+import { SERIES } from "./live-rates";
 
 // The runner's own table, figure for figure (lib/live-rates.fixture.ts).
 const rates = readRates(REAL_ROWS, FIXTURE_NOW);
@@ -151,5 +154,44 @@ describe("benchmark30 — the leverage check's 30-yr fixed, and which one it is"
     expect(benchmark30(null, null)).toBeNull();
     expect(benchmark30(undefined, undefined)).toBeNull();
     expect(benchmark30(null, { low: null, as_of: "2026-08-20" })).toBeNull();
+  });
+});
+
+describe("today's rates, as a line a Claude step reads (the audit of 2026-09-30)", () => {
+  it("names the index the model prices off, the 10-year and SOFR, each dated, from the same seeds the model takes", () => {
+    const seeds = debtSeeds(rates, 60);
+    const line = ratesPromptLine(seeds, 60)!;
+    expect(line).toMatch(/^TODAY'S RATES \(FRED, read for this screen\): /);
+    expect(line).toContain(`the 5-yr Treasury ${seeds.permanent!.pct.toFixed(2)}% (${datedLong(seeds.permanent!.asOf)}), which the site's model prices a fixed-rate permanent loan off for its hold of 5 years`);
+    expect(line).toContain(`the 10-yr Treasury ${seeds.tenYear!.pct.toFixed(2)}% (${datedLong(seeds.tenYear!.asOf)})`);
+    expect(line).toContain(`30-day avg SOFR ${seeds.floating!.pct.toFixed(2)}% (${datedLong(seeds.floating!.asOf)}), a floating, bridge or construction loan's index`);
+    expect(line).toContain("never state a rate as current that is not one of them or built from one of them");
+  });
+
+  it("says the 10-year once where the hold prices off it", () => {
+    const seeds = debtSeeds(rates, 120);
+    const line = ratesPromptLine(seeds, 120)!;
+    expect(seeds.permanent?.id).toBe("DGS10");
+    expect(line.match(/10-yr Treasury/g)?.length).toBe(1);
+  });
+
+  it("claims nothing where the table seeds nothing", () => {
+    expect(ratesPromptLine(NO_DEBT_SEEDS, 60)).toBeNull();
+  });
+
+  it("reads exactly the series the seeds are built from: every Treasury tenor and SOFR", () => {
+    const ids = SERIES.filter(isDebtSeedSeries).map((s) => s.id);
+    expect(ids).toContain("DGS5");
+    expect(ids).toContain("DGS10");
+    expect(ids).toContain("SOFR30DAYAVG");
+    expect(ids).toContain("SOFR");
+    expect(ids).not.toContain("MORTGAGE30US");
+    // The seeds read off those rows alone are the seeds read off the whole table.
+    const only = readRates(REAL_ROWS.filter((r) => ids.includes(r.series_id)), FIXTURE_NOW);
+    const all = debtSeeds(rates, 60);
+    const bare = debtSeeds(only, 60);
+    expect(bare.permanent).toEqual(all.permanent);
+    expect(bare.tenYear).toEqual(all.tenYear);
+    expect(bare.floating).toEqual(all.floating);
   });
 });

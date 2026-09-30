@@ -5,6 +5,9 @@ import { parseModelFile } from "@/lib/model-parse";
 import { describeRunFailure } from "@/lib/anthropic/failure";
 import { extractDocFacts } from "@/lib/anthropic/model-extract";
 import { reconcileDocs } from "@/lib/anthropic/model-reconcile";
+import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { ratesPromptLine } from "@/lib/debt-index";
+import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { DOC_KIND_LABEL } from "@/lib/documents";
 import { computeModel, planCaveats } from "./compute";
 import type { DocFacts, UnderwritingModel } from "./types";
@@ -84,7 +87,11 @@ export async function runModelGeneration(dealId: string): Promise<void> {
 
     // Pass 2 — reconcile across all sources.
     await patchJob(dealId, { status: "running", step: "model", progress: 62 });
-    const recon = await reconcileDocs(allFacts);
+    // Today's debt indices, dated — the model's loan rate is built from
+    // them where no document states one (liveDebtSeeds never throws; a
+    // table with nothing fresh hands the step no rates).
+    const ratesLine = ratesPromptLine(await liveDebtSeeds(HOLD_MONTHS), HOLD_MONTHS);
+    const recon = await reconcileDocs(allFacts, ratesLine);
 
     // Pass 3 — compute the cash flow and returns deterministically.
     const { cashFlow, returns } = computeModel(recon.inputs);

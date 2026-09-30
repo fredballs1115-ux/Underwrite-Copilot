@@ -41,6 +41,10 @@ vi.mock("@/lib/storage", () => ({ downloadDealFile: vi.fn(async () => Buffer.fro
 vi.mock("@/lib/model-parse", () => ({ parseModelFile: vi.fn(async () => ({ kind: "text", text: "rows" })) }));
 vi.mock("@/lib/anthropic/model-extract", () => ({ extractDocFacts: vi.fn() }));
 vi.mock("@/lib/anthropic/model-reconcile", () => ({ reconcileDocs: vi.fn() }));
+// Today's rates, off a table with nothing fresh: the step is handed none.
+vi.mock("@/lib/debt-index-read", () => ({
+  liveDebtSeeds: vi.fn(async () => ({ permanent: null, floating: null, tenYear: null, survey30: null })),
+}));
 
 import { runModelGeneration } from "./build-model";
 import { extractDocFacts } from "@/lib/anthropic/model-extract";

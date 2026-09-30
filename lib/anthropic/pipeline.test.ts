@@ -374,6 +374,37 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("hands the challenger today's rates, dated, from the table the model is seeded from (the audit of 2026-09-30)", async () => {
+    state.rates = [
+      { series_id: "DGS5", obs_date: "2026-09-22", value: 3.9 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.2 },
+      { series_id: "SOFR30DAYAVG", obs_date: "2026-09-22", value: 4.05 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("TODAY'S RATES (FRED, read for this screen): the 5-yr Treasury 3.90% (Sep 22, 2026)");
+    expect(note).toContain("the 10-yr Treasury 4.20% (Sep 22, 2026)");
+    expect(note).toContain("30-day avg SOFR 4.05% (Sep 22, 2026)");
+  });
+
+  it("hands the challenger no rates where the table holds nothing fresh — nothing is claimed as current", async () => {
+    state.rates = [{ series_id: "DGS5", obs_date: "2026-01-02", value: 3.9 }];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("TODAY'S RATES");
+  });
+
   it("a deal in a covered market hands the market check the metro's published figures, dated, and stores what it read", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [
