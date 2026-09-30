@@ -149,6 +149,12 @@ vi.mock("@/lib/storage", () => ({
   downloadOmPdf: vi.fn(async () => Buffer.from("%PDF-1.4\n")),
 }));
 vi.mock("@/lib/email", () => ({ notifyAnalysisReady: vi.fn(async () => {}) }));
+// The memorandum's cover, lifted beside the steps after the extraction
+// (lib/deal-picture's search is its own test's; here, what the screen asks).
+vi.mock("@/lib/deal-picture", () => ({
+  ensureDealPicture: vi.fn(async () => null),
+  pictureMayBeInMemorandum: vi.fn(() => true),
+}));
 vi.mock("@/lib/criteria-server", () => ({ getBuyBoxForDeal: vi.fn(async () => null) }));
 vi.mock("@/lib/model-parse", () => ({ parseModelFile: vi.fn() }));
 vi.mock("./first-signal", () => ({ readFirstSignal: vi.fn() }));
@@ -177,7 +183,8 @@ vi.mock("./om-source", async (importOriginal) => {
   };
 });
 
-import { runAnalysis, textLayerMissed } from "./pipeline";
+import { SCREEN_PICTURE_WAIT_MS, runAnalysis, textLayerMissed } from "./pipeline";
+import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import { recordUsage, type CallUsage, type UsageSummary } from "./usage";
 import { PRICES } from "./models";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -285,6 +292,8 @@ beforeEach(() => {
   vi.mocked(scrutinizeComps).mockResolvedValue(COMPS);
   vi.mocked(checkMarket).mockResolvedValue(MARKET);
   vi.mocked(synthesizeVerdict).mockResolvedValue(VERDICT);
+  vi.mocked(ensureDealPicture).mockResolvedValue(null);
+  vi.mocked(pictureMayBeInMemorandum).mockReturnValue(true);
   errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -1042,6 +1051,82 @@ describe("runAnalysis — the memorandum's call for offers (#467)", () => {
     state.deals.d1.offers_due = null;
     await runAnalysis("d1");
     expect(state.deals.d1.offers_due).toBeNull();
+  });
+});
+
+describe("runAnalysis — the building's photograph, lifted beside the screen", () => {
+  it("looks for the memorandum's cover right after the extraction, in the bytes the screen already downloaded, the cover alone", async () => {
+    const { downloadOmPdf } = await import("@/lib/storage");
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(ensureDealPicture).toHaveBeenCalledTimes(1);
+    const [, id, opts] = vi.mocked(ensureDealPicture).mock.calls[0];
+    expect(id).toBe("d1");
+    // The gallery's sixteen pages are left to the deal's first view.
+    expect(opts).toMatchObject({ omPath: "u/d1.pdf", isSample: false, cache: null, gallery: false, waitMs: SCREEN_PICTURE_WAIT_MS });
+    // One download for the whole run: the search reads the screen's own copy.
+    expect(downloadOmPdf).toHaveBeenCalledTimes(1);
+    expect(opts.pdf).toBe(await vi.mocked(downloadOmPdf).mock.results[0].value);
+    // Asked only once the extraction had landed, and only where a search is due.
+    expect(vi.mocked(extractTerms).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(ensureDealPicture).mock.invocationCallOrder[0],
+    );
+    expect(pictureMayBeInMemorandum).toHaveBeenCalledWith({ omPath: "u/d1.pdf", isSample: false, cache: null });
+  });
+
+  it("reads beside the steps after the extraction, never in front of them", async () => {
+    // The lift cannot finish until the challenger has run: a screen that
+    // waited on it before its next step would never get there.
+    let challenged!: () => void;
+    const reached = new Promise<void>((resolve) => (challenged = resolve));
+    vi.mocked(challengeAssumptions).mockImplementation(async () => {
+      challenged();
+      return CHALLENGES;
+    });
+    vi.mocked(ensureDealPicture).mockImplementation(async () => {
+      await reached;
+      return null;
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(state.deals.d1.verdict).toMatchObject({ verdict: "caution" });
+  });
+
+  it("a lift that fails leaves the screen exactly as it was: done, every result written, the failure logged and never shown", async () => {
+    vi.mocked(ensureDealPicture).mockRejectedValue(new Error("storage is down"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(job().error).toBeNull();
+    expect(state.deals.d1.challenges).toEqual(CHALLENGES);
+    expect(state.deals.d1.comps).toEqual(COMPS);
+    expect(state.deals.d1.verdict).toMatchObject({ verdict: "caution" });
+    expect(errSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("was not lifted for deal d1"), "storage is down");
+    warnSpy.mockRestore();
+  });
+
+  it("never lifts for the sample deal, a deal whose photograph needs no search, or a deal typed in by hand", async () => {
+    state.deals.d1.is_sample = true;
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(ensureDealPicture).not.toHaveBeenCalled();
+
+    state = freshState();
+    vi.mocked(pictureMayBeInMemorandum).mockReturnValue(false);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(pictureMayBeInMemorandum).toHaveBeenCalled();
+    expect(ensureDealPicture).not.toHaveBeenCalled();
+
+    // A manual deal has no memorandum to read.
+    state = freshState();
+    vi.mocked(pictureMayBeInMemorandum).mockReturnValue(true);
+    state.deals.d1.om_storage_path = null;
+    state.deals.d1.extraction = EXTRACTION;
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(ensureDealPicture).not.toHaveBeenCalled();
   });
 });
 

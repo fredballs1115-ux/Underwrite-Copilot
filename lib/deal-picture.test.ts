@@ -130,6 +130,37 @@ describe("a memorandum photograph lifted under older rules, judged again (#444)"
   });
 });
 
+describe("the memorandum's bytes a caller already holds (the screen's lift)", () => {
+  beforeEach(() => {
+    store.oms.clear();
+    store.files.clear();
+    store.uploads = [];
+    store.removed = [];
+  });
+
+  it("are read in place of a download, and are left as they were handed over", async () => {
+    // Nothing in storage: a download would fail, so the cover can only come
+    // from the bytes handed over.
+    const pdf = await testMemorandum([{ images: [await testPicture(800, 500, "jpeg")] }]);
+    const before = Buffer.from(pdf);
+    const { client, db } = fakeDb(null);
+    const got = await ensureDealPicture(client, "d1", {
+      omPath: "u/d1.pdf",
+      isSample: false,
+      cache: null,
+      waitMs: 5_000,
+      gallery: false,
+      pdf,
+    });
+    expect(got?.source).toBe("om");
+    expect(db.photo?.picture?.hero).toBe(got!.hero);
+    expect(db.photo?.pictureSearchV).toBe(PICTURE_SEARCH_VERSION);
+    // The cover and its thumbnail, and the caller's buffer untouched.
+    expect(store.uploads).toHaveLength(2);
+    expect(Buffer.from(pdf).equals(before)).toBe(true);
+  });
+});
+
 describe("the memorandum's other photographs, read behind the cover (#448)", () => {
   beforeEach(() => {
     store.oms.clear();

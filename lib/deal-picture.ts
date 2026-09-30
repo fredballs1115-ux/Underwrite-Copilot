@@ -25,8 +25,11 @@ import {
  * The building's own photograph: found once, stored twice, shown first.
  *
  * FOUND ONCE. The cover of the deal's memorandum is lifted out of the PDF
- * (`lib/om-photo`) the first time anything asks for the deal's picture —
- * the pipeline row's thumbnail, the deal page — and never again: the
+ * (`lib/om-photo`) by the screen itself, right after its extraction and
+ * from the bytes the screen already holds, so a new deal's first view finds
+ * its photograph stored — or, for a deal screened before that, the first
+ * time anything asks for the deal's picture (the pipeline row's thumbnail,
+ * the deal page) — and never again: the
  * result, or the fact that there was none, is written to the deal's
  * imagery cache (`deals.photo`, the jsonb the geocoder and the Street View
  * verdict already share). A memorandum with no usable photograph is
@@ -606,6 +609,11 @@ function refreshGalleryBehind(
  * a route waits for the verdict; a page render gets the old photograph at
  * once and the search runs behind it. Where the search cannot run (no turn,
  * no memorandum, a storage failure), the old photograph stands.
+ *
+ * A caller that already holds the memorandum's bytes — the screen, which
+ * lifts the cover right after its extraction so a new deal's first view
+ * finds its photograph stored — hands them over as `pdf`, and the search
+ * reads those rather than downloading the file a second time.
  */
 export async function ensureDealPicture(
   supabase: SupabaseClient,
@@ -619,6 +627,10 @@ export async function ensureDealPicture(
      *  email): the gallery is left to the deal's first view, so a worker
      *  about to run the next screen never decodes sixteen pages beside it */
     gallery?: boolean;
+    /** the memorandum at `omPath`, where the caller already holds it: read
+     *  in place of a download. pdfjs is handed a copy, so the caller's
+     *  buffer is never detached or changed */
+    pdf?: Uint8Array;
   },
 ): Promise<DealPicture | null> {
   const { cache } = opts;
@@ -638,7 +650,7 @@ export async function ensureDealPicture(
   }
   const running = inFlight.get(dealId);
   if (running) return waitMs > 0 ? running : stale;
-  const search = searchMemorandum(supabase, dealId, opts.omPath, cache, waitMs, gallery)
+  const search = searchMemorandum(supabase, dealId, opts.omPath, cache, waitMs, gallery, opts.pdf)
     .then((outcome) => (outcome.settled ? outcome.picture : stale))
     .finally(() => inFlight.delete(dealId));
   inFlight.set(dealId, search);
@@ -664,13 +676,14 @@ async function searchMemorandum(
   cache: DealVisualCache | null,
   waitMs: number,
   withGallery = true,
+  given?: Uint8Array,
 ): Promise<SearchOutcome> {
   const release = await searches.acquireWithin(waitMs);
   if (!release) return { picture: null, settled: false };
   // Held until the gallery behind the cover is read, when there is one.
   let held = true;
   try {
-    const pdf = await downloadOmPdf(omPath, { kind: "deal", dealId, only: ["om"] });
+    const pdf = given ?? (await downloadOmPdf(omPath, { kind: "deal", dealId, only: ["om"] }));
     const cover = await coverOf(pdf);
     let outcome: SearchOutcome;
     if (!cover) {

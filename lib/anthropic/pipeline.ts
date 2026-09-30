@@ -62,6 +62,8 @@ import { BRIEF_NATIONAL_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
 import { notifyAnalysisReady } from "@/lib/email";
+import type { DealVisualCache } from "@/lib/deal-location";
+import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import type {
   AssetClass,
   ExtractionResult,
@@ -218,6 +220,69 @@ async function siteFlagsForScreen(
   }
   const last = await read();
   return answered(last) ? last.flags : null;
+}
+
+/** How long the screen's lift of the memorandum's cover waits for a turn.
+ *  The turns are the ones the deal pages' own searches take
+ *  (lib/deal-picture); nothing is waiting on this one, so it may wait. */
+export const SCREEN_PICTURE_WAIT_MS = 30_000;
+/** The most the screen waits, at its end, for a lift still running. */
+export const SCREEN_PICTURE_MS = 60_000;
+
+/**
+ * The building's own photograph, lifted out of the memorandum right after
+ * the extraction and beside the steps that follow. A deal's photograph used
+ * to be looked for only on its first view, so a new deal's first pipeline
+ * view showed a placeholder, and a batch upload's first view queued every
+ * deal behind the picture search's two turns. The screen already holds the
+ * memorandum's bytes, so the search reads those rather than downloading the
+ * file again, and it lifts the cover alone (#464's rule for the worker): the
+ * gallery's sixteen pages wait for the deal's first view.
+ *
+ * Never the sample deal, and only where lib/deal-picture says a search is
+ * due (`pictureMayBeInMemorandum`: no photograph stored, none looked for
+ * under today's rules). It never fails or slows the screen: the steps after
+ * the extraction run while it reads, a failure is logged and dropped, and
+ * what it returns settles within `SCREEN_PICTURE_MS` whatever the search
+ * does — the screen waits for it only at its end, to release its turn with
+ * the memorandum the lift read.
+ */
+function liftPictureBeside(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+  omPath: string,
+  pdf: Uint8Array,
+): Promise<void> {
+  const limit = pause(SCREEN_PICTURE_MS);
+  const lift = (async () => {
+    const { data } = await admin.from("deals").select("photo, is_sample").eq("id", dealId).maybeSingle();
+    const row = data as { photo?: DealVisualCache | null; is_sample?: boolean } | null;
+    if (!row || row.is_sample) return "skipped" as const;
+    const cache = row.photo ?? null;
+    if (!pictureMayBeInMemorandum({ omPath, isSample: false, cache })) return "skipped" as const;
+    await ensureDealPicture(admin, dealId, {
+      omPath,
+      isSample: false,
+      cache,
+      waitMs: SCREEN_PICTURE_WAIT_MS,
+      gallery: false,
+      pdf,
+    });
+    return "done" as const;
+  })().catch((err) => {
+    console.warn(
+      `[pipeline] the memorandum's photograph was not lifted for deal ${dealId}:`,
+      err instanceof Error ? err.message : err,
+    );
+    return "failed" as const;
+  });
+  return Promise.race([lift, limit.done.then(() => "running" as const)])
+    .then((outcome) => {
+      if (outcome === "running") {
+        console.warn(`[pipeline] the memorandum's photograph for deal ${dealId} is still being read; the screen ends without waiting for it`);
+      }
+    })
+    .finally(() => limit.cancel());
 }
 
 /**
@@ -466,6 +531,9 @@ async function runAnalysisSteps(
   // Files-API object, so a large OM never leaves an orphaned upload behind.
   let omSource: OmSource | null = null;
   let releaseSlot: (() => void) | null = null;
+  // The memorandum's photograph, lifted beside the steps after the
+  // extraction; settled, bounded, before the run gives up its turn.
+  let pictureLift: Promise<void> | null = null;
   const stopHeartbeat = startHeartbeat(dealId);
   try {
     releaseSlot = await runGate.acquire();
@@ -750,6 +818,12 @@ async function runAnalysisSteps(
       await markDone("extract");
     }
     if (manual) await markDone("extract");
+
+    // The building's own photograph, out of the memorandum the run already
+    // holds — beside the steps below, never in their way (liftPictureBeside).
+    if (pdf && !manual) {
+      pictureLift = liftPictureBeside(admin, dealId, deal.om_storage_path as string, pdf);
+    }
 
     // Step 1b — multi-document reconciliation (best-effort). Compares the OM
     // against any rent roll / T-12 / financials and stores the deal's
@@ -1043,6 +1117,9 @@ async function runAnalysisSteps(
       // the deal (and its job row) is gone — nothing left to tell
     });
   } finally {
+    // Never rejects, and settles within SCREEN_PICTURE_MS: the turn is given
+    // up with the memorandum the lift read, not while it still holds it.
+    await pictureLift;
     releaseSlot?.();
     stopHeartbeat();
     await releaseOmSource(omSource);
