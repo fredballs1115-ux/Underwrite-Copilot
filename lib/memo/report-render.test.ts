@@ -259,6 +259,51 @@ describe("ReportDocument (full report)", () => {
     expect(text).toMatch(/balance, \d+\.\d% to its Mar 2028 maturity/);
   }, 45000);
 
+  it("on a note behind a senior loan, prints no loan-to-value and says why", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2025, 8, 30)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      interest: {
+        kind: "note" as const,
+        summary: "Sale of a mezzanine loan",
+        share: "",
+        groundLease: "",
+        loan: "$80M mezzanine loan behind a senior mortgage",
+        page: "",
+      },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        row("Unpaid principal balance", "$80,000,000"),
+        row("Note rate", "9.00%"),
+        row("Maturity date", "March 31, 2028"),
+        row("Amortization", "Interest-only"),
+        row("Payment status", "Performing"),
+        row("Whole-asset value", "$300,000,000"),
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const input = buildReportData(deal, "September 30, 2025", [], buildSensitivityData(derived.inputs, null));
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.");
+    // $80M over $300M alone would read 27%: never printed.
+    expect(text).not.toMatch(/puts the balance at \d+% of its value/);
+  }, 45000);
+
   it("prints the seller's loan offered for assumption beside the model it was priced against (#419)", async () => {
     vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 25)), toFake: ["Date"] });
     const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });

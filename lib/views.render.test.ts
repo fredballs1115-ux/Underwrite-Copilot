@@ -5350,6 +5350,34 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(under).toMatch(/left:81\.9\d*%/);
   });
 
+  it("a note behind a senior loan draws no loan-to-value: its price against its balance, and why", () => {
+    const AS_OF = new Date(Date.UTC(2025, 8, 30));
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 5" });
+    const mezz = base({ ...blank, kind: "note", summary: "Sale of a $15M mezzanine loan", loan: "$15M mezzanine loan behind a $60M senior loan", page: "p. 5" }, [
+      row("Unpaid principal balance", "$16,000,000"),
+      row("Note rate", "11.0%"),
+      row("Maturity date", "March 31, 2028"),
+      row("Whole-asset value", "$70,000,000"),
+      row("Payment status", "Performing"),
+    ]);
+    const html = render(React.createElement(InterestPanel, { interest: readInterestFor(mezz, 15_000_000, AS_OF) }));
+    const text = visibleText(html);
+    // The note's own figures stand.
+    expect(html).toContain('data-qa="note-figures"');
+    // No collateral track, no percentage of the collateral's value.
+    expect(html).not.toContain('data-bar="note-balance"');
+    expect(text).not.toContain("of the collateral's value");
+    expect(text).not.toMatch(/Unpaid balance \$16\.0M · \d+%/);
+    // The price against the balance, and the reason the loan-to-value is not given.
+    expect(html.match(/data-bar="interest"/g)).toHaveLength(1);
+    expect(text).toContain("Price $15.0M");
+    expect(text).toContain("Unpaid balance $16.0M");
+    expect(html).toContain('data-qa="note-ltv-withheld"');
+    expect(text).toContain("its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.");
+    expect(a11yIssues(html), "mezzanine note panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
   it("a leased fee: the building's income as the track, the ground rent filled, and the calculator's leased-fee side", () => {
     const ex = base({ ...blank, kind: "leased_fee", groundLease: "71 years remaining; unsubordinated" }, [
       { label: "Ground rent", value: "$1,200,000", flagged: false, page: "p. 4" },

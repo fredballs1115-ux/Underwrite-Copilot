@@ -36,7 +36,13 @@
 //
 // THE COLLATERAL'S VALUE IS THE OM'S. Loan-to-value at the balance and at
 // the price are two divisions by the value the memorandum states — the
-// cushion under the lender and under the buyer — never a value of ours.
+// cushion under the lender and under the buyer — never a value of ours. And
+// only for a note nothing ranks ahead of: a mezzanine loan, a second or
+// junior lien, a B-note, subordinate debt or a position behind a senior loan
+// is at risk from its LAST dollar, which sits on top of the senior balance —
+// $15M behind a $60M senior loan on a $70M value had read 21% where the
+// stack is 107%. The memorandum states no senior balance (the extraction has
+// no row for one), so the loan-to-value is withheld, never computed.
 
 import { withArticle } from "@/lib/article";
 import { parseUsd } from "@/lib/money";
@@ -61,6 +67,10 @@ export interface NoteTerms {
   status: NoteStatus | null;
   /** the collateral's value as the OM states it */
   collateralValue: number | null;
+  /** the note sits behind other debt, as the memorandum's words for it say
+   *  (`isSubordinateNote`): its loan-to-value needs a senior balance the
+   *  memorandum does not state, and is withheld */
+  subordinate: boolean;
 }
 
 export interface NoteRead {
@@ -81,9 +91,12 @@ export interface NoteRead {
    *  years from today's balance", or run interest-only where the OM states
    *  an interest-only period beside an amortization */
   paymentBasis: string | null;
-  /** the balance over the collateral's stated value, percent */
+  /** the balance over the collateral's stated value, percent — null on a
+   *  subordinate note, whose loan-to-value runs on top of a senior balance
+   *  the memorandum does not state */
   ltvAtBalancePct: number | null;
-  /** the price over the collateral's stated value, percent */
+  /** the price over the collateral's stated value, percent — null on a
+   *  subordinate note, as above */
   ltvAtPricePct: number | null;
   /** past maturity on the reading's date */
   matured: boolean;
@@ -149,7 +162,46 @@ export function parseStatedDate(text: string | null | undefined, minYear: number
   return null;
 }
 
-type MetricRows = { metrics?: Array<{ label: string; value: string }> } | null | undefined;
+type MetricRows =
+  | {
+      metrics?: Array<{ label: string; value: string }>;
+      /** the interest as the extraction states it — its sentence and the
+       *  loan's terms, read for the note's position */
+      interest?: { summary?: string | null; loan?: string | null } | null;
+    }
+  | null
+  | undefined;
+
+// What puts a note behind other debt: a mezzanine loan, a second or junior
+// lien, a B-note, subordinate debt, or a position behind a senior loan.
+const SUBORDINATE_WORDS =
+  /\bmezz(?:anine)?\b|\b(?:second|2nd|third|3rd)[\s-]+(?:lien|mortgage|position|priority|trust[\s-]+deed|deed[\s-]+of[\s-]+trust)\b|\bjunior\b|\bb[\s-]?notes?\b|\bb[\s-]piece\b|\bsubordinat(?:e|ed)\b|\bbehind\b/i;
+// The note named AHEAD of the other loan: "senior to a $10M B-note", "ahead
+// of the mezzanine loan", "a $5M mezzanine loan sits behind it".
+const THIS_NOTE = String.raw`(?:it|this\s+(?:loan|note|mortgage|lien))\b`;
+const RANKS_AHEAD = new RegExp(
+  String.raw`\bsenior\s+to\b|\bahead\s+of\b|\bbehind\s+${THIS_NOTE}|\b(?:subordinat(?:e|ed)|junior)\s+to\s+${THIS_NOTE}`,
+  "i",
+);
+// The note named BEHIND another: "behind a $60M senior loan", "subordinate
+// to the A-note", "junior to the first mortgage".
+const RANKS_BEHIND = new RegExp(
+  String.raw`\bbehind\b(?!\s+${THIS_NOTE})|\b(?:subordinat(?:e|ed)|junior)\s+to\b(?!\s+${THIS_NOTE})`,
+  "i",
+);
+
+/**
+ * Whether the words for a note put it behind other debt — a mezzanine loan,
+ * a second or junior lien, a B-note, subordinate debt, a position behind a
+ * senior loan — unless they only name such a loan behind THIS one ("a $40M
+ * A-note senior to a $10M B-note"). Any other mention reads as subordinate:
+ * a loan-to-value withheld is the error that prints no wrong figure.
+ */
+export function isSubordinateNote(words: string | null | undefined): boolean {
+  const w = words ?? "";
+  if (!SUBORDINATE_WORDS.test(w)) return false;
+  return !(RANKS_AHEAD.test(w) && !RANKS_BEHIND.test(w));
+}
 
 const rowOf = (ex: MetricRows, re: RegExp, not?: RegExp) =>
   (ex?.metrics ?? []).find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
@@ -194,9 +246,17 @@ export function noteTermRows<M extends { label: string; value: string }>(metrics
 }
 
 /** The note's terms from the rows the extraction is asked to label them
- *  — each only as stated, null where the OM says nothing. */
+ *  — each only as stated, null where the OM says nothing. Its position is
+ *  read from the interest's own sentence and terms and the note's rows. */
 export function readNoteTerms(ex: MetricRows): NoteTerms {
   const { balanceRow, rateRow, maturityRow, amortRow, ioRow, statusRow, valueRow } = noteRowsOf(ex);
+  const position = [
+    ex?.interest?.summary,
+    ex?.interest?.loan,
+    ...[balanceRow, rateRow, maturityRow, amortRow, ioRow, statusRow].flatMap((r) => (r ? [r.label, r.value] : [])),
+  ]
+    .filter(Boolean)
+    .join(". ");
 
   const amortText = amortRow?.value ?? "";
   const statesIo =
@@ -225,6 +285,7 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
     amortYears,
     status,
     collateralValue: valueRow ? money(valueRow.value) : null,
+    subordinate: isSubordinateNote(position),
   };
 }
 
@@ -290,8 +351,11 @@ export function readNote(terms: NoteTerms, price: number | null, asOf: Date): No
     monthsLeft: months != null && !matured ? months : null,
     ytmPct,
     paymentBasis,
-    ltvAtBalancePct: terms.collateralValue != null ? (balance / terms.collateralValue) * 100 : null,
-    ltvAtPricePct: terms.collateralValue != null ? (price / terms.collateralValue) * 100 : null,
+    // Behind a senior loan the note's last dollar sits on top of a balance
+    // the memorandum does not state: withheld, never struck on the note's
+    // own balance alone.
+    ltvAtBalancePct: terms.collateralValue != null && !terms.subordinate ? (balance / terms.collateralValue) * 100 : null,
+    ltvAtPricePct: terms.collateralValue != null && !terms.subordinate ? (price / terms.collateralValue) * 100 : null,
     matured,
   };
 }

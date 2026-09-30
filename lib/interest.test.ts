@@ -9,6 +9,7 @@ import {
   interestOf,
   interestShortLine,
   noteCaption,
+  noteCollateralSentence,
   parseSharePct,
   readInterest,
 } from "./interest";
@@ -362,6 +363,42 @@ describe("a note, underwritten as a note (#416)", () => {
     expect(interestShortLine(bare)).toBe(
       "A loan secured by the property, not the property — the $20.0M price is an 18.0% discount to the $24.4M balance",
     );
+  });
+
+  it("a note behind a senior loan: no loan-to-value, and every surface says why", () => {
+    // $15M of mezzanine behind a $60M senior loan on a $70M value read "21%"
+    // when the stack is 107%. The memorandum states no senior balance.
+    const mezz = ex(
+      interest({ kind: "note", summary: "Sale of a $15M mezzanine loan", loan: "$15M mezzanine loan behind a $60M senior loan", page: "p. 5" }),
+      [row("Unpaid principal balance", "$15,000,000"), row("Note rate", "11.0%"), row("Maturity date", "March 31, 2028"), row("Whole-asset value", "$70,000,000"), row("Payment status", "Performing")],
+    );
+    const r = readInterest(mezz, 15_000_000, AS_OF)!;
+    expect(r.note!.terms.subordinate).toBe(true);
+    expect(r.note!.ltvAtBalancePct).toBeNull();
+    expect(r.note!.ltvAtPricePct).toBeNull();
+    const WITHHELD =
+      "The collateral's stated $70.0M is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.";
+    expect(noteCollateralSentence(r.note)).toBe(WITHHELD);
+    expect(r.headline).toContain(WITHHELD);
+    expect(r.headline).not.toMatch(/puts the balance at \d+%/);
+    expect(r.headline).not.toContain("21%");
+    // The memo's and the workbook cover's short line never carried the
+    // loan-to-value, and carries none now.
+    expect(interestShortLine(r)).not.toMatch(/\d+% of/);
+    expect(gluedWords(r.headline)).toEqual([]);
+    // The deal context and the challenger read the headline.
+    vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
+    expect(dealContextFor(mezz)).toContain(WITHHELD);
+    expect(interestNote(readInterest(mezz, askingPriceOf(mezz))!)).toContain(WITHHELD);
+  });
+
+  it("a first-lien note keeps its loan-to-value exactly as before", () => {
+    const first = note("Performing", [...TERMS]);
+    const withWords = { ...first, interest: { ...first.interest!, summary: "Sale of the first mortgage note", loan: "$24.4M first mortgage, 5.25% coupon" } };
+    const r = readInterest(withWords, 20_000_000, AS_OF)!;
+    expect(r.note!.terms.subordinate).toBe(false);
+    expect(noteCollateralSentence(r.note)).toBe(CUSHION);
+    expect(r.headline).toContain(CUSHION);
   });
 
   it("the deal context and the challenger read the note's yield on the day they run", () => {

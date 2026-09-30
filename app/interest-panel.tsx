@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LeaseTermBar } from "@/app/lease-term-bar";
 import { termEndLabel } from "@/lib/ground-lease-term";
-import { noteCaption, noteYieldSentence, type InterestRead } from "@/lib/interest";
+import { noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRead } from "@/lib/interest";
 
 /**
  * What is being sold (#414) — the pure panel for `lib/interest`, drawn by
@@ -23,7 +23,10 @@ import { noteCaption, noteYieldSentence, type InterestRead } from "@/lib/interes
  * the balance filled light and the price dark over it — the loan-to-value
  * at each, and the empty remainder the cushion. A note that is not paying,
  * or is past its maturity, keeps its sentence: a large yield there is one
- * nobody earns.
+ * nobody earns. A note behind other debt draws no collateral track — its
+ * cushion sits on top of a senior balance the memorandum does not state —
+ * so its price is drawn against its balance, and the sentence under it
+ * says why the loan-to-value is withheld.
  *
  * A ground lease's term is drawn under the lead where the memorandum states
  * when it ends (#421): the years left today, and the extension options
@@ -63,6 +66,9 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
   // always the collateral's bar where the memorandum states the value.
   const text = n && tiles.length === 0 ? [r.lead, noteYieldSentence(n)].filter(Boolean).join(" ") : r.lead;
   const caption = tiles.length > 0 ? noteCaption(n) : "";
+  // Behind a senior loan the loan-to-value is withheld (lib/note-yield), and
+  // the reason stands where the collateral's track would.
+  const ltvWithheld = n?.terms.subordinate ? noteCollateralSentence(n) : "";
   const collateral =
     n && n.terms.collateralValue != null && n.ltvAtBalancePct != null && n.ltvAtPricePct != null
       ? (() => {
@@ -178,6 +184,11 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
             <span className="text-right">{bar.right}</span>
           </div>
         </div>
+      )}
+      {ltvWithheld && (
+        <p className="mt-1 text-[11px] leading-snug text-muted" data-qa="note-ltv-withheld">
+          {ltvWithheld}
+        </p>
       )}
       {(r.summary || r.groundLease || r.loan) && (
         <ul className="mt-2 space-y-0.5 text-xs leading-relaxed text-muted">

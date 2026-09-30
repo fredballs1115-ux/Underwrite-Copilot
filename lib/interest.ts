@@ -287,9 +287,18 @@ export function noteYieldSentence(n: NoteRead | null): string {
 
 /** The note's cushion (#416): the loan-to-value at the balance and at the
  *  price, over the value the OM states for the collateral — "" where it
- *  states none. */
+ *  states none. On a note behind other debt (a mezzanine loan, a junior
+ *  lien, a B-note) the loan-to-value is withheld and the sentence says why:
+ *  at its last dollar it needs the senior loan's balance, which the
+ *  memorandum does not state. Every surface that prints the cushion — the
+ *  headline the deal context and the challenger read, the panel, the
+ *  report's note terms — prints this sentence. */
 export function noteCollateralSentence(n: NoteRead | null): string {
-  if (!n || n.ltvAtBalancePct == null || n.ltvAtPricePct == null || n.terms.collateralValue == null) return "";
+  if (!n || n.terms.collateralValue == null) return "";
+  if (n.terms.subordinate) {
+    return `The collateral's stated ${money(n.terms.collateralValue)} is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.`;
+  }
+  if (n.ltvAtBalancePct == null || n.ltvAtPricePct == null) return "";
   return `The collateral's stated ${money(n.terms.collateralValue)} puts the balance at ${Math.round(n.ltvAtBalancePct)}% of its value and the price at ${Math.round(n.ltvAtPricePct)}%.`;
 }
 
