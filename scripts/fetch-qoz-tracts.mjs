@@ -24,7 +24,9 @@
 // 01001020700 | Low-Income Community | 2011-2015" to "Wyoming | Washakie
 // | 56043000301 | Low-Income Community | 2011-2015"; the tract type is
 // "Low-Income Community" or "Non-LIC Contiguous". Columns are found by the
-// header's own names, never by position.
+// header's own names, never by position — by a cell's LAST line, since the
+// header's first cell holds the filter note above the name ("Click arrow to
+// filter state", a blank line, "State": the first run read no header).
 //
 // QOZ_URL is a test hook: the parser is checked against a workbook of the
 // same shape written locally, since the sandbox cannot reach cdfifund.gov.
@@ -70,7 +72,8 @@ export async function readQozList(bytes) {
     const cells = [];
     row.eachCell({ includeEmpty: true }, (cell, n) => (cells[n] = text(cell)));
     if (!cols) {
-      const at = (name) => cells.findIndex((c) => c === name);
+      const lastLine = (c) => (c ?? "").split(/\r?\n/).map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean).pop() ?? "";
+      const at = (name) => cells.findIndex((c) => lastLine(c).toLowerCase() === name.toLowerCase());
       const found = Object.fromEntries(Object.entries(HEADERS).map(([k, name]) => [k, at(name)]));
       if (Object.values(found).every((i) => i > 0)) cols = found;
       return;

@@ -11,8 +11,12 @@ const readQozList = read as (bytes: Buffer) => Promise<{
 
 // The CDFI Fund's workbook as the runner printed it (zori.yml probe_url, run
 // 36752260808): a title and three notes, the header in row 5, one row a
-// designated tract.
-async function workbook(rows: (string | number)[][], header = ["State", "County", "Census Tract Number", "Tract Type", "ACS Data Source"]): Promise<Buffer> {
+// designated tract. The header's first cell carries the filter note above
+// the name — "Click arrow to filter state", a blank line, "State" — one cell.
+async function workbook(
+  rows: (string | number)[][],
+  header = ["Click arrow to filter state\n\nState", "County", "Census Tract Number", "Tract Type", "ACS Data Source"],
+): Promise<Buffer> {
   const book = new ExcelJS.Workbook();
   const sheet = book.addWorksheet("QOZs 14Jun");
   sheet.addRow(["", "Designated Qualified Opportunity Zones"]);
