@@ -39,6 +39,7 @@ import {
   parseCount,
   parseMoney,
   parsePct,
+  parsePrice,
   unitCountFromMetrics,
   unitCountRow,
 } from "@/lib/criteria";
@@ -346,7 +347,9 @@ export function capitalBudgetFromMetrics(
 ): CapitalBudget | null {
   const m = findMetric(metrics, BUDGET_INCLUDE, BUDGET_EXCLUDE) as MetricLike | null;
   if (!m) return null;
-  const raw = parseMoney(m.value);
+  // A cost is read as a price is (#466): a range's top, the end that does
+  // not flatter the yield on it.
+  const raw = parsePrice(m.value);
   if (raw == null || !(raw > 0)) return null;
   const statedAllIn = ALL_IN.test(m.label);
   // An all-in figure with no price to take out of it stands as the total
@@ -380,7 +383,8 @@ export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): Metr
 export function askingPriceOf(extraction: ExtractionResult | null | undefined): number | null {
   if (!extraction) return null;
   const row = findPriceMetric(extraction.metrics ?? [], inferStrategy(extraction).kind);
-  const n = row ? parseMoney(row.value) : null;
+  // A range's top (#466): the end that does not flatter the returns.
+  const n = row ? parsePrice(row.value) : null;
   return n != null && n > 0 ? n : null;
 }
 
@@ -655,7 +659,7 @@ export function planSummary(
   if (!extraction || !isPlanDeal(strategy.kind)) return null;
   const metrics = extraction.metrics ?? [];
   const priceMetric = findPriceMetric(metrics, strategy.kind);
-  const priceRaw = priceMetric ? parseMoney(priceMetric.value) : null;
+  const priceRaw = priceMetric ? parsePrice(priceMetric.value) : null;
   const stated = priceRaw != null && priceRaw > 0 ? priceRaw : null;
   // What the price buys (#414, #415): a share's is grossed up to the whole
   // the plan's figures describe; a note's, a leased fee's and a share's
@@ -730,7 +734,7 @@ export function assessPlausibility(
   if (!extraction) return [];
   const metrics = extraction.metrics ?? [];
   const priceMetric = findPriceMetric(metrics, strategy.kind);
-  const stated = priceMetric ? parseMoney(priceMetric.value) : null;
+  const stated = priceMetric ? parsePrice(priceMetric.value) : null;
   if (stated == null || !(stated > 0)) return [];
   // What the price buys (lib/interest, #414). A note's price is a loan's:
   // set against the collateral's NOI it is a cap rate nobody earns, so no

@@ -4,7 +4,7 @@
 // (Universal module: used by the deal page; snapshots are written by the
 // pipeline into deals.prior_screen — see migration 0010.)
 
-import { METRIC_FIND, parseMoney, parsePct } from "./criteria";
+import { METRIC_FIND, parseMoney, parsePct, parsePrice } from "./criteria";
 
 interface MetricLike {
   label: string;
@@ -51,6 +51,8 @@ interface Tracked {
   include: RegExp;
   exclude?: RegExp;
   kind: "money" | "pct";
+  /** the asking price, read as every price is: a range at its top (#466) */
+  price?: boolean;
   /** which way is good news for the buyer */
   betterWhen: "down" | "up";
 }
@@ -66,6 +68,7 @@ const TRACKED: Tracked[] = [
     include: METRIC_FIND.price.inc,
     exclude: METRIC_FIND.price.exc,
     kind: "money",
+    price: true,
     betterWhen: "down",
   },
   {
@@ -215,7 +218,7 @@ export function computeScreenDiff(
     if (!pair) continue;
     const [b, a] = pair;
 
-    const parse = t.kind === "money" ? parseMoney : parsePct;
+    const parse = t.price ? parsePrice : t.kind === "money" ? parseMoney : parsePct;
     const bv = parse(b.value);
     const av = parse(a.value);
     if (bv == null || av == null) continue;

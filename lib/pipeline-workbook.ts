@@ -3,7 +3,7 @@ import ExcelJS from "exceljs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import { STAGES, STAGE_LABEL, normalizeStage, type Stage } from "@/lib/stages";
 import { assetClassLabel } from "@/lib/asset-class";
-import { parseMoney, parsePct } from "@/lib/criteria";
+import { parsePct, parsePrice, priceRange } from "@/lib/criteria";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
@@ -219,7 +219,10 @@ export async function buildPipelineWorkbook(
       row.getCell(6).value = d.market || "—";
       row.getCell(6).font = baseFont;
 
-      const priceNum = d.price ? parseMoney(d.price) : null;
+      // A range at its top (#466), the figure every other reader takes, and
+      // the range said in the cell's note.
+      const priceNum = d.price ? parsePrice(d.price) : null;
+      const priceSpan = d.price ? priceRange(d.price) : null;
       const priceCell = row.getCell(7);
       if (priceNum != null) {
         priceCell.value = priceNum;
@@ -234,6 +237,7 @@ export async function buildPipelineWorkbook(
       // …and where the seller's loan is offered for assumption (#419), the
       // same note says so, since the columns are fixed too.
       const notes = [
+        priceSpan ? `The memorandum states a range, ${d.price}: the cell is its top, the end that does not flatter the returns.` : null,
         d.interest ? `${d.interest}: the price does not buy the building outright — the deal page says what it buys.` : null,
         d.debt ? `${d.debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate.` : null,
         d.affordable ? `${d.affordable}: a covenant or a contract sets these rents — they move with the limits, not the market; the deal page says until when.` : null,
@@ -380,7 +384,7 @@ export async function buildPipelineWorkbook(
   // Live-pipeline value: sum of parsed asking prices, dead excluded.
   const live = rows.filter((d) => normalizeStage(d.stage) !== "dead");
   const prices = live
-    .map((d) => (d.price ? parseMoney(d.price) : null))
+    .map((d) => (d.price ? parsePrice(d.price) : null))
     .filter((n): n is number => n != null && n > 0);
   const totalRow = r + 1;
   header(`B${totalRow}`, "Live pipeline");

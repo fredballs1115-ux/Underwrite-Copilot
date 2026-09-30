@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { findMetric, parseMoney } from "@/lib/criteria";
+import { findMetric, parseMoney, parsePrice } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
   buildingPriceOf,
@@ -184,7 +184,7 @@ function deriveSeed(
   // the whole asset, so a share's price is grossed up, and a note's or a
   // leased fee's seeds no price the property's loan could be tested on.
   const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind);
-  const price = buildingPriceOf(extraction, priceMetric ? parseMoney(priceMetric.value) : null);
+  const price = buildingPriceOf(extraction, priceMetric ? parsePrice(priceMetric.value) : null);
   // The in-place or Year-1 NOI, never the stabilized pro forma.
   const figs = noiFigures(metrics);
   const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1") ?? null;

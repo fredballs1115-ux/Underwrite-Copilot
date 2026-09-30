@@ -14,6 +14,7 @@ import {
   findMetric,
   parseMoney,
   parsePct,
+  parsePrice,
   METRIC_FIND,
 } from "@/lib/criteria";
 import {
@@ -189,7 +190,7 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     // and the price the building's figures describe (#415): a share's
     // grossed up to the whole, none for a note or a leased fee.
     const priceMetric = findPriceMetric(metrics, strategy.kind);
-    const price = buildingPriceOf(ext, priceMetric ? parseMoney(priceMetric.value) : null);
+    const price = buildingPriceOf(ext, priceMetric ? parsePrice(priceMetric.value) : null);
     const basis = plan
       ? plan.totalCost != null
         ? deriveBasis(metrics, assetClass, plan.totalCost, true)

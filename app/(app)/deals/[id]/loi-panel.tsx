@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { withArticle } from "@/lib/article";
+import { parsePrice } from "@/lib/criteria";
 import { parseUsd } from "@/lib/money";
 
 /**
@@ -24,7 +25,10 @@ export function LoiPanel({
   plan?: { kind: string; label: string } | null;
 }) {
   const needsEntitlements = plan?.kind === "conversion" || plan?.kind === "development";
-  const prefill = parseUsd(askingPrice);
+  // The ask as every surface reads it — a range at its top (#466) — and a
+  // figure only where it is a price at all.
+  const asked = parsePrice(askingPrice);
+  const prefill = asked != null && asked >= 10_000 ? Math.round(asked) : null;
   const [buyer, setBuyer] = useState("");
   const [price, setPrice] = useState(prefill ? String(prefill) : "");
   const [deposit, setDeposit] = useState(

@@ -7,7 +7,7 @@
 // (the same price, cap, count and plan rows every other surface uses), then
 // the flagged rows, then the rest.
 import type { InterestKind } from "./anthropic/types";
-import { findGoingInCap, parseMoney } from "./criteria";
+import { findGoingInCap, parsePrice } from "./criteria";
 import {
   capitalBudgetFromMetrics,
   findPriceMetric,
@@ -69,7 +69,7 @@ export function keyTermRows<M extends KeyTermMetric>(
   } else if (isPlanDeal(kind)) {
     const stabilized = noiFigures(rows).find((f) => f.kind === "stabilized");
     if (stabilized) lead(rows.find((m) => m.label === stabilized.label));
-    const priceValue = price ? parseMoney(price.value) : null;
+    const priceValue = price ? parsePrice(price.value) : null;
     const budget = capitalBudgetFromMetrics(
       rows,
       priceValue != null && priceValue > 0 ? priceValue : null,

@@ -27,6 +27,7 @@ import {
   parseCount,
   parseMoney,
   parsePct,
+  parsePrice,
   findGoingInCap,
   geoTargets,
   hasNoDealbreakers,
@@ -229,7 +230,8 @@ function evalDealbreakers(
   // land cost is judged, the same row the page prints.
   if (db.maxPriceM != null) {
     const priceRow = findPriceRow(metrics, extraction?.strategy?.kind);
-    const price = priceRow ? parseMoney(priceRow.value) : null;
+    // A range's top (#466): a ceiling is tested by the end that can breach it.
+    const price = priceRow ? parsePrice(priceRow.value) : null;
     const ceiling = db.maxPriceM * 1e6;
     if (price == null) unknown.push("price");
     else if (price <= ceiling) clear.push("price");

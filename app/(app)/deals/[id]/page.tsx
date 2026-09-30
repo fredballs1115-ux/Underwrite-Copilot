@@ -46,7 +46,7 @@ import { floodKey, floodZoneLine, siteFlagsOutdated, siteFlagsStale, type NfhlLe
 import { floodLegend } from "@/lib/flood-map";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
-import { buildingSfRow, findGoingInCap, parseMoney } from "@/lib/criteria";
+import { buildingSfRow, findGoingInCap, parsePrice } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { signedSupplementUrl } from "@/lib/storage";
@@ -810,7 +810,7 @@ export default async function DealPage({
   // public-record comps' median call and the research panel's per-unit
   // read divide; the header still shows the price as asked.
   const priceTag = interestTag(extraction);
-  const subjectPriceNumber = buildingPriceOf(extraction, summaryPrice ? parseMoney(summaryPrice) : null);
+  const subjectPriceNumber = buildingPriceOf(extraction, summaryPrice ? parsePrice(summaryPrice) : null);
   // Also re-kick a lingering "pending" sentinel: a deploy can kill the
   // after() worker between claim and result, and claimRecordComps's
   // stale-pending reclaim (10-min threshold) is only reachable if someone

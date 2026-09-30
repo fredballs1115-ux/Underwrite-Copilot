@@ -3,8 +3,8 @@ import {
   buildingSfFromMetrics,
   findGoingInCap,
   findMetric,
-  parseMoney,
   parsePct,
+  parsePrice,
 } from "@/lib/criteria";
 import {
   buildingPriceOf,
@@ -171,7 +171,7 @@ export function deriveInternalComps(
     if (!price && !cap && yoc == null) continue;
     // Only rows whose values actually parse — a garbled extraction ("TBD",
     // "see broker") isn't a comp.
-    const priceNum = price ? parseMoney(price.value) : null;
+    const priceNum = price ? parsePrice(price.value) : null;
     const capNum = cap ? parsePct(cap.value) : null;
     if (priceNum == null && capNum == null && yoc == null) continue;
 

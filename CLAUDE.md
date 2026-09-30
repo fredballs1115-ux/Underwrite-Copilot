@@ -651,15 +651,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   days — `esaAge`: current, update, redo; the date read as early as its
   words allow, a month or a year alone its first day, `reportDate`); **a
   finding is what the words say** (`esaFinding`: a REC, a CREC, an HREC,
-  de minimis, none — a denial like "no RECs", "did not identify any RECs"
-  or "RECs: none" struck out before the rest is read, so "No RECs; one
-  HREC" is the historical one; a "no further action" letter is said as
+  de minimis, none — a denial like "no RECs", "did not identify any RECs",
+  "RECs: none" or "RECs were not identified" struck out before the rest is
+  read, so "No RECs; one HREC" is the historical one; an exception in the
+  denial's own clause is the finding, and the standard's "no evidence of
+  RECs … except for the following:" lists RECs, while an "except" in a
+  clause of its own is not one; a "no further action" letter is said as
   stated, never as clean); **the immediate repairs are capital at
   closing** (the model's `capitalImprovementsYr1` carries them, extracted,
   where the memorandum states no budget and no PIP; a stated budget or PIP
   is read as including them, never the two added); **a blank is null**
-  ("None" repairs is a finding of zero; an uncited report is absent). The
-  zoning reader strikes "no violations" before it reads. Tags, most serious
+  ("None" repairs is a finding of zero, but a row that states nothing —
+  "N/A", "Not stated", "—" — is no row at all, never a clean report; an
+  uncited report is absent). A date filed under the report's own name
+  ("Phase I ESA": "March 2026") is its date, never its finding. The
+  zoning reader strikes "no violations" before it reads, and reads
+  "legal, non-conforming" with its comma. Tags, most serious
   first: "Phase I: REC", "PML 24%", "Phase I: CREC", "Non-conforming",
   "Legal non-conforming", "Repairs $630k", "Phase I over a year old".
   `PML_LENDER_PCT` (20) is the line most lenders ask for earthquake
@@ -677,6 +684,33 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   cover ("The reports", `meta.siteReports`), the report's caveat
   (`buildReportData`'s twenty-first argument) and the compare table's
   Reports row.
+- A price stated as a range (#466): pricing guidance or a whisper —
+  "$40,000,000 – $42,000,000", "$40M-$42M", "$40–42M", "$40 to $42
+  million", "between $40M and $42M" — is read at its TOP, the end that
+  does not flatter a return. `priceRange` in `lib/criteria.ts` reads the
+  two ends (the second figure's scale carried to a first written without
+  one, where that makes a range at all; a second no larger than the first,
+  or more than twice it, is no range: "$42,000,000 – $500,000 credit",
+  "– 5.25% cap"), `parsePrice` is the range's top or else `parseMoney`, and
+  `priceRangeShort` writes "$40–42M" for a slot that shows one price.
+  **Every reader of an asking price goes through `parsePrice`**:
+  `askingPriceOf`, the plan (`planSummary`) and its capital budget (a cost
+  read as a price is), the plausibility check, the model
+  (`deriveUnderwriteInputs`, whose source note says "the top of the
+  $40,000,000–$42,000,000 range the OM states, the end that does not
+  flatter the returns; enter the price you would pay"), the mandate
+  ceiling, the internal comps, the analytics, the market memory, the key
+  terms' budget, the comps' subject basis, the portfolio's allocation
+  against the ask, the screen diff's price row, the debt sizer's seed, the
+  deal page's building price, the letter of intent's prefill, the
+  pipeline's sort and price column (the range shown as one) and the
+  meeting workbook (the top in the cell, the range in its note). The buy
+  box's price band judges a ceiling by the range's top and a floor by its
+  bottom, and says the range ("the ask is $40.0M–$42.0M, its top 2%
+  over"). `parseMoney` itself still reads a range's first figure: an
+  income's unflattering end is its bottom, not its top, so it stays the
+  reader of every other figure. The header and the key terms print the
+  price row as stated.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`

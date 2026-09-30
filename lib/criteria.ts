@@ -398,6 +398,77 @@ export function parseMoney(raw: string): number | null {
   return sign * n * mult;
 }
 
+// ── A price stated as a range (#466) ─────────────────────────────────────
+
+const RANGE_SCALE: Record<string, number> = {
+  k: 1e3,
+  thousand: 1e3,
+  m: 1e6,
+  mm: 1e6,
+  million: 1e6,
+  b: 1e9,
+  bn: 1e9,
+  billion: 1e9,
+};
+const RANGE_FIGURE = String.raw`\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|thousand|mm|million|m|bn|billion|b)?`;
+const PRICE_RANGE = new RegExp(
+  String.raw`^(?:(?:±|\+\/-|~|≈|approx(?:imately|\.)?|about|circa|c\.|usd|us\$)\s*)?(?:between\s+)?${RANGE_FIGURE}\s*(?:[-–—]|to|and)\s*${RANGE_FIGURE}\b`,
+  "i",
+);
+
+/**
+ * A price the OM states as a RANGE — pricing guidance, a whisper — as its
+ * two ends: "$40,000,000 – $42,000,000", "$40M-$42M", "$40–42M", "$40 to
+ * $42 million", "between $40M and $42M". The second figure's scale carries
+ * to a first written without one ("$40–42M" is $40M to $42M) wherever that
+ * makes a range at all, so "$950,000 – $1.1M" keeps its first figure whole.
+ * Null for a single figure, and for two figures that are not a range: a
+ * second no larger than the first ("$42,000,000 – $500,000 credit",
+ * "$42,000,000 – 5.25% cap") or more than twice it.
+ */
+export function priceRange(raw: string): { low: number; high: number } | null {
+  const m = PRICE_RANGE.exec(raw.trim());
+  if (!m) return null;
+  const n1 = Number(m[1].replace(/,/g, ""));
+  const n2 = Number(m[3].replace(/,/g, ""));
+  const s1 = m[2] ? (RANGE_SCALE[m[2].toLowerCase()] ?? 1) : 1;
+  const s2 = m[4] ? (RANGE_SCALE[m[4].toLowerCase()] ?? 1) : 1;
+  const high = n2 * s2;
+  let low = n1 * s1;
+  // "$40–42M": the first figure borrows the second's scale where, so
+  // scaled, it lies within a range's reach below the second.
+  if (!m[2] && m[4] && n1 * s2 <= high && n1 * s2 * 2 >= high) low = n1 * s2;
+  if (!Number.isFinite(low) || !Number.isFinite(high) || !(low > 0) || !(high > low) || high > 2 * low) return null;
+  return { low, high };
+}
+
+/**
+ * A PRICE, read on the side that does not flatter the buyer: the top of a
+ * range the OM states — a lower price lifts every return and every cap
+ * struck on it — else the one figure `parseMoney` reads. Every reader of an
+ * asking price goes through here; `parseMoney` stays the reader of every
+ * other figure, since an income's or a cost's unflattering side is not its
+ * top. It read "$40,000,000 – $42,000,000" guidance as $40M before.
+ */
+export function parsePrice(raw: string): number | null {
+  const r = priceRange(raw);
+  return r ? r.high : parseMoney(raw);
+}
+
+const rangeEnd = (n: number, unit: number, suffix: string) => {
+  const v = n / unit;
+  return `${Number.isInteger(v) ? v : Math.round(v * 10) / 10}${suffix}`;
+};
+
+/** A range as one short figure — "$40–42M", "$950k–$1.1M" — for a slot
+ *  that shows one price. */
+export function priceRangeShort(r: { low: number; high: number }): string {
+  if (r.low >= 1e6) return `$${rangeEnd(r.low, 1e6, "")}–${rangeEnd(r.high, 1e6, "M")}`;
+  if (r.high >= 1e6) return `$${rangeEnd(r.low, 1e3, "k")}–$${rangeEnd(r.high, 1e6, "M")}`;
+  if (r.low >= 1e3) return `$${rangeEnd(r.low, 1e3, "")}–${rangeEnd(r.high, 1e3, "k")}`;
+  return `$${Math.round(r.low)}–${Math.round(r.high)}`;
+}
+
 /** "5.25%" / "5.25 %" → 5.25, or null. */
 export function parsePct(raw: string): number | null {
   const m = raw.replace(/\s/g, "").match(/(-?\d+(?:\.\d+)?)%/);
@@ -1099,7 +1170,18 @@ export function evaluateBuyBox(
     // the deal page and the pipeline print — so the band never says
     // "no asking price" beside a printed one.
     const metric = findPriceRow(metrics, extraction?.strategy?.kind);
-    const dollars = metric ? parseMoney(metric.value) : null;
+    // A range (#466) is judged by the end that tests the band: its bottom
+    // where it reaches under a floor, else its top — never the flattering
+    // end against a ceiling — and said as the range it is.
+    const range = metric ? priceRange(metric.value) : null;
+    const dollars = range
+      ? band.min != null && range.low < band.min
+        ? range.low
+        : range.high
+      : metric
+        ? parseMoney(metric.value)
+        : null;
+    const shown = (n: number) => (range ? `${fmtM(range.low)}–${fmtM(range.high)}` : fmtM(n));
     const noun = metric && /\b(land|site)\b/i.test(metric.label) ? "land cost" : "ask";
     const bandText = [
       band.min != null ? `${fmtM(band.min)} min` : null,
@@ -1127,18 +1209,22 @@ export function evaluateBuyBox(
         checks.push({
           label: "Price",
           status: "pass",
-          detail: `Mandate is ${bandText} — the ${noun} is ${fmtM(dollars)}. Inside the band.`,
+          detail: `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}. Inside the band.`,
         });
       } else {
         const bound = belowMin ? band.min! : band.max!;
         const off = Math.abs(dollars - bound) / bound;
         const near = off <= NEAR_REL;
+        // Which end of a range missed.
+        const end = range ? `its ${belowMin ? "bottom" : "top"} ` : "";
         checks.push({
           label: "Price",
           status: near ? "near" : "miss",
           detail: near
-            ? `Mandate is ${bandText} — the ${noun} is ${fmtM(dollars)}, ${Math.round(off * 100)}% ${belowMin ? "under" : "over"}. Close enough to price; a retrade could land it inside.`
-            : `Mandate is ${bandText} — the ${noun} is ${fmtM(dollars)}. ${belowMin ? "Below" : "Beyond"} the mandate.`,
+            ? `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}, ${end}${Math.round(off * 100)}% ${belowMin ? "under" : "over"}. Close enough to price; a retrade could land it inside.`
+            : range
+              ? `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}, ${end}${belowMin ? "below" : "beyond"} the mandate.`
+              : `Mandate is ${bandText} — the ${noun} is ${fmtM(dollars)}. ${belowMin ? "Below" : "Beyond"} the mandate.`,
         });
       }
     }
