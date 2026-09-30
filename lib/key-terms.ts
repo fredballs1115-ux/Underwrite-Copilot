@@ -21,6 +21,7 @@ import { noteTermRows } from "./note-yield";
 import { affordableTermRows } from "./affordable";
 import { singleTenantTermRows } from "./single-tenant";
 import { hotelTermRows } from "./hotel-deal";
+import { saleTermRows } from "./sale-terms";
 
 export interface KeyTermMetric {
   label: string;
@@ -55,6 +56,9 @@ export function keyTermRows<M extends KeyTermMetric>(
   };
   const price = findPriceMetric(rows, kind);
   lead(price);
+  // An auction has no asking price (#456): its starting bid, the buyer's
+  // premium, the reserve and the deadline stand where the price would.
+  for (const row of saleTermRows(rows)) lead(row);
   if (interest === "note") {
     for (const row of noteTermRows(rows)) lead(row);
   } else if (isPlanDeal(kind)) {

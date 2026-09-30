@@ -20,6 +20,8 @@ import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLea
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantModelLine, singleTenantShortLine } from "@/lib/single-tenant";
 import { hotelModelLine, hotelShortLine, readHotelDeal } from "@/lib/hotel-deal";
+import { readSale, saleShortLine } from "@/lib/sale-terms";
+import { saleCeilingRead } from "@/lib/sale-ceiling";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -115,6 +117,11 @@ export interface WorkbookMeta {
    *  ending inside its hold, a manager outlasting its sale; absent on
    *  anything but a hotel */
   hotel?: { line: string; read: string } | null;
+  /** how the property is sold (lib/sale-terms, #456): the sale in one line,
+   *  then the most this model pays all-in at the screening hurdle, backed
+   *  out of the buyer's premium (lib/sale-ceiling); absent on a negotiated
+   *  sale */
+  sale?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -349,6 +356,9 @@ export function deriveUnderwriteInputs(
   // promote — and a note's price is the collateral's model at the loan's
   // price, which the note says outright.
   const interest = interestOf(extraction);
+  // How it is sold (#456): an auction's starting bid is where the price
+  // starts, read only where no asking price is stated.
+  const saleFloor = readSale(extraction);
 
   if (price != null && interest.kind === "partial_interest" && interest.sharePct != null) {
     const share = interest.sharePct;
@@ -374,6 +384,19 @@ export function deriveUnderwriteInputs(
               ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease; the model runs the ground rent as the income, with a building's assumptions"
               : "OM asking / purchase price",
       pageOf(priceMetric),
+    );
+  } else if (saleFloor?.floorAllIn != null && saleFloor.startingBid != null) {
+    // An auction has no asking price (#456): the starting bid plus the
+    // buyer's premium is the floor of what a winner pays, a stated fact —
+    // never a placeholder, and never the price itself.
+    price = saleFloor.floorAllIn;
+    mark(
+      "purchasePrice",
+      "derived",
+      `The $${Math.round(saleFloor.startingBid).toLocaleString("en-US")} starting bid${
+        saleFloor.premium ? ` plus the ${saleFloor.premium.pct}% buyer's premium` : ""
+      } — the floor of what a winning bidder pays, so every return here is a ceiling; enter the price you would bid`,
+      saleFloor.startingBidPage || undefined,
     );
   } else if (goingFig && capPct) {
     // Only an in-place / Year-1 NOI may back a price out of the going-in cap.
@@ -697,6 +720,7 @@ export function deriveUnderwriteInputs(
       leasehold: leaseholdMeta(extraction, inputs),
       affordable: affordableMeta(extraction),
       singleTenant: singleTenantMeta(extraction, inputs),
+      sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {
             line: hotelShortLine(hotelRead),

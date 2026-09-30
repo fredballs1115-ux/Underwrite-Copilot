@@ -13,6 +13,7 @@ import { assumableTag } from "@/lib/assumable-debt";
 import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
 import { hotelTag } from "@/lib/hotel-deal";
+import { saleTag } from "@/lib/sale-terms";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -42,6 +43,10 @@ export interface PipelineSlots {
    *  "Unencumbered", "Independent" (lib/hotel-deal `hotelTag`, #455);
    *  absent or null on anything but a hotel */
   hotel?: string | null;
+  /** how the property is sold — "Auction, 5% premium", "Receivership
+   *  sale", "Bank-owned (REO)" (lib/sale-terms `saleTag`, #456); absent or
+   *  null on a negotiated sale */
+  sale?: string | null;
 }
 
 /**
@@ -100,5 +105,8 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     tenancy: singleTenantTag(extraction),
     // A hotel's contracts and its PIP change what the price buys.
     hotel: hotelTag(extraction),
+    // An auction's price is whatever clears; a court's or a lender's sale
+    // is as-is — said beside the price.
+    sale: saleTag(extraction),
   };
 }

@@ -147,3 +147,21 @@ describe("dealContextFor — what a hotel is sold with (#455)", () => {
     expect(dealContextFor({ ...hotel, hotel: undefined })).toBe("Deal type: Stabilized.");
   });
 });
+
+describe("dealContextFor — how the property is sold (#456)", () => {
+  it("says an auction's starting bid is not a price, before anything else but what is being sold", () => {
+    const auction: ExtractionResult = {
+      dealName: "Midtown Office Tower",
+      assetClass: "office",
+      strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+      sale: { method: "auction", terms: "", condition: "", page: "" },
+      metrics: [m("NOI (in-place)", "$480,000"), m("Starting bid", "$2,500,000"), m("Buyer's premium", "5%")],
+    };
+    const ctx = dealContextFor(auction)!;
+    expect(ctx.startsWith("How it is sold: The property is sold at auction: bidding opens at $2.5M")).toBe(true);
+    expect(ctx).toContain("$2.5M at the hammer is $2.63M all-in");
+    expect(dealContextFor({ ...auction, sale: { ...auction.sale!, method: "negotiated" }, metrics: [m("Asking price", "$3,000,000")] })).toBe(
+      "Deal type: Stabilized.",
+    );
+  });
+});

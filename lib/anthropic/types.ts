@@ -166,7 +166,30 @@ export interface ExtractionResult {
    *  extraction saved before it was read, and blank on anything but a
    *  hotel. Read by lib/hotel-deal. */
   hotel?: ExtractedHotel;
+  /** HOW THE PROPERTY IS SOLD (#456): a negotiated sale, an auction, a
+   *  receiver's, a bankruptcy's or a lender's (REO) — with its terms and
+   *  the condition it is sold in, as the OM states them. Absent on an
+   *  extraction saved before it was read. Read by lib/sale-terms. */
+  sale?: ExtractedSale;
   metrics: ExtractedMetric[];
+}
+
+/** How a property is sold (#456). */
+export type SaleMethod = "negotiated" | "auction" | "receivership" | "bankruptcy" | "reo" | "unknown";
+
+/** The sale as the OM states it — every field a string, "" where it
+ *  states none. The auction's figures (the starting bid, the reserve, the
+ *  buyer's premium, the bid deadline, a stalking-horse bid) are rows. */
+export interface ExtractedSale {
+  method: SaleMethod;
+  /** the sale's terms as stated — the platform or court, the deposit, the
+   *  closing period, the contingencies, the bid procedures */
+  terms: string;
+  /** the condition it is sold in as stated — "as-is, where-is", no
+   *  representations or warranties */
+  condition: string;
+  /** the OM's page for the sale */
+  page: string;
 }
 
 /** What a hotel's sale is subject to (#455): free of its brand and its

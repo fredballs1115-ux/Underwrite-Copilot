@@ -40,6 +40,7 @@ import { assumableNote, readAssumable } from "@/lib/assumable-debt";
 import { affordableNote, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantNote } from "@/lib/single-tenant";
 import { hotelNote, readHotelDeal } from "@/lib/hotel-deal";
+import { readSale, saleNote } from "@/lib/sale-terms";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -864,6 +865,11 @@ async function runAnalysisSteps(
         // encumbrance and the PIP, then the contract traps by name.
         const hotel = readHotelDeal(ex);
         if (hotel) notes.push(hotelNote(hotel));
+
+        // How it is sold (#456): an auction's bid and premium, a court's or
+        // a lender's sale — the sale's traps by name.
+        const sale = readSale(ex);
+        if (sale) notes.push(saleNote(sale));
 
         if (flagged.length) {
           notes.push(

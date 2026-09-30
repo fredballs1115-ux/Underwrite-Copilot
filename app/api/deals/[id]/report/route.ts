@@ -19,6 +19,7 @@ import { leaseholdExitView, readLeaseholdExit, type LeaseholdExitView } from "@/
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { staleAfterFailure } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
@@ -159,6 +160,7 @@ export async function GET(
   let leasehold: LeaseholdExitView | null = null;
   let singleTenant: { line: string; read: string } | null = null;
   let hotel: { line: string; read: string } | null = null;
+  let sale: { line: string; read: string } | null = null;
   try {
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
     if (extraction) {
@@ -215,6 +217,11 @@ export async function GET(
       singleTenant = derived.meta.singleTenant ?? null;
       // What a hotel is sold with (#455), read against this model.
       hotel = derived.meta.hotel ?? null;
+      // How it is sold (#456): the ceiling bid at this report's own hurdle,
+      // the buy box's where set — the same one its grids are coloured by.
+      sale = derived.meta.sale
+        ? { line: derived.meta.sale.line, read: saleCeilingRead(extraction, derived.inputs, hurdlePct ?? SALE_HURDLE_PCT) }
+        : null;
 
       // The model's assumptions against the published figures — the same
       // read the deal page's card and the workbook make (lib/model-vs-market,
@@ -293,7 +300,7 @@ export async function GET(
         ((deal as unknown as { site_flags?: SiteFlagsResult | null }).site_flags ?? null),
       ).catch(() => null),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

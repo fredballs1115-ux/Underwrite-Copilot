@@ -121,6 +121,18 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     ]);
   });
 
+  it("an auction's starting bid, premium, reserve and deadline stand where the price would (#456)", () => {
+    const auction = [
+      { label: "Total SF", value: "62,000 SF", flagged: false },
+      { label: "Bid deadline", value: "October 15, 2026", flagged: false },
+      { label: "Replacement reserve", value: "$0.25/SF", flagged: false },
+      { label: "Reserve price", value: "Undisclosed", flagged: false },
+      { label: "Buyer's premium", value: "5%", flagged: false },
+      { label: "Starting bid", value: "$2,500,000", flagged: false },
+    ];
+    expect(keyTermRows(auction, "stabilized", 4).map((m) => m.label)).toEqual(["Starting bid", "Buyer's premium", "Reserve price", "Bid deadline"]);
+  });
+
   it("drops rows that are not objects, never repeats a row, and honours the limit", () => {
     const rows = keyTermRows([null, ...conversion, undefined, conversion[4]], "conversion", 3);
     expect(rows).toHaveLength(3);

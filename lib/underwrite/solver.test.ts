@@ -120,6 +120,20 @@ describe("solveMaxBid — price that clears the floors", () => {
     expect(s.binding).toBeNull();
   });
 
+  it("a high-yield deal whose return at 5% of the price is past the IRR's reach still finds its ceiling (#456)", () => {
+    // An auction's opening floor on an 18% cap: at the search floor the
+    // levered return is too large for the IRR routine and reads as none.
+    const base = baseInputs({ purchasePrice: 2_625_000, inPlaceRentAnnual: 1_000_000, expenseLines: [{ label: "Operating expenses", annual: 450_000 }] });
+    expect(computeUnderwrite({ ...base, purchasePrice: base.purchasePrice * 0.05 }).returns.leveredIrrPct).toBeNull();
+    const r = solveMaxBid(base, { minIrr: 0.15 });
+    expect(r.price).not.toBeNull();
+    expect(r.unbounded || (r.at?.irr ?? 0) >= 0.15 - 1e-9).toBe(true);
+    if (!r.unbounded) {
+      // …and it is the edge: a little more does not clear.
+      expect(computeUnderwrite({ ...base, purchasePrice: r.price! + 50_000 }).returns.leveredIrrPct!).toBeLessThan(0.15);
+    }
+  });
+
   it("no floors → no solution object, not a crash", () => {
     const s = solveMaxBid(base, {});
     expect(s.price).toBeNull();

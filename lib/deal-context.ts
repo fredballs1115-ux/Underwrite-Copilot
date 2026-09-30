@@ -8,6 +8,7 @@ import { assumableContextLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableContextLine, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantContextLine } from "@/lib/single-tenant";
 import { hotelContextLine, readHotelDeal } from "@/lib/hotel-deal";
+import { readSale, saleContextLine } from "@/lib/sale-terms";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -51,12 +52,16 @@ export function dealContextFor(
   // What a hotel is sold with (#455): its flag, its manager, whether the
   // sale is encumbered by them, and the brand's PIP.
   const hotel = readHotelDeal(extraction);
+  // How it is sold (#456): an auction's starting bid is not a price, and a
+  // receiver, a trustee or a lender never ran the building.
+  const sale = readSale(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
   const flood = floodContextLine(site?.flood);
   const head = [
     ...(interest ? [interestContextLine(interest)] : []),
+    ...(sale ? [saleContextLine(sale)] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
     ...(affordable ? [affordableContextLine(affordable)] : []),
     ...(singleTenant ? [singleTenantContextLine(singleTenant)] : []),

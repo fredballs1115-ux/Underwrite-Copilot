@@ -20,6 +20,8 @@ import { readAffordable } from "@/lib/affordable";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { readSingleTenant } from "@/lib/single-tenant";
 import { HotelPanel } from "@/app/hotel-panel";
+import { SalePanel } from "@/app/sale-panel";
+import { readSale } from "@/lib/sale-terms";
 import { readHotelDeal } from "@/lib/hotel-deal";
 import { keyTermRows } from "@/lib/key-terms";
 import { readPortfolio } from "@/lib/portfolio";
@@ -295,6 +297,10 @@ export function ShareView({
       {/* What is being sold (#414) — a note, a share, a leasehold changes
           what every figure below means; nothing for a plain fee simple. */}
       <InterestPanel interest={readInterest(safeExtraction, askingPriceOf(safeExtraction))} />
+
+      {/* How it is sold (#456): the starting bid, the premium on top, the
+          reserve and the deadline — or who is selling, and as-is. */}
+      <SalePanel sale={readSale(safeExtraction)} />
 
       {/* A covenant or a contract that sets the rents (#453): how much of the
           building is restricted, until when, and what the model is not. */}

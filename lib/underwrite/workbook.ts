@@ -336,6 +336,22 @@ function buildCover(
       r++;
     }
   }
+  // How the property is sold (#456): an auction's bid, premium, reserve
+  // and deadline, then the most this model pays all-in at the screening
+  // hurdle, backed out of the premium.
+  if (meta.sale) {
+    fact("How it is sold", meta.sale.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.sale.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.sale.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 40;
+      r++;
+    }
+  }
   // What a hotel is sold with (#455): the flag, the encumbrance, the PIP
   // and the franchise's end, then the PIP against this model's capital
   // line and the agreements' clocks against its hold.
