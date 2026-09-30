@@ -833,7 +833,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   ride with it: `unitCountRow` (lib/criteria) counts a park by its pads
   where it states RV sites too, whichever row comes first — every per-pad
   figure divided by the RV sites before — and a park or a build-to-rent
-  portfolio wears a drawing of homes as its cover (`COVER_ART.homes`,
+  portfolio wears a drawing of homes as its cover (the `homes` kind in
   lib/deal-cover-art), never the apartment block.
 - A self-storage facility (#471): the extraction labels its figures as
   rows of their own, each only as stated — "Physical occupancy" (units),
@@ -1180,7 +1180,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   market the site reads, never instead of it); the table's test holds such a
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
-  id, and the sheet's folder takes the id with the colon replaced.
+  id, and the sheet's folder takes the id with the colon replaced. Twenty
+  are served (2026-09-30: Albuquerque, Boise, Bridgeport, Buffalo,
+  Charleston, Des Moines, Grand Rapids, Greenville, Hartford, Honolulu,
+  Knoxville, Louisville, Memphis, Milwaukee, New Orleans, Oklahoma City,
+  Omaha, Providence, Tucson, Tulsa), each judged through the card's 16:10
+  and the deal page's 21:9 crops — never the 4:1 band, which a `cbsa:` row
+  never draws; San Jose, Fresno and Madison had nothing usable and keep the
+  aerial, and Birmingham's first search read Birmingham, England's
+  categories. Milwaukee's and Greenville's credits are the author Commons
+  names, where each filename names another (the owner was told). The route
+  decodes the key itself (the cards ask for it percent-encoded, and no key
+  holds a "%"), and live-verify's PHOTOGRAPHS step reads the quoted keys
+  too.
   Montgomery County
   is deliberately absent: a suburban submarket has no skyline, and the
   overhead is the more honest picture of a place shaped by its land — the
@@ -1809,11 +1821,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `lib/zori-read.ts` (the `server-only` read, admin client, cached per
   metro) and `app/market/zori-line.tsx` (`ZoriLine`, pure — the asking rent
   drawn against the 2BR fair market rent on ONE scale, with the gap said).
-  **The FMR is what HUD will PAY, the ZORI is what landlords are ASKING**:
-  one is set once a year from survey data two years old by the time it
-  applies, the other is this month's listings across all home types
-  before concessions, and the page shows both and lets neither stand in
-  for the other — an underwrite that takes the FMR for the market rent is
+  **The FMR is HUD's yearly two-bedroom figure, utilities included; the ZORI
+  is what landlords are ASKING**: one is set once a year from survey data
+  two years old by the time it applies, the other is this month's listings
+  across all home types before concessions, and the page shows both and
+  lets neither stand in for the other — the gap between them is between two
+  measures, never a premium over what HUD pays (the first sentence said
+  "the fair market rent HUD pays", which was not true) — an underwrite that takes the FMR for the market rent is
   a year or two behind, one that takes the asking rent for the achievable
   rent has not priced the concessions. **Zillow's condition for use is
   attribution**, so `ZORI_CREDIT` is part of the component, not the
@@ -3018,9 +3032,59 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   - Towson has no place layer at all, which is unincorporated (null),
     never unknown.
 
-  Flags carry `v: SITE_FLAGS_V` (2). An answered lookup from before is
-  made again on the deal's next view (`siteFlagsOutdated`), and
-  `buildSubject` takes the Census county over the address's own.
+  Flags carry `v: SITE_FLAGS_V` (3 since #472 and #473). An answered
+  lookup from before is made again on the deal's next view
+  (`siteFlagsOutdated`), and `buildSubject` takes the Census county over
+  the address's own.
+
+  **The Opportunity Zone check** (#473). The zones were designated on 2010
+  tract numbers, so the lookup asks the geocoder again under its
+  `Census2010_Current` vintage (`layers=Census Tracts`, a call of its own:
+  the current vintage answers the current tract under the same layer name —
+  the runner printed both, and Frisco's 2010 tract 48085030408 is
+  48085030410 today) and checks the zone by it (`ozTract`,
+  `vintage: "2010"`), falling back to the current number, with
+  `OZ_CURRENT_NUMBER_CAVEAT`, only where that call fails. The answer comes
+  first from `data/qoz-tracts.json` (`lib/qoz.ts`, server-only): the CDFI
+  Fund's list of all 8,764 designated tracts (8,566 low-income communities,
+  198 contiguous, in 56 states and territories; updated December 14, 2018;
+  the Fund's note says the official list is the IRS's), read on the runner
+  by `scripts/fetch-qoz-tracts.mjs` — the `qoz` job of `cbsa-counties.yml`,
+  published to the `qoz-tracts` branch, since the sandbox cannot reach
+  cdfifund.gov; the header's first cell carries the filter note above
+  "State", so columns are found by a cell's last line. The registry
+  (`incentive_zones`, Maryland's tracts unless a national layer is loaded)
+  is asked only for a tract the list does not name, and a registry that
+  cannot be read leaves the list's answer. A miss is "not on the list" only
+  where the list holds the tract's state (`opportunityZoneFrom`,
+  `OZ_STATE_RULE_V`: a v2 miss was read against any state's zones and now
+  reads as not checked), and a check that did not run says why (no tract,
+  the tract lookup failed).
+- What the site says is held to its sources (#473, an audit's fixes):
+  - **A rule's words are the file's.** Nothing but
+    `scripts/seed-research.mjs` writes a rule's text to the database (the
+    steward only stamps `as_of` on a re-verification, the intel job reads
+    ids), so `mergeRules` (lib/research-data) takes each rule the file holds
+    from the file, and the database's later `as_of` only where its words
+    are the file's own, compared key-order-free since jsonb reorders keys; a
+    rule only the database holds is kept. Taking the database's copy kept a
+    corrected rule wrong until someone reseeded.
+  - **Rolling windows roll.** California's and Washington's new-building
+    exemptions are `building_age_years_lt` (15 and 12, as their statutes
+    count), read against the current year; a permit year alone can prove a
+    building young, never old.
+  - **One list of outside services.** `lib/data-processors.ts`, printed by
+    the security and privacy pages (`app/processor-list.tsx`) and held by
+    its test to the hosts the code calls.
+  - **A date or none.** `metroFact` returns the figure with its snapshot's
+    `as_of`, `asOfLabel` says "as of …" or "undated", a research file with
+    no date is never given a typed-in one (a source scan guards it), and
+    the demo's 2–4 unit median prints its month through `twoToFourMedian`.
+  - **A rule of thumb says so.** The memo's and the report's market flags,
+    and the deal page's overview risk, call a typical range a rule of thumb.
+  - **The challenger computes a tax reset only from the memorandum's own
+    bill and assessed value**, and otherwise says the tax line resets and
+    the rate is the assessor's to give — never an assumed ratio or millage.
 - Each building's own photograph: `lib/om-photo.ts` (pure) reads the JPEG
   image objects out of the deal's memorandum — a `/DCTDecode` stream IS the
   JPEG's bytes, verbatim, and `jpegInfo` reads its width, height and
@@ -3181,18 +3245,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the page passes `aerial: false` to `bannerSources`, so a photograph
   that fails, or a deal outside every photographed market, falls to the
   deal's COVER (`lib/deal-cover.ts`, pure, drawn by
-  `app/(app)/deals/deal-cover.tsx`): one of eight deep gradients picked
-  by hashing the deal's id (`coverToneFor`, so a deal always wears the
-  same one), a white line drawing of its kind of building
-  (`coverKindFor` through `assetClassKey`: an apartment block, an office
-  tower, a warehouse, a storefront, a hotel, storage doors, a staked
-  parcel, a plain building), and at a card's foot "No photo yet" over
-  its place (`coverPlace`: the address's city and state, else the
-  market's name, else the memorandum's words) — the market caption's
-  type, the drawing above it so a long name never runs through it, and
-  its accessible name saying there is no photograph of the deal yet.
-  `lib/deal-cover.test.ts` holds white to AAA on every gradient where
-  the words sit. The list row's thumbnail had asked the image route for
+  `app/(app)/deals/deal-cover.tsx`): an evening illustration of its kind
+  of building (`coverKindFor` through `assetClassKey`: an apartment block,
+  homes, an office tower, a warehouse, a storefront, a hotel, storage
+  doors, a staked parcel, a plain building — lit from a low sun, some
+  windows glowing, a distant city or hills behind) under one of eight
+  skies picked by hashing the deal's id (`coverToneFor`, the old
+  gradients' index, so a deal keeps its hue), with the deal's own draw
+  (`coverVariantFor`) of the sun, the lit windows and the building's form,
+  so two deals of one kind are two buildings; and at a card's foot "No
+  photo yet" over its place (`coverPlace`: the address's city and state,
+  else the market's name, else the memorandum's words) — the market
+  caption's type, and its accessible name saying there is no photograph of
+  the deal yet. A wide frame's horizon sits at 72%, so the words sit on the
+  ground on the smallest card (224×140), and `lib/deal-cover.test.ts` holds
+  the place to AAA and the eyebrow to AA over the worst pixel under each
+  line, before the shade, across every kind and sky. The list row's thumbnail had asked the image route for
   "the best picture", which fell to the USGS aerial for every deal
   without a photograph — a column of little maps; `DealThumb` now takes
   the card's own sources at the `THUMB` frame (168px, which asks for
@@ -3207,9 +3275,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (`imagePlan`'s `overhead: false`, through `fetchBestBuildingImage`)
   and, where no photograph of the building answers, draws the deal's
   cover as an SVG (`coverSvg` in `lib/deal-cover-art.ts`, pure and
-  dependency-free: the ONE set of drawings `DealCover` draws too, so the
-  card, the row and the avatar show one cover for one deal; the class
-  the deck turned out to be through `shownAssetClass`). `DealAvatar`
+  dependency-free, laying the scene out for the frame asked —
+  `coverLayout`, `SMALL_FRAME_PX` — and the ONE document `DealCover`
+  paints as its background through `coverImage`, so the card, the row and
+  the avatar show one cover for one deal and no extra request; the class
+  the deck turned out to be through `shownAssetClass`; the route's ETag
+  carries `COVER_EDITION`, so a browser holding the old drawing is sent
+  the new one). `DealAvatar`
   (⌘K, the comps from the reader's own pipeline, the sticky bar) and
   the pipeline map's hover card ask for it; a caller that does not keeps
   the overheads and the 404. The SVG carries no words, script or style,
@@ -3303,8 +3375,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `PICTURE_SEARCH_VERSION` 4 re-derives the memorandum pictures lifted
     before.
   - **Shown only once whole.** `DealBanner` and `DealThumb` hold the frame
-    with the deal's cover (`DealCover`'s `words={false}`: the gradient and
-    the drawing, `aria-hidden`, no "No photo yet" over a photo on its way)
+    with the deal's cover (`DealCover`'s `words={false}`: the illustration
+    without its words, `aria-hidden`, no "No photo yet" over a photo on its
+    way)
     and fade the picture in on `load` — never its progressive scans, never
     an empty frame; the mount check catches a load that finished before
     hydration. The first four cards are `loading="eager"` and
@@ -3342,9 +3415,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   service-role key under a label of its own — no new secret, and rotating
   that key retires every link already sent). The route serves only what is
   stored and never searches: the photograph cut to the frame by attention,
-  else the deal's cover (`coverSvg` for the square, `coverBannerSvg` for
-  the banner, laid out for a 2:1 box since the square's `slice` cut the
-  drawing), both as JPEG; a bad token, a deleted deal and the sample
+  else the deal's cover (`coverSvg` for the banner and the square alike,
+  laid out for each frame), both as JPEG; a bad token, a deleted deal and the sample
   answer 404. `/api` is outside the proxy's matcher, so no sign-in bounce
   reaches it. Before the screen-complete email goes, `emailPicture`
   (lib/email) looks for the memorandum's cover where nobody has yet
@@ -3871,8 +3943,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   it carries each metro's SINGLE-FAMILY permits (`<CITY><NNN>BP1FH`,
   fourteen series, metric `permits_1unit`), so the multi-unit figure is
   the total less the single-family series, month by month, and every
-  surface says so ("the total less the single-family series, the only
-  split published for a metro"). Three rules: the two series are aligned
+  surface says so ("the total less the single-family series, since FRED
+  carries no multi-unit series for a metro or a state" — one constant,
+  `NO_MULTI_UNIT_SERIES` in `lib/permit-split.ts`; the first wording said
+  no split was published at all, and a market check saved with it is read
+  through `currentBriefLine`). Three rules: the two series are aligned
   by their own dates and a month one of them lacks leaves BOTH sums, so
   the subtraction never runs across different months; a month of permits
   is the season, so the figure is twelve months against the twelve before
