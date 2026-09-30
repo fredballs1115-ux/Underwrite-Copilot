@@ -7,6 +7,8 @@ import { describe, expect, it, vi } from "vitest";
 import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
 import { a11yIssues } from "./render-lint";
+import { buyBoxRead, dealCheckSource } from "./buy-box-chip";
+import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => {
@@ -34,7 +36,15 @@ describe("the homepage, as a screen reader hears it", () => {
     // "Caution" and "WATCH" sat side by side with nothing saying which was
     // the verdict and which the fit against the buy box.
     expect(card).toMatch(/<span class="sr-only">Verdict: <\/span>(Go|Caution|No-go)<\/span>/);
-    expect(card).toMatch(/<span class="sr-only">Buy-box <\/span>Fit \d+ · (Pursue|Watch|Pass)<\/span>/);
+    expect(card).toMatch(/<span class="sr-only">Buy-box <\/span>Fit \d+ · (Pursue|Watch|Pass|Outside box)<\/span>/);
+    // And it is the deal header's own chip for the same deal and box, never
+    // a call only the homepage makes.
+    const chip = buyBoxRead(
+      SAMPLE_DEAL.asset_class,
+      dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
+      SAMPLE_DEMO_BOX,
+    ).chip.label;
+    expect(card).toContain(`<span class="sr-only">Buy-box </span>${chip}</span>`);
   }, 60_000);
 
   it("reads each stat once, its label as the term and its figure as the value", async () => {

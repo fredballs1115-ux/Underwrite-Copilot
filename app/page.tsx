@@ -24,8 +24,7 @@ import {
 // drifted (the page said 7.1% while the engine computed 6.9%).
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { dealCheckSource } from "@/lib/buy-box-chip";
-import { scoreMandateFit, type MandateVerdict } from "@/lib/mandate";
+import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
 import { ruleCounts } from "@/lib/research-data";
 import { hoursSince } from "@/lib/research";
@@ -1336,18 +1335,20 @@ function DealPreview() {
       : SAMPLE_DEAL.verdict.verdict === "pass_on"
         ? "No-go"
         : "Caution";
-  // The sample's mandate fit against its demo buy box — the score and call
-  // /demo's buy box draws — so the chip says what it is ("Fit") and can
-  // never drift from the engine.
-  const fit = scoreMandateFit(
+  // The sample against its demo buy box, read the way the deal page's
+  // header reads it (lib/buy-box-chip's `buyBoxRead`): the fit score, and a
+  // criterion the box misses outright winning the chip — so the card never
+  // says what the product's own header would not.
+  const fitChip = buyBoxRead(
     SAMPLE_DEAL.asset_class,
     dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
     SAMPLE_DEMO_BOX,
-  );
-  const FIT: Record<MandateVerdict, { word: string; cls: string }> = {
-    PURSUE: { word: "Pursue", cls: "bg-pass/10 text-pass" },
-    WATCH: { word: "Watch", cls: "bg-caution/10 text-caution" },
-    PASS: { word: "Pass", cls: "bg-kill/10 text-kill" },
+  ).chip;
+  const FIT_TONE: Record<BuyBoxChipTone, string> = {
+    pass: "bg-pass/10 text-pass",
+    caution: "bg-caution/10 text-caution",
+    kill: "bg-kill/10 text-kill",
+    muted: "bg-faint text-muted",
   };
   return (
     <div className="relative">
@@ -1367,12 +1368,10 @@ function DealPreview() {
             <span className="sr-only">Verdict: </span>
             {verdictWord}
           </span>
-          {fit.score !== null && fit.verdict ? (
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FIT[fit.verdict].cls}`}>
-              <span className="sr-only">Buy-box </span>
-              {`Fit ${fit.score} · ${FIT[fit.verdict].word}`}
-            </span>
-          ) : null}
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${FIT_TONE[fitChip.tone]}`}>
+            <span className="sr-only">Buy-box </span>
+            {fitChip.label}
+          </span>
         </div>
         <p className="mt-0.5 text-xs text-muted">
           Brewerytown, Philadelphia · Multifamily · {inputs.units} units
