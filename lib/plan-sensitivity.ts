@@ -92,10 +92,13 @@ export function buildYieldOnCostGrid(plan: PlanSummary | null, refCapPct: number
 }
 
 /**
- * Development-spread bands. 150–200 bps of yield on cost over the cap the
- * finished product trades at is the conventional ask for taking construction
- * and lease-up risk; under 75 bps the plan is being built for the market's
- * cap rate rather than for a return on the risk of building; below the cap
+ * Development-spread bands — a rule of thumb, and said as one wherever they
+ * are drawn (`SPREAD_RULE_OF_THUMB`), the way the site names every typical
+ * range it did not read. 150–200 bps of yield on cost over the cap the
+ * finished product trades at is the conventional ask for taking
+ * construction and lease-up risk; the bands shade the grid by that
+ * convention, and a cell's band is not a market figure or a verdict on the
+ * plan. Below the cap is arithmetic, not convention: valued at that cap,
  * the finished project is worth less than it cost.
  */
 export type SpreadBucket = "wide" | "adequate" | "thin" | "none" | "negative";
@@ -109,13 +112,20 @@ export function spreadBucket(spreadBps: number): SpreadBucket {
   return "negative";
 }
 
+/** Each band's range, and nothing a range cannot say: the judgement is the
+ *  rule of thumb's, printed beside the swatches as one. */
 export const SPREAD_LABEL: Record<SpreadBucket, string> = {
   wide: "200+ bps over the cap",
   adequate: "150–199 bps",
   thin: "75–149 bps",
-  none: "0–74 bps — built for the market's cap, not for the risk",
-  negative: "below the cap — worth less finished than it cost",
+  none: "0–74 bps",
+  negative: "below the cap — worth less finished than it cost, at that cap",
 };
+
+/** What the shading is, on every legend that draws the bands (the deal
+ *  page's grid and the report's plan page). */
+export const SPREAD_RULE_OF_THUMB =
+  "Shaded by a rule of thumb, not a verdict: 150–200 bps over the cap is the conventional ask for construction and lease-up risk.";
 
 export interface PlanBreakevens {
   /** the stabilized NOI at which yield on total cost just equals the reference cap */

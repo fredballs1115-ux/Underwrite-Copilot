@@ -50,6 +50,13 @@ describe("PlanSensitivity — yield on cost, stressed", () => {
     // 25 cells, each carrying a signed spread (the legend's "150–199 bps"
     // labels carry no sign, so they are not counted).
     expect((html.match(/[+-]\d+ bps</g) ?? []).length).toBe(25);
+    // The bands are a rule of thumb, said beside the swatches and in each
+    // cell's title; no band's label hands down a verdict of its own.
+    expect(html).toContain(
+      "Shaded by a rule of thumb, not a verdict: 150–200 bps over the cap is the conventional ask for construction and lease-up risk.",
+    );
+    expect(html).toContain('title="200+ bps over the cap (a rule-of-thumb band)"');
+    expect(html).not.toContain("built for the market");
   });
 
   it("renders nothing without a plan or a reference cap", () => {

@@ -988,9 +988,16 @@ describe("ReportDocument (full report)", () => {
       const element = React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0];
       const buf = await renderToBuffer(element);
       expect(buf.subarray(0, 5).toString()).toBe("%PDF-");
-      return (buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length;
+      return { pages: (buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length, buf };
     };
-    const [withPlan, without] = await Promise.all([render(true), render(false)]);
+    const [planned, plain] = await Promise.all([render(true), render(false)]);
+    const withPlan = planned.pages;
+    const without = plain.pages;
+    // The spread bands are a rule of thumb, said beside the swatches; the
+    // legend's ranges carry no verdict of their own.
+    const planText = (await pdfTextOf(planned.buf)).replace(/\s+/g, " ");
+    expect(planText).toContain("Shaded by a rule of thumb, not a verdict: 150-200 bps over the cap is the conventional ask for construction and lease-up risk.");
+    expect(planText).not.toContain("built for the market's cap");
     // memo + plan + extracted terms, versus the same minus the plan. The IRR
     // sensitivity page is omitted on a plan deal (the annual model's IRR is
     // not the plan's return — the plan page carries its own grid), so the

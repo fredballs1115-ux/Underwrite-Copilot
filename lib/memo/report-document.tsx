@@ -41,6 +41,7 @@ import {
 import {
   SPREAD_BG,
   SPREAD_LABEL,
+  SPREAD_RULE_OF_THUMB,
   refCapNote,
   spreadBucket,
   type PlanReport,
@@ -1365,7 +1366,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             )}
           </Text>
 
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 9 }}>
+          {/* The bands are a rule of thumb (lib/plan-sensitivity), said
+              beside the swatches as the deal page says it. */}
+          <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 9 }}>{str(SPREAD_RULE_OF_THUMB)}</Text>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
             {SPREAD_ORDER.map((b) => (
               <View key={b} style={{ flexDirection: "row", alignItems: "center", gap: 3.5 }}>
                 <View

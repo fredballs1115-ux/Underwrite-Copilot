@@ -2,6 +2,7 @@ import { withArticle } from "@/lib/article";
 import type { PlanSummary } from "@/lib/deal-strategy";
 import {
   SPREAD_LABEL,
+  SPREAD_RULE_OF_THUMB,
   buildYieldOnCostGrid,
   planBreakevens,
   refCapNote,
@@ -104,7 +105,7 @@ export function PlanSensitivity({
                   return (
                     <td
                       key={ci}
-                      title={SPREAD_LABEL[bucket]}
+                      title={`${SPREAD_LABEL[bucket]} (a rule-of-thumb band)`}
                       className={`rounded-md px-2 py-1.5 font-mono tabular-nums ${BUCKET_CLS[bucket]} ${
                         base ? "ring-2 ring-ink" : ""
                       }`}
@@ -143,7 +144,12 @@ export function PlanSensitivity({
         </li>
       </ul>
 
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+      {/* The bands are a rule of thumb, said beside the swatches that draw
+          them — never a verdict a cell's colour hands down on its own. */}
+      <p className="mt-2 text-[11px] text-muted" data-qa="spread-rule-of-thumb">
+        {SPREAD_RULE_OF_THUMB}
+      </p>
+      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
         {LEGEND.map((b) => (
           <span key={b} className="inline-flex items-center gap-1">
             <span className={`inline-block h-2.5 w-2.5 rounded-sm ${BUCKET_CLS[b]}`} aria-hidden />

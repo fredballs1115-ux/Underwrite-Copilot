@@ -4,6 +4,8 @@ import { inferStrategy, planSummary } from "./deal-strategy";
 import {
   BUDGET_STOPS,
   NOI_STOPS,
+  SPREAD_LABEL,
+  SPREAD_RULE_OF_THUMB,
   buildYieldOnCostGrid,
   planBreakevens,
   spreadBucket,
@@ -119,6 +121,18 @@ describe("spreadBucket", () => {
     expect(spreadBucket(0)).toBe("none");
     expect(spreadBucket(-1)).toBe("negative");
     expect(spreadBucket(Number.NaN)).toBe("none");
+  });
+
+  it("labels each band by its range and names the bands a rule of thumb, never a verdict", () => {
+    expect(SPREAD_LABEL).toEqual({
+      wide: "200+ bps over the cap",
+      adequate: "150–199 bps",
+      thin: "75–149 bps",
+      none: "0–74 bps",
+      negative: "below the cap — worth less finished than it cost, at that cap",
+    });
+    expect(SPREAD_RULE_OF_THUMB).toContain("rule of thumb, not a verdict");
+    expect(SPREAD_RULE_OF_THUMB).toContain("150–200 bps over the cap is the conventional ask");
   });
 });
 
