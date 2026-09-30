@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { readMetroRates, readRates, type RateRow } from "./live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { modelVsMarket, type ModelVsMarketInput } from "./model-vs-market";
+import { checkTitles, readGrainNote, readScope, readsNation } from "./model-vs-market-scope";
 import { ModelVsMarketCard } from "@/app/(app)/deals/[id]/model-vs-market-card";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -264,7 +265,10 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
 
   it("names the scope, the date, and each assumption with its source and its chip", () => {
     expect(text).toContain("Assumptions against the published figures");
-    expect(text).toContain("set against what the Washington DC market and the national series have actually done, read on Sep 21, 2026.");
+    expect(text).toContain("set against the published figures for the Washington DC market and the nation, read on Sep 21, 2026.");
+    // The expense row carries the bond market's inflation expectation, a
+    // forecast, so the header never calls every figure what the series did.
+    expect(text).not.toContain("actually done");
     expect(text).toContain("not a forecast");
     expect(text).toContain("Rent growth");
     expect(text).toContain("3.0%/yr");
@@ -279,12 +283,34 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
 
   it("says the national scope where no metro figure was read, names the rows it has, and renders nothing with nothing to say", () => {
     const national = visibleText(renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read: modelVsMarket({ ...base, assetClass: "office" }) })));
-    expect(national).toContain("The model's rent growth, expense growth and exit cap, set against the national series, read on Sep 21, 2026.");
+    expect(national).toContain("The model's rent growth, expense growth and exit cap, set against the nation's published figures, read on Sep 21, 2026.");
     expect(national).toContain("Rent growth");
     expect(national).toContain("the nation's lessors, not the metro's");
     expect(national).not.toContain("Stabilized vacancy");
-    expect(text).toContain("The model's rent growth, expense growth, stabilized vacancy and exit cap, set against what the Washington DC market and the national series have actually done, read on Sep 21, 2026.");
+    expect(text).toContain("The model's rent growth, expense growth, stabilized vacancy and exit cap, set against the published figures for the Washington DC market and the nation, read on Sep 21, 2026.");
     expect(renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read: null }))).toBe("");
+  });
+
+  it("names the nation only where a national figure was read, and a state as a state", () => {
+    // A stale national table: the metro's rents and vacancy still read, and
+    // nothing of the nation's does, so the sentence names the market alone.
+    const stale = new Date("2027-03-01T00:00:00Z");
+    const metroOnly = modelVsMarket({ ...base, national: readRates(REAL_ROWS, stale) })!;
+    expect(metroOnly.checks.map((c) => c.key)).toEqual(["rent_growth", "vacancy"]);
+    expect(readsNation(metroOnly)).toBe(false);
+    expect(readScope(metroOnly, "Sep 21, 2026")).toBe(
+      "The model's rent growth and stabilized vacancy, set against the published figures for the Washington DC market, read on Sep 21, 2026.",
+    );
+    // The exit cap's 10-year is the nation's even where the tracker's cap
+    // range makes the row the metro's.
+    expect(readsNation({ checks: [{ ...check(base, "exit_cap")!, scope: "metro" }] })).toBe(true);
+    const state = { readOn: "2026-09-21", metro: "Pennsylvania", grain: "state" as const, checks: modelVsMarket(base)!.checks };
+    expect(readScope(state, "2026-09-21")).toBe(
+      "The model's rent growth, expense growth, stabilized vacancy and exit cap, set against the published figures for the state of Pennsylvania and the nation, read on 2026-09-21 — the address lies outside the metros the site tracks, so the state's figures stand in for a metro's.",
+    );
+    expect(readGrainNote(state)).toBe("a state figure is the state's, not any metro's, the submarket's or the building's.");
+    expect(readGrainNote(modelVsMarket(base)!)).toBe("a metro figure is the metro area's, not the submarket's or the building's.");
+    expect(checkTitles({ checks: [check(base, "vacancy")!] })).toBe("stabilized vacancy");
   });
 
   it("reads clean and names everything", () => {

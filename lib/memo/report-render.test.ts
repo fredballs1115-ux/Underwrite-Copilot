@@ -163,7 +163,8 @@ describe("ReportDocument (full report)", () => {
     // with its line breaks folded — the wrap is the page's, not the words'.
     const assumedText = (await pdfTextOf(assumed)).replace(/\s+/g, " ");
     expect(assumedText).toContain("Assumptions against the published figures");
-    expect(assumedText).toContain("Philadelphia market and the national series have actually done, read on 2026-09-21");
+    expect(assumedText).toContain("set against the published figures for the Philadelphia market and the nation, read on 2026-09-21");
+    expect(assumedText).not.toContain("actually done");
     expect(assumedText).toContain("Rent growth 3.0%/yr (a screening default)");
     expect(assumedText).toContain("ahead of the published figures");
     expect(assumedText).toContain("Exit cap 6.00% (derived from the documents)");

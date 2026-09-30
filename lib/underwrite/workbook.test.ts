@@ -616,7 +616,7 @@ describe("the Market Read tab — the assumptions against the published figures,
     const ws = wb.getWorksheet("Market Read")!;
     expect(ws.getCell(1, 1).value).toBe("Assumptions against the published figures");
     expect(String(ws.getCell(2, 1).value)).toBe(
-      "The model's rent growth and exit cap, set against what the Washington DC market and the national series have actually done, read on 2026-09-21.",
+      "The model's rent growth and exit cap, set against the published figures for the Washington DC market and the nation, read on 2026-09-21.",
     );
     expect(String(ws.getCell(3, 1).value)).toContain("not a forecast");
     expect(ws.getCell(5, 1).value).toBe("ASSUMPTION");

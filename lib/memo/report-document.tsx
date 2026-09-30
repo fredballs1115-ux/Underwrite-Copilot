@@ -49,6 +49,7 @@ import {
 } from "@/lib/plan-sensitivity";
 import { planFacts } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
+import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
@@ -277,16 +278,14 @@ const s = StyleSheet.create({
  */
 function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) {
   if (!read || read.checks.length === 0) return null;
-  const titles = read.checks.map((c) => c.title.toLowerCase());
-  const what = titles.length <= 1 ? (titles[0] ?? "") : `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
-  const scope = read.metro
-    ? `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${read.readOn}.`
-    : `The model's ${what}, set against the national series, read on ${read.readOn}.`;
+  // The deal page's card's own words (lib/model-vs-market-scope): the
+  // published figures for the market or the state, and the nation's.
+  const scope = readScope(read, read.readOn);
   return (
     <View style={{ marginTop: 12 }} wrap={false}>
       <TitleRow title="Assumptions against the published figures" marginTop={0} />
       <Text style={s.sub}>
-        {`${scope} A trailing year is what an assumption is being asked to beat, not a forecast; a metro figure is the metro area's, not the submarket's or the building's.`}
+        {`${scope} A trailing year is what an assumption is being asked to beat, not a forecast; ${readGrainNote(read)}`}
       </Text>
       {read.checks.map((c) => (
         <View key={c.key} style={{ marginTop: 3 }}>

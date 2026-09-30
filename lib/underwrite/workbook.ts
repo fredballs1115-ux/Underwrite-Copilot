@@ -7,6 +7,7 @@ import type { DerivedModel, InputSource } from "./inputs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import { STRATEGY_LABEL, STRATEGY_READING, isPlanDeal } from "@/lib/deal-strategy";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
+import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 
 /**
@@ -849,15 +850,12 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
     ws.getColumn(i + 1).width = w;
   });
   titleRow(ws, "Assumptions against the published figures");
-  const titles = read.checks.map((c) => c.title.toLowerCase());
-  const what = titles.length <= 1 ? (titles[0] ?? "") : `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
-  const scope = read.metro
-    ? `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${read.readOn}.`
-    : `The model's ${what}, set against the national series, read on ${read.readOn}.`;
-  label(ws.getCell(2, 1), scope, { color: MUTED, size: 9 });
+  // The deal page's card's own words (lib/model-vs-market-scope): the
+  // published figures for the market or the state, and the nation's.
+  label(ws.getCell(2, 1), readScope(read, read.readOn), { color: MUTED, size: 9 });
   label(
     ws.getCell(3, 1),
-    "A trailing year is what an assumption is being asked to beat, not a forecast; a metro figure is the metro area's, not the submarket's or the building's. The model's figures are the Assumptions tab's as built; change them there.",
+    `A trailing year is what an assumption is being asked to beat, not a forecast; ${readGrainNote(read)} The model's figures are the Assumptions tab's as built; change them there.`,
     { color: MUTED, size: 9 },
   );
   const headers = ["Assumption", "Model", "Model source", "Published figure", "Figure", "As of", "Publisher", "Read", "What the figures say"];

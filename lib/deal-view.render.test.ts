@@ -556,7 +556,8 @@ describe("DealView — the sample deal renders every section without a runtime e
     const html = render(withRead);
     const text = textOf(html);
     expect(text).toMatch(/Assumptions against the published figures/);
-    expect(text).toMatch(/set against what the Philadelphia market and the national series have actually done, read on Sep 21, 2026\./);
+    expect(text).toMatch(/set against the published figures for the Philadelphia market and the nation, read on Sep 21, 2026\./);
+    expect(text).not.toMatch(/actually done/);
     expect(text).toMatch(/Rent growth/);
     expect(text).toMatch(/ahead of the published figures/);
     expect(text).toMatch(/assumes cap compression/);
