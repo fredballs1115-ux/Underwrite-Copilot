@@ -31,9 +31,10 @@ import {
   findGoingInCap,
   occupancyPctFromMetrics,
   occupancyRow,
-  parseMoney,
   parsePct,
+  parsePrice,
   parseSf,
+  priceRange,
 } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
@@ -431,7 +432,14 @@ export function deriveUnderwriteInputs(
     capDecimal != null && capDecimal / 100 > 0.005 && capDecimal / 100 <= IMPLIED_CAP_CEILING
       ? capDecimal / 100
       : null;
-  let price = priceMetric ? parseMoney(priceMetric.value) : null;
+  // A range the OM states — pricing guidance, a whisper — is read at its
+  // top (#466): the end that does not flatter a single return below.
+  let price = priceMetric ? parsePrice(priceMetric.value) : null;
+  const priceSpan = priceMetric ? priceRange(priceMetric.value) : null;
+  const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  const spanNote = priceSpan
+    ? `the top of the ${usd0(priceSpan.low)}–${usd0(priceSpan.high)} range the OM states, the end that does not flatter the returns`
+    : "";
   // What the price buys (lib/interest, #414). A share's price is grossed up
   // to the whole asset the building's figures describe — the model runs the
   // entity's cash flows, of which the share earns its slice before any
@@ -449,22 +457,24 @@ export function deriveUnderwriteInputs(
     mark(
       "purchasePrice",
       "derived",
-      `The OM's $${Math.round(stated).toLocaleString("en-US")} for ${withArticle(`${share}%`)} share, grossed up to the whole asset — the model runs the whole building's cash flows; the share earns ${share}% of them before the promote and the sponsor's fees`,
+      `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to the whole asset — the model runs the whole building's cash flows; the share earns ${share}% of them before the promote and the sponsor's fees`,
       pageOf(priceMetric),
     );
   } else if (price != null) {
+    const what = priceIsLand
+      ? "OM land / site cost — the development's acquisition basis; the build sits in the capital plan"
+      : interest.kind === "note"
+        ? "The OM's price for a NOTE secured by the property — this model runs the collateral as if bought outright at that price, which is not the note's return"
+        : interest.kind === "partial_interest"
+          ? "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
+          : interest.kind === "leased_fee"
+            ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease; the model runs the ground rent as the income, with a building's assumptions"
+            : "OM asking / purchase price";
     mark(
       "purchasePrice",
       "extracted",
-      priceIsLand
-        ? "OM land / site cost — the development's acquisition basis; the build sits in the capital plan"
-        : interest.kind === "note"
-          ? "The OM's price for a NOTE secured by the property — this model runs the collateral as if bought outright at that price, which is not the note's return"
-          : interest.kind === "partial_interest"
-            ? "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
-            : interest.kind === "leased_fee"
-              ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease; the model runs the ground rent as the income, with a building's assumptions"
-              : "OM asking / purchase price",
+      // A range is said, with the end the model runs at (#466).
+      spanNote ? `${what} — ${usd0(price)}, ${spanNote}; enter the price you would pay` : what,
       pageOf(priceMetric),
     );
   } else if (saleFloor?.floorAllIn != null && saleFloor.startingBid != null) {

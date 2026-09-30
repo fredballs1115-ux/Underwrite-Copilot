@@ -30,7 +30,7 @@ import type { StructuredAddress } from "@/lib/address";
 import { ASSET_CLASS_OPTIONS, assetClassLabel } from "@/lib/asset-class";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
-import { parseMoney, parsePct } from "@/lib/criteria";
+import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
 import {
   STAGES,
   STAGE_LABEL,
@@ -128,6 +128,10 @@ type SortKey = "name" | "asset" | "price" | "cap" | "fit" | "status" | "added";
  *  showed every deal as "$68,000,…" before; the raw string stays when it
  *  is not a figure at all ("Call for offers"). */
 function compactPrice(raw: string): string {
+  // Guidance stated as a range stays one (#466) — "$40–42M" — where the
+  // first cut showed its bottom alone, the flattering end, as the price.
+  const range = priceRange(raw);
+  if (range) return priceRangeShort(range);
   const n = parseMoney(raw);
   if (n == null || !(n > 0)) return raw;
   return n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
@@ -163,7 +167,7 @@ function sortValue(d: DealCard, key: SortKey): string | number {
     case "asset":
       return d.assetClass;
     case "price":
-      return d.slots.price ? (parseMoney(d.slots.price) ?? -1) : -1;
+      return d.slots.price ? (parsePrice(d.slots.price) ?? -1) : -1;
     case "cap":
       return d.slots.cap ? (parsePct(d.slots.cap) ?? -1) : -1;
     case "fit":

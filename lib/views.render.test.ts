@@ -101,8 +101,9 @@ const CARDS: DealCard[] = [
   card({ id: "j", name: "Unpriced land — Route 1 parcel", verdict: "caution", stage: "screening", fit: null, slots: { cap: null, price: null, yoc: null }, market: "Laurel, MD", coveredMarket: "Baltimore" }),
   // A run whose process died mid-screen, and a re-screen that failed before
   // its verdict — the stored verdict must not read as the current call.
-  // …and one tenant leasing the whole building (#454).
-  card({ id: "k", name: "Arlington Flex Park", assetClass: "industrial", stage: "screening", jobStatus: "stalled", slots: { cap: null, price: "$9,100,000", yoc: null, tenancy: "Single tenant, 6 yrs left" }, market: "Arlington, TX", coveredMarket: "Dallas–Fort Worth", hasAddress: false }),
+  // …and one tenant leasing the whole building (#454), priced as guidance:
+  // a range stays a range (#466).
+  card({ id: "k", name: "Arlington Flex Park", assetClass: "industrial", stage: "screening", jobStatus: "stalled", slots: { cap: null, price: "$9,000,000 – $9,500,000", yoc: null, tenancy: "Single tenant, 6 yrs left" }, market: "Arlington, TX", coveredMarket: "Dallas–Fort Worth", hasAddress: false }),
   // …and a LIHTC regulatory agreement on three units in four (#453).
   card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "underwriting", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null, affordable: "LIHTC, 75% restricted" }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth", flood: { tag: "Flood AE", cell: "AE (SFHA)" } }),
 ];
@@ -160,6 +161,9 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // stabilized ones their cap; the teammate's deal names who added it.
     expect(text).toContain("11.7%");
     expect(text).toContain("5.6%");
+    // Guidance stated as a range shows as one, never its bottom alone (#466).
+    expect(text).toContain("$9–9.5M");
+    expect(text).not.toContain("$9.0M");
     expect(text).toContain("Jordan Lee");
     // A deal in a metro area the site reads without a brief says so on its
     // row — read, not briefed — where a covered market's says covered.

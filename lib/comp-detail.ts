@@ -6,7 +6,7 @@
 // rent ("$2,520/mo"), a bare dollar figure, or a percentage with no "cap"
 // beside it is not a basis or a cap, and reads as nothing — the same honesty
 // as the report's rangeRead.
-import { buildingSfFromMetrics, parseMoney } from "@/lib/criteria";
+import { buildingSfFromMetrics, parsePrice } from "@/lib/criteria";
 import { findPricedMetric, unitCountFromMetrics, type StrategyKind } from "@/lib/deal-strategy";
 import type { InterestKind } from "@/lib/interest";
 
@@ -89,7 +89,7 @@ export function subjectBasis(
   if (interest?.kind === "note" || interest?.kind === "leased_fee") return none;
   if (interest?.kind === "partial_interest" && interest.sharePct == null) return none;
   const row = findPricedMetric(metrics, kind);
-  const stated = row ? parseMoney(row.value) : null;
+  const stated = row ? parsePrice(row.value) : null;
   if (stated == null || stated < 10_000) return none;
   const price = interest?.sharePct != null ? stated / (interest.sharePct / 100) : stated;
   const units = unitCountFromMetrics(metrics);
