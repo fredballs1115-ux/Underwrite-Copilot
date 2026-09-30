@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "The building in your inbox",
+      "href": "/account",
+      "blurb": "The email that says a screen is done now opens on the building's photograph, the way a listing alert does, and the Monday digest shows each deal it names beside its own picture. It is the cover of its memorandum or the photograph you added; a deal with no photograph wears the cover its pipeline card does. Where nobody has opened the deal yet, the screen looks for the memorandum's cover before the email goes, so the first email already shows the building. The deal's assumption bridge, rent roll and valuations pages now head with its picture beside its name too."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Photographs arrive softly, in their own colours",
       "href": "/deals",
       "blurb": "Each deal photograph stored from today carries a tiny preview of itself, a few hundred bytes kept with the deal, and the page draws it blurred in the frame the moment the page opens — the way a listing's photographs arrive — before the photograph itself has loaded. The pipeline's cards and rows, the deal page's photograph and mosaic, and the shared screen show the building's own colours at once and the photograph over them as it arrives, where they used to show a plain grey plate or the deal's drawn cover while it loaded. A deal's cover photograph stored before today gets its preview the first time it is shown again, and shows it from the next visit on."

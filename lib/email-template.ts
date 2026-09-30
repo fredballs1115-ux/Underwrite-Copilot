@@ -16,6 +16,10 @@ export interface AnalysisReadyEmailInput {
   reason: string;
   dealUrl: string;
   settingsUrl: string;
+  /** the building's picture across the top (#464, lib/email-picture): its
+   *  photograph, else its cover; `alt` is "" for the cover, a drawing that
+   *  only holds the frame */
+  picture?: { url: string; alt: string } | null;
 }
 
 const esc = (s: string) =>
@@ -56,7 +60,16 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
           <td style="background-color:#0c3338;padding:18px 28px;">
             <span style="color:#ffffff;font-size:15px;font-weight:600;letter-spacing:-0.01em;">Underwrite Copilot</span>
           </td>
-        </tr>
+        </tr>${
+          input.picture
+            ? `
+        <tr>
+          <td style="padding:0;line-height:0;font-size:0;">
+            <a href="${esc(input.dealUrl)}" style="display:block;text-decoration:none;"><img src="${esc(input.picture.url)}" width="520" height="260" alt="${esc(input.picture.alt)}" style="display:block;width:100%;max-width:520px;height:auto;border:0;outline:none;text-decoration:none;" /></a>
+          </td>
+        </tr>`
+            : ""
+        }
         <tr>
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#5f6b69;">Screen complete</p>
@@ -107,12 +120,28 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
 export interface DigestInput {
   /** e.g. [{ label: "Screening", count: 3 }] — ladder order, zeros dropped */
   stages: { label: string; count: number }[];
-  /** offers due in the next 7 days, soonest first */
-  offersDue: { name: string; due: string; url: string }[];
+  /** offers due in the next 7 days, soonest first; `pictureUrl` is the
+   *  deal's square (#464, lib/email-picture) */
+  offersDue: { name: string; due: string; url: string; pictureUrl?: string | null }[];
   /** verdicts that landed in the last 7 days */
-  verdicts: { name: string; label: string; color: string; url: string }[];
+  verdicts: { name: string; label: string; color: string; url: string; pictureUrl?: string | null }[];
   pipelineUrl: string;
   settingsUrl: string;
+}
+
+/**
+ * A digest row's picture cell (#464): the deal's 48px square, the way a
+ * listing alert pictures each result, linked to the deal like its name.
+ * Decorative (`alt=""`): the name beside it says which deal it is. A
+ * section where some rows have a picture keeps the column for all of them,
+ * so the names start at one x.
+ */
+function pictureCell(entry: { url: string; pictureUrl?: string | null }, column: boolean): string {
+  if (!column) return "";
+  const img = entry.pictureUrl
+    ? `<a href="${esc(entry.url)}" style="display:block;text-decoration:none;"><img src="${esc(entry.pictureUrl)}" width="48" height="48" alt="" style="display:block;width:48px;height:48px;border:0;border-radius:8px;" /></a>`
+    : "";
+  return `<td width="48" style="width:48px;padding:6px 12px 6px 0;vertical-align:middle;line-height:0;font-size:0;">${img}</td>`;
 }
 
 /** The Monday-morning pipeline digest — same dependency-free table style as
@@ -152,19 +181,30 @@ export function weeklyDigestEmail(input: DigestInput): {
     )
     .join("");
 
+  const offerPictures = input.offersDue.some((o) => o.pictureUrl);
   const offerRows = input.offersDue
     .map(
       (o) => `<tr>
-        <td style="padding:4px 0;font-size:13px;"><a href="${esc(o.url)}" style="color:#114e54;font-weight:600;text-decoration:none;">${esc(o.name)}</a></td>
-        <td style="padding:4px 0 4px 16px;font-size:13px;color:#b23a30;font-weight:600;text-align:right;white-space:nowrap;">${esc(o.due)}</td>
+        ${pictureCell(o, offerPictures)}<td style="padding:4px 0;font-size:13px;vertical-align:middle;"><a href="${esc(o.url)}" style="color:#114e54;font-weight:600;text-decoration:none;">${esc(o.name)}</a></td>
+        <td style="padding:4px 0 4px 16px;font-size:13px;color:#b23a30;font-weight:600;text-align:right;white-space:nowrap;vertical-align:middle;">${esc(o.due)}</td>
       </tr>`,
     )
     .join("");
 
+  // With a picture the call moves to the right, as the due date sits in the
+  // row above it; without one it leads, as it always has.
+  const verdictPictures = input.verdicts.some((v) => v.pictureUrl);
+  const verdictPill = (v: DigestInput["verdicts"][number]) =>
+    `<span style="display:inline-block;background-color:${esc(v.color)};color:#ffffff;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;">${esc(v.label)}</span>`;
   const verdictRows = input.verdicts
-    .map(
-      (v) => `<tr>
-        <td style="padding:4px 8px 4px 0;"><span style="display:inline-block;background-color:${esc(v.color)};color:#ffffff;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;">${esc(v.label)}</span></td>
+    .map((v) =>
+      verdictPictures
+        ? `<tr>
+        ${pictureCell(v, true)}<td style="padding:4px 0;font-size:13px;vertical-align:middle;"><a href="${esc(v.url)}" style="color:#18211f;font-weight:600;text-decoration:none;">${esc(v.name)}</a></td>
+        <td style="padding:4px 0 4px 16px;text-align:right;white-space:nowrap;vertical-align:middle;">${verdictPill(v)}</td>
+      </tr>`
+        : `<tr>
+        <td style="padding:4px 8px 4px 0;">${verdictPill(v)}</td>
         <td style="padding:4px 0;font-size:13px;"><a href="${esc(v.url)}" style="color:#18211f;text-decoration:none;">${esc(v.name)}</a></td>
       </tr>`,
     )

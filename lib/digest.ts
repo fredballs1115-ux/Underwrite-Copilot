@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { weeklyDigestEmail } from "@/lib/email-template";
 import { sendEmail, emailEnabled } from "@/lib/email";
 import { STAGES, STAGE_LABEL, normalizeStage } from "@/lib/stages";
+import { emailPictureUrl } from "@/lib/email-picture";
 
 const VERDICT_EMAIL: Record<string, { label: string; color: string }> = {
   pass: { label: "Go", color: "#1b7a5e" },
@@ -138,6 +139,9 @@ export async function runWeeklyDigests(admin: SupabaseClient): Promise<number> {
           name: d.name,
           due: DUE_FMT.format(new Date(`${d.offers_due}T00:00:00Z`)),
           url: `${appUrl()}/deals/${d.id}`,
+          // The deal's own square beside its name (#464): its photograph,
+          // else the cover its card wears.
+          pictureUrl: emailPictureUrl(appUrl(), d.id, "thumb"),
         }));
 
       // Real verdict recency: the pipeline stamps generatedAt on each verdict
@@ -168,6 +172,7 @@ export async function runWeeklyDigests(admin: SupabaseClient): Promise<number> {
             label: v.label,
             color: v.color,
             url: `${appUrl()}/deals/${d.id}`,
+            pictureUrl: emailPictureUrl(appUrl(), d.id, "thumb"),
           };
         });
 
