@@ -11,6 +11,8 @@ import { marketPictureFor } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
+import { AffordablePanel } from "@/app/affordable-panel";
+import { readAffordable } from "@/lib/affordable";
 import { withArticle } from "@/lib/article";
 import { interestTag, readInterest } from "@/lib/interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
@@ -1141,6 +1143,10 @@ export default async function DealPage({
             before any figure is believed, since it changes what the price
             buys (lib/interest). Nothing for a plain fee simple. */}
         <InterestPanel interest={interest} />
+        {/* A covenant or a contract that sets the rents (#453): the units it
+            binds, until when, each tier against its limit — said before any
+            rent growth is believed (lib/affordable). */}
+        <AffordablePanel affordable={readAffordable(extraction)} />
         <PlausibilityPanel findings={plausibility} strategy={strategy} />
         <PlanSensitivity plan={plan} refCap={refCap} />
 

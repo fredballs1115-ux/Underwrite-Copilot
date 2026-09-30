@@ -303,6 +303,22 @@ function buildCover(
     ws.getRow(r).height = 40;
     r++;
   }
+  // A covenant or a contract that sets the rents (#453): how much of the
+  // building is restricted and until when, then what this model's one rent
+  // growth rate is not on it.
+  if (meta.affordable) {
+    fact("Affordability", meta.affordable.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 28;
+    if (meta.affordable.modelCaveat) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.affordable.modelCaveat;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
   // A leasehold's exit (#422): this model's sale valued on the years its
   // lease has left then, and the Exit Cap that runs the workbook on the
   // term — the input stays the model's; the reader decides. The lease's

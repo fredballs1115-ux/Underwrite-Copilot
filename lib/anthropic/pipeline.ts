@@ -37,6 +37,7 @@ import {
 import { dealContextFor } from "@/lib/deal-context";
 import { interestNote, readInterest } from "@/lib/interest";
 import { assumableNote, readAssumable } from "@/lib/assumable-debt";
+import { affordableNote, readAffordable } from "@/lib/affordable";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -844,6 +845,12 @@ async function runAnalysisSteps(
         // assumable-debt traps by name.
         const assumable = readAssumable(ex, null);
         if (assumable) notes.push(assumableNote(assumable));
+
+        // A covenant or a contract that sets the rents (#453): the
+        // restriction's facts, then each program's traps by name — a
+        // pro forma that marks restricted units to market is a misread.
+        const affordable = readAffordable(ex);
+        if (affordable) notes.push(affordableNote(affordable));
 
         if (flagged.length) {
           notes.push(

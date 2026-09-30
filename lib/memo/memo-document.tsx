@@ -30,6 +30,7 @@ import type {
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
+import { affordableShortLine, readAffordable } from "@/lib/affordable";
 import { floodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -122,6 +123,14 @@ function assumableLineFor(extraction: ExtractionResult | null): string {
   return a ? assumableLine(a) : "";
 }
 
+/** A covenant or a contract that sets the rents (lib/affordable, #453), in
+ *  one line for the memo's header: how much is restricted, under what,
+ *  until when. "" on a market-rate deal. */
+function affordableLineFor(extraction: ExtractionResult | null): string {
+  const r = readAffordable(extraction);
+  return r ? affordableShortLine(r) : "";
+}
+
 /** FEMA's flood zone at the building, from the stored site-flags lookup,
  *  in one line for the memo's header (#426): "" where there is nothing to
  *  say — minimal hazard, no digital map, a lookup still pending. */
@@ -144,6 +153,9 @@ export type MemoData = {
   /** the seller's loan offered for assumption, as stated (#419); "" where
    *  none is */
   assumableLine?: string;
+  /** a covenant or a contract that sets the rents (lib/affordable, #453),
+   *  in one line; "" on a market-rate deal */
+  affordableLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -388,6 +400,7 @@ export function buildMemoData(
     strategyLine: pdfSafe(strategyLineFor(extraction ?? null)),
     interestLine: pdfSafe(interestLineFor(extraction ?? null)),
     assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
+    affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
     floodLine: pdfSafe(floodLineFor(deal)),
     dateStr,
     verdictWord: vmeta?.word ?? null,
@@ -831,6 +844,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             )}
             {/* The seller's loan offered for assumption (#419), as stated. */}
             {data.assumableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.assumableLine}</Text>}
+            {/* A covenant or a contract that sets the rents (#453): the
+                restricted units' rents move with the limits, not the market. */}
+            {data.affordableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.affordableLine}</Text>}
             {/* FEMA's flood zone at the building (#426): a Special Flood
                 Hazard Area is a cost and a lender's condition. */}
             {data.floodLine && <Text style={[s.sub, { color: "#9b1c1c" }]}>{data.floodLine}</Text>}

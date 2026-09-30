@@ -15,6 +15,8 @@ import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { interestOf, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { InterestPanel } from "@/app/interest-panel";
+import { AffordablePanel } from "@/app/affordable-panel";
+import { readAffordable } from "@/lib/affordable";
 import { keyTermRows } from "@/lib/key-terms";
 import { readPortfolio } from "@/lib/portfolio";
 import { PortfolioCard } from "@/app/portfolio-card";
@@ -289,6 +291,10 @@ export function ShareView({
       {/* What is being sold (#414) — a note, a share, a leasehold changes
           what every figure below means; nothing for a plain fee simple. */}
       <InterestPanel interest={readInterest(safeExtraction, askingPriceOf(safeExtraction))} />
+
+      {/* A covenant or a contract that sets the rents (#453): how much of the
+          building is restricted, until when, and what the model is not. */}
+      <AffordablePanel affordable={readAffordable(safeExtraction)} />
 
       {assumable && (
         <p

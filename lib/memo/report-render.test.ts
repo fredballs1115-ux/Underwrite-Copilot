@@ -304,6 +304,37 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("The seller's loan is offered for assumption: $30.0M at 3.45% to Mar 2031");
   }, 45000);
 
+  it("prints a covenant on the rents over the grids its rent growth axis would mislead (#453)", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      affordable: { programs: ["lihtc" as const], summary: "", agreement: "", assistance: "", tiers: [], page: "" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("Restricted units", "186"), row("Affordability expiration", "December 31, 2054")],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "September 30, 2026", [], sensitivity);
+    const buf = await renderToBuffer(
+      React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("186 of 248 units (75%) rent-restricted under LIHTC until Dec 2054.");
+    expect(text).toContain("The screening model grows every unit's rent at one rate.");
+    expect(text).toContain("read its rent growth as the 62 market-rate units");
+  }, 45000);
+
   it("prints a leasehold's exit on the term its lease has left at the sale, with the term and the two exits drawn (#422)", async () => {
     vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 25)), toFake: ["Date"] });
     const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });

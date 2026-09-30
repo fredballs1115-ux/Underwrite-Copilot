@@ -72,6 +72,10 @@ export type Col = {
    *  (minimal)", "no FEMA digital map" — lib/site-flags `floodCell`, #426);
    *  blank before the lookup has answered */
   flood?: string;
+  /** a covenant or a contract that sets the rents ("LIHTC, 75%
+   *  restricted" — lib/affordable `affordableTag`, #453); absent on a
+   *  market-rate deal */
+  affordable?: string | null;
   /** the building's pictures to try, best first, each with its own credit
    *  (lib/deal-banner, #418) — absent where the caller draws none */
   pictures?: BannerSource[];
@@ -183,6 +187,12 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       label: "Asset class",
       get: (c) => assetClassLabel(c.assetClass) || "—",
     },
+    // A covenant or a contract that sets the rents (#453): a restricted
+    // building's rents move with the limits, not the market, which changes
+    // what every return below it means.
+    // A dash, never "market-rate": a screen saved before the restriction
+    // was read did not look.
+    { label: "Affordability", get: (c) => c.affordable || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },

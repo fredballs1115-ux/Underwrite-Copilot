@@ -620,6 +620,33 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a LIHTC building: the challenger reads the restriction's traps, and the deal context says the rents are capped (#453)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      affordable: {
+        programs: ["lihtc"],
+        summary: "A 2011 tax-credit property",
+        agreement: "Extended Use Agreement with the state housing finance agency",
+        assistance: "",
+        tiers: [],
+        page: "",
+      },
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Restricted units", value: "120", flagged: false, page: "", basis: "na" },
+        { label: "Affordability expiration", value: "December 31, 2054", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("Affordability: This is an affordable-housing deal:");
+    expect(note).toContain("rent-restricted under a LIHTC regulatory agreement until Dec 2054");
+    expect(note).toContain("LIHTC TRAPS, checked by name");
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toContain("Affordability: This is an affordable-housing deal:");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a single-market deal stores no other markets' figures", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     state.rates = [{ series_id: "WASH911URN", obs_date: "2026-07-01", value: 3.4 }];

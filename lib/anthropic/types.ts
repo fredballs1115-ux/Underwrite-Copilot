@@ -146,7 +146,54 @@ export interface ExtractionResult {
    *  states it. Absent on an extraction saved before it was read, which
    *  reads as fee simple. */
   interest?: ExtractedInterest;
+  /** AFFORDABLE HOUSING (#453): the recorded restrictions and rental-
+   *  assistance contracts that set some or all of the rents — a LIHTC
+   *  regulatory agreement, a Section 8 HAP contract, a bond set-aside, a
+   *  tax exemption's covenant — as the OM states them. Absent on an
+   *  extraction saved before it was read, and empty (no programs) on a
+   *  market-rate deal. Read by lib/affordable. */
+  affordable?: ExtractedAffordability;
   metrics: ExtractedMetric[];
+}
+
+/** A restriction or contract that sets rents (#453): Section 42 housing tax
+ *  credits, a Section 8 project-based HAP contract, a tax-exempt bond's
+ *  set-aside, restricted units in exchange for a property-tax exemption (a
+ *  PFC or HFC, 421-a, a PILOT), the zoning's inclusionary units, or any
+ *  other recorded covenant (HOME, a state trust fund, Section 515). */
+export type AffordableProgram = "lihtc" | "section8" | "bond" | "tax_exemption" | "inclusionary" | "other";
+
+/** One income tier of the unit mix, as the OM states it — every figure a
+ *  string, "" where it states none for the tier. */
+export interface AffordableTierStated {
+  /** the tier as the OM labels it: "60% AMI", "30% AMI", "Section 8",
+   *  "Market" */
+  label: string;
+  /** the tier's units, a bare figure ("120") */
+  units: string;
+  /** the tier's average in-place rent per unit per month ("$1,245") */
+  rent: string;
+  /** the tier's maximum allowable rent per month, where the OM states one */
+  maxRent: string;
+}
+
+export interface ExtractedAffordability {
+  /** the programs whose restriction or contract binds the property today
+   *  or will bind the buyer — never marketing words ("workforce",
+   *  "naturally occurring affordable"); empty on a market-rate deal */
+  programs: AffordableProgram[];
+  /** one sentence, the restriction in the OM's own terms ("" if none) */
+  summary: string;
+  /** the regulatory agreement(s) as stated — the agency, the set-aside,
+   *  the term ("" if none) */
+  agreement: string;
+  /** the rental-assistance contract as stated — its units, its rents, its
+   *  term and renewals ("" if none) */
+  assistance: string;
+  /** the unit mix by income tier, in the OM's order */
+  tiers: AffordableTierStated[];
+  /** the OM's page for the restriction ("" if unknown) */
+  page: string;
 }
 
 export type InterestKind = "fee_simple" | "leasehold" | "leased_fee" | "note" | "partial_interest" | "unknown";

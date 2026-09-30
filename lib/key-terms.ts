@@ -18,6 +18,7 @@ import {
   type StrategyKind,
 } from "./deal-strategy";
 import { noteTermRows } from "./note-yield";
+import { affordableTermRows } from "./affordable";
 
 export interface KeyTermMetric {
   label: string;
@@ -68,6 +69,9 @@ export function keyTermRows<M extends KeyTermMetric>(
     lead(findGoingInCap(rows));
   }
   lead(unitCountRow(rows));
+  // A covenant or a contract that sets the rents (#453): how many units it
+  // binds and until when, right after the count it is a share of.
+  for (const row of affordableTermRows(rows)) lead(row);
   const rest = rows.filter((m) => !head.includes(m));
   return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
 }

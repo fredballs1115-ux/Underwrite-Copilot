@@ -1077,6 +1077,7 @@ jobs:
           mark "#447 suburbs read their metro area" grep -q "Suburbs read their metro area" p_whats-new.html
           # #452 — a city's rent rules read the building's municipality (signed-in): its card.
           mark "#452 rent rules reach the right city" grep -q "Rent rules reach the right city" p_whats-new.html
+          mark "#453 affordable housing is read as affordable" grep -q "Affordable housing, read as affordable housing" p_whats-new.html
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
           if [ "$MARKS_BAD" -gt 0 ]; then

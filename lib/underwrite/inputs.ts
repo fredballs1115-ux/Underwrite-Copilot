@@ -17,6 +17,7 @@ import { withArticle } from "@/lib/article";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
+import { affordableShortLine, readAffordable } from "@/lib/affordable";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -97,6 +98,10 @@ export interface WorkbookMeta {
    *  the basis; absent unless a leasehold states when its lease ends (the
    *  lease's end itself rides in `interest.line`) */
   leasehold?: { line: string; read: string } | null;
+  /** a covenant or a contract that sets the rents (lib/affordable, #453):
+   *  the restriction in one line, and what this model's one rent growth
+   *  rate is not on it; absent on a market-rate deal */
+  affordable?: { line: string; modelCaveat: string | null } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -197,6 +202,14 @@ function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["intere
 function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["assumable"] {
   const a = readAssumable(extraction, inputs);
   return a ? { line: assumableLine(a), read: assumableSentence(a) } : null;
+}
+
+/** The cover's lines about a covenant or a contract that sets the rents
+ *  (#453): the restriction, and what the model's one growth rate is not on
+ *  it. Null on a market-rate deal. */
+function affordableMeta(extraction: ExtractionResult | null): WorkbookMeta["affordable"] {
+  const r = readAffordable(extraction);
+  return r ? { line: affordableShortLine(r), modelCaveat: r.modelCaveat } : null;
 }
 
 /** The cover's lines about a leasehold's exit (#422): the deal page's own
@@ -639,6 +652,7 @@ export function deriveUnderwriteInputs(
       interest: interestMeta(extraction),
       assumable: assumableMeta(extraction, inputs),
       leasehold: leaseholdMeta(extraction, inputs),
+      affordable: affordableMeta(extraction),
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,

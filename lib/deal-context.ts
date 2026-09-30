@@ -5,6 +5,7 @@ import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { assetWords } from "@/lib/asset-words";
 import { interestContextLine, readInterest } from "@/lib/interest";
 import { assumableContextLine, readAssumable } from "@/lib/assumable-debt";
+import { affordableContextLine, readAffordable } from "@/lib/affordable";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -37,6 +38,10 @@ export function dealContextFor(
   // The seller's loan, where it is offered for assumption (#417): its terms
   // as stated and what its value turns on, right after what is being sold.
   const assumable = readAssumable(extraction, null);
+  // A covenant or a contract that sets the rents (#453): the restricted
+  // units' rents move with the limits, not the market, and a gap to market
+  // on them is not loss to lease — said before any rent is read.
+  const affordable = readAffordable(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
@@ -44,6 +49,7 @@ export function dealContextFor(
   const head = [
     ...(interest ? [interestContextLine(interest)] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
+    ...(affordable ? [affordableContextLine(affordable)] : []),
     ...(flood ? [flood] : []),
   ];
   const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];

@@ -158,6 +158,42 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 25, 2026", []).assumableLine).toBe("");
   }, 30000);
 
+  it("says a covenant on the rents under the title (#453), and nothing on the market-rate sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      affordable: { programs: ["lihtc", "section8"], summary: "", agreement: "", assistance: "", tiers: [], page: "" },
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Restricted units", value: "186", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Units under HAP contract", value: "82", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Affordability expiration", value: "December 31, 2054", flagged: false, page: "p. 3", basis: "na" },
+        { label: "HAP contract expiration", value: "June 30, 2029", flagged: false, page: "p. 3", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "September 30, 2026", []);
+    expect(data.affordableLine).toBe(
+      "Affordable housing: 186 of 248 units (75%) rent-restricted under LIHTC until Dec 2054; 82 under a Section 8 HAP contract to Jun 2029",
+    );
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("186 of 248 units (75%) rent-restricted under LIHTC until Dec 2054");
+    // Still one page.
+    expect((buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
+    expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).affordableLine).toBe("");
+  }, 30000);
+
   it("the cover aerial prints on page one, and the memo is still one page", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,

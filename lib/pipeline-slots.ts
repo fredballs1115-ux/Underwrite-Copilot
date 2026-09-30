@@ -10,6 +10,7 @@ import { findGoingInCap } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
 import { interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
+import { affordableTag } from "@/lib/affordable";
 
 export interface PipelineSlots {
   /** the going-in cap as the OM states it — null on a plan deal, which has
@@ -27,6 +28,10 @@ export interface PipelineSlots {
    *  3.45%" (lib/assumable-debt `assumableTag`, #419); absent or null
    *  where none is */
   debt?: string | null;
+  /** a covenant or a contract that sets the rents — "LIHTC, 75%
+   *  restricted", "Section 8, 34% of units" (lib/affordable
+   *  `affordableTag`, #453); absent or null on a market-rate deal */
+  affordable?: string | null;
 }
 
 /**
@@ -78,5 +83,8 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // Debt a buyer can take over is a screening fact of its own in 2026:
     // the row says so beside the price, and the deal page prices it.
     debt: assumableTag(extraction),
+    // A restricted building's rents move with the limits, not the market:
+    // the row says so beside the price, where a scan of the pipeline reads.
+    affordable: affordableTag(extraction),
   };
 }
