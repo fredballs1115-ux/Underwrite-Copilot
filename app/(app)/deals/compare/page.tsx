@@ -6,7 +6,7 @@ import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxCheckSource, evaluateBuyBox, type BuyBox } from "@/lib/criteria";
-import { CompareTable, usd, type Col } from "./compare-table";
+import { CompareTable, MODEL_ROWS_NOTE, usd, type Col } from "./compare-table";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import type { FirstSignal } from "@/lib/anthropic/types";
@@ -16,7 +16,7 @@ import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
 import { asOfLabel } from "@/lib/research";
-import { findPriceMetric, inferStrategy, isPlanDeal, noiFigures } from "@/lib/deal-strategy";
+import { findPriceMetric, inferStrategy, noiFigures } from "@/lib/deal-strategy";
 import { bannerSources } from "@/lib/deal-banner";
 import { floodCell, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { affordableTag } from "@/lib/affordable";
@@ -32,7 +32,7 @@ import { brokerageOf } from "@/lib/offering";
 import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
-import { compareInterest } from "@/lib/compare-interest";
+import { compareReturns } from "@/lib/compare-figures";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { verdictBehind, type JobLike } from "@/lib/screen-run";
@@ -76,14 +76,24 @@ function toCol(
   // is negative or a default — not a figure to compare on, and not one to
   // spread against debt. The yield-on-cost row is its answer.
   const strat = inferStrategy(ex, signal);
-  const planDeal = isPlanDeal(strat.kind);
   // What the price buys (#423): the model runs at the documents' price, and
   // on a note that is a loan's and on a share the share's — so a note shows
   // its yield to maturity where a building shows a cap, a share's cap is
   // struck on the whole its price implies, and returns the price did not
   // buy are withheld rather than set beside buildings' (lib/compare-interest).
-  const ci = compareInterest(ex, r ?? null);
-  const cap = planDeal ? null : ci.cap;
+  // Where the first-draft model has no figure, the memorandum's own: the
+  // header's yield on cost, the pipeline card's going-in cap, each said as
+  // the memorandum's (lib/compare-figures).
+  const figs = compareReturns(ex, r ?? null, strat);
+  const planDeal = figs.planDeal;
+  const cap = figs.cap;
+  // The price and the year-1 NOI: the model's, else the memorandum's — the
+  // shared price reader (never a per-unit price or a prior trade; a
+  // development's land cost is its price) and its in-place or year-1 NOI.
+  const modelPrice = usd(r?.purchasePrice);
+  const statedPrice = findPriceMetric(ex?.metrics ?? [], strat.kind)?.value ?? null;
+  const modelNoi = usd(r?.year1Noi);
+  const statedNoi = goingInNoiText(ex);
 
   // Mandate fit — same engine, the same inputs and the same inferred kind
   // as the pipeline and deal page, so a development's land cost is judged
@@ -136,18 +146,20 @@ function toCol(
     fitNote,
     strategy: strat.kind === "unknown" ? null : strat.label,
     planDeal,
-    irr: ci.withheld ? null : (r?.leveredIrrPct ?? null),
-    em: ci.withheld ? null : (r?.equityMultiple ?? null),
-    coc: ci.withheld ? null : (r?.cashOnCashPct ?? null),
+    irr: figs.withheld ? null : (r?.leveredIrrPct ?? null),
+    em: figs.withheld ? null : (r?.equityMultiple ?? null),
+    coc: figs.withheld ? null : (r?.cashOnCashPct ?? null),
     cap,
-    yoc: r?.yieldOnCostPct ?? null,
+    capFrom: figs.capFrom,
+    yoc: figs.yoc,
+    yocFrom: figs.yocFrom,
     // Same arithmetic as the deal page's leverage check, run on the SAME cap
     // this table shows one row above — never a differently-sourced number.
     leverage: cap != null && bench30 != null ? leverageRead(cap, bench30) : null,
     // The same cap over today's 10-year (lib/debt-index reads it off the
     // rates table the strip draws from) — a fact with a date, no verdict.
     capOverTenYear: cap != null && tenYearPct != null ? capSpreadRead(cap, tenYearPct) : null,
-    interest: ci.tag,
+    interest: figs.tag,
     affordable: affordableTag(ex),
     tenancy: singleTenantTag(ex),
     roster: rosterTag(ex),
@@ -161,8 +173,8 @@ function toCol(
     storage: selfStorageTag(ex, Infinity),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
-    noteYtm: ci.noteYtmPct,
-    withheld: ci.withheld,
+    noteYtm: figs.noteYtmPct,
+    withheld: figs.withheld,
     // FEMA's zone at the building from the stored site-flags lookup (#426);
     // blank before it has answered, never a guess.
     flood: floodCell(
@@ -171,10 +183,10 @@ function toCol(
         return f && f.status !== "pending" && !siteFlagsStale(f, address?.label) ? f.flood : undefined;
       })(),
     ),
-    // The shared price reader — never a per-unit price or a prior trade; a
-    // development's land cost is its price.
-    price: usd(r?.purchasePrice) ?? findPriceMetric(ex?.metrics ?? [], strat.kind)?.value ?? null,
-    noi: usd(r?.year1Noi) ?? goingInNoiText(ex),
+    price: modelPrice ?? statedPrice,
+    priceFrom: modelPrice ? "model" : statedPrice ? "om" : null,
+    noi: modelNoi ?? statedNoi,
+    noiFrom: modelNoi ? "model" : statedNoi ? "om" : null,
     // Each building pictured at the head of its column (#418): its own
     // photograph where the deal has one cached, then Street View, then the
     // USGS aerial — each pinned, so its credit is the picture on screen.
@@ -295,8 +307,7 @@ export default async function ComparePage({
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Compare</h1>
         <p className="mt-1 text-sm text-muted">
-          {cols.length}{" "}deals side by side. Returns come from each deal&apos;s
-          generated model where present.
+          {cols.length}{" "}deals side by side.{" "}{MODEL_ROWS_NOTE}
         </p>
       </div>
 

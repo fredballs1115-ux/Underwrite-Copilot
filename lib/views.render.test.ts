@@ -764,7 +764,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect((cards[1].match(/>best</g) ?? []).length).toBe(2);
     expect((cards[2].match(/>best</g) ?? []).length).toBe(0);
     const tableRow = (label: string) =>
-      (html.match(new RegExp(`<td class="sticky left-0[^"]*">${label}</td>([\\s\\S]*?)</tr>`))?.[1] ?? "").split("<td ").slice(1);
+      (html.match(new RegExp(`<td class="sticky left-0[^"]*">${label}(?: · model)?</td>([\\s\\S]*?)</tr>`))?.[1] ?? "").split("<td ").slice(1);
     for (const label of ["Levered IRR", "Equity multiple"]) {
       const cells = tableRow(label);
       expect(cells, label).toHaveLength(4);
@@ -774,6 +774,56 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const settled = renderToStaticMarkup(React.createElement(CompareTable, { cols: cols.map((c) => ({ ...c, behind: null })) }));
     expect(visibleText(settled)).not.toContain("Re-screening");
     expect(settled.split("<li ").slice(1)[0].match(/>best</g) ?? []).toHaveLength(2);
+  });
+
+  it("names the rows the first-draft model fills, and marks the memorandum's own figure where a deal's model has none", () => {
+    // The table reads each deal's first-draft model, not the memorandum's
+    // figures its header prints (the audit of 2026-09-30).
+    const cols: Col[] = [
+      { ...COLS[0], capFrom: "model", priceFrom: "model", noiFrom: "model" },
+      // No model: the memorandum's going-in cap, price and NOI, as the
+      // pipeline card and the header read them.
+      col({
+        id: "om",
+        name: "Oak Terrace",
+        hasModel: false,
+        cap: 6.1,
+        capFrom: "om",
+        leverage: leverageRead(6.1, 6.2),
+        capOverTenYear: capSpreadRead(6.1, 4.94),
+        price: "$30,000,000",
+        priceFrom: "om",
+        noi: "$1,830,000",
+        noiFrom: "om",
+      }),
+      // A plan deal with no model: the yield on cost its header prints.
+      { ...COLS[1], hasModel: false, irr: null, em: null, yoc: 11.7, yocFrom: "om", price: "$20,000,000", priceFrom: "om", noi: null },
+    ];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    dumpView("compare-sources", html);
+    expect(a11yIssues(html), "a11y compare sources").toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    const tableLabels = [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => m[1]);
+    const cardLabels = [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => m[1]);
+    // A row a model figure fills says so beside its name, in both layouts.
+    for (const label of ["Levered IRR", "Equity multiple", "Going-in cap", "Leverage vs 30-yr", "Purchase price", "Year-1 NOI"]) {
+      expect(tableLabels, label).toContain(`${label} · model`);
+      expect(cardLabels.filter((l) => l === `${label} · model`), label).toHaveLength(cols.length);
+    }
+    // The yield on cost row holds the memorandum's figure alone: no mark.
+    expect(tableLabels).toContain("Yield on cost (stabilized)");
+    expect(tableLabels).not.toContain("Yield on cost (stabilized) · model");
+    // Each figure of the memorandum's own is marked, once a layout.
+    for (const figure of ["6.1%", "11.7%", "$30,000,000", "$1,830,000", "$20,000,000"]) {
+      expect((text.match(new RegExp(`${figure.replace(/[$.]/g, "\\$&")} \\(OM\\)`, "g")) ?? []).length, figure).toBe(2);
+    }
+    // A model's figure is never marked.
+    expect(text).not.toMatch(/5\.6% \(OM\)|\$68,000,000 \(OM\)/);
+    // Deals with no model at all: nothing says "model".
+    const noModels = renderToStaticMarkup(React.createElement(CompareTable, { cols: cols.slice(1) }));
+    expect(noModels).not.toContain(" · model");
+    expect(visibleText(noModels)).toContain("6.1% (OM)");
   });
 
   it("pictures each building at the head of its column and its phone card, the credit on the picture (#418)", () => {
@@ -819,9 +869,11 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
 
   it("leaves out a row blank for every deal compared, in the table and the phone cards, and keeps one with a figure for any deal", () => {
     // The row labels each layout draws: the table's sticky first cells, and
-    // the phone cards' terms (a card each, so a row's label once a card).
-    const tableRows = (html: string) => [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => m[1]);
-    const cardRows = (html: string) => [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => m[1]);
+    // the phone cards' terms (a card each, so a row's label once a card) —
+    // a row the model fills read without its "· model" mark.
+    const bare = (label: string) => label.replace(/ · model$/, "");
+    const tableRows = (html: string) => [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => bare(m[1]));
+    const cardRows = (html: string) => [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => bare(m[1]));
     const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
     // Four deals none of which states a hotel, a sale, a restriction or any
     // of the other deal-type facts: no column of dashes for any of them.

@@ -129,6 +129,18 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind): stri
 }
 
 /**
+ * The going-in cap the memorandum states, as a pipeline row's Cap slot
+ * shows it: none on a plan deal, whose stabilized cap or yield on cost is the
+ * finished project's (its slot carries the yield on total cost). The compare
+ * table reads it where a deal's model has no cap (lib/compare-figures), so
+ * the card and the table show one figure.
+ */
+export function statedCapSlot(extraction: ExtractionResult, planDeal: boolean): string | null {
+  if (planDeal) return null;
+  return findGoingInCap(extraction.metrics ?? [])?.value ?? null;
+}
+
+/**
  * The asset class a pipeline row shows. A deal created with "Auto-detect"
  * keeps "auto" in its column, and what the deck turned out to be lives in
  * the extraction — so the row shows that read, and shows nothing (no rail,
@@ -164,7 +176,7 @@ export function pickSlots(extraction: ExtractionResult, signal: FirstSignal | nu
     // the meeting .xlsx, the analytics and the comp memory apply, so a
     // value-add's row shows its yield on cost where the export shows "n/a
     // — plan", never a cap on one and a yield on the other.
-    cap: plan ? null : (findGoingInCap(metrics)?.value ?? null),
+    cap: statedCapSlot(extraction, plan != null),
     // The shared price reader; on a development with no asking price the
     // land or site cost is what is being bought. The first signal's ask
     // fills the slot before the extraction lands, as on the deal page —

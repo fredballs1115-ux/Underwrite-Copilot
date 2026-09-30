@@ -3,6 +3,7 @@ import { assetClassLabel } from "@/lib/asset-class";
 import type { BannerSource } from "@/lib/deal-banner";
 import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
+import type { FigureSource } from "@/lib/compare-figures";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "bg-pass/15 text-pass" },
@@ -16,6 +17,25 @@ export const pct = (n: number | null | undefined) =>
   n == null || !isFinite(n) ? null : n.toFixed(1) + "%";
 export const mult = (n: number | null | undefined) =>
   n == null || !isFinite(n) ? null : n.toFixed(2) + "x";
+
+/** What the return rows are, said once over the table (the audit of
+ *  2026-09-30): the first-draft model's figures (lib/model, which carries
+ *  no date), not the memorandum's that each deal's header prints. */
+export const MODEL_ROWS_NOTE =
+  "Rows marked “model” read each deal’s first-draft model (built on request, not rebuilt when its memorandum is replaced), not the memorandum’s figures on its header; a figure marked (OM) is the memorandum’s own, where the model has none.";
+
+/** A row a model figure fills says so beside its name. */
+const MODEL_ROW = " · model";
+
+/** A figure the memorandum states, in a row the model fills elsewhere. */
+const OM_MARK = (
+  <>
+    {" "}
+    <span className="font-sans text-[10px] text-muted" title="The memorandum’s own figure — this deal’s first-draft model has none">
+      (OM)
+    </span>
+  </>
+);
 
 /** A cell that says nothing: no figure, or the dash that stands for none.
  *  A reason ("n/a — plan", "judged on yield on cost") is not blank. */
@@ -54,9 +74,14 @@ export type Col = {
   em: number | null;
   coc: number | null;
   cap: number | null;
-  /** stabilized NOI ÷ total cost, % — the yardstick for a deal with a plan;
-   *  null for a stabilized asset or a model built before the plan existed */
+  /** where the cap came from: the first-draft model, or the memorandum's
+   *  own going-in cap where the model has none (lib/compare-figures) */
+  capFrom?: FigureSource | null;
+  /** stabilized NOI ÷ total cost, % — the yardstick for a deal with a plan:
+   *  the model's, else the one the deal's header prints; null for a
+   *  stabilized asset */
   yoc: number | null;
+  yocFrom?: FigureSource | null;
   /** cap vs the freshest 30-yr fixed — same arithmetic as the deal page */
   leverage: LeverageRead | null;
   /** cap over today's 10-year Treasury (lib/leverage `capSpreadRead`) —
@@ -64,7 +89,9 @@ export type Col = {
    *  when the table holds no fresh 10-year */
   capOverTenYear?: CapSpreadRead | null;
   price: string | null;
+  priceFrom?: FigureSource | null;
   noi: string | null;
+  noiFrom?: FigureSource | null;
   /** what the price buys where it is not the building outright ("Note",
    *  "49% share", "Leasehold, 45 yrs left" — lib/interest `interestTag`),
    *  said beside the price (#423) */
@@ -272,6 +299,10 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     /** the figure is signed (a spread over a benchmark): its bar runs from a
      *  centre line, scaled to the row's widest spread either way */
     signed?: boolean;
+    /** where a return row's figure came from — the deal's first-draft model
+     *  or the memorandum — so a row the model fills says so beside its name
+     *  and a memorandum's figure in it is marked (the audit of 2026-09-30) */
+    src?: (c: Col) => FigureSource | null | undefined;
   }[] = [
     { label: "Market", get: (c) => c.market },
     {
@@ -327,12 +358,14 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Deal type", get: (c) => c.strategy ?? "—" },
     // A note's or a share's model returns are not the deal's (#423): said
     // as withheld, with the reason, rather than left a bare dash.
+    // The returns are the first-draft model's alone.
     {
       label: "Levered IRR",
       get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.irr)),
       best: (c) => crownable(c) && c.irr != null && c.irr === bestIrr,
       mono: true,
       num: (c) => c.irr,
+      src: (c) => (c.withheld || c.irr == null ? null : "model"),
     },
     {
       label: "Equity multiple",
@@ -340,8 +373,15 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       best: (c) => crownable(c) && c.em != null && c.em === bestEm,
       mono: true,
       num: (c) => c.em,
+      src: (c) => (c.withheld || c.em == null ? null : "model"),
     },
-    { label: "Cash-on-cash (Yr 1)", get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.coc)), mono: true, num: (c) => c.coc },
+    {
+      label: "Cash-on-cash (Yr 1)",
+      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.coc)),
+      mono: true,
+      num: (c) => c.coc,
+      src: (c) => (c.withheld || c.coc == null ? null : "model"),
+    },
     // A plan deal's year-1 cap is a dark building's (negative, or a default)
     // — not a figure to compare on. Say so; the yield on cost row below is
     // its answer. Its cell draws no bar either. A note has no cap at all:
@@ -358,17 +398,23 @@ export function CompareTable({ cols }: { cols: Col[] }) {
             : pct(c.cap),
       mono: true,
       num: (c) => (c.planDeal ? null : c.cap),
+      // The model's cap, else the memorandum's (lib/compare-figures); a
+      // note's yield is read off the memorandum's own terms.
+      src: (c) =>
+        c.planDeal ? null : c.withheld === "note" ? (c.noteYtm != null ? "om" : null) : c.cap != null ? c.capFrom : null,
     },
     // The plan's yardstick: stabilized NOI over everything it cost to get
     // there. Blank for a stabilized asset — its going-in cap is the answer.
     {
       label: "Yield on cost (stabilized)",
       // A plan deal's other cells send the reader here ("judged on yield on
-      // cost"), so the row stays while one is compared; a plan deal whose
-      // model has no yield on cost says so rather than leaving a dash.
+      // cost"), so the row stays while one is compared: the model's figure,
+      // else the one the deal's header prints; "not stated" where neither
+      // has one, rather than a dash.
       get: (c) => pct(c.yoc) ?? (c.planDeal ? "not stated" : null),
       mono: true,
       num: (c) => c.yoc,
+      src: (c) => (c.yoc != null ? c.yocFrom : null),
     },
     {
       label: "Leverage vs 30-yr",
@@ -394,6 +440,8 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       // the read's colour; a plan deal has no cap to spread, so no bar.
       num: (c) => (c.planDeal || !c.leverage ? null : c.leverage.spreadBps),
       signed: true,
+      // Struck on the cap one row up, so from where that cap came.
+      src: (c) => (c.planDeal || c.withheld === "note" || !c.leverage ? null : c.capFrom),
     },
     // The cap over today's 10-year — the spread a cap is quoted against, a
     // fact with no verdict, so the cell carries no tone; signed, like the
@@ -411,11 +459,17 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       mono: true,
       num: (c) => (c.planDeal || !c.capOverTenYear ? null : c.capOverTenYear.spreadBps),
       signed: true,
+      src: (c) => (c.planDeal || c.withheld === "note" || !c.capOverTenYear ? null : c.capFrom),
     },
     // What the price buys, beside it, where it is not the building
     // outright (#423) — the pipeline row's own tag.
-    { label: "Purchase price", get: (c) => (c.price && c.interest ? `${c.price} · ${c.interest}` : c.price), mono: true },
-    { label: "Year-1 NOI", get: (c) => c.noi, mono: true },
+    {
+      label: "Purchase price",
+      get: (c) => (c.price && c.interest ? `${c.price} · ${c.interest}` : c.price),
+      mono: true,
+      src: (c) => (c.price ? c.priceFrom : null),
+    },
+    { label: "Year-1 NOI", get: (c) => c.noi, mono: true, src: (c) => (c.noi ? c.noiFrom : null) },
   ];
 
   // A row blank for every deal compared says nothing a meeting can read:
@@ -425,6 +479,13 @@ export function CompareTable({ cols }: { cols: Col[] }) {
   // out, in the table and the phone cards alike; a row with a figure for
   // any one deal stays, its dashes with it.
   const rows = metricRows.filter((mr) => cols.some((c) => !blankCell(mr.get(c))));
+
+  // A row the first-draft model fills for any deal says so beside its name,
+  // so its figures never read as the header's; a figure the memorandum
+  // states instead, where the model has none, is marked (OM).
+  const labelOf = rows.map((mr) => (cols.some((c) => mr.src?.(c) === "model") ? `${mr.label}${MODEL_ROW}` : mr.label));
+  const omMark = (mr: (typeof rows)[number], c: Col, val: string | null) =>
+    val != null && mr.src?.(c) === "om" ? OM_MARK : null;
 
   // Each row's spread, once, for both layouts: every figure against the
   // row's largest (the widest either way on a signed row), rejected deals
@@ -484,13 +545,14 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                   const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
                   return (
                     <div key={mr.label} className="min-w-0">
-                      <dt className="text-[10px] uppercase tracking-wide text-muted">{mr.label}</dt>
+                      <dt className="text-[10px] uppercase tracking-wide text-muted">{labelOf[ri]}</dt>
                       <dd
                         className={`text-sm ${mr.mono ? "font-mono tabular-nums" : ""} ${
                           isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"
                         }`}
                       >
                         {val ?? <span className="text-muted">—</span>}
+                        {omMark(mr, c, val)}
                         {isBest && BEST_PILL}
                         {barFor(mr, c, ri, ci, isBest)}
                       </dd>
@@ -584,7 +646,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
             {rows.map((mr, ri) => (
               <tr key={mr.label} className="border-b border-line last:border-0">
                 <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  {mr.label}
+                  {labelOf[ri]}
                 </td>
                 {cols.map((c, ci) => {
                   const val = mr.get(c);
@@ -597,6 +659,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                       } ${isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"}`}
                     >
                       {val ?? <span className="text-muted">—</span>}
+                      {omMark(mr, c, val)}
                       {isBest && BEST_PILL}
                       {barFor(mr, c, ri, ci, isBest)}
                     </td>
