@@ -119,11 +119,14 @@ export function PlaceBackdrop({
   metro,
   height = 600,
   scrim = "band",
+  sizes = "100vw",
 }: {
   metro: string;
   height?: number;
   /** "band" for words set at the bottom, "center" for a centred card */
   scrim?: Scrim;
+  /** how wide the band draws, for the browser to pick a file by (#451) */
+  sizes?: string;
 }) {
   // Either picture is enough to open on. Gating on the overhead alone was
   // safe only by accident — every market with a skyline happens to have an
@@ -133,15 +136,17 @@ export function PlaceBackdrop({
   if (!METRO_VIEWS[metro] && !hasSkyline(metro)) return null;
   return (
     <div className="pointer-events-none absolute inset-0">
-      {/* 1400px: the probe measures these at 1600 and the range is wide —
-          260 KB for Jersey City, a megabyte for Atlanta — and a band is the
-          one place that weight is paid on every page load. Above centre,
+      {/* Offered at the skyline's widths (#451), each encoded again at a
+          fraction of Commons' weight, so a phone takes 1600 and a dense
+          laptop 2400 where one 1400px file was stretched twice over; 1400
+          stays the file a browser without srcset gets. Above centre,
           because a skyline's subject is its tower line and the bottom of
           the frame is usually road or water. */}
       <CityPhoto
         metro={metro}
         width={1400}
         height={height}
+        sizes={sizes}
         className="h-full w-full object-cover object-[50%_42%]"
       />
       <PhotoScrim scrim={scrim} />
@@ -210,7 +215,8 @@ export function MarketBand({
 }) {
   return (
     <div className="band-dark relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[21rem]">
-      <PlaceBackdrop metro={metro} height={480} scrim="caption" />
+      {/* Inside a page's column, never wider than its 72rem. */}
+      <PlaceBackdrop metro={metro} height={480} scrim="caption" sizes="(min-width: 1200px) 1104px, 100vw" />
       <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
         <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
         {/* Two lines at most: the scrim is measured to the top of a name

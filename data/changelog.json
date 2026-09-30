@@ -3,6 +3,12 @@
   "entries": [
     {
       "date": "2026-09-30",
+      "title": "City photos, lighter and sharper",
+      "href": "/market",
+      "blurb": "The city photographs across the site are now re-encoded before they reach you, so they load lighter with nothing lost to the eye, and the wide photo that opens each market page is sharp on high-resolution laptop screens, where it had been stretched to twice its size."
+    },
+    {
+      "date": "2026-09-30",
       "title": "Flip through a deal's photos on its card",
       "href": "/deals",
       "blurb": "On your pipeline, a card showing the deal's own photo now lets you flip through the other photos from its memorandum without opening the deal: arrows on the picture when you point at it (always there on a phone or tablet), a swipe, and dots that show where you are. Each photo keeps its own credit and page, and the next one loads before you ask for it."
