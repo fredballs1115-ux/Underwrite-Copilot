@@ -38,7 +38,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (the same rule as the meeting .xlsx — a plan deal shows yield on cost, never
   a cap). The sample deal's ONE derivation for the demo page, the demo workbook
   and the demo report: `lib/sample-derive.ts` (actuals included — never call
-  `deriveUnderwriteInputs` on the sample directly).
+  `deriveUnderwriteInputs` on the sample directly). **The sample is never
+  seeded from today's rates** on any surface: every caller asks
+  `lib/model-market.ts` with the row's `is_sample` (`modelMarketFor`,
+  `constructionSeedFor`, `modelRatesLine`), so the signed-in sample runs at
+  the flat 6.00% the demo's sentences quote; a test scans app/ and lib/ so
+  no surface hands a model an index of its own.
 - A broker comp's figures: `lib/comp-detail.ts` reads a stated per-unit /
   per-SF basis and cap out of the comp's one detail line (`compFigures`), the
   subject's own basis from the shared readers (`subjectBasis` — none for a
@@ -1939,7 +1944,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   research tracker: Colliers, Suburban Maryland (Montgomery and Prince
   George's together, not a county split), Q1 2026 (read Aug 25, 2026) — a
   research print, not a feed"); the benchmark rows the research panel
-  prints carry the same citation (`Benchmark.cite`). A lab, an
+  prints carry the same citation (`Benchmark.cite`). An asking rent has
+  its own `rent_read` by the same rule (Chicago's $43.90 office rent is
+  Cushman's CBD MarketBeat, not the block's first link; a note naming no
+  house names none), and every public surface credits a figure through
+  one reader — `blockCitations`, `figureSources` and `figuresTitle` in
+  `lib/tracker-read.ts`: the "By asset type" panel's credit line (the
+  header says the day the research was READ, never "as of"), the sector
+  leaderboard's per-cell tooltips and source links, the coverage board,
+  the compare card, and the homepage's band and gallery, whose figures
+  each carry their own period ("Office 27.3% vac (Q1 2026) · $43.90/SF
+  (Q2 2026)"). A test scans the research files for a per-foot figure that
+  lost its "$". A lab, an
   outdoor-storage yard or a cold-storage warehouse, named so in the class
   or the deck's own class words, reads no tracker. Three reads:
   a commercial deal's stabilized vacancy — which had no row, the Census
@@ -4437,7 +4453,25 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   has loaded — the server's markup and the first frame show 0:00 — so a
   reload mid-screen picks up the run's time rather than starting again; a
   start over `MAX_RUN_MS` back is a row stamped before the restamp, and the
-  page's own moment stands in). In-process runs heartbeat
+  page's own moment stands in). **The page claims no duration it has not
+  measured** (`lib/screen-duration.ts`): the rail's "typically 2–4
+  minutes" is gone, and from three of the reader's own finished screens it
+  says their median ("Your screens usually take about 3 minutes") from
+  each ledger's `wallMs` — the run's own time, start to finish, which
+  `runAnalysis` writes beside the ledger; never the ledger's `ms`, which
+  sums the model calls alone. While a first screen has not yet written the
+  terms, an empty figure on the deal header, the pipeline card and the list
+  row is a quiet shimmer named "Reading the memorandum"
+  (`lib/screen-reading.ts` `readingMemorandum`), never the dash a finished
+  screen gives a figure the memorandum does not state; the card shows the
+  first signal's price meanwhile, its fit marked "First read". The
+  free-deal meter on the pipeline and the account page is
+  `lib/deal-allowance.ts` (`dealAllowance`: the team's trial first, then the
+  reader's own, as the create action decides), the onboarding checklist's
+  "Screen your first OM" ticks only for a memorandum's screen that reached
+  its verdict (`lib/onboarding.ts`), and a typed ⌘K query searches every
+  deal by name on the server (`lib/palette-search.ts`, an escaped `ilike`).
+  In-process runs heartbeat
   the job row; a Files-API copy of an OM is released when its run ends
   (`releaseOmSource`); one web process runs at most `ANALYSIS_CONCURRENCY`
   (default two) screens at once (`lib/anthropic/run-gate.ts` — the claim is
