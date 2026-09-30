@@ -1404,10 +1404,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   else**: the cron script and the module both import it, so the two cannot
   disagree about what a series is, and `readSeriesTable` REFUSES a
   malformed entry rather than skipping it (a skipped entry is a series the
-  cron keeps writing and the page silently stops showing). Fifty-three
+  cron keeps writing and the page silently stops showing). Fifty
   series in seven groups: the whole Treasury curve (eleven tenors, the
   breakeven, the real yield), the money market (SOFR, its 30-day average,
-  fed funds, prime), credit spreads, mortgage and bank lending (the two
+  fed funds, prime), corporate credit (the Treasury's own high-quality
+  corporate curve, `HQMCB10YR`, monthly — 2026-09-30: the three ICE BofA
+  spreads and Moody's Baa yield the strip had carried came off it, once
+  the probe's terms line (run 36785223477) showed their publishers license
+  them to FRED, not to a site that republishes them, Moody's forbidding
+  any redistribution outright; `lib/live-rates.test.ts` holds every table,
+  national and local, free of ICE, Moody's, S&P and Case-Shiller), mortgage
+  and bank lending (the two
   PMMS surveys, bank CRE loans y/y, delinquency, the three SLOOS
   standards series, and — #410 — commercial property prices against a
   year ago, `BOGZ1FL010000386Q`, the Fed's Financial Accounts, the one

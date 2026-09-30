@@ -10,7 +10,8 @@ import type { RateRow } from "./live-rates";
  * series — and the five lessor rent indexes what the dry run of 2026-09-23
  * printed (run 35917848391), the same figures for the same August, the
  * insurance premium index what the branch's dry run the same day printed
- * (run 35929534333). The
+ * (run 35929534333), the Treasury's HQM corporate rate what the probe of
+ * 2026-09-30 printed (run 36785223477). The
  * earlier observations behind the 10-year and SOFR are what the Sep 16
  * cron wrote, read out of that run's log. Nothing here was typed from
  * memory: the sandbox cannot reach FRED, and a fixture that guesses a figure
@@ -40,11 +41,11 @@ export const REAL_ROWS: RateRow[] = [
   { series_id: "SOFR30DAYAVG", obs_date: "2026-09-21", value: 3.67623 },
   { series_id: "DFF", obs_date: "2026-09-17", value: 3.88 },
   { series_id: "DPRIME", obs_date: "2026-09-17", value: 7 },
-  // Credit.
-  { series_id: "BAMLC0A0CM", obs_date: "2026-09-18", value: 0.77 },
-  { series_id: "BAMLC0A4CBBB", obs_date: "2026-09-18", value: 0.94 },
-  { series_id: "BAMLH0A0HYM2", obs_date: "2026-09-18", value: 2.68 },
-  { series_id: "DBAA", obs_date: "2026-09-18", value: 6.41 },
+  // Corporate credit: the Treasury's high-quality corporate curve, the
+  // newest observation the rates workflow's probe printed on 2026-09-30
+  // (run 36785223477). ICE's spreads and Moody's yield were taken off the
+  // strip that day: their publishers license them to FRED, not to us.
+  { series_id: "HQMCB10YR", obs_date: "2026-08-01", value: 5.58 },
   // Mortgage and bank lending.
   { series_id: "MORTGAGE30US", obs_date: "2026-09-17", value: 6.95 },
   { series_id: "MORTGAGE15US", obs_date: "2026-09-17", value: 6.26 },

@@ -3248,7 +3248,8 @@ describe("the rates strip", () => {
     expect(text).toContain("4.94%"); // the 10-year
     expect(text).toContain("3.85%"); // SOFR
     expect(text).toContain("6.95%"); // the survey
-    expect(text).toContain("77 bps"); // IG corporate: a spread, said as bps
+    expect(text).toContain("5.58%"); // the Treasury's HQM corporate rate, monthly
+    expect(text).not.toContain("ICE BofA"); // licensed to FRED, not to us
     expect(text).toContain("3.4%"); // CPI y/y: a change, to one place
     expect(text).toContain("−5.7%"); // banks EASING on multifamily, signed
     expect(text).toContain("344k"); // starts, 5+ units: a count
@@ -3311,7 +3312,7 @@ describe("the rates strip", () => {
   });
 
   it("folds the rest into groups whose summary already carries the figures", () => {
-    for (const g of ["Credit spreads", "Mortgage &amp; bank lending", "Inflation &amp; cost", "Jobs &amp; output", "Supply &amp; vacancy"]) {
+    for (const g of ["Corporate credit", "Mortgage &amp; bank lending", "Inflation &amp; cost", "Jobs &amp; output", "Supply &amp; vacancy"]) {
       expect(html).toContain(g);
     }
     expect((html.match(/<details/g) ?? []).length).toBe(5);
