@@ -22,6 +22,8 @@ import { createClient } from "@supabase/supabase-js";
 import { createRequire } from "node:module";
 // The one FMR row builder (plain Node strips its types).
 import { FMR_BEDS, fiscalYearOn, fmrMetroLabel, fmrRows, fyStart } from "../lib/fmr.ts";
+// A failure said on the run's page, not only in its log.
+import { annotation, missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
 
 const require = createRequire(import.meta.url);
 const { metros: METROS } = require("../data/research/metros.json");
@@ -29,8 +31,17 @@ const { metros: METROS } = require("../data/research/metros.json");
 const token = process.env.HUD_API_TOKEN;
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!token || !url || !key) {
-  console.error("HUD_API_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY are required.");
+// A missing secret is a failed run, never a quiet one. All three are
+// needed: the token for HUD's API, the other two to write what it returns.
+const unset = missingSecrets({ HUD_API_TOKEN: token, SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: key });
+if (unset.length > 0) {
+  console.log(
+    missingSecretsError(
+      "fetch-fmr",
+      unset,
+      "Set what is missing where this pull runs (the repository's Actions secrets, or the Render cron's environment); HUD's API token is free with a huduser.gov account.",
+    ),
+  );
   process.exit(1);
 }
 const supabase = createClient(url, key, { auth: { persistSession: false } });
@@ -69,15 +80,21 @@ const hud = async (path) => {
   return res.json();
 };
 
-const areas = await hud("/fmr/listMetroAreas");
+let areas;
+try {
+  areas = await hud("/fmr/listMetroAreas");
+} catch (err) {
+  console.log(annotation("error", `listMetroAreas failed — ${String(err).slice(0, 300)}; nothing was written`, "HUD FMR pull failed"));
+  process.exit(1);
+}
 if (!Array.isArray(areas) || !areas.length) {
-  console.error("listMetroAreas returned nothing usable — inspect the API response shape.");
+  console.log(annotation("error", "listMetroAreas returned nothing usable — inspect the API response shape; nothing was written", "HUD FMR pull failed"));
   process.exit(1);
 }
 const nameKey = ["area_name", "metro_name", "name"].find((k) => k in areas[0]);
 const codeKey = ["cbsa_code", "code", "metro_code", "entityid"].find((k) => k in areas[0]);
 if (!nameKey || !codeKey) {
-  console.error(`unexpected area fields: ${Object.keys(areas[0]).join(", ")}`);
+  console.log(annotation("error", `unexpected area fields: ${Object.keys(areas[0]).join(", ")}; nothing was written`, "HUD FMR pull failed"));
   process.exit(1);
 }
 
@@ -144,8 +161,14 @@ for (const m of AREA_MATCHERS) {
     console.log(`${label}: ${rows[0].note.split(".")[0]} — 2BR $${rents["2br"] ?? "?"} (${area[nameKey]})`);
   } catch (err) {
     failures += 1;
-    console.error(`${label}: ${String(err).slice(0, 300)}`);
+    // One annotation a metro: the run stays green if any metro was written,
+    // and the page says which kept its last rows.
+    console.log(annotation("warning", `${label}: ${String(err).slice(0, 300)}; its rows keep what they held`, "HUD FMR metro failed"));
   }
 }
 console.log(`fmr fetch: ${ok} metros updated, ${failures} failed.`);
-process.exit(ok > 0 ? 0 : 1); // partial success is success (same policy as fetch-rates)
+if (ok === 0) {
+  console.log(annotation("error", `No metro was updated: all ${failures} failed (see the warnings above).`, "HUD FMR pull failed"));
+  process.exit(1);
+}
+process.exit(0); // partial success is success (same policy as fetch-rates)

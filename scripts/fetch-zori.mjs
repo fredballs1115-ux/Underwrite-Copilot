@@ -47,6 +47,8 @@ import { createRequire } from "node:module";
 // them alone, so a metric outside it would be read by nothing and
 // "re-verified" — overwritten — by a web search.
 import { ZILLOW_METRICS } from "../lib/feed-rows.ts";
+// A failure said on the run's page, not only in its log.
+import { annotation, missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
 
 const require = createRequire(import.meta.url);
 
@@ -85,7 +87,7 @@ const FILES = [
 for (const f of FILES) {
   for (const metric of [f.metric, f.yoyMetric]) {
     if (!ZILLOW_METRICS.includes(metric)) {
-      console.error(`${f.kind}: metric "${metric}" is not in lib/feed-rows ZILLOW_METRICS; add it there before this pull writes it`);
+      console.log(annotation("error", `${f.kind}: metric "${metric}" is not in lib/feed-rows ZILLOW_METRICS; add it there before this pull writes it`));
       process.exit(1);
     }
   }
@@ -94,8 +96,16 @@ for (const f of FILES) {
 const dryRun = process.env.DRY_RUN === "1";
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!dryRun && (!url || !key)) {
-  console.error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY are required (or DRY_RUN=1).");
+// A missing secret is a failed run, never a quiet one.
+const unset = dryRun ? [] : missingSecrets({ SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: key });
+if (unset.length > 0) {
+  console.log(
+    missingSecretsError(
+      "fetch-zori",
+      unset,
+      "Set what is missing where this pull runs (the repository's Actions secrets), or run with DRY_RUN=1 to fetch and print without writing.",
+    ),
+  );
   process.exit(1);
 }
 const supabase = dryRun ? null : createClient(url, key, { auth: { persistSession: false } });
@@ -213,24 +223,43 @@ async function pull(file) {
     }
     console.log(`${m.id}: ${file.say(value)} (${m.region}, ${newest.h})${yoy !== null ? ` · ${yoy > 0 ? "+" : ""}${yoy}% y/y` : ""}`);
   }
-  for (const miss of missed) console.error(`${miss}: no ${file.kind} row by that RegionName`);
+  // One annotation for the file's misses: each metro named keeps last
+  // month's row, which the site stops saying once it is past its cadence.
+  if (missed.length > 0) {
+    console.log(
+      annotation(
+        "warning",
+        `${file.kind}: ${missed.length} of ${METROS.length} metros have no row by their RegionName and keep their last figures: ${missed.join(", ")}`,
+        `Zillow ${file.kind}: metros missed`,
+      ),
+    );
+  }
   return { out, matched, missed };
 }
 
 const all = [];
 let anyRent = 0;
+const fileSummary = [];
 for (const file of FILES) {
   try {
     const { out, matched, missed } = await pull(file);
     all.push(...out);
     if (file.metric === "zori_rent") anyRent = matched;
+    fileSummary.push(`${file.kind} ${matched} of ${METROS.length}`);
     console.log(
       `${file.kind} ROLL-UP: ${matched} of ${METROS.length} metros matched${missed.length ? `; missed: ${missed.join(", ")}` : ""}`,
     );
   } catch (err) {
     // One file down does not take the others with it: the page shows what
-    // it has and the line says what it does not.
-    console.error(`${file.kind}: FAILED — ${err instanceof Error ? err.message : String(err)}`);
+    // it has and the run's page says what it does not.
+    fileSummary.push(`${file.kind} failed`);
+    console.log(
+      annotation(
+        "warning",
+        `${file.kind}: FAILED — ${err instanceof Error ? err.message : String(err)}; its rows keep last month's figures, which the site stops saying once they are past their cadence`,
+        `Zillow ${file.kind} failed`,
+      ),
+    );
     console.log(`${file.kind} ROLL-UP: 0 of ${METROS.length} metros matched; the file did not answer`);
   }
 }
@@ -238,9 +267,15 @@ for (const file of FILES) {
 if (supabase && all.length > 0) {
   const { error } = await supabase.from("benchmarks").upsert(all, { onConflict: "sector,metro,metric" });
   if (error) {
-    console.error(`benchmarks upsert: ${error.message}`);
+    console.log(annotation("error", `benchmarks upsert: ${error.message}; nothing was written`, "Zillow pull failed"));
     process.exit(1);
   }
   console.log(`benchmarks: upserted ${all.length} rows`);
 }
-process.exit(anyRent === 0 ? 1 : 0);
+// The run in one line: each file's matches, and what was written.
+console.log(`ZILLOW ROLL-UP: ${fileSummary.join("; ")}; ${dryRun ? "dry run, nothing written" : `${all.length} rows written`}`);
+if (anyRent === 0) {
+  console.log(annotation("error", "The all-homes asking rent matched no metro, so the pull fails (see the warnings above).", "Zillow pull failed"));
+  process.exit(1);
+}
+process.exit(0);

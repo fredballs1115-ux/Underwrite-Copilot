@@ -20,6 +20,8 @@
 // FRED's API needs a (free) key: https://fred.stlouisfed.org/docs/api/api_key.html
 
 import { createRequire } from "node:module";
+// A failure said on the run's page, not only in its log (plain Node strips its types).
+import { annotation, missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
 
 const require = createRequire(import.meta.url);
 /** @type {{ historyRows: number; series: Array<{ id: string; fred?: string; units?: string; source?: string; label: string }>; metroSeries?: Array<{ id: string; fred?: string; units?: string; source?: string; label: string }> }} */
@@ -65,11 +67,19 @@ const dryRun = process.env.DRY_RUN === "1";
 const fredKey = process.env.FRED_API_KEY;
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!fredKey || (!dryRun && (!url || !key))) {
-  console.error(
-    dryRun
-      ? "FRED_API_KEY is required."
-      : "FRED_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY are required.",
+// A missing secret is a failed run, never a quiet one: a green run that
+// wrote nothing reads as a healthy feed. BLS_API_KEY is optional (below)
+// and is not asked for here.
+const unset = missingSecrets(
+  dryRun ? { FRED_API_KEY: fredKey } : { FRED_API_KEY: fredKey, SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: key },
+);
+if (unset.length > 0) {
+  console.log(
+    missingSecretsError(
+      "fetch-rates",
+      unset,
+      "Set what is missing where this pull runs (the repository's Actions secrets, or the Render cron's environment); DRY_RUN=1 needs only FRED_API_KEY.",
+    ),
   );
   process.exit(1);
 }
@@ -144,7 +154,11 @@ for (const s of FROM_FRED) {
     );
   } catch (err) {
     failed.push(s.id);
-    console.error(`${s.id}: FAILED — ${err instanceof Error ? err.message : String(err)}`);
+    // One annotation a failed series: the run stays green (the rest were
+    // written), and the page says which series kept its last rows.
+    console.log(
+      annotation("warning", `${s.id}: FAILED — ${err instanceof Error ? err.message : String(err)}; its rows keep their last observation`, "FRED series failed"),
+    );
   }
   await sleep(PACE_MS);
 }
@@ -204,7 +218,7 @@ if (FROM_BLS.length > 0) {
         .map((o) => ({ series_id: s.id, obs_date: o.obs_date, value: o.value, label: s.label }));
       if (obs.length === 0) {
         failed.push(s.id);
-        console.error(`${s.id}: FAILED — the BLS returned no monthly observation`);
+        console.log(annotation("warning", `${s.id}: FAILED — the BLS returned no monthly observation; its rows keep their last`, "BLS series failed"));
         continue;
       }
       if (dryRun) {
@@ -225,18 +239,32 @@ if (FROM_BLS.length > 0) {
       );
     }
   } catch (err) {
-    for (const s of FROM_BLS) if (!wrote.includes(s.id) && !failed.includes(s.id)) failed.push(s.id);
-    console.error(`BLS: FAILED — ${err instanceof Error ? err.message : String(err)}`);
+    const lost = FROM_BLS.filter((s) => !wrote.includes(s.id) && !failed.includes(s.id)).map((s) => s.id);
+    failed.push(...lost);
+    // One annotation for the source: the one request carries every BLS series.
+    console.log(
+      annotation(
+        "warning",
+        `BLS: FAILED — ${err instanceof Error ? err.message : String(err)}; ${lost.length} series keep their last rows (${lost.join(", ")})`,
+        "BLS request failed",
+      ),
+    );
   }
 }
 
-// One line to read the run by, in the shape live-verify's roll-up uses.
+// One line to read the run by, in the shape live-verify's roll-up uses. It
+// counts the series THIS pull asks for — FRED's and the BLS's; the Census
+// survey's rows in the same table are scripts/fetch-hvs.mjs's.
+const asked = FROM_FRED.length + FROM_BLS.length;
 console.log(
   probeOnly
     ? "RATES ROLL-UP: probe only — the table was not walked (tick dry_run beside a probe to walk it)"
-    : `RATES ROLL-UP: ${wrote.length} of ${SERIES.length} series answered` +
+    : `RATES ROLL-UP: ${wrote.length} of ${asked} series answered` +
         (failed.length ? `; failed: ${failed.join(", ")}` : ""),
 );
+if (!probeOnly && wrote.length === 0) {
+  console.log(annotation("error", `The rates pull wrote nothing: all ${asked} series failed (see the warnings above).`, "rates pull failed"));
+}
 
 // PROBE_BLS — candidate BLS ids, fetched from the BLS and printed with the
 // newest observation (and the title, with a key), written nowhere. The

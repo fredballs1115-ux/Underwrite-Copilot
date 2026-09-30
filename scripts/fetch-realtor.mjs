@@ -50,6 +50,8 @@ import { createRequire } from "node:module";
 // them alone, so a metric outside it would be read by nothing and
 // "re-verified" — overwritten — by a web search.
 import { REALTOR_METRICS } from "../lib/feed-rows.ts";
+// A failure said on the run's page, not only in its log.
+import { annotation, missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
 
 const require = createRequire(import.meta.url);
 
@@ -62,8 +64,16 @@ const SOURCE = "https://www.realtor.com/research/data/";
 const dryRun = process.env.DRY_RUN === "1";
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!dryRun && (!url || !key)) {
-  console.error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY are required (or DRY_RUN=1).");
+// A missing secret is a failed run, never a quiet one.
+const unset = dryRun ? [] : missingSecrets({ SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: key });
+if (unset.length > 0) {
+  console.log(
+    missingSecretsError(
+      "fetch-realtor",
+      unset,
+      "Set what is missing where this pull runs (the repository's Actions secrets), or run with DRY_RUN=1 to fetch and print without writing.",
+    ),
+  );
   process.exit(1);
 }
 const supabase = dryRun ? null : createClient(url, key, { auth: { persistSession: false } });
@@ -115,7 +125,7 @@ const HOTNESS_METRICS = {
 // A metric the list does not name stops the pull here, dry run or not.
 for (const metric of [...COLUMNS.flatMap((c) => [c.metric, `${c.metric}_yoy`]), ...Object.values(HOTNESS_METRICS)]) {
   if (!REALTOR_METRICS.includes(metric)) {
-    console.error(`metric "${metric}" is not in lib/feed-rows REALTOR_METRICS; add it there before this pull writes it`);
+    console.log(annotation("error", `metric "${metric}" is not in lib/feed-rows REALTOR_METRICS; add it there before this pull writes it`));
     process.exit(1);
   }
 }
@@ -130,7 +140,7 @@ const BENCHMARK_UNITS = new Set(["usd", "pct", "ratio", "months", "count", "usd_
 const HOTNESS_UNITS = ["count", "count", "ratio", "count"];
 for (const unit of [...COLUMNS.map((c) => c.unit), "pct", ...HOTNESS_UNITS]) {
   if (!BENCHMARK_UNITS.has(unit)) {
-    console.error(`unit "${unit}" is not in the benchmarks table's check (${[...BENCHMARK_UNITS].join(", ")})`);
+    console.log(annotation("error", `unit "${unit}" is not in the benchmarks table's check (${[...BENCHMARK_UNITS].join(", ")})`));
     process.exit(1);
   }
 }
@@ -156,7 +166,7 @@ const res = await fetch(URL, {
   signal: AbortSignal.timeout(60_000),
 });
 if (!res.ok) {
-  console.error(`REALTOR: HTTP ${res.status} from ${URL}`);
+  console.log(annotation("error", `REALTOR: HTTP ${res.status} from ${URL}; nothing was written`, "Realtor.com pull failed"));
   process.exit(1);
 }
 const text = await res.text();
@@ -166,7 +176,7 @@ const ix = (name) => header.indexOf(name);
 const needed = ["month_date_yyyymm", "cbsa_code", "cbsa_title", ...COLUMNS.flatMap((c) => [c.col, c.yy])];
 const missing = needed.filter((n) => ix(n) < 0);
 if (missing.length) {
-  console.error(`REALTOR: header lacks ${missing.join(", ")}; header: ${header.slice(0, 16).join(", ")}`);
+  console.log(annotation("error", `REALTOR: header lacks ${missing.join(", ")}; header: ${header.slice(0, 16).join(", ")}`, "Realtor.com pull failed"));
   process.exit(1);
 }
 const rows = new Map();
@@ -177,7 +187,7 @@ for (const line of lines.slice(1)) {
 const months = new Set(Array.from(rows.values()).map((c) => c[ix("month_date_yyyymm")]));
 const month = Array.from(months).sort().at(-1) ?? "";
 if (!/^\d{6}$/.test(month)) {
-  console.error(`REALTOR: no month in the file; saw ${Array.from(months).join(", ") || "nothing"}`);
+  console.log(annotation("error", `REALTOR: no month in the file; saw ${Array.from(months).join(", ") || "nothing"}`, "Realtor.com pull failed"));
   process.exit(1);
 }
 // Dated the first of its month: the figure is a month's, as the CPI's are.
@@ -231,13 +241,24 @@ for (const m of METROS) {
   matched++;
   console.log(`${m.id}: ${said.join(" · ")} — ${title}, ${month}`);
 }
-for (const miss of missed) console.error(`${miss}: no Realtor.com row`);
+// One annotation for the inventory file's misses: each metro named keeps
+// last month's rows, which the site stops saying once past their cadence.
+if (missed.length > 0) {
+  console.log(
+    annotation(
+      "warning",
+      `REALTOR: ${missed.length} of ${METROS.length} metros have no inventory row for ${month} and keep their last figures: ${missed.join(", ")}`,
+      "Realtor.com inventory: metros missed",
+    ),
+  );
+}
 
 // ── The hotness file ────────────────────────────────────────────────────
 //
 // A file that fails is a loud line and the inventory rows still write.
 let hotMatched = 0;
 const hotMissed = [];
+let hotSaid = "hotness";
 try {
   const hres = await fetch(HOTNESS_URL, {
     headers: { "user-agent": "UnderwriteCopilot/1.0 (+https://underwrite-copilot.onrender.com)" },
@@ -337,21 +358,45 @@ try {
     hotMatched++;
     console.log(`${m.id}: hotness ${said.join(" · ")} — ${title}, ${hmonth}`);
   }
-  for (const miss of hotMissed) console.error(`${miss}: no hotness row`);
+  hotSaid = `hotness ${hmonth}`;
+  // One annotation for the hotness file's misses (a metro outside the 300
+  // it ranks has no row, and is named here too).
+  if (hotMissed.length > 0) {
+    console.log(
+      annotation(
+        "warning",
+        `HOTNESS: ${hotMissed.length} of ${METROS.length} metros have no rank for ${hmonth} and keep their last rows: ${hotMissed.join(", ")}`,
+        "Realtor.com hotness: metros missed",
+      ),
+    );
+  }
 } catch (err) {
-  console.error(`HOTNESS: FAILED — ${err instanceof Error ? err.message : String(err)}; the inventory rows still write`);
+  hotSaid = "hotness file failed";
+  console.log(
+    annotation(
+      "warning",
+      `HOTNESS: FAILED — ${err instanceof Error ? err.message : String(err)}; the inventory rows still write, and the ranks keep last month's rows, which the site stops saying once past their cadence`,
+      "Realtor.com hotness failed",
+    ),
+  );
 }
 
 if (supabase && out.length > 0) {
   const { error } = await supabase.from("benchmarks").upsert(out, { onConflict: "sector,metro,metric" });
   if (error) {
-    console.error(`benchmarks upsert: ${error.message}`);
+    console.log(annotation("error", `benchmarks upsert: ${error.message}; nothing was written`, "Realtor.com pull failed"));
     process.exit(1);
   }
   console.log(`benchmarks: upserted ${out.length} rows`);
 }
+// The run in one line, each file with the month it wrote: the two files are
+// published apart and can be a month apart.
 console.log(
-  `REALTOR ROLL-UP: ${matched} of ${METROS.length} metros matched${missed.length ? `; missed: ${missed.join(", ")}` : ""}` +
-    `; hotness ${hotMatched} of ${METROS.length}${hotMissed.length ? `; missed: ${hotMissed.join(", ")}` : ""}`,
+  `REALTOR ROLL-UP: inventory ${month}, ${matched} of ${METROS.length} metros matched${missed.length ? `; missed: ${missed.join(", ")}` : ""}` +
+    `; ${hotSaid}, ${hotMatched} of ${METROS.length}${hotMissed.length ? `; missed: ${hotMissed.join(", ")}` : ""}`,
 );
-process.exit(matched === 0 ? 1 : 0);
+if (matched === 0) {
+  console.log(annotation("error", "The inventory file matched no metro, so the pull fails (see the warnings above).", "Realtor.com pull failed"));
+  process.exit(1);
+}
+process.exit(0);
