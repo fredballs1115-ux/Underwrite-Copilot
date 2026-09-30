@@ -144,6 +144,18 @@ function findValue(
   );
 }
 
+/** The point the deal's location cache holds for its current address, while
+ *  the cache is fresh — read here, outside the render, since it reads the
+ *  clock. */
+function knownPointOf(
+  cache: DealVisualCache | null,
+  address: import("@/lib/address").StructuredAddress | null,
+): { lat: number; lng: number } | null {
+  return cacheFresh(cache, Date.now(), address) && typeof cache?.lat === "number" && typeof cache?.lng === "number"
+    ? { lat: cache.lat, lng: cache.lng }
+    : null;
+}
+
 export default async function DealPage({
   params,
   searchParams,
@@ -861,10 +873,7 @@ export default async function DealPage({
   // day, or the runner's copy when it has not answered in 1.5 s.
   const floodStreet = !!dealAddress?.street?.trim();
   const visualCache = (deal.photo as DealVisualCache | null) ?? null;
-  const knownPoint =
-    cacheFresh(visualCache, Date.now(), dealAddress) && typeof visualCache?.lat === "number" && typeof visualCache?.lng === "number"
-      ? { lat: visualCache.lat, lng: visualCache.lng }
-      : null;
+  const knownPoint = knownPointOf(visualCache, dealAddress);
   const floodArea = !!knownPoint && visualCache?.geoPrecision === "area";
   const floodFrame = knownPoint && floodFrameCurrent(visualCache?.floodFrame, knownPoint) ? visualCache?.floodFrame ?? null : null;
   if (floodStreet && !floodArea && !floodFrame) {
