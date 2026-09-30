@@ -22,7 +22,7 @@ export const mult = (n: number | null | undefined) =>
  *  2026-09-30): the first-draft model's figures (lib/model, which carries
  *  no date), not the memorandum's that each deal's header prints. */
 export const MODEL_ROWS_NOTE =
-  "Rows marked “model” read each deal’s first-draft model (built on request, not rebuilt when its memorandum is replaced), not the memorandum’s figures on its header; a figure marked (OM) is the memorandum’s own, where the model has none.";
+  "Rows marked “model” read each deal’s first-draft model (built on request, not rebuilt when its memorandum is replaced), not the memorandum’s figures on its header; a figure marked (OM) comes from the memorandum’s figures, stated or worked from them (a yield on cost, a note’s yield, a spread), where the model has none.";
 
 /** A row a model figure fills says so beside its name. */
 const MODEL_ROW = " · model";
@@ -31,7 +31,7 @@ const MODEL_ROW = " · model";
 const OM_MARK = (
   <>
     {" "}
-    <span className="font-sans text-[10px] text-muted" title="The memorandum’s own figure — this deal’s first-draft model has none">
+    <span className="font-sans text-[10px] text-muted" title="From the memorandum’s figures — this deal’s first-draft model has none">
       (OM)
     </span>
   </>

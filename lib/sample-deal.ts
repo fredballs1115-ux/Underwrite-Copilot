@@ -311,10 +311,13 @@ const challenges: ChallengerResult = {
       question: "What's the absorption schedule to get from 9% to 6%?",
     },
   ],
-  // Both runs carry the T-12's expenses, so the drop is the exit, the rent
-  // growth and the vacancy — rent growth the largest of the three — and never
-  // the expense load (the audit of 2026-09-30).
-  stressTest: `At a flat ${inputs.exitCapPct}% exit, ${inputs.rentGrowthPct}% rent growth and a real ${inputs.vacancyPct}% vacancy, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the T-12's expenses.`,
+  // Both runs carry the model's own year-one expenses, so the drop is the
+  // exit, the rent growth and the vacancy — rent growth the largest of the
+  // three — and never the expense load (the audit of 2026-09-30). The model's
+  // $3.1M is not the T-12's $3,085,000, so the sentence names the model's
+  // figure, and its exit is said as a figure, not as "flat" against the
+  // 5.45% going-in cap (the pre-merge audit of 2026-09-30).
+  stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same $${(inputs.year1Opex / 1e6).toFixed(1)}M of year-one expenses.`,
 };
 
 const comps: BrokerCompsResult = {

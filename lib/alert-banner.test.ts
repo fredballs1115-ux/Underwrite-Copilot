@@ -1,9 +1,9 @@
 /**
  * The workspace-wide regulatory alert banner renders rows written outside the
  * request: only a real web URL ever becomes a link, and the headline is text.
- * Its Dismiss is this browser's alone — a cookie, never the shared row — and
- * the shared `dismissed_at` column, which any signed-in user may write, is
- * not read.
+ * Its Dismiss is the reader's alone — a cookie named for their account, in
+ * this browser, never the shared row — and the shared `dismissed_at` column,
+ * which any signed-in user may write, is not read.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement, type ReactNode } from "react";
@@ -11,6 +11,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 
 const rows: Record<string, unknown>[] = [];
 const state = vi.hoisted(() => ({
+  /** the signed-in account, a uuid as Supabase gives one */
+  userId: "5e7d4b1a-0000-4000-8000-00000000abcd",
   calls: [] as unknown[][],
   cookie: undefined as string | undefined,
   sets: [] as { name: string; value: string; options: Record<string, unknown> }[],
@@ -20,7 +22,10 @@ const state = vi.hoisted(() => ({
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
-    get: (name: string) => (name === "uc_dismissed_alerts" && state.cookie !== undefined ? { name, value: state.cookie } : undefined),
+    // Only the signed-in account's own cookie answers: another account's list
+    // in the same browser is never read.
+    get: (name: string) =>
+      name === `uc_dismissed_alerts_${state.userId}` && state.cookie !== undefined ? { name, value: state.cookie } : undefined,
     set: (name: string, value: string, options: Record<string, unknown>) => {
       state.sets.push({ name, value, options });
     },
@@ -47,7 +52,7 @@ vi.mock("@/lib/supabase/server", () => {
       return q;
     },
   };
-  return { createSupabaseServerClient: async () => client, getCurrentUser: async () => ({ id: "u1" }) };
+  return { createSupabaseServerClient: async () => client, getCurrentUser: async () => ({ id: state.userId }) };
 });
 
 import { RegulatoryAlertBanner } from "@/app/(app)/regulatory-alert-banner";
@@ -126,7 +131,7 @@ describe("RegulatoryAlertBanner", () => {
     expect(before - since).toBeLessThanOrEqual(30 * 86_400_000 + 1_000);
   });
 
-  it("hides only the alerts this browser dismissed, still showing up to three", async () => {
+  it("hides only the alerts this reader dismissed, still showing up to three", async () => {
     const D = "0d000000-0000-4000-8000-000000000004";
     for (const [id, h] of [[A, "Rule A"], [B, "Rule B"], [C, "Rule C"], [D, "Rule D"]]) {
       rows.push({ id, rule_id: null, headline: h, url: null, detail: null });
@@ -141,7 +146,7 @@ describe("RegulatoryAlertBanner", () => {
     expect(state.calls.find((c) => c[0] === "limit")?.[1]).toBe(4);
   });
 
-  it("dismisses into this browser's cookie, and writes nothing shared", async () => {
+  it("dismisses into this reader's own cookie, and writes nothing shared", async () => {
     rows.push({ id: A, rule_id: null, headline: "Rule A", url: null, detail: null });
     state.cookie = C;
     const action = formAction(await RegulatoryAlertBanner())!;
@@ -152,7 +157,7 @@ describe("RegulatoryAlertBanner", () => {
     expect(state.writes).toBe(0);
     expect(state.sets).toHaveLength(1);
     const set = state.sets[0];
-    expect(set.name).toBe("uc_dismissed_alerts");
+    expect(set.name).toBe(`uc_dismissed_alerts_${state.userId}`);
     expect(set.value).toBe(`${A},${C}`);
     expect(set.options).toMatchObject({ path: "/", httpOnly: true, sameSite: "lax", maxAge: 365 * 24 * 60 * 60 });
     // An id that is not an alert's sets nothing.

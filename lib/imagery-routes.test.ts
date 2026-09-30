@@ -110,7 +110,28 @@ function sources(dir: string): string[] {
 
 describe("the sizes the site's pages ask the imagery routes for", () => {
   const files = sources(join(process.cwd(), "app")).map((f) => readFileSync(f, "utf8"));
-  const elements = (tag: string) => files.flatMap((s) => [...s.matchAll(new RegExp(`<${tag}\\b[\\s\\S]*?\\/>`, "g"))].map((m) => m[0]));
+  // Each element's opening tag, self-closing or not, read to the first `>`
+  // outside its braces (an arrow function's `=>` sits inside them). A band
+  // wraps its words since its credit moved after them, so a finder that
+  // wanted `/>` read past its opening tag and missed most of the bands.
+  const elements = (tag: string) =>
+    files.flatMap((s) => {
+      const out: string[] = [];
+      for (const m of s.matchAll(new RegExp(`<${tag}\\b`, "g"))) {
+        const start = m.index ?? 0;
+        let depth = 0;
+        for (let i = start + m[0].length; i < s.length; i++) {
+          const c = s[i];
+          if (c === "{") depth++;
+          else if (c === "}") depth--;
+          else if (c === ">" && depth === 0) {
+            out.push(s.slice(start, i + 1));
+            break;
+          }
+        }
+      }
+      return out;
+    });
   const num = (el: string, prop: string) => {
     const m = new RegExp(`\\b${prop}=\\{(\\d+)\\}`).exec(el);
     return m ? Number(m[1]) : null;

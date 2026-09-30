@@ -71,6 +71,7 @@ import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture"
 import type {
   AssetClass,
   ExtractionResult,
+  FirstSignal,
   ChallengerResult,
   BrokerCompsResult,
   ReconciliationResult,
@@ -363,7 +364,7 @@ async function liveMarketFromDb(
   try {
     const { data } = await admin
       .from("deals")
-      .select("address, asset_class, extraction")
+      .select("address, asset_class, extraction, first_signal")
       .eq("id", dealId)
       .single();
     // The column holds the structured object the deal form saved (the deals
@@ -397,7 +398,11 @@ async function liveMarketFromDb(
     // deal filed as an office and pitched as mixed-use was checked as one
     // thing and shown as the other.
     const assetClass = shownAssetClass((data?.asset_class as string | null) ?? null, ex) || null;
-    const kind = inferStrategy(ex).kind;
+    // The first signal read beside the extraction, as the deal page reads it:
+    // a deal only the first signal calls a development or a conversion is a
+    // plan here too, and reads what building costs (the audit of 2026-09-30).
+    const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
+    const kind = inferStrategy(ex, firstSignal).kind;
     const plan = isPlanDeal(kind);
     // What building costs is read only where the deal builds something — a
     // development, a conversion, a value-add with a stated budget — never a

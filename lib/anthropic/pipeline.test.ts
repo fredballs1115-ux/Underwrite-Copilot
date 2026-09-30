@@ -477,6 +477,39 @@ describe("runAnalysis — the happy path", () => {
     expect(handed).not.toContain("banks tightening standards for multifamily loans");
   });
 
+  it("reads the plan the first signal names, as the deal page does: a conversion reads what building costs (the audit of 2026-09-30)", async () => {
+    // Nothing in the extraction names a plan (its strategy is unknown); the
+    // first signal calls it a conversion. The deal page reads the signal
+    // beside the extraction, and the screen's market check now does too.
+    state.deals.d1.asset_class = "office";
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+    } as unknown as ExtractionResult);
+    vi.mocked(readFirstSignal).mockResolvedValue({
+      ...SIGNAL,
+      assetClass: "office",
+      take: "A conversion of a vacant office tower to apartments — check the budget against the floor plates.",
+    } as unknown as FirstSignal);
+    state.rates = [
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+      { series_id: "SUBLPDRCSC", obs_date: "2026-07-01", value: 8.2 },
+      { series_id: "WPUIP2312001_YOY", obs_date: "2026-08-01", value: 2.4 },
+      { series_id: "CES2000000003_YOY", obs_date: "2026-08-01", value: 4.1 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3];
+    expect(handed).toContain("construction and land development loans");
+    expect(handed).toContain("Construction costs —");
+  });
+
   it("a suburb its address's words miss reads its metro area's figures, placed by its tract's county and said so (#447)", async () => {
     const label = "5000 Main St, Frisco, TX 75034";
     state.deals.d1.address = { label, street: "5000 Main St", city: "Frisco", state: "TX", zip: "75034", county: "", submarket: "" };
