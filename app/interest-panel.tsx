@@ -178,11 +178,27 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
               <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink" style={{ left: `${collateral.tick * 100}%` }} />
             )}
           </div>
-          <div className="mt-1 flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-[11px] text-muted">
-            <span>{`Price ${collateral.priceText} · ${collateral.ltvAtPrice}% of the collateral's value`}</span>
-            <span>{`Unpaid balance ${collateral.balanceText} · ${collateral.ltvAtBalance}%`}</span>
-            <span className="text-right">{`The collateral, as stated ${money(collateral.value)}`}</span>
-          </div>
+          {/* A key, as every other bar has: the price dark, the balance light
+              under it, and the collateral's value the whole track — or, on a
+              loan under water, the tick. */}
+          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted" data-qa="note-collateral-key">
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/70" />
+              {`Price ${collateral.priceText} · ${collateral.ltvAtPrice}% of the collateral's value`}
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/25" />
+              {`Unpaid balance ${collateral.balanceText} · ${collateral.ltvAtBalance}%`}
+            </li>
+            <li className="flex items-center gap-1.5">
+              {collateral.tick != null ? (
+                <span aria-hidden className="inline-block h-3 w-0.5 shrink-0 rounded-full bg-ink" />
+              ) : (
+                <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-line" />
+              )}
+              {`The collateral, as stated ${money(collateral.value)}`}
+            </li>
+          </ul>
         </div>
       )}
       {bar && (

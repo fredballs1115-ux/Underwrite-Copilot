@@ -5636,6 +5636,21 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(html.match(/data-bar="note-balance"/g)).toHaveLength(1);
     expect(html).toContain('data-bar="interest" style="width:58.8');
     expect(html).toContain('data-bar="note-balance" style="width:71.7');
+    // A key, as every other bar has (the research pass of 2026-09-30): each
+    // figure under the bar beside a swatch of its own fill — the price dark,
+    // the balance light, the collateral's value the whole track.
+    const keyOf = (h: string) => {
+      const at = h.indexOf('data-qa="note-collateral-key"');
+      expect(at).toBeGreaterThan(-1);
+      const ul = h.slice(at, h.indexOf("</ul>", at));
+      return [...ul.matchAll(/<li[^>]*><span aria-hidden="true" class="([^"]*)"><\/span>([^<]*)<\/li>/g)].map((m) => ({ swatch: m[1], says: m[2] }));
+    };
+    const key = keyOf(html);
+    expect(key.map((k) => k.says)).toEqual(["Price $20.0M · 59% of the collateral&#x27;s value", "Unpaid balance $24.4M · 72%", "The collateral, as stated $34.0M"]);
+    expect(key[0].swatch).toContain("bg-brand/70");
+    expect(key[1].swatch).toContain("bg-brand/25");
+    expect(key[2].swatch).toContain("bg-line");
+    expect(html).toMatch(/<div class="relative h-2\.5 rounded-full bg-line" aria-hidden="true">/);
     expect(a11yIssues(html), "note panel").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
 
@@ -5656,6 +5671,11 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     );
     expect(visibleText(under)).toContain("Unpaid balance $24.4M · 122%");
     expect(under).toMatch(/left:81\.9\d*%/);
+    // Under water the value is the tick, and its key says so with a tick.
+    const underKey = keyOf(under);
+    expect(underKey[2].says).toBe("The collateral, as stated $20.0M");
+    expect(underKey[2].swatch).toContain("w-0.5");
+    expect(underKey[2].swatch).toContain("bg-ink");
   });
 
   it("a note behind a senior loan draws no loan-to-value: its price against its balance, and why", () => {
