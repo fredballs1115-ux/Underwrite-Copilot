@@ -59,7 +59,12 @@ way in this batch):
 9. **Before charging anyone**: the legal entity, governing law and venue on
    the Terms and Privacy pages, and a support address that is not Gmail —
    with counsel.
-10. **The free tier's rule** (a decision): today it is "3 deals at a time"
+10. **`OPERATOR_EMAILS` on the Render web service** (your address, comma-
+    separated for several): /data-health's working view — what a screen
+    costs, the feeds, the probes, the steward — now shows only to the
+    addresses it names; until it is set, everyone (you included) sees the
+    corrections ledger alone.
+11. **The free tier's rule** (a decision): today it is "3 deals at a time"
     (deleting one frees a slot), re-screens are unlimited and sign-up has no
     CAPTCHA, at about $3 a screen. The pages now say what is enforced; tell
     me the rule you want and I will make the code and the copy match it.
