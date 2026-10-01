@@ -25,9 +25,10 @@ function sources(dir: string, out: string[] = []): string[] {
 const APP = sources(join(ROOT, "app"));
 
 /** Every file under app/ that refuses a free account through lib/billing's
- *  `isPro`, with the gate it holds — or null for the deal page, which reads
- *  the plan only to show which of its controls are Pro. A new call site
- *  fails here until the Pro card names its feature. */
+ *  `isPro`, with the gate it holds — or null for a page that reads the plan
+ *  only to show which of its controls are Pro (the deal page; the rent roll
+ *  page, whose download the workbook route gates). A new call site fails
+ *  here until the Pro card names its feature. */
 const IS_PRO_CALLERS: Record<string, string | null> = {
   "app/api/deals/[id]/memo/route.ts": "memo",
   "app/api/deals/[id]/report/route.ts": "report",
@@ -39,6 +40,7 @@ const IS_PRO_CALLERS: Record<string, string | null> = {
   "app/(app)/deals/[id]/ask-actions.ts": "ask",
   "app/(app)/deals/[id]/comps-actions.ts": "comp-search",
   "app/(app)/deals/[id]/page.tsx": null,
+  "app/(app)/deals/[id]/rent-roll/page.tsx": null,
 };
 
 const GATES = PRO_PLAN.flatMap((l) => l.gates as readonly string[]);
