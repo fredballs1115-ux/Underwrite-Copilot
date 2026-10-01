@@ -41,22 +41,24 @@ const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"
 const finite = (n: number | null): n is number => n != null && Number.isFinite(n);
 
 /** Swap the scenario's computed IRR / CoC into the metric set the mandate
- *  score reads, replacing the OM's broker figures — same scorer, model basis. */
-function withScenarioReturns(
+ *  score reads, replacing the OM's broker figures — same scorer, model basis.
+ *  A return the model could not compute swaps nothing: the memorandum's own
+ *  row stays, so the score never loses a dimension the chip's line then
+ *  calls "the memorandum's figures". */
+export function withScenarioReturns(
   metrics: { label: string; value: string }[],
   irrDec: number | null,
   cocDec: number | null,
 ): { label: string; value: string }[] {
-  const kept = metrics.filter(
-    (m) => !METRIC_FIND.irr.inc.test(m.label) && !METRIC_FIND.coc.inc.test(m.label),
+  const swapIrr = finite(irrDec);
+  const swapCoc = finite(cocDec);
+  const out = metrics.filter(
+    (m) =>
+      !(swapIrr && METRIC_FIND.irr.inc.test(m.label)) &&
+      !(swapCoc && METRIC_FIND.coc.inc.test(m.label)),
   );
-  const out = [...kept];
-  if (irrDec != null && Number.isFinite(irrDec)) {
-    out.push({ label: "IRR", value: `${(irrDec * 100).toFixed(1)}%` });
-  }
-  if (cocDec != null && Number.isFinite(cocDec)) {
-    out.push({ label: "Cash-on-cash", value: `${(cocDec * 100).toFixed(1)}%` });
-  }
+  if (swapIrr) out.push({ label: "IRR", value: `${(irrDec * 100).toFixed(1)}%` });
+  if (swapCoc) out.push({ label: "Cash-on-cash", value: `${(cocDec * 100).toFixed(1)}%` });
   return out;
 }
 

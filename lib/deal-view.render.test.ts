@@ -27,6 +27,7 @@ import { DealView } from "@/app/(app)/deals/[id]/deal-view";
 import {
   SensitivityPlayground,
   playgroundFitLine,
+  withScenarioReturns,
   type PlaygroundData,
 } from "@/app/(app)/deals/[id]/sensitivity-playground";
 import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
@@ -936,6 +937,28 @@ describe("the sensitivity playground says whose figures it runs", () => {
     const text = textOf(renderToStaticMarkup(React.createElement(SensitivityPlayground, { data: p.playground })));
     expect(text).toMatch(/Exit cap\s*5\.45%\s*base 5\.45%\s*3\.45%\s*7\.45%/);
     expect(text).not.toContain("1.45%");
+  });
+
+  it("keeps the memorandum's return where the model could not compute its own (2026-10-01)", () => {
+    // The audit: a model IRR that did not compute dropped the memorandum's
+    // IRR row and put nothing in its place, so the box scored one dimension
+    // fewer while the chip's line said "the memorandum's figures".
+    const om = [
+      { label: "Price", value: "$10,000,000" },
+      { label: "Levered IRR", value: "14.2%" },
+      { label: "Cash-on-Cash Return", value: "6.1%" },
+    ];
+    expect(withScenarioReturns(om, null, null)).toEqual(om);
+    expect(withScenarioReturns(om, Number.NaN, 0.072)).toEqual([
+      { label: "Price", value: "$10,000,000" },
+      { label: "Levered IRR", value: "14.2%" },
+      { label: "Cash-on-cash", value: "7.2%" },
+    ]);
+    expect(withScenarioReturns(om, 0.118, null)).toEqual([
+      { label: "Price", value: "$10,000,000" },
+      { label: "Cash-on-Cash Return", value: "6.1%" },
+      { label: "IRR", value: "11.8%" },
+    ]);
   });
 
   it("says what a moved slider's fit is against, and names nothing it did not score", () => {
