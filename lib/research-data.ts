@@ -19,7 +19,7 @@ import specialtySeed from "@/data/research/specialty.json";
 import type { Benchmark, RegulatoryRule, RuleSubject } from "@/lib/research";
 import { US_STATE_ABBREV } from "@/lib/address";
 import { fmrBenchmarkRows, fmrOf, newestFmrOnly, type Fmr } from "@/lib/fmr";
-import { figureNote, figureRead } from "@/lib/tracker-read";
+import { figureNote, figureRead, rentOf } from "@/lib/tracker-read";
 
 export function seedRules(): RegulatoryRule[] {
   return (rulesSeed.rules as unknown as RegulatoryRule[]).filter(
@@ -255,6 +255,8 @@ export function seedBenchmarks(): Benchmark[] {
     vacancy_pct_low?: number | null;
     vacancy_pct_high?: number | null;
     asking_rent_psf?: number | null;
+    asking_rent_psf_low?: number | null;
+    asking_rent_psf_high?: number | null;
     cap_rate_low_pct?: number | null;
     cap_rate_high_pct?: number | null;
     status?: string;
@@ -295,13 +297,16 @@ export function seedBenchmarks(): Benchmark[] {
           cite: figureNote(read),
         });
       }
-      if (typeof blk.asking_rent_psf === "number") {
+      // A rent the file states as a band is a row with both ends, never
+      // a point made of its midpoint.
+      const rent = rentOf(blk);
+      if (rent) {
         const read = figureRead(blk.rent_read, blk.sources);
         out.push({
           ...base,
           metric: `${sector}_asking_rent_psf`,
-          low: blk.asking_rent_psf,
-          high: blk.asking_rent_psf,
+          low: rent.low,
+          high: rent.high,
           unit: "usd_sf_yr",
           source: read.links[0] ?? "",
           cite: figureNote(read),

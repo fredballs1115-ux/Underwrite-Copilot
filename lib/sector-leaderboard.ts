@@ -1,5 +1,5 @@
 import metrosSeed from "@/data/research/metros.json";
-import { blockCitations, type CitedFigure } from "@/lib/tracker-read";
+import { blockCitations, rentOf, type CitedFigure, type RentBand } from "@/lib/tracker-read";
 
 /** One sector block inside a metro's `sector_snapshot` — the research layer's
  *  per-asset-class read: vacancy (a band when trackers diverge — the
@@ -12,6 +12,9 @@ export type SnapBlock = {
   vacancy_pct_low?: number | null;
   vacancy_pct_high?: number | null;
   asking_rent_psf?: number | null;
+  /** an asking rent the file states as a band — never carried as its midpoint */
+  asking_rent_psf_low?: number | null;
+  asking_rent_psf_high?: number | null;
   rent_basis?: string | null;
   cap_rate_low_pct?: number | null;
   cap_rate_high_pct?: number | null;
@@ -28,7 +31,8 @@ export type LeaderRow = {
   name: string;
   vLow: number | null;
   vHigh: number | null;
-  rent: number | null;
+  /** the asking rent a foot as the file states it, a point or a band */
+  rent: RentBand | null;
   rentBasis: string | null;
   capLow: number | null;
   capHigh: number | null;
@@ -57,7 +61,7 @@ export function sectorLeaderboard(sector: string): {
     if (!blk || typeof blk !== "object") continue;
     const vLow = blk.vacancy_pct ?? blk.vacancy_pct_low ?? null;
     const vHighRaw = blk.vacancy_pct ?? blk.vacancy_pct_high ?? vLow;
-    const rent = typeof blk.asking_rent_psf === "number" ? blk.asking_rent_psf : null;
+    const rent = rentOf(blk);
     const capLow = typeof blk.cap_rate_low_pct === "number" ? blk.cap_rate_low_pct : null;
     const capHigh = typeof blk.cap_rate_high_pct === "number" ? blk.cap_rate_high_pct : null;
     if (vLow === null && rent === null && capLow === null) {

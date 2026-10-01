@@ -175,15 +175,16 @@
         "industrial": {
           "vacancy_pct_low": 6.0,
           "vacancy_pct_high": 10.1,
-          "asking_rent_psf": 12.5,
-          "rent_basis": "NNN midpoint of $10-15 band",
+          "asking_rent_psf_low": 10,
+          "asking_rent_psf_high": 15,
+          "rent_basis": "NNN, a band as stated",
           "status": "sourced",
           "sources": [
             "https://warespace.com/resources/market-reports/washington-dc",
             "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf",
             "https://www.colliers.com/en/research/washington-dc/maryland-industrial-market-report-2026-q1"
           ],
-          "note": "Two bases, recorded as the spread: the close-in Central PG corridor runs ~6.0% (Newmark 1Q26 Washington-metro survey / WareSpace small-bay), while Colliers’ Maryland report prints the WHOLE county at 10.1% for Q1 2026 (down 110bps QoQ) — outer big-box product loosens the county-wide number. Ask which submarket your deal sits in before picking a benchmark. Asking ~$10-15/SF NNN; the encoded $12.50 is the band midpoint, labeled as such — a 30-40% discount to close-in NoVA.",
+          "note": "Two bases, recorded as the spread: the close-in Central PG corridor runs ~6.0% (Newmark 1Q26 Washington-metro survey / WareSpace small-bay), while Colliers’ Maryland report prints the WHOLE county at 10.1% for Q1 2026 (down 110bps QoQ) — outer big-box product loosens the county-wide number. Ask which submarket your deal sits in before picking a benchmark. Asking ~$10-15/SF NNN, carried as the band and never its midpoint — a 30-40% discount to close-in NoVA.",
           "vacancy_read": {
             "house": "Newmark / WareSpace (6.0%) and Colliers (10.1%)",
             "area": "the close-in Central PG corridor (6.0%) to the whole county (10.1%)",
@@ -195,7 +196,7 @@
             ]
           },
           "rent_read": {
-            "construct": "the midpoint of a $10–15/SF NNN asking band"
+            "construct": "a NNN asking band, ~$10–15/SF as the note states it"
           }
         },
         "multifamily": {

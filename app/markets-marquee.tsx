@@ -3,7 +3,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { datedLong } from "@/lib/debt-index";
 import { fmrLabel, fmrOf, fmrToday, fmrWhen } from "@/lib/fmr";
 import { MARKET_COUNT } from "@/lib/market-count";
-import { blockCitations, figuresTitle } from "@/lib/tracker-read";
+import { blockCitations, figuresTitle, rentOf, rentText } from "@/lib/tracker-read";
 import { PausableTicker } from "./pausable-ticker";
 
 // Server-component module only: it pulls a research seed JSON, which must
@@ -65,6 +65,8 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
         vacancy_pct_low?: number | null;
         vacancy_pct_high?: number | null;
         asking_rent_psf?: number | null;
+        asking_rent_psf_low?: number | null;
+        asking_rent_psf_high?: number | null;
       } | null
     > | null;
   };
@@ -90,8 +92,9 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
       const read = shown.find((f) => f.label === label)?.read;
       return [read?.slice, read?.period ?? "undated"].filter(Boolean).join(", ");
     };
-    const rent =
-      typeof b.asking_rent_psf === "number" ? ` · $${b.asking_rent_psf.toFixed(2)}/SF (${when("Rent")})` : "";
+    // A band as the file states it ("$10–15/SF"), never a point made of one.
+    const rentBand = rentOf(b);
+    const rent = rentBand ? ` · ${rentText(rentBand)}/SF (${when("Rent")})` : "";
     const snapAsOf = (entry.sector_snapshot as Record<string, unknown>).as_of;
     return {
       text: [`${SECTOR_LABEL[sector]} ${vac} vac (${when("Vacancy")})${rent}`, rulesPart]

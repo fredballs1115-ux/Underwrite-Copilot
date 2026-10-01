@@ -198,10 +198,45 @@ export interface CitedFigure {
   words: string;
 }
 
+/** An asking rent a foot as the file states it: one figure, or a band. */
+export interface RentBand {
+  low: number;
+  high: number;
+}
+
+/**
+ * A block's asking rent as the file states it — a point (`asking_rent_psf`)
+ * or a band (`asking_rent_psf_low` / `asking_rent_psf_high`) — and never a
+ * point made of a band. Prince George's industrial rent is "~$10-15/SF NNN"
+ * in its note, and the file had carried it as $12.50, the band's midpoint,
+ * which the homepage gallery, the leaderboard and the compare card printed
+ * as a figure (the research pass of 2026-10-01). Null where the block
+ * states neither, or states a band upside down.
+ */
+export function rentOf(raw: unknown): RentBand | null {
+  const b = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const point = num(b.asking_rent_psf);
+  if (point !== null) return { low: point, high: point };
+  const low = num(b.asking_rent_psf_low);
+  const high = num(b.asking_rent_psf_high) ?? low;
+  if (low === null || high === null || high < low) return null;
+  return { low, high };
+}
+
+/** "$13.27", or a band as a band — "$10–15" where both ends are whole dollars,
+ *  "$10.50–15.25" where they are not. Never a midpoint. */
+export function rentText(r: RentBand): string {
+  if (Math.abs(r.high - r.low) < 0.005) return `$${r.low.toFixed(2)}`;
+  const whole = Number.isInteger(r.low) && Number.isInteger(r.high);
+  return whole ? `$${r.low}–${r.high}` : `$${r.low.toFixed(2)}–${r.high.toFixed(2)}`;
+}
+
 type CitedBlock = {
   vacancy_pct?: unknown;
   vacancy_pct_low?: unknown;
   asking_rent_psf?: unknown;
+  asking_rent_psf_low?: unknown;
+  asking_rent_psf_high?: unknown;
   cap_rate_low_pct?: unknown;
   cap_rate_high_pct?: unknown;
   vacancy_read?: unknown;
@@ -231,7 +266,7 @@ export function blockCitations(raw: unknown): CitedFigure[] {
     const read = figureRead(b.vacancy_read, sources);
     out.push({ label: "Vacancy", read, words: withSlice(read) });
   }
-  if (num(b.asking_rent_psf) !== null) {
+  if (rentOf(b) !== null) {
     const read = figureRead(b.rent_read, sources);
     out.push({ label: "Rent", read, words: withSlice(read) });
   }

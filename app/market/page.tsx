@@ -48,7 +48,7 @@ import {
   sectorLeaderboard,
   type SnapBlock,
 } from "@/lib/sector-leaderboard";
-import { blockCitations, figureNote, figureSources, figuresTitle, type CitedFigure } from "@/lib/tracker-read";
+import { blockCitations, figureNote, figureSources, figuresTitle, rentOf, rentText, type CitedFigure } from "@/lib/tracker-read";
 import { SubmarketsPanel } from "./submarkets-panel";
 import { listSubmarkets } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
@@ -172,10 +172,10 @@ function SectorSnapshotPanel({
                   : `vacancy ${vLow}–${vHigh}%`,
               );
             }
-            if (typeof b.asking_rent_psf === "number") {
-              bits.push(
-                `asking $${b.asking_rent_psf.toFixed(2)}/SF${b.rent_basis ? ` (${b.rent_basis})` : ""}`,
-              );
+            // A band as the file states it, never a point made of one.
+            const rent = rentOf(b);
+            if (rent) {
+              bits.push(`asking ${rentText(rent)}/SF${b.rent_basis ? ` (${b.rent_basis})` : ""}`);
             }
             if (
               typeof b.cap_rate_low_pct === "number" &&
@@ -1136,7 +1136,7 @@ async function SectorLeaderboard({ sector }: { sector: string }) {
                       className="py-1.5 pr-3 font-mono text-xs tabular-nums"
                       title={credit("Rent")}
                     >
-                      {r.rent !== null ? `$${r.rent.toFixed(2)}` : "—"}
+                      {r.rent !== null ? rentText(r.rent) : "—"}
                     </td>
                   )}
                   {anyCap && (

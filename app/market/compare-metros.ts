@@ -2,7 +2,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { FMR_BEDS, fmrOf } from "@/lib/fmr";
 import { compsFeedState } from "@/lib/public-comps/core";
 import { datedLong } from "@/lib/debt-index";
-import { blockCitations, figuresTitle } from "@/lib/tracker-read";
+import { blockCitations, figuresTitle, rentOf, rentText } from "@/lib/tracker-read";
 import type { CompareMetro, CompareSector } from "./market-compare";
 
 // The compare tool's compact per-metro facts, derived once from the research
@@ -38,6 +38,8 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
             vacancy_pct_low?: number | null;
             vacancy_pct_high?: number | null;
             asking_rent_psf?: number | null;
+            asking_rent_psf_low?: number | null;
+            asking_rent_psf_high?: number | null;
             cap_rate_low_pct?: number | null;
             cap_rate_high_pct?: number | null;
           }
@@ -50,7 +52,9 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
         s.vLow = vLow;
         if (typeof vHigh === "number") s.vHigh = vHigh;
       }
-      if (typeof blk.asking_rent_psf === "number") s.rent = blk.asking_rent_psf;
+      // A band as the file states it ("$10–15"), never a point made of one.
+      const rent = rentOf(blk);
+      if (rent) s.rent = rentText(rent);
       if (
         typeof blk.cap_rate_low_pct === "number" &&
         typeof blk.cap_rate_high_pct === "number"

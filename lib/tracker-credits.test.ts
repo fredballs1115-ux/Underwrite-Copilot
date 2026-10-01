@@ -156,3 +156,52 @@ describe("the compare card", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 });
+
+// ── An asking rent stated as a band is printed as the band (the research pass of 2026-10-01) ──
+import { rentOf, rentText } from "@/lib/tracker-read";
+import { metroFact } from "@/app/markets-marquee";
+import { seedBenchmarks } from "@/lib/research-data";
+
+describe("an asking rent the file states as a band is never a point made of one", () => {
+  it("reads a point as a point and a band as a band", () => {
+    expect(rentOf({ asking_rent_psf: 13.27 })).toEqual({ low: 13.27, high: 13.27 });
+    expect(rentOf({ asking_rent_psf_low: 10, asking_rent_psf_high: 15 })).toEqual({ low: 10, high: 15 });
+    expect(rentOf({ asking_rent_psf_low: 15, asking_rent_psf_high: 10 })).toBeNull();
+    expect(rentOf({ asking_rent_psf: null })).toBeNull();
+    expect(rentOf(null)).toBeNull();
+    expect(rentText({ low: 13.27, high: 13.27 })).toBe("$13.27");
+    expect(rentText({ low: 10, high: 15 })).toBe("$10–15");
+    expect(rentText({ low: 10.5, high: 15 })).toBe("$10.50–15.00");
+  });
+
+  it("prints Prince George's industrial rent as the note's band on every surface, never $12.50", () => {
+    const pg = block("pg_county", "industrial");
+    expect(rentOf(pg)).toEqual({ low: 10, high: 15 });
+    expect(String(pg.note)).toContain("~$10-15/SF NNN");
+    // The homepage gallery and the markets band.
+    expect(metroFact({ sector_snapshot: { industrial: pg } }, 0)!.text).toContain("$10–15/SF");
+    // The sector leaderboard's rent column.
+    expect(sectorLeaderboard("industrial").rows.find((r) => r.id === "pg_county")!.rent).toEqual({ low: 10, high: 15 });
+    // The compare card's cell.
+    const compare = COMPARE_METROS.find((m) => m.id === "pg_county")!;
+    expect(compare.sectors?.industrial?.rent).toBe("$10–15");
+    // The deal page's benchmark row: both ends.
+    const row = seedBenchmarks().find((b) => b.metro === "Prince George's County MD" && b.metric === "industrial_asking_rent_psf")!;
+    expect([row.low, row.high]).toEqual([10, 15]);
+    // Nowhere does the figure the file used to carry come back.
+    for (const text of [metroFact({ sector_snapshot: { industrial: pg } }, 0)!.text, compare.sectors?.industrial?.rent ?? ""]) {
+      expect(text).not.toContain("12.5");
+    }
+  });
+
+  it("no research block encodes a midpoint as a figure", () => {
+    for (const m of metrosSeed.metros) {
+      const snap = (m.sector_snapshot as unknown as Record<string, Block | string>) ?? {};
+      for (const [sector, blk] of Object.entries(snap)) {
+        if (sector === "as_of" || typeof blk !== "object") continue;
+        const said = [blk.rent_basis, ...["vacancy_read", "rent_read", "cap_read"].map((k) => (blk[k] as { construct?: string } | undefined)?.construct)];
+        for (const s of said) expect(String(s ?? ""), `${m.id}.${sector}`).not.toMatch(/midpoint|mid-point/i);
+      }
+    }
+  });
+});

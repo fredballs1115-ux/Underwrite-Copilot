@@ -606,7 +606,7 @@ describe("the going-in cap the documents imply where they state none", () => {
 });
 
 // ── The research tracker's read, beside the feeds ───────────────────────────
-import { bandText, figureCitation, figureNote, figureRead, trackerFor, trackerSectorFor } from "./tracker-read";
+import { bandText, figureCitation, figureNote, figureRead, rentOf, trackerFor, trackerSectorFor } from "./tracker-read";
 import metrosSeed from "@/data/research/metros.json";
 
 describe("trackerFor — the sector snapshot's vacancy band and cap range for a deal's kind of building in its metro", () => {
@@ -765,7 +765,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
         const sources = (blk.sources as string[] | undefined) ?? [];
         const where = `${m.id}.${sector}`;
         const hasVacancy = typeof (blk.vacancy_pct ?? blk.vacancy_pct_low) === "number";
-        const hasRent = typeof blk.asking_rent_psf === "number";
+        const hasRent = rentOf(blk) !== null;
         const hasCap = typeof blk.cap_rate_low_pct === "number";
         expect("vacancy_read" in blk, `${where} vacancy_read`).toBe(hasVacancy);
         expect("rent_read" in blk, `${where} rent_read`).toBe(hasRent);

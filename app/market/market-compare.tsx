@@ -10,7 +10,9 @@ import { FMR_BEDS, fmrLabel, fmrWhen, type FmrBed } from "@/lib/fmr";
 export type CompareSector = {
   vLow?: number;
   vHigh?: number;
-  rent?: number;
+  /** the asking rent a foot as the research states it, written — "$13.27",
+   *  or a band as a band ("$10–15"), never a midpoint */
+  rent?: string;
   capLow?: number;
   capHigh?: number;
   /** the cell's figures' own house, area and period (lib/tracker-read), for
@@ -52,7 +54,7 @@ function sectorCell(s: CompareSector | undefined): string {
       ? `${s.vLow}–${s.vHigh}%`
       : `${s.vLow}%`;
   const extras: string[] = [];
-  if (typeof s.rent === "number") extras.push(`$${s.rent.toFixed(2)}/SF`);
+  if (s.rent) extras.push(`${s.rent}/SF`);
   if (typeof s.capLow === "number" && typeof s.capHigh === "number")
     extras.push(`cap ${s.capLow}–${s.capHigh}%`);
   return extras.length > 0 ? `${v} · ${extras.join(" · ")}` : v;
