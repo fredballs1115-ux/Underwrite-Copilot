@@ -243,6 +243,10 @@ export async function buildPipelineWorkbook(
         d.planDeal && !isDead
           ? { size: 10, bold: true, color: { argb: BRAND } }
           : baseFont;
+      // A note's or a leased fee's type says whose strategy it is
+      // ("Stabilized (the collateral)"), longer than the column: wrapped,
+      // so the row grows to print it whole.
+      row.getCell(5).alignment = { wrapText: true };
       row.getCell(6).value = d.market || "—";
       row.getCell(6).font = baseFont;
 

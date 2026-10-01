@@ -104,6 +104,7 @@ export function buildBrief(input: VerdictInputs): string {
       assessPlausibility(ex, strategy),
       strategy,
       planSummary(ex, strategy),
+      ex,
     );
     if (note) sections.push("## Deal strategy, the plan, and figures that do not tie", note);
   }

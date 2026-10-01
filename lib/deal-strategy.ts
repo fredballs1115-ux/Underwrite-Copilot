@@ -25,7 +25,7 @@
  */
 
 import { withArticle } from "@/lib/article";
-import { groundRentOf, interestOf } from "@/lib/interest";
+import { dealTypeLabel, groundRentOf, interestOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
@@ -1063,13 +1063,17 @@ export function plausibilityNote(
   findings: PlausibilityFinding[],
   strategy: DealStrategy,
   plan: PlanSummary | null = null,
+  /** the extraction, which says what the price buys: on a note or a leased
+   *  fee the type is said as whose strategy it is (lib/interest
+   *  `dealTypeLabel`), the collateral's or the leaseholder's building's */
+  extraction: ExtractionResult | null = null,
 ): string {
   const bits: string[] = [];
   if (isPlanDeal(strategy.kind)) {
     // An inferred plan deal's summary IS the reading line; print it once.
     const reading = STRATEGY_READING[strategy.kind];
     const summary = strategy.summary && strategy.summary !== reading ? ` — ${strategy.summary}` : "";
-    bits.push(`DEAL STRATEGY: ${strategy.label}${summary} ${reading}`);
+    bits.push(`DEAL STRATEGY: ${dealTypeLabel(strategy.label, extraction)}${summary} ${reading}`);
     if (plan) bits.push(`THE PLAN AS THE OM STATES IT: ${planLine(plan)}.`);
     bits.push(
       "The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income, and it is expected to sit far above the acquisition price. Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.",

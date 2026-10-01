@@ -32,7 +32,7 @@ import type {
 import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type DealStrategy } from "@/lib/deal-strategy";
 import { marketsPhrase, portfolioFacts, readPortfolio } from "@/lib/portfolio";
 import { yieldOnCostText } from "@/lib/plan-facts";
-import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
@@ -113,15 +113,19 @@ export const STATUS_CHIP: Record<
 function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStrategy): string {
   if (strategy.kind === "unknown" || strategy.kind === "stabilized") return "";
   const plan = planSummary(extraction, strategy);
+  // Whose strategy it is on a note or a leased fee, as the deal header says
+  // it (lib/interest `dealTypeLabel`): the collateral's, or the building
+  // someone else owns on the land.
+  const kind = dealTypeLabel(strategy.label, extraction);
   const m = (n: number) =>
     n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
   if (plan?.stabilizedNoi && plan.totalCost != null && plan.yieldOnCost != null) {
-    return `${strategy.label} · stabilized NOI ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
+    return `${kind} · stabilized NOI ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
       plan.costPerUnit != null ? `; ${m(plan.costPerUnit)} per planned unit all-in` : ""
     })`;
   }
-  if (plan?.stabilizedNoi) return `${strategy.label} · stabilized NOI ${m(plan.stabilizedNoi.value)}`;
-  return strategy.label;
+  if (plan?.stabilizedNoi) return `${kind} · stabilized NOI ${m(plan.stabilizedNoi.value)}`;
+  return kind;
 }
 
 /** A portfolio memorandum (lib/portfolio, #411), in one line for the memo's

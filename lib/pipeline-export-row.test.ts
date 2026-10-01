@@ -121,6 +121,30 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(pipelineExportRow(deal(), ctx)).toMatchObject({ cap: "5.90%", capWithheld: null });
   });
 
+  it("says whose strategy the deal type is on a note or a leased fee, as the deal header does", async () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const sold = (kind: "note" | "leased_fee" | "fee_simple") =>
+      ({
+        dealName: "Harbor Point",
+        assetClass: "multifamily",
+        market: "Baltimore, MD",
+        address: "",
+        interest: { ...blank, kind },
+        metrics: [m("Asking price", "$20,000,000"), m("Going-in cap rate", "6.00%")],
+      }) as ExtractionResult;
+    const note = pipelineExportRow(deal({ extraction: sold("note") }), ctx);
+    expect(note.dealType).toBe("Stabilized (the collateral)");
+    expect(pipelineExportRow(deal({ extraction: sold("leased_fee") }), ctx).dealType).toBe("Stabilized (the leaseholder's building)");
+    expect(pipelineExportRow(deal({ extraction: sold("fee_simple") }), ctx).dealType).toBe("Stabilized");
+    // The sheet prints it whole: the column is narrow, so the cell wraps.
+    const buf = await buildPipelineWorkbook([note], new Date("2026-09-08T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    const cell = wb.getWorksheet("Pipeline")!.getRow(6).getCell(5);
+    expect(cell.value).toBe("Stabilized (the collateral)");
+    expect(cell.alignment?.wrapText).toBe(true);
+  });
+
   it("judges the buy box on the pipeline page's inputs: the address widens the geography", () => {
     const box: BuyBox = { markets: "Montgomery County" };
     const address = {

@@ -991,6 +991,7 @@ async function runAnalysisSteps(
           assessPlausibility(ex, strategy),
           strategy,
           planSummary(ex, strategy),
+          ex,
         );
         if (plausibility) notes.push(plausibility);
 

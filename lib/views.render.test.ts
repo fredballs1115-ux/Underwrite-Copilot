@@ -1960,6 +1960,43 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(beforeHtml).not.toContain('aria-label="The plan"');
   });
 
+  it("says whose strategy the deal type is on a note or a leased fee, as the sender's page header does", () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const sold = (kind: "note" | "leased_fee" | "fee_simple") =>
+      ({
+        dealName: "Harbor Point",
+        assetClass: "multifamily",
+        market: "Baltimore, MD",
+        address: "",
+        interest: { ...blank, kind },
+        metrics: [
+          { label: "Asking price", value: "$20,000,000", flagged: false, page: "" },
+          { label: "Going-in cap rate", value: "6.00%", flagged: false, page: "" },
+        ],
+      }) as ExtractionResult;
+    const subtitle = (kind: "note" | "leased_fee" | "fee_simple") =>
+      visibleText(
+        renderToStaticMarkup(
+          React.createElement(ShareView, {
+            dealName: "Harbor Point",
+            assetClass: "multifamily",
+            expiresAt: "2026-10-05T12:00:00Z",
+            verdictStale: false,
+            picture: null,
+            extraction: sold(kind),
+            comps: null,
+            market: null,
+            verdict: SAMPLE_DEAL.verdict,
+          }),
+        ),
+      );
+    expect(subtitle("note")).toContain("Baltimore, MD · Multifamily · Stabilized (the collateral)");
+    expect(subtitle("leased_fee")).toContain("Baltimore, MD · Multifamily · Stabilized (the leaseholder's building)");
+    const plain = subtitle("fee_simple");
+    expect(plain).toContain("Baltimore, MD · Multifamily · Stabilized");
+    expect(plain).not.toContain("Stabilized (the");
+  });
+
   it("says a covenant on the rents under the title, and nothing on a market-rate deal (#453)", () => {
     const restricted = {
       ...SAMPLE_DEAL.extraction,

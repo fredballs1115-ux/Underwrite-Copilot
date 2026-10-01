@@ -626,6 +626,22 @@ describe("plausibilityNote", () => {
     expect(note).not.toMatch(/FIGURES THAT DO NOT TIE/);
   });
 
+  it("says whose strategy the deal type is on a note or a leased fee, as the deal header does", () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const sold = (kind: "note" | "leased_fee" | "fee_simple") =>
+      ex([metric("Asking price", "$9M"), metric("Renovation budget", "$1M")], { interest: { ...blank, kind } });
+    const noteFor = (kind: "note" | "leased_fee" | "fee_simple") => {
+      const e = sold(kind);
+      const s = inferStrategy(e);
+      return plausibilityNote([], s, planSummary(e, s), e);
+    };
+    expect(noteFor("note")).toMatch(/^DEAL STRATEGY: Value-add \(the collateral\) /);
+    expect(noteFor("leased_fee")).toMatch(/^DEAL STRATEGY: Value-add \(the leaseholder's building\) /);
+    // A price that buys the building keeps the label as it stands.
+    expect(noteFor("fee_simple")).toMatch(/^DEAL STRATEGY: Value-add /);
+    expect(noteFor("fee_simple")).not.toMatch(/\(the /);
+  });
+
   it("says plainly what the plan does not state", () => {
     const e = ex([metric("Asking price", "$9M"), metric("Renovation budget", "$1M")]);
     const s = inferStrategy(e);

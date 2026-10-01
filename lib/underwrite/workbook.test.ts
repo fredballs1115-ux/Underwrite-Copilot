@@ -1162,6 +1162,37 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "What is being sold")).toThrow();
   });
 
+  it("says whose strategy the deal type is on a note or a leased fee — on the Cover, the Assumptions tab and the Deal Summary alike", async () => {
+    const sold = (kind: "note" | "leased_fee" | "fee_simple") =>
+      deriveUnderwriteInputs(
+        {
+          ...extraction,
+          strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+          interest: { kind, summary: "", share: "", groundLease: "", loan: "", page: "" },
+          metrics: [
+            ...extraction.metrics,
+            ...(kind === "note" ? [{ label: "Unpaid principal balance", value: "$62,500,000", flagged: false, page: "p. 3" }] : []),
+          ],
+        },
+        "fallback",
+      );
+    const labels = async (m: ReturnType<typeof sold>) => {
+      const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+      const cover = wb.getWorksheet("Cover")!;
+      const assum = wb.getWorksheet("Assumptions")!;
+      const summary = wb.getWorksheet("Deal Summary")!;
+      return [
+        cover.getCell(findRow(cover, 2, "Deal type"), 3).value,
+        assum.getCell(findRow(assum, 1, "Deal Type"), 2).value,
+        summary.getCell(findRow(summary, 1, "Deal Type"), 2).value,
+      ];
+    };
+    expect(await labels(sold("note"))).toEqual(Array(3).fill("Stabilized (the collateral)"));
+    expect(await labels(sold("leased_fee"))).toEqual(Array(3).fill("Stabilized (the leaseholder's building)"));
+    // A price that buys the building keeps the label as it stands.
+    expect(await labels(sold("fee_simple"))).toEqual(Array(3).fill("Stabilized"));
+  });
+
   it("a covenant on the rents (#453): the restriction, then what the model's one growth rate is not on it", async () => {
     const units = extraction.metrics.find((m) => m.label === "Units")?.value;
     const restricted = deriveUnderwriteInputs(

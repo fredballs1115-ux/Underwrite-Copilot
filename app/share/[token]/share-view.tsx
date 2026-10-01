@@ -14,7 +14,7 @@ import type {
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
-import { interestOf, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestOf, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing";
 import { InterestPanel } from "@/app/interest-panel";
@@ -332,7 +332,9 @@ export function ShareView({
         {[
           extraction?.market,
           assetClassLabel(assetClass),
-          strategy.kind !== "unknown" ? strategy.label : null,
+          // Whose strategy it is on a note or a leased fee, as the sender's
+          // page header says it (lib/interest `dealTypeLabel`).
+          strategy.kind !== "unknown" ? dealTypeLabel(strategy.label, safeExtraction) : null,
         ]
           .filter(Boolean)
           .join(" · ")}

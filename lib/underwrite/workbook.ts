@@ -12,6 +12,7 @@ import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { datedLong } from "@/lib/debt-index";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT } from "./plan-caveat";
+import type { InterestKind } from "@/lib/anthropic/types";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -184,7 +185,7 @@ export async function buildUnderwriteWorkbook(
   wsSens.properties.tabColor = { argb: "FFA05A1C" };
 
   buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead }, builtAt);
-  buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy);
+  buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy, model.meta.interest?.kind);
   if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
@@ -587,6 +588,9 @@ function buildAssumptions(
   inp: UnderwriteInputs,
   sources: DerivedModel["sources"],
   strategy: DerivedModel["meta"]["strategy"],
+  /** what the price buys (the cover's `meta.interest.kind`), which says
+   *  whose strategy the deal type is on a note or a leased fee */
+  interestKind?: InterestKind,
 ) {
   ws.getColumn(1).width = 36;
   ws.getColumn(2).width = 16;
@@ -630,12 +634,23 @@ function buildAssumptions(
   const dealKind = strategy ?? "unknown";
   if (dealKind !== "unknown") {
     label(ws.getCell(r, 1), "Deal Type", { indent: 1 });
-    label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind]);
+    // Whose strategy it is on a note or a leased fee, as the cover says it
+    // (lib/interest): the collateral's, or the leaseholder's building's.
+    const kindLabel = dealTypeLabelFor(STRATEGY_LABEL[dealKind], interestKind);
+    label(ws.getCell(r, 2), kindLabel);
     const note = ws.getCell(r, 3);
     note.value = isPlanDeal(dealKind)
       ? `${STRATEGY_READING[dealKind]} Year-1 income below is in-place or assumed — never the OM's stabilized pro forma.`
       : STRATEGY_READING[dealKind];
     note.font = { name: ARIAL, size: 9, color: MUTED };
+    if (kindLabel !== STRATEGY_LABEL[dealKind]) {
+      // The qualified label is longer than the column: wrapped, with the
+      // row's three cells set at its top.
+      ws.getCell(r, 1).alignment = { indent: 1, vertical: "top" };
+      ws.getCell(r, 2).alignment = { wrapText: true, vertical: "top" };
+      ws.getCell(r, 3).alignment = { vertical: "top" };
+      ws.getRow(r).height = 40;
+    }
     r++;
   }
   input("Purchase Price", inp.purchasePrice, "PurchasePrice", FMT.usd, "purchasePrice", true);
@@ -1193,7 +1208,8 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   // a live link to the Assumptions cell, so flexing it flows through.
   if (dealKind !== "unknown") {
     r++;
-    label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind]);
+    // Whose strategy it is on a note or a leased fee, as the cover says it.
+    label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind));
     if (planDeal) {
       label(ws.getCell(r, 4), "Capital Budget (yr 1)");
       ws.getCell(r, 5).value = { formula: "CapImprovements" } as ExcelJS.CellFormulaValue; styleLink(ws.getCell(r, 5), FMT.usd);

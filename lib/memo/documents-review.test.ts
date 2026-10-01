@@ -291,6 +291,19 @@ describe("the documents read the deal's kind as its page does — the extraction
     expect(without.keyTerms[1].label).not.toBe("Stabilized NOI");
   });
 
+  it("the memo's subtitle says whose strategy the deal type is on a note or a leased fee, as the deal header does", () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const sold = (kind: "note" | "leased_fee") =>
+      ({
+        ...(planDealRow({ ...signalConversion, interest: { ...blank, kind } }) as unknown as Record<string, unknown>),
+        first_signal: SIGNAL,
+      }) as unknown as DealRow;
+    expect(buildMemoData(sold("note"), "September 30, 2026").strategyLine).toMatch(/^Conversion \(the collateral\)( · |$)/);
+    expect(buildMemoData(sold("leased_fee"), "September 30, 2026").strategyLine).toMatch(/^Conversion \(the leaseholder's building\)( · |$)/);
+    // A price that buys the building keeps the label as it stands.
+    expect(buildMemoData(row(SIGNAL), "September 30, 2026").strategyLine).toMatch(/^Conversion · /);
+  });
+
   it("the report omits the IRR page and builds the plan page for the kind the page reads", () => {
     const derived = deriveUnderwriteInputs(signalConversion, "The Wexley");
     const refCap = { pct: derived.inputs.exitCapPct, provenance: derived.sources.exitCapPct?.provenance ?? ("assumption" as const) };

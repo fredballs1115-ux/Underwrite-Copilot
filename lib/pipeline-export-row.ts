@@ -7,7 +7,7 @@ import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { buyBoxCheckSource, evaluateBuyBox, foldBuyBoxChecks, type BuyBox } from "@/lib/criteria";
 import { noteCapSlot } from "@/lib/compare-interest";
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
-import { interestTag } from "@/lib/interest";
+import { dealTypeLabel, interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
 import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
@@ -81,7 +81,9 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // deal the extraction has read.
     assetClass: shownAssetClass(d.asset_class, extraction),
     market: extraction?.market ?? "",
-    dealType: strategy.kind === "unknown" ? null : strategy.label,
+    // Whose strategy it is on a note or a leased fee, as the deal header
+    // says it (lib/interest `dealTypeLabel`).
+    dealType: strategy.kind === "unknown" ? null : dealTypeLabel(strategy.label, extraction),
     planDeal: plan != null,
     price: findPriceMetric(metrics, strategy.kind)?.value ?? null,
     interest: interestTag(extraction),
