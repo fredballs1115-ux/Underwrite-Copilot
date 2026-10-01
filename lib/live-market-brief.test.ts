@@ -4,6 +4,7 @@ import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import { CONSTRUCTION_COST_IDS, BRIEF_NATIONAL_IDS, CRE_PRICE_ID, DEBT_MARKET_IDS, lendingStandardsFor, liveMarketBrief, periodLabel, rentIndexFor, sectorJobsFor, sectorPayrollMetric } from "./live-market-brief";
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
+import { briefDelta } from "./brief-delta";
 
 const NOW = new Date("2026-09-23T12:00:00Z");
 
@@ -57,7 +58,9 @@ const REALTOR: RealtorRead = {
 
 describe("liveMarketBrief — the metro's published figures, dated and sourced, for the market check", () => {
   const rates = readMetroRates("dc", DC_ROWS, NOW);
-  const brief = liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, rates, zori: ZORI, realtor: REALTOR, now: NOW })!;
+  // An apartment deal: the housing figures speak to rental housing alone.
+  const apartments = "multifamily";
+  const brief = liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, assetClass: apartments, rates, zori: ZORI, realtor: REALTOR, now: NOW })!;
 
   it("names the metro, the day it was read, and that the figures are the metro's", () => {
     expect(brief.metro).toBe("Washington, DC");
@@ -110,7 +113,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
   it("says Zillow's and Realtor.com's figures only while current on the brief's day — the limits the feeds card judges the pulls by", () => {
     const rates = readMetroRates("dc", DC_ROWS, NOW);
     const on = (day: string) =>
-      liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, rates, zori: ZORI, realtor: REALTOR, now: new Date(`${day}T12:00:00Z`) })!;
+      liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, assetClass: apartments, rates, zori: ZORI, realtor: REALTOR, now: new Date(`${day}T12:00:00Z`) })!;
     const has = (b: { lines: string[] }, start: string) => b.lines.some((l) => l.startsWith(start));
     // Zillow's August (Aug 31) is current through Oct 25; Realtor.com's (Aug 1) through Oct 13.
     expect(has(on("2026-10-13"), "Asking rent")).toBe(true);
@@ -123,7 +126,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
 
   it("says the hotness rank under its own month where its file is a month behind the inventory's, and not past its cadence", () => {
     const july = { ...REALTOR, hotness: { ...REALTOR.hotness!, asOf: "2026-07-01" } };
-    const input = { metro: { id: "dc", name: "Washington, DC" }, rates: [], zori: null, realtor: july };
+    const input = { metro: { id: "dc", name: "Washington, DC" }, assetClass: apartments, rates: [], zori: null, realtor: july };
     const early = liveMarketBrief({ ...input, now: new Date("2026-09-10T12:00:00Z") })!;
     expect(early.lines).toEqual([
       "For-sale market: median list price $599,000 (-1.2% from a year ago), 12,400 active listings (+14.3%), median 41 days on market (+12.5%), loosening on both flow figures, hotness rank 40 of 300 metros for Jul 2026 (12 places cooler than a year ago) (Aug 2026; Realtor.com — list prices are asks, not sales)",
@@ -168,6 +171,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     const later = new Date("2027-06-01T00:00:00Z");
     const stale = liveMarketBrief({
       metro: { id: "dc", name: "Washington, DC" },
+      assetClass: apartments,
       rates: readMetroRates("dc", DC_ROWS, later),
       zori: null,
       realtor: null,
@@ -179,6 +183,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
   it("a figure the pull did not have has no line, never a zero", () => {
     const few = liveMarketBrief({
       metro: { id: "dc", name: "Washington, DC" },
+      assetClass: apartments,
       rates: readMetroRates("dc", DC_ROWS.filter((r) => r.series_id === "WASH911URN"), NOW),
       zori: { ...ZORI, mfrRent: null, mfrYoyPct: null, homeValue: null, homeValueYoyPct: null, priceToRentYears: null },
       realtor: null,
@@ -196,6 +201,7 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
   it("a suburb's lines wear the MSA's name, as its tiles do", () => {
     const pg = liveMarketBrief({
       metro: { id: "pg_county", name: "Prince George's County, MD" },
+      assetClass: apartments,
       rates: readMetroRates("pg_county", DC_ROWS, NOW),
       zori: null,
       realtor: null,
@@ -203,6 +209,97 @@ describe("liveMarketBrief — the metro's published figures, dated and sourced, 
     })!;
     expect(pg.text).toContain("Prince George's County, MD market");
     expect(pg.lines.some((l) => l.includes("Rental vacancy, metro area, Washington MSA"))).toBe(true);
+  });
+});
+
+// Research pass 18: an office deal's market check was handed the apartment
+// survey's vacancy, the CPI rent, Zillow's asking rents, house prices and the
+// for-sale market, and told to check its vacancy against them. The housing
+// figures speak to rental housing alone, as the model's read and the demand
+// card already hold them.
+describe("the housing figures go to rental housing alone", () => {
+  const rates = readMetroRates("dc", DC_ROWS, NOW);
+  const of = (assetClass: string | null) =>
+    liveMarketBrief({ metro: { id: "dc", name: "Washington, DC" }, assetClass, rates, zori: ZORI, realtor: REALTOR, now: NOW });
+  const HOUSING = [/^Rental vacancy/, /^Housing units permitted/, /^House prices/, /^Rent paid by sitting tenants/, /^Asking rent/, /^For-sale market/];
+  const HOUSING_KEYS = ["rental_vacancy_msa", "rental_vacancy", "permits_ttm", "permits_multi_ttm", "zori_rent", "zori_mfr_rent", "zhvi", "rdc_median_list_price", "rdc_active_listings", "rdc_days_on_market", "rdc_hotness_rank"];
+
+  it("an office in a covered metro is handed no housing line and no housing figure — the metro's jobs still", () => {
+    const office = of("office")!;
+    for (const re of HOUSING) expect(office.lines.some((l) => re.test(l)), String(re)).toBe(false);
+    for (const key of HOUSING_KEYS) expect(office.figures.some((f) => f.key === key), key).toBe(false);
+    expect(office.lines).toEqual([
+      "Unemployment 3.4% (Jul 2026, Washington MSA; FRED), +0.2 pt on the month before",
+      "Nonfarm payrolls +0.8% from a year ago (Jul 2026, Washington MSA; FRED)",
+    ]);
+    // Its header names only the publisher its lines come from.
+    expect(office.text).toContain("read on 2026-09-23 from FRED. Each is dated");
+    expect(office.text).not.toMatch(/Zillow|Realtor\.com|Census/);
+  });
+
+  it("an apartment building still gets every one of them, and so does each class that is rental housing", () => {
+    const apartments = of("multifamily")!;
+    // Every housing line the fixture has a row for (it carries no house
+    // prices and no CPI rent).
+    for (const re of [/^Rental vacancy, metro area/, /^Rental vacancy, South Census region/, /^Housing units permitted/, /^Asking rent/, /^For-sale market/]) {
+      expect(apartments.lines.some((l) => re.test(l)), String(re)).toBe(true);
+    }
+    expect(apartments.text).toContain("from FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com");
+    for (const cls of ["mixed_use", "sfr_btr", "student_housing", "manufactured_housing"]) {
+      expect(of(cls)!.lines.some((l) => l.startsWith("Rental vacancy, metro area")), cls).toBe(true);
+    }
+  });
+
+  it("no other class reads them — a hotel, licensed care, storage, a net lease — and nor does a class nothing has resolved", () => {
+    for (const cls of ["retail", "industrial", "hospitality_str", "senior_housing", "self_storage", "net_lease", "medical_office", null]) {
+      const b = of(cls);
+      for (const re of HOUSING) expect(b?.lines.some((l) => re.test(l)) ?? false, `${cls} ${re}`).toBe(false);
+    }
+  });
+
+  it("house prices and the rent sitting tenants pay are housing figures too", () => {
+    // Philadelphia's own series as the table files them: the division's
+    // house price index (FRED's change from a year ago) and the CPI rent
+    // level, whose change from a year ago is worked out on read.
+    const rows: RateRow[] = [
+      { series_id: "PHIL942URN", obs_date: "2026-08-01", value: 4.2 },
+      { series_id: "ATNHPIUS37964Q_YOY", obs_date: "2026-04-01", value: 3.1 },
+      ...Array.from({ length: 13 }, (_, i) => {
+        const d = new Date(Date.UTC(2026, 7 - i, 1));
+        return { series_id: "CUURA102SEHA", obs_date: d.toISOString().slice(0, 10), value: i === 0 ? 412 : 400 };
+      }),
+    ];
+    const philly = (assetClass: string) =>
+      liveMarketBrief({ metro: { id: "philadelphia", name: "Philadelphia" }, assetClass, rates: readMetroRates("philadelphia", rows, NOW), zori: null, realtor: null, now: NOW })!;
+    const apartments = philly("multifamily").lines;
+    expect(apartments.some((l) => l.startsWith("House prices (FHFA index) +3.1%"))).toBe(true);
+    expect(apartments.some((l) => l.startsWith("Rent paid by sitting tenants (CPI rent of primary residence) +3.0%"))).toBe(true);
+    const office = philly("office").lines;
+    expect(office.some((l) => l.startsWith("House prices"))).toBe(false);
+    expect(office.some((l) => l.startsWith("Rent paid by sitting tenants"))).toBe(false);
+    expect(office.some((l) => l.startsWith("Unemployment 4.2%"))).toBe(true);
+  });
+
+  it("a state's annual rental vacancy is a housing figure too", () => {
+    const stateRows: RateRow[] = [
+      { series_id: "PAUR", obs_date: "2026-08-01", value: 4.1 },
+      { series_id: "PARVAC", obs_date: "2025-01-01", value: 6.1 },
+    ];
+    const pa = (assetClass: string) =>
+      liveMarketBrief({ metro: { id: "state:PA", name: "Pennsylvania" }, assetClass, rates: readMetroRates("state:PA", stateRows, NOW), zori: null, realtor: null, now: NOW })!;
+    expect(pa("multifamily").lines.some((l) => l.startsWith("Rental vacancy, Pennsylvania, the state's annual figure"))).toBe(true);
+    expect(pa("office").lines.some((l) => l.startsWith("Rental vacancy"))).toBe(false);
+    expect(pa("office").text).toContain("read on 2026-09-23 from FRED. Each is dated");
+  });
+
+  it("since this screen leaves out a housing figure an office's check stored before, rather than read it as a move to nothing", () => {
+    // A check stored before the change carried the housing figures; today's
+    // read for the same office carries none, and the comparison keeps only
+    // the figures read both times (lib/brief-delta).
+    const stored = of("multifamily")!.figures;
+    const today = of("office")!.figures;
+    const delta = briefDelta("2026-09-01", stored, today)!;
+    expect(delta.moves.map((m) => m.key).sort()).toEqual(["jobs_yoy", "unemployment"]);
   });
 });
 

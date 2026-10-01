@@ -623,17 +623,45 @@ function debtMarketLines(
 /** Whose figures a market id's are: a state's (`state:PA`) or a metro's. */
 const grainOf = (id: string): LiveMarketBrief["grain"] => (isStateMarket(id) ? "state" : "metro");
 
+/**
+ * The metro's figures about housing: the survey's rental vacancy (the metro
+ * area's, the region's, the state's), the rent sitting tenants pay (CPI
+ * rent), house prices and the housing units permitted. With Zillow's asking
+ * rents and Realtor.com's for-sale market, they speak to rental housing and
+ * to nothing else (research pass 18): an office's vacancy is not the
+ * apartment survey's, its rent is not a renter's, and its supply is not the
+ * housing pipeline — the model's read (lib/model-vs-market), the demand
+ * card's supply line (lib/metro-demand) and now the market check all hold
+ * them to a `residential` class. Unemployment and all payrolls speak to
+ * every deal; a commercial deal reads its own sector's payrolls and its kind
+ * of lessor's national rents instead.
+ */
+const HOUSING_METRICS: ReadonlySet<string> = new Set([
+  "rental_vacancy_msa",
+  "rental_vacancy",
+  "rental_vacancy_state",
+  "rent_cpi_yoy",
+  "hpi_yoy",
+  "permits",
+  "permits_1unit",
+]);
+
 export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null {
   const said: Said[] = [];
   const sector = sectorJobsFor(input.assetClass);
   const supply = metroSupply(input.rates);
+  // Rental housing reads the housing figures; every other class — and a
+  // class nothing has resolved — reads none of them (`assetWords`).
+  const housing = assetWords(input.assetClass ?? undefined).residential;
   for (const r of input.rates) {
+    const metric = (r.meta as { metric?: string }).metric;
+    if (!housing && metric && HOUSING_METRICS.has(metric)) continue;
     const s = rateLine(r, sector, supply);
     if (s) said.push(s);
   }
-  const z = zoriLine(input.zori, input.now);
+  const z = housing ? zoriLine(input.zori, input.now) : null;
   if (z) said.push(z);
-  const m = realtorLine(input.realtor, input.now);
+  const m = housing ? realtorLine(input.realtor, input.now) : null;
   if (m) said.push(m);
   // Everything after this point is national, and every surface says how
   // many: "each the metro's" over a block that ends with the 10-year was
@@ -665,7 +693,15 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   // flatters or damns a market the deal is not in.
   const grain: LiveMarketBrief["grain"] = grainOf(input.metro.id);
   const pf = input.portfolio && input.portfolio.properties >= 2 ? input.portfolio : null;
-  const sources = grain === "state" ? "FRED and the Census Bureau" : "FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com";
+  // The publishers the block can carry: the Census Bureau's survey, Zillow,
+  // Realtor.com and the BLS's own CPI rent series speak to rental housing
+  // alone, so a commercial deal's block — its every line read through FRED
+  // — never names them.
+  const sources = !housing
+    ? "FRED"
+    : grain === "state"
+      ? "FRED and the Census Bureau"
+      : "FRED, the BLS, the Census Bureau, Zillow Research and Realtor.com";
   const whose = grain === "state" ? "the state's" : "the metro area's";
   // One of a portfolio's OTHER markets (#413): its own block, saying which
   // of the portfolio's properties it speaks for — never the portfolio's,

@@ -510,6 +510,46 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("an office in a covered metro is handed the metro's jobs and no housing figure; an apartment building the same day still is (research pass 18)", async () => {
+    state.deals.d1.asset_class = "office";
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [
+      { series_id: "WASH911URN", obs_date: "2026-08-01", value: 3.4 },
+      { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: -1.2 },
+      { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
+      { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
+    state.benchmarks = [
+      { metric: "zori_rent", metro: "Washington DC", low: 2310, as_of: "2026-08-31", note: "Washington, DC", source: "Zillow" },
+      { metric: "zori_rent_yoy", metro: "Washington DC", low: 2.1, as_of: "2026-08-31", note: "", source: "Zillow" },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+      expect(job().status).toBe("done");
+      const office = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+      expect(office).toContain("- Unemployment 3.4% (Aug 2026, Washington MSA; FRED)");
+      expect(office).toContain("- Payrolls in professional and business services, the sector that fills offices: -1.2% from a year ago");
+      expect(office).toContain("- Debt market — 10-year Treasury 4.90%");
+      expect(office).not.toContain("Rental vacancy");
+      expect(office).not.toContain("Asking rent");
+      expect(office).not.toContain("Zillow");
+      const stored = state.deals.d1.market as { liveBrief?: { figures: { key: string }[] } | null };
+      expect(stored.liveBrief?.figures.map((f) => f.key)).toEqual(["unemployment", "sector_jobs_yoy", "dgs10"]);
+
+      // The same metro, the same day, an apartment building: every housing line.
+      vi.mocked(checkMarket).mockClear();
+      state.deals.d1.asset_class = "multifamily";
+      await runAnalysis("d1");
+      const apartments = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+      expect(apartments).toContain("- Rental vacancy, metro area, Washington MSA: 6.2% with a ±2.2 pt margin of error");
+      expect(apartments).toContain("- Asking rent, all home types: $2,310/mo, +2.1% from a year ago");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("reads the debt market for the class the deal is filed as, not the deck's word for it", async () => {
     // The analyst filed an office; the deck calls itself multifamily. Every
     // page shows the office (shownAssetClass), so the check reads a

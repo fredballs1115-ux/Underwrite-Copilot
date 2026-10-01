@@ -415,6 +415,20 @@ describe("market check — the metro's published figures ride last, and only whe
     expect(clause).toContain("a figure narrows the range, it does not replace the OM's own numbers");
   });
 
+  // Research pass 18: the clause told every deal to check "occupancy and
+  // vacancy against the metro's rental vacancy" and "an exit story against
+  // the for-sale market's direction", with no class gate.
+  it("never asks a commercial building to read a housing figure", () => {
+    const clause = liveMarketClause(brief);
+    expect(clause).toContain("are handed over for rental housing alone, and read for it alone");
+    expect(clause).toContain("On any other kind of building the block carries no housing figure, and none is ever read against it");
+    expect(clause).toContain("against the national index of rents its kind of lessor charges");
+    expect(clause).toContain("against the metro's payrolls in the sector that fills its kind");
+    // The old ungated instructions are gone.
+    expect(clause).not.toContain("occupancy and vacancy against the metro's rental vacancy");
+    expect(clause).not.toMatch(/supply claims against the year of permits \(on rental housing/);
+  });
+
   it("nothing to hand over is an empty clause, and the instruction is byte-for-byte the old one", () => {
     expect(liveMarketClause(null)).toBe("");
     expect(liveMarketClause("  ")).toBe("");
