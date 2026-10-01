@@ -1964,9 +1964,12 @@ never a placeholder.
 ### E. Standing decisions, no deadline
 
 - **`ANALYSIS_WORKER=1`** on Render moves screens to the worker process.
-  Migration 0016 now exists, so this is available. Worth doing once you have
-  real concurrent users: a deploy mid-screen currently restarts the web
-  process (checkpoints resume it, but the worker is cleaner).
+  Migration 0016 now exists, so this is available. Worth doing before real
+  users arrive: without it a screen runs inside the web process, and a
+  deploy mid-screen ends it — nothing resumes it (checkpoints are read only
+  in the worker), so the deal reads "Stalled" until the analyst runs it
+  again. With the worker, a deploy pauses the screen and the next attempt
+  resumes from its last finished step.
 - **`MODEL_VERDICT`** picks the verdict model; `/data-health` shows what each
   choice costs per screen.
 - **`OM_READ=pdf`** forces the page read if a deck ever reads wrong from its
