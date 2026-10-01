@@ -3454,20 +3454,21 @@ describe("the deal math tools", () => {
 
   it("separates the broker's NOI from the one you would own", () => {
     // #341. A $48M building at a stated 5.50% cap: the reserve and the
-    // leasing capital are $308,800 a year, and the cap a lender would
-    // underwrite is 4.86%.
+    // leasing capital are $1,344,000 a year, and the cap a lender would
+    // underwrite is 2.70%. (The card had divided the leasing line by the
+    // lease term twice and printed $308,800, 4.86% and 64bp.)
     expect(text).toContain("What sits below the NOI line");
     expect(text).toContain("$2,640,000");
-    expect(text).toContain("$2,331,200");
-    expect(text).toContain("4.86%");
-    expect(text).toContain("is 64bp of cap rate above the one a lender would underwrite");
+    expect(text).toContain("$1,296,000");
+    expect(text).toContain("2.70%");
+    expect(text).toContain("is 280bp of cap rate above the one a lender would underwrite");
   });
 
   it("says the omission as a price, and again as a bid", () => {
-    // $5,614,545 of value, which is also $48M less the $42.39M at which the
+    // $24,436,364 of value, which is also $48M less the $23.56M at which the
     // real NOI earns the advertised cap — one number said two ways.
-    expect(text).toContain("$5,614,545");
-    expect(text).toContain("$42.39M");
+    expect(text).toContain("$24,436,364");
+    expect(text).toContain("$23.56M");
   });
 
   it("draws the largest line as the range the assumption actually spans", () => {
@@ -3475,8 +3476,8 @@ describe("the deal math tools", () => {
     // renewal range.
     expect((html.match(/data-bar="line"/g) ?? []).length).toBe(4);
     expect((html.match(/data-bar="renew"/g) ?? []).length).toBe(1);
-    expect(text).toContain("$144,000");
-    expect(text).toContain("$472,000");
+    expect(text).toContain("$720,000");
+    expect(text).toContain("$2,360,000");
     expect(text).toContain("And the largest line is a guess");
   });
 

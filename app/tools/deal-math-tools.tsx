@@ -5158,7 +5158,6 @@ function BelowTheLine() {
   const [price, setPrice] = useShared("blP", "48M");
   const [reserve, setReserve] = useShared("blR", "0.25");
   const [roll, setRoll] = useShared("blO", "20");
-  const [term, setTerm] = useShared("blT", "5");
   const [newTi, setNewTi] = useShared("blA", "45");
   const [renTi, setRenTi] = useShared("blB", "12");
   const [newLc, setNewLc] = useShared("blC", "14");
@@ -5173,14 +5172,13 @@ function BelowTheLine() {
         priceUsd: num(price),
         reservePerSf: num(reserve),
         annualRolloverPct: num(roll),
-        leaseTermYears: num(term),
         newTiPerSf: num(newTi),
         renewalTiPerSf: num(renTi),
         newLcPerSf: num(newLc),
         renewalLcPerSf: num(renLc),
         renewalProbabilityPct: num(renew),
       }),
-    [noi, sf, price, reserve, roll, term, newTi, renTi, newLc, renLc, renew],
+    [noi, sf, price, reserve, roll, newTi, renTi, newLc, renLc, renew],
   );
 
   // The two NOIs on one track, the stated one full width and the owner's
@@ -5205,7 +5203,6 @@ function BelowTheLine() {
           <Field label="Asking price" value={price} onChange={setPrice} placeholder="48M" />
           <Field label="Reserve" suffix="/SF" value={reserve} onChange={setReserve} placeholder="0.25" />
           <Field label="Rolls a year" suffix="%" value={roll} onChange={setRoll} placeholder="20" />
-          <Field label="Lease term" suffix="yr" value={term} onChange={setTerm} placeholder="5" />
           <Field label="New TI" suffix="/SF" value={newTi} onChange={setNewTi} placeholder="45" />
           <Field label="Renewal TI" suffix="/SF" value={renTi} onChange={setRenTi} placeholder="12" />
           <Field label="New commission" suffix="/SF" value={newLc} onChange={setNewLc} placeholder="14" />
@@ -5322,9 +5319,10 @@ function BelowTheLine() {
             Capital that recurs is an expense: replacing a twenty-fifth of a
             roof every year forever is a cost of doing business, whatever an
             accountant calls it. Leasing capital is not optional either, and
-            its annual cost is not its invoice — a building on five-year
-            leases re-tenants a fifth of itself a year, so spending nothing
-            this year means the cost is late rather than absent.
+            its annual cost is an average year&rsquo;s invoice, not this
+            year&rsquo;s — a building on five-year leases re-tenants a fifth
+            of itself a year, so spending nothing this year means the cost is
+            late rather than absent.
           </p>
         </div>
       </div>
