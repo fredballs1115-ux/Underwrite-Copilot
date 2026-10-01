@@ -196,9 +196,11 @@ function iso(dayNumber: number): string {
  * Both measured from the transfer, not from each other. The 180-day window
  * is then capped by the due date of the return for the year the transfer
  * fell in — 15 April of the following year, for an individual filing on a
- * calendar year — because the replacement has to be acquired before that
- * return is filed. An extension restores the full 180 days, which is why a
- * Q4 exchange's first act is usually to file one.
+ * calendar year — because the exchange period ends at that return's due
+ * date, extensions included (§1031(a)(3)(B); the card had said "before
+ * that return is filed", which is not the rule). An extension restores the
+ * full 180 days, which is why a Q4 exchange's first act is usually to file
+ * one.
  */
 export function exchangeClock(closing: string | null): ExchangeRead["clock"] {
   const start = day(closing);

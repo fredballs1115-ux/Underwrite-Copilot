@@ -3255,6 +3255,11 @@ describe("the deal math tools", () => {
     expect(text).toContain("151 days");
     expect(text).toContain("29 days");
     expect(text).toContain("An extension restores the full 180 days");
+    // The window ends at the return's DUE DATE, extensions included
+    // (§1031(a)(3)(B)) — the card had said "before the return … is filed".
+    expect(text).toContain("acquired by the due date of the return for 2026,");
+    expect(text).toContain(", extensions included. An extension restores the full 180 days");
+    expect(text).not.toContain("is filed");
     // Two segments of the window plus the part the due date takes off it.
     expect((html.match(/data-bar="clock"/g) ?? []).length).toBe(2);
     expect((html.match(/data-bar="clock-lost"/g) ?? []).length).toBe(1);
