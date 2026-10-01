@@ -19,6 +19,7 @@ Font.registerHyphenationCallback((word) =>
 );
 import type { BuyBoxCheck } from "@/lib/criteria";
 import { pdfSafe } from "./pdf-text";
+import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { screenedOn } from "@/lib/screen-run";
 import type {
@@ -439,24 +440,9 @@ const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const confidenceOf = (v: unknown): MemoData["ranges"][number]["confidence"] =>
   v === "high" || v === "medium" || v === "low" ? v : "";
 
-/** Pull the first numeric out of a display string ("$1,495" → 1495). */
-function firstNum(sv: string): number | null {
-  const m = sv.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
-  return m ? parseFloat(m[0]) : null;
-}
-
-/** Where the base sits inside low → high, 0..1 — the deal page's positional
- *  read; null when the three figures do not parse as one scale. Which end
- *  is the sponsor's depends on the assumption (a higher rent is theirs, a
- *  higher vacancy the buyer's), so the position is drawn, never graded. */
-export function basePosition(r: { low: string; base: string; high: string }): number | null {
-  const lo = firstNum(r.low);
-  const hi = firstNum(r.high);
-  const base = firstNum(r.base);
-  return lo != null && hi != null && base != null && hi > lo
-    ? Math.min(1, Math.max(0, (base - lo) / (hi - lo)))
-    : null;
-}
+// Where the base sits inside low → high: the shared reader, re-exported for
+// the full report's market reads (lib/verdict-range).
+export { basePosition };
 
 // WinAnsi-only text (standard Helvetica can't encode anything else) \u2014 the
 // full filter lives in pdf-text.ts (universal, unit-tested); re-exported here
@@ -556,14 +542,18 @@ export function buildMemoData(
   };
   const ranges = (list(screen?.ranges) as NonNullable<typeof screen>["ranges"])
     .slice(0, 4)
-    .map((r) => ({
-      label: clamp(r?.label, 28),
-      low: str(r?.low),
-      base: str(r?.base),
-      high: str(r?.high),
-      source: clamp(r?.source, 56),
-      confidence: confidenceOf(r?.confidence),
-    }));
+    .map((r) =>
+      // Read in numeric order (lib/verdict-range): a verdict stored when the
+      // conservative end came first can hold its larger figure as "low".
+      rangeInOrder({
+        label: clamp(r?.label, 28),
+        low: str(r?.low),
+        base: str(r?.base),
+        high: str(r?.high),
+        source: clamp(r?.source, 56),
+        confidence: confidenceOf(r?.confidence),
+      }),
+    );
   const dealKillers = (
     list(screen?.dealKillers) as NonNullable<typeof screen>["dealKillers"]
   )

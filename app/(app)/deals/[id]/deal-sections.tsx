@@ -20,6 +20,7 @@ import { safeHttpUrl } from "@/lib/safe-url";
 import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/comp-detail";
 import { gapDisagreementLine, gapScale, incomeGapShare, type GapUnit } from "@/lib/gap-detail";
 import { typicalRange as readTypicalRange } from "@/lib/typical-range";
+import { basePosition, firstNumber, rangeInOrder } from "@/lib/verdict-range";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/analyze";
 import { locatedPage, type DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
@@ -1770,7 +1771,7 @@ function PositionBar({
   // Plot the OM's value against the typical band — "how far outside typical"
   // is the actual analyst question, not just which side of it.
   const band = readTypicalRange(typicalRange);
-  const om = firstNum(omSays);
+  const om = firstNumber(omSays);
   if (band && om != null) {
     const [lo, hi] = band;
     const pad = (hi - lo) * 0.35 || Math.abs(hi) * 0.1 || 1;
@@ -2198,25 +2199,17 @@ const RANGE_CONF: Record<ScreenRange["confidence"], { label: string; cls: string
   low: { label: "Low", cls: "bg-kill/10 text-kill" },
 };
 
-/** Pull the first numeric out of a display string ("$1,495" → 1495). */
-function firstNum(sv: string): number | null {
-  const m = sv.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
-  return m ? parseFloat(m[0]) : null;
-}
 
-function RangeCard({ r }: { r: ScreenRange }) {
+function RangeCard({ r: stored }: { r: ScreenRange }) {
+  // Read in numeric order (lib/verdict-range): a verdict stored when the
+  // conservative end came first can hold its larger figure as "low".
+  const r = rangeInOrder(stored);
   const conf = RANGE_CONF[r.confidence] ?? RANGE_CONF.medium;
   // Positional encoding: WHERE the base sits inside low→high is the most
   // diagnostic fact about a range. The dot is one neutral colour: the
   // higher figure is not always the sponsor's (a higher vacancy is the
   // buyer's end), so the position is drawn, never graded.
-  const lo = firstNum(r.low);
-  const hi = firstNum(r.high);
-  const base = firstNum(r.base);
-  const pos =
-    lo != null && hi != null && base != null && hi > lo
-      ? Math.min(1, Math.max(0, (base - lo) / (hi - lo)))
-      : null;
+  const pos = basePosition(r);
   return (
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex items-center justify-between gap-2">

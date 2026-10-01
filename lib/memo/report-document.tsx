@@ -16,6 +16,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type MemoData } from "./memo-document";
+import { rangeInOrder } from "@/lib/verdict-range";
 import { typicalRangeParts } from "@/lib/typical-range";
 
 /** The OM's figure placed on the typical range — "5.25%" on "5.25–5.75%" —
@@ -798,7 +799,11 @@ function CallInFullPage({
   const risks = list(verdict.topRisks).map(str).filter(Boolean);
   const steps = list(verdict.nextSteps).map(str).filter(Boolean);
   const screen = verdict.screen;
-  const ranges = list(screen?.ranges) as NonNullable<VerdictResult["screen"]>["ranges"];
+  // Read in numeric order (lib/verdict-range): a verdict stored when the
+  // conservative end came first can hold its larger figure as "low".
+  const ranges = (list(screen?.ranges) as NonNullable<VerdictResult["screen"]>["ranges"]).map((r) =>
+    r ? rangeInOrder({ ...r, low: str(r.low), high: str(r.high) }) : r,
+  );
   const killers = list(screen?.dealKillers) as NonNullable<VerdictResult["screen"]>["dealKillers"];
   const flips = list(screen?.sensitivity) as NonNullable<VerdictResult["screen"]>["sensitivity"];
   const item = { fontSize: 9, color: C.ink, lineHeight: 1.3 } as const;

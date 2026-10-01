@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { placedByClause } from "@/lib/placed-by";
 import { screenedOn } from "@/lib/screen-run";
+import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import type {
   BrokerCompsResult,
   ExtractionResult,
   FirstSignal,
   MarketResult,
-  ScreenRange,
   VerdictCall,
   VerdictResult,
   VerdictScenario,
@@ -167,22 +167,6 @@ function VerdictIcon({ call, className }: { call: VerdictCall | null; className?
   );
 }
 
-/** Pull the first numeric out of a display string ("$1,495" → 1495). */
-function firstNum(sv: string): number | null {
-  const m = sv.replace(/,/g, "").match(/-?\d+(\.\d+)?/);
-  return m ? parseFloat(m[0]) : null;
-}
-
-/** Where the base sits inside low→high — the deal page's positional read. */
-function basePosition(r: ScreenRange): number | null {
-  const lo = firstNum(r.low);
-  const hi = firstNum(r.high);
-  const base = firstNum(r.base);
-  return lo != null && hi != null && base != null && hi > lo
-    ? Math.min(1, Math.max(0, (base - lo) / (hi - lo)))
-    : null;
-}
-
 /** A first sentence in the open, the rest one click away (the Market data
  *  page's fold). The whole text stays in the HTML. */
 function Fold({ text, className = "" }: { text: string; className?: string }) {
@@ -304,7 +288,9 @@ export function ShareView({
   // shared screen does not carry.
   const assumable = readAssumable(safeExtraction, null);
   const sellerNote = readSellerFinancing(safeExtraction, null);
-  const ranges = (screen?.ranges ?? []).slice(0, 6);
+  // Read in numeric order (lib/verdict-range): a verdict stored when the
+  // conservative end came first can hold its larger figure as "low".
+  const ranges = (screen?.ranges ?? []).slice(0, 6).map(rangeInOrder);
   const killers = (screen?.dealKillers ?? []).slice(0, 3);
   // One OM, several properties (#411): the deal page's own card, read by
   // the same reader, so a partner sees what is being bought property by
