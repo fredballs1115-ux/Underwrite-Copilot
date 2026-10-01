@@ -7060,7 +7060,11 @@ describe("ManufacturedHousingPanel (#470) — whose homes stand on the pads, the
     expect(text).toContain("114 homes their residents own (76%)");
     expect(text).toContain("18 homes the park owns (12%)");
     expect(text).toContain("18 vacant pads");
-    expect(text).toContain("The memorandum's market $500 ($70 under, 16.3%)");
+    // The gap's share names its base (the research pass of 2026-09-30:
+    // "($70 under, 16.3%)" named none — $70 is 16.3% of the $430 lot rent in
+    // place, 14% of the market's $500).
+    expect(text).toContain("The memorandum's market $500 ($70 above today's lot rent, 16.3% of it)");
+    expect(text).toContain("$70 a month under, 16.3% of the rent in place");
     expect(text).toContain("A park-owned home $895 a month: $465 of it the home's, above the lot's");
     for (const key of ["price-pad", "utilities", "billing", "age", "rv", "rent-control"]) expect(html).toContain(`data-mh="${key}"`);
     expect(text).toContain("Private water & sewer");

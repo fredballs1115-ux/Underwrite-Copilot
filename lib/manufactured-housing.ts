@@ -271,6 +271,8 @@ export interface ManufacturedHousingRead {
   /** market less in place, a month: positive where the rents are under
    *  market */
   gap: number | null;
+  /** that gap as a share of the lot rent in place, % — $70 under a $430
+   *  lot rent is 16.3%, never the share of the market's $500 */
   gapPct: number | null;
   /** the gap a year across the occupied pads, where both are known */
   gapAnnual: number | null;
@@ -490,7 +492,7 @@ function sentencesOf(r: Omit<ManufacturedHousingRead, "sentences" | "headline">)
       : `the memorandum's market ${rent(r.marketLotRent)}`;
     if (r.gap > 0) {
       const year = r.gapAnnual != null && r.occupied != null ? `, ${usd(r.gapAnnual)} a year across the ${count(r.occupied)} occupied pads were every lot at market` : "";
-      out.push(`The average lot rent is ${rent(r.lotRent)} a month against ${market}: ${rent(r.gap)} a month (${pct1(r.gapPct ?? 0)}) under${year}.`);
+      out.push(`The average lot rent is ${rent(r.lotRent)} a month against ${market}: ${rent(r.gap)} a month under, ${pct1(r.gapPct ?? 0)} of the rent in place${year}.`);
       out.push(
         `A resident who owns the home pays thousands to move it, so the lot rent can rise — but each increase runs through the notice the law requires${
           r.rentControl?.regulated ? " and the rent rules the memorandum names" : ""

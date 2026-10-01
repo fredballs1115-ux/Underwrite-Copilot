@@ -64,7 +64,7 @@ describe("a manufactured-housing park, read as stated (#470)", () => {
     );
     expect(r.headline).toContain("The 18 vacant pads earn nothing until a home is moved onto each");
     expect(r.headline).toContain(
-      "The average lot rent is $430 a month against the memorandum's market $525: $95 a month (22.1%) under, $150,480 a year across the 132 occupied pads were every lot at market.",
+      "The average lot rent is $430 a month against the memorandum's market $525: $95 a month under, 22.1% of the rent in place, $150,480 a year across the 132 occupied pads were every lot at market.",
     );
     expect(r.headline).toContain(
       "A park-owned home rents for $895 a month, $465 above its lot's $430: across the 18 homes, up to $100,440 a year of the income is the homes' rather than the land's.",
