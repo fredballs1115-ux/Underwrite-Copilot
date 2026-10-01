@@ -44,7 +44,7 @@
  *
  * Rule 4. THE RETURN ON COST HAS NO CLOCK IN IT. It is the figure every
  * memorandum leads with and it is the same number on a three-year hold and
- * a ten-year one — while the program's actual return is 63.7% and 13.7% on
+ * a ten-year one — while the program's actual return is 63.7% and 19.9% on
  * those two, same premium, same cost, same building. The reason is
  * `pvFromExitPct`: most of a program's present value is the RESALE rather
  * than the rent it collects on the way, so the value is created once and
@@ -474,12 +474,27 @@ function runProgram(
   for (const row of schedule) {
     if (row.year > hold) continue;
     flows[row.year - 1] -= row.capital;
-    flows[row.year] += row.premiumIncome;
   }
   // Doors finished within the hold — a year's doors count only if the year
   // itself closed inside it.
   const finished = schedule.filter((r) => r.year <= hold).reduce((s, r) => s + r.doors, 0);
   const doorsAtExit = Math.min(units, finished);
+  // The premium, every year up to the sale. A program year collects what its
+  // row says (the doors done before it, and half of this year's); a year
+  // after the program's last is not empty — every finished door earns its
+  // premium in it until the building is sold. The first version credited
+  // only the program's own years, so a five-year hold on a three-year
+  // program collected nothing in years four and five although 200 renovated
+  // doors were earning $360,000 a year, and the held return read 31.4%
+  // against 34.7% (and the two shocks were struck on the same gap).
+  const income: number[] = [];
+  for (let year = 1; year <= hold; year += 1) {
+    const row = schedule.find((r) => r.year === year);
+    income.push(row ? row.premiumIncome : round(doorsAtExit * annualPremium));
+  }
+  income.forEach((amount, i) => {
+    flows[i + 1] += amount;
+  });
   const exitValue = cap > 0 ? (doorsAtExit * annualPremium) / cap : 0;
   flows[hold] += exitValue;
 
@@ -490,9 +505,7 @@ function runProgram(
   // here drives the operating side negative and reports every program as
   // 100% resale — which is what the first version of this did, and it read
   // as a finding rather than as the arithmetic error it was.
-  const pvRent = schedule
-    .filter((r) => r.year <= hold)
-    .reduce((s, r) => s + r.premiumIncome / Math.pow(1 + d, r.year), 0);
+  const pvRent = income.reduce((s, amount, i) => s + amount / Math.pow(1 + d, i + 1), 0);
   const gross = pvRent + pvExit;
   return {
     rate: irr(flows),

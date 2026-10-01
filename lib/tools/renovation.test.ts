@@ -212,25 +212,45 @@ describe("readRenovation — rule 3, the make-ready is deferred and the downtime
 describe("readRenovation — rule 4, the return on cost has no clock in it", () => {
   it("most of the program's present value is the resale", () => {
     const r = readRenovation(SEED);
-    expect(r.pvFromExitPct).toBe(90);
+    // 82% with the finished doors earning in years four and five; it read 90%
+    // while those two years were left at nothing.
+    expect(r.pvFromExitPct).toBe(82);
     expect(r.pvFromExitPct).toBeGreaterThan(50);
   });
 
-  it("the same program earns twice as much sold the year it finishes", () => {
+  it("the same program earns nearly twice as much sold the year it finishes", () => {
     const r = readRenovation(SEED);
     expect(r.completionYear).toBe(3);
     expect(r.irrIfSoldAtCompletionPct).toBe(63.7);
-    expect(r.programIrrPct).toBe(31.4);
+    // 34.7%, the renovated doors earning their premium in years four and
+    // five. It read 31.4% while those years were left empty.
+    expect(r.programIrrPct).toBe(34.7);
     // Same premium, same cost, same building.
-    expect(r.irrIfSoldAtCompletionPct!).toBeGreaterThan(2 * r.programIrrPct!);
+    expect(r.irrIfSoldAtCompletionPct!).toBeGreaterThan(1.8 * r.programIrrPct!);
   });
 
   it("and the return decays with every year it is held past completion", () => {
     const rates = [3, 4, 5, 7, 10].map(
       (holdYears) => readRenovation({ ...SEED, holdYears }).programIrrPct!,
     );
-    expect(rates).toEqual([63.7, 42.2, 31.4, 20.8, 13.7]);
+    // Was [63.7, 42.2, 31.4, 20.8, 13.7]: every hold past year three had
+    // dropped the finished doors' rent after the program's last year.
+    expect(rates).toEqual([63.7, 44.2, 34.7, 25.6, 19.9]);
     for (let i = 1; i < rates.length; i += 1) expect(rates[i]).toBeLessThan(rates[i - 1]);
+  });
+
+  it("collects the finished doors' premium every year up to the sale", () => {
+    // A three-year program held five years: years four and five each carry
+    // 200 doors × $1,800, and the stream is built independently here. The
+    // first version credited nothing after the program's last year.
+    const flows = [-942_690, -879_690, -619_020, 306_000, 360_000, 360_000 + 7_200_000];
+    expect(Math.round(irr(flows)! * 1000) / 10).toBe(34.7);
+    expect(readRenovation(SEED).programIrrPct).toBe(34.7);
+    // The shocks carry the same years: a 10% premium miss earns 31.1% and a
+    // 50bp wider exit 32.2% (27.9% and 28.7% with the years left empty).
+    const r = readRenovation(SEED);
+    expect(r.irrIfPremiumMissesPct).toBe(31.1);
+    expect(r.irrIfExitCapWidensPct).toBe(32.2);
   });
 
   it("both shocks cost the program return, and neither is asserted over the other", () => {
@@ -262,6 +282,10 @@ describe("readRenovation — rule 4, the return on cost has no clock in it", () 
     for (const y of r.schedule) {
       flows[y.year - 1] -= y.capital;
       flows[y.year] += y.premiumIncome;
+    }
+    // The years after the program's last carry every finished door.
+    for (let year = r.schedule.length + 1; year <= hold; year += 1) {
+      flows[year] += r.stabilizedPremiumNoi!;
     }
     flows[hold] += r.stabilizedPremiumNoi! / 0.05;
     expect(Math.round(irr(flows)! * 1000) / 10).toBe(r.programIrrPct);

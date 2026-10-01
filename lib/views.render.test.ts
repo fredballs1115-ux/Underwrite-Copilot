@@ -3823,11 +3823,14 @@ describe("the deal math tools", () => {
   });
 
   it("puts a clock on the return on cost, which has none of its own", () => {
-    // Rule 4: 63.7% sold at completion against 31.4% held to the stated
-    // exit, because 90% of the value is the resale rather than the rent.
+    // Rule 4: 63.7% sold at completion against 34.7% held to the stated
+    // exit, because 82% of the value is the resale rather than the rent.
+    // (31.4% and 90% while the finished doors earned nothing after the
+    // program's last year.)
     expect(text).toContain("A return on cost has no clock in it");
     expect(text).toContain("63.7%");
-    expect(text).toContain("31.4%");
+    expect(text).toContain("34.7%");
+    expect(text).toContain("because 82% of the value is");
   });
 
   it("files forty cards into eight clusters, none of them at the ceiling", () => {
