@@ -1017,3 +1017,28 @@ describe("DealView — the LOI panel says what the download drafts", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 });
+
+describe("DealView — Ask's thread on a team deal", () => {
+  it("names who asked each question, from the names the page read, and links the current memorandum's pages", () => {
+    const me = "11111111-1111-4111-8111-111111111111";
+    const mate = "33333333-3333-4333-8333-333333333333";
+    const html = render({
+      ...sampleProps("overview"),
+      isSample: false,
+      hasOm: true,
+      isPro: true,
+      userId: me,
+      omUrl: "/api/deals/d1/om",
+      askerNames: { [mate]: "Jordan Lee" },
+      qa: [
+        { at: "2026-09-01T00:00:00.000Z", q: "What is the coupon?", answer: "4.25%, p. 12.", cites: [{ page: "p. 12", note: "loan terms" }], by: mate, earlier: false },
+        { at: "2026-09-02T00:00:00.000Z", q: "Who is the seller?", answer: "A receiver.", cites: [], by: me, earlier: false },
+      ],
+    } as Props);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/What is the coupon\?\s*Sep 1 · asked by Jordan Lee/);
+    expect(text).toMatch(/Who is the seller\?\s*Sep 2 · asked by you/);
+    expect(html).toContain('href="/api/deals/d1/om#page=12"');
+  });
+});

@@ -103,6 +103,8 @@ describe("askDeal — what an answer keeps", () => {
     expect(entry.cites).toEqual([{ page: "p. 12", note: "the loan terms" }]);
     expect(entry.om).toBe(omFingerprint(OM_BYTES));
     expect(entry.om).toMatch(/^[0-9a-f]{16}$/);
+    // Who asked, by user id — the stable identity, as the decision log keeps it.
+    expect(entry.by).toBe(OWNER);
   });
 
   it("keeps no page at all where the read could not say how long the deck is", async () => {
@@ -201,5 +203,35 @@ describe("AskPanel — page chips open the OM only for the memorandum the deal h
       React.createElement(AskPanel, { dealId: DEAL, qa, hasOm: false, isSample: false, isPro: true, omUrl: null }),
     );
     expect(bare).not.toMatch(/#page=/);
+  });
+});
+
+describe("AskPanel — who asked, on a team deal", () => {
+  const MATE = "33333333-3333-4333-8333-333333333333";
+  const GONE = "44444444-4444-4444-8444-444444444444";
+  const asked = (q: string, by?: string) => ({ at: "2026-09-01T00:00:00.000Z", q, answer: "…", cites: [], ...(by ? { by } : {}) });
+  const qa = parseDealQa([
+    asked("Mine?", OWNER),
+    asked("A teammate's?", MATE),
+    asked("A former teammate's?", GONE),
+    asked("Asked before askers were recorded?"),
+  ]);
+  const panel = (askers: { me: string | null; names: Record<string, string> } | null) =>
+    visibleText(
+      renderToStaticMarkup(
+        React.createElement(AskPanel, { dealId: DEAL, qa, hasOm: true, isSample: false, isPro: true, askers }),
+      ),
+    );
+
+  it("names the reader as you and a teammate by name, and no one whose name is not the reader's to see", () => {
+    const text = panel({ me: OWNER, names: { [MATE]: "Jordan Lee" } });
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/Mine\?\s*Sep 1 · asked by you/);
+    expect(text).toMatch(/A teammate's\?\s*Sep 1 · asked by Jordan Lee/);
+    expect(text.match(/asked by/g)).toHaveLength(2);
+  });
+
+  it("names no one on a personal deal", () => {
+    expect(panel(null)).not.toMatch(/asked by/);
   });
 });

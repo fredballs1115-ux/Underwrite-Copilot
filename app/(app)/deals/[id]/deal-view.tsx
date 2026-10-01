@@ -349,6 +349,7 @@ export function DealView({
   sellerNote = null,
   leaseholdExit = null,
   loi = null,
+  askerNames = null,
 }: {
   dealId: string;
   dealName: string;
@@ -407,6 +408,10 @@ export function DealView({
   notes?: DealNote[];
   userEmail?: string | null;
   qa?: AskEntry[];
+  /** a team deal's teammates by user id, named the way the pipeline names
+   *  who added a deal — Ask's thread says who asked each question; null on
+   *  a personal deal */
+  askerNames?: Record<string, string> | null;
   isSample?: boolean;
   /** the ~30s first read, so the LOI's prefill and the comps' subject read
    *  the deal's kind as the page does */
@@ -875,6 +880,7 @@ export function DealView({
               isSample={isSample}
               isPro={isPro}
               omUrl={omUrl}
+              askers={askerNames ? { me: userId, names: askerNames } : null}
             />
             <DecisionLog
               dealId={dealId}

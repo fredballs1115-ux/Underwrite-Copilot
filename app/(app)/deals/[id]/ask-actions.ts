@@ -117,6 +117,8 @@ export async function askDeal(
       // The memorandum it was asked of, so a reissued deck never inherits
       // this answer's pages (lib/deals `parseDealQa`).
       om: omFingerprint(pdf),
+      // Who asked, by user id: a team deal's thread names them.
+      by: user.id,
     };
     // Atomic append (RPC, 0017) so two concurrent asks never overwrite each
     // other's paid answers; read-modify-write only as the pre-RPC fallback.

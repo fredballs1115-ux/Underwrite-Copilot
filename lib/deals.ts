@@ -71,6 +71,9 @@ export interface AskEntry {
    *  (lib/om-fingerprint) — absent on an entry saved before entries were
    *  stamped */
   om?: string;
+  /** who asked it: their user id, the stable identity (emails change) —
+   *  absent on an entry saved before askers were recorded */
+  by?: string;
   /** READ, never stored: asked of a memorandum the deal has since replaced,
    *  so its answer and its pages are that memorandum's (`parseDealQa`) */
   earlier?: boolean;
@@ -122,6 +125,7 @@ export function parseDealQa(raw: unknown): AskEntry[] {
   return raw.flatMap((e, i): AskEntry[] => {
     if (!isAskEntry(e)) return [];
     const om = typeof e.om === "string" && e.om ? e.om : undefined;
+    const by = typeof e.by === "string" && e.by ? e.by : undefined;
     const earlier =
       lastMarker < 0 ? false : om && typeof current === "string" && current ? om !== current : i < lastMarker;
     return [
@@ -141,6 +145,7 @@ export function parseDealQa(raw: unknown): AskEntry[] {
               .slice(0, 6)
           : [],
         ...(om ? { om } : {}),
+        ...(by ? { by } : {}),
         earlier,
       },
     ];

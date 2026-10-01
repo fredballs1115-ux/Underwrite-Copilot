@@ -44,6 +44,7 @@ export function AskPanel({
   isSample,
   isPro,
   omUrl = null,
+  askers = null,
 }: {
   dealId: string;
   qa: AskEntry[];
@@ -54,6 +55,11 @@ export function AskPanel({
    *  an answer's page chips open it at `#page=N`, as the fact chips do —
    *  only on an answer asked of the memorandum the deal holds now */
   omUrl?: string | null;
+  /** a team deal's askers: the reader's own user id, and each teammate's
+   *  name by user id, the way the pipeline names who added a deal
+   *  (`full_name`, else the email). Null on a personal deal, which names
+   *  no one. */
+  askers?: { me: string | null; names: Record<string, string> } | null;
 }) {
   const [state, action] = useActionState<AskState, FormData>(askDeal, null);
   const formRef = useRef<HTMLFormElement>(null);
@@ -64,6 +70,14 @@ export function AskPanel({
   }, [state]);
 
   const askable = hasOm && !isSample;
+  // Who asked, on a team deal, after the date: the reader as "you", a
+  // teammate by name, and no one where the name is not the reader's to see
+  // (a former teammate's profile) or the entry predates askers being
+  // recorded.
+  const askedBy = (by: string | undefined): string => {
+    const who = !askers || !by ? null : by === askers.me ? "you" : (askers.names[by] ?? null);
+    return who ? ` · asked by ${who}` : "";
+  };
 
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
@@ -89,6 +103,7 @@ export function AskPanel({
                 {e.q}
                 <span className="ml-2 text-xs font-normal text-muted">
                   {safeWhen(e.at)}
+                  {askedBy(e.by)}
                 </span>
                 {/* The deck has been replaced since: this answer, and its
                     pages, are the earlier memorandum's (lib/deals). */}

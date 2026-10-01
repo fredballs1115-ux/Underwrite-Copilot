@@ -841,6 +841,11 @@ export default async function DealPage({
   // Who a task can be assigned to: the viewer, plus (team deals) the roster.
   // Teammate emails read under the "teammates read profiles" policy (0007).
   const taskAssignees: TaskAssignee[] = [];
+  // Who asked each of Ask's questions on a team deal, named the way the
+  // pipeline names who added a deal (`full_name`, else the email) — from
+  // the same profile rows, so it costs no query of its own. Null on a
+  // personal deal, whose thread names no one.
+  const askerNames: Record<string, string> | null = ownership.team_id ? {} : null;
   if (user) {
     taskAssignees.push({
       userId: user.id,
@@ -866,6 +871,7 @@ export default async function DealPage({
               (p.full_name ?? "").trim() ||
               (p.email ? p.email.split("@")[0] : "teammate"),
           });
+          if (askerNames) askerNames[p.id] = p.full_name || p.email || "Teammate";
         }
       }
     }
@@ -1522,6 +1528,7 @@ export default async function DealPage({
         userEmail={user?.email ?? null}
         userId={user?.id ?? null}
         qa={parseDealQa((deal as { qa?: unknown }).qa)}
+        askerNames={askerNames}
         isSample={!!(deal as { is_sample?: boolean }).is_sample}
         marketMemory={marketMemory}
         actuals={actuals}
