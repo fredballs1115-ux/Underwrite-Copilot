@@ -17,6 +17,7 @@ import { MAX_PICTURE_BYTES, clearOmPicture, picturePaths, storePicture } from "@
 import { floodFramePaths } from "@/lib/flood-frame-core";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { dealLanding } from "@/lib/personal-deal";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import {
   claimJob,
@@ -68,7 +69,9 @@ export type CreateDealError =
   | "upload";
 
 export type CreateDealResult =
-  | { ok: true; dealId: string; deduped?: boolean }
+  // personal: a team member's deal filed in their own pipeline, where the
+  // team does not see it (lib/personal-deal) — said where they land.
+  | { ok: true; dealId: string; deduped?: boolean; personal?: boolean }
   | { ok: false; error: CreateDealError };
 
 /**
@@ -135,21 +138,25 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   // as the same intent and go to it instead of creating a twin.
   const { data: recent } = await supabase
     .from("deals")
-    .select("id, created_at")
+    .select("id, created_at, team_id")
     .eq("user_id", user.id)
     .eq("name", name)
     .gte("created_at", new Date(Date.now() - 15_000).toISOString())
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (recent?.id) return { ok: true, dealId: recent.id as string, deduped: true };
+  if (recent?.id) {
+    return { ok: true, dealId: recent.id as string, deduped: true, personal: !!billing.team && !recent.team_id };
+  }
 
   // On a team, new deals land in the shared pipeline while the team plan or
   // trial allows it; otherwise fall back to a personal deal so a personal-Pro
-  // (or under-cap) member is never blocked by the team's spent trial.
+  // (or under-cap) member is never blocked by the team's spent trial — and
+  // say so, since the shared pipeline will not show it.
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
+  const personal = !!billing.team && !teamAllowed;
   const { data: deal, error: insertErr } = await supabase
     .from("deals")
     .insert({
@@ -223,13 +230,14 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
 
   if (!workerMode) after(() => runAnalysis(dealId));
 
-  return { ok: true, dealId };
+  return { ok: true, dealId, personal };
 }
 
-/** Create a deal from the new-deal form, then land on it. */
+/** Create a deal from the new-deal form, then land on it — saying so where
+ *  a team member's deal went into their own pipeline. */
 export async function createDeal(formData: FormData) {
   const result = await createDealCore(formData);
-  if (result.ok) redirect(`/deals/${result.dealId}`);
+  if (result.ok) redirect(dealLanding(result.dealId, !!result.personal));
   if (result.error === "auth") {
     // Round-trip through login BACK to an error state — landing without an
     // error would read as success and clear the localStorage draft.
@@ -292,14 +300,14 @@ export async function createManualDeal(
   // mint twin deals and twin Claude runs.
   const { data: recent } = await supabase
     .from("deals")
-    .select("id")
+    .select("id, team_id")
     .eq("user_id", user.id)
     .eq("name", facts.name)
     .gte("created_at", new Date(Date.now() - 15_000).toISOString())
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (recent?.id) redirect(`/deals/${recent.id}`);
+  if (recent?.id) redirect(dealLanding(recent.id as string, !!billing.team && !recent.team_id));
 
   // A structured autocomplete pick fills the market for the pipeline table
   // and geography checks, and so does a typed line, from the city and state
@@ -316,6 +324,7 @@ export async function createManualDeal(
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
+  const personal = !!billing.team && !teamAllowed;
   const { data: deal, error: insertErr } = await supabase
     .from("deals")
     .insert({
@@ -361,7 +370,7 @@ export async function createManualDeal(
   }
 
   if (!workerMode) after(() => runAnalysis(dealId));
-  redirect(`/deals/${dealId}`);
+  redirect(dealLanding(dealId, personal));
 }
 
 /**

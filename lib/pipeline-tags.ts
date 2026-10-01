@@ -9,8 +9,20 @@
 // fit whole on a picture as wide as its card's waits on the card's own
 // line under the figures. Pure: no I/O, no LLM.
 import type { PipelineSlots } from "@/lib/pipeline-slots";
+import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
 
-export type TagTone = "brand" | "caution" | "kill";
+/** A tag's tone: the brand's for what the deal page reads, caution and kill
+ *  for what warns, and muted for what is about the pipeline, not the deal. */
+export type TagTone = "brand" | "caution" | "kill" | "muted";
+
+/**
+ * A deal in the reader's own pipeline while the reader is on a team
+ * (lib/personal-deal): their teammates do not see it. Not one of
+ * `dealTags` — it says who sees the deal, not what the memorandum says — so
+ * it rides on the card's line under the figures and the row's tag line, at
+ * every width, and never on the picture.
+ */
+export const PERSONAL_TAG: DealTag = { key: "personal", text: PERSONAL_CHIP, tone: "muted", title: PERSONAL_TITLE };
 
 export interface DealTag {
   /** the slot it comes from, stable for a React key */

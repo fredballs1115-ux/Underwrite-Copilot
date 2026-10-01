@@ -101,7 +101,7 @@ export default async function TeamPage({
         <h1 className="text-3xl font-semibold tracking-tight">Team</h1>
         <p className="mt-1 text-sm text-muted">
           One shared pipeline — every teammate sees, screens, and compares the
-          same deals.
+          deals in it.
         </p>
       </div>
 
@@ -118,10 +118,16 @@ export default async function TeamPage({
             <h2 className="text-sm font-semibold tracking-tight">
               Create your team
             </h2>
+            {/* What the create actions do (app/(app)/deals/actions.ts
+                `teamAllowed`): the team's while its trial or plan allows,
+                else the adder's own, which the team does not see. */}
             <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted">
-              Name it, invite teammates with a link, and every deal anyone
-              uploads lands in one shared pipeline. Your existing personal
-              deals stay personal.
+              Name it, invite teammates with a link, and the deals you all add
+              land in one shared pipeline: up to {TEAM_TRIAL_DEALS}{" "}on the
+              free trial, every one on the Team plan. Once the trial&apos;s
+              deals are in use, a new deal goes into its adder&apos;s own
+              pipeline, which teammates don&apos;t see, until the plan starts.
+              Your existing personal deals stay personal.
             </p>
             <form action={createTeam} className="mt-4 flex max-w-md gap-2">
               <input
@@ -148,7 +154,7 @@ export default async function TeamPage({
             </h2>
             <ul className="mt-3 space-y-2 text-sm text-muted">
               {[
-                "Everyone on the team sees the same pipeline — deals, verdicts, models, and memos.",
+                "Everyone on the team sees the shared pipeline — its deals, verdicts, models, and memos.",
                 `Up to ${TEAM_TRIAL_DEALS} shared deals are free to try. Past that, the Team plan is ${TEAM_PRICE_LABEL} — billed only for the seats you actually have.`,
                 "The Team plan unlocks everything in Pro for every member.",
                 "Joining is one click on an invite link. You can be on one team at a time.",

@@ -10,6 +10,7 @@ import {
 // can edit before the batch runs; the single upload pre-fills the same way.
 import { nameFromFile } from "@/lib/deal-name";
 import { MAX_OM_PAGES } from "@/lib/pdf";
+import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
 
 const MAX_FILES = 4;
 const MAX_BYTES = 32 * 1024 * 1024;
@@ -31,7 +32,9 @@ const ERROR_COPY: Record<string, string> = {
 type ItemStatus =
   | { kind: "ready" }
   | { kind: "uploading" }
-  | { kind: "queued"; dealId: string; deduped: boolean }
+  // personal: filed in the member's own pipeline, which the team does not
+  // see (lib/personal-deal).
+  | { kind: "queued"; dealId: string; deduped: boolean; personal: boolean }
   | { kind: "error"; message: string }
   | { kind: "skipped"; message: string };
 
@@ -139,7 +142,7 @@ export function BatchUpload({
         fd.set("om", item.file);
         const res = await submit(fd);
         if (res.ok) {
-          status = { kind: "queued", dealId: res.dealId, deduped: !!res.deduped };
+          status = { kind: "queued", dealId: res.dealId, deduped: !!res.deduped, personal: !!res.personal };
         } else {
           if (res.error === "limit" || res.error === "teamlimit") hitCap = true;
           status = { kind: "error", message: ERROR_COPY[res.error] ?? "Something went wrong." };
@@ -321,6 +324,15 @@ export function BatchUpload({
                 )}
                 {item.status.kind === "queued" && (
                   <span className="flex shrink-0 items-center gap-2">
+                    {item.status.personal && (
+                      <span
+                        title={PERSONAL_TITLE}
+                        data-qa="batch-personal"
+                        className="rounded-full border border-line bg-surface px-2 py-0.5 text-[11px] font-semibold text-muted"
+                      >
+                        {PERSONAL_CHIP}
+                      </span>
+                    )}
                     {TRIAGE_CHIP[triage[item.status.dealId]?.fit ?? ""] && (
                       <span
                         title={

@@ -752,6 +752,53 @@ describe("Pipeline — the free-deal meter counts what the create action counts 
   });
 });
 
+describe("Pipeline — a team reader's own deal says the team does not see it (lib/personal-deal)", () => {
+  // Once the team's trial deals are in use a member's new deal goes into
+  // their own pipeline, and the pipeline marked only a teammate's deal.
+  const props = {
+    errorMessage: null,
+    notice: null,
+    onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
+    billing: BILLING,
+  };
+  const mine = card({ id: "m", name: "Elm Street Lofts", personal: true, slots: { cap: "6.0%", price: "$14,000,000", yoc: null } });
+  const shared = card({
+    id: "s",
+    name: "Harbor View Apartments",
+    addedBy: "Jordan Lee",
+    personal: false,
+    slots: { cap: "5.9%", price: "$41,250,000", yoc: null, interest: "49% share" },
+  });
+
+  it("wears its chip on the card's line and the row's tag line, and a filter tells the two apart", () => {
+    for (const initialView of ["cards", "list"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([mine, shared]), initialView, onTeam: true }));
+      dumpView(`pipeline-personal-${initialView}`, html);
+      expect(a11yIssues(html), initialView).toEqual([]);
+      const text = visibleText(html);
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect((text.match(/Personal — not shared/g) ?? []).length, initialView).toBe(1);
+      expect(html, initialView).toContain("your teammates don&#x27;t see this deal");
+      expect(html, initialView).toMatch(/<select[^>]*aria-label="Filter by sharing"/);
+      for (const label of ["All deals", "Shared", "Personal"]) expect(html, initialView).toContain(`>${label}</option>`);
+    }
+    // On a card it rides the line under the figures at every width — never
+    // the picture, which keeps what the building's figures must not hide.
+    const chips = cardChips(render(React.createElement(Pipeline, { ...props, deals: withThumbs([mine, shared]), initialView: "cards", onTeam: true })));
+    expect(chips.get("m")?.map((c) => [c.text, c.where, c.tiers])).toEqual([["Personal — not shared", "line", [true, true, true]]]);
+    expect(chips.get("m")?.[0].cls).toContain("text-muted");
+    expect(chips.get("s")?.map((c) => c.text)).toEqual(["49% share"]);
+  });
+
+  it("off a team, no chip and no filter", () => {
+    for (const initialView of ["cards", "list"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...mine, personal: false }]), initialView }));
+      expect(visibleText(html), initialView).not.toContain("Personal — not shared");
+      expect(html, initialView).not.toContain('aria-label="Filter by sharing"');
+    }
+  });
+});
+
 describe("Pipeline — a deal screened again shows the run, never the call it is replacing", () => {
   // #479: a re-screen rewrites the terms first and the verdict last, so the
   // stored call is the previous screen's until the run reaches it.

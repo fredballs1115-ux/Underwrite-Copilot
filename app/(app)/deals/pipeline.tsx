@@ -34,7 +34,8 @@ import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
 import { compareSortValues, type SortDir } from "@/lib/pipeline-sort";
-import { PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
+import { PERSONAL_TAG, PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
+import { SHARING_OPTIONS, matchesSharing } from "@/lib/personal-deal";
 // Why a fit wears "First read": it is judged on the first signal, before the
 // extraction lands — the deal page's buy-box panel says the same, and the
 // CSV and the meeting workbook mark the figure with the same words.
@@ -59,6 +60,10 @@ export type DealCard = {
   stage: string;
   /** teammate who added this team deal (null when it's yours) */
   addedBy: string | null;
+  /** the deal is in the reader's own pipeline while the reader is on a team
+   *  — no team holds it, so the teammates do not see it (lib/personal-deal);
+   *  absent off a team */
+  personal?: boolean;
   /** deterministic buy-box result against the user's mandate */
   fit: "fits" | "near" | "outside" | null;
   /** 0–100 mandate-fit score + its PURSUE/WATCH/PASS call (null pre-screen) */
@@ -315,6 +320,7 @@ export function Pipeline({
   billing,
   initialView = "cards",
   viewerId = null,
+  onTeam = false,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -332,6 +338,9 @@ export function Pipeline({
   initialView?: PipelineView;
   /** the signed-in reader's id, whose own the new-deal form's draft is */
   viewerId?: string | null;
+  /** the reader is on a team: the pipeline holds the team's deals beside
+   *  the reader's own, and a filter tells the two apart */
+  onTeam?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [view, setViewState] = useState<PipelineView>(initialView);
@@ -351,6 +360,9 @@ export function Pipeline({
   const [market, setMarket] = useState("all");
   // Mandate-fit filter (Feature 4): all / PURSUE / WATCH / PASS.
   const [mfit, setMfit] = useState("all");
+  // On a team: the shared pipeline's deals, or the reader's own the team
+  // does not see (lib/personal-deal).
+  const [sharing, setSharing] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("added");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
   // Dead deals stay out of the pipeline until asked for (or filtered to).
@@ -377,6 +389,7 @@ export function Pipeline({
             asset: string;
             market: string;
             mfit: string;
+            sharing: string;
             showDead: boolean;
             collapsed: Partial<Record<Stage, boolean>>;
           }>;
@@ -385,6 +398,7 @@ export function Pipeline({
           if (typeof v.asset === "string") setAsset(v.asset);
           if (typeof v.market === "string") setMarket(v.market);
           if (typeof v.mfit === "string") setMfit(v.mfit);
+          if (typeof v.sharing === "string") setSharing(v.sharing);
           if (typeof v.showDead === "boolean") setShowDead(v.showDead);
           if (v.collapsed && typeof v.collapsed === "object")
             setCollapsed(v.collapsed);
@@ -401,12 +415,12 @@ export function Pipeline({
     try {
       sessionStorage.setItem(
         PERSIST_KEY,
-        JSON.stringify({ verdict, stage, asset, market, mfit, showDead, collapsed }),
+        JSON.stringify({ verdict, stage, asset, market, mfit, sharing, showDead, collapsed }),
       );
     } catch {
       // storage unavailable — view state is per-visit only
     }
-  }, [verdict, stage, asset, market, mfit, showDead, collapsed]);
+  }, [verdict, stage, asset, market, mfit, sharing, showDead, collapsed]);
 
   // The ⌘K "New deal…" action lands here as ?new=1 — honor it even when the
   // pipeline is already mounted (client-side navigation keeps state). The
@@ -520,6 +534,9 @@ export function Pipeline({
       if (asset !== "all" && d.assetClass !== asset) return false;
       if (market !== "all" && d.market !== market) return false;
       if (mfit !== "all" && d.mandateVerdict !== mfit) return false;
+      // Only where the filter is drawn: a choice saved on a team never
+      // hides deals once the reader is off it.
+      if (onTeam && !matchesSharing(sharing, !!d.personal)) return false;
       return true;
     });
     return list.sort((a, b) => {
@@ -528,7 +545,7 @@ export function Pipeline({
       const tie = sortKey === "added" ? 0 : b.createdAt.localeCompare(a.createdAt);
       return cmp || tie;
     });
-  }, [deals, deferredQuery, verdict, stage, asset, market, mfit, sortKey, sortDir, showDead]);
+  }, [deals, deferredQuery, verdict, stage, asset, market, mfit, onTeam, sharing, sortKey, sortDir, showDead]);
 
   // The pipeline reads as one ladder: deals grouped by stage, in stage order,
   // each group internally sorted by the active column sort.
@@ -611,6 +628,7 @@ export function Pipeline({
     setAsset("all");
     setMarket("all");
     setMfit("all");
+    setSharing("all");
   }
   const filtersActive =
     query.trim() !== "" ||
@@ -618,7 +636,8 @@ export function Pipeline({
     stage !== "all" ||
     asset !== "all" ||
     market !== "all" ||
-    mfit !== "all";
+    mfit !== "all" ||
+    (onTeam && sharing !== "all");
   // Export the current (filtered) view as a CSV — opens in Excel/Sheets.
   function exportCsv() {
     // Neutralize formula-leading cells (=, +, -, @) — deal names and OM-derived
@@ -933,6 +952,16 @@ export function Pipeline({
                 ["WATCH", "Watch · 50–74"],
                 ["PASS", "Pass · <50"],
               ]}
+            />
+          )}
+          {/* On a team the list holds the shared pipeline's deals beside the
+              reader's own, which the team does not see (lib/personal-deal). */}
+          {onTeam && (
+            <FilterSelect
+              label="Filter by sharing"
+              value={sharing}
+              onChange={setSharing}
+              options={SHARING_OPTIONS}
             />
           )}
           {deadCount > 0 && (
@@ -1527,8 +1556,8 @@ function MetaLine({
 
 /** A tag's tone in its words, and in the outline its chip wears on a line
  *  of its own (on the picture, a chip is white). */
-const TAG_TEXT: Record<TagTone, string> = { brand: "text-brand", caution: "text-caution", kill: "text-kill" };
-const TAG_BORDER: Record<TagTone, string> = { brand: "border-brand/30", caution: "border-caution/35", kill: "border-kill/35" };
+const TAG_TEXT: Record<TagTone, string> = { brand: "text-brand", caution: "text-caution", kill: "text-kill", muted: "text-muted" };
+const TAG_BORDER: Record<TagTone, string> = { brand: "border-brand/30", caution: "border-caution/35", kill: "border-kill/35", muted: "border-line" };
 
 /** A deal's tags (lib/pipeline-tags) on a line of their own under its
  *  figures, wrapping: a chip each, never cut — a tag longer than the line
@@ -1681,8 +1710,8 @@ const DealRow = memo(function DealRow({
   // line of their own under the figures at every width, so a tag never
   // pushes the price, the cap or the fit off a one-line truncation — the
   // phone's line had read "$41.3M · 49% share · 5…" — and is never cut
-  // itself.
-  const tags = dealTags(d.slots, d.flood);
+  // itself. A deal the reader's team does not see says so last.
+  const tags = d.personal ? [...dealTags(d.slots, d.flood), PERSONAL_TAG] : dealTags(d.slots, d.flood);
   // A plan deal has no going-in cap; its yield on total cost is the figure
   // that answers the same question, so it takes the slot — labelled.
   const capBit = d.slots.cap ? (
@@ -2175,7 +2204,10 @@ const DealTile = memo(function DealTile({
   const pictureTags = placed.filter((p) => p.onPicture.some(Boolean));
   const lineTags = placed.filter((p) => p.onPicture.some((on) => !on));
   const lineAt = new Map(lineTags.map((p) => [p.tag.key, p.onPicture.map((on) => !on)]));
-  const lineShown = PICTURE_TIERS.map((_, k) => lineTags.some((p) => !p.onPicture[k]));
+  // A deal the reader's team does not see says so on the line at every
+  // width, after the tags; never on the picture, which carries what the
+  // building's figures must not hide.
+  const lineShown = PICTURE_TIERS.map((_, k) => !!d.personal || lineTags.some((p) => !p.onPicture[k]));
 
   const inner = (
     <>
@@ -2316,7 +2348,7 @@ const DealTile = memo(function DealTile({
           the two ask the same width. */}
       <div className="@container/card pb-3.5">
         <TagLine
-          tags={lineTags.map((p) => p.tag)}
+          tags={d.personal ? [...lineTags.map((p) => p.tag), PERSONAL_TAG] : lineTags.map((p) => p.tag)}
           className={`px-4 pt-2.5 ${atTiers(lineShown).flex}`}
           chipClass={(t) => atTiers(lineAt.get(t.key) ?? []).block}
         />

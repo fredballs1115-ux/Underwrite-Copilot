@@ -318,6 +318,10 @@ export default async function DealsPage({
         d.team_id && d.user_id !== user?.id
           ? (nameById.get(d.user_id) ?? "Teammate")
           : null,
+      // On a team, a deal no team holds is the reader's own and the team
+      // does not see it — filed there once the team's trial deals are in
+      // use, or added before the reader joined (lib/personal-deal).
+      personal: !!billing?.team && !d.team_id,
       market: extraction?.market ?? "",
       // The same placement the deal page makes — the list and the detail
       // agree on whether an address sits inside the briefed markets.
@@ -462,6 +466,7 @@ export default async function DealsPage({
         }
         initialView={initialView}
         viewerId={user?.id ?? null}
+        onTeam={!!billing?.team}
       />
       {/* The strip's own read streams after the pipeline rather than
           holding it back; nothing is drawn until it has stories. */}

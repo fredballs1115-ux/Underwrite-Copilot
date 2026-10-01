@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { addressUpgrade } from "@/lib/address";
+import { TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { FILED_PERSONAL, filedPersonalNotice } from "@/lib/personal-deal";
 import { notFound } from "next/navigation";
 import { ResearchPanel } from "./research-panel";
 import { SectorFieldsForm } from "./sector-fields-form";
@@ -180,10 +182,10 @@ export default async function DealPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; tab?: string; a?: string }>;
+  searchParams: Promise<{ error?: string; tab?: string; a?: string; filed?: string }>;
 }) {
   const { id } = await params;
-  const { error: errorCode, tab, a: analysisParam } = await searchParams;
+  const { error: errorCode, tab, a: analysisParam, filed } = await searchParams;
 
   const supabase = await createSupabaseServerClient();
   // Request-cached: shares the layout's auth call instead of a second hop.
@@ -484,6 +486,15 @@ export default async function DealPage({
       })),
     };
   }
+
+  // A team member's new deal the create action filed in their own pipeline
+  // (`?filed=personal`, lib/personal-deal): said where they land, since the
+  // pipeline they share will not show it. Only while it is still so — the
+  // reader's own deal, in no team's pipeline, and the reader on a team.
+  const filedPersonal =
+    filed === FILED_PERSONAL && !!user && ownership.user_id === user.id && !ownership.team_id
+      ? !!(await supabase.from("team_members").select("team_id").eq("user_id", user.id).maybeSingle()).data
+      : false;
 
   // Delete is the creator's or the team owner's (the RLS delete policy); a
   // teammate is not offered it rather than refused after the fact.
@@ -1038,6 +1049,12 @@ export default async function DealPage({
       >
         ← All deals
       </Link>
+
+      {filedPersonal && (
+        <p role="status" data-qa="filed-personal" className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
+          {filedPersonalNotice(TEAM_TRIAL_DEALS)}
+        </p>
+      )}
 
       {/* THE summary bar — the deal in five seconds, no scrolling: the
           building's picture, its name, the call, the buy-box fit, the
