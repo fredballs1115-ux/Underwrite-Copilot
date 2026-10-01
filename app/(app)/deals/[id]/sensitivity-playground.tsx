@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import { costAssumptionsLine } from "@/lib/underwrite/cost-note";
+import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
 import {
   sliderValues,
   runScenario,
@@ -63,14 +64,10 @@ function withScenarioReturns(
  * The Sensitivity Playground (Feature 2): three levers over the deal's
  * underwriting model, recomputed in-browser on every drag — returns, and the
  * mandate verdict + fit score, move live. Pure math (the tested engine); the
- * LLM pipeline is never re-run from here.
+ * LLM pipeline is never re-run from here. On a plan deal it says its returns
+ * are the screening model's (PLAN_RETURNS_CAVEAT, lib/underwrite/plan-caveat,
+ * which the workbook's Deal Summary prints too).
  */
-/** On a plan deal the screening model books the budget in year 1 and runs
- *  year-1 income as modelled, so its returns are not the plan's — the full
- *  report omits its IRR page for that reason, and the page says it here. */
-export const PLAN_RETURNS_CAVEAT =
-  "On a plan deal these returns run the screening model — the budget booked in year 1, year-1 income as modelled — not the plan's return, which is judged on its yield on cost. The full report leaves them out for that reason, and a bid solved on them is a screening figure.";
-
 export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const { inputs, dealAssetClass, checkSource, box } = data;
   const planDeal = PLAN_KINDS.has(data.strategy ?? "");

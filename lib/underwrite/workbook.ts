@@ -10,6 +10,7 @@ import { STRATEGY_LABEL, STRATEGY_READING, isPlanDeal } from "@/lib/deal-strateg
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
+import { PLAN_RETURNS_CAVEAT } from "./plan-caveat";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -688,7 +689,9 @@ function buildAssumptions(
   input("Asset Management Fee % of equity/yr", inp.amFeePctEquity, "AMFeePctEquity", FMT.pct2, "amFeePctEquity");
 
   header("Financing");
-  input("Loan to Cost", inp.ltc, "LTC", FMT.pct1, "ltc", true);
+  // Struck on the acquisition cost — price, closing costs and fee (the Deal
+  // Summary's Loan Basis); the capital plan is paid from year-1 cash flow.
+  input("Loan to Cost (acquisition cost)", inp.ltc, "LTC", FMT.pct1, "ltc", true);
   input("All-in Rate (index + spread)", inp.allInRatePct, "AllInRate", FMT.pct2, "allInRatePct", true);
   input("Interest-Only Period (months; 999 = full)", inp.ioMonths, "IOMonths", FMT.int, "ioMonths");
   input("Amortization (months)", inp.amortMonths, "AmortMonths", FMT.int, "amortMonths");
@@ -1116,7 +1119,23 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   });
   ws.getRow(r).height = 14;
   ws.getRow(r + 1).height = 24;
-  r += 3;
+  const dealKind = meta.strategy ?? "unknown";
+  const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
+  if (planDeal) {
+    // On a plan deal the tiles are the screening model's returns, struck
+    // with the whole budget in year 1 — the deal page's own caveat, said
+    // under them before anyone quotes one.
+    const row = r + 2;
+    ws.mergeCells(row, 1, row, 5);
+    const c = ws.getCell(row, 1);
+    c.value = PLAN_RETURNS_CAVEAT;
+    c.font = { name: ARIAL, size: 9, color: MUTED };
+    c.alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(row).height = 36;
+    r += 4;
+  } else {
+    r += 3;
+  }
 
   // ── PROJECT OVERVIEW ──
   sectionHeader(ws, r, "Project Overview", 1, 5); r++;
@@ -1131,8 +1150,6 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   else label(ws.getCell(r, 5), "n/a", { color: MUTED });
   // Deal type, and on a plan deal the budget the returns have to pay for —
   // a live link to the Assumptions cell, so flexing it flows through.
-  const dealKind = meta.strategy ?? "unknown";
-  const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
   if (dealKind !== "unknown") {
     r++;
     label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind], { color: GREEN });
@@ -1214,6 +1231,17 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
       { type: "cellIs", operator: "equal", priority: 2, formulae: ['TRUE'], style: { font: { color: { argb: "FF1B7A5E" }, bold: true } } },
     ],
   });
+  // The capital plan is neither a source nor a use here: the engine spends
+  // it in year 1's cash flow (the Cash Flow tab's Capital Improvements line),
+  // so the loan is struck on the acquisition cost and the equity above
+  // leaves it out. Said under Sources, with the budget linked.
+  sr++;
+  label(ws.getCell(sr, 1), "Capital Plan (yr 1)", { indent: 1 });
+  const capPlan = ws.getCell(sr, 2);
+  capPlan.value = { formula: "CapImprovements" } as ExcelJS.CellFormulaValue;
+  styleLink(capPlan, FMT.usd);
+  sr++;
+  label(ws.getCell(sr, 1), "paid from year-1 cash flow, not these sources", { indent: 1, size: 9, color: MUTED });
   r = Math.max(r, sr) + 2;
 
   // Monthly payment helper (named), mirrors engine.monthlyPayment.

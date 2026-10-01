@@ -25,11 +25,11 @@ import { inferStrategy } from "@/lib/deal-strategy";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { DealView } from "@/app/(app)/deals/[id]/deal-view";
 import {
-  PLAN_RETURNS_CAVEAT,
   SensitivityPlayground,
   playgroundFitLine,
   type PlaygroundData,
 } from "@/app/(app)/deals/[id]/sensitivity-playground";
+import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
 import { buyBoxRead } from "@/lib/buy-box-chip";
 import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
 import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { readInterest } from "@/lib/interest";
-import { PLAN_RETURNS_CAVEAT } from "@/app/(app)/deals/[id]/sensitivity-playground";
+import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
 import { PLAN_MODEL_CAVEAT, screeningModelCaveat } from "../model-caveat";
 
 const building: ExtractionResult = {

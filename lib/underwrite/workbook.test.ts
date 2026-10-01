@@ -6,6 +6,7 @@ import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import { buildSensitivityGrids } from "./sensitivity";
 import type { UnderwriteInputs } from "./engine";
+import { PLAN_RETURNS_CAVEAT } from "./plan-caveat";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 /**
@@ -616,6 +617,40 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     expect(String((summary.getCell(yocRow, 5).value as { formula?: string }).formula)).toMatch(/StabilizedNOI\/TotalCost/);
   });
 
+  it("says under the headline tiles that a plan deal's returns are the screening model's — the deal page's own sentence", () => {
+    // The tiles lead with a levered IRR, a multiple and a year-1
+    // cash-on-cash struck with the whole budget in year 1; the deal page
+    // prints its caveat over the same returns, and the full report leaves
+    // them out. The sentence sits on the row under the tiles' values.
+    const summary = wb.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "PURCHASE PRICE");
+    expect(summary.getCell(tiles + 1, 2).value).toMatchObject({ formula: expect.stringContaining("IRR(") });
+    expect(summary.getCell(tiles + 2, 1).value).toBe(PLAN_RETURNS_CAVEAT);
+    expect(summary.getCell(tiles + 2, 1).alignment?.wrapText).toBe(true);
+  });
+
+  it("says under Sources how the capital plan is paid: out of year-1 cash flow, not the loan or the equity", () => {
+    // The loan is sized on the acquisition cost and the equity is the plug
+    // on uses that leave the budget out — the engine spends the budget in
+    // year 1's cash flow — so Sources says where it is.
+    const summary = wb.getWorksheet("Deal Summary")!;
+    const row = findRow(summary, 1, "Capital Plan (yr 1)");
+    expect(row).toBe(findRow(summary, 1, "Sources = Uses") + 1);
+    expect(summary.getCell(row, 2).value).toMatchObject({ formula: "CapImprovements" });
+    expect(summary.getCell(row, 2).font?.color?.argb).toBe("FF107C41"); // a link, green
+    expect(summary.getCell(row + 1, 1).value).toBe("paid from year-1 cash flow, not these sources");
+    const id = hf.getSheetId("Deal Summary")!;
+    expect(hf.getCellValue({ sheet: id, row: row - 1, col: 1 })).toBe(160_000_000);
+    // What the line says is what the engine does: the budget is year 1's
+    // capital, outside the loan and the equity.
+    expect(planEngine.cashFlow[0].capitalImprovements).toBe(160_000_000);
+    expect(Number(named(hf, "LoanAmount"))).toBeCloseTo(planEngine.sourcesUses.loanAmount, 0);
+    expect(Number(named(hf, "Equity"))).toBeCloseTo(planEngine.sourcesUses.totalUses - planEngine.sourcesUses.loanAmount, 0);
+    // And the LTC input says what it is struck on.
+    const assum = wb.getWorksheet("Assumptions")!;
+    expect(assum.getCell(findRow(assum, 1, "Loan to Cost (acquisition cost)"), 2).value).toBe(plan.inputs.ltc);
+  });
+
   it("a plan deal whose OM states no stabilized NOI says so, and the yield cell reads n/a rather than erroring", async () => {
     const noNoi = deriveUnderwriteInputs(
       { ...conversion, metrics: conversion.metrics.filter((m) => !/NOI/.test(m.label)) },
@@ -642,6 +677,10 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     const cover = sb.getWorksheet("Cover")!;
     const cr = findRow(cover, 2, "Deal type");
     expect(String(cover.getCell(cr + 1, 3).value)).not.toMatch(/capital budget/);
+    // No plan caveat over a stabilized deal's returns; the capital plan's
+    // line under Sources stands on every deal, since any deal can carry one.
+    summary.eachRow((row) => row.eachCell((cell) => expect(cell.value).not.toBe(PLAN_RETURNS_CAVEAT)));
+    findRow(summary, 1, "Capital Plan (yr 1)");
   });
 
   it("still has zero formula errors, and total uses tie to the engine", () => {
