@@ -121,7 +121,19 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
         <span className="text-sm font-semibold">{r.label}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
-      <p className="mt-1 text-sm leading-relaxed">{r.headline}</p>
+      {/* What is restricted or under contract, and until when, leads; the
+          limits, the contract's terms and the clocks are one click away and
+          whole in the HTML, since the pictures below draw them. */}
+      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
+      {r.sentences.length > 1 && (
+        <details className="group mt-1 text-sm leading-relaxed">
+          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
+            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
+            <span className="hidden group-open:inline">Less</span>
+          </summary>
+          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
+        </details>
+      )}
 
       {units && (
         <div className="mt-2.5" data-qa="affordable-units">

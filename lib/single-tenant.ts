@@ -250,9 +250,15 @@ export interface SingleTenantRead {
   /** the annual base rent, where stated */
   rent: number | null;
   rating: RatingRead | null;
-  /** who, until when, and how the rent grows, in the reader's sentences */
+  /** who, until when, and how the rent grows, in the reader's sentences,
+   *  one a line — the panel leads with the first and folds the rest */
+  sentences: string[];
+  /** those sentences as one paragraph */
   headline: string;
 }
+
+/** The read's figures, before its sentences are written from them. */
+type LeaseFacts = Omit<SingleTenantRead, "headline" | "sentences">;
 
 const isoOf = (d: Date) => d.toISOString().slice(0, 10);
 const clean = (s: string | null | undefined) => (s ?? "").trim();
@@ -307,7 +313,7 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
   const n = parsePageNumber(st.page);
   const page = n != null && pageCount != null && n <= pageCount ? clean(st.page) : "";
 
-  const read: Omit<SingleTenantRead, "headline"> = {
+  const read: LeaseFacts = {
     tenant,
     guarantor: clean(st.guarantor),
     leaseType: clean(st.leaseType),
@@ -322,7 +328,8 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
     rent,
     rating: readRating(ratingRow?.value),
   };
-  return { ...read, headline: headlineOf(read) };
+  const sentences = sentencesOf(read);
+  return { ...read, sentences, headline: sentences.join(" ") };
 }
 
 // ── Saying it ───────────────────────────────────────────────────────────
@@ -342,7 +349,7 @@ function ratingClause(r: RatingRead): string {
   return r.grade ? ` — rated ${noPeriod(r.stated)}, ${GRADE_WORDS[r.grade]}` : ` — its credit as stated: ${noPeriod(r.stated)}`;
 }
 
-function whoSentence(r: Omit<SingleTenantRead, "headline">): string {
+function whoSentence(r: LeaseFacts): string {
   const guarantee = r.guarantor ? `, the rent guaranteed by ${nameOf(r.guarantor)} as stated` : ", and the memorandum names no guarantor";
   const end = r.rating ? ratingClause(r.rating) : "";
   const sentence = `${nameOf(r.tenant)} leases the whole property${guarantee}${end}`;
@@ -385,7 +392,7 @@ function earlySentence(e: EarlyEnd | null): string {
     : `The tenant's right to end the lease early opened ${end}, as stated — the lease runs only as long as the tenant chooses.`;
 }
 
-function increasesSentence(r: Omit<SingleTenantRead, "headline">): string {
+function increasesSentence(r: LeaseFacts): string {
   const inc = r.increases;
   if (!inc) return r.increasesStated ? `The rent's increases as stated: ${noPeriod(r.increasesStated)}.` : "";
   switch (inc.kind) {
@@ -402,8 +409,8 @@ function increasesSentence(r: Omit<SingleTenantRead, "headline">): string {
   }
 }
 
-function headlineOf(r: Omit<SingleTenantRead, "headline">): string {
-  return [whoSentence(r), termSentence(r.term), earlySentence(r.early), increasesSentence(r)].filter(Boolean).join(" ");
+function sentencesOf(r: LeaseFacts): string[] {
+  return [whoSentence(r), termSentence(r.term), earlySentence(r.early), increasesSentence(r)].filter(Boolean);
 }
 
 /** The model a single tenant's lease is set against: the engine's own

@@ -133,8 +133,16 @@ export interface SaleRead {
   floorAllIn: number | null;
   deadline: { ends: string; stated: string; daysLeft: number } | null;
   stalkingHorse: number | null;
+  /** who sells, the bid, the premium, the reserve and the deadline, in the
+   *  reader's sentences, one a line — the panel leads with the first and
+   *  folds the rest */
+  sentences: string[];
+  /** those sentences as one paragraph */
   headline: string;
 }
+
+/** The read's figures, before its sentences are written from them. */
+type SaleFacts = Omit<SaleRead, "headline" | "sentences">;
 
 const isoOf = (d: Date) => d.toISOString().slice(0, 10);
 const money = (n: number) =>
@@ -180,7 +188,7 @@ export function readSale(ex: ExtractionResult | null | undefined, asOf: Date = n
           : { kind: "stated", amount: null, stated: v };
   }
   const deadlineIso = deadlineRow ? parseStatedDate(deadlineRow.value, 2000, 2199) : null;
-  const read: Omit<SaleRead, "headline"> = {
+  const read: SaleFacts = {
     method,
     label: METHOD_LABEL[method],
     terms: clean(s?.terms),
@@ -201,12 +209,13 @@ export function readSale(ex: ExtractionResult | null | undefined, asOf: Date = n
       : null,
     stalkingHorse: stalkingRow ? parseUsd(stalkingRow.value) : null,
   };
-  return { ...read, headline: headlineOf(read) };
+  const sentences = sentencesOf(read);
+  return { ...read, sentences, headline: sentences.join(" ") };
 }
 
 // ── Saying it ───────────────────────────────────────────────────────────
 
-function auctionSentences(r: Omit<SaleRead, "headline">): string[] {
+function auctionSentences(r: SaleFacts): string[] {
   const out: string[] = [];
   if (r.startingBid != null) {
     out.push(
@@ -249,7 +258,7 @@ const SELLER_SENTENCE: Partial<Record<SaleMethod, string>> = {
   reo: "The lender that took it back is selling it: it never ran the building either, sells as-is, and discloses only what it knows.",
 };
 
-function headlineOf(r: Omit<SaleRead, "headline">): string {
+function sentencesOf(r: SaleFacts): string[] {
   const parts: string[] = [];
   if (r.method === "auction") parts.push(...auctionSentences(r));
   else if (SELLER_SENTENCE[r.method]) parts.push(SELLER_SENTENCE[r.method]!);
@@ -265,7 +274,7 @@ function headlineOf(r: Omit<SaleRead, "headline">): string {
     );
   }
   if (r.condition) parts.push(`Sold as stated: ${r.condition.replace(/[.;,\s]+$/, "")}.`);
-  return parts.join(" ");
+  return parts;
 }
 
 /**

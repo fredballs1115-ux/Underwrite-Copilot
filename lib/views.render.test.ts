@@ -5576,6 +5576,7 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(text).toContain("What is being sold");
     expect(text).toContain("A loan secured by the property");
     expect(text).toContain("The $20.0M price is an 18.0% discount to the $24.4M unpaid balance.");
+    expectLeadThenFold(html, readInterestFor(ex, 20_000_000)!.leadSentences);
     expect(text).toContain("Price $20.0M");
     expect(text).toContain("Unpaid balance $24.4M");
     expect(text).toContain("The loan as stated: $24.4M UPB, 5.25% coupon, 90 days delinquent");
@@ -5597,6 +5598,10 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     );
     expect(leaseHtml).toContain('href="/tools#ground-lease"');
     expect(leaseHtml).not.toContain('data-bar="interest"');
+    expectLeadThenFold(
+      leaseHtml,
+      readInterestFor(base({ ...blank, kind: "leasehold", groundLease: "62 years remaining; $310,000 a year" }), 20_000_000)!.leadSentences,
+    );
     expect(visibleText(leaseHtml)).toContain("The ground lease as stated: 62 years remaining; $310,000 a year");
     expect(render(React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "fee_simple" }), 20_000_000) }))).not.toContain("What is being sold");
   });
@@ -5917,6 +5922,25 @@ describe("LeaseholdExitCard — the term, the two exits, and the model's returns
   });
 });
 
+/**
+ * The deal-type panels' read (the research pass of 2026-09-30): the older
+ * panels printed their whole read open — the affordable one ran about
+ * twenty lines on a phone — where the newer ones say the first sentence
+ * and fold the rest. Every one now leads with the reader's first sentence
+ * and folds the rest, whole in the HTML, under "Read the rest (N more)".
+ */
+function expectLeadThenFold(html: string, sentences: string[]) {
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
+  expect(sentences.length).toBeGreaterThan(1);
+  const lead = `<p class="mt-1 text-sm leading-relaxed">${esc(sentences[0])}</p>`;
+  const at = html.indexOf(lead);
+  expect(at, "the first sentence leads, alone").toBeGreaterThan(-1);
+  const fold = html.slice(at + lead.length);
+  expect(fold.startsWith('<details class="group mt-1 text-sm leading-relaxed">'), "the rest folds under it").toBe(true);
+  expect(fold).toContain(`Read the rest (${sentences.length - 1} more)`);
+  expect(fold.slice(0, fold.indexOf("</details>"))).toContain(`<p class="mt-1">${esc(sentences.slice(1).join(" "))}</p>`);
+}
+
 // ── Affordable housing (#453) ──────────────────────────────────────────────
 import { AffordablePanel } from "@/app/affordable-panel";
 import { readAffordable } from "@/lib/affordable";
@@ -6005,6 +6029,7 @@ describe("AffordablePanel — a covenant or a contract that sets the rents, draw
     expect(text).toContain("to Jun 2029 · 2.8 years");
     expect(text).toContain("Stated end 2025 — passed");
     expectClocksStack(html, "affordable-clocks", 3);
+    expectLeadThenFold(html, readAffordable(maple(), AS_OF)!.sentences);
     // The rents: each restricted tier against the limit it states.
     expect(html.match(/data-bar="affordable-rent"/g)).toHaveLength(2);
     expect(text).toContain("$1,020 of a $1,090 limit");
@@ -6098,6 +6123,7 @@ describe("SingleTenantPanel — the one lease a single-tenant property is, drawn
     expect(text).toContain("Tenant holds a right of first refusal on any sale");
     expect(text).toContain("$390,000");
     expect(text).toContain("enter 1.92% as the rent growth to run the model on the lease");
+    expectLeadThenFold(html, readSingleTenant(walgreens(), AS_OF)!.sentences);
     expect(a11yIssues(html), "single-tenant panel").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });
@@ -6231,6 +6257,7 @@ describe("HotelPanel — what a hotel is sold with, drawn", () => {
     expect(text).toContain("2031 · 5.3 years");
     expect(text).toContain("The line is the model's sale, 5 years out");
     expectClocksStack(html, "hotel-clocks", 2);
+    expectLeadThenFold(html, readHotelDeal(courtyard(), AS_OF)!.sentences);
     // The rooms: the equation, and the index against 100.
     // The equation is six inline runs; read as one line of text.
     expect(text.replace(/\s+/g, " ")).toContain("ADR $189.50 × occupancy 74.0% = RevPAR $140.23");
@@ -6312,6 +6339,7 @@ describe("SalePanel — how the property is sold, drawn", () => {
     expect(text).toContain("Auction");
     expect(text).toContain("Bids due in 15 days");
     expect(text).toContain("bidding opens at $2.5M, which is where the price starts, not what it is");
+    expectLeadThenFold(html, sale.sentences);
     // One bar: the bid, the premium on it, and a tick at the ceiling.
     expect(html.match(/data-bar="sale-bid"/g)).toHaveLength(1);
     expect(html.match(/data-bar="sale-premium"/g)).toHaveLength(1);

@@ -157,9 +157,15 @@ export interface HotelDealRead {
   revparIndex: number | null;
   ffeReservePct: number | null;
   /** the sale, the PIP, the clocks and the room revenue, in the reader's
-   *  sentences */
+   *  sentences, one a line — the panel leads with the first and folds the
+   *  rest */
+  sentences: string[];
+  /** those sentences as one paragraph */
   headline: string;
 }
+
+/** The read's figures, before its sentences are written from them. */
+type HotelFacts = Omit<HotelDealRead, "headline" | "sentences">;
 
 const clean = (s: string | null | undefined) => (s ?? "").trim();
 const pageIn = (page: string | undefined, pageCount: number | null) => {
@@ -215,7 +221,7 @@ export function readHotelDeal(ex: ExtractionResult | null | undefined, asOf: Dat
   const ffeRow = find(rows, FFE_ROW);
   const ffe = ffeRow && /%/.test(ffeRow.value) ? pctOf(ffeRow.value) : null;
 
-  const read: Omit<HotelDealRead, "headline"> = {
+  const read: HotelFacts = {
     brand,
     independent: INDEPENDENT.test(brand),
     franchise,
@@ -243,7 +249,8 @@ export function readHotelDeal(ex: ExtractionResult | null | undefined, asOf: Dat
     revparIndex: index != null && index > 0 && index < 400 ? index : null,
     ffeReservePct: ffe != null && ffe > 0 && ffe <= 15 ? ffe : null,
   };
-  return { ...read, headline: headlineOf(read) };
+  const sentences = sentencesOf(read);
+  return { ...read, sentences, headline: sentences.join(" ") };
 }
 
 const ENCUMBRANCES: HotelEncumbrance[] = ["unencumbered", "brand", "management", "brand_and_management", "unknown"];
@@ -272,12 +279,12 @@ const ENCUMBRANCE_SENTENCE: Record<HotelEncumbrance, string> = {
   unknown: "",
 };
 
-function flagSentence(r: Omit<HotelDealRead, "headline">): string {
+function flagSentence(r: HotelFacts): string {
   if (r.independent) return "The hotel is independent, as stated — no flag, no franchise fees, and no brand's reservation system behind it.";
   return r.brand ? `The hotel is flagged ${noPeriod(r.brand)}, as stated.` : "";
 }
 
-function pipSentence(r: Omit<HotelDealRead, "headline">): string {
+function pipSentence(r: HotelFacts): string {
   const funds = " — capital the buyer funds on top of the price.";
   const unit = r.keyNoun.replace(/s$/, "");
   const across = r.keys != null ? ` across its ${r.keys.toLocaleString("en-US")} ${r.keyNoun}` : "";
@@ -300,7 +307,9 @@ function clockSentence(label: string, e: DatedEnd | null, passed: string): strin
   return `The ${label} ends ${e.from === "year" ? `in ${end}` : end}, ${yearsText(e.yearsLeft)} from today.`;
 }
 
-function roomsSentence(r: Omit<HotelDealRead, "headline">): string {
+/** The room revenue and the index against the competitive set, a sentence
+ *  each. */
+function roomsSentences(r: HotelFacts): string[] {
   const parts: string[] = [];
   if (r.revpar != null && r.revparComputed != null && r.ties === false) {
     parts.push(
@@ -319,20 +328,18 @@ function roomsSentence(r: Omit<HotelDealRead, "headline">): string {
           : `Its RevPAR index is ${i}: it earns ${i - 100}% more per available room than its competitive set.`,
     );
   }
-  return parts.join(" ");
+  return parts;
 }
 
-function headlineOf(r: Omit<HotelDealRead, "headline">): string {
+function sentencesOf(r: HotelFacts): string[] {
   return [
     flagSentence(r),
     ENCUMBRANCE_SENTENCE[r.encumbrance],
     pipSentence(r),
     clockSentence("franchise", r.franchiseEnds, "the flag's term as read cannot be right; check the license"),
     clockSentence("management agreement", r.managementEnds, "the manager's term as read cannot be right; check the agreement"),
-    roomsSentence(r),
-  ]
-    .filter(Boolean)
-    .join(" ");
+    ...roomsSentences(r),
+  ].filter(Boolean);
 }
 
 /** The model a hotel's contracts are set against: its hold (months) and

@@ -63,8 +63,10 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         ].filter((t): t is { label: string; value: string; sub: string } => t != null)
       : [];
   // The tiles say the yield; without them the sentence does. The cushion is
-  // always the collateral's bar where the memorandum states the value.
-  const text = n && tiles.length === 0 ? [r.lead, noteYieldSentence(n)].filter(Boolean).join(" ") : r.lead;
+  // always the collateral's bar where the memorandum states the value. The
+  // first sentence leads and the rest folds, whole in the HTML, as every
+  // deal-type panel reads.
+  const said = n && tiles.length === 0 ? [...r.leadSentences, noteYieldSentence(n)].filter(Boolean) : r.leadSentences;
   const caption = tiles.length > 0 ? noteCaption(n) : "";
   // Behind a senior loan the loan-to-value is withheld (lib/note-yield), and
   // the reason stands where the collateral's track would.
@@ -137,7 +139,16 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         <span className="text-sm font-semibold">{r.label}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
-      <p className="mt-1 text-sm leading-relaxed">{text}</p>
+      {said.length > 0 && <p className="mt-1 text-sm leading-relaxed">{said[0]}</p>}
+      {said.length > 1 && (
+        <details className="group mt-1 text-sm leading-relaxed">
+          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
+            <span className="group-open:hidden">{`Read the rest (${said.length - 1} more)`}</span>
+            <span className="hidden group-open:inline">Less</span>
+          </summary>
+          <p className="mt-1">{said.slice(1).join(" ")}</p>
+        </details>
+      )}
       {r.term && r.termLine && (
         <div className="mt-2.5">
           <LeaseTermBar yearsLeft={r.term.yearsLeft} endLabel={termEndLabel(r.term)} optionYears={r.term.options?.years ?? null} />

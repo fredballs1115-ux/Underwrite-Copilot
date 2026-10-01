@@ -70,7 +70,19 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
         <span className="text-sm font-semibold">{r.tenant}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
-      <p className="mt-1 text-sm leading-relaxed">{r.headline}</p>
+      {/* Who leases it and who guarantees it lead; the term, the options
+          and the increases are one click away and whole in the HTML, since
+          the pictures below draw them. */}
+      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
+      {r.sentences.length > 1 && (
+        <details className="group mt-1 text-sm leading-relaxed">
+          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
+            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
+            <span className="hidden group-open:inline">Less</span>
+          </summary>
+          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
+        </details>
+      )}
 
       {eff && eff.yearsLeft > 0 && (
         <div className="mt-2.5" data-qa="single-tenant-term">

@@ -73,7 +73,19 @@ export function HotelPanel({
         {encumbrance && <span className="rounded-full border border-brand/30 px-2 py-0.5 text-[10px] font-semibold text-brand">{encumbrance}</span>}
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
-      <p className="mt-1 text-sm leading-relaxed">{r.headline}</p>
+      {/* The flag leads; the encumbrance, the PIP, the clocks and the rooms
+          are one click away and whole in the HTML, since the chip and the
+          pictures below draw them. */}
+      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
+      {r.sentences.length > 1 && (
+        <details className="group mt-1 text-sm leading-relaxed">
+          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
+            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
+            <span className="hidden group-open:inline">Less</span>
+          </summary>
+          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
+        </details>
+      )}
 
       {r.pricePerKey != null && r.pipPerKey != null && r.allInPerKey != null && (
         <div className="mt-2.5" data-qa="hotel-basis">

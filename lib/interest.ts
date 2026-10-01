@@ -215,6 +215,9 @@ export interface InterestRead {
    *  above the figures it draws; the headline itself on every other
    *  interest */
   lead: string;
+  /** the lead's sentences, one a line — the panel says the first and folds
+   *  the rest */
+  leadSentences: string[];
   /** what the property model on this deal is and is not, for the surfaces
    *  that draw one — null where it is simply the buyer's model */
   modelCaveat: string | null;
@@ -402,39 +405,47 @@ export function readInterest(
       ? `the building's ${money(incomeBeforeGroundRent)} of income before the ground rent covers the ${money(groundRent)} rent ${times(groundRentCoverage)}`
       : null;
 
-  let headline: string;
+  // The lead, a sentence a line: the panel says the first and folds the
+  // rest; every other surface reads them as one paragraph.
+  const lead: string[] = [];
   let modelCaveat: string | null = null;
   switch (kind) {
     case "note":
-      headline =
-        "This memorandum sells a LOAN secured by the property, not the property: the buyer steps into the lender's position, and the return is the note's coupon and its discount to the balance — or, on a default, what the collateral fetches after foreclosure.";
+      lead.push(
+        "This memorandum sells a LOAN secured by the property, not the property: the buyer steps into the lender's position, and the return is the note's coupon and its discount to the balance — or, on a default, what the collateral fetches after foreclosure.",
+      );
       if (discountPct != null && price != null && balance != null) {
-        headline += ` The ${money(price)} price is ${discountPhrase(discountPct)} the ${money(balance)} unpaid balance.`;
+        lead.push(`The ${money(price)} price is ${discountPhrase(discountPct)} the ${money(balance)} unpaid balance.`);
       }
       modelCaveat =
         "The screening model underwrites the collateral as if it were bought outright at the note's price. That is not the note's return, and its cap rate and IRR are not figures this buyer earns.";
       break;
     case "partial_interest":
-      headline =
+      lead.push(
         sharePct != null && price != null && impliedWhole != null
           ? `This memorandum sells ${withArticle(shareText(sharePct))} share of the owning entity, not the whole asset: ${money(price)} for the share is ${money(impliedWhole)} for the whole, grossed up — the whole building's income is set against that, and a minority share is worth less than its slice once control, the promote and the exit rights are priced.`
-          : "This memorandum sells a share of the owning entity, not the whole asset, and states no single percentage for it — the whole building's income cannot be set against the share's price until the share is known.";
+          : "This memorandum sells a share of the owning entity, not the whole asset, and states no single percentage for it — the whole building's income cannot be set against the share's price until the share is known.",
+      );
       modelCaveat =
         sharePct != null && impliedWhole != null
           ? `The screening model runs the whole asset at the ${money(impliedWhole)} the share's price implies; the share earns its ${shareText(sharePct)} of those cash flows only before the waterfall's promote and the sponsor's fees.`
           : "The screening model runs the whole asset at the share's price, which it cannot gross up without a stated percentage — its returns are not the share's.";
       break;
     case "leasehold":
-      headline =
-        "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land. The ground rent comes ahead of the debt, and at the lease's end the building reverts — a capitalised NOI values a perpetuity that ends.";
-      if (coverageClause) headline += ` Here ${coverageClause}.`;
+      lead.push(
+        "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land.",
+        "The ground rent comes ahead of the debt, and at the lease's end the building reverts — a capitalised NOI values a perpetuity that ends.",
+      );
+      if (coverageClause) lead.push(`Here ${coverageClause}.`);
       modelCaveat =
         "The screening model capitalises the exit like a fee-simple building. On a leasehold the value at exit is what the term left will bear — run the ground lease calculator on the stated term.";
       break;
     case "leased_fee":
-      headline = `This memorandum sells a LEASED FEE: the land under a building someone else owns, with its ground lease. The buyer collects the ground rent — the income here, not an expense and never the building's NOI — and when the lease ends the building reverts to the buyer. The rent is safe while the building's own income covers it${
-        coverageClause ? `, and ${coverageClause}` : ""
-      }.`;
+      lead.push(
+        "This memorandum sells a LEASED FEE: the land under a building someone else owns, with its ground lease.",
+        "The buyer collects the ground rent — the income here, not an expense and never the building's NOI — and when the lease ends the building reverts to the buyer.",
+        `The rent is safe while the building's own income covers it${coverageClause ? `, and ${coverageClause}` : ""}.`,
+      );
       modelCaveat =
         "The screening model runs the ground rent as a building's NOI, with a building's growth, vacancy and expense assumptions. A ground rent grows by its lease's own schedule and resets, has no vacancy while the lease stands, and ends in the reversion of the land and the building — run the ground lease calculator's leased-fee side on the stated terms.";
       break;
@@ -443,9 +454,12 @@ export function readInterest(
       // part of its site, or one that collects it (a pad let on a ground
       // lease, common on a retail center) — the lease as stated says which,
       // and the sentence must not guess (#415).
-      headline =
-        "Part of the site is under a ground lease. Whether this owner pays the ground rent (an expense ahead of the debt) or collects it (a pad let on a ground lease), the lease's term and resets decide what that part is worth — the lease as stated says which.";
+      lead.push(
+        "Part of the site is under a ground lease.",
+        "Whether this owner pays the ground rent (an expense ahead of the debt) or collects it (a pad let on a ground lease), the lease's term and resets decide what that part is worth — the lease as stated says which.",
+      );
   }
+  const headline = lead.join(" ");
   return {
     kind,
     label: INTEREST_LABEL[kind],
@@ -466,6 +480,7 @@ export function readInterest(
     // cushion — the panel draws both and says the lead alone.
     headline: [headline, noteYieldSentence(note), noteCollateralSentence(note)].filter(Boolean).join(" "),
     lead: headline,
+    leadSentences: lead,
     modelCaveat,
     term,
     termLine: term ? groundLeaseTermLine(term) : "",

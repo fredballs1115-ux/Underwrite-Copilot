@@ -308,7 +308,10 @@ export interface AffordableRead {
   hapEnds: DatedEnd | null;
   /** an end the memorandum states as a term from a start, kept as stated */
   unreadEnds: string[];
-  /** the sentences every surface leads with */
+  /** the program, the counts and the clocks in the reader's sentences, one
+   *  a line — the panel leads with the first and folds the rest */
+  sentences: string[];
+  /** the sentences every surface leads with, as one paragraph */
   headline: string;
   /** each tier's rent against its limit, where the memorandum states both */
   tierLines: string[];
@@ -421,7 +424,8 @@ export function readAffordable(ex: ExtractionResult | null | undefined, asOf: Da
           ? `${count(restrictedUnits)} ${restrictedUnits === 1 ? `${noun.one} is` : `${noun.many} are`} rent-restricted`
           : `Some of the ${noun.many} are rent-restricted — the memorandum states no count of them —`;
     lines.push(
-      `This is an affordable-housing deal: ${who}${under}${untilClause(restrictionEnds, rows.restrictionEndRow && !restrictionEnds ? rows.restrictionEndRow.value.trim() : null)}. Their rents are capped at the program's limits and ${limits}, not with the market — the gap to market on those ${noun.many} is the restriction's cost, not loss to lease, and it is the buyer's only when the restriction ends.`,
+      `This is an affordable-housing deal: ${who}${under}${untilClause(restrictionEnds, rows.restrictionEndRow && !restrictionEnds ? rows.restrictionEndRow.value.trim() : null)}.`,
+      `Their rents are capped at the program's limits and ${limits}, not with the market — the gap to market on those ${noun.many} is the restriction's cost, not loss to lease, and it is the buyer's only when the restriction ends.`,
     );
   }
   if (countsDisagree) {
@@ -452,7 +456,8 @@ export function readAffordable(ex: ExtractionResult | null | undefined, asOf: Da
         : ` that expires ${hapEnds.from === "year" ? "in " : ""}${endLabel(hapEnds)}, ${yearsText(hapEnds.yearsLeft)} from today`;
     const sentence = `${who}${when}`;
     lines.push(
-      `${opener}${opener ? sentence : sentence.charAt(0).toUpperCase() + sentence.slice(1)}. The contract sets the rent and HUD pays what the tenant's share of it does not; at renewal HUD brings contract rents above market down to market, and an owner who opts out gives a year's notice, the tenants take vouchers and the ${noun.many} rent at market.`,
+      `${opener}${opener ? sentence : sentence.charAt(0).toUpperCase() + sentence.slice(1)}.`,
+      `The contract sets the rent and HUD pays what the tenant's share of it does not; at renewal HUD brings contract rents above market down to market, and an owner who opts out gives a year's notice, the tenants take vouchers and the ${noun.many} rent at market.`,
     );
   }
   if (complianceEnds && restrictionEnds && restrictionEnds.yearsLeft > 0) {
@@ -543,6 +548,7 @@ export function readAffordable(ex: ExtractionResult | null | undefined, asOf: Da
     complianceEnds,
     hapEnds,
     unreadEnds,
+    sentences: lines,
     headline: lines.join(" "),
     tierLines,
     gapLine,
