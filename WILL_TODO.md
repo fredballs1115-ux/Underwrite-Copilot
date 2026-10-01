@@ -63,7 +63,11 @@ way in this batch):
     separated for several): /data-health's working view — what a screen
     costs, the feeds, the probes, the steward — now shows only to the
     addresses it names; until it is set, everyone (you included) sees the
-    corrections ledger alone.
+    corrections ledger alone. It also names who is emailed when screens
+    stop for a reason only you can fix (at most one alert an hour for each
+    kind); set it on the worker too once screens run there. Optional
+    beside it: `RESEND_REPLY_TO`, an address replies to the emails go to
+    (sent only where it names one).
 11. **The free tier's rule** (a decision): today it is "3 deals at a time"
     (deleting one frees a slot), re-screens are unlimited and sign-up has no
     CAPTCHA, at about $3 a screen. The pages now say what is enforced; tell
@@ -811,7 +815,7 @@ and never was.
 
 Three things they share: every field reads shorthand (`$20M`, `4.75%`,
 `1.25x`); every field travels in the URL, so a sizing is a link; and the
-math is a pure tested module before it reaches a page — **1,183 tests** on
+math is a pure tested module before it reaches a page — **1,184 tests** on
 the forty-five modules, plus **119** that render the page itself and check the
 figures it prints. And since #314 the homepage renders its shelf of those
 calculations from the SAME list the page builds its cards from, so it can

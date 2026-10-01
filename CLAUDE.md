@@ -3765,8 +3765,26 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (`pictureMayBeInMemorandum`), with `ensureDealPicture`'s `gallery:
   false` — the cover alone, so the worker never decodes sixteen pages
   beside the next screen; the gallery waits for the deal's first view —
-  bounded by `EMAIL_PICTURE_WAIT_MS`, and the banner's alt names a
-  photograph only where the search (or the cache) says there is one. The
+  bounded by `EMAIL_PICTURE_WAIT_MS`, and the banner's alt names the deal
+  and its link ("The Maddox — open the deal"), true of whichever picture
+  the route serves when the email is opened; with images blocked, the
+  banner and the squares hold a tint and show their alt. **Every email is
+  sent once, to the reader who asked** (#488, `lib/email-send`, the one
+  sender, which the Stripe webhook's price alert also goes through after
+  its response): each send carries an `Idempotency-Key` named for its
+  occasion (`weekly-digest/<user>/<Monday>`,
+  `screen-complete/<deal>/<the verdict's generatedAt>`,
+  `screen-stopped/<deal>/<the job's created_at>`), so a timed-out retry is
+  not a second email; a screen's emails go to whoever asked for the run
+  (`requestedBy`, in the worker payload's JSON or the in-process run's
+  arguments), and only while they are the deal's creator or a member of its
+  team (`screenEmailRecipient`), never the creator in their place; the
+  digest counts open deals and their deadlines through the sixth day, marks
+  a call whose re-screen is running, stalled or failed, and carries a
+  one-click unsubscribe (`lib/email-unsubscribe`: a token of the user and
+  the one setting, under its own key label, never expiring; RFC 8058's
+  `List-Unsubscribe` and `List-Unsubscribe-Post` headers; the route acts
+  on the one-click POST only, and a GET shows a button that sends it). The
   deal's bridge, rent roll and valuations pages head with `DealCrumb`
   (`app/(app)/deals/[id]/deal-crumb.tsx`: `DealAvatar` at its `md` 40px
   beside the way back).
