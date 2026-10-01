@@ -71,6 +71,7 @@ import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
 import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
 import type { LoiTerms } from "@/lib/loi-terms";
+import { LOI_REFUSAL_BANNERS } from "@/lib/loi-refusal";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
 import { interestOf } from "@/lib/interest";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
@@ -228,6 +229,10 @@ const MODEL_ERRORS: Record<string, string> = {
   loisample:
     "The sample deal is a walkthrough — LOI drafts generate on your own deals.",
   loifail: "Couldn’t build the LOI just now — please try again in a moment.",
+  // A memorandum that sells a note, a share or the leased fee, or sells at
+  // auction or out of a bankruptcy: the route refuses the letter in the
+  // panel's own sentence (lib/loi-refusal).
+  ...LOI_REFUSAL_BANNERS,
   reportempty: "Run the screen first — the full report needs a verdict to export.",
   reportfail:
     "Couldn’t build the full report just now — please try again in a moment.",

@@ -34,6 +34,7 @@ import { buyBoxRead } from "@/lib/buy-box-chip";
 import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
 import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
+import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -973,7 +974,14 @@ describe("DealView — the LOI panel says what the download drafts", () => {
       ...sampleProps("documents"),
       isSample: false,
       isPro: true,
-      loi: { plan: { kind: "conversion", label: "Conversion" } },
+      loi: {
+        plan: { kind: "conversion", label: "Conversion" },
+        refusal: null,
+        leasehold: null,
+        seller: null,
+        properties: [],
+        notes: [],
+      },
     } as Props);
     // The panel's own section (the tab around it carries the OM controls).
     const at = html.lastIndexOf("<section", html.indexOf(">LOI draft<"));
@@ -984,5 +992,28 @@ describe("DealView — the LOI panel says what the download drafts", () => {
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/This deal is a conversion: the draft’s diligence clause covers/);
     expect(text).toMatch(/carries an entitlements contingency/);
+  });
+
+  it("a refused letter: the route's code lands as a banner in the panel's own sentence", () => {
+    // What the LOI route redirects with on a note (lib/loi-refusal).
+    const html = render({
+      ...sampleProps("documents"),
+      isSample: false,
+      isPro: true,
+      modelErrorCode: LOI_REFUSAL_CODE.note,
+      loi: {
+        plan: null,
+        refusal: { kind: "note", sentence: LOI_REFUSAL.note },
+        leasehold: null,
+        seller: null,
+        properties: [],
+        notes: [],
+      },
+    } as Props);
+    const text = textOf(html);
+    // Once in the banner, once in the panel, which offers no form.
+    expect(text.split(LOI_REFUSAL.note).length - 1).toBe(2);
+    expect(html).not.toMatch(/Download LOI draft/);
+    expect(gluedWords(text)).toEqual([]);
   });
 });

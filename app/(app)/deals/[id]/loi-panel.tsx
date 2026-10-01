@@ -27,6 +27,8 @@ export function LoiPanel({
   terms?: LoiTerms | null;
 }) {
   const plan = terms?.plan ?? null;
+  const refusal = terms?.refusal ?? null;
+  const notes = terms?.notes ?? [];
   const needsEntitlements = plan?.kind === "conversion" || plan?.kind === "development";
   // The ask as every surface reads it — a range at its top (#466) — and a
   // figure only where it is a price at all.
@@ -74,16 +76,33 @@ export function LoiPanel({
   const field =
     "w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30";
 
+  const header = (
+    <div className="flex flex-wrap items-center gap-2">
+      <h2 className="text-sm font-semibold tracking-tight">LOI draft</h2>
+      {!isPro && (
+        <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
+          Pro
+        </span>
+      )}
+    </div>
+  );
+
+  // What the memorandum sells, or how, makes this letter the wrong document:
+  // the route refuses it in these very words, so there is no form to fill.
+  if (refusal) {
+    return (
+      <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
+        {header}
+        <p data-qa="loi-refusal" className="mt-1.5 max-w-lg text-sm leading-relaxed text-muted">
+          {refusal.sentence}
+        </p>
+      </section>
+    );
+  }
+
   return (
     <section className="rounded-2xl border border-line bg-surface p-5 shadow-sm">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">LOI draft</h2>
-        {!isPro && (
-          <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
-            Pro
-          </span>
-        )}
-      </div>
+      {header}
       <p className="mt-0.5 max-w-lg text-xs leading-relaxed text-muted">
         A one-page, non-binding letter of intent as an editable Word file, prefilled from the
         screen. Have counsel review before anything is sent.
@@ -98,6 +117,16 @@ export function LoiPanel({
             : ""}
           .
         </p>
+      )}
+      {notes.length > 0 && (
+        // The lines the memorandum decided — what is bought, who sells, the
+        // portfolio's properties — each marked in the draft for review.
+        <ul data-qa="loi-notes" className="mt-2 max-w-lg list-disc space-y-1 pl-4 text-xs leading-relaxed text-brand">
+          {notes.map((n) => (
+            <li key={n}>{n}</li>
+          ))}
+          <li>Each is highlighted in the draft for review.</li>
+        </ul>
       )}
 
       {!isPro ? (

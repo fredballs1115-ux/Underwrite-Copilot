@@ -4,6 +4,7 @@ import { buildLoiDocx } from "@/lib/loi";
 import { getBrandingForDeal } from "@/lib/branding-server";
 import { parseUsd } from "@/lib/money";
 import { loiTermsFor } from "@/lib/loi-terms";
+import { LOI_REFUSAL_CODE } from "@/lib/loi-refusal";
 import type { DealRow } from "@/lib/deals";
 import type { StructuredAddress } from "@/lib/address";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -77,6 +78,25 @@ export async function GET(
     );
   }
 
+  // What the letter drafts, read with the first signal through the panel's
+  // own reader (lib/loi-terms), so it carries exactly the clauses the panel
+  // said it would. The deal's kind shapes the paper — a conversion or a
+  // development carries an entitlements contingency; every plan deal's
+  // diligence names the work — and what is sold decides whether this is
+  // the document at all: a note, a share, the leased fee, an auction or a
+  // bankruptcy sale is refused with the panel's own sentence, before any
+  // figure on the form is read.
+  const terms = loiTermsFor(
+    (deal as { extraction?: ExtractionResult | null }).extraction ?? null,
+    ((deal as { first_signal?: unknown }).first_signal as FirstSignal | null) ?? null,
+  );
+  if (terms.refusal) {
+    return Response.redirect(
+      new URL(`/deals/${id}?tab=documents&error=${LOI_REFUSAL_CODE[terms.refusal.kind]}`, req.url),
+      302,
+    );
+  }
+
   // Same M-aware parse the panel uses, so "$68.5M" means the same thing on
   // both sides; the floors bounce figures that could only be typos ("$68"
   // is never a building price).
@@ -126,18 +146,14 @@ export async function GET(
     firmName = null;
   }
 
-  // The deal's kind shapes the paper: a conversion or a development carries
-  // an entitlements contingency; every plan deal's diligence names the work.
-  // Read with the first signal through the panel's own reader, so the
-  // letter carries exactly the clauses the panel said it would.
-  const terms = loiTermsFor(
-    (deal as { extraction?: ExtractionResult | null }).extraction ?? null,
-    ((deal as { first_signal?: unknown }).first_signal as FirstSignal | null) ?? null,
-  );
-
   try {
     const buffer = await buildLoiDocx({
       plan: terms.plan,
+      // What the memorandum states the sale is, where it is not the
+      // property from its owner: each line marked in the letter for review.
+      leasehold: terms.leasehold,
+      seller: terms.seller,
+      properties: terms.properties,
       buyerName,
       firmName,
       propertyName: deal.name,
