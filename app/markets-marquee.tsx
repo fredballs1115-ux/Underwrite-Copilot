@@ -4,6 +4,7 @@ import { datedLong } from "@/lib/debt-index";
 import { fmrLabel, fmrOf, fmrToday, fmrWhen } from "@/lib/fmr";
 import { MARKET_COUNT } from "@/lib/market-count";
 import { blockCitations, figuresTitle, rentOf, rentText } from "@/lib/tracker-read";
+import { sharedAreaFor } from "@/lib/sector-leaderboard";
 import { PausableTicker } from "./pausable-ticker";
 
 // Server-component module only: it pulls a research seed JSON, which must
@@ -57,6 +58,7 @@ export function researchReadOn(day: string): string {
 
 export function metroFact(m: unknown, rotate = 0): MetroFact | null {
   const entry = m as {
+    id?: string;
     rule_ids?: string[];
     sector_snapshot?: Record<
       string,
@@ -87,10 +89,13 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
     // Each figure's own period, never the day the research was read.
     const shown = blockCitations(b).filter((f) => f.label !== "Cap");
     // A figure's period, and the narrower stock it covers where the file
-    // says it is one ("Class A space, Q2 2026").
+    // says it is one ("Class A space, Q2 2026") — and, where the market
+    // reads a figure it shares with others, whose figure it is ("Suburban
+    // Maryland, Q1 2026"), never the county's own.
+    const shared = sharedAreaFor(sector, entry.id);
     const when = (label: string) => {
       const read = shown.find((f) => f.label === label)?.read;
-      return [read?.slice, read?.period ?? "undated"].filter(Boolean).join(", ");
+      return [shared, read?.slice, read?.period ?? "undated"].filter(Boolean).join(", ");
     };
     // A band as the file states it ("$10–15/SF"), never a point made of one.
     const rentBand = rentOf(b);

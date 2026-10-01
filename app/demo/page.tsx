@@ -12,7 +12,7 @@ import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { metroFmr, seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
 import { fmrLabel, fmrToday, fmrWhen } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
-import { sectorLeaderboard } from "@/lib/sector-leaderboard";
+import { sectorStandings } from "@/lib/sector-leaderboard";
 import { blockCitations } from "@/lib/tracker-read";
 import metrosSeed from "@/data/research/metros.json";
 import { sampleLegal } from "@/lib/sample-legal";
@@ -288,14 +288,15 @@ export default async function DemoPage() {
   };
   // Where each Philadelphia read sits across the covered markets — the same
   // shared leaderboard builder behind the market page's rankings and rank
-  // chips, so the sample screen can never disagree with them. A sector with
-  // no numeric vacancy (retail's held-open level) simply gets no rank.
+  // chips (lib/sector-leaderboard), so the sample screen can never disagree
+  // with them. A figure the ranking cannot place (a spread of two reads,
+  // undated, over a year old) says why rather than taking a rank; a sector
+  // with no numeric vacancy (retail's held-open level) gets nothing.
+  const standings = sectorStandings(["office", "industrial", "multifamily", "retail"], fmrToday());
   const phillyRank = (sector: string): string | null => {
-    const ranked = sectorLeaderboard(sector).rows.filter(
-      (r) => r.vLow !== null,
-    );
-    const i = ranked.findIndex((r) => r.id === "philadelphia");
-    return i >= 0 ? `#${i + 1} of ${ranked.length}` : null;
+    const s = standings[sector]?.["philadelphia"];
+    if (!s) return null;
+    return s.rank !== null ? `#${s.rank} of ${s.total}` : `not ranked: ${s.reason}`;
   };
   const phillyRanks = {
     office: phillyRank("office"),

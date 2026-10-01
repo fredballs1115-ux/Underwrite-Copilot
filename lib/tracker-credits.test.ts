@@ -124,7 +124,8 @@ describe("the sector leaderboard credits each row's figures, never the block's f
   it("the page draws the credits through the one reader and says the day read as that", () => {
     const page = readFileSync(join(process.cwd(), "app/market/page.tsx"), "utf8");
     expect(page).toContain("<FigureCredits figures={blockCitations(b)} />");
-    expect(page).toContain("figureSources(r.figures,");
+    // The leaderboard's sources are drawn by the pure boards (#tracker-boards).
+    expect(readFileSync(join(process.cwd(), "app/market/tracker-boards.tsx"), "utf8")).toContain("figureSources(figures, ok)");
     expect(page).toContain("`· research read ${datedLong(readOn)}`");
     expect(page).not.toContain("fundamentals as of");
     expect(page).not.toMatch(/`as of \$\{datedLong\(snapDates/);

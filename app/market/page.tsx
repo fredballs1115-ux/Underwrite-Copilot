@@ -23,7 +23,6 @@ import { SurveyVacancyBoard } from "./survey-vacancy-board";
 import { DATA_METROS } from "@/lib/market-match";
 import { marketMeta, marketPageFor, sectorPageFor } from "@/lib/public-pages";
 import { marketHeading, publicMetadata } from "@/lib/page-meta";
-import { heatShade } from "./heat-shade";
 import { MetroLive } from "./metro-live";
 import { ReadOnlyMetroView } from "./read-only-metro";
 import { LessorRentLine } from "./lessor-rent-line";
@@ -46,10 +45,13 @@ import metrosSeed from "@/data/research/metros.json";
 import multifamilySeed from "@/data/research/multifamily.json";
 import {
   sectorLeaderboard,
+  sectorStandings,
   type SnapBlock,
+  type Standing,
 } from "@/lib/sector-leaderboard";
-import { blockCitations, figureNote, figureSources, figuresTitle, rentOf, rentText, type CitedFigure } from "@/lib/tracker-read";
+import { blockCitations, rentOf, rentText, type CitedFigure } from "@/lib/tracker-read";
 import { SubmarketsPanel } from "./submarkets-panel";
+import { CoverageBoardCell, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
 import { listSubmarkets } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
 import { MarketCompare } from "./market-compare";
@@ -72,24 +74,14 @@ const SECTOR_LABEL: Record<string, string> = {
   industrial: "Industrial",
   retail: "Retail",
 };
-// Where each metro sits in its sector's cross-metro ranking (tightest first),
-// keyed sector → metro id — same shared builder the leaderboard table and the
-// homepage lens render, so a brief's chip can never disagree with the table.
-// Metros without a numeric vacancy for a sector simply have no rank entry.
-const SECTOR_RANKS: Record<
-  string,
-  Record<string, { rank: number; total: number }>
-> = Object.fromEntries(
-  ["office", "industrial", "multifamily", "retail"].map((sec) => {
-    const ranked = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
-    return [
-      sec,
-      Object.fromEntries(
-        ranked.map((r, i) => [r.id, { rank: i + 1, total: ranked.length }]),
-      ),
-    ];
-  }),
-);
+// Where each metro's figure stands in its sector's cross-metro ranking
+// (tightest first), keyed sector → metro id — the same shared builder the
+// leaderboard table and the coverage board read (lib/sector-leaderboard
+// `sectorStandings`), so a brief's chip can never disagree with the table.
+// A figure the sources do not let the ranking place — undated, over a year
+// old, a narrower stock, a spread of two reads — has a standing with its
+// reason and no rank; a metro with no vacancy figure has none.
+const TRACKED_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
 /** A block's figures, each credited on one line to its own house, area and
  *  period, and linked to its own source where the file ties one to it. */
 function FigureCredits({ figures }: { figures: CitedFigure[] }) {
@@ -124,11 +116,14 @@ function FigureCredits({ figures }: { figures: CitedFigure[] }) {
 function SectorSnapshotPanel({
   snapshot,
   metroId,
+  standings = {},
   national = [],
   metroRates = [],
 }: {
   snapshot: Record<string, unknown> | null;
   metroId?: string;
+  /** each tracked sector's standings (`sectorStandings`), read for the day */
+  standings?: Record<string, Record<string, Standing>>;
   /** the national rates table (`liveRates`), for each commercial sector's
    *  lessor rent index line — the nation's figure, said so, under the
    *  metro's tracker fundamentals */
@@ -196,16 +191,8 @@ function SectorSnapshotPanel({
                   <span className="font-mono text-xs tabular-nums text-ink">
                     {bits.length > 0 ? bits.join(" · ") : "figures pending"}
                   </span>
-                  {metroId && SECTOR_RANKS[sector]?.[metroId] && (
-                    <Link
-                      href={`/market?sector=${sector}`}
-                      prefetch={false}
-                      title={`rank among covered-market ${SECTOR_LABEL[sector] ?? sector} vacancy reads, tightest first`}
-                      className="rounded-full border border-line px-1.5 py-px text-[10px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
-                    >
-                      #{SECTOR_RANKS[sector][metroId].rank} of{" "}
-                      {SECTOR_RANKS[sector][metroId].total}
-                    </Link>
+                  {metroId && standings[sector]?.[metroId] && (
+                    <StandingChip sector={sector} metroId={metroId} standing={standings[sector][metroId]} />
                   )}
                   <span
                     className={`ml-auto rounded px-1.5 py-px text-[10px] font-medium ${
@@ -748,6 +735,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
             }).sector_snapshot ?? null
           }
           metroId={active.id}
+          standings={sectorStandings(TRACKED_SECTORS, todayIso())}
           national={national}
           metroRates={live}
         />
@@ -844,25 +832,17 @@ async function MetroExplorer({ selected }: { selected?: string }) {
 // industrial, because a 5% industrial market and a 5% office market are not
 // the same news. Cells with no numeric read render as gaps and say why, so
 // the grid shows coverage honestly rather than implying completeness.
-const HEAT_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
+const HEAT_SECTORS = TRACKED_SECTORS;
 
 function SectorHeatGrid() {
-  // Rank position per (sector, metro) drives the shade; the shared builder is
-  // the same one the leaderboard, the rank chips, and /demo read.
-  const ranks = new Map<string, { t: number; label: string; credit: string }>();
+  // Each market's standing per sector drives its cell: the figure and its own
+  // period always, the shade only where the column ranks it — the shared
+  // builder the leaderboard, the rank chips, and /demo read.
+  const standings = sectorStandings(HEAT_SECTORS, todayIso());
+  const cells = new Map<string, CoverageCell>();
   for (const sec of HEAT_SECTORS) {
-    const rows = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
-    rows.forEach((r, i) => {
-      const hi = r.vHigh ?? r.vLow!;
-      const vacancy = r.figures.find((f) => f.label === "Vacancy");
-      ranks.set(`${sec}|${r.id}`, {
-        // 0 = tightest in this column, 1 = loosest.
-        t: rows.length > 1 ? i / (rows.length - 1) : 0,
-        label: r.vLow === hi ? `${r.vLow}` : `${r.vLow}–${hi}`,
-        // The figure's own house, area and period, for the cell's title.
-        credit: vacancy ? figureNote(vacancy.read) : "undated",
-      });
-    });
+    const marketsIn = Object.entries(standings[sec] ?? {});
+    for (const [id, st] of marketsIn) cells.set(`${sec}|${id}`, coverageCell(st, st.total));
   }
   const metros = (metrosSeed.metros ?? []) as {
     id: string;
@@ -874,7 +854,8 @@ function SectorHeatGrid() {
     const r = m.region ?? "More markets";
     if (!regions.includes(r)) regions.push(r);
   }
-  const filled = ranks.size;
+  const filled = cells.size;
+  const rankedCells = [...cells.values()].filter((c) => c.t !== null).length;
   const total = metros.length * HEAT_SECTORS.length;
   // The days the research sweep read the snapshots — one day, or the span
   // where they differ. Never the figures' own date: each figure is a house's
@@ -892,9 +873,6 @@ function SectorHeatGrid() {
       : snapDates.length === 1
         ? `read ${datedLong(snapDates[0])}`
         : `read ${datedLong(snapDates[0])} to ${datedLong(snapDates[snapDates.length - 1])}`;
-  // Emerald (tight) → amber (loose), low alpha so the figure stays readable
-  // — the one shade every board on this page uses (app/market/heat-shade).
-  const shade = heatShade;
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -903,7 +881,7 @@ function SectorHeatGrid() {
           The whole board — vacancy by market and asset class
         </h2>
         <span className="text-[11px] text-muted">
-          {`Research ${boardAsOf} · ${filled} of ${total} cells carry a numeric read · shaded within each column, so office compares to office`}
+          {`Research ${boardAsOf} · ${filled} of ${total} cells carry a numeric read, ${rankedCells} of them ranked · shaded within each column, so office compares to office`}
         </span>
       </div>
       <div className="mt-3 overflow-x-auto">
@@ -948,29 +926,11 @@ function SectorHeatGrid() {
                           {m.name}
                         </Link>
                       </td>
-                      {HEAT_SECTORS.map((s) => {
-                        const cell = ranks.get(`${s}|${m.id}`);
-                        return (
-                          <td key={s} className="px-1 py-1">
-                            {cell ? (
-                              <div
-                                className="rounded-md px-1.5 py-1 text-center font-mono text-xs tabular-nums text-ink"
-                                style={{ backgroundColor: shade(cell.t) }}
-                                title={`${SECTOR_LABEL[s]} vacancy, ${cell.credit} — shaded by rank within this column, tightest first`}
-                              >
-                                {cell.label}
-                              </div>
-                            ) : (
-                              <div
-                                className="rounded-md border border-dashed border-line/70 px-1.5 py-1 text-center text-[11px] text-muted"
-                                title="No numeric level on file for this market and asset class — a recorded gap, never estimated."
-                              >
-                                —
-                              </div>
-                            )}
-                          </td>
-                        );
-                      })}
+                      {HEAT_SECTORS.map((s) => (
+                        <td key={s} className="px-1 py-1">
+                          <CoverageBoardCell sector={s} cell={cells.get(`${s}|${m.id}`) ?? null} />
+                        </td>
+                      ))}
                     </tr>
                   ))}
               </Fragment>
@@ -979,8 +939,10 @@ function SectorHeatGrid() {
         </table>
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        Sourced figures; a band is shown as a band; a dash is a recorded gap,
-        explained in the metro brief.
+        Sourced figures, each with its own period; a band is shown as a band;
+        a dashed cell is a figure the column does not rank (undated, over a
+        year old, a narrower stock or a spread of two reads); a dash is a
+        recorded gap, explained in the metro brief.
       </p>
     </section>
   );
@@ -1060,9 +1022,10 @@ async function RentBoardLive() {
 // four snapshot-tracked classes produce rows; other sector tabs render the
 // research doc alone.
 async function SectorLeaderboard({ sector }: { sector: string }) {
-  const { rows, heldOpen } = sectorLeaderboard(sector);
+  // One row per distinct figure, ranked where the sources let the ranking
+  // place it, read for today (lib/sector-leaderboard).
+  const { rows, ranked, heldOpen } = sectorLeaderboard(sector, todayIso());
   if (rows.length === 0 && heldOpen.length === 0) return null;
-  const label = SECTOR_LABEL[sector] ?? sector;
   // The demand side, live: the same markets ranked by their payrolls in the
   // sector that fills this kind of building (all payrolls for apartments),
   // one cached read of that metric across the metros. A failed read leaves
@@ -1076,112 +1039,13 @@ async function SectorLeaderboard({ sector }: { sector: string }) {
       console.warn("sector payrolls read failed:", err instanceof Error ? err.message : err);
     }
   }
-  const anyRent = rows.some((r) => r.rent !== null);
-  const anyCap = rows.some((r) => r.capLow !== null);
-  const band = (lo: number, hi: number | null) =>
-    hi === null || hi === lo ? `${lo}%` : `${lo}–${hi}%`;
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">
-          {label} across the covered markets
-        </h3>
-        <span className="text-[11px] text-muted">
-          ranked tightest to loosest · vintages vary by print — each metro page
-          declares them
-        </span>
-      </div>
-      <div className="mt-2 overflow-x-auto">
-        <table className="w-full min-w-[440px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-line text-[11px] uppercase tracking-wide text-muted">
-              <th className="py-1.5 pr-2 font-medium">#</th>
-              <th className="py-1.5 pr-3 font-medium">Market</th>
-              <th className="py-1.5 pr-3 font-medium">Vacancy</th>
-              {anyRent && <th className="py-1.5 pr-3 font-medium">Asking $/SF</th>}
-              {anyCap && <th className="py-1.5 pr-3 font-medium">Cap range</th>}
-              <th className="py-1.5 font-medium">Src</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r, i) => {
-              // Each figure's own house, area and period, for its cell's
-              // title, and its own link in the Src column — never the
-              // block's first link, which is another figure's as often as not.
-              const credit = (label: CitedFigure["label"]) => {
-                const f = r.figures.filter((x) => x.label === label);
-                return f.length > 0 ? figuresTitle(f) : undefined;
-              };
-              const links = figureSources(r.figures, (href) => linkOk(href) !== false);
-              // Sorted with every vacancy-ranked row first, so index = rank.
-              return (
-                <tr key={r.id} className="border-b border-line/60">
-                  <td className="py-1.5 pr-2 font-mono text-[11px] tabular-nums text-muted">
-                    {r.vLow !== null ? i + 1 : "—"}
-                  </td>
-                  <td className="py-1.5 pr-3">
-                    <Link
-                      href={`/market?metro=${r.id}`}
-                      prefetch={false}
-                      className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
-                    >
-                      {r.name}
-                    </Link>
-                  </td>
-                  <td className="py-1.5 pr-3 font-mono text-xs tabular-nums" title={credit("Vacancy")}>
-                    {r.vLow !== null ? band(r.vLow, r.vHigh) : "level open"}
-                  </td>
-                  {anyRent && (
-                    <td
-                      className="py-1.5 pr-3 font-mono text-xs tabular-nums"
-                      title={credit("Rent")}
-                    >
-                      {r.rent !== null ? rentText(r.rent) : "—"}
-                    </td>
-                  )}
-                  {anyCap && (
-                    <td className="py-1.5 pr-3 font-mono text-xs tabular-nums" title={credit("Cap")}>
-                      {r.capLow !== null && r.capHigh !== null
-                        ? band(r.capLow, r.capHigh)
-                        : "—"}
-                    </td>
-                  )}
-                  <td className="py-1.5 text-[11px] text-muted">
-                    {links.length > 0 ? (
-                      <span className="inline-flex flex-wrap gap-x-1.5">
-                        {links.map((l) => (
-                          <a
-                            key={l.href}
-                            href={l.href}
-                            target="_blank"
-                            rel="noreferrer"
-                            title={l.title}
-                            className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                          >
-                            {l.label}
-                          </a>
-                        ))}
-                      </span>
-                    ) : (
-                      <span title={figuresTitle(r.figures)}>on file</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {heldOpen.length > 0 && (
-        <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
-          Direction on file, numeric level held open: {heldOpen.join(" · ")} —
-          the metro pages carry the sourced notes.
-        </p>
-      )}
+      <LeaderboardTable sector={sector} rows={rows} ranked={ranked} heldOpen={heldOpen} />
       {payrollMetric && payrolls.length > 0 && (
         <SectorJobsRank
           metric={payrollMetric}
-          markets={rows.map((r) => ({ id: r.id, name: r.name }))}
+          markets={rows.flatMap((r) => r.markets)}
           rates={payrolls}
         />
       )}

@@ -52,6 +52,12 @@ export interface FigureRead {
    *  stabilized core", a rent's "Class A space" — or null; such a cap is
    *  shown and named, never held to an exit */
   slice: string | null;
+  /** a band that is ONE read — one house, one area, one period — which its
+   *  publisher prints as a range (`"band": "printed"` in the file: Hampton
+   *  Roads retail, "4.4–4.6%, carried as the printed band"). Any other band
+   *  is two reads — two houses, two inventories or two periods — and the
+   *  rankings never place it (lib/sector-leaderboard). */
+  printedBand: boolean;
 }
 
 export interface TrackerRead {
@@ -160,7 +166,72 @@ export function figureRead(raw: unknown, sources: readonly string[] | undefined)
     links,
     construct: words(r.construct),
     slice: words(r.slice),
+    printedBand: r.band === "printed",
   };
+}
+
+const MONTH_END = ["01-31", "02-28", "03-31", "04-30", "05-31", "06-30", "07-31", "08-31", "09-30", "10-31", "11-30", "12-31"];
+const MONTHS = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+
+/** The last day a qualifier ("q2", "h1", "year-end", "mid", "march"…) covers in a year. */
+function endOf(year: number, qualifier: string | null): string {
+  const q = qualifier ?? "";
+  const quarter = /^q([1-4])$/.exec(q);
+  if (quarter) return `${year}-${["03-31", "06-30", "09-30", "12-31"][Number(quarter[1]) - 1]}`;
+  if (q === "h1" || q === "mid") return `${year}-06-30`;
+  if (q === "early") return `${year}-03-31`;
+  const month = MONTHS.indexOf(q.slice(0, 3));
+  if (month >= 0 && q !== "") return `${year}-${MONTH_END[month]}`;
+  // h2, year-end, late, or a year alone: the year's last day.
+  return `${year}-12-31`;
+}
+
+/**
+ * The last day each dated part of a period covers, earliest first, read
+ * only from what the words say: "Q2 2026" ends June 30, "year-end 2025" and
+ * "2024" a December 31st, "mid-2026" June 30, "March 2026" March 31; "Q1
+ * and Q2 2026" is two parts, a quarter each. A qualifier dates the next
+ * year after it. Empty for a period that names no year.
+ */
+export function periodEnds(period: string | null | undefined): string[] {
+  if (!period) return [];
+  const out: string[] = [];
+  let pending: string[] = [];
+  const token =
+    /\b(q[1-4]|h[12]|year-end|mid|late|early|jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|june?|july?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b|\b((?:19|20)\d{2})\b/gi;
+  for (const m of period.matchAll(token)) {
+    if (m[2]) {
+      const year = Number(m[2]);
+      if (pending.length === 0) out.push(endOf(year, null));
+      for (const q of pending) out.push(endOf(year, q));
+      pending = [];
+    } else {
+      pending.push(m[1].toLowerCase());
+    }
+  }
+  return out.sort();
+}
+
+/** Whether a figure is undated: no period, a period that says one of its
+ *  reads is undated ("the ODU survey undated"), or one that names no year. */
+export function isUndated(read: Pick<FigureRead, "period">): boolean {
+  return !read.period || /\bundated\b/i.test(read.period) || periodEnds(read.period).length === 0;
+}
+
+/** Whether a dated figure's period — its earliest part — ended more than a
+ *  year before `today` (an ISO day): "2024" and "Q4 2024" on 2026-10-01. */
+export function olderThanAYear(read: Pick<FigureRead, "period">, today: string): boolean {
+  const end = periodEnds(read.period)[0];
+  if (!end || !/^\d{4}-\d{2}-\d{2}$/.test(today)) return false;
+  const cutoff = `${Number(today.slice(0, 4)) - 1}${today.slice(4)}`;
+  return end < cutoff;
+}
+
+/** "Suburban Maryland", "Washington DC region" — an area's words as a row
+ *  names it: no leading "the", no parenthetical, the first letter capital. */
+export function areaLabel(area: string): string {
+  const bare = area.replace(/^the\s+/i, "").replace(/\s*\([^)]*\)\s*$/, "").trim();
+  return bare.charAt(0).toUpperCase() + bare.slice(1);
 }
 
 /**

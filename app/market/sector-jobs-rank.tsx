@@ -1,9 +1,11 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import {
   SECTOR_JOBS_LABEL,
   formatValue,
   isSectorJobsMetric,
   metroSeriesFor,
+  periodOf,
   seriesUrl,
   type LiveRate,
   type MetroMetric,
@@ -20,16 +22,32 @@ import { monthOf } from "@/lib/zori";
  * the space is tight, this says where the demand for it is growing.
  *
  * Pure: the page reads one metric across the metros (`liveMetricRates`)
- * and hands the rows in with the leaderboard's own markets. A suburb has
- * no series of its own and reads its MSA's (`metroSeriesFor`), so the row
- * says whose figure it is; two suburbs of one MSA therefore share a bar,
- * which is the truth rather than a duplicate. A market with no fresh
- * figure is listed last, unranked, with the reason, never dropped — and
- * nothing renders at all until the pull has written a row.
+ * and hands the rows in with the leaderboard's own markets.
+ *
+ * ONE ROW PER FIGURE (the research pass of 2026-10-01). A suburb has no
+ * series of its own and reads its metro area's (`metroSeriesFor`), so
+ * Prince George's, Montgomery County and Northern Virginia read
+ * Washington's payrolls and Newark New York's: four of them had taken rank
+ * numbers of their own on a figure that was the metro area's, and the "·
+ * Washington MSA" that said so was cut by a fixed-width cell at every
+ * width. A row is now the metro area's figure, named for the area, with
+ * every market that reads it listed beside it — the names wrap rather than
+ * truncate. And the ranking is one month's: a figure of an older month is
+ * listed after the ranked rows with its month, as a stale or missing one
+ * is, never ranked under a month it is not of. Nothing renders until the
+ * pull has written a row.
  */
 export interface RankMarket {
   id: string;
   name: string;
+}
+
+interface RankRow {
+  /** the series the markets read */
+  meta: MetroSeriesMeta;
+  r: LiveRate;
+  /** every market that reads it, the series' own market first */
+  markets: RankMarket[];
 }
 
 export function SectorJobsRank({
@@ -44,49 +62,76 @@ export function SectorJobsRank({
   rates: readonly LiveRate[];
 }) {
   const byId = new Map(rates.map((r) => [r.meta.id, r]));
-  const rows = markets.map((m) => {
+  // Each market's series for the metric, its own or its metro area's.
+  const reads = markets.map((m) => {
     const meta = metroSeriesFor(m.id).series.find((s) => s.metric === metric) ?? null;
-    const r = meta ? (byId.get(meta.id) ?? null) : null;
-    return { market: m, meta, r, borrowed: meta !== null && meta.metro !== m.id };
+    return { market: m, meta, r: meta ? (byId.get(meta.id) ?? null) : null };
   });
-  const ranked = rows
-    .filter((x): x is typeof x & { r: LiveRate } => x.r !== null && x.r.fresh && Number.isFinite(x.r.value))
-    .sort((a, b) => b.r.value - a.r.value);
-  if (ranked.length === 0) return null;
-  const unranked = rows.filter((x) => !ranked.includes(x as (typeof ranked)[number]));
+  // One row per series: every market that reads it.
+  const bySeries = new Map<string, RankRow>();
+  for (const x of reads) {
+    if (!x.meta || !x.r) continue;
+    const row = bySeries.get(x.meta.id) ?? { meta: x.meta, r: x.r, markets: [] };
+    if (!row.markets.some((m) => m.id === x.market.id)) row.markets.push(x.market);
+    bySeries.set(x.meta.id, row);
+  }
+  for (const row of bySeries.values()) {
+    // The series' own market first, then the markets that borrow it.
+    row.markets.sort((a, b) => Number(b.id === row.meta.metro) - Number(a.id === row.meta.metro));
+  }
+  const usable = [...bySeries.values()].filter((x) => x.r.fresh && Number.isFinite(x.r.value));
+  // The ranking's month: the newest any fresh figure is of.
+  const newest = usable.map((x) => x.r.obsDate).sort().at(-1) ?? null;
+  const ranked = usable.filter((x) => x.r.obsDate === newest).sort((a, b) => b.r.value - a.r.value);
+  if (!newest || ranked.length === 0) return null;
+  const olderMonth = usable.filter((x) => x.r.obsDate !== newest);
+  const stale = [...bySeries.values()].filter((x) => !usable.includes(x));
+  const noRow = reads.filter((x) => x.meta === null || x.r === null);
   const widest = Math.max(0.1, ...ranked.map((x) => Math.abs(x.r.value)));
-  const newest = ranked.map((x) => x.r.obsDate).sort().at(-1) ?? ranked[0].r.obsDate;
   const what = isSectorJobsMetric(metric) ? SECTOR_JOBS_LABEL[metric] : "All payrolls";
   const heading = isSectorJobsMetric(metric)
     ? `Where ${what.toLowerCase()} jobs are growing`
     : "Where payrolls are growing";
+  const notRanked = [
+    ...olderMonth.map((x) => `${x.meta.area} (${formatValue(x.r)}, ${periodOf(x.r)} — an older month)`),
+    ...stale.map((x) => `${x.meta.area} (not updating, newest ${periodOf(x.r)})`),
+    ...noRow.map((x) => `${x.market.name} (${x.meta === null ? "no series on FRED" : "no row yet"})`),
+  ];
   return (
     <div className="mt-4" data-qa="sector-jobs-rank">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">{heading}</h3>
         <span className="text-[11px] text-muted">
-          {`${what}, on a year ago · ranked fastest first · ${monthOf(newest)} · BLS payrolls via FRED`}
+          {`${what}, on a year ago · ${ranked.length} metro areas ranked fastest first · ${monthOf(newest)} · BLS payrolls via FRED`}
         </span>
       </div>
-      <div className="mt-2 max-w-xl space-y-1">
+      <ol className="mt-2 max-w-2xl space-y-1.5">
         {ranked.map((x, i) => (
-          <div key={x.market.id} className="flex items-center gap-2">
-            <span className="w-5 shrink-0 text-right font-mono text-[11px] tabular-nums text-muted">{i + 1}</span>
-            <span className="w-36 shrink-0 truncate text-[11px] sm:w-48">
-              <Link
-                href={`/market?metro=${x.market.id}`}
-                prefetch={false}
-                className="font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
-              >
-                {x.market.name}
-              </Link>
-              {x.borrowed && x.meta && (
-                <span className="text-muted" title={`${x.market.name} has no series of its own; the figure is the metro area's`}>
-                  {` · ${x.meta.area}`}
-                </span>
-              )}
+          <li
+            key={x.meta.id}
+            className="grid grid-cols-[1.25rem_minmax(0,1fr)_minmax(4rem,35%)_3.5rem] items-center gap-2"
+            data-rank-row={x.meta.id}
+          >
+            <span className="text-right font-mono text-[11px] tabular-nums text-muted">{i + 1}</span>
+            {/* The area whose figure it is, then every market that reads it:
+                wrapped, never truncated. */}
+            <span className="min-w-0 text-[11px] leading-snug">
+              <span className="font-semibold text-ink">{x.meta.area}</span>
+              {" — "}
+              {x.markets.map((m, k) => (
+                <Fragment key={m.id}>
+                  {k > 0 ? ", " : null}
+                  <Link
+                    href={`/market?metro=${m.id}`}
+                    prefetch={false}
+                    className="font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                  >
+                    {m.name}
+                  </Link>
+                </Fragment>
+              ))}
             </span>
-            <div className="relative h-3 flex-1 rounded-sm bg-faint" aria-hidden="true">
+            <div className="relative h-3 rounded-sm bg-faint" aria-hidden="true">
               <div className="absolute inset-y-0 left-1/2 w-px bg-line" />
               <div
                 data-bar="sectorrank"
@@ -98,25 +143,21 @@ export function SectorJobsRank({
               href={seriesUrl(x.r.meta.id)}
               target="_blank"
               rel="noreferrer"
-              className="w-14 shrink-0 text-right font-mono text-[11px] tabular-nums text-ink underline decoration-dotted underline-offset-2 hover:text-brand"
+              className="text-right font-mono text-[11px] tabular-nums text-ink underline decoration-dotted underline-offset-2 hover:text-brand"
               title={x.r.meta.label}
             >
               {formatValue(x.r)}
             </a>
-          </div>
+          </li>
         ))}
-      </div>
-      {unranked.length > 0 && (
-        <p className="mt-1.5 text-[11px] text-muted">
-          {`Not ranked — ${unranked
-            .map((x) => `${x.market.name} (${x.meta === null ? "no series on FRED" : x.r === null ? "no row yet" : "stale figure"})`)
-            .join(", ")}.`}
-        </p>
+      </ol>
+      {notRanked.length > 0 && (
+        <p className="mt-1.5 text-[11px] text-muted">{`Not ranked — ${notRanked.join(", ")}.`}</p>
       )}
       <p className="mt-1 text-[11px] leading-relaxed text-muted">
         {isSectorJobsMetric(metric)
-          ? `The payroll count in the sector that fills this kind of building, each metro area's own (a suburb reads its metro area's, named), against the same month a year earlier. The table above ranks the same markets by how tight the space is; this ranks them by whether the demand for it is growing, and the two need not agree.`
-          : `All payrolls, each metro area's own (a suburb reads its metro area's, named), against the same month a year earlier — the demand side a rental market runs on. The table above ranks by how tight the market is; this ranks by whether it is growing, and the two need not agree.`}
+          ? `The payroll count in the sector that fills this kind of building, each metro area's own, against the same month a year earlier — one row a metro area, naming every market that reads its figure (a suburb has none of its own). The table above ranks the same markets by how tight the space is; this ranks them by whether the demand for it is growing, and the two need not agree.`
+          : `All payrolls, each metro area's own, against the same month a year earlier — one row a metro area, naming every market that reads its figure (a suburb has none of its own) — the demand side a rental market runs on. The table above ranks by how tight the market is; this ranks by whether it is growing, and the two need not agree.`}
       </p>
     </div>
   );

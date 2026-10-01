@@ -692,6 +692,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
         ],
         construct: null,
         slice: null,
+        printedBand: false,
       },
       cap: null,
     });
@@ -744,10 +745,11 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
       links: ["https://b.example/q2"],
       construct: null,
       slice: null,
+      printedBand: false,
     });
     // A block with a figure and no read: nothing named, and never the first source.
     const bare = figureRead(undefined, sources);
-    expect(bare).toEqual({ house: null, area: null, period: null, links: [], construct: null, slice: null });
+    expect(bare).toEqual({ house: null, area: null, period: null, links: [], construct: null, slice: null, printedBand: false });
     expect(figureCitation(bare)).toBe("undated");
     expect(figureNote({ ...bare, house: "Essex Realty", period: "April 2026", construct: "a transaction average", slice: "Class B/C buildings" })).toBe(
       "Essex Realty, April 2026; a transaction average; for Class B/C buildings",
@@ -755,7 +757,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
   });
 
   it("every tracker figure in the research file carries its own read, linked only to its block's sources", () => {
-    const known = new Set(["house", "area", "period", "links", "construct", "slice"]);
+    const known = new Set(["house", "area", "period", "links", "construct", "slice", "band"]);
     let figures = 0;
     for (const m of metrosSeed.metros) {
       const snap = (m as { sector_snapshot?: Record<string, unknown> | null }).sector_snapshot ?? {};

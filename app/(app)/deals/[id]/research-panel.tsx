@@ -30,7 +30,7 @@ import {
 import { withArticle } from "@/lib/article";
 import { FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrToday, fmrWhen, readFmrMetric, type FmrBed } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
-import { sectorLeaderboard } from "@/lib/sector-leaderboard";
+import { sectorStandings } from "@/lib/sector-leaderboard";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
@@ -151,24 +151,13 @@ export function benchRowLabel(b: Pick<Benchmark, "metric" | "as_of">): string {
   return metricLabel(b.metric);
 }
 
-// Where each covered metro sits per sector across the covered markets
-// (tightest vacancy first) — the same shared builder behind the market
-// page's rankings, the briefs' chips, and the sample screen, so a deal's
-// vs-market row can never disagree with them.
-const SECTOR_RANKS: Record<
-  string,
-  Record<string, { rank: number; total: number }>
-> = Object.fromEntries(
-  ["office", "industrial", "multifamily", "retail"].map((sec) => {
-    const ranked = sectorLeaderboard(sec).rows.filter((r) => r.vLow !== null);
-    return [
-      sec,
-      Object.fromEntries(
-        ranked.map((r, i) => [r.id, { rank: i + 1, total: ranked.length }]),
-      ),
-    ];
-  }),
-);
+// Where each covered metro's figure stands per sector across the covered
+// markets (tightest vacancy first) — the same shared builder behind the
+// market page's rankings, the briefs' chips, and the sample screen
+// (lib/sector-leaderboard `sectorStandings`), so a deal's vs-market row can
+// never disagree with them. Read for the day the panel renders: a figure
+// over a year old is not ranked.
+const TRACKED_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
 
 /** Plain-English labels for condition keys surfaced as open questions. */
 const UNKNOWN_LABELS: Record<string, string> = {
@@ -308,6 +297,7 @@ export async function ResearchPanel({
 }) {
   // Today, for a fair market rent's year (ended or not) — read once here.
   const today = fmrToday();
+  const standings = sectorStandings(TRACKED_SECTORS, today);
   // The checked-in research layer, with the database's rows merged in — a
   // missing table (migration not yet run) degrades silently to the files.
   // A rule's words are always the file's (mergeRules: nothing else writes
@@ -645,8 +635,8 @@ export async function ResearchPanel({
               // Vacancy rows also say where this metro sits in its sector's
               // cross-metro ranking — same builder as the market page.
               const vac = b.metric.match(/^(\w+?)_vacancy_pct$/);
-              const rank =
-                vac && metro ? SECTOR_RANKS[vac[1]]?.[metro.id] : undefined;
+              const standing = vac && metro ? standings[vac[1]]?.[metro.id] : undefined;
+              const rank = standing && standing.rank !== null ? { rank: standing.rank, total: standing.total } : undefined;
               return (
                 <li
                   key={`${b.metro}|${b.metric}`}
@@ -661,7 +651,7 @@ export async function ResearchPanel({
                     {rank && vac && (
                       <Link
                         href={`/market?sector=${vac[1]}`}
-                        title="rank across covered markets, tightest first"
+                        title={`rank across covered markets, tightest first${standing && standing.row.markets.length > 1 ? ` — one figure${standing.row.sharedArea ? ` for ${standing.row.sharedArea}` : ""}, read by ${standing.row.markets.map((m) => m.name).join(", ")}` : ""}`}
                         className="ml-2 rounded-full border border-line px-1.5 py-px text-[11px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
                       >
                         #{rank.rank} of {rank.total}

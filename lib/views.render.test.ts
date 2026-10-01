@@ -5556,13 +5556,15 @@ import { SectorJobsRank } from "@/app/market/sector-jobs-rank";
 import { readMetricRates } from "@/lib/live-rates";
 
 describe("SectorJobsRank — the covered markets ranked by a sector's payrolls, under the vacancy leaderboard", () => {
-  // Professional and business services across four metro areas, as the
-  // pull would write them; Richmond's row is stale, Boston has no row.
+  // Professional and business services across five metro areas, as the
+  // pull would write them; Richmond's row is stale, Chicago's is a month
+  // behind the rest, Boston has no row.
   const ROWS: RateRow[] = [
     { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.31234 },
     { series_id: "DALL148PBSV_YOY", obs_date: "2026-08-01", value: 2.4 },
     { series_id: "PHIL942PBSV_YOY", obs_date: "2026-08-01", value: -0.8 },
     { series_id: "RICH051PBSV_YOY", obs_date: "2025-08-01", value: 0.9 },
+    { series_id: "CHIC917PBSV_YOY", obs_date: "2026-07-01", value: 5.5 },
   ];
   const rates = readMetricRates("jobs_pbs_yoy", ROWS, FIXTURE_NOW);
   const markets = [
@@ -5572,29 +5574,34 @@ describe("SectorJobsRank — the covered markets ranked by a sector's payrolls, 
     { id: "richmond", name: "Richmond" },
     { id: "boston", name: "Boston" },
     { id: "nova", name: "Northern Virginia" },
+    { id: "chicago", name: "Chicago" },
   ];
   const html = render(React.createElement(SectorJobsRank, { metric: "jobs_pbs_yoy", markets, rates }));
   const text = visibleText(html);
 
-  it("ranks fastest first, draws a signed bar a market, links each figure, and names a suburb's borrowed figure", () => {
+  it("ranks one row a metro area's figure, fastest first, naming every market that reads it", () => {
     expect(text).toContain("Where professional & business services jobs are growing");
-    expect(text).toContain("Professional & business services, on a year ago · ranked fastest first · Aug 2026 · BLS payrolls via FRED");
-    // Dallas, then Washington and its suburb on the same figure, then Philadelphia.
-    const order = ["Dallas–Fort Worth", "Washington DC", "Northern Virginia", "Philadelphia"].map((n) => text.indexOf(n));
+    expect(text).toContain("Professional & business services, on a year ago · 3 metro areas ranked fastest first · Aug 2026 · BLS payrolls via FRED");
+    // Dallas, then Washington's figure — read by the District and Northern
+    // Virginia, one row, one rank (the research pass of 2026-10-01 found
+    // each suburb ranked on its metro area's figure) — then Philadelphia.
+    const order = ["Dallas–Fort Worth", "Washington MSA", "Philadelphia"].map((n) => text.indexOf(n));
     expect(order).toEqual([...order].sort((a, b) => a - b));
     expect(order.every((i) => i >= 0)).toBe(true);
-    // The suburb's name is a link and the MSA's name a muted span after it, so
-    // the visible text splits there; the served markup carries the pair.
-    expect(text).toContain("· Washington MSA");
-    expect(html).toContain("Northern Virginia</a><span class=\"text-muted\"");
-    expect((html.match(/data-bar="sectorrank"/g) ?? []).length).toBe(4);
+    const washington = html.match(/<li[^>]*data-rank-row="WASH911PBSV_YOY"[\s\S]*?<\/li>/)?.[0] ?? "";
+    expect(washington.replace(/<[^>]+>/g, "")).toContain("Washington MSA — Washington DC, Northern Virginia");
+    expect((html.match(/data-rank-row=/g) ?? []).length).toBe(3);
+    // The area and the names wrap; nothing in a row is truncated.
+    expect(washington).not.toContain("truncate");
+    expect((html.match(/data-bar="sectorrank"/g) ?? []).length).toBe(3);
     expect(html).toContain('data-bar="sectorrank" class="absolute inset-y-0 right-1/2 bg-brand"');
     expect(html).toContain("https://fred.stlouisfed.org/series/DALL148PBSV\"");
     expect(html).toContain('href="/market?metro=dallas"');
     expect(text).toContain("2.4%");
     expect(text).toContain("−0.8%");
-    // Richmond's figure is a year old and Boston has no row: listed, unranked, with the reason.
-    expect(text).toContain("Not ranked — Richmond (stale figure), Boston (no row yet).");
+    // Chicago's figure is a month behind, Richmond's a year old, Boston has no
+    // row: listed, unranked, each with its reason and its own month.
+    expect(text).toContain("Not ranked — Chicago MSA (5.5%, Jul 2026 — an older month), Richmond MSA (not updating, newest Aug 2025), Boston (no row yet).");
     expect(text).toContain("the two need not agree");
     expect(a11yIssues(html), "sector jobs rank").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
@@ -7873,5 +7880,76 @@ describe("RuleItem and Fold — a rule's first sentence whole, its caution in vi
     const one = render(React.createElement(Fold, { text: "Just one (Fla. Stat. 166.043) sentence." }));
     expect(one).toContain('<p class="">Just one (Fla. Stat. 166.043) sentence.</p>');
     expect(one).not.toContain("<details");
+  });
+});
+
+// ── The research tracker's rankings, drawn (the research pass of 2026-10-01) ──
+import { CoverageBoardCell, LeaderboardTable, StandingChip, coverageCell } from "@/app/market/tracker-boards";
+import { sectorLeaderboard, sectorStandings } from "@/lib/sector-leaderboard";
+
+describe("the tracker's leaderboard, chips and coverage cells — one row a figure, a rank only where the sources state one", () => {
+  const TODAY = "2026-10-01";
+  const table = (sector: string) => {
+    const b = sectorLeaderboard(sector, TODAY);
+    return render(React.createElement(LeaderboardTable, { sector, rows: b.rows, ranked: b.ranked, heldOpen: b.heldOpen }));
+  };
+
+  it("draws a shared figure as one row naming its area and every market, and lists the unranked after with the reason", () => {
+    const html = table("multifamily");
+    const text = visibleText(html);
+    // The ranking's own words, which live-verify greps on the retail page.
+    expect(text).toContain("figures ranked tightest to loosest");
+    const strip = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'");
+    const dmv = html.match(/<tr[^>]*data-row-rank="2"[\s\S]*?<\/tr>/)?.[0] ?? "";
+    expect(strip(dmv)).toContain("Washington DC region — Washington DC, Prince George's County MD, Montgomery County MD, Northern Virginia");
+    // Each figure's own period beside it.
+    expect(strip(dmv)).toContain("year-end 2025");
+    expect((html.match(/data-row-rank="2"/g) ?? []).length).toBe(1);
+    // The unranked block, after the ranked rows, each with its reason.
+    expect(text).toContain("Not ranked — the reason under each market");
+    expect(html.indexOf("Not ranked — the reason")).toBeGreaterThan(html.lastIndexOf('data-row-rank="5"'));
+    expect(text).toContain("undated; a spread of two reads");
+    // A figure with no house says so, plainly, and never "on file".
+    expect(text).toContain("vacancy: publisher not recorded");
+    expect(text).not.toMatch(/\bon file\b/);
+    expect(a11yIssues(html), "multifamily leaderboard").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("prints a band as a band, ranks a printed range by its loosest end and keeps the held-open line", () => {
+    const html = table("retail");
+    const text = visibleText(html);
+    expect(text).toContain("4.4–4.6%");
+    expect(text).toContain("numeric level held open");
+    expect(text).toContain("2024, over a year old");
+    // Prince George's industrial rent is the note's band, never $12.50.
+    const industrial = visibleText(table("industrial"));
+    expect(industrial).toContain("$10–15");
+    expect(industrial).not.toContain("12.50");
+    expect(industrial).toContain("undated; small-bay space only; a spread of two reads");
+  });
+
+  it("chips a market by its figure's standing: a rank naming the shared figure, or why it is not ranked", () => {
+    const s = sectorStandings(["office", "industrial"], TODAY);
+    const ranked = render(React.createElement(StandingChip, { sector: "office", metroId: "montgomery_county", standing: s.office.montgomery_county }));
+    expect(ranked).toMatch(/#\d+ of \d+/);
+    expect(ranked).toContain("tightest first");
+    expect(ranked).toContain("one figure for Suburban Maryland, read by Prince George&#x27;s County MD too");
+    const unranked = visibleText(render(React.createElement(StandingChip, { sector: "industrial", metroId: "nova", standing: s.industrial.nova })));
+    expect(unranked).toContain("not ranked · undated; small-bay space only; a spread of two reads");
+  });
+
+  it("shades only a ranked coverage cell, prints every cell's period, and names the area of a shared one", () => {
+    const s = sectorStandings(["office"], TODAY);
+    const shared = coverageCell(s.office.montgomery_county, s.office.montgomery_county.total);
+    expect(shared.period).toBe("Q1 2026");
+    expect(shared.credit).toContain("one figure: Suburban Maryland — Prince George's County MD, Montgomery County MD");
+    const html = render(React.createElement(CoverageBoardCell, { sector: "office", cell: shared }));
+    expect(html).toContain('data-cell="ranked"');
+    expect(visibleText(html)).toContain("Q1 2026");
+    const spread = render(React.createElement(CoverageBoardCell, { sector: "office", cell: coverageCell(s.office.dc, s.office.dc.total) }));
+    expect(spread).toContain('data-cell="unranked"');
+    expect(spread).not.toContain("background-color");
+    expect(spread).toContain("not ranked: a spread of two reads");
   });
 });
