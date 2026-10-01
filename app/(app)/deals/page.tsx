@@ -78,10 +78,14 @@ export default async function DealsPage({
   // opens the new-deal form on the manual tab with the address pre-picked.
   const prefillAddress = parseStructuredAddress(addr ?? "");
   const errorMessage = errorCode ? (ERRORS[errorCode] ?? null) : null;
+  // Joining moves no deal (join_team_with_token adds the membership alone):
+  // the deals added from now on go into the team's pipeline, while its trial
+  // or plan takes them (the create actions' `teamAllowed`), and the ones
+  // already here stay the reader's own.
   const notice = deleted
     ? "Deal deleted."
     : joined
-      ? "Welcome to the team — this pipeline is now shared with your teammates."
+      ? "Welcome to the team. The deals you add from now on go into its shared pipeline while the team's trial or plan allows; the deals you already had stay personal."
       : null;
 
   const supabase = await createSupabaseServerClient();

@@ -6,6 +6,11 @@ export type TeamRole = "owner" | "member";
 /** Team deals included before the Team plan is required. */
 export const TEAM_TRIAL_DEALS = 3;
 
+/** Days an unused invite link lives: team_invites.expires_at defaults to
+ *  now() + 14 days (migration 0007). A link lets one person join, once
+ *  (0012: the join claims it), and its owner can revoke it before then. */
+export const INVITE_DAYS = 14;
+
 export interface TeamMemberInfo {
   userId: string;
   role: TeamRole;

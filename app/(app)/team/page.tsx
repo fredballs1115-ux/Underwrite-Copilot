@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import { getTeam, memberLabel, TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { getTeam, memberLabel, INVITE_DAYS, TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { TEAM_PRICE_LABEL, teamMonthlyTotal, fmtUsd } from "@/lib/billing";
 import {
   createTeam,
@@ -17,6 +17,18 @@ import { CopyLinkButton, ConfirmSubmit } from "./team-client";
 import { PendingButton } from "../pending-button";
 
 export const metadata: Metadata = { title: "Team" };
+
+/** What a member who leaves, or is removed, keeps of the deals they added:
+ *  the deals stay in the team's pipeline under their name (removeMember and
+ *  leaveTeam move nothing), and row-level security reads a deal by its
+ *  creator — so they still open it, mint a share link to it and delete it
+ *  (0007's read and delete policies, 0017's share links). An edit to the
+ *  deal itself is refused while it stays in a team they are not on (0007's
+ *  update check). */
+const LEAVING_KEEPS = {
+  them: "The deals they added stay in the team pipeline, and they keep access to them: they can still open them, share them by link and delete them.",
+  you: "You'll stop seeing your teammates' deals. The deals you added stay in the team pipeline, and you keep access to them: you can still open them, share them by link and delete them.",
+};
 
 const TEAM_UNAVAILABLE = { cls: "bg-kill/10 text-kill", text: "Team checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you set up." };
 const MESSAGES: Record<string, { cls: string; text: string }> = {
@@ -232,9 +244,13 @@ export default async function TeamPage({
                     {team.role === "owner" && m.userId !== user?.id && (
                       <form action={removeMember}>
                         <input type="hidden" name="memberId" value={m.userId} />
+                        {/* What row-level security leaves a departed member
+                            (migrations 0007, 0017): a deal's creator still
+                            reads it, links it and deletes it; an edit is
+                            refused while it is in a team they are not on. */}
                         <ConfirmSubmit
                           label="Remove"
-                          confirmText={`Remove ${memberLabel(m)} from ${team.name}? Their deals stay in the team pipeline.`}
+                          confirmText={`Remove ${memberLabel(m)} from ${team.name}? ${LEAVING_KEEPS.them}`}
                           danger
                         />
                       </form>
@@ -247,7 +263,7 @@ export default async function TeamPage({
               <form action={leaveTeam} className="mt-4 border-t border-line pt-4">
                 <ConfirmSubmit
                   label="Leave team"
-                  confirmText={`Leave ${team.name}? You'll stop seeing the shared pipeline.`}
+                  confirmText={`Leave ${team.name}? ${LEAVING_KEEPS.you}`}
                   danger
                 />
               </form>
@@ -262,9 +278,12 @@ export default async function TeamPage({
                   <h2 className="text-sm font-semibold tracking-tight">
                     Invite teammates
                   </h2>
+                  {/* Single use since migration 0012; an unused link's
+                      expiry is 0007's default (lib/teams INVITE_DAYS). */}
                   <p className="mt-1 text-sm text-muted">
-                    Each link works until it expires (14 days) and can be
-                    revoked anytime.
+                    Each link lets one person join, once. An unused link
+                    expires {INVITE_DAYS} days after you make it, and you
+                    can revoke it anytime.
                   </p>
                 </div>
                 <form action={createInvite}>
