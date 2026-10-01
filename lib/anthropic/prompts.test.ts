@@ -22,6 +22,7 @@ import {
 } from "@/lib/anthropic/prompts";
 import { gapFigure } from "@/lib/gap-detail";
 import { compFigures } from "@/lib/comp-detail";
+import { priceRange } from "@/lib/criteria";
 import { rangeRead } from "@/lib/memo/report-document";
 
 // A deal with a plan — conversion, development, lease-up, heavy value-add —
@@ -117,6 +118,19 @@ describe("plan deals are judged on their own terms", () => {
       expect(p).toContain(lookAlike);
     }
     expect(p).toContain("Put the number alone in the value");
+  });
+
+  // Research pass 18: "Put the number alone in the value" could cost a
+  // price range its top, and every reader prices at the end it is given.
+  it("the extraction keeps a price stated as a range whole, and each example is one the price reader reads as a range", () => {
+    const p = extractionInstruction("multifamily");
+    expect(p).toContain("a price the OM states as a range or as pricing guidance: keep it as written on the \"Asking price\" row, both ends");
+    expect(p).toContain("never one end, a midpoint or the lower figure alone");
+    const examples = (p.match(/both ends — "([^"]+)", "([^"]+)", "([^"]+)"/) ?? []).slice(1);
+    expect(examples).toHaveLength(3);
+    for (const ex of examples) {
+      expect(priceRange(ex), ex).toEqual({ low: 40_000_000, high: 42_000_000 });
+    }
   });
 
   it("the model reconciliation asks for the plan and forbids a stabilized pro forma as year 1 without it", () => {

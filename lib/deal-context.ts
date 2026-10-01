@@ -1,7 +1,8 @@
 import { floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
-import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type StrategyKind } from "@/lib/deal-strategy";
+import { priceRange, priceRangeShort } from "@/lib/criteria";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { assetWords } from "@/lib/asset-words";
 import { dealTypeLabel, interestContextLine, readInterest } from "@/lib/interest";
@@ -22,6 +23,20 @@ import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
   n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+
+/**
+ * A price the OM states as a range — pricing guidance, a whisper — said once,
+ * with the end every figure is struck at (#466): the price readers take its
+ * top (lib/criteria `parsePrice`), the end that does not flatter a return,
+ * and a step that reads the memorandum's "$40–42M" would otherwise strike its
+ * own cap or basis on either end. "" where the price row states one figure.
+ */
+function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind): string {
+  const row = findPriceMetric(extraction?.metrics ?? [], kind);
+  const r = row ? priceRange(row.value) : null;
+  if (!row || !r) return "";
+  return `The ${row.label.trim().toLowerCase()} is stated as a range, ${priceRangeShort(r)}: every figure here is struck at its top, ${compact(r.high)}, the end that does not flatter a return.`;
+}
 
 /**
  * What the screen established about the deal, in two to four sentences, for
@@ -100,9 +115,12 @@ export function dealContextFor(
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
   const flood = floodContextLine(site?.flood);
+  // A price stated as a range (#466): which end every figure is struck at.
+  const range = priceRangeLine(extraction, strategy.kind);
   const head = [
     ...(interest ? [interestContextLine(interest)] : []),
     ...(sale ? [saleContextLine(sale)] : []),
+    ...(range ? [range] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
     ...(sellerNote ? [sellerFinancingContextLine(sellerNote)] : []),
     ...(affordable ? [affordableContextLine(affordable)] : []),

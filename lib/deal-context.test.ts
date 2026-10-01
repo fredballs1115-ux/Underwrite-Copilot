@@ -81,6 +81,24 @@ describe("dealContextFor — what the screen established, for every step that re
     expect(dealContextFor(unnamed, null, { take: "A stabilized asset — check the rent roll." })).toBe("Deal type: Stabilized.");
   });
 
+  it("a price stated as a range says which end every figure is struck at (#466, research pass 18)", () => {
+    const ranged: ExtractionResult = {
+      ...CONVERSION,
+      dealName: "Maddox Apartments",
+      strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$40,000,000 – $42,000,000"), m("Units", "150")],
+    };
+    expect(dealContextFor(ranged)).toBe(
+      "The asking price is stated as a range, $40–42M: every figure here is struck at its top, $42.0M, the end that does not flatter a return. Deal type: Stabilized.",
+    );
+    // Guidance in the OM's own shorthand reads the same.
+    expect(dealContextFor({ ...ranged, metrics: [m("Pricing guidance", "$40–42M")] })).toContain(
+      "The pricing guidance is stated as a range, $40–42M: every figure here is struck at its top, $42.0M",
+    );
+    // One figure: nothing said.
+    expect(dealContextFor({ ...ranged, metrics: [m("Asking price", "$42,000,000")] })).toBe("Deal type: Stabilized.");
+  });
+
   it("a stabilized asset gets only its type; an unknown strategy gets nothing", () => {
     expect(
       dealContextFor({
