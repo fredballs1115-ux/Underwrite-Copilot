@@ -38,6 +38,7 @@ import { readSiteReports } from "@/lib/site-reports";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { dealTypeLabel, interestTag, readInterest } from "@/lib/interest";
+import { yieldOnCostText } from "@/lib/plan-facts";
 import { goingInCapFigure, noteCapSlot } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
@@ -900,7 +901,7 @@ export default async function DealPage({
   const summaryCap = plan
     ? null
     : (findGoingInCap(metrics)?.value ?? signalGoingInCap(firstSignal)?.text ?? null);
-  const summaryYoc = plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null;
+  const summaryYoc = plan?.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : null;
 
   // The model's assumptions against the published figures (lib/model-vs-market):
   // rent growth against the metro's asking rents and its sitting tenants'

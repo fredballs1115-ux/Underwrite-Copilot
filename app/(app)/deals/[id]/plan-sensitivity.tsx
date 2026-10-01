@@ -1,5 +1,6 @@
 import { withArticle } from "@/lib/article";
 import type { PlanSummary } from "@/lib/deal-strategy";
+import { yieldOnCostText } from "@/lib/plan-facts";
 import {
   SPREAD_LABEL,
   SPREAD_RULE_OF_THUMB,
@@ -119,7 +120,7 @@ export function PlanSensitivity({
                         base ? "ring-2 ring-ink" : ""
                       }`}
                     >
-                      <span className="block text-sm font-semibold">{pct(cell.yieldOnCost)}</span>
+                      <span className="block text-sm font-semibold">{yieldOnCostText(cell.yieldOnCost)}</span>
                       <span className="block text-[10px] text-muted">
                         {cell.spreadBps >= 0 ? "+" : ""}
                         {cell.spreadBps} bps

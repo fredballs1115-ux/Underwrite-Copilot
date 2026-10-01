@@ -11,6 +11,7 @@ import { PlanSensitivity } from "@/app/(app)/deals/[id]/plan-sensitivity";
 import { ConstructionDebtPanel } from "@/app/(app)/deals/[id]/construction-debt-panel";
 import { PlanStrip } from "@/app/(app)/deals/[id]/plausibility-panel";
 import { SharePlan } from "@/app/share/[token]/plan-facts";
+import { yieldOnCostText } from "@/lib/plan-facts";
 
 const CONVERSION: ExtractionResult = {
   dealName: "1200 K Street — Office-to-Residential Conversion",
@@ -33,10 +34,10 @@ const plan = planSummary(CONVERSION, inferStrategy(CONVERSION))!;
 const refCap = { pct: 0.06, provenance: "assumption" as const };
 
 describe("PlanSensitivity — yield on cost, stressed", () => {
-  it("renders the grid with the OM's case at 11.7% (+567 bps) and the two exact sentences", () => {
+  it("renders the grid with the OM's case at 11.67% (+567 bps) and the two exact sentences", () => {
     const html = renderToStaticMarkup(React.createElement(PlanSensitivity, { plan, refCap }));
     expect(html).toContain("Yield on cost, stressed");
-    expect(html).toContain("11.7%");
+    expect(html).toContain("11.67%");
     expect(html).toContain("+567 bps");
     expect(html).toContain("OM NOI");
     expect(html).toContain("OM budget");
@@ -57,6 +58,18 @@ describe("PlanSensitivity — yield on cost, stressed", () => {
     );
     expect(html).toContain('title="200+ bps over the cap (a rule-of-thumb band)"');
     expect(html).not.toContain("built for the market");
+  });
+
+  it("prints each cell's yield to the spread's own precision, so yield less cap is the spread it prints (2026-09-30)", () => {
+    // The research pass: "11.7%" over a "6.00%" cap beside "+567 bps" — one
+    // number in two roundings. Every cell now reads to two decimals.
+    const html = renderToStaticMarkup(React.createElement(PlanSensitivity, { plan, refCap }));
+    const cells = [...html.matchAll(/font-semibold">(\d+\.\d\d)%<\/span><span class="block text-\[10px\] text-muted">([+-]?\d+) bps/g)];
+    expect(cells.length).toBe(25);
+    for (const [, yieldPct, bps] of cells) {
+      expect(Math.round((Number(yieldPct) - refCap.pct * 100) * 100), `${yieldPct}% / ${bps} bps`).toBe(Number(bps));
+    }
+    expect(yieldOnCostText(plan.yieldOnCost!)).toBe("11.67%");
   });
 
   it("pins its row labels while the grid scrolls sideways on a phone (2026-09-30)", () => {
@@ -100,8 +113,8 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     expect(html).toContain('value="$160,000,000"');
     expect(html).toContain('value="$21,000,000"');
     expect(html).toMatch(/aria-label="Years to take-out"[^>]*value="3"/);
-    // Yield on cost with the carry inside it is below the OM's 11.7%.
-    expect(html).toMatch(/Yield on total cost with the carry inside it:.*10\.\d%/);
+    // Yield on cost with the carry inside it is below the OM's 11.67%.
+    expect(html).toMatch(/Yield on total cost with the carry inside it:.*10\.\d\d%/);
   });
 
   it("adds no second interest reserve where the stated budget includes its own, and says so", () => {
@@ -122,8 +135,8 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     expect(html).toContain("the stated budget includes its interest reserve");
     expect(html).toContain('data-qa="reserve-in-budget"');
     expect(html).not.toContain("The draw is assumed to average");
-    // The OM's own 11.7% stands: the carry is already inside it.
-    expect(html).toMatch(/Yield on total cost with the carry inside it:.*11\.7%/);
+    // The OM's own 11.67% stands: the carry is already inside it.
+    expect(html).toMatch(/Yield on total cost with the carry inside it:.*11\.67%/);
     // Without the words, the reserve goes on top as before.
     const plain = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, props));
     expect(plain).not.toContain("the stated budget includes its interest reserve");
@@ -189,7 +202,7 @@ describe("SharePlan — the plan on the shared screen", () => {
     expect(html).toContain("Budget (total cost less price)");
     expect(html).toContain("$160.0M");
     expect(html).toContain("$180.0M"); // total cost
-    expect(html).toContain("11.7%"); // yield on cost
+    expect(html).toContain("11.67%"); // yield on cost
     expect(html).toContain("24 months of construction");
     expect(html).toContain("A conversion deal has no going-in cap");
     expect(html).toContain("never a cap rate on the acquisition price");
@@ -222,14 +235,14 @@ describe("SharePlan — the plan on the shared screen", () => {
       expect(html).toContain("Budget (doors × cost a door)");
       expect(html).toContain("$2.9M");
       expect(html).toContain("$50.9M"); // total cost
-      expect(html).toContain("6.1%"); // yield on cost
+      expect(html).toContain("6.09%"); // yield on cost
     }
   });
 
   it("prints the same five facts as the deal page's plan strip", () => {
     const share = renderToStaticMarkup(React.createElement(SharePlan, { strategy, plan }));
     const strip = renderToStaticMarkup(React.createElement(PlanStrip, { strategy, plan }));
-    for (const figure of ["$21.0M", "$20.0M", "$160.0M", "$180.0M", "11.7%"]) {
+    for (const figure of ["$21.0M", "$20.0M", "$160.0M", "$180.0M", "11.67%"]) {
       expect(share).toContain(figure);
       expect(strip).toContain(figure);
     }

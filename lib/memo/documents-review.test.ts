@@ -281,7 +281,7 @@ describe("the documents read the deal's kind as its page does — the extraction
 
   it("the memo's subtitle and key terms follow the page's kind", () => {
     const withSignal = buildMemoData(row(SIGNAL), "September 30, 2026");
-    expect(withSignal.strategyLine).toMatch(/^Conversion · stabilized NOI \$2\.7M on \$38\.0M total cost \(7\.0% yield on cost/);
+    expect(withSignal.strategyLine).toMatch(/^Conversion · stabilized NOI \$2\.7M on \$38\.0M total cost \(7\.00% yield on cost/);
     // A plan deal's key terms lead with the price, then the stabilized NOI
     // and the budget it is judged on.
     expect(withSignal.keyTerms.slice(0, 3).map((t) => t.label)).toEqual(["Asking price", "Stabilized NOI", "Construction budget"]);

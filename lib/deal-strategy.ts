@@ -29,6 +29,7 @@ import { groundRentOf, interestOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
+import { yieldOnCostText } from "@/lib/plan-facts";
 import {
   LATER_YEAR,
   METRIC_FIND,
@@ -1045,7 +1046,9 @@ function planLine(plan: PlanSummary): string {
       : "construction / renovation budget not stated in the figures",
   );
   if (plan.totalCost != null) parts.push(`total cost ${money(plan.totalCost)}`);
-  if (plan.yieldOnCost != null) parts.push(`yield on total cost ${pct(plan.yieldOnCost, 1)}`);
+  // As the deal page prints it, so a verdict that quotes it quotes the
+  // page's own figure.
+  if (plan.yieldOnCost != null) parts.push(`yield on total cost ${yieldOnCostText(plan.yieldOnCost)}`);
   parts.push(plan.timeline ? `timeline: ${plan.timeline}` : "timeline to stabilization not stated");
   if (plan.capitalBudgetText) parts.push(`budget as worded: ${plan.capitalBudgetText}`);
   return parts.join("; ");

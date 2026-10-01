@@ -2,6 +2,7 @@ import { floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { yieldOnCostText } from "@/lib/plan-facts";
 import { assetWords } from "@/lib/asset-words";
 import { interestContextLine, readInterest } from "@/lib/interest";
 import { assumableContextLine, readAssumable } from "@/lib/assumable-debt";
@@ -117,7 +118,7 @@ export function dealContextFor(
     lines.push(
       `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)} is the finished project's figure${
         plan.totalCost != null && plan.yieldOnCost != null
-          ? ` — over ${compact(plan.totalCost)} of total cost it is ${withArticle(`${(Math.round(plan.yieldOnCost * 1000) / 10).toFixed(1)}%`)} yield on cost`
+          ? ` — over ${compact(plan.totalCost)} of total cost it is ${withArticle(yieldOnCostText(plan.yieldOnCost))} yield on cost`
           : ""
       }, not today's income and not a cap rate on the price.`,
     );

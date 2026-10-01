@@ -620,7 +620,7 @@ describe("plausibilityNote", () => {
     expect(note).toMatch(/THE PLAN AS THE OM STATES IT/);
     expect(note).toMatch(/stabilized NOI \$21\.0M/);
     expect(note).toMatch(/total cost \$180\.0M/);
-    expect(note).toMatch(/yield on total cost 11\.7%/);
+    expect(note).toMatch(/yield on total cost 11\.67%/);
     expect(note).toMatch(/not a misread/);
     expect(note).toMatch(/as conservative as the deck presents it/);
     expect(note).not.toMatch(/FIGURES THAT DO NOT TIE/);

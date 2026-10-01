@@ -6,6 +6,7 @@ import { parseMoney } from "@/lib/criteria";
 import type { PlanSummary } from "@/lib/deal-strategy";
 import type { RateSeed } from "@/lib/debt-index";
 import { sizeConstructionDebt, worksYearsFromTimeline } from "@/lib/construction-debt";
+import { yieldOnCostText } from "@/lib/plan-facts";
 
 const fmtUsd = (n: number) =>
   Math.abs(n) >= 1e6
@@ -180,17 +181,17 @@ export function ConstructionDebtPanel({
           {r.reserveInBudget ? (
             <p className="mt-2 text-xs leading-relaxed text-muted" data-qa="reserve-in-budget">
               Yield on total cost with the carry inside it:{" "}
-              <span className="font-mono font-semibold tabular-nums text-ink">{pct(r.yieldOnCost)}</span>
+              <span className="font-mono font-semibold tabular-nums text-ink">{yieldOnCostText(r.yieldOnCost)}</span>
               {" "}— the stated budget includes its interest reserve, so no second reserve is added on top of it.
             </p>
           ) : (
             <p className="mt-2 text-xs leading-relaxed text-muted">
               Yield on total cost with the carry inside it:{" "}
-              <span className="font-mono font-semibold tabular-nums text-ink">{pct(r.yieldOnCost)}</span>
+              <span className="font-mono font-semibold tabular-nums text-ink">{yieldOnCostText(r.yieldOnCost)}</span>
               {plan.yieldOnCost != null && (
                 <>
                   {" "}
-                  against the OM&apos;s {pct(plan.yieldOnCost)}{" "}on price plus works alone — the reserve is
+                  against the OM&apos;s {yieldOnCostText(plan.yieldOnCost)}{" "}on price plus works alone — the reserve is
                   a real cost of the plan and the OM&apos;s figure leaves it out.
                 </>
               )}{" "}

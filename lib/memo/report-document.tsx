@@ -53,7 +53,7 @@ import {
   type SpreadBucket,
   type YocGrid,
 } from "@/lib/plan-sensitivity";
-import { planFacts } from "@/lib/plan-facts";
+import { planFacts, yieldOnCostText } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
@@ -1303,7 +1303,7 @@ function YocGridPdf({ grid, axis }: { grid: YocGrid; axis: string }) {
                 }}
               >
                 <Text style={{ fontSize: 8.5, fontFamily: "Helvetica-Bold", color: C.ink }}>
-                  {fmtPct(cell.yieldOnCost)}
+                  {yieldOnCostText(cell.yieldOnCost)}
                 </Text>
                 <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 1 }}>
                   {`${cell.spreadBps >= 0 ? "+" : ""}${cell.spreadBps} bps`}

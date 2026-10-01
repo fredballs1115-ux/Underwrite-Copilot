@@ -31,6 +31,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type DealStrategy } from "@/lib/deal-strategy";
 import { marketsPhrase, portfolioFacts, readPortfolio } from "@/lib/portfolio";
+import { yieldOnCostText } from "@/lib/plan-facts";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -115,7 +116,7 @@ function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStra
   const m = (n: number) =>
     n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
   if (plan?.stabilizedNoi && plan.totalCost != null && plan.yieldOnCost != null) {
-    return `${strategy.label} · stabilized NOI ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${(plan.yieldOnCost * 100).toFixed(1)}% yield on cost${
+    return `${strategy.label} · stabilized NOI ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
       plan.costPerUnit != null ? `; ${m(plan.costPerUnit)} per planned unit all-in` : ""
     })`;
   }

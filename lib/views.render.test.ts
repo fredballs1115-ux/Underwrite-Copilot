@@ -1910,7 +1910,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(text).toContain("Washington, DC · Multifamily · Conversion");
     // The plan block, as the page draws it, with its yield on total cost.
     expect(html).toContain('aria-label="The plan"');
-    expect(text).toMatch(/Yield on cost\s*7\.0%/i);
+    expect(text).toMatch(/Yield on cost\s*7\.00%/i);
     // A row screened before the first signal existed reads as before.
     const beforeHtml = renderToStaticMarkup(React.createElement(ShareView, props));
     expect(visibleText(beforeHtml)).toContain("Washington, DC · Multifamily · Stabilized");
@@ -2101,7 +2101,7 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(text).toContain("The plan");
     expect(text).toContain("Conversion");
     expect(text).toContain("$21.0M");
-    expect(text).toContain("11.7%");
+    expect(text).toContain("11.67%");
     expect(text).toContain("A conversion deal has no going-in cap");
     expect(text).toContain("verify vs. source");
     expect(text).toContain("Exit");
