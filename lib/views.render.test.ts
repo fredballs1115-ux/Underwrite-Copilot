@@ -79,10 +79,15 @@ const card = (over: Partial<DealCard> & Pick<DealCard, "id" | "name">): DealCard
   ...over,
 });
 
+// Each deal sits on a real rung of the ladder (lib/stages): the fixture's
+// "underwriting" and "loi" were no stage at all, so every deal folded onto
+// Screening and the funnel's middle rungs were never drawn lit. One deal a
+// middle rung: Harbor View tracking, the Maddox in active pursuit, 1400
+// Market's LOI submitted, Elm Street Lofts under contract.
 const CARDS: DealCard[] = [
   // A renovation program stated a door at a time (#460).
-  card({ id: "a", name: "The Maddox at Brewerytown", verdict: "caution", stage: "underwriting", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null, valueAdd: "Reno $250/mo, 20% on cost", basis: "$274k/unit" }, offersDue: "2026-09-30" }),
-  card({ id: "b", name: "1400 Market — office to residential", verdict: "pass", stage: "loi", fit: "fits", score: 88, mandateVerdict: "PURSUE", slots: { cap: null, price: "$20,000,000", yoc: "11.7%" }, market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
+  card({ id: "a", name: "The Maddox at Brewerytown", verdict: "caution", stage: "active_pursuit", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null, valueAdd: "Reno $250/mo, 20% on cost", basis: "$274k/unit" }, offersDue: "2026-09-30" }),
+  card({ id: "b", name: "1400 Market — office to residential", verdict: "pass", stage: "loi_submitted", fit: "fits", score: 88, mandateVerdict: "PURSUE", slots: { cap: null, price: "$20,000,000", yoc: "11.7%" }, market: "Center City, Philadelphia, PA", coveredMarket: "Philadelphia" }),
   // Frisco names no place the Dallas market's list knows: its county placed it (#447).
   card({ id: "c", name: "Riverbend Site — 240 units", verdict: "pass", stage: "screening", fit: "outside", score: 42, mandateVerdict: "PASS", slots: { cap: null, price: "$4,000,000", yoc: "7.2%" }, market: "Frisco, TX", coveredMarket: null, readMarket: "Dallas–Fort Worth", readCounty: "Collin County, TX" }),
   // A deal in a metro area the site reads without a brief: named as read, not briefed.
@@ -95,7 +100,7 @@ const CARDS: DealCard[] = [
   // A hotel sold encumbered by its manager, with the brand's PIP (#455).
   card({ id: "f", name: "Courtyard Newark Airport", assetClass: "hospitality_str", verdict: null, stage: "screening", jobStatus: "failed", slots: { cap: null, price: null, yoc: null, hotel: "Mgmt encumbered, PIP $35k/key" }, market: "Newark, NJ", coveredMarket: "Northern New Jersey" }),
   // A 49% LP interest: the row says what the price buys beside the figure.
-  card({ id: "g", name: "Harbor View Apartments", verdict: "caution", stage: "underwriting", addedBy: "Jordan Lee", fit: "fits", score: 79, mandateVerdict: "PURSUE", slots: { cap: "5.9%", price: "$41,250,000", yoc: null, interest: "49% share" }, market: "Baltimore, MD", coveredMarket: "Baltimore" }),
+  card({ id: "g", name: "Harbor View Apartments", verdict: "caution", stage: "tracking", addedBy: "Jordan Lee", fit: "fits", score: 79, mandateVerdict: "PURSUE", slots: { cap: "5.9%", price: "$41,250,000", yoc: null, interest: "49% share" }, market: "Baltimore, MD", coveredMarket: "Baltimore" }),
   card({ id: "h", name: "Sample — The Maddox at Brewerytown", verdict: "caution", stage: "screening", fit: "near", score: 71, mandateVerdict: "WATCH", slots: { cap: "5.6%", price: "$68,000,000", yoc: null }, market: "Brewerytown, Philadelphia, PA", coveredMarket: "Philadelphia" }),
   // A note the seller will carry (#462).
   card({ id: "i", name: "Lakewood Self Storage", assetClass: "self_storage", verdict: "pass", stage: "closed", fit: null, slots: { cap: "6.4%", price: "$9,800,000", yoc: null, sellerNote: "Seller financing 5.00%" }, market: "Lakewood, CO", coveredMarket: null }),
@@ -106,7 +111,7 @@ const CARDS: DealCard[] = [
   // a range stays a range (#466).
   card({ id: "k", name: "Arlington Flex Park", assetClass: "industrial", stage: "screening", jobStatus: "stalled", slots: { cap: null, price: "$9,000,000 – $9,500,000", yoc: null, tenancy: "Single tenant, 6 yrs left" }, market: "Arlington, TX", coveredMarket: "Dallas–Fort Worth", hasAddress: false }),
   // …and a LIHTC regulatory agreement on three units in four (#453).
-  card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "underwriting", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null, affordable: "LIHTC, 75% restricted" }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth", flood: { tag: "Flood AE", cell: "AE (SFHA)" } }),
+  card({ id: "l", name: "Elm Street Lofts", verdict: "pass", stage: "under_contract", jobStatus: "failed", fit: "fits", score: 84, mandateVerdict: "PURSUE", slots: { cap: "6.0%", price: "$14,000,000", yoc: null, affordable: "LIHTC, 75% restricted" }, market: "Dallas, TX", coveredMarket: "Dallas–Fort Worth", flood: { tag: "Flood AE", cell: "AE (SFHA)" } }),
 ];
 
 const BILLING = { isPro: false, canCreateDeal: true, allowance: dealAllowance({ plan: "free", dealCount: 1, team: null }) };
@@ -135,6 +140,17 @@ const withThumbs = (cards: DealCard[]): DealCard[] =>
     cover: coverFor({ seed: c.id, assetClass: c.assetClass, place: c.market || null }),
   }));
 
+/** The stage funnel's rungs as the markup draws them: each button's title
+ *  ("Tracking · 1 deal") and whether it can be tapped, in ladder order. */
+function funnelRungs(html: string): { title: string; disabled: boolean; markup: string }[] {
+  const funnel = html.match(/<ol[^>]*aria-label="Deals by stage"[^>]*>[\s\S]*?<\/ol>/)?.[0] ?? "";
+  return [...funnel.matchAll(/<button\b([^>]*)>([\s\S]*?)<\/button>/g)].map((m) => ({
+    title: m[1].match(/title="([^"]*)"/)?.[1] ?? "",
+    disabled: /\sdisabled=""/.test(m[1]),
+    markup: m[0],
+  }));
+}
+
 describe("Pipeline — every card shape renders and reads clean", () => {
   it("renders the pipeline with twelve deals in every state", () => {
     const html = render(
@@ -152,6 +168,22 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(a11yIssues(html), "a11y pipeline").toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
+    // The ladder as the fixture fills it: every live rung drawn with its
+    // count and a filter to tap, the four middle rungs included (the dead
+    // deal has its own toggle and no rung) — and a section of the list a
+    // stage, each under its own name with its count.
+    expect(funnelRungs(html).map((r) => [r.title, r.disabled])).toEqual([
+      ["Screening · 7 deals", false],
+      ["Tracking · 1 deal", false],
+      ["Active pursuit · 1 deal", false],
+      ["LOI submitted · 1 deal", false],
+      ["Under contract / DD · 1 deal", false],
+      ["Closed · 1 deal", false],
+    ]);
+    for (const r of funnelRungs(html).slice(1, 5)) expect(r.markup, r.title).toMatch(/bg-brand\/10 text-brand[^"]*">1</);
+    for (const [label, n] of [["Screening", 7], ["Tracking", 1], ["Active pursuit", 1], ["LOI submitted", 1], ["Under contract / DD", 1], ["Closed", 1]] as const) {
+      expect(html, label).toMatch(new RegExp(`aria-expanded="true"[^>]*>[\\s\\S]{0,600}?>${label}</span><span[^>]*>${n}</span>`));
+    }
     // Every live deal is on the page under its own name; the dead one is
     // folded away until asked for.
     for (const c of CARDS) {
@@ -619,7 +651,7 @@ describe("Pipeline — a deal screened again shows the run, never the call it is
     id: "r",
     name: "Harbor View Apartments",
     verdict: "pass",
-    stage: "underwriting",
+    stage: "active_pursuit",
     jobStatus: "running",
     slots: { cap: "5.9%", price: "$41,250,000", yoc: null },
     market: "Baltimore, MD",
