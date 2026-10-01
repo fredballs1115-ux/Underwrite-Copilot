@@ -3925,12 +3925,15 @@ describe("the rates strip", () => {
     expect(text).not.toContain("ICE BofA"); // licensed to FRED, not to us
     expect(text).toContain("3.4%"); // CPI y/y: a change, to one place
     expect(text).toContain("−5.7%"); // banks EASING on multifamily, signed
-    expect(text).toContain("344k"); // starts, 5+ units: a count
+    expect(text).toContain("344k/yr"); // starts, 5+ units: a count at an annual rate, the unit on the figure
     // Each by its own cadence, the year always in it (the research pass of
     // 2026-10-01 read "CRE delinquency as of Apr 1" for a Q2 figure).
     expect(text).toContain("10-yr Treasury as of Sep 17, 2026");
     expect(text).toContain("CRE delinquency as of Q2 2026");
     expect(text).toContain("CPI y/y as of Aug 2026");
+    // The mortgage survey names its publisher on the tile, as the BLS and
+    // the Census are named on theirs.
+    expect(text).toContain("30-yr fixed as of Sep 17, 2026 · Freddie Mac");
     expect(text).not.toMatch(/as of [A-Z][a-z]{2} \d{1,2}(?!, \d{4})\b/);
   });
 
@@ -4003,7 +4006,7 @@ describe("the rates strip", () => {
     }
     expect((html.match(/<details/g) ?? []).length).toBe(5);
     expect(text).toContain("CPI y/y 3.4%");
-    expect(text).toContain("Starts, 5+ units 344k");
+    expect(text).toContain("Starts, 5+ units 344k/yr");
     // The money market stands beside the curve, not in a fold.
     expect(text).toContain("Money market");
     expect(text).toContain("30-day avg SOFR");

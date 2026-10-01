@@ -21,6 +21,7 @@ import {
   seriesMeta,
   periodLabel,
   periodOf,
+  publisherTag,
   treasuryForTerm,
   yieldCurve,
   type RateRow,
@@ -371,9 +372,18 @@ describe("how a figure is said", () => {
     expect(formatValue(of("TLNRESCONS_YOY"))).toBe("−1.3%");
   });
 
-  it("says a count with its thousands", () => {
-    expect(formatValue(of("HOUST5F"))).toBe("344k");
-    expect(formatValue(of("HOUST"))).toBe("1,275k");
+  it("says a count with its thousands and its annual rate, on the figure", () => {
+    // "344k" bare read as a count of something; the annual rate was in a
+    // hover title alone (the research pass of 2026-10-01).
+    expect(formatValue(of("HOUST5F"))).toBe("344k/yr");
+    expect(formatValue(of("HOUST"))).toBe("1,275k/yr");
+  });
+
+  it("names the publisher a tile credits beside its link", () => {
+    expect(publisherTag(of("MORTGAGE30US").meta)).toBe("Freddie Mac");
+    expect(publisherTag(of("DGS10").meta)).toBeNull();
+    expect(publisherTag({ source: "bls", label: "Rent of primary residence" })).toBe("BLS");
+    expect(publisherTag({ source: "census", label: "Rental vacancy" })).toBe("Census");
   });
 
   it("says a move with its unit, as a magnitude the arrow signs", () => {

@@ -4,6 +4,7 @@ import {
   groupRates,
   periodLabel,
   periodOf,
+  publisherTag,
   seriesUrl,
   yieldCurve,
   type LiveRate,
@@ -223,7 +224,7 @@ export function RateTile({
           rel="noreferrer"
           className="underline decoration-dotted underline-offset-2 hover:text-ink"
         >
-          {`${short ?? r.meta.short} as of ${periodOf(r)}${r.meta.source === "bls" ? " · BLS" : r.meta.source === "census" ? " · Census" : ""}`}
+          {`${short ?? r.meta.short} as of ${periodOf(r)}${publisherTag(r.meta) ? ` · ${publisherTag(r.meta)}` : ""}`}
         </a>
         {!r.fresh && <span className="ml-1 text-amber-700">· not updating</span>}
       </p>

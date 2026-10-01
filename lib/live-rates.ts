@@ -80,7 +80,8 @@ export type Cadence = "daily" | "weekly" | "monthly" | "quarterly" | "annual";
 
 /**
  * What the stored figure is — which decides how it is shown and how it
- * moves. `count` is thousands at an annual rate (the national starts);
+ * moves. `count` is thousands at an annual rate (the national starts),
+ * shown with its unit ("344k/yr");
  * `units` is a plain count of things (a metro's permits in a month).
  */
 export type Unit = "pct" | "spread" | "pts" | "count" | "units";
@@ -857,7 +858,11 @@ export function formatValue(r: Pick<LiveRate, "value" | "meta">): string {
     case "pts":
       return `${signed(r.value, 1)}%`;
     case "count":
-      return `${Math.round(r.value).toLocaleString("en-US")}k`;
+      // Thousands of units at an annual rate (FRED's "seasonally adjusted
+      // annual rate"): the month's pace, a year of it. Bare, "344k" read as
+      // a count of something with its unit in a hover title alone; the unit
+      // is on the figure (the research pass of 2026-10-01).
+      return `${Math.round(r.value).toLocaleString("en-US")}k/yr`;
     case "units":
       return Math.round(r.value).toLocaleString("en-US");
   }
@@ -1073,6 +1078,20 @@ export function periodLabel(obsDate: string, cadence: Cadence): string {
 /** The period a live figure is for: its own date, said by its own cadence. */
 export function periodOf(r: { obsDate: string; meta: Pick<SeriesMeta, "cadence"> }): string {
   return periodLabel(r.obsDate, r.meta.cadence);
+}
+
+/**
+ * Who publishes a figure, where a tile names it beside its link: the BLS or
+ * the Census Bureau for a series pulled from them, and Freddie Mac for its
+ * mortgage survey — FRED carries the survey, and the table's own label says
+ * whose it is. Null for everything else, which the strip's heading and the
+ * link itself credit to FRED.
+ */
+export function publisherTag(meta: Pick<SeriesMeta, "source" | "label">): string | null {
+  if (meta.source === "bls") return "BLS";
+  if (meta.source === "census") return "Census";
+  if (/^Freddie Mac\b/.test(meta.label)) return "Freddie Mac";
+  return null;
 }
 
 
