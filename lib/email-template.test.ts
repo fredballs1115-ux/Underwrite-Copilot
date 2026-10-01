@@ -64,6 +64,7 @@ describe("every email is a whole document a mail client reads well", () => {
   const digestInput: DigestInput = {
     stages: [{ label: "Screening", count: 2 }],
     offersDue: [{ name: "The Maddox <B>", due: "Fri, Oct 2", url: "https://underwrite.example/deals/a", pictureUrl: thumb(1) }],
+    offersThrough: "Sun, Oct 4",
     verdicts: [{ name: "Harbor & Point", label: "Go", color: "#1b7a5e", url: "https://underwrite.example/deals/c", pictureUrl: thumb(3) }],
     pipelineUrl: "https://underwrite.example/deals",
     settingsUrl: "https://underwrite.example/account",
@@ -158,6 +159,7 @@ describe("the Monday digest pictures each deal it names (#464)", () => {
       { name: "The Maddox", due: "Fri, Oct 2", url: "https://underwrite.example/deals/a", pictureUrl: thumb(1) },
       { name: "Pine & Oak", due: "Mon, Oct 5", url: "https://underwrite.example/deals/b", pictureUrl: thumb(2) },
     ],
+    offersThrough: "Sun, Oct 11",
     verdicts: [
       { name: "Harbor Point", label: "Caution", color: "#a05a1c", url: "https://underwrite.example/deals/c", pictureUrl: thumb(3) },
     ],

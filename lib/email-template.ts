@@ -239,13 +239,29 @@ export function screenStoppedEmail(input: ScreenStoppedEmailInput): {
 /* ------------------------- weekly pipeline digest ------------------------ */
 
 export interface DigestInput {
-  /** e.g. [{ label: "Screening", count: 3 }] — ladder order, zeros dropped */
+  /** the OPEN deals by stage (lib/stages `isOpenStage`: Closed and Dead are
+   *  not counted), e.g. [{ label: "Screening", count: 3 }] — ladder order,
+   *  zeros dropped; their sum is the digest's "open deals" */
   stages: { label: string; count: number }[];
-  /** offers due in the next 7 days, soonest first; `pictureUrl` is the
-   *  deal's square (#464, lib/email-picture) */
+  /** open deals' offer deadlines from today through `offersThrough`,
+   *  soonest first; `pictureUrl` is the deal's square (#464,
+   *  lib/email-picture) */
   offersDue: { name: string; due: string; url: string; pictureUrl?: string | null }[];
-  /** verdicts that landed in the last 7 days */
-  verdicts: { name: string; label: string; color: string; url: string; pictureUrl?: string | null }[];
+  /** the window's last day, as the deadlines are written ("Sun, Oct 11"):
+   *  the section is headed "Offers due by" it, so it says the window it
+   *  lists — a "this week" heading had listed eight days */
+  offersThrough: string;
+  /** verdicts that landed in the last 7 days; `note` marks a call whose
+   *  re-screen is running, stalled or failed (lib/digest), as the pipeline
+   *  card marks it */
+  verdicts: {
+    name: string;
+    label: string;
+    color: string;
+    url: string;
+    pictureUrl?: string | null;
+    note?: string | null;
+  }[];
   pipelineUrl: string;
   settingsUrl: string;
 }
@@ -274,20 +290,21 @@ export function weeklyDigestEmail(input: DigestInput): {
   html: string;
   text: string;
 } {
-  const live = input.stages.reduce((n, s) => n + s.count, 0);
-  const dealsWord = `${live} live deal${live === 1 ? "" : "s"}`;
+  const open = input.stages.reduce((n, s) => n + s.count, 0);
+  const dealsWord = `${open} open deal${open === 1 ? "" : "s"}`;
   const subject = `Your pipeline this week — ${dealsWord}`;
+  const offersTitle = `Offers due by ${input.offersThrough}`;
 
   const text = [
-    `Your pipeline this week:`,
+    `Your pipeline this week — ${dealsWord}, by stage:`,
     ``,
     ...input.stages.map((s) => `  ${s.label}: ${s.count}`),
     input.offersDue.length ? `` : null,
-    input.offersDue.length ? `Offers due this week:` : null,
+    input.offersDue.length ? `${offersTitle}:` : null,
     ...input.offersDue.map((o) => `  ${o.name} — ${o.due}: ${o.url}`),
     input.verdicts.length ? `` : null,
     input.verdicts.length ? `Verdicts since last week:` : null,
-    ...input.verdicts.map((v) => `  ${v.label}: ${v.name} — ${v.url}`),
+    ...input.verdicts.map((v) => `  ${v.label}: ${v.name}${v.note ? ` (${v.note})` : ""} — ${v.url}`),
     ``,
     `Open the pipeline: ${input.pipelineUrl}`,
     ``,
@@ -330,23 +347,27 @@ export function weeklyDigestEmail(input: DigestInput): {
   const verdictPictures = input.verdicts.some((v) => v.pictureUrl);
   const verdictPill = (v: DigestInput["verdicts"][number]) =>
     `<span style="display:inline-block;background-color:${esc(v.color)};color:#ffffff;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;">${esc(v.label)}</span>`;
+  // A call its re-screen is replacing, or failed to: said under the name, in
+  // the caution tone, as the pipeline card says it over the call.
+  const callNote = (v: DigestInput["verdicts"][number]) =>
+    v.note ? `<br /><span style="font-size:12px;font-weight:600;color:#a05a1c;">${esc(v.note)}</span>` : "";
   const verdictRows = input.verdicts
     .map((v) =>
       verdictPictures
         ? `<tr>
-        ${pictureCell(v, true)}<td style="padding:4px 0;font-size:13px;vertical-align:middle;"><a href="${esc(v.url)}" style="color:#18211f;font-weight:600;text-decoration:none;">${esc(v.name)}</a></td>
+        ${pictureCell(v, true)}<td style="padding:4px 0;font-size:13px;vertical-align:middle;"><a href="${esc(v.url)}" style="color:#18211f;font-weight:600;text-decoration:none;">${esc(v.name)}</a>${callNote(v)}</td>
         <td style="padding:4px 0 4px 16px;text-align:right;white-space:nowrap;vertical-align:middle;">${verdictPill(v)}</td>
       </tr>`
         : `<tr>
-        <td style="padding:4px 8px 4px 0;">${verdictPill(v)}</td>
-        <td style="padding:4px 0;font-size:13px;"><a href="${esc(v.url)}" style="color:#18211f;text-decoration:none;">${esc(v.name)}</a></td>
+        <td style="padding:4px 8px 4px 0;vertical-align:top;">${verdictPill(v)}</td>
+        <td style="padding:4px 0;font-size:13px;"><a href="${esc(v.url)}" style="color:#18211f;text-decoration:none;">${esc(v.name)}</a>${callNote(v)}</td>
       </tr>`,
     )
     .join("");
 
   const section = (title: string, rows: string) =>
     rows
-      ? `<p style="margin:20px 0 6px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5f6b69;">${title}</p>
+      ? `<p style="margin:20px 0 6px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5f6b69;">${esc(title)}</p>
          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${rows}</table>`
       : "";
 
@@ -358,8 +379,8 @@ export function weeklyDigestEmail(input: DigestInput): {
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#5f6b69;">Monday pipeline digest</p>
             <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${dealsWord} in your pipeline</h1>
-            ${section("By stage", stageRows)}
-            ${section("Offers due this week", offerRows)}
+            ${section("Open deals by stage", stageRows)}
+            ${section(offersTitle, offerRows)}
             ${section("Verdicts since last week", verdictRows)}
             ${button(input.pipelineUrl, "Open the pipeline")}
           </td>
