@@ -18,7 +18,7 @@ import { CompsMap, type MapComp } from "./comps-map";
 import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
 import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/comp-detail";
-import { gapScale, incomeGapShare, type GapUnit } from "@/lib/gap-detail";
+import { gapDisagreementLine, gapScale, incomeGapShare, type GapUnit } from "@/lib/gap-detail";
 import { typicalRange as readTypicalRange } from "@/lib/typical-range";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/analyze";
 import { pageInDeck, type DealFact } from "@/lib/facts";
@@ -1371,6 +1371,9 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
     d: DIR[r.direction] ?? DIR.neutral,
     share: scale.shares[i] ?? null,
     unit: scale.units[i] ?? null,
+    // The bar is the two figures' own gap (lib/gap-detail); where the
+    // reconciler's line says another, the row says so under it.
+    differs: gapDisagreementLine(r),
   }));
   const legend =
     "Bars: each gap scaled to the widest of its kind; favorable right, unfavorable left.";
@@ -1404,7 +1407,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
           up the table takes over. */}
       <div className="sm:hidden">
         <ul className="grid gap-2" aria-label="Reconciliation as cards">
-          {view.map(({ r, d, share, unit }, i) => (
+          {view.map(({ r, d, share, unit, differs }, i) => (
             <li key={i} className="rounded-xl border border-line bg-surface p-3 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <p className="min-w-0 break-words text-sm font-medium">{r.metric}</p>
@@ -1426,6 +1429,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
                 </div>
               </dl>
               {r.gap && <p className="mt-2 text-sm text-ink">{r.gap}</p>}
+              {differs && <p data-gap-differs className="mt-1 text-[11px] text-caution">{differs}</p>}
               {share !== null && unit && <GapBar share={share} unit={unit} />}
             </li>
           ))}
@@ -1443,7 +1447,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
             </tr>
           </thead>
           <tbody>
-            {view.map(({ r, d, share, unit }, i) => {
+            {view.map(({ r, d, share, unit, differs }, i) => {
               return (
                 <tr
                   key={i}
@@ -1464,6 +1468,7 @@ export function Reconciliation({ result }: { result: ReconciliationResult }) {
                       {d.label}
                     </span>
                     {r.gap && <p className="mt-1 text-ink">{r.gap}</p>}
+                    {differs && <p data-gap-differs className="mt-1 text-[11px] text-caution">{differs}</p>}
                     {share !== null && unit && <GapBar share={share} unit={unit} />}
                   </td>
                 </tr>

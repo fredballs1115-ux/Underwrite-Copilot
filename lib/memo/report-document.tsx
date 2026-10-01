@@ -75,7 +75,7 @@ import type { InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
 import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
-import { gapScale } from "@/lib/gap-detail";
+import { gapDisagreementLine, gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
 import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
 
@@ -1584,7 +1584,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // the widest dollar gap and a basis-point gap against the widest in basis
   // points, never across; a neutral or figureless row draws none.
   const gapShares = gapScale(
-    rows.map((r) => ({ gap: str(r?.gap), direction: str(r?.direction) })),
+    rows.map((r) => ({ gap: str(r?.gap), omValue: str(r?.omValue), myValue: str(r?.myValue), direction: str(r?.direction) })),
   ).shares;
 
   const BASIS_LABEL: Record<string, string> = {
@@ -2306,6 +2306,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                   >
                     {str(r?.gap)}
                   </Text>
+                  {(() => {
+                    // Where the line's figure is not the two figures' own
+                    // gap, the page says so, as the deal page does.
+                    const differs = gapDisagreementLine({ gap: str(r?.gap), omValue: str(r?.omValue), myValue: str(r?.myValue) });
+                    return differs ? <Text style={{ fontSize: 7, color: C.muted, marginTop: 1.5 }}>{pdfSafe(differs)}</Text> : null;
+                  })()}
                   {share !== null ? (
                     <View
                       style={{

@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { gapFigure, gapScale, gapShare, incomeGapShare } from "./gap-detail";
+import {
+  gapDisagreement,
+  gapDisagreementLine,
+  gapFigure,
+  gapScale,
+  gapShare,
+  incomeGapShare,
+  rowGap,
+  valueGap,
+} from "./gap-detail";
 import { SAMPLE_DEAL } from "./sample-deal";
 
 describe("gapFigure — the magnitude a reconciliation gap states", () => {
@@ -50,11 +59,13 @@ describe("gapFigure — the magnitude a reconciliation gap states", () => {
 describe("gapShare — a gap as a share of the model's own figure, the actuals card's footing", () => {
   it("reads the sample's rows: the NOI gap a share of the model's NOI, the vacancy gap of its rate, agreement nothing", () => {
     const [noi, vacancy, cap] = SAMPLE_DEAL.reconciliation.rows.map((r) => gapShare(r));
-    // $174k over the model's $3,706,500 — the property-actuals card's 4.7%.
-    expect(noi).toBeCloseTo(174_000 / 3_706_500, 10);
+    // The two figures' own gap, $3,880,000 less $3,706,500 = $173,500 (the
+    // line rounds it to "$174k"), over the model's NOI: the card's 4.7%.
+    expect(noi).toBeCloseTo(173_500 / 3_706_500, 10);
     // 300 bps over the model's 9.0%.
     expect(vacancy).toBeCloseTo(3 / 9, 10);
-    expect(cap).toBeNull();
+    // 5.45% beside 5.45%: the figures' own gap is nothing.
+    expect(cap).toBe(0);
   });
 
   it("puts points and a share of a dollar figure on the same footing, and refuses what the words do not settle", () => {
@@ -70,6 +81,43 @@ describe("gapShare — a gap as a share of the model's own figure, the actuals c
     expect(gapShare({ gap: "$174k below", myValue: "Not modelled" })).toBeNull();
     expect(gapShare({ gap: "$174k below", myValue: null })).toBeNull();
     expect(gapShare({ gap: "In agreement", myValue: "5.45%" })).toBeNull();
+  });
+});
+
+describe("the gap is the two figures' own subtraction, not the reconciler's arithmetic (research pass 18)", () => {
+  it("subtracts two dollar figures and two rates, and reads the line only where the figures make no gap", () => {
+    const [noi, vacancy, cap] = SAMPLE_DEAL.reconciliation.rows;
+    expect(valueGap(noi)).toEqual({ value: 173_500, unit: "usd" });
+    expect(valueGap(vacancy)).toEqual({ value: 300, unit: "bps" });
+    expect(valueGap(cap)).toEqual({ value: 0, unit: "bps" });
+    // A range, a figure unstated or two footings make no gap of their own.
+    expect(valueGap({ omValue: "5.25%–5.75%", myValue: "6.0%" })).toBeNull();
+    expect(valueGap({ omValue: "$3,880,000", myValue: "Not modelled" })).toBeNull();
+    expect(valueGap({ omValue: "$2,400/mo", myValue: "$28,800/yr" })).toBeNull();
+    expect(rowGap({ omValue: "$3,880,000", myValue: "Not modelled", gap: "$174k below" })).toEqual({ value: 174_000, unit: "usd" });
+  });
+
+  it("says where the line and the figures disagree beyond its rounding, and is silent where they agree", () => {
+    for (const row of SAMPLE_DEAL.reconciliation.rows) expect(gapDisagreement(row)).toBeNull();
+    const wrong = { omValue: "$3,880,000", myValue: "$3,706,500", gap: "$1.2M below the OM" };
+    expect(gapDisagreementLine(wrong)).toBe("The two figures differ by $173,500, where the line says $1,200,000.");
+    const same = { omValue: "5.50%", myValue: "5.50%", gap: "25 bps tighter" };
+    expect(gapDisagreementLine(same)).toBe("The two figures are the same, where the line says 25 bps.");
+    expect(gapDisagreementLine({ omValue: "6.0%", myValue: "9.0%", gap: "3 pts higher" })).toBeNull();
+    // A per-unit line beside two totals is no claim about the totals' gap.
+    expect(gapDisagreement({ omValue: "$3,880,000", myValue: "$3,706,500", gap: "$725 per unit below" })).toBeNull();
+  });
+
+  it("draws a row's bar from the figures, and none for a gap of nothing", () => {
+    const scale = gapScale([
+      { omValue: "$3,880,000", myValue: "$3,706,500", gap: "$1.2M below", direction: "unfavorable" },
+      { omValue: "$500,000", myValue: "$400,000", gap: "$100k below", direction: "unfavorable" },
+      { omValue: "5.50%", myValue: "5.50%", gap: "25 bps tighter", direction: "unfavorable" },
+    ]);
+    // $173,500 is the widest dollar gap, not the line's $1.2M.
+    expect(scale.shares[0]).toBe(-1);
+    expect(scale.shares[1]).toBeCloseTo(-100_000 / 173_500, 10);
+    expect(scale.shares[2]).toBeNull();
   });
 });
 

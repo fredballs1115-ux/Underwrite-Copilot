@@ -9,6 +9,7 @@
 // reads as nothing. Dollars, basis points and percentages are different
 // yardsticks: the scale puts each unit on its own track and never mixes them.
 import type { ReconDirection } from "@/lib/anthropic/types";
+import { typicalRangeParts } from "@/lib/typical-range";
 
 export type GapUnit = "usd" | "bps" | "pct";
 
@@ -97,6 +98,76 @@ function oneFooting(gap: Footing, base: Footing): boolean {
   return false;
 }
 
+/** A reconciliation row's three texts: the OM's figure, the model's, and
+ *  the line the reconciler wrote between them. */
+export interface GapRow {
+  omValue?: string | null;
+  myValue?: string | null;
+  gap?: string | null;
+}
+
+const isRange = (text: string | null | undefined) => typicalRangeParts(text ?? "") != null;
+
+/**
+ * The gap the row's two figures make, where both are stated on one footing.
+ * The reconciler is asked for the difference and writes it as a line ("$174k
+ * below the OM") — the model's arithmetic — beside two values that both
+ * parse, so the code subtracts them: two dollar figures give dollars, two
+ * rates give basis points. Null where either figure is unstated, a range,
+ * or on another footing (a month beside a year, one unit beside the whole),
+ * and the row's own line is read instead. The SIGN stays the row's stated
+ * direction; this is the size alone.
+ */
+export function valueGap(row: GapRow): GapFigure | null {
+  if (isRange(row.omValue) || isRange(row.myValue)) return null;
+  const om = gapFigure(row.omValue);
+  const mine = gapFigure(row.myValue);
+  if (!om || !mine || om.unit !== mine.unit) return null;
+  if (om.unit === "usd") {
+    if (!oneFooting(footingOf(row.omValue), footingOf(row.myValue))) return null;
+    return { value: Math.abs(om.value - mine.value), unit: "usd" };
+  }
+  if (om.unit === "pct") return { value: Math.round(Math.abs(om.value - mine.value) * 10_000) / 100, unit: "bps" };
+  return null;
+}
+
+/** The figure a row's gap is drawn and graded by: the two values' own gap
+ *  where they make one, else the magnitude the row's line states. */
+export function rowGap(row: GapRow): GapFigure | null {
+  return valueGap(row) ?? gapFigure(row.gap);
+}
+
+/**
+ * Where the reconciler's line states a gap of the values' own unit and
+ * footing that the two values do not make — beyond the line's rounding (6%,
+ * or $1,000 / 5 bps) — the two, so a page can say so rather than draw one
+ * and print the other.
+ */
+export function gapDisagreement(row: GapRow): { computed: GapFigure; stated: GapFigure } | null {
+  const computed = valueGap(row);
+  let stated = gapFigure(row.gap);
+  if (!computed || !stated) return null;
+  if (stated.unit === "pct" && computed.unit === "bps" && POINTS.test((row.gap ?? "").match(PCT)?.[0] ?? "")) {
+    stated = { value: stated.value * 100, unit: "bps" };
+  }
+  if (stated.unit !== computed.unit) return null;
+  if (computed.unit === "usd" && !oneFooting(footingOf(row.gap), footingOf(row.omValue))) return null;
+  const tolerance = Math.max(computed.value * 0.06, computed.unit === "usd" ? 1_000 : 5);
+  return Math.abs(stated.value - computed.value) > tolerance ? { computed, stated } : null;
+}
+
+const sayGap = (f: GapFigure) =>
+  f.unit === "usd" ? `$${Math.round(f.value).toLocaleString("en-US")}` : `${Math.round(f.value * 100) / 100} bps`;
+
+/** The sentence a page prints under a row whose line and figures disagree. */
+export function gapDisagreementLine(row: GapRow): string | null {
+  const d = gapDisagreement(row);
+  if (!d) return null;
+  return d.computed.value === 0
+    ? `The two figures are the same, where the line says ${sayGap(d.stated)}.`
+    : `The two figures differ by ${sayGap(d.computed)}, where the line says ${sayGap(d.stated)}.`;
+}
+
 /**
  * A gap's size as a share of the buyer's own figure: the property-actuals
  * card's delta, (OM − actual) ÷ |actual|, with the row's model figure in the
@@ -113,10 +184,18 @@ function oneFooting(gap: Footing, base: Footing): boolean {
  * words do not say which. Nor is a dollar gap stated by the month, or per
  * unit or per foot, beside a figure stated another way (`oneFooting`).
  */
-export function gapShare(row: { gap?: string | null; myValue?: string | null }): number | null {
-  const g = gapFigure(row.gap);
+export function gapShare(row: GapRow): number | null {
   const base = gapFigure(row.myValue);
-  if (!g || !base || base.value <= 0) return null;
+  if (!base || base.value <= 0) return null;
+  // The two figures' own gap first (`valueGap`): it is on the values'
+  // footing by construction.
+  const computed = valueGap(row);
+  if (computed) {
+    if (computed.unit === "usd") return base.unit === "usd" ? computed.value / base.value : null;
+    if (computed.unit === "bps") return base.unit === "pct" ? computed.value / 100 / base.value : null;
+  }
+  const g = gapFigure(row.gap);
+  if (!g) return null;
   switch (g.unit) {
     case "usd":
       return base.unit === "usd" && oneFooting(footingOf(row.gap), footingOf(row.myValue))
@@ -140,7 +219,7 @@ export function gapShare(row: { gap?: string | null; myValue?: string | null }):
  * of the income, and the NOI band says nothing about it; such a row keeps
  * its grade.
  */
-export function incomeGapShare(row: { gap?: string | null; myValue?: string | null }): number | null {
+export function incomeGapShare(row: GapRow): number | null {
   return gapFigure(row.myValue)?.unit === "usd" ? gapShare(row) : null;
 }
 
@@ -158,9 +237,16 @@ export interface GapScale {
  *  $174k gap and a 300 bps gap never share a scale. A neutral row draws
  *  nothing — its gap is not a distance in either direction. */
 export function gapScale(
-  rows: ReadonlyArray<{ gap?: string | null; direction?: ReconDirection | string | null }>,
+  rows: ReadonlyArray<GapRow & { direction?: ReconDirection | string | null }>,
 ): GapScale {
-  const figures = rows.map((r) => (r.direction === "neutral" ? null : gapFigure(r.gap)));
+  // The two values' own gap where they make one (`rowGap`), so the bar is
+  // the code's subtraction rather than the reconciler's; a zero gap draws
+  // nothing.
+  const figures = rows.map((r) => {
+    if (r.direction === "neutral") return null;
+    const f = rowGap(r);
+    return f && f.value > 0 ? f : null;
+  });
   const widest: Partial<Record<GapUnit, number>> = {};
   for (const f of figures) {
     if (!f) continue;
