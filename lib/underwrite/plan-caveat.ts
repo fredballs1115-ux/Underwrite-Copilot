@@ -9,5 +9,11 @@
  * module, and a value exported beside a client component is, on the server,
  * a client reference rather than the string (lib/client-reference.test.ts).
  */
-export const PLAN_RETURNS_CAVEAT =
-  "On a plan deal these returns run the screening model — the budget booked in year 1, year-1 income as modelled — not the plan's return, which is judged on its yield on cost. The full report leaves them out for that reason, and a bid solved on them is a screening figure.";
+const PLAN_RETURNS_CORE =
+  "On a plan deal these returns run the screening model — the budget booked in year 1, year-1 income as modelled — not the plan's return, which is judged on its yield on cost. The full report leaves them out for that reason";
+
+/** The deal page's sentence, over the returns its max bid is solved on. */
+export const PLAN_RETURNS_CAVEAT = `${PLAN_RETURNS_CORE}, and a bid solved on them is a screening figure.`;
+
+/** The workbook's, which solves no bid: the same sentence without the bid. */
+export const PLAN_RETURNS_CAVEAT_WORKBOOK = `${PLAN_RETURNS_CORE}.`;

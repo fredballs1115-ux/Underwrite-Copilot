@@ -6,7 +6,7 @@ import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import { buildSensitivityGrids } from "./sensitivity";
 import type { UnderwriteInputs } from "./engine";
-import { PLAN_RETURNS_CAVEAT } from "./plan-caveat";
+import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 /**
@@ -625,7 +625,9 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     const summary = wb.getWorksheet("Deal Summary")!;
     const tiles = findRow(summary, 1, "PURCHASE PRICE");
     expect(summary.getCell(tiles + 1, 2).value).toMatchObject({ formula: expect.stringContaining("IRR(") });
-    expect(summary.getCell(tiles + 2, 1).value).toBe(PLAN_RETURNS_CAVEAT);
+    expect(summary.getCell(tiles + 2, 1).value).toBe(PLAN_RETURNS_CAVEAT_WORKBOOK);
+    // The workbook solves no bid, so its caveat says nothing of one.
+    expect(PLAN_RETURNS_CAVEAT_WORKBOOK).not.toMatch(/bid/);
     expect(summary.getCell(tiles + 2, 1).alignment?.wrapText).toBe(true);
   });
 
@@ -679,7 +681,7 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     expect(String(cover.getCell(cr + 1, 3).value)).not.toMatch(/capital budget/);
     // No plan caveat over a stabilized deal's returns; the capital plan's
     // line under Sources stands on every deal, since any deal can carry one.
-    summary.eachRow((row) => row.eachCell((cell) => expect(cell.value).not.toBe(PLAN_RETURNS_CAVEAT)));
+    summary.eachRow((row) => row.eachCell((cell) => expect(cell.value).not.toBe(PLAN_RETURNS_CAVEAT_WORKBOOK)));
     findRow(summary, 1, "Capital Plan (yr 1)");
   });
 

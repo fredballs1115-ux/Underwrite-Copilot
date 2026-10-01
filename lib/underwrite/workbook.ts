@@ -11,7 +11,7 @@ import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { datedLong } from "@/lib/debt-index";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
-import { PLAN_RETURNS_CAVEAT } from "./plan-caveat";
+import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 import type { InterestKind } from "@/lib/anthropic/types";
 
 /**
@@ -713,7 +713,10 @@ function buildAssumptions(
   // and a per-lease allowance on the space that rolls is not typed in here.
   input("TI $/SF/yr, whole building", inp.tiPsf, "TIPSF", FMT.psf);
   label(ws.getCell(r - 1, 3), "Charged on every SF of the building, every year — not a per-lease allowance", { color: MUTED, size: 9 });
-  input("Leasing Commission % of rent", inp.lcPct, "LCPct", FMT.pct1);
+  // The same for the commission: the Cash Flow tab charges it on the year's
+  // whole rent, every year, not on the leases that roll.
+  input("Leasing Commission % of all rent, every year", inp.lcPct, "LCPct", FMT.pct1);
+  label(ws.getCell(r - 1, 3), "Charged on the year's whole rent, every year — not a commission on the leases that roll", { color: MUTED, size: 9 });
 
   header("Fees");
   input("Asset Management Fee % of equity/yr", inp.amFeePctEquity, "AMFeePctEquity", FMT.pct2, "amFeePctEquity");
@@ -1177,7 +1180,7 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     const row = r + 2;
     ws.mergeCells(row, 1, row, 5);
     const c = ws.getCell(row, 1);
-    c.value = PLAN_RETURNS_CAVEAT;
+    c.value = PLAN_RETURNS_CAVEAT_WORKBOOK;
     c.font = { name: ARIAL, size: 9, color: MUTED };
     c.alignment = { wrapText: true, vertical: "top" };
     ws.getRow(row).height = 36;
