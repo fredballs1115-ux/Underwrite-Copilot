@@ -14,6 +14,7 @@ import {
   signatureMismatch,
 } from "@/lib/storage";
 import { getTeam } from "@/lib/teams";
+import { handOverTeamWork } from "@/lib/account-handover";
 import { SIGNED_OUT, authErrorCopy } from "@/lib/auth-flow";
 import { getStripe } from "@/lib/stripe/client";
 import { syncTeamSeats } from "@/lib/stripe/seats";
@@ -191,7 +192,9 @@ export async function changePassword(
  *   1. refuse if they own a team (transfer isn't supported yet),
  *   2. cancel any live personal subscription (never delete a paying account
  *      and keep charging it),
- *   3. hand their shared team deals to the team owner (deleting the auth user
+ *   3. hand the deals they added to a team's pipeline, and their work on any
+ *      team's deals, to that team's owner — by each deal's own team, so a
+ *      team they have left keeps its deals too (deleting the auth user
  *      cascades deals.user_id, and teammates must not lose shared work),
  *   4. leave the team, sweep personal files from storage,
  *   5. delete the auth user — every remaining row cascades in the database.
@@ -234,47 +237,22 @@ export async function deleteAccount(formData: FormData) {
     }
   }
 
-  // 3. Shared team deals transfer to the team owner instead of vanishing —
-  //    counted, so the sign-in page can say they stayed.
-  let handedOver = 0;
+  // 3. What the account has in a team's pipeline goes to that team's owner
+  //    instead of cascading away with it (lib/account-handover): the deals
+  //    it added to a team's pipeline, by each deal's own team — the team it
+  //    is on now, or one it has left, whose pipeline removeMember and
+  //    leaveTeam leave its deals in — and its own work on any team's deals
+  //    (saved versions, valuations and rent roll imports). Counted, so the
+  //    sign-in page can say they stayed. A share link the member minted is
+  //    revoked with them (deal_shares cascades), so no one outside keeps
+  //    access on the word of someone who has gone. A failed read or write
+  //    stops here, before the account is deleted: deleting it would cascade
+  //    whatever had not moved.
+  const handover = await handOverTeamWork(admin, user.id);
+  if (handover.ownsTeam) redirect("/account?error=ownerdelete");
+  if (!handover.ok) redirect("/account?error=handover");
+  const handedOver = handover.deals;
   if (team) {
-    const { data: owner, error: ownerErr } = await admin
-      .from("teams")
-      .select("owner_id")
-      .eq("id", team.id)
-      .maybeSingle();
-    // With no owner to hand them to, the account's deletion would cascade
-    // the team's deals away: stop, with nothing touched.
-    if (ownerErr || !owner?.owner_id) redirect("/account?error=handover");
-    const ownerId = owner.owner_id as string;
-    const { count, error: moveErr } = await admin
-      .from("deals")
-      .update({ user_id: ownerId }, { count: "exact" })
-      .eq("team_id", team.id)
-      .eq("user_id", user.id);
-    // A handover that failed leaves the team's deals on this account, and
-    // deleting it would cascade them away — the error had gone unread.
-    if (moveErr) redirect("/account?error=handover");
-    handedOver = count ?? 0;
-    // The member's own work on the team's deals — saved versions, valuations
-    // and rent roll imports — is the team's too, and moves with the deals
-    // rather than cascading away with the account (pass 14, 2026-10-01). A
-    // share link the member minted is revoked with them (deal_shares
-    // cascades), so no one outside keeps access on the word of someone who
-    // has left.
-    const { data: teamDeals, error: listErr } = await admin.from("deals").select("id").eq("team_id", team.id);
-    if (listErr) redirect("/account?error=handover");
-    const teamDealIds = ((teamDeals ?? []) as { id: string }[]).map((d) => d.id);
-    if (teamDealIds.length) {
-      for (const table of ["deal_versions", "valuations", "rent_roll_imports"] as const) {
-        const { error: workErr } = await admin
-          .from(table)
-          .update({ user_id: ownerId })
-          .in("deal_id", teamDealIds)
-          .eq("user_id", user.id);
-        if (workErr) redirect("/account?error=handover");
-      }
-    }
     await admin
       .from("team_members")
       .delete()
