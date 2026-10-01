@@ -920,6 +920,14 @@ describe("the sensitivity playground says whose figures it runs", () => {
     expect(gluedWords(textOf(html))).toEqual([]);
   });
 
+  it("its exit-cap slider runs the base ± 200 bps and never opens on a cap no deal trades at (2026-09-30)", () => {
+    // The research pass: the sample's 5.45% slider ran from 1.45% to 9.45%.
+    const p = sampleProps(null) as unknown as { playground: PlaygroundData };
+    const text = textOf(renderToStaticMarkup(React.createElement(SensitivityPlayground, { data: p.playground })));
+    expect(text).toMatch(/Exit cap\s*5\.45%\s*base 5\.45%\s*3\.45%\s*7\.45%/);
+    expect(text).not.toContain("1.45%");
+  });
+
   it("says what a moved slider's fit is against, and names nothing it did not score", () => {
     const s = { score: 52, base: 36, scored: ["IRR", "cash-on-cash"], onMemorandum: 63 };
     expect(playgroundFitLine(s, false)).toBe("with the model's IRR and cash-on-cash scored · Fit 63 on the memorandum's figures");

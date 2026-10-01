@@ -34,8 +34,8 @@ export const DEAL_KILLERS = 3;
 // The IC memo is exactly one page (lib/memo/memo-document.tsx).
 export const MEMO_PAGES = 1;
 // The sensitivity playground's exit-cap slider sweep, each way
-// (lib/underwrite/playground.ts LEVER_STEPS: 16 × 25bps).
-export const SLIDER_SWEEP_BPS = 400;
+// (lib/underwrite/playground.ts LEVER_STEPS: 8 × 25bps).
+export const SLIDER_SWEEP_BPS = 200;
 
 // ── Research-layer facts (countable in the codebase) ────────────────────────
 // Public-record comp jurisdictions: RE-EXPORTED from the provider registry

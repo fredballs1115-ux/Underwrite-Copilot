@@ -29,17 +29,21 @@ export interface ScenarioMetrics {
 
 /** Lever geometry: `span` steps each way builds the compact ±2-step grid
  *  (PDF heatmap); `sliderSpan` steps each way builds the on-screen slider's
- *  range — deliberately much wider (Bug 9: ±50bps couldn't flip a verdict on
- *  most deals; the exit-cap slider now sweeps ±400bps at 25bps resolution). */
+ *  range — deliberately wider (Bug 9: ±50bps couldn't flip a verdict on most
+ *  deals). The exit-cap slider sweeps ±200bps at 25bps resolution, and stops
+ *  at `sliderFloor` (2.00%): it had swept ±400bps, so a 5.45% deal's slider
+ *  opened on a 1.45% exit, a cap no deal trades at. The floor is the
+ *  slider's alone — the model's inputs and the report's grid are untouched —
+ *  and never rises above the deal's own base. */
 /** The stepped percent levers — price is a free input, not a slider. */
 export type PercentLever = "exitCapPct" | "rentGrowthPct" | "vacancyPct";
 
 export const LEVER_STEPS: Record<
   PercentLever,
-  { step: number; span: number; sliderSpan: number; min: number; max: number }
+  { step: number; span: number; sliderSpan: number; min: number; max: number; sliderFloor?: number }
 > = {
-  // 25bps steps; slider ±16 steps = ±400bps
-  exitCapPct: { step: 0.0025, span: 2, sliderSpan: 16, min: 0.0025, max: 0.25 },
+  // 25bps steps; slider ±8 steps = ±200bps, never under 2.00%
+  exitCapPct: { step: 0.0025, span: 2, sliderSpan: 8, min: 0.0025, max: 0.25, sliderFloor: 0.02 },
   // 50bps steps; slider ±3 steps = ±150bps (the spec's 1.0–4.0% example)
   rentGrowthPct: { step: 0.005, span: 2, sliderSpan: 3, min: -0.05, max: 0.15 },
   // 1.0pt steps; slider ±3 steps = ±3pt (the spec's 2–8% example)
@@ -85,12 +89,15 @@ export function sliderValues(
   lever: PercentLever,
   base: number,
 ): { values: number[]; baseIdx: number } {
-  const raw = stops(lever, base, LEVER_STEPS[lever].sliderSpan);
+  const { min, max, sliderFloor } = LEVER_STEPS[lever];
+  const b = clamp(Number.isFinite(base) ? base : min, min, max);
+  // The slider's own floor, never above the (clamped) base: a deal whose
+  // base sits under it keeps its base as the slider's first stop.
+  const lo = Math.min(b, Math.max(min, sliderFloor ?? min));
+  const raw = stops(lever, base, LEVER_STEPS[lever].sliderSpan).map((v) => Math.max(lo, v));
   const values = raw.filter((v, i) => i === 0 || v !== raw[i - 1]);
   // The base was pushed unclamped-duplicates-first, so the first occurrence
   // of its value IS the base stop.
-  const { min, max } = LEVER_STEPS[lever];
-  const b = clamp(Number.isFinite(base) ? base : min, min, max);
   return { values, baseIdx: values.indexOf(b) };
 }
 
