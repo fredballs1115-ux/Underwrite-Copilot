@@ -1668,6 +1668,12 @@ function AfterTax() {
     [terms],
   );
   const segOn = (num(segPct) ?? 0) > 0;
+  // The building's depreciation comes back at the ordinary rate, capped at
+  // 25% — the module's figure, so the bar, the legend and the sentences say
+  // the rate the bill was struck at.
+  const ordinaryRate = num(ordinary);
+  const rate1250 = r.recaptureRatePct ?? 25;
+  const ratePct = (n: number) => `${Math.round(n * 100) / 100}%`;
 
   const slice: { label: string; amount: number; rate: string; tone: string }[] = r.sale
     ? [
@@ -1680,7 +1686,7 @@ function AfterTax() {
         {
           label: "Unrecaptured 1250",
           amount: r.sale.unrecaptured1250,
-          rate: "25%",
+          rate: ratePct(rate1250),
           tone: "bg-caution",
         },
         {
@@ -1789,10 +1795,25 @@ function AfterTax() {
         <p className="mt-4 text-sm text-muted">
           Depreciation is a <span className="font-semibold text-ink">timing</span> benefit,
           not a permanent one: shelter and recapture at the same rate and it nets
-          to nothing. What survives here is the gap between the{" "}
-          {(num(ordinary) ?? 0).toFixed(0)}% that sheltered it and the 25% that
-          recaptures it — plus the time value of having had the money in
-          between, which this does not count.
+          to nothing.
+          {ordinaryRate !== null && ordinaryRate > rate1250 && (
+            <>
+              {" "}
+              What survives here is the gap between the {ratePct(ordinaryRate)} that
+              sheltered it and the {ratePct(rate1250)} that recaptures it — plus the time
+              value of having had the money in between, which this does not count.
+            </>
+          )}
+          {ordinaryRate !== null && ordinaryRate <= rate1250 && (
+            <>
+              {" "}
+              Here the two are one rate: the building&rsquo;s depreciation comes back at
+              the ordinary rate up to a 25% ceiling, and {ratePct(ordinaryRate)} is under
+              it, so every dollar the sale takes back is worth what it saved — the
+              benefit is the time value of having had the money in between, which this
+              does not count.
+            </>
+          )}
         </p>
       )}
 
@@ -1801,8 +1822,13 @@ function AfterTax() {
           <span className="font-semibold text-ink">Cost segregation is not a free lunch.</span>{" "}
           It moves {usdExact(plain.yearOneDepreciation)} of year-one write-off up to{" "}
           {usdExact(r.yearOneDepreciation)} — but the carved-out part comes back
-          under section 1245 at {(num(ordinary) ?? 0).toFixed(0)}%, not at 25%. In
-          raw dollars this deal keeps{" "}
+          under section 1245 at{" "}
+          {ordinaryRate === null
+            ? "the ordinary rate."
+            : ordinaryRate > rate1250
+              ? `${ratePct(ordinaryRate)}, not at the ${ratePct(rate1250)} the building’s depreciation comes back at.`
+              : `${ratePct(ordinaryRate)}, the rate the building’s depreciation comes back at too.`}{" "}
+          In raw dollars this deal keeps{" "}
           <span className="font-semibold tabular-nums text-ink">{usd(r.netOfRecapture)}</span>{" "}
           with the study against{" "}
           <span className="font-semibold tabular-nums text-ink">{usd(plain.netOfRecapture)}</span>{" "}

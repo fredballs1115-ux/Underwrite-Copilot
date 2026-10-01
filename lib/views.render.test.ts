@@ -2900,6 +2900,9 @@ describe("the deal math tools", () => {
     expect(text).toContain("$1.36M");
     expect(text).toContain("$654,545");
     expect(text).toContain("shelter and recapture at the same rate and it nets");
+    // The 25% is the ceiling on unrecaptured 1250 gain, reached here because
+    // the seeded owner is taxed at 37%; a 22% owner pays 22% on it.
+    expect(text).toContain("the gap between the 37% that sheltered it and the 25% that recaptures it");
   });
 
   it("says plainly that it is not tax advice", () => {
