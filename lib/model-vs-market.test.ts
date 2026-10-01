@@ -324,6 +324,18 @@ import { impliedGoingInCap, modelVsMarketFor } from "./model-vs-market";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
+/** A first signal naming no plan, carrying whatever cap the fast read found. */
+const signalWithCap = (goingInCap: string, assetClass = "industrial"): FirstSignal => ({
+  dealName: "Meridian Logistics Center",
+  assetClass,
+  market: "Inland Empire, CA",
+  askPrice: "$50,000,000",
+  size: "300,000 SF",
+  goingInCap,
+  perUnit: "",
+  take: "Check the rent roll against the market's asking rents.",
+});
+
 describe("modelVsMarketFor — the deal page, the report and the workbook call one function", () => {
   const extraction: ExtractionResult = {
     dealName: "Meridian Logistics Center",
@@ -374,19 +386,48 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     expect(r.checks.every((c) => c.scope === "national")).toBe(true);
   });
 
-  it("takes the page's own cap where it passes one; where the page shows none, the cap the documents' NOI implies on their price", () => {
-    const own = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads, goingInCapText: "5.5%" })!;
+  it("where the extraction states no cap, takes the first signal's, as the page's summary bar does; where neither does, the cap the documents' NOI implies on their price", () => {
+    const noCap: ExtractionResult = { ...extraction, metrics: extraction.metrics.filter((m) => !/cap rate/i.test(m.label)) };
+    // The page, the report and the workbook all hand the signal in, so all
+    // three read its 5.5% — the page's summary bar's own fallback.
+    const own = modelVsMarketFor({ derived, extraction: noCap, firstSignal: signalWithCap("5.5%"), storedAssetClass: "industrial", metro: null, reads })!;
     expect(own.checks[2].read).toContain("The going-in cap 5.50% is 56 bps over it, so the exit assumes the spread widens 50 bps");
-    // No cap in the page's slot: the OM's $3,000,000 NOI over its
-    // $50,000,000 price is 6.00% going in, said as the arithmetic it is.
-    const none = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads, goingInCapText: null })!;
-    expect(none.checks[2].tone).toBe("level");
-    expect(none.checks[2].read).toContain("The going-in cap implied by the OM's NOI over its price, 6.00%, is 106 bps over it, so the exit holds the spread");
+    // The extraction's stated cap outranks the signal's.
+    const stated = modelVsMarketFor({ derived, extraction, firstSignal: signalWithCap("5.5%"), storedAssetClass: "industrial", metro: null, reads })!;
+    expect(stated.checks[2].read).toContain("The going-in cap 6.00% is 106 bps over it");
+    // No cap stated anywhere, or a signal "cap" no price can carry (a 105%
+    // figure is a yield on cost or a pro forma): the OM's $3,000,000 NOI
+    // over its $50,000,000 price is 6.00% going in, said as the arithmetic.
+    for (const firstSignal of [undefined, signalWithCap(""), signalWithCap("105%"), signalWithCap("0.4%")]) {
+      const none = modelVsMarketFor({ derived, extraction: noCap, firstSignal, storedAssetClass: "industrial", metro: null, reads })!;
+      expect(none.checks[2].tone, firstSignal?.goingInCap).toBe("level");
+      expect(none.checks[2].read).toContain("The going-in cap implied by the OM's NOI over its price, 6.00%, is 106 bps over it, so the exit holds the spread");
+    }
     // Nothing to imply it from: no cap, and the check states the spread alone.
-    const bare: ExtractionResult = { ...extraction, metrics: extraction.metrics.filter((m) => !/net operating income/i.test(m.label)) };
-    const noNoi = modelVsMarketFor({ derived, extraction: bare, storedAssetClass: "industrial", metro: null, reads, goingInCapText: null })!;
+    const bare: ExtractionResult = { ...noCap, metrics: noCap.metrics.filter((m) => !/net operating income/i.test(m.label)) };
+    const noNoi = modelVsMarketFor({ derived, extraction: bare, storedAssetClass: "industrial", metro: null, reads })!;
     expect(noNoi.checks[2].tone).toBe("stated");
     expect(noNoi.checks[2].read).toContain("No going-in cap to set it against; the spread is the claim.");
+  });
+
+  it("reads one going-in cap for one deal on the page, the report and the workbook (the audit of 2026-10-01)", () => {
+    // A $30M price, a $1.74M NOI and no cap row: the documents imply 5.80%,
+    // while the first signal read 5.4% off the cover. The page had handed in
+    // its summary bar's 5.4% and read 60 bps of widening; the report and the
+    // workbook, handed nothing, read the implied 5.80% and 20 bps.
+    const deal: ExtractionResult = {
+      ...extraction,
+      metrics: [
+        { label: "Asking price", value: "$30,000,000", flagged: false, page: "p. 5" },
+        { label: "Net operating income", value: "$1,740,000", flagged: false, page: "p. 7" },
+        { label: "Rentable square feet", value: "200,000", flagged: false, page: "p. 4" },
+      ],
+    };
+    expect(impliedGoingInCap(deal)?.pct).toBeCloseTo(5.8, 6);
+    const model = deriveUnderwriteInputs(deal, deal.dealName!);
+    const exit = modelVsMarketFor({ derived: model, extraction: deal, firstSignal: signalWithCap("5.4%"), storedAssetClass: "industrial", metro: null, reads })!.checks.find((c) => c.key === "exit_cap");
+    expect(exit?.read).toContain("The going-in cap 5.40%");
+    expect(exit?.read).not.toContain("implied");
   });
 
   it("a plan deal reads no going-in cap, whatever the extraction states", () => {
@@ -404,9 +445,9 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     const exit = r?.checks.find((c) => c.key === "exit_cap");
     expect(exit?.tone).toBe("stated");
     expect(exit?.read).toContain("A plan deal has no going-in cap to set it against");
-    // Not even the one its figures would imply: a plan's NOI belongs over
-    // total cost, and the page shows none either.
-    const shown = modelVsMarketFor({ derived: deriveUnderwriteInputs(plan, "plan"), extraction: plan, storedAssetClass: "auto", metro: null, reads, goingInCapText: null });
+    // Not the first signal's either, nor the one its figures would imply: a
+    // plan's NOI belongs over total cost, and the page shows none.
+    const shown = modelVsMarketFor({ derived: deriveUnderwriteInputs(plan, "plan"), extraction: plan, firstSignal: signalWithCap("5.0%"), storedAssetClass: "auto", metro: null, reads });
     expect(shown?.checks.find((c) => c.key === "exit_cap")?.read).toContain("A plan deal has no going-in cap to set it against");
   });
 
@@ -431,7 +472,7 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     expect(exitOf(without)?.read).toContain("The going-in cap 6.00%");
   });
 
-  it("a note reads no going-in cap — stated, passed in or implied — since its price is a loan's (the audit of 2026-09-30)", () => {
+  it("a note reads no going-in cap — stated, the first signal's or implied — since its price is a loan's (the audit of 2026-09-30)", () => {
     const note: ExtractionResult = {
       ...extraction,
       interest: { kind: "note", summary: "The first mortgage note secured by the property", share: "", groundLease: "", loan: "", page: "p. 2" },
@@ -440,10 +481,16 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     for (const r of [
       // the report's and the workbook's call: the extraction's own stated cap
       modelVsMarketFor({ derived, extraction: note, storedAssetClass: "industrial", metro: null, reads }),
-      // the deal page's call, handing in the cap its summary reads
-      modelVsMarketFor({ derived, extraction: note, storedAssetClass: "industrial", metro: null, reads, goingInCapText: "6.0%" }),
-      // no cap shown: the NOI over the note's price is no cap either
-      modelVsMarketFor({ derived, extraction: note, storedAssetClass: "industrial", metro: null, reads, goingInCapText: null }),
+      // the first signal's cap, which the summary bar falls back to
+      modelVsMarketFor({ derived, extraction: note, firstSignal: signalWithCap("6.0%"), storedAssetClass: "industrial", metro: null, reads }),
+      // no cap stated anywhere: the NOI over the note's price is no cap either
+      modelVsMarketFor({
+        derived,
+        extraction: { ...note, metrics: note.metrics.filter((m) => !/cap rate/i.test(m.label)) },
+        storedAssetClass: "industrial",
+        metro: null,
+        reads,
+      }),
     ]) {
       expect(exitOf(r)?.tone).toBe("stated");
       expect(exitOf(r)?.read).toContain("No going-in cap to set it against; the spread is the claim.");
@@ -477,10 +524,10 @@ describe("the going-in cap the documents imply where they state none", () => {
     expect(impliedGoingInCap(priced)).toEqual({ pct: 7.5, whole: false });
     const metro = { id: "dc", name: "Washington DC" };
     for (const exit of [
-      // the report's and the workbook's call: no cap text, the extraction's own
+      // no first signal handed in
       exitOf(modelVsMarketFor({ derived, extraction: priced, storedAssetClass: "auto", metro, reads })),
-      // the deal page's call: its summary bar shows no cap
-      exitOf(modelVsMarketFor({ derived, extraction: priced, storedAssetClass: "auto", metro, reads, goingInCapText: null })),
+      // a first signal with no cap in it, as every surface hands it in
+      exitOf(modelVsMarketFor({ derived, extraction: priced, firstSignal: signalWithCap("", "multifamily"), storedAssetClass: "auto", metro, reads })),
     ]) {
       expect(exit?.modelSource).toBe("a screening default");
       expect(exit?.tone).toBe("compresses");

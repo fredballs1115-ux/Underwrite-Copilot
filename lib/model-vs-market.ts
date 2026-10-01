@@ -14,6 +14,7 @@ import {
   inferStrategy,
   isPlanDeal,
   noiFigures,
+  signalGoingInCap,
 } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
 import { interestOf } from "@/lib/interest";
@@ -733,13 +734,18 @@ export function impliedGoingInCap(extraction: ExtractionResult | null): { pct: n
 
 /**
  * The read for a deal, from what every surface already holds — the derived
- * model, the extraction, the stored class, the covered metro and today's
- * figures — so the deal page, the report route and the workbook route call
- * ONE function and cannot disagree about the class the deck turned out to
- * be (`shownAssetClass`), whether the deal is a plan (`inferStrategy`), or
- * which cap is the going-in cap (the page's own summary figure where it
- * passes one, else the extraction's; where neither states one, the cap the
- * documents' NOI implies on their price; and none on a plan deal).
+ * model, the extraction, the first signal, the stored class, the covered
+ * metro and today's figures — so the deal page, the report route and the
+ * workbook route call ONE function and cannot disagree about the class the
+ * deck turned out to be (`shownAssetClass`), whether the deal is a plan
+ * (`inferStrategy`), or which cap is the going-in cap: the extraction's
+ * stated one, else the first signal's where it can be a cap on the price
+ * (`signalGoingInCap`, the page's summary bar's own fallback); where
+ * neither states one, the cap the documents' NOI implies on their price;
+ * and none on a plan deal or a note. The rule lives here and nowhere else:
+ * the page once handed in its summary bar's figure while the report and
+ * the workbook read the implied cap, and one deal's exit read 60 bps of
+ * widening on the page and 20 in the documents.
  */
 export function modelVsMarketFor(args: {
   derived: Pick<DerivedModel, "inputs" | "sources">;
@@ -753,11 +759,6 @@ export function modelVsMarketFor(args: {
    *  research tracker's */
   metro: { id: string; name: string; placedBy?: unknown } | null;
   reads: MarketReads;
-  /** the going-in cap as the page shows it; leave undefined to read the
-   *  extraction's, pass null where the page shows none — either way, where
-   *  no cap is stated the one the documents' NOI implies on their price is
-   *  read in its place (none on a plan deal) */
-  goingInCapText?: string | null;
 }): ModelVsMarket | null {
   const { derived, extraction, storedAssetClass, metro, reads } = args;
   const planDeal = isPlanDeal(inferStrategy(extraction, args.firstSignal ?? null).kind);
@@ -765,15 +766,14 @@ export function modelVsMarketFor(args: {
   // collateral's, never the buyer's, so the exit is set against no going-in
   // cap on a note — stated, passed in or implied — on every surface.
   const note = interestOf(extraction).kind === "note";
-  const capText = note
-    ? null
-    : args.goingInCapText !== undefined
-      ? args.goingInCapText
-      : planDeal
-        ? null
-        : (findGoingInCap(extraction?.metrics ?? [])?.value ?? null);
+  const capText = note || planDeal ? null : (findGoingInCap(extraction?.metrics ?? [])?.value ?? null);
   const parsed = capText ? parsePct(capText) : null;
-  const stated = parsed != null && Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  const stated =
+    parsed != null && Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : capText == null && !note && !planDeal
+        ? (signalGoingInCap(args.firstSignal)?.pct ?? null)
+        : null;
   // Where the documents state no going-in cap, the one their own NOI and
   // price imply: without it a deal whose NOI is 7.50% of its price read "no
   // going-in cap to set it against" while the model's 6.00% default exit

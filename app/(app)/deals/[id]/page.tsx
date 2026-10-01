@@ -110,7 +110,7 @@ import { type MandateScore } from "@/lib/mandate";
 import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
 import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import {
-  IMPLIED_CAP_CEILING,
+  signalGoingInCap,
   assessPlausibility,
   askingPriceOf,
   buildingPriceOf,
@@ -890,19 +890,12 @@ export default async function DealPage({
   // The first signal's cap is a fast read with no label to check; before the
   // extraction lands it fills this slot only when it can be a cap on the
   // price at all (a 105% "cap" is a yield on cost or a pro forma, not a cap).
-  const signalCap = firstSignal?.goingInCap.trim() || null;
-  const signalCapPct = signalCap ? Number(signalCap.replace(/[^\d.]/g, "")) : NaN;
-  const signalCapPlausible =
-    signalCap != null &&
-    Number.isFinite(signalCapPct) &&
-    signalCapPct > 0.5 &&
-    signalCapPct <= IMPLIED_CAP_CEILING * 100;
   // The shared going-in cap reader — the same call the buy box, the mandate
   // and the memories make. A plan deal has no going-in cap (the pipeline
   // row's rule, `pickSlots`): its slot carries the yield on total cost.
   const summaryCap = plan
     ? null
-    : (findGoingInCap(metrics)?.value ?? (signalCapPlausible ? signalCap : null));
+    : (findGoingInCap(metrics)?.value ?? signalGoingInCap(firstSignal)?.text ?? null);
   const summaryYoc = plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null;
 
   // The model's assumptions against the published figures (lib/model-vs-market):
@@ -910,10 +903,11 @@ export default async function DealPage({
   // rents, expense growth against consumer prices, vacancy against the
   // survey's metro figure inside its margin, and the exit cap's spread over
   // today's 10-year beside the going-in cap's — the same reads as above,
-  // the memorandum's stated cap (the summary bar's, save on a note, whose
-  // bar withholds it while the model runs the collateral as if bought
-  // outright); where it states none, the cap its NOI implies on its price,
-  // said as such (none on a note, whose price is a loan's); no model call.
+  // the memorandum's stated cap (the summary bar's own rule, read inside
+  // `modelVsMarketFor` so the report and the workbook set the exit against
+  // the same figure; none on a note, whose bar withholds it while the model
+  // runs the collateral as if bought outright); where it states none, the
+  // cap its NOI implies on its price, said as such; no model call.
   // Null where there is no model or nothing fresh to read it against.
   const modelRead: ModelVsMarket | null =
     derived && reads
@@ -924,7 +918,6 @@ export default async function DealPage({
           storedAssetClass: deal.asset_class as string | null,
           metro: liveMarket,
           reads,
-          goingInCapText: summaryCap,
         })
       : null;
   // Year built feeds the rules engine's age-based coverage tests (NYC

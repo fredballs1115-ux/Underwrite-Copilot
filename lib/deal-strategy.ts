@@ -88,6 +88,24 @@ export const STRATEGY_READING: Record<StrategyKind, string> = {
  *  misread. */
 export const IMPLIED_CAP_CEILING = 0.25;
 
+/**
+ * The first signal's going-in cap, where it can be a cap on the price at
+ * all: the signal is a fast read with no label to check, so a figure at or
+ * under 0.5%, or past IMPLIED_CAP_CEILING (a 105% "cap" is a yield on cost
+ * or a pro forma), is none. The deal page's summary bar and the model's
+ * market read (`modelVsMarketFor`, behind the page, the report and the
+ * workbook) both fall back to it where the extraction states no going-in
+ * cap, so the three set the exit against one figure.
+ */
+export function signalGoingInCap(
+  signal: { goingInCap?: string | null } | null | undefined,
+): { text: string; pct: number } | null {
+  const text = signal?.goingInCap?.trim() || null;
+  if (!text) return null;
+  const pct = Number(text.replace(/[^\d.]/g, ""));
+  return Number.isFinite(pct) && pct > 0.5 && pct <= IMPLIED_CAP_CEILING * 100 ? { text, pct } : null;
+}
+
 interface MetricLike {
   label: string;
   value: string;
