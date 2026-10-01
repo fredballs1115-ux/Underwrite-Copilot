@@ -6,7 +6,7 @@ import { SectorFieldsForm } from "./sector-fields-form";
 import type { SectorFieldValues } from "@/lib/sector-fields";
 import { PublicCompsPanel } from "./public-comps-panel";
 import { PropertyVisual } from "./property-visual";
-import { DealHero, type HeroFigure } from "./deal-hero";
+import { DealHero, priceFigureOf, type HeroFigure } from "./deal-hero";
 import { marketPictureFor } from "@/lib/market-picture";
 import { DealStickyBar } from "./deal-sticky-bar";
 import { PortfolioCard } from "@/app/portfolio-card";
@@ -1015,12 +1015,12 @@ export default async function DealPage({
   // .xlsx use. The price as asked, labelled with what it buys where that is
   // not the building outright (#415): "Price · 49% share". The header draws
   // both, and the bar that keeps the deal in view repeats them word for word
-  // (#437), so a price never stands alone without what it buys.
-  const priceFigure: HeroFigure = {
-    label: `${plan?.priceLabel === "Land cost" ? "Land cost" : "Price"}${priceTag ? ` · ${priceTag}` : ""}`,
-    value: summaryPrice ?? null,
-    figure: true,
-  };
+  // (#437), so a price never stands alone without what it buys. A price
+  // stated as a range is drawn short, the range as stated in its title.
+  const priceFigure: HeroFigure = priceFigureOf(
+    `${plan?.priceLabel === "Land cost" ? "Land cost" : "Price"}${priceTag ? ` · ${priceTag}` : ""}`,
+    summaryPrice ?? null,
+  );
   // A note has no going-in cap (lib/compare-interest, #423's rule, which the
   // key terms and the compare table keep): the collateral's income over a
   // loan's price is a cap nobody earns, so the slot says the note's yield to
@@ -1425,7 +1425,7 @@ export default async function DealPage({
         dealId={id}
         name={deal.name as string}
         chip={pill ?? null}
-        figures={[priceFigure, returnFigure].flatMap((f) => (f.value ? [{ label: f.label, value: f.value }] : []))}
+        figures={[priceFigure, returnFigure].flatMap((f) => (f.value ? [{ label: f.label, value: f.value, title: f.title }] : []))}
       />
 
       {/* A portfolio OM's properties, one row each (lib/portfolio): absent

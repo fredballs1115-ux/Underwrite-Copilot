@@ -28,8 +28,9 @@ export function DealStickyBar({
    *  previous screen's (a re-screen running, or one that failed first) */
   chip?: { label: string; cls: string; note?: string } | null;
   /** the price and the cap (or a plan deal's yield on cost), as the header
-   *  prints them */
-  figures: { label: string; value: string }[];
+   *  prints them — a price range drawn short, the range as stated in its
+   *  title (`priceFigureOf`) */
+  figures: { label: string; value: string; title?: string }[];
 }) {
   const [shown, setShown] = useState(false);
   useEffect(() => {
@@ -68,7 +69,9 @@ export function DealStickyBar({
         {figures.map((f) => (
           <span key={f.label} className="hidden shrink-0 items-baseline gap-1.5 text-xs md:inline-flex">
             <span className="text-muted">{f.label}</span>
-            <span className="font-mono font-semibold tabular-nums">{f.value}</span>
+            <span className="font-mono font-semibold tabular-nums" title={f.title}>
+              {f.value}
+            </span>
           </span>
         ))}
       </div>

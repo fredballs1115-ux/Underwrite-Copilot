@@ -4321,7 +4321,7 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
 });
 
 // ── The deal header, laid out the way a listing opens (#433) ───────────────
-import { DealHero } from "@/app/(app)/deals/[id]/deal-hero";
+import { DealHero, priceFigureOf } from "@/app/(app)/deals/[id]/deal-hero";
 
 describe("DealHero — the building's picture beside its name and its figures (#433)", () => {
   const figures = [
@@ -4436,6 +4436,31 @@ describe("DealHero — the building's picture beside its name and its figures (#
     expect(html).toMatch(/<figure data-hero-picture="true" class="[^"]*rounded-t-\[15px\][^"]*@3xl:rounded-tr-none/);
   });
 
+  it("draws a price stated as a range the way the pipeline does, the range as stated in its title", () => {
+    // The research pass of 2026-09-30: "$9,000,000 – $9,500,000" ran 192px
+    // in a phone's 121px tile and read "$9,000,000 – $9".
+    const range = priceFigureOf("Price", "$9,000,000 – $9,500,000");
+    expect(range).toEqual({ label: "Price", value: "$9–9.5M", title: "As stated: $9,000,000 – $9,500,000", figure: true });
+    // A single figure, words and a blank stay as stated.
+    expect(priceFigureOf("Price · 49% share", "$41,250,000")).toEqual({ label: "Price · 49% share", value: "$41,250,000", figure: true });
+    expect(priceFigureOf("Price", "Call for offers")).toEqual({ label: "Price", value: "Call for offers", figure: true });
+    expect(priceFigureOf("Price", null)).toEqual({ label: "Price", value: null, figure: true });
+    const ranged = renderToStaticMarkup(
+      React.createElement(DealHero, {
+        title: "Arlington Flex Park",
+        subtitle: "2201 E Lamar Blvd, Arlington, TX · Industrial",
+        figures: [range, ...figures.slice(1)],
+      }),
+    );
+    dumpView("deal-hero-range", ranged);
+    expect(a11yIssues(ranged)).toEqual([]);
+    expect(gluedWords(visibleText(ranged))).toEqual([]);
+    // The figure is the short range, whole, on one line; the range as the
+    // memorandum states it is the figure's own title.
+    expect(ranged).toMatch(/<dd class="[^"]*whitespace-nowrap[^"]*" title="As stated: \$9,000,000 – \$9,500,000">\$9–9\.5M<\/dd>/);
+    expect(visibleText(ranged)).not.toContain("$9,000,000");
+  });
+
   it("with no picture, the header is one column and marks nothing to split around", () => {
     expect(bare).not.toContain('data-hero-picture="true"');
     expect(bare).not.toContain("[grid-area:pic]");
@@ -4512,6 +4537,23 @@ describe("DealStickyBar — the deal kept in view past its header", () => {
     expect(text).toContain("Going-in cap");
     expect(text).toContain("5.45%");
     expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("says a price range as the header does, word for word, with the range as stated in its title", () => {
+    // The page hands both the one figure `priceFigureOf` returns.
+    const price = priceFigureOf("Price", "$9,000,000 – $9,500,000");
+    const header = renderToStaticMarkup(React.createElement(DealHero, { title: "Arlington Flex Park", subtitle: "Industrial", figures: [price] }));
+    const bar = renderToStaticMarkup(
+      React.createElement(DealStickyBar, {
+        dealId: "d1",
+        name: "Arlington Flex Park",
+        figures: [{ label: price.label, value: price.value!, title: price.title }],
+      }),
+    );
+    const said = (html: string) => html.match(/title="As stated: \$9,000,000 – \$9,500,000">([^<]+)</)?.[1];
+    expect(said(bar)).toBe("$9–9.5M");
+    expect(said(bar)).toBe(said(header));
+    expect(a11yIssues(bar)).toEqual([]);
   });
 });
 
