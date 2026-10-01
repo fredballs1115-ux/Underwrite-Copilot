@@ -6259,10 +6259,13 @@ function Waterfall() {
           <div className="mt-3 grid grid-cols-2 gap-3">
             <Field label="LP equity" suffix="%" value={lpPct} onChange={setLpPct} placeholder="90" />
             <Field label="Pref" suffix="%" value={pref} onChange={setPref} placeholder="8" />
+            {/* A tier's split runs UP TO its hurdle — 80/20 until the LP
+                reaches 12% — which is how `runWaterfall` reads it and how
+                the result rows below name it ("To 12% — 80/20"). */}
             <Field label="Hurdle 1" suffix="%" value={h1} onChange={setH1} placeholder="12" />
-            <Field label="LP above it" suffix="%" value={s1} onChange={setS1} placeholder="80" />
+            <Field label="LP to hurdle 1" suffix="%" value={s1} onChange={setS1} placeholder="80" />
             <Field label="Hurdle 2" suffix="%" value={h2} onChange={setH2} placeholder="18" />
-            <Field label="LP above it" suffix="%" value={s2} onChange={setS2} placeholder="70" />
+            <Field label="LP to hurdle 2" suffix="%" value={s2} onChange={setS2} placeholder="70" />
           </div>
         </div>
 
@@ -8208,9 +8211,9 @@ function FeeDrag() {
             <Field label="LP equity" suffix="%" value={lpPct} onChange={setLpPct} placeholder="90" />
             <Field label="Pref" suffix="%" value={pref} onChange={setPref} placeholder="8" />
             <Field label="Hurdle 1" suffix="%" value={h1} onChange={setH1} placeholder="15" />
-            <Field label="LP above it" suffix="%" value={s1} onChange={setS1} placeholder="70" />
+            <Field label="LP to hurdle 1" suffix="%" value={s1} onChange={setS1} placeholder="70" />
             <Field label="Hurdle 2" suffix="%" value={h2} onChange={setH2} placeholder="20" />
-            <Field label="LP above it" suffix="%" value={s2} onChange={setS2} placeholder="50" />
+            <Field label="LP to hurdle 2" suffix="%" value={s2} onChange={setS2} placeholder="50" />
           </div>
         </div>
 

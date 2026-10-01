@@ -3335,6 +3335,16 @@ describe("the deal math tools", () => {
     expect((html.match(/data-bar="tier-gp"/g) ?? []).length).toBe(3);
   });
 
+  it("labels a tier's split as the share up to its hurdle, which is how it runs", () => {
+    // The split runs until the LP reaches the hurdle — "To 12% — 80/20" in
+    // the rows above. The fields of both waterfall cards said "LP above it",
+    // which describes a different structure: read that way, the seed's
+    // promote is $112,598 at a 16.0% GP IRR, not $400,565 at 20.6%.
+    expect(text).toContain("LP to hurdle 1");
+    expect(text).toContain("LP to hurdle 2");
+    expect(text).not.toContain("LP above it");
+  });
+
   it("runs the loan over the hold and draws each year's split", () => {
     // $13M at 6.5% over 30 years, held 10: a $986,026 payment, and $11.02M
     // STILL OWED at the balloon. The point of the card is that a third of
