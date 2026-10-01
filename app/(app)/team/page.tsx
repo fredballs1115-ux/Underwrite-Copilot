@@ -150,7 +150,7 @@ export default async function TeamPage({
               {[
                 "Everyone on the team sees the same pipeline — deals, verdicts, models, and memos.",
                 `The first ${TEAM_TRIAL_DEALS} shared deals are free to try. After that, the Team plan is ${TEAM_PRICE_LABEL} — billed only for the seats you actually have.`,
-                "The Team plan unlocks the Excel model, PDF memo, and comp search for every member.",
+                "The Team plan unlocks everything in Pro for every member.",
                 "Joining is one click on an invite link. You can be on one team at a time.",
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2.5">

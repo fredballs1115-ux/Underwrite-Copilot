@@ -17,6 +17,8 @@ import {
   PRICE_TEAM_BASE_MONTHLY,
   PRICE_TEAM_MEMBER_MONTHLY,
   FREE_DEALS,
+  FREE_PLAN,
+  PRO_PLAN_LINES,
   SAMPLE_COMP_PREMIUM_LINE,
 } from "@/lib/marketing-constants";
 // The Excel-preview rows are COMPUTED from the live engine on the sample
@@ -269,22 +271,9 @@ const XLSX_PREVIEW_ROWS: [string, string, string][] = (() => {
   ];
 })();
 
-const FREE_FEATURES = [
-  `${FREE_DEALS} deals, the full six-stage screen on each`,
-  "Sourced ranges + the three deal-killers",
-  "Recorded-sales comps + local rent-rule check by address",
-  "Risk digest and side-by-side deal comparison",
-  "Reconcile your own underwriting model",
-];
-
-const PRO_FEATURES = [
-  "Unlimited deals",
-  "Excel models with live formulas — the underwrite and the rent roll",
-  "IC memo, full PDF report, and LOI draft",
-  "Your firm's branding on memos, reports, workbooks & LOI",
-  "Public-web comp search",
-  "Everything in Free",
-];
+// The plan cards' lists are the billing page's too (lib/marketing-constants
+// FREE_PLAN, PRO_PLAN_LINES), each Pro line held to the gate that makes it
+// Pro by lib/plan-features.test.ts.
 
 const FAQ: { q: string; a: string }[] = [
   {
@@ -1078,7 +1067,7 @@ export default function Home() {
                 </p>
                 <p className="mt-1 text-sm text-muted">The full screen on your next {FREE_DEALS} deals.</p>
                 <ul className="mt-5 flex-1 space-y-2.5">
-                  {FREE_FEATURES.map((f) => (
+                  {FREE_PLAN.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
                       <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-faint text-[10px] font-bold text-muted">
                         ✓
@@ -1107,7 +1096,7 @@ export default function Home() {
                 </p>
                 <p className="mt-1 text-sm text-muted">Unlimited screens, plus the exports for your IC.</p>
                 <ul className="mt-5 flex-1 space-y-2.5">
-                  {PRO_FEATURES.map((f) => (
+                  {PRO_PLAN_LINES.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
                       <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
                         ✓

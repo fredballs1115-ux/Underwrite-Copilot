@@ -12,28 +12,15 @@ import {
 } from "@/lib/billing";
 import { getTeam, TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { dealAllowance, type AllowancePool } from "@/lib/deal-allowance";
-import { PRICE_PRO_MONTHLY } from "@/lib/marketing-constants";
+import { FREE_PLAN, PRICE_PRO_MONTHLY, PRO_PLAN_LINES, PRO_UPSELL } from "@/lib/marketing-constants";
 import { startCheckout, openPortal } from "./actions";
 import { removeMember, openTeamPortal } from "../team/actions";
 import { PendingButton } from "../pending-button";
 
 export const metadata: Metadata = { title: "Billing" };
 
-// Benefit-framed: what the feature does for you, not what it's called.
-const FREE_FEATURES = [
-  `${FREE_DEAL_LIMIT} deals with the full six-stage screen on each`,
-  "Sourced ranges + the three deal-killers, stressed first",
-  "Side-by-side deal comparison",
-  "Reconcile the screen against your own model",
-];
-
-const PRO_FEATURES = [
-  "Unlimited deals — screen every OM that hits your inbox",
-  "Institutional Excel model — live formulas, monthly detail, debt schedule, sensitivity matrices",
-  "One-page PDF screening memo you can hand to your IC",
-  "Public-web comp search beyond the broker's comps",
-  "Per-tab uploads and multi-document reconciliation",
-];
+// The plan cards draw the homepage's own lists (lib/marketing-constants),
+// each Pro line held to the gate that makes it Pro.
 
 // Billing failures, in a customer's words. A setup problem on our side —
 // the config codes from lib/stripe/diagnose.ts — reads as checkout not being
@@ -58,15 +45,11 @@ export default async function BillingPage({
   searchParams: Promise<{ status?: string; error?: string; upsell?: string }>;
 }) {
   const { status, error, upsell } = await searchParams;
-  // Which Pro feature bounced the user here, for a contextual upsell line.
-  const UPSELL_LABELS: Record<string, string> = {
-    memo: "export the one-page IC memo",
-    report: "export the full multi-page report",
-    underwrite: "export the institutional Excel model",
-    loi: "export the LOI draft",
-    branding: "put your firm's name and logo on exported reports",
-    rentroll: "export the live-formula rent-roll workbook",
-  };
+  // Which Pro feature bounced the user here, for a contextual upsell line —
+  // a key the refusals send, and an own key only: a link naming
+  // "constructor" had printed Object's source into the banner.
+  const upsellWords =
+    upsell && Object.hasOwn(PRO_UPSELL, upsell) ? PRO_UPSELL[upsell as keyof typeof PRO_UPSELL] : null;
   const supabase = await createSupabaseServerClient();
   // Request-cached: the (app) layout's own auth call, not a second hop.
   const user = await getCurrentUser();
@@ -99,7 +82,7 @@ export default async function BillingPage({
         : upsell
           ? {
               cls: "bg-brand/5 text-brand",
-              text: `Upgrade to Pro to ${UPSELL_LABELS[upsell] ?? "unlock that"} — choose a plan below.`,
+              text: `Upgrade to Pro to ${upsellWords ?? "unlock that"} — choose a plan below.`,
             }
         : error
           ? (BILLING_ERRORS[error] ?? null)
@@ -227,7 +210,7 @@ export default async function BillingPage({
             The full screen, on your first {FREE_DEAL_LIMIT} deals.
           </p>
           <ul className="mt-5 flex-1 space-y-2.5">
-            {FREE_FEATURES.map((f) => (
+            {FREE_PLAN.map((f) => (
               <li key={f} className="flex items-start gap-2.5 text-sm">
                 <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-faint text-[10px] font-bold text-muted">
                   ✓
@@ -259,7 +242,7 @@ export default async function BillingPage({
             Unlimited screening, plus the artifacts you hand to your IC.
           </p>
           <ul className="mt-5 flex-1 space-y-2.5">
-            {PRO_FEATURES.map((f) => (
+            {PRO_PLAN_LINES.map((f) => (
               <li key={f} className="flex items-start gap-2.5 text-sm">
                 <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-pass/15 text-[10px] font-bold text-pass">
                   ✓
