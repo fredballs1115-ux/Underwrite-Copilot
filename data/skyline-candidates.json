@@ -1216,18 +1216,24 @@
       "area": "San Jose-Sunnyvale-Santa Clara, CA",
       "wikipedia": [
         "San Jose, California",
-        "Downtown San Jose"
+        "Downtown San Jose",
+        "Plaza de César Chávez",
+        "Santana Row"
       ],
       "categories": [
+        "Skylines of San Jose, California",
+        "Views of San Jose, California",
+        "Downtown San Jose",
+        "Guadalupe River Park",
+        "San Jose City Hall (California)",
+        "Panoramics of San Jose, California",
         "Skylines of San Jose",
-        "San Jose skyline",
-        "Views of San Jose",
-        "Panoramics of San Jose",
-        "Aerial photographs of San Jose"
+        "Views of San Jose"
       ],
       "queries": [
-        "San Jose skyline panorama",
-        "San Jose downtown cityscape"
+        "San Jose California skyline",
+        "Downtown San Jose skyline night",
+        "San Jose California downtown aerial"
       ]
     },
     {
@@ -1626,18 +1632,22 @@
       "area": "Fresno, CA",
       "wikipedia": [
         "Fresno, California",
-        "Downtown Fresno"
+        "Downtown Fresno",
+        "Tower District"
       ],
       "categories": [
+        "Skylines of Fresno, California",
+        "Views of Fresno, California",
+        "Downtown Fresno",
+        "Fresno County Courthouse",
+        "Tower District, Fresno, California",
         "Skylines of Fresno",
-        "Fresno skyline",
-        "Views of Fresno",
-        "Panoramics of Fresno",
-        "Aerial photographs of Fresno"
+        "Views of Fresno"
       ],
       "queries": [
-        "Fresno skyline panorama",
-        "Fresno downtown cityscape"
+        "Fresno California skyline",
+        "Fresno California downtown",
+        "Fresno Tower Theatre"
       ]
     },
     {
@@ -1802,18 +1812,23 @@
       "area": "Madison, WI",
       "wikipedia": [
         "Madison, Wisconsin",
-        "Downtown Madison"
+        "Wisconsin State Capitol",
+        "Lake Monona",
+        "Monona Terrace"
       ],
       "categories": [
+        "Skylines of Madison, Wisconsin",
+        "Views of Madison, Wisconsin",
+        "Wisconsin State Capitol",
+        "Monona Terrace",
+        "Lake Monona",
         "Skylines of Madison",
-        "Madison skyline",
-        "Views of Madison",
-        "Panoramics of Madison",
-        "Aerial photographs of Madison"
+        "Views of Madison"
       ],
       "queries": [
-        "Madison skyline panorama",
-        "Madison downtown cityscape"
+        "Madison Wisconsin skyline Lake Monona",
+        "Madison Wisconsin isthmus",
+        "Wisconsin State Capitol Madison skyline"
       ]
     },
     {
@@ -4485,6 +4500,598 @@
         "Olympia Washington waterfront"
       ],
       "candidates": []
+    },
+    {
+      "metroId": "cbsa:47930",
+      "city": "Waterbury, Connecticut",
+      "area": "Waterbury-Shelton, CT",
+      "wikipedia": [
+        "Waterbury, Connecticut",
+        "Union Station (Waterbury, Connecticut)"
+      ],
+      "categories": [
+        "Skylines of Waterbury, Connecticut",
+        "Views of Waterbury, Connecticut",
+        "Union Station (Waterbury, Connecticut)"
+      ],
+      "queries": [
+        "Waterbury Connecticut skyline",
+        "Waterbury Connecticut downtown",
+        "Waterbury Union Station clock tower"
+      ]
+    },
+    {
+      "metroId": "cbsa:35980",
+      "city": "New London, Connecticut",
+      "area": "Norwich-New London-Willimantic, CT",
+      "wikipedia": [
+        "New London, Connecticut",
+        "Mystic, Connecticut",
+        "Norwich, Connecticut"
+      ],
+      "categories": [
+        "Mystic River Bascule Bridge",
+        "Views of Mystic, Connecticut",
+        "Views of New London, Connecticut",
+        "Skylines of New London, Connecticut"
+      ],
+      "queries": [
+        "Mystic Connecticut drawbridge",
+        "New London Connecticut waterfront",
+        "Mystic Connecticut harbor"
+      ]
+    },
+    {
+      "metroId": "cbsa:25180",
+      "city": "Hagerstown, Maryland",
+      "area": "Hagerstown-Martinsburg, MD-WV",
+      "wikipedia": [
+        "Hagerstown, Maryland",
+        "Martinsburg, West Virginia"
+      ],
+      "categories": [
+        "Skylines of Hagerstown, Maryland",
+        "Views of Hagerstown, Maryland",
+        "Downtown Hagerstown, Maryland",
+        "Antietam National Battlefield"
+      ],
+      "queries": [
+        "Hagerstown Maryland downtown",
+        "Hagerstown Maryland skyline",
+        "Martinsburg West Virginia downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:21500",
+      "city": "Erie, Pennsylvania",
+      "area": "Erie, PA",
+      "wikipedia": [
+        "Erie, Pennsylvania",
+        "Presque Isle State Park"
+      ],
+      "categories": [
+        "Skylines of Erie, Pennsylvania",
+        "Views of Erie, Pennsylvania",
+        "Bicentennial Tower (Erie, Pennsylvania)",
+        "Presque Isle Bay"
+      ],
+      "queries": [
+        "Erie Pennsylvania skyline",
+        "Erie Pennsylvania bayfront",
+        "Presque Isle Bay Erie"
+      ]
+    },
+    {
+      "metroId": "cbsa:12700",
+      "city": "Hyannis, Massachusetts",
+      "area": "Barnstable Town, MA",
+      "wikipedia": [
+        "Cape Cod",
+        "Hyannis, Massachusetts",
+        "Provincetown, Massachusetts"
+      ],
+      "categories": [
+        "Hyannis Harbor",
+        "Views of Provincetown, Massachusetts",
+        "Chatham Light",
+        "Views of Hyannis, Massachusetts"
+      ],
+      "queries": [
+        "Hyannis harbor",
+        "Provincetown harbor",
+        "Cape Cod Chatham harbor"
+      ]
+    },
+    {
+      "metroId": "cbsa:15540",
+      "city": "Burlington, Vermont",
+      "area": "Burlington-South Burlington, VT",
+      "wikipedia": [
+        "Burlington, Vermont",
+        "Church Street Marketplace"
+      ],
+      "categories": [
+        "Skylines of Burlington, Vermont",
+        "Views of Burlington, Vermont",
+        "Church Street Marketplace",
+        "Burlington Waterfront"
+      ],
+      "queries": [
+        "Burlington Vermont Lake Champlain",
+        "Burlington Vermont downtown",
+        "Burlington Vermont skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:15940",
+      "city": "Canton, Ohio",
+      "area": "Canton-Massillon, OH",
+      "wikipedia": [
+        "Canton, Ohio",
+        "Pro Football Hall of Fame"
+      ],
+      "categories": [
+        "Skylines of Canton, Ohio",
+        "Views of Canton, Ohio",
+        "Downtown Canton, Ohio",
+        "Pro Football Hall of Fame"
+      ],
+      "queries": [
+        "Canton Ohio skyline",
+        "Canton Ohio downtown",
+        "Canton Ohio Market Avenue"
+      ]
+    },
+    {
+      "metroId": "cbsa:22420",
+      "city": "Flint, Michigan",
+      "area": "Flint, MI",
+      "wikipedia": [
+        "Flint, Michigan"
+      ],
+      "categories": [
+        "Skylines of Flint, Michigan",
+        "Views of Flint, Michigan",
+        "Saginaw Street (Flint, Michigan)",
+        "Downtown Flint, Michigan"
+      ],
+      "queries": [
+        "Flint Michigan downtown",
+        "Flint Michigan Vehicle City arch",
+        "Flint Michigan skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:28020",
+      "city": "Kalamazoo, Michigan",
+      "area": "Kalamazoo-Portage, MI",
+      "wikipedia": [
+        "Kalamazoo, Michigan",
+        "Bronson Park"
+      ],
+      "categories": [
+        "Skylines of Kalamazoo, Michigan",
+        "Views of Kalamazoo, Michigan",
+        "Downtown Kalamazoo, Michigan",
+        "Bronson Park"
+      ],
+      "queries": [
+        "Kalamazoo Michigan skyline",
+        "Kalamazoo Michigan downtown",
+        "Kalamazoo Mall"
+      ]
+    },
+    {
+      "metroId": "cbsa:43620",
+      "city": "Sioux Falls, South Dakota",
+      "area": "Sioux Falls, SD-MN",
+      "wikipedia": [
+        "Sioux Falls, South Dakota",
+        "Falls Park (Sioux Falls, South Dakota)"
+      ],
+      "categories": [
+        "Falls Park (Sioux Falls, South Dakota)",
+        "Skylines of Sioux Falls, South Dakota",
+        "Views of Sioux Falls, South Dakota"
+      ],
+      "queries": [
+        "Sioux Falls Falls Park",
+        "Sioux Falls skyline",
+        "Sioux Falls downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:22020",
+      "city": "Fargo, North Dakota",
+      "area": "Fargo, ND-MN",
+      "wikipedia": [
+        "Fargo, North Dakota",
+        "Fargo Theatre"
+      ],
+      "categories": [
+        "Skylines of Fargo, North Dakota",
+        "Views of Fargo, North Dakota",
+        "Downtown Fargo, North Dakota",
+        "Fargo Theatre"
+      ],
+      "queries": [
+        "Fargo North Dakota skyline",
+        "Fargo downtown Broadway",
+        "Fargo Moorhead Red River"
+      ]
+    },
+    {
+      "metroId": "cbsa:16300",
+      "city": "Cedar Rapids, Iowa",
+      "area": "Cedar Rapids, IA",
+      "wikipedia": [
+        "Cedar Rapids, Iowa",
+        "Mays Island (Iowa)"
+      ],
+      "categories": [
+        "Skylines of Cedar Rapids, Iowa",
+        "Views of Cedar Rapids, Iowa",
+        "Cedar River (Iowa)"
+      ],
+      "queries": [
+        "Cedar Rapids Iowa skyline",
+        "Cedar Rapids downtown Cedar River",
+        "Cedar Rapids Iowa"
+      ]
+    },
+    {
+      "metroId": "cbsa:13140",
+      "city": "Beaumont, Texas",
+      "area": "Beaumont-Port Arthur, TX",
+      "wikipedia": [
+        "Beaumont, Texas",
+        "Port Arthur, Texas"
+      ],
+      "categories": [
+        "Skylines of Beaumont, Texas",
+        "Views of Beaumont, Texas",
+        "Downtown Beaumont, Texas"
+      ],
+      "queries": [
+        "Beaumont Texas skyline",
+        "Beaumont Texas downtown",
+        "Neches River Beaumont"
+      ]
+    },
+    {
+      "metroId": "cbsa:47380",
+      "city": "Waco, Texas",
+      "area": "Waco, TX",
+      "wikipedia": [
+        "Waco, Texas",
+        "Waco Suspension Bridge"
+      ],
+      "categories": [
+        "Waco Suspension Bridge",
+        "Skylines of Waco, Texas",
+        "Views of Waco, Texas",
+        "Brazos River in Waco, Texas"
+      ],
+      "queries": [
+        "Waco suspension bridge Brazos",
+        "Waco Texas skyline",
+        "Waco Texas downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:25860",
+      "city": "Hickory, North Carolina",
+      "area": "Hickory-Lenoir-Morganton, NC",
+      "wikipedia": [
+        "Hickory, North Carolina",
+        "Morganton, North Carolina"
+      ],
+      "categories": [
+        "Views of Hickory, North Carolina",
+        "Downtown Hickory, North Carolina",
+        "Lake Hickory",
+        "Views of Morganton, North Carolina"
+      ],
+      "queries": [
+        "Hickory North Carolina downtown",
+        "Lake Hickory North Carolina",
+        "Morganton North Carolina downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:26580",
+      "city": "Huntington, West Virginia",
+      "area": "Huntington-Ashland, WV-KY-OH",
+      "wikipedia": [
+        "Huntington, West Virginia",
+        "Ashland, Kentucky"
+      ],
+      "categories": [
+        "Skylines of Huntington, West Virginia",
+        "Views of Huntington, West Virginia",
+        "Downtown Huntington Historic District"
+      ],
+      "queries": [
+        "Huntington West Virginia skyline",
+        "Huntington West Virginia Ohio River",
+        "Huntington West Virginia downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:17300",
+      "city": "Clarksville, Tennessee",
+      "area": "Clarksville, TN-KY",
+      "wikipedia": [
+        "Clarksville, Tennessee"
+      ],
+      "categories": [
+        "Views of Clarksville, Tennessee",
+        "Downtown Clarksville, Tennessee",
+        "Cumberland River in Clarksville, Tennessee"
+      ],
+      "queries": [
+        "Clarksville Tennessee downtown",
+        "Clarksville Tennessee Cumberland River",
+        "Clarksville Tennessee skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:40220",
+      "city": "Roanoke, Virginia",
+      "area": "Roanoke, VA",
+      "wikipedia": [
+        "Roanoke, Virginia",
+        "Mill Mountain Star"
+      ],
+      "categories": [
+        "Skylines of Roanoke, Virginia",
+        "Views of Roanoke, Virginia",
+        "Mill Mountain Star",
+        "Views from Mill Mountain"
+      ],
+      "queries": [
+        "Roanoke Virginia skyline",
+        "Roanoke Virginia from Mill Mountain",
+        "Roanoke Virginia downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:28700",
+      "city": "Bristol, Tennessee",
+      "area": "Kingsport-Bristol, TN-VA",
+      "wikipedia": [
+        "Bristol, Tennessee",
+        "Bristol, Virginia",
+        "Kingsport, Tennessee"
+      ],
+      "categories": [
+        "Bristol Sign",
+        "State Street (Bristol)",
+        "Views of Kingsport, Tennessee",
+        "Downtown Kingsport, Tennessee"
+      ],
+      "queries": [
+        "Bristol Virginia Tennessee sign",
+        "Bristol State Street",
+        "Kingsport Tennessee downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:46220",
+      "city": "Tuscaloosa, Alabama",
+      "area": "Tuscaloosa, AL",
+      "wikipedia": [
+        "Tuscaloosa, Alabama"
+      ],
+      "categories": [
+        "Skylines of Tuscaloosa, Alabama",
+        "Views of Tuscaloosa, Alabama",
+        "Downtown Tuscaloosa, Alabama",
+        "Black Warrior River"
+      ],
+      "queries": [
+        "Tuscaloosa Alabama skyline",
+        "Tuscaloosa downtown",
+        "Tuscaloosa Black Warrior River"
+      ]
+    },
+    {
+      "metroId": "cbsa:17980",
+      "city": "Columbus, Georgia",
+      "area": "Columbus, GA-AL",
+      "wikipedia": [
+        "Columbus, Georgia",
+        "Chattahoochee RiverWalk"
+      ],
+      "categories": [
+        "Skylines of Columbus, Georgia",
+        "Views of Columbus, Georgia",
+        "Chattahoochee River in Columbus, Georgia",
+        "Chattahoochee RiverWalk"
+      ],
+      "queries": [
+        "Columbus Georgia skyline",
+        "Columbus Georgia riverwalk",
+        "Columbus Georgia Chattahoochee"
+      ]
+    },
+    {
+      "metroId": "cbsa:31340",
+      "city": "Lynchburg, Virginia",
+      "area": "Lynchburg, VA",
+      "wikipedia": [
+        "Lynchburg, Virginia",
+        "Monument Terrace"
+      ],
+      "categories": [
+        "Skylines of Lynchburg, Virginia",
+        "Views of Lynchburg, Virginia",
+        "Downtown Lynchburg, Virginia",
+        "James River in Lynchburg, Virginia"
+      ],
+      "queries": [
+        "Lynchburg Virginia skyline",
+        "Lynchburg Virginia James River",
+        "Lynchburg Virginia downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:17780",
+      "city": "College Station, Texas",
+      "area": "College Station-Bryan, TX",
+      "wikipedia": [
+        "College Station, Texas",
+        "Bryan, Texas",
+        "Texas A&M University"
+      ],
+      "categories": [
+        "Views of College Station, Texas",
+        "Downtown Bryan, Texas",
+        "Texas A&M University campus",
+        "Kyle Field"
+      ],
+      "queries": [
+        "Texas A&M campus aerial",
+        "Bryan Texas downtown",
+        "College Station Texas"
+      ]
+    },
+    {
+      "metroId": "cbsa:16620",
+      "city": "Charleston, West Virginia",
+      "area": "Charleston, WV",
+      "wikipedia": [
+        "Charleston, West Virginia",
+        "West Virginia State Capitol"
+      ],
+      "categories": [
+        "Skylines of Charleston, West Virginia",
+        "Views of Charleston, West Virginia",
+        "West Virginia State Capitol",
+        "Kanawha River in Charleston, West Virginia"
+      ],
+      "queries": [
+        "Charleston West Virginia skyline",
+        "Charleston West Virginia Kanawha River",
+        "West Virginia State Capitol Kanawha"
+      ]
+    },
+    {
+      "metroId": "cbsa:24540",
+      "city": "Greeley, Colorado",
+      "area": "Greeley, CO",
+      "wikipedia": [
+        "Greeley, Colorado"
+      ],
+      "categories": [
+        "Views of Greeley, Colorado",
+        "Downtown Greeley, Colorado",
+        "Skylines of Greeley, Colorado"
+      ],
+      "queries": [
+        "Greeley Colorado downtown",
+        "Greeley Colorado skyline",
+        "Greeley Colorado"
+      ]
+    },
+    {
+      "metroId": "cbsa:28420",
+      "city": "Kennewick, Washington",
+      "area": "Kennewick-Richland, WA",
+      "wikipedia": [
+        "Tri-Cities, Washington",
+        "Kennewick, Washington",
+        "Richland, Washington"
+      ],
+      "categories": [
+        "Cable Bridge",
+        "Views of Kennewick, Washington",
+        "Views of Richland, Washington",
+        "Columbia River in the Tri-Cities, Washington"
+      ],
+      "queries": [
+        "Tri-Cities Washington Columbia River",
+        "Kennewick Washington Cable Bridge",
+        "Richland Washington"
+      ]
+    },
+    {
+      "metroId": "cbsa:13380",
+      "city": "Bellingham, Washington",
+      "area": "Bellingham, WA",
+      "wikipedia": [
+        "Bellingham, Washington",
+        "Bellingham Bay"
+      ],
+      "categories": [
+        "Skylines of Bellingham, Washington",
+        "Views of Bellingham, Washington",
+        "Bellingham Bay"
+      ],
+      "queries": [
+        "Bellingham Washington skyline Mount Baker",
+        "Bellingham Bay waterfront",
+        "Bellingham Washington downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:34900",
+      "city": "Napa, California",
+      "area": "Napa, CA",
+      "wikipedia": [
+        "Napa, California",
+        "Napa Valley AVA"
+      ],
+      "categories": [
+        "Views of Napa, California",
+        "Napa River in Napa, California",
+        "Vineyards in Napa County, California"
+      ],
+      "queries": [
+        "Napa Valley vineyards",
+        "Napa California downtown riverfront",
+        "Napa Valley landscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:27980",
+      "city": "Kahului, Hawaii",
+      "area": "Kahului-Wailuku, HI",
+      "wikipedia": [
+        "Maui",
+        "Kahului, Hawaii",
+        "Wailuku, Hawaii"
+      ],
+      "categories": [
+        "Views of Maui",
+        "Iao Valley",
+        "Kahului Harbor",
+        "Wailuku, Hawaii"
+      ],
+      "queries": [
+        "Maui coastline",
+        "Iao Valley Maui",
+        "Kahului Maui"
+      ]
+    },
+    {
+      "metroId": "cbsa:32780",
+      "city": "Medford, Oregon",
+      "area": "Medford, OR",
+      "wikipedia": [
+        "Medford, Oregon",
+        "Rogue Valley"
+      ],
+      "categories": [
+        "Views of Medford, Oregon",
+        "Downtown Medford, Oregon",
+        "Rogue Valley"
+      ],
+      "queries": [
+        "Medford Oregon downtown",
+        "Rogue Valley Oregon",
+        "Medford Oregon skyline"
+      ]
     }
   ]
 }
