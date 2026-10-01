@@ -116,14 +116,22 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
       )}
 
       {facts.length > 0 && (
-        <dl className="mt-3 grid grid-cols-[minmax(7rem,11rem)_1fr] gap-x-3 gap-y-1 text-xs" data-qa="single-tenant-facts">
-          {facts.map((f) => (
-            <div key={f.k} className="contents">
-              <dt className="font-medium text-ink">{f.k}</dt>
-              <dd className="min-w-0 text-muted">{f.v}</dd>
-            </div>
-          ))}
-        </dl>
+        // A fact's label over its value until the panel itself is 28rem
+        // wide: beside an 11rem label column a phone left the value 75px,
+        // and "Walgreens Boots Alliance, Inc." broke a word a line.
+        <div className="@container/tenant mt-3">
+          <dl
+            className="grid grid-cols-1 gap-y-1.5 text-xs @md/tenant:grid-cols-[minmax(7rem,11rem)_1fr] @md/tenant:gap-x-3 @md/tenant:gap-y-1"
+            data-qa="single-tenant-facts"
+          >
+            {facts.map((f) => (
+              <div key={f.k} className="@md/tenant:contents">
+                <dt className="font-medium text-ink">{f.k}</dt>
+                <dd className="min-w-0 text-muted">{f.v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       )}
 
       {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}

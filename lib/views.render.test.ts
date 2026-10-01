@@ -6144,6 +6144,13 @@ describe("SingleTenantPanel — the one lease a single-tenant property is, drawn
     expect(text).toContain("$390,000");
     expect(text).toContain("enter 1.92% as the rent growth to run the model on the lease");
     expectLeadThenFold(html, readSingleTenant(walgreens(), AS_OF)!.sentences);
+    // The facts stack, label over value, until the panel is 28rem wide (the
+    // research pass of 2026-09-30: beside an 11rem label column a phone left
+    // each value 75px, "Walgreens Boots Alliance, Inc." a word a line).
+    const facts = html.slice(html.indexOf('data-qa="single-tenant-facts"') - 400, html.indexOf("</dl>", html.indexOf('data-qa="single-tenant-facts"')));
+    expect(facts).toContain('<div class="@container/tenant mt-3">');
+    expect(facts).toMatch(/<dl class="grid grid-cols-1 [^"]*@md\/tenant:grid-cols-\[minmax\(7rem,11rem\)_1fr\][^"]*" data-qa="single-tenant-facts">/);
+    expect((facts.match(/<div class="@md\/tenant:contents"><dt class="font-medium text-ink">/g) ?? []).length).toBe(5);
     expect(a11yIssues(html), "single-tenant panel").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });
