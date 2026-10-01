@@ -3,6 +3,36 @@
   "entries": [
     {
       "date": "2026-10-01",
+      "title": "The pipeline, whole at every width",
+      "blurb": "On a phone, every rung of the stage funnel now shows its stage's name, an empty one included, where a row of unnamed circles had stood. A deal's tags sit on a line of their own under its figures, so no price, cap rate or tag is cut off; a tag rides on the picture only where it fits whole. Within a row of cards, the figures and footers line up. A buy-box fit judged before the memorandum has been read is marked \"first read\" in the CSV and the meeting workbook, as it is on the card.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Deal page figures that agree with each other",
+      "blurb": "A plan's yield on cost now prints to two decimals wherever it is shown, so a grid's yield less its cap matches the spread beside it. The sensitivity playground's fit chip is drawn as the header's chip, scored on the model's returns, and says so beside the memorandum's score. A reconciliation gap inside the actuals card's 5% in-line band is graded low in the risk digest, no longer high. An apartment rent roll reads as rent per unit a month. The debt sizer lists a loan offered for assumption, or a note the seller offers to carry, under its own heading, and lists nothing as your financing on a note. The exit-cap slider sweeps 2 points each way and never goes under 2.00%.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "One Pro plan, listed as it works",
+      "blurb": "The billing page and the homepage now list the same Pro plan, line by line the features it unlocks, Ask and the first-draft model built from your documents included. Features every plan has are no longer listed as Pro. The free plan is said as its limit counts: up to 3 deals.",
+      "href": "/billing"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Signing up keeps your invite",
+      "blurb": "If you open a team invite and then create an account, the confirmation email now brings you back to the invite, and a plan chosen on the homepage is carried through the same way. Wherever an unconfirmed email stands in the way, the sign-in page offers to send the confirmation link again. When our email is rate-limited, the page says so, rather than asking you to wait before requesting another link. A password change that is refused says why in one sentence.",
+      "href": "/login"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Deleting an account, said as it happens",
+      "blurb": "Deleting your account removes it, your own deals and their files. If you are a member of a team, the deals you added to the team's pipeline stay with the team: they pass to its owner with your saved versions, valuations and rent roll imports on them, and the sign-in page you land on says so. If that handover fails, nothing is deleted.",
+      "href": "/privacy"
+    },
+    {
+      "date": "2026-10-01",
       "title": "Reports that print only what the deal supports",
       "blurb": "A full report on a memorandum that states no price now leaves out its IRR grids and max bid, and says why. Before, it printed a placeholder price's returns as if they were the deal's. The max bid is solved on every floor your buy box sets, as the deal page solves it, and names the one that binds. A note gets no max bid, and on a share the max bid is said to be the whole building's price. The grids now print the hold, the loan and the dated rate they run on, beside a base case that names each input's source. A new page, \"The call, in full\", prints everything the one-page memo shortens to fit.",
       "href": "/demo"

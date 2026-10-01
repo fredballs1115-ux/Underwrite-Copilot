@@ -1152,6 +1152,11 @@ jobs:
           mark "#484 an unreadable memorandum refused at upload" grep -q "A memorandum the screen cannot read is refused at upload" p_whats-new.html
           mark "#484 the deal header, whole on a phone" grep -q "The deal header, whole on a phone" p_whats-new.html
           mark "#484 notes held to their own terms" grep -q "Notes held to their own terms" p_whats-new.html
+          mark "#485 the pipeline, whole at every width" grep -q "The pipeline, whole at every width" p_whats-new.html
+          mark "#485 deal page figures that agree" grep -q "Deal page figures that agree with each other" p_whats-new.html
+          mark "#485 one pro plan, listed as it works" grep -q "One Pro plan, listed as it works" p_whats-new.html
+          mark "#485 signing up keeps your invite" grep -q "Signing up keeps your invite" p_whats-new.html
+          mark "#485 deleting an account, said as it happens" grep -q "Deleting an account, said as it happens" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
