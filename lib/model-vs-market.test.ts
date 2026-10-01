@@ -714,8 +714,10 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
           figures++;
           for (const k of Object.keys(read)) expect(known.has(k), `${where}.${key}.${k}`).toBe(true);
           for (const link of (read.links as string[] | undefined) ?? []) expect(sources, `${where}.${key}`).toContain(link);
-          // A vacancy is never a slice of its class; a cap or a rent may be.
-          if (key === "vacancy_read") expect(read.slice, where).toBeUndefined();
+          // Any figure may be for a narrower stock than its class (Northern
+          // Virginia's small-bay vacancy); a slice is words, and the checks
+          // name it rather than hold the model to it.
+          if (read.slice !== undefined) expect(typeof read.slice, where).toBe("string");
         }
       }
     }
@@ -782,24 +784,39 @@ describe("the tracker inside the model's checks", () => {
     });
   });
 
-  it("inside the band is inside; over its high end is looser and conservative; a point band reads as one figure; an undated figure says so", () => {
-    const nova = { ...base, assetClass: "industrial", metro: { id: "nova", name: "Northern Virginia" }, tracker: trackerFor("nova", "industrial") };
-    const inside = check({ ...nova, inputs: { ...base.inputs, vacancyPct: 0.045 } }, "vacancy")!;
+  it("inside the band is inside; over its high end is looser and conservative; a point band reads as one figure", () => {
+    const pg = { ...base, assetClass: "industrial", metro: { id: "pg_county", name: "Prince George's County MD" }, tracker: trackerFor("pg_county", "industrial") };
+    const inside = check({ ...pg, inputs: { ...base.inputs, vacancyPct: 0.08 } }, "vacancy")!;
     expect(inside.tone).toBe("inside");
-    // Northern Virginia's industrial band names no house and no period.
-    expect(inside.read).toContain("reads 3.9–5.0% on the research tracker: Northern Virginia, undated (read Aug 25, 2026)");
-    expect(inside.published.map((p) => [p.asOf, p.publisher])).toEqual([
-      ["undated", "research tracker"],
-      ["undated", "research tracker"],
-    ]);
     expect(inside.read).toContain("The model sits inside the tracker's band.");
-    const looser = check({ ...nova, inputs: { ...base.inputs, vacancyPct: 0.08 } }, "vacancy")!;
+    const looser = check({ ...pg, inputs: { ...base.inputs, vacancyPct: 0.12 } }, "vacancy")!;
     expect(looser.tone).toBe("looser");
-    expect(looser.read).toContain("The model runs 3.0 points looser than the industrial stock the figure covers — conservative against the tracker.");
+    expect(looser.read).toContain("The model runs 1.9 points looser than the industrial stock the figure covers — conservative against the tracker.");
     const point = check({ ...base, assetClass: "industrial", tracker: trackerFor("dc", "industrial"), inputs: { ...base.inputs, vacancyPct: 0.05 } }, "vacancy")!;
     expect(point.published).toHaveLength(1);
     expect(point.published[0].label).toBe("Industrial vacancy (research tracker), the Washington metro");
     expect(point.read).toContain("reads 7.4% on the research tracker: Newmark, the Washington metro, Q1 2026 (read Aug 25, 2026)");
+  });
+
+  it("a band the file says is for a narrower stock is shown and named, and the model is not held to it (the audit of 2026-10-01)", () => {
+    // Northern Virginia's 3.9–5.0% is its small-bay space: a bulk warehouse
+    // at 6% had read "1.0 point looser than the industrial stock the figure
+    // covers".
+    const nova = { ...base, assetClass: "industrial", metro: { id: "nova", name: "Northern Virginia" }, tracker: trackerFor("nova", "industrial") };
+    const bulk = check({ ...nova, inputs: { ...base.inputs, vacancyPct: 0.06 } }, "vacancy")!;
+    expect(bulk.tone).toBe("aside");
+    expect(bulk.toneLabel).toBe("beside a narrower stock");
+    // Northern Virginia's industrial band names no house and no period.
+    expect(bulk.read).toContain("reads 3.9–5.0% on the research tracker: Northern Virginia, undated (read Aug 25, 2026)");
+    expect(bulk.read).toContain(
+      "That figure is for small-bay space, not the industrial market as a whole, so the model is not held to it; its vacancy sits 1.0 point over its high end.",
+    );
+    expect(bulk.read).not.toContain("looser than");
+    expect(bulk.published.map((p) => [p.asOf, p.publisher])).toEqual([
+      ["undated", "research tracker"],
+      ["undated", "research tracker"],
+    ]);
+    expect(check({ ...nova, inputs: { ...base.inputs, vacancyPct: 0.045 } }, "vacancy")!.read).toContain("its vacancy sits inside it.");
   });
 
   it("without a tracker read a commercial deal has no vacancy row, as before", () => {

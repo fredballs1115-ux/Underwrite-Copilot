@@ -223,13 +223,17 @@ export function blockCitations(raw: unknown): CitedFigure[] {
   const b = (raw && typeof raw === "object" ? raw : {}) as CitedBlock;
   const sources = Array.isArray(b.sources) ? b.sources.filter((s): s is string => typeof s === "string") : [];
   const out: CitedFigure[] = [];
+  // A vacancy or a rent for a narrower stock than the class says whose it
+  // is ("for Class A space", "for small-bay space"): Philadelphia's Class A
+  // industrial rent had printed as the market's (the audit of 2026-10-01).
+  const withSlice = (read: FigureRead) => [figureCitation(read), read.slice ? `for ${read.slice}` : null].filter(Boolean).join("; ");
   if (num(b.vacancy_pct) !== null || num(b.vacancy_pct_low) !== null) {
     const read = figureRead(b.vacancy_read, sources);
-    out.push({ label: "Vacancy", read, words: figureCitation(read) });
+    out.push({ label: "Vacancy", read, words: withSlice(read) });
   }
   if (num(b.asking_rent_psf) !== null) {
     const read = figureRead(b.rent_read, sources);
-    out.push({ label: "Rent", read, words: figureCitation(read) });
+    out.push({ label: "Rent", read, words: withSlice(read) });
   }
   if (num(b.cap_rate_low_pct) !== null && num(b.cap_rate_high_pct) !== null) {
     const read = figureRead(b.cap_read, sources);

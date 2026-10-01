@@ -379,11 +379,13 @@
           ],
           "note": "NoVA is among the tightest small-bay markets in the country: ~3.9-5.0% vacancy (roughly half the national average), $17.44/SF NNN asking; close-in Alexandria ~$17-20 NNN. Infill small-bay under 50k SF intensely supply-constrained.",
           "vacancy_read": {
-            "area": "Northern Virginia"
+            "area": "Northern Virginia",
+            "slice": "small-bay space"
           },
           "rent_read": {
             "area": "Northern Virginia",
-            "construct": "NNN asking"
+            "construct": "NNN asking",
+            "slice": "small-bay space"
           }
         },
         "multifamily": {

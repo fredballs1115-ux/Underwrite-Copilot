@@ -20,6 +20,7 @@ const TONE_CLASS: Record<CheckTone, string> = {
   compresses: "bg-kill/10 text-kill",
   level: "bg-faint text-muted",
   stated: "bg-faint text-muted",
+  aside: "bg-faint text-muted",
 };
 
 export function ModelVsMarketCard({ read }: { read: ModelVsMarket | null }) {

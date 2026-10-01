@@ -269,7 +269,9 @@ export default async function DemoPage() {
     | undefined;
   const credit = (sector: string, label: "Vacancy" | "Rent") => {
     const fig = blockCitations(phillySnapshot?.[sector]).find((f) => f.label === label);
-    return { period: fig?.read.period ?? "undated", title: fig?.words };
+    // The narrower stock a figure covers rides with its period ("Class A
+    // space, Q2 2026"), so a Class A rent never reads as the market's.
+    return { period: [fig?.read.slice, fig?.read.period ?? "undated"].filter(Boolean).join(", "), title: fig?.words };
   };
   const phillySectors = {
     office: band("office_vacancy_pct"),

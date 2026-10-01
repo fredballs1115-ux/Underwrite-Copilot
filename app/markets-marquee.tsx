@@ -84,7 +84,12 @@ export function metroFact(m: unknown, rotate = 0): MetroFact | null {
     const vac = lo === hi ? `${lo}%` : `${lo}–${hi}%`;
     // Each figure's own period, never the day the research was read.
     const shown = blockCitations(b).filter((f) => f.label !== "Cap");
-    const when = (label: string) => shown.find((f) => f.label === label)?.read.period ?? "undated";
+    // A figure's period, and the narrower stock it covers where the file
+    // says it is one ("Class A space, Q2 2026").
+    const when = (label: string) => {
+      const read = shown.find((f) => f.label === label)?.read;
+      return [read?.slice, read?.period ?? "undated"].filter(Boolean).join(", ");
+    };
     const rent =
       typeof b.asking_rent_psf === "number" ? ` · $${b.asking_rent_psf.toFixed(2)}/SF (${when("Rent")})` : "";
     const snapAsOf = (entry.sector_snapshot as Record<string, unknown>).as_of;

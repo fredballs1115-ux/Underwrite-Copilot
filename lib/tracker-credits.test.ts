@@ -46,6 +46,13 @@ describe("blockCitations — each figure a block carries, with its own read", ()
     expect(blockCitations(null)).toEqual([]);
   });
 
+  it("a vacancy or a rent for a narrower stock says whose it is (the audit of 2026-10-01)", () => {
+    const philly = blockCitations(block("philadelphia", "industrial")).find((f) => f.label === "Rent")!;
+    expect(philly.words).toContain("for Class A space");
+    const nova = blockCitations(block("nova", "industrial"));
+    expect(nova.map((f) => f.words)).toEqual(["Northern Virginia, undated; for small-bay space", "Northern Virginia, undated; for small-bay space"]);
+  });
+
   it("every figure on file is credited only to its own block's sources", () => {
     for (const m of metrosSeed.metros) {
       const snap = (m.sector_snapshot as unknown as Record<string, Block | string>) ?? {};
@@ -55,7 +62,11 @@ describe("blockCitations — each figure a block carries, with its own read", ()
           for (const link of f.read.links) expect(blk.sources, `${m.id}.${sector} ${f.label}`).toContain(link);
           // A cap's line says what kind of figure it is and whose stock; a
           // vacancy's and a rent's say who, where and when.
-          expect(f.words, `${m.id}.${sector} ${f.label}`).toBe(f.label === "Cap" ? figureNote(f.read) : figureCitation(f.read));
+          expect(f.words, `${m.id}.${sector} ${f.label}`).toBe(
+            f.label === "Cap"
+              ? figureNote(f.read)
+              : [figureCitation(f.read), f.read.slice ? `for ${f.read.slice}` : null].filter(Boolean).join("; "),
+          );
         }
       }
     }

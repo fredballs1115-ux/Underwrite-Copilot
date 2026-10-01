@@ -71,7 +71,8 @@ export type CheckTone =
   | "widens"
   | "compresses"
   | "level"
-  | "stated";
+  | "stated"
+  | "aside";
 
 export const TONE_LABEL: Record<CheckTone, string> = {
   ahead: "ahead of the published figures",
@@ -86,6 +87,7 @@ export const TONE_LABEL: Record<CheckTone, string> = {
   compresses: "assumes cap compression",
   level: "spread held at the exit",
   stated: "spread stated",
+  aside: "beside a narrower stock",
 };
 
 export interface PublishedFigure {
@@ -224,6 +226,33 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
   const f = t.vacancy ?? UNNAMED;
   const published = trackerFigures(t, f, "vacancy", t.vacancyLow, hi);
   const band = bandText(t.vacancyLow, hi);
+  // A figure the file says is for a narrower stock than the class (`slice`:
+  // Northern Virginia's small-bay space) is shown and named, and the model
+  // is not held to it — capBandTail's rule for a cap. A bulk warehouse read
+  // against a small-bay band was called a point looser than "the industrial
+  // stock the figure covers" (the audit of 2026-10-01).
+  if (f.slice) {
+    const point = Math.abs(hi - t.vacancyLow) < SAME;
+    const where =
+      v > hi + SAME
+        ? `${pts(v - hi)} over ${point ? "it" : "its high end"}`
+        : v < t.vacancyLow - SAME
+          ? `${pts(t.vacancyLow - v)} under ${point ? "it" : "its low end"}`
+          : point
+            ? "at it"
+            : "inside it";
+    return {
+      key: "vacancy",
+      title: "Stabilized vacancy",
+      model: `${v.toFixed(1)}%`,
+      modelSource: sourceWords(input.sources?.vacancyPct),
+      published,
+      tone: "aside",
+      toneLabel: TONE_LABEL.aside,
+      scope: "metro",
+      read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f)} — a research print, not a feed. That figure is for ${f.slice}, not the ${t.sectorLabel} market as a whole, so the model is not held to it; its vacancy sits ${where}.`,
+    };
+  }
   const tone: CheckTone = v < t.vacancyLow - SAME ? "tighter" : v > hi + SAME ? "looser" : "inside";
   // The stock the figure covers — the file's area, which is not always the
   // market's (Suburban Maryland's office figure is filed under both of its
