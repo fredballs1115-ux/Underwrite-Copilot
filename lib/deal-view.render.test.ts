@@ -530,6 +530,18 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(src).not.toMatch(/scrollIntoView\(/);
   });
 
+  it("the decision log's note box takes the card's width on a phone, its button beneath (2026-09-30)", () => {
+    // The research pass: at 390px the box sat beside "Add note" at about
+    // 210px, and its two rows cut the placeholder off at its third line.
+    const html = render(sampleProps("overview"));
+    const at = html.indexOf('aria-label="New decision note"');
+    expect(at).toBeGreaterThan(-1);
+    const form = html.slice(html.lastIndexOf("<form", at), html.indexOf("</form>", at));
+    expect(form).toMatch(/<div class="flex flex-col gap-2 sm:flex-row sm:items-start">/);
+    expect(form).toMatch(/<textarea[^>]*class="w-full min-w-0 [^"]*sm:flex-1"/);
+    expect(form).toMatch(/<button type="submit" class="[^"]*self-end[^"]*sm:self-auto"/);
+  });
+
   it("the reconciler tab draws each stated gap as a bar from a centre line", () => {
     const html = render(sampleProps("analyses", "reconciler"));
     // Two of the sample's three rows state a figure — "$174k below the OM"

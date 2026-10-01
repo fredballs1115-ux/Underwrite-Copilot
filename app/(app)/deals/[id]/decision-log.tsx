@@ -42,7 +42,7 @@ function SaveButton() {
     <button
       type="submit"
       disabled={pending}
-      className="shrink-0 rounded-lg bg-brand px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:opacity-60"
+      className="shrink-0 self-end rounded-lg bg-brand px-3.5 py-1.5 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:opacity-60 sm:self-auto"
     >
       {pending ? "Saving…" : "Add note"}
     </button>
@@ -81,7 +81,10 @@ export function DecisionLog({
       <p className="mt-0.5 text-xs text-muted">Notes and stage moves, newest first.</p>
 
       <form action={addDealNote} className="mt-3">
-        <div className="flex items-start gap-2">
+        {/* On a phone the note box takes the card's whole width, the button
+            under it, so its two rows hold the placeholder whole; beside the
+            button it was cut off at its third line. */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
           <input type="hidden" name="dealId" value={dealId} />
           <textarea
             name="text"
@@ -90,7 +93,7 @@ export function DecisionLog({
             rows={2}
             aria-label="New decision note"
             placeholder="e.g. Passed at $68M — revisit if they come back under $63M."
-            className="min-w-0 flex-1 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30"
+            className="w-full min-w-0 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30 sm:flex-1"
           />
           <SaveButton />
         </div>
