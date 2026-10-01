@@ -2080,8 +2080,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   at. Realtor.com's condition for use is attribution (`REALTOR_CREDIT`).
   **A figure is said only while current, under its own month**
   (2026-09-30): `zoriFor`, `realtorFor` and `hotnessFor` take the
-  reader's date and answer nothing past `ZILLOW_FRESH_DAYS` (55: dated the
-  1st, pulled on the 20th of the next month) or `REALTOR_FRESH_DAYS` (73:
+  reader's date and answer nothing past `ZILLOW_FRESH_DAYS` (55: dated its
+  month's LAST day, pulled on the 20th of the next month and replaced on
+  the 20th of the month after, about 50 days old) or `REALTOR_FRESH_DAYS` (73:
   dated the 1st, replaced on the 8th of the month after next — 45 had
   marked a current figure stale), and every figure — the apartment rent,
   the home value, each year-ago change, the hotness parts — is read only
