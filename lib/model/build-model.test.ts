@@ -7,6 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = Record<string, unknown>;
 const jobs: Row[] = [];
+/** what the run wrote to the deal row */
+const dealWrites: Row[] = [];
 let docs: Row[] = [];
 let dealRow: Row | null = { is_sample: false };
 
@@ -33,6 +35,7 @@ vi.mock("@/lib/supabase/admin", () => ({
         },
         then<T>(resolve: (v: { data: unknown; error: null }) => T) {
           if (table === "deal_documents") return Promise.resolve({ data: docs, error: null }).then(resolve);
+          if (table === "deals" && q._patch) dealWrites.push(q._patch);
           if (table === "deals") return Promise.resolve({ data: dealRow, error: null }).then(resolve);
           if (table === "analysis_jobs" && q._patch) jobs.push(q._patch);
           return Promise.resolve({ data: null, error: null }).then(resolve);
@@ -52,6 +55,8 @@ vi.mock("@/lib/debt-index-read", () => ({
 }));
 
 import { runModelGeneration } from "./build-model";
+import type { UnderwritingModel } from "./types";
+import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { extractDocFacts } from "@/lib/anthropic/model-extract";
 import { reconcileDocs } from "@/lib/anthropic/model-reconcile";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
@@ -59,6 +64,7 @@ import { liveDebtSeeds } from "@/lib/debt-index-read";
 let errSpy: ReturnType<typeof vi.spyOn>;
 beforeEach(() => {
   jobs.length = 0;
+  dealWrites.length = 0;
   docs = [{ id: "doc1", kind: "om", filename: "om.pdf", storage_path: "u/om.pdf" }];
   dealRow = { is_sample: false };
   errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -88,6 +94,26 @@ describe("runModelGeneration — what a failure tells the analyst", () => {
     await runModelGeneration("d1");
     expect(lastJob().status).toBe("error");
     expect(lastJob().error).toMatch(/Add at least one document/);
+  });
+});
+
+describe("runModelGeneration — what a built model keeps of its build", () => {
+  it("is dated, and keeps the ids of the documents it was built from beside their labels", async () => {
+    docs = [
+      { id: "doc1", kind: "om", filename: "om.pdf", storage_path: "u/om.pdf" },
+      { id: "doc2", kind: "rent_roll", filename: "rr.xlsx", storage_path: "u/rr.xlsx" },
+    ];
+    vi.mocked(extractDocFacts).mockResolvedValue({ docName: "om.pdf", kind: "om", facts: [] });
+    vi.mocked(reconcileDocs)
+      .mockReset()
+      .mockResolvedValue({ metrics: [], inputs: SAMPLE_DEAL.model.inputs, summary: "", caveats: [] } as never);
+    const before = Date.now();
+    await runModelGeneration("d1");
+    expect(lastJob().status).toBe("done");
+    const model = dealWrites.map((w) => w.model as UnderwritingModel | undefined).find(Boolean)!;
+    expect(model.generatedFrom).toEqual(["Offering memorandum: om.pdf", "Rent roll: rr.xlsx"]);
+    expect(model.generatedFromIds).toEqual(["doc1", "doc2"]);
+    expect(Date.parse(model.generatedAt!)).toBeGreaterThanOrEqual(before - 1000);
   });
 });
 

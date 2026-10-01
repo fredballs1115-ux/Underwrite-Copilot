@@ -8,8 +8,8 @@ import { reconcileDocs } from "@/lib/anthropic/model-reconcile";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelRatesLine } from "@/lib/model-market";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
-import { DOC_KIND_LABEL } from "@/lib/documents";
 import { computeModel, planCaveats } from "./compute";
+import { documentLabel } from "./provenance";
 import type { DocFacts, UnderwritingModel } from "./types";
 
 type JobPatch = {
@@ -112,9 +112,13 @@ export async function runModelGeneration(dealId: string): Promise<void> {
     }
 
     const model: UnderwritingModel = {
-      generatedFrom: docs.map(
-        (d) => `${DOC_KIND_LABEL[d.kind] ?? "Document"}: ${d.filename}`,
-      ),
+      // One label rule, the tab's own (lib/model/provenance), so a model
+      // stored before it kept ids is still compared label for label.
+      generatedFrom: docs.map(documentLabel),
+      // When, and from exactly which documents: the tab says the build's
+      // day and what the deal's documents gained or lost since.
+      generatedAt: new Date().toISOString(),
+      generatedFromIds: docs.map((d) => d.id),
       holdYears: recon.inputs.holdYears,
       metrics: recon.metrics,
       conflicts: recon.metrics.filter((m) => m.isConflict),

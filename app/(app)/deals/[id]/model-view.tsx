@@ -12,6 +12,13 @@ import type {
 } from "@/lib/model/types";
 import { computeModel, type CashFlowYear } from "@/lib/model/compute";
 import {
+  builtSentence,
+  changedSinceSentence,
+  modelProvenance,
+  sourcingSentence,
+  statedByDocument,
+} from "@/lib/model/provenance";
+import {
   computeSensitivityGrid,
   SENSITIVITY_PRICE_FACTORS,
 } from "@/lib/model/sensitivity";
@@ -42,23 +49,27 @@ export function ModelView({
   documents,
   active,
   isPro,
+  isSample = false,
 }: {
   dealId: string;
   model: UnderwritingModel | null;
   documents: DealDocument[];
   active: boolean;
   isPro: boolean;
+  /** the sample deal, whose model lists the fixture's documents and which
+   *  has no document rows of its own to compare them with */
+  isSample?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-6">
       {model ? (
         <>
-          <FirstDraftBanner />
+          <FirstDraftBanner model={model} documents={documents} compare={!isSample} />
           <ReturnsHeadline model={model} />
           <StressPanel model={model} />
           <Sensitivity model={model} />
           <Conflicts conflicts={model.conflicts} />
-          <Assumptions metrics={model.metrics} />
+          <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} />
           <CapexPanel model={model} />
           <CashFlow cashFlow={model.cashFlow} />
           <SummaryCaveats summary={model.summary} caveats={model.caveats} />
@@ -158,14 +169,39 @@ function InputsNeeded({ documents }: { documents: DealDocument[] }) {
 // were retired (2d036c4): the one Excel download is the OM underwrite
 // (lib/underwrite/workbook.ts), a separate model built from the
 // memorandum's figures. The card says so beside its download button.
-function FirstDraftBanner() {
+//
+// What the banner says is counted, never claimed (lib/model/provenance):
+// how many assumptions a document states and how many the model chose where
+// none does, when the model was built and from which documents, and what
+// the deal's documents gained or lost since — with the way to rebuild.
+function FirstDraftBanner({
+  model,
+  documents,
+  compare,
+}: {
+  model: UnderwritingModel;
+  documents: DealDocument[];
+  /** compare the deal's documents with the model's — never on the sample */
+  compare: boolean;
+}) {
+  const read = modelProvenance(model, documents);
+  const changed = compare ? changedSinceSentence(read) : "";
   return (
     <div className="rounded-xl border border-line border-l-4 border-l-caution bg-caution/5 px-4 py-3">
       <p className="text-sm font-medium">First-draft model — verify before relying on it</p>
-      <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        Built from your documents: every number traces to a source, and
-        conflicts are listed below.
+      <p className="mt-0.5 text-xs leading-relaxed text-muted">{sourcingSentence(read)}</p>
+      <p data-qa="model-built" className="mt-1 text-xs leading-relaxed text-muted">
+        {builtSentence(read)}
       </p>
+      {changed && (
+        <p data-qa="model-changed" className="mt-1 text-xs font-medium leading-relaxed text-caution">
+          {changed}{" "}
+          <a href="#model-documents" className="underline underline-offset-2 transition-colors hover:text-ink">
+            Regenerate the model
+          </a>{" "}
+          to build from the documents the deal has now.
+        </p>
+      )}
     </div>
   );
 }
@@ -636,13 +672,28 @@ export function Conflicts({ conflicts }: { conflicts: ReconciledMetric[] }) {
   );
 }
 
-export function Assumptions({ metrics }: { metrics: ReconciledMetric[] }) {
+export function Assumptions({
+  metrics,
+  generatedFrom = [],
+}: {
+  metrics: ReconciledMetric[];
+  /** the documents the model was built from, which a row's source may cite
+   *  by file name (lib/model/provenance) */
+  generatedFrom?: string[];
+}) {
   const [open, setOpen] = useState(false);
   const shown = open ? metrics : metrics.slice(0, 8);
+  // Counted, never claimed: a row no document states is the model's own.
+  const assumed = metrics.filter((m) => !statedByDocument(m, generatedFrom)).length;
   return (
     <section>
       <h2 className="text-sm font-semibold tracking-tight">
-        Assumptions <span className="font-normal text-muted">· every value sourced</span>
+        Assumptions{" "}
+        <span className="font-normal text-muted">
+          {assumed === 0
+            ? "· each from your documents"
+            : `· ${metrics.length - assumed} from your documents, ${assumed} assumed`}
+        </span>
       </h2>
       <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[40rem] text-sm">
@@ -672,7 +723,21 @@ export function Assumptions({ metrics }: { metrics: ReconciledMetric[] }) {
                   <td className="whitespace-nowrap px-4 py-3 font-mono tabular-nums">
                     {m.chosenValue}
                   </td>
-                  <td className="px-4 py-3 text-muted">{m.authority}</td>
+                  <td className="px-4 py-3 text-muted">
+                    {m.authority}
+                    {!statedByDocument(m, generatedFrom) && (
+                      <>
+                        {" "}
+                        <span
+                          data-qa="assumed"
+                          title="No document states this figure — the model chose it"
+                          className="ml-1 inline-flex rounded-full bg-caution/10 px-1.5 py-px text-[10px] font-medium uppercase text-caution"
+                        >
+                          assumed
+                        </span>
+                      </>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${c.cls}`}
@@ -908,7 +973,8 @@ function DocumentsPanel({
   isPro: boolean;
 }) {
   return (
-    <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+    // The banner's "Regenerate the model" lands here, at the control.
+    <section id="model-documents" className="scroll-mt-24 rounded-xl border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight">
         Documents <span className="font-normal text-muted">· {documents.length}</span>
       </h2>

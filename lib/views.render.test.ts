@@ -1053,6 +1053,66 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(gluedWords(text)).toEqual([]);
     expect(text.length).toBeGreaterThan(100);
   });
+
+  // The tab claimed "every number traces to a source" and "every value
+  // sourced" over rows the reconciliation had chosen itself where no
+  // document stated one (lib/model/provenance).
+  const doc = (id: string, kind: string, filename: string) => ({
+    id,
+    deal_id: "d1",
+    kind,
+    filename,
+    storage_path: `documents/d1/${id}-${filename}`,
+    content_type: null,
+    created_at: "2026-09-29T12:00:00Z",
+  });
+  const docs = [
+    doc("a", "om", "Maddox-OM.pdf"),
+    doc("b", "rent_roll", "Maddox-RentRoll.xlsx"),
+    doc("c", "t12", "Maddox-T12.pdf"),
+  ];
+  const dated = {
+    ...SAMPLE_DEAL.model,
+    generatedFrom: ["Offering memorandum: Maddox-OM.pdf", "Rent roll: Maddox-RentRoll.xlsx", "T-12 / operating statement: Maddox-T12.pdf"],
+    generatedAt: "2026-09-30T18:00:00.000Z",
+    generatedFromIds: ["a", "b", "c"],
+  };
+
+  it("counts what it sources: the rows no document states are marked assumed, and the headlines say how many", () => {
+    const html = render(React.createElement(ModelView, { dealId: "d1", model: dated, documents: docs, active: false, isPro: true }));
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).not.toMatch(/every number traces to a source|every value sourced/);
+    expect(text).toMatch(/8 of the 13 assumptions below come from them, and the other 5, which no document states, are the model's own, marked “assumed”/);
+    expect(text).toMatch(/Assumptions\s*· 8 from your documents, 5 assumed/);
+    // The table's first eight rows hold two the reconciliation chose: the exit cap and rent growth.
+    expect(html.match(/data-qa="assumed"/g)).toHaveLength(2);
+    expect(text).toMatch(/Market assumed/);
+    expect(text).toMatch(/Built Sep 30, 2026 from Maddox-OM\.pdf \(Offering memorandum\), Maddox-RentRoll\.xlsx \(Rent roll\), Maddox-T12\.pdf \(T-12 \/ operating statement\)\./);
+    expect(html).not.toMatch(/data-qa="model-changed"/);
+  });
+
+  it("says when the deal's documents changed since the build, and points to the control that rebuilds it", () => {
+    const now = [docs[1], docs[2], doc("d", "om", "Maddox-OM-reissued.pdf")];
+    const html = render(React.createElement(ModelView, { dealId: "d1", model: dated, documents: now, active: false, isPro: true }));
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(text).toMatch(
+      /Since it was built, Maddox-OM-reissued\.pdf \(Offering memorandum\) was added and Maddox-OM\.pdf \(Offering memorandum\) was removed — these figures do not reflect that\.\s*Regenerate the model\s*to build from the documents the deal has now\./,
+    );
+    expect(html).toMatch(/<a href="#model-documents"[^>]*>Regenerate the model<\/a>/);
+    expect(html).toMatch(/<section id="model-documents"/);
+  });
+
+  it("says a model stored undated is undated, and compares nothing on the sample, whose documents are the fixture's", () => {
+    const html = render(
+      React.createElement(ModelView, { dealId: "sample", model: SAMPLE_DEAL.model, documents: [], active: false, isPro: false, isSample: true }),
+    );
+    const text = visibleText(html);
+    expect(text).toMatch(/Undated — built from Maddox-OM\.pdf \(Offering memorandum\)/);
+    expect(html).not.toMatch(/data-qa="model-changed"/);
+  });
 });
 
 describe("CompareTable — a stabilized asset, a conversion and a rejected deal side by side", () => {

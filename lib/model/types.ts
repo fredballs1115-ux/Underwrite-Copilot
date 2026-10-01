@@ -42,6 +42,13 @@ export interface DocFacts {
 /** The full first-draft model stored on the deal. */
 export interface UnderwritingModel {
   generatedFrom: string[]; // document names used
+  /** when it was built, ISO — absent on a model stored before builds were
+   *  dated, which the tab says is undated (lib/model/provenance) */
+  generatedAt?: string;
+  /** the deal_documents ids it was built from, in `generatedFrom`'s order,
+   *  so the tab can say what was added or removed since — absent before
+   *  they were kept, when the labels are compared instead */
+  generatedFromIds?: string[];
   holdYears: number;
   metrics: ReconciledMetric[]; // sourced assumptions + reconciliation audit
   conflicts: ReconciledMetric[]; // subset where isConflict === true

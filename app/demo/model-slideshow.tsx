@@ -54,8 +54,8 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
         key: "assumptions",
         label: "Assumptions",
         blurb:
-          "Every input with its source and the document that won — OM claims versus rent-roll and T-12 actuals.",
-        node: <Assumptions metrics={model.metrics} />,
+          "Every input with the document that won — OM claims versus rent-roll and T-12 actuals — and the ones no document states, marked assumed.",
+        node: <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} />,
       },
       {
         key: "conflicts",

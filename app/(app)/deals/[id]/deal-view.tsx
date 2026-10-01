@@ -911,6 +911,7 @@ export function DealView({
             assumable={assumable}
             sellerNote={sellerNote}
             leaseholdExit={leaseholdExit}
+            isSample={isSample}
           />
         )}
 
@@ -1004,6 +1005,7 @@ function FinancialsPanel({
   assumable = null,
   sellerNote = null,
   leaseholdExit = null,
+  isSample = false,
 }: {
   results: Results;
   active: boolean;
@@ -1022,6 +1024,9 @@ function FinancialsPanel({
   assumable?: AssumableView | null;
   sellerNote?: AssumableView | null;
   leaseholdExit?: LeaseholdExitView | null;
+  /** the sample deal: its model's documents are the fixture's, never rows
+   *  of its own, so the Model tab compares no document set against them */
+  isSample?: boolean;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -1089,6 +1094,7 @@ function FinancialsPanel({
             documents={documents}
             active={active}
             isPro={isPro}
+            isSample={isSample}
           />
         </div>
       </details>
