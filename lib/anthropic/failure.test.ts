@@ -44,6 +44,19 @@ describe("describeRunFailure — the analyst reads a sentence, the log keeps the
     );
   });
 
+  it("a 400 about the account — a spent credit balance, a usage limit — is ours, never the document's (pass 14, 2026-10-01)", () => {
+    for (const err of [
+      apiError(400, "invalid_request_error", "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."),
+      apiError(400, "invalid_request_error", "You have reached your specified API usage limits. You will regain access on 2026-11-01 at 00:00 UTC."),
+    ]) {
+      const f = describeRunFailure(err);
+      expect(f.message).toMatch(/on our side, not your deal/);
+      expect(f.message).not.toMatch(/PDF|document|scanned/);
+      expect(f.message).not.toMatch(/credit|billing|Anthropic/i);
+      expect(f.detail).toMatch(/credit balance|usage limits/);
+    }
+  });
+
   it("a connection failure and a storage miss each say what to do", () => {
     const conn = Object.assign(new Error("Connection error."), { name: "APIConnectionError" });
     expect(describeRunFailure(conn).message).toMatch(/couldn't reach/);

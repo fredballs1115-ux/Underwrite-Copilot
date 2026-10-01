@@ -40,6 +40,14 @@ const TOO_LARGE =
   "The analysis service refused this document as too large — try a smaller PDF.";
 const REJECTED =
   "The analysis service could not accept this document — if the OM is scanned, password-protected or very long, try a text-based PDF; otherwise try again.";
+// The provider answers a spent credit balance or a workspace's usage limit
+// with a 400 like any malformed request; read as REJECTED, it blamed the
+// analyst's document for the operator's account.
+const ACCOUNT_PAUSED =
+  "The analysis service has paused our account's requests — a limit on our side, not your deal. It needs the operator, not a retry.";
+/** A 400 whose words are the provider's account, never the request: a
+ *  credit balance, a usage or spend limit, billing. */
+const ACCOUNT_LIMIT = /credit balance|usage limit|spend(?:ing)? limit|purchase credits|plans? (?:&|and) billing/i;
 const UNREACHABLE =
   "We couldn't reach the analysis service — check back in a minute and try again.";
 const UNREADABLE =
@@ -112,7 +120,9 @@ export function describeRunFailure(err: unknown): RunFailure {
     if (status === 401 || status === 403) return { message: CREDENTIALS, detail };
     if (status === 429) return { message: RATE_LIMITED, detail };
     if (status === 413) return { message: TOO_LARGE, detail };
-    if (status === 400 || status === 422) return { message: REJECTED, detail };
+    if (status === 400 || status === 422) {
+      return { message: ACCOUNT_LIMIT.test(messageOf(err)) ? ACCOUNT_PAUSED : REJECTED, detail };
+    }
     if (status === 408 || status === 409 || status >= 500) return { message: OVERLOADED, detail };
     return { message: UNEXPECTED, detail };
   }
