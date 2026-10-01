@@ -3049,6 +3049,8 @@ function GroundLease() {
 
   const widestValue = Math.max(1, r.asIfPerpetual ?? 0, r.leaseholdValue ?? 0);
   const widestCover = Math.max(0.01, r.coverage ?? 0, r.resetCoverage ?? 0);
+  // The years the module ran, held as it holds them.
+  const heldYears = Math.max(1, Math.round(heldTo(num(years) ?? 0, MAX_GROUND_LEASE_YEARS)));
 
   return (
     <Card
@@ -3097,8 +3099,12 @@ function GroundLease() {
                 tone: "bg-kill",
               },
               {
-                // The years the module ran, held as it holds them.
-                label: `Worth over the ${Math.max(1, Math.round(heldTo(num(years) ?? 0, MAX_GROUND_LEASE_YEARS)))} years that are left`,
+                // The years the module ran, held as it holds them — and the
+                // reset in the value where the lease gives its year.
+                label:
+                  r.resetYear === null
+                    ? `Worth over the ${heldYears} years that are left`
+                    : `Worth over the ${heldYears} years left, the year-${r.resetYear} reset in`,
                 amount: r.leaseholdValue,
                 tone: "bg-brand",
               },
@@ -3134,7 +3140,12 @@ function GroundLease() {
               ...(r.resetCoverage !== null
                 ? [
                     {
-                      label: `After the reset to ${reset}% of land value`,
+                      // On the NOI of the year the reset lands — the
+                      // building's income has grown by then too.
+                      label:
+                        r.resetYear === null
+                          ? `If it reset today, to ${reset}% of land value`
+                          : `After the reset in year ${r.resetYear}, on that year's NOI`,
                       amount: r.resetCoverage,
                       tone: r.resetCoverage < 2 ? "bg-kill" : "bg-brand",
                     },
