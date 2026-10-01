@@ -11,6 +11,7 @@
  * connection-error name, the parser's own message), never by class.
  */
 import { recordUsage, usageOfResponse } from "./usage";
+import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE } from "./operator-failures";
 
 /** An error whose message was written for the analyst and shows as it is. */
 export class ScreenError extends Error {
@@ -30,8 +31,7 @@ export interface RunFailure {
   detail: string;
 }
 
-const CREDENTIALS =
-  "The analysis service isn't accepting our credentials. That is a configuration problem on our side, not your deal — it needs the operator, not a retry.";
+const CREDENTIALS = CREDENTIALS_FAILURE;
 const RATE_LIMITED =
   "The analysis service is rate-limiting us right now — wait a minute and try again.";
 const OVERLOADED =
@@ -47,8 +47,7 @@ const REJECTED =
 // The provider answers a spent credit balance or a workspace's usage limit
 // with a 400 like any malformed request; read as REJECTED, it blamed the
 // analyst's document for the operator's account.
-const ACCOUNT_PAUSED =
-  "The analysis service has paused our account's requests — a limit on our side, not your deal. It needs the operator, not a retry.";
+const ACCOUNT_PAUSED = ACCOUNT_PAUSED_FAILURE;
 /** A 400 whose words are the provider's account, never the request: a
  *  credit balance, a usage or spend limit, billing. */
 const ACCOUNT_LIMIT = /credit balance|usage limit|spend(?:ing)? limit|purchase credits|plans? (?:&|and) billing/i;

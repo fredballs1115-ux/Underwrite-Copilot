@@ -7,6 +7,7 @@ import {
   structuredOutput,
 } from "./failure";
 import { newLedger, withUsageLedger } from "./usage";
+import { needsOperator } from "./operator-failures";
 
 /** The SDK's APIError, by shape: an HTTP status and its "401 {…}" message. */
 function apiError(status: number, type: string, message: string): Error {
@@ -56,7 +57,23 @@ describe("describeRunFailure — the analyst reads a sentence, the log keeps the
       expect(f.message).not.toMatch(/PDF|document|scanned/);
       expect(f.message).not.toMatch(/credit|billing|Anthropic/i);
       expect(f.detail).toMatch(/credit balance|usage limits/);
+      // The deal page leaves out its "Try again" under it.
+      expect(needsOperator(f.message)).toBe(true);
     }
+  });
+
+  it("only the operator's failures read as needing the operator (the deal page's Try again)", () => {
+    expect(needsOperator(describeRunFailure(apiError(401, "authentication_error", "invalid x-api-key")).message)).toBe(true);
+    for (const err of [
+      apiError(429, "rate_limit_error", "slow down"),
+      apiError(529, "overloaded_error", "Overloaded"),
+      apiError(400, "invalid_request_error", "pdf pages"),
+      new Error("fetch failed"),
+    ]) {
+      expect(needsOperator(describeRunFailure(err).message)).toBe(false);
+    }
+    expect(needsOperator(null)).toBe(false);
+    expect(needsOperator("")).toBe(false);
   });
 
   it("a connection failure and a storage miss each say what to do", () => {

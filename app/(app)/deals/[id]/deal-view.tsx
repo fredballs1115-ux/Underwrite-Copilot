@@ -80,6 +80,7 @@ import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 import { MAX_OM_PAGES } from "@/lib/pdf";
+import { needsOperator } from "@/lib/anthropic/operator-failures";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
@@ -432,6 +433,7 @@ export function DealView({
   // the clock is a side effect, not render), it flips the rail to a restart.
   const [stalled, setStalled] = useState(false);
   const wasStalled = useRef(false);
+  const operatorFailure = job?.status === "error" && needsOperator(job.error);
 
   const active = isActive(job?.status);
   // Why any result below is the previous screen's: a failed run never
@@ -691,8 +693,10 @@ export function DealView({
             This screen stalled
           </p>
           <p className="mt-1 text-sm text-muted">
-            It hasn&apos;t made progress in a while — the run may have been
-            interrupted. Nothing was lost; start it again to pick back up.
+            It hasn&apos;t made progress in a while — the run was probably
+            interrupted, most often by the site restarting under it. What it
+            had saved stays on the deal; starting again runs the screen from
+            the beginning.
           </p>
           <RetryForm dealId={dealId} label="Start it again" />
         </div>
@@ -713,16 +717,18 @@ export function DealView({
             {staleResults.length > 0
               ? "The results it did not reach still show below, marked as the previous screen's. "
               : "Nothing was lost. "}
-            If it fails twice, email{" "}
+            {operatorFailure ? "Email" : "If it fails twice, email"}{" "}
             <a
               className="font-medium text-brand hover:text-brand-strong"
               href="mailto:underwritecopilot.support@gmail.com"
             >
               underwritecopilot.support@gmail.com
             </a>{" "}
-            and we&apos;ll dig in.
+            {operatorFailure ? "and we\u2019ll fix it on our side." : "and we\u2019ll dig in."}
           </p>
-          <RetryForm dealId={dealId} label="Try again" />
+          {/* A failure on our side (lib/anthropic/operator-failures) says a
+              retry will not help; no button offers one beneath it. */}
+          {!operatorFailure && <RetryForm dealId={dealId} label="Try again" />}
         </div>
       )}
 
