@@ -114,7 +114,8 @@ describe("the eighth review's document cases", () => {
     expect(data.keyTerms).toHaveLength(4);
     expect(data.keyTerms.slice(0, 3).map((t) => t.label)).toEqual(["Asking price", "Going-in cap", "Units"]);
     const text = await render(React.createElement(MemoDocument, { data }));
-    expect(text).toMatch(/KEY TERMS\nASKING PRICE\n\$68,000,000\nGOING-IN CAP\n5\.45%\nUNITS\n248\n/);
+    // The price tile carries its basis under it, as the pipeline card does.
+    expect(text).toMatch(/KEY TERMS\nASKING PRICE\n\$68,000,000\n\$274k\/unit\nGOING-IN CAP\n5\.45%\nUNITS\n248\n/);
   }, 30000);
 
   it("2. the report omits the IRR sensitivity page on a plan deal and says so on the plan page; a stabilized asset keeps it", async () => {

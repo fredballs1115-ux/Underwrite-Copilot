@@ -29,7 +29,8 @@ import type {
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
-import { askingPriceOf, inferStrategy, planSummary, type DealStrategy } from "@/lib/deal-strategy";
+import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type DealStrategy } from "@/lib/deal-strategy";
+import { marketsPhrase, portfolioFacts, readPortfolio } from "@/lib/portfolio";
 import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -48,7 +49,7 @@ import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/cor
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
 import { assetClassLabel } from "@/lib/asset-class";
-import { shownAssetClass } from "@/lib/pipeline-slots";
+import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 
 const C = {
   brand: "#114e54",
@@ -120,6 +121,16 @@ function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStra
   }
   if (plan?.stabilizedNoi) return `${strategy.label} · stabilized NOI ${m(plan.stabilizedNoi.value)}`;
   return strategy.label;
+}
+
+/** A portfolio memorandum (lib/portfolio, #411), in one line for the memo's
+ *  header: how many properties across which markets, then the facts a buyer
+ *  should see before pricing any of it — the deal page's card's own
+ *  sentences — so a three-market portfolio never reads as one building on
+ *  page one. "" for a single property. */
+function portfolioLineFor(extraction: ExtractionResult | null): string {
+  const p = readPortfolio(extraction);
+  return p ? [`A portfolio of ${p.assets.length} properties across ${marketsPhrase(p)}.`, ...portfolioFacts(p)].join(" ") : "";
 }
 
 /** What is being sold, in one line for the memo's header (lib/interest):
@@ -254,6 +265,9 @@ export type MemoData = {
   /** deal type and, for a plan deal, the plan's headline figures ("" for a
    *  stabilized asset). Optional for callers built before it existed. */
   strategyLine?: string;
+  /** a portfolio memorandum's properties and markets, and the facts to see
+   *  before pricing it (lib/portfolio), in one line; "" for one property */
+  portfolioLine?: string;
   /** what is being sold (lib/interest, #414) — a note, a share, a
    *  leasehold, in one line; "" for a plain fee simple */
   interestLine?: string;
@@ -309,7 +323,9 @@ export type MemoData = {
   verdictColor: string;
   verdictSub: string;
   verdictReason: string;
-  keyTerms: { label: string; value: string; flagged: boolean }[];
+  /** `sub` is the price tile's basis — "$274k/unit", "$200k/key", the
+   *  pipeline card's own figure (lib/pipeline-slots `basisTag`) */
+  keyTerms: { label: string; value: string; flagged: boolean; sub?: string }[];
   topRisks: string[];
   challenges: { severity: string; assumption: string; challenge: string }[];
   flags: { label: string; text: string }[];
@@ -480,10 +496,16 @@ export function buildMemoData(
   // The deal-defining rows first (price, cap or the plan's figures, units),
   // then the flagged ones — so the block never opens on four speculative
   // pro-forma figures and omits the asking price (lib/key-terms.ts).
+  // The price tile carries the basis under it, as a pipeline card does: the
+  // building's price over its count in the memorandum's own noun, or its
+  // area — none on a note, the land or a plan deal (lib/pipeline-slots).
+  const priceRow = findPriceMetric(metrics ?? [], strategy.kind);
+  const priceBasis = extraction && priceRow ? basisTag(extraction, strategy.kind, str(deal.asset_class)) : null;
   const keyTerms = keyTermRows(metrics, strategy.kind, 8, interestOf(extraction ?? null).kind).map((m) => ({
     label: str(m.label),
     value: str(m.value),
     flagged: !!m.flagged,
+    ...(priceBasis && priceRow && m.label === priceRow.label && m.value === priceRow.value ? { sub: str(priceBasis) } : {}),
   }));
 
   const ch = (list(challenges?.challenges) as ChallengerResult["challenges"])
@@ -595,6 +617,7 @@ export function buildMemoData(
     // On a deal filed "Auto-detect", what the deck turned out to be.
     assetClass: shownAssetClass(str(deal.asset_class), extraction ?? null),
     strategyLine: pdfSafe(strategyLineFor(extraction ?? null, strategy)),
+    portfolioLine: pdfSafe(portfolioLineFor(extraction ?? null)),
     interestLine: pdfSafe(interestLineFor(extraction ?? null)),
     assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
     affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
@@ -826,6 +849,7 @@ const s = StyleSheet.create({
   termLabel: { fontSize: 7, color: C.muted, textTransform: "uppercase", letterSpacing: 0.4 },
   termValue: { fontSize: 11, fontFamily: "Helvetica-Bold", marginTop: 1.5 },
   verify: { fontSize: 6.5, color: C.caution, marginTop: 1 },
+  termSub: { fontSize: 7, color: C.muted, marginTop: 1 },
 
   row: { flexDirection: "row", marginBottom: 5 },
   bullet: { width: 10, color: C.muted },
@@ -1073,6 +1097,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {subParts.length > 0 && (
               <Text style={s.sub}>{subParts.join("  ·  ")}</Text>
             )}
+            {/* A portfolio (#411): how many properties across which markets,
+                and what to see before pricing any of it. */}
+            {data.portfolioLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.portfolioLine}</Text>}
             {/* What is being sold (#414) — a note, a share, a leasehold, said
                 under the title before any figure is read. */}
             {data.interestLine && (
@@ -1297,6 +1324,7 @@ export function MemoPage({ data }: { data: MemoData }) {
                 <View key={i} style={s.term}>
                   <Text style={s.termLabel}>{t.label}</Text>
                   <Text style={s.termValue}>{t.value}</Text>
+                  {t.sub ? <Text style={s.termSub}>{t.sub}</Text> : null}
                   {t.flagged ? <Text style={s.verify}>verify vs. source</Text> : null}
                 </View>
               ))}

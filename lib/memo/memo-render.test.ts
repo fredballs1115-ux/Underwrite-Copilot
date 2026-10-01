@@ -799,6 +799,75 @@ describe("MemoDocument (redesigned)", () => {
     expect(killersAtBreak[1]).toMatch(/screening memo, continued 1\. Basis/);
   }, 60000);
 
+  it("says a portfolio is a portfolio under the title, and the basis under the price tile, and keeps the ordinary sample on one page", async () => {
+    const prop = (name: string, address: string, count: string, noi: string, occupancy: string, allocatedPrice: string, page: string) => ({
+      name, address, count, area: "", noi, occupancy, yearBuilt: "", allocatedPrice, page,
+    });
+    const portfolio = {
+      dealName: "Rust Belt Residential Portfolio",
+      assetClass: "multifamily",
+      market: "Pittsburgh, PA",
+      address: "1200 Liberty Ave, Pittsburgh, PA 15222",
+      metrics: [
+        { label: "Asking price", value: "$75,000,000", flagged: false, page: "p. 3" },
+        { label: "Units", value: "398", flagged: false, page: "p. 3" },
+        { label: "Net operating income", value: "$3,780,000", flagged: false, page: "p. 9" },
+      ],
+      properties: [
+        prop("Liberty Lofts", "1200 Liberty Ave, Pittsburgh, PA 15222", "128", "$1,420,000", "95%", "$28,000,000", "p. 14"),
+        prop("Ohio City Commons", "1850 W 25th St, Cleveland, OH 44113", "210", "$2,050,000", "94%", "$38,000,000", "p. 22"),
+        prop("Marion Gardens", "400 Barks Rd, Marion, OH 43302", "60", "$310,000", "82%", "$4,000,000", "p. 30"),
+      ],
+      totalPages: 28,
+    };
+    const base = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    };
+    const data = buildMemoData({ ...base, name: portfolio.dealName, extraction: portfolio } as unknown as DealRow, "September 30, 2026", []);
+    expect(data.portfolioLine).toBe(
+      "A portfolio of 3 properties across 3 markets — Pittsburgh PA (1), Cleveland OH (1) and Ohio (1). Ohio City Commons carries 54% of the stated NOI — the portfolio's income rides on one property. The allocated prices sum to $70.0M against the $75.0M ask (-6.7%) — the memorandum does not add up.",
+    );
+    // $75M over the 398 units the memorandum counts, under the price.
+    expect(data.keyTerms[0]).toEqual({ label: "Asking price", value: "$75,000,000", flagged: false, sub: "$188k/unit" });
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain("A portfolio of 3 properties across 3 markets — Pittsburgh PA (1), Cleveland OH (1) and Ohio (1).");
+    expect(text).toContain("ASKING PRICE $75,000,000 $188k/unit");
+
+    // The ordinary sample, its buy box included: no portfolio line, the
+    // basis under its price, and still one page.
+    const checks = evaluateBuyBox(
+      SAMPLE_DEAL.asset_class,
+      { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
+      SAMPLE_DEMO_BOX,
+    );
+    const sample = buildMemoData(base as unknown as DealRow, "September 30, 2026", checks);
+    expect(sample.portfolioLine).toBe("");
+    expect(sample.keyTerms[0].sub).toBe("$274k/unit");
+    const buf = await renderToBuffer(React.createElement(MemoDocument, { data: sample }) as unknown as Parameters<typeof renderToBuffer>[0]);
+    expect(pdfPageTextsOf(buf)).toHaveLength(1);
+    // A note's price is a loan's: no basis under it.
+    const note = buildMemoData(
+      {
+        ...base,
+        extraction: {
+          ...SAMPLE_DEAL.extraction,
+          interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+          metrics: [...SAMPLE_DEAL.extraction.metrics, { label: "Unpaid principal balance", value: "$80,000,000", flagged: false, page: "p. 3", basis: "na" }],
+        },
+      } as unknown as DealRow,
+      "September 30, 2026",
+      [],
+    );
+    expect(note.keyTerms.some((t) => t.sub)).toBe(false);
+  }, 45000);
+
   it("says the deal-killers' and the flips' IRR moves are the screen's estimates, never the model's", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,
