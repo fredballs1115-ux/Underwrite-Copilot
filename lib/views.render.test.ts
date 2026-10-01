@@ -5654,8 +5654,14 @@ describe("SectorJobsBoard — payroll growth by market and sector, shaded within
     for (const label of ["All payrolls", "Professional & business services", "Education & health services", "Transportation, warehousing & utilities", "Retail trade", "Leisure & hospitality"]) {
       expect(text, label).toContain(label);
     }
-    // Fourteen metro areas, grouped by region; a suburb is not a row of its own.
-    expect(text).toContain("Washington DC");
+    // Fourteen metro areas, grouped by region, each row named for its metro
+    // area — "Washington DC" was the Washington MSA's figures under the
+    // District's name (the research pass of 2026-10-01); a suburb is not a
+    // row of its own.
+    expect(text).toContain("Washington MSA");
+    expect(text).toContain("New York MSA");
+    expect(text).not.toMatch(/\bNew York City\b/);
+    expect(html).toContain("Washington DC&#x27;s market page; the figures are the Washington MSA&#x27;s");
     expect(text).not.toContain("Prince George");
     expect(text).toContain("Mid-Atlantic");
     // Phoenix leads the office-using column, Washington the all-payrolls one —
@@ -5666,8 +5672,8 @@ describe("SectorJobsBoard — payroll growth by market and sector, shaded within
     expect(text).toContain("3.9%");
     // The read-without-a-brief block: its heading, its rows unlinked, the note saying what it is.
     expect(text).toContain("Read without a brief");
-    expect(text).toContain("Phoenix AZ");
-    expect(text).toContain("Cleveland OH");
+    expect(text).toContain("Phoenix MSA");
+    expect(text).toContain("Cleveland MSA");
     expect(html).not.toContain('href="/market?metro=phoenix"');
     expect(html).toContain('href="/market?metro=dc"');
     expect(text).toContain("The last block is the metro areas the site reads without a brief: the same series, ranked in the same columns");
@@ -5776,12 +5782,17 @@ describe("SurveyVacancyBoard — where rental vacancy is lowest, by the survey, 
   const html = render(React.createElement(SurveyVacancyBoard, { markets, rates, us }));
   const text = visibleText(html);
 
-  it("ranks the fresh figures tightest first, briefed and read-without-a-brief alike, each with its whisker, the national line drawn and the stale row named", () => {
-    expect(text).toContain("Where rental vacancy is lowest");
-    expect(text).toContain("4 metro areas ranked, tightest first · Q2 2026");
-    // San Diego (read without a brief, unlinked) leads; Austin trails; Washington links.
-    expect(text.indexOf("San Diego CA")).toBeLessThan(text.indexOf("Washington DC"));
-    expect(text.indexOf("Washington DC")).toBeLessThan(text.indexOf("Austin TX"));
+  it("orders one quarter's fresh figures lowest first, with no rank numbers, each with its whisker in points, the national line drawn and the stale row named", () => {
+    expect(text).toContain("Where rental vacancy is lowest — the survey's figure for 5 metro areas, each with its margin");
+    expect(text).toContain("4 metro areas in order, lowest first · Q2 2026");
+    // San Diego (read without a brief, unlinked) leads; Austin trails; Washington links —
+    // each named for the metro area the survey publishes for.
+    expect(text.indexOf("San Diego MSA")).toBeLessThan(text.indexOf("Washington MSA"));
+    expect(text.indexOf("Washington MSA")).toBeLessThan(text.indexOf("Austin MSA"));
+    // An order, not a ranking: overlapping whiskers are not ordered, so no row is numbered.
+    expect(html).not.toMatch(/<li[^>]*data-survey-row[^>]*><span class="font-mono/);
+    expect(html).not.toContain("<ol");
+    expect(text).toContain("±2 pts");
     expect(html).not.toContain('href="/market?metro=san_diego"');
     expect(html).toContain('href="/market?metro=dc"');
     expect(text).toContain("2.9%");
@@ -5789,10 +5800,11 @@ describe("SurveyVacancyBoard — where rental vacancy is lowest, by the survey, 
     expect(text).toContain("16.9%");
     expect((html.match(/data-bar="surveyvac"/g) ?? []).length).toBe(4);
     // React writes the apostrophe as an entity inside an attribute.
-    expect(html).toContain("the whisker is the survey&#x27;s ±5.1 pt margin of error");
+    expect(html).toContain("the whisker is the survey&#x27;s ±5.1 pts margin of error");
     expect(text).toContain("The thin vertical line is the national rate, 7.3% in Q2 2026.");
-    expect(text).toContain("Not updating, shown rather than ranked: Cleveland OH 8.4% (Q2 2025)");
-    expect(text).toContain("two metro areas whose whiskers overlap are not ordered by it, whatever the ranking says.");
+    expect(text).toContain("Not updating, shown rather than placed: Cleveland MSA 8.4% (Q2 2025)");
+    // live-verify greps the first half of this sentence (#405).
+    expect(text).toContain("two metro areas whose whiskers overlap are not ordered by it, whatever the order says — so the rows carry no rank numbers.");
     expect(a11yIssues(html), "survey vacancy board").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });
@@ -5834,8 +5846,10 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
   it("ranks the apartment figure fastest first across briefed and read-only metros, lists a suburb's shared row once and an all-homes-only metro unranked, and carries Zillow's credit", () => {
     expect(text).toContain("Where apartment asking rents are moving");
     expect(text).toContain("3 metro areas ranked, fastest first · Aug 2026");
-    expect(text.indexOf("San Francisco")).toBeLessThan(text.indexOf("Pittsburgh PA"));
-    expect(text.indexOf("Pittsburgh PA")).toBeLessThan(text.indexOf("Washington DC"));
+    // Each row named for its metro area (the research pass of 2026-10-01).
+    expect(text.indexOf("San Francisco MSA")).toBeLessThan(text.indexOf("Pittsburgh MSA"));
+    expect(text.indexOf("Pittsburgh MSA")).toBeLessThan(text.indexOf("Washington MSA"));
+    expect(text).not.toContain("Washington DC");
     expect(text).not.toContain("Prince George");
     expect(text).toContain("+11.6%");
     expect(text).toContain("−0.4%");
@@ -5845,7 +5859,7 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
     expect(html).toContain('href="/market?metro=san_francisco"');
     expect(html).not.toContain('href="/market?metro=pittsburgh"');
     expect((html.match(/data-bar="rentboard"/g) ?? []).length).toBe(3);
-    expect(text).toContain("No apartment figure this month, all homes shown rather than ranked: Detroit MI +3.8%");
+    expect(text).toContain("No apartment figure this month, all homes shown rather than ranked: Detroit MSA +3.8%");
     expect(text).toContain("a suburb shares its metro area's row and is not listed twice.");
     expect(text).toContain("Data: Zillow Research.");
     expect(html).toContain('href="https://www.zillow.com/research/data/"');
@@ -5859,8 +5873,8 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
     const july = rows.map((r) => (r.metro === "Pittsburgh PA" ? { ...r, as_of: "2026-07-31" } : r));
     const board = visibleText(render(React.createElement(RentBoard, { markets, reads: new Map(markets.map((m) => [m.name, zoriFor(july, m.name, read)])) })));
     expect(board).toContain("2 metro areas ranked, fastest first · Aug 2026");
-    expect(board).toContain("San Francisco");
-    expect(board).not.toContain("Pittsburgh PA");
+    expect(board).toContain("San Francisco MSA");
+    expect(board).not.toContain("Pittsburgh MSA");
     // And a board read past the figures' cadence is no board at all.
     const late = new Map(markets.map((m) => [m.name, zoriFor(rows, m.name, new Date("2026-10-30T12:00:00Z"))]));
     expect(render(React.createElement(RentBoard, { markets, reads: late }))).not.toContain("Where apartment asking rents");
@@ -7951,5 +7965,44 @@ describe("the tracker's leaderboard, chips and coverage cells — one row a figu
     expect(spread).toContain('data-cell="unranked"');
     expect(spread).not.toContain("background-color");
     expect(spread).toContain("not ranked: a spread of two reads");
+  });
+});
+
+// ── A board is one period's: a fresh row of an older period is listed, never placed ──
+describe("the boards rank one period's rows, and list a fresh row of an older one with its own period (the research pass of 2026-10-01)", () => {
+  it("the survey board places the newest quarter's figures alone", () => {
+    const markets = [
+      { id: "dc", name: "Washington DC" },
+      { id: "atlanta", name: "Atlanta" },
+    ];
+    // Atlanta's Q1 figure is still fresh (the survey's 300 days) when
+    // Washington's Q2 is out: it is listed with its quarter, not placed.
+    const rows: RateRow[] = [
+      { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
+      { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+      { series_id: "HVS_RVR_12060", obs_date: "2026-01-01", value: 3.1 },
+    ];
+    const html = render(React.createElement(SurveyVacancyBoard, { markets, rates: readMetricRates("rental_vacancy_msa", rows, FIXTURE_NOW), us: null }));
+    const text = visibleText(html);
+    expect(text).toContain("1 metro area in order, lowest first · Q2 2026");
+    expect((html.match(/data-survey-row=/g) ?? []).length).toBe(1);
+    expect(text).toContain("An older quarter, listed rather than placed: Atlanta MSA 3.1% (Q1 2026)");
+  });
+
+  it("the payroll board shades a column's newest month alone", () => {
+    const markets = [
+      { id: "dc", name: "Washington DC", region: "DMV core" },
+      { id: "atlanta", name: "Atlanta", region: "Major US markets" },
+    ];
+    const rows: RateRow[] = [
+      { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: 1.3 },
+      { series_id: "ATLA013PBSV_YOY", obs_date: "2026-07-01", value: 4.4 },
+    ];
+    const rates = Object.fromEntries(BOARD_METRICS.map((metric) => [metric, readMetricRates(metric, rows, FIXTURE_NOW)]));
+    const html = render(React.createElement(SectorJobsBoard, { markets, rates }));
+    expect(html).toContain('data-cell="older-month"');
+    expect(visibleText(html)).toContain("4.4% · Jul 2026");
+    expect(html).toContain("an older month than the column&#x27;s Aug 2026: shown, not ranked");
+    expect(visibleText(html)).toContain("1 of 12 cells carry a fresh figure");
   });
 });

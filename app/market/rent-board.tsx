@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori";
+import { metroSeriesFor } from "@/lib/live-rates";
 import type { BoardMarket } from "./sector-jobs-board";
 
 /**
@@ -47,6 +48,10 @@ export function RentBoard({
     .sort((a, b) => b.z.mfrYoyPct - a.z.mfrYoyPct);
   if (!newest || ranked.length === 0) return null;
   const unranked = rows.filter((x) => !ranked.includes(x as (typeof ranked)[number]));
+  // Each row is the metro area's figure, named for the metro area as the
+  // series table names it ("Washington MSA"): the board's "Washington DC"
+  // and "New York City" were the metro areas' rents under the city's name.
+  const areaOf = (m: BoardMarket) => metroSeriesFor(m.id).series.find((s) => s.metro === m.id)?.area ?? m.name;
   const widest = Math.max(0.5, ...ranked.map((x) => Math.abs(x.z.mfrYoyPct)));
   const half = (v: number) => `${Math.min(50, (Math.abs(v) / widest) * 50)}%`;
   const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}%`;
@@ -62,15 +67,16 @@ export function RentBoard({
             <span className="font-mono text-[10px] tabular-nums text-muted">{i + 1}</span>
             {market.briefed === false ? (
               <span className="truncate font-medium text-ink" title="Read without a brief — the same Zillow figure, no market page behind it">
-                {market.name}
+                {areaOf(market)}
               </span>
             ) : (
               <Link
                 href={`/market?metro=${market.id}`}
                 prefetch={false}
+                title={`${market.name}'s market page; the rent is the ${areaOf(market)}'s`}
                 className="truncate font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
               >
-                {market.name}
+                {areaOf(market)}
               </Link>
             )}
             <div
@@ -94,7 +100,7 @@ export function RentBoard({
       {unranked.length > 0 && (
         <p className="mt-2 text-[11px] text-muted">
           {"No apartment figure this month, all homes shown rather than ranked: "}
-          {unranked.map((x, i) => `${i > 0 ? "; " : ""}${x.market.name}${x.z.yoyPct !== null ? ` ${signed(x.z.yoyPct)}` : ""}`).join("")}
+          {unranked.map((x, i) => `${i > 0 ? "; " : ""}${areaOf(x.market)}${x.z.yoyPct !== null ? ` ${signed(x.z.yoyPct)}` : ""}`).join("")}
         </p>
       )}
       <p className="mt-3 text-[11px] leading-relaxed text-muted">

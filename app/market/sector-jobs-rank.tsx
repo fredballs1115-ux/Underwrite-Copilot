@@ -102,7 +102,7 @@ export function SectorJobsRank({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">{heading}</h3>
         <span className="text-[11px] text-muted">
-          {`${what}, on a year ago · ${ranked.length} metro areas ranked fastest first · ${monthOf(newest)} · BLS payrolls via FRED`}
+          {`${what}, on a year ago · ${ranked.length} metro area${ranked.length === 1 ? "" : "s"} ranked fastest first · ${monthOf(newest)} · BLS payrolls via FRED`}
         </span>
       </div>
       <ol className="mt-2 max-w-2xl space-y-1.5">

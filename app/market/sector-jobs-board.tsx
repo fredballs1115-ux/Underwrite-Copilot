@@ -76,16 +76,29 @@ export function SectorJobsBoard({
     if (!meta) return null;
     return (rates[metric] ?? []).find((r) => r.meta.id === meta.id) ?? null;
   };
-  // Rank within each column over the fresh figures only.
+  // Rank within each column over the fresh figures of the column's newest
+  // month only: a month's figure stays fresh for weeks after the next is
+  // out, and a column that shaded both ranked two months as one (the
+  // research pass of 2026-10-01). A fresh figure of an older month is shown
+  // with its month and left out of the shading, as a stale one is.
   const rank = new Map<string, number>();
+  const columnMonth = new Map<MetroMetric, string>();
   for (const metric of BOARD_METRICS) {
     const fresh = rows
       .map((m) => ({ id: m.id, r: cell(m.id, metric) }))
-      .filter((x): x is { id: string; r: LiveRate } => x.r !== null && x.r.fresh && Number.isFinite(x.r.value))
-      .sort((a, b) => b.r.value - a.r.value);
-    fresh.forEach((x, i) => rank.set(`${metric}|${x.id}`, fresh.length > 1 ? i / (fresh.length - 1) : 0));
+      .filter((x): x is { id: string; r: LiveRate } => x.r !== null && x.r.fresh && Number.isFinite(x.r.value));
+    const month = fresh.map((x) => x.r.obsDate).sort().at(-1);
+    if (!month) continue;
+    columnMonth.set(metric, month);
+    const ranked = fresh.filter((x) => x.r.obsDate === month).sort((a, b) => b.r.value - a.r.value);
+    ranked.forEach((x, i) => rank.set(`${metric}|${x.id}`, ranked.length > 1 ? i / (ranked.length - 1) : 0));
   }
   if (rank.size === 0) return null;
+  // Each row is the metro area's figures, named for the area the series
+  // table names ("Washington MSA"): the board's "Washington DC" and "New
+  // York City" were the metro areas' figures under the city's name.
+  const areaOf = (m: BoardMarket) =>
+    metroSeriesFor(m.id).series.find((s) => s.metro === m.id && BOARD_METRICS.includes(s.metric))?.area ?? m.name;
   const regions: string[] = [];
   for (const m of rows) {
     const r = m.region ?? "More markets";
@@ -147,15 +160,16 @@ export function SectorJobsBoard({
                             className="text-xs font-medium text-ink"
                             title="Read without a brief — the same published series, no market page, comps pull or tracker behind it"
                           >
-                            {m.name}
+                            {areaOf(m)}
                           </span>
                         ) : (
                           <Link
                             href={`/market?metro=${m.id}`}
                             prefetch={false}
+                            title={`${m.name}'s market page; the figures are the ${areaOf(m)}'s`}
                             className="text-xs font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
                           >
-                            {m.name}
+                            {areaOf(m)}
                           </Link>
                         )}
                       </td>
@@ -171,6 +185,22 @@ export function SectorJobsBoard({
                                 title={`${r.meta.label} — ${monthOf(r.obsDate)}; shaded by rank within this column, fastest first`}
                               >
                                 {formatValue(r)}
+                              </div>
+                            </td>
+                          );
+                        }
+                        if (r && r.fresh && Number.isFinite(r.value)) {
+                          // Fresh, but an older month than the column's:
+                          // the figure and its month, unshaded — never
+                          // ranked under a month it is not of.
+                          return (
+                            <td key={metric} className="px-1 py-1">
+                              <div
+                                className="rounded-md border border-dashed border-line px-1.5 py-1 text-center font-mono text-[11px] tabular-nums text-muted"
+                                title={`${r.meta.label} — ${periodOf(r)}, an older month than the column's ${monthOf(columnMonth.get(metric) ?? r.obsDate)}: shown, not ranked`}
+                                data-cell="older-month"
+                              >
+                                {`${formatValue(r)} · ${periodOf(r)}`}
                               </div>
                             </td>
                           );
@@ -207,7 +237,7 @@ export function SectorJobsBoard({
         </table>
       </div>
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        {`BLS payrolls for each metro area by supersector, each against the same month a year earlier${newest ? `, newest ${monthOf(newest)}` : ""}, via FRED, pulled every weekday; a suburb reads its metro area's row. A dashed figure with a date is a series that stopped updating, shown rather than ranked; a dash is a series FRED does not carry. Each column is the sector that fills a kind of building — offices, warehouses, stores, hotels, clinics — and all payrolls is what rental housing runs on.`}
+        {`BLS payrolls for each metro area by supersector, each against the same month a year earlier${newest ? `, newest ${monthOf(newest)}` : ""}, via FRED, pulled every weekday; each row is named for its metro area, and a suburb reads its metro area's row. A column ranks its newest month alone: a dashed figure with a date is an older month's, or a series that stopped updating (amber), shown rather than ranked; a dash is a series FRED does not carry. Each column is the sector that fills a kind of building — offices, warehouses, stores, hotels, clinics — and all payrolls is what rental housing runs on.`}
         {rows.some((m) => m.briefed === false)
           ? " The last block is the metro areas the site reads without a brief: the same series, ranked in the same columns, with no research brief, comps pull or tracker behind them and no market page to open."
           : ""}
