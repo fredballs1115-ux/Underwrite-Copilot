@@ -56,6 +56,8 @@ export function resolveGoingInCap(v: ValuationFacts): ResolvedCap {
 }
 
 export interface BridgeComponent {
+  /** `residual` — the part of the gap the stated components do not account
+   *  for — is present only where it is a dollar or more */
   key: "noi" | "cap" | "deduction" | "residual";
   label: string;
   /** dollars of value; positive means it pushed B's value ABOVE A's */
@@ -157,8 +159,19 @@ export function reconcileValuations(
       amount: deductionEffect,
       share: share(deductionEffect),
     },
-    { key: "residual", label: "Unexplained", amount: residual, share: share(residual) },
   ];
+  // The residual is the part of the gap the stated components do not
+  // account for, and its label says so — not "Unexplained", which read as a
+  // verdict on the documents. Under a dollar it is rounding, and there is
+  // no such line: two opinions that agree reconcile to nothing.
+  if (Math.abs(residual) >= 1) {
+    components.push({
+      key: "residual",
+      label: deductionComparable ? "Not in the stated NOI, cap or capex" : "Not in the stated NOI or cap",
+      amount: residual,
+      share: share(residual),
+    });
+  }
 
   return {
     ok: true,

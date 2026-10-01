@@ -3,8 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { computeUnderwrite } from "@/lib/underwrite/engine";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
+import { modelOpinion } from "@/lib/valuation/model-opinion";
 import {
   bridgeSummaryLine,
   reconcileValuations,
@@ -61,6 +61,10 @@ const PCT_FIELDS: ReadonlySet<ValuationField> = new Set([
   "discountRate",
 ]);
 
+/** "$2.0M", "$450k" — a dollar figure for a sentence. */
+const usdShort = (n: number): string =>
+  Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`;
+
 const toNamed = (v: Valuation): NamedValuation => ({
   sourceLabel: v.sourceLabel,
   headlineValue: v.headlineValue,
@@ -102,32 +106,30 @@ export default async function ValuationsPage({
   const valuations = ((rows ?? []) as Record<string, unknown>[]).map(parseValuationRow);
 
   // The user's own underwriting, pinned as the last column. Derived, not
-  // stored — it always reflects the deal as it stands right now.
+  // stored — it always reflects the deal as it stands right now — and laid
+  // out as a BOV states an opinion, so its cap and its deduction describe
+  // the same price (lib/valuation/model-opinion).
   const base = await currentDealAssumptions(
     supabase,
     id,
     deal.name as string,
     (deal.extraction as ExtractionResult | null) ?? null,
   );
-  const ours: NamedValuation | null = base
-    ? (() => {
-        const r = computeUnderwrite(base);
-        return {
-          sourceLabel: "Our UW",
-          headlineValue: base.purchasePrice,
-          year1Noi: r.cashFlow[0]?.noi ?? null,
-          goingInCap: r.returns.goingInCapPct,
-          exitCap: base.exitCapPct,
-          holdYears: Math.round(base.holdMonths / 12),
-          rentGrowth: base.rentGrowthPct,
-          vacancyAssumption: base.vacancyPct,
-          capexDeduction: base.capitalImprovementsYr1,
-          // The screening engine prices off cash flows and an exit cap, not a
-          // discount rate — claiming one would be inventing an assumption.
-          discountRate: null,
-        };
-      })()
-    : null;
+  const opinion = base ? modelOpinion(base) : null;
+  const ours: NamedValuation | null = opinion?.valuation ?? null;
+  // Where the model carries Year-1 capital its cap is on the all-in basis,
+  // and the cell says so, with the cap on the price alone beside it.
+  const oursNotes: ColumnData["notes"] =
+    opinion?.allIn && base
+      ? {
+          goingInCap: {
+            chip: "all-in",
+            title: `NOI over the price plus the model's ${usdShort(base.capitalImprovementsYr1)} of Year-1 capital, the base a BOV caps before it deducts the capital${
+              opinion.capOnPrice != null ? ` — on the price alone it is ${(opinion.capOnPrice * 100).toFixed(2)}%` : ""
+            }.`,
+          },
+        }
+      : {};
 
   // The extracted BOVs' own documents, so a page citation can open its
   // source: each through the route that signs the file when it is clicked
@@ -194,6 +196,7 @@ export default async function ValuationsPage({
             ) as ColumnData["values"],
             citations: {},
             derivedFields: [],
+            notes: oursNotes,
             implied: (() => {
               const r = impliedReturns(base!, ours);
               return {

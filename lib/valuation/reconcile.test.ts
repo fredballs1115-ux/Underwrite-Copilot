@@ -8,7 +8,8 @@ import {
   type ValuationBridgeOk,
 } from "./reconcile";
 import { impliedReturns } from "./implied";
-import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { modelOpinion } from "./model-opinion";
+import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
 
 /** Relative closeness — at $70M scale, an absolute 1e-9 is finer than float64
  *  can represent, so "sums exactly" means to within a part in 10^9. */
@@ -169,10 +170,9 @@ describe("reconcileValuations — the symmetric split", () => {
       const mirror = bridge.components.find((x) => x.key === c.key)!;
       expectClose(mirror.amount, c.amount, 1e-9);
     }
-    expect(
-      Math.abs(bridge.components.find((c) => c.key === "residual")!.amount),
-    ).toBeLessThan(0.01);
-    expect(bridgeSummaryLine(bridge)).not.toContain("unexplained");
+    // Nothing is left over, so there is no residual line at all.
+    expect(bridge.components.some((c) => c.key === "residual")).toBe(false);
+    expect(bridgeSummaryLine(bridge)).not.toContain("not in the stated");
   });
 
   it("never turns an unstated capex deduction into a zero deduction", () => {
@@ -181,15 +181,16 @@ describe("reconcileValuations — the symmetric split", () => {
     const deduction = bridge.components.find((c) => c.key === "deduction")!;
     expect(deduction.amount).toBe(0);
     expect(deduction.label).toContain("not stated");
-    // With both sides stated the identity closes and nothing is unexplained…
+    // With both sides stated the identity closes and nothing is left over…
     const withStated = ok(reconcileValuations(JLL, EASTDIL));
-    expect(
-      Math.abs(withStated.components.find((c) => c.key === "residual")!.amount),
-    ).toBeLessThan(0.01);
+    expect(withStated.components.some((c) => c.key === "residual")).toBe(false);
     // …and with one side silent, the $900k of capex treatment surfaces as
-    // unexplained instead of being quietly assumed away.
+    // the part the stated figures do not account for, instead of being
+    // quietly assumed away — and the line says that is what it is.
     const residual = bridge.components.find((c) => c.key === "residual")!;
     expectClose(residual.amount, -900_000, 1e-6);
+    expect(residual.label).toBe("Not in the stated NOI or cap");
+    expect(bridgeSummaryLine(bridge)).toMatch(/-?\d+% not in the stated NOI or cap/);
   });
 });
 
@@ -321,5 +322,61 @@ describe("impliedReturns", () => {
     expect(r.ok).toBe(false);
     expect(r.error).toContain("no headline value");
     expect(r.leveredIrrPct).toBeNull();
+  });
+});
+
+describe("the model's own opinion (Our UW)", () => {
+  // The research pass's case: $50M price, $3.0M NOI, $2.0M of Year-1 capital.
+  const INPUTS: UnderwriteInputs = {
+    ...BASE,
+    purchasePrice: 50_000_000,
+    inPlaceRentAnnual: 4_600_000,
+    expenseLines: [{ label: "Opex", annual: 1_370_000 }],
+    mgmtFeePct: 0,
+    capitalImprovementsYr1: 2_000_000,
+  };
+
+  it("strikes its cap on the price plus its capital, so value = NOI ÷ cap − capital lands on the price", () => {
+    const { valuation, capOnPrice, allIn } = modelOpinion(INPUTS);
+    expect(allIn).toBe(true);
+    expectClose(valuation.year1Noi! / valuation.goingInCap! - valuation.capexDeduction!, INPUTS.purchasePrice);
+    expectClose(capOnPrice!, valuation.year1Noi! / INPUTS.purchasePrice);
+    // No capital: the cap on the price, one figure.
+    const plain = modelOpinion({ ...INPUTS, capitalImprovementsYr1: 0 });
+    expect(plain.allIn).toBe(false);
+    expectClose(plain.valuation.goingInCap!, plain.capOnPrice!);
+  });
+
+  it("an opinion identical to the model's reconciles to zero, with no residual line", () => {
+    const ours = modelOpinion(INPUTS).valuation;
+    const same = ok(reconcileValuations({ ...ours, sourceLabel: "Broker" }, ours));
+    expect(same.totalDelta).toBe(0);
+    expect(same.components.some((c) => c.key === "residual")).toBe(false);
+    for (const c of same.components) expect(Math.abs(c.amount)).toBeLessThan(1);
+    // A broker who sees what the model sees — its NOI, capped on the price
+    // plus the capital, less the same capital — read "Cap rate −$2.0M,
+    // Unexplained +$2.0M" against the old column.
+    const broker: NamedValuation = {
+      sourceLabel: "Broker",
+      headlineValue: 50_000_000,
+      year1Noi: ours.year1Noi,
+      goingInCap: ours.year1Noi! / 52_000_000,
+      exitCap: null,
+      holdYears: null,
+      rentGrowth: null,
+      vacancyAssumption: null,
+      capexDeduction: 2_000_000,
+      discountRate: null,
+    };
+    const b = ok(reconcileValuations(broker, ours));
+    for (const c of b.components) expect(Math.abs(c.amount)).toBeLessThan(1);
+    expect(b.components.some((c) => c.key === "residual")).toBe(false);
+    expect(bridgeSummaryLine(b)).toContain("land on the same value");
+  });
+
+  it("runs through the model at its own price to the model's own return", () => {
+    const ours = modelOpinion(INPUTS).valuation;
+    const implied = impliedReturns(INPUTS, ours);
+    expect(implied.leveredIrrPct).toBeCloseTo(computeUnderwrite(INPUTS).returns.leveredIrrPct!, 9);
   });
 });

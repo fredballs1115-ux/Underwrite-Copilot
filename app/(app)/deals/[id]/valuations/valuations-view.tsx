@@ -19,6 +19,9 @@ export interface ColumnData {
   values: Partial<Record<ValuationField, number | null>>;
   citations: Partial<Record<ValuationField, { page: string; snippet: string }>>;
   derivedFields: ValuationField[];
+  /** a cell's own note: a short chip and what it means ("all-in" on a cap
+   *  struck on the price plus the capital deducted below it) */
+  notes?: Partial<Record<ValuationField, { chip: string; title: string }>>;
   implied: {
     ok: boolean;
     error?: string;
@@ -229,11 +232,20 @@ export function ValuationsView({
                 {columns.map((c) => {
                   const cite = c.citations[field];
                   const derived = c.derivedFields.includes(field);
+                  const note = c.notes?.[field];
                   return (
                     <td key={c.id} className="px-3 py-2 text-right font-mono text-ink">
                       <span title={cite ? `${cite.page}${cite.snippet ? ` — “${cite.snippet}”` : ""}` : undefined}>
                         {fmt(field, c.values[field])}
                       </span>
+                      {note ? (
+                        <span
+                          className="ml-1 rounded bg-faint px-1 text-[10px] font-sans font-medium text-muted"
+                          title={note.title}
+                        >
+                          {note.chip}
+                        </span>
+                      ) : null}
                       {derived ? (
                         <span
                           className="ml-1 rounded bg-caution/15 px-1 text-[10px] font-sans font-medium text-caution"
@@ -312,7 +324,15 @@ export function ValuationsView({
       <p className="text-xs leading-relaxed text-muted">
         Superscripts are page references — hover for the quote, click to open.{" "}
         <span className="font-medium text-caution">der</span> = a cap rate derived from value and
-        NOI. A dash = the source is silent. The IRR row runs each price through your model; its
+        NOI.
+        {columns.some((c) => c.notes?.goingInCap?.chip === "all-in") ? (
+          <>
+            {" "}
+            <span className="font-medium">all-in</span> = a cap on the price plus the capital
+            deducted below it, so value = NOI ÷ cap − capital.
+          </>
+        ) : null}{" "}
+        A dash = the source is silent. The IRR row runs each price through your model; its
         superscript counts borrowed assumptions.
       </p>
 
