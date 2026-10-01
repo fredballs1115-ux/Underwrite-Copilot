@@ -124,6 +124,15 @@ describe("askDeal — what an answer keeps", () => {
     expect(written).toHaveLength(3);
   });
 
+  it("at the cap, says so and hands the typed question back to the box, as every other refusal does", async () => {
+    const q = (i: number) => ({ at: `2026-09-01T00:00:${String(i).padStart(2, "0")}.000Z`, q: `Question ${i}?`, answer: "a", cites: [] });
+    db.deal.qa = Array.from({ length: 25 }, (_, i) => q(i));
+    const state = await ask("What does the OM say about the roof?");
+    expect(state?.error).toMatch(/reached its 25-question cap/);
+    expect(state?.question).toBe("What does the OM say about the roof?");
+    expect(db.appended).toEqual([]);
+  });
+
   it("counts questions toward the cap, never a replaced OM's markers", async () => {
     const q = (i: number) => ({ at: `2026-09-01T00:00:${String(i).padStart(2, "0")}.000Z`, q: `Question ${i}?`, answer: "a", cites: [] });
     db.deal.qa = [...Array.from({ length: 24 }, (_, i) => q(i)), { at: "2026-09-02T00:00:00.000Z", event: OM_REPLACED, om: "ab" }];
@@ -180,6 +189,11 @@ describe("AskPanel — page chips open the OM only for the memorandum the deal h
     expect(html).not.toContain(`href="${OM_URL}#page=3"`);
     // The earlier answer's page still shows, as the earlier deck's, unlinked.
     expect(html).toMatch(/<span[^>]*title="the cover"[^>]*>p\. 3<\/span>/);
+  });
+
+  it("promises no answer time: nothing measures one", () => {
+    expect(visibleText(html)).toMatch(/Answers cite the OM’s pages\./);
+    expect(visibleText(html)).not.toMatch(/second|minute/);
   });
 
   it("links nothing where the deal has no OM to open", () => {

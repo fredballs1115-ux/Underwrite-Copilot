@@ -22,7 +22,7 @@ const MAX_QUESTIONS = 25;
 /**
  * Ask-the-deal: one question, answered from the stored OM with page cites,
  * appended to the deal's Q&A thread. Runs inline (the analyst is waiting) —
- * a single Claude call, ~15–30 seconds. Returns useActionState-style state
+ * a single Claude call over the whole deck. Returns useActionState-style state
  * so errors render next to the form instead of bouncing the page.
  */
 export async function askDeal(
@@ -92,6 +92,8 @@ export async function askDeal(
   if (qa.length >= MAX_QUESTIONS) {
     return {
       error: `This deal reached its ${MAX_QUESTIONS}-question cap — the thread above should have it covered.`,
+      // The typed question stays in the box, as on every other refusal.
+      ...keep,
     };
   }
 

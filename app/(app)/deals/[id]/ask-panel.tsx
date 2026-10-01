@@ -75,8 +75,10 @@ export function AskPanel({
           </span>
         )}
       </div>
+      {/* No answer time is promised: nothing measures one (the house rule
+          lib/screen-duration keeps for the screen). */}
       <p className="mt-0.5 text-xs text-muted">
-        Answers cite the OM&rsquo;s pages; allow ~20 seconds.
+        Answers cite the OM&rsquo;s pages.
       </p>
 
       {qa.length > 0 && (
