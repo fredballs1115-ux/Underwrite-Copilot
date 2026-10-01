@@ -17,6 +17,12 @@ import "server-only";
  *                    an address (`replyToAddress`); unset, a reply goes to
  *                    the sender, and no address is ever assumed for it
  *   RESEND_BASE_URL  test override for the API host
+ *
+ * The request's shape is Resend's own, printed from its API reference by
+ * the runner (zori.yml's probe, run 36819534149): `reply_to` and `headers`
+ * ("Custom headers to add to the email") are fields of the send-email body,
+ * and the idempotency key goes in the `Idempotency-Key` HTTP header ("Send
+ * the key in the Idempotency-Key HTTP header in your API requests").
  */
 
 /** Resend's shared onboarding domain. Mail sent from it is delivered only to
