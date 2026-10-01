@@ -25,6 +25,8 @@ export interface ValidationIssue {
     | "missing_sf"
     | "mixed_rent_basis"
     | "skipped_totals"
+    | "unread_date"
+    | "dates_day_first"
     | "no_leases";
   message: string;
   /** source rows the issue points at */
@@ -36,9 +38,20 @@ export interface ValidateOptions {
   nra?: number | null;
   /** how far off the median rent PSF counts as an outlier (multiplicative) */
   outlierFactor?: number;
-  /** what the parser left out of the leases, so the stored issues say it */
-  parse?: Partial<Pick<ParseResult, "skippedTotals">>;
+  /** what the parser left out of the leases or would not read, so the stored
+   *  issues say it */
+  parse?: Partial<Pick<ParseResult, "skippedTotals" | "unreadDates" | "dayFirst">>;
 }
+
+/** "31 December 2028" — the day said in words, so a date read day first is
+ *  unmistakable whichever way the reader writes dates. */
+const dayInWords = (isoDate: string): string =>
+  new Date(`${isoDate}T00:00:00Z`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
 
 /** Up to three labels, quoted, for a message naming what it points at. */
 const quoted = (labels: string[]): string => {
@@ -71,6 +84,26 @@ export function validateLeases(
         skipped.map((s) => s.label),
       )}.`,
       rows: skipped.map((s) => s.row),
+    });
+  }
+  const unreadDates = options.parse?.unreadDates ?? [];
+  if (unreadDates.length) {
+    parseIssues.push({
+      severity: "warning",
+      code: "unread_date",
+      message: `${unreadDates.length} date${unreadDates.length === 1 ? "" : "s"} could not be read and ${
+        unreadDates.length === 1 ? "is" : "are"
+      } left blank rather than guessed (${quoted(unreadDates.map((u) => u.text))}): no month and day that exist, or no year. A lease whose expiry is blank stays out of WALT and the rollover schedule.`,
+      rows: [...new Set(unreadDates.map((u) => u.row))],
+    });
+  }
+  const dayFirst = options.parse?.dayFirst;
+  if (dayFirst) {
+    parseIssues.push({
+      severity: "info",
+      code: "dates_day_first",
+      message: `Dates read day first, as the file writes them: “${dayFirst.text}” is ${dayInWords(dayFirst.date)}.`,
+      rows: [],
     });
   }
 
@@ -154,7 +187,9 @@ export function validateLeases(
     });
   }
 
-  const missingExpiry = leases.filter((l) => !l.vacant && !l.leaseExpiry);
+  // An expiry the reader refused is said once, by the unread-date note above.
+  const refusedExpiry = new Set(unreadDates.filter((u) => u.field === "leaseExpiry").map((u) => u.row));
+  const missingExpiry = leases.filter((l) => !l.vacant && !l.leaseExpiry && !refusedExpiry.has(l.sourceRow));
   if (missingExpiry.length) {
     issues.push({
       severity: "warning",

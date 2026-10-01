@@ -12,6 +12,18 @@
 
 export type RentBasis = "NNN" | "MG" | "FSG" | "unknown";
 
+/** Whether a stored date is a real day, yyyy-mm-dd — a 13th month or a 31st
+ *  of June is not one. An import saved before the parser checked its dates
+ *  can carry "2028-31-12", which turned WALT into NaN; every reader treats
+ *  such a lease as undated instead, as it does a blank. */
+export function isIsoDate(s: string | null | undefined): s is string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s ?? "");
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (mo < 1 || mo > 12 || d < 1) return false;
+  return d <= new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+
 /** One normalized lease. Every optional figure is `null` when the file didn't
  *  state it — never 0, which would silently sink WALT and rent totals. */
 export interface Lease {

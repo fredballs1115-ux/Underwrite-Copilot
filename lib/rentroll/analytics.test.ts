@@ -72,6 +72,17 @@ describe("computeWalt", () => {
     expect(yearsTo("2020-01-01", AS_OF)).toBe(0);
   });
 
+  it("treats a stored expiry that names no real day as undated, never NaN", () => {
+    // An import saved before the parser checked its dates could carry this.
+    const stored: Lease[] = [{ ...CLEAN[0] }, { ...CLEAN[1], leaseExpiry: "2028-31-12" }];
+    const walt = computeWalt(stored, AS_OF);
+    expect(Number.isFinite(walt.bySf!)).toBe(true);
+    expect(walt.excludedSf).toBe(25_000);
+    const s = rolloverSchedule(stored);
+    expect(s.undatedSf).toBe(25_000);
+    expect(s.years.map((y) => y.year)).toEqual([2027]);
+  });
+
   it("returns null rather than 0 when nothing is datable", () => {
     const walt = computeWalt([], AS_OF);
     expect(walt.bySf).toBeNull();

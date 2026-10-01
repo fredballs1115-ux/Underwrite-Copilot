@@ -13,6 +13,7 @@ import {
   normalizeHeader,
 } from "./parse";
 import { validateLeases } from "./validate";
+import { computeWalt } from "./analytics";
 import {
   CLEAN_CSV,
   MESSY_CSV,
@@ -77,6 +78,36 @@ describe("value coercion", () => {
   it("reads Excel serial dates off the 1899-12-30 epoch", () => {
     expect(excelSerialToIso(45000)).toBe("2023-03-15");
     expect(parseDate(45000)).toBe("2023-03-15");
+  });
+
+  it("reads a date day first where its first figure can only be a day, and refuses one that fits neither", () => {
+    expect(parseDate("31/12/2028")).toBe("2028-12-31");
+    expect(parseDate("12/31/2028")).toBe("2028-12-31");
+    expect(parseDate("31.12.2028")).toBe("2028-12-31");
+    // Either way round names a day: the file's convention decides.
+    expect(parseDate("05/06/2028")).toBe("2028-05-06");
+    expect(parseDate("05/06/2028", { dayFirst: true })).toBe("2028-06-05");
+    // Neither way round names a day that exists — null, never "2028-31-12".
+    for (const s of [
+      "13/13/2028",
+      "31/31/2028",
+      "2/30/2027",
+      "2028-13-05",
+      "2028-31-12",
+      "2027-02-30",
+      "31-Feb-2027",
+      "Feb 29, 2027",
+    ]) {
+      expect(parseDate(s), s).toBeNull();
+    }
+    expect(parseDate("Feb 29, 2028")).toBe("2028-02-29");
+    expect(parseDate("Dec 31, 2028")).toBe("2028-12-31");
+    expect(parseDate("2028-12")).toBe("2028-12-31");
+    // A year alone names no day — as text or as a number, never serial 2028
+    // (20 July 1905); a day with no year is no date either.
+    expect(parseDate("2028")).toBeNull();
+    expect(parseDate(2028)).toBeNull();
+    expect(parseDate("12/31")).toBeNull();
   });
 
   it("recognises lease bases", () => {
@@ -147,6 +178,42 @@ describe("toLeases", () => {
   it("drops blank spacer rows", () => {
     const { skippedBlankRows } = leasesFrom(MESSY_CSV);
     expect(skippedBlankRows).toBeGreaterThanOrEqual(1);
+  });
+
+  it("reads a whole file day first where its dates show it, and leaves a date that fits neither blank and said", () => {
+    const parsed = leasesFrom(
+      [
+        "Suite,Tenant,SF,Commencement,Expiration,Annual Rent",
+        "1,Ardent Co,1000,01/02/2020,31/12/2028,20000",
+        "2,Birch LLC,1000,01/03/2021,05/06/2028,30000",
+        "3,Cobalt Inc,1000,01/01/2022,31/31/2028,40000",
+        "4,Delta Ltd,1000,,MTM,10000",
+      ].join("\n"),
+    );
+    const by = (name: string) => parsed.leases.find((l) => l.tenant === name)!;
+    expect(by("Ardent Co").leaseExpiry).toBe("2028-12-31");
+    expect(by("Ardent Co").leaseStart).toBe("2020-02-01");
+    expect(by("Birch LLC").leaseExpiry).toBe("2028-06-05");
+    expect(by("Cobalt Inc").leaseExpiry).toBeNull();
+    expect(parsed.dayFirst).toEqual({ text: "31/12/2028", date: "2028-12-31" });
+    // "MTM" says there is no fixed expiry; "31/31/2028" is a date refused.
+    expect(parsed.unreadDates).toEqual([{ row: 4, field: "leaseExpiry", text: "31/31/2028" }]);
+
+    const issues = validateLeases(parsed.leases, { parse: parsed });
+    expect(issues.find((i) => i.code === "unread_date")).toMatchObject({ severity: "warning", rows: [4] });
+    expect(issues.find((i) => i.code === "dates_day_first")?.message).toContain("“31/12/2028” is 31 December 2028");
+    // The refused expiry is said once, by the unread note; the blank one by
+    // the missing-expiry warning.
+    expect(issues.find((i) => i.code === "missing_expiry")?.rows).toEqual([5]);
+    expect(Number.isFinite(computeWalt(parsed.leases, "2026-10-01").bySf!)).toBe(true);
+  });
+
+  it("reads a day-first date in a month-first file by its own figures", () => {
+    const { leases, dayFirst } = leasesFrom(
+      "Suite,Tenant,SF,Expiration,Annual Rent\n1,Acme Co,1000,12/31/2030,20000\n2,Northside Dental,4000,31/12/2028,148000\n",
+    );
+    expect(dayFirst).toBeNull();
+    expect(leases.map((l) => l.leaseExpiry)).toEqual(["2030-12-31", "2028-12-31"]);
   });
 
   it("keeps a missing expiry null instead of inventing one", () => {

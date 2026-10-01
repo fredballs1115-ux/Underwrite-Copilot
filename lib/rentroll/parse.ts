@@ -331,59 +331,106 @@ function endOfMonth(y: number, m: number): number {
 }
 
 const twoDigitYear = (y: number): number => (y >= 70 ? 1900 + y : 2000 + y);
+const fullYear = (y: number): number => (y < 100 ? twoDigitYear(y) : y);
+
+/** The ISO date for a year, month and day that exist — null for a 13th
+ *  month, a 31st of June or a 29th of February outside a leap year, which a
+ *  date column carries only where it was read the wrong way round. */
+function realIso(y: number, m: number, d: number): string | null {
+  if (![y, m, d].every(Number.isInteger) || m < 1 || m > 12 || d < 1) return null;
+  return d <= endOfMonth(y, m) ? iso(y, m, d) : null;
+}
+
+const monthOf = (word: string): number | undefined =>
+  MONTHS[word.slice(0, 4).toLowerCase()] ?? MONTHS[word.slice(0, 3).toLowerCase()];
+
+/** A figure that is a year, not an Excel serial: serial 2028 is 20 July 1905. */
+const yearLike = (n: number): boolean => Number.isInteger(n) && n >= 1900 && n <= 2199;
+
+/** A day and a month written as figures — "31/12/2028", "12-31-26", "31.12.2028". */
+const NUMERIC_DATE = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/;
+
+export interface DateOptions {
+  /** read a date whose day and month could be either (05/06/2028) day
+   *  first — the file's own convention, decided by `toLeases` from the dates
+   *  that can only be one way */
+  dayFirst?: boolean;
+}
 
 /**
- * Parse the date formats rent rolls actually carry: ISO, US m/d/y, d-mmm-yy,
- * "Jan-27", "January 2027", and Excel's 1900-based serial numbers.
- * Returns ISO yyyy-mm-dd, or null.
+ * Parse the date formats rent rolls actually carry: ISO, m/d/y and d/m/y,
+ * d-mmm-yy, "Mmm d, yyyy", "Jan-27", "January 2027", and Excel's 1900-based
+ * serial numbers. Returns ISO yyyy-mm-dd, or null.
+ *
+ * A date is a day that exists. 31/12/2028 can only be day first, so it is
+ * read that way; 12/31/2028 only month first; 05/06/2028 could be either and
+ * is read by the file's convention (`dayFirst`), month first where the file
+ * has not shown one. A date that fits neither (13/13/2028, 2/30/2027,
+ * 2028-31-12), a year alone and a day with no year are refused — null, never
+ * a guess: the parser once wrote "2028-31-12" and WALT came back NaN.
  */
-export function parseDate(raw: unknown): string | null {
+export function parseDate(raw: unknown, options: DateOptions = {}): string | null {
   if (raw == null) return null;
   if (raw instanceof Date) {
     return Number.isNaN(raw.getTime())
       ? null
       : iso(raw.getUTCFullYear(), raw.getUTCMonth() + 1, raw.getUTCDate());
   }
-  if (typeof raw === "number") return excelSerialToIso(raw);
+  if (typeof raw === "number") return yearLike(raw) ? null : excelSerialToIso(raw);
 
   const s = String(raw).trim();
   if (!s) return null;
 
-  const isoMatch = /^(\d{4})[-/](\d{1,2})[-/](\d{1,2})/.exec(s);
-  if (isoMatch) {
-    return iso(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]));
+  const isoMatch = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})(?=$|[T\s])/.exec(s);
+  if (isoMatch) return realIso(Number(isoMatch[1]), Number(isoMatch[2]), Number(isoMatch[3]));
+
+  // "2028-12" — a year and a month, so the month's end.
+  const isoMonth = /^(\d{4})[-/](\d{1,2})$/.exec(s);
+  if (isoMonth) {
+    const [y, m] = [Number(isoMonth[1]), Number(isoMonth[2])];
+    return m >= 1 && m <= 12 ? iso(y, m, endOfMonth(y, m)) : null;
   }
 
-  const us = /^(\d{1,2})[-/](\d{1,2})[-/](\d{2,4})$/.exec(s);
-  if (us) {
-    const y = Number(us[3]);
-    return iso(y < 100 ? twoDigitYear(y) : y, Number(us[1]), Number(us[2]));
+  const numeric = NUMERIC_DATE.exec(s);
+  if (numeric) {
+    const [a, b, y] = [Number(numeric[1]), Number(numeric[2]), fullYear(Number(numeric[3]))];
+    const dayFirst = a > 12 ? true : b > 12 ? false : !!options.dayFirst;
+    return dayFirst ? realIso(y, b, a) : realIso(y, a, b);
   }
 
-  const dMmmY = /^(\d{1,2})[-\s]([a-z]{3,9})[-\s](\d{2,4})$/i.exec(s);
+  const dMmmY = /^(\d{1,2})[-\s]([a-z]{3,9})\.?[-\s,]+(\d{2,4})$/i.exec(s);
   if (dMmmY) {
-    const m = MONTHS[dMmmY[2].slice(0, 4).toLowerCase()] ?? MONTHS[dMmmY[2].slice(0, 3).toLowerCase()];
-    if (m) {
-      const y = Number(dMmmY[3]);
-      return iso(y < 100 ? twoDigitYear(y) : y, m, Number(dMmmY[1]));
-    }
+    const m = monthOf(dMmmY[2]);
+    if (m) return realIso(fullYear(Number(dMmmY[3])), m, Number(dMmmY[1]));
+  }
+
+  // "Dec 31, 2028", "December 31st 2028".
+  const mmmDY = /^([a-z]{3,9})\.?\s+(\d{1,2})(?:st|nd|rd|th)?,?\s+(\d{4})$/i.exec(s);
+  if (mmmDY) {
+    const m = monthOf(mmmDY[1]);
+    if (m) return realIso(Number(mmmDY[3]), m, Number(mmmDY[2]));
   }
 
   // "Jan-27", "Jan 2027", "January 2027" — month precision, so end of month.
   const mmmY = /^([a-z]{3,9})[-\s,]+(\d{2,4})$/i.exec(s);
   if (mmmY) {
-    const m = MONTHS[mmmY[1].slice(0, 4).toLowerCase()] ?? MONTHS[mmmY[1].slice(0, 3).toLowerCase()];
+    const m = monthOf(mmmY[1]);
     if (m) {
-      const yr = Number(mmmY[2]);
-      const y = yr < 100 ? twoDigitYear(yr) : yr;
+      const y = fullYear(Number(mmmY[2]));
       return iso(y, m, endOfMonth(y, m));
     }
   }
 
-  // A bare number in a date column is an Excel serial that survived as text.
+  // A bare number in a date column is an Excel serial that survived as text
+  // — unless it is a year, which names no day.
   const asNumber = parseNumber(s);
-  if (asNumber != null && asNumber > 1000 && asNumber < 100_000) return excelSerialToIso(asNumber);
+  if (asNumber != null) {
+    return !yearLike(asNumber) && asNumber > 1000 && asNumber < 100_000 ? excelSerialToIso(asNumber) : null;
+  }
 
+  // Anything else the engine can read, but only with its year: "12/31" alone
+  // reads as 2001 to Date.parse, which is no lease's expiry.
+  if (!/\b\d{4}\b/.test(s)) return null;
   const parsed = Date.parse(s);
   if (!Number.isNaN(parsed)) {
     const d = new Date(parsed);
@@ -391,6 +438,10 @@ export function parseDate(raw: unknown): string | null {
   }
   return null;
 }
+
+/** What a date column says where it states no date at all — a blank by
+ *  another name, never a date read wrong. */
+const NO_DATE = /^(?:n\/?a|na|none|-+|—|–|tbd|tba|mtm|m-t-m|month[\s-]+to[\s-]+month|holdover|hold over|expired|vacant|see notes?)$/i;
 
 /** Excel's serial epoch is 1899-12-30 (its 1900 leap-year bug baked in). */
 export function excelSerialToIso(serial: number): string | null {
@@ -475,6 +526,16 @@ export interface SkippedRow {
   label: string;
 }
 
+/** A cell that held something the parser would not read as a figure, left
+ *  blank on the lease rather than guessed. */
+export interface UnreadCell {
+  /** 1-based row in the source file */
+  row: number;
+  field: CanonicalKey;
+  /** the cell as the file wrote it */
+  text: string;
+}
+
 export interface ParseResult {
   leases: Lease[];
   mapping: ColumnMapping;
@@ -486,6 +547,34 @@ export interface ParseResult {
   /** each totals line left out, by row and label — stored with the import's
    *  issues (lib/rentroll/validate) and shown on the page */
   skippedTotals: SkippedRow[];
+  /** dates on occupied leases that name no day that exists (31/31/2028), a
+   *  year alone, or a day with no year — blank on the lease, said here */
+  unreadDates: UnreadCell[];
+  /** the cell that showed the file writes its dates day first ("31/12/2028")
+   *  and the day it is, so a date that could be either was read that way;
+   *  null where none did */
+  dayFirst: { text: string; date: string } | null;
+}
+
+/**
+ * The file's own date convention, from the dates that can only be one way: a
+ * first figure over 12 is a day ("31/12/2028"), a second one over 12 is
+ * ("12/31/2028"). Day first only where the file shows it and never shows the
+ * other — a file that shows both is read cell by cell.
+ */
+function dayFirstEvidence(cells: unknown[]): { text: string; date: string } | null {
+  let dayFirst: { text: string; date: string } | null = null;
+  for (const c of cells) {
+    const m = typeof c === "string" ? NUMERIC_DATE.exec(c.trim()) : null;
+    if (!m) continue;
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    if (b > 12 && a <= 12) return null;
+    if (a > 12 && b <= 12 && !dayFirst) {
+      const date = parseDate(c, { dayFirst: true });
+      if (date) dayFirst = { text: String(c).trim(), date };
+    }
+  }
+  return dayFirst;
 }
 
 /** Two figures that agree to a dollar (or a foot), or to half a percent. */
@@ -528,6 +617,22 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
     return raw == null ? null : isMonthly("baseRentAnnual") ? raw * 12 : raw;
   };
 
+  // One date convention for the whole file, decided from both date columns.
+  const body = grid.slice(mapping.headerRow + 1);
+  const dayFirst = dayFirstEvidence(
+    body.flatMap((row) => (row ? [at(row, "leaseStart"), at(row, "leaseExpiry")] : [])),
+  );
+  const dateOf = (row: Grid[number], key: CanonicalKey): string | null =>
+    parseDate(at(row, key), { dayFirst: dayFirst != null });
+  const unreadDates: UnreadCell[] = [];
+  /** A date cell that holds something, reads as no date, and is no word for
+   *  "no date" ("MTM", "N/A") — a date the reader refused. */
+  const unreadDate = (row: Grid[number], key: CanonicalKey): string | null => {
+    const raw = at(row, key);
+    const said = text(raw);
+    return said && !NO_DATE.test(said) && dateOf(row, key) == null ? said : null;
+  };
+
   // The leases since the last totals line, and since the top of the roll —
   // what a rule-4 label's figures must add up.
   let blockStart = 0;
@@ -553,7 +658,7 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
     if (elsewhere) return elsewhere.trim();
     const opener = [suite, tenant, ...others].find(opensOnTotalsWord);
     if (!opener || (suite && suite !== opener)) return null;
-    const dated = parseDate(at(row, "leaseExpiry")) != null || parseDate(at(row, "leaseStart")) != null;
+    const dated = dateOf(row, "leaseExpiry") != null || dateOf(row, "leaseStart") != null;
     return !dated && addsUp(row) ? opener.trim() : null;
   };
 
@@ -577,7 +682,7 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
     const psfRaw = parseNumber(at(row, "rentPsf"));
     const rentPsfStated = psfRaw == null ? null : isMonthly("rentPsf") ? psfRaw * 12 : psfRaw;
 
-    const leaseExpiry = parseDate(at(row, "leaseExpiry"));
+    const leaseExpiry = dateOf(row, "leaseExpiry");
     const vacant =
       looksLike(tenantRaw, VACANT_MARKERS) ||
       (tenantRaw === "" && (baseRentAnnual == null || baseRentAnnual === 0));
@@ -588,12 +693,21 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
       continue;
     }
 
+    // A vacancy's dates are no lease's; an occupied lease's refused date is
+    // left blank and said.
+    if (!vacant) {
+      for (const field of ["leaseStart", "leaseExpiry"] as const) {
+        const said = unreadDate(row, field);
+        if (said != null) unreadDates.push({ row: r + 1, field, text: said });
+      }
+    }
+
     leases.push({
       sourceRow: r + 1,
       suite: String(at(row, "suite") ?? "").trim(),
       tenant: vacant ? "" : tenantRaw,
       sf,
-      leaseStart: parseDate(at(row, "leaseStart")),
+      leaseStart: dateOf(row, "leaseStart"),
       leaseExpiry: vacant ? null : leaseExpiry,
       baseRentAnnual: vacant ? null : baseRentAnnual,
       rentPsf:
@@ -618,6 +732,8 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
     skippedTotalRows: skippedTotals.length,
     skippedBlankRows,
     skippedTotals,
+    unreadDates,
+    dayFirst,
   };
 }
 

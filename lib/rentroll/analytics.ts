@@ -14,8 +14,14 @@
  *    much of the building rolls, rent-weighted tells you how much of the income
  *    does. When the big tenant is cheap, those are different deals.
  */
-import type { Lease } from "./schema";
+import { isIsoDate, type Lease } from "./schema";
 import type { ProfileDraft } from "./profiles";
+
+/** A lease's expiry where it is a real day — null for a blank and for a date
+ *  an older import stored the wrong way round ("2028-31-12"), so neither
+ *  turns WALT into NaN and the workbook (which writes no such date) and the
+ *  page bucket the same leases. */
+const expiryOf = (l: Lease): string | null => (isIsoDate(l.leaseExpiry) ? l.leaseExpiry : null);
 
 const DAY_MS = 86_400_000;
 const DAYS_PER_YEAR = 365.25;
@@ -56,12 +62,13 @@ export function computeWalt(leases: Lease[], asOf: string): Walt {
     if (l.vacant) continue;
     const sf = l.sf ?? 0;
     const rent = l.baseRentAnnual ?? 0;
-    if (!l.leaseExpiry) {
+    const expiry = expiryOf(l);
+    if (!expiry) {
       excludedSf += sf;
       excludedRent += rent;
       continue;
     }
-    const years = yearsTo(l.leaseExpiry, asOf);
+    const years = yearsTo(expiry, asOf);
     if (sf > 0) {
       sfNum += years * sf;
       sfDen += sf;
@@ -122,15 +129,16 @@ export function rolloverSchedule(
   const nra = options.nra ?? (rolledSf > 0 ? rolledSf : null);
   const vacantSf = leases.filter((l) => l.vacant).reduce((s, l) => s + (l.sf ?? 0), 0);
   const undatedSf = leases
-    .filter((l) => !l.vacant && !l.leaseExpiry)
+    .filter((l) => !l.vacant && !expiryOf(l))
     .reduce((s, l) => s + (l.sf ?? 0), 0);
 
   const buckets = new Map<number, RolloverYear>();
   let totalSfExpiring = 0;
 
   for (const l of leases) {
-    if (l.vacant || !l.leaseExpiry) continue;
-    const year = Number(l.leaseExpiry.slice(0, 4));
+    const expiry = expiryOf(l);
+    if (l.vacant || !expiry) continue;
+    const year = Number(expiry.slice(0, 4));
     if (!Number.isFinite(year)) continue;
     const bucket = buckets.get(year) ?? {
       year,

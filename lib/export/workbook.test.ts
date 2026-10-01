@@ -187,6 +187,13 @@ describe("buildRentRollWorkbook — structure", () => {
     expect((cf.getCell(CF_ROW.equityMultiple, 2).value as CellVal).formula).toContain("SUM(");
   });
 
+  it("writes no serial for a day that does not exist, so the page and the workbook date the same leases", () => {
+    expect(isoToSerial("2027-12-31")).toBe(46_752);
+    // The engine would roll 30 February into 2 March; the page calls it undated.
+    expect(isoToSerial("2027-02-30")).toBeNull();
+    expect(isoToSerial("2028-31-12")).toBeNull();
+  });
+
   it("writes the rent roll's own data as inputs, not formulas", async () => {
     const wb = new ExcelJS.Workbook();
     await wb.xlsx.load(buffer as unknown as ArrayBuffer);

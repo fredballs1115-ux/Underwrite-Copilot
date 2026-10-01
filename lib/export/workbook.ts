@@ -1,6 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
-import type { Lease } from "@/lib/rentroll/schema";
+import { isIsoDate, type Lease } from "@/lib/rentroll/schema";
 import type { WorkbookInputs } from "./cashflow";
 import { buildRentRollCashFlow } from "./cashflow";
 
@@ -50,8 +50,11 @@ const FMT = {
   date: "mm/dd/yyyy",
 } as const;
 
-/** Excel serial for an ISO date, off the 1899-12-30 epoch. */
+/** Excel serial for an ISO date, off the 1899-12-30 epoch — null for a day
+ *  that does not exist, which the engine would roll forward (30 February
+ *  into 2 March) where the page treats the lease as undated. */
 export function isoToSerial(iso: string): number | null {
+  if (!isIsoDate(iso)) return null;
   const t = Date.parse(`${iso}T00:00:00Z`);
   if (Number.isNaN(t)) return null;
   return Math.round((t - Date.UTC(1899, 11, 30)) / 86_400_000);
