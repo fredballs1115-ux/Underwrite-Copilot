@@ -16,6 +16,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type MemoData } from "./memo-document";
+import { typicalRangeParts } from "@/lib/typical-range";
 
 /** The OM's figure placed on the typical range — "5.25%" on "5.25–5.75%" —
  *  as the memo places a base between its low and high: 0..1, clamped, so a
@@ -23,12 +24,11 @@ import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type Me
  *  null when either side does not parse as one scale. */
 export function rangeRead(omSays: string, typicalRange: string): number | null {
   // "5.25–5.75%", "5.25%–5.75%" (the unit after the low figure too),
-  // "$2,150–$2,450/mo", "2.5 to 3.5%", "5.25%-5.75%" (a hyphen).
-  const m = typicalRange.match(
-    /(\$?-?\d[\d,]*\.?\d*)\s*%?\s*(?:–|—|-|to)\s*(\$?-?\d[\d,]*\.?\d*)/,
-  );
-  if (!m) return null;
-  return basePosition({ low: m[1], base: omSays, high: m[2] });
+  // "$2,150–$2,450/mo", "2.5 to 3.5%", "5.25%-5.75%" (a hyphen): the one
+  // reader the deal page's position bar reads too (lib/typical-range).
+  const parts = typicalRangeParts(typicalRange);
+  if (!parts) return null;
+  return basePosition({ low: parts[0], base: omSays, high: parts[1] });
 }
 import {
   gridTakeaway,

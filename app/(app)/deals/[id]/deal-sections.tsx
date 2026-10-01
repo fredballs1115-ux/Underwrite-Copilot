@@ -19,6 +19,7 @@ import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
 import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/comp-detail";
 import { gapScale, incomeGapShare, type GapUnit } from "@/lib/gap-detail";
+import { typicalRange as readTypicalRange } from "@/lib/typical-range";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/analyze";
 import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
@@ -1742,14 +1743,6 @@ function MiniStat({ label, value }: { label: string; value: string }) {
 }
 
 /** Parse "5.25%–5.75%" / "5.25 to 5.75" style ranges into [lo, hi]. */
-function parseRange(sv: string): [number, number] | null {
-  const nums = sv.replace(/,/g, "").match(/-?\d+(\.\d+)?/g);
-  if (!nums || nums.length < 2) return null;
-  const lo = parseFloat(nums[0]);
-  const hi = parseFloat(nums[1]);
-  return hi > lo ? [lo, hi] : null;
-}
-
 function PositionBar({
   assessment,
   omSays,
@@ -1761,7 +1754,7 @@ function PositionBar({
 }) {
   // Plot the OM's value against the typical band — "how far outside typical"
   // is the actual analyst question, not just which side of it.
-  const band = parseRange(typicalRange);
+  const band = readTypicalRange(typicalRange);
   const om = firstNum(omSays);
   if (band && om != null) {
     const [lo, hi] = band;
