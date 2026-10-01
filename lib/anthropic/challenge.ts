@@ -6,6 +6,7 @@ import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, challengerInstruction } from "./prompts";
+import { todayLine } from "./today";
 import type { AssetClass, ChallengerResult } from "./types";
 
 const ChallengerSchema = z.object({
@@ -50,6 +51,8 @@ export async function challengeAssumptions(
           // Reads the OM from the prompt cache the extraction step wrote.
           omDocument(om),
           { type: "text", text: instruction },
+          // Today's date, after the cached document (lib/anthropic/today).
+          { type: "text", text: todayLine() },
         ],
       },
     ],

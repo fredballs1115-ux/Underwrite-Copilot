@@ -6,6 +6,7 @@ import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, extractionInstruction } from "./prompts";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
+import { todayLine } from "./today";
 import type { AssetClass, ExtractionResult } from "./types";
 
 // The schema Claude must fill. `zodOutputFormat` turns this into a strict
@@ -184,6 +185,9 @@ export async function extractTerms(
           // back-to-back, read it from cache at a fraction of the input cost.
           omDocument(om),
           { type: "text", text: extractionInstruction(assetClass) },
+          // Today's date rides last, after the cached prefix
+          // (lib/anthropic/today).
+          { type: "text", text: todayLine() },
         ],
       },
     ],

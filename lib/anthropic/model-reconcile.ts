@@ -5,6 +5,7 @@ import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, reconciliationInstruction } from "./prompts";
+import { todayLine } from "./today";
 import type { DocFacts } from "@/lib/model/types";
 
 const SourceSchema = z.object({
@@ -107,6 +108,8 @@ export async function reconcileDocs(
                 },
               ]
             : []),
+          // Today's date, last (lib/anthropic/today).
+          { type: "text", text: todayLine() },
         ],
       },
     ],

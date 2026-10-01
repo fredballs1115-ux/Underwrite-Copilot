@@ -5,6 +5,7 @@ import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, verdictInstruction } from "./prompts";
+import { todayLine } from "./today";
 import {
   assessPlausibility,
   findPricedMetric,
@@ -438,6 +439,9 @@ export async function synthesizeVerdict(
               input,
             )}`,
           },
+          // Today's date, which every dated figure in the brief is read
+          // against (lib/anthropic/today).
+          { type: "text", text: todayLine() },
         ],
       },
     ],

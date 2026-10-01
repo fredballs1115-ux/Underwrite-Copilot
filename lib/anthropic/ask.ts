@@ -7,6 +7,7 @@ import { structured } from "./failure";
 import { omDocument, omRequestOptions, omSourceWithPages, releaseOmSource } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM } from "./prompts";
+import { todayLine } from "./today";
 import { newLedger, summarizeUsage, usageLogLine, withUsageLedger } from "./usage";
 // What the screen established about the deal — shared with the broker-comp
 // scrutiny, the market check and the reconciler; re-exported here so the
@@ -136,6 +137,9 @@ export async function askDealQuestion(
               content: [
                 omDocument(om),
                 { type: "text", text: askInstruction(question, context) },
+                // Today's date, after the cached document
+                // (lib/anthropic/today).
+                { type: "text", text: todayLine() },
               ],
             },
           ],

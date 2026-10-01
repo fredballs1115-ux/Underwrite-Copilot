@@ -13,6 +13,7 @@ import {
 } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, docExtractionInstruction } from "./prompts";
+import { todayLine } from "./today";
 import type { ParsedModel } from "@/lib/model-parse";
 import type { DocFacts } from "@/lib/model/types";
 
@@ -57,6 +58,8 @@ export async function extractDocFacts(doc: {
     type: "text",
     text: docExtractionInstruction(doc.kind, doc.name),
   });
+  // Today's date, after the document (lib/anthropic/today).
+  content.push({ type: "text", text: todayLine() });
 
   try {
     const out = await structured(`Fact extraction from "${doc.name}"`, () =>

@@ -43,6 +43,9 @@ import { isFeedMetric, withoutFeedRows, withoutYearAgoRows } from "../lib/feed-r
 // The research rows dated by the period their figure is for, which no
 // re-verification may re-date (lib/period-rows).
 import { isPeriodMetric, withoutPeriodRows } from "../lib/period-rows.ts";
+// Today's date, as every Claude step is told it (lib/anthropic/today): a
+// "confirmed" means true today, never true of a period that has ended.
+import { todayLine } from "../lib/anthropic/today.ts";
 
 const LINKS_PER_NIGHT = 25;
 const RECHECK_CLAIMS = 5;
@@ -378,10 +381,12 @@ Claim: ${claim}
 
 Reply with ONLY a JSON object:
 {"verdict":"confirmed"|"corrected"|"disputed"|"not_found","new_low":number|null,"new_high":number|null,"evidence_url":"https://..."|null,"note":"one sentence"}
-- confirmed: a primary source still supports these numbers (evidence_url required)
+- confirmed: a primary source still supports these numbers TODAY (evidence_url required) — a source for a period that has ended confirms that period's figure, not today's
 - corrected: a primary source now states materially different numbers — give them in the SAME unit (${b.unit})
 - disputed: primary sources conflict with each other
-- not_found: you could not find a primary source either way`
+- not_found: you could not find a primary source either way
+
+${todayLine(today)}`
         );
         const subj = `benchmark ${b.sector}/${b.metro || "national"}/${b.metric}`;
         const okUrl = typeof v.evidence_url === "string" && v.evidence_url.startsWith("http");
@@ -436,7 +441,10 @@ Rule [${r.id}] (${r.jurisdiction_state}${r.jurisdiction_local ? "/" + r.jurisdic
 Source on file: ${r.source} (as of ${r.as_of})
 
 Reply with ONLY a JSON object:
-{"verdict":"confirmed"|"changed"|"disputed"|"not_found","evidence_url":"https://..."|null,"note":"one sentence"}`
+{"verdict":"confirmed"|"changed"|"disputed"|"not_found","evidence_url":"https://..."|null,"note":"one sentence"}
+- confirmed only where the rule as stated is still true TODAY: a cap, an allowance or a term stated for a period that has ended is "changed", even where a source confirms it for that period
+
+${todayLine(today)}`
         );
         const subj = `rule ${r.id}`;
         const okUrl = typeof v.evidence_url === "string" && v.evidence_url.startsWith("http");

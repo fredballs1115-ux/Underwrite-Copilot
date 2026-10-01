@@ -6,6 +6,7 @@ import { structured } from "./failure";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, marketCheckInstruction } from "./prompts";
+import { todayLine } from "./today";
 import type { AssetClass, MarketResult } from "./types";
 
 const MarketSchema = z.object({
@@ -62,6 +63,9 @@ export async function checkMarket(
           // identical.
           omDocument(om),
           { type: "text", text: marketCheckInstruction(assetClass, context, liveMarket) },
+          // Today's date, which every dated figure is read against
+          // (lib/anthropic/today).
+          { type: "text", text: todayLine() },
         ],
       },
     ],

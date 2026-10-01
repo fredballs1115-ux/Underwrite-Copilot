@@ -17,6 +17,7 @@ import {
   rentRollExtractionInstruction,
   t12ExtractionInstruction,
 } from "./prompts";
+import { todayLine } from "./today";
 import type { ParsedModel } from "@/lib/model-parse";
 import type { RentRollExtraction, T12Extraction } from "@/lib/actuals/types";
 
@@ -95,7 +96,13 @@ export async function extractRentRoll(parsed: ParsedModel): Promise<RentRollExtr
         messages: [
           {
             role: "user",
-            content: [doc.block, { type: "text", text: rentRollExtractionInstruction(RENT_ROLL_ROW_CAP) }],
+            // Today's date last, after the document (lib/anthropic/today):
+            // a lease's expiry is read against it.
+            content: [
+              doc.block,
+              { type: "text", text: rentRollExtractionInstruction(RENT_ROLL_ROW_CAP) },
+              { type: "text", text: todayLine() },
+            ],
           },
         ],
         output_config: { format: zodOutputFormat(RentRollSchema) },
@@ -126,7 +133,7 @@ export async function extractT12(parsed: ParsedModel): Promise<T12Extraction> {
         messages: [
           {
             role: "user",
-            content: [doc.block, { type: "text", text: t12ExtractionInstruction() }],
+            content: [doc.block, { type: "text", text: t12ExtractionInstruction() }, { type: "text", text: todayLine() }],
           },
         ],
         output_config: { format: zodOutputFormat(T12Schema) },

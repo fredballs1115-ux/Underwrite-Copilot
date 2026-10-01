@@ -19,6 +19,9 @@
 import { createClient } from "@supabase/supabase-js";
 // A failure said on the run's page, not only in its log (plain Node strips its types).
 import { missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
+// Today's date, as every Claude step is told it (lib/anthropic/today): a law
+// "about to" change is judged against the day, never the model's training.
+import { todayLine } from "../lib/anthropic/today.ts";
 
 // One watch query per jurisdiction rule-set + per sector the buyer tracks.
 // Keep queries SPECIFIC — Google News RSS returns ~100 items per query and
@@ -155,7 +158,9 @@ Items:
 ${fresh.map((c, i) => `${i}. [${c.sector}] ${c.title} (${c.source ?? "?"})`).join("\n")}
 
 Reply with ONLY a JSON array, one object per item, same order:
-[{"i":0,"relevance":7,"summary":"one sentence","action":"imperative next step or null","rule_change":false,"rule_id":null}, ...]`;
+[{"i":0,"relevance":7,"summary":"one sentence","action":"imperative next step or null","rule_change":false,"rule_id":null}, ...]
+
+${todayLine()}`;
 
 async function callClaude(prompt) {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
