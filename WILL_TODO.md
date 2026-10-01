@@ -125,6 +125,26 @@ way in this batch):
   after its first sentence within today's design; folding each panel to a
   headline, or moving the panels into Overview, is a layout change and
   yours.
+- **The rent roll workbook's math** (research pass 15): it applies the
+  model's whole-building vacancy (one minus today's occupancy) every year
+  ON TOP of the lease-up it models lease by lease, and sets expense
+  recoveries to zero — on the module's own design case (130,493 SF, 48%
+  leased) that is no levered IRR at all against 14.75% with a 5% general
+  vacancy. ARGUS reduces general vacancy by absorption and turnover by
+  default. Also yours: downtime and free rent sit below NOI (ARGUS puts them
+  in revenue), every lease grows at the market escalation rather than its
+  own stated bump, and closing costs are the 1% hold alone. The workbook
+  now says what it assumes; the fix changes the exported IRR, so it waits
+  for you.
+- **The BOV reconciler's cap basis:** a broker who quotes the cap on its own
+  headline and also states a deduction has that deduction counted twice,
+  and the bridge shows the difference as "Unexplained". Fixing it means
+  recording which value each opinion's cap is struck on.
+- **The rent roll and the model read one file twice:** the rent roll upload
+  is also re-read by Claude into the deal's model, so the confirmed mapping
+  never reaches the model. Feeding the confirmed import into the model, and
+  a residential rent roll mode (loss to lease and unit mix, not WALT), are
+  larger changes.
 - **Header slots on two deal types:** a value-add whose memorandum states
   no stabilized NOI shows "Yield on cost —" (a plan deal shows yield on
   cost, never a cap), and an auction shows "Price —" beside a stated
