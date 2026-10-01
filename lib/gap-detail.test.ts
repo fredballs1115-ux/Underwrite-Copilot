@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gapFigure, gapScale } from "./gap-detail";
+import { gapFigure, gapScale, gapShare } from "./gap-detail";
 import { SAMPLE_DEAL } from "./sample-deal";
 
 describe("gapFigure — the magnitude a reconciliation gap states", () => {
@@ -44,6 +44,32 @@ describe("gapFigure — the magnitude a reconciliation gap states", () => {
     expect(gapFigure(undefined)).toBeNull();
     // A year or a page is not a gap.
     expect(gapFigure("see p. 12")).toBeNull();
+  });
+});
+
+describe("gapShare — a gap as a share of the model's own figure, the actuals card's footing", () => {
+  it("reads the sample's rows: the NOI gap a share of the model's NOI, the vacancy gap of its rate, agreement nothing", () => {
+    const [noi, vacancy, cap] = SAMPLE_DEAL.reconciliation.rows.map((r) => gapShare(r));
+    // $174k over the model's $3,706,500 — the property-actuals card's 4.7%.
+    expect(noi).toBeCloseTo(174_000 / 3_706_500, 10);
+    // 300 bps over the model's 9.0%.
+    expect(vacancy).toBeCloseTo(3 / 9, 10);
+    expect(cap).toBeNull();
+  });
+
+  it("puts points and a share of a dollar figure on the same footing, and refuses what the words do not settle", () => {
+    expect(gapShare({ gap: "3 pts higher", myValue: "9.0%" })).toBeCloseTo(3 / 9, 10);
+    expect(gapShare({ gap: "2 percentage points below", myValue: "8%" })).toBeCloseTo(0.25, 10);
+    expect(gapShare({ gap: "+4.2% below the OM", myValue: "$3,706,500" })).toBeCloseTo(0.042, 10);
+    // A bare percent beside a rate: a share of it, or points of it?
+    expect(gapShare({ gap: "+4.2%", myValue: "9.0%" })).toBeNull();
+    // Units that are not one footing.
+    expect(gapShare({ gap: "$174k below", myValue: "9.0%" })).toBeNull();
+    expect(gapShare({ gap: "300 bps higher", myValue: "$3,706,500" })).toBeNull();
+    // A model figure unstated, or nothing in the gap line.
+    expect(gapShare({ gap: "$174k below", myValue: "Not modelled" })).toBeNull();
+    expect(gapShare({ gap: "$174k below", myValue: null })).toBeNull();
+    expect(gapShare({ gap: "In agreement", myValue: "5.45%" })).toBeNull();
   });
 });
 

@@ -31,6 +31,7 @@ import {
   type PlaygroundData,
 } from "@/app/(app)/deals/[id]/sensitivity-playground";
 import { buyBoxRead } from "@/lib/buy-box-chip";
+import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -489,6 +490,29 @@ describe("DealView — the sample deal renders every section without a runtime e
     // Before the name, in the same cell.
     expect(html.indexOf("/api/deals/deal-2/image")).toBeLessThan(html.indexOf("Girard Flats"));
     expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("grades a reconciliation gap on the actuals card's band — the NOI gap that card calls In line is never HIGH (2026-09-30)", () => {
+    // The research pass: Property actuals called the OM's NOI 4.7% over the
+    // T-12 "In line", and the Risk digest beneath it ranked the same $174k
+    // gap HIGH, because every unfavorable reconciliation row was HIGH.
+    const p = sampleProps("overview");
+    const html = render(p);
+    expect(textOf(html)).toMatch(/Δ 4\.7% \(OM over actual\)\s*In line/);
+    const risks = deriveRisks(p.results as Parameters<typeof deriveRisks>[0]);
+    expect(risks.find((r) => r.title.startsWith("Year-1 NOI"))?.severity).toBe("low");
+    // The vacancy gap, 300 bps on the model's 9.0%, stays outside the band.
+    expect(risks.find((r) => r.title.startsWith("Vacancy"))?.severity).toBe("high");
+    expect(html).toContain('title="3 high · 6 med · 2 low"');
+    // A row whose size cannot be read on that footing keeps its old grade.
+    const unread = deriveRisks({
+      ...(p.results as Parameters<typeof deriveRisks>[0]),
+      reconciliation: {
+        rows: [{ metric: "Exit cap", omValue: "5.25%", myValue: "5.50%", gap: "Tighter than the model", direction: "unfavorable" }],
+        takeaway: "",
+      },
+    });
+    expect(unread.find((r) => r.title.startsWith("Exit cap:"))?.severity).toBe("high");
   });
 
   it("the reconciler tab draws each stated gap as a bar from a centre line", () => {

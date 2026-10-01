@@ -56,6 +56,42 @@ export function gapFigure(text: string | null | undefined): GapFigure | null {
   return null;
 }
 
+// A percentage gap stated in points of a rate ("3 pts", "2 pp", "3
+// percentage points"), not as a share of the figure.
+const POINTS = /percentage points?|\bpts?\b|\bpp\b/i;
+
+/**
+ * A gap's size as a share of the buyer's own figure: the property-actuals
+ * card's delta, (OM − actual) ÷ |actual|, with the row's model figure in the
+ * actual's place. A reconciliation row can then be graded on that card's
+ * band. It reads only what the row states, each through `gapFigure`: the
+ * magnitude the gap line states, and the model's figure. There are three
+ * footings:
+ * - a dollar gap over a dollar figure;
+ * - basis points, or percentage points, over a rate;
+ * - a percentage of a dollar figure, as it stands.
+ * Null where the two are not on one footing, or where either is unstated.
+ * A dollar gap on a rate is not on one footing. Neither is a bare "4%"
+ * beside a rate: it could be a share of the rate or points of it, and the
+ * words do not say which.
+ */
+export function gapShare(row: { gap?: string | null; myValue?: string | null }): number | null {
+  const g = gapFigure(row.gap);
+  const base = gapFigure(row.myValue);
+  if (!g || !base || base.value <= 0) return null;
+  switch (g.unit) {
+    case "usd":
+      return base.unit === "usd" ? g.value / base.value : null;
+    case "bps":
+      return base.unit === "pct" ? g.value / 100 / base.value : null;
+    case "pct": {
+      if (base.unit === "usd") return g.value / 100;
+      const points = POINTS.test((row.gap ?? "").match(PCT)?.[0] ?? "");
+      return base.unit === "pct" && points ? g.value / base.value : null;
+    }
+  }
+}
+
 export interface GapScale {
   /** each row's gap as a signed share of the widest gap of its unit —
    *  positive when favorable to the buyer, negative when unfavorable; null

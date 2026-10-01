@@ -201,10 +201,16 @@ export function pickOmNoi(
   return { label: pick.label, value: raw?.value ?? "", noi: pick.value, basis: pick.kind };
 }
 
+/** The band the property-actuals card calls "In line": the OM's NOI within
+ *  5% of the actual, either way. The Overview's risk digest grades a
+ *  reconciliation gap on the same band, so one gap never reads "In line"
+ *  on the card and HIGH beside it. */
+export const NOI_IN_LINE_BAND = 0.05;
+
 export function severityForNoiDelta(deltaPct: number): ActualsSeverity {
   const abs = Math.abs(deltaPct);
   if (abs > 0.1) return "red_flag";
-  if (abs > 0.05) return "material";
+  if (abs > NOI_IN_LINE_BAND) return "material";
   return "in_line";
 }
 
