@@ -370,7 +370,13 @@ function noteFor(x: {
       );
     }
     if (parts.length > 0) return parts.join(" ");
-    return `The contract rent is ${x.rentPremiumPct}% above market, so ${usd(x.pricePremium)} of the price is the lease rather than the building.`;
+    // A size of the lease only where the price IS over the building's value
+    // at market: the credit cap can sit high enough over the market cap that
+    // an above-market rent still prices under it, and "$X of the price is the
+    // lease" over a negative premium names a figure that is not there.
+    return x.pricePremium > 0
+      ? `The contract rent is ${x.rentPremiumPct}% above market, so ${usd(x.pricePremium)} of the price is the lease rather than the building.`
+      : `The contract rent is ${x.rentPremiumPct}% above market, but at the ${rate(x.creditCapPct)} credit cap the price is still ${usd(x.pricePremium)} under the building's value at market rent: the cap, not the rent, sets it.`;
   }
   if (x.rentPremiumPct < 0) {
     return "The contract rent is under market, so the buyer is getting a building worth more than the lease it carries.";

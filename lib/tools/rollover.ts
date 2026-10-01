@@ -43,7 +43,7 @@
 // Pure, no I/O.
 
 import { readFigure } from "@/lib/money";
-import { MAX_ROLLOVER_YEARS, heldTo } from "@/lib/tools/limits";
+import { MAX_LEASE_YEARS, MAX_ROLLOVER_YEARS, heldTo } from "@/lib/tools/limits";
 import { cellsOf } from "@/lib/tools/unit-mix";
 
 /** A rollover schedule past fifteen years is not a screening question — the
@@ -385,9 +385,13 @@ export function readRollover(t: RollInput): RollResult {
     totalRent > 0 ? round1(((totalRent - beyondRent) / totalRent) * 100) : null;
 
   // Rule 3's scale: what one year would carry if the same roll were even
-  // over the term it actually spans.
+  // over the term it actually spans — the longest lease's, held only to the
+  // longest lease the cards read, so a mistyped expiry cannot make every
+  // year a cliff. Never the schedule's fifteen years: a roll spanning twenty
+  // is 5% a year, and holding it to fifteen raised the mark to 6.7% and hid
+  // a cliff between the two.
   const span = Math.max(1, Math.ceil(Math.max(...rows.map(termOf), 1)));
-  const evenYearSharePct = round1(100 / Math.min(span, MAX_YEARS));
+  const evenYearSharePct = round1(100 / Math.min(span, MAX_LEASE_YEARS));
 
   const biggest = withRent.length
     ? withRent.reduce((best, r) => (rentOf(r) > rentOf(best) ? r : best))

@@ -129,6 +129,18 @@ describe("rule 3 — an average hides a cliff", () => {
     );
   });
 
+  it("sets the even roll over the term the roll spans, past the schedule's fifteen years", () => {
+    // Twenty years of leases, one a year: an even roll is 5% a year. Held to
+    // the schedule's fifteen years it read 6.7%, and a 9% year sat under the
+    // 1.5x line that names a cliff.
+    const lines = Array.from({ length: 20 }, (_, i) => `T${i + 1}\t10,000\t30\t${i + 1}`);
+    const r = readRollover({ rows: readRoll(lines.join("\n"), 2026).rows, holdYears: 5 });
+    expect(r.evenYearSharePct).toBe(5);
+    // A mistyped expiry is held to the longest lease the cards read.
+    const typo = readRoll(["A\t10,000\t30\t3", "B\t10,000\t30\t500"].join("\n"), 2026);
+    expect(readRollover({ rows: typo.rows, holdYears: 5 }).evenYearSharePct).toBe(1);
+  });
+
   it("names the worst year on the seeded roll and what stands behind it", () => {
     const r = run();
     expect(r.worstYear!.year).toBe(4);
