@@ -256,6 +256,49 @@ export function formatFieldValue(value: LeafValue, format: FieldFormat): string 
   }
 }
 
+/**
+ * A before / after pair that never prints the same twice: each value at the
+ * field's usual precision, and at more places only where that would read
+ * "5.87% → 5.87%" for two values that differ — a percent to three or four
+ * places, a dollar figure in whole dollars. Null when the two still print
+ * the same at every precision carried here: such a move is not one to
+ * narrate as from-this-to-that.
+ */
+export function formatFieldPair(
+  from: LeafValue,
+  to: LeafValue,
+  format: FieldFormat,
+): [string, string] | null {
+  const a = formatFieldValue(from, format);
+  const b = formatFieldValue(to, format);
+  if (a !== b) return [a, b];
+  if (typeof from !== "number" || typeof to !== "number" || !Number.isFinite(from) || !Number.isFinite(to)) {
+    return null;
+  }
+  const finer: ((v: number) => string)[] =
+    format === "pct"
+      ? [3, 4].map((dp) => (v: number) => `${(v * 100).toFixed(dp)}%`)
+      : format === "usdPsf"
+        ? [3, 4].map((dp) => (v: number) => `$${v.toFixed(dp)}/SF`)
+        : format === "usd"
+          ? [(v: number) => `${v < 0 ? "-" : ""}$${Math.round(Math.abs(v)).toLocaleString("en-US")}`]
+          : [(v: number) => String(Number(v.toFixed(4)))];
+  for (const f of finer) {
+    const [x, y] = [f(from), f(to)];
+    if (x !== y) return [x, y];
+  }
+  return null;
+}
+
+/** A label as it reads inside a sentence: "Loan to cost" → "loan to
+ *  cost", while an acronym keeps its case — "DD / closing hold". */
+export function inSentence(label: string): string {
+  return label
+    .split(" ")
+    .map((w) => (/^[A-Z0-9][A-Z0-9-]*$/.test(w) && /[A-Z]/.test(w) && w.length > 1 ? w : w.toLowerCase()))
+    .join(" ");
+}
+
 /** Signed delta between two leaf values, phrased for the summary sentence
  *  ("cutting price by $1.7M", "tightening the exit cap from 8.00% to 6.50%"). */
 export function formatFieldDelta(

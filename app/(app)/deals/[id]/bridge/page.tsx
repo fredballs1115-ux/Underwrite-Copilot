@@ -5,6 +5,13 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { bridgeSentence } from "@/lib/bridge/attribution";
 import { getOrBuildBridge, listDealVersions, snapshotVersion } from "@/lib/bridge/versions";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
+import {
+  SCENARIO_LEVERS,
+  leverFor,
+  leverRefusalSentence,
+  leverText,
+  type LeverRefusal,
+} from "@/lib/bridge/scenario-form";
 import { BridgeView, type VersionOption } from "./bridge-view";
 import { saveScenarioVersion, deleteDealVersion } from "./actions";
 import { DealCrumb } from "../deal-crumb";
@@ -19,18 +26,30 @@ const ERRORS: Record<string, string> = {
   noextraction: "This deal hasn't been screened yet, so there are no assumptions to version.",
 };
 
-/** Percent inputs are typed as whole numbers; the engine stores decimals. */
-const asPct = (v: number) => (v * 100).toFixed(2);
+const REFUSALS: readonly LeverRefusal[] = ["unreadable", "range", "whole_years"];
+
+/** The sentence an error code is answered with; a refused lever's is built
+ *  from the lever's own label (lib/bridge/scenario-form). */
+function errorSentence(code: string | undefined, field: string | undefined, why: string | undefined): string | null {
+  if (!code) return null;
+  if (code === "lever") {
+    const lever = leverFor(field);
+    const refusal = REFUSALS.find((r) => r === why);
+    return lever && refusal ? leverRefusalSentence(lever, refusal) : null;
+  }
+  return ERRORS[code] ?? null;
+}
 
 export default async function BridgePage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string; to?: string; error?: string }>;
+  searchParams: Promise<{ from?: string; to?: string; error?: string; field?: string; why?: string }>;
 }) {
   const { id } = await params;
-  const { from: fromParam, to: toParam, error: errorCode } = await searchParams;
+  const { from: fromParam, to: toParam, error: errorCode, field, why } = await searchParams;
+  const errorText = errorSentence(errorCode, field, why);
 
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
@@ -92,9 +111,9 @@ export default async function BridgePage({
         </p>
       </header>
 
-      {errorCode && ERRORS[errorCode] ? (
+      {errorText ? (
         <p className="rounded-lg border border-kill/30 bg-kill/5 px-4 py-3 text-sm text-kill">
-          {ERRORS[errorCode]}
+          {errorText}
         </p>
       ) : null}
 
@@ -169,25 +188,17 @@ export default async function BridgePage({
           </p>
           <form action={saveScenarioVersion} className="mt-4 flex flex-col gap-4">
             <input type="hidden" name="dealId" value={id} />
+            {/* Each lever prefilled at the input's own precision; a price is
+                typed as people type it ("$12.5M"), so it keeps a keyboard
+                with letters, and the rest take numbers. */}
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              {(
-                [
-                  ["purchasePrice", "Purchase price ($)", String(Math.round(current.purchasePrice))],
-                  ["exitCapPct", "Exit cap (%)", asPct(current.exitCapPct)],
-                  ["rentGrowthPct", "Rent growth (%)", asPct(current.rentGrowthPct)],
-                  ["vacancyPct", "Vacancy (%)", asPct(current.vacancyPct)],
-                  ["expenseGrowthPct", "Expense growth (%)", asPct(current.expenseGrowthPct)],
-                  ["holdMonths", "Hold (months)", String(current.holdMonths)],
-                  ["ltc", "Loan to cost (%)", asPct(current.ltc)],
-                  ["allInRatePct", "All-in rate (%)", asPct(current.allInRatePct)],
-                ] as const
-              ).map(([name, label, value]) => (
-                <label key={name} className="flex flex-col gap-1 text-xs text-muted">
-                  {label}
+              {SCENARIO_LEVERS.map((lever) => (
+                <label key={lever.field} className="flex flex-col gap-1 text-xs text-muted">
+                  {lever.label}
                   <input
-                    name={name}
-                    defaultValue={value}
-                    inputMode="decimal"
+                    name={lever.field}
+                    defaultValue={leverText(lever, current[lever.field])}
+                    inputMode={lever.kind === "usd" ? undefined : "decimal"}
                     className="rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-sm text-ink"
                   />
                 </label>

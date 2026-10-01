@@ -6,35 +6,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
-import { setPath } from "@/lib/bridge/fields";
-import type { Assumptions } from "@/lib/bridge/model";
-
-/** The levers the scenario form exposes, with the parse each needs. Percents
- *  arrive as whole numbers ("6.5") and are stored as decimals, matching the
- *  engine's convention everywhere else. */
-const LEVERS: { field: keyof Assumptions; kind: "pct" | "usd" | "months" | "sf" }[] = [
-  { field: "purchasePrice", kind: "usd" },
-  { field: "exitCapPct", kind: "pct" },
-  { field: "rentGrowthPct", kind: "pct" },
-  { field: "vacancyPct", kind: "pct" },
-  { field: "expenseGrowthPct", kind: "pct" },
-  { field: "holdMonths", kind: "months" },
-  { field: "ltc", kind: "pct" },
-  { field: "allInRatePct", kind: "pct" },
-];
-
-/** Strip currency/percent decoration and parse. Returns null for blank or
- *  unparseable input so a typo leaves the assumption untouched rather than
- *  silently zeroing it. */
-function parseLever(raw: FormDataEntryValue | null, kind: string): number | null {
-  if (raw == null) return null;
-  const cleaned = String(raw).replace(/[$,\s%]/g, "");
-  if (!cleaned) return null;
-  const n = Number(cleaned);
-  if (!Number.isFinite(n)) return null;
-  if (kind === "pct") return n / 100;
-  return n;
-}
+import { applyScenarioForm } from "@/lib/bridge/scenario-form";
 
 /**
  * Save a labelled scenario as a new deal version.
@@ -69,11 +41,19 @@ export async function saveScenarioVersion(formData: FormData) {
   );
   if (!base) redirect(`/deals/${dealId}/bridge?error=noextraction`);
 
-  let scenario = base;
-  for (const { field, kind } of LEVERS) {
-    const value = parseLever(formData.get(field), kind);
-    if (value != null) scenario = setPath(scenario, field, value);
+  // Only the levers the user moved: every field comes back prefilled, and an
+  // untouched one keeps the base's full precision (lib/bridge/scenario-form).
+  // A figure the form cannot read is refused out loud, never dropped.
+  const form = applyScenarioForm(base, (field) => {
+    const v = formData.get(field);
+    return v == null ? null : String(v);
+  });
+  if (form.refused) {
+    redirect(
+      `/deals/${dealId}/bridge?error=lever&field=${form.refused.lever.field}&why=${form.refused.refusal}`,
+    );
   }
+  const scenario = form.scenario;
 
   const label = String(formData.get("label") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim();
