@@ -160,6 +160,23 @@ way in this batch):
   cost, never a cap), and an auction shows "Price —" beside a stated
   starting bid. Showing the going-in cap, or the starting bid labelled as
   one, changes the slot rule.
+- **Seven methods on /tools** (research pass 16, 2026-10-01). The pass's
+  errors are being fixed. These seven are choices of method, and each is
+  yours to keep or change:
+  - the waterfall has no "thereafter" split: above the last hurdle, the
+    last tier's split repeats;
+  - lease buyout: in the end-it-now case, the replacement tenant keeps
+    paying past its term with no second turnover, which flatters the
+    buyout;
+  - leased fee: only the land reverts, although the card's own rule says
+    the building reverts too;
+  - hold or sell: the tax and the prepayment penalty are held flat every
+    year;
+  - prepayment: discounts to maturity rather than to the open date, on a
+    monthly-compounded Treasury;
+  - ground lease: the 10-year term margin is said as "the margin lenders
+    look for";
+  - after tax and 1031: recapture is filled first.
 
 ## 🟢 2026-09-25 — being found, and the site's own address (#430)
 
