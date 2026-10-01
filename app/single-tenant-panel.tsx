@@ -44,6 +44,11 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
       ? { lease: inc.annualPct, model: model.rentGrowthPct * 100, how: inc.kind === "flat" ? "flat" : inc.how }
       : null;
   const scale = growth ? Math.max(growth.lease, growth.model, 1) : 1;
+  // The lease's growth a year, then the lease's own words where they say it
+  // differently ("10% every 5 years", "flat") — never "3% a year — 3% a
+  // year" for an annual bump the reader already words that way.
+  const perYear = growth ? `${pct2(growth.lease)} a year` : "";
+  const leaseText = growth && growth.how !== perYear ? `${perYear} — ${growth.how}` : perYear;
   const modelLine = model ? singleTenantModelLine(r, model) : "";
   const facts = [
     { k: "Guarantor", v: r.guarantor || "None named in the memorandum" },
@@ -82,7 +87,7 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
       {growth && (
         <ul className="mt-3 space-y-1.5" data-qa="single-tenant-growth">
           {[
-            { key: "lease", label: "The lease's increases", pct: growth.lease, text: `${pct2(growth.lease)} a year — ${growth.how}`, tone: "bg-brand/70", bar: "lease-increase" },
+            { key: "lease", label: "The lease's increases", pct: growth.lease, text: leaseText, tone: "bg-brand/70", bar: "lease-increase" },
             { key: "model", label: "The model's rent growth", pct: growth.model, text: `${pct1(growth.model)} a year`, tone: "bg-muted/50", bar: "model-growth" },
           ].map((g) => (
             <li key={g.key} className="text-[11px]">

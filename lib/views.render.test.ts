@@ -6092,6 +6092,23 @@ describe("SingleTenantPanel — the one lease a single-tenant property is, drawn
     expect(gluedWords(text)).toEqual([]);
   });
 
+  it("says an annual bump once: the lease's own words only where they differ from the rate a year", () => {
+    // The research pass of 2026-09-30: "3% annually" read "3% a year — 3% a
+    // year" beside the bar.
+    const annual = (stated: string) => {
+      const ex = walgreens();
+      ex.metrics = ex.metrics.map((m) => (m.label === "Rent increases" ? { ...m, value: stated } : m));
+      return visibleText(render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(ex, AS_OF), model: MODEL })));
+    };
+    const yearly = annual("3% annually");
+    expect(yearly).toContain("3% a year");
+    expect(yearly).not.toContain("3% a year — 3% a year");
+    expect(gluedWords(yearly)).toEqual([]);
+    // The stated words stay where they say it another way.
+    expect(annual("Flat")).toContain("0% a year — flat");
+    expect(annual("10% every 5 years")).toContain("1.92% a year — 10% every 5 years");
+  });
+
   it("marks the hold's years past a lease that ends inside it, and draws no growth there", () => {
     const short = walgreens({}, []);
     short.metrics = short.metrics.map((m) => (m.label === "Lease expiration" ? { ...m, value: "2029" } : m));
