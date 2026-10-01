@@ -891,6 +891,26 @@ async function runAnalysisSteps(
           "We couldn't read any figures out of this PDF, from its text or its pages — check it is the offering memorandum rather than a teaser or a cover letter, or upload a clearer copy with Replace OM.",
         );
       }
+      // The memorandum's page count, as exact as this run can make it: the
+      // text layer's own (pdfjs walked the pages); else the model's count of
+      // the PDF it read (robust to object-stream / bookmarked PDFs the byte
+      // counter mis-reads); else the fail-safe byte counter, only where the
+      // model did not report. Stored as the extraction's own count, so every
+      // reader that holds a cited page to `totalPages` (what is being sold,
+      // a portfolio's properties, the sale, the reports) agrees with the
+      // citation rows below — the model's count had been stored even where
+      // the layer's exact one was in hand.
+      const pageCount =
+        omSource?.kind === "pages"
+          ? omSource.pages
+          : extraction.totalPages && extraction.totalPages > 0
+            ? extraction.totalPages
+            : pdf
+              ? countPdfPages(pdf)
+              : 0;
+      if (pageCount != null && pageCount > 0 && pageCount !== extraction.totalPages) {
+        extraction = { ...extraction, totalPages: pageCount };
+      }
       await admin
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })
@@ -936,19 +956,7 @@ async function runAnalysisSteps(
       // never shown). Best-effort — a pre-0018 schema or a write failure must
       // never sink the screen.
       try {
-        // The text layer's page count is exact (pdfjs walked the pages).
-        // Otherwise prefer the model's own count (it read the native PDF —
-        // robust to object-stream / bookmarked PDFs the byte counter
-        // mis-reads), and fall back to the fail-safe byte counter only when
-        // the model didn't report.
-        const pageCount =
-          omSource?.kind === "pages"
-            ? omSource.pages
-            : extraction.totalPages && extraction.totalPages > 0
-              ? extraction.totalPages
-              : pdf
-                ? countPdfPages(pdf)
-                : 0;
+        // The same count the extraction now stores (above).
         const facts = buildDealFacts(extraction.metrics, pageCount);
         await admin.from("deal_facts").delete().eq("deal_id", dealId);
         const rows = toFactRows(dealId, facts);

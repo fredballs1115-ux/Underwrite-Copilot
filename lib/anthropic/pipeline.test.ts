@@ -1545,6 +1545,23 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     expect(state.deals.d1.extraction).toEqual({ old: true });
   });
 
+  it("stores the text layer's exact page count on the extraction, and the model's own where the pages were read (research pass 18)", async () => {
+    // The model counted 12; pdfjs walked 38 pages of the layer. The facts
+    // were validated against 38 while the extraction kept 12, so a page the
+    // citation rows accept was dropped by every reader of `totalPages`.
+    const layer = { kind: "pages" as const, text: "[[page 1]]\nthe deck", pages: 38, sparsePages: 0 };
+    vi.mocked(omSourceFor).mockResolvedValueOnce(layer);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect((state.deals.d1.extraction as ExtractionResult).totalPages).toBe(38);
+    expect((state.deals.d1.extraction as ExtractionResult).metrics).toEqual(EXTRACTION.metrics);
+
+    // Read as pages: the model's count stands.
+    state = freshState();
+    await runAnalysis("d1");
+    expect((state.deals.d1.extraction as ExtractionResult).totalPages).toBe(12);
+  });
+
   it("the previous first signal survives a failed first read (it is no longer cleared ahead of the call)", async () => {
     vi.mocked(readFirstSignal).mockRejectedValue(new Error("boom"));
     await runAnalysis("d1");
