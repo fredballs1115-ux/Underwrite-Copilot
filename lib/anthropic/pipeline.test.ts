@@ -417,7 +417,8 @@ describe("runAnalysis — the happy path", () => {
     await runAnalysis("d1");
     expect(job().status).toBe("done");
     expect(job().step).toBe("verdict");
-    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    // Stored with how it was read: the PDF itself, here (omSourceFor's fake).
+    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual(COMPS);
     // A deal with no address sits in no covered market: the check ran on
@@ -1481,7 +1482,7 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
 
     // The mixed generation: this run's extraction and challenges beside the
     // previous screen's comps, market and verdict.
-    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual({ old: true });
     expect(state.deals.d1.verdict).toEqual({ old: true });
@@ -1524,7 +1525,8 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await runAnalysis("d1");
     expect(job().status).toBe("done");
-    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    // The fall-back is recorded with the extraction, for Ask (research pass 18).
+    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
     expect(extractTerms).toHaveBeenCalledTimes(2);
     expect(vi.mocked(extractTerms).mock.calls[0][0]).toBe(pages);
     expect(vi.mocked(extractTerms).mock.calls[1][0]).toBe(buffer);
@@ -1555,6 +1557,7 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     expect(job().status).toBe("done");
     expect((state.deals.d1.extraction as ExtractionResult).totalPages).toBe(38);
     expect((state.deals.d1.extraction as ExtractionResult).metrics).toEqual(EXTRACTION.metrics);
+    expect((state.deals.d1.extraction as ExtractionResult).omRead).toBe("text");
 
     // Read as pages: the model's count stands.
     state = freshState();
@@ -1684,7 +1687,8 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     expect(job().status).toBe("done");
     expect(extractTerms).toHaveBeenCalledTimes(2);
     expect(vi.mocked(extractTerms).mock.calls[1][0]).toBe(buffer);
-    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    // The fall-back to the pages is recorded with the extraction, for Ask.
+    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
     expect(vi.mocked(challengeAssumptions).mock.calls[0][0]).toBe(buffer);
 
     // A layer that read the NOI is the deck: one read, no fallback.
@@ -1698,6 +1702,8 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     expect(vi.mocked(extractTerms).mock.calls.length).toBe(extractsBefore + 1);
     expect(vi.mocked(omSourceFor).mock.calls.length).toBe(sourcesBefore + 1);
     expect(vi.mocked(challengeAssumptions).mock.calls.at(-1)?.[0]).toBe(pages);
+    // …and is recorded as read from its text layer.
+    expect((state.deals.d1.extraction as ExtractionResult).omRead).toBe("text");
   });
 
   it("an attempt resumed after the fallback to the pages reads the pages from the start — the payload remembers", async () => {

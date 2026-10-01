@@ -911,6 +911,14 @@ async function runAnalysisSteps(
       if (pageCount != null && pageCount > 0 && pageCount !== extraction.totalPages) {
         extraction = { ...extraction, totalPages: pageCount };
       }
+      // How this read was made — the deck's text layer, or the PDF itself
+      // (the layer never dense enough, or found wanting above and re-read as
+      // pages) — stored with the extraction, where the checkpoint payload
+      // was the only record and lasted only the run: Ask reads the
+      // memorandum the same way (lib/anthropic/ask `askTextFirst`), and
+      // never answers "the OM doesn't state" a figure the screen found in a
+      // picture on a page.
+      extraction = { ...extraction, omRead: omSource?.kind === "pages" ? "text" : "pdf" };
       await admin
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })

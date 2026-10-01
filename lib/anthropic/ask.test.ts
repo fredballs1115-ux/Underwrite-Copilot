@@ -1,6 +1,86 @@
-import { describe, expect, it } from "vitest";
-import { askInstruction, dealContextFor } from "./ask";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExtractionResult } from "./types";
+
+// Ask's transport (research pass 18): the OM's source, the model and the
+// deal's stored extraction, each faked, so a test can see which read a
+// question is handed.
+vi.mock("./om-source", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("./om-source")>();
+  return {
+    ...orig,
+    omSourceWithPages: vi.fn(async () => ({ om: orig.omFromBuffer(Buffer.alloc(0)), pages: 12 })),
+    releaseOmSource: vi.fn(async () => {}),
+  };
+});
+vi.mock("./client", () => ({
+  getAnthropic: vi.fn(() => ({
+    messages: { parse: vi.fn(async () => ({ stop_reason: "end_turn", parsed_output: { answer: "It is stated.", cites: [] } })) },
+  })),
+}));
+vi.mock("@/lib/supabase/admin", () => ({ createSupabaseAdminClient: vi.fn() }));
+
+import { askDealQuestion, askInstruction, askTextFirst, dealContextFor } from "./ask";
+import { omSourceWithPages } from "./om-source";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+
+/** The deals row the question's read finds, or a read that fails. */
+function storedExtraction(extraction: Record<string, unknown> | null | "fails") {
+  vi.mocked(createSupabaseAdminClient).mockImplementation(
+    () =>
+      ({
+        from: () => ({
+          select: () => ({
+            eq: () => ({
+              maybeSingle: async () => {
+                if (extraction === "fails") throw new Error("down");
+                return { data: extraction ? { extraction } : null, error: null };
+              },
+            }),
+          }),
+        }),
+      }) as never,
+  );
+}
+
+describe("Ask reads the memorandum the way the screen did (research pass 18)", () => {
+  const pdf = Buffer.from("%PDF-1.4\n");
+  const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+  beforeEach(() => {
+    vi.mocked(omSourceWithPages).mockClear();
+    logSpy.mockClear();
+  });
+
+  it("the text layer only where the screen did not read the PDF itself", () => {
+    expect(askTextFirst("pdf")).toBe(false);
+    expect(askTextFirst("text")).toBe(true);
+    // A deal screened before the read was recorded decides as before.
+    expect(askTextFirst(null)).toBe(true);
+    expect(askTextFirst(undefined)).toBe(true);
+  });
+
+  it("a deal whose screen fell back to the pages is asked from the pages, not the layer it found wanting", async () => {
+    storedExtraction({ dealName: "Oakwood Flats", omRead: "pdf" });
+    const r = await askDealQuestion(pdf, "What is the in-place NOI?", null, { dealId: "d1" });
+    expect(r.answer).toBe("It is stated.");
+    expect(vi.mocked(omSourceWithPages)).toHaveBeenCalledWith(pdf, "om.pdf", { textFirst: false });
+  });
+
+  it("a deal read from its text layer, one screened before the record, and a read that fails all decide as before", async () => {
+    for (const row of [{ omRead: "text" }, { dealName: "Oakwood Flats" }, null, "fails"] as const) {
+      vi.mocked(omSourceWithPages).mockClear();
+      storedExtraction(row);
+      await askDealQuestion(pdf, "What is the in-place NOI?", null, { dealId: "d1" });
+      expect(vi.mocked(omSourceWithPages), JSON.stringify(row)).toHaveBeenCalledWith(pdf, "om.pdf", { textFirst: true });
+    }
+  });
+
+  it("a caller that holds the read hands it in, and nothing is read again", async () => {
+    vi.mocked(createSupabaseAdminClient).mockClear();
+    await askDealQuestion(pdf, "What is the in-place NOI?", null, { dealId: "d1", omRead: "pdf" });
+    expect(vi.mocked(omSourceWithPages)).toHaveBeenCalledWith(pdf, "om.pdf", { textFirst: false });
+    expect(vi.mocked(createSupabaseAdminClient)).not.toHaveBeenCalled();
+  });
+});
 
 describe("askInstruction — ask-the-deal's prompt", () => {
   const q = "What is the going-in cap rate?";
