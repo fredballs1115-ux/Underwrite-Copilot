@@ -31,6 +31,11 @@ const COPY = {
   signupsClosed: `New sign-ups are closed right now — email ${SUPPORT} and we'll set you up.`,
   emailNotAllowed: `We can't send email to that address yet — a setup problem on our side, not yours. Email ${SUPPORT} and we'll get you in.`,
   tooMany: "Too many attempts — wait a minute and try again.",
+  // The project's own hourly cap on the emails the auth service sends: it
+  // trips during a sign-up spike, for people who never asked before, so it
+  // says what happened on our side and never "wait before asking again".
+  emailBusy:
+    "Our email is rate-limited right now, so the link didn't go out — please try again shortly.",
   banned: `This account is suspended — email ${SUPPORT} if you think that's a mistake.`,
   linkExpired: "That link has expired — request a new one.",
   unreachable: "Couldn't reach the sign-in service — please try again in a moment.",
@@ -43,12 +48,17 @@ const GENERIC: Record<AuthIntent, string> = {
   reset: "Something went wrong sending the reset link — please try again.",
 };
 
-/** "For security purposes, you can only request this after 47 seconds." */
-function waitCopy(message: string): string {
+/**
+ * The auth service's one code for two different limits. "For security
+ * purposes, you can only request this after 47 seconds." is the person's own
+ * address asked again inside the minute, and says the wait. "Email rate limit
+ * exceeded" is the project's hourly cap on the emails it sends — reached by
+ * everyone's sign-ups and resets together, so the person reading it may have
+ * asked for nothing before.
+ */
+function emailLimitCopy(message: string): string {
   const m = /after (\d+) seconds?/i.exec(message);
-  return m
-    ? `Wait about ${m[1]} seconds before requesting another link.`
-    : "Wait a minute before requesting another link.";
+  return m ? `Wait about ${m[1]} seconds before requesting another link.` : COPY.emailBusy;
 }
 
 /**
@@ -83,7 +93,7 @@ export function authErrorCopy(
     case "provider_disabled":
       return COPY.emailOff;
     case "over_email_send_rate_limit":
-      return waitCopy(m);
+      return emailLimitCopy(m);
     case "over_request_rate_limit":
     case "over_sms_send_rate_limit":
       return COPY.tooMany;
@@ -106,7 +116,8 @@ export function authErrorCopy(
   if (m.includes("already registered") || m.includes("already been registered"))
     return ACCOUNT_EXISTS;
   if (m.includes("email not confirmed")) return COPY.confirmFirst;
-  if (m.includes("for security purposes")) return waitCopy(m);
+  if (m.includes("for security purposes")) return emailLimitCopy(m);
+  if (m.includes("email rate limit")) return COPY.emailBusy;
   if (m.includes("rate limit")) return COPY.tooMany;
   if (m.includes("password should") || m.includes("password is too weak") || m.includes("weak password"))
     return COPY.weakPassword;

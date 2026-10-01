@@ -44,8 +44,21 @@ describe("authErrorCopy — the auth service's codes become sentences", () => {
       .toMatch(/closed right now/);
     expect(authErrorCopy({ code: "email_address_not_authorized", message: "Email address not authorized" }, "signup"))
       .toMatch(/setup problem on our side/);
-    expect(authErrorCopy({ code: "over_email_send_rate_limit", message: "Email rate limit exceeded" }, "signup"))
-      .toMatch(/Wait a minute before requesting another link/);
+  });
+
+  it("the project's hourly email cap says it is ours, never 'wait before requesting another'", () => {
+    // It trips during a sign-up spike, for people who asked for nothing.
+    for (const intent of ["signup", "reset"] as const) {
+      const copy = authErrorCopy({ code: "over_email_send_rate_limit", message: "Email rate limit exceeded" }, intent);
+      expect(copy, intent).toBe(
+        "Our email is rate-limited right now, so the link didn't go out — please try again shortly.",
+      );
+      expect(copy).not.toMatch(/wait a minute|another link/i);
+      // Older responses carry no code.
+      expect(authErrorCopy({ message: "Email rate limit exceeded" }, intent), intent).toBe(copy);
+    }
+    // Any other rate limit is still the request limit.
+    expect(authErrorCopy({ message: "Request rate limit reached" }, "signin")).toMatch(/Too many attempts/);
   });
 
   it("reads the wait out of a reset rate limit", () => {
