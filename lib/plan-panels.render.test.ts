@@ -59,6 +59,16 @@ describe("PlanSensitivity — yield on cost, stressed", () => {
     expect(html).not.toContain("built for the market");
   });
 
+  it("pins its row labels while the grid scrolls sideways on a phone (2026-09-30)", () => {
+    // The research pass: at 390px the 560px grid scrolled inside a 266px
+    // card and its row labels ("OM NOI", "−10%") scrolled away with it.
+    const html = renderToStaticMarkup(React.createElement(PlanSensitivity, { plan, refCap }));
+    const pinned = html.match(/<th scope="(?:row|col)" class="sticky left-0 z-10 bg-surface /g) ?? [];
+    // The corner and the five NOI rows; the budget columns scroll.
+    expect(pinned.length).toBe(6);
+    expect(html).toMatch(/data-qa="plan-grid"[^>]*><table class="w-full min-w-\[560px\]/);
+  });
+
   it("renders nothing without a plan or a reference cap", () => {
     expect(renderToStaticMarkup(React.createElement(PlanSensitivity, { plan: null, refCap }))).toBe("");
     expect(renderToStaticMarkup(React.createElement(PlanSensitivity, { plan, refCap: null }))).toBe("");

@@ -33,6 +33,12 @@ const BUCKET_CLS: Record<SpreadBucket, string> = {
 };
 const LEGEND: SpreadBucket[] = ["wide", "adequate", "thin", "none", "negative"];
 
+/** A row label pinned at the grid's left edge while the grid scrolls
+ *  sideways: on the card's surface, its 4px of border spacing painted in
+ *  the same colour, so no scrolled cell (nor the base cell's ring) shows
+ *  through the gaps around it. */
+const PINNED = "sticky left-0 z-10 bg-surface shadow-[0_0_0_4px_var(--color-surface)]";
+
 export type RefCap = RefCapInput;
 
 /**
@@ -74,13 +80,16 @@ export function PlanSensitivity({
         short and 30% over is conservative.
       </p>
 
-      <div className="mt-3 overflow-x-auto">
+      {/* On a phone the grid scrolls sideways inside its card; the row
+          labels stay pinned at its left edge (sticky, on the card's own
+          surface) so a yield is never read without its row. */}
+      <div className="mt-3 overflow-x-auto" data-qa="plan-grid">
         <table className="w-full min-w-[560px] border-separate border-spacing-1 text-center text-xs">
           <thead>
             <tr>
               <th
                 scope="col"
-                className="text-left align-bottom text-[10px] font-medium uppercase tracking-wide text-muted"
+                className={`${PINNED} text-left align-bottom text-[10px] font-medium uppercase tracking-wide text-muted`}
               >
                 NOI ↓ · Budget →
               </th>
@@ -95,7 +104,7 @@ export function PlanSensitivity({
           <tbody>
             {grid.noiRows.map((r, ri) => (
               <tr key={r.delta}>
-                <th scope="row" className="text-left font-mono text-[11px] font-medium text-muted">
+                <th scope="row" className={`${PINNED} text-left font-mono text-[11px] font-medium text-muted`}>
                   {r.delta === 0 ? "OM NOI" : delta(r.delta)}
                   <span className="block text-[10px] font-normal">{money(r.noi)}</span>
                 </th>
