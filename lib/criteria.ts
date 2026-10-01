@@ -990,6 +990,10 @@ export function buyBoxCheckSource(
     // cap reading and the development's land price on the very page that
     // shows them.
     strategy: strategyKind ? { kind: strategyKind } : (extraction?.strategy ?? null),
+    // What the price buys rides along too: without it a note's collateral
+    // cap is held to the box's cap floor and the mandate's dealbreaker on
+    // every page, where the rule is that a note's price is a loan's.
+    interest: extraction?.interest ?? null,
   };
 }
 

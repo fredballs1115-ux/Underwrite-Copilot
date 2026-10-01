@@ -58,6 +58,20 @@ describe("evaluateBuyBox — reads the expected figures", () => {
     expect(check(r, "Going-in cap")?.detail).not.toContain("7.00%");
   });
 
+  it("keeps the note's interest through buyBoxCheckSource, the source every page judges against (the audit of 2026-10-01)", () => {
+    // The pages never pass the raw extraction: each builds the box's source
+    // through buyBoxCheckSource, which dropped `interest`, so the note's rule
+    // above never fired on any page.
+    const box: BuyBox = { minCapPct: 6.0 };
+    const note = { ...ex([["Going-in cap rate", "4.50%"]]), interest: { kind: "note" } };
+    const r = evaluateBuyBox("auto", buyBoxCheckSource(note, null, null), box);
+    expect(check(r, "Going-in cap")?.status).toBe("unknown");
+    expect(check(r, "Going-in cap")?.detail).toContain("this is a note");
+    // A building at the same cap still misses the floor.
+    const building = ex([["Going-in cap rate", "4.50%"]]);
+    expect(check(evaluateBuyBox("auto", buyBoxCheckSource(building, null, null), box), "Going-in cap")?.status).toBe("miss");
+  });
+
   it("does not read the exit cap as the going-in cap", () => {
     const box: BuyBox = { minCapPct: 5.0 };
     // Only an exit cap present → the going-in check has no figure → unknown.
