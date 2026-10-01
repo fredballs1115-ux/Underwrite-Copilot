@@ -126,6 +126,13 @@ describe("claimJob — a retry after a failed worker run keeps the steps that fi
     expect(Date.parse(update.created_at)).toBeLessThanOrEqual(Date.now());
   });
 
+  it("a claim clears the last run's ledger, so a run that ends before any model call never wears its cost or time (the audit of 2026-10-01)", async () => {
+    const { db, calls } = fakeDb({ id: "j1", status: "done", updated_at: HOUR_AGO });
+    expect((await claimJob(db, "d1", "signal")).outcome).toBe("claimed");
+    const update = calls.find((c) => c.update)!.update as { usage?: unknown };
+    expect("usage" in update && update.usage === null).toBe(true);
+  });
+
   it("a live, fresh row is busy; a live row past the stale window is reclaimable", async () => {
     const fresh = fakeDb({ id: "j1", status: "running", updated_at: new Date().toISOString() });
     expect((await claimJob(fresh.db, "d1", "signal")).outcome).toBe("busy");

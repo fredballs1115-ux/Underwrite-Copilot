@@ -4,9 +4,10 @@
 // takes 2–4 minutes" and a side job "usually a minute or two", figures no
 // run had ever been held to. Every screen's ledger is stored on its job row
 // (`analysis_jobs.usage`, migration 0035, lib/anthropic/usage), and a
-// screen's carries its own time, start to finish (`wallMs`: its wait for a
-// turn, its model calls and everything between them — never the ledger's
-// `ms`, which sums the calls alone). Where the reader's own account has at
+// screen that finished in one attempt carries its own time (`wallMs`: its
+// wait for a turn, its model calls and everything between them, to the
+// moment it was marked done — never the ledger's `ms`, which sums the calls
+// alone; a failed or resumed run carries none). Where the reader's own account has at
 // least three finished screens with one, the rail says their median,
 // rounded to what a person would say; with fewer, it says no duration — the
 // run's own clock already shows the time it has taken. Pure: the page makes

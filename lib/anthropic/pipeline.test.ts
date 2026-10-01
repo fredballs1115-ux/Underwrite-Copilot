@@ -360,6 +360,36 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     expect((state.jobs[0] as { usage?: unknown }).usage).toBeUndefined();
     expect(state.writes.some((w) => w.table === "analysis_jobs" && "usage" in w.patch)).toBe(false);
   });
+
+  it("the screen's own time goes only on a run that finished in one attempt: a failed run and a resumed one carry none (the audit of 2026-10-01)", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    // A failed run's time is no screen's: "your screens usually take" would
+    // average in a run that stopped in three seconds, or timed out.
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      meter("Extraction");
+      throw apiError(529, "overloaded_error", "Overloaded");
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    const failed = (state.jobs[0] as { usage?: UsageSummary }).usage;
+    expect(failed?.calls.map((c) => c.what)).toEqual(["Extraction"]);
+    expect(failed?.wallMs).toBeUndefined();
+
+    // A resumed attempt ran only the steps an earlier one left it.
+    state = freshState();
+    state.deals.d1.extraction = EXTRACTION;
+    state.jobs[0].payload = { kind: "screen", completed: ["signal", "extract", "reconcile_docs", "ingest_actuals"] };
+    vi.mocked(challengeAssumptions).mockImplementation(async () => {
+      meter("Challenge");
+      return CHALLENGES;
+    });
+    await runAnalysis("d1", { resume: true });
+    expect(job().status).toBe("done");
+    const resumed = (state.jobs[0] as { usage?: UsageSummary }).usage;
+    expect(resumed?.calls.map((c) => c.what)).toEqual(["Challenge"]);
+    expect(resumed?.wallMs).toBeUndefined();
+    logSpy.mockRestore();
+  });
 });
 
 describe("runAnalysis — the happy path", () => {

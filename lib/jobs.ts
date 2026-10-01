@@ -209,6 +209,10 @@ export async function claimJob(
       step,
       progress: 0,
       error: null,
+      // The run's ledger is this run's: a claim clears the last one's, so a
+      // run that ends before any model call (no OM, a deck past the page
+      // limit) never wears the previous run's cost or time (migration 0035).
+      usage: null,
       created_at: now,
       updated_at: now,
       ...(workerPayload !== undefined

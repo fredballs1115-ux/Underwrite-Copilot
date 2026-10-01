@@ -553,22 +553,37 @@ export async function runAnalysis(
 ): Promise<void> {
   // Every model call inside the run records its meters into this ledger,
   // and the run's own time rides with it (the deal page's "your screens
-  // usually take", lib/screen-duration): its wait for a turn included.
+  // usually take", lib/screen-duration): its wait for a turn included,
+  // stopped at the moment the job was marked done.
   const ledger = newLedger();
   const started = Date.now();
+  let finished: RunFinish | null = null;
   try {
-    await withUsageLedger(ledger, () => runAnalysisSteps(dealId, opts));
+    finished = await withUsageLedger(ledger, () => runAnalysisSteps(dealId, opts));
   } finally {
-    await writeUsage(dealId, ledger, Date.now() - started);
+    // A screen's time only where this attempt ran the screen from its first
+    // step to done: a failed run's time is no screen's, and a resumed
+    // attempt's covers only the steps an earlier one left it.
+    await writeUsage(dealId, ledger, finished?.whole ? finished.doneAt - started : undefined);
   }
+}
+
+/** How a screen ended, for its clock: when the job was marked done, and
+ *  whether this attempt ran every step itself (no checkpoint skipped). */
+interface RunFinish {
+  doneAt: number;
+  whole: boolean;
 }
 
 async function runAnalysisSteps(
   dealId: string,
   opts?: { snapshotPrior?: boolean; resume?: boolean },
-): Promise<void> {
+): Promise<RunFinish | null> {
   const snapshotPrior = opts?.snapshotPrior ?? true;
   const resume = opts?.resume ?? false;
+  let finished: RunFinish | null = null;
+  // Steps an earlier attempt of this run had already finished (worker mode).
+  let resumedSteps = 0;
   // The OM's transport for this run — released in `finally` when it is a
   // Files-API object, so a large OM never leaves an orphaned upload behind.
   let omSource: OmSource | null = null;
@@ -633,6 +648,7 @@ async function runAnalysisSteps(
         // no checkpoints — run everything
       }
     }
+    resumedSteps = completed.size;
     const writeCheckpoint = async () => {
       if (!resume) return;
       try {
@@ -1151,6 +1167,9 @@ async function runAnalysisSteps(
       progress: 100,
       error: null,
     });
+    // The run's clock stops here, when the reader sees the screen done —
+    // never after the email, the picture lift or the cleanup below.
+    finished = { doneAt: Date.now(), whole: resumedSteps === 0 };
 
     // Heads-up email (key-ready; silently off without RESEND_API_KEY, and
     // best-effort by design — the screen itself is already complete).
@@ -1170,6 +1189,7 @@ async function runAnalysisSteps(
     stopHeartbeat();
     await releaseOmSource(omSource);
   }
+  return finished;
 }
 
 /**
