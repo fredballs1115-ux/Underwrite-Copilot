@@ -3738,7 +3738,6 @@
       "wikipedia": [
         "Gainesville, Florida",
         "University of Florida",
-        "University of Florida",
         "Century Tower"
       ],
       "categories": [
@@ -3753,7 +3752,6 @@
         "Gainesville Florida skyline",
         "University of Florida campus",
         "University of Florida Century Tower",
-        "University of Florida campus",
         "Paynes Prairie"
       ],
       "candidates": []
@@ -3777,7 +3775,12 @@
         "Santa Barbara Stearns Wharf",
         "Santa Barbara skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "View of Santa Barbara, California from the Stearns Wharf.jpg",
+          "note": "Santa Maria-Santa Barbara, CA — Gatorfan252525, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36799416970)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:41500",
@@ -3819,7 +3822,12 @@
         "Boulder Colorado downtown",
         "Boulder Pearl Street"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Flatirons view from Broomfield, Colorado.jpg",
+          "note": "Boulder, CO — Kpsudeep, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36799416970)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:22660",
@@ -3858,7 +3866,12 @@
         "Eugene Oregon Skinner Butte",
         "Eugene Oregon downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Eugene Oregon from Skinner Butte.JPG",
+          "note": "Eugene-Springfield, OR — Laura Alier, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36799416970)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:49660",
@@ -3878,7 +3891,12 @@
         "Youngstown Ohio downtown",
         "Youngstown Mahoning River"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Youngstown skyline Wean Park.jpg",
+          "note": "Youngstown-Warren, OH — Dblcut3, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36799416970)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:44140",

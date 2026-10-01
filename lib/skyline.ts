@@ -654,6 +654,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Boise, ID",
     size: [3600, 2504],
   },
+  // Boulder, CO: skyline-sheet run 36799416970 — the Flatirons in the evening light under gold clouds, the ridge and the snow behind whole in both crops above the words, over the campus and the Flatirons from the air, whose summit the deal page's 16:9 cuts and whose Flatirons its 21:9 cuts through, the slabs in fog, Pearl Street's corners, a black-and-white frame and a crane across the campus.
+  "cbsa:14500": {
+    file: "Flatirons view from Broomfield, Colorado.jpg",
+    place: "The Flatirons at sunset, snow on the peaks behind, from Broomfield",
+    credit: "Kpsudeep",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Boulder, CO",
+    size: [5456, 3632],
+  },
   // Bridgeport, CT: skyline-sheet run 36750858237 — the principal city's lead image, whole in every crop.
   "cbsa:14860": {
     file: "Bridgeport, Connecticut downtown.jpg",
@@ -793,6 +803,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "El Paso, TX",
     size: [3159, 1751],
+  },
+  // Eugene-Springfield, OR: skyline-sheet run 36799416970 — the city among its evergreens from Skinner Butte under a clear sky, Spencer Butte behind, whole in both crops, over the same view under white and grey skies at 614 and 584px tall, Autzen Stadium from a drone and on a game day, a warehouse's signs over a parking lot, a park path and a 1908 print.
+  "cbsa:21660": {
+    file: "Eugene Oregon from Skinner Butte.JPG",
+    place: "Downtown Eugene among its evergreens from Skinner Butte, Spencer Butte behind",
+    credit: "Laura Alier",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Eugene-Springfield, OR",
+    size: [3456, 2304],
   },
   // Fayetteville, NC: skyline-sheet run 36798176732 — downtown's church spires and tree-lined street from above in clear daylight, every spire whole in both crops, over the Market House down Hay Street on a grey winter day through a heavy phone filter. The runner printed the author as "Public domain, City of Fayetteville"; the credit is the name in it.
   "cbsa:22180": {
@@ -1214,6 +1234,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "San Juan-Bayamón-Caguas, PR",
     size: [4032, 2268],
   },
+  // Santa Maria-Santa Barbara, CA: skyline-sheet run 36799416970 — the palms, the red-roofed town and the mountains behind, whole in both crops under a clear sky, over the harbour's fishing boats at golden hour, whose ridge the wide crop clips, a drone's view of the harbour and the wharf under a washed-out haze, a shopping plaza and a hazy view across the rooftops.
+  "cbsa:42200": {
+    file: "View of Santa Barbara, California from the Stearns Wharf.jpg",
+    place: "Santa Barbara's palm-lined beach under the Santa Ynez Mountains, from Stearns Wharf",
+    credit: "Gatorfan252525",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Santa Maria-Santa Barbara, CA",
+    size: [4032, 3024],
+  },
   // Santa Rosa-Petaluma, CA: skyline-sheet run 36791355974 — the Sonoma County article's lead, whole in both crops under a blue sky; the county's coast (Arched Rock, Bodega Head) is as fine but farther from the market, and the rest were a train platform, San Francisco and a downtown sign.
   // The runner printed the author as "w:en:User:Anlace" (a link to the
   // English Wikipedia user); the credit is the name in it.
@@ -1415,6 +1445,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "York-Hanover, PA",
     size: [3968, 2976],
+  },
+  // Youngstown-Warren, OH: skyline-sheet run 36799416970 — downtown's towers under a blue sky with the city's name in letters on the lawn before them, its full height in every crop, over a tower whose top the card cuts, the university's tower under a grey sky, a snowy lot's parking sign and two plane-window views of the interchanges under cloud.
+  "cbsa:49660": {
+    file: "Youngstown skyline Wean Park.jpg",
+    place: "Downtown Youngstown beyond the Youngstown letters in Wean Park",
+    credit: "Dblcut3",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Youngstown-Warren, OH",
+    size: [1936, 733],
   },
 };
 
