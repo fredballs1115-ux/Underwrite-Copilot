@@ -4868,6 +4868,12 @@
         "Hickory North Carolina downtown",
         "Lake Hickory North Carolina",
         "Morganton North Carolina downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Train Depot, Morganton, North Carolina (2008).jpg",
+          "note": "Hickory-Lenoir-Morganton, NC — Ron Reiring, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816286360)."
+        }
       ]
     },
     {
@@ -4925,6 +4931,12 @@
         "Roanoke Virginia skyline",
         "Roanoke Virginia from Mill Mountain",
         "Roanoke Virginia downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Roanoke City (Virginia) from Mill Mountain Star at Dusk.jpg",
+          "note": "Roanoke, VA — Joe Ravi, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816286360)."
+        }
       ]
     },
     {
@@ -4946,6 +4958,12 @@
         "Bristol Virginia Tennessee sign",
         "Bristol State Street",
         "Kingsport Tennessee downtown"
+      ],
+      "candidates": [
+        {
+          "file": "State Street - Bristol, TN-VA.jpg",
+          "note": "Kingsport, TN — AppalachianCentrist, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816361727)."
+        }
       ]
     },
     {
@@ -4985,6 +5003,12 @@
         "Columbus Georgia skyline",
         "Columbus Georgia riverwalk",
         "Columbus Georgia Chattahoochee"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Columbus, Georgia skyline.jpg",
+          "note": "Columbus, GA — PghPhxNfk, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816361727)."
+        }
       ]
     },
     {
@@ -5005,6 +5029,12 @@
         "Lynchburg Virginia skyline",
         "Lynchburg Virginia James River",
         "Lynchburg Virginia downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Lynchburg zoomed in.jpg",
+          "note": "Lynchburg, VA — Northern-Virginia-Photographer, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816361727)."
+        }
       ]
     },
     {
@@ -5046,6 +5076,12 @@
         "Charleston West Virginia skyline",
         "Charleston West Virginia Kanawha River",
         "West Virginia State Capitol Kanawha"
+      ],
+      "candidates": [
+        {
+          "file": "The Capitol from the air (35064567685).jpg",
+          "note": "Charleston, WV — Josh Stapler from Charleston, United States, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816361727)."
+        }
       ]
     },
     {

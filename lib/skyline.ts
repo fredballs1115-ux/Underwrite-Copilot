@@ -744,6 +744,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Cedar Rapids, IA",
     size: [3855, 1554],
   },
+  // Charleston, WV: skyline-sheet run 36816361727 — the West Virginia State Capitol from above the Kanawha, its gold dome against a wooded ridge and its reflection in the river, sky across the top, whole in both crops. Over the front at ground level, whose 21:9 takes its finial and half its lantern, a drone view of the front under an America 250 banner, whose 21:9 takes its lantern, the dome small beyond a running track and through blades of grass, and an 1891 engraving.
+  "cbsa:16620": {
+    file: "The Capitol from the air (35064567685).jpg",
+    place: "The West Virginia State Capitol's gold dome over the Kanawha River, from above the water",
+    credit: "Josh Stapler from Charleston, United States",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Charleston, WV",
+    size: [4000, 2250],
+  },
   // Charleston, SC: skyline-sheet run 36751130861 — the picture the city is known by; the credit is the name the runner printed, without the talk-page link printed after it.
   "cbsa:16700": {
     file: "Rainbow Row Panorama.jpg",
@@ -783,6 +793,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Columbia, SC",
     size: [1844, 892],
+  },
+  // Columbus, GA: skyline-sheet run 36816361727 — an article's lead, the Chattahoochee's rapids over rock shelves below a row of brick mills with two chimneys and a water tower, autumn colour on the banks under a grey-blue sky; whole on the card and at 16:9, the 21:9 takes the chimneys' tops and half the water tower's tank. Over a hazy telephoto of office blocks, a zipline's timber tower backlit on the riverwalk and a highway bridge's underside.
+  "cbsa:17980": {
+    file: "Downtown Columbus, Georgia skyline.jpg",
+    place: "Rapids on the Chattahoochee below downtown Columbus's brick mills and chimneys",
+    credit: "PghPhxNfk",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Columbus, GA",
+    size: [4032, 3021],
   },
   // Corpus Christi, TX: skyline-sheet run 36787138337 — the city article's lead, whole in both crops, over an aerial of the bay shore and hazy views from the bridge.
   "cbsa:18580": {
@@ -1024,6 +1044,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Hartford, CT",
     size: [7096, 3548],
   },
+  // Hickory-Lenoir-Morganton, NC: skyline-sheet run 36816286360 — an article's lead, Morganton's depot in clear light, yellow clapboard and white brackets under a red-trimmed roof and three brick chimneys, whole on the card and at 16:9, the tallest chimney's cap flush on the 21:9's top edge. Over two civic buildings in Hickory in evening sun across an empty road, and another city's street (Castro Street in Mountain View, California).
+  "cbsa:25860": {
+    file: "Train Depot, Morganton, North Carolina (2008).jpg",
+    place: "Morganton's railway depot, yellow with a red-trimmed roof, under a blue sky",
+    credit: "Ron Reiring",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Hickory-Lenoir-Morganton, NC",
+    size: [3008, 2000],
+  },
   // Huntsville, AL: skyline-sheet run 36782967654 — the downtown towers over the park's water, over two aerials of the interstate. The runner printed the author as "No machine-readable author provided. Anivron assumed (based on copyright claims)."; the credit is the name in it, without Commons' sentence around it.
   "cbsa:26620": {
     file: "Downtown Huntsville, Alabama.jpg",
@@ -1053,6 +1083,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Killeen-Temple, TX",
     size: [1491, 926],
+  },
+  // Kingsport, TN: skyline-sheet run 36816361727 — an article's lead, State Street in Bristol in sun under cumulus, its brick and stone fronts, flags and awnings and the Paramount's vertical sign, whole in both crops, the road and a crosswalk under the card's words. Over Kingsport's Broad Street shot into a low sun with a flare beside its street clock, and an aerial of a chemical plant.
+  "cbsa:28700": {
+    file: "State Street - Bristol, TN-VA.jpg",
+    place: "State Street in Bristol, its storefronts and flags under a blue sky",
+    credit: "AppalachianCentrist",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Kingsport, TN",
+    size: [4032, 2687],
   },
   // Kiryas Joel-Poughkeepsie-Newburgh, NY: skyline-sheet run 36800324942 — an article's lead, Poughkeepsie's riverfront on the Hudson under a clear evening sky with a balloon rising, whole in every crop, over the Walkway over the Hudson from the shore under bare trees, the same bridge in winter ice, Newburgh's waterfront from Beacon, a Hudson Highlands view whose author is unknown, a military photograph and an 1834 engraving.
   "cbsa:28880": {
@@ -1153,6 +1193,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Louisville, KY",
     size: [9640, 2304],
+  },
+  // Lynchburg, VA: skyline-sheet run 36816361727 — downtown on its hill above the James, its dark office tower whole in both crops under cirrus in a deep blue sky, green trees at the sides and the river under the card's words. Over the same view wider, a dense brick downtown under a white sky in winter, downtown at dusk across a dark slope of grass, a railway trestle through branches and the library's front under wires.
+  "cbsa:31340": {
+    file: "Downtown Lynchburg zoomed in.jpg",
+    place: "Downtown Lynchburg above the James River, under a blue sky streaked with cloud",
+    credit: "Northern-Virginia-Photographer",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Lynchburg, VA",
+    size: [4032, 3024],
   },
   // Madison, WI: skyline-sheet run 36816573981 — a one-market run's pick of twenty-seven: the State Capitol's dome over downtown, across a frozen lake in low winter light under a clear sky, whole in both crops; over a drone's view of the Capitol whose crops cut its statue, the dome up the boulevard under a white sky with its statue cut at 21:9, Monona Terrace from the water, Bascom Hill in autumn with the dome small, Bascom Mall in black and white, power lines across the dome, the lake's open water, haze and algae, an 1855 lithograph and an old frame of a train. The runner printed the licence as "Public Domain" with a link to the Internet Archive's copy of Creative Commons' retired public-domain page; it is written here as the table's other public-domain rows are, with no link, since public domain asks for none.
   "cbsa:31540": {
@@ -1413,6 +1463,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Reno, NV",
     size: [4159, 1254],
+  },
+  // Roanoke, VA: skyline-sheet run 36816286360 — an article's lead and the view the city is known by, from the Mill Mountain Star: downtown at dusk, its domed tower lit and the interstate's light trails curving through, the Blue Ridge in silhouette under a deep blue sky, the ridge with sky above it in both crops. Over the same view in daylight as a panorama whose downtown falls under the card's words, in low afternoon sun behind bare branches with its mountains lost at 21:9, two telephotos of downtown with no sky (one a PNG), an industrial district under a mountain, the city at night through bare trees, the tower over a rail yard and a parking lot, and a tavern's neon signs.
+  "cbsa:40220": {
+    file: "Roanoke City (Virginia) from Mill Mountain Star at Dusk.jpg",
+    place: "Downtown Roanoke at dusk from the Mill Mountain Star, the Blue Ridge beyond",
+    credit: "Joe Ravi",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Roanoke, VA",
+    size: [2668, 1808],
   },
   // Rochester, NY: skyline-sheet run 36781253352 — a one-market run's pick of twenty-four; the six-market sheet held an airport, a dated overhead and a washed-out sky.
   "cbsa:40380": {
