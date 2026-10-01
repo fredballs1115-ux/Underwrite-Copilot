@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import { screeningModelCaveat } from "@/lib/bridge/model-caveat";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
 import { modelOpinion } from "@/lib/valuation/model-opinion";
 import {
@@ -109,7 +110,7 @@ export default async function ValuationsPage({
   if (!user) redirect("/login");
 
   const [{ data: deal, error }, { data: rows }] = await Promise.all([
-    supabase.from("deals").select("id, name, extraction").eq("id", id).maybeSingle(),
+    supabase.from("deals").select("id, name, extraction, first_signal").eq("id", id).maybeSingle(),
     supabase
       .from("valuations")
       .select("*")
@@ -132,6 +133,14 @@ export default async function ValuationsPage({
     (deal.extraction as ExtractionResult | null) ?? null,
   );
   const opinion = base ? modelOpinion(base) : null;
+  // On a note or a plan deal the model's IRRs and going-in cap are not the
+  // buyer's: said above the table, and on the copied line where the model's
+  // own column is one side of the bridge.
+  const caveat = screeningModelCaveat(
+    (deal.extraction as ExtractionResult | null) ?? null,
+    (deal.first_signal as FirstSignal | null) ?? null,
+    { cap: true },
+  );
   const ours: NamedValuation | null = opinion?.valuation ?? null;
   // Where the model carries Year-1 capital its cap is on the all-in basis,
   // and the cell says so, with the cap on the price alone beside it.
@@ -254,7 +263,11 @@ export default async function ValuationsPage({
   const b = bId ? byId.get(bId)! : null;
   const bridge = a && b ? reconcileValuations(a, b) : null;
   const tally = a && b ? scoreAggressiveness(a, b) : null;
-  const summary = bridge?.ok ? bridgeSummaryLine(bridge) : null;
+  const summary = bridge?.ok
+    ? caveat && (aId === "__ours" || bId === "__ours")
+      ? `${bridgeSummaryLine(bridge)} ${caveat.copy}`
+      : bridgeSummaryLine(bridge)
+    : null;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
@@ -270,6 +283,15 @@ export default async function ValuationsPage({
       {errorText ? (
         <p className="rounded-lg border border-kill/30 bg-kill/5 px-4 py-3 text-sm text-kill">
           {errorText}
+        </p>
+      ) : null}
+
+      {caveat && ours ? (
+        <p
+          data-caveat={caveat.kind}
+          className="rounded-lg border border-caution/30 bg-caution/5 px-4 py-3 text-sm text-ink"
+        >
+          {caveat.text}
         </p>
       ) : null}
 

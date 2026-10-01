@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { bridgeSentence } from "@/lib/bridge/attribution";
+import { screeningModelCaveat } from "@/lib/bridge/model-caveat";
 import { getOrBuildBridge, listDealVersions, snapshotVersion } from "@/lib/bridge/versions";
 import { currentVersionId, defaultPair } from "@/lib/bridge/version-rules";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
@@ -61,13 +62,16 @@ export default async function BridgePage({
 
   const { data: deal, error } = await supabase
     .from("deals")
-    .select("id, name, extraction")
+    .select("id, name, extraction, first_signal")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`Couldn't load the deal: ${error.message}`);
   if (!deal) notFound();
 
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+  // On a note or a plan deal the screening model's IRRs are not the buyer's:
+  // said above them, and on the end of the line a reader copies.
+  const caveat = screeningModelCaveat(extraction, (deal.first_signal as FirstSignal | null) ?? null);
   const current = await currentDealAssumptions(supabase, id, deal.name as string, extraction);
 
   // Every visit snapshots the deal's live assumptions — but only when they
@@ -118,6 +122,15 @@ export default async function BridgePage({
       {errorText ? (
         <p className="rounded-lg border border-kill/30 bg-kill/5 px-4 py-3 text-sm text-kill">
           {errorText}
+        </p>
+      ) : null}
+
+      {caveat ? (
+        <p
+          data-caveat={caveat.kind}
+          className="rounded-lg border border-caution/30 bg-caution/5 px-4 py-3 text-sm text-ink"
+        >
+          {caveat.text}
         </p>
       ) : null}
 
@@ -175,7 +188,7 @@ export default async function BridgePage({
 
           <BridgeView
             bridge={bridge}
-            sentence={bridgeSentence(bridge)}
+            sentence={caveat ? `${bridgeSentence(bridge)} ${caveat.copy}` : bridgeSentence(bridge)}
             fromVersion={options.find((o) => o.id === fromVersion.id)!}
             toVersion={options.find((o) => o.id === toVersion.id)!}
           />
