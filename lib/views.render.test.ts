@@ -2688,6 +2688,13 @@ describe("the deal math tools", () => {
     expect(text).toContain("$42.50M");
     expect(text).toContain("7.00%");
     expect(text).toContain("150 bps");
+    // The seed sits exactly on the 150 bps developers commonly look for,
+    // which is a rule of thumb read on an all-in cost — said as one, never
+    // as the verdict "a spread worth building into", which the seed (no
+    // construction interest in its cost) had been given.
+    expect(text).toContain("commonly look for — a rule of thumb");
+    expect(text).toContain("construction loan's interest");
+    expect(text).not.toContain("a spread worth building into");
     // $36/SF/yr over 100,000 SF and 120 units: $3.60M a year, $2,500 a
     // unit a month. The totals read compact, the per-unit rent exact —
     // which is the right way round, since one is a magnitude and the other

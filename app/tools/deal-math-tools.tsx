@@ -704,6 +704,13 @@ function BuildOrBuy() {
   // the trade, to the left there is no reason to take the risk. 300 bps of
   // travel each way covers the range anyone actually argues about.
   const SPAN = 300;
+  // What developers commonly ask of the spread before they build — a rule
+  // of thumb, said as one, never a verdict on the project: it moves with
+  // the market and the risk, and it is read on an all-in cost, construction
+  // interest included, which the cost above does not carry unless the soft
+  // cost does. The line once said the seed, sitting exactly on it, was "a
+  // spread worth building into".
+  const RULE_OF_THUMB_BPS = 150;
   const bps = y.spreadBps ?? 0;
   const reach = Math.min(50, (Math.abs(bps) / SPAN) * 50);
   const healthy = bps >= 0;
@@ -767,10 +774,10 @@ function BuildOrBuy() {
             <span className="text-muted">
               {" "}
               over the exit cap.{" "}
-              {bps >= 150
-                ? "That is a spread worth building into."
+              {bps >= RULE_OF_THUMB_BPS
+                ? `That meets the ${RULE_OF_THUMB_BPS} bps developers commonly look for — a rule of thumb, and only once the cost carries the construction loan's interest.`
                 : bps >= 0
-                  ? "Thin — the risk is not obviously paid for."
+                  ? `Under the ${RULE_OF_THUMB_BPS} bps developers commonly look for — a rule of thumb — so the risk is not obviously paid for.`
                   : "Below the cap it would sell at. There is no trade here."}
             </span>
           </p>
