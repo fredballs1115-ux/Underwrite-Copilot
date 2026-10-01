@@ -34,7 +34,11 @@ const DELETE_ERRORS: Record<string, string> = {
  *  `*` returns whichever columns the schema has, so a pre-0014/0017 schema
  *  missing one toggle's column still reads the other — the per-toggle
  *  degradation the old column-at-a-time reads bought, in one round trip.
- *  A missing row or a failed read reads as ON, as the senders assume. */
+ *  A missing row reads as ON, the switches' default, as the senders read
+ *  it. A failed read SHOWS as ON here too — the page draws the default it
+ *  could not check — while the senders read a failed read as OFF and send
+ *  nothing (lib/email `wantsAnalysisEmail`; the digest asks for the
+ *  switched-on rows and sends none when that read fails). */
 async function emailPrefsOf(userId: string): Promise<{ onAnalysis: boolean; weeklyDigest: boolean }> {
   try {
     const { data, error } = await createSupabaseAdminClient()

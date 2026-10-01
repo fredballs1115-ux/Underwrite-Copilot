@@ -75,6 +75,9 @@ services:
       #   sync: false
       # - key: RESEND_FROM
       #   sync: false
+      # Optional: where a reply to any email goes (no Reply-To when unset).
+      # - key: RESEND_REPLY_TO
+      #   sync: false
       # - key: BILLING_ALERT_EMAIL
       #   sync: false
       # Street View building photos (optional): metadata-checked, key stays
@@ -128,6 +131,8 @@ services:
       # - key: RESEND_API_KEY
       #   sync: false
       # - key: RESEND_FROM
+      #   sync: false
+      # - key: RESEND_REPLY_TO
       #   sync: false
 
   # ── The four crons below all have FREE GitHub Actions twins ────────────────

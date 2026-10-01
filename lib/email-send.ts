@@ -13,6 +13,9 @@ import "server-only";
  *   RESEND_API_KEY   enables sending
  *   RESEND_FROM      the sender, on a domain verified with Resend — required:
  *                    without one the emails are PAUSED (see `emailSetup`)
+ *   RESEND_REPLY_TO  optional: where a reply goes. Sent only where it names
+ *                    an address (`replyToAddress`); unset, a reply goes to
+ *                    the sender, and no address is ever assumed for it
  *   RESEND_BASE_URL  test override for the API host
  */
 
@@ -85,6 +88,16 @@ export function emailEnabled(): boolean {
   return readySetup() !== null;
 }
 
+/** The Reply-To the operator set (RESEND_REPLY_TO), or null: unset, blank,
+ *  or naming no address. Never a default — a reply goes where the operator
+ *  says it should, or to the sender. */
+export function replyToAddress(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string | null {
+  const set = env.RESEND_REPLY_TO?.trim();
+  return set && senderDomain(set) ? set : null;
+}
+
 /** How long a send waits for Resend before giving up on the request. */
 export const SEND_TIMEOUT_MS = 8000;
 
@@ -121,6 +134,7 @@ export async function sendEmail(
   if (!ready) return false;
   const { key, from } = ready;
   const base = process.env.RESEND_BASE_URL ?? "https://api.resend.com";
+  const replyTo = replyToAddress();
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), SEND_TIMEOUT_MS);
   try {
@@ -132,7 +146,14 @@ export async function sendEmail(
         // "Send the key in the Idempotency-Key HTTP header" (Resend).
         ...(opts.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : {}),
       },
-      body: JSON.stringify({ from, to: Array.isArray(to) ? to : [to], subject, html, text }),
+      body: JSON.stringify({
+        from,
+        to: Array.isArray(to) ? to : [to],
+        subject,
+        html,
+        text,
+        ...(replyTo ? { reply_to: replyTo } : {}),
+      }),
       signal: ctrl.signal,
     });
     if (!res.ok) {

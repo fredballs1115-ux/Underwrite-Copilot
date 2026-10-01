@@ -35,6 +35,7 @@ import {
   senderDomain,
   wantsAnalysisEmail,
 } from "./email";
+import { replyToAddress } from "./email-send";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -178,6 +179,26 @@ describe("every send names its occasion in Resend's Idempotency-Key header", () 
     expect(requests[0].headers["Idempotency-Key"]).toBe("weekly-digest/u1/2026-10-05");
     expect("Idempotency-Key" in requests[1].headers).toBe(false);
     expect(requests[1].body.to).toEqual(["a@example.com", "b@example.com"]);
+  });
+
+  it("carries a Reply-To only where the operator set an address for it, never a default", async () => {
+    const saved = process.env.RESEND_REPLY_TO;
+    try {
+      delete process.env.RESEND_REPLY_TO;
+      await sendEmail("a@example.com", "S", "<p>B</p>", "B");
+      process.env.RESEND_REPLY_TO = "   ";
+      await sendEmail("a@example.com", "S", "<p>B</p>", "B");
+      process.env.RESEND_REPLY_TO = "Underwrite Copilot support";
+      await sendEmail("a@example.com", "S", "<p>B</p>", "B");
+      process.env.RESEND_REPLY_TO = " Support <support@underwrite.example> ";
+      await sendEmail("a@example.com", "S", "<p>B</p>", "B");
+      expect(requests.map((r) => r.body.reply_to)).toEqual([undefined, undefined, undefined, "Support <support@underwrite.example>"]);
+      expect(replyToAddress({})).toBeNull();
+      expect(replyToAddress({ RESEND_REPLY_TO: "help@underwrite.example" })).toBe("help@underwrite.example");
+    } finally {
+      if (saved === undefined) delete process.env.RESEND_REPLY_TO;
+      else process.env.RESEND_REPLY_TO = saved;
+    }
   });
 
   it("builds a key from the email's kind and its occasion, or none where a part is missing", () => {
