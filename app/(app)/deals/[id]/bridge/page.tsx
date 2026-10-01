@@ -4,6 +4,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { bridgeSentence } from "@/lib/bridge/attribution";
 import { getOrBuildBridge, listDealVersions, snapshotVersion } from "@/lib/bridge/versions";
+import { currentVersionId, defaultPair } from "@/lib/bridge/version-rules";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
 import {
   SCENARIO_LEVERS,
@@ -22,7 +23,10 @@ const pct1 = (v: number | null | undefined) =>
   v == null ? "—" : `${(v * 100).toFixed(1)}%`;
 
 const ERRORS: Record<string, string> = {
-  save: "Couldn't save that scenario. Check the label isn't already used on this deal.",
+  labeltaken: "That label is already used by a version on this deal — pick another. Nothing was saved.",
+  denied: "This account can't add versions to this deal. Nothing was saved.",
+  save: "The version could not be saved — the database refused the write. Nothing was saved; try again.",
+  delete: "That version could not be deleted. Try again.",
   noextraction: "This deal hasn't been screened yet, so there are no assumptions to version.",
 };
 
@@ -67,8 +71,8 @@ export default async function BridgePage({
   const current = await currentDealAssumptions(supabase, id, deal.name as string, extraction);
 
   // Every visit snapshots the deal's live assumptions — but only when they
-  // actually moved since the last version, so the list is a record of changes
-  // rather than a record of page views.
+  // moved from its latest base snapshot (a saved scenario is never one), so
+  // the list is a record of changes rather than a record of page views.
   if (current) {
     await snapshotVersion(supabase, {
       dealId: id,
@@ -78,6 +82,9 @@ export default async function BridgePage({
   }
 
   const versions = await listDealVersions(supabase, id);
+  // The version that is the deal as it stands: kept, so not offered for
+  // deletion — a view would only take it again.
+  const liveId = currentVersionId(current, versions);
 
   const options: VersionOption[] = versions.map((v) => ({
     id: v.id,
@@ -88,12 +95,9 @@ export default async function BridgePage({
     leveredIrrPct: v.results?.leveredIrrPct ?? null,
   }));
 
-  // Default to the latest two, oldest of the pair on the left.
-  const toVersion = versions.find((v) => v.id === toParam) ?? versions[0] ?? null;
-  const fromVersion =
-    versions.find((v) => v.id === fromParam && v.id !== toVersion?.id) ??
-    versions.find((v) => v.id !== toVersion?.id) ??
-    null;
+  // A scenario opens against the base it was saved from, a base against the
+  // base before it — never a scenario against a later base, backwards.
+  const { from: fromVersion, to: toVersion } = defaultPair(versions, toParam, fromParam);
 
   const bridge =
     fromVersion && toVersion
@@ -260,16 +264,26 @@ export default async function BridgePage({
                   })}
                 </span>
                 {v.note ? <span className="text-xs text-muted">{v.note}</span> : null}
-                <form action={deleteDealVersion} className="ml-auto">
-                  <input type="hidden" name="dealId" value={id} />
-                  <input type="hidden" name="versionId" value={v.id} />
-                  <button
-                    type="submit"
-                    className="text-xs text-muted underline-offset-2 hover:text-kill hover:underline"
+                {v.id === liveId ? (
+                  <span
+                    className="ml-auto rounded bg-faint px-1.5 py-px text-xs text-muted"
+                    title="The deal's assumptions as they stand. It is kept while they do — a visit would only take it again — so it has no Delete."
                   >
-                    Delete
-                  </button>
-                </form>
+                    current
+                  </span>
+                ) : (
+                  <form action={deleteDealVersion} className="ml-auto">
+                    <input type="hidden" name="dealId" value={id} />
+                    <input type="hidden" name="versionId" value={v.id} />
+                    <button
+                      type="submit"
+                      aria-label={`Delete version ${v.version_label}`}
+                      className="text-xs text-muted underline-offset-2 hover:text-kill hover:underline"
+                    >
+                      Delete
+                    </button>
+                  </form>
+                )}
               </li>
             ))}
           </ul>

@@ -58,6 +58,13 @@ export async function saveScenarioVersion(formData: FormData) {
   const label = String(formData.get("label") ?? "").trim();
   const note = String(formData.get("note") ?? "").trim();
 
+  // The base the scenario is built from goes in first, as an automatic
+  // snapshot wherever it moved since the last one (the rate index can move
+  // between the page and the save), so the scenario always has the base it
+  // was saved from to be set against. A base that cannot be written does not
+  // stop the save.
+  await snapshotVersion(supabase, { dealId, userId: user.id, assumptions: base });
+
   const outcome = await snapshotVersion(supabase, {
     dealId,
     userId: user.id,
@@ -68,7 +75,12 @@ export async function saveScenarioVersion(formData: FormData) {
   });
 
   if (outcome.status === "failed") {
-    redirect(`/deals/${dealId}/bridge?error=save`);
+    console.error("[bridge] scenario save failed", outcome.error);
+    redirect(
+      `/deals/${dealId}/bridge?error=${
+        outcome.reason === "label_taken" ? "labeltaken" : outcome.reason === "denied" ? "denied" : "save"
+      }`,
+    );
   }
   revalidatePath(`/deals/${dealId}/bridge`);
   redirect(`/deals/${dealId}/bridge?to=${outcome.version.id}`);
@@ -87,7 +99,11 @@ export async function deleteDealVersion(formData: FormData) {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  await supabase.from("deal_versions").delete().eq("id", versionId).eq("deal_id", dealId);
+  const { error } = await supabase.from("deal_versions").delete().eq("id", versionId).eq("deal_id", dealId);
+  if (error) {
+    console.error("[bridge] version delete failed", error.message);
+    redirect(`/deals/${dealId}/bridge?error=delete`);
+  }
   revalidatePath(`/deals/${dealId}/bridge`);
   redirect(`/deals/${dealId}/bridge`);
 }
