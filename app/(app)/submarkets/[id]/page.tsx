@@ -188,7 +188,7 @@ export default async function SubmarketPage({
 
       {/* ── Trends ────────────────────────────────────────────────────── */}
       <section className="rounded-lg border border-line bg-surface p-4">
-        <h2 className="text-sm font-semibold text-ink">Absorption and asking rent</h2>
+        <h2 className="text-sm font-semibold text-ink">Vacancy and asking rent</h2>
         <div className="mt-3">
           <DualAxisTrend
             bars={metrics.vacancy.length ? metrics.vacancy : []}
