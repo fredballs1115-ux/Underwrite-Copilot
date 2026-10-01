@@ -532,7 +532,7 @@ export function interestNote(r: InterestRead): string {
     partial_interest:
       "PARTIAL-INTEREST TRAPS, checked by name where the OM gives the inputs: (a) THE PRICE IS FOR A SHARE — hold the whole asset's income against the price grossed up by the share, never against the share's price; (b) CONTROL — who decides a sale, a refinance and a budget, and what a minority holder can block; (c) THE WATERFALL — the share's economics after the sponsor's promote and fees, not its pro-rata slice; (d) EXIT RIGHTS — buy-sell, right of first refusal, drag and tag, and how a minority share is ever sold; (e) CAPITAL CALLS — what happens to a holder who does not fund one.",
     leasehold:
-      "LEASEHOLD TRAPS, checked by name where the OM gives the inputs: (a) THE TERM LEFT — against the loan's term (a lender wants years of margin) and the hold; (b) THE RESETS — a rent struck at a share of then-current land value is an uncapped repricing; (c) SUBORDINATION — an unsubordinated ground rent outranks the mortgage, and a default ends the lease, the building and the loan together; (d) COVERAGE — the NOI over the ground rent, the lender's first test; (e) THE REVERSION — at expiry the building goes to the landowner, so the exit is worth what the remaining term will bear.",
+      "LEASEHOLD TRAPS, checked by name where the OM gives the inputs: (a) THE TERM LEFT — against the loan's term (a lender wants years of margin) and the hold; (b) THE RESETS — a rent struck at a share of then-current land value is an uncapped repricing; (c) SUBORDINATION — an unsubordinated ground rent outranks the mortgage, and a default ends the lease, the building and the loan together; (d) COVERAGE — the building's income before the ground rent over the ground rent, the lender's first test; (e) THE REVERSION — at expiry the building goes to the landowner, so the exit is worth what the remaining term will bear.",
     leased_fee:
       "LEASED-FEE TRAPS, checked by name where the OM gives the inputs: (a) THE RENT IS THE INCOME — the ground rent with its bumps and resets, never the building's NOI, which belongs to the building's owner; (b) COVERAGE — the building's income over the ground rent is the whole margin of safety, and a thin one is a tenant that stops paying first; (c) SUBORDINATION — a subordinated ground lease has pledged the land to the leasehold's lender, so a default can cost the buyer the land itself, where an unsubordinated rent sits ahead of that mortgage; (d) THE RESETS — a rent reset to a share of then-current land value is where the growth lives, and a lease on fixed bumps alone has none; (e) THE REVERSION — the years until the building reverts to the buyer, and what it will be worth then; (f) PURCHASE OPTIONS — a tenant's option to buy the land caps the reversion.",
     fee_simple:
@@ -540,8 +540,30 @@ export function interestNote(r: InterestRead): string {
     unknown:
       "GROUND-LEASE TRAP, checked by name: part of the site is under a ground lease — say which side this owner is on: paying the rent (an expense ahead of the debt, whose term and resets can reprice that part) or collecting it (the ground tenant's credit, and the reversion of its improvements at the lease's end).",
   };
-  return `${interestContextLine(r)} ${traps[r.kind]}`;
+  const shared = SHARED_TRAPS_READ[r.kind];
+  return `${interestContextLine(r)} ${traps[r.kind]}${shared ? ` ${shared}` : ""}`;
 }
+
+/**
+ * The two traps the challenger's base instruction gives every property — the
+ * tax line reset on the sale, and insurance at the seller's legacy premium
+ * instead of a new owner's quote — read for an interest they do not fit as
+ * written (research pass 18). Each says only what holds in general and
+ * leaves to the documents, or the jurisdiction, what varies: a note's sale
+ * transfers no property; whether a share's sale resets the assessment is the
+ * jurisdiction's change-of-ownership rule; a leased fee's owner rarely
+ * carries either line, and the ground lease decides. Appended to the
+ * interest's note, after the document like the rest of the challenger's
+ * notes. A fee simple and a leasehold keep the traps as written.
+ */
+const SHARED_TRAPS_READ: Partial<Record<InterestKind, string>> = {
+  note:
+    "THE TWO SHARED TRAPS, read for a note in place of the tax reset and the legacy insurance premium as the instruction above words them: a note's sale transfers no property — the borrower still owns the collateral — so neither the tax reset on a sale nor a new owner's insurance quote applies to this buyer. Read both as the borrower's: whether the collateral's taxes are paid and its insurance in force, which reach the note through the borrower's capacity to pay and the collateral's value. Should the buyer take the property in a foreclosure, its taxes and insurance become the buyer's from then, and whether that transfer resets the assessment is the jurisdiction's rule to say.",
+  partial_interest:
+    "THE TWO SHARED TRAPS, read for a share in place of the tax reset and the legacy insurance premium as the instruction above words them: the owning entity keeps the property, so whether this sale resets the tax assessment depends on the jurisdiction's change-of-ownership rule for a transfer of an interest in the entity that owns it — say which rule applies where the OM gives the facts, and never assume a reset or its absence. The insurance stays the entity's own policy, so the trap reads as its next renewal, not a new owner's quote.",
+  leased_fee:
+    "THE TWO SHARED TRAPS, read for a leased fee in place of the tax reset and the legacy insurance premium as the instruction above words them: the owner of the land under a ground lease rarely carries either line — the ground lease decides who pays the property's taxes and insures the building — so read both through the lease as stated. Where the lease puts them on the leaseholder, a reassessment or a repriced policy reaches this buyer only as a thinner cover of the ground rent; where it leaves either with the landowner, that line is this buyer's.",
+};
 
 /** "; the lease ends Dec 2071, 45.3 years from today" — the term's end in a
  *  clause for the short line (#422), where the memorandum states it and it

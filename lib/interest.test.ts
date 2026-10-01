@@ -302,6 +302,40 @@ describe("readInterest — what the price buys, said", () => {
       expect(lease, trap).toContain(trap);
     }
   });
+
+  // Research pass 18: the leasehold's coverage trap said "the NOI over the
+  // ground rent" where the code divides the building's income before the
+  // ground rent — a trap reading 4.5× where the panel says 5.5×.
+  it("the leasehold's coverage trap is the code's division: the income before the ground rent over the rent", () => {
+    const lease = interestNote(readInterest(ex(interest({ kind: "leasehold" })), 20_000_000)!);
+    expect(lease).toContain("(d) COVERAGE — the building's income before the ground rent over the ground rent, the lender's first test");
+    expect(lease).not.toContain("the NOI over the ground rent");
+  });
+
+  // Research pass 18: the challenger's two shared traps — the tax line reset
+  // on the sale, the seller's legacy insurance premium — reached every deal,
+  // and do not fit a note, a share or a leased fee as written.
+  it("reads the two shared traps for a note, a share and a leased fee, conditionally where the law varies; a fee simple and a leasehold keep them", () => {
+    const note = interestNote(readInterest(ex(interest({ kind: "note" })), 20_000_000)!);
+    expect(note).toContain("THE TWO SHARED TRAPS, read for a note in place of the tax reset and the legacy insurance premium");
+    expect(note).toContain("a note's sale transfers no property — the borrower still owns the collateral");
+    expect(note).toContain("whether that transfer resets the assessment is the jurisdiction's rule to say");
+    const share = interestNote(readInterest(ex(interest({ kind: "partial_interest", share: "49%" })), 20_000_000)!);
+    expect(share).toContain("THE TWO SHARED TRAPS, read for a share");
+    expect(share).toContain("depends on the jurisdiction's change-of-ownership rule");
+    expect(share).toContain("never assume a reset or its absence");
+    // A share of no stated percentage is still a share: the entity keeps the property.
+    expect(interestNote(readInterest(ex(interest({ kind: "partial_interest" })), 20_000_000)!)).toContain("THE TWO SHARED TRAPS, read for a share");
+    const fee = interestNote(readInterest(ex(interest({ kind: "leased_fee" })), 20_000_000)!);
+    expect(fee).toContain("THE TWO SHARED TRAPS, read for a leased fee");
+    expect(fee).toContain("rarely carries either line — the ground lease decides who pays the property's taxes and insures the building");
+    for (const kept of [
+      interestNote(readInterest(ex(interest({ kind: "leasehold" })), 20_000_000)!),
+      interestNote(readInterest(ex(interest({ kind: "fee_simple", groundLease: "Pad 3 is let on a ground lease" })), 20_000_000)!),
+    ]) {
+      expect(kept).not.toContain("THE TWO SHARED TRAPS");
+    }
+  });
 });
 
 describe("a note, underwritten as a note (#416)", () => {
