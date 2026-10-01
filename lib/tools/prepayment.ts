@@ -291,7 +291,7 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
           ? `Rates have ${treasuryRatePct > loanRatePct ? "risen past" : "reached"} the ${loanRatePct}% coupon, so the lender loses nothing by ` +
               "being repaid and yield maintenance is the floor rather than a real loss."
           : `With the Treasury at ${treasuryRatePct}%, under the ${loanRatePct}% coupon, the lender ` +
-              `does lose interest by being repaid — $${yieldMaintenanceRaw.toLocaleString("en-US")} — ` +
+              `does lose interest by being repaid — ${usdExact(yieldMaintenanceRaw)} — ` +
               "but less than the floor, so the floor sets the penalty.",
       );
     }
