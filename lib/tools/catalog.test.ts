@@ -170,6 +170,61 @@ describe("the cards' bar markers", () => {
 });
 
 /**
+ * Every field's value rides in the page's ONE query string, under the key
+ * its card chose (`useShared` in app/tools/deal-math-tools.tsx), and the
+ * first card to read a key claims it. So a key two cards share is one
+ * figure on two cards: the later card shows the earlier card's seed on every
+ * visit, and typing in either moves both. Seven keys did exactly that — the
+ * rent roll read the refinance rate, the closing statement priced its $20M
+ * building at the prepayment card's 3.75 — and no render test could see it,
+ * because the server never reads a URL.
+ *
+ * So the check runs at the source, as the bar markers' does: split the file
+ * at its card functions and hold each key to one field of one card.
+ */
+describe("the cards' link keys", () => {
+  const src = read("app/tools/deal-math-tools.tsx");
+  const starts = [...src.matchAll(/^function ([A-Z]\w*)\(/gm)].map((m) => ({
+    name: m[1],
+    at: m.index!,
+  }));
+  const cardAt = (at: number) => starts.filter((s) => s.at <= at).at(-1)?.name ?? "(top)";
+
+  // Every call that names a key: `useShared` and any reader built on it. Its
+  // own definition (`function useShared(key: string, …)`) is not a call.
+  const calls = [...src.matchAll(/(?<!function )\buse(?:Shared|Choice)\(\s*([^,)]*)/g)].map(
+    (m) => ({ arg: m[1].trim(), card: cardAt(m.index!) }),
+  );
+
+  it("finds the cards and their keys at all", () => {
+    // Without this the checks below could pass on an empty scan forever.
+    expect(starts.length, "no card functions found").toBeGreaterThan(20);
+    expect(calls.length, "no link keys found").toBeGreaterThan(300);
+  });
+
+  it("spells every key, so the scan can hold it", () => {
+    // A key in a variable or a template is a key nothing can check.
+    const unread = calls.filter((c) => !/^"[A-Za-z0-9_-]+"$/.test(c.arg));
+    expect(unread.map((c) => `${c.card}: ${c.arg}`)).toEqual([]);
+  });
+
+  it("gives each key to exactly one field of one card", () => {
+    const owners = new Map<string, string[]>();
+    for (const c of calls) {
+      const key = c.arg.slice(1, -1);
+      owners.set(key, [...(owners.get(key) ?? []), c.card]);
+    }
+    const shared = [...owners.entries()]
+      .filter(([, cards]) => cards.length > 1)
+      .map(([key, cards]) => `${key}: ${cards.join(" and ")}`);
+    expect(
+      shared,
+      "a key read by two fields is one figure in both — rename the later card's",
+    ).toEqual([]);
+  });
+});
+
+/**
  * The index's clusters.
  *
  * `groupedTools` filters TOOL_INDEX by group, which means a card whose

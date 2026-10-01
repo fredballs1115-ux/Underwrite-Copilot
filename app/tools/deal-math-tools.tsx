@@ -150,6 +150,14 @@ function Field({
  * browser's first paint disagree, which React calls a hydration error and a
  * reader sees as a flash of the wrong numbers. So a shared link paints the
  * seeded figures for one frame and then its own.
+ *
+ * A key belongs to the PAGE, not to its card: every card writes into one
+ * query string, and the first card to read a key claims it, so two cards
+ * reaching for the same short key share one figure — the later card shows
+ * the earlier one's seed on every visit, and typing in either moves both.
+ * Seven keys did exactly that (the research pass of 2026-10-01), unseen by
+ * the render tests because the server never reads a URL. The catalog test
+ * holds every key to one field of one card.
  */
 /** The page's live field values, and the subscribers to tell when one moves. */
 const live = new Map<string, string>();
@@ -1417,9 +1425,9 @@ function Proration() {
   const [taxAmount, setTaxAmount] = useShared("ptx", "240,000");
   const [timing, setTiming] = useShared("ptm", "arrears");
   const [dayTo, setDayTo] = useShared("pdy", "seller");
-  const [rent, setRent] = useShared("prc", "150,000");
+  const [rent, setRent] = useShared("pcr", "150,000");
   const [deposits, setDeposits] = useShared("psd", "92,000");
-  const [price, setPrice] = useShared("ppr", "$20M");
+  const [price, setPrice] = useShared("pcp", "$20M");
   const [escrow, setEscrow] = useShared("pem", "500,000");
 
   const r = useMemo(
@@ -2044,7 +2052,7 @@ function Recovery() {
   const [curVar, setCurVar] = useShared("rcv", "1,180,000");
   const [curOcc, setCurOcc] = useShared("rco", "94");
   const [grossTo, setGrossTo] = useShared("rgu", "95");
-  const [capPct, setCapPct] = useShared("rcap", "5");
+  const [capPct, setCapPct] = useShared("rcpct", "5");
   const [capType, setCapType] = useShared("rct", "cumulative");
   const [controllable, setControllable] = useShared("rctrl", "60");
   const [years, setYears] = useShared("ryr", "3");
@@ -2732,11 +2740,11 @@ function Leaseback() {
   const [sf, setSf] = useShared("lbsf", "180,000");
   const [mkt, setMkt] = useShared("lbmr", "7.50");
   const [con, setCon] = useShared("lbcr", "9.00");
-  const [term, setTerm] = useShared("lbt", "20");
-  const [esc, setEsc] = useShared("lbe", "2");
+  const [term, setTerm] = useShared("slbt", "20");
+  const [esc, setEsc] = useShared("slbe", "2");
   const [credit, setCredit] = useShared("lbcc", "6.00");
   const [market, setMarket] = useShared("lbmc", "6.25");
-  const [disc, setDisc] = useShared("lbd", "8");
+  const [disc, setDisc] = useShared("slbd", "8");
   const [cost, setCost] = useShared("lbsc", "1.5");
   const [rate, setRate] = useShared("lbr", "6.5");
   const [amort, setAmort] = useShared("lba", "25");
@@ -5718,7 +5726,7 @@ const ROLLOVER_SEED = [
 ].join("\n");
 
 function Rollover() {
-  const [raw, setRaw] = useShared("rr", ROLLOVER_SEED);
+  const [raw, setRaw] = useShared("rrt", ROLLOVER_SEED);
   const [sf, setSf] = useShared("rrsf", "200,000");
   const [hold, setHold] = useShared("rrh", "5");
   const [capSf, setCapSf] = useShared("rrc", "45");
