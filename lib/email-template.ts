@@ -12,7 +12,10 @@ export interface AnalysisReadyEmailInput {
   verdictColor: string;
   /** the deal header's buy-box chip (lib/buy-box-chip): "Fit 82 · Pursue",
    *  "Fit 61 · Outside box", "Fits buy box", "Near buy box", "Outside buy
-   *  box", "Buy box unverified" — or "No buy box set" */
+   *  box", "Buy box unverified" — or "No buy box set", or lib/email's line
+   *  for a box it could not read. Drawn after "Buy box:", as the plain-text
+   *  part has always said it: beside the call's pill, a bare "Fit 82 ·
+   *  Pursue" read as a second call ("No-go  Fit 82 · Pursue"). */
   buyBoxLabel: string;
   /** one-line verdict reason ("" to omit) */
   reason: string;
@@ -81,8 +84,8 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
                 <td style="background-color:${esc(input.verdictColor)};border-radius:999px;padding:5px 14px;">
                   <span style="color:#ffffff;font-size:13px;font-weight:600;">${esc(input.verdictLabel)}</span>
                 </td>
-                <td style="padding-left:10px;">
-                  <span style="color:#5f6b69;font-size:13px;">${esc(input.buyBoxLabel)}</span>
+                <td style="padding-left:12px;">
+                  <span style="color:#5f6b69;font-size:13px;">Buy box: <span style="color:#18211f;font-weight:600;">${esc(input.buyBoxLabel)}</span></span>
                 </td>
               </tr>
             </table>

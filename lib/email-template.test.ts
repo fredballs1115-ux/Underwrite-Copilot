@@ -88,6 +88,20 @@ describe("the Monday digest pictures each deal it names (#464)", () => {
   });
 });
 
+describe("the screen-complete email's buy-box chip is labelled as the buy box's", () => {
+  it("says \"Buy box:\" before the chip, as the plain-text part does, so it never reads as a second call", () => {
+    const { html, text } = analysisReadyEmail({ ...ready, verdictLabel: "No-go", verdictColor: "#b23a30", buyBoxLabel: "Fit 82 · Pursue" });
+    expect(text).toContain("Buy box: Fit 82 · Pursue");
+    const call = html.indexOf(">No-go</span>");
+    const chip = html.indexOf("Fit 82 · Pursue");
+    expect(call).toBeGreaterThan(-1);
+    expect(chip).toBeGreaterThan(call);
+    // Nothing but the label's own words between the call and the chip.
+    const between = html.slice(call + 1, chip).replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    expect(between).toBe("No-go Buy box:");
+  });
+});
+
 describe("a screen that stopped says so by email (pass 14, 2026-10-01)", () => {
   const input = {
     dealName: "The Maddox <Brewerytown>",

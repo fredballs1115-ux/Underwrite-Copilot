@@ -28,6 +28,10 @@ const VERDICT_EMAIL: Record<string, { label: string; color: string }> = {
   pass_on: { label: "No-go", color: "#b23a30" },
 };
 
+/** The screen-complete email's buy-box line where the box itself could not
+ *  be read: said as the read's failure, never as a fact about the deal. */
+export const BUY_BOX_NOT_READ = "couldn't be read just now — open the deal to see it";
+
 /** Resend's shared onboarding domain. Mail sent from it is delivered only to
  *  the address that owns the Resend account, never to a customer, so a
  *  sender there is no sender at all. */
@@ -194,12 +198,15 @@ export async function notifyAnalysisReady(
     // source — the extraction, the first signal, the address the page reads
     // — and the same fold, the mandate-fit score leading, so the email's
     // chip never disagrees with the page it links to. The page shows no chip
-    // without a box; the email says so.
-    let buyBoxLabel = "Buy box unverified";
+    // without a box; the email says so. A box the email could not read says
+    // that, never "unverified" — the chip's word for a deal its facts could
+    // not judge, a claim about the deal — nor "no buy box set".
+    let buyBoxLabel = BUY_BOX_NOT_READ;
     try {
       const box = await getBuyBoxForDeal(
         deal.user_id as string,
         (deal.team_id as string) ?? null,
+        { strict: true },
       );
       if (box) {
         const extraction = (deal.extraction as ExtractionResult | null) ?? null;
@@ -217,7 +224,7 @@ export async function notifyAnalysisReady(
         buyBoxLabel = "No buy box set";
       }
     } catch {
-      // keep the default label
+      // the box was not read: the label says so
     }
 
     const v = VERDICT_EMAIL[verdict.verdict] ?? {

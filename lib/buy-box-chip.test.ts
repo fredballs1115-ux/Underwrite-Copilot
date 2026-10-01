@@ -12,14 +12,20 @@ import type { BuyBox, BuyBoxCheck } from "./criteria";
 import type { MandateScore } from "./mandate";
 import type { ExtractionResult, FirstSignal } from "./anthropic/types";
 
-const boxes = vi.hoisted(() => ({ current: null as unknown }));
-vi.mock("@/lib/criteria-server", () => ({ getBuyBoxForDeal: async () => boxes.current }));
+const boxes = vi.hoisted(() => ({ current: null as unknown, unreadable: false, asked: [] as unknown[] }));
+vi.mock("@/lib/criteria-server", () => ({
+  getBuyBoxForDeal: async (...args: unknown[]) => {
+    boxes.asked.push(args[2]);
+    if (boxes.unreadable) throw new Error("the buy box could not be read: connection reset");
+    return boxes.current;
+  },
+}));
 vi.mock("@/lib/deal-picture", () => ({
   pictureMayBeInMemorandum: () => false,
   ensureDealPicture: async () => null,
 }));
 
-import { notifyAnalysisReady } from "./email";
+import { BUY_BOX_NOT_READ, notifyAnalysisReady } from "./email";
 import { buyBoxChip, buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { buyBoxCheckSource, evaluateBuyBox } from "./criteria";
 import { inferStrategy } from "./deal-strategy";
@@ -161,6 +167,32 @@ describe("the screen-complete email's chip is the deal header's", () => {
       om_storage_path: `u1/${DEAL}.pdf`,
     });
     expect(chip).toBe(page.chip.label);
+  });
+
+  it("says the box was not read where its read failed — never \"unverified\", a claim about the deal, nor \"no buy box set\"", async () => {
+    boxes.unreadable = true;
+    boxes.asked = [];
+    try {
+      const chip = await emailedChip({
+        name: "Main Street Flats",
+        user_id: "u1",
+        team_id: null,
+        asset_class: "multifamily",
+        extraction: EXTRACTION,
+        first_signal: null,
+        address: null,
+        verdict: { verdict: "caution", reason: "" },
+        is_sample: false,
+        photo: null,
+        om_storage_path: null,
+      });
+      expect(chip).toBe(BUY_BOX_NOT_READ);
+      expect(chip).not.toMatch(/unverified|no buy box/i);
+      // The email asks for a read that fails loudly rather than reading as "none".
+      expect(boxes.asked).toEqual([{ strict: true }]);
+    } finally {
+      boxes.unreadable = false;
+    }
   });
 
   it("says there is no buy box where the account has none", async () => {
