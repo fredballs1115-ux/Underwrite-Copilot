@@ -8096,3 +8096,30 @@ describe("a tracker figure's credit says what is missing, and a source links its
     expect(html.replace(/<[^>]+>/g, "")).toContain("source (redfin_metro_market_tracker.tsv000.gz, updated 2026-06-02, Multi-Family 2-4 Unit property type)");
   });
 });
+
+// ── The weekday intel items: dated, and the AI's read labelled as one investor's (the research pass of 2026-10-01) ──
+import { IntelItems } from "@/app/market/intel-items";
+
+describe("IntelItems — each item dated, its score and next step said as an AI's read for one investor, not advice", () => {
+  const items = [
+    { url: "https://example.com/a", title: "County passes a rent cap", source: "Example News", relevance: 7, action: "Check the cap's small-landlord exemption", published_at: "2026-09-29T14:00:00Z", created_at: "2026-09-30T11:00:00Z" },
+    { url: "https://example.com/b", title: "Lender pulls back on small multifamily", source: null, relevance: 6, action: null, published_at: null, created_at: "2026-09-30T11:00:00Z" },
+  ];
+  const html = render(React.createElement(IntelItems, { items }));
+  const text = visibleText(html);
+
+  it("dates each item by its publisher's date, or the day the job saw it", () => {
+    expect(text).toContain("(Example News, Sep 29, 2026)");
+    expect(text).toContain("(seen Sep 30, 2026)");
+  });
+
+  it("labels the score and the next step as an AI's read against one investor's criteria", () => {
+    expect(text).toContain("AI score 7/10");
+    expect(text).toContain("an AI's read (Claude's) of the headline against one investor's criteria — a small buyer of 2–4 unit buildings on the East Coast — not advice");
+    expect(text).toContain("AI's suggested next step for that investor: Check the cap's small-landlord exemption");
+    expect(text).not.toContain("→");
+    expect(a11yIssues(html), "intel items").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    expect(render(React.createElement(IntelItems, { items: [] }))).not.toContain("intel-label");
+  });
+});
