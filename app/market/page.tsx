@@ -21,6 +21,7 @@ import { SectorJobsRank } from "./sector-jobs-rank";
 import { BOARD_METRICS, SectorJobsBoard } from "./sector-jobs-board";
 import { SurveyVacancyBoard } from "./survey-vacancy-board";
 import { DATA_METROS } from "@/lib/market-match";
+import { regionCountLabel } from "@/lib/market-count";
 import { marketMeta, marketPageFor, sectorPageFor } from "@/lib/public-pages";
 import { marketHeading, publicMetadata } from "@/lib/page-meta";
 import { MetroLive } from "./metro-live";
@@ -541,7 +542,7 @@ function MetroChips({ active }: { active: string }) {
             <h3 className="text-[11px] font-semibold uppercase tracking-wider text-muted">
               {region}{" "}
               <span className="ml-1 font-normal normal-case tracking-normal">
-                · {group.length} metro{group.length === 1 ? "" : "s"}
+                {`· ${regionCountLabel(region, group.length)}`}
               </span>
             </h3>
             <div className="mt-1.5 flex flex-wrap gap-1.5">{group.map((m) => chip(m.id, m.name))}</div>

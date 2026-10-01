@@ -24,3 +24,15 @@ export const BRIEF_COUNT = (metrosSeed.metros ?? []).length;
 /** Every market the site reads published figures for: the briefed markets,
  *  counted as above, and the metro areas read without a brief. */
 export const MARKETS_READ = MARKET_COUNT + DATA_METROS.length;
+
+/**
+ * What one region's row of /market's chips counts, in `MARKET_COUNT`'s
+ * units: the DMV core's chips are four briefs of ONE market, and every other
+ * chip is a market of its own. The rows said "DMV core · 4 metros" beside a
+ * homepage counting the same four as one market, and "Mid-Atlantic · 5
+ * metros" over Newark / Jersey City, which is not a metro area of its own.
+ */
+export function regionCountLabel(region: string, briefs: number): string {
+  if (region === "DMV core") return briefs === 1 ? "1 market" : `${briefs} briefs, one market`;
+  return `${briefs} market${briefs === 1 ? "" : "s"}`;
+}
