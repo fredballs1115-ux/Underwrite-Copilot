@@ -31,13 +31,18 @@ import type {
   VerdictResult,
 } from "./types";
 
+// The pages draw low → high on one track and print the cells "Low" and
+// "High" (the deal page's range cards, the memo, the report, the shared
+// screen), so the two are the smaller and the larger figure, never the
+// conservative and the sponsor's end: an exit cap's conservative end is its
+// higher figure, and "Low 5.75% / High 5.25%" drew no bar (research pass 18).
 const ScreenRangeSchema = z.object({
   label: z.string(),
-  low: z.string(),
-  base: z.string(),
-  high: z.string(),
+  low: z.string().describe("The smaller figure of the range, with its unit — whichever end is the conservative one."),
+  base: z.string().describe("Your defensible pick, between low and high."),
+  high: z.string().describe("The larger figure of the range, with its unit."),
   source: z.string(),
-  basis: z.string(),
+  basis: z.string().describe("One line: which end is the conservative one, and what drives the spread."),
   confidence: z.enum(["high", "medium", "low"]),
 });
 

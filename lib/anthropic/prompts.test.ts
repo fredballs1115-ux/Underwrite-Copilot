@@ -67,6 +67,18 @@ describe("plan deals are judged on their own terms", () => {
     expect(p).toContain("built on the building's basis the brief computes where it computes one");
   });
 
+  // Research pass 18: the prompt said "low = conservative … high = the
+  // sponsor's optimistic end" while every page prints the cells "Low" and
+  // "High" and draws them low to high — so an exit cap read literally came
+  // back "Low 5.75% / High 5.25%" and drew no bar.
+  it("the verdict's ranges run in numeric order, and the basis says which end is conservative", () => {
+    const p = verdictInstruction();
+    expect(p).toContain("in numeric order — `low` the smaller figure and `high` the larger, whichever end is the conservative one");
+    expect(p).toContain("a one-line `basis` that says which end is the conservative one");
+    expect(p).not.toContain("low = conservative");
+    expect(p).not.toContain("high = the sponsor's optimistic end");
+  });
+
   it("the extraction reads the strategy first and labels every NOI", () => {
     const p = extractionInstruction("multifamily");
     expect(p).toContain("strategy.kind");
