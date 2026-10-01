@@ -3,7 +3,7 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
 import { structured } from "./failure";
-import { omDocument, omRequestOptions, omSourceFor, releaseOmSource } from "./om-source";
+import { omDocument, omRequestOptions, omSourceWithPages, releaseOmSource } from "./om-source";
 import { MODELS } from "./models";
 import { ANALYST_SYSTEM } from "./prompts";
 import { newLedger, summarizeUsage, usageLogLine, withUsageLedger } from "./usage";
@@ -29,7 +29,13 @@ const AskSchema = z.object({
 
 export interface AskResult {
   answer: string;
+  /** the pages as the model cited them — held to the memorandum's length
+   *  by the caller (lib/facts `locatedPage`) before any is kept */
   cites: { page: string; note: string }[];
+  /** the memorandum's length in pages as this read established it (the
+   *  text layer's count, else the fail-safe byte counter); null where
+   *  neither could, and then no cited page can be validated */
+  pages: number | null;
 }
 
 /**
@@ -73,14 +79,15 @@ export async function askDealQuestion(
   const client = getAnthropic();
   // The same source the pipeline reads — the deck's text layer when dense,
   // the PDF otherwise (oversized ones as a Files-API reference) — so a
-  // question asked near a screen shares its cached prefix.
-  const om = await omSourceFor(pdf, "om.pdf", { textFirst: true });
+  // question asked near a screen shares its cached prefix. The read also
+  // says how many pages the deck has, which every cited page is held to.
+  const { om, pages } = await omSourceWithPages(pdf, "om.pdf", { textFirst: true });
   // A question is one read of the whole deck. Its spend is said in the log
   // the way a screen's is, so the operator's picture of what a deal costs
   // includes the questions asked of it.
   const ledger = newLedger();
   try {
-    return await withUsageLedger(ledger, () =>
+    const out = await withUsageLedger(ledger, () =>
       structured("The answer", () =>
         client.messages.parse({
           model: MODELS.reasoning,
@@ -99,6 +106,7 @@ export async function askDealQuestion(
         }, omRequestOptions(om)),
       ),
     );
+    return { ...out, pages };
   } finally {
     // The Files-API copy of a large OM lives only for this one question.
     await releaseOmSource(om);

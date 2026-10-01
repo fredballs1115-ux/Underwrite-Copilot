@@ -21,7 +21,7 @@ import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/
 import { gapDisagreementLine, gapScale, incomeGapShare, type GapUnit } from "@/lib/gap-detail";
 import { typicalRange as readTypicalRange } from "@/lib/typical-range";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/analyze";
-import { pageInDeck, type DealFact } from "@/lib/facts";
+import { locatedPage, type DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
 import { useToast } from "../../toaster";
@@ -798,7 +798,7 @@ export function buildBrokerEmail(challenges: Challenge[], dealName?: string, tot
         // Only a page the memorandum has: an email to its broker citing a
         // page their deck does not hold is the one place a misread page
         // leaves the site.
-        const cited = pageInDeck(c.page, totalPages);
+        const cited = locatedPage(c.page, totalPages);
         const page = cited != null ? ` (OM p. ${cited})` : "";
         return `${++n}. ${c.question}${page}`;
       });
@@ -945,7 +945,7 @@ export function BrokerComps({
         ? [
             ...saleComps.map((c, i): MapComp => {
               // A page the memorandum has, never the model's raw citation.
-              const pageNum = pageInDeck(c.page, mapContext.totalPages);
+              const pageNum = locatedPage(c.page, mapContext.totalPages);
               return {
                 id: `om-${i}`,
                 kind: "om",

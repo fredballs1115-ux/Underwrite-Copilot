@@ -874,6 +874,7 @@ export function DealView({
               hasOm={hasOm}
               isSample={isSample}
               isPro={isPro}
+              omUrl={omUrl}
             />
             <DecisionLog
               dealId={dealId}

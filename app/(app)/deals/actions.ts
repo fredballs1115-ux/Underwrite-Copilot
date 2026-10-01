@@ -34,7 +34,8 @@ import {
   type Stage,
 } from "@/lib/stages";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import { parseDealNotes } from "@/lib/deals";
+import { OM_REPLACED, parseDealNotes } from "@/lib/deals";
+import { omFingerprint } from "@/lib/om-fingerprint";
 import {
   factsFromForm,
   manualFactsProblem,
@@ -1021,6 +1022,23 @@ export async function replaceOm(formData: FormData) {
   // one, so the next view finds this one's. A picture the reader uploaded
   // is theirs and stays.
   await clearOmPicture(supabase, dealId, (deal.photo as DealVisualCache | null) ?? null);
+  // Ask's answers stay on the thread — it only grows (migration 0036) — so
+  // the thread is told the memorandum changed, through the same append Ask
+  // writes with: an answer before this marker, or stamped with another
+  // deck's fingerprint, reads as asked of the earlier memorandum, its pages
+  // that deck's (lib/deals `parseDealQa`). A deal with no OM before has no
+  // answers to mark. Best-effort: the new deck is in place either way.
+  if (deal.om_storage_path) {
+    try {
+      const { error: markErr } = await supabase.rpc("append_deal_qa", {
+        p_deal: dealId,
+        p_entry: { at: new Date().toISOString(), event: OM_REPLACED, om: omFingerprint(replacementBytes) },
+      });
+      if (markErr) console.error(`[replaceOm] the Ask thread of ${dealId} was not marked: ${markErr.message}`);
+    } catch (err) {
+      console.error(`[replaceOm] the Ask thread of ${dealId} was not marked:`, err);
+    }
+  }
 
   // Only diff against results from a COMPLETED previous run — snapshotting
   // after a failed run would pair a half-new extraction with an old verdict.

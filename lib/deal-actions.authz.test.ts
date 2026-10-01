@@ -139,6 +139,8 @@ vi.mock("@/lib/supabase/server", () => {
 
 import { deleteDeal, renameDeal, replaceOm } from "@/app/(app)/deals/actions";
 import { askDeal } from "@/app/(app)/deals/[id]/ask-actions";
+import { OM_REPLACED } from "@/lib/deals";
+import { omFingerprint } from "@/lib/om-fingerprint";
 
 async function landing(run: () => Promise<unknown>): Promise<string> {
   try {
@@ -223,6 +225,31 @@ describe("replaceOm with a forged om_storage_path", () => {
     fd.set("om", new File([new Uint8Array(Buffer.from("%PDF-1.7 first"))], "om.pdf", { type: "application/pdf" }));
     await landing(() => replaceOm(fd));
     expect(storageOps.filter((o) => o.op === "upload")).toEqual([{ op: "upload", paths: [MY_OM] }]);
+    // No OM before, so no answer was asked of one: the thread is not marked.
+    expect(db.savedQa).toEqual([]);
+  });
+});
+
+describe("replaceOm and Ask's thread", () => {
+  it("marks the thread with the new deck's fingerprint through the append Ask writes with, after the bytes are in place", async () => {
+    const bytes = Buffer.from("%PDF-1.7 the reissued deck");
+    const fd = new FormData();
+    fd.set("dealId", DEAL);
+    fd.set("om", new File([new Uint8Array(bytes)], "om.pdf", { type: "application/pdf" }));
+    expect(await landing(() => replaceOm(fd))).toBe(`/deals/${DEAL}`);
+    expect(storageOps.filter((o) => o.op === "upload")).toEqual([{ op: "upload", paths: [MY_OM] }]);
+    expect(db.savedQa).toEqual([{ at: expect.any(String), event: OM_REPLACED, om: omFingerprint(bytes) }]);
+    // The thread itself is never rewritten (migration 0036).
+    expect(db.updates.some((u) => u.table === "deals" && "qa" in (u.patch as object))).toBe(false);
+  });
+
+  it("marks nothing when the upload fails: the old deck is still the deal's", async () => {
+    db.deal.om_storage_path = VICTIM_OM;
+    const fd = new FormData();
+    fd.set("dealId", DEAL);
+    fd.set("om", new File([new Uint8Array(Buffer.from("%PDF-1.7 x"))], "x.pdf", { type: "application/pdf" }));
+    expect(await landing(() => replaceOm(fd))).toBe(`/deals/${DEAL}?error=omupload`);
+    expect(db.savedQa).toEqual([]);
   });
 });
 

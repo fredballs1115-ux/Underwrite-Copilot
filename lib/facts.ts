@@ -45,13 +45,14 @@ export function parsePageNumber(raw: string | undefined | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
-/** A page the model cited, as a number, only where it parses AND falls
- *  inside the document's own length; null where it does not, or where the
- *  length is unknown — a citation the deck cannot hold is never shown,
- *  linked or sent to a broker. */
-export function pageInDeck(raw: string | undefined | null, totalPages: number | null | undefined): number | null {
+/** The absolute rule as one call: the page a citation names, only where it
+ *  parses AND falls inside the document's real length; null otherwise —
+ *  including when the length could not be determined, since then no page
+ *  can be validated. Every citation of the memorandum goes through it: the
+ *  extracted facts, Ask's answers, the broker email and the comps map. */
+export function locatedPage(raw: string | undefined | null, pageCount: number | null | undefined): number | null {
   const n = parsePageNumber(raw);
-  return n != null && totalPages != null && n <= totalPages ? n : null;
+  return n != null && pageCount != null && n >= 1 && n <= pageCount ? n : null;
 }
 
 /** Derive a display unit from the value string (pure, best-effort). */
@@ -86,17 +87,15 @@ export function buildDealFacts(
   docLabel = "OM",
 ): DealFact[] {
   return metrics.map((m) => {
-    const parsed = parsePageNumber(m.page);
-    const located =
-      parsed != null && pageCount != null && parsed >= 1 && parsed <= pageCount;
+    const page = locatedPage(m.page, pageCount);
     const snippet = m.locatorSnippet?.trim();
     return {
       field: m.label,
       value: m.value,
       unit: deriveUnit(m.value) || null,
       docLabel,
-      pageNumber: located ? parsed : null,
-      located,
+      pageNumber: page,
+      located: page != null,
       locatorSnippet: snippet ? snippet.split(/\s+/).slice(0, 12).join(" ") : null,
       confidence: confidenceFor(m),
       provenance: "extracted",
