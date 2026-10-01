@@ -15,7 +15,7 @@ import {
 } from "@/lib/storage";
 import { getTeam } from "@/lib/teams";
 import { chunks, handOverTeamWork, readAll } from "@/lib/account-handover";
-import { deletionStopHref, type DeletionDone } from "@/lib/account-deletion";
+import { deletedHref, deletionStopHref, type DeletionDone } from "@/lib/account-deletion";
 import { SIGNED_OUT, authErrorCopy } from "@/lib/auth-flow";
 import { getStripe } from "@/lib/stripe/client";
 import { syncTeamSeats } from "@/lib/stripe/seats";
@@ -261,7 +261,6 @@ export async function deleteAccount(formData: FormData) {
   if (handover.ownsTeam) redirect("/account?error=ownerdelete");
   const done: DeletionDone = { movedToTeam: handover.deals + handover.work > 0, cancelled: false };
   if (!handover.ok) redirect(deletionStopHref("handover", done));
-  const handedOver = handover.deals;
 
   // 3. Cancel a live personal subscription. If Stripe fails — or the
   //    subscription cannot be read — stop: deleting the account while a
@@ -353,6 +352,6 @@ export async function deleteAccount(formData: FormData) {
 
   await supabase.auth.signOut();
   // The sign-in page says what happened: everything gone, or — where deals
-  // went to the team's owner in step 2 — what stayed and with whom.
-  redirect(handedOver > 0 ? "/login?deleted=team" : "/login?deleted=1");
+  // or work went to a team's owner in step 2 — what stayed and with whom.
+  redirect(deletedHref(handover));
 }

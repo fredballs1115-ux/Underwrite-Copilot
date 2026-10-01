@@ -3,6 +3,7 @@ import { LogoMark } from "@/app/logo";
 import { FREE_DEALS } from "@/lib/marketing-constants";
 import { MARKET_COUNT } from "@/app/markets-marquee";
 import { CONFIRM_LINK_FAILED, authLinkBanner, initialLoginMode } from "@/lib/auth-flow";
+import { deletedBanner } from "@/lib/account-deletion";
 import { publicMetadata } from "@/lib/page-meta";
 import { LoginForm } from "./login-form";
 import { PlaceBackdrop } from "@/app/place-band";
@@ -54,11 +55,11 @@ export default async function LoginPage({
 
           {deleted && (
             <p className="mt-6 rounded-lg bg-surface/95 px-3 py-2 text-center text-sm text-ink shadow-card">
-              {/* A team member's deals in the team's pipeline are handed to
-                  the team's owner, not deleted (deleteAccount, step 2). */}
-              {deleted === "team"
-                ? "Your account has been deleted, with your own deals and files. The deals you added to your team's pipeline stay with the team, handed to its owner. Thanks for trying Underwrite Copilot."
-                : "Your account and all its data have been deleted. Thanks for trying Underwrite Copilot."}
+              {/* What a member had in a team's pipeline is handed to the
+                  team's owner, not deleted (deleteAccount, step 2): the
+                  deals, or their work on the team's deals alone
+                  (lib/account-deletion). */}
+              {deletedBanner(deleted)}
             </p>
           )}
           {linkBanner && (

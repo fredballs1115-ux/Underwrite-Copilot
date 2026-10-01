@@ -10,6 +10,8 @@
  * the schema does — so a deal that was not handed over is gone afterwards.
  */
 import { renderToStaticMarkup } from "react-dom/server";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 type Row = Record<string, unknown>;
@@ -280,8 +282,34 @@ describe("deleting an account says what happened to a team's deals", () => {
     for (const id of ["deal-a", "deal-b", "deal-c"]) expect(row("deals", id)?.user_id, id).toBe("owner-1");
     expect(db.deleted).toBe(true);
     const text = await signInPage("team");
-    expect(text).toContain("The deals you added to your team's pipeline stay with the team, handed to its owner.");
+    expect(text).toContain(
+      "The deals you added to a team's pipeline stay with the team, handed to its owner, as does any work of yours on the team's deals.",
+    );
     expect(text).not.toContain("all its data have been deleted");
+  });
+
+  it("a member who added no deal but whose work on the team's deals moved is told so, not that all their data went (L2)", async () => {
+    db.team = { id: "team-1", role: "member" };
+    db.tables.teams = [{ id: "team-1", owner_id: "owner-1" }];
+    db.tables.deals = [deal("shared", "teammate-2", "team-1")];
+    db.tables.deal_versions = [{ id: "v-1", deal_id: "shared", user_id: ME }];
+    db.tables.valuations = [{ id: "val-1", deal_id: "shared", user_id: ME }];
+    expect(await landing()).toBe("/login?deleted=teamwork");
+    expect(row("deal_versions", "v-1")?.user_id).toBe("owner-1");
+    const text = await signInPage("teamwork");
+    expect(text).toContain(
+      "Your work on a team's deals — saved versions, valuations and rent roll imports — stays with the team, handed to its owner.",
+    );
+    expect(text).not.toContain("all its data have been deleted");
+    expect(text).not.toContain("The deals you added");
+  });
+
+  it("the account page says, before the deletion, that the work on a team's deals stays with the team too (L2)", () => {
+    const page = readFileSync(join(process.cwd(), "app/(app)/account/page.tsx"), "utf8").replace(/\s+/g, " ");
+    expect(page).toContain(
+      "The deals you added to a team&apos;s pipeline stay with the team, handed to its owner, and so does your work on any team&apos;s deals: saved versions, valuations and rent roll imports.",
+    );
+    expect(page).not.toContain("Deals you shared with a team stay with the team.");
   });
 
   it("an account with nothing handed over says everything went", async () => {
@@ -358,7 +386,7 @@ describe("deleting an account says what happened to a team's deals", () => {
     db.tables.deals = [deal("shared", "teammate-2", "team-1")];
     const n = READ_PAGE + 234;
     db.tables.deal_versions = Array.from({ length: n }, (_, i) => ({ id: `v-${String(i).padStart(5, "0")}`, deal_id: "shared", user_id: ME }));
-    expect(await landing()).toBe("/login?deleted=1");
+    expect(await landing()).toBe("/login?deleted=teamwork");
     expect(rows("deal_versions").filter((v) => v.user_id === "owner-1")).toHaveLength(n);
     expect(db.pages.filter((p) => p.table === "deal_versions").map((p) => p.range[0])).toEqual([0, READ_PAGE, n]);
     const moves = db.writes.filter((w) => w.table === "deal_versions" && w.op === "update");

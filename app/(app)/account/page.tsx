@@ -248,9 +248,11 @@ export default async function AccountPage({
           Delete account
         </h2>
         <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted">
-          Permanently deletes your account, your deals, your documents, and
-          your analyses, and cancels any active subscription. Deals you shared
-          with a team stay with the team. This cannot be undone.
+          Permanently deletes your account, your personal deals with their
+          documents and analyses, and cancels any active subscription. The
+          deals you added to a team&apos;s pipeline stay with the team, handed
+          to its owner, and so does your work on any team&apos;s deals: saved
+          versions, valuations and rent roll imports. This cannot be undone.
         </p>
         <DeleteAccountForm />
       </section>

@@ -1,11 +1,20 @@
 // A stopped account deletion says what its earlier steps had already done
 // (lib/account-deletion). The page had said "nothing was deleted" after a
 // subscription was cancelled, and "nothing was removed" after the team's
-// deals had moved and the membership was gone.
+// deals had moved and the membership was gone. A finished one says what
+// stayed with a team: a member whose work moved without a deal of theirs had
+// been told all their data was gone.
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { deletionStopCopy, deletionStopHref, deletionStopNotice, type DeletionStop } from "./account-deletion";
+import {
+  deletedBanner,
+  deletedHref,
+  deletionStopCopy,
+  deletionStopHref,
+  deletionStopNotice,
+  type DeletionStop,
+} from "./account-deletion";
 
 const STOPS: DeletionStop[] = ["handover", "cancelsub", "delete"];
 const DONE = [
@@ -56,6 +65,21 @@ describe("deletionStopCopy — what failed, and what had already happened", () =
     // Any other code is the page's own map's.
     expect(deletionStopNotice({ error: "ownerdelete" })).toBeNull();
     expect(deletionStopNotice({})).toBeNull();
+  });
+
+  it("lands a finished deletion on the sentence for what stayed with a team", () => {
+    expect(deletedHref({ deals: 2, work: 0 })).toBe("/login?deleted=team");
+    expect(deletedHref({ deals: 1, work: 7 })).toBe("/login?deleted=team");
+    // Work alone moved: the page had said all the account's data was gone.
+    expect(deletedHref({ deals: 0, work: 3 })).toBe("/login?deleted=teamwork");
+    expect(deletedHref({ deals: 0, work: 0 })).toBe("/login?deleted=1");
+    expect(deletedBanner("1")).toBe("Your account and all its data have been deleted. Thanks for trying Underwrite Copilot.");
+    for (const kept of ["team", "teamwork"]) {
+      expect(deletedBanner(kept)).toMatch(/^Your account has been deleted, with your own deals and files\. .+ handed to its owner/);
+      expect(deletedBanner(kept)).not.toContain("all its data");
+    }
+    // Only a deal handed over is said to be one.
+    expect(deletedBanner("teamwork")).not.toContain("deals you added");
   });
 
   it("is what the account page shows, in place of the sentences it typed", () => {

@@ -55,6 +55,29 @@ export function deletionStopCopy(stop: DeletionStop, done: DeletionDone): string
     : `Deletion failed — nothing was removed. Please try again, or email ${SUPPORT}.`;
 }
 
+/** Where a finished deletion lands: the sign-in page, saying what stayed
+ *  with a team — the deals handed to a team's owner (`team`), the user's
+ *  work on a team's deals alone (`teamwork`: a member who added no deal
+ *  but whose versions or valuations moved had been told all their data
+ *  was gone), or nothing (`1`). */
+export function deletedHref(moved: { deals: number; work: number }): string {
+  return `/login?deleted=${moved.deals > 0 ? "team" : moved.work > 0 ? "teamwork" : "1"}`;
+}
+
+const THANKS = "Thanks for trying Underwrite Copilot.";
+const OWN_GONE = "Your account has been deleted, with your own deals and files.";
+
+/** The sign-in page's sentence for its `?deleted=` value. */
+export function deletedBanner(param: string): string {
+  if (param === "team") {
+    return `${OWN_GONE} The deals you added to a team's pipeline stay with the team, handed to its owner, as does any work of yours on the team's deals. ${THANKS}`;
+  }
+  if (param === "teamwork") {
+    return `${OWN_GONE} Your work on a team's deals — saved versions, valuations and rent roll imports — stays with the team, handed to its owner. ${THANKS}`;
+  }
+  return `Your account and all its data have been deleted. ${THANKS}`;
+}
+
 /** The sentence for the account page's query, or null where it names no
  *  deletion stop. */
 export function deletionStopNotice(params: { error?: string; moved?: string; cancelled?: string }): string | null {
