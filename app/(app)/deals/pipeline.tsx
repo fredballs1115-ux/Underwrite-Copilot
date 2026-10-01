@@ -1213,7 +1213,8 @@ export function Pipeline({
 
 /** The ladder as one picture: a rung per live stage with its count, each a
  *  one-tap stage filter. An empty rung is hollow — it used to be a collapsed
- *  section header with a zero in it. Dead deals sit behind their own toggle. */
+ *  section header with a zero in it — and still wears its stage's name, for
+ *  sight and for a screen reader. Dead deals sit behind their own toggle. */
 function StageFunnel({
   counts,
   active,
@@ -1234,12 +1235,13 @@ function StageFunnel({
         const on = active === s;
         const lit = n > 0 || on;
         return (
-          // On a phone the populated rungs take twice the width of the hollow
-          // ones and the hollow ones drop their label, so six rungs fit.
-          <li
-            key={s}
-            className={`relative min-w-0 ${lit ? "flex-[2] sm:flex-1" : "flex-1"}`}
-          >
+          // Six rungs share the width equally while there is room, and none
+          // is ever narrower than its own name: on a phone, or beside the
+          // calls' split at `lg`, "Screening" takes the width it needs and the
+          // shorter names give it up. The hollow rungs used to drop their
+          // name below `sm` to make room, which left a row of blank circles
+          // a screen reader announced as "0 deals".
+          <li key={s} className="relative min-w-max flex-1">
             {/* the rail, drawn as each rung's two halves so it meets the
                 neighbours' centres whatever the rungs' widths; the rung's
                 own background covers the joint */}
@@ -1272,11 +1274,12 @@ function StageFunnel({
                   {n > 0 ? n : ""}
                 </span>
               </span>
-              {/* Six rungs share a phone's width: the label shrinks there
-                  rather than truncating; the full name is the tooltip. */}
+              {/* Six names share a phone's width: the label is a size smaller
+                  there (and smaller again under 340px, where the six only
+                  just fit), never cut; the full name is the tooltip. */}
               <span
-                className={`w-full truncate text-[9px] font-medium uppercase sm:text-[10px] sm:tracking-wide ${
-                  lit ? "text-ink" : "hidden text-muted sm:block"
+                className={`w-full truncate text-[8px] font-medium uppercase min-[340px]:text-[9px] sm:text-[10px] sm:tracking-wide ${
+                  lit ? "text-ink" : "text-muted"
                 }`}
               >
                 {SHORT_STAGE[s]}

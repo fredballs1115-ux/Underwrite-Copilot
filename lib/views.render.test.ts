@@ -298,6 +298,44 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(html).toContain("Seller financing 5.00%: the seller offers to carry financing");
   });
 
+  it("names every rung of the funnel, an empty one included, for sight and for a screen reader", () => {
+    // Two deals, on two middle rungs: four rungs stand empty.
+    const html = render(
+      React.createElement(Pipeline, {
+        deals: withThumbs(CARDS.slice(0, 2)),
+        errorMessage: null,
+        notice: null,
+        onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
+        billing: BILLING,
+      }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    const rungs = funnelRungs(html);
+    expect(rungs.map((r) => [r.title, r.disabled])).toEqual([
+      ["Screening · 0 deals", true],
+      ["Tracking · 0 deals", true],
+      ["Active pursuit · 1 deal", false],
+      ["LOI submitted · 1 deal", false],
+      ["Under contract / DD · 0 deals", true],
+      ["Closed · 0 deals", true],
+    ]);
+    const names = ["Screening", "Tracking", "Pursuit", "LOI", "Contract", "Closed"];
+    rungs.forEach((r, k) => {
+      // The name is drawn at every width: an empty rung's label was
+      // `hidden` below `sm`, a blank circle a screen reader called "0 deals".
+      const label = r.markup.match(/<span class="([^"]*)">([^<]*)<\/span><span class="sr-only">/);
+      expect(label?.[2], r.title).toBe(names[k]);
+      expect(label?.[1], r.title).not.toMatch(/(^|\s)hidden(\s|$)/);
+      // What a screen reader hears: the name, then the count — the disc
+      // that draws the count is hidden from it.
+      const heard = visibleText(r.markup.replace(/<span aria-hidden="true"[^>]*><span[^>]*>[^<]*<\/span><\/span>/, ""));
+      expect(heard.replace(/\s+/g, " ").trim(), r.title).toBe(`${names[k]} ${r.disabled ? "0 deals" : "1 deal"}`);
+    });
+    // The six share the width, but none is ever narrower than its own name
+    // (a phone, or beside the calls' split at `lg`, cut "Screening" short).
+    expect((html.match(/<li class="relative min-w-max flex-1">/g) ?? []).length).toBe(6);
+  });
+
   it("draws the pipeline as photograph-led cards by default: the building's picture, the call over it, the three figures (#428)", () => {
     // Each deal's pictures as the page resolves them: the Maddox has a
     // memorandum nobody has read the cover of yet, 1400 Market its own
