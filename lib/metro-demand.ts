@@ -122,10 +122,13 @@ export function metroDemand(rates: readonly LiveRate[], assetClass: string | nul
       return row(r, SECTOR_JOBS_LABEL[metric], false, sector !== null && metric === sector.metric);
     }),
   ];
-  const newest = sectors.map((r) => r.obsDate).sort().at(-1) ?? sectors[0].obsDate;
-  const stale = sectors
-    .filter((r) => !r.fresh)
-    .map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${periodOf(r)}`);
+  // All payrolls is checked like the sectors: a stopped total had drawn
+  // under the newest sector's month with no word that it had stopped (the
+  // research pass of 2026-10-01).
+  const drawn = [...(allJobs ? [allJobs] : []), ...sectors];
+  const newest = drawn.map((r) => r.obsDate).sort().at(-1) ?? sectors[0].obsDate;
+  const byKey = new Map(drawn.map((r) => [r.meta.id, r]));
+  const stale = rows.filter((x) => !x.fresh).map((x) => `${x.label} as of ${periodOf(byKey.get(x.key)!)}`);
   const mine = rows.find((x) => x.mine)?.label ?? null;
   const grain: MetroDemand["grain"] = (sectors[0].meta as MetroSeriesMeta).metro.startsWith("state:") ? "state" : "metro";
   return {

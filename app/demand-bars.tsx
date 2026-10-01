@@ -51,7 +51,7 @@ export function DemandBars({ demand }: { demand: MetroDemand }) {
       <p className="mt-1.5 text-[11px] text-muted">
         {`${demand.newestMonth} · BLS payrolls via FRED, against the same month a year earlier · each figure links to its series`}
         {demand.stale.length > 0 &&
-          ` · ${demand.stale.length === 1 ? "one sector's figure is stale" : `${demand.stale.length} sectors' figures are stale`}: ${demand.stale.join(", ")}`}
+          ` · ${demand.stale.length === 1 ? "one figure is stale" : `${demand.stale.length} figures are stale`}: ${demand.stale.join(", ")}`}
       </p>
       {demand.supply && <SupplyLine supply={demand.supply} />}
     </>

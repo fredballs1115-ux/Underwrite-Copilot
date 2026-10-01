@@ -5284,7 +5284,7 @@ describe("SampleDemandCard — the sample market's payrolls by sector, read toda
     expect(text).toContain("Rental housing runs on all payrolls, drawn first");
     expect(text).not.toContain("this building's sector");
     expect(text).toContain("Aug 2026 · BLS payrolls via FRED, against the same month a year earlier");
-    expect(text).toContain("one sector's figure is stale: Leisure & hospitality as of Aug 2025");
+    expect(text).toContain("one figure is stale: Leisure & hospitality as of Aug 2025");
     expect(text).toContain("Every screened deal in a covered market gets this picture");
     // Four bars: all payrolls in the neutral tone, every sector full (nothing is faded
     // when nothing is marked), and the retail fall drawn leftward from the centre line.
@@ -5517,7 +5517,14 @@ describe("MetroLive — jobs by sector, one picture beside all payrolls", () => 
     const rows = ROWS.map((r) => ({ ...r, obs_date: r.series_id === "WASH911LEIH_YOY" ? "2026-05-01" : "2026-10-01" }));
     const stale = visibleText(render(React.createElement(MetroLive, { rates: readMetroRates("dc", rows, later), metroId: "dc", metroName: "Washington DC" })));
     expect(stale).toContain("Oct 2026 · BLS payrolls via FRED");
-    expect(stale).toContain("one sector's figure is stale: Leisure & hospitality as of May 2026");
+    expect(stale).toContain("one figure is stale: Leisure & hospitality as of May 2026");
+  });
+
+  it("checks all payrolls like the sectors: a stopped total is said, never drawn under the sectors' month (the research pass of 2026-10-01)", () => {
+    const later = new Date("2026-12-30T00:00:00Z");
+    const rows = ROWS.map((r) => ({ ...r, obs_date: r.series_id === "WASH911NA_YOY" ? "2026-05-01" : "2026-10-01" }));
+    const out = visibleText(render(React.createElement(MetroLive, { rates: readMetroRates("dc", rows, later), metroId: "dc", metroName: "Washington DC" })));
+    expect(out).toContain("one figure is stale: All payrolls as of May 2026");
   });
 });
 
@@ -8004,5 +8011,54 @@ describe("the boards rank one period's rows, and list a fresh row of an older on
     expect(visibleText(html)).toContain("4.4% · Jul 2026");
     expect(html).toContain("an older month than the column&#x27;s Aug 2026: shown, not ranked");
     expect(visibleText(html)).toContain("1 of 12 cells carry a fresh figure");
+  });
+});
+
+// ── A tile that is not the market's own figure names its area (the research pass of 2026-10-01) ──
+import { marketOwnArea, namesItsArea } from "@/lib/metro-own-area";
+
+describe("MetroLive — a tile names its area wherever the figure is not the market's own", () => {
+  it("knows a market's own area only where it is the market", () => {
+    const own = (metro: string, area: string) => ({ metro, area });
+    expect(marketOwnArea([own("dc", "Washington MSA")], "dc", "Washington DC")).toBe("Washington MSA");
+    expect(marketOwnArea([own("pg_county", "Prince George's County"), own("dc", "Washington MSA")], "pg_county", "Prince George's County MD")).toBe("Prince George's County");
+    // Northern Virginia's one series of its own is Fairfax County's.
+    expect(marketOwnArea([own("nova", "Fairfax County"), own("dc", "Washington MSA")], "nova", "Northern Virginia")).toBeNull();
+    expect(namesItsArea(own("nova", "Fairfax County"), "nova", null)).toBe(true);
+    expect(namesItsArea(own("philadelphia", "Philadelphia division"), "philadelphia", "Philadelphia MSA")).toBe(true);
+    expect(namesItsArea(own("philadelphia", "Philadelphia MSA"), "philadelphia", "Philadelphia MSA")).toBe(false);
+  });
+
+  it("names Fairfax County on Northern Virginia's unemployment and the division on Philadelphia's house prices", () => {
+    const nova = visibleText(
+      render(
+        React.createElement(MetroLive, {
+          rates: readMetroRates("nova", [
+            { series_id: "VAFAIR5URN", obs_date: "2026-07-01", value: 2.9 },
+            { series_id: "WASH911NA_YOY", obs_date: "2026-07-01", value: 1.2 },
+          ], FIXTURE_NOW),
+          metroId: "nova",
+          metroName: "Northern Virginia",
+        }),
+      ),
+    );
+    expect(nova).toContain("Unemployment · Fairfax County");
+    expect(nova).toContain("Jobs y/y · Washington MSA");
+    expect(nova).toContain("A figure for an area other than Northern Virginia as a whole — a county, or one division of the metro area — names its area on the tile too.");
+    const philly = visibleText(
+      render(
+        React.createElement(MetroLive, {
+          rates: readMetroRates("philadelphia", [
+            { series_id: "PHIL942URN", obs_date: "2026-07-01", value: 4.1 },
+            { series_id: "ATNHPIUS37964Q_YOY", obs_date: "2026-04-01", value: 5.4 },
+          ], FIXTURE_NOW),
+          metroId: "philadelphia",
+          metroName: "Philadelphia PA",
+        }),
+      ),
+    );
+    expect(philly).toContain("House prices y/y · Philadelphia division");
+    // The metro area's own figure is the market's, said bare.
+    expect(philly).not.toContain("Unemployment · Philadelphia MSA");
   });
 });

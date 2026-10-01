@@ -342,7 +342,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toMatch(/Professional & business services is the sector that fills this building's kind, drawn full/);
     expect(text).toMatch(/Professional & business services · this building's sector/);
     expect(text).toMatch(/Aug 2026 · BLS payrolls via FRED, against the same month a year earlier/);
-    expect(text).toMatch(/one sector's figure is stale: Leisure & hospitality as of Aug 2025/);
+    expect(text).toMatch(/one figure is stale: Leisure & hospitality as of Aug 2025/);
     // Four bars, the deal's own full and the others faded; a negative change draws leftward.
     expect((html.match(/data-bar="demand"/g) ?? []).length).toBe(4);
     expect(html).toContain('data-bar="demand" class="absolute inset-y-0 left-1/2 bg-brand"');

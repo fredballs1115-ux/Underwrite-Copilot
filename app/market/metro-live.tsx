@@ -14,6 +14,7 @@ import {
 import { monthOf } from "@/lib/zori";
 import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
 import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
+import { marketOwnArea, namesItsArea } from "@/lib/metro-own-area";
 
 /**
  * A covered metro's own figures, live from FRED — the four things a metro
@@ -105,6 +106,12 @@ export function MetroLive({
   // The areas FRED names, for the heading — the metro's own, then the MSA
   // whose figures fill in.
   const areas = Array.from(new Set(metas.map((m) => m.area)));
+  // The area the market's own figures are for, where that area IS the
+  // market; null where it is not (Northern Virginia's one series of its own
+  // is Fairfax County's unemployment), so every tile names its area.
+  const ownArea = marketOwnArea(metas, metroId, metroName);
+  // Tiles filed under the market whose area is not the market's own.
+  const narrower = metas.filter((m) => m.metro === metroId && namesItsArea(m, metroId, ownArea));
   const fromBls = metas.some((m) => m.source === "bls");
   const fromCensus = metas.some((m) => m.source === "census");
   const hasRentIndex = metas.some((m) => m.metric === "rent_cpi_yoy");
@@ -130,8 +137,11 @@ export function MetroLive({
       <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-5">
         {tiles.map((r) => {
           const meta = r.meta as MetroSeriesMeta;
-          // A borrowed figure wears the MSA's name on its own tile.
-          const owner = meta.metro === metroId ? "" : ` · ${meta.area}`;
+          // A figure that is not the market's own wears its area's name on
+          // its tile: a borrowed one (the MSA's, the region's), and one
+          // filed under the market whose area is narrower or other than the
+          // market's (lib/metro-own-area).
+          const owner = namesItsArea(meta, metroId, ownArea) ? ` · ${meta.area}` : "";
           if (meta.metric === "permits") {
             const year = permitsTrailingYear(r);
             if (!year) {
@@ -198,6 +208,8 @@ export function MetroLive({
           " Where FRED does not carry the area, the rent index comes from the BLS directly."}
         {borrowed.length > 0 &&
           ` Where FRED publishes nothing for ${metroName} itself, the figure is the metro area's, named on the tile.`}
+        {narrower.length > 0 &&
+          ` A figure for an area other than ${metroName} as a whole — a county, or one division of the metro area — names its area on the tile too.`}
         {hasMsaVacancy &&
           " The metro area's rental vacancy is the Housing Vacancy Survey's own figure for it, with the survey's margin of error beside it: the survey is a sample, so a quarter's move inside the margin is noise, and the region's figure is the steadier one."}
         {hasRegionVacancy &&
@@ -238,8 +250,11 @@ function SectorJobsPicture({
     })),
   ];
   const widest = Math.max(0.1, ...rows.map((x) => Math.abs(x.r.value)));
-  const newest = sectors.map((r) => r.obsDate).sort().at(-1) ?? sectors[0].obsDate;
-  const stale = sectors.filter((r) => !r.fresh);
+  // All payrolls is checked like the sectors (the research pass of
+  // 2026-10-01): a stopped total had drawn under the newest sector's month
+  // with no word that it had stopped.
+  const newest = rows.map((x) => x.r.obsDate).sort().at(-1) ?? sectors[0].obsDate;
+  const stale = rows.filter((x) => !x.r.fresh);
   return (
     <div className="mt-4">
       <h4 className="text-[11px] uppercase tracking-wide text-muted">{`Jobs by sector, on a year ago${owner}`}</h4>
@@ -271,7 +286,7 @@ function SectorJobsPicture({
       </div>
       <p className="mt-1 text-[11px] text-muted">
         {`${monthOf(newest)} · BLS payrolls via FRED · each figure links to its series`}
-        {stale.length > 0 && ` · ${stale.length === 1 ? "one sector's figure is stale" : `${stale.length} sectors' figures are stale`}: ${stale.map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${periodOf(r)}`).join(", ")}`}
+        {stale.length > 0 && ` · ${stale.length === 1 ? "one figure is stale" : `${stale.length} figures are stale`}: ${stale.map((x) => `${x.label} as of ${periodOf(x.r)}`).join(", ")}`}
       </p>
     </div>
   );
