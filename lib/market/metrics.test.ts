@@ -532,12 +532,52 @@ describe("assumptionWarnings", () => {
       PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
       [],
     );
-    const w = assumptionWarnings(INPUTS, heavy, SUBMARKET).find(
+    const w = assumptionWarnings(INPUTS, heavy, SUBMARKET, [], "stabilized", { pct: 6, source: "stated" }).find(
       (x) => x.code === "supply_vs_exit_cap",
     )!;
     expect(w).toBeDefined();
     expect(w.message).toContain("months of supply");
-    expect(w.message).toContain("5.50% exit cap");
+    expect(w.message).toContain("Your 5.50% exit cap is 50 bps under the 6.00% going-in cap");
+    expect(w.message).toContain("assumes the market tightens");
+    expect(w.basis).toContain("going-in cap 6.00%, as stated");
+  });
+
+  it("reads a 5.25% exit on a deal bought at 4.75% as widening, never as the market tightening", () => {
+    const heavy = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
+      [],
+    );
+    const inputs = { ...INPUTS, exitCapPct: 0.0525 } as UnderwriteInputs;
+    const w = assumptionWarnings(inputs, heavy, SUBMARKET, [], "stabilized", { pct: 4.75, source: "implied" }).find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(w.message).toContain("Your 5.25% exit cap sits 50 bps over the 4.75% going-in cap.");
+    expect(w.message).not.toMatch(/tighten|compression/);
+    expect(w.basis).toContain("implied by the stated NOI over the price");
+  });
+
+  it("says nothing about compression where the deal has no going-in cap", () => {
+    const heavy = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
+      [],
+    );
+    // A plan deal or a note has none (`dealGoingInCap`), and an exit cap
+    // under 6% is not "the market tightening" without one to tighten from.
+    const w = assumptionWarnings(INPUTS, heavy, SUBMARKET, [], "development", null).find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(w.message).toContain("months of supply under construction");
+    expect(w.message).not.toMatch(/tighten|compression|going-in|exit cap/);
+    const shrinking = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, netAbsorptionSf: -50_000 })),
+      [],
+    );
+    const s = assumptionWarnings(INPUTS, shrinking, SUBMARKET).find((x) => x.code === "supply_vs_exit_cap")!;
+    expect(s.message).not.toMatch(/going-in|exit cap/);
+    const held = assumptionWarnings(INPUTS, shrinking, SUBMARKET, [], "stabilized", { pct: 5.75, source: "stated" }).find(
+      (x) => x.code === "supply_vs_exit_cap",
+    )!;
+    expect(held.message).toContain("Your 5.50% exit cap, at or under the 5.75% going-in cap, is hard to defend here.");
   });
 
   it("on a plan deal, says the deal itself delivers into the pipeline it is warned about", () => {

@@ -49,10 +49,44 @@ const marked = (basis: string, unverified: number): string => {
   return mark ? `${basis}; ${mark}` : basis;
 };
 
+/** The deal's going-in cap the exit is set against — lib/model-vs-market's
+ *  `dealGoingInCap`, percent — or null where the deal has none. */
+export interface GoingInCapRead {
+  pct: number;
+  source: "stated" | "implied" | "implied_whole";
+}
+
+const GOING_IN_SOURCE: Record<GoingInCapRead["source"], string> = {
+  stated: "as stated",
+  implied: "implied by the stated NOI over the price",
+  implied_whole: "implied by the stated NOI over the whole the share's price grosses up to",
+};
+
+/**
+ * What the exit cap assumes, set against the deal's own going-in cap — the
+ * compression a deep pipeline makes hard to defend is a move from one to the
+ * other, and an exit cap low in the abstract (a 5.25% exit on a deal bought at
+ * 4.75%) widens rather than tightens. With no going-in cap (a plan deal, a
+ * note, nothing stated or implied) there is nothing to compress from, and the
+ * sentence says nothing about compression at all.
+ */
+function exitAgainstGoingIn(exitCap: number, goingIn: GoingInCapRead | null): string {
+  if (!goingIn) return "";
+  const entry = goingIn.pct / 100;
+  const bps = Math.round(Math.abs(exitCap - entry) * 10_000);
+  if (bps === 0) return ` Your ${pct(exitCap, 2)} exit cap holds the going-in cap flat while that delivers.`;
+  return exitCap < entry
+    ? ` Your ${pct(exitCap, 2)} exit cap is ${bps} bps under the ${pct(entry, 2)} going-in cap — it assumes the market tightens while that delivers.`
+    : ` Your ${pct(exitCap, 2)} exit cap sits ${bps} bps over the ${pct(entry, 2)} going-in cap.`;
+}
+
 /**
  * Run every check. Dismissed warnings are RETURNED, not filtered out — the card
  * shows them struck through with the reason, which is the whole point of
  * requiring one.
+ *
+ * `goingIn` is the deal's going-in cap (`dealGoingInCap`), the one the exit is
+ * set against; null leaves the supply warning silent on compression.
  */
 export function assumptionWarnings(
   inputs: UnderwriteInputs,
@@ -60,6 +94,7 @@ export function assumptionWarnings(
   submarket: Submarket,
   dismissals: Dismissal[] = [],
   strategy: StrategyKind = "unknown",
+  goingIn: GoingInCapRead | null = null,
 ): AssumptionWarning[] {
   const byCode = new Map(dismissals.map((d) => [d.code, d]));
   const out: AssumptionWarning[] = [];
@@ -95,9 +130,21 @@ export function assumptionWarnings(
     });
   }
 
-  // ── Months of supply vs exit cap compression ────────────────────────────
+  // ── Months of supply vs the exit cap against the going-in cap ───────────
   const threshold = submarket.supplyWarningMonths;
+  const goingInBasis = goingIn
+    ? `; going-in cap ${goingIn.pct.toFixed(2)}%, ${GOING_IN_SOURCE[goingIn.source]}`
+    : "";
   if (metrics.supply.status === "supply_exceeds_demand") {
+    const entry = goingIn ? goingIn.pct / 100 : null;
+    // At or under the going-in cap is what the market giving space back
+    // makes hard to defend; over it, the sentence says by how much.
+    const exitClause =
+      entry == null
+        ? ""
+        : inputs.exitCapPct <= entry + 0.00005
+          ? ` Your ${pct(inputs.exitCapPct, 2)} exit cap, at or under the ${pct(entry, 2)} going-in cap, is hard to defend here.`
+          : exitAgainstGoingIn(inputs.exitCapPct, goingIn);
     push({
       code: "supply_vs_exit_cap",
       severity: "warning",
@@ -106,29 +153,27 @@ export function assumptionWarnings(
         "en-US",
       )} SF under construction against ${Math.round(metrics.supply.t12Absorption).toLocaleString(
         "en-US",
-      )} SF of trailing-12 net absorption — the market is giving space back while more is being built. An exit cap at or below the going-in cap is hard to defend here.${planClause}`,
+      )} SF of trailing-12 net absorption — the market is giving space back while more is being built.${exitClause}${planClause}`,
       basis: marked(
-        `${trailingYearBasis(metrics.absorption)}: ${metrics.absorption.periods.join(", ")}`,
+        `${trailingYearBasis(metrics.absorption)}: ${metrics.absorption.periods.join(", ")}${goingInBasis}`,
         metrics.unverified.supply,
       ),
     });
   } else if (metrics.supply.status === "ok" && metrics.supply.months > threshold) {
-    const compressing = inputs.exitCapPct < 0.06;
     push({
       code: "supply_vs_exit_cap",
       severity: "warning",
       title: "Deep construction pipeline",
       message: `${metrics.supply.months.toFixed(
         0,
-      )} months of supply under construction, against your ${threshold}-month threshold.${
-        compressing
-          ? ` Your ${pct(inputs.exitCapPct, 2)} exit cap assumes the market tightens while that delivers.`
-          : ` Exit cap compression is hard to defend while that delivers.`
-      }${planClause}`,
+      )} months of supply under construction, against your ${threshold}-month threshold.${exitAgainstGoingIn(
+        inputs.exitCapPct,
+        goingIn,
+      )}${planClause}`,
       basis: marked(
         `${Math.round(metrics.supply.ucSf).toLocaleString("en-US")} SF UC ÷ ${Math.round(
           metrics.supply.monthlyAbsorption,
-        ).toLocaleString("en-US")} SF/mo absorption (${trailingYearBasis(metrics.absorption)})`,
+        ).toLocaleString("en-US")} SF/mo absorption (${trailingYearBasis(metrics.absorption)})${goingInBasis}`,
         metrics.unverified.supply,
       ),
     });

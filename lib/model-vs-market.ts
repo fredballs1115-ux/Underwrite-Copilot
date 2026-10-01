@@ -732,6 +732,47 @@ export function impliedGoingInCap(extraction: ExtractionResult | null): { pct: n
   return { pct: cap * 100, whole: price !== asked };
 }
 
+/** A deal's going-in cap, percent, and where it came from. */
+export interface DealGoingInCap {
+  pct: number;
+  /** stated by the documents (or the first signal); implied by their NOI
+   *  over their price; or implied on the whole a share's price grosses up to */
+  source: "stated" | "implied" | "implied_whole";
+}
+
+/**
+ * THE going-in cap an exit is set against, wherever one is: the
+ * extraction's stated cap, else the first signal's where it can be a cap on
+ * the price (`signalGoingInCap`); where neither states one, the cap the
+ * documents' NOI implies on their price (`impliedGoingInCap`); and none on a
+ * plan deal (its year-1 cap is a dark building's) or a note (the
+ * collateral's income over a loan's price is a cap nobody earns, #414).
+ * `modelVsMarketFor` reads it, and so does the submarket check's supply
+ * warning, so no two surfaces set one exit against two going-in caps.
+ */
+export function dealGoingInCap(
+  extraction: ExtractionResult | null,
+  firstSignal?: FirstSignal | null,
+): DealGoingInCap | null {
+  const planDeal = isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+  if (planDeal || interestOf(extraction).kind === "note") return null;
+  const capText = findGoingInCap(extraction?.metrics ?? [])?.value ?? null;
+  const parsed = capText ? parsePct(capText) : null;
+  const stated =
+    parsed != null && Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : capText == null
+        ? (signalGoingInCap(firstSignal)?.pct ?? null)
+        : null;
+  if (stated != null) return { pct: stated, source: "stated" };
+  // Where the documents state no going-in cap, the one their own NOI and
+  // price imply: without it a deal whose NOI is 7.50% of its price read "no
+  // going-in cap to set it against" while the model's 6.00% default exit
+  // priced 150 bps of compression unsaid.
+  const implied = impliedGoingInCap(extraction);
+  return implied ? { pct: implied.pct, source: implied.whole ? "implied_whole" : "implied" } : null;
+}
+
 /**
  * The read for a deal, from what every surface already holds — the derived
  * model, the extraction, the first signal, the stored class, the covered
@@ -764,29 +805,17 @@ export function modelVsMarketFor(args: {
   const planDeal = isPlanDeal(inferStrategy(extraction, args.firstSignal ?? null).kind);
   // A note's price is a loan's (#414): the cap its memorandum states is the
   // collateral's, never the buyer's, so the exit is set against no going-in
-  // cap on a note — stated, passed in or implied — on every surface.
-  const note = interestOf(extraction).kind === "note";
-  const capText = note || planDeal ? null : (findGoingInCap(extraction?.metrics ?? [])?.value ?? null);
-  const parsed = capText ? parsePct(capText) : null;
-  const stated =
-    parsed != null && Number.isFinite(parsed) && parsed > 0
-      ? parsed
-      : capText == null && !note && !planDeal
-        ? (signalGoingInCap(args.firstSignal)?.pct ?? null)
-        : null;
-  // Where the documents state no going-in cap, the one their own NOI and
-  // price imply: without it a deal whose NOI is 7.50% of its price read "no
-  // going-in cap to set it against" while the model's 6.00% default exit
-  // priced 150 bps of compression unsaid. Never on a plan deal.
-  const implied = stated == null && !planDeal && !note ? impliedGoingInCap(extraction) : null;
+  // cap on a note — stated, passed in or implied — on every surface; nor on
+  // a plan deal. One reader says which cap it is (`dealGoingInCap`).
+  const goingIn = dealGoingInCap(extraction, args.firstSignal ?? null);
   const assetClass = shownAssetClass(storedAssetClass ?? null, extraction) || null;
   return modelVsMarket({
     inputs: derived.inputs,
     sources: derived.sources,
     assetClass,
     plan: planDeal,
-    goingInCapPct: stated ?? implied?.pct ?? null,
-    goingInCapSource: stated != null ? "stated" : implied ? (implied.whole ? "implied_whole" : "implied") : undefined,
+    goingInCapPct: goingIn?.pct ?? null,
+    goingInCapSource: goingIn?.source,
     metro,
     rates: reads.rates,
     zori: reads.zori,

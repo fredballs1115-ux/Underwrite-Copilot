@@ -320,7 +320,7 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
 });
 
 // ── One read for every surface ──────────────────────────────────────────────
-import { impliedGoingInCap, modelVsMarketFor } from "./model-vs-market";
+import { dealGoingInCap, impliedGoingInCap, modelVsMarketFor } from "./model-vs-market";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
@@ -496,6 +496,21 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
       expect(exitOf(r)?.read).toContain("No going-in cap to set it against; the spread is the claim.");
       expect(exitOf(r)?.read).not.toContain("The going-in cap");
     }
+  });
+
+  it("is one reader, `dealGoingInCap`, that the submarket check's supply warning reads too", () => {
+    const noCap: ExtractionResult = { ...extraction, metrics: extraction.metrics.filter((m) => !/cap rate/i.test(m.label)) };
+    expect(dealGoingInCap(extraction)).toEqual({ pct: 6, source: "stated" });
+    expect(dealGoingInCap(noCap, signalWithCap("5.5%"))).toEqual({ pct: 5.5, source: "stated" });
+    expect(dealGoingInCap(noCap)?.source).toBe("implied");
+    expect(dealGoingInCap(noCap)?.pct).toBeCloseTo(6, 9);
+    const note: ExtractionResult = {
+      ...extraction,
+      interest: { kind: "note", summary: "The first mortgage note", share: "", groundLease: "", loan: "", page: "p. 2" },
+    };
+    expect(dealGoingInCap(note, signalWithCap("6.0%"))).toBeNull();
+    const conversion: FirstSignal = { ...signalWithCap("6.0%"), take: "A conversion of a vacant plant to last-mile logistics." };
+    expect(dealGoingInCap(extraction, conversion)).toBeNull();
   });
 });
 
