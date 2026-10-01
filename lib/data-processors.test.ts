@@ -39,7 +39,7 @@ describe("the outside services a user's data reaches, one list held to the code"
       ["lib/public-comps/run.ts", /https:\/\/(photon\.komoot\.io)/],
       ["lib/site-flags/run.ts", /https:\/\/(geocoding\.geo\.census\.gov)/],
       ["lib/imagery.ts", /https:\/\/(maps\.googleapis\.com)/],
-      ["lib/email.ts", /https:\/\/(api\.resend\.com)/],
+      ["lib/email-send.ts", /https:\/\/(api\.resend\.com)/],
       ["app/(app)/address-autocomplete.tsx", /https:\/\/(photon\.komoot\.io)/],
       ["app/(app)/deals/[id]/comps-map.tsx", /https:\/\/(photon\.komoot\.io)/],
     ] as const) {
