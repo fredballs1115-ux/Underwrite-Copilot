@@ -9,6 +9,7 @@ import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding
 import { STRATEGY_LABEL, STRATEGY_READING, isPlanDeal } from "@/lib/deal-strategy";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
+import { datedLong } from "@/lib/debt-index";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT } from "./plan-caveat";
 
@@ -891,8 +892,9 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
   });
   titleRow(ws, "Assumptions against the published figures");
   // The deal page's card's own words (lib/model-vs-market-scope): the
-  // published figures for the market or the state, and the nation's.
-  label(ws.getCell(2, 1), readScope(read, read.readOn), { color: MUTED, size: 9 });
+  // published figures for the market or the state, and the nation's — the
+  // day in the card's own format ("Sep 21, 2026"), never the ISO key.
+  label(ws.getCell(2, 1), readScope(read, datedLong(read.readOn)), { color: MUTED, size: 9 });
   label(
     ws.getCell(3, 1),
     `A trailing year is what an assumption is being asked to beat, not a forecast; ${readGrainNote(read)} The model's figures are the Assumptions tab's as built; change them there.`,
@@ -923,10 +925,25 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
       if (p) {
         label(ws.getCell(r, 4), `${p.label}: ${p.text}`, { size: 9 });
         const v = ws.getCell(r, 5);
+        // Raw, so it sorts and computes, and shown in its unit: a published
+        // figure is a percent change or a level in percent (PublishedFigure),
+        // so the format's "%" is a literal, never Excel's ×100 percent.
         v.value = p.value;
-        v.numFmt = "0.00";
+        v.numFmt = '0.00"%"';
         v.font = { name: ARIAL, size: 10, color: INK };
-        label(ws.getCell(r, 6), p.asOf, { size: 9 });
+        // A feed's observation day is a date, so the column sorts by it; a
+        // research figure's period ("Q1 2026", "undated") stays as written,
+        // and so does a day that does not exist, never rolled into another.
+        const day = /^\d{4}-\d{2}-\d{2}$/.test(p.asOf) ? Date.parse(`${p.asOf}T00:00:00Z`) : NaN;
+        const asOf = ws.getCell(r, 6);
+        if (Number.isFinite(day) && new Date(day).toISOString().slice(0, 10) === p.asOf) {
+          asOf.value = new Date(day);
+          asOf.numFmt = "mmm d, yyyy";
+          asOf.font = { name: ARIAL, size: 9, color: INK };
+          asOf.alignment = { horizontal: "left" };
+        } else {
+          label(asOf, p.asOf, { size: 9 });
+        }
         label(ws.getCell(r, 7), p.publisher, { size: 9, color: MUTED });
       }
       r++;

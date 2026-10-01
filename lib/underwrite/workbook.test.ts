@@ -895,8 +895,9 @@ describe("the Market Read tab — the assumptions against the published figures,
     expect(names.indexOf("Market Read")).toBe(names.indexOf("Assumptions") + 1);
     const ws = wb.getWorksheet("Market Read")!;
     expect(ws.getCell(1, 1).value).toBe("Assumptions against the published figures");
+    // The day in the deal page's own words (lib/debt-index `datedLong`).
     expect(String(ws.getCell(2, 1).value)).toBe(
-      "The model's rent growth and exit cap, set against the published figures for the Washington DC market and the nation, read on 2026-09-21.",
+      "The model's rent growth and exit cap, set against the published figures for the Washington DC market and the nation, read on Sep 21, 2026.",
     );
     expect(String(ws.getCell(3, 1).value)).toContain("not a forecast");
     expect(ws.getCell(5, 1).value).toBe("ASSUMPTION");
@@ -907,8 +908,13 @@ describe("the Market Read tab — the assumptions against the published figures,
     expect(ws.getCell(6, 2).value).toBe("3.0%/yr");
     expect(ws.getCell(6, 3).value).toBe("a screening default");
     expect(ws.getCell(6, 4).value).toBe("Asking rent, all home types: +2.3% over the year to Aug 2026");
+    // The figure raw, so it sorts and computes, shown in its unit — every
+    // published figure is a percent (lib/model-vs-market's PublishedFigure).
     expect(ws.getCell(6, 5).value).toBe(2.3);
-    expect(ws.getCell(6, 6).value).toBe("2026-08-31");
+    expect(ws.getCell(6, 5).numFmt).toBe('0.00"%"');
+    // A dated figure's day is a date, so the column sorts by it.
+    expect(ws.getCell(6, 6).value).toEqual(new Date(Date.UTC(2026, 7, 31)));
+    expect(ws.getCell(6, 6).numFmt).toBe("mmm d, yyyy");
     expect(ws.getCell(6, 7).value).toBe("Zillow Research");
     expect(ws.getCell(6, 8).value).toBe("inside the published range");
     expect(String(ws.getCell(6, 9).value)).toContain("The model grows rents 3.0%/yr.");
@@ -919,6 +925,7 @@ describe("the Market Read tab — the assumptions against the published figures,
     // The second check starts on the next row.
     expect(ws.getCell(8, 1).value).toBe("Exit cap");
     expect(ws.getCell(8, 5).value).toBe(4.94);
+    expect(ws.getCell(8, 5).numFmt).toBe('0.00"%"');
     expect(ws.getCell(8, 8).value).toBe("spread widens at the exit");
     // A data tab: nothing on it is a formula.
     ws.eachRow((row) => {
@@ -927,6 +934,26 @@ describe("the Market Read tab — the assumptions against the published figures,
         expect(v && typeof v === "object" && "formula" in v, cell.address).toBe(false);
       });
     });
+  });
+
+  it("keeps a research figure's period as the file states it: a quarter, or undated, is not a day", async () => {
+    const tracked: ModelVsMarket = {
+      ...read,
+      checks: [
+        {
+          ...read.checks[1],
+          published: [
+            { label: "Office cap (research tracker), low end", text: "6.50% (Q1 2026)", value: 6.5, asOf: "Q1 2026", publisher: "research tracker: CBRE" },
+            { label: "Office cap (research tracker), high end", text: "7.25% (undated)", value: 7.25, asOf: "undated", publisher: "research tracker" },
+          ],
+        },
+      ],
+    };
+    const ws = (await load(await buildUnderwriteWorkbook(model, null, tracked))).getWorksheet("Market Read")!;
+    expect(ws.getCell(6, 6).value).toBe("Q1 2026");
+    expect(ws.getCell(7, 6).value).toBe("undated");
+    expect(ws.getCell(6, 5).value).toBe(6.5);
+    expect(ws.getCell(7, 5).numFmt).toBe('0.00"%"');
   });
 
   it("is absent with nothing read, rather than an empty tab", async () => {
