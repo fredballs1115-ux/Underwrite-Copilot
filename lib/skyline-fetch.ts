@@ -97,17 +97,32 @@ export const SKYLINE_QUALITY = 82;
 
 /**
  * A photograph as it is served: a JPEG encoded again, upright, in sRGB and
- * without its metadata; anything else, or a JPEG that will not re-encode or
- * would come out larger, as Commons sent it.
+ * without its metadata, and no wider than the width it was asked for;
+ * anything else, or a JPEG that will not re-encode, as Commons sent it.
+ * Commons snaps a thumbnail's width up to sizes of its own (the contact
+ * sheets asked for 640px and every copy came back 960px), so a copy wider
+ * than asked is brought down to the width the srcset promised — never
+ * enlarged. One at the width asked is kept as sent where encoding again
+ * would come out larger.
  */
-export async function lighten(body: ArrayBuffer, type: string): Promise<{ body: ArrayBuffer; type: string }> {
+export async function lighten(
+  body: ArrayBuffer,
+  type: string,
+  width?: number,
+): Promise<{ body: ArrayBuffer; type: string }> {
   if (!/^image\/jpe?g\b/i.test(type)) return { body, type };
   try {
-    const out = await sharp(Buffer.from(body), { failOn: "none", limitInputPixels: 80_000_000 })
-      .rotate()
-      .jpeg({ quality: SKYLINE_QUALITY, mozjpeg: true })
-      .toBuffer();
-    if (out.byteLength === 0 || out.byteLength >= body.byteLength) return { body, type };
+    const input = sharp(Buffer.from(body), { failOn: "none", limitInputPixels: 80_000_000 });
+    // The width it will be shown at: an EXIF turn of a quarter (5–8) stands
+    // the stored picture on its side, so its stored height is its width.
+    const meta = await input.metadata();
+    const sent = ((meta.orientation ?? 1) >= 5 ? meta.height : meta.width) ?? 0;
+    const narrower = width != null && width > 0 && sent > width;
+    let pipeline = input.rotate();
+    if (narrower) pipeline = pipeline.resize({ width, withoutEnlargement: true });
+    const out = await pipeline.jpeg({ quality: SKYLINE_QUALITY, mozjpeg: true }).toBuffer();
+    if (out.byteLength === 0) return { body, type };
+    if (!narrower && out.byteLength >= body.byteLength) return { body, type };
     return { body: out.buffer.slice(out.byteOffset, out.byteOffset + out.byteLength) as ArrayBuffer, type: "image/jpeg" };
   } catch {
     return { body, type };
@@ -162,7 +177,7 @@ export async function fetchSkylinePhoto(
       // one briefly costs less than fetching it again for the next reader.
       const raw = await img.arrayBuffer();
       if (raw.byteLength === 0) return null;
-      const light = await lighten(raw, type);
+      const light = await lighten(raw, type, width);
       remember(key, light.body, light.type);
       return light;
     } finally {

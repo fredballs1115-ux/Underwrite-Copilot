@@ -23,6 +23,33 @@ describe("a market's photograph, encoded again to be served (#451)", () => {
     expect({ w: m.width, h: m.height, format: m.format }).toEqual({ w: 1200, h: 800, format: "jpeg" });
   });
 
+  it("brings a copy wider than the width asked down to it, and never enlarges one (2026-10-01)", async () => {
+    // Commons snaps a thumbnail's width up to its own sizes: the contact
+    // sheets asked for 640px and were sent 960px.
+    const wide = await photo(80, 1600, 1000);
+    const got = await lighten(ab(wide), "image/jpeg", 960);
+    const m = await sharp(Buffer.from(got.body)).metadata();
+    expect({ w: m.width, h: m.height }).toEqual({ w: 960, h: 600 });
+    // Asked wider than it is: the same size, never stretched.
+    const same = await lighten(ab(wide), "image/jpeg", 2400);
+    expect((await sharp(Buffer.from(same.body)).metadata()).width).toBe(1600);
+    // A light copy wider than asked is still brought down, whatever its bytes.
+    const lightWide = await photo(30, 1600, 1000);
+    const down = await lighten(ab(lightWide), "image/jpeg", 480);
+    expect((await sharp(Buffer.from(down.body)).metadata()).width).toBe(480);
+    // Stored on its side with an EXIF turn: judged by the width it is shown
+    // at (1,000 upright), so a 1,200 ask leaves it as it is, upright.
+    const turned = await sharp(testPixels(1600, 1000, 2), { raw: { width: 1600, height: 1000, channels: 3 } })
+      .jpeg({ quality: 30 })
+      .withMetadata({ orientation: 6 })
+      .toBuffer();
+    const upright = await lighten(ab(turned), "image/jpeg", 1200);
+    expect(upright.body.byteLength).toBe(turned.byteLength);
+    const turnedDown = await lighten(ab(turned), "image/jpeg", 500);
+    const t = await sharp(Buffer.from(turnedDown.body)).metadata();
+    expect({ w: t.width, h: t.height }).toEqual({ w: 500, h: 800 });
+  });
+
   it("keeps what Commons sent where encoding again would not help or cannot run", async () => {
     // Already light: encoding again would come out larger.
     const light = await photo(40);
