@@ -634,6 +634,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Bakersfield, CA",
     size: [3088, 2048],
   },
+  // Barnstable Town, MA: skyline-sheet run 36816098960 — the Old Harbor Life Saving Station small on the dune line at sunset under heavy blue-grey cloud, golden grass across the foot, from the Cape Cod article, whole in both crops. Chosen over the sheet's first pick, White Crest Beach in Wellfleet: its photographer's attribution page (en.wikipedia User:MattWade/ImageAttribution, read from the runner in zori run 36817794786) asks for his name linked to his own user page, a link this credit line does not carry. Over Provincetown under a pale sky from the Pilgrim Monument and Chatham Light at night.
+  "cbsa:12700": {
+    file: "Old Harbor Life Saving Station, Sunset.JPG",
+    place: "The Old Harbor Life Saving Station on the Cape Cod dunes at sunset, under heavy cloud",
+    credit: "JCefaly",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Barnstable Town, MA",
+    size: [3888, 2592],
+  },
   // Bend, OR: skyline-sheet run 36808230184 — the Deschutes beside Drake Park under a blue sky, its banks mirrored in the water, sharp and whole in both crops, over a downtown street at dawn under the Tower Theatre's sign with a bronze figure on a bench in its foreground, Mount Bachelor under a grey sky (the area's mountain, not the city), and two panoramas of the river 560 and 592px tall at their own width.
   "cbsa:13460": {
     file: "Drake Park, Bend (July 2012) - 1.JPG",

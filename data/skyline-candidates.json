@@ -4618,6 +4618,12 @@
         "Hyannis harbor",
         "Provincetown harbor",
         "Cape Cod Chatham harbor"
+      ],
+      "candidates": [
+        {
+          "file": "Old Harbor Life Saving Station, Sunset.JPG",
+          "note": "Barnstable Town, MA — JCefaly, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816098960)."
+        }
       ]
     },
     {
