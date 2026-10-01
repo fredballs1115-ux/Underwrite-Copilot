@@ -39,9 +39,10 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
     ],
   },
   {
-    h: "Cookies",
+    h: "Cookies and browser storage",
     body: [
-      "We use session cookies to keep you signed in. There are no advertising or cross-site tracking cookies.",
+      "Signing in sets the session cookies that keep you signed in; they last up to 400 days unless you sign out. Two cookies of our own remember a choice for a year: the view of your pipeline you left on (cards, list or map), and the regulatory alerts you dismissed, kept under your account's name.",
+      "Your browser also keeps a few things on this device only: a deal you started adding but did not submit (its name and address), that you closed the getting-started list, and, for the visit, your pipeline's filters and the map's looked-up places. There are no advertising or cross-site tracking cookies.",
     ],
   },
   {
@@ -95,7 +96,7 @@ export default function PrivacyPage() {
         <h1 className="text-3xl font-semibold tracking-tight">
           Privacy policy
         </h1>
-        <p className="mt-2 text-sm text-muted">Last updated: September 30, 2026</p>
+        <p className="mt-2 text-sm text-muted">Last updated: October 1, 2026</p>
         <p className="mt-5 text-sm leading-relaxed text-muted">
           Deal documents are sensitive — most OMs travel under confidentiality
           terms. This page says exactly what we collect, where it goes, and
