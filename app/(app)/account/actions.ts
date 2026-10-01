@@ -15,7 +15,15 @@ import {
 } from "@/lib/storage";
 import { getTeam } from "@/lib/teams";
 import { chunks, handOverTeamWork, readAll } from "@/lib/account-handover";
-import { deletedHref, deletionStopHref, type DeletionDone } from "@/lib/account-deletion";
+import {
+  accountHref,
+  deletedHref,
+  deletionStopHref,
+  doneFromForm,
+  mergeMoved,
+  movedOf,
+  type DeletionDone,
+} from "@/lib/account-deletion";
 import { SIGNED_OUT, authErrorCopy } from "@/lib/auth-flow";
 import { getStripe } from "@/lib/stripe/client";
 import { syncTeamSeats } from "@/lib/stripe/seats";
@@ -229,8 +237,13 @@ async function cancelSubscription(subId: string): Promise<boolean> {
  * steps before it had already done (lib/account-deletion).
  */
 export async function deleteAccount(formData: FormData) {
+  // What a try that stopped had already done, carried in by the account
+  // page's form from the query that stop landed on: a retry finds nothing
+  // left to move, and the subscription it cancelled no longer live, so
+  // without it the retry would say less than happened.
+  const before = doneFromForm(formData);
   const confirm = String(formData.get("confirm") ?? "").trim();
-  if (confirm !== "DELETE") redirect("/account?error=confirm");
+  if (confirm !== "DELETE") redirect(accountHref("confirm", before));
 
   const supabase = await createSupabaseServerClient();
   const {
@@ -259,7 +272,10 @@ export async function deleteAccount(formData: FormData) {
   //    the account would cascade whatever had not moved.
   const handover = await handOverTeamWork(admin, user.id);
   if (handover.ownsTeam) redirect("/account?error=ownerdelete");
-  const done: DeletionDone = { movedToTeam: handover.deals + handover.work > 0, cancelled: false };
+  const done: DeletionDone = {
+    movedToTeam: mergeMoved(before.movedToTeam, movedOf(handover)),
+    cancelled: before.cancelled,
+  };
   if (!handover.ok) redirect(deletionStopHref("handover", done));
 
   // 3. Cancel a live personal subscription. If Stripe fails — or the
@@ -352,6 +368,7 @@ export async function deleteAccount(formData: FormData) {
 
   await supabase.auth.signOut();
   // The sign-in page says what happened: everything gone, or — where deals
-  // or work went to a team's owner in step 2 — what stayed and with whom.
-  redirect(deletedHref(handover));
+  // or work went to a team's owner in step 2, this try or one before it —
+  // what stayed and with whom.
+  redirect(deletedHref(done.movedToTeam));
 }

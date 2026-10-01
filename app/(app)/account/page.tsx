@@ -10,7 +10,7 @@ import { EmailToggle } from "./email-toggle";
 import { BrandingSection } from "./branding-section";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { emailEnabled } from "@/lib/email";
-import { deletionStopNotice } from "@/lib/account-deletion";
+import { deletionStopNotice, doneFromQuery } from "@/lib/account-deletion";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -254,7 +254,9 @@ export default async function AccountPage({
           to its owner, and so does your work on any team&apos;s deals: saved
           versions, valuations and rent roll imports. This cannot be undone.
         </p>
-        <DeleteAccountForm />
+        {/* What a stopped try had already done rides into the next one,
+            so its pages say it too (lib/account-deletion). */}
+        <DeleteAccountForm carried={doneFromQuery({ moved, cancelled })} />
       </section>
     </div>
   );

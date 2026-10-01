@@ -206,15 +206,20 @@ vi.mock("@/app/login/actions", () => {
   return { authenticate: none, requestPasswordReset: none, resendConfirmation: none };
 });
 
+import { createElement } from "react";
 import { deleteAccount } from "@/app/(app)/account/actions";
+import { DeleteAccountForm } from "@/app/(app)/account/delete-account-form";
 import { HANDOVER_CHUNK, READ_PAGE } from "./account-handover";
 import { deletionStopNotice } from "./account-deletion";
 import LoginPage from "@/app/login/page";
 import { visibleText } from "./render-lint";
 
-async function landing(): Promise<string> {
+/** Where a deletion lands — the form's own fields beside the typed DELETE,
+ *  as the account page's form sends them after a stop. */
+async function landing(fields: Record<string, string> = {}): Promise<string> {
   const fd = new FormData();
   fd.set("confirm", "DELETE");
+  for (const [k, v] of Object.entries(fields)) fd.set(k, v);
   try {
     await deleteAccount(fd);
   } catch (e) {
@@ -424,7 +429,7 @@ describe("deleting an account says what happened to a team's deals", () => {
     // The valuations' write fails after the deals': the deals moved.
     for (const [table, href] of [
       ["deals", "/account?error=handover"],
-      ["valuations", "/account?error=handover&moved=1"],
+      ["valuations", "/account?error=handover&moved=deals"],
     ] as const) {
       db.tables.deals = [deal("deal-a", ME, "team-1")];
       db.tables.valuations = [{ id: "val-a", deal_id: "deal-a", user_id: ME }];
@@ -434,7 +439,7 @@ describe("deleting an account says what happened to a team's deals", () => {
       expect(db.deleted, table).toBe(false);
     }
     expect(notice("/account?error=handover")).toContain("nothing was changed and your account was not deleted");
-    expect(notice("/account?error=handover&moved=1")).toContain(
+    expect(notice("/account?error=handover&moved=deals")).toContain(
       "Part of what you had in a team's pipeline moved to the team's owner before the rest could, so your account was not deleted.",
     );
   });
@@ -493,7 +498,7 @@ describe("deleting an account moves the team's work first, cancels the plan next
     memberWithSubscription();
     db.stripe = { cancel: "fail", status: "active" };
     const href = await landing();
-    expect(href).toBe("/account?error=cancelsub&moved=1");
+    expect(href).toBe("/account?error=cancelsub&moved=deals");
     expect(db.deleted).toBe(false);
     expect(row("deals", "deal-a")?.user_id).toBe("owner-1");
     expect(row("deals", "mine")?.user_id).toBe(ME);
@@ -518,7 +523,7 @@ describe("deleting an account moves the team's work first, cancels the plan next
   it("a profile that cannot be read stops before Stripe and the deletion: a live plan would keep billing", async () => {
     memberWithSubscription();
     db.failReadOn = "profiles";
-    expect(await landing()).toBe("/account?error=cancelsub&moved=1");
+    expect(await landing()).toBe("/account?error=cancelsub&moved=deals");
     expect(db.events.some((e) => e.startsWith("stripe:"))).toBe(false);
     expect(db.deleted).toBe(false);
   });
@@ -527,7 +532,7 @@ describe("deleting an account moves the team's work first, cancels the plan next
     memberWithSubscription();
     db.failDelete = true;
     const href = await landing();
-    expect(href).toBe("/account?error=delete&moved=1&cancelled=1");
+    expect(href).toBe("/account?error=delete&moved=deals&cancelled=1");
     expect(rows("team_members").map((m) => m.user_id)).toContain(ME);
     expect(row("deals", "mine")?.user_id).toBe(ME);
     expect(db.events).not.toContain("seats:team-1");
@@ -552,5 +557,70 @@ describe("deleting an account moves the team's work first, cancels the plan next
     const docReads = db.reads.filter((r) => r.table === "deal_documents");
     expect(docReads).toHaveLength(Math.ceil(n / HANDOVER_CHUNK));
     for (const r of docReads) expect((r.filters.find(([op]) => op === "in")?.[2] as string[]).length).toBeLessThanOrEqual(HANDOVER_CHUNK);
+  });
+});
+
+// The stops say to try again, and a retry starts with nothing left to move:
+// the first try's handover had already taken the deals. Without what the
+// page's form carries in, the retry landed on "all its data have been
+// deleted" for an account whose deals had stayed with the team.
+describe("a retry after a stop says what the stopped try had done", () => {
+  /** The query a stop landed on, as the account page's form sends it back. */
+  const carried = (href: string): Record<string, string> => {
+    const q = new URL(href, "https://app.test").searchParams;
+    return Object.fromEntries(["moved", "cancelled"].flatMap((k) => (q.get(k) ? [[k, q.get(k)!]] : [])));
+  };
+
+  it("lands on the deals that stayed with the team, though this try moved none", async () => {
+    /** A first try that moved the deals and stopped at Stripe, then the
+     *  retry, sent with what the page carried or without it. */
+    const retry = async (withCarried: boolean) => {
+      memberWithSubscription();
+      db.writes.length = 0;
+      db.deleted = false;
+      db.stripe = { cancel: "fail", status: "active" };
+      const first = await landing();
+      expect(first).toBe("/account?error=cancelsub&moved=deals");
+      // The reader cancels from Billing; the webhook marks the profile.
+      db.tables.profiles[0].subscription_status = "canceled";
+      const href = await landing(withCarried ? carried(first) : {});
+      // The retry had nothing to move: the one deals write is the first try's.
+      expect(db.writes.filter((w) => w.op === "update" && w.table === "deals")).toHaveLength(1);
+      expect(db.deleted).toBe(true);
+      return href;
+    };
+    expect(await retry(true)).toBe("/login?deleted=team");
+    // What the same retry said with nothing carried: all the data gone.
+    expect(await retry(false)).toBe("/login?deleted=1");
+  });
+
+  it("a second failed deletion still says the subscription the first one cancelled was cancelled", async () => {
+    memberWithSubscription();
+    db.failDelete = true;
+    const first = await landing();
+    expect(first).toBe("/account?error=delete&moved=deals&cancelled=1");
+    db.tables.profiles[0].subscription_status = "canceled";
+    const second = await landing(carried(first));
+    expect(second).toBe(first);
+    expect(notice(second)).toContain("your subscription was cancelled and what you had in a team's pipeline moved to the team's owner");
+  });
+
+  it("a mistyped confirmation keeps what the stopped try had done for the next", async () => {
+    const fd = new FormData();
+    fd.set("confirm", "delete");
+    fd.set("moved", "work");
+    fd.set("cancelled", "1");
+    await expect(deleteAccount(fd)).rejects.toThrow("REDIRECT /account?error=confirm&moved=work&cancelled=1");
+    expect(db.writes).toEqual([]);
+  });
+
+  it("the account page's form carries the query's flags in as hidden fields, and nothing without them", () => {
+    const html = renderToStaticMarkup(createElement(DeleteAccountForm, { carried: { movedToTeam: "deals", cancelled: true } }));
+    expect(html).toContain('<input type="hidden" name="moved" value="deals"/>');
+    expect(html).toContain('<input type="hidden" name="cancelled" value="1"/>');
+    const plain = renderToStaticMarkup(createElement(DeleteAccountForm, { carried: { movedToTeam: null, cancelled: false } }));
+    expect(plain).not.toContain('type="hidden"');
+    const page = readFileSync(join(process.cwd(), "app/(app)/account/page.tsx"), "utf8");
+    expect(page).toContain("<DeleteAccountForm carried={doneFromQuery({ moved, cancelled })} />");
   });
 });
