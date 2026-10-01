@@ -40,11 +40,13 @@ export function assumableRows<M extends Row>(metrics: ReadonlyArray<M>) {
 }
 
 /** Every row of the loan offered for assumption the memorandum states, each
- *  with the term it states. None without a balance row: no balance, no
- *  loan offered. */
+ *  with the term it states — a balance or not. A row named for the seller's
+ *  loan is that loan's: listed with no balance beside it, "Assumable loan
+ *  rate 3.45%" had fallen through to the buyer's own financing as a plain
+ *  rate. (What prices the loan, lib/assumable-debt, still prices none
+ *  without a balance.) */
 export function assumableStatedRows<M extends Row>(metrics: ReadonlyArray<M>): { term: string; row: M }[] {
   const r = assumableRows(metrics);
-  if (!r.balanceRow) return [];
   return stated([
     ["Balance", r.balanceRow],
     ["Rate", r.rateRow],
@@ -77,10 +79,10 @@ export function sellerNoteRows<M extends Row>(metrics: ReadonlyArray<M>) {
 }
 
 /** Every row of the seller's note the memorandum states, each with the
- *  term it states. None where it states no amount, rate or term. */
+ *  term it states, whichever they are: a note's amortization stated alone
+ *  is the note's, never the buyer's financing. */
 export function sellerNoteStatedRows<M extends Row>(metrics: ReadonlyArray<M>): { term: string; row: M }[] {
   const r = sellerNoteRows(metrics);
-  if (!r.amountRow && !r.rateRow && !r.termRow) return [];
   return stated([
     ["Amount", r.amountRow],
     ["Rate", r.rateRow],

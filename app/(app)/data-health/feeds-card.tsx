@@ -4,7 +4,8 @@ import { feedStatusWord, type FeedStatus } from "@/lib/feed-health";
 type StatusWord = ReturnType<typeof feedStatusWord>;
 
 /** A feed's newest observation and how old it is, or a dash for none. */
-const newestText = (f: FeedStatus) => (f.newest ? `${f.newest} · ${f.ageDays === 0 ? "today" : `${f.ageDays} days old`}` : "—");
+const newestText = (f: FeedStatus) =>
+  f.newest ? `${f.newest} · ${f.ageDays === 0 ? "today" : `${f.ageDays} ${f.ageDays === 1 ? "day" : "days"} old`}` : "—";
 
 /** How many of a feed's series are current, or a dash where it has none. */
 const seriesText = (f: FeedStatus) => (f.seriesTotal > 0 ? `${f.seriesFresh} of ${f.seriesTotal} current` : "—");

@@ -781,6 +781,15 @@ describe("the debt sizer lists a stated loan under whose loan it is (2026-09-30)
     expect(t.offered.map((r) => r.label)).toEqual(["LTV"]);
   });
 
+  it("lists a seller's loan's term as that loan's even where its balance is not stated (the audit, 2026-10-01)", () => {
+    const rateOnly = omLoanTerms(withRows([row("Assumable loan rate", "3.45%")]));
+    expect(rateOnly.assumable.map((r) => `${r.label}: ${r.value}`)).toEqual(["Rate: 3.45%"]);
+    expect(rateOnly.offered.map((r) => r.label)).toEqual(["LTV"]);
+    const amortOnly = omLoanTerms(withRows([row("Seller financing amortization", "25 years")]));
+    expect(amortOnly.seller.map((r) => r.label)).toEqual(["Amortization"]);
+    expect(amortOnly.offered.map((r) => r.label)).toEqual(["LTV"]);
+  });
+
   it("lists the note the seller offers to carry as the seller's note", () => {
     const t = omLoanTerms(
       withRows([

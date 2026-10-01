@@ -9,20 +9,27 @@ import { UPLOAD_MAX_BYTES, sizeAgainstLimit, tooLargeMessage, wrongTypeMessage }
 const MB = 1024 * 1024;
 
 describe("a file over the limit never reads as equal to it", () => {
-  it("says the shipped case as over the limit, to a tenth", () => {
+  it("says a file a byte over as just over, and a larger one to the nearest tenth", () => {
+    // Rounded up, a byte over the limit had read "32.1 MB".
     expect(tooLargeMessage("deck.pdf", 32 * MB + 1, UPLOAD_MAX_BYTES)).toBe(
-      '"deck.pdf" is 32.1 MB — over the 32 MB limit. Try compressing or splitting it.',
+      '"deck.pdf" is just over the 32 MB limit. Try compressing or splitting it.',
     );
-    expect(sizeAgainstLimit(Math.round(32.4 * MB), UPLOAD_MAX_BYTES).size).toBe("32.4");
+    expect(tooLargeMessage("deck.pdf", Math.round(32.4 * MB), UPLOAD_MAX_BYTES)).toBe(
+      '"deck.pdf" is 32.4 MB — over the 32 MB limit. Try compressing or splitting it.',
+    );
     expect(sizeAgainstLimit(32.5 * MB, UPLOAD_MAX_BYTES).size).toBe("32.5");
   });
 
-  it("every size from a byte over to a MB over reads larger than the limit", () => {
+  it("every size from a byte over to a MB over reads larger than the limit, or just over it, and never larger than it is", () => {
     for (let bytes = UPLOAD_MAX_BYTES + 1; bytes <= UPLOAD_MAX_BYTES + MB; bytes += 4099) {
       const { size, limit } = sizeAgainstLimit(bytes, UPLOAD_MAX_BYTES);
       expect(limit).toBe("32");
+      if (size === null) {
+        expect(bytes / MB, `${bytes} bytes`).toBeLessThan(32.05);
+        continue;
+      }
       expect(Number(size), `${bytes} bytes`).toBeGreaterThan(Number(limit));
-      expect(Number(size), `${bytes} bytes`).toBeGreaterThanOrEqual(bytes / MB);
+      expect(Math.abs(Number(size) - bytes / MB), `${bytes} bytes`).toBeLessThanOrEqual(0.05);
     }
   });
 
@@ -32,7 +39,8 @@ describe("a file over the limit never reads as equal to it", () => {
     expect(sizeAgainstLimit(2 * MB, 1.5 * MB)).toEqual({ size: "2", limit: "1.5" });
     // A limit that is no tenth of a MB still never ties the file over it.
     const odd = sizeAgainstLimit(1_000_001, 1_000_000);
-    expect(Number(odd.size)).toBeGreaterThan(Number(odd.limit));
+    expect(odd.size).toBeNull();
+    expect(tooLargeMessage("a.pdf", 1_000_001, 1_000_000)).toContain("is just over the 1 MB limit");
   });
 });
 
