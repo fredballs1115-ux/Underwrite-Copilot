@@ -30,7 +30,10 @@ import {
   emailSetup,
   notifyAnalysisReady,
   senderDomain,
+  wantsAnalysisEmail,
 } from "./email";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const DEAL = "3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b";
 const PICTURE: DealPicture = {
@@ -248,5 +251,41 @@ describe("the emails are paused without a sender a customer receives mail from",
     } finally {
       warn.mockRestore();
     }
+  });
+});
+
+// The account page's switch: an email per finished screen, and one when a
+// screen fails before its verdict. A failed read of the switch had counted
+// as ON, so a database blip could email someone who had turned it off.
+describe("the analysis emails go only where the reader has not said no", () => {
+  const prefs = (result: { data?: unknown; error?: unknown } | "throw") =>
+    ({
+      from: () => ({
+        select: () => ({
+          eq: () => ({
+            maybeSingle: async () => {
+              if (result === "throw") throw new Error("connection reset");
+              return { data: result.data ?? null, error: result.error ?? null };
+            },
+          }),
+        }),
+      }),
+    }) as unknown as SupabaseClient;
+
+  it("sends by default and where the switch is on, never where it is off or unread", async () => {
+    expect(await wantsAnalysisEmail(prefs({ data: null }), "u1")).toBe(true);
+    expect(await wantsAnalysisEmail(prefs({ data: { email_on_analysis: true } }), "u1")).toBe(true);
+    expect(await wantsAnalysisEmail(prefs({ data: { email_on_analysis: false } }), "u1")).toBe(false);
+    expect(await wantsAnalysisEmail(prefs({ error: { message: "timeout" } }), "u1")).toBe(false);
+    expect(await wantsAnalysisEmail(prefs("throw"), "u1")).toBe(false);
+  });
+
+  it("the worker emails a screen it gives up on, or that throws, as the pipeline does its own", () => {
+    const src = readFileSync(join(process.cwd(), "worker/index.ts"), "utf8");
+    expect(src).toMatch(/if \(payload\.kind === "screen"\) await notifyAnalysisFailed\(admin, next\.deal_id as string, INTERRUPTED_MSG\)/);
+    expect(src).toMatch(/if \(failed && job\.payload\.kind === "screen"\) await notifyAnalysisFailed\(admin, job\.dealId, message\)/);
+    const email = readFileSync(join(process.cwd(), "lib/email.ts"), "utf8");
+    // Both notifiers read the switch through the one reader.
+    expect(email.match(/await wantsAnalysisEmail\(admin, deal\.user_id as string\)/g)).toHaveLength(2);
   });
 });

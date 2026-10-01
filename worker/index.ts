@@ -36,6 +36,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { downloadDealFile, removeSupplementFile, type StorageScope } from "@/lib/storage";
 import { runWeeklyDigests } from "@/lib/digest";
+import { notifyAnalysisFailed } from "@/lib/email";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Tunables — env-overridable so the test rig can run the real binary fast.
@@ -225,6 +226,10 @@ async function claimNext(): Promise<ClaimedJob | null> {
       if (payload.model?.path) {
         await removeSupplementFile(payload.model.path, parkedModelScope(next.deal_id as string));
       }
+      // The account page promises an email when a screen fails before its
+      // verdict; the pipeline sends it on its own failures, and these are
+      // the worker's.
+      if (payload.kind === "screen") await notifyAnalysisFailed(admin, next.deal_id as string, INTERRUPTED_MSG);
     }
     return null;
   }
@@ -427,11 +432,9 @@ async function main(): Promise<void> {
       // runJob handles its own failures; reaching here is unexpected. Mark
       // the job errored so the deal never wedges on "running".
       log(`job ${job.id} threw unexpectedly: ${err instanceof Error ? err.message : err}`);
-      await failJob(
-        job.id,
-        "The analysis hit an unexpected worker error — please try again.",
-        { status: "running" },
-      );
+      const message = "The analysis hit an unexpected worker error — please try again.";
+      const failed = await failJob(job.id, message, { status: "running" });
+      if (failed && job.payload.kind === "screen") await notifyAnalysisFailed(admin, job.dealId, message);
     } finally {
       clearTimeout(timer);
       current = null;

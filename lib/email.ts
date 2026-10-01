@@ -146,6 +146,28 @@ export async function sendEmail(
  * buy-box chip the deal header shows (lib/buy-box-chip, from the same
  * inputs), and swallows every failure.
  */
+/**
+ * The account's "Email when an analysis finishes" switch, read for one
+ * send: ON for an account with no profile row yet (the switch's default),
+ * OFF where the reader turned it off — and OFF where the read fails. It
+ * had read a failed read as ON, a habit from before migration 0014 added
+ * the column, so a blip in the database could email someone who had said
+ * no; a missed email is the smaller wrong.
+ */
+export async function wantsAnalysisEmail(admin: SupabaseClient, userId: string): Promise<boolean> {
+  try {
+    const { data: prefs, error } = await admin
+      .from("profiles")
+      .select("email_on_analysis")
+      .eq("id", userId)
+      .maybeSingle();
+    if (error) return false;
+    return !(prefs && prefs.email_on_analysis === false);
+  } catch {
+    return false;
+  }
+}
+
 export async function notifyAnalysisReady(
   admin: SupabaseClient,
   dealId: string,
@@ -163,21 +185,7 @@ export async function notifyAnalysisReady(
     const verdict = deal.verdict as VerdictResult | null;
     if (!verdict?.verdict) return;
 
-    // The per-user toggle — ON by default, and ON when the column predates
-    // migration 0014 (the select just errors; never block the email feature
-    // on schema lag, and never crash on it either).
-    let wants = true;
-    try {
-      const { data: prefs, error } = await admin
-        .from("profiles")
-        .select("email_on_analysis")
-        .eq("id", deal.user_id as string)
-        .maybeSingle();
-      if (!error && prefs && prefs.email_on_analysis === false) wants = false;
-    } catch {
-      // pre-0014 schema — default on
-    }
-    if (!wants) return;
+    if (!(await wantsAnalysisEmail(admin, deal.user_id as string))) return;
 
     const { data: userRes } = await admin.auth.admin.getUserById(
       deal.user_id as string,
@@ -263,18 +271,7 @@ export async function notifyAnalysisFailed(
       .eq("id", dealId)
       .maybeSingle();
     if (!deal || deal.is_sample) return;
-    let wants = true;
-    try {
-      const { data: prefs, error } = await admin
-        .from("profiles")
-        .select("email_on_analysis")
-        .eq("id", deal.user_id as string)
-        .maybeSingle();
-      if (!error && prefs && prefs.email_on_analysis === false) wants = false;
-    } catch {
-      // pre-0014 schema — default on
-    }
-    if (!wants) return;
+    if (!(await wantsAnalysisEmail(admin, deal.user_id as string))) return;
     const { data: userRes } = await admin.auth.admin.getUserById(deal.user_id as string);
     const to = userRes?.user?.email;
     if (!to) return;
