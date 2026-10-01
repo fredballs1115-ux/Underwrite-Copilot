@@ -717,8 +717,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   bottom, and says the range ("the ask is $40.0M–$42.0M, its top 2%
   over"). `parseMoney` itself still reads a range's first figure: an
   income's unflattering end is its bottom, not its top, so it stays the
-  reader of every other figure. The header and the key terms print the
-  price row as stated.
+  reader of every other figure. The key terms print the price row as
+  stated; the deal header and its sticky bar draw a range short
+  (`priceFigureOf` in `deal-hero.tsx` through `priceRangeShort`: "$9–9.5M")
+  with the range as stated in its title, since the stated range overran the
+  header's figure box at every width.
 - The offering process (#467): the extraction files when offers are due as
   a row, "Offers due", exactly as written (never a tour, questions or
   closing date; "Offers reviewed as received" where so), and the brokers
