@@ -48,15 +48,16 @@ import {
   type SnapBlock,
   type Standing,
 } from "@/lib/sector-leaderboard";
-import { blockCitations, rentOf, rentText, type CitedFigure } from "@/lib/tracker-read";
+import { blockCitations, rentOf, rentText } from "@/lib/tracker-read";
 import { SubmarketsPanel } from "./submarkets-panel";
-import { CoverageBoardCell, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
+import { CoverageBoardCell, FigureCredits, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
 import { listSubmarkets } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
 import { MarketCompare } from "./market-compare";
 import { COMPARE_METROS } from "./compare-metros";
 import { Fold } from "./fold";
 import { RuleItem } from "./rule-item";
+import { SourceRef } from "./source-ref";
 import { ExampleListings } from "./example-listings";
 import { examplesFor } from "@/lib/example-listings";
 import { FmrRow } from "./fmr-row";
@@ -83,37 +84,6 @@ const SECTOR_LABEL: Record<string, string> = {
 // old, a narrower stock, a spread of two reads — has a standing with its
 // reason and no rank; a metro with no vacancy figure has none.
 const TRACKED_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
-/** A block's figures, each credited on one line to its own house, area and
- *  period, and linked to its own source where the file ties one to it. */
-function FigureCredits({ figures }: { figures: CitedFigure[] }) {
-  if (figures.length === 0) return null;
-  return (
-    <p className="mt-1 text-[11px] leading-relaxed text-muted" data-qa="figure-credits">
-      {figures.map((f, i) => {
-        const href = f.read.links[0];
-        return (
-          <Fragment key={f.label}>
-            {i > 0 ? " · " : null}
-            {`${f.label}: `}
-            {href && linkOk(href) !== false ? (
-              <a
-                href={href}
-                target="_blank"
-                rel="noreferrer"
-                className="underline decoration-dotted underline-offset-2 hover:text-ink"
-              >
-                {f.words}
-              </a>
-            ) : (
-              f.words
-            )}
-          </Fragment>
-        );
-      })}
-    </p>
-  );
-}
-
 function SectorSnapshotPanel({
   snapshot,
   metroId,
@@ -1054,8 +1024,12 @@ function SectorExplorer({ selected }: { selected?: string }) {
         <h2 className="text-sm font-semibold tracking-tight">
           Every asset class, researched
         </h2>
+        {/* The day the research was read — not any figure's own date — and
+            what the table holds: a tier's cap as its source states it, a
+            range or one figure. "Ranges, never single numbers" sat above
+            6% and 6.2% (the research pass of 2026-10-01). */}
         <span className="text-[11px] text-muted">
-          {`${asOfLabel(doc.as_of)} · ranges, never single numbers`}
+          {`${typeof doc.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(doc.as_of) ? `research read ${datedLong(doc.as_of)}` : asOfLabel(doc.as_of)} · each tier's cap as its source states it, a range or one figure`}
         </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1084,17 +1058,7 @@ function SectorExplorer({ selected }: { selected?: string }) {
             >
               {cycleStatus}
             </span>
-            {doc.cycle_position.sources?.[0] &&
-              linkOk(doc.cycle_position.sources[0]) !== false && (
-                <a
-                  href={doc.cycle_position.sources[0]}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="ml-1.5 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-                >
-                  source
-                </a>
-              )}
+            <SourceRef source={doc.cycle_position.sources?.[0]} className="ml-1.5 text-[11px] text-muted" />
           </p>
         )}
 
@@ -1119,17 +1083,10 @@ function SectorExplorer({ selected }: { selected?: string }) {
                     </td>
                     <td className="py-1.5 text-[11px] text-muted">
                       {r.status ?? "sourced"}
-                      {r.sources?.[0] && linkOk(r.sources[0]) !== false && (
+                      {r.sources?.[0] && (
                         <>
                           {" · "}
-                          <a
-                            href={r.sources[0]}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                          >
-                            source
-                          </a>
+                          <SourceRef source={r.sources[0]} />
                         </>
                       )}
                     </td>

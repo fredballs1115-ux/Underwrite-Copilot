@@ -317,3 +317,38 @@ export function CoverageBoardCell({ sector, cell }: { sector: string; cell: Cove
     </div>
   );
 }
+
+/** A block's figures, each credited on one line to its own house, area and
+ *  period, and linked to its own source where the file ties one to it. */
+export function FigureCredits({ figures }: { figures: CitedFigure[] }) {
+  if (figures.length === 0) return null;
+  return (
+    <p className="mt-1 text-[11px] leading-relaxed text-muted" data-qa="figure-credits">
+      {figures.map((f, i) => {
+        const href = f.read.links[0];
+        return (
+          <Fragment key={f.label}>
+            {i > 0 ? " · " : null}
+            {`${f.label}: `}
+            {href && linkOk(href) !== false ? (
+              <a
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="underline decoration-dotted underline-offset-2 hover:text-ink"
+              >
+                {f.words}
+              </a>
+            ) : f.read.house ? (
+              // A house the file names, with no link a visitor can follow:
+              // said as that, never left to read like a checked source.
+              `${f.words} (no link recorded)`
+            ) : (
+              f.words
+            )}
+          </Fragment>
+        );
+      })}
+    </p>
+  );
+}

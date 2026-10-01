@@ -8062,3 +8062,37 @@ describe("MetroLive — a tile names its area wherever the figure is not the mar
     expect(philly).not.toContain("Unemployment · Philadelphia MSA");
   });
 });
+
+// ── A figure a visitor cannot check says what is missing (the research pass of 2026-10-01) ──
+import { FigureCredits } from "@/app/market/tracker-boards";
+import { SourceRef } from "@/app/market/source-ref";
+import { sourceParts } from "@/lib/source-parts";
+import { blockCitations } from "@/lib/tracker-read";
+import metrosForCredits from "@/data/research/metros.json";
+
+describe("a tracker figure's credit says what is missing, and a source links its address alone", () => {
+  const blockOf = (id: string, sector: string) =>
+    ((metrosForCredits.metros.find((m) => m.id === id)!.sector_snapshot as unknown) as Record<string, unknown>)[sector];
+
+  it("says a figure names no publisher, and a publisher with no link has none, never a credit that reads like a source", () => {
+    const chicago = visibleText(render(React.createElement(FigureCredits, { figures: blockCitations(blockOf("chicago", "office")) })));
+    expect(chicago).toContain("Vacancy: publisher not recorded, Q1 2026");
+    const miami = visibleText(render(React.createElement(FigureCredits, { figures: blockCitations(blockOf("miami", "retail")) })));
+    expect(miami).toContain("Vacancy: Colliers, Miami-Dade, Q2 2026 (no link recorded)");
+  });
+
+  it("links a source's address and prints the file's note beside it as text", () => {
+    const redfin = "https://www.redfin.com/news/data-center/downloads/ (redfin_metro_market_tracker.tsv000.gz, updated 2026-06-02, Multi-Family 2-4 Unit property type)";
+    expect(sourceParts(redfin)).toEqual({
+      href: "https://www.redfin.com/news/data-center/downloads/",
+      words: "redfin_metro_market_tracker.tsv000.gz, updated 2026-06-02, Multi-Family 2-4 Unit property type",
+    });
+    expect(sourceParts("https://a.example/x — the file, page 3")).toEqual({ href: "https://a.example/x", words: "the file, page 3" });
+    expect(sourceParts("https://a.example/x")).toEqual({ href: "https://a.example/x", words: null });
+    expect(sourceParts("FRED, the series page")).toEqual({ href: null, words: "FRED, the series page" });
+    const html = render(React.createElement(SourceRef, { source: redfin }));
+    expect(html).toContain('href="https://www.redfin.com/news/data-center/downloads/"');
+    expect(html).not.toContain('href="https://www.redfin.com/news/data-center/downloads/ (');
+    expect(html.replace(/<[^>]+>/g, "")).toContain("source (redfin_metro_market_tracker.tsv000.gz, updated 2026-06-02, Multi-Family 2-4 Unit property type)");
+  });
+});

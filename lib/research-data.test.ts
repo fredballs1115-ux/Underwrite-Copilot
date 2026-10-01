@@ -161,7 +161,8 @@ describe("sector snapshot benchmark rows", () => {
     // The Washington region's apartment vacancy names no house: no link, and its own period.
     const dcVacancy = snapRows.find((b) => b.metro === "Washington DC" && b.metric === "multifamily_vacancy_pct")!;
     expect(dcVacancy.source).toBe("");
-    expect(dcVacancy.cite).toBe("the Washington DC region, year-end 2025");
+    // A figure the file names no house for says so (the research pass of 2026-10-01).
+    expect(dcVacancy.cite).toBe("publisher not recorded, the Washington DC region, year-end 2025");
   });
   it("the homepage spread board has at least three real divergences to draw", () => {
     // The SpreadBoard derives (metro, sector) pairs where two named trackers

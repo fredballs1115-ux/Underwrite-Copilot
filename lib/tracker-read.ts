@@ -241,7 +241,10 @@ export function areaLabel(area: string): string {
  * A field the file leaves out is left out of the words.
  */
 export function figureCitation(read: Pick<FigureRead, "house" | "area" | "period">): string {
-  return [read.house, read.area, read.period ?? "undated"].filter((x): x is string => !!x).join(", ");
+  // A figure the file names no house for says so, plainly: a credit that
+  // read "Vacancy: Q2 2026" looked like a source a visitor could check (the
+  // research pass of 2026-10-01).
+  return [read.house ?? "publisher not recorded", read.area, read.period ?? "undated"].filter((x): x is string => !!x).join(", ");
 }
 
 /**

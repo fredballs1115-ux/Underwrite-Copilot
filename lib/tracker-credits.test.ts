@@ -29,7 +29,9 @@ describe("blockCitations — each figure a block carries, with its own read", ()
   it("credits Chicago's office vacancy and rent apart, and neither to the block's first link", () => {
     const [vacancy, rent, ...rest] = blockCitations(block("chicago", "office"));
     expect(rest).toEqual([]);
-    expect(vacancy).toMatchObject({ label: "Vacancy", words: "Q1 2026" });
+    // A figure the file names no house for says so plainly — never a
+    // credit that reads like a source (the research pass of 2026-10-01).
+    expect(vacancy).toMatchObject({ label: "Vacancy", words: "publisher not recorded, Q1 2026" });
     expect(vacancy.read.links).toEqual([]);
     expect(rent).toMatchObject({ label: "Rent", words: "Cushman & Wakefield, the CBD, Q2 2026" });
     expect(rent.read.links).toEqual([CBD_OFFICE]);
@@ -50,7 +52,10 @@ describe("blockCitations — each figure a block carries, with its own read", ()
     const philly = blockCitations(block("philadelphia", "industrial")).find((f) => f.label === "Rent")!;
     expect(philly.words).toContain("for Class A space");
     const nova = blockCitations(block("nova", "industrial"));
-    expect(nova.map((f) => f.words)).toEqual(["Northern Virginia, undated; for small-bay space", "Northern Virginia, undated; for small-bay space"]);
+    expect(nova.map((f) => f.words)).toEqual([
+      "publisher not recorded, Northern Virginia, undated; for small-bay space",
+      "publisher not recorded, Northern Virginia, undated; for small-bay space",
+    ]);
   });
 
   it("every figure on file is credited only to its own block's sources", () => {
@@ -139,7 +144,7 @@ describe("the compare card", () => {
     const chicago = COMPARE_METROS.find((m) => m.id === "chicago")!;
     expect(chicago.researchReadOn).toBe(datedLong(String((metrosSeed.metros.find((m) => m.id === "chicago")!.sector_snapshot as { as_of: string }).as_of)));
     expect(chicago.sectors?.office?.cite).toBe(
-      "Vacancy: Q1 2026 · Rent: Cushman & Wakefield, the CBD, Q2 2026; average gross asking",
+      "Vacancy: publisher not recorded, Q1 2026 · Rent: Cushman & Wakefield, the CBD, Q2 2026; average gross asking",
     );
     for (const m of COMPARE_METROS) {
       for (const s of Object.values(m.sectors ?? {})) {
@@ -153,6 +158,12 @@ describe("the compare card", () => {
     expect(text).toMatch(/research read [A-Z][a-z]{2} \d{1,2}, \d{4}/);
     expect(text).not.toMatch(/research as of/);
     expect(html).toContain('title="Vacancy: Colliers (21.3%) and CBRE (22.2%), the District, Q2 2026"');
+    // Each figure's own period is on the card, not only in a title (the
+    // research pass of 2026-10-01) — once for a cell whose figures share
+    // one — and a figure the DMV markets share names its area.
+    expect(text).toContain("21.3–22.2% (Q2 2026)");
+    expect(text).toContain("10.3–15.5% · $13.27/SF (Q2 2026)");
+    expect(text).toContain("5.2% (Washington DC region, year-end 2025) · cap 4.75–5.5% (Washington DC region, undated)");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });

@@ -731,7 +731,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
     const region = trackerFor("pg_county", "multifamily")!;
     expect(region.vacancy).toMatchObject({ house: null, area: "the Washington DC region", period: "year-end 2025", links: [] });
     expect(region.cap).toMatchObject({ house: null, period: null, links: [] });
-    expect(figureCitation(region.cap!)).toBe("the Washington DC region, undated");
+    expect(figureCitation(region.cap!)).toBe("publisher not recorded, the Washington DC region, undated");
     // The Miami retail figure is Colliers' Q2 2026; the block's only Colliers link is its Q1 report, so it is not credited.
     expect(trackerFor("miami", "retail")!.vacancy).toMatchObject({ house: "Colliers", period: "Q2 2026", links: [] });
   });
@@ -750,7 +750,7 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
     // A block with a figure and no read: nothing named, and never the first source.
     const bare = figureRead(undefined, sources);
     expect(bare).toEqual({ house: null, area: null, period: null, links: [], construct: null, slice: null, printedBand: false });
-    expect(figureCitation(bare)).toBe("undated");
+    expect(figureCitation(bare)).toBe("publisher not recorded, undated");
     expect(figureNote({ ...bare, house: "Essex Realty", period: "April 2026", construct: "a transaction average", slice: "Class B/C buildings" })).toBe(
       "Essex Realty, April 2026; a transaction average; for Class B/C buildings",
     );
@@ -871,7 +871,7 @@ describe("the tracker inside the model's checks", () => {
     expect(bulk.tone).toBe("aside");
     expect(bulk.toneLabel).toBe("beside a narrower stock");
     // Northern Virginia's industrial band names no house and no period.
-    expect(bulk.read).toContain("reads 3.9–5.0% on the research tracker: Northern Virginia, undated (read Aug 25, 2026)");
+    expect(bulk.read).toContain("reads 3.9–5.0% on the research tracker: publisher not recorded, Northern Virginia, undated (read Aug 25, 2026)");
     expect(bulk.read).toContain(
       "That figure is for small-bay space, not the industrial market as a whole, so the model is not held to it; its vacancy sits 1.0 point over its high end.",
     );
@@ -900,7 +900,7 @@ describe("the tracker inside the model's checks", () => {
     // The region's figure names no house, so no link and no house is credited.
     expect(c.published[2]).toMatchObject({ value: 5.2, asOf: "year-end 2025", publisher: "research tracker" });
     expect(c.read).toContain(
-      "The model sits inside the survey's margin of the published figure. The research tracker's apartment vacancy reads 5.2%: the Washington DC region, year-end 2025 (read Aug 25, 2026) — research, shown beside the Census figure rather than in its place.",
+      "The model sits inside the survey's margin of the published figure. The research tracker's apartment vacancy reads 5.2%: publisher not recorded, the Washington DC region, year-end 2025 (read Aug 25, 2026) — research, shown beside the Census figure rather than in its place.",
     );
   });
 
@@ -914,7 +914,7 @@ describe("the tracker inside the model's checks", () => {
       ["Apartment cap (research tracker), the Washington DC region, high end", 5.5, "undated"],
     ]);
     expect(c.read).toContain(
-      "The research tracker's apartment cap range is 4.75–5.50% (a band on a deal mix leaning Class B / value-add): the Washington DC region, undated (read Aug 25, 2026), and the exit cap sits 50 bps over its high end — the conservative direction for an exit.",
+      "The research tracker's apartment cap range is 4.75–5.50% (a band on a deal mix leaning Class B / value-add): publisher not recorded, the Washington DC region, undated (read Aug 25, 2026), and the exit cap sits 50 bps over its high end — the conservative direction for an exit.",
     );
     const tight = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.045 } }, "exit_cap")!;
     expect(tight.read).toContain("the exit cap sits 25 bps under its low end — an exit priced tighter than the market's own range today, which is cap compression on top of the spread read.");

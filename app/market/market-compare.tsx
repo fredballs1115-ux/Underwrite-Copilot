@@ -18,6 +18,15 @@ export type CompareSector = {
   /** the cell's figures' own house, area and period (lib/tracker-read), for
    *  its title — never the day the research was read */
   cite?: string;
+  /** each figure's own period, printed beside it ("Q2 2026", "undated") —
+   *  the card had shown only the day the research was read, each figure's
+   *  period in a hover title (the research pass of 2026-10-01) */
+  vPeriod?: string;
+  rentPeriod?: string;
+  capPeriod?: string;
+  /** the area a figure several markets share is for ("Suburban Maryland"),
+   *  said beside it, so a county's cell never passes it off as the county's */
+  shared?: string;
 };
 
 export type CompareMetro = {
@@ -53,11 +62,18 @@ function sectorCell(s: CompareSector | undefined): string {
     s.vHigh != null && s.vHigh !== s.vLow
       ? `${s.vLow}–${s.vHigh}%`
       : `${s.vLow}%`;
-  const extras: string[] = [];
-  if (s.rent) extras.push(`${s.rent}/SF`);
+  // Each figure with its own period beside it — once for the cell where the
+  // figures share one — and the shared area where the figure is several
+  // markets' own.
+  const parts: { text: string; period: string }[] = [{ text: v, period: s.vPeriod ?? "undated" }];
+  if (s.rent) parts.push({ text: `${s.rent}/SF`, period: s.rentPeriod ?? "undated" });
   if (typeof s.capLow === "number" && typeof s.capHigh === "number")
-    extras.push(`cap ${s.capLow}–${s.capHigh}%`);
-  return extras.length > 0 ? `${v} · ${extras.join(" · ")}` : v;
+    parts.push({ text: `cap ${s.capLow}–${s.capHigh}%`, period: s.capPeriod ?? "undated" });
+  const said = (period: string) => [s.shared, period].filter(Boolean).join(", ");
+  const periods = new Set(parts.map((p) => p.period));
+  return periods.size === 1
+    ? `${parts.map((p) => p.text).join(" · ")} (${said(parts[0].period)})`
+    : parts.map((p) => `${p.text} (${said(p.period)})`).join(" · ");
 }
 
 /** The days the research was read for the two metros, said once where they
@@ -220,7 +236,7 @@ export function MarketCompare({ metros, today }: { metros: CompareMetro[]; today
       {(a.sectors || b.sectors) && (
         <div className="mt-4 overflow-x-auto">
           <p className="text-[10px] uppercase tracking-wide text-muted">
-            {`Asset-type read · vacancy, asking rent, cap where sourced · ${researchDates(a, b)}`}
+            {`Asset-type read · vacancy, asking rent, cap where sourced, each with its own period · ${researchDates(a, b)}`}
           </p>
           <table className="mt-1.5 w-full min-w-[28rem] text-left text-[11px]">
             <thead>

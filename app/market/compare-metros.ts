@@ -3,6 +3,7 @@ import { FMR_BEDS, fmrOf } from "@/lib/fmr";
 import { compsFeedState } from "@/lib/public-comps/core";
 import { datedLong } from "@/lib/debt-index";
 import { blockCitations, figuresTitle, rentOf, rentText } from "@/lib/tracker-read";
+import { sharedAreaFor } from "@/lib/sector-leaderboard";
 import type { CompareMetro, CompareSector } from "./market-compare";
 
 // The compare tool's compact per-metro facts, derived once from the research
@@ -63,8 +64,21 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
         s.capHigh = blk.cap_rate_high_pct;
       }
       // The cell shows its rent and cap only beside a vacancy, and so does
-      // its title.
-      if (typeof s.vLow === "number") s.cite = figuresTitle(blockCitations(blk));
+      // its title; each figure's own period is printed beside it, and the
+      // shared area where several markets read the figure.
+      if (typeof s.vLow === "number") {
+        const figs = blockCitations(blk);
+        s.cite = figuresTitle(figs);
+        const period = (label: "Vacancy" | "Rent" | "Cap") => {
+          const f = figs.find((x) => x.label === label);
+          return f ? (f.read.period ?? "undated") : undefined;
+        };
+        s.vPeriod = period("Vacancy");
+        s.rentPeriod = period("Rent");
+        s.capPeriod = period("Cap");
+        const shared = sharedAreaFor(sec, m.id);
+        if (shared) s.shared = shared;
+      }
       if (Object.keys(s).length > 0) sectors[sec] = s;
     }
   }

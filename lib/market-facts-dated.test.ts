@@ -41,7 +41,7 @@ describe("the covered markets' research facts, each figure with its own period",
   it("a figure whose period the file does not state is undated; an FMR says its year; no figure, no credit", () => {
     expect(metroFact({ sector_snapshot: { office: { vacancy_pct: 12.5 } }, rule_ids: ["a"] }, 0)).toEqual({
       text: "Office 12.5% vac (undated) · 1 rule on file",
-      cite: "Vacancy: undated",
+      cite: "Vacancy: publisher not recorded, undated",
       readOn: null,
     });
     // The fiscal year is the block's own (lib/fmr), never one typed on the page.
