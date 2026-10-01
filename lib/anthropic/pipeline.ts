@@ -180,23 +180,44 @@ function pause(ms: number): { done: Promise<void>; cancel: () => void } {
  * geocoder or FEMA leaves the screen to read the market by the address, as
  * it always did. Null where nothing has answered.
  */
+/** The deal's stored site flags beside the address line they must match. */
+async function readStoredFlags(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+): Promise<{ label: string; flags: SiteFlagsResult | null }> {
+  try {
+    const { data } = await admin.from("deals").select("address, site_flags").eq("id", dealId).maybeSingle();
+    const row = data as { address?: { label?: string } | null; site_flags?: SiteFlagsResult | null } | null;
+    return { label: row?.address?.label?.trim() ?? "", flags: row?.site_flags ?? null };
+  } catch {
+    return { label: "", flags: null };
+  }
+}
+
+/** Answered, and for the address the deal has now: flags looked up before
+ *  an edit are the old address's. */
+const flagsAnswered = ({ label, flags }: { label: string; flags: SiteFlagsResult | null }) =>
+  !!flags && flags.status !== "pending" && !siteFlagsStale(flags, label);
+
+/**
+ * The site flags as stored, with no lookup — for a step that runs after the
+ * comps and the market check already asked (a resumed run's verdict, a
+ * reconcile against the buyer's model). Null where nothing has answered.
+ */
+async function storedSiteFlags(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+): Promise<SiteFlagsResult | null> {
+  const stored = await readStoredFlags(admin, dealId);
+  return flagsAnswered(stored) ? stored.flags : null;
+}
+
 async function siteFlagsForScreen(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
 ): Promise<SiteFlagsResult | null> {
-  const read = async (): Promise<{ label: string; flags: SiteFlagsResult | null }> => {
-    try {
-      const { data } = await admin.from("deals").select("address, site_flags").eq("id", dealId).maybeSingle();
-      const row = data as { address?: { label?: string } | null; site_flags?: SiteFlagsResult | null } | null;
-      return { label: row?.address?.label?.trim() ?? "", flags: row?.site_flags ?? null };
-    } catch {
-      return { label: "", flags: null };
-    }
-  };
-  // Answered, and for the address the deal has now: flags looked up before
-  // an edit are the old address's.
-  const answered = ({ label, flags }: { label: string; flags: SiteFlagsResult | null }) =>
-    !!flags && flags.status !== "pending" && !siteFlagsStale(flags, label);
+  const read = () => readStoredFlags(admin, dealId);
+  const answered = flagsAnswered;
   const first = await read();
   // No address, no lookup: the address matchers read nothing either.
   if (!first.label) return null;
@@ -466,14 +487,22 @@ async function liveMarketFromDb(
  * Re-synthesize the one-screen verdict from whatever results the deal currently
  * has stored. Called at the end of the main run and again after a reconcile, so
  * the verdict always reflects the latest evidence.
+ *
+ * `dealContext` is what the screen established about the deal (lib/deal-
+ * context: what is being sold, how it is sold, the kind, the plan's figures,
+ * the flood zone) — the same text the comps, the market check, Ask and the
+ * reconciler read, built once by the caller and handed in, so the verdict
+ * never judges a share's price over the whole building's units or a note's
+ * price as a property's while every step before it was told otherwise.
  */
 async function regenerateVerdict(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
+  dealContext: string | null,
 ): Promise<void> {
   const { data } = await admin
     .from("deals")
-    .select("extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
+    .select("asset_class, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
     .eq("id", dealId)
     .single();
 
@@ -496,6 +525,11 @@ async function regenerateVerdict(
     // The deal's kind is read with the first signal beside the extraction,
     // as every other step reads it.
     firstSignal: (data?.first_signal as FirstSignal | null | undefined) ?? null,
+    // The class the deal is filed as, read with the deck's where the
+    // analyst left "Auto" (shownAssetClass) — the noun the building's basis
+    // is said in, as the pipeline card says it.
+    assetClass: (data?.asset_class as string | null | undefined) ?? null,
+    dealContext,
     challenges: (data?.challenges as ChallengerResult) ?? null,
     comps: (data?.comps as BrokerCompsResult) ?? null,
     reconciliation: (data?.reconciliation as ReconciliationResult) ?? null,
@@ -1118,13 +1152,15 @@ async function runAnalysisSteps(
     // established — the deal's kind and, on a plan deal, the plan's figures —
     // so a conversion's comps are held against total cost, not the shell.
     // The site flags once, for both steps: the flood zone for the deal
-    // context (#426), the census tract's county for the market (#447).
+    // context (#426), the census tract's county for the market (#447). A
+    // run resumed past both reads the flags as stored, never looks again.
     const siteFlags =
-      !completed.has("comps") || !completed.has("market") ? await siteFlagsForScreen(admin, dealId) : null;
-    const dealContext =
       !completed.has("comps") || !completed.has("market")
-        ? await dealContextFromDb(admin, dealId, siteFlags)
-        : null;
+        ? await siteFlagsForScreen(admin, dealId)
+        : await storedSiteFlags(admin, dealId);
+    // What the screen established, built ONCE for the comps, the market
+    // check and the verdict, so the three are told the same thing.
+    const dealContext = await dealContextFromDb(admin, dealId, siteFlags);
     if (!completed.has("comps")) {
       await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
       const comps = manual ? manualCompsStub() : await scrutinizeComps(om(), dealContext);
@@ -1168,9 +1204,10 @@ async function runAnalysisSteps(
       await markDone("market");
     }
 
-    // Step 5 — verdict (synthesizes everything gathered above)
+    // Step 5 — verdict (synthesizes everything gathered above), told what
+    // the screen established, as the comps and the market check were.
     await patchJob(dealId, { status: "running", step: "verdict", progress: 90 });
-    await regenerateVerdict(admin, dealId);
+    await regenerateVerdict(admin, dealId, dealContext);
 
     await patchJob(dealId, {
       status: "done",
@@ -1262,15 +1299,15 @@ async function runReconciliationSteps(
     // The reconciler is told the deal's kind, so a buyer's model that carries
     // construction and downtime is compared to the OM on the plan's terms —
     // the kind read with the first signal, as the screen's steps read it.
-    const reconciliation = await reconcileModel(
-      omSource,
-      parsed,
-      dealContextFor(
-        (deal.extraction as ExtractionResult | null) ?? null,
-        null,
-        (deal.first_signal as FirstSignal | null | undefined) ?? null,
-      ),
+    // Built once, with the flood zone the screen's lookup stored, for the
+    // reconciler and the verdict both.
+    const flags = await storedSiteFlags(admin, dealId);
+    const dealContext = dealContextFor(
+      (deal.extraction as ExtractionResult | null) ?? null,
+      flags ? { flood: flags.flood } : null,
+      (deal.first_signal as FirstSignal | null | undefined) ?? null,
     );
+    const reconciliation = await reconcileModel(omSource, parsed, dealContext);
 
     await admin
       .from("deals")
@@ -1279,7 +1316,7 @@ async function runReconciliationSteps(
 
     // Fold the reconciliation into the verdict so the headline reflects it.
     await patchJob(dealId, { status: "running", step: "verdict", progress: 80 });
-    await regenerateVerdict(admin, dealId);
+    await regenerateVerdict(admin, dealId, dealContext);
 
     await patchJob(dealId, {
       status: "done",

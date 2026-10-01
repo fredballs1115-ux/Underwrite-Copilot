@@ -53,6 +53,19 @@ describe("plan deals are judged on their own terms", () => {
     expect(p).toContain("never a misread and never a going-in cap");
   });
 
+  // Research pass 18: the verdict saw a share's price beside the whole
+  // building's units, a note's price and an auction's starting bid, and
+  // nothing told it what each buys.
+  it("the verdict never strikes a basis, a cap or a return on a price the brief says is not the building's", () => {
+    const p = verdictInstruction();
+    expect(p).toContain("The brief opens with what the screen established about the deal, checked in code");
+    expect(p).toContain("never strike a basis, a cap or a return on that figure");
+    for (const what of ["a note's price is a loan's", "a share's price buys the share", "a leased fee's price buys the land", "an auction's starting bid is where the bidding opens"]) {
+      expect(p, what).toContain(what);
+    }
+    expect(p).toContain("built on the building's basis the brief computes where it computes one");
+  });
+
   it("the extraction reads the strategy first and labels every NOI", () => {
     const p = extractionInstruction("multifamily");
     expect(p).toContain("strategy.kind");

@@ -598,6 +598,43 @@ describe("runAnalysis — the happy path", () => {
     expect(brief).not.toContain("Stabilized");
   });
 
+  it("the verdict is handed the deal context the comps and the market check read, built once — on a resumed run too (research pass 18)", async () => {
+    const share = {
+      ...EXTRACTION,
+      interest: { kind: "partial_interest", summary: "", share: "49% limited partnership interest", groundLease: "", loan: "", page: "p. 3" },
+      metrics: [...EXTRACTION.metrics, { label: "Units", value: "240", flagged: false, page: "p. 3", basis: "na", locatorSnippet: "" }],
+    } as unknown as ExtractionResult;
+    vi.mocked(extractTerms).mockResolvedValue(share);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const comps = vi.mocked(scrutinizeComps).mock.calls[0][1];
+    expect(comps).toContain("What is being sold: a share of the owning entity.");
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toBe(comps);
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(input.dealContext).toBe(comps);
+    expect(input.assetClass).toBe("multifamily");
+    const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+    const brief = buildBrief(input);
+    expect(brief).toContain(`## What the screen established about the deal, checked in code\n\n${comps}`);
+    expect(brief).toContain("THE BUILDING'S BASIS, computed in code: $170k/unit");
+
+    // An attempt resumed past the comps and the market check still tells the verdict.
+    vi.clearAllMocks();
+    vi.mocked(createSupabaseAdminClient).mockImplementation(() => ({ from: (t: string) => new FakeQuery(state, t) }) as never);
+    vi.mocked(synthesizeVerdict).mockResolvedValue(VERDICT);
+    state.jobs[0].payload = {
+      kind: "screen",
+      completed: ["signal", "extract", "reconcile_docs", "ingest_actuals", "challenge", "comps", "market"],
+    };
+    await runAnalysis("d1", { resume: true });
+    expect(job().status).toBe("done");
+    expect(vi.mocked(scrutinizeComps)).not.toHaveBeenCalled();
+    expect(vi.mocked(checkMarket)).not.toHaveBeenCalled();
+    // The stored flags were read, never looked up again.
+    expect(vi.mocked(claimSiteFlags)).not.toHaveBeenCalled();
+    expect(vi.mocked(synthesizeVerdict).mock.calls[0][0].dealContext).toBe(comps);
+  });
+
   it("a suburb its address's words miss reads its metro area's figures, placed by its tract's county and said so (#447)", async () => {
     const label = "5000 Main St, Frisco, TX 75034";
     state.deals.d1.address = { label, street: "5000 Main St", city: "Frisco", state: "TX", zip: "75034", county: "", submarket: "" };

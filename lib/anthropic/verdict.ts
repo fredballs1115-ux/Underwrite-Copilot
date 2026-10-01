@@ -5,7 +5,20 @@ import { getAnthropic } from "./client";
 import { structured } from "./failure";
 import { MODELS, MAX_TOKENS } from "./models";
 import { ANALYST_SYSTEM, verdictInstruction } from "./prompts";
-import { assessPlausibility, inferStrategy, planSummary, plausibilityNote } from "@/lib/deal-strategy";
+import {
+  assessPlausibility,
+  findPricedMetric,
+  inferStrategy,
+  isPlanDeal,
+  planSummary,
+  plausibilityNote,
+  type DealStrategy,
+} from "@/lib/deal-strategy";
+import { parsePrice, priceRange } from "@/lib/criteria";
+import { interestOf } from "@/lib/interest";
+import { readSale } from "@/lib/sale-terms";
+import { assetWords } from "@/lib/asset-words";
+import { basisTag as buildingBasisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import type {
@@ -59,12 +72,96 @@ export interface VerdictInputs {
    *  challenger and the market figures read it, so the verdict never calls
    *  stabilized a deal every other step read as a plan */
   firstSignal?: FirstSignal | null;
+  /** the class the deal row is filed as ("auto" where the analyst left it
+   *  to the deck), read with the extraction's through `shownAssetClass` for
+   *  the noun the building's basis is said in */
+  assetClass?: string | null;
+  /** what the screen established about the deal (lib/deal-context) — the
+   *  same text the comps, the market check, Ask and the reconciler read,
+   *  built once by the pipeline: what is being sold, how it is sold, the
+   *  kind, the plan's figures, the flood zone */
+  dealContext?: string | null;
   challenges: ChallengerResult | null;
   comps: BrokerCompsResult | null;
   reconciliation: ReconciliationResult | null;
   market: MarketResult | null;
   /** the buyer's standing criteria, pre-formatted one per line (optional) */
   buyBox?: string[] | null;
+}
+
+// "$170k", "$40.8M" — as the deal context writes a figure (lib/deal-context).
+const compact = (n: number): string =>
+  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+const dollars = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
+const shareText = (pct: number): string => `${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
+
+/**
+ * The building's own basis as the code computes it, in one sentence (research
+ * pass 18): the readers the pipeline card's basis and the comps' subject
+ * tick read (lib/pipeline-slots `basisTag`, lib/comp-detail `subjectBasis` —
+ * a range's top, a share's price grossed up to the whole), and on a plan deal
+ * the plan's total cost a planned unit (lib/deal-strategy `planSummary`).
+ * The brief used to print the asking price beside the unit count and leave
+ * the division to the synthesizer: a 49% share's $20M over 240 units read
+ * $83k a unit where the building's basis is $170k, a note's price is a
+ * loan's, and an auction's starting bid is where the bidding opens. Each of
+ * those says what the code computes, or that there is none and why.
+ */
+function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedClass: string | null | undefined): string {
+  const { kind, sharePct } = interestOf(ex);
+  if (kind === "note") {
+    return "THE BUILDING'S BASIS: none — this sells a loan, and its price is a loan's. No price per unit or per SF, no cap and no property return is struck on it; the collateral's own figures belong to the collateral's owner.";
+  }
+  if (kind === "leased_fee") {
+    return "THE BUILDING'S BASIS: none — the price buys the land under the ground lease, not the building, and is never divided over the building's units or area.";
+  }
+  if (kind === "partial_interest" && sharePct == null) {
+    return "THE BUILDING'S BASIS: none — the OM states no percentage for the share, so the whole its price implies cannot be read, and the share's price is never divided over the whole building's units or area.";
+  }
+  const words = assetWords(shownAssetClass(storedClass, ex));
+  const noun = words.noun ?? { one: "unit", many: "units" };
+  const metrics = ex.metrics ?? [];
+  // The price row the basis divides — the same row the card's basis reads.
+  const row = findPricedMetric(metrics, strategy.kind);
+  const tag = buildingBasisTag(ex, strategy.kind, storedClass);
+  if (isPlanDeal(strategy.kind)) {
+    // A plan deal's basis is its total cost; the shell's or the land's price
+    // over units that do not exist yet is no basis at all.
+    const plan = planSummary(ex, strategy);
+    const deal = strategy.label.toLowerCase();
+    const never = strategy.kind === "development" ? "the land's price" : "the price alone";
+    const priceAlone = tag ? ` The price alone is ${tag}, before the works.` : "";
+    if (plan?.costPerUnit != null && plan.units != null && plan.totalCost != null) {
+      return `THE BUILDING'S BASIS, computed in code: on this ${deal} deal it is total cost — ${compact(plan.totalCost)} over ${plan.units.toLocaleString("en-US")} planned ${noun.many} is ${compact(plan.costPerUnit)} per planned ${noun.one}, never ${never} over them.${priceAlone}`;
+    }
+    if (plan?.totalCost != null) {
+      return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, ${compact(plan.totalCost)} all-in as computed in code; the OM states no planned count to set it per ${noun.one}, and ${never} is never the basis.${priceAlone}`;
+    }
+    return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, which the code cannot compute from what the OM states; ${never} is never the basis.${priceAlone}`;
+  }
+  if (tag) {
+    const range = row ? priceRange(row.value) : null;
+    const what =
+      sharePct != null
+        ? `the whole the ${shareText(sharePct)} share's price implies`
+        : range
+          ? "the top of the price range the OM states, the end that does not flatter a return"
+          : "the asking price";
+    const over = words.basis === "sf" ? "the building's area" : `the OM's ${noun.one} count`;
+    const never = sharePct != null ? " The share's own price over the whole building is no basis." : "";
+    return `THE BUILDING'S BASIS, computed in code: ${tag} — ${what}, over ${over}.${never} Build the basis range on this figure.`;
+  }
+  const price = row ? parsePrice(row.value) : null;
+  const sale = price == null ? readSale(ex) : null;
+  if (sale?.startingBid != null) {
+    const allIn =
+      sale.floorAllIn != null && sale.floorAllIn !== sale.startingBid
+        ? ` (${dollars(sale.floorAllIn)} all-in with the buyer's premium)`
+        : "";
+    return `THE BUILDING'S BASIS: none — the OM states no asking price, and the ${dollars(sale.startingBid)} starting bid${allIn} is where the bidding opens, not a price: a cap or a return struck on it is the ceiling of what the building yields and a basis struck on it the floor of what it costs, never the deal's.`;
+  }
+  if (price == null) return "THE BUILDING'S BASIS: none — the OM states no asking price to compute one from.";
+  return `THE BUILDING'S BASIS: none computed — the OM states no ${words.basis === "sf" ? "building area" : `${noun.one} count`} to set the price over.`;
 }
 
 /** Roll the gathered analysis up into one readable brief for the synthesizer.
@@ -99,13 +196,29 @@ export function buildBrief(input: VerdictInputs): string {
       : "Not available.",
   );
 
+  const strategy = ex ? inferStrategy(ex, input.firstSignal ?? null) : null;
+
+  // What the screen established about the deal, checked in code, before a
+  // single extracted figure — the deal context every step that reads the OM
+  // after the extraction is handed (what is being sold, how it is sold, the
+  // kind, the plan, the flood zone), and the building's own basis. A
+  // share's price, a note's and the land's are not the building's, and an
+  // auction's starting bid is not a price; the brief says so here, where the
+  // other steps' instructions say it.
+  const established = [
+    input.dealContext?.trim() ?? "",
+    ex && strategy ? buildingBasisLine(ex, strategy, input.assetClass) : "",
+  ].filter(Boolean);
+  if (established.length > 0) {
+    sections.push("## What the screen established about the deal, checked in code", established.join("\n\n"));
+  }
+
   // What kind of deal this is, the plan's own figures, and whether the
   // numbers tie — checked in code before the synthesizer reads a single
   // extracted number. On a conversion the stabilized NOI is the finished
   // building's, judged on yield on total cost; on a stabilized asset an NOI
   // above the price is a misread. The brief says which.
-  if (ex) {
-    const strategy = inferStrategy(ex, input.firstSignal ?? null);
+  if (ex && strategy) {
     const note = plausibilityNote(
       assessPlausibility(ex, strategy),
       strategy,
