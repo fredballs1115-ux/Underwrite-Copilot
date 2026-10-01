@@ -85,8 +85,10 @@ async function emailedChip(row: Record<string, unknown>): Promise<string> {
 }
 
 beforeEach(() => {
-  for (const k of ["RESEND_API_KEY", "RESEND_BASE_URL", "NEXT_PUBLIC_APP_URL", "SUPABASE_SERVICE_ROLE_KEY"]) env[k] = process.env[k];
+  for (const k of ["RESEND_API_KEY", "RESEND_FROM", "RESEND_BASE_URL", "NEXT_PUBLIC_APP_URL", "SUPABASE_SERVICE_ROLE_KEY"]) env[k] = process.env[k];
   process.env.RESEND_API_KEY = "re_test";
+  // A sender on a verified domain: without one the emails are paused (lib/email).
+  process.env.RESEND_FROM = "Underwrite Copilot <notify@underwrite.example>";
   process.env.RESEND_BASE_URL = "https://resend.test";
   process.env.NEXT_PUBLIC_APP_URL = "https://underwrite.example";
   delete process.env.SUPABASE_SERVICE_ROLE_KEY;

@@ -16,7 +16,8 @@ import { emailPictureUrl } from "@/lib/email-picture";
  *
  * Env:
  *   RESEND_API_KEY   enables sending
- *   RESEND_FROM      verified sender (falls back to Resend's onboarding one)
+ *   RESEND_FROM      the sender, on a domain verified with Resend — required:
+ *                    without one the emails are PAUSED (see `emailSetup`)
  *   RESEND_BASE_URL  test override for the API host
  */
 
@@ -26,8 +27,73 @@ const VERDICT_EMAIL: Record<string, { label: string; color: string }> = {
   pass_on: { label: "No-go", color: "#b23a30" },
 };
 
+/** Resend's shared onboarding domain. Mail sent from it is delivered only to
+ *  the address that owns the Resend account, never to a customer, so a
+ *  sender there is no sender at all. */
+const RESEND_SHARED_DOMAIN = "resend.dev";
+
+/**
+ * Whether the emails can reach a customer. `off`: no key, the feature is not
+ * set up. `paused`: a key, but no sender a customer would receive mail from —
+ * RESEND_FROM unset, naming no address, or on Resend's shared resend.dev
+ * domain (the default this module used to fall back to, which delivered to
+ * the Resend account's owner and nobody else while the account page showed
+ * both emails on). Pure: the environment is an argument.
+ */
+export type EmailSetup =
+  | { state: "on"; key: string; from: string }
+  | { state: "off" }
+  | { state: "paused"; reason: string };
+
+export function emailSetup(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): EmailSetup {
+  const key = env.RESEND_API_KEY?.trim();
+  if (!key) return { state: "off" };
+  const from = env.RESEND_FROM?.trim() ?? "";
+  if (!from) return { state: "paused", reason: "RESEND_FROM is not set" };
+  const domain = senderDomain(from);
+  if (!domain) return { state: "paused", reason: `RESEND_FROM names no address ("${from}")` };
+  if (domain === RESEND_SHARED_DOMAIN || domain.endsWith(`.${RESEND_SHARED_DOMAIN}`)) {
+    return {
+      state: "paused",
+      reason: `RESEND_FROM is on Resend's shared ${RESEND_SHARED_DOMAIN} domain, which delivers only to the Resend account's own address`,
+    };
+  }
+  return { state: "on", key, from };
+}
+
+/** The domain of a sender written "Name <a@b.com>" or "a@b.com", lowercased;
+ *  null where it names no address. */
+export function senderDomain(from: string): string | null {
+  const angled = /<([^<>]*)>\s*$/.exec(from);
+  const address = (angled ? angled[1] : from).trim();
+  const at = address.lastIndexOf("@");
+  if (at <= 0) return null;
+  const domain = address.slice(at + 1).trim().toLowerCase();
+  return domain && !/[\s<>"]/.test(domain) ? domain : null;
+}
+
+/** Said once a process, never per email: a paused feature is one fact. */
+let pausedSaid = false;
+
+/** The setup to send with, or null. A paused setup says why in the log,
+ *  once; a missing key stays silent, as it always has. */
+function readySetup(): { key: string; from: string } | null {
+  const setup = emailSetup();
+  if (setup.state === "paused" && !pausedSaid) {
+    pausedSaid = true;
+    console.warn(
+      `[email] paused: ${setup.reason} — no email is sent until RESEND_FROM names a sender on a domain verified with Resend.`,
+    );
+  }
+  return setup.state === "on" ? setup : null;
+}
+
+/** Whether the emails go out — what the senders check before reading
+ *  anything, and what the account page says beside its two switches. */
 export function emailEnabled(): boolean {
-  return !!process.env.RESEND_API_KEY;
+  return readySetup() !== null;
 }
 
 function appUrl(): string {
@@ -40,11 +106,12 @@ export async function sendEmail(
   html: string,
   text: string,
 ): Promise<boolean> {
-  const key = process.env.RESEND_API_KEY;
-  if (!key) return false;
+  // The rule holds at the one place a request is made: while paused, no
+  // send is attempted, whoever calls.
+  const ready = readySetup();
+  if (!ready) return false;
+  const { key, from } = ready;
   const base = process.env.RESEND_BASE_URL ?? "https://api.resend.com";
-  const from =
-    process.env.RESEND_FROM ?? "Underwrite Copilot <onboarding@resend.dev>";
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 8000);
   try {
@@ -74,7 +141,7 @@ export async function sendEmail(
 
 /**
  * One email per completed analysis: deal name, buy-box verdict, link to the
- * report. Fully best-effort — reads the owner's toggle (default ON, including
+ * deal page. Fully best-effort — reads the owner's toggle (default ON, including
  * on a pre-0014 schema where the column doesn't exist yet), derives the same
  * buy-box chip the deal header shows (lib/buy-box-chip, from the same
  * inputs), and swallows every failure.

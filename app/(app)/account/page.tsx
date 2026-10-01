@@ -72,6 +72,9 @@ export default async function AccountPage({
   const allowance = billing ? dealAllowance(billing) : null;
   const emailOnAnalysis = prefs.onAnalysis;
   const emailWeeklyDigest = prefs.weeklyDigest;
+  // Paused (no key, or no sender a customer receives mail from — lib/email):
+  // the switches still save a choice, and the section says nothing is sent.
+  const emailSending = emailEnabled();
 
   return (
     <div className="space-y-6">
@@ -126,6 +129,20 @@ export default async function AccountPage({
 
       {/* Notifications */}
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
+        {!emailSending && (
+          <p
+            data-qa="email-paused"
+            className="mb-5 flex flex-wrap items-center gap-2 rounded-lg bg-faint px-3 py-2 text-sm text-muted"
+          >
+            <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs font-semibold text-ink">
+              Paused
+            </span>
+            <span>
+              Both emails are paused for now — none is being sent. Each
+              switch keeps your choice for when sending starts.
+            </span>
+          </p>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold tracking-tight">
@@ -133,10 +150,7 @@ export default async function AccountPage({
             </h2>
             <p className="mt-1 max-w-md text-sm text-muted">
               One email per completed screen — the verdict, the buy-box call,
-              and a link to the report.
-              {!emailEnabled() && (
-                <> Sending is currently paused while email is being configured.</>
-              )}
+              and a link to the deal page.
             </p>
           </div>
           <EmailToggle
@@ -153,9 +167,6 @@ export default async function AccountPage({
             <p className="mt-1 max-w-md text-sm text-muted">
               Monday morning: your deals by stage, offers due this week, and
               the verdicts that landed since last week.
-              {!emailEnabled() && (
-                <> Sending is currently paused while email is being configured.</>
-              )}
             </p>
           </div>
           <EmailToggle
