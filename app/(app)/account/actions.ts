@@ -14,7 +14,8 @@ import {
   signatureMismatch,
 } from "@/lib/storage";
 import { getTeam } from "@/lib/teams";
-import { handOverTeamWork } from "@/lib/account-handover";
+import { chunks, handOverTeamWork, readAll } from "@/lib/account-handover";
+import { deletionStopHref, type DeletionDone } from "@/lib/account-deletion";
 import { SIGNED_OUT, authErrorCopy } from "@/lib/auth-flow";
 import { getStripe } from "@/lib/stripe/client";
 import { syncTeamSeats } from "@/lib/stripe/seats";
@@ -186,18 +187,46 @@ export async function changePassword(
   return { ok: true };
 }
 
+/** A personal subscription that is still billing, or may yet. */
+const LIVE_SUBSCRIPTION = ["active", "trialing", "past_due", "incomplete"];
+
+/** Cancel a personal subscription — true once Stripe has it cancelled. A
+ *  deletion tried again after one that stopped later finds the subscription
+ *  it cancelled still live in the profile's mirror until Stripe's webhook
+ *  lands, and Stripe will not cancel a subscription twice: one that refuses
+ *  is read back, and an ended one counts as cancelled. */
+async function cancelSubscription(subId: string): Promise<boolean> {
+  try {
+    await getStripe().subscriptions.cancel(subId);
+    return true;
+  } catch {
+    try {
+      const sub = await getStripe().subscriptions.retrieve(subId);
+      return sub.status === "canceled" || sub.status === "incomplete_expired";
+    } catch {
+      return false;
+    }
+  }
+}
+
 /**
  * Self-serve account deletion — the privacy policy promises it, so it exists.
- * Order matters:
+ * Order matters: the team's work is handed over first — it is what teammates
+ * would lose, and a retry finishes it — the subscription is cancelled next,
+ * and the user is deleted last, since nothing brings an account back.
  *   1. refuse if they own a team (transfer isn't supported yet),
- *   2. cancel any live personal subscription (never delete a paying account
- *      and keep charging it),
- *   3. hand the deals they added to a team's pipeline, and their work on any
+ *   2. hand the deals they added to a team's pipeline, and their work on any
  *      team's deals, to that team's owner — by each deal's own team, so a
  *      team they have left keeps its deals too (deleting the auth user
  *      cascades deals.user_id, and teammates must not lose shared work),
- *   4. leave the team, sweep personal files from storage,
- *   5. delete the auth user — every remaining row cascades in the database.
+ *   3. cancel any live personal subscription (never delete a paying account
+ *      and keep charging it),
+ *   4. collect the personal deals' files,
+ *   5. delete the auth user — every remaining row cascades in the database,
+ *      the team membership with it — then sweep the files and resync the
+ *      team's seats.
+ * A step that fails stops the deletion, and the account page says what the
+ * steps before it had already done (lib/account-deletion).
  */
 export async function deleteAccount(formData: FormData) {
   const confirm = String(formData.get("confirm") ?? "").trim();
@@ -216,28 +245,7 @@ export async function deleteAccount(formData: FormData) {
   //    cascade away under their members.
   if (team?.role === "owner") redirect("/account?error=ownerdelete");
 
-  // 2. Cancel a live personal subscription first. If Stripe fails, stop —
-  //    deleting the account while a subscription keeps billing is worse than
-  //    asking the user to try again.
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("stripe_subscription_id, subscription_status")
-    .eq("id", user.id)
-    .maybeSingle();
-  const subId = (profile?.stripe_subscription_id as string) ?? null;
-  const subStatus = (profile?.subscription_status as string) ?? "";
-  if (
-    subId &&
-    ["active", "trialing", "past_due", "incomplete"].includes(subStatus)
-  ) {
-    try {
-      await getStripe().subscriptions.cancel(subId);
-    } catch {
-      redirect("/account?error=cancelsub");
-    }
-  }
-
-  // 3. What the account has in a team's pipeline goes to that team's owner
+  // 2. What the account has in a team's pipeline goes to that team's owner
   //    instead of cascading away with it (lib/account-handover): the deals
   //    it added to a team's pipeline, by each deal's own team — the team it
   //    is on now, or one it has left, whose pipeline removeMember and
@@ -245,34 +253,48 @@ export async function deleteAccount(formData: FormData) {
   //    (saved versions, valuations and rent roll imports). Counted, so the
   //    sign-in page can say they stayed. A share link the member minted is
   //    revoked with them (deal_shares cascades), so no one outside keeps
-  //    access on the word of someone who has gone. A failed read or write
-  //    stops here, before the account is deleted: deleting it would cascade
-  //    whatever had not moved.
+  //    access on the word of someone who has gone. First, because it keeps
+  //    the team's work and a retry finishes it: a failed read or write stops
+  //    here, before the subscription or the account is touched — deleting
+  //    the account would cascade whatever had not moved.
   const handover = await handOverTeamWork(admin, user.id);
   if (handover.ownsTeam) redirect("/account?error=ownerdelete");
-  if (!handover.ok) redirect("/account?error=handover");
+  const done: DeletionDone = { movedToTeam: handover.deals + handover.work > 0, cancelled: false };
+  if (!handover.ok) redirect(deletionStopHref("handover", done));
   const handedOver = handover.deals;
-  if (team) {
-    await admin
-      .from("team_members")
-      .delete()
-      .eq("team_id", team.id)
-      .eq("user_id", user.id);
+
+  // 3. Cancel a live personal subscription. If Stripe fails — or the
+  //    subscription cannot be read — stop: deleting the account while a
+  //    subscription keeps billing is worse than asking the user to try again.
+  const { data: profile, error: profileErr } = await admin
+    .from("profiles")
+    .select("stripe_subscription_id, subscription_status")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (profileErr) redirect(deletionStopHref("cancelsub", done));
+  const subId = (profile?.stripe_subscription_id as string) ?? null;
+  const subStatus = (profile?.subscription_status as string) ?? "";
+  if (subId && LIVE_SUBSCRIPTION.includes(subStatus)) {
+    if (!(await cancelSubscription(subId))) redirect(deletionStopHref("cancelsub", done));
+    done.cancelled = true;
   }
 
   // 4. Collect the personal deals' storage paths before the rows cascade —
   //    per deal, so each path is checked against the deal it claims to belong
-  //    to before the service role removes anything.
-  const { data: deals } = await admin
-    .from("deals")
-    .select("id, om_storage_path, supplements, photo")
-    .eq("user_id", user.id);
-  const dealRows = (deals ?? []) as {
-    id: string;
-    om_storage_path: string | null;
-    supplements: Record<string, { files?: { path: string }[] }> | null;
-    photo: DealVisualCache | null;
-  }[];
+  //    to before the service role removes anything. Read in pages and looked
+  //    up a chunk of deals at a time, as the handover reads: a long list
+  //    stopped at PostgREST's row cap, and every deal's id in one URL failed
+  //    the documents' read outright. Best-effort as before — a failed read
+  //    leaves files to sweep, never a half-deleted account.
+  const dealRows =
+    (await readAll<{
+      id: string;
+      om_storage_path: string | null;
+      supplements: Record<string, { files?: { path: string }[] }> | null;
+      photo: DealVisualCache | null;
+    }>((from, to) =>
+      admin.from("deals").select("id, om_storage_path, supplements, photo").eq("user_id", user.id).order("id").range(from, to),
+    )) ?? [];
   const byDeal = new Map<string, string[]>();
   for (const d of dealRows) {
     // Worker-mode reconciles park a model file next to the OM — sweep that
@@ -290,11 +312,11 @@ export async function deleteAccount(formData: FormData) {
       for (const f of tab.files ?? []) if (f.path) paths.push(f.path);
     byDeal.set(d.id, paths);
   }
-  if (byDeal.size) {
+  for (const ids of chunks([...byDeal.keys()])) {
     const { data: docs } = await admin
       .from("deal_documents")
       .select("deal_id, storage_path")
-      .in("deal_id", [...byDeal.keys()]);
+      .in("deal_id", ids);
     for (const doc of (docs ?? []) as { deal_id: string; storage_path: string }[])
       if (doc.storage_path) byDeal.get(doc.deal_id)?.push(doc.storage_path);
   }
@@ -312,11 +334,14 @@ export async function deleteAccount(formData: FormData) {
     // sweep is best-effort
   }
 
-  // 5. Delete the auth user (cascades profiles, deals, jobs, documents),
-  //    then sweep files. Storage leftovers are recoverable noise; a half-
-  //    deleted account is not — so the user row goes first.
+  // 5. Delete the auth user (cascades profiles, deals, jobs, documents, and
+  //    the team membership — the seat sync below counts the roster after
+  //    it), then sweep files. Storage leftovers are recoverable noise; a
+  //    half-deleted account is not — so the user row goes first. A failure
+  //    here leaves the account, its membership and its own deals in place;
+  //    the page says what steps 2 and 3 had already done.
   const { error: delErr } = await admin.auth.admin.deleteUser(user.id);
-  if (delErr) redirect("/account?error=delete");
+  if (delErr) redirect(deletionStopHref("delete", done));
   for (const [dealId, paths] of byDeal) {
     await removeStorageFiles(paths, { kind: "deal", dealId });
   }
@@ -328,6 +353,6 @@ export async function deleteAccount(formData: FormData) {
 
   await supabase.auth.signOut();
   // The sign-in page says what happened: everything gone, or — where deals
-  // went to the team's owner in step 3 — what stayed and with whom.
+  // went to the team's owner in step 2 — what stayed and with whom.
   redirect(handedOver > 0 ? "/login?deleted=team" : "/login?deleted=1");
 }

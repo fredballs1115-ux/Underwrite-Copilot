@@ -2,7 +2,7 @@
  * Deleting an account keeps what the privacy page promises, and says what
  * happened. The deals a member added to a team's pipeline — the team they are
  * on, or one they have left — are handed to that team's owner with their own
- * work on the team's deals, not deleted (deleteAccount, step 3;
+ * work on the team's deals, not deleted (deleteAccount, step 2;
  * lib/account-handover), so the sign-in page it lands on says they stayed, and
  * with whom, where "all its data have been deleted" would not be true. Driven
  * against an in-memory fake of the two database clients that answers each
@@ -20,12 +20,23 @@ const db = vi.hoisted(() => ({
   tables: {} as Record<string, Record<string, unknown>[]>,
   /** a table whose writes fail */
   failOn: null as string | null,
+  /** a table whose reads fail */
+  failReadOn: null as string | null,
+  /** the auth service refuses to delete the user */
+  failDelete: false,
+  /** Stripe: whether a cancel goes through, and the status a read answers
+   *  (null: the read fails too) */
+  stripe: { cancel: "ok" as "ok" | "fail", status: null as string | null },
   deleted: false,
   writes: [] as { table: string; op: string; values?: unknown; filters: [string, string, unknown][] }[],
+  /** every read, with its filters */
+  reads: [] as { table: string; filters: [string, string, unknown][] }[],
   /** each paged read: the table and the page asked for */
   pages: [] as { table: string; range: [number, number] }[],
   /** the storage sweep, by the deal each path was checked against */
   swept: [] as string[],
+  /** writes, Stripe calls, the user's deletion and the seat sync, in order */
+  events: [] as string[],
 }));
 
 const ME = "member-1";
@@ -51,8 +62,12 @@ function query(table: string) {
   };
   const answer = (single: boolean) => {
     const rows = (db.tables[table] ??= []);
-    if (q.op !== "select") db.writes.push({ table, op: q.op, values: q.values, filters: q.filters });
+    if (q.op !== "select") {
+      db.writes.push({ table, op: q.op, values: q.values, filters: q.filters });
+      db.events.push(`write:${table}:${q.op}`);
+    } else db.reads.push({ table, filters: q.filters });
     if (q.op !== "select" && db.failOn === table) return { data: null, error: { message: "write refused" }, count: null };
+    if (q.op === "select" && db.failReadOn === table) return { data: null, error: { message: "read refused" } };
     const hit = rows.filter((r) => matches(r, q.filters));
     if (q.op === "update") {
       for (const r of hit) Object.assign(r, q.values);
@@ -133,6 +148,8 @@ vi.mock("@/lib/supabase/admin", () => ({
     auth: {
       admin: {
         deleteUser: async (id: string) => {
+          db.events.push("deleteUser");
+          if (db.failDelete) return { error: { message: "auth service refused" } };
           db.deleted = true;
           cascade(id);
           return { error: null };
@@ -143,11 +160,26 @@ vi.mock("@/lib/supabase/admin", () => ({
 }));
 vi.mock("@/lib/teams", () => ({ getTeam: async () => db.team }));
 vi.mock("@/lib/stripe/client", () => ({
-  getStripe: () => {
-    throw new Error("no subscription to cancel");
+  getStripe: () => ({
+    subscriptions: {
+      cancel: async (id: string) => {
+        db.events.push(`stripe:cancel:${id}`);
+        if (db.stripe.cancel === "fail") throw new Error("Stripe refused the cancel");
+        return { id, status: "canceled" };
+      },
+      retrieve: async (id: string) => {
+        db.events.push(`stripe:retrieve:${id}`);
+        if (db.stripe.status === null) throw new Error("Stripe is down");
+        return { id, status: db.stripe.status };
+      },
+    },
+  }),
+}));
+vi.mock("@/lib/stripe/seats", () => ({
+  syncTeamSeats: async (teamId: string) => {
+    db.events.push(`seats:${teamId}`);
   },
 }));
-vi.mock("@/lib/stripe/seats", () => ({ syncTeamSeats: async () => {} }));
 vi.mock("@/lib/storage", () => ({
   removeStorageFiles: async (_paths: string[], scope: { dealId?: string }) => {
     if (scope.dealId) db.swept.push(scope.dealId);
@@ -174,6 +206,7 @@ vi.mock("@/app/login/actions", () => {
 
 import { deleteAccount } from "@/app/(app)/account/actions";
 import { HANDOVER_CHUNK, READ_PAGE } from "./account-handover";
+import { deletionStopNotice } from "./account-deletion";
 import LoginPage from "@/app/login/page";
 import { visibleText } from "./render-lint";
 
@@ -207,11 +240,36 @@ beforeEach(() => {
     deals: [],
   };
   db.failOn = null;
+  db.failReadOn = null;
+  db.failDelete = false;
+  db.stripe = { cancel: "ok", status: null };
   db.deleted = false;
   db.writes.length = 0;
+  db.reads.length = 0;
   db.pages.length = 0;
   db.swept.length = 0;
+  db.events.length = 0;
 });
+
+/** The page the account lands on after a stop, read back as the page reads it. */
+function notice(href: string): string | null {
+  const q = new URL(href, "https://app.test").searchParams;
+  return deletionStopNotice({ error: q.get("error") ?? undefined, moved: q.get("moved") ?? undefined, cancelled: q.get("cancelled") ?? undefined });
+}
+
+/** A member of team-1 with a live personal subscription and one deal in the
+ *  team's pipeline. */
+function memberWithSubscription() {
+  db.team = { id: "team-1", role: "member" };
+  db.tables.teams = [{ id: "team-1", owner_id: "owner-1" }];
+  db.tables.team_members = [
+    { team_id: "team-1", user_id: "owner-1", role: "owner" },
+    { team_id: "team-1", user_id: ME, role: "member" },
+  ];
+  db.tables.profiles = [{ id: ME, stripe_subscription_id: "sub_1", subscription_status: "active", branding: null }];
+  db.tables.deals = [deal("deal-a", ME, "team-1"), deal("mine", ME, null)];
+  db.tables.valuations = [{ id: "val-a", deal_id: "deal-a", user_id: ME }];
+}
 
 describe("deleting an account says what happened to a team's deals", () => {
   it("a member whose deals went to the team's owner lands on the sign-in page saying so", async () => {
@@ -331,17 +389,26 @@ describe("deleting an account says what happened to a team's deals", () => {
     expect(db.deleted).toBe(true);
   });
 
-  it("a handover that fails stops before the account is deleted, so nothing cascades away", async () => {
+  it("a handover that fails stops before the account is deleted, so nothing cascades away — and says what had moved", async () => {
     db.team = { id: "team-1", role: "member" };
     db.tables.teams = [{ id: "team-1", owner_id: "owner-1" }];
-    for (const table of ["deals", "valuations"]) {
+    // The deals' write fails: nothing moved.
+    // The valuations' write fails after the deals': the deals moved.
+    for (const [table, href] of [
+      ["deals", "/account?error=handover"],
+      ["valuations", "/account?error=handover&moved=1"],
+    ] as const) {
       db.tables.deals = [deal("deal-a", ME, "team-1")];
       db.tables.valuations = [{ id: "val-a", deal_id: "deal-a", user_id: ME }];
       db.failOn = table;
       db.deleted = false;
-      expect(await landing(), table).toBe("/account?error=handover");
+      expect(await landing(), table).toBe(href);
       expect(db.deleted, table).toBe(false);
     }
+    expect(notice("/account?error=handover")).toContain("nothing was changed and your account was not deleted");
+    expect(notice("/account?error=handover&moved=1")).toContain(
+      "Part of what you had in a team's pipeline moved to the team's owner before the rest could, so your account was not deleted.",
+    );
   });
 
   it("a team's owner is still refused, before anything is touched", async () => {
@@ -361,5 +428,101 @@ describe("deleting an account says what happened to a team's deals", () => {
     expect(await landing()).toBe("/account?error=ownerdelete");
     expect(db.writes).toEqual([]);
     expect(db.deleted).toBe(false);
+  });
+});
+
+// M1: the order keeps what can be kept. It had cancelled the subscription
+// before the handover and removed the membership before the user, so a
+// handover that failed left a cancelled plan behind a page saying nothing was
+// deleted, and a deletion that failed left the member off the team behind
+// "nothing was removed".
+describe("deleting an account moves the team's work first, cancels the plan next, deletes the user last", () => {
+  it("hands the team's deals over before it cancels the subscription, and cancels before it deletes the user", async () => {
+    memberWithSubscription();
+    expect(await landing()).toBe("/login?deleted=team");
+    expect(db.events.filter((e) => /^(write:deals|write:valuations|stripe:|deleteUser|seats:)/.test(e))).toEqual([
+      "write:deals:update",
+      "write:valuations:update",
+      "stripe:cancel:sub_1",
+      "deleteUser",
+      "seats:team-1",
+    ]);
+    // The membership goes with the user, never before it — and the seats are
+    // synced once it has, against the roster that is left.
+    expect(db.writes.some((w) => w.table === "team_members")).toBe(false);
+    expect(rows("team_members").map((m) => m.user_id)).toEqual(["owner-1"]);
+  });
+
+  it("a handover that fails never reaches Stripe", async () => {
+    memberWithSubscription();
+    db.failOn = "deals";
+    expect(await landing()).toBe("/account?error=handover");
+    expect(db.events.some((e) => e.startsWith("stripe:"))).toBe(false);
+    expect(rows("team_members").map((m) => m.user_id)).toContain(ME);
+  });
+
+  it("a subscription Stripe will not cancel stops the deletion after the team's work has moved, and the page says it has", async () => {
+    memberWithSubscription();
+    db.stripe = { cancel: "fail", status: "active" };
+    const href = await landing();
+    expect(href).toBe("/account?error=cancelsub&moved=1");
+    expect(db.deleted).toBe(false);
+    expect(row("deals", "deal-a")?.user_id).toBe("owner-1");
+    expect(row("deals", "mine")?.user_id).toBe(ME);
+    expect(rows("team_members").map((m) => m.user_id)).toContain(ME);
+    const text = notice(href)!;
+    expect(text).toContain("What you had in a team's pipeline has already moved to the team's owner, and stays with the team.");
+    expect(text).not.toMatch(/nothing was (deleted|changed|removed)/i);
+    // Nothing had moved: the page says nothing changed.
+    expect(notice("/account?error=cancelsub")).toContain("Nothing was changed.");
+  });
+
+  it("a retry finds the subscription the stopped deletion cancelled, and finishes", async () => {
+    // The first try cancelled it and stopped later; Stripe will not cancel it
+    // twice, and the profile's mirror still read it live.
+    memberWithSubscription();
+    db.stripe = { cancel: "fail", status: "canceled" };
+    expect(await landing()).toBe("/login?deleted=team");
+    expect(db.events).toContain("stripe:retrieve:sub_1");
+    expect(db.deleted).toBe(true);
+  });
+
+  it("a profile that cannot be read stops before Stripe and the deletion: a live plan would keep billing", async () => {
+    memberWithSubscription();
+    db.failReadOn = "profiles";
+    expect(await landing()).toBe("/account?error=cancelsub&moved=1");
+    expect(db.events.some((e) => e.startsWith("stripe:"))).toBe(false);
+    expect(db.deleted).toBe(false);
+  });
+
+  it("a user deletion that fails says what the steps before it had done, and leaves the membership in place", async () => {
+    memberWithSubscription();
+    db.failDelete = true;
+    const href = await landing();
+    expect(href).toBe("/account?error=delete&moved=1&cancelled=1");
+    expect(rows("team_members").map((m) => m.user_id)).toContain(ME);
+    expect(row("deals", "mine")?.user_id).toBe(ME);
+    expect(db.events).not.toContain("seats:team-1");
+    expect(notice(href)).toBe(
+      "Deletion failed: your account and your own deals are still here, but before it stopped, your subscription was cancelled and what you had in a team's pipeline moved to the team's owner, where it stays. Please try again, or email underwritecopilot.support@gmail.com.",
+    );
+  });
+
+  it("a user deletion that fails before anything changed says nothing was removed", async () => {
+    db.tables.deals = [deal("mine", ME, null)];
+    db.failDelete = true;
+    const href = await landing();
+    expect(href).toBe("/account?error=delete");
+    expect(notice(href)).toBe("Deletion failed — nothing was removed. Please try again, or email underwritecopilot.support@gmail.com.");
+  });
+
+  it("sweeps every personal deal's files: the list read in pages, its documents a chunk of deals at a time", async () => {
+    const n = READ_PAGE + 50;
+    db.tables.deals = Array.from({ length: n }, (_, i) => deal(`p-${String(i).padStart(5, "0")}`, ME, null));
+    expect(await landing()).toBe("/login?deleted=1");
+    expect(new Set(db.swept).size).toBe(n);
+    const docReads = db.reads.filter((r) => r.table === "deal_documents");
+    expect(docReads).toHaveLength(Math.ceil(n / HANDOVER_CHUNK));
+    for (const r of docReads) expect((r.filters.find(([op]) => op === "in")?.[2] as string[]).length).toBeLessThanOrEqual(HANDOVER_CHUNK);
   });
 });

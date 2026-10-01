@@ -10,6 +10,7 @@ import { EmailToggle } from "./email-toggle";
 import { BrandingSection } from "./branding-section";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { emailEnabled } from "@/lib/email";
+import { deletionStopNotice } from "@/lib/account-deletion";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -19,11 +20,8 @@ const DELETE_ERRORS: Record<string, string> = {
   confirm: 'Type DELETE (all caps) in the box to confirm deletion.',
   ownerdelete:
     "You own a team, so self-deletion is disabled — it would take the team down with you. Email underwritecopilot.support@gmail.com and we'll handle it.",
-  cancelsub:
-    "We couldn't cancel your subscription automatically — nothing was deleted. Cancel it from the Billing page first, then try again.",
-  delete: "Deletion failed — nothing was removed. Please try again, or email underwritecopilot.support@gmail.com.",
-  handover:
-    "We couldn't hand your work on the team's deals to the team's owner, so your account was not deleted. Please try again, or email underwritecopilot.support@gmail.com.",
+  // A deletion that stopped part way (handover, cancelsub, delete) says what
+  // its earlier steps had already done: lib/account-deletion, read below.
   // Report branding (Feature 6)
   brandowner:
     "Team branding is managed by the team owner — ask them to update it.",
@@ -57,10 +55,11 @@ async function emailPrefsOf(userId: string): Promise<{ onAnalysis: boolean; week
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string; error?: string; branding?: string }>;
+  searchParams: Promise<{ reset?: string; error?: string; branding?: string; moved?: string; cancelled?: string }>;
 }) {
-  const { reset, error, branding: brandingParam } = await searchParams;
-  const deleteError = error ? (DELETE_ERRORS[error] ?? null) : null;
+  const { reset, error, branding: brandingParam, moved, cancelled } = await searchParams;
+  const deleteError =
+    deletionStopNotice({ error, moved, cancelled }) ?? (error ? (DELETE_ERRORS[error] ?? null) : null);
   const supabase = await createSupabaseServerClient();
   // Request-cached: the (app) layout's own auth call, not a second hop.
   const user = await getCurrentUser();
