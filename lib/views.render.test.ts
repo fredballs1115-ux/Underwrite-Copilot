@@ -3976,7 +3976,7 @@ describe("the rates strip", () => {
     expect(text).toContain("a normal curve, long money dearer than short");
     // With one observation per tenor there is no week-ago line, and the
     // caption does not claim one.
-    expect(text).toContain("Solid is today's curve as last posted, Sep 17, 2026.");
+    expect(text).toContain("Solid is today's read of the curve, as last posted Sep 17, 2026.");
     expect(text).not.toContain("dashed a week earlier");
     // Every tenor's figure is written on the picture.
     for (const v of ["3.97", "4.67", "4.94", "5.32", "5.29"]) expect(html).toContain(`>${v}</text>`);
@@ -3991,7 +3991,7 @@ describe("the rates strip", () => {
       }
     }
     const out = render(React.createElement(RatesStrip, { rates: readRates(rows, FIXTURE_NOW) }));
-    expect(visibleText(out)).toContain("Solid is today's curve as last posted, Sep 17, 2026; dashed a week earlier.");
+    expect(visibleText(out)).toContain("Solid is today's read of the curve, as last posted Sep 17, 2026; dashed a week earlier.");
     expect(out).toContain('stroke-dasharray="3 3"');
     // And each tile now carries its recent path — the 2-year and the
     // 10-year have tiles under the picture; the other tenors are the

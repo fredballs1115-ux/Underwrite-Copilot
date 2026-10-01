@@ -401,11 +401,13 @@ function CurveFigure({ curve }: { curve: YieldCurve }) {
           </g>
         ))}
       </svg>
-      {/* One string, so the date and the words are one text node. "Today's
-          curve" is the curve as last posted, dated — a weekend or a holiday
-          posts nothing, and the strip never claims a figure is today's. */}
+      {/* One string, so the date and the words are one text node. The solid
+          line is the page's read today of the curve as last posted, dated —
+          a weekend or a holiday posts nothing, and the strip never claims a
+          figure is today's.
+          ("Solid is today" is what live-verify's #362 marker greps.) */}
       <figcaption className="mt-1 text-[11px] text-muted">
-        {`Solid is today's curve as last posted, ${periodLabel(curve.asOf, "daily")}${weekAgo ? "; dashed a week earlier" : ""}. Each tenor is a field's Treasury where a clause names one.`}
+        {`Solid is today's read of the curve, as last posted ${periodLabel(curve.asOf, "daily")}${weekAgo ? "; dashed a week earlier" : ""}. Each tenor is a field's Treasury where a clause names one.`}
       </figcaption>
     </figure>
   );
