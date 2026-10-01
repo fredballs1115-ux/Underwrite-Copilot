@@ -3495,7 +3495,7 @@ function FloatingRate({
         The premium is what a broker quoted you, never a number this works out:
         pricing a cap needs a volatility surface, which is not screening
         arithmetic. It is a use funded at closing, not a haircut on the loan.
-        {sofrAsOf ? ` SOFR is today's, as of ${sofrAsOf}.` : ""}
+        {sofrAsOf ? ` The index starts at SOFR as of ${shortDate(sofrAsOf)}.` : ""}
       </p>
     </Card>
   );
@@ -3622,7 +3622,13 @@ function Prepayment({ curve = [] }: { curve?: readonly CurveSeed[] }) {
         <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
           <Stat label="Cheaper route" value={r.cheaper ?? "—"} />
           <Stat label="What it costs" value={usd(r.cost)} />
-          <Stat label="Below market by" value={usd(r.debtMarkToMarket)} tone="muted" />
+          {/* Signed: a coupon over today's lending rate is a loan ABOVE
+              market, said as one, never "below market by -$412,000". */}
+          <Stat
+            label={(r.debtMarkToMarket ?? 0) < 0 ? "Above market by" : "Below market by"}
+            value={usd(r.debtMarkToMarket === null ? null : Math.abs(r.debtMarkToMarket))}
+            tone="muted"
+          />
           <Stat label="Balloon at maturity" value={usd(r.balloon)} tone="muted" />
         </div>
       )}
@@ -3839,10 +3845,16 @@ function LeaseBuyout() {
               to the cent. A "$14 / SF" spread beside a "$41.50" market
               rent reads as a different kind of number. */}
           <Stat
-            label="Under market by"
-            value={r.spreadPsf === null ? "—" : `$${r.spreadPsf.toFixed(2)} / SF`}
+            label={(r.spreadPsf ?? 0) < 0 ? "Over market by" : "Under market by"}
+            value={
+              r.spreadPsf === null ? "—" : `${usdCents(Math.abs(r.spreadPsf))} / SF`
+            }
           />
-          <Stat label="A year, across the space" value={usd(r.spreadAnnual)} tone="muted" />
+          <Stat
+            label="A year, across the space"
+            value={usd(r.spreadAnnual === null ? null : Math.abs(r.spreadAnnual))}
+            tone="muted"
+          />
           <Stat label="Turnover bill" value={usd(r.reTenantingCost)} tone="muted" />
           <Stat label="Rent lost to downtime" value={usd(r.downtimeCost)} tone="muted" />
         </div>
@@ -6177,7 +6189,11 @@ function UnitMix() {
                   tone="muted"
                 />
                 <Stat label="GPR at market" value={usd(t.gprMarket)} tone="muted" />
-                <Stat label="Under market by" value={pct(t.lossToLeasePct, 1)} tone="muted" />
+                <Stat
+                  label={(t.lossToLeasePct ?? 0) < 0 ? "Over market by" : "Under market by"}
+                  value={pct(t.lossToLeasePct === null ? null : Math.abs(t.lossToLeasePct), 1)}
+                  tone="muted"
+                />
               </div>
             </>
           )}

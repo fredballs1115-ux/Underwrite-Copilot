@@ -3643,7 +3643,7 @@ describe("the deal math tools", () => {
 // on a fixture without a database: every series the cron writes, as the
 // runner's Sep 21 dry run actually printed them (lib/live-rates.fixture.ts).
 import { RatesStrip } from "@/app/rates-strip";
-import { SERIES, readRates, type RateRow } from "@/lib/live-rates";
+import { SERIES, rateSeeds, readRates, type RateRow } from "@/lib/live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "@/lib/live-rates.fixture";
 
 describe("the rates strip", () => {
@@ -3668,6 +3668,16 @@ describe("the rates strip", () => {
     expect(text).toContain("10-yr Treasury as of Sep 17");
     expect(text).toContain("CRE delinquency as of Apr 1");
     expect(text).toContain("CPI y/y as of Aug 1");
+  });
+
+  it("dates the SOFR the floating-rate card starts from the way the strip dates it", () => {
+    // It printed the table's own "as of 2026-09-18" (the research pass of
+    // 2026-10-01), beside a strip that says "Sep 18".
+    const page = visibleText(
+      render(React.createElement(DealMathTools, { seeds: rateSeeds(rates) })),
+    );
+    expect(page).toContain("The index starts at SOFR as of Sep 18.");
+    expect(page).not.toContain("2026-09-18");
   });
 
   it("draws the curve as a picture, today against the tenors, with its slope named", () => {
