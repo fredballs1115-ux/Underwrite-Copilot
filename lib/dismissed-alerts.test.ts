@@ -13,6 +13,7 @@ import {
   alertWindowStart,
   dismissedCookie,
   dismissedCookieName,
+  dismissedFor,
   isAlertId,
   parseDismissed,
   undismissed,
@@ -83,6 +84,29 @@ describe("the cookie the dismissal sets", () => {
   it("is not set for an id that is not an alert's", () => {
     expect(dismissedCookie(id(1), "", true, ALICE)).toBeNull();
     expect(dismissedCookie(id(1), "x\r\nSet-Cookie: a=b", true, ALICE)).toBeNull();
+  });
+});
+
+describe("the list a reader has dismissed (the audit of 2026-10-01)", () => {
+  const jar = (cookies: Record<string, string>) => (name: string) => cookies[name];
+
+  it("is the account's cookie where there is one, whatever the old shared cookie holds", () => {
+    const get = jar({ [dismissedCookieName(ALICE)]: id(2), [DISMISSED_ALERTS_COOKIE]: `${id(1)},${id(3)}` });
+    expect(dismissedFor(get, ALICE)).toEqual([id(2)]);
+  });
+
+  it("falls back to the old shared cookie before the reader's first dismissal under the account's name", () => {
+    const get = jar({ [DISMISSED_ALERTS_COOKIE]: `${id(1)},${id(3)}` });
+    expect(dismissedFor(get, ALICE)).toEqual([id(1), id(3)]);
+    // …and the first dismissal under the account's name carries them.
+    const next = dismissedCookie(dismissedFor(get, ALICE).join(","), id(4), true, ALICE)!;
+    expect(next.name).toBe(dismissedCookieName(ALICE));
+    expect(parseDismissed(next.value)).toEqual([id(4), id(1), id(3)]);
+  });
+
+  it("is empty with neither cookie, and an emptied account cookie is not filled from the old one", () => {
+    expect(dismissedFor(jar({}), ALICE)).toEqual([]);
+    expect(dismissedFor(jar({ [dismissedCookieName(ALICE)]: "", [DISMISSED_ALERTS_COOKIE]: id(1) }), ALICE)).toEqual([]);
   });
 });
 

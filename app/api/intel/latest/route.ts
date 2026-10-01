@@ -3,20 +3,23 @@
 // clean 401 beats an empty 200 for an unauthenticated caller).
 //
 // "Open" is the banner's rule (app/(app)/regulatory-alert-banner.tsx):
-// detected in the last 30 days and not dismissed in this browser. The shared
-// `dismissed_at` column is not read — every signed-in user may write it.
+// detected in the last 30 days and not dismissed by this reader in this
+// browser — their account's cookie, read through the banner's own reader
+// (`dismissedFor`). The shared `dismissed_at` column is not read — every
+// signed-in user may write it.
 
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import { DISMISSED_ALERTS_COOKIE, alertWindowStart, parseDismissed, undismissed } from "@/lib/dismissed-alerts";
+import { alertWindowStart, dismissedFor, undismissed } from "@/lib/dismissed-alerts";
 
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
   }
-  const dismissed = parseDismissed((await cookies()).get(DISMISSED_ALERTS_COOKIE)?.value);
+  const store = await cookies();
+  const dismissed = dismissedFor((name) => store.get(name)?.value, user.id);
   const supabase = await createSupabaseServerClient();
   try {
     const [{ data: digest }, { data: items }, { data: alerts }] = await Promise.all([

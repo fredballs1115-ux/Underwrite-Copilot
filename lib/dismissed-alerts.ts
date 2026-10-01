@@ -23,6 +23,21 @@ export function dismissedCookieName(userId: string): string {
   return `${DISMISSED_ALERTS_COOKIE}_${key}`;
 }
 
+/**
+ * The reader's dismissals, newest first: their account's cookie, else the
+ * old shared cookie's (`DISMISSED_ALERTS_COOKIE`) — what a reader dismissed
+ * before the cookie was named for the account, read until their first
+ * dismissal writes the account's cookie with those ids in it. Every surface
+ * that hides a dismissed alert (the banner, its action, /api/intel/latest)
+ * reads through this one, so none reads a list the others do not write.
+ * The old cookie's ids only ever name alerts detected before the rename,
+ * and an alert stops asking for attention `ALERT_WINDOW_DAYS` after it was
+ * detected, so the fallback fades out on its own.
+ */
+export function dismissedFor(get: (name: string) => string | undefined, userId: string): string[] {
+  return parseDismissed(get(dismissedCookieName(userId)) ?? get(DISMISSED_ALERTS_COOKIE));
+}
+
 /** The newest this many dismissals are kept: 50 ids of 36 characters and
  *  their commas are under 2 KB, well inside a cookie's 4. */
 export const MAX_DISMISSED_ALERTS = 50;

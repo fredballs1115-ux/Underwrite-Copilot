@@ -15,13 +15,7 @@
 import { cookies } from "next/headers";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { safeHttpUrl } from "@/lib/safe-url";
-import {
-  alertWindowStart,
-  dismissedCookie,
-  dismissedCookieName,
-  parseDismissed,
-  undismissed,
-} from "@/lib/dismissed-alerts";
+import { alertWindowStart, dismissedCookie, dismissedFor, undismissed } from "@/lib/dismissed-alerts";
 
 interface AlertRow {
   id: string;
@@ -41,8 +35,10 @@ async function dismissAlert(formData: FormData) {
   const user = await getCurrentUser();
   if (!user) return;
   const store = await cookies();
+  // The list so far — the account's cookie, else what this reader dismissed
+  // under the old shared one — so a first dismissal carries the earlier ones.
   const next = dismissedCookie(
-    store.get(dismissedCookieName(user.id))?.value,
+    dismissedFor((name) => store.get(name)?.value, user.id).join(","),
     id,
     process.env.NODE_ENV === "production",
     user.id,
@@ -57,7 +53,8 @@ export async function RegulatoryAlertBanner() {
   try {
     const user = await getCurrentUser();
     if (!user) return null;
-    const dismissed = parseDismissed((await cookies()).get(dismissedCookieName(user.id))?.value);
+    const store = await cookies();
+    const dismissed = dismissedFor((name) => store.get(name)?.value, user.id);
     const supabase = await createSupabaseServerClient();
     const { data } = await supabase
       .from("regulatory_alerts")
