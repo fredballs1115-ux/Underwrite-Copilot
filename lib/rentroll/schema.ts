@@ -149,13 +149,14 @@ export const CANONICAL_FIELDS: CanonicalField[] = [
     aliases: [
       "annual rent", "base rent annual", "annual base rent", "rent annual",
       "yearly rent", "annual contract rent", "base rent", "rent", "contract rent",
-      "current rent", "in place rent", "scheduled rent",
+      "current rent", "in place rent", "scheduled rent", "actual rent", "lease rent",
+      "rent charged", "charged rent",
     ],
     monthlyAliases: [
       "monthly rent", "base rent monthly", "monthly base rent", "rent monthly",
       "rent per month", "monthly contract rent", "current monthly rent", "mo rent",
     ],
-    help: "Monthly columns are recognised by their header and annualized on import.",
+    help: "The rent the tenant pays — never a market or asking rent. A header that says month is annualized on import, and so is one that names no period on a roll that leases by the month.",
   },
   {
     key: "rentPsf",

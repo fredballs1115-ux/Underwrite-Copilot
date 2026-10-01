@@ -127,6 +127,15 @@ export function profileFamilyOf(assetClass: string | null | undefined): ProfileF
   return assetWords(assetClass).profile;
 }
 
+/** Whether a class leases by the month or the year — the apartment profile's
+ *  family (lib/asset-words): every residential class, and storage, senior
+ *  housing and a hotel beside them. Its roll is read for loss to lease, not
+ *  WALT (a short WALT and a year of expiries are how it runs, not a cliff),
+ *  and a rent its roll states with no period is a month's. */
+export function leasesShort(assetClass: string | null | undefined): boolean {
+  return profileFamilyOf(assetClass) === "multifamily";
+}
+
 /** The profile id that asks for the class's market default by name, so a
  *  reader with a saved profile can still pick the default. */
 export const MARKET_DEFAULT_ID = "default";

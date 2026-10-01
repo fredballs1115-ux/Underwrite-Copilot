@@ -11,8 +11,8 @@ import {
   yearsTo,
 } from "./analytics";
 import { parseCsv, suggestMapping, toLeases } from "./parse";
-import { PROFILE_DEFAULTS, normalizeProfile } from "./profiles";
-import { CLEAN_CSV, MISSING_EXPIRIES_CSV, fortyTenantCsv } from "./__fixtures__";
+import { PROFILE_DEFAULTS, leasesShort, normalizeProfile } from "./profiles";
+import { CLEAN_CSV, MISSING_EXPIRIES_CSV, apartmentCsv, fortyTenantCsv } from "./__fixtures__";
 import type { Lease } from "./schema";
 
 const leasesFrom = (csv: string): Lease[] => {
@@ -267,6 +267,30 @@ describe("concentrationFlags", () => {
       holdYears: 5,
     });
     expect(flags.find((f) => f.code === "walt_under_hold")).toBeDefined();
+  });
+
+  it("raises no rollover-year or WALT flag on leases that run a year, and says so", () => {
+    const leases = leasesFrom(apartmentCsv());
+    const commercial = analyzeRentRoll(leases, { asOf: "2026-10-01" });
+    // Read as an office roll, every apartment roll looked like a cliff.
+    expect(commercial.flags.map((f) => f.code)).toEqual(
+      expect.arrayContaining(["rollover_year", "walt_under_hold"]),
+    );
+    const apartments = analyzeRentRoll(leases, { asOf: "2026-10-01", leasesShort: true });
+    expect(apartments.leasesShort).toBe(true);
+    expect(apartments.flags.some((f) => f.code === "rollover_year" || f.code === "walt_under_hold")).toBe(false);
+    // The WALT is still measured; it is just not a flag.
+    expect(apartments.walt.bySf).toBeCloseTo(commercial.walt.bySf!, 12);
+    expect(leasesShort("multifamily")).toBe(true);
+    expect(leasesShort("self_storage")).toBe(true);
+    expect(leasesShort("office")).toBe(false);
+    expect(leasesShort("")).toBe(false);
+  });
+
+  it("still raises a tenant concentration flag on a short-lease roll", () => {
+    const walt = computeWalt(CLEAN, AS_OF);
+    const flags = concentrationFlags(CLEAN, rolloverSchedule(CLEAN), walt, { nra: 100_000, leasesShort: true });
+    expect(flags.map((f) => f.code).sort()).toEqual(["tenant_income", "tenant_nra"]);
   });
 
   it("reports one worst tenant rather than a wall on a 40-tenant roll", () => {

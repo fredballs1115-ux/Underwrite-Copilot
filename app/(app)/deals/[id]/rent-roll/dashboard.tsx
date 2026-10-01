@@ -76,7 +76,8 @@ function RolloverChart({
           const x = 8 + i * COL_W + (COL_W - BAR_W) / 2;
           const h = Math.max(2, (y.sfExpiring / maxSf) * PLOT_H);
           const top = PAD_T + PLOT_H - h;
-          const heavy = (y.pctOfNra ?? 0) > 0.3;
+          // A year's expiries on a roll of one-year leases is no cliff.
+          const heavy = !analytics.leasesShort && (y.pctOfNra ?? 0) > 0.3;
           return (
             <g key={y.year}>
               <title>{`${y.year}: ${sf(y.sfExpiring)}, ${usd(y.rentExpiring)} rent, ${y.leaseCount} lease${
@@ -204,8 +205,17 @@ export function RentRollDashboard({
       </dl>
 
       {/* ── Concentration flags ───────────────────────────────────────── */}
-      {analytics.flags.length ? (
+      {analytics.leasesShort || analytics.flags.length ? (
         <section className="flex flex-col gap-2">
+          {/* A roll of leases that run a year: the rollover and WALT flags
+              describe commercial leases, so in their place it says how
+              this roll is read. */}
+          {analytics.leasesShort ? (
+            <p data-qa="loss-to-lease-note" className="rounded-lg border border-line bg-faint px-4 py-2.5 text-sm text-muted">
+              Leases here run a year or less, so this roll is read for loss to lease — the mark to market
+              below — not for WALT: a short WALT and a year of expiries are routine, not a cliff.
+            </p>
+          ) : null}
           {analytics.flags.map((f) => (
             <p
               key={`${f.code}-${f.value.toFixed(4)}`}

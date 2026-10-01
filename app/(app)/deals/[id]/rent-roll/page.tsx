@@ -13,6 +13,7 @@ import {
 import {
   MARKET_DEFAULT_ID,
   defaultProfileFor,
+  leasesShort,
   openingProfile,
   profileFamilyOf,
   type ProfileDraft,
@@ -120,6 +121,7 @@ export default async function RentRollPage({
     ? analyzeRentRoll(record.leases, {
         asOf: record.asOfDate ?? new Date().toISOString().slice(0, 10),
         nra: record.nra,
+        leasesShort: leasesShort(assetClass),
       })
     : null;
 

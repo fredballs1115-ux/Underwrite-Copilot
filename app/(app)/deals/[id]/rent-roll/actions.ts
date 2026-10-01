@@ -10,11 +10,13 @@ import {
   suggestMapping,
   toLeases,
   type ColumnMapping,
+  type MappingOptions,
 } from "@/lib/rentroll/parse";
 import { CANONICAL_FIELDS, type CanonicalKey } from "@/lib/rentroll/schema";
 import { validateLeases } from "@/lib/rentroll/validate";
 import { getRentRollImport, saveMapping, savedMappingFor, saveProfile } from "@/lib/rentroll/store";
-import { defaultProfileFor } from "@/lib/rentroll/profiles";
+import { defaultProfileFor, leasesShort } from "@/lib/rentroll/profiles";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 
 const MAX_FILE = 32 * 1024 * 1024;
 
@@ -24,10 +26,23 @@ async function requireDeal(dealId: string) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
-  const { data } = await supabase.from("deals").select("id").eq("id", dealId).maybeSingle();
+  const { data } = await supabase
+    .from("deals")
+    .select("id, asset_class, extracted_class:extraction->>assetClass")
+    .eq("id", dealId)
+    .maybeSingle();
   if (!data) return null;
-  return { supabase, user };
+  const row = data as { asset_class: string | null; extracted_class: string | null };
+  // The deal's one class, as the page reads it: it decides whether a rent
+  // that names no period is a month's, and the rent-per-SF ceiling.
+  const assetClass = shownAssetClass(row.asset_class, { assetClass: row.extracted_class });
+  return { supabase, user, assetClass };
 }
+
+/** How a deal's class reads its roll: a class nothing has read leaves it to
+ *  the file's own headers (lib/rentroll/parse `MappingOptions`). */
+const mappingOptions = (assetClass: string): MappingOptions =>
+  assetClass ? { rentMonthly: leasesShort(assetClass) } : {};
 
 const num = (raw: FormDataEntryValue | null): number | null => {
   if (raw == null) return null;
@@ -68,7 +83,7 @@ export async function uploadRentRoll(formData: FormData) {
   }
   if (!grid.length) redirect(`/deals/${dealId}/rent-roll?error=empty`);
 
-  const suggested = suggestMapping(grid);
+  const suggested = suggestMapping(grid, undefined, mappingOptions(ctx.assetClass));
   const signature = headerSignature(grid, suggested.headerRow);
   const saved = await savedMappingFor(ctx.supabase, ctx.user.id, signature);
   const mapping = saved ?? suggested;
@@ -77,7 +92,7 @@ export async function uploadRentRoll(formData: FormData) {
   const nra = num(formData.get("nra"));
   // The parse result rides along so the totals lines it left out are stored
   // with the import's issues and shown on the page, never lost silently.
-  const issues = validateLeases(parsed.leases, { nra, parse: parsed });
+  const issues = validateLeases(parsed.leases, { nra, parse: parsed, assetClass: ctx.assetClass });
 
   const docId = crypto.randomUUID();
   const path = documentPath(dealId, docId, file.name, "rent-roll");
@@ -159,7 +174,7 @@ export async function confirmMapping(formData: FormData) {
 
   const parsed = toLeases(grid, mapping);
   const nra = num(formData.get("nra")) ?? record.nra;
-  const issues = validateLeases(parsed.leases, { nra, parse: parsed });
+  const issues = validateLeases(parsed.leases, { nra, parse: parsed, assetClass: ctx.assetClass });
   const asOf = String(formData.get("asOf") ?? "").trim();
 
   await ctx.supabase

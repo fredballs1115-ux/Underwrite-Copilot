@@ -47,6 +47,26 @@ export const TOTAL_NAMED_TENANTS_CSV = `Suite,Tenant,RSF,Commencement,Expiration
 Total,,56000,,,1732000,
 `;
 
+/** An apartment roll as a property-management system exports it: a monthly
+ *  "Market Rent" beside the monthly "Actual Rent" the resident pays, a
+ *  move-in date beside the lease's own start, one-year leases, and a unit
+ *  type no lease basis is read from. Twelve units, one vacant. */
+export function apartmentCsv(): string {
+  const rows = ["Unit,Unit Type,SF,Resident,Market Rent,Actual Rent,Move-In,Lease Start,Lease End,Deposit"];
+  for (let i = 0; i < 12; i++) {
+    const [type, sf, market] = i % 2 === 0 ? (["1x1", 720, 1650] as const) : (["2x2", 1040, 2150] as const);
+    const unit = 101 + i;
+    if (i === 5) {
+      rows.push(`${unit},${type},${sf},VACANT,${market},,,,,`);
+      continue;
+    }
+    const actual = market - 50 - (i % 3) * 25;
+    const month = i + 1;
+    rows.push(`${unit},${type},${sf},Resident ${unit},${market},${actual},3/1/2023,${month}/1/2026,${month}/28/2027,500`);
+  }
+  return `${rows.join("\n")}\n`;
+}
+
 /** 40 tenants, staggered expiries — the "rollover schedule IS the deal" case. */
 export function fortyTenantCsv(): string {
   const rows = [`Suite,Tenant,Rentable SF,Lease Expiration,Annual Rent,Lease Type`];

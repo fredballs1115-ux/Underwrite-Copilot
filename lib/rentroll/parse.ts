@@ -160,12 +160,48 @@ export function normalizeHeader(raw: unknown): string {
     .trim();
 }
 
-const ALL_ALIASES: { key: CanonicalKey; alias: string; monthly: boolean }[] = CANONICAL_FIELDS.flatMap(
-  (f) => [
-    ...f.aliases.map((alias) => ({ key: f.key, alias, monthly: false })),
-    ...(f.monthlyAliases ?? []).map((alias) => ({ key: f.key, alias, monthly: true })),
-  ],
-);
+/** Every alias, with its place in its field's list: where two columns match a
+ *  field equally well, the alias listed first wins ("Lease Start" over
+ *  "Move-in" for the lease's start). */
+const ALL_ALIASES: { key: CanonicalKey; alias: string; monthly: boolean; rank: number }[] =
+  CANONICAL_FIELDS.flatMap((f) => [
+    ...f.aliases.map((alias, i) => ({ key: f.key, alias, monthly: false, rank: i })),
+    ...(f.monthlyAliases ?? []).map((alias, i) => ({
+      key: f.key,
+      alias,
+      monthly: true,
+      rank: f.aliases.length + i,
+    })),
+  ]);
+
+/** A header naming a market, asking or budgeted rent — what the space could
+ *  let for, never what the tenant pays — maps to no field: a roll's "Market
+ *  Rent" beside its "Actual Rent" had taken the base-rent column, and the
+ *  in-place rent fell to the Rent $/SF column (the market rent the analysis
+ *  reads is the leasing profile's). */
+const MARKET_RENT_HEADER = /\b(market|mkt|asking|pro ?forma|proforma|budget|budgeted|potential|gpr|street)\b/;
+
+/** A header naming what is let — "Unit Type", "Floor plan", "Bed/Bath" — maps
+ *  to no field: its "type" had read as the lease's expense basis, and with
+ *  that refused, as the reimbursement type. */
+const SPACE_TYPE_HEADER =
+  /\b(unit|space|suite|apartment|apt)\s+type\b|\bfloor ?plans?\b|\bfloorplans?\b|\bbed(room)?s?\b|\bbath(room)?s?\b|\bunit mix\b/;
+
+/** The period a rent header states: a month's figure or a year's. */
+const MONTH_HEADER = /\b(monthly|month|months|mo|mos|mth|mthly|mnth|mnthly)\b/;
+const YEAR_HEADER = /\b(annual|annually|annualized|yearly|year|yr|pa|annum)\b/;
+
+/** A header only a residential roll carries — where the deal's class is not
+ *  known, it says a rent column that names no period is a month's. */
+const RESIDENTIAL_HEADER = /\b(resident|residents|move in|bedrooms?|beds|baths?|floor ?plan|floorplan)\b/;
+
+export interface MappingOptions {
+  /** read a base-rent column whose header names no period as a month's: the
+   *  deal's class leases by the month or the year (lib/rentroll/profiles
+   *  `leasesShort`), and rental housing states its rents by the month. Unset
+   *  (no class read), a header only a residential roll carries decides. */
+  rentMonthly?: boolean;
+}
 
 /**
  * How well a header cell matches an alias, 0..1. Exact beats prefix beats
@@ -250,35 +286,53 @@ export interface ColumnMapping {
 /**
  * Best-guess mapping from the header row. Each canonical field takes the
  * highest-scoring unclaimed column, so two columns that both look like "rent"
- * don't both win.
+ * don't both win. A market or asking rent maps to nothing, and neither does a
+ * space's type.
+ *
+ * WHETHER A RENT IS A MONTH'S IS THE HEADER'S TO SAY: "Monthly Rent", "Rent /
+ * Mo" and "Rent PSF / Mo" are annualized on import, "Annual Rent" and "Rent
+ * PSF / Yr" are not. A base-rent header that names no period ("Actual Rent")
+ * is a month's where the roll leases by the month (`options.rentMonthly`) and
+ * a year's otherwise. The confirmation form shows the "× 12" box either way.
  */
-export function suggestMapping(grid: Grid, headerRow?: number): ColumnMapping {
+export function suggestMapping(grid: Grid, headerRow?: number, options: MappingOptions = {}): ColumnMapping {
   const hr = headerRow ?? detectHeaderRow(grid);
   const headers = (grid[hr] ?? []).map((c) => normalizeHeader(c));
 
-  const candidates: { key: CanonicalKey; col: number; score: number; monthly: boolean }[] = [];
+  const candidates: { key: CanonicalKey; col: number; score: number; rank: number }[] = [];
   headers.forEach((h, col) => {
-    if (!h) return;
-    for (const { key, alias, monthly } of ALL_ALIASES) {
+    if (!h || MARKET_RENT_HEADER.test(h) || SPACE_TYPE_HEADER.test(h)) return;
+    for (const { key, alias, rank } of ALL_ALIASES) {
       const s = aliasScore(h, alias);
-      if (s >= 0.3) candidates.push({ key, col, score: s, monthly });
+      if (s >= 0.3) candidates.push({ key, col, score: s, rank });
     }
   });
-  candidates.sort((a, b) => b.score - a.score);
+  candidates.sort((a, b) => b.score - a.score || a.rank - b.rank);
 
   const columns: ColumnMapping["columns"] = {};
   const confidence: ColumnMapping["confidence"] = {};
-  const monthly: CanonicalKey[] = [];
   const usedCols = new Set<number>();
   for (const c of candidates) {
     if (columns[c.key] !== undefined || usedCols.has(c.col)) continue;
     columns[c.key] = c.col;
     confidence[c.key] = c.score;
     usedCols.add(c.col);
-    if (c.monthly) monthly.push(c.key);
   }
 
-  return { columns, monthly, headerRow: hr, confidence };
+  const rentMonthly = options.rentMonthly ?? headers.some((h) => RESIDENTIAL_HEADER.test(h));
+  const monthly = (["baseRentAnnual", "rentPsf"] as const).filter((key) => {
+    const col = columns[key];
+    if (col === undefined) return false;
+    const h = headers[col];
+    if (MONTH_HEADER.test(h)) return true;
+    if (YEAR_HEADER.test(h)) return false;
+    // A rent per foot that names no period stays a year's: a commercial
+    // figure, and a monthly one is caught by its base rent (lib/rentroll/
+    // validate's cross-check) rather than guessed here.
+    return key === "baseRentAnnual" && rentMonthly;
+  });
+
+  return { columns, monthly: [...monthly], headerRow: hr, confidence };
 }
 
 // ---------------------------------------------------------------------------

@@ -7,8 +7,34 @@
  *
  * Pure.
  */
+import { assetWords } from "@/lib/asset-words";
 import type { ParseResult } from "./parse";
 import type { Lease } from "./schema";
+
+/**
+ * The rent per SF a year past which no building charges a foot, so a lease
+ * read above it is a column read wrong — flagged, never corrected. Rental
+ * housing counted by the unit tops out near $150 (a Manhattan penthouse), so
+ * $250 is past it; anything else is held to $1,000, past every office,
+ * industrial and apartment building, which only the dearest retail streets
+ * pass. A typical apartment export once mapped its monthly "Actual Rent" to
+ * Rent $/SF and the page marked $1,886.74/SF against a $32 market with no
+ * warning, because the only check compared the rows with their own median.
+ */
+export const RENT_PSF_CEILING = 1_000;
+export const RESIDENTIAL_RENT_PSF_CEILING = 250;
+
+/** The ceiling for a deal's class (lib/asset-words): rental housing priced by
+ *  the unit gets the residential one; a mixed-use building, whose shops can
+ *  let for more, and every other class, the general one. */
+export function rentPsfCeiling(assetClass: string | null | undefined): number {
+  const words = assetWords(assetClass);
+  return words.residential && words.basis === "unit" ? RESIDENTIAL_RENT_PSF_CEILING : RENT_PSF_CEILING;
+}
+
+/** "$1.36M", "$2,150" — a figure in a message. */
+const dollars = (n: number): string =>
+  Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(2)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
 
 /** "info" says what the import did on purpose (a totals line left out), so
  *  the page shows it without calling it a problem. */
@@ -20,6 +46,8 @@ export interface ValidationIssue {
     | "sf_exceeds_nra"
     | "expiry_before_start"
     | "rent_psf_outlier"
+    | "rent_psf_implausible"
+    | "rent_psf_mismatch"
     | "duplicate_suite"
     | "missing_expiry"
     | "missing_sf"
@@ -41,6 +69,9 @@ export interface ValidateOptions {
   /** what the parser left out of the leases or would not read, so the stored
    *  issues say it */
   parse?: Partial<Pick<ParseResult, "skippedTotals" | "unreadDates" | "dayFirst">>;
+  /** the deal's class (lib/pipeline-slots `shownAssetClass`), which sets the
+   *  rent-per-SF ceiling */
+  assetClass?: string | null;
 }
 
 /** "31 December 2028" — the day said in words, so a date read day first is
@@ -166,6 +197,53 @@ export function validateLeases(
         rows: outliers.map((l) => l.sourceRow),
       });
     }
+  }
+
+  // A rent per foot no building charges is a column read wrong, however the
+  // rows agree with each other.
+  const ceiling = rentPsfCeiling(options.assetClass);
+  const pastCeiling = leases.filter((l) => !l.vacant && l.rentPsf != null && l.rentPsf > ceiling);
+  if (pastCeiling.length) {
+    const top = Math.max(...pastCeiling.map((l) => l.rentPsf!));
+    const who =
+      ceiling === RESIDENTIAL_RENT_PSF_CEILING
+        ? "any rental housing"
+        : "any office, industrial or apartment building";
+    issues.push({
+      severity: "error",
+      code: "rent_psf_implausible",
+      message: `${pastCeiling.length} lease${pastCeiling.length === 1 ? "" : "s"} read above $${ceiling.toLocaleString(
+        "en-US",
+      )}/SF a year (up to $${top.toLocaleString("en-US", { maximumFractionDigits: 2 })}) — past what ${who} charges a foot, so a column is read wrong: usually a monthly or per-unit rent mapped to Rent $/SF, or a monthly figure read as a year's. Nothing was corrected; check the mapping.`,
+      rows: pastCeiling.map((l) => l.sourceRow),
+    });
+  }
+
+  // The rent per foot times the area is the base rent, where the file states
+  // both: two columns that disagree cannot both be right.
+  const disagree = leases.filter((l) => {
+    if (l.vacant || l.rentPsf == null || l.sf == null || l.baseRentAnnual == null) return false;
+    if (l.rentPsf <= 0 || l.sf <= 0 || l.baseRentAnnual <= 0) return false;
+    const ratio = (l.rentPsf * l.sf) / l.baseRentAnnual;
+    return ratio > 1.5 || ratio < 1 / 1.5;
+  });
+  if (disagree.length) {
+    const l = disagree[0];
+    const implied = l.rentPsf! * l.sf!;
+    const ratio = implied / l.baseRentAnnual!;
+    const twelve = Math.abs(ratio - 12) / 12 < 0.15 || Math.abs(1 / ratio - 12) / 12 < 0.15;
+    issues.push({
+      severity: "warning",
+      code: "rent_psf_mismatch",
+      message: `On ${disagree.length} lease${disagree.length === 1 ? "" : "s"} the Rent $/SF column times the area is not the base rent (row ${
+        l.sourceRow
+      }: $${l.rentPsf!.toLocaleString("en-US", { maximumFractionDigits: 2 })}/SF × ${Math.round(l.sf!).toLocaleString(
+        "en-US",
+      )} SF is ${dollars(implied)} a year, against ${dollars(l.baseRentAnnual!)}) — one of the two columns is mapped wrong${
+        twelve ? ", or one is a month's figure and the other a year's" : ""
+      }. Check the mapping.`,
+      rows: disagree.map((x) => x.sourceRow),
+    });
   }
 
   const bySuite = new Map<string, number[]>();

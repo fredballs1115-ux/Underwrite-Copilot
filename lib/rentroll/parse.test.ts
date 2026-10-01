@@ -12,13 +12,14 @@ import {
   toLeases,
   normalizeHeader,
 } from "./parse";
-import { validateLeases } from "./validate";
+import { rentPsfCeiling, validateLeases } from "./validate";
 import { computeWalt } from "./analytics";
 import {
   CLEAN_CSV,
   MESSY_CSV,
   MISSING_EXPIRIES_CSV,
   TOTAL_NAMED_TENANTS_CSV,
+  apartmentCsv,
   fortyTenantCsv,
 } from "./__fixtures__";
 
@@ -227,6 +228,86 @@ describe("toLeases", () => {
     const { leases } = leasesFrom(fortyTenantCsv());
     expect(leases).toHaveLength(40);
     expect(leases.every((l) => l.sf != null && l.leaseExpiry != null)).toBe(true);
+  });
+});
+
+describe("an apartment roll maps the rent the resident pays, a month at a time", () => {
+  const grid = parseCsv(apartmentCsv());
+  const header = (col: number | undefined) => (col == null ? null : String(grid[0][col]));
+
+  it("takes Actual Rent over Market Rent, and maps neither the market rent nor the unit type to anything", () => {
+    const m = suggestMapping(grid);
+    expect(header(m.columns.baseRentAnnual)).toBe("Actual Rent");
+    expect(m.monthly).toEqual(["baseRentAnnual"]);
+    const mapped = Object.values(m.columns).map(header);
+    expect(mapped).not.toContain("Market Rent");
+    expect(mapped).not.toContain("Unit Type");
+    expect(m.columns.rentPsf).toBeUndefined();
+    expect(m.columns.rentBasis).toBeUndefined();
+    expect(header(m.columns.leaseStart)).toBe("Lease Start");
+    expect(header(m.columns.tenant)).toBe("Resident");
+  });
+
+  it("reads the in-place rent a year at a time, so its rent per foot is an apartment's", () => {
+    const { leases } = toLeases(grid, suggestMapping(grid));
+    const first = leases[0];
+    expect(first.baseRentAnnual).toBe((1650 - 50) * 12);
+    expect(first.rentPsf).toBeCloseTo(((1650 - 50) * 12) / 720, 9);
+    expect(leases.filter((l) => !l.vacant).every((l) => l.rentPsf! > 15 && l.rentPsf! < 40)).toBe(true);
+    expect(validateLeases(leases, { assetClass: "multifamily" }).map((i) => i.code)).not.toContain(
+      "rent_psf_implausible",
+    );
+  });
+
+  it("flags the old mis-mapping — the monthly rent in the $/SF column — and corrects nothing", () => {
+    const old = suggestMapping(grid);
+    old.columns = { ...old.columns, baseRentAnnual: 4, rentPsf: 5 }; // Market Rent, Actual Rent
+    old.monthly = [];
+    const { leases } = toLeases(grid, old);
+    const issues = validateLeases(leases, { assetClass: "multifamily" });
+    const implausible = issues.find((i) => i.code === "rent_psf_implausible")!;
+    expect(implausible.severity).toBe("error");
+    expect(implausible.message).toContain("above $250/SF a year");
+    expect(implausible.rows).toHaveLength(11);
+    expect(issues.find((i) => i.code === "rent_psf_mismatch")?.severity).toBe("warning");
+    // The figures stay as read: the check says, it never rewrites.
+    expect(leases[0].rentPsf).toBe(1600);
+  });
+});
+
+describe("a rent column's period is the header's to say", () => {
+  const periodOf = (header: string, options?: { rentMonthly?: boolean }) =>
+    suggestMapping(parseCsv(`Suite,Tenant,SF,Expiration,${header}\n1,A Co,1000,2030-12-31,5000\n`), 0, options).monthly;
+
+  it("reads a month's figure where the header says month, and a year's where it says year", () => {
+    expect(periodOf("Rent/Mo")).toEqual(["baseRentAnnual"]);
+    expect(periodOf("Actual Rent (Monthly)")).toEqual(["baseRentAnnual"]);
+    expect(periodOf("Rent PSF/Mo")).toEqual(["rentPsf"]);
+    expect(periodOf("Annual Rent", { rentMonthly: true })).toEqual([]);
+    expect(periodOf("Rent PSF/Yr", { rentMonthly: true })).toEqual([]);
+  });
+
+  it("reads a rent that names no period by the way the building leases", () => {
+    expect(periodOf("Rent", { rentMonthly: true })).toEqual(["baseRentAnnual"]);
+    expect(periodOf("Rent", { rentMonthly: false })).toEqual([]);
+    expect(periodOf("Rent")).toEqual([]);
+    // A rent per foot stays a year's; its base rent catches a monthly one.
+    expect(periodOf("Rent PSF", { rentMonthly: true })).toEqual([]);
+  });
+
+  it("holds a lease's rent per foot to its base rent, and names a month read as a year", () => {
+    const grid = parseCsv("Suite,Tenant,SF,Expiration,Monthly Rent,Rent PSF\n1,A Co,1000,2030-12-31,3000,3\n");
+    const issue = validateLeases(toLeases(grid, suggestMapping(grid)).leases).find((i) => i.code === "rent_psf_mismatch");
+    expect(issue?.message).toContain("one is a month's figure and the other a year's");
+    expect(issue?.rows).toEqual([2]);
+  });
+
+  it("sets the ceiling by the class: rental housing by the unit, everything else by the dearest retail", () => {
+    expect(rentPsfCeiling("multifamily")).toBe(250);
+    expect(rentPsfCeiling("student_housing")).toBe(250);
+    expect(rentPsfCeiling("mixed_use")).toBe(1_000);
+    expect(rentPsfCeiling("office")).toBe(1_000);
+    expect(rentPsfCeiling("")).toBe(1_000);
   });
 });
 

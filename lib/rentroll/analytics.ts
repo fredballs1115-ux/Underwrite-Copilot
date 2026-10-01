@@ -461,9 +461,14 @@ export interface ConcentrationOptions {
   tenantThreshold?: number;
   /** share of NRA rolling in one year that trips a flag */
   yearThreshold?: number;
+  /** the building leases by the month or the year (lib/rentroll/profiles
+   *  `leasesShort`): the rollover-year and WALT flags describe commercial
+   *  leases and are not raised — a one-year apartment lease is no cliff */
+  leasesShort?: boolean;
 }
 
-/** The three flags that should fire without being asked for. */
+/** The three flags that should fire without being asked for — the tenant
+ *  ones on any roll, the rollover and WALT ones on leases that run for years. */
 export function concentrationFlags(
   leases: Lease[],
   schedule: RolloverSchedule,
@@ -513,7 +518,7 @@ export function concentrationFlags(
     }
   }
 
-  if (nra && nra > 0) {
+  if (nra && nra > 0 && !options.leasesShort) {
     for (const y of schedule.years) {
       const share = y.sfExpiring / nra;
       if (share > yearThreshold) {
@@ -529,7 +534,7 @@ export function concentrationFlags(
     }
   }
 
-  if (walt.bySf != null && walt.bySf < holdYears) {
+  if (walt.bySf != null && walt.bySf < holdYears && !options.leasesShort) {
     flags.push({
       code: "walt_under_hold",
       severity: walt.bySf < holdYears / 2 ? "critical" : "warning",
@@ -571,11 +576,14 @@ export interface RentRollAnalytics {
   rollover: RolloverSchedule;
   flags: ConcentrationFlag[];
   asOf: string;
+  /** the building leases by the month or the year: read for loss to lease,
+   *  and raised no rollover-year or WALT flag */
+  leasesShort: boolean;
 }
 
 export function analyzeRentRoll(
   leases: Lease[],
-  options: { asOf: string; nra?: number | null; holdYears?: number },
+  options: { asOf: string; nra?: number | null; holdYears?: number; leasesShort?: boolean },
 ): RentRollAnalytics {
   const totalSf = leases.reduce((s, l) => s + (l.sf ?? 0), 0);
   const vacantSf = leases.filter((l) => l.vacant).reduce((s, l) => s + (l.sf ?? 0), 0);
@@ -588,6 +596,7 @@ export function analyzeRentRoll(
   const flags = concentrationFlags(leases, rollover, walt, {
     nra,
     holdYears: options.holdYears,
+    leasesShort: options.leasesShort,
   });
 
   return {
@@ -604,5 +613,6 @@ export function analyzeRentRoll(
     rollover,
     flags,
     asOf: options.asOf,
+    leasesShort: !!options.leasesShort,
   };
 }

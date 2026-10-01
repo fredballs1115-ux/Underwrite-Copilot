@@ -1501,18 +1501,18 @@ import { analyzeRentRoll, leaseUpCurve, markToMarket, rolloverCostForecast, roll
 import { parseCsv, suggestMapping, toLeases } from "@/lib/rentroll/parse";
 import { PROFILE_DEFAULTS } from "@/lib/rentroll/profiles";
 import { validateLeases } from "@/lib/rentroll/validate";
-import { CLEAN_CSV, MESSY_CSV, MISSING_EXPIRIES_CSV } from "@/lib/rentroll/__fixtures__";
+import { CLEAN_CSV, MESSY_CSV, MISSING_EXPIRIES_CSV, apartmentCsv } from "@/lib/rentroll/__fixtures__";
 import { deriveAnalytics, type AnalyticsRow } from "@/lib/analytics";
 import { rentTrend } from "@/lib/market/metrics";
 import type { SubmarketPeriod } from "@/lib/market/types";
 
 describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
-  const renderRoll = (csv: string) => {
+  const renderRoll = (csv: string, opts: { leasesShort?: boolean } = {}) => {
     const grid = parseCsv(csv);
     const parsed = toLeases(grid, suggestMapping(grid));
     const leases = parsed.leases;
-    const profile = PROFILE_DEFAULTS.office;
-    const analytics = analyzeRentRoll(leases, { asOf: "2026-01-01", nra: null });
+    const profile = opts.leasesShort ? PROFILE_DEFAULTS.multifamily : PROFILE_DEFAULTS.office;
+    const analytics = analyzeRentRoll(leases, { asOf: "2026-01-01", nra: null, leasesShort: opts.leasesShort });
     const schedule = rolloverSchedule(leases, { nra: null });
     const rent = profile.marketRentPsf;
     const mtm = markToMarket(leases, { default: rent, NNN: rent, MG: rent, FSG: rent });
@@ -1531,7 +1531,10 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
           filename: "rent-roll.csv",
         }),
       );
-    dumpView(`rent-roll-${csv === CLEAN_CSV ? "clean" : csv === MESSY_CSV ? "messy" : "issues"}`, html);
+    dumpView(
+      `rent-roll-${opts.leasesShort ? "apartments" : csv === CLEAN_CSV ? "clean" : csv === MESSY_CSV ? "messy" : "issues"}`,
+      html,
+    );
     expect(a11yIssues(html), "a11y rent roll").toEqual([]);
     return { text: visibleText(html), html, priced: Math.min(25, mtm.rows.length) };
   };
@@ -1562,6 +1565,17 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("Left out 1 totals line");
     expect(text).toContain("(row 11)");
+  });
+
+  it("an apartment roll is read for loss to lease, with no rollover-cliff or WALT flag", () => {
+    const { text, html } = renderRoll(apartmentCsv(), { leasesShort: true });
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain('data-qa="loss-to-lease-note"');
+    expect(text).toContain("read for loss to lease");
+    expect(text).not.toMatch(/of NRA rolls in/);
+    expect(text).not.toMatch(/shorter than the \d+-year hold/);
+    // No year of one-year leases is drawn in the warning colour.
+    expect(html).not.toContain("var(--color-caution)");
   });
 });
 
