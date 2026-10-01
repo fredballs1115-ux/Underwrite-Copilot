@@ -2,7 +2,7 @@ import "server-only";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import type { BuyBoxCheck } from "@/lib/criteria";
-import type { FloodMapView } from "@/lib/site-flags/core";
+import { siteFlagsStale, type FloodMapView, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import { REPORT_FLOOD_SIZE } from "@/lib/basemaps";
@@ -92,6 +92,18 @@ const C = {
 const str = (v: unknown): string =>
   pdfSafe(typeof v === "string" ? v : v == null ? "" : String(v));
 const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+/**
+ * A stored day as a reader writes it — "2026-09-28" or a timestamp reads
+ * "Sep 28, 2026" — the way the memo dates its screen. A value that is not a
+ * date prints as stored rather than as a guess.
+ */
+export function readDay(v: string | null | undefined): string {
+  const s = (v ?? "").trim();
+  const t = Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(s) ? `${s}T00:00:00Z` : s);
+  if (!s || !Number.isFinite(t)) return s;
+  return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
 
 const SEV_COLOR: Record<string, string> = {
   high: C.kill,
@@ -286,7 +298,7 @@ function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) 
   if (!read || read.checks.length === 0) return null;
   // The deal page's card's own words (lib/model-vs-market-scope): the
   // published figures for the market or the state, and the nation's.
-  const scope = readScope(read, read.readOn);
+  const scope = readScope(read, readDay(read.readOn));
   return (
     <View style={{ marginTop: 12 }} wrap={false}>
       <TitleRow title="Assumptions against the published figures" marginTop={0} />
@@ -398,7 +410,7 @@ function PhotosBlock({ photos }: { photos: MemoCover[] }) {
   );
 }
 
-function SiteBlock({ view }: { view: FloodMapView }) {
+function SiteBlock({ view, lookedUp }: { view: FloodMapView; lookedUp?: string | null }) {
   return (
     <View wrap={false}>
       {view.image ? (
@@ -453,6 +465,13 @@ function SiteBlock({ view }: { view: FloodMapView }) {
         </View>
       ) : null}
       {view.line ? <Text style={{ fontSize: 9, color: C.ink, marginTop: 6, lineHeight: 1.35 }}>{str(view.line)}</Text> : null}
+      {/* The day the zone was looked up, where the stored lookup says it:
+          a map is redrawn and a lookup can be months old. */}
+      {view.line && lookedUp ? (
+        <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 3 }}>
+          {str(`The zone as FEMA's National Flood Hazard Layer gave it on ${lookedUp}.`)}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -644,9 +663,9 @@ function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean)
   const localCount = b.lines.length - nat;
   const first_ = localCount === 1 ? "The first is" : `The first ${localCount} are`;
   if (!first) {
-    return `And ${whose} own, where ${sit}, read on ${b.readOn}. Each is ${state ? "the state's" : "the metro's"} - not those properties' own, and never the portfolio's.${nationSays}`;
+    return `And ${whose} own, where ${sit}, read on ${readDay(b.readOn)}. Each is ${state ? "the state's" : "the metro's"} - not those properties' own, and never the portfolio's.${nationSays}`;
   }
-  const lead = `Figures the check read beside the rules of thumb: ${whose}, as published, read on ${b.readOn}${
+  const lead = `Figures the check read beside the rules of thumb: ${whose}, as published, read on ${readDay(b.readOn)}${
     state ? " - the address lies outside the metros the site tracks" : ""
   }.${state ? "" : placedBySentence(b.placedBy)}`;
   const each =
@@ -1497,6 +1516,16 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   const market = deal.market as MarketResult | null;
   const reconciliation = deal.reconciliation as ReconciliationResult | null;
   const verdict = (deal.verdict as VerdictResult | null) ?? null;
+  // The day the flood zone on the site page was looked up: the stored
+  // lookup's own date, only where it answered for the address the map is
+  // drawn at (the route's floodMapFor reads the same row the same way).
+  const siteFlags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+  const floodLookedUp =
+    siteFlags?.status === "ok" &&
+    !siteFlagsStale(siteFlags, (deal.address as { label?: string } | null)?.label) &&
+    Number.isFinite(Date.parse(siteFlags.retrievedAt ?? ""))
+      ? readDay(siteFlags.retrievedAt)
+      : null;
 
   const metrics = list(extraction?.metrics) as NonNullable<
     ExtractionResult["metrics"]
@@ -1893,7 +1922,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       {input.floodMap && (
         <PageChrome title="The site" count="FEMA flood map" dealName={dealName} branding={memo.branding}>
           <Text style={s.sub}>{"What FEMA's flood insurance rate map shows around the building: FEMA's own zones, drawn in the colours of the key below."}</Text>
-          <SiteBlock view={input.floodMap} />
+          <SiteBlock view={input.floodMap} lookedUp={floodLookedUp} />
         </PageChrome>
       )}
 

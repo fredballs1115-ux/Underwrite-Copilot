@@ -136,6 +136,10 @@ export async function buildUnderwriteWorkbook(
   /** a portfolio memorandum's properties (lib/portfolio) — a tab of their
    *  own after the Deal Summary; no tab for a single property */
   portfolio?: PortfolioRead | null,
+  /** when the workbook was built — the day its cover's "from today" lines
+   *  were read on, printed on the cover and set as the file's created and
+   *  modified time (it was 1970) */
+  builtAt: Date = new Date(),
 ): Promise<Buffer> {
   const { inputs } = model;
   const result = computeUnderwrite(inputs);
@@ -143,7 +147,8 @@ export async function buildUnderwriteWorkbook(
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "Underwrite Copilot";
-  wb.created = new Date(0);
+  wb.created = builtAt;
+  wb.modified = builtAt;
 
   const wsCover = wb.addWorksheet("Cover", { views: [{ showGridLines: false }] });
   const wsSummary = wb.addWorksheet("Deal Summary", { views: [{ showGridLines: false }] });
@@ -175,7 +180,7 @@ export async function buildUnderwriteWorkbook(
   wsSummary.properties.tabColor = { argb: HEADFILL };
   wsSens.properties.tabColor = { argb: "FFA05A1C" };
 
-  buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead });
+  buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead }, builtAt);
   buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy);
   if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
@@ -224,6 +229,8 @@ function buildCover(
   branding?: ExportBranding | null,
   /** which of the optional tabs this workbook carries, for the Contents */
   optional: { portfolio: boolean; marketRead: boolean } = { portfolio: false, marketRead: false },
+  /** when it was built: the day "years from today" on this cover counts from */
+  builtAt: Date = new Date(),
 ) {
   const { meta } = model;
   ws.getColumn(1).width = 3;
@@ -264,6 +271,13 @@ function buildCover(
   fact("Asset class", meta.assetClass);
   fact("Market", meta.market);
   fact("Address", meta.address);
+  // The day the workbook was built: every "years from today" below — a
+  // ground lease's term, an abatement's end — counts from it, and a file
+  // opened months later would otherwise read them as this year's.
+  fact(
+    "Built",
+    builtAt.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }),
+  );
   // The deal's strategy decides what its figures mean. On a plan deal
   // (value-add, conversion, development, lease-up) the cover says so, because
   // the OM's stabilized NOI is the finished project's figure — never this

@@ -784,6 +784,23 @@ describe("the Portfolio tab — each property as the memorandum states it, the s
   });
 });
 
+// ── When it was built ─────────────────────────────────────────────────────
+describe("the workbook says the day it was built, which its \"from today\" lines count from", () => {
+  it("prints the build day on the cover and stamps the file's created and modified time with it, never 1970", async () => {
+    const builtAt = new Date(Date.UTC(2026, 8, 30, 15, 4));
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(model, null, null, null, builtAt)) as unknown as ArrayBuffer);
+    const cover = wb.getWorksheet("Cover")!;
+    expect(cover.getCell(findRow(cover, 2, "Built"), 3).value).toBe("Sep 30, 2026");
+    expect(wb.created?.toISOString()).toBe(builtAt.toISOString());
+    expect(wb.modified?.toISOString()).toBe(builtAt.toISOString());
+    // A caller that passes no time is stamped now, not with the epoch.
+    const now = new ExcelJS.Workbook();
+    await now.xlsx.load((await buildUnderwriteWorkbook(model)) as unknown as ArrayBuffer);
+    expect(now.created!.getUTCFullYear()).toBeGreaterThanOrEqual(2026);
+  });
+});
+
 // ── What is being sold, on the cover (#414) ────────────────────────────────
 describe("the cover says what is being sold, and what the model is and is not on it", () => {
   it("a note: the line and the caveat under the deal type; a fee simple: neither", async () => {

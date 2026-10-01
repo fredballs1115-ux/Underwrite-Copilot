@@ -8,7 +8,7 @@ import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing
 import { afterEach, describe, it, expect, vi } from "vitest";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, rangeRead, ReportDocument } from "./report-document";
+import { buildReportData, rangeRead, readDay, ReportDocument } from "./report-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { pdfFillCountOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
@@ -122,7 +122,7 @@ describe("ReportDocument (full report)", () => {
     );
     const briefedText = await pdfTextOf(briefed);
     expect(briefedText).toContain("Figures the check read beside the rules of thumb");
-    expect(briefedText).toContain("Philadelphia, PA market's, as published, read on 2026-09-23");
+    expect(briefedText).toContain("Philadelphia, PA market's, as published, read on Sep 23, 2026");
     expect(briefedText).toContain("Unemployment 4.1% (Jul 2026, Philadelphia MSA; FRED)");
     expect(briefedText).toContain("10-year Treasury 4.94%");
     expect(await pdfTextOf(buf)).not.toContain("Figures the check read");
@@ -166,7 +166,7 @@ describe("ReportDocument (full report)", () => {
     // with its line breaks folded — the wrap is the page's, not the words'.
     const assumedText = (await pdfTextOf(assumed)).replace(/\s+/g, " ");
     expect(assumedText).toContain("Assumptions against the published figures");
-    expect(assumedText).toContain("set against the published figures for the Philadelphia market and the nation, read on 2026-09-21");
+    expect(assumedText).toContain("set against the published figures for the Philadelphia market and the nation, read on Sep 21, 2026");
     expect(assumedText).not.toContain("actually done");
     expect(assumedText).toContain("Rent growth 3.0%/yr (a screening default)");
     expect(assumedText).toContain("ahead of the published figures");
@@ -1254,13 +1254,13 @@ describe("ReportDocument (full report)", () => {
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain(
-      "Figures the check read beside the rules of thumb: the state of Pennsylvania's, as published, read on 2026-09-23 - the address lies outside the metros the site tracks. The first is the state's, not any metro's, the submarket's or the building's. The last is the nation's, and says so.",
+      "Figures the check read beside the rules of thumb: the state of Pennsylvania's, as published, read on Sep 23, 2026 - the address lies outside the metros the site tracks. The first is the state's, not any metro's, the submarket's or the building's. The last is the nation's, and says so.",
     );
     expect(text).not.toContain("the Pennsylvania market's");
     expect(text).toContain("They speak for the portfolio's 1 property in Pennsylvania of its 3, never for the portfolio.");
     expect(text).toContain("• Unemployment 3.7% (Aug 2026, Pennsylvania; FRED)");
     expect(text).toContain(
-      "And the Cleveland OH market's own, where 2 of the portfolio's 3 properties sit, read on 2026-09-23. Each is the metro's - not those properties' own, and never the portfolio's.",
+      "And the Cleveland OH market's own, where 2 of the portfolio's 3 properties sit, read on Sep 23, 2026. Each is the metro's - not those properties' own, and never the portfolio's.",
     );
     expect(text).toContain("• Unemployment 4.4% (Jul 2026, Cleveland MSA; FRED)");
   }, 60000);
@@ -1293,9 +1293,17 @@ describe("ReportDocument (full report)", () => {
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain(
-      "Figures the check read beside the rules of thumb: the Dallas-Fort Worth market's, as published, read on 2026-09-23. The deal was placed in this market by its county: Collin County, TX, which the Census Bureau files in the Dallas-Fort Worth-Arlington, TX metro area. Its address names no place the market's own list does, so these are the metro area's figures, not the county's.",
+      "Figures the check read beside the rules of thumb: the Dallas-Fort Worth market's, as published, read on Sep 23, 2026. The deal was placed in this market by its county: Collin County, TX, which the Census Bureau files in the Dallas-Fort Worth-Arlington, TX metro area. Its address names no place the market's own list does, so these are the metro area's figures, not the county's.",
     );
   }, 60000);
+
+  it("prints a stored day the way a reader writes it, and a value that is no date as stored", () => {
+    expect(readDay("2026-09-28")).toBe("Sep 28, 2026");
+    expect(readDay("2026-09-25T23:30:00Z")).toBe("Sep 25, 2026");
+    expect(readDay("")).toBe("");
+    expect(readDay(null)).toBe("");
+    expect(readDay("last week")).toBe("last week");
+  });
 
   it("reads the OM's figure onto its typical range", () => {
     // The sample's three checks: at the low end, past the high end, inside.
@@ -1441,6 +1449,33 @@ describe("ReportDocument (full report)", () => {
     expect(await pdfTextOf(without)).not.toContain("FEMA flood map");
     expect(pagesOf(buf)).toBe(pagesOf(without) + 1);
     expect(imagesOf(buf) - imagesOf(without)).toBeGreaterThanOrEqual(4);
+
+    // The stored lookup says when it was made: the page says the zone's day.
+    expect(text).not.toContain("gave it on");
+    const lookedUp = { ...deal, site_flags: { status: "ok", tractGeoid: null, opportunityZone: null, flood: flag, retrievedAt: "2026-09-25T14:30:00Z", note: "" } } as unknown as DealRow;
+    const dated = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, {
+          input: buildReportData(lookedUp, "September 30, 2026", [], null, undefined, undefined, undefined, undefined, null, null, null, view),
+        }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    expect(dated).toContain("The zone as FEMA's National Flood Hazard Layer gave it on Sep 25, 2026.");
+    // A lookup made for an address the deal has since changed from is not this map's.
+    const moved = {
+      ...lookedUp,
+      address: { label: "200 Main St, Dallas, TX 75201" },
+      site_flags: { ...(lookedUp as unknown as { site_flags: object }).site_flags, subject: { lat: 1, lng: 1, label: "100 Elm St, Dallas, TX 75201" } },
+    } as unknown as DealRow;
+    expect(
+      pdfTextOf(
+        await renderToBuffer(
+          React.createElement(ReportDocument, {
+            input: buildReportData(moved, "September 30, 2026", [], null, undefined, undefined, undefined, undefined, null, null, null, view),
+          }) as unknown as Parameters<typeof renderToBuffer>[0],
+        ),
+      ),
+    ).not.toContain("gave it on");
 
     // FEMA answered the zone and not the picture: the words stand alone,
     // with no credit for a picture that is not there.
