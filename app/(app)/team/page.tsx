@@ -18,9 +18,11 @@ import { PendingButton } from "../pending-button";
 
 export const metadata: Metadata = { title: "Team" };
 
+const TEAM_UNAVAILABLE = { cls: "bg-kill/10 text-kill", text: "Team checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you set up." };
 const MESSAGES: Record<string, { cls: string; text: string }> = {
   created: { cls: "bg-pass/10 text-pass", text: "Team created — invite your first teammate below." },
   success: { cls: "bg-pass/10 text-pass", text: "Team plan active — the shared pipeline is unlimited. Thank you!" },
+  activating: { cls: "bg-faint text-muted", text: "Checkout complete — the Team plan switches on as soon as Stripe confirms it, usually within a minute. Refresh shortly." },
   cancelled: { cls: "bg-faint text-muted", text: "Checkout cancelled — no charge was made." },
   name: { cls: "bg-kill/10 text-kill", text: "Give the team a name." },
   already: { cls: "bg-kill/10 text-kill", text: "You're already on a team — leave it before creating or joining another." },
@@ -30,7 +32,7 @@ const MESSAGES: Record<string, { cls: string; text: string }> = {
   remove: { cls: "bg-kill/10 text-kill", text: "Couldn't remove that member — please try again." },
   leave: { cls: "bg-kill/10 text-kill", text: "Couldn't leave the team — please try again." },
   ownerleave: { cls: "bg-kill/10 text-kill", text: "Owners can't leave their own team. Transfer isn't supported yet — email underwritecopilot.support@gmail.com and we'll handle it." },
-  config: { cls: "bg-kill/10 text-kill", text: "Team checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you set up." },
+  config: TEAM_UNAVAILABLE,
   save: { cls: "bg-kill/10 text-kill", text: "Couldn't save the team's billing profile — please try again." },
   checkout: { cls: "bg-kill/10 text-kill", text: "Couldn't start checkout — please try again." },
   nocustomer: { cls: "bg-faint text-muted", text: "No team subscription on file yet — start with the Team plan below." },
@@ -41,11 +43,13 @@ const MESSAGES: Record<string, { cls: string; text: string }> = {
   confirmdelete: { cls: "bg-kill/10 text-kill", text: "Type DELETE (all caps) in the box to confirm deleting the team." },
   deletesub: { cls: "bg-kill/10 text-kill", text: "We couldn't convert the team's subscription, so nothing was deleted. Try again, or email underwritecopilot.support@gmail.com." },
   delete: { cls: "bg-kill/10 text-kill", text: "Couldn't delete the team — nothing was removed. Please try again." },
-  // Config-specific causes from lib/stripe/diagnose.ts — operator-fixable.
-  stripekey: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe rejected the API key. Site owner — STRIPE_SECRET_KEY is missing, truncated, or from the wrong account; paste the full live secret key and save." },
-  price: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe couldn't find a configured team price. Site owner — this is almost always a Test-mode price ID used with a Live key; copy the live price_… IDs into STRIPE_TEAM_PRICE_ID and STRIPE_TEAM_SEAT_PRICE_ID." },
-  pricetype: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: a configured Stripe price is one-time, but subscriptions need Recurring · Monthly. Site owner — recreate the price as recurring and update the ID." },
-  appurl: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: the app's public URL is misconfigured. Site owner — set NEXT_PUBLIC_APP_URL to the full https:// address of this site." },
+  // A setup problem on our side (lib/stripe/diagnose.ts) reads as team
+  // checkout not being available; which knob is wrong goes to the server
+  // log for the operator, never onto a customer's page.
+  stripekey: TEAM_UNAVAILABLE,
+  price: TEAM_UNAVAILABLE,
+  pricetype: TEAM_UNAVAILABLE,
+  appurl: TEAM_UNAVAILABLE,
 };
 
 export default async function TeamPage({
@@ -54,18 +58,23 @@ export default async function TeamPage({
   searchParams: Promise<{ created?: string; error?: string; status?: string }>;
 }) {
   const { created, error, status } = await searchParams;
-  const banner = created
-    ? MESSAGES.created
-    : status
-      ? MESSAGES[status]
-      : error
-        ? MESSAGES[error]
-        : null;
 
   const supabase = await createSupabaseServerClient();
   // Request-cached: the (app) layout's own auth call, not a second hop.
   const user = await getCurrentUser();
   const team = user ? await getTeam(supabase, user.id) : null;
+  // Stripe returns the buyer here when checkout completes, which can be a
+  // moment before its webhook switches the plan: "Team plan active" waits
+  // for the team's plan to say so.
+  const banner = created
+    ? MESSAGES.created
+    : status === "success" && !team?.planActive
+      ? MESSAGES.activating
+      : status
+        ? MESSAGES[status]
+        : error
+          ? MESSAGES[error]
+          : null;
   // Whether the owner personally pays for Pro — decides which upgrade path
   // the Start-Team button takes (in-place conversion vs a new checkout).
   const ownerIsPersonalPro =

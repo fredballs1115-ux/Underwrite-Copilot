@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { getStripe } from "@/lib/stripe/client";
-import { classifyStripeError, isStaleCustomer } from "@/lib/stripe/diagnose";
+import { isStaleCustomer, stripeErrorCode } from "@/lib/stripe/diagnose";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 function appUrl(): string {
@@ -57,7 +57,7 @@ export async function startCheckout() {
       }
     } catch (err) {
       console.error(`checkout: customer verification failed for ${user.id}:`, err);
-      redirect(`/billing?error=${classifyStripeError(err) ?? "checkout"}`);
+      redirect(`/billing?error=${stripeErrorCode(err, "checkout")}`);
     }
   }
   if (!customerId) {
@@ -75,7 +75,7 @@ export async function startCheckout() {
       // Log the real Stripe error (invalid key, etc.) so the failure is
       // diagnosable in the server logs, not just a generic "try again".
       console.error(`checkout: stripe.customers.create failed for ${user.id}:`, err);
-      redirect(`/billing?error=${classifyStripeError(err) ?? "checkout"}`);
+      redirect(`/billing?error=${stripeErrorCode(err, "checkout")}`);
     }
     customerId = customer.id;
     // Billing columns are service-role-only (migration 0006), so persist the
@@ -121,7 +121,7 @@ export async function startCheckout() {
     if (isRedirectError(err)) throw err;
     // Surface the real reason (invalid price ID, bad key, outage) in the logs.
     console.error(`checkout: create session failed for ${user.id} (price ${priceId}):`, err);
-    redirect(`/billing?error=${classifyStripeError(err) ?? "checkout"}`);
+    redirect(`/billing?error=${stripeErrorCode(err, "checkout")}`);
   }
 
   if (session.url) redirect(session.url);
@@ -168,7 +168,7 @@ export async function openPortal() {
   } catch (err) {
     if (isRedirectError(err)) throw err;
     console.error(`portal: customer verification failed for ${user.id}:`, err);
-    redirect(`/billing?error=${classifyStripeError(err) ?? "checkout"}`);
+    redirect(`/billing?error=${stripeErrorCode(err, "checkout")}`);
   }
   let session;
   try {
@@ -178,7 +178,7 @@ export async function openPortal() {
     });
   } catch (err) {
     console.error(`portal: create session failed for ${user.id}:`, err);
-    redirect(`/billing?error=${classifyStripeError(err) ?? "checkout"}`);
+    redirect(`/billing?error=${stripeErrorCode(err, "checkout")}`);
   }
   redirect(session.url);
 }

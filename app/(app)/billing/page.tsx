@@ -35,20 +35,21 @@ const PRO_FEATURES = [
   "Per-tab uploads and multi-document reconciliation",
 ];
 
-// Billing failures name their actual cause. The four config codes come from
-// lib/stripe/diagnose.ts — they only occur when the site's Stripe setup is
-// wrong, so the copy speaks to the operator; transient failures keep the
-// generic retry line.
+// Billing failures, in a customer's words. A setup problem on our side —
+// the config codes from lib/stripe/diagnose.ts — reads as checkout not being
+// available, with where to write; which knob is wrong goes to the server log
+// for the operator (`stripeErrorCode`), never onto a customer's page.
+const UNAVAILABLE = { cls: "bg-kill/10 text-kill", text: "Checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you upgraded." };
 const BILLING_ERRORS: Record<string, { cls: string; text: string }> = {
-  config: { cls: "bg-kill/10 text-kill", text: "Checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you upgraded." },
+  config: UNAVAILABLE,
+  stripekey: UNAVAILABLE,
+  price: UNAVAILABLE,
+  pricetype: UNAVAILABLE,
+  appurl: UNAVAILABLE,
   nocustomer: { cls: "bg-faint text-muted", text: "No subscription on file yet — start with Upgrade to Pro below." },
   save: { cls: "bg-kill/10 text-kill", text: "Couldn't save your billing profile — please try again." },
   exists: { cls: "bg-faint text-muted", text: "You already have an active subscription — if it still shows Free, activation can take a moment; refresh shortly." },
   checkout: { cls: "bg-kill/10 text-kill", text: "Couldn't start checkout — please try again in a moment." },
-  stripekey: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe rejected the API key. Site owner — STRIPE_SECRET_KEY is missing, truncated, or from the wrong account; paste the full live secret key and save." },
-  price: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe couldn't find the configured price. Site owner — this is almost always a Test-mode price ID used with a Live key; copy the price_… ID from Live mode into STRIPE_PRICE_ID." },
-  pricetype: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: the configured Stripe price is one-time, but subscriptions need Recurring · Monthly. Site owner — recreate the price as recurring and update the ID." },
-  appurl: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: the app's public URL is misconfigured. Site owner — set NEXT_PUBLIC_APP_URL to the full https:// address of this site." },
 };
 
 export default async function BillingPage({
@@ -86,8 +87,13 @@ export default async function BillingPage({
   const team = user && billing?.team ? await getTeam(supabase, user.id) : null;
 
   const banner =
+    // Stripe returns the buyer here when checkout completes, which can be a
+    // moment before its webhook switches the plan: "You're on Pro" waits for
+    // the plan to say so.
     status === "success"
-      ? { cls: "bg-pass/10 text-pass", text: "You're on Pro — everything's unlocked. Thank you!" }
+      ? isPro
+        ? { cls: "bg-pass/10 text-pass", text: "You're on Pro — everything's unlocked. Thank you!" }
+        : { cls: "bg-faint text-muted", text: "Checkout complete — your plan switches to Pro as soon as Stripe confirms it, usually within a minute. Refresh shortly." }
       : status === "cancelled"
         ? { cls: "bg-faint text-muted", text: "Checkout cancelled — no charge was made." }
         : upsell
