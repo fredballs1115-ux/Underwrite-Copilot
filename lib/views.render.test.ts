@@ -4505,7 +4505,10 @@ describe("DealHero — the building's picture beside its name and its figures (#
     expect(a11yIssues(live)).toEqual([]);
     // Three figures not read yet, each a named shimmer, never a dash.
     expect((live.match(/data-qa="figure-reading"/g) ?? []).length).toBe(3);
-    expect((live.match(/role="status" aria-label="Reading the memorandum"/g) ?? []).length).toBe(3);
+    // A named picture, never a live region: three figures announcing
+    // themselves at once is noise to a screen reader (the audit of 2026-10-01).
+    expect((live.match(/role="img" aria-label="Reading the memorandum"/g) ?? []).length).toBe(3);
+    expect(live).not.toContain('role="status"');
     expect(live).toMatch(/data-qa="figure-reading" class="skeleton /);
     expect(visibleText(live)).not.toContain("—");
     expect(visibleText(live)).toContain("$48,500,000");

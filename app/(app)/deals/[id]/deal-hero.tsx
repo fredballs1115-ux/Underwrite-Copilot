@@ -121,8 +121,10 @@ export function DealHero({
                       // Not read yet, rather than not stated: a quiet
                       // shimmer (still under prefers-reduced-motion — the
                       // .skeleton sweep only runs where motion is welcome).
+                      // A picture with a name, not a live region: four
+                      // figures announcing themselves at once is noise.
                       <span
-                        role="status"
+                        role="img"
                         aria-label="Reading the memorandum"
                         data-qa="figure-reading"
                         className="skeleton inline-block h-[1.1em] w-20 max-w-full rounded align-middle"

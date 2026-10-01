@@ -431,6 +431,7 @@ export function DealView({
   // background process (a deploy/restart). Computed in the poll (where reading
   // the clock is a side effect, not render), it flips the rail to a restart.
   const [stalled, setStalled] = useState(false);
+  const wasStalled = useRef(false);
 
   const active = isActive(job?.status);
   // Why any result below is the previous screen's: a failed run never
@@ -474,11 +475,14 @@ export function DealView({
         // Detect a stalled run: still active but its row hasn't been written in
         // the stale window (the background process likely died).
         const isRunning = data.status === "running" || data.status === "queued";
-        setStalled(
-          isRunning &&
-            !!data.updated_at &&
-            Date.now() - Date.parse(data.updated_at) > STALL_MS,
-        );
+        const nowStalled =
+          isRunning && !!data.updated_at && Date.now() - Date.parse(data.updated_at) > STALL_MS;
+        setStalled(nowStalled);
+        // The header was drawn while the run was reading: a figure not read
+        // yet shimmered. A run that stalls is reading nothing, so the page is
+        // drawn again once, and a missing figure takes its dash.
+        if (nowStalled && !wasStalled.current) router.refresh();
+        wasStalled.current = nowStalled;
 
         if (data.status === "running" || data.status === "queued") {
           notified.current = false;
