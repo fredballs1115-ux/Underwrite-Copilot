@@ -2,10 +2,12 @@
 // per-SF basis and a cap rate — so the comps table and the report can draw a
 // comp against the subject instead of printing the line alone. Pure and
 // LLM-free, and it reads only what the text says: "$252k/unit", "$252,000
-// per door", "$410/SF", "$410 psf", "5.6% cap", "cap rate 5.60%". A monthly
-// rent ("$2,520/mo"), a bare dollar figure, or a percentage with no "cap"
-// beside it is not a basis or a cap, and reads as nothing — the same honesty
-// as the report's rangeRead.
+// per door", "$252,000 a unit", "Price/Unit: $252,000", "$410/SF", "$410
+// psf", "$410/RSF", "$410 a foot", "5.6% cap", "a 5.6 cap", "cap rate of
+// approximately 5.60%". A monthly rent ("$2,520/mo"), a bare dollar figure,
+// a percentage with no "cap" beside it, or a cap stated as a range is not a
+// basis or a cap, and reads as nothing — the same honesty as the report's
+// rangeRead.
 import { buildingSfFromMetrics, parsePrice } from "@/lib/criteria";
 import { findPricedMetric, isOutdoorStorageYard, unitCountFromMetrics, type StrategyKind } from "@/lib/deal-strategy";
 import type { InterestKind } from "@/lib/interest";
@@ -27,13 +29,39 @@ export interface CompFigures {
 
 // "$252k", "$252,000", "$2.1M", "$410" — the figure and an optional k / M.
 const MONEY = String.raw`\$\s?(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d+))?\s*([kKmM])?(?![a-zA-Z])`;
-const PER_UNIT = new RegExp(String.raw`${MONEY}\s*(?:/|per)\s*(?:unit|door|key|bed|room|pad|site)s?\b`, "i");
-const PER_SF = new RegExp(
-  String.raw`${MONEY}\s*(?:(?:/|per)\s*(?:sf|s\.f\.|sq\.?\s*ft\.?|square\s+f(?:oo|ee)t)|psf)\b`,
+// What one is called: a unit, a door, a key, a bed, a pad, an apartment, a
+// home, a space — each class's own word (lib/asset-words).
+const UNIT_WORD = String.raw`(?:unit|door|key|bed|room|pad|site|lot|apartment|apt\.?|home|space|stall|suite)s?`;
+// A foot of building, as a comp states it: SF, RSF / NRSF / GSF / NSF, a
+// square foot, or a foot alone.
+const SF_WORD = String.raw`(?:(?:n?r|g|n)?sf|s\.f\.|sq\.?\s*ft\.?|square\s+f(?:oo|ee)t|f(?:oo|ee)t|ft)`;
+// A figure per month, per year, per night is a rent, never a price:
+// "$1,200 per unit per month", "$25/SF/yr".
+const NOT_A_RENT = String.raw`(?!\s*(?:/|per|an?|each)?\s*(?:mo(?:nth)?|yr|year|annum|annual(?:ly)?|monthly|day|night|week)\b)`;
+// "$252,000 per unit", "$252K/door", "$252,000 a unit".
+const PER_UNIT = new RegExp(String.raw`${MONEY}\s*(?:/|per|an?|each)\s*${UNIT_WORD}\b${NOT_A_RENT}`, "i");
+// "Price/Unit: $252,000", "$/door $252K", "PPU $252K".
+const UNIT_LABEL_FIRST = new RegExp(
+  String.raw`(?:\bprice\s*(?:/|per)\s*${UNIT_WORD}|\$\s*/\s*${UNIT_WORD}|\bppu)\b\s*(?:of|:|=|was|is)?\s*${MONEY}`,
   "i",
 );
-const CAP_AFTER = /(\d{1,2}(?:\.\d+)?)\s*%\s*(?:going[- ]in\s+)?cap\b/i;
-const CAP_BEFORE = /\bcap(?:\s*rate)?\s*(?:of|:|at|@)?\s*(\d{1,2}(?:\.\d+)?)\s*%/i;
+// "$410/SF", "$410 psf", "$410/RSF", "$410 a foot".
+const PER_SF = new RegExp(String.raw`${MONEY}\s*(?:(?:/|per|an?)\s*${SF_WORD}|p\.?s\.?f\.?)\b${NOT_A_RENT}`, "i");
+// "Price/SF: $410", "$/SF $410", "PSF $410".
+const SF_LABEL_FIRST = new RegExp(
+  String.raw`(?:\bprice\s*(?:/|per)\s*${SF_WORD}|\$\s*/\s*${SF_WORD}|\bp\.?p?s\.?f\.?)\b\s*(?:of|:|=|was|is)?\s*${MONEY}`,
+  "i",
+);
+// "5.4% cap", "5.40% going-in cap", "a 5.4 cap" — the figure right before
+// the word, a percent sign or not; never a year ("2023 cap ex") or capex.
+const CAP_AFTER = /(?<![\d.$,])(\d{1,2}(?:\.\d{1,2})?)\s*%?\s*(?:going[- ]in\s+)?cap\b(?!\s*-?\s*ex)/i;
+// "cap rate of 5.4%", "cap rate was approximately 5.4%", "cap: 5.4%".
+const CAP_BEFORE =
+  /\bcap(?:\s*rate)?\s*(?:(?:of|was|is|at|@|:|around|about|approximately|approx\.?|roughly|near|~)\s*){0,2}(\d{1,2}(?:\.\d+)?)\s*%/i;
+// A cap stated as a range — "5.25%-5.75% cap", "5.25 to 5.75% cap" — is no
+// single cap, and is read as none rather than as either end.
+const CAP_RANGE = /(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:going[- ]in\s+)?cap\b/i;
+const CAP_RANGE_AFTER = /\bcap(?:\s*rate)?\s*(?:of|:|at|@)?\s*(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%/i;
 
 function money(m: RegExpMatchArray): number | null {
   const whole = m[1].replace(/,/g, "");
@@ -48,11 +76,12 @@ export function compFigures(detail: string | null | undefined): CompFigures {
   const text = (detail ?? "").trim();
   if (!text) return { perUnit: null, perSf: null, capPct: null };
 
-  const unitMatch = text.match(PER_UNIT);
+  const unitMatch = text.match(PER_UNIT) ?? text.match(UNIT_LABEL_FIRST);
   const unit = unitMatch ? money(unitMatch) : null;
-  const sfMatch = text.match(PER_SF);
+  const sfMatch = text.match(PER_SF) ?? text.match(SF_LABEL_FIRST);
   const sf = sfMatch ? money(sfMatch) : null;
-  const capMatch = text.match(CAP_AFTER) ?? text.match(CAP_BEFORE);
+  const ranged = CAP_RANGE.test(text) || CAP_RANGE_AFTER.test(text);
+  const capMatch = ranged ? null : (text.match(CAP_AFTER) ?? text.match(CAP_BEFORE));
   const cap = capMatch ? Number(capMatch[1]) : null;
 
   return {

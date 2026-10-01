@@ -45,6 +45,49 @@ describe("compFigures — reads a comp's stated basis and cap, nothing more", ()
   });
 });
 
+describe("compFigures — every shape a comp's detail line comes in (WILL_TODO's reader item, 2026-10-01)", () => {
+  it("reads a per-unit basis however the line words it, in each class's own word", () => {
+    for (const [line, perUnit] of [
+      ["$252,000 a unit", 252_000],
+      ["$252k/apartment", 252_000],
+      ["$60k/space", 60_000],
+      ["$35,000 per key", 35_000],
+      ["$95,000/home", 95_000],
+      ["Price/Unit: $252,000", 252_000],
+      ["$/door $252K", 252_000],
+      ["PPU $252K", 252_000],
+    ] as const) {
+      expect(compFigures(line).perUnit, line).toBe(perUnit);
+    }
+  });
+
+  it("reads a per-SF basis on rentable, net or gross feet, or a foot alone", () => {
+    for (const line of ["$410/RSF", "$410/NRSF", "$410 per GSF", "$410 per foot", "$410 a foot", "Price/SF: $410", "$/SF $410", "PSF $410"]) {
+      expect(compFigures(line).perSf, line).toBe(410);
+    }
+  });
+
+  it("reads a cap without its percent sign, and with words between", () => {
+    expect(compFigures("sold at a 5.4 cap").capPct).toBe(5.4);
+    expect(compFigures("a 5 cap").capPct).toBe(5);
+    expect(compFigures("cap rate was 5.4%").capPct).toBe(5.4);
+    expect(compFigures("cap rate of approximately 5.4%").capPct).toBe(5.4);
+  });
+
+  it("reads no cap from a range, a year, capex or a bare percentage", () => {
+    for (const line of ["5.25%-5.75% cap", "5.25 to 5.75% cap", "cap rate 5.25%-5.75%", "2023 cap ex", "$1.2M of cap-ex", "5.4% on in-place NOI"]) {
+      expect(compFigures(line).capPct, line).toBeNull();
+    }
+  });
+
+  it("reads a rent per month or per year as no basis at all", () => {
+    for (const line of ["$1,200 per unit per month", "$1,450/unit/mo", "$2,100 a unit monthly", "$25/SF/yr", "$32.50 per SF per year", "$28 psf annually"]) {
+      const f = compFigures(line);
+      expect([f.perUnit, f.perSf], line).toEqual([null, null]);
+    }
+  });
+});
+
 describe("subjectBasis — the deal's own basis from the shared readers", () => {
   it("divides the sample's asking price by its unit count", () => {
     const b = subjectBasis(SAMPLE_DEAL.extraction.metrics, "stabilized");
