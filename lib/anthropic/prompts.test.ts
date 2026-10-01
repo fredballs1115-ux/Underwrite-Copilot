@@ -371,6 +371,15 @@ describe("sector-aware challenger traps", () => {
     expect(challengerInstruction("land_infill")).toContain("RESIDUAL VALUE");
   });
 
+  // Research pass 18: the storage list stated "third-party management at
+  // 6%" as fact — a rule of thumb no reader computes.
+  it("the storage list names the management fee as a line, not a figure", () => {
+    const p = challengerInstruction("self_storage");
+    expect(p).toContain("the management fee: what a third-party manager would charge, carried even where the seller manages the facility itself");
+    expect(p).not.toMatch(/management at \d/);
+    expect(challengerInstruction("auto")).not.toMatch(/management at \d/);
+  });
+
   it("auto carries every class's list once, gated on what the document turns out to be", () => {
     const p = challengerInstruction("auto");
     expect(p).toContain("whichever asset class the document turns out to be");
