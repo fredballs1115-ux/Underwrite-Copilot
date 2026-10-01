@@ -41,7 +41,7 @@ import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
 import { dealTypeLabel, interestTag, readInterest } from "@/lib/interest";
 import { yieldOnCostText } from "@/lib/plan-facts";
-import { goingInCapFigure, noteCapSlot } from "@/lib/compare-interest";
+import { goingInCapFigure, modelReturnsRead, noteCapSlot } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
@@ -1490,6 +1490,12 @@ export default async function DealPage({
         // reader from the same row — so the panel names the clauses the
         // download carries (lib/loi-terms).
         loi={loiTermsFor(extraction, firstSignal)}
+        // The first-draft model's returns where the price is not the
+        // building's — the compare table's rule (lib/compare-interest): a
+        // note's cap and returns withheld, its yield in the cap's place; a
+        // share's cap struck on the whole, its returns standing only where
+        // the model ran at that whole.
+        modelInterest={model ? modelReturnsRead(extraction, model.returns) : null}
         metroDemand={
           reads && liveMarket
             ? metroDemand(reads.rates, readClass)

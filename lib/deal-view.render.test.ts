@@ -1018,6 +1018,27 @@ describe("DealView — the LOI panel says what the download drafts", () => {
   });
 });
 
+describe("DealView — the Model tab reads the price for what it buys", () => {
+  it("hands the tab the page's read: a note's returns are withheld there, as the compare table withholds them", () => {
+    const html = render({
+      ...sampleProps("financials"),
+      modelInterest: {
+        tag: "Note",
+        cap: null,
+        noteYtmPct: 13.8,
+        withheld: "note",
+        share: false,
+        line: "A note's price is a loan's: this model runs the collateral as if bought outright at it, so its cap and returns are the collateral's, not the note's, and are withheld.",
+      },
+    } as Props);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/A note's price is a loan's/);
+    expect(text).toMatch(/Levered IRR\s*n\/a — note/);
+    expect(text).toMatch(/Yield to maturity\s*13\.80%/);
+  });
+});
+
 describe("DealView — Ask's thread on a team deal", () => {
   it("names who asked each question, from the names the page read, and links the current memorandum's pages", () => {
     const me = "11111111-1111-4111-8111-111111111111";

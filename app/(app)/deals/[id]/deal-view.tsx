@@ -71,6 +71,7 @@ import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
 import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
 import type { LoiTerms } from "@/lib/loi-terms";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { LOI_REFUSAL_BANNERS } from "@/lib/loi-refusal";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
 import { interestOf } from "@/lib/interest";
@@ -350,6 +351,7 @@ export function DealView({
   leaseholdExit = null,
   loi = null,
   askerNames = null,
+  modelInterest = null,
 }: {
   dealId: string;
   dealName: string;
@@ -390,6 +392,10 @@ export function DealView({
    *  route's own reader (lib/loi-terms), so the panel and the download
    *  cannot disagree; null leaves the panel with no plan to name */
   loi?: LoiTerms | null;
+  /** the first-draft model's returns read for what the price buys — the
+   *  compare table's rule (lib/compare-interest): a note's or a share's
+   *  withheld, with the reason; null with no model */
+  modelInterest?: ModelReturnsRead | null;
   /** the metro area's payrolls by sector today, with this building's
    *  sector marked (lib/metro-demand); null outside the covered markets */
   metroDemand?: MetroDemand | null;
@@ -912,6 +918,7 @@ export function DealView({
             sellerNote={sellerNote}
             leaseholdExit={leaseholdExit}
             isSample={isSample}
+            modelInterest={modelInterest}
           />
         )}
 
@@ -1006,6 +1013,7 @@ function FinancialsPanel({
   sellerNote = null,
   leaseholdExit = null,
   isSample = false,
+  modelInterest = null,
 }: {
   results: Results;
   active: boolean;
@@ -1027,6 +1035,8 @@ function FinancialsPanel({
   /** the sample deal: its model's documents are the fixture's, never rows
    *  of its own, so the Model tab compares no document set against them */
   isSample?: boolean;
+  /** what the model's returns mean for what the price buys */
+  modelInterest?: ModelReturnsRead | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -1095,6 +1105,7 @@ function FinancialsPanel({
             active={active}
             isPro={isPro}
             isSample={isSample}
+            interest={modelInterest}
           />
         </div>
       </details>

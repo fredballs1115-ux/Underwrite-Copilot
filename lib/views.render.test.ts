@@ -45,6 +45,7 @@ vi.mock("../app/(app)/deals/actions", () => {
 
 import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
+import { modelReturnsRead } from "@/lib/compare-interest";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
 import { coverFor } from "@/lib/deal-cover";
@@ -1103,6 +1104,72 @@ describe("ModelView — the sample model renders every panel", () => {
     );
     expect(html).toMatch(/<a href="#model-documents"[^>]*>Regenerate the model<\/a>/);
     expect(html).toMatch(/<section id="model-documents"/);
+  });
+
+  // The tab printed a note's or a share's cap and returns as figures, where
+  // the compare table withholds the same model's (lib/compare-interest).
+  const priced = (interest: NonNullable<ExtractionResult["interest"]> | undefined, ask: string, rows: ExtractionResult["metrics"] = []) =>
+    ({
+      dealName: "Harbor View Apartments",
+      assetClass: "multifamily",
+      totalPages: 40,
+      interest,
+      metrics: [{ label: "Asking price", value: ask, flagged: false, page: "p. 2" }, ...rows],
+    }) as ExtractionResult;
+  const stated = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 5" });
+  const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+  const modelTab = (interest: ReturnType<typeof modelReturnsRead>) => {
+    const html = render(
+      React.createElement(ModelView, { dealId: "d1", model: SAMPLE_DEAL.model, documents: [], active: false, isPro: true, interest }),
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    return text;
+  };
+  const sampleCap = `${SAMPLE_DEAL.model.returns.goingInCapPct.toFixed(2)}%`;
+  // A stat's label and figure, as the tile draws them: one over the other.
+  const tile = (label: string, value: string) =>
+    new RegExp(`${label.replace(/[()]/g, "\\$&")}\\s*${value.replace(/[.()]/g, "\\$&")}`);
+
+  it("a note: the cap and the returns withheld, its yield to maturity in the cap's place, and no stress panel or grid", () => {
+    const AS_OF = new Date(Date.UTC(2025, 8, 30));
+    const note = priced({ ...blank, kind: "note" }, "$20,000,000", [
+      stated("Unpaid principal balance", "$24,400,000"),
+      stated("Note rate", "5.25%"),
+      stated("Maturity date", "March 31, 2028"),
+      stated("Amortization", "Interest-only"),
+      stated("Payment status", "Performing"),
+    ]);
+    const read = modelReturnsRead(note, SAMPLE_DEAL.model.returns, AS_OF);
+    const text = modelTab(read);
+    expect(text).toMatch(/A note's price is a loan's: this model runs the collateral as if bought outright at it/);
+    expect(text).toMatch(/Levered IRR\s*n\/a — note/);
+    expect(text).toMatch(/Cash-on-cash \(Yr 1\)\s*n\/a — note/);
+    expect(text).toMatch(/Equity multiple\s*n\/a — note/);
+    expect(text).toMatch(tile("Yield to maturity", `${read.noteYtmPct!.toFixed(2)}%`));
+    expect(text).not.toContain(sampleCap);
+    expect(text).not.toMatch(/Stress the assumptions|Return sensitivity/);
+  });
+
+  it("a share: its cap struck on the whole, its returns withheld at the share's price and standing at the whole's", () => {
+    // $68M for 49% is $138.8M for the whole; the model ran at $68M.
+    const share = priced({ ...blank, kind: "partial_interest", share: "49% limited partnership interest" }, "$68,000,000");
+    const read = modelReturnsRead(share, SAMPLE_DEAL.model.returns);
+    const text = modelTab(read);
+    expect(text).toMatch(/A share's price is for the share/);
+    expect(text).toMatch(/Levered IRR\s*n\/a — share/);
+    expect(text).toMatch(tile("Going-in cap (on the whole)", `${read.cap!.toFixed(2)}%`));
+    expect(text).not.toMatch(/Stress the assumptions|Return sensitivity/);
+
+    // The same share priced so the model ran at the whole: the returns are
+    // the whole asset's, and stand.
+    const atWhole = priced({ ...blank, kind: "partial_interest", share: "49% limited partnership interest" }, "$33,320,000");
+    const whole = modelTab(modelReturnsRead(atWhole, SAMPLE_DEAL.model.returns));
+    expect(whole).not.toMatch(/n\/a — share/);
+    expect(whole).toMatch(tile("Levered IRR", `${SAMPLE_DEAL.model.returns.leveredIrrPct!.toFixed(2)}%`));
+    expect(whole).toMatch(/Going-in cap \(on the whole\)/);
+    expect(whole).toMatch(/Stress the assumptions/);
   });
 
   it("says a model stored undated is undated, and compares nothing on the sample, whose documents are the fixture's", () => {

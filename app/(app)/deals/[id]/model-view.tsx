@@ -22,6 +22,7 @@ import {
   computeSensitivityGrid,
   SENSITIVITY_PRICE_FACTORS,
 } from "@/lib/model/sensitivity";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
 import {
   addDealDocument,
   removeDealDocument,
@@ -50,6 +51,7 @@ export function ModelView({
   active,
   isPro,
   isSample = false,
+  interest = null,
 }: {
   dealId: string;
   model: UnderwritingModel | null;
@@ -59,15 +61,21 @@ export function ModelView({
   /** the sample deal, whose model lists the fixture's documents and which
    *  has no document rows of its own to compare them with */
   isSample?: boolean;
+  /** what the price buys, read by the compare table's rule (lib/compare-
+   *  interest `modelReturnsRead`): a note's or a share's returns withheld */
+  interest?: ModelReturnsRead | null;
 }) {
+  // Returns the price did not buy are withheld — and so are the stress
+  // panel's and the grid's, which recompute the same returns.
+  const withheld = interest?.withheld ?? null;
   return (
     <div className="flex flex-col gap-6">
       {model ? (
         <>
           <FirstDraftBanner model={model} documents={documents} compare={!isSample} />
-          <ReturnsHeadline model={model} />
-          <StressPanel model={model} />
-          <Sensitivity model={model} />
+          <ReturnsHeadline model={model} interest={interest} />
+          {!withheld && <StressPanel model={model} />}
+          {!withheld && <Sensitivity model={model} />}
           <Conflicts conflicts={model.conflicts} />
           <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} />
           <CapexPanel model={model} />
@@ -236,9 +244,20 @@ function Stat({
  *  misread — either way not a return. Mirrors lib/deal-strategy. */
 const IMPLAUSIBLE_CAP = 0.25;
 
-export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
+export function ReturnsHeadline({
+  model,
+  interest = null,
+}: {
+  model: UnderwritingModel;
+  /** what the price buys (lib/compare-interest `modelReturnsRead`): a
+   *  note's or a share's returns are withheld, with the reason */
+  interest?: ModelReturnsRead | null;
+}) {
   const r = model.returns;
-  const implausible = r.purchasePrice > 0 && r.year1Noi / r.purchasePrice >= IMPLAUSIBLE_CAP;
+  const withheld = interest?.withheld ?? null;
+  // The building's NOI over a loan's or a share's price is no misread plan:
+  // the price is not the building's, and the line above the figures says so.
+  const implausible = !withheld && r.purchasePrice > 0 && r.year1Noi / r.purchasePrice >= IMPLAUSIBLE_CAP;
   return (
     <section>
       <div className="flex items-center justify-between gap-3">
@@ -288,15 +307,36 @@ export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
           />
         </div>
       )}
+      {interest?.line && (
+        <p data-qa="returns-withheld" className="mt-3 max-w-2xl text-xs leading-relaxed text-muted">
+          {interest.line}
+        </p>
+      )}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Levered IRR" value={pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
-        <Stat label="Cash-on-cash (Yr 1)" value={pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
-        <Stat label="Equity multiple" value={mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
-        <Stat
-          label={r.yieldOnCostPct != null ? "Going-in cap (Yr 1)" : "Going-in cap"}
-          value={pct(r.goingInCapPct)}
-          tone={implausible ? "kill" : r.goingInCapPct < 0 ? "caution" : undefined}
-        />
+        <Stat label="Levered IRR" value={withheld ? `n/a — ${withheld}` : pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Cash-on-cash (Yr 1)" value={withheld ? `n/a — ${withheld}` : pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Equity multiple" value={withheld ? `n/a — ${withheld}` : mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
+        {withheld === "note" ? (
+          // A note has no cap: its yield to maturity at its price where it
+          // pays or may, the deal header's own slot (lib/compare-interest).
+          interest?.noteYtmPct != null ? (
+            <Stat label="Yield to maturity" value={pct(interest.noteYtmPct)} />
+          ) : (
+            <Stat label="Going-in cap" value="n/a — note" />
+          )
+        ) : interest?.share ? (
+          // A share's cap is struck on the whole its price implies.
+          <Stat
+            label="Going-in cap (on the whole)"
+            value={interest.cap != null ? pct(interest.cap) : "n/a — share"}
+          />
+        ) : (
+          <Stat
+            label={r.yieldOnCostPct != null ? "Going-in cap (Yr 1)" : "Going-in cap"}
+            value={pct(r.goingInCapPct)}
+            tone={implausible ? "kill" : r.goingInCapPct < 0 ? "caution" : undefined}
+          />
+        )}
         <Stat label="Purchase price" value={usd(r.purchasePrice)} />
         <Stat label="Equity" value={usd(r.equity)} />
         <Stat

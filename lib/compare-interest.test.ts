@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { compareInterest, goingInCapFigure, noteCapSlot } from "@/lib/compare-interest";
+import { compareInterest, goingInCapFigure, modelReturnsRead, noteCapSlot } from "@/lib/compare-interest";
 
 const row = (label: string, value: string, page = "p. 5") => ({ label, value, flagged: false, page });
 const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
@@ -125,5 +125,40 @@ describe("a note's going-in cap slot, wherever the deal is summarized", () => {
     expect(src).toMatch(/capText=\{noteCap \? null : summaryCap\}/);
     expect(src).toMatch(/capWithheld=\{noteCap \? "note" : null\}/);
     expect(readFileSync("app/(app)/deals/[id]/research-panel.tsx", "utf8")).toMatch(/capWithheld === "note"/);
+  });
+});
+
+// The deal page's Model tab draws the model this table reads, and printed a
+// note's or a share's cap and returns as figures (the research pass of
+// 2026-10-01): the same rule, and its reason in a sentence.
+describe("modelReturnsRead — the Model tab under the table's rule", () => {
+  const AS_OF = new Date(Date.UTC(2025, 8, 30));
+  const note = deal({ ...blank, kind: "note" }, [
+    row("Unpaid principal balance", "$24,400,000"),
+    row("Note rate", "5.25%"),
+    row("Maturity date", "March 31, 2028"),
+    row("Amortization", "Interest-only"),
+    row("Payment status", "Performing"),
+  ]);
+  const share = deal({ ...blank, kind: "partial_interest", share: "49% limited partnership interest" }, []);
+
+  it("a note: the table's figures, and why its returns are withheld", () => {
+    const r = modelReturnsRead(note, MODEL, AS_OF);
+    expect(r).toMatchObject({ ...compareInterest(note, MODEL, AS_OF), share: false });
+    expect(r.line).toMatch(/^A note's price is a loan's: this model runs the collateral as if bought outright at it/);
+  });
+
+  it("a share: its cap on the whole; its returns withheld at the share's price and standing at the whole's", () => {
+    const r = modelReturnsRead(share, MODEL);
+    expect(r).toMatchObject({ withheld: "share", share: true });
+    expect(r.line).toMatch(/so its returns are withheld, and the cap is struck on that whole\.$/);
+    const atWhole = modelReturnsRead(share, { ...MODEL, purchasePrice: 20_000_000 / 0.49 });
+    expect(atWhole).toMatchObject({ withheld: null, share: true, line: null });
+    const unstated = modelReturnsRead(deal({ ...blank, kind: "partial_interest" }, []), MODEL);
+    expect(unstated.line).toMatch(/states no percentage to gross it up by/);
+  });
+
+  it("a fee simple says nothing and stands", () => {
+    expect(modelReturnsRead(deal(undefined, []), MODEL)).toEqual({ tag: null, cap: 9.5, noteYtmPct: null, withheld: null, share: false, line: null });
   });
 });
