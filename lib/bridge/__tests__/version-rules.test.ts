@@ -112,3 +112,17 @@ describe("the bridge keeps a record of changes, not of page views", () => {
     expect(saveFailure(null)).toBe("failed");
   });
 });
+
+describe("the deal as it stands is kept on the server, not only hidden on the page", () => {
+  it("the delete action refuses the current version before it deletes anything", async () => {
+    const { readFileSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/bridge/actions.ts"), "utf8");
+    const body = src.slice(src.indexOf("export async function deleteDealVersion"));
+    const refusal = body.indexOf("if (currentVersionId(current, versions) === versionId) redirect(");
+    expect(refusal).toBeGreaterThan(0);
+    expect(refusal).toBeLessThan(body.indexOf('.from("deal_versions").delete()'));
+    const page = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/bridge/page.tsx"), "utf8");
+    expect(page).toContain("current: \"That version is the deal's assumptions as they stand");
+  });
+});

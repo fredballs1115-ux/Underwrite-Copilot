@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { snapshotVersion } from "@/lib/bridge/versions";
+import { listDealVersions, snapshotVersion } from "@/lib/bridge/versions";
+import { currentVersionId } from "@/lib/bridge/version-rules";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
 import { applyScenarioForm } from "@/lib/bridge/scenario-form";
 
@@ -98,6 +99,22 @@ export async function deleteDealVersion(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // The version that IS the deal as it stands is kept: the page offers no
+  // Delete for it, since the next view would only take it again under a new
+  // label. Refused here too, because the form can be posted without the
+  // page.
+  const { data: deal } = await supabase.from("deals").select("name, extraction").eq("id", dealId).maybeSingle();
+  if (deal) {
+    const current = await currentDealAssumptions(
+      supabase,
+      dealId,
+      deal.name as string,
+      (deal.extraction as ExtractionResult | null) ?? null,
+    );
+    const versions = await listDealVersions(supabase, dealId);
+    if (currentVersionId(current, versions) === versionId) redirect(`/deals/${dealId}/bridge?error=current`);
+  }
 
   const { error } = await supabase.from("deal_versions").delete().eq("id", versionId).eq("deal_id", dealId);
   if (error) {

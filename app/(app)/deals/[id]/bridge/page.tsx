@@ -28,6 +28,7 @@ const ERRORS: Record<string, string> = {
   denied: "This account can't add versions to this deal. Nothing was saved.",
   save: "The version could not be saved — the database refused the write. Nothing was saved; try again.",
   delete: "That version could not be deleted. Try again.",
+  current: "That version is the deal's assumptions as they stand, so it is kept: a view of this page would only take it again.",
   noextraction: "This deal hasn't been screened yet, so there are no assumptions to version.",
 };
 
