@@ -725,7 +725,10 @@ export async function setOffersDue(formData: FormData) {
   redirect(`/deals/${dealId}`);
 }
 
-/** Rename a deal. RLS scopes the update to the caller's own deal. */
+/** Rename a deal. RLS scopes the update to the caller's own deal. The
+ *  sample keeps its name: the name is what marks it as the sample on every
+ *  list, and a renamed sample read there as a real deal. The deal page
+ *  offers it no Rename; this refuses one sent anyway. */
 export async function renameDeal(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -736,6 +739,13 @@ export async function renameDeal(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, is_sample")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal || (deal as { is_sample?: boolean }).is_sample) redirect(`/deals/${dealId}`);
 
   await supabase
     .from("deals")

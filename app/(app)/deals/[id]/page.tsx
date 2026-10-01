@@ -1318,7 +1318,12 @@ export default async function DealPage({
               dealId={id}
               stage={((deal as { stage?: string }).stage as string) ?? "screening"}
             />
-            <DealActions dealId={id} dealName={deal.name} canDelete={canDelete} />
+            <DealActions
+              dealId={id}
+              dealName={deal.name}
+              canDelete={canDelete}
+              canRename={!(deal as { is_sample?: boolean }).is_sample}
+            />
           </>
         }
       >

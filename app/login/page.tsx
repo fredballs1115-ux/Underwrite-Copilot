@@ -74,8 +74,8 @@ export default async function LoginPage({
             <h1 className="text-xl font-semibold tracking-tight">Welcome</h1>
             <p className="mt-2 text-sm leading-relaxed text-muted">
               Screen your first deal in minutes. Up to {FREE_DEALS} deals are
-              free — no card required, and a fully-worked sample deal is
-              waiting inside.
+              free — no card required — and one click inside adds a
+              fully-worked sample deal to your pipeline.
             </p>
             <LoginForm initialMode={initialLoginMode(params)} next={next ?? null} />
           </div>

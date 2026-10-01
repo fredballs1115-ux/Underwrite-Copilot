@@ -11,6 +11,8 @@
  *     never gets its bytes written over.
  *   - askDeal: the same forged path is never downloaded, and no answer is
  *     saved.
+ *   - renameDeal: the sample keeps its name — nothing is written — while a
+ *     deal of the reader's own is renamed.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -86,6 +88,8 @@ const db = {
   deleteMatches: 1,
   deleteAttempts: 0,
   savedQa: [] as unknown[],
+  /** every UPDATE sent, with its table and its patch */
+  updates: [] as { table: string; patch: unknown }[],
 };
 
 vi.mock("@/lib/supabase/server", () => {
@@ -100,8 +104,9 @@ vi.mock("@/lib/supabase/server", () => {
         _op: "select" as "select" | "delete" | "update",
         select: () => q,
         eq: () => q,
-        update: () => {
+        update: (patch: unknown) => {
           q._op = "update";
+          db.updates.push({ table, patch });
           return q;
         },
         delete: () => {
@@ -132,7 +137,7 @@ vi.mock("@/lib/supabase/server", () => {
   return { createSupabaseServerClient: async () => client, getCurrentUser: async () => ({ id: db.caller }) };
 });
 
-import { deleteDeal, replaceOm } from "@/app/(app)/deals/actions";
+import { deleteDeal, renameDeal, replaceOm } from "@/app/(app)/deals/actions";
 import { askDeal } from "@/app/(app)/deals/[id]/ask-actions";
 
 async function landing(run: () => Promise<unknown>): Promise<string> {
@@ -152,6 +157,7 @@ beforeEach(() => {
   db.deleteMatches = 1;
   db.deleteAttempts = 0;
   db.savedQa.length = 0;
+  db.updates.length = 0;
   db.deal = {
     id: DEAL,
     user_id: CREATOR,
@@ -230,5 +236,28 @@ describe("askDeal with a forged om_storage_path", () => {
     expect(state && "error" in state && state.error).toBeTruthy();
     expect(storageOps).toEqual([]);
     expect(db.savedQa).toEqual([]);
+  });
+});
+
+describe("renameDeal", () => {
+  const rename = (name: string) => {
+    const fd = new FormData();
+    fd.set("dealId", DEAL);
+    fd.set("name", name);
+    return renameDeal(fd);
+  };
+
+  it("the sample keeps its name: nothing is written, and the deal opens as it was", async () => {
+    // The name is what marks the sample on every list; a renamed sample
+    // read there as a real deal.
+    db.deal.is_sample = true;
+    expect(await landing(() => rename("Our Brewerytown acquisition"))).toBe(`/deals/${DEAL}`);
+    expect(db.updates).toEqual([]);
+  });
+
+  it("a deal of the reader's own is renamed", async () => {
+    expect(await landing(() => rename("  The Maddox, Phase II  "))).toBe(`/deals/${DEAL}`);
+    expect(db.updates).toHaveLength(1);
+    expect(db.updates[0]).toMatchObject({ table: "deals", patch: { name: "The Maddox, Phase II" } });
   });
 });
