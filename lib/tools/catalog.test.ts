@@ -184,17 +184,18 @@ describe("the cards' bar markers", () => {
  */
 describe("the cards' link keys", () => {
   const src = read("app/tools/deal-math-tools.tsx");
-  const starts = [...src.matchAll(/^function ([A-Z]\w*)\(/gm)].map((m) => ({
+  // Every top-level function: the cards, and the hooks the keys go through.
+  const starts = [...src.matchAll(/^function (\w+)\s*[<(]/gm)].map((m) => ({
     name: m[1],
     at: m.index!,
   }));
-  const cardAt = (at: number) => starts.filter((s) => s.at <= at).at(-1)?.name ?? "(top)";
+  const fnAt = (at: number) => starts.filter((s) => s.at <= at).at(-1)?.name ?? "(top)";
 
-  // Every call that names a key: `useShared` and any reader built on it. Its
-  // own definition (`function useShared(key: string, …)`) is not a call.
-  const calls = [...src.matchAll(/(?<!function )\buse(?:Shared|Choice)\(\s*([^,)]*)/g)].map(
-    (m) => ({ arg: m[1].trim(), card: cardAt(m.index!) }),
-  );
+  // Every call that names a key: `useShared` and any reader built on it —
+  // but not the hooks' own definitions, nor one hook passing its `key` on.
+  const calls = [...src.matchAll(/(?<!function )\buse(?:Shared|Choice)\(\s*([^,)]*)/g)]
+    .map((m) => ({ arg: m[1].trim(), card: fnAt(m.index!) }))
+    .filter((c) => !/^use[A-Z]/.test(c.card));
 
   it("finds the cards and their keys at all", () => {
     // Without this the checks below could pass on an empty scan forever.

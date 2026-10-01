@@ -222,6 +222,26 @@ function useShared(key: string, initial: string): [string, (v: string) => void] 
   return [value, set];
 }
 
+/**
+ * A choice in the link: one of the card's own options, else its seed.
+ *
+ * The link is text anyone can edit, and a value no option matches is a trap
+ * with two sides: a `<select>` shows its FIRST option while the card's sum
+ * reads the raw string, so the capital stack drew "Accrues" and computed
+ * "Pays current" (the research pass of 2026-10-01). Read through here, the
+ * control and the sum see the same value, and the options handed back are
+ * the ones the control draws.
+ */
+function useChoice<T extends string>(
+  key: string,
+  initial: NoInfer<T>,
+  options: readonly { value: T; label: string }[],
+): [T, (v: string) => void, readonly { value: T; label: string }[]] {
+  const [raw, set] = useShared(key, initial);
+  const value = options.find((o) => o.value === raw)?.value ?? initial;
+  return [value, set, options];
+}
+
 /** A button that puts something on the clipboard and says it did. */
 function CopyButton({
   label,
@@ -726,9 +746,14 @@ function BuildOrBuy() {
 // ── 4. one rent, four ways ─────────────────────────────────────────────────
 
 function RentConverter() {
-  const [basis, setBasis] = useState<"perSfYear" | "perSfMonth" | "perUnitMonth">(
-    "perSfYear",
-  );
+  // The basis travels in the link beside the amount it is the unit of: kept
+  // in the page alone, a "$2,500 a unit a month" sent as a URL opened as
+  // $2,500 a foot a year.
+  const [basis, setBasis, bases] = useChoice("amtb", "perSfYear", [
+    { value: "perSfYear", label: "$ / SF / yr" },
+    { value: "perSfMonth", label: "$ / SF / mo" },
+    { value: "perUnitMonth", label: "$ / unit / mo" },
+  ]);
   const [amount, setAmount] = useShared("amt", "36");
   const [sf, setSf] = useShared("rsf", "100,000");
   const [units, setUnits] = useShared("ru", "120");
@@ -747,22 +772,17 @@ function RentConverter() {
   const exp = num(expenses);
   const gross = q.perSfYear !== null && exp !== null ? q.perSfYear + exp : null;
 
-  const BASES: Array<{ key: typeof basis; label: string }> = [
-    { key: "perSfYear", label: "$ / SF / yr" },
-    { key: "perSfMonth", label: "$ / SF / mo" },
-    { key: "perUnitMonth", label: "$ / unit / mo" },
-  ];
-
   return (
     <Card id="rent-converter" eyebrow="Rent" title="One rent, four ways">
       <div className="flex flex-wrap gap-2">
-        {BASES.map((b) => (
+        {bases.map((b) => (
           <button
-            key={b.key}
+            key={b.value}
             type="button"
-            onClick={() => setBasis(b.key)}
+            onClick={() => setBasis(b.value)}
+            aria-pressed={basis === b.value}
             className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              basis === b.key
+              basis === b.value
                 ? "bg-brand text-white"
                 : "bg-faint text-muted hover:text-ink"
             }`}
