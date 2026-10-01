@@ -57,6 +57,7 @@
  * Pure, no I/O.
  */
 
+import { usdExact } from "./format";
 import { MAX_GROUND_LEASE_YEARS, heldTo } from "./limits";
 
 function real(n: number | null | undefined): n is number {
@@ -327,7 +328,7 @@ export function readGroundLease(input: GroundLeaseTerms): GroundLeaseRead {
     leasedFeeValue = round(pv);
   }
 
-  const usd = (n: number) => `$${n.toLocaleString("en-US")}`;
+  const usd = usdExact;
   const notes: string[] = [];
   if (overstatementPct !== null && overstatementPct > 0) {
     const split =
