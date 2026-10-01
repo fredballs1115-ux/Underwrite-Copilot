@@ -21,6 +21,9 @@
 //      human review instead. A row a FEED PULL wrote (Zillow's, Realtor.com's,
 //      HUD's fair market rents — lib/feed-rows) is never re-checked, re-dated
 //      or corrected: its publisher dates it and the next run replaces it.
+//      Nor is a row whose as_of is the PERIOD its figure is for (the 2–4 unit
+//      month's figures, the mortgage survey's week — lib/period-rows): its
+//      date is the figure's, and today is not that period.
 //   5. HEARTBEAT — a steward_runs row wraps the whole run; the site footer
 //      renders its finished_at as "data last verified", and warns when the
 //      newest run is older than 48h. Silence is impossible by construction.
@@ -37,6 +40,9 @@ import { createClient } from "@supabase/supabase-js";
 // What the feed pulls write, and the filters that leave those rows alone —
 // the one list the pulls and the reads use too (plain Node strips its types).
 import { isFeedMetric, withoutFeedRows, withoutYearAgoRows } from "../lib/feed-rows.ts";
+// The research rows dated by the period their figure is for, which no
+// re-verification may re-date (lib/period-rows).
+import { isPeriodMetric, withoutPeriodRows } from "../lib/period-rows.ts";
 
 const LINKS_PER_NIGHT = 25;
 const RECHECK_CLAIMS = 5;
@@ -328,12 +334,19 @@ if (!anthropicKey) {
     // the source; its next run replaces the row. So feed rows are left out
     // in the query — the three oldest are three research rows — in every
     // write, and once more in hand below.
+    //
+    // NOR IS A PERIOD ROW (lib/period-rows): once the feed rows were out,
+    // the three oldest were the 2–4 unit medians, dated the last day of the
+    // month they are for, and a "confirmed" would have made May's median
+    // October's. Left out the same three ways.
     const [{ data: bmRows, error: bmError }, { data: rr }] = await Promise.all([
-      withoutFeedRows(
-        supabase
-          .from("benchmarks")
-          .select("id, sector, metro, metric, low, high, unit, source, as_of, note")
-          .in("status", ["sourced", "verified"])
+      withoutPeriodRows(
+        withoutFeedRows(
+          supabase
+            .from("benchmarks")
+            .select("id, sector, metro, metric, low, high, unit, source, as_of, note")
+            .in("status", ["sourced", "verified"])
+        )
       )
         .order("as_of", { ascending: true })
         .limit(3),
@@ -345,9 +358,13 @@ if (!anthropicKey) {
         .limit(RECHECK_CLAIMS - 3),
     ]);
     if (bmError) notes.push(`re-verification: benchmarks unreadable (${String(bmError.message).slice(0, 80)}) — none re-checked`);
-    const bm = (bmRows ?? []).filter((b) => !isFeedMetric(b.metric));
-    if (bm.length < (bmRows?.length ?? 0)) {
-      notes.push(`re-verification: ${(bmRows?.length ?? 0) - bm.length} feed rows came back past the filter and were left alone`);
+    const notFeed = (bmRows ?? []).filter((b) => !isFeedMetric(b.metric));
+    if (notFeed.length < (bmRows?.length ?? 0)) {
+      notes.push(`re-verification: ${(bmRows?.length ?? 0) - notFeed.length} feed rows came back past the filter and were left alone`);
+    }
+    const bm = notFeed.filter((b) => !isPeriodMetric(b.metric));
+    if (bm.length < notFeed.length) {
+      notes.push(`re-verification: ${notFeed.length - bm.length} period rows came back past the filter and were left alone`);
     }
 
     for (const b of bm) {
@@ -369,13 +386,16 @@ Reply with ONLY a JSON object:
         const subj = `benchmark ${b.sector}/${b.metro || "national"}/${b.metric}`;
         const okUrl = typeof v.evidence_url === "string" && v.evidence_url.startsWith("http");
         if (v.verdict === "confirmed" && okUrl) {
-          // The write carries the feed filter too: it cannot touch a feed
-          // row whatever id it is handed. A write that failed logs nothing.
-          const { error: upError } = await withoutFeedRows(
-            supabase
-              .from("benchmarks")
-              .update({ as_of: iso.slice(0, 10) })
-              .eq("id", b.id)
+          // The write carries the feed and period filters too: it cannot
+          // touch either kind of row whatever id it is handed. A write that
+          // failed logs nothing.
+          const { error: upError } = await withoutPeriodRows(
+            withoutFeedRows(
+              supabase
+                .from("benchmarks")
+                .update({ as_of: iso.slice(0, 10) })
+                .eq("id", b.id)
+            )
           );
           if (upError) throw new Error(`benchmarks update: ${upError.message}`);
           await logChange(subj, `as_of ${b.as_of}`, `as_of ${iso.slice(0, 10)}`, `steward re-verified against live source: ${v.note ?? ""}`.trim(), v.evidence_url);
@@ -387,11 +407,13 @@ Reply with ONLY a JSON object:
         ) {
           const nl = Number.isFinite(v.new_low) ? v.new_low : b.low;
           const nh = Number.isFinite(v.new_high) ? v.new_high : b.high;
-          const { error: upError } = await withoutFeedRows(
-            supabase
-              .from("benchmarks")
-              .update({ low: nl, high: nh, as_of: iso.slice(0, 10) })
-              .eq("id", b.id)
+          const { error: upError } = await withoutPeriodRows(
+            withoutFeedRows(
+              supabase
+                .from("benchmarks")
+                .update({ low: nl, high: nh, as_of: iso.slice(0, 10) })
+                .eq("id", b.id)
+            )
           );
           if (upError) throw new Error(`benchmarks update: ${upError.message}`);
           await logChange(subj, `${b.low ?? "?"}–${b.high ?? "?"} ${b.unit}`, `${nl ?? "?"}–${nh ?? "?"} ${b.unit}`, `steward correction from live source: ${v.note ?? ""}`.trim(), v.evidence_url);
