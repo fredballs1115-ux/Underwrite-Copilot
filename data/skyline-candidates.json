@@ -3536,12 +3536,18 @@
       "categories": [
         "Skylines of Lansing, Michigan",
         "Views of Lansing, Michigan",
-        "Michigan State Capitol"
+        "Michigan State Capitol",
+        "Downtown Lansing, Michigan",
+        "Michigan State University campus",
+        "Beaumont Tower"
       ],
       "queries": [
         "Lansing Michigan skyline",
         "Lansing Michigan Capitol",
-        "Lansing Grand River"
+        "Lansing Grand River",
+        "Lansing Michigan downtown",
+        "Michigan State University campus",
+        "Beaumont Tower East Lansing"
       ],
       "candidates": [
         {
@@ -3586,12 +3592,18 @@
       "categories": [
         "Skylines of Lincoln, Nebraska",
         "Views of Lincoln, Nebraska",
-        "Nebraska State Capitol"
+        "Nebraska State Capitol",
+        "Downtown Lincoln, Nebraska",
+        "Haymarket (Lincoln, Nebraska)",
+        "Memorial Stadium (Lincoln, Nebraska)"
       ],
       "queries": [
         "Lincoln Nebraska skyline",
         "Lincoln Nebraska Capitol",
-        "Lincoln Haymarket"
+        "Lincoln Haymarket",
+        "Nebraska State Capitol tower",
+        "Lincoln Nebraska downtown",
+        "Memorial Stadium Lincoln Nebraska"
       ],
       "candidates": []
     },
