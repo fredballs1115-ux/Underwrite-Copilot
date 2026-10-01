@@ -2785,6 +2785,13 @@ function Leaseback() {
   const [cost, setCost] = useShared("lbsc", "1.5");
   const [rate, setRate] = useShared("lbr", "6.5");
   const [amort, setAmort] = useShared("lba", "25");
+  // The loan the same building would carry is sized by three lender tests,
+  // which were a 60% / 1.30× / 9% the card applied with no field (the
+  // research pass of 2026-10-01). A blank one is not applied, as on the
+  // debt sizer.
+  const [ltv, setLtv] = useShared("slbl", "60");
+  const [dscr, setDscr] = useShared("slbc", "1.30");
+  const [dy, setDy] = useShared("slby", "9");
 
   const r = useMemo(
     () =>
@@ -2800,12 +2807,14 @@ function Leaseback() {
         sellingCostPct: num(cost),
         mortgageRatePct: num(rate),
         mortgageAmortYears: num(amort),
-        maxLtvPct: 60,
-        minDscr: 1.3,
-        minDebtYieldPct: 9,
+        maxLtvPct: num(ltv),
+        minDscr: num(dscr),
+        minDebtYieldPct: num(dy),
       }),
-    [sf, mkt, con, term, esc, credit, market, disc, cost, rate, amort],
+    [sf, mkt, con, term, esc, credit, market, disc, cost, rate, amort, ltv, dscr, dy],
   );
+  // Years the rent costs less than the coupon: every year before it passes.
+  const underCoupon = r.yearRentPassesCoupon === null ? null : r.yearRentPassesCoupon - 1;
 
   // Rules 1 and 2 as one picture: what the buyer pays, what an ordinary
   // owner would pay, and what the two pieces are actually worth. The gaps
@@ -2841,6 +2850,9 @@ function Leaseback() {
             <Field label="Cost of sale" suffix="%" value={cost} onChange={setCost} placeholder="1.5" />
             <Field label="Mortgage rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
             <Field label="…amortised over" suffix="yrs" value={amort} onChange={setAmort} placeholder="25" />
+            <Field label="Max LTV" suffix="%" value={ltv} onChange={setLtv} placeholder="60" />
+            <Field label="Min DSCR" suffix="x" value={dscr} onChange={setDscr} placeholder="1.30" />
+            <Field label="Min debt yield" suffix="%" value={dy} onChange={setDy} placeholder="9" />
           </div>
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
             Two cap rates, deliberately. One prices the tenant&rsquo;s covenant
@@ -2924,13 +2936,20 @@ function Leaseback() {
             </div>
           )}
 
-          {r.yearRentPassesCoupon !== null && r.mortgageProceeds !== null && (
+          {underCoupon !== null && r.mortgageProceeds !== null && r.extraRaised !== null && (
             <p className="mt-3 text-sm text-muted">
-              It raises {usdExact(r.extraRaised)} more than the loan the
-              building carries ({usdExact(r.mortgageProceeds)}, on{" "}
-              {r.mortgageBindingTest?.toLowerCase()}) and costs less than the
-              coupon — for four years. The rent passes it in year{" "}
-              {r.yearRentPassesCoupon} and never comes back under.
+              {/* Each part read off the figures: the years under the coupon
+                  were a typed "four", true of the worked example alone. */}
+              {`It raises ${usdExact(Math.abs(r.extraRaised))} ${
+                r.extraRaised < 0 ? "less" : "more"
+              } than the loan the building carries (${usdExact(r.mortgageProceeds)}${
+                r.mortgageBindingTest ? `, on ${r.mortgageBindingTest.toLowerCase()}` : ""
+              }) `}
+              {underCoupon === 0
+                ? "and its first year's rent is already over the coupon."
+                : `and costs less than the coupon for its first ${
+                    underCoupon === 1 ? "year" : `${underCoupon} years`
+                  }. The rent passes it in year ${r.yearRentPassesCoupon} and never comes back under.`}
             </p>
           )}
 
@@ -4773,6 +4792,9 @@ function MaxBid() {
   const [dy, setDy] = useShared("mbY", "9");
   const [rate, setRate] = useShared("mbR", "6.5");
   const [amort, setAmort] = useShared("mbA", "30");
+  // The loan fee was a 1% the card charged with no field (the research pass
+  // of 2026-10-01): a cost it counts belongs in front of the reader.
+  const [fee, setFee] = useShared("mbF", "1");
   const [close, setClose] = useShared("mbC", "1.5");
 
   const r = useMemo(() => {
@@ -4805,10 +4827,11 @@ function MaxBid() {
       ratePct: lending ? num(rate)! : Number.NaN,
       amortYears: lending ? num(amort)! : Number.NaN,
       ioYears: 0,
-      loanFeePct: 1,
+      // A blank fee is none, as a blank closing cost is: a cost not stated.
+      loanFeePct: num(fee),
       closingCostPct: num(close),
     });
-  }, [noi, growth, hold, exitCap, sellCost, target, ltv, dscr, dy, rate, amort, close]);
+  }, [noi, growth, hold, exitCap, sellCost, target, ltv, dscr, dy, rate, amort, fee, close]);
 
   // The three lender tests on one track, scaled to the largest, so the
   // binding one is the SHORTEST bar — which is the whole reading.
@@ -4833,6 +4856,7 @@ function MaxBid() {
           <Field label="Min debt yield" suffix="%" value={dy} onChange={setDy} placeholder="9" />
           <Field label="Loan rate" suffix="%" value={rate} onChange={setRate} placeholder="6.5" />
           <Field label="Amortisation" suffix="yr" value={amort} onChange={setAmort} placeholder="30" />
+          <Field label="Loan fee" suffix="%" value={fee} onChange={setFee} placeholder="1" />
           <Field label="Closing costs" suffix="%" value={close} onChange={setClose} placeholder="1.5" />
         </div>
 
