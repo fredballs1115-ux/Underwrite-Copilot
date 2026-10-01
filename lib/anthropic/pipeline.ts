@@ -62,6 +62,7 @@ import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
 import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
 import { shownAssetClass } from "@/lib/pipeline-slots";
+import { assetClassKey } from "@/lib/asset-words";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines, evaluateBuyBox, hasNoDealbreakers, type BuyBox, type BuyBoxCheck } from "@/lib/criteria";
@@ -1183,7 +1184,14 @@ async function runAnalysisSteps(
       // spread the site's model adds for the deal's class, as its default.
       const ratesLine = await todaysRatesLine(admin, challengeEx);
       if (ratesLine) reconNote = reconNote ? `${reconNote} ${ratesLine}` : ratesLine;
-      const challenges = await challengeAssumptions(om(), assetClass, reconNote);
+      // The class the deck turned out to be, where the deal was filed
+      // "Auto" (shownAssetClass, as every page shows it): the extraction has
+      // read it by now, so the challenger is handed that class's own trap
+      // list rather than all sixteen (14.7k characters against 5.7k for an
+      // apartment building). A phrase no class resolves keeps them all.
+      const challengeClass =
+        (assetClassKey(shownAssetClass(assetClass, challengeEx)) as AssetClass | null) ?? assetClass;
+      const challenges = await challengeAssumptions(om(), challengeClass, reconNote);
       await admin
         .from("deals")
         .update({ challenges, updated_at: new Date().toISOString() })

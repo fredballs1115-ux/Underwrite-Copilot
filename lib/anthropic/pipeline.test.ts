@@ -483,6 +483,26 @@ describe("runAnalysis — the happy path", () => {
     }
   });
 
+  it("hands the challenger the class the deck turned out to be where the deal was filed Auto, so it reads that class's traps alone (research pass 18)", async () => {
+    state.deals.d1.asset_class = "auto";
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Hospitality" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][1]).toBe("hospitality_str");
+
+    // A phrase no class resolves keeps every list, as before.
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Specialty asset" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][1]).toBe("auto");
+
+    // A class the analyst filed stays theirs, whatever the deck says.
+    vi.mocked(challengeAssumptions).mockClear();
+    state.deals.d1.asset_class = "office";
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Multifamily" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][1]).toBe("office");
+  });
+
   it("hands the challenger no rates where the table holds nothing fresh — nothing is claimed as current", async () => {
     state.rates = [{ series_id: "DGS5", obs_date: "2026-01-02", value: 3.9 }];
     vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
