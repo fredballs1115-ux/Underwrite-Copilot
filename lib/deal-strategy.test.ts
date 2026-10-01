@@ -391,6 +391,12 @@ describe("renovationProgramBudget — a value-add program stated a door at a tim
     expect(plausibilityNote([], inferStrategy(VALUE_ADD()), p)).toContain(
       "$2.9M (192 doors × $15,000 a door, the renovation program as stated)",
     );
+    // A stabilized NOI never sits above a price: it sits above today's
+    // income, and over the price alone reads as a cap not earned today
+    // (research pass 18 — the note had told the challenger the first).
+    const note = plausibilityNote([], inferStrategy(VALUE_ADD()), p);
+    expect(note).not.toContain("far above the acquisition price");
+    expect(note).toContain("it is expected to sit above today's income");
   });
 
   it("a total the memorandum states wins, and is never added to the program", () => {
