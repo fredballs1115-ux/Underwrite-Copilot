@@ -37,7 +37,7 @@ import { readTaxAbatement } from "@/lib/tax-abatement";
 import { readSiteReports } from "@/lib/site-reports";
 import { SALE_HURDLE_PCT, saleCeiling } from "@/lib/sale-ceiling";
 import { withArticle } from "@/lib/article";
-import { interestTag, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestTag, readInterest } from "@/lib/interest";
 import { goingInCapFigure, noteCapSlot } from "@/lib/compare-interest";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
@@ -625,7 +625,9 @@ export default async function DealPage({
   const plan = planSummary(extraction, strategy);
   const plausibility = assessPlausibility(extraction, strategy);
   const interest = readInterest(extraction, askingPriceOf(extraction));
-  const summaryStrategy = strategy.kind === "unknown" ? null : strategy.label;
+  // A note's or a leased fee's deal type describes a building the price does
+  // not buy, so the header says whose (lib/interest `dealTypeLabel`).
+  const summaryStrategy = strategy.kind === "unknown" ? null : dealTypeLabel(strategy.label, extraction);
 
   // Property actuals (Feature 1), deal tasks (Feature 7), and the team
   // roster — four independent reads, one round-trip. All best-effort: the

@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtractedInterest, ExtractionResult } from "@/lib/anthropic/types";
 import {
   INTEREST_LABEL,
+  dealTypeLabel,
   groundRentOf,
   incomeBeforeGroundRentOf,
   interestContextLine,
@@ -118,6 +119,23 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
     expect(interestOf(null)).toEqual({ kind: "fee_simple", sharePct: null });
     expect(interestOf(ex(interest({ kind: "partial_interest", share: "49% LP interest" })))).toEqual({ kind: "partial_interest", sharePct: 49 });
     expect(interestOf(ex(interest({ kind: "note", share: "49%" })))).toEqual({ kind: "note", sharePct: null });
+  });
+});
+
+describe("dealTypeLabel — the header's deal type says whose strategy it is (2026-09-30)", () => {
+  it("names the collateral on a note and the leaseholder's building on a leased fee", () => {
+    // The research pass: the header said "Deal type: Stabilized" over a note
+    // and a leased fee, a word for a building the price does not buy.
+    expect(dealTypeLabel("Stabilized", ex(interest({ kind: "note" })))).toBe("Stabilized (the collateral)");
+    expect(dealTypeLabel("Stabilized", ex(interest({ kind: "leased_fee" })))).toBe("Stabilized (the leaseholder's building)");
+  });
+
+  it("leaves every interest that buys the building, or a share of it, as it was", () => {
+    for (const kind of ["fee_simple", "leasehold", "partial_interest", "unknown"] as const) {
+      expect(dealTypeLabel("Value-add", ex(interest({ kind })))).toBe("Value-add");
+    }
+    expect(dealTypeLabel("Stabilized", ex(undefined))).toBe("Stabilized");
+    expect(dealTypeLabel("Stabilized", null)).toBe("Stabilized");
   });
 });
 

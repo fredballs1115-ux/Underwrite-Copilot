@@ -162,6 +162,21 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
   }
 }
 
+/** The deal type as the header names it, said whose strategy it is where
+ *  the price does not buy the building: a note's "Stabilized" describes the
+ *  collateral that secures the loan, a leased fee's the building someone
+ *  else owns on the land. Elsewhere the label as it stands. */
+export function dealTypeLabel(strategyLabel: string, ex: ExtractionResult | null | undefined): string {
+  switch (interestOf(ex).kind) {
+    case "note":
+      return `${strategyLabel} (the collateral)`;
+    case "leased_fee":
+      return `${strategyLabel} (the leaseholder's building)`;
+    default:
+      return strategyLabel;
+  }
+}
+
 /** What the price buys, in words. */
 export const INTEREST_LABEL: Record<InterestKind, string> = {
   fee_simple: "Fee simple",
