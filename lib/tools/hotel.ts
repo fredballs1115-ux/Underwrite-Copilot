@@ -49,6 +49,7 @@
  */
 
 import { withArticle } from "@/lib/article";
+import { usdExact } from "@/lib/tools/format";
 
 /** The reserve a franchise agreement typically requires, as a % of revenue. */
 export const DEFAULT_FFE_RESERVE_PCT = 4;
@@ -414,8 +415,10 @@ function noteFor(x: HotelRead): string {
   return "Enter the competitive set's rate and occupancy to see which half of RevPAR is short.";
 }
 
+/** Whole dollars through the shared writer, the size alone: the sentence
+ *  says which lever wins in words. */
 function usd(n: number): string {
-  return `$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+  return usdExact(Math.abs(n));
 }
 
 function round(n: number, places = 0): number {

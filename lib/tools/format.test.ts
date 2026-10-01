@@ -1,5 +1,50 @@
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { usd, usdCents, usdExact } from "./format";
+
+/**
+ * Every place a source writes a "$" straight before a figure it
+ * interpolates — `$${n.toLocaleString()}` in a template, `${n}` after a
+ * literal "$" in JSX text, `"$" + n` — which is a dollar written by hand:
+ * it prints "$-1,234" for a negative and whatever precision the line chose.
+ *
+ * Read off TypeScript's own parse rather than a pattern over the text, so
+ * a comment is never a hit and JSX text is told apart from a template.
+ */
+export function handWrittenDollars(file: string, src: string): Array<{ line: number; text: string }> {
+  const kind = file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
+  const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, kind);
+  const hits: Array<{ line: number; text: string }> = [];
+  const hit = (node: ts.Node) => {
+    const at = sf.getLineAndCharacterOfPosition(node.getStart(sf));
+    hits.push({ line: at.line + 1, text: node.getText(sf).replace(/\s+/g, " ").slice(0, 100) });
+  };
+  // "$", then nothing but space, then the figure.
+  const endsInDollar = (s: string) => /\$\s*$/.test(s);
+  const visit = (node: ts.Node) => {
+    if (ts.isTemplateExpression(node)) {
+      // The text before each interpolation: the head, then every middle.
+      if (endsInDollar(node.head.text)) hit(node);
+      node.templateSpans.forEach((span, i) => {
+        if (i < node.templateSpans.length - 1 && endsInDollar(span.literal.text)) hit(span);
+      });
+    } else if (ts.isJsxText(node) && endsInDollar(node.text)) {
+      const kids = ts.isJsxElement(node.parent) || ts.isJsxFragment(node.parent) ? node.parent.children : null;
+      const next = kids ? kids[kids.indexOf(node) + 1] : undefined;
+      if (next && ts.isJsxExpression(next)) hit(node);
+    } else if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.PlusToken) {
+      const left = node.left;
+      if ((ts.isStringLiteral(left) || ts.isNoSubstitutionTemplateLiteral(left)) && endsInDollar(left.text)) {
+        hit(node);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sf);
+  return hits;
+}
 
 /**
  * The one dollar writer behind /tools: the cards' tiles and the modules'
@@ -47,5 +92,41 @@ describe("the shared dollar writer", () => {
     expect(usdCents(59.333)).toBe("$59.33");
     expect(usd(999_999.6)).toBe("$1,000,000");
     expect(usd(1_005_000)).toBe("$1.00M");
+  });
+});
+
+describe("no /tools module writes a dollar of its own", () => {
+  it("finds every shape a hand-written dollar takes, and passes the writer's", () => {
+    const inTs = (src: string) => handWrittenDollars("x.ts", src).length;
+    const inTsx = (src: string) => handWrittenDollars("x.tsx", src).length;
+    expect(inTs("const s = `owed $${n.toLocaleString()} at the sale`;")).toBe(1);
+    expect(inTs("const s = `${a} and $${b.toFixed(2)} a foot`;")).toBe(1);
+    expect(inTs('const s = "$" + n.toLocaleString();')).toBe(1);
+    expect(inTsx("const p = <p>The face rent is ${rent.toFixed(2)}.</p>;")).toBe(1);
+    expect(inTsx("const p = <span value={`$${n}`} />;")).toBe(1);
+    // The shared writer, a price written into the copy, and a comment
+    // describing the old shape are none of them hand-written figures.
+    expect(inTs("const s = `owed ${usdExact(n)} at the sale`;")).toBe(0);
+    expect(inTs('const s = "a $20M price";')).toBe(0);
+    expect(inTs("// it printed `$${n}` here\nconst x = 1;")).toBe(0);
+    expect(inTsx("const p = <p>{usdCents(rent)} a foot</p>;")).toBe(0);
+    expect(inTs("const r = new RegExp(`^${word}$`);")).toBe(0);
+  });
+
+  it("holds every module in lib/tools to the shared writer", () => {
+    const dir = join(process.cwd(), "lib/tools");
+    const files = readdirSync(dir).filter(
+      (f) => /\.ts$/.test(f) && !/\.test\.ts$/.test(f) && f !== "format.ts",
+    );
+    expect(files.length).toBeGreaterThan(40);
+    const report = files.flatMap((f) =>
+      handWrittenDollars(f, readFileSync(join(dir, f), "utf8")).map(
+        (h) => `lib/tools/${f}:${h.line}: ${h.text}`,
+      ),
+    );
+    expect(
+      report,
+      `write these through lib/tools/format (usd, usdExact, usdCents):\n${report.join("\n")}`,
+    ).toEqual([]);
   });
 });

@@ -56,6 +56,7 @@
 
 import { irr } from "../underwrite/engine";
 import { readDebt } from "./debt-math";
+import { usd as compactUsd } from "./format";
 import { MAX_HOLD_YEARS, heldTo } from "./limits";
 
 /** How far the price search will look, as a multiple of the asking price. */
@@ -451,11 +452,10 @@ function noteFor(x: AssumptionRead, t: AssumptionTerms): string {
   return "Enter the loan's remaining term and the exit cap to compare the two positions.";
 }
 
+/** The shared writer's compact form, the size alone: each sentence says
+ *  the direction in words ("MORE", "less", "HIGHER"). */
 function usd(n: number): string {
-  const a = Math.abs(n);
-  return a >= 1_000_000
-    ? `$${(a / 1_000_000).toFixed(2)}M`
-    : `$${Math.round(a).toLocaleString("en-US")}`;
+  return compactUsd(Math.abs(n));
 }
 
 function rnd(n: number, places = 0): number {

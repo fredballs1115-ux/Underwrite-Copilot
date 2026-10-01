@@ -72,6 +72,7 @@
  * Pure, no I/O.
  */
 
+import { usdExact } from "./format";
 import { cellsOf } from "./unit-mix";
 
 /** Under this many comps is not a grid at all. Matches `MEDIAN_FLOOR`. */
@@ -522,10 +523,6 @@ function pct(n: number): string {
   return `${n >= 0 ? "+" : ""}${n}%`;
 }
 
-function usd(n: number): string {
-  return `$${Math.round(n).toLocaleString("en-US")}`;
-}
-
 function noteFor(x: Omit<GridRead, "note">, t: GridTerms): string {
   const unit = t.unitLabel.trim() || "unit";
 
@@ -533,7 +530,7 @@ function noteFor(x: Omit<GridRead, "note">, t: GridTerms): string {
   // where the two schools are not a matter of taste.
   const broke = x.comps.filter((c) => c.additiveWentNegative);
   if (broke.length > 0) {
-    return `Summing the adjustments takes ${broke.length === 1 ? `${broke[0].name} to zero or below` : `${broke.length} comps to zero or below`}, which is the one place the two conventions are not a matter of taste: a price cannot be adjusted away. Each adjustment is a multiplier here, so ${broke.length === 1 ? "it survives" : "they survive"} at ${usd(broke[0].basisAdjusted as number)} per ${unit}.`;
+    return `Summing the adjustments takes ${broke.length === 1 ? `${broke[0].name} to zero or below` : `${broke.length} comps to zero or below`}, which is the one place the two conventions are not a matter of taste: a price cannot be adjusted away. Each adjustment is a multiplier here, so ${broke.length === 1 ? "it survives" : "they survive"} at ${usdExact(broke[0].basisAdjusted as number)} per ${unit}.`;
   }
 
   // Then the floor: below three comps there is no grid, whatever the
@@ -552,8 +549,8 @@ function noteFor(x: Omit<GridRead, "note">, t: GridTerms): string {
     const con =
       x.conventionGap === null
         ? ""
-        : ` The sequential-versus-additive argument, by contrast, is worth ${usd(Math.abs(x.conventionGap))} on the same grid.`;
-    return `${usd(Math.abs(x.timeAdjustmentValue))} of the indicated ${usd(x.indicatedValue)} is the TIME adjustment — the market's own movement since these sales, before anything about the buildings is considered. Leave it out, as a grid of "recent" comps invites, and the same comps indicate ${usd(x.valueIfTimeIgnored as number)}.${con}`;
+        : ` The sequential-versus-additive argument, by contrast, is worth ${usdExact(Math.abs(x.conventionGap))} on the same grid.`;
+    return `${usdExact(Math.abs(x.timeAdjustmentValue))} of the indicated ${usdExact(x.indicatedValue)} is the TIME adjustment — the market's own movement since these sales, before anything about the buildings is considered. Leave it out, as a grid of "recent" comps invites, and the same comps indicate ${usdExact(x.valueIfTimeIgnored as number)}.${con}`;
   }
 
   // Then comparability, which is what a clean-looking grid hides.
@@ -566,23 +563,23 @@ function noteFor(x: Omit<GridRead, "note">, t: GridTerms): string {
 
   // Then whether the set agrees with itself.
   if (x.rangePct !== null && x.rangePct > 25) {
-    return `The adjusted comps span ${x.rangePct}% from ${usd(x.lowBasis as number)} to ${usd(x.highBasis as number)} per ${unit}, which is wide enough that the set is not agreeing on a value. A spread that wide is a reason to look again at the adjustments rather than to reconcile them.`;
+    return `The adjusted comps span ${x.rangePct}% from ${usdExact(x.lowBasis as number)} to ${usdExact(x.highBasis as number)} per ${unit}, which is wide enough that the set is not agreeing on a value. A spread that wide is a reason to look again at the adjustments rather than to reconcile them.`;
   }
 
   // Then the ask, where there is one — the thing the grid is for.
   if (x.askPremiumPct !== null && x.askPremium !== null && x.indicatedValue !== null) {
     const over = x.askPremium > 0;
-    return `The comps indicate ${usd(x.indicatedValue)} against an ask of ${usd(t.askingPrice as number)} — ${usd(Math.abs(x.askPremium))} ${over ? "over" : "under"}, ${Math.abs(x.askPremiumPct)}%. ${over ? "That gap is what the adjustments have to justify, and it is worth checking which of them the seller would dispute." : "A set of comps above the ask is worth a second look at the adjustments before it is treated as a finding."}`;
+    return `The comps indicate ${usdExact(x.indicatedValue)} against an ask of ${usdExact(t.askingPrice as number)} — ${usdExact(Math.abs(x.askPremium))} ${over ? "over" : "under"}, ${Math.abs(x.askPremiumPct)}%. ${over ? "That gap is what the adjustments have to justify, and it is worth checking which of them the seller would dispute." : "A set of comps above the ask is worth a second look at the adjustments before it is treated as a finding."}`;
   }
 
   if (x.evidence === "thin") {
-    return `${x.usableCount} comps, indicating ${usd(x.indicatedBasis as number)} per ${unit}${x.indicatedValue === null ? "" : ` and ${usd(x.indicatedValue)}`} — weighted toward ${x.strongest}, which needs the least adjustment. Under ${THIN_COMPS} comps the figure carries its count: it is a read rather than a median.`;
+    return `${x.usableCount} comps, indicating ${usdExact(x.indicatedBasis as number)} per ${unit}${x.indicatedValue === null ? "" : ` and ${usdExact(x.indicatedValue)}`} — weighted toward ${x.strongest}, which needs the least adjustment. Under ${THIN_COMPS} comps the figure carries its count: it is a read rather than a median.`;
   }
 
   if (x.indicatedBasis !== null && x.meanBasis !== null && x.indicatedValue !== null) {
     const same = Math.abs(x.indicatedBasis - x.meanBasis) < 0.005;
-    return `${x.usableCount} comps indicate ${usd(x.indicatedBasis)} per ${unit}, or ${usd(x.indicatedValue)}${same ? "" : ` — against ${usd(x.meanBasis)} on a straight average`}. ${same ? "The weighting and the average agree here, which happens only when the comps carry similar adjustment." : `The weighting leans on ${x.strongest} at ${x.comps.find((c) => c.name === x.strongest)?.grossAdjustmentPct}% gross and away from ${x.weakest}.`}`;
+    return `${x.usableCount} comps indicate ${usdExact(x.indicatedBasis)} per ${unit}, or ${usdExact(x.indicatedValue)}${same ? "" : ` — against ${usdExact(x.meanBasis)} on a straight average`}. ${same ? "The weighting and the average agree here, which happens only when the comps carry similar adjustment." : `The weighting leans on ${x.strongest} at ${x.comps.find((c) => c.name === x.strongest)?.grossAdjustmentPct}% gross and away from ${x.weakest}.`}`;
   }
 
-  return `${x.usableCount} comps adjusted to ${usd(x.indicatedBasis as number)} per ${unit}. Give the subject's size to turn that into a value.`;
+  return `${x.usableCount} comps adjusted to ${usdExact(x.indicatedBasis as number)} per ${unit}. Give the subject's size to turn that into a value.`;
 }

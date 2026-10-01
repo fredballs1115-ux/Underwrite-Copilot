@@ -37,6 +37,8 @@
 import { irr } from "@/lib/underwrite/engine";
 import { sizeLoan, type LoanTest } from "@/lib/tools/deal-math";
 import { readDebt } from "@/lib/tools/debt-math";
+// $22.4M in the note, where a full figure would swamp the sentence.
+import { usd } from "@/lib/tools/format";
 
 export interface BidYear {
   year: number;
@@ -300,8 +302,8 @@ export function readBid(t: BidInput): BidResult {
     // crossing, and the coverage tests bind above it.
     const coverageBinds = maxPrice > bindingFlipPrice;
     note = coverageBinds
-      ? `${binding.label} governs at this price. Below ${money(bindingFlipPrice)} loan-to-value takes over instead.`
-      : `${binding.label} governs at this price. Above ${money(bindingFlipPrice)} the coverage tests take over instead.`;
+      ? `${binding.label} governs at this price. Below ${usd(bindingFlipPrice)} loan-to-value takes over instead.`
+      : `${binding.label} governs at this price. Above ${usd(bindingFlipPrice)} the coverage tests take over instead.`;
   } else {
     note = `${binding.label} governs the loan at this price.`;
   }
@@ -326,11 +328,4 @@ export function readBid(t: BidInput): BidResult {
     bindingFlipPrice,
     note,
   };
-}
-
-/** $22.4M — only for the note, where a full figure would swamp the sentence. */
-function money(n: number): string {
-  const a = Math.abs(n);
-  if (a >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  return `$${Math.round(n).toLocaleString("en-US")}`;
 }

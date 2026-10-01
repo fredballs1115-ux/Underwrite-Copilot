@@ -64,6 +64,8 @@
  * Pure, no I/O.
  */
 
+import { usdExact } from "./format";
+
 /** Longer than this is a typo rather than an entitlement. */
 export const MAX_MONTHS = 120;
 /** Above this chance of approval an applicable fee has no finite break-even. */
@@ -286,8 +288,10 @@ export function readEntitlement(t: EntitlementTerms): EntitlementRead {
   return { ...read, note: noteFor(read, t) };
 }
 
+/** Whole dollars through the shared writer, the size alone: each sentence
+ *  says the direction in words ("under water", "BELOW", "lower"). */
 function usd(n: number): string {
-  return `$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+  return usdExact(Math.abs(n));
 }
 
 function noteFor(x: Omit<EntitlementRead, "note">, t: EntitlementTerms): string {

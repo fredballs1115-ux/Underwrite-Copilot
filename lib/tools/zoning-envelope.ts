@@ -74,6 +74,7 @@
  */
 
 import { withArticle } from "@/lib/article";
+import { usdExact } from "@/lib/tools/format";
 
 /** Square feet a surface space takes, including its share of drive aisle. */
 export const SF_PER_SURFACE_SPACE = 350;
@@ -472,7 +473,7 @@ function bonusTrade(
     if (unitsAddedByBonus <= 0) {
       const cost =
         priced !== null && setAsideUnits > 0 && priced.bonusWorth < 0
-          ? ` Taken as it stands it restricts ${setAsideUnits} of the ${unitsWithBonus} units for nothing: ${usd(Math.abs(priced.bonusWorth))} a year off the rent roll.`
+          ? ` Taken as it stands it restricts ${setAsideUnits} of the ${unitsWithBonus} units for nothing: ${usdExact(Math.abs(priced.bonusWorth))} a year off the rent roll.`
           : "";
       bonusNote = `The ${trimmed(pct)}% bonus lifts the density limit to ${unitsByDensityWithBonus} units, but ${bindingWithBonus} still holds the site to ${unitsWithBonus}, so it adds none of them without relief${reliefWords === null ? "" : `: ${reliefWords}`}.${cost}`;
     } else {
@@ -512,14 +513,14 @@ function noteFor(x: EnvelopeRead, t: EnvelopeInput): string {
       x.usableBonusPct !== null && x.bindingWithBonus !== "density" && positive(t.bonusDensityPct)
         ? `${x.bindingWithBonus} holds the site to ${withArticle(`${x.usableBonusPct}%`)} bonus, not the ${trimmed(t.bonusDensityPct)}% offered, and `
         : "";
-    return `The density bonus takes ${usd(Math.abs(x.bonusWorth))} a year off the rent roll: ${held}this set-aside needs a bonus above ${x.bonusBreakEvenPct}% before it pays, because the discount is struck against the bonused count and reaches units the bonus never created.`;
+    return `The density bonus takes ${usdExact(Math.abs(x.bonusWorth))} a year off the rent roll: ${held}this set-aside needs a bonus above ${x.bonusBreakEvenPct}% before it pays, because the discount is struck against the bonused count and reaches units the bonus never created.`;
   }
   // Then the site's own finding — parking binding is the one nobody expects.
   if (x.binding === "parking" && t.parkingType === "surface") {
     return `Parking binds: the spaces and the footprint are competing for the same ${Math.round(t.siteSf ?? 0).toLocaleString("en-US")} square feet, so a deck buys units rather than convenience.`;
   }
   if (adds && x.bonusWorth !== null && x.bonusWorth > 0 && x.bonusBreakEvenPct !== null) {
-    return `The density bonus adds ${x.unitsAddedByBonus} units and ${usd(x.bonusWorth)} a year — it clears the ${x.bonusBreakEvenPct}% this set-aside needs to break even.`;
+    return `The density bonus adds ${x.unitsAddedByBonus} units and ${usdExact(x.bonusWorth)} a year — it clears the ${x.bonusBreakEvenPct}% this set-aside needs to break even.`;
   }
   if (x.unitsOverstatedByEfficiency !== null && x.unitsOverstatedByEfficiency > 0) {
     return `${cap(x.binding)} binds, and measuring the units net rather than gross would have claimed ${x.unitsOverstatedByEfficiency} more than the floor area ratio allows.`;
@@ -533,10 +534,6 @@ function noteFor(x: EnvelopeRead, t: EnvelopeInput): string {
 function cap(b: Binding | null): string {
   if (b === null) return "Nothing";
   return b.charAt(0).toUpperCase() + b.slice(1);
-}
-
-function usd(n: number): string {
-  return `$${Math.round(n).toLocaleString("en-US")}`;
 }
 
 /** A percent as typed, without a trailing ".0". */

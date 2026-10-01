@@ -53,6 +53,8 @@
  * and how a statement reports.
  */
 
+import { usdExact } from "./format";
+
 /** A lease longer than this is refused rather than run — a typo, not a term. */
 export const MAX_TERM = 50;
 
@@ -250,8 +252,10 @@ function noteFor(
     : "The statement and the cash agree in this year.";
 }
 
+/** Whole dollars through the shared writer, the size alone: each sentence
+ *  says the direction in words ("more rent", "UNDERSTATES"). */
 function usd(n: number): string {
-  return `$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+  return usdExact(Math.abs(n));
 }
 
 function round(n: number, places = 0): number {

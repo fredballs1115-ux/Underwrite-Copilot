@@ -58,6 +58,8 @@
  * Pure, no I/O.
  */
 
+import { usdExact } from "./format";
+
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
 }
@@ -221,7 +223,7 @@ export function readReassessment(input: ReassessmentInputs): ReassessmentRead {
       year1Tax: newTax,
       impliedRatePct: implied,
       note:
-        `The bill after closing is $${newTax.toLocaleString("en-US")}. ` +
+        `The bill after closing is ${usdExact(newTax)}. ` +
         "Enter the memorandum's current tax line to see what it adds.",
     };
   }
@@ -246,8 +248,14 @@ export function readReassessment(input: ReassessmentInputs): ReassessmentRead {
       increase,
       impliedRatePct: implied,
       rateDisagrees,
+      // A bill the reassessment lowers is said as lowered, as the NOI branch
+      // below says it, never as a negative "adds".
       note:
-        `Reassessment adds $${increase.toLocaleString("en-US")} a year. ` +
+        (increase > 0
+          ? `Reassessment adds ${usdExact(increase)} a year. `
+          : increase < 0
+            ? `Reassessment LOWERS the bill by ${usdExact(-increase)} a year. `
+            : "Reassessment leaves the bill where it is. ") +
         "Enter the memorandum's NOI to see what it does to the cap rate.",
     };
   }
@@ -281,7 +289,7 @@ export function readReassessment(input: ReassessmentInputs): ReassessmentRead {
   }
   if (steps > 1) {
     notes.push(
-      `Phased over ${steps} years, so year one is $${year1Tax.toLocaleString("en-US")} ` +
+      `Phased over ${steps} years, so year one is ${usdExact(year1Tax)} ` +
         "and the stabilized bill is the one that prices the exit.",
     );
   }

@@ -62,6 +62,7 @@
  */
 
 import { irr } from "../underwrite/engine";
+import { usdExact } from "./format";
 import { MAX_HOLD_YEARS, heldTo } from "./limits";
 
 /**
@@ -560,8 +561,10 @@ function noteFor(x: RenovationRead): string {
   return "Enter the renovation cost and the rents it is priced against.";
 }
 
+/** Whole dollars through the shared writer, the size alone: each sentence
+ *  says the direction in words ("out-rents", "UNDERSTATES"). */
 function usd(n: number): string {
-  return `$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+  return usdExact(Math.abs(n));
 }
 
 function round(n: number, places = 0): number {

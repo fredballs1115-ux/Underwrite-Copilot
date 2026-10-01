@@ -57,6 +57,7 @@
 // Pure, no I/O.
 
 import { loanConstant, sizeLoan } from "@/lib/tools/deal-math";
+import { usdExact } from "@/lib/tools/format";
 
 const real = (n: number | null | undefined): n is number =>
   typeof n === "number" && Number.isFinite(n);
@@ -334,7 +335,9 @@ function noteFor(x: {
   discountRatePct: number;
   term: number;
 }): string {
-  const usd = (n: number) => `$${round(Math.abs(n)).toLocaleString("en-US")}`;
+  // The size alone, through the shared writer: each sentence says the
+  // direction in words ("over", "under").
+  const usd = (n: number) => usdExact(Math.abs(n));
   const rate = (n: number) => `${Math.round(n * 100) / 100}%`;
   // Said wherever it is there, because the card's "paid over the two
   // pieces" includes it: the price is struck at one rate, the term

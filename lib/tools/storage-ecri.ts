@@ -50,6 +50,7 @@
  */
 
 import { withArticle } from "@/lib/article";
+import { usdExact } from "@/lib/tools/format";
 
 /** Months in the year the downtime and the tenancy are measured against. */
 const MONTHS = 12;
@@ -371,8 +372,10 @@ function noteFor(x: StorageRead, t: StorageTerms): string {
   return "Enter the street rate and the increase to see how much room is left.";
 }
 
+/** Whole dollars through the shared writer, the size alone: the sentence
+ *  says the direction in words ("costs revenue"). */
 function usd(n: number): string {
-  return `$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+  return usdExact(Math.abs(n));
 }
 
 function rnd(n: number, places = 0): number {

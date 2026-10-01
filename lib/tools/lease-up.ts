@@ -45,6 +45,8 @@
 //
 // Pure, no I/O.
 
+import { usdExact } from "./format";
+
 /** A lease-up past five years is not a screening question. */
 export const MAX_MONTHS = 60;
 /** The common date the two shocks are read at — rule 1. */
@@ -347,8 +349,8 @@ function noteFor(x: {
   horizon: number;
   free: number;
 }): string {
-  const usd = (n: number) => `$${round(n).toLocaleString("en-US")}`;
-  const mo = (n: number) => `${n} month${n === 1 ? "" : "s"}`;
+  const usd = usdExact;
+  const mo =(n: number) => `${n} month${n === 1 ? "" : "s"}`;
   if (x.monthsToStabilize === null) {
     return `It does not fill within ${mo(x.horizon)} at this pace — check the absorption.`;
   }
