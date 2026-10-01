@@ -203,25 +203,63 @@ const WORDS: Record<string, Row> = {
 /** The keys the table knows, in the label map's order. */
 export const ASSET_CLASS_KEYS = Object.keys(ASSET_CLASS_LABEL) as readonly string[];
 
+// Land is what a phrase names when it names a site, a parcel or a lot —
+// unless the site is sold WITH a lease, which makes it income rather than
+// land: a pad on a ground lease, land leased to a tenant, a NNN site. One
+// tenant named or implied is a net lease; several are no net lease, and no
+// land either. "Scattered-site" is a kind of housing, not a site.
+const LAND_WORDS = /\b(land|site|parcel|lot|acreage|infill|entitled)\b/i;
+const LEASE_WORDS = /\bground[- ]?leas(?:e|ed|es|ing)\b|\bleased\b|\blease\b|\bnnn\b|\btenant(?:s|ed)?\b/i;
+const MANY_TENANTS = /\bmulti[- ]?tenant(?:ed)?\b|\btenants\b/i;
+const leasedSite = (s: string) => LAND_WORDS.test(s) && LEASE_WORDS.test(s) && !MANY_TENANTS.test(s);
+const bareLand = (s: string) => LAND_WORDS.test(s) && !LEASE_WORDS.test(s);
+
 /** Where a class the model phrased itself ("NNN retail", "boutique hotel")
  *  is filed — by the words it used, first match wins, longest tells first. */
-const PHRASE_TO_KEY: readonly (readonly [RegExp, string])[] = [
+const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean), string])[] = [
   [/\b(hotel|hospitality|lodging|motel|resort|short[- ]term rental|str)\b/i, "hospitality_str"],
-  [/\b(self[- ]?storage|storage)\b/i, "self_storage"],
+  [/\b(self[- ]?storage|mini[- ]?storage)\b/i, "self_storage"],
+  // Storage that is a warehouse or a yard — refrigerated buildings and
+  // industrial outdoor storage — is industrial, and is read before the bare
+  // word "storage" can file a cold-storage warehouse as a self-storage
+  // facility (the site-researcher's pass of 2026-09-30 ran "Cold Storage
+  // Warehouse" and "Industrial Outdoor Storage" through this table and got
+  // self-storage for both).
+  [/\b(cold[- ]storage|refrigerated|freezer|industrial outdoor storage|outdoor storage|ios)\b/i, "industrial"],
+  [/\b(storage)\b/i, "self_storage"],
   [/\b(manufactured|mobile[- ]home|mhc|rv park|rv resort)\b/i, "manufactured_housing"],
   [/\b(student)\b/i, "student_housing"],
-  [/\b(senior|assisted living|memory care|independent living|skilled nursing)\b/i, "senior_housing"],
+  // A continuing care retirement community (a CCRC, a "life plan
+  // community") and an active adult community are senior housing by their
+  // own names; a 55+ park is read by the manufactured-housing rule above.
+  [
+    /\b(senior|assisted living|memory care|independent living|skilled nursing|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|active[\s-]+adult|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?))\b/i,
+    "senior_housing",
+  ],
   [/\b(medical office|mob\b|medical)\b/i, "medical_office"],
   [/\b(data ?cent(er|re)s?)\b/i, "data_center"],
   [/\b(parking|garage)\b/i, "parking"],
   [/\b(mixed[- ]use)\b/i, "mixed_use"],
   [/\b(net[- ]lease|nnn|single[- ]tenant)\b/i, "net_lease"],
-  [/\b(land|site|parcel|lot|acreage|infill|entitled)\b/i, "land_infill"],
+  // Housing on scattered sites is single-family rental, never a site (the
+  // land rule's "site" had filed "Scattered-site SFR portfolio" as land).
+  [/\bscattered[- ]sites?\b/i, "sfr_btr"],
+  // A cell tower or a billboard stands on land let to the one company that
+  // owns it: its site is a net lease.
+  [/\b(?:cell(?:ular)?|wireless|telecom(?:munications?)?|communications?)[\s-]+towers?\b|\bcell[\s-]+sites?\b|\bbillboards?\b/i, "net_lease"],
+  // A site sold with its lease to one tenant is a net lease ("Retail pad
+  // site (ground lease)"), and a site under lease to several is no land.
+  [leasedSite, "net_lease"],
+  [bareLand, "land_infill"],
   [/\b(sfr|single[- ]family|btr|build[- ]to[- ]rent|townhomes?|scattered)\b/i, "sfr_btr"],
   [/\b(office|creative|life science|lab)\b/i, "office"],
   [/\b(industrial|warehouse|logistics|distribution|flex|manufacturing|cold storage|ios|outdoor storage)\b/i, "industrial"],
   [/\b(retail|shopping|strip|grocery|restaurant|qsr)\b/i, "retail"],
   [/\b(multifamily|multi[- ]family|apartment|residential|condo|garden|mid[- ]rise|high[- ]rise|walk[- ]up)\b/i, "multifamily"],
+  // Rental housing named by its program or its tenants ("Affordable Housing
+  // (LIHTC)", "Workforce Housing") — last, so a student, senior,
+  // manufactured or single-family phrase is read by its own rule first.
+  [/\b(affordable|workforce|lihtc|section 8|housing)\b/i, "multifamily"],
 ];
 
 /** The known key a stored class or a phrase of the model's resolves to;
@@ -232,7 +270,7 @@ export function assetClassKey(key: string | null | undefined): string | null {
   const lower = k.toLowerCase();
   if (lower === "auto") return null;
   if (WORDS[lower]) return lower;
-  for (const [re, known] of PHRASE_TO_KEY) if (re.test(k)) return known;
+  for (const [test, known] of PHRASE_TO_KEY) if (typeof test === "function" ? test(k) : test.test(k)) return known;
   return null;
 }
 
@@ -264,6 +302,16 @@ export function assetWords(key: string | null | undefined): AssetWords {
   const row = known ? WORDS[known] : GENERIC;
   const k = known ?? (key ?? "").trim();
   return { key: k, label: assetClassLabel(k), ...row, basisLabel: basisLabelFor(row) };
+}
+
+/** A class whose rent is quoted a month a unit — an apartment's "rent /
+ *  unit / mo", a home's, a bed's, a pad's — so its rent roll is read per
+ *  unit a month, never per foot a year. A mixed-use building is rental
+ *  housing priced by the foot, and its roll mixes suites with apartments:
+ *  it is read by the foot. */
+export function rentQuotedMonthly(key: string | null | undefined): boolean {
+  const w = assetWords(key);
+  return w.noun != null && w.income === `rent / ${w.noun.one} / mo`;
 }
 
 /** Rent control, TOPA and just-cause rules can reach a deal of this class. */

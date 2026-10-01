@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { CityPhoto } from "./city-photo";
-import { METRO_VIEWS } from "@/lib/metro-imagery";
+import { metroView } from "@/lib/metro-imagery";
 import { hasSkyline } from "@/lib/skyline";
 
 // A real place behind a page's opening words.
@@ -69,7 +69,41 @@ import { hasSkyline } from "@/lib/skyline";
 // failure this whole treatment exists to avoid.
 
 /** How the scrim is shaped, which depends on where the band's words sit. */
-export type Scrim = "band" | "center" | "caption";
+export type Scrim = "band" | "center" | "caption" | "hero";
+
+/**
+ * The homepage hero's photograph below `lg` (2026-09-30): a strip across the
+ * top of the stacked hero, fading into the band at its foot, with the words
+ * starting where it ends. The hero's words sit at its TOP, where the "band"
+ * scrim is clear by design, and measured in Chromium over a white frame
+ * they read 1.9:1 on a phone and 3.0:1 on a laptop — the photograph was
+ * drawn behind the one part of the hero that could not have it. Cut to a
+ * strip, a phone shows three quarters of the skyline's width, where
+ * covering the whole 1,200px stack had shown a sliver of sky.
+ * `HERO_WORDS_TOP` is the padding that starts the words at the strip's
+ * foot; lib/place-band.contrast.test.ts holds the two to each other.
+ */
+export const HERO_STRIP = "absolute inset-x-0 top-0 h-[18rem] sm:h-[22rem] lg:inset-0 lg:h-auto";
+export const HERO_WORDS_TOP = "pt-[18rem] sm:pt-[22rem] lg:pt-24";
+
+/**
+ * The hero's scrim from `lg` up, left to right across the band (0–1 of its
+ * width), with the scrim's alpha at each: dark behind the words' column
+ * (the 72rem container's left half, which ends just short of the band's
+ * middle — past 49% of its width only on screens wider than about 2,160px,
+ * still under the 0.92 plateau), clearing across the sample card's column
+ * to the photograph at the right. The "band" gradient stays under it for
+ * the stats row.
+ */
+export const HERO_SIDE_SCRIM: ReadonlyArray<{ at: number; alpha: number }> = [
+  { at: 0, alpha: 0.94 },
+  { at: 0.5, alpha: 0.92 },
+  { at: 0.76, alpha: 0 },
+];
+
+const heroSideGradient = `linear-gradient(to right, ${HERO_SIDE_SCRIM.map(
+  (s) => `color-mix(in srgb, var(--color-sidebar) ${Math.round(s.alpha * 100)}%, transparent) ${Math.round(s.at * 100)}%`,
+).join(", ")})`;
 
 /**
  * The caption scrim's stops, in px up from the bottom, with the scrim's
@@ -99,6 +133,15 @@ export function PhotoScrim({ scrim = "band" }: { scrim?: Scrim }) {
       <div className="absolute inset-0 bg-sidebar/20" />
       {scrim === "band" ? (
         <div className="absolute inset-0 bg-gradient-to-t from-sidebar from-0% via-sidebar/85 via-55% to-sidebar/0 to-100%" />
+      ) : scrim === "hero" ? (
+        <>
+          {/* Below lg: the strip fades into the band at its foot, where the
+              words begin. From lg: the band's own gradient for the stats
+              row, and the words' column dark from the left. */}
+          <div className="absolute inset-0 bg-gradient-to-b from-sidebar/0 from-40% to-sidebar to-100% lg:hidden" />
+          <div className="absolute inset-0 hidden bg-gradient-to-t from-sidebar from-0% via-sidebar/85 via-55% to-sidebar/0 to-100% lg:block" />
+          <div className="absolute inset-0 hidden lg:block" style={{ backgroundImage: heroSideGradient }} />
+        </>
       ) : scrim === "caption" ? (
         <div className="absolute inset-0" style={{ backgroundImage: captionGradient }} />
       ) : (
@@ -114,12 +157,24 @@ export function PhotoScrim({ scrim = "band" }: { scrim?: Scrim }) {
   );
 }
 
-/** The picture and its scrim, for a band that positions itself. */
+/** How wide a band inside a public page's content column draws: the
+ *  column's 72rem less its gutters, or the screen below that (#451). */
+export const PAGE_COLUMN_SIZES = "(min-width: 1200px) 1104px, 100vw";
+
+/**
+ * The picture and its scrim, for a band that positions itself, with the
+ * band's words passed in as `children`: they are drawn between the picture
+ * and its credit, so the credit, drawn at the foot of the picture, comes
+ * after the words in the markup, and Tab and a screen reader meet the words
+ * first (CityPhoto's `layer`). A band with no picture draws its words alone.
+ */
 export function PlaceBackdrop({
   metro,
   height = 600,
   scrim = "band",
   sizes = "100vw",
+  eager = false,
+  children,
 }: {
   metro: string;
   height?: number;
@@ -127,30 +182,36 @@ export function PlaceBackdrop({
   scrim?: Scrim;
   /** how wide the band draws, for the browser to pick a file by (#451) */
   sizes?: string;
+  /** the first thing on the page: fetched at once and ahead of the rest,
+   *  never lazily — every other picture waits its turn */
+  eager?: boolean;
+  /** the band's words, before the picture's credit in the markup */
+  children?: ReactNode;
 }) {
   // Either picture is enough to open on. Gating on the overhead alone was
   // safe only by accident — every market with a skyline happens to have an
   // aerial too — and would have blanked the band for the first market that
   // got a photograph without one. CityPhoto decides between them; this only
   // decides whether there is anything to decide between.
-  if (!METRO_VIEWS[metro] && !hasSkyline(metro)) return null;
+  if (!metroView(metro) && !hasSkyline(metro)) return <>{children}</>;
+  // Offered at the skyline's widths (#451), each encoded again at a fraction
+  // of Commons' weight, so a phone takes 1600 and a dense laptop 2400 where
+  // one 1400px file was stretched twice over; 1400 stays the file a browser
+  // without srcset gets. Above centre, because a skyline's subject is its
+  // tower line and the bottom of the frame is usually road or water.
   return (
-    <div className="pointer-events-none absolute inset-0">
-      {/* Offered at the skyline's widths (#451), each encoded again at a
-          fraction of Commons' weight, so a phone takes 1600 and a dense
-          laptop 2400 where one 1400px file was stretched twice over; 1400
-          stays the file a browser without srcset gets. Above centre,
-          because a skyline's subject is its tower line and the bottom of
-          the frame is usually road or water. */}
-      <CityPhoto
-        metro={metro}
-        width={1400}
-        height={height}
-        sizes={sizes}
-        className="h-full w-full object-cover object-[50%_42%]"
-      />
-      <PhotoScrim scrim={scrim} />
-    </div>
+    <CityPhoto
+      metro={metro}
+      width={1400}
+      height={height}
+      sizes={sizes}
+      eager={eager}
+      className="h-full w-full object-cover object-[50%_42%]"
+      layer={scrim === "hero" ? HERO_STRIP : "absolute inset-0"}
+      overlay={<PhotoScrim scrim={scrim} />}
+    >
+      {children}
+    </CityPhoto>
   );
 }
 
@@ -173,19 +234,23 @@ export function PlaceBackdrop({
 export function PlaceBand({
   metro,
   width = "max-w-3xl",
+  eager = false,
   children,
 }: {
   metro: string;
   /** the page's content width, so the words line up with what follows */
   width?: string;
+  /** the band opens its page: its picture is fetched first (PlaceBackdrop) */
+  eager?: boolean;
   children: ReactNode;
 }) {
   return (
     <section className="band-dark relative flex min-h-[19rem] items-end overflow-hidden text-white sm:min-h-[23rem]">
-      <PlaceBackdrop metro={metro} />
-      <div className={`relative mx-auto w-full ${width} px-6 pb-12 pt-16 sm:pb-16 sm:pt-24`}>
-        <div className="on-photo band-words">{children}</div>
-      </div>
+      <PlaceBackdrop metro={metro} eager={eager}>
+        <div className={`relative mx-auto w-full ${width} px-6 pb-12 pt-16 sm:pb-16 sm:pt-24`}>
+          <div className="on-photo band-words">{children}</div>
+        </div>
+      </PlaceBackdrop>
     </section>
   );
 }
@@ -206,24 +271,28 @@ export function MarketBand({
   eyebrow,
   name,
   as: Heading = "h3",
+  eager = false,
 }: {
   metro: string;
   eyebrow: string;
   name: string;
   /** the name's heading level: a section of /market, or a page's own title */
   as?: "h1" | "h3";
+  /** the page's opening picture: fetched first (PlaceBackdrop) */
+  eager?: boolean;
 }) {
   return (
     <div className="band-dark relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[21rem]">
       {/* Inside a page's column, never wider than its 72rem. */}
-      <PlaceBackdrop metro={metro} height={480} scrim="caption" sizes="(min-width: 1200px) 1104px, 100vw" />
-      <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
-        {/* Two lines at most: the scrim is measured to the top of a name
-            wrapped to two lines on a phone, and a submarket's name is
-            whatever its owner typed. The whole name stays in the text. */}
-        <Heading className="mt-1 line-clamp-2 text-2xl font-semibold tracking-tight sm:text-3xl">{name}</Heading>
-      </div>
+      <PlaceBackdrop metro={metro} height={480} scrim="caption" sizes={PAGE_COLUMN_SIZES} eager={eager}>
+        <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
+          {/* Two lines at most: the scrim is measured to the top of a name
+              wrapped to two lines on a phone, and a submarket's name is
+              whatever its owner typed. The whole name stays in the text. */}
+          <Heading className="mt-1 line-clamp-2 text-2xl font-semibold tracking-tight sm:text-3xl">{name}</Heading>
+        </div>
+      </PlaceBackdrop>
     </div>
   );
 }

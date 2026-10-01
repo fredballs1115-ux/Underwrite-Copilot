@@ -239,6 +239,50 @@ describe("bridgeSentence", () => {
     expect(sentence).toMatch(/added \d+ bps/);
   });
 
+  it("gives each input its own verb: only a cap rate widens and tightens", () => {
+    const say = (patch: Record<string, number>) => bridgeSentence(buildBridge(BASE, withFields(BASE, patch)));
+    expect(say({ rentGrowthPct: 0.04 })).toContain("Raising rent growth from 3.00% to 4.00%");
+    expect(say({ ltc: 0.65 })).toContain("Raising loan to cost from 60.00% to 65.00%");
+    expect(say({ vacancyPct: 0.04 })).toContain("Lowering vacancy & credit loss from 5.00% to 4.00%");
+    expect(say({ allInRatePct: 0.055 })).toContain("Lowering all-in rate from 6.00% to 5.50%");
+    expect(say({ holdMonths: 84 })).toContain("Lengthening hold period from 5 yr to 7 yr");
+    expect(say({ exitCapPct: 0.085 })).toContain("Widening exit cap from 8.00% to 8.50%");
+    const notCaps: Record<string, number>[] = [
+      { rentGrowthPct: 0.04 },
+      { ltc: 0.65 },
+      { vacancyPct: 0.04 },
+      { allInRatePct: 0.055 },
+    ];
+    for (const patch of notCaps) expect(say(patch)).not.toMatch(/Widening|Tightening/);
+  });
+
+  it("never narrates a move whose before and after print the same", () => {
+    // 5.87453% against 5.87%: two places print both "5.87%", three tell
+    // them apart.
+    const a = setPath(BASE, "exitCapPct", 0.0587453);
+    const b = setPath(BASE, "exitCapPct", 0.0587);
+    const sentence = bridgeSentence(buildBridge(a, b));
+    expect(sentence).not.toContain("from 5.87% to 5.87%");
+    expect(sentence).toMatch(/Tightening exit cap from 5\.875% to 5\.870%|No single assumption/);
+    // At every precision carried the same: folded into "other assumptions".
+    const bridge = buildBridge(BASE, setPath(BASE, "exitCapPct", 0.0800002), {
+      run: (x) => ({ leveredIrr: x.exitCapPct > 0.08 ? 0.05 : 0.1, unleveredIrr: 0.08, leveredEquityMultiple: 1.5, year1CashFlow: 0 }),
+    });
+    const folded = bridgeSentence(bridge);
+    expect(folded).not.toContain("exit cap from");
+    expect(folded).toContain("1 other assumption cost 500 bps.");
+  });
+
+  it("prints a re-shaped expense list as its line count, never [object Object]", () => {
+    const b = setPath(BASE, "expenseLines", [
+      { label: "Operating expenses", annual: 300_000 },
+      { label: "Property taxes", annual: 160_000 },
+    ]);
+    const sentence = bridgeSentence(buildBridge(BASE, b));
+    expect(sentence).not.toContain("[object Object]");
+    expect(sentence).toContain("from 1 line to 2 lines");
+  });
+
   it("rolls minor drivers into one trailing clause", () => {
     const target = withFields(BASE, {
       purchasePrice: 12_000_000,

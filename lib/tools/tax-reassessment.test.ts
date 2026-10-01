@@ -174,7 +174,19 @@ describe("a blank is null, never zero", () => {
     const r = readReassessment({ ...SEED, omNoi: null });
     expect(r.increase).toBe(165_000);
     expect(r.omCapPct).toBeNull();
-    expect(r.note).toContain("adds");
+    expect(r.note).toContain("Reassessment adds $165,000 a year.");
+  });
+
+  it("says a lower bill as lower before the NOI is known, never as a negative addition", () => {
+    // It read "Reassessment adds $-125,000 a year." — the NOI branch has
+    // always said LOWERS, and this one now says it too.
+    const r = readReassessment({ ...SEED, omNoi: null, currentTax: 500_000 });
+    expect(r.increase).toBe(-125_000);
+    expect(r.note).toContain("Reassessment LOWERS the bill by $125,000 a year.");
+    expect(r.note).not.toContain("adds");
+    expect(r.note).not.toContain("$-");
+    const same = readReassessment({ ...SEED, omNoi: null, currentTax: 375_000 });
+    expect(same.note).toContain("leaves the bill where it is");
   });
 });
 

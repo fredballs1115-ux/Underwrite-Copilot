@@ -36,6 +36,8 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { downloadDealFile, removeSupplementFile, type StorageScope } from "@/lib/storage";
 import { runWeeklyDigests } from "@/lib/digest";
+import { notifyAnalysisFailed } from "@/lib/email";
+import { requesterOf } from "@/lib/jobs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Tunables — env-overridable so the test rig can run the real binary fast.
@@ -60,8 +62,11 @@ const DIGEST_DOW = int0(process.env.WORKER_DIGEST_DOW, 1);
 const DIGEST_HOUR_UTC = int0(process.env.WORKER_DIGEST_HOUR_UTC, 13);
 const DIGEST_CHECK_MS = int(process.env.WORKER_DIGEST_CHECK_MS, 15 * 60_000);
 
+// Said to the analyst on the deal page and in the stopped-screen email, so
+// in plain words: what happened, and the deal page's own button.
 const INTERRUPTED_MSG =
-  "The screen was interrupted repeatedly (worker restarts) and stopped retrying — hit “Try again” to run it fresh.";
+  `The screen was interrupted ${MAX_ATTEMPTS} time${MAX_ATTEMPTS === 1 ? "" : "s"} while our servers restarted, ` +
+  "so it stopped trying on its own. Choose “Try again” on the deal page to run it fresh.";
 
 function int(v: string | undefined, fallback: number): number {
   const n = Number(v);
@@ -86,6 +91,9 @@ interface ClaimedJob {
     kind?: string;
     snapshotPrior?: boolean;
     model?: { name: string; path: string };
+    /** who asked for the run (lib/jobs `WorkerPayload`), read through
+     *  `requesterOf`: the screen's emails go to them */
+    requestedBy?: unknown;
   };
 }
 
@@ -225,6 +233,14 @@ async function claimNext(): Promise<ClaimedJob | null> {
       if (payload.model?.path) {
         await removeSupplementFile(payload.model.path, parkedModelScope(next.deal_id as string));
       }
+      // The account page promises an email when a screen fails before its
+      // verdict; the pipeline sends it on its own failures, and these are
+      // the worker's — to whoever asked for the run.
+      if (payload.kind === "screen") {
+        await notifyAnalysisFailed(admin, next.deal_id as string, INTERRUPTED_MSG, {
+          requestedBy: requesterOf(payload.requestedBy),
+        });
+      }
     }
     return null;
   }
@@ -331,6 +347,7 @@ async function runJob(job: ClaimedJob): Promise<void> {
   await runAnalysis(job.dealId, {
     snapshotPrior: job.payload.snapshotPrior === true,
     resume: true,
+    requestedBy: requesterOf(job.payload.requestedBy),
   });
 }
 
@@ -362,7 +379,8 @@ async function main(): Promise<void> {
   log(
     `starting — poll ${POLL_MS}ms, heartbeat ${HEARTBEAT_MS}ms, max ${MAX_ATTEMPTS} attempts, job timeout ${Math.round(JOB_TIMEOUT_MS / 60000)}min`,
   );
-  if (process.env.RESEND_API_KEY && !process.env.NEXT_PUBLIC_APP_URL) {
+  // A blank setting is unset, as lib/app-url reads it.
+  if (process.env.RESEND_API_KEY && !process.env.NEXT_PUBLIC_APP_URL?.trim()) {
     log(
       "note: RESEND_API_KEY is set but NEXT_PUBLIC_APP_URL isn't — email links will use the default host",
     );
@@ -427,11 +445,11 @@ async function main(): Promise<void> {
       // runJob handles its own failures; reaching here is unexpected. Mark
       // the job errored so the deal never wedges on "running".
       log(`job ${job.id} threw unexpectedly: ${err instanceof Error ? err.message : err}`);
-      await failJob(
-        job.id,
-        "The analysis hit an unexpected worker error — please try again.",
-        { status: "running" },
-      );
+      const message = "The analysis hit an unexpected worker error — please try again.";
+      const failed = await failJob(job.id, message, { status: "running" });
+      if (failed && job.payload.kind === "screen") {
+        await notifyAnalysisFailed(admin, job.dealId, message, { requestedBy: requesterOf(job.payload.requestedBy) });
+      }
     } finally {
       clearTimeout(timer);
       current = null;

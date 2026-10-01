@@ -1,13 +1,20 @@
 import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori";
+import { fmrLabel, fmrWhen } from "@/lib/fmr";
 
 /**
- * What landlords are asking this month, against what HUD will pay — the
- * asking rent from Zillow's Observed Rent Index beside the metro's 2BR fair
- * market rent, on one scale, so the gap between the two is a picture. And
- * two more of Zillow's figures where the pull had them: the APARTMENT
- * asking rent (the same index over multifamily listings alone, the one an
- * apartment underwrite should read, drawn as a third bar) and the typical
- * home value, said against a year of rent as the price-to-rent ratio.
+ * What landlords are asking this month, beside HUD's fair market rent — the
+ * asking rent from Zillow's Observed Rent Index and the metro's 2BR fair
+ * market rent on one scale, as two bars. And two more of Zillow's figures
+ * where the pull had them: the APARTMENT asking rent (the same index over
+ * multifamily listings alone, the one an apartment underwrite should read,
+ * drawn as a third bar) and the typical home value, said against a year of
+ * rent as the price-to-rent ratio.
+ *
+ * The bars are two different measures, and the words say so: the asking
+ * rent is listings of every type and size of home before concessions, the
+ * fair market rent a yearly two-bedroom figure with utilities included. The
+ * gap between them is not a premium over what HUD pays — the first version
+ * called it "above the fair market rent HUD pays", which was not true.
  *
  * Pure: the page reads the rows and hands the figure in, so this renders on
  * a fixture. Nothing renders with no figure — a metro with no ZORI row gets
@@ -15,28 +22,43 @@ import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori
  * simply absent. Zillow's condition for using the data is attribution, so
  * the credit is part of the component and not the page's to forget.
  *
- * The numbers are about different things. The FMR is set once a year from
- * survey data two years old by the time it applies; the asking rent is
- * this month's listings, all home types, before concessions; the apartment
- * figure is those listings that are apartments. An asking rent well above
- * the FMR is the ordinary case in a tight market and says nothing about a
- * building — it says which figure an underwrite should not mistake for
- * the other.
+ * The apartment figure is those listings that are apartments. An asking
+ * rent well above the FMR is the ordinary case in a tight market and says
+ * nothing about a building — it says which figure an underwrite should not
+ * mistake for the other.
+ *
+ * The fair market rent comes with the fiscal year its research block states
+ * (lib/fmr `fmrTwoBed`), and the bar and the sentence name that year: a
+ * figure for one year is not the next year's.
  */
-export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: number | null }) {
+export function ZoriLine({
+  z,
+  fmr2br,
+  today,
+}: {
+  z: ZoriRead | null;
+  fmr2br: { rent: number; fy: number; effective?: string | null } | null;
+  /** today's ISO day, read by the page: past the fair market rent's fiscal
+   *  year the line says the year ended (lib/fmr `fmrWhen`) */
+  today?: string;
+}) {
   if (!z) return null;
-  const top = Math.max(z.rent, z.mfrRent ?? 0, fmr2br ?? 0);
+  const hud = fmr2br?.rent ?? null;
+  const ended = fmr2br && today ? fmrWhen({ fy: fmr2br.fy, effective: fmr2br.effective ?? null }, today) : null;
+  const endedClause = ended?.ended ? `, a year that ${ended.text},` : "";
+  const top = Math.max(z.rent, z.mfrRent ?? 0, hud ?? 0);
   const width = (v: number) => `${Math.max(6, Math.round((v / top) * 100))}%`;
-  const gapPct = fmr2br ? Math.round(((z.rent - fmr2br) / fmr2br) * 1000) / 10 : null;
+  const gapPct = hud ? Math.round(((z.rent - hud) / hud) * 1000) / 10 : null;
   const mfrGapPct =
     z.mfrRent !== null && z.rent > 0 ? Math.round(((z.mfrRent - z.rent) / z.rent) * 1000) / 10 : null;
 
   // One string, so React puts no separators inside a sentence live-verify greps.
   const sentence =
-    (gapPct !== null
-      ? `Asking rent ${gapPct >= 0 ? "runs" : "sits"} ${Math.abs(gapPct).toFixed(1)}% ${gapPct >= 0 ? "above" : "below"} the fair market rent HUD pays for a two-bedroom — `
-      : "") +
-    "the asking figure is this month's listings before concessions, the fair market rent a year's survey applied a year later, and neither is the other." +
+    (gapPct !== null && fmr2br
+      ? "Two different measures on one scale, and neither is the other: the asking rent is this month's listings of every type and size of home, before concessions; " +
+        `HUD's ${fmrLabel(fmr2br.fy)} fair market rent${endedClause} is a yearly figure for a two-bedroom, utilities included. ` +
+        `The asking rent reads ${Math.abs(gapPct).toFixed(1)}% ${gapPct >= 0 ? "above" : "below"} it, a gap between the two measures and not a premium over what HUD pays.`
+      : "The asking rent is this month's listings of every type and size of home, before concessions.") +
     (z.shared ? " The asking rent is the metro area's, shared across the MSA." : "") +
     (mfrGapPct !== null
       ? ` The apartment figure is Zillow's multifamily listings alone, ${Math.abs(mfrGapPct).toFixed(1)}% ${mfrGapPct < 0 ? "under" : "over"} the all-homes one, which adds houses and condos and runs higher wherever the houses are dear.`
@@ -90,7 +112,12 @@ export function ZoriLine({ z, fmr2br }: { z: ZoriRead | null; fmr2br: number | n
             <Bar label="Apartments" value={z.mfrRent} width={width(z.mfrRent)} tone="bg-brand" />
           )}
           <Bar label="All homes" value={z.rent} width={width(z.rent)} tone={z.mfrRent !== null ? "bg-brand/70" : "bg-brand"} />
-          <Bar label="HUD 2BR" value={fmr2br} width={width(fmr2br)} tone="bg-brand/40" />
+          <Bar
+            label={`HUD ${fmrLabel(fmr2br.fy)} 2BR${ended?.ended ? " (ended)" : ""}`}
+            value={fmr2br.rent}
+            width={width(fmr2br.rent)}
+            tone="bg-brand/40"
+          />
         </div>
       )}
       <p className="mt-1 text-[11px] leading-relaxed text-muted">{sentence}</p>
@@ -113,7 +140,8 @@ function Change({ pct }: { pct: number | null }) {
 function Bar({ label, value, width, tone }: { label: string; value: number; width: string; tone: string }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="w-16 shrink-0 text-[10px] font-medium text-muted">{label}</span>
+      {/* Wide enough for the HUD bar's label, fiscal year and all, on one line. */}
+      <span className="w-24 shrink-0 text-[10px] font-medium text-muted">{label}</span>
       <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
         <div className={`h-full rounded-full ${tone}`} style={{ width }} data-bar="zori" />
       </div>

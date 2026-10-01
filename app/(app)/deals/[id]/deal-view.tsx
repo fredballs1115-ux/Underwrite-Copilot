@@ -69,13 +69,22 @@ import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
 import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
-import { findPricedMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
+import type { LoiTerms } from "@/lib/loi-terms";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
+import { LOI_REFUSAL_BANNERS } from "@/lib/loi-refusal";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
 import { interestOf } from "@/lib/interest";
+import { dealFileLinkFor } from "@/lib/deal-file-link";
+import { servedInline } from "@/lib/inline-types";
+import { elapsedLabel, runStartMs } from "@/lib/run-clock";
+import { revealScrollLeft } from "@/lib/tab-strip";
 import type { ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
-import type { DealDocument } from "@/lib/documents";
+import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
+import { MAX_OM_PAGES } from "@/lib/pdf";
+import { needsOperator } from "@/lib/anthropic/operator-failures";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
@@ -87,6 +96,10 @@ type Job = {
   error: string | null;
   /** last write to the job row — used to detect a crashed/stalled run */
   updated_at?: string | null;
+  /** when the run was asked for — restamped by every claim of the deal's
+   *  one job row (lib/jobs) — so the progress clock counts from the run's
+   *  start rather than from the page load */
+  created_at?: string | null;
 } | null;
 
 // A run that hasn't written progress in this long is treated as stalled: the
@@ -152,9 +165,12 @@ const LEGACY_TABS: Record<string, { section: SectionKey; analysis?: AnalysisKey 
 
 // The automatic pass, in order — drives the progress rail and pending logic.
 const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"];
+// The jobs that run on their own, outside the six-step screen: the rail draws
+// them as one indicator, and the overview keeps its meter while they run.
+const SIDE_JOBS = new Set(["reconcile", "model", "comps_search"]);
 
 const STEP_LABELS: Record<string, string> = {
-  signal: "First pass — the headline read lands in about half a minute…",
+  signal: "First pass — reading the headline figures…",
   extract: "Reading the OM and extracting the key terms…",
   challenge: "Grilling the assumptions the way an investment committee would…",
   comps: "Weighing the OM’s comps — sell-side sets tend to lean favorable…",
@@ -174,6 +190,9 @@ const MODEL_ERRORS: Record<string, string> = {
   omfile: "Choose the reissued OM (PDF) to upload.",
   ompdf: "The replacement OM must be a PDF.",
   omsize: "That PDF is larger than 32 MB — please try a smaller file.",
+  omlocked:
+    "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password and upload that. The stored OM is unchanged.",
+  ompages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the financial sections on their own. The stored OM is unchanged.`,
   omupload:
     "The upload didn’t complete — the stored OM is unchanged. Please try again.",
   ompermission:
@@ -211,6 +230,10 @@ const MODEL_ERRORS: Record<string, string> = {
   loisample:
     "The sample deal is a walkthrough — LOI drafts generate on your own deals.",
   loifail: "Couldn’t build the LOI just now — please try again in a moment.",
+  // A memorandum that sells a note, a share or the leased fee, or sells at
+  // auction or out of a bankruptcy: the route refuses the letter in the
+  // panel's own sentence (lib/loi-refusal).
+  ...LOI_REFUSAL_BANNERS,
   reportempty: "Run the screen first — the full report needs a verdict to export.",
   reportfail:
     "Couldn’t build the full report just now — please try again in a moment.",
@@ -225,6 +248,10 @@ const MODEL_ERRORS: Record<string, string> = {
     "The latest screen failed before it reached the verdict — run it again so the memo pairs today’s terms with today’s call.",
   reportstale:
     "The latest screen failed before it reached the verdict — run it again so the report pairs today’s terms with today’s call.",
+  memorunning:
+    "The latest screen of this deal hasn’t reached its verdict yet — the memo waits for it, so it never pairs the new terms with the last call.",
+  reportrunning:
+    "The latest screen of this deal hasn’t reached its verdict yet — the report waits for it, so it never pairs the new terms with the last call.",
 };
 
 // Errors from the Reconciler tab's own upload are shown inline there; every
@@ -242,15 +269,6 @@ function askingPriceValue(extraction: ExtractionResult | null, signal: FirstSign
   // being bought. The kind is inferred with the first signal, exactly as the
   // page infers it, so the letter and the page never name two prices.
   return findPricedMetric(extraction?.metrics ?? [], inferStrategy(extraction, signal).kind)?.value ?? "";
-}
-
-/** The deal's plan for the LOI draft — its clauses follow the kind. */
-function loiPlan(
-  extraction: ExtractionResult | null,
-  signal: FirstSignal | null,
-): { kind: string; label: string } | null {
-  const s = inferStrategy(extraction, signal);
-  return isPlanDeal(s.kind) ? { kind: s.kind, label: s.label } : null;
 }
 
 function isActive(status: string | undefined): boolean {
@@ -297,6 +315,7 @@ export function DealView({
   hasOm,
   modelErrorCode,
   job: initialJob,
+  typicalScreen = null,
   results,
   supplements,
   model,
@@ -330,6 +349,9 @@ export function DealView({
   assumable = null,
   sellerNote = null,
   leaseholdExit = null,
+  loi = null,
+  askerNames = null,
+  modelInterest = null,
 }: {
   dealId: string;
   dealName: string;
@@ -338,8 +360,13 @@ export function DealView({
   hasOm: boolean;
   modelErrorCode: string | null;
   job: Job;
+  /** how long the reader's own screens usually take — "about 3 minutes",
+   *  the median of their stored run times (lib/screen-duration); null under
+   *  three runs, and then the rail claims no duration */
+  typicalScreen?: string | null;
   results: Results;
-  /** results a FAILED latest screen never reached — they belong to the
+  /** results the latest screen has not rewritten — a failed run never
+   *  reached them, or a running one has not yet — so they belong to the
    *  previous screen and every surface here says so (lib/screen-run.ts) */
   staleResults?: ResultKey[];
   /** today's starting rates off the rates table (lib/debt-index) for the
@@ -361,6 +388,14 @@ export function DealView({
    *  the model's sale (lib/leasehold-exit, #421) — plain data; null unless
    *  a leasehold states when its lease ends */
   leaseholdExit?: LeaseholdExitView | null;
+  /** what the letter of intent drafts — read on the server by the LOI
+   *  route's own reader (lib/loi-terms), so the panel and the download
+   *  cannot disagree; null leaves the panel with no plan to name */
+  loi?: LoiTerms | null;
+  /** the first-draft model's returns read for what the price buys — the
+   *  compare table's rule (lib/compare-interest): a note's or a share's
+   *  withheld, with the reason; null with no model */
+  modelInterest?: ModelReturnsRead | null;
   /** the metro area's payrolls by sector today, with this building's
    *  sector marked (lib/metro-demand); null outside the covered markets */
   metroDemand?: MetroDemand | null;
@@ -379,8 +414,13 @@ export function DealView({
   notes?: DealNote[];
   userEmail?: string | null;
   qa?: AskEntry[];
+  /** a team deal's teammates by user id, named the way the pipeline names
+   *  who added a deal — Ask's thread says who asked each question; null on
+   *  a personal deal */
+  askerNames?: Record<string, string> | null;
   isSample?: boolean;
-  /** the ~30s first read, so the LOI infers the deal's kind as the page does */
+  /** the ~30s first read, so the LOI's prefill and the comps' subject read
+   *  the deal's kind as the page does */
   firstSignal?: FirstSignal | null;
   userId?: string | null;
   marketMemory?: MarketGroup | null;
@@ -407,8 +447,16 @@ export function DealView({
   // background process (a deploy/restart). Computed in the poll (where reading
   // the clock is a side effect, not render), it flips the rail to a restart.
   const [stalled, setStalled] = useState(false);
+  const wasStalled = useRef(false);
+  const operatorFailure = job?.status === "error" && needsOperator(job.error);
 
   const active = isActive(job?.status);
+  // Why any result below is the previous screen's: a failed run never
+  // reached it, or the run in progress has not yet (lib/screen-run).
+  const staleWhy: "failed" | "running" = job?.status === "error" ? "failed" : "running";
+  // A screen, not a side job, is under way: the rail's "Step N of 6" is the
+  // progress cue, and the overview's own count of results stands down.
+  const screening = active && !SIDE_JOBS.has(job?.step ?? "");
 
   // Poll the lightweight status endpoint while a run is in flight. When the
   // step changes (or the run ends), pull the freshly-written section data.
@@ -444,11 +492,14 @@ export function DealView({
         // Detect a stalled run: still active but its row hasn't been written in
         // the stale window (the background process likely died).
         const isRunning = data.status === "running" || data.status === "queued";
-        setStalled(
-          isRunning &&
-            !!data.updated_at &&
-            Date.now() - Date.parse(data.updated_at) > STALL_MS,
-        );
+        const nowStalled =
+          isRunning && !!data.updated_at && Date.now() - Date.parse(data.updated_at) > STALL_MS;
+        setStalled(nowStalled);
+        // The header was drawn while the run was reading: a figure not read
+        // yet shimmered. A run that stalls is reading nothing, so the page is
+        // drawn again once, and a missing figure takes its dash.
+        if (nowStalled && !wasStalled.current) router.refresh();
+        wasStalled.current = nowStalled;
 
         if (data.status === "running" || data.status === "queued") {
           notified.current = false;
@@ -534,6 +585,33 @@ export function DealView({
     setSection(key);
     syncUrl(key);
   }
+
+  // The section bar scrolls sideways on a phone, and the tab a link, the
+  // URL or a jump from the Overview selects can sit past its end (Analyses
+  // sat at x 369–497 of a 390px screen). On mount and on every change of
+  // section the STRIP scrolls the selected tab into view (lib/tab-strip):
+  // its own scrollLeft, never the page's, so the page never jumps.
+  const tabStrip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = tabStrip.current;
+    const tab = strip?.querySelector<HTMLElement>(`#tab-${section}`);
+    if (!strip || !tab) return;
+    const s = strip.getBoundingClientRect();
+    const t = tab.getBoundingClientRect();
+    // A tab under the phone's faded right edge (1.75rem, where the strip
+    // carries its mask) is not yet read.
+    const css = getComputedStyle(strip);
+    const mask = css.getPropertyValue("mask-image") || css.getPropertyValue("-webkit-mask-image");
+    const fade = /gradient/.test(mask)
+      ? 1.75 * parseFloat(getComputedStyle(document.documentElement).fontSize)
+      : 0;
+    const left = revealScrollLeft(
+      { left: s.left, clientWidth: strip.clientWidth, scrollWidth: strip.scrollWidth, scrollLeft: strip.scrollLeft },
+      { left: t.left, right: t.right },
+      fade,
+    );
+    if (left != null) strip.scrollLeft = left;
+  }, [section]);
   function selectAnalysis(key: AnalysisKey) {
     setAnalysis(key);
     setSection("analyses");
@@ -646,7 +724,7 @@ export function DealView({
     <div className="flex flex-col gap-5">
       {active && !stalled && (
         <div className="flex flex-col gap-2">
-          <ProgressRail job={job!} />
+          <ProgressRail job={job!} typicalScreen={typicalScreen} />
           <NotifyOffer />
         </div>
       )}
@@ -657,8 +735,10 @@ export function DealView({
             This screen stalled
           </p>
           <p className="mt-1 text-sm text-muted">
-            It hasn&apos;t made progress in a while — the run may have been
-            interrupted. Nothing was lost; start it again to pick back up.
+            It hasn&apos;t made progress in a while — the run was probably
+            interrupted, most often by the site restarting under it. What it
+            had saved stays on the deal; starting again runs the screen from
+            the beginning.
           </p>
           <RetryForm dealId={dealId} label="Start it again" />
         </div>
@@ -679,21 +759,27 @@ export function DealView({
             {staleResults.length > 0
               ? "The results it did not reach still show below, marked as the previous screen's. "
               : "Nothing was lost. "}
-            If it fails twice, email{" "}
+            {operatorFailure ? "Email" : "If it fails twice, email"}{" "}
             <a
               className="font-medium text-brand hover:text-brand-strong"
               href="mailto:underwritecopilot.support@gmail.com"
             >
               underwritecopilot.support@gmail.com
             </a>{" "}
-            and we&apos;ll dig in.
+            {operatorFailure ? "and we\u2019ll fix it on our side." : "and we\u2019ll dig in."}
           </p>
-          <RetryForm dealId={dealId} label="Try again" />
+          {/* A failure on our side (lib/anthropic/operator-failures) says a
+              retry will not help; no button offers one beneath it. */}
+          {!operatorFailure && <RetryForm dealId={dealId} label="Try again" />}
         </div>
       )}
 
       {/* Section bar — one section visible at a time. */}
-      <div className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]">
+      <div
+        ref={tabStrip}
+        data-tab-strip
+        className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]"
+      >
         <div
           role="tablist"
           aria-label="Deal sections"
@@ -778,8 +864,10 @@ export function DealView({
             <OverviewView
               results={results}
               active={active}
+              screening={screening}
               onNavigate={navigateLegacy}
               stale={staleResults}
+              staleWhy={staleWhy}
             />
             {playground && <SensitivityPlayground data={playground} />}
             {tasks !== null && (
@@ -797,6 +885,8 @@ export function DealView({
               hasOm={hasOm}
               isSample={isSample}
               isPro={isPro}
+              omUrl={omUrl}
+              askers={askerNames ? { me: userId, names: askerNames } : null}
             />
             <DecisionLog
               dealId={dealId}
@@ -827,6 +917,8 @@ export function DealView({
             assumable={assumable}
             sellerNote={sellerNote}
             leaseholdExit={leaseholdExit}
+            isSample={isSample}
+            modelInterest={modelInterest}
           />
         )}
 
@@ -852,10 +944,12 @@ export function DealView({
             marketSince={marketSince}
             metroDemand={metroDemand}
             staleVerdict={staleResults.includes("verdict")}
+            staleWhy={staleWhy}
             compSubject={subjectBasis(
               results.extraction?.metrics ?? [],
               inferStrategy(results.extraction, firstSignal).kind,
               interestOf(results.extraction),
+              results.extraction?.assetClass,
             )}
           />
         )}
@@ -884,7 +978,7 @@ export function DealView({
                 dealId={dealId}
                 askingPrice={askingPriceValue(results.extraction, firstSignal)}
                 isPro={isPro}
-                plan={loiPlan(results.extraction, firstSignal)}
+                terms={loi}
               />
             )}
           </div>
@@ -918,6 +1012,8 @@ function FinancialsPanel({
   assumable = null,
   sellerNote = null,
   leaseholdExit = null,
+  isSample = false,
+  modelInterest = null,
 }: {
   results: Results;
   active: boolean;
@@ -936,6 +1032,11 @@ function FinancialsPanel({
   assumable?: AssumableView | null;
   sellerNote?: AssumableView | null;
   leaseholdExit?: LeaseholdExitView | null;
+  /** the sample deal: its model's documents are the fixture's, never rows
+   *  of its own, so the Model tab compares no document set against them */
+  isSample?: boolean;
+  /** what the model's returns mean for what the price buys */
+  modelInterest?: ModelReturnsRead | null;
 }) {
   return (
     <div className="flex flex-col gap-6">
@@ -987,9 +1088,12 @@ function FinancialsPanel({
       >
         <summary className="cursor-pointer list-none px-5 py-4 text-sm font-semibold tracking-tight [&::-webkit-details-marker]:hidden">
           <span className="flex items-center justify-between gap-2">
-            Excel model {model ? "— ready" : ""}
+            {/* The card holds the first-draft model built from the documents;
+                its Excel download is the underwrite's own workbook, a separate
+                model (model-view says so) — so the heading names the model. */}
+            First-draft model {model ? "— ready" : ""}
             <span className="text-xs font-normal text-muted">
-              {model ? "download or regenerate" : "generate from your documents"}
+              {model ? "the Excel workbook, or regenerate" : "generate from your documents"}
             </span>
           </span>
         </summary>
@@ -1000,6 +1104,8 @@ function FinancialsPanel({
             documents={documents}
             active={active}
             isPro={isPro}
+            isSample={isSample}
+            interest={modelInterest}
           />
         </div>
       </details>
@@ -1025,10 +1131,14 @@ const MANDATE_META: Record<
 function MandateScoreHeader({
   mandate,
   unscored,
+  outsideOn = [],
 }: {
   mandate: MandateScore;
   /** buy-box criteria that are checked (below) but not part of the fit score */
   unscored: string[];
+  /** criteria the deal misses outright — the header's chip reads "Outside
+   *  box" on any of them, whatever the score's call */
+  outsideOn?: string[];
 }) {
   const score = mandate.score!;
   const meta = MANDATE_META[mandate.verdict!];
@@ -1079,6 +1189,9 @@ function MandateScoreHeader({
         {mandate.unresolvedDealbreakers > 0 && !mandate.dealbreakerTripped
           ? ` ${mandate.unresolvedDealbreakers} dealbreaker${mandate.unresolvedDealbreakers > 1 ? "s" : ""} couldn't be checked — verify manually.`
           : ""}
+        {outsideOn.length > 0 && mandate.verdict !== "PASS"
+          ? ` It misses the box outright on ${outsideOn.join(" and ")}, so the deal's chip reads Outside box whatever the score's call.`
+          : ""}
       </p>
     </div>
   );
@@ -1087,7 +1200,9 @@ function MandateScoreHeader({
 /** Deal memory (Feature 6): what this account's OWN past screens of the same
  *  market + asset class looked like — a one-line read at the point of decision,
  *  linking to the full Market data page. Never a teammate's or another
- *  account's deals. */
+ *  account's deals. The count is of the screens that left a going-in cap or a
+ *  basis behind (lib/market-memory `buildComps` keeps no other), and the
+ *  sentence says so. */
 function MarketMemoryStrip({ group }: { group: MarketGroup }) {
   const bits: string[] = [];
   if (group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
@@ -1109,7 +1224,7 @@ function MarketMemoryStrip({ group }: { group: MarketGroup }) {
         You&apos;ve screened{" "}
         <span className="font-medium text-ink">{group.count}</span> other{" "}
         {group.market} <span>{assetClassLabel(group.assetClass)}</span>{" "}
-        deal{group.count === 1 ? "" : "s"}
+        deal{group.count === 1 ? "" : "s"}{" "}with a cap or basis on file
         {bits.length ? (
           <>
             : <span className="text-ink">{bits.join(" · ")}</span>
@@ -1179,6 +1294,10 @@ export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
           unscored={data.checks
             .filter((c) => c.label === "Price" || c.label.startsWith("Basis / "))
             .map((c) => (c.label === "Price" ? "price" : c.label.toLowerCase()))}
+          // The criteria the deal misses outright: the header's chip folds
+          // every check and reads "Outside box" on any of them (lib/buy-box-
+          // chip), so the gauge says why it differs from its own call.
+          outsideOn={data.checks.filter((c) => c.status === "miss").map((c) => c.label.toLowerCase())}
         />
       )}
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -1259,6 +1378,7 @@ function AnalysesPanel({
   internalComps,
   omUrl,
   staleVerdict = false,
+  staleWhy = "failed",
   compSubject = null,
   marketSince = null,
   metroDemand = null,
@@ -1278,8 +1398,10 @@ function AnalysesPanel({
   supplements: SupplementsMap;
   internalComps: InternalComp[];
   omUrl: string | null;
-  /** the latest screen failed before re-running the verdict */
+  /** the latest screen has not re-run the verdict (lib/screen-run) */
   staleVerdict?: boolean;
+  /** why: that screen failed before the verdict, or is still running */
+  staleWhy?: "failed" | "running";
   /** the subject's own basis, read where the first signal is in scope, so
    *  the comps table's tick and the deal header agree on the deal's kind */
   compSubject?: SubjectBasis | null;
@@ -1340,9 +1462,13 @@ function AnalysesPanel({
   } else if (data) {
     content =
       analysis === "verdict" ? (
-        <VerdictView result={results.verdict!} stale={staleVerdict} />
+        <VerdictView result={results.verdict!} stale={staleVerdict} staleWhy={staleWhy} />
       ) : analysis === "challenger" ? (
-        <ChallengerView result={results.challenges!} dealName={dealName} />
+        <ChallengerView
+          result={results.challenges!}
+          dealName={dealName}
+          totalPages={results.extraction?.totalPages ?? null}
+        />
       ) : analysis === "comps" ? (
         <BrokerComps
           result={results.comps!}
@@ -1357,6 +1483,7 @@ function AnalysesPanel({
               results.extraction?.address || results.extraction?.market || "",
             market: results.extraction?.market ?? "",
             omUrl,
+            totalPages: results.extraction?.totalPages ?? null,
           }}
         />
       ) : (
@@ -1458,6 +1585,7 @@ function DocumentsPanel({
     t12: "T-12",
     financials: "Financials",
     loan_terms: "Loan terms",
+    bov: "BOV",
     other: "Document",
   };
   const SUPP_LABEL: Record<string, string> = {
@@ -1487,7 +1615,7 @@ function DocumentsPanel({
                 href={omUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                title="Opens the uploaded OM (link valid for 1 hour)"
+                title="Opens the uploaded OM"
                 className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
               >
                 View
@@ -1513,17 +1641,39 @@ function DocumentsPanel({
               </span>
             </li>
           )}
-          {documents.map((d) => (
-            <li
-              key={d.id}
-              className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
-            >
-              <span className="min-w-0 flex-1 truncate">{d.filename}</span>
-              <span className="shrink-0 text-xs text-muted">
-                {KIND_LABEL[d.kind] ?? d.kind}
-              </span>
-            </li>
-          ))}
+          {documents.map((d) => {
+            // Signed when it is clicked (app/api/deals/[id]/file), so a page
+            // left open never hands over an expired link.
+            const href = dealFileLinkFor(dealId, d.storage_path);
+            // A PDF or an image opens in the browser; anything else — a rent
+            // roll's spreadsheet — is stored to download (lib/inline-types).
+            const opens = d.content_type
+              ? servedInline(d.content_type)
+              : /\.(pdf|png|jpe?g|gif|webp)$/i.test(d.filename);
+            return (
+              <li
+                key={d.id}
+                className="flex flex-wrap items-center gap-2 px-3 py-2.5 text-sm"
+              >
+                <span className="min-w-0 flex-1 truncate">{d.filename}</span>
+                <span className="shrink-0 text-xs text-muted">
+                  {KIND_LABEL[d.kind] ?? DOC_KIND_LABEL[d.kind] ?? d.kind}
+                </span>
+                {href && (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={opens ? `Opens ${d.filename}` : `Downloads ${d.filename}`}
+                    aria-label={`${opens ? "View" : "Download"} ${d.filename}`}
+                    className="rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint"
+                  >
+                    {opens ? "View" : "Download"}
+                  </a>
+                )}
+              </li>
+            );
+          })}
         </ul>
         {hasVerdict && (
           <div className="mt-3">
@@ -1617,17 +1767,26 @@ function TabDot({
   );
 }
 
-/** mm:ss elapsed since mount — a moving number so a long step never reads as
- *  "hung" the way a frozen percentage does. */
-function useElapsed(): string {
-  const [secs, setSecs] = useState(0);
+/** m:ss since the run was asked for — the job row's own claim where the
+ *  page has it (lib/run-clock), queue wait included, so a reload mid-screen
+ *  picks up the run's time rather than starting again once the page has
+ *  loaded; since this page began watching where it has none. A moving
+ *  number, so a long step never reads as "hung" the way a frozen
+ *  percentage does. The clock is read in the effect, never in render,
+ *  so the server's markup and the first client render agree. */
+function useElapsed(startedAt: string | null | undefined): string {
+  const [clock, setClock] = useState<{ since: number; now: number } | null>(null);
   useEffect(() => {
-    const t = setInterval(() => setSecs((v) => v + 1), 1000);
-    return () => clearInterval(t);
+    const since = Date.now();
+    const tick = () => setClock({ since, now: Date.now() });
+    const raf = requestAnimationFrame(tick);
+    const t = setInterval(tick, 1000);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(t);
+    };
   }, []);
-  const m = Math.floor(secs / 60);
-  const sec = String(secs % 60).padStart(2, "0");
-  return `${m}:${sec}`;
+  return clock ? elapsedLabel(runStartMs(startedAt, clock.since), clock.now) : "0:00";
 }
 
 /** Where the deal has been: every stage change with its date, newest first.
@@ -1825,21 +1984,25 @@ function NotifyOffer() {
       }}
       className="w-fit text-xs font-medium text-brand transition-colors hover:text-brand-strong"
     >
-      Notify me when it&apos;s done — it&apos;ll be a few minutes
+      Notify me when it&apos;s done
     </button>
   );
 }
 
-function ProgressRail({ job }: { job: NonNullable<Job> }) {
-  const elapsed = useElapsed();
+function ProgressRail({
+  job,
+  typicalScreen = null,
+}: {
+  job: NonNullable<Job>;
+  /** the reader's own screens' measured median, said — or null, and no
+   *  duration is claimed (lib/screen-duration) */
+  typicalScreen?: string | null;
+}) {
+  const elapsed = useElapsed(job.created_at);
 
   // Reconcile and model generation run on their own — a simple indicator, not
   // the 6-step pipeline rail.
-  if (
-    job.step === "reconcile" ||
-    job.step === "model" ||
-    job.step === "comps_search"
-  ) {
+  if (SIDE_JOBS.has(job.step ?? "")) {
     return (
       <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
         <div className="flex items-center gap-3">
@@ -1847,15 +2010,15 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
           <span className="text-sm">
             {job.status === "queued"
               ? "Queued — waiting for an open analyst slot…"
-              : (STEP_LABELS[job.step] ?? "Working…")}
+              : (STEP_LABELS[job.step ?? ""] ?? "Working…")}
           </span>
           <span className="ml-auto font-mono text-xs tabular-nums text-muted">
             {elapsed}
           </span>
         </div>
         <p className="mt-2 text-xs text-muted">
-          Usually a minute or two — you can keep browsing; a toast will tell
-          you when it lands.
+          It keeps running if you leave; with this page open, a note here
+          says when it lands.
         </p>
       </div>
     );
@@ -1910,8 +2073,9 @@ function ProgressRail({ job }: { job: NonNullable<Job> }) {
         })}
       </ol>
       <p className="mt-3 text-xs text-muted">
-        A full screen typically takes 2–4 minutes — finished sections open as
-        they land, so feel free to explore them meanwhile.
+        {typicalScreen
+          ? `Your screens usually take ${typicalScreen} — finished sections open as they land, so feel free to explore them meanwhile.`
+          : "Finished sections open as they land, so feel free to explore them meanwhile."}
       </p>
     </div>
   );

@@ -1,14 +1,18 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getBilling } from "@/lib/billing";
+import { dealAllowance } from "@/lib/deal-allowance";
 import { signOut } from "@/app/login/actions";
 import { ChangePasswordForm } from "./change-password-form";
 import { DeleteAccountForm } from "./delete-account-form";
 import { EmailToggle } from "./email-toggle";
 import { BrandingSection } from "./branding-section";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { emailEnabled } from "@/lib/email";
+import { emailEnabled } from "@/lib/email-send";
+import { emailNotes } from "@/lib/email-notes";
+import { analysisWorkerEnabled, workerSchemaReady } from "@/lib/jobs";
+import { deletionStopNotice, doneFromQuery } from "@/lib/account-deletion";
 
 export const metadata: Metadata = { title: "Account" };
 
@@ -18,9 +22,8 @@ const DELETE_ERRORS: Record<string, string> = {
   confirm: 'Type DELETE (all caps) in the box to confirm deletion.',
   ownerdelete:
     "You own a team, so self-deletion is disabled — it would take the team down with you. Email underwritecopilot.support@gmail.com and we'll handle it.",
-  cancelsub:
-    "We couldn't cancel your subscription automatically — nothing was deleted. Cancel it from the Billing page first, then try again.",
-  delete: "Deletion failed — nothing was removed. Please try again, or email underwritecopilot.support@gmail.com.",
+  // A deletion that stopped part way (handover, cancelsub, delete) says what
+  // its earlier steps had already done: lib/account-deletion, read below.
   // Report branding (Feature 6)
   brandowner:
     "Team branding is managed by the team owner — ask them to update it.",
@@ -29,52 +32,61 @@ const DELETE_ERRORS: Record<string, string> = {
   brandlogotype: "Logos must be a PNG or JPG file.",
 };
 
+/** The two email preferences, ON by default. One read of the profile row:
+ *  `*` returns whichever columns the schema has, so a pre-0014/0017 schema
+ *  missing one toggle's column still reads the other — the per-toggle
+ *  degradation the old column-at-a-time reads bought, in one round trip.
+ *  A missing row reads as ON, the switches' default, as the senders read
+ *  it. A failed read SHOWS as ON here too — the page draws the default it
+ *  could not check — while the senders read a failed read as OFF and send
+ *  nothing (lib/email `wantsAnalysisEmail`; the digest asks for the
+ *  switched-on rows and sends none when that read fails). */
+async function emailPrefsOf(userId: string): Promise<{ onAnalysis: boolean; weeklyDigest: boolean }> {
+  try {
+    const { data, error } = await createSupabaseAdminClient()
+      .from("profiles")
+      .select("*")
+      .eq("id", userId)
+      .maybeSingle();
+    const row = !error && data ? (data as { email_on_analysis?: unknown; email_weekly_digest?: unknown }) : null;
+    return {
+      onAnalysis: row?.email_on_analysis !== false,
+      weeklyDigest: row?.email_weekly_digest !== false,
+    };
+  } catch {
+    return { onAnalysis: true, weeklyDigest: true };
+  }
+}
+
 export default async function AccountPage({
   searchParams,
 }: {
-  searchParams: Promise<{ reset?: string; error?: string; branding?: string }>;
+  searchParams: Promise<{ reset?: string; error?: string; branding?: string; moved?: string; cancelled?: string }>;
 }) {
-  const { reset, error, branding: brandingParam } = await searchParams;
-  const deleteError = error ? (DELETE_ERRORS[error] ?? null) : null;
+  const { reset, error, branding: brandingParam, moved, cancelled } = await searchParams;
+  const deleteError =
+    deletionStopNotice({ error, moved, cancelled }) ?? (error ? (DELETE_ERRORS[error] ?? null) : null);
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  const billing = user ? await getBilling(supabase, user.id) : null;
+  // Request-cached: the (app) layout's own auth call, not a second hop.
+  const user = await getCurrentUser();
+  // The billing read and the email preferences don't wait on each other.
+  const [billing, prefs] = user
+    ? await Promise.all([getBilling(supabase, user.id), emailPrefsOf(user.id)])
+    : [null, { onAnalysis: true, weeklyDigest: true }];
   const isPro = billing?.isPro ?? false;
-
-  // Email preferences — ON by default; pre-0014/0017 schemas (columns
-  // missing) read as ON too, matching what the senders assume. Queried one
-  // column at a time so a half-migrated schema degrades per-toggle.
-  let emailOnAnalysis = true;
-  let emailWeeklyDigest = true;
-  if (user) {
-    const admin = createSupabaseAdminClient();
-    try {
-      const { data: prefs, error: prefErr } = await admin
-        .from("profiles")
-        .select("email_on_analysis")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (!prefErr && prefs && prefs.email_on_analysis === false) {
-        emailOnAnalysis = false;
-      }
-    } catch {
-      // default stands
-    }
-    try {
-      const { data: prefs, error: prefErr } = await admin
-        .from("profiles")
-        .select("email_weekly_digest")
-        .eq("id", user.id)
-        .maybeSingle();
-      if (!prefErr && prefs && prefs.email_weekly_digest === false) {
-        emailWeeklyDigest = false;
-      }
-    } catch {
-      // default stands
-    }
-  }
+  // The pipeline's meter and this line count by the create action's own
+  // rule (lib/deal-allowance): a team's trial first, then the reader's own.
+  const allowance = billing ? dealAllowance(billing) : null;
+  const emailOnAnalysis = prefs.onAnalysis;
+  const emailWeeklyDigest = prefs.weeklyDigest;
+  // What each switch promises, and which process sends each email
+  // (lib/email-notes): this service's own setup (no key, or no sender a
+  // customer receives mail from — lib/email-send) speaks only for what this
+  // service sends. The digest always goes from the background worker, and
+  // so do the screen emails once screens run there, as the deal actions
+  // decide it (the flag, and the worker's columns in place).
+  const workerMode = analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  const notes = emailNotes({ sending: emailEnabled(), workerMode });
 
   return (
     <div className="space-y-6">
@@ -107,11 +119,7 @@ export default async function AccountPage({
               Signed in as
             </p>
             <p className="mt-1 font-medium">{user?.email ?? "—"}</p>
-            {billing && !isPro && (
-              <p className="mt-1 text-xs text-muted">
-                {billing.dealCount} of {billing.dealLimit} free deals used
-              </p>
-            )}
+            {allowance?.line && <p className="mt-1 text-xs text-muted">{allowance.line}</p>}
           </div>
           <div className="flex items-center gap-3">
             <span
@@ -133,18 +141,28 @@ export default async function AccountPage({
 
       {/* Notifications */}
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
+        {notes.paused && (
+          <p
+            data-qa="email-paused"
+            className="mb-5 flex flex-wrap items-center gap-2 rounded-lg bg-faint px-3 py-2 text-sm text-muted"
+          >
+            <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs font-semibold text-ink">
+              Paused
+            </span>
+            <span>{notes.paused}</span>
+          </p>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold tracking-tight">
               Email when an analysis finishes
             </h2>
-            <p className="mt-1 max-w-md text-sm text-muted">
-              One email per completed screen — the verdict, the buy-box call,
-              and a link to the report.
-              {!emailEnabled() && (
-                <> Sending is currently paused while email is being configured.</>
-              )}
-            </p>
+            <p className="mt-1 max-w-md text-sm text-muted">{notes.analysis}</p>
+            {notes.analysisSentBy && (
+              <p data-qa="email-sent-by-worker" className="mt-1 max-w-md text-xs text-muted">
+                {notes.analysisSentBy}
+              </p>
+            )}
           </div>
           <EmailToggle
             enabled={emailOnAnalysis}
@@ -157,12 +175,9 @@ export default async function AccountPage({
             <h2 className="text-sm font-semibold tracking-tight">
               Weekly pipeline digest
             </h2>
-            <p className="mt-1 max-w-md text-sm text-muted">
-              Monday morning: your deals by stage, offers due this week, and
-              the verdicts that landed since last week.
-              {!emailEnabled() && (
-                <> Sending is currently paused while email is being configured.</>
-              )}
+            <p className="mt-1 max-w-md text-sm text-muted">{notes.digest}</p>
+            <p data-qa="digest-sent-by-worker" className="mt-1 max-w-md text-xs text-muted">
+              {notes.digestSentBy}
             </p>
           </div>
           <EmailToggle
@@ -196,14 +211,15 @@ export default async function AccountPage({
         </a>
       </p>
 
-      {/* Sign out */}
+      {/* Data health: the corrections ledger every reader sees (the
+          operator's working view is on the same page, for the operator) */}
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold tracking-tight">Data health</h2>
             <p className="mt-1 text-sm text-muted">
-              The nightly verification steward&apos;s ledger: runs, open
-              issues, and every correction made in the open.
+              Every correction the nightly steward makes to the site&apos;s
+              data, with its evidence.
             </p>
           </div>
           <Link
@@ -215,6 +231,7 @@ export default async function AccountPage({
         </div>
       </section>
 
+      {/* Sign out */}
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -240,11 +257,15 @@ export default async function AccountPage({
           Delete account
         </h2>
         <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted">
-          Permanently deletes your account, your deals, your documents, and
-          your analyses, and cancels any active subscription. Deals you shared
-          with a team stay with the team. This cannot be undone.
+          Permanently deletes your account, your personal deals with their
+          documents and analyses, and cancels any active subscription. The
+          deals you added to a team&apos;s pipeline stay with the team, handed
+          to its owner, and so does your work on any team&apos;s deals: saved
+          versions, valuations and rent roll imports. This cannot be undone.
         </p>
-        <DeleteAccountForm />
+        {/* What a stopped try had already done rides into the next one,
+            so its pages say it too (lib/account-deletion). */}
+        <DeleteAccountForm carried={doneFromQuery({ moved, cancelled })} />
       </section>
     </div>
   );

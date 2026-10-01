@@ -7,6 +7,7 @@ import {
   structuredOutput,
 } from "./failure";
 import { newLedger, withUsageLedger } from "./usage";
+import { needsOperator } from "./operator-failures";
 
 /** The SDK's APIError, by shape: an HTTP status and its "401 {…}" message. */
 function apiError(status: number, type: string, message: string): Error {
@@ -40,8 +41,39 @@ describe("describeRunFailure — the analyst reads a sentence, the log keeps the
     expect(describeRunFailure(apiError(500, "api_error", "boom")).message).toMatch(/overloaded/);
     expect(describeRunFailure(apiError(413, "invalid_request_error", "too big")).message).toMatch(/too large/);
     expect(describeRunFailure(apiError(400, "invalid_request_error", "pdf pages")).message).toMatch(
-      /text-based PDF/,
+      /Replace OM/,
     );
+    // A scan is read as pictures: the advice never blames one.
+    expect(describeRunFailure(apiError(400, "invalid_request_error", "pdf pages")).message).not.toMatch(/scan/i);
+  });
+
+  it("a 400 about the account — a spent credit balance, a usage limit — is ours, never the document's (pass 14, 2026-10-01)", () => {
+    for (const err of [
+      apiError(400, "invalid_request_error", "Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."),
+      apiError(400, "invalid_request_error", "You have reached your specified API usage limits. You will regain access on 2026-11-01 at 00:00 UTC."),
+    ]) {
+      const f = describeRunFailure(err);
+      expect(f.message).toMatch(/on our side, not your deal/);
+      expect(f.message).not.toMatch(/PDF|document|scanned/);
+      expect(f.message).not.toMatch(/credit|billing|Anthropic/i);
+      expect(f.detail).toMatch(/credit balance|usage limits/);
+      // The deal page leaves out its "Try again" under it.
+      expect(needsOperator(f.message)).toBe(true);
+    }
+  });
+
+  it("only the operator's failures read as needing the operator (the deal page's Try again)", () => {
+    expect(needsOperator(describeRunFailure(apiError(401, "authentication_error", "invalid x-api-key")).message)).toBe(true);
+    for (const err of [
+      apiError(429, "rate_limit_error", "slow down"),
+      apiError(529, "overloaded_error", "Overloaded"),
+      apiError(400, "invalid_request_error", "pdf pages"),
+      new Error("fetch failed"),
+    ]) {
+      expect(needsOperator(describeRunFailure(err).message)).toBe(false);
+    }
+    expect(needsOperator(null)).toBe(false);
+    expect(needsOperator("")).toBe(false);
   });
 
   it("a connection failure and a storage miss each say what to do", () => {

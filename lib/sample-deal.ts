@@ -58,6 +58,23 @@ const inputs: ModelInputs = {
 
 const { cashFlow, returns } = computeModel(inputs);
 
+// The sample's sentences quote its own model: each IRR and each move below is
+// the engine's, run on the inputs above, so a sentence can never drift from
+// the figures printed beside it (the first version said "roughly 8%" and
+// "roughly 200 bps" of a model that returns 8.7% and moves 185 and 237).
+const irrWith = (over: Partial<ModelInputs>): number | null =>
+  computeModel({ ...inputs, ...over }).returns.leveredIrrPct;
+const irrText = (v: number | null): string => (v == null ? "—" : `${v.toFixed(1)}%`);
+/** A move in IRR to the nearest 10 bps, from the model's own return. */
+const bpsFrom = (v: number | null): string => {
+  const base = returns.leveredIrrPct;
+  return v == null || base == null ? "—" : `${Math.round(Math.abs(v - base) * 10) * 10} bps`;
+};
+/** The OM's own case: its exit cap, rent growth and stabilized vacancy. */
+const OM_CASE = { exitCapPct: 5.25, rentGrowthPct: 4, vacancyPct: 6 } as const;
+/** The OM's stated NOI less the T-12's, the gap the reconciliation names. */
+const NOI_GAP = 3_880_000 - 3_706_500;
+
 const modelMetrics: ReconciledMetric[] = [
   {
     key: "price",
@@ -278,13 +295,13 @@ const challenges: ChallengerResult = {
       challenge:
         "The model exits 20 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
       question:
-        "What supports a 5.25% exit in year five when the submarket trades at 5.25–5.75% today?",
+        "What thesis supports buying at a 5.45% cap and selling five years later at 5.25%?",
     },
     {
-      assumption: "$180/mo renovation premium",
+      assumption: "$200/mo renovation premium",
       severity: "high",
       challenge:
-        "Pro forma rents jump 13% on a renovation program the comps don't yet support at this basis.",
+        "Pro forma rents jump 8.3%, $2,400 to $2,600, on a renovation program the comps don't yet support at this basis.",
       question: "Which renovated comps achieved this premium, and at what cost per unit?",
     },
     {
@@ -294,8 +311,13 @@ const challenges: ChallengerResult = {
       question: "What's the absorption schedule to get from 9% to 6%?",
     },
   ],
-  stressTest:
-    "At a flat 5.5% exit, a real 9% vacancy, and a heavier expense load, the levered IRR falls from the pro forma's mid-teens to roughly 8%.",
+  // Both runs carry the model's own year-one expenses, so the drop is the
+  // exit, the rent growth and the vacancy — rent growth the largest of the
+  // three — and never the expense load (the audit of 2026-09-30). The model's
+  // $3.1M is not the T-12's $3,085,000, so the sentence names the model's
+  // figure, and its exit is said as a figure, not as "flat" against the
+  // 5.45% going-in cap (the pre-merge audit of 2026-09-30).
+  stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same $${(inputs.year1Opex / 1e6).toFixed(1)}M of year-one expenses.`,
 };
 
 const comps: BrokerCompsResult = {
@@ -328,11 +350,11 @@ const comps: BrokerCompsResult = {
     },
   ],
   redFlags: [
-    "Two of three sale comps sit in stronger submarkets, inflating the implied basis.",
+    "One of three sale comps, Vue at Girard, is a newer asset in a stronger submarket, inflating the implied basis.",
     "A weaker $238k/unit trade 0.8 mi away was omitted from the set.",
   ],
   summary:
-    "The comp set leans on the strongest trades and omits a nearby weaker sale — sell-side selections usually do. On clean comps, the basis looks 8–12% rich.",
+    "The comp set leans on the strongest trades and omits a nearby weaker sale — sell-side selections usually do. Against the two clean trades, $252k and $261k a unit, the $274k ask is 7% rich, and richer against the omitted $238k sale.",
 };
 
 const reconciliation: ReconciliationResult = {
@@ -359,8 +381,7 @@ const reconciliation: ReconciliationResult = {
       direction: "neutral",
     },
   ],
-  takeaway:
-    "Your model lands ~$174k light on NOI and 300 bps higher on vacancy — together roughly 200 bps of IRR versus the OM.",
+  takeaway: `Your model lands ~$174k light on NOI and 300 bps higher on vacancy — together roughly ${bpsFrom(irrWith({ year1Opex: inputs.year1Opex - NOI_GAP }))} of IRR versus the OM.`,
 };
 
 const market: MarketResult = {
@@ -396,7 +417,7 @@ const verdict: VerdictResult = {
   reason:
     "The going-in basis is rich and the returns lean on an aggressive exit and rent ramp. Worth a closer look only if the seller moves on price or the ramp is de-risked.",
   topRisks: [
-    "Exit cap of 5.25% sits at the tight end of today's submarket trades with no catalyst.",
+    "Exit cap of 5.25% sits 20 bps inside the 5.45% going-in cap, with no catalyst for the compression.",
     "Pro forma rents assume a $200/mo premium the comps don't support.",
     "Stabilized vacancy of 6% ignores the 9% in-place reality.",
   ],
@@ -411,7 +432,7 @@ const verdict: VerdictResult = {
         low: "$2,400",
         base: "$2,480",
         high: "$2,600",
-        source: "Public listings + 3 comp leases within 1 mi",
+        source: "Rent roll and one lease comp ($2,520)",
         basis: "Low = in-place renewals; high = the OM's renovated pro forma.",
         confidence: "medium",
       },
@@ -429,16 +450,16 @@ const verdict: VerdictResult = {
         low: "5.25%",
         base: "5.50%",
         high: "5.75%",
-        source: "Submarket trades 5.25–5.75%; broker holds 5.25%",
+        source: "Rule-of-thumb range; the OM holds 5.25%",
         basis: "Base assumes no compression; high reflects a softer exit.",
         confidence: "medium",
       },
       {
         label: "Basis / unit",
-        low: "$248k",
-        base: "$262k",
+        low: "$238k",
+        base: "$257k",
         high: "$274k",
-        source: "Last two comparable trades (p. 14) vs. ask",
+        source: "Trades $252k, $261k (p. 14); omitted $238k",
         basis: "Ask sits above clean comps with no renovation premium yet.",
         confidence: "high",
       },
@@ -452,7 +473,7 @@ const verdict: VerdictResult = {
       {
         lever: "exit",
         read: "Underwritten at a 5.25% exit, inside going-in.",
-        risk: "A flat 5.5% exit knocks roughly 200 bps off the IRR.",
+        risk: `A flat 5.5% exit knocks roughly ${bpsFrom(irrWith({ exitCapPct: 5.25 }))} off the IRR.`,
       },
       {
         lever: "debt",
@@ -497,14 +518,24 @@ const rentRollExtraction: RentRollExtraction = {
   page: "roll p.1–6",
 };
 
+const ROLL_OCCUPIED_UNITS = 225;
+const ROLL_OCCUPIED_SF = 200_635;
+const ROLL_RENT_PSF = 32.4;
+
 const rentRollSummary: RentRollSummary = {
   unitCount: 248,
-  occupiedUnits: 225,
+  occupiedUnits: ROLL_OCCUPIED_UNITS,
   totalSf: 220_720,
-  occupiedSf: 200_635,
+  occupiedSf: ROLL_OCCUPIED_SF,
   sfWeightedOccupancy: 0.909,
   waltYears: 0.6,
-  weightedAvgRentPsf: 32.4,
+  weightedAvgRentPsf: ROLL_RENT_PSF,
+  // The same rent said per unit a month, from the figures above: the rent
+  // per SF a year over the occupied SF, ÷ 12, over the occupied units — the
+  // memorandum's "$2,400/mo" in-place rent, and the T-12's collected rent
+  // over the same units.
+  avgRentMonthly: (ROLL_RENT_PSF * ROLL_OCCUPIED_SF) / 12 / ROLL_OCCUPIED_UNITS,
+  rentUnits: ROLL_OCCUPIED_UNITS,
   expiryBuckets: { next12mo: 0.78, y1to3: 0.22, y3to5: 0, y5plus: 0 },
   expiryCoveredSf: 196_400,
   truncated: false,

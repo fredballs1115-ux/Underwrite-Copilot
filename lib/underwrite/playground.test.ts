@@ -194,15 +194,34 @@ describe("runScenario — the price lever reprices the whole model", () => {
 });
 
 describe("sliderValues — the Bug-9 wide slider range", () => {
-  it("exit cap sweeps ±400bps in 25bps steps around a mid-range base", () => {
+  it("exit cap sweeps ±200bps in 25bps steps around a mid-range base", () => {
     const { values, baseIdx } = sliderValues("exitCapPct", 0.06);
-    expect(values).toHaveLength(33); // ±16 steps + base
+    expect(values).toHaveLength(17); // ±8 steps + base
     expect(values[baseIdx]).toBe(0.06);
-    expect(values[0]).toBeCloseTo(0.02, 10); // −400bps
-    expect(values[values.length - 1]).toBeCloseTo(0.1, 10); // +400bps
+    expect(values[0]).toBeCloseTo(0.04, 10); // −200bps
+    expect(values[values.length - 1]).toBeCloseTo(0.08, 10); // +200bps
     // Strictly increasing — no dead zones on the slider.
     for (let i = 1; i < values.length; i++)
       expect(values[i]).toBeGreaterThan(values[i - 1]);
+  });
+
+  it("never opens the exit cap on a cap no deal trades at: the slider stops at 2.00% (2026-09-30)", () => {
+    // The research pass: the sample's 5.45% base swept to a 1.45% exit.
+    const sample = sliderValues("exitCapPct", 0.0545);
+    expect(sample.values[0]).toBeCloseTo(0.0345, 10);
+    expect(sample.values[sample.values.length - 1]).toBeCloseTo(0.0745, 10);
+    // A low base reaches the floor and stops there, every stop still a step.
+    const low = sliderValues("exitCapPct", 0.03);
+    expect(low.values[0]).toBe(0.02);
+    expect(low.values[low.baseIdx]).toBe(0.03);
+    for (let i = 1; i < low.values.length; i++) expect(low.values[i]).toBeGreaterThan(low.values[i - 1]);
+    // A base under the floor keeps its own value as the first stop — the
+    // floor is the slider's, never a change to the deal's base.
+    const under = sliderValues("exitCapPct", 0.015);
+    expect(under.baseIdx).toBe(0);
+    expect(under.values[0]).toBe(0.015);
+    // The report's grid is its own compact range, untouched by the floor.
+    expect(leverValues("exitCapPct", 0.015)[0]).toBeCloseTo(0.01, 10);
   });
 
   it("matches the sweep the homepage advertises (SLIDER_SWEEP_BPS)", async () => {
@@ -243,7 +262,7 @@ describe("sliderValues — the Bug-9 wide slider range", () => {
     expect(Math.min(...values)).toBeGreaterThan(0);
   });
 
-  it("±400bps of exit cap actually flips the mandate verdict (Bug 9)", () => {
+  it("±200bps of exit cap still flips the mandate verdict (Bug 9)", () => {
     // A deal that clears a 12% IRR floor at its 6% base exit cap…
     const base = baseInputs();
     const box = { minIrrPct: 12 };
@@ -262,8 +281,9 @@ describe("sliderValues — the Bug-9 wide slider range", () => {
     };
     const { values, baseIdx } = sliderValues("exitCapPct", base.exitCapPct);
     expect(verdictAt(values[baseIdx])).toBe("PURSUE");
-    // …and reads PASS at the +400bps end of the slider — the verdict swings
-    // across its whole range as the slider moves.
+    // …and reads PASS at the +200bps end of the slider — the verdict swings
+    // across its whole range as the slider moves, which the ±50bps grid
+    // range never did.
     expect(verdictAt(values[values.length - 1])).toBe("PASS");
     // The swing is dramatic, not marginal: ≥8pt of IRR across the range.
     const irrAt = (capPct: number) =>

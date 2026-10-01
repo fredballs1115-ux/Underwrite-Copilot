@@ -332,7 +332,7 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
           <Killer
             n={2}
             name="Exit"
-            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — the spread does the returns' heavy lifting."
+            read="Underwriting exits 20 bps below the going-in cap after a 5-year hold — a return that leans on cap compression."
             severity="caution"
           />
           <LegalBlock legal={legal} />
@@ -360,7 +360,7 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
             low="5.25%"
             base={`${INPUTS.exitCapPct.toFixed(2)}%`}
             high="5.75%"
-            src="submarket trades 5.25–5.75%; broker holds 5.25%."
+            src="the market check's typical range, a rule of thumb; the OM holds 5.25%."
           />
           <RangeRow
             label="Market rent / unit"
@@ -389,10 +389,12 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
           <div className="flex flex-wrap gap-1.5 text-[10px] font-medium">
             {(
               [
-                ["✓", "Market", "text-pass border-line"],
-                ["✓", "Price", "text-pass border-line"],
+                // The sample deal's own checks against its demo buy box
+                // (lib/sample-deal SAMPLE_DEMO_BOX, as /demo draws them).
                 ["✓", "Asset class", "text-pass border-line"],
+                ["✓", "Units", "text-pass border-line"],
                 ["✕", "Going-in cap", "text-kill border-kill/30 bg-kill/[0.04]"],
+                ["—", "Target return", "text-muted border-line"],
               ] as const
             ).map(([mark, label, cls]) => (
               <span
@@ -442,7 +444,7 @@ function DemoPanel({ tab, legal }: { tab: Tab; legal: SampleLegal }) {
             ))}
           </div>
           <CompRow name="The Brixton" meta="comparable vintage · 2.1 mi" rating="support" />
-          <CompRow name="Vue at Legacy" meta="newer, amenitized · 4.0 mi" rating="stretched" />
+          <CompRow name="Vue at Girard" meta="newer, amenitized · 4.0 mi" rating="stretched" />
           <p className="text-[10px] leading-relaxed text-muted">
             Five analyses, one rubric — the verdict flips across scenarios, and
             that spread <em>is</em> the finding.

@@ -34,8 +34,8 @@ export const DEAL_KILLERS = 3;
 // The IC memo is exactly one page (lib/memo/memo-document.tsx).
 export const MEMO_PAGES = 1;
 // The sensitivity playground's exit-cap slider sweep, each way
-// (lib/underwrite/playground.ts LEVER_STEPS: 16 × 25bps).
-export const SLIDER_SWEEP_BPS = 400;
+// (lib/underwrite/playground.ts LEVER_STEPS: 8 × 25bps).
+export const SLIDER_SWEEP_BPS = 200;
 
 // ── Research-layer facts (countable in the codebase) ────────────────────────
 // Public-record comp jurisdictions: RE-EXPORTED from the provider registry
@@ -99,6 +99,68 @@ export const PRICE_TEAM_BASE_MONTHLY = `$${PRICE_TEAM_BASE_MONTHLY_USD.toFixed(2
 export const PRICE_TEAM_MEMBER_MONTHLY = `$${PRICE_TEAM_MEMBER_MONTHLY_USD.toFixed(2)}`;
 export const FREE_DEALS = 3;
 
+// ── What each plan includes ─────────────────────────────────────────────────
+// ONE list for the homepage's plan cards and the billing page's, so the two
+// can never sell different things. The billing page listed per-tab uploads
+// and the multi-document reconciliation as Pro — nothing gates either, and
+// the screen reconciles a rent roll or a T-12 on every plan — and neither
+// page named Ask-the-deal, which is gated. Each Pro line names the gates in
+// the code that hold it to Pro, and lib/plan-features.test.ts holds the
+// list to them: a new gate with no line, or a line whose gate is gone,
+// fails there.
+
+/** The free allowance as a page says it. The cap counts the deals a reader
+ *  has now — the create action and the database's trigger count the deals
+ *  that exist, samples left out — so it is "up to", never "your first", and
+ *  it promises nothing about the rule staying as it is. */
+export const FREE_DEALS_LINE = `Up to ${FREE_DEALS} deals free`;
+
+/** The free plan's card, on the homepage and the billing page alike. */
+export const FREE_PLAN: readonly string[] = [
+  `Up to ${FREE_DEALS} deals, the full six-stage screen on each`,
+  "Sourced ranges + the three deal-killers",
+  "Recorded-sales comps + local rent-rule check by address",
+  "Risk digest and side-by-side deal comparison",
+  "Reconcile your own underwriting model",
+];
+
+/** Each `/billing?upsell=` key a Pro refusal sends the reader with, and
+ *  what the billing page says they were trying to do. */
+export const PRO_UPSELL = {
+  memo: "export the one-page IC memo",
+  report: "export the full multi-page report",
+  underwrite: "export the institutional Excel model",
+  rentroll: "export the live-formula rent-roll workbook",
+  loi: "export the LOI draft",
+  branding: "put your firm's name and logo on exported reports",
+} as const;
+export type ProUpsell = keyof typeof PRO_UPSELL;
+
+/** A Pro gate refused where it stands — by the action, on the page — with
+ *  no trip to the billing page. */
+export type ProInPlace = "deal-cap" | "model-build" | "ask" | "comp-search";
+
+export interface ProPlanLine {
+  /** what both plan cards print */
+  label: string;
+  /** the gates that hold it to Pro */
+  gates: readonly (ProUpsell | ProInPlace)[];
+}
+
+/** What Pro adds, gate by gate. */
+export const PRO_PLAN: readonly ProPlanLine[] = [
+  { label: "Unlimited deals", gates: ["deal-cap"] },
+  { label: "IC memo, full PDF report, and LOI draft", gates: ["memo", "report", "loi"] },
+  { label: "Excel models with live formulas — the underwrite and the rent roll", gates: ["underwrite", "rentroll"] },
+  { label: "A first-draft model built from your documents", gates: ["model-build"] },
+  { label: "Ask the deal — answers cite the OM's pages", gates: ["ask"] },
+  { label: "Public-web comp search", gates: ["comp-search"] },
+  { label: "Your firm's branding on memos, reports, workbooks & LOI", gates: ["branding"] },
+];
+
+/** The Pro card's lines, as both pages draw them. */
+export const PRO_PLAN_LINES: readonly string[] = [...PRO_PLAN.map((l) => l.label), "Everything in Free"];
+
 // ── Sample-deal narrative figures (fixture-sourced) ─────────────────────────
 // All of these come from ONE story — the illustrative Maddox sample deal
 // (lib/sample-deal.ts) — so the hero card, the demo tabs, and the bento tell
@@ -107,13 +169,6 @@ export const FREE_DEALS = 3;
 // The comp-premium line matches the sample's comp scrutiny narrative.
 export const SAMPLE_COMP_PREMIUM_LINE =
   "$274k/unit is 7% above the last two comparable trades with no renovation premium to justify it.";
-// The retrade tile: broker cut the sample deal's price in a reissued deck.
-export const SAMPLE_RETRADE_DELTA = "−$1.8M (−2.5%)";
-// The your-model-vs-OM tile rows (sample reconciliation story).
-export const SAMPLE_RECONCILE_ROWS: [string, string, string][] = [
-  ["Exit cap", "you 5.75 · OM 5.25", "+50 bps"],
-  ["Yr-1 rents", "you $1.41k · OM $1.54k", "−8.4%"],
-];
 
 // NOTE deliberately absent: the Excel-preview IRR figures. Those are COMPUTED
 // from the live engine on the sample model at render time (app/page.tsx

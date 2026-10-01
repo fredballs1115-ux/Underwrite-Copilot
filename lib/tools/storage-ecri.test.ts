@@ -79,7 +79,24 @@ describe("readStorage — rule 1, the trade has a closed form", () => {
     expect(breakEvenMoveOut(10, 135, 160, 1)).toBeNull();
     const r = readStorage({ ...SEED, streetRent: 160 });
     expect(r.breakEvenMoveOutPct).toBeNull();
-    expect(r.note).toContain("there is no trade to make");
+    // $160 a month, less a month's downtime, re-lets at $146.67 — above the
+    // $135 paid, below the $148.50 raised. No move-out rate makes the
+    // increase lose revenue, but each one gives back part of the gain; the
+    // note had said a leaver re-lets "for more than the raised tenant".
+    expect(r.note).toContain("cannot lose revenue at any move-out rate");
+    expect(r.note).toContain("for less than the raised rent");
+    expect(r.note).not.toContain("more than the raised tenant");
+  });
+
+  it("calls a move-out a gain only where the leaver re-lets above the raised rent", () => {
+    // $105 street against $100 raised to $110 is the case above, said right…
+    const between = readStorage({ ...SEED, inPlaceRent: 100, streetRent: 105, downtimeMonths: 0 });
+    expect(between.breakEvenMoveOutPct).toBeNull();
+    expect(between.note).not.toContain("every move-out is a gain");
+    // …and $170 less a month's downtime is $155.83, over the $148.50 raised.
+    const above = readStorage({ ...SEED, streetRent: 170 });
+    expect(above.breakEvenMoveOutPct).toBeNull();
+    expect(above.note).toContain("there is no trade to make — every move-out is a gain");
   });
 });
 

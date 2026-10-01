@@ -1,9 +1,18 @@
+import type { ReactNode } from "react";
+
 /**
  * A market photograph's caption (#438, #439): "Market photo" over the
  * market's name, on a shade at the foot of the picture, with the
  * photographer and licence beside it. It is the place the deal is in, said
  * on the picture's face, so a skyline never passes for the building. One
  * markup for the pipeline's card and the deal page's picture.
+ *
+ * The caption lets a click through to the picture under it. The credit's
+ * own links, where it has them, take it back (`pointer-events-auto` on the
+ * link): the deal page's picture is no link, so its caption links the
+ * photographer to the file's page and the licence to its text; a pipeline
+ * card is itself a link, so its credit is words, and the page's one linked
+ * line under the cards carries the links.
  */
 export function MarketCaption({
   market,
@@ -12,8 +21,9 @@ export function MarketCaption({
 }: {
   /** the market's name as the site names it: "Pittsburgh PA" */
   market: string;
-  /** the photographer and the licence (lib/skyline `photographerLine`) */
-  credit: string;
+  /** the photographer and the licence (lib/skyline `photographerLine`), as
+   *  words or drawn with their links (app/credit-parts) */
+  credit: ReactNode;
   /** a card's caption, or the deal page's larger picture's */
   size?: "card" | "hero";
 }) {

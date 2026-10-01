@@ -14,8 +14,14 @@
  *    much of the building rolls, rent-weighted tells you how much of the income
  *    does. When the big tenant is cheap, those are different deals.
  */
-import type { Lease } from "./schema";
+import { isIsoDate, type Lease } from "./schema";
 import type { ProfileDraft } from "./profiles";
+
+/** A lease's expiry where it is a real day — null for a blank and for a date
+ *  an older import stored the wrong way round ("2028-31-12"), so neither
+ *  turns WALT into NaN and the workbook (which writes no such date) and the
+ *  page bucket the same leases. */
+const expiryOf = (l: Lease): string | null => (isIsoDate(l.leaseExpiry) ? l.leaseExpiry : null);
 
 const DAY_MS = 86_400_000;
 const DAYS_PER_YEAR = 365.25;
@@ -37,6 +43,9 @@ export interface Walt {
   /** the SF and rent those figures were measured over */
   coveredSf: number;
   coveredRent: number;
+  /** the dated, leased SF whose lease states a rent — how much of the space
+   *  the rent-weighted figure speaks for */
+  coveredSfWithRent: number;
   /** occupied SF/rent EXCLUDED for want of an expiry date */
   excludedSf: number;
   excludedRent: number;
@@ -49,6 +58,7 @@ export function computeWalt(leases: Lease[], asOf: string): Walt {
   let sfDen = 0;
   let rentNum = 0;
   let rentDen = 0;
+  let sfWithRent = 0;
   let excludedSf = 0;
   let excludedRent = 0;
 
@@ -56,12 +66,13 @@ export function computeWalt(leases: Lease[], asOf: string): Walt {
     if (l.vacant) continue;
     const sf = l.sf ?? 0;
     const rent = l.baseRentAnnual ?? 0;
-    if (!l.leaseExpiry) {
+    const expiry = expiryOf(l);
+    if (!expiry) {
       excludedSf += sf;
       excludedRent += rent;
       continue;
     }
-    const years = yearsTo(l.leaseExpiry, asOf);
+    const years = yearsTo(expiry, asOf);
     if (sf > 0) {
       sfNum += years * sf;
       sfDen += sf;
@@ -69,6 +80,7 @@ export function computeWalt(leases: Lease[], asOf: string): Walt {
     if (rent > 0) {
       rentNum += years * rent;
       rentDen += rent;
+      if (sf > 0) sfWithRent += sf;
     }
   }
 
@@ -77,6 +89,7 @@ export function computeWalt(leases: Lease[], asOf: string): Walt {
     byRent: rentDen > 0 ? rentNum / rentDen : null,
     coveredSf: sfDen,
     coveredRent: rentDen,
+    coveredSfWithRent: sfWithRent,
     excludedSf,
     excludedRent,
     asOf,
@@ -122,15 +135,16 @@ export function rolloverSchedule(
   const nra = options.nra ?? (rolledSf > 0 ? rolledSf : null);
   const vacantSf = leases.filter((l) => l.vacant).reduce((s, l) => s + (l.sf ?? 0), 0);
   const undatedSf = leases
-    .filter((l) => !l.vacant && !l.leaseExpiry)
+    .filter((l) => !l.vacant && !expiryOf(l))
     .reduce((s, l) => s + (l.sf ?? 0), 0);
 
   const buckets = new Map<number, RolloverYear>();
   let totalSfExpiring = 0;
 
   for (const l of leases) {
-    if (l.vacant || !l.leaseExpiry) continue;
-    const year = Number(l.leaseExpiry.slice(0, 4));
+    const expiry = expiryOf(l);
+    if (l.vacant || !expiry) continue;
+    const year = Number(expiry.slice(0, 4));
     if (!Number.isFinite(year)) continue;
     const bucket = buckets.get(year) ?? {
       year,
@@ -376,6 +390,15 @@ export interface LeaseUpCurve {
   stabilizedOccupancyPct: number;
 }
 
+/** The lease-up pace the page and the workbook start from until the user
+ *  sets one: the vacancy leased over three years. A screening placeholder,
+ *  never a market absorption figure, and every surface says so. */
+export const DEFAULT_LEASE_UP_MONTHS = 36;
+
+export function defaultAbsorptionSfPerMonth(vacantSf: number): number {
+  return vacantSf > 0 ? Math.round(vacantSf / DEFAULT_LEASE_UP_MONTHS) : 0;
+}
+
 /**
  * Absorption of the vacant SF at a stated pace, building-wide.
  *
@@ -453,9 +476,14 @@ export interface ConcentrationOptions {
   tenantThreshold?: number;
   /** share of NRA rolling in one year that trips a flag */
   yearThreshold?: number;
+  /** the building leases by the month or the year (lib/rentroll/profiles
+   *  `leasesShort`): the rollover-year and WALT flags describe commercial
+   *  leases and are not raised — a one-year apartment lease is no cliff */
+  leasesShort?: boolean;
 }
 
-/** The three flags that should fire without being asked for. */
+/** The three flags that should fire without being asked for — the tenant
+ *  ones on any roll, the rollover and WALT ones on leases that run for years. */
 export function concentrationFlags(
   leases: Lease[],
   schedule: RolloverSchedule,
@@ -505,7 +533,7 @@ export function concentrationFlags(
     }
   }
 
-  if (nra && nra > 0) {
+  if (nra && nra > 0 && !options.leasesShort) {
     for (const y of schedule.years) {
       const share = y.sfExpiring / nra;
       if (share > yearThreshold) {
@@ -521,12 +549,20 @@ export function concentrationFlags(
     }
   }
 
-  if (walt.bySf != null && walt.bySf < holdYears) {
+  // The term that matters is the income's: weighted by rent where the roll
+  // states a rent for most of its dated, leased space (four-fifths of it),
+  // by area otherwise — and the sentence says which it measured.
+  const weighByRent =
+    walt.byRent != null && walt.coveredSf > 0 && walt.coveredSfWithRent >= 0.8 * walt.coveredSf;
+  const term = weighByRent ? walt.byRent : walt.bySf;
+  if (term != null && term < holdYears && !options.leasesShort) {
     flags.push({
       code: "walt_under_hold",
-      severity: walt.bySf < holdYears / 2 ? "critical" : "warning",
-      message: `WALT of ${walt.bySf.toFixed(1)} years is shorter than the ${holdYears}-year hold — the tenants that pay for this deal roll inside it.`,
-      value: walt.bySf,
+      severity: term < holdYears / 2 ? "critical" : "warning",
+      message: weighByRent
+        ? `WALT by rent is ${term.toFixed(1)} years, shorter than the ${holdYears}-year hold — on average the rent rolls before the sale.`
+        : `WALT by area is ${term.toFixed(1)} years, shorter than the ${holdYears}-year hold — on average the leased space rolls before the sale; the roll states too few rents to weigh the income.`,
+      value: term,
     });
   }
 
@@ -556,30 +592,40 @@ export interface RentRollAnalytics {
   totalSf: number;
   occupiedSf: number;
   vacantSf: number;
+  /** occupied SF over `nra` */
   occupancyPct: number | null;
+  /** the area occupancy is over: the building's NRA where the user stated
+   *  one, else the roll's own leased + vacant SF */
+  nra: number | null;
+  nraStated: boolean;
   inPlaceRentAnnual: number;
   weightedInPlacePsf: number | null;
   walt: Walt;
   rollover: RolloverSchedule;
   flags: ConcentrationFlag[];
   asOf: string;
+  /** the building leases by the month or the year: read for loss to lease,
+   *  and raised no rollover-year or WALT flag */
+  leasesShort: boolean;
 }
 
 export function analyzeRentRoll(
   leases: Lease[],
-  options: { asOf: string; nra?: number | null; holdYears?: number },
+  options: { asOf: string; nra?: number | null; holdYears?: number; leasesShort?: boolean },
 ): RentRollAnalytics {
   const totalSf = leases.reduce((s, l) => s + (l.sf ?? 0), 0);
   const vacantSf = leases.filter((l) => l.vacant).reduce((s, l) => s + (l.sf ?? 0), 0);
   const occupiedSf = totalSf - vacantSf;
   const inPlaceRentAnnual = leases.reduce((s, l) => s + (l.baseRentAnnual ?? 0), 0);
-  const nra = options.nra ?? (totalSf > 0 ? totalSf : null);
+  const statedNra = options.nra != null && options.nra > 0 ? options.nra : null;
+  const nra = statedNra ?? (totalSf > 0 ? totalSf : null);
 
   const walt = computeWalt(leases, options.asOf);
   const rollover = rolloverSchedule(leases, { nra });
   const flags = concentrationFlags(leases, rollover, walt, {
     nra,
     holdYears: options.holdYears,
+    leasesShort: options.leasesShort,
   });
 
   return {
@@ -590,11 +636,14 @@ export function analyzeRentRoll(
     occupiedSf,
     vacantSf,
     occupancyPct: nra && nra > 0 ? occupiedSf / nra : null,
+    nra,
+    nraStated: statedNra != null,
     inPlaceRentAnnual,
     weightedInPlacePsf: occupiedSf > 0 ? inPlaceRentAnnual / occupiedSf : null,
     walt,
     rollover,
     flags,
     asOf: options.asOf,
+    leasesShort: !!options.leasesShort,
   };
 }

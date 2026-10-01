@@ -60,6 +60,20 @@ describe("benchmark units", () => {
     });
   }
 
+  it("lib/fmr.ts, which the FMR pull and the seed script build their rows with, writes only units the table accepts", () => {
+    // Those two scripts carry no `unit:` of their own any more — the rows
+    // are lib/fmr's `fmrRows` — so the builder is held to the list instead.
+    const src = readFileSync("lib/fmr.ts", "utf8");
+    const units = [...src.matchAll(/unit:\s*["']([a-z_]+)["']/g)].map((m) => m[1]);
+    expect(units.length).toBeGreaterThan(0);
+    for (const u of units) {
+      expect(allowed.has(u), `lib/fmr.ts writes unit "${u}", which 0023's check refuses`).toBe(true);
+    }
+    for (const script of ["fetch-fmr.mjs", "seed-research.mjs"]) {
+      expect(readFileSync(join(SCRIPTS, script), "utf8")).toContain('from "../lib/fmr.ts"');
+    }
+  });
+
   it("the Realtor pull's own guard names the same list", () => {
     // The script refuses a unit outside the table's list before it fetches
     // anything, so a dry run fails on it too; its copy of the list must be

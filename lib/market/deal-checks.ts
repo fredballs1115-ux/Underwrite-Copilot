@@ -1,8 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
 import { inferStrategy } from "@/lib/deal-strategy";
+import { dealGoingInCap } from "@/lib/model-vs-market";
 import { assumptionWarnings, memoLinesFor, type AssumptionWarning } from "./checks";
 import { getDealSubmarket, loadSubmarketView, type SubmarketView } from "./store";
 
@@ -27,20 +28,29 @@ export async function dealSubmarketCheck(
   const link = await getDealSubmarket(supabase, dealId);
   if (!link) return null;
 
-  const [view, assumptions] = await Promise.all([
+  const [view, assumptions, signalRes] = await Promise.all([
     loadSubmarketView(supabase, link.submarketId),
     currentDealAssumptions(supabase, dealId, dealName, extraction),
+    // The first signal, read beside the rest: where the documents state no
+    // going-in cap, its own is the one the exit is set against — the rule
+    // the model's market read follows (`dealGoingInCap`).
+    supabase.from("deals").select("first_signal").eq("id", dealId).maybeSingle(),
   ]);
   if (!view || !assumptions) return null;
+  const firstSignal =
+    ((signalRes.data as { first_signal?: FirstSignal | null } | null)?.first_signal as FirstSignal | null) ?? null;
 
   // The deal's strategy shapes the wording: a conversion or development is
-  // part of the pipeline it is being warned about, not a bystander to it.
+  // part of the pipeline it is being warned about, not a bystander to it. Its
+  // going-in cap is what the exit cap is set against — none on a plan deal
+  // or a note, where the warning says nothing about compression.
   const warnings = assumptionWarnings(
     assumptions,
     view.metrics,
     view.submarket,
     link.dismissals,
-    inferStrategy(extraction).kind,
+    inferStrategy(extraction, firstSignal).kind,
+    dealGoingInCap(extraction, firstSignal),
   );
   return { view, warnings, memoLines: memoLinesFor(warnings) };
 }

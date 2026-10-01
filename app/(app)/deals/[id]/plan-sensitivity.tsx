@@ -1,7 +1,9 @@
 import { withArticle } from "@/lib/article";
 import type { PlanSummary } from "@/lib/deal-strategy";
+import { yieldOnCostText } from "@/lib/plan-facts";
 import {
   SPREAD_LABEL,
+  SPREAD_RULE_OF_THUMB,
   buildYieldOnCostGrid,
   planBreakevens,
   refCapNote,
@@ -31,6 +33,12 @@ const BUCKET_CLS: Record<SpreadBucket, string> = {
   negative: "bg-kill/20",
 };
 const LEGEND: SpreadBucket[] = ["wide", "adequate", "thin", "none", "negative"];
+
+/** A row label pinned at the grid's left edge while the grid scrolls
+ *  sideways: on the card's surface, its 4px of border spacing painted in
+ *  the same colour, so no scrolled cell (nor the base cell's ring) shows
+ *  through the gaps around it. */
+const PINNED = "sticky left-0 z-10 bg-surface shadow-[0_0_0_4px_var(--color-surface)]";
 
 export type RefCap = RefCapInput;
 
@@ -73,13 +81,16 @@ export function PlanSensitivity({
         short and 30% over is conservative.
       </p>
 
-      <div className="mt-3 overflow-x-auto">
+      {/* On a phone the grid scrolls sideways inside its card; the row
+          labels stay pinned at its left edge (sticky, on the card's own
+          surface) so a yield is never read without its row. */}
+      <div className="mt-3 overflow-x-auto" data-qa="plan-grid">
         <table className="w-full min-w-[560px] border-separate border-spacing-1 text-center text-xs">
           <thead>
             <tr>
               <th
                 scope="col"
-                className="text-left align-bottom text-[10px] font-medium uppercase tracking-wide text-muted"
+                className={`${PINNED} text-left align-bottom text-[10px] font-medium uppercase tracking-wide text-muted`}
               >
                 NOI ↓ · Budget →
               </th>
@@ -94,7 +105,7 @@ export function PlanSensitivity({
           <tbody>
             {grid.noiRows.map((r, ri) => (
               <tr key={r.delta}>
-                <th scope="row" className="text-left font-mono text-[11px] font-medium text-muted">
+                <th scope="row" className={`${PINNED} text-left font-mono text-[11px] font-medium text-muted`}>
                   {r.delta === 0 ? "OM NOI" : delta(r.delta)}
                   <span className="block text-[10px] font-normal">{money(r.noi)}</span>
                 </th>
@@ -104,12 +115,12 @@ export function PlanSensitivity({
                   return (
                     <td
                       key={ci}
-                      title={SPREAD_LABEL[bucket]}
+                      title={`${SPREAD_LABEL[bucket]} (a rule-of-thumb band)`}
                       className={`rounded-md px-2 py-1.5 font-mono tabular-nums ${BUCKET_CLS[bucket]} ${
                         base ? "ring-2 ring-ink" : ""
                       }`}
                     >
-                      <span className="block text-sm font-semibold">{pct(cell.yieldOnCost)}</span>
+                      <span className="block text-sm font-semibold">{yieldOnCostText(cell.yieldOnCost)}</span>
                       <span className="block text-[10px] text-muted">
                         {cell.spreadBps >= 0 ? "+" : ""}
                         {cell.spreadBps} bps
@@ -143,7 +154,12 @@ export function PlanSensitivity({
         </li>
       </ul>
 
-      <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
+      {/* The bands are a rule of thumb, said beside the swatches that draw
+          them — never a verdict a cell's colour hands down on its own. */}
+      <p className="mt-2 text-[11px] text-muted" data-qa="spread-rule-of-thumb">
+        {SPREAD_RULE_OF_THUMB}
+      </p>
+      <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted">
         {LEGEND.map((b) => (
           <span key={b} className="inline-flex items-center gap-1">
             <span className={`inline-block h-2.5 w-2.5 rounded-sm ${BUCKET_CLS[b]}`} aria-hidden />

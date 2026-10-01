@@ -131,6 +131,33 @@ describe("deriveInternalComps — the basis follows the asset class before any p
   });
 });
 
+describe("deriveInternalComps — an outdoor-storage yard has no per-SF basis", () => {
+  it("shows the yard's price and cap, and no price over its shop building", () => {
+    const yard = {
+      dealName: "Lot 9 yard",
+      assetClass: "Industrial Outdoor Storage (IOS)",
+      market: "Dallas, TX",
+      metrics: [m("Asking price", "$12,000,000"), m("Going-in cap rate", "6.0%"), m("Building SF", "4,000")],
+    };
+    const warehouse = {
+      dealName: "Dock 4",
+      assetClass: "industrial",
+      market: "Dallas, TX",
+      metrics: [m("Asking price", "$20,000,000"), m("Total SF", "100,000 SF")],
+    };
+    const comps = deriveInternalComps("current", "industrial", { assetClass: "industrial" }, [
+      sib("y", "Lot 9 yard", "industrial", yard),
+      sib("w", "Dock 4", "industrial", warehouse),
+    ]);
+    const by = Object.fromEntries(comps.map((c) => [c.dealId, c]));
+    // It had read "$3000/SF".
+    expect(by.y.basisLabel).toBeNull();
+    expect(by.y.priceLabel).toBe("$12.0M");
+    expect(by.y.capLabel).toBe("6.0%");
+    expect(by.w.basisLabel).toBe("$200/SF");
+  });
+});
+
 describe("deriveInternalComps — what never becomes a comp figure", () => {
   it("a pro forma cap on an operating asset is not a comp cap (the row still qualifies on price)", () => {
     const [c] = deriveInternalComps("x", "multifamily", null, [

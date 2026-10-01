@@ -12,6 +12,7 @@ import {
   propertyFigures,
   readPortfolio,
   shareBasisWord,
+  shareOfTrack,
 } from "./portfolio";
 
 const prop = (over: Partial<PortfolioProperty>): PortfolioProperty => ({
@@ -220,6 +221,20 @@ describe("the sentences every surface prints — the card, the report and the sh
     const offices = readPortfolio(ex(FIVE.map((x, i) => ({ ...x, count: "", area: `${(i + 1) * 50_000} SF` }))))!;
     expect(shareBasisWord(offices, noun)).toBe("SF");
     expect(propertyFigures(offices, 0, noun)[0]).toBe("7% of the SF");
+  });
+
+  it("shareOfTrack: a share of the whole fills that share of its track, whatever the largest share is", () => {
+    const p = readPortfolio(ex(FIVE))!;
+    // Each bar is its own share: the five fill the track exactly once
+    // between them, the largest no more than its own share.
+    expect(p.shares!.reduce((s, v) => s + shareOfTrack(v), 0)).toBeCloseTo(1, 10);
+    expect(shareOfTrack(Math.max(...p.shares!))).toBeCloseTo(Math.max(...p.shares!) / 100, 10);
+    expect(shareOfTrack(52.76)).toBeCloseTo(0.5276, 10);
+    expect(shareOfTrack(0)).toBe(0);
+    expect(shareOfTrack(100)).toBe(1);
+    expect(shareOfTrack(120)).toBe(1);
+    expect(shareOfTrack(-5)).toBe(0);
+    expect(shareOfTrack(Number.NaN)).toBe(0);
   });
 
   it("portfolioMoney rounds on the tenths, never on a float's toFixed", () => {

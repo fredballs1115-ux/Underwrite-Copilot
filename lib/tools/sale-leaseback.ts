@@ -21,8 +21,16 @@
 //    said. So the buyer is really buying two things: the contract rent for
 //    the term, and a market-rent building afterwards. Capitalising the
 //    contract rent as though it ran forever is the same error as valuing a
-//    leasehold at a fee-simple cap — on the seeded deal it overpays by
-//    $5,073,880, a fifth of the price. `honestValue` runs the two pieces.
+//    leasehold at a fee-simple cap. `honestValue` runs the two pieces, and
+//    on the seeded deal the price is $3,973,557 over them — but only
+//    $1,434,633 of that is the rent premium reverting (the premium
+//    capitalised forever at the credit cap, less what it is worth over its
+//    term). The other $2,538,924 would be paid at market rent too: the price
+//    is struck at the 6.00% credit cap and the term discounted at 8%, two
+//    inputs that disagree about the yield rather than a finding about the
+//    lease. The two parts are reported apart (`overpaymentFromPremium`,
+//    `overpaymentAtMarketRent`) and each sentence is gated on its own; the
+//    first version laid the whole $3,973,557 on the reversion.
 //
 // 3. THE CREDIT IS THE CAP RATE, AND THE CREDIT IS WHY THE DEAL EXISTS. A
 //    sale-leaseback's cap rate is a function of the tenant's balance sheet
@@ -49,6 +57,8 @@
 // Pure, no I/O.
 
 import { loanConstant, sizeLoan } from "@/lib/tools/deal-math";
+import { usdExact } from "@/lib/tools/format";
+import { MAX_LEASEBACK_YEARS, heldTo } from "@/lib/tools/limits";
 
 const real = (n: number | null | undefined): n is number =>
   typeof n === "number" && Number.isFinite(n);
@@ -58,8 +68,9 @@ const round = (n: number) => Math.round(n);
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** A term past fifty years is a ground lease, not a leaseback. */
-export const MAX_TERM = 50;
+/** A term past fifty years is a ground lease, not a leaseback — the bound
+ *  lives in lib/tools/limits, where the card reads it to say so. */
+export const MAX_TERM = MAX_LEASEBACK_YEARS;
 
 export interface SaleLeasebackResult {
   /** year-one rent on the lease the seller writes */
@@ -84,6 +95,15 @@ export interface SaleLeasebackResult {
   overpayment: number | null;
   /** …as a share of the price */
   overpaymentPct: number | null;
+  /** the part of it the rent PREMIUM explains: the premium capitalised as
+   *  though it ran forever, less what it is worth before it reverts */
+  overpaymentFromPremium: number | null;
+  /** …and the part the same lease at MARKET rent would be paid over its two
+   *  pieces too — the credit cap against the discount rate, not the lease */
+  overpaymentAtMarketRent: number | null;
+  /** the rate the term was discounted at — the one entered, or the market
+   *  cap where none was */
+  discountRatePct: number | null;
   /** rule 4 — cash the seller raises, after the cost of selling */
   cashRaised: number | null;
   /** …at a cost of, a year */
@@ -111,7 +131,8 @@ export interface SaleLeasebackResult {
   note: string;
 }
 
-const EMPTY: SaleLeasebackResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: SaleLeasebackResult = {
   contractNoi: null,
   marketNoi: null,
   rentPremiumPct: null,
@@ -123,6 +144,9 @@ const EMPTY: SaleLeasebackResult = {
   reversionValue: null,
   overpayment: null,
   overpaymentPct: null,
+  overpaymentFromPremium: null,
+  overpaymentAtMarketRent: null,
+  discountRatePct: null,
   cashRaised: null,
   annualRent: null,
   rentPerDollarRaised: null,
@@ -171,7 +195,7 @@ export function readLeaseback(t: SaleLeasebackInput): SaleLeasebackResult {
   if (!positive(t.creditCapPct) || !positive(t.marketCapPct)) {
     return { ...EMPTY, note: "Enter both cap rates — the tenant's credit prices one and the real estate prices the other." };
   }
-  const term = positive(t.termYears) ? Math.min(Math.round(t.termYears), MAX_TERM) : 0;
+  const term = positive(t.termYears) ? heldTo(Math.round(t.termYears), MAX_TERM) : 0;
   if (term <= 0) {
     return { ...EMPTY, note: `Enter the lease term, between one and ${MAX_TERM} years.` };
   }
@@ -188,18 +212,29 @@ export function readLeaseback(t: SaleLeasebackInput): SaleLeasebackResult {
 
   // Rule 2. The term, then the reversion — because the rent reverts and the
   // building does not care what the old lease said.
-  const disc = positive(t.discountRatePct) ? t.discountRatePct / 100 : t.marketCapPct / 100;
+  const discPct = positive(t.discountRatePct) ? t.discountRatePct : t.marketCapPct;
+  const disc = discPct / 100;
   const esc = atLeastZero(t.escalationPct) / 100;
-  let termValue = 0;
-  for (let y = 1; y <= term; y++) {
-    termValue += (contractNoi * Math.pow(1 + esc, y - 1)) / Math.pow(1 + disc, y);
-  }
+  const termValueOf = (noi: number) => {
+    let pv = 0;
+    for (let y = 1; y <= term; y++) pv += (noi * Math.pow(1 + esc, y - 1)) / Math.pow(1 + disc, y);
+    return pv;
+  };
+  const termValue = termValueOf(contractNoi);
   // The reversion is a MARKET-rent building, capitalised at the market cap,
   // discounted back over the term. Growing the market rent would be a second
   // assumption about the market; the card holds it flat and says so.
   const reversionValue = marketValue / Math.pow(1 + disc, term);
   const honestValue = round(termValue + reversionValue);
   const overpayment = price - honestValue;
+  // The same lease written at MARKET rent, priced and valued the same way.
+  // What it is paid over its two pieces has nothing to do with the rent
+  // premium — it is the price's cap against the rate the term is discounted
+  // at — and the rest of the overpayment is the premium's own: capitalised
+  // as though it ran forever, against what it is worth before it reverts.
+  const overpaymentAtMarketRent =
+    round(marketNoi / (t.creditCapPct / 100)) - round(termValueOf(marketNoi) + reversionValue);
+  const overpaymentFromPremium = overpayment - overpaymentAtMarketRent;
 
   // Rule 4. The seller's side, against the loan the same building carries —
   // through sizeLoan, so it is the same three tests as everywhere else.
@@ -251,6 +286,9 @@ export function readLeaseback(t: SaleLeasebackInput): SaleLeasebackResult {
     reversionValue: round(reversionValue),
     overpayment,
     overpaymentPct: price > 0 ? round1((overpayment / price) * 100) : null,
+    overpaymentFromPremium,
+    overpaymentAtMarketRent,
+    discountRatePct: discPct,
     cashRaised,
     annualRent,
     rentPerDollarRaised: rentPerDollar === null ? null : round2(rentPerDollar),
@@ -265,40 +303,85 @@ export function readLeaseback(t: SaleLeasebackInput): SaleLeasebackResult {
     note: noteFor({
       rentPremiumPct,
       pricePremium,
-      overpayment,
-      overpaymentPct: price > 0 ? round1((overpayment / price) * 100) : null,
+      price,
+      fromPremium: overpaymentFromPremium,
+      atMarketRent: overpaymentAtMarketRent,
+      creditCapPct: t.creditCapPct,
+      discountRatePct: discPct,
       term,
     }),
   };
 }
 
 /**
- * The one sentence, leading with rule 2 — the reversion is the part a buyer
- * capitalising the contract rent has not priced at all.
+ * The sentences, leading with rule 2 — the reversion is the part a buyer
+ * capitalising the contract rent has not priced at all — and each part of
+ * the overpayment gated on its own.
  *
- * The reversion branch is gated on there BEING a rent premium, which the
+ * The reversion sentence is gated on there BEING a rent premium, which the
  * first draft was not. With the contract rent at market and a discount rate
- * above the market cap, `overpayment` is still positive — the two inputs
+ * above the credit cap, `overpayment` is still positive — the two inputs
  * simply disagree about what the building yields — and the card was calling
  * that a reversion cost on a lease with nothing to revert from. An artifact
- * of two assumptions is not a finding about the deal.
+ * of two assumptions is not a finding about the deal. The second version
+ * kept that gate and still laid the WHOLE overpayment on the reversion
+ * wherever there was a premium: on the seed, $2,538,924 of the $3,973,557 is
+ * that same disagreement, and is now said as what it is.
  */
 function noteFor(x: {
   rentPremiumPct: number;
   pricePremium: number;
-  overpayment: number;
-  overpaymentPct: number | null;
+  price: number;
+  fromPremium: number;
+  atMarketRent: number;
+  creditCapPct: number;
+  discountRatePct: number;
   term: number;
 }): string {
-  const usd = (n: number) => `$${round(Math.abs(n)).toLocaleString("en-US")}`;
-  if (x.rentPremiumPct > 0 && x.overpayment > 0 && x.overpaymentPct !== null) {
-    return `The rent reverts at year ${x.term}, and the building does not — which is ${usd(x.overpayment)} of the price, ${x.overpaymentPct}% of it.`;
-  }
+  // The size alone, through the shared writer: each sentence says the
+  // direction in words ("over", "under").
+  const usd = (n: number) => usdExact(Math.abs(n));
+  const rate = (n: number) => `${Math.round(n * 100) / 100}%`;
+  // Said wherever it is there, because the card's "paid over the two
+  // pieces" includes it: the price is struck at one rate, the term
+  // discounted at another, and that is the inputs, not the lease.
+  const yieldWords = `the price is struck at the ${rate(x.creditCapPct)} credit cap and the term discounted at ${rate(x.discountRatePct)}, two inputs that disagree about the yield rather than a finding about the lease`;
+  const atMarket = x.atMarketRent > 0;
   if (x.rentPremiumPct > 0) {
-    return `The contract rent is ${x.rentPremiumPct}% above market, so ${usd(x.pricePremium)} of the price is the lease rather than the building.`;
+    const parts: string[] = [];
+    if (x.fromPremium > 0 && x.price > 0) {
+      parts.push(
+        `The rent reverts at year ${x.term}, and the building does not — which is ${usd(x.fromPremium)} of the price, ${round1((x.fromPremium / x.price) * 100)}% of it.`,
+      );
+    }
+    if (atMarket) {
+      parts.push(
+        `${parts.length > 0 ? "The other" : "Of what is paid over the two pieces,"} ${usd(x.atMarketRent)} would be paid at market rent too: ${yieldWords}.`,
+      );
+    } else if (x.atMarketRent < 0) {
+      // The two rates can run the other way — a discount rate low against
+      // the credit cap on an escalating rent — and then they pay back some
+      // or all of the reversion. Said, because the reversion sentence alone
+      // reads as the buyer overpaying on a price that may sit under the two
+      // pieces in all.
+      const total = x.fromPremium + x.atMarketRent;
+      parts.push(
+        `At market rent the same lease would be priced ${usd(x.atMarketRent)} under its two pieces — ${yieldWords} — so in all the price is ${usd(total)} ${total > 0 ? "over" : "under"} them.`,
+      );
+    }
+    if (parts.length > 0) return parts.join(" ");
+    // A size of the lease only where the price IS over the building's value
+    // at market: the credit cap can sit high enough over the market cap that
+    // an above-market rent still prices under it, and "$X of the price is the
+    // lease" over a negative premium names a figure that is not there.
+    return x.pricePremium > 0
+      ? `The contract rent is ${x.rentPremiumPct}% above market, so ${usd(x.pricePremium)} of the price is the lease rather than the building.`
+      : `The contract rent is ${x.rentPremiumPct}% above market, but at the ${rate(x.creditCapPct)} credit cap the price is still ${usd(x.pricePremium)} under the building's value at market rent: the cap, not the rent, sets it.`;
   }
   if (x.rentPremiumPct < 0) {
     return "The contract rent is under market, so the buyer is getting a building worth more than the lease it carries.";
   }
-  return "The contract rent is at market, which makes this an ordinary sale with an ordinary tenant in it.";
+  return atMarket
+    ? `The contract rent is at market, which makes this an ordinary sale with an ordinary tenant in it — though ${usd(x.atMarketRent)} is still paid over the two pieces: ${yieldWords}.`
+    : "The contract rent is at market, which makes this an ordinary sale with an ordinary tenant in it.";
 }

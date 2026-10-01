@@ -102,6 +102,9 @@ interface ExtractionLike {
   metrics: MetricLike[];
   /** the deal's kind, when known — a development's price is its land cost */
   strategy?: { kind?: string } | null;
+  /** what the price buys (#414); on a note the stated cap is the
+   *  collateral's, so no cap floor is scored on it */
+  interest?: { kind?: string | null } | null;
 }
 
 type Pattern = { readonly inc: RegExp; readonly exc?: RegExp };
@@ -123,6 +126,15 @@ function goingInCapPct(metrics: MetricLike[]): number | null {
   const m = findGoingInCap(metrics);
   return m ? parsePct(m.value) : null;
 }
+
+/** A note's price is a loan's (#414): the cap its memorandum states is the
+ *  collateral's, a return the note's buyer does not earn, so a cap floor is
+ *  never scored or tripped on it — evaluateBuyBox's rule. */
+function isNote(extraction: ExtractionLike | null): boolean {
+  return extraction?.interest?.kind === "note";
+}
+const NOTE_CAP_DETAIL = (floor: number) =>
+  `Mandate wants ≥${floor}% going-in, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`;
 
 /** The deal's asset class: the explicit override wins, else what the screen
  *  read. Mirrors evaluateBuyBox. */
@@ -196,8 +208,10 @@ const fmtM = (d: number) =>
   d >= 1e6 ? `$${(d / 1e6).toFixed(1)}M` : `$${Math.round(d / 1e3)}k`;
 
 /** Evaluate the hard dealbreakers against the screen. Each returns a bucket:
- *  `tripped` (violated), `clear` (satisfied), or `unknown` (no figure yet). */
-function evalDealbreakers(
+ *  `tripped` (violated), `clear` (satisfied), or `unknown` (no figure yet).
+ *  Exported for the verdict's brief, which names the red lines a deal trips
+ *  in these sentences rather than re-deriving them. */
+export function evalDealbreakers(
   dealAssetClass: string,
   extraction: ExtractionLike | null,
   box: BuyBox,
@@ -240,7 +254,7 @@ function evalDealbreakers(
 
   // Hard going-in cap floor.
   if (db.minCapPct != null) {
-    const cap = goingInCapPct(metrics);
+    const cap = isNote(extraction) ? null : goingInCapPct(metrics);
     if (cap == null) unknown.push("cap rate");
     else if (cap >= db.minCapPct) clear.push("cap rate");
     else tripped.push(`going-in cap ${cap.toFixed(2)}% under the ${db.minCapPct}% floor`);
@@ -391,11 +405,14 @@ export function scoreMandateFit(
 
   // ---- Going-in cap (floor) ---------------------------------------------
   if (box.minCapPct != null) {
-    const cap = goingInCapPct(metrics);
+    const note = isNote(extraction);
+    const cap = note ? null : goingInCapPct(metrics);
     const s = scoreFloor(cap, box.minCapPct, NEAR_CAP_PT, WEIGHTS.cap);
     const detail =
       s.status === "unknown"
-        ? `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`
+        ? note
+          ? NOTE_CAP_DETAIL(box.minCapPct)
+          : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`
         : s.status === "pass"
           ? `Mandate wants ≥${box.minCapPct}% going-in — the deal shows ${cap!.toFixed(2)}%. Clears the floor.`
           : s.status === "partial"

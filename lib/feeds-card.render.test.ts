@@ -9,8 +9,7 @@ import { FeedsCard } from "@/app/(app)/data-health/feeds-card";
 import { SAMPLE_METRO, SAMPLE_STATE, feedHealth } from "@/lib/feed-health";
 import { readMetroRates, readRates, type RateRow } from "@/lib/live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "@/lib/live-rates.fixture";
-import type { ZoriRead } from "@/lib/zori";
-import type { RealtorRead } from "@/lib/realtor";
+import type { FileMonth } from "@/lib/zori";
 import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
 
 const DC_ROWS: RateRow[] = [
@@ -29,12 +28,12 @@ const PA_ROWS: RateRow[] = [
   { series_id: "PARVAC", obs_date: "2025-01-01", value: 6.6 },
 ];
 
-function render(now: Date, zori: ZoriRead | null, realtor: RealtorRead | null): string {
+function render(now: Date, zillow: readonly FileMonth[], realtor: readonly FileMonth[]): string {
   const feeds = feedHealth({
     rates: readRates(REAL_ROWS, now),
     metro: readMetroRates(SAMPLE_METRO.id, DC_ROWS, now),
     state: readMetroRates(SAMPLE_STATE.id, PA_ROWS, now),
-    zori,
+    zillow,
     realtor,
     now,
   });
@@ -43,7 +42,11 @@ function render(now: Date, zori: ZoriRead | null, realtor: RealtorRead | null): 
 
 describe("FeedsCard — every feed's row, current or named stale", () => {
   it("on the fixture's day every feed is current, and the sample metro is named", () => {
-    const html = render(FIXTURE_NOW, { asOf: "2026-08-31" } as ZoriRead, { asOf: "2026-09-01" } as RealtorRead);
+    // What the two monthly pulls hold on Sep 21: August from each file,
+    // Zillow's dated the month's last day and Realtor.com's its first.
+    const zillow = ["asking rent", "apartment asking rent", "home value"].map((label) => ({ label, asOf: "2026-08-31" }));
+    const realtor = ["inventory", "hotness rank"].map((label) => ({ label, asOf: "2026-08-01" }));
+    const html = render(FIXTURE_NOW, zillow, realtor);
     dumpView("feeds-current", html);
     expect(a11yIssues(html)).toEqual([]);
     const text = visibleText(html);
@@ -61,15 +64,59 @@ describe("FeedsCard — every feed's row, current or named stale", () => {
   });
 
   it("a fortnight with no pull tints the daily row, names its series, and leaves the monthly rows current", () => {
-    const html = render(new Date("2026-10-05T12:00:00Z"), null, null);
+    const html = render(new Date("2026-10-05T12:00:00Z"), [], []);
     dumpView("feeds-stale", html);
     expect(a11yIssues(html)).toEqual([]);
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/feeds are not current/);
-    expect(text).toMatch(/10-yr Treasury/);
+    // The stale series named, as a reader reads them (the lint's text
+    // breaks at every closing span), each hyphenated word kept whole so a
+    // line never ends on "5-" with "yr" on the next.
+    expect(text.replace(/\s+/g, " ")).toMatch(/1-mo , 3-mo , 6-mo .*10-yr Treasury/);
+    expect(html).toContain('<span class="whitespace-nowrap">5-yr</span>');
+    expect(html).not.toMatch(/(?<!<span class="whitespace-nowrap">)\b\d+-(?:mo|yr)\b/);
     expect(text).toMatch(/no rows/);
     expect(html).toContain("bg-amber-500/10");
+  });
+
+  it("on a phone, stacks each feed with its status, its newest figure, its series and the stale series' names in view", () => {
+    // At 390px the table's six columns scrolled its last two — the series
+    // and the status with the stale series' names — out of its card; a
+    // phone gets an entry a feed instead, and the table keeps `sm` up.
+    const html = render(new Date("2026-10-05T12:00:00Z"), [], []);
+    expect(a11yIssues(html)).toEqual([]);
+    const list = html.match(/<ul class="([^"]*)" data-qa="feeds-list">([\s\S]*?)<\/ul>/);
+    expect(list?.[1]).toMatch(/(^|\s)sm:hidden(\s|$)/);
+    expect(html).toContain('<div class="mt-3 hidden overflow-x-auto sm:block"><table');
+    const entries = [...(list?.[2] ?? "").matchAll(/<li [^>]*>([\s\S]*?)<\/li>/g)].map((m) => visibleText(m[1]).replace(/\s+/g, " ").trim());
+    // An entry a feed, as the table has a row a feed.
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries).toHaveLength((html.match(/<tr class="border-t /g) ?? []).length);
+    // The daily feed, stale: its name and status first, then everything the
+    // table's columns said, the stale series named last.
+    const daily = entries.find((e) => e.startsWith("Rates — daily series")) ?? "";
+    expect(daily).toMatch(/^Rates — daily series stale FRED · .+ Newest observation 2026-09-21 · 14 days old Series 0 of \d+ current Not current .*10-yr Treasury/);
+    // A feed with no rows says so, with dashes for the figures it has none of.
+    expect(entries.some((e) => /no rows .* Newest observation — Series —$/.test(e))).toBe(true);
+    // Every stale feed's entry is tinted, as its table row is.
+    expect((list?.[2].match(/<li class="[^"]*bg-amber-500\/10/g) ?? []).length).toBe((html.match(/<tr class="border-t border-line\/60 bg-amber-500\/10"/g) ?? []).length);
+  });
+
+  it("a file left behind by its pull tints the feed's row and names the file with its month", () => {
+    const zillow = [
+      { label: "asking rent", asOf: "2026-08-31" },
+      { label: "apartment asking rent", asOf: "2026-06-30" },
+      { label: "home value", asOf: "2026-08-31" },
+    ];
+    const realtor = ["inventory", "hotness rank"].map((label) => ({ label, asOf: "2026-08-01" }));
+    const html = render(FIXTURE_NOW, zillow, realtor);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/1 of \d+ feeds is not current/);
+    expect(text).toMatch(/2 of 3 current/);
+    expect(text).toMatch(/apartment asking rent \(2026-06-30\)/);
   });
 
   it("nothing readable is said plainly", () => {

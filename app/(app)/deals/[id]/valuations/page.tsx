@@ -1,10 +1,18 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import { signedSupplementUrl } from "@/lib/storage";
-import type { ExtractionResult } from "@/lib/anthropic/types";
-import { computeUnderwrite } from "@/lib/underwrite/engine";
+import { dealFileLinkFor } from "@/lib/deal-file-link";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import { screeningModelCaveat } from "@/lib/bridge/model-caveat";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
+import { modelOpinion } from "@/lib/valuation/model-opinion";
+import {
+  FIELD_KIND,
+  fieldRefusalSentence,
+  fieldText,
+  isValuationField,
+  type FieldRefusal,
+} from "@/lib/valuation/form";
 import {
   bridgeSummaryLine,
   reconcileValuations,
@@ -36,10 +44,26 @@ const ERRORS: Record<string, string> = {
   size: "That file is over 32MB — the analysis service can't read it.",
   format: "That file's contents don't match its extension.",
   label: "Give the valuation a label so the comparison columns are readable.",
-  save: "Couldn't save that valuation.",
+  save: "Couldn't save that valuation. Nothing was added; try again.",
+  update: "Couldn't save those changes — the valuation is as it was. Try again.",
+  delete: "Couldn't delete that valuation. Try again.",
   nodoc: "There's no source document attached to that valuation to re-read.",
   extract: "Re-reading that BOV failed. Try again, or fill the fields in by hand.",
+  extractsave: "The BOV was re-read, but saving what it read failed — the valuation is as it was. Try again.",
 };
+
+const REFUSALS: readonly FieldRefusal[] = ["unreadable", "range", "whole_years"];
+
+/** The sentence an error code is answered with; a refused field's is built
+ *  from the field's own label (lib/valuation/form). */
+function errorSentence(code: string | undefined, field: string | undefined, why: string | undefined): string | null {
+  if (!code) return null;
+  if (code === "field") {
+    const refusal = REFUSALS.find((r) => r === why);
+    return isValuationField(field) && refusal ? fieldRefusalSentence(field, refusal) : null;
+  }
+  return ERRORS[code] ?? null;
+}
 
 /** How each field is typed on the manual form. */
 const FIELD_HINT: Record<ValuationField, string> = {
@@ -53,13 +77,9 @@ const FIELD_HINT: Record<ValuationField, string> = {
   capexDeduction: "$",
   discountRate: "%",
 };
-const PCT_FIELDS: ReadonlySet<ValuationField> = new Set([
-  "goingInCap",
-  "exitCap",
-  "rentGrowth",
-  "vacancyAssumption",
-  "discountRate",
-]);
+/** "$2.0M", "$450k" — a dollar figure for a sentence. */
+const usdShort = (n: number): string =>
+  Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`;
 
 const toNamed = (v: Valuation): NamedValuation => ({
   sourceLabel: v.sourceLabel,
@@ -79,17 +99,18 @@ export default async function ValuationsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ a?: string; b?: string; error?: string }>;
+  searchParams: Promise<{ a?: string; b?: string; error?: string; field?: string; why?: string }>;
 }) {
   const { id } = await params;
-  const { a: aParam, b: bParam, error: errorCode } = await searchParams;
+  const { a: aParam, b: bParam, error: errorCode, field: errorField, why } = await searchParams;
+  const errorText = errorSentence(errorCode, errorField, why);
 
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
   const [{ data: deal, error }, { data: rows }] = await Promise.all([
-    supabase.from("deals").select("id, name, extraction").eq("id", id).maybeSingle(),
+    supabase.from("deals").select("id, name, extraction, first_signal").eq("id", id).maybeSingle(),
     supabase
       .from("valuations")
       .select("*")
@@ -102,50 +123,55 @@ export default async function ValuationsPage({
   const valuations = ((rows ?? []) as Record<string, unknown>[]).map(parseValuationRow);
 
   // The user's own underwriting, pinned as the last column. Derived, not
-  // stored — it always reflects the deal as it stands right now.
+  // stored — it always reflects the deal as it stands right now — and laid
+  // out as a BOV states an opinion, so its cap and its deduction describe
+  // the same price (lib/valuation/model-opinion).
   const base = await currentDealAssumptions(
     supabase,
     id,
     deal.name as string,
     (deal.extraction as ExtractionResult | null) ?? null,
   );
-  const ours: NamedValuation | null = base
-    ? (() => {
-        const r = computeUnderwrite(base);
-        return {
-          sourceLabel: "Our UW",
-          headlineValue: base.purchasePrice,
-          year1Noi: r.cashFlow[0]?.noi ?? null,
-          goingInCap: r.returns.goingInCapPct,
-          exitCap: base.exitCapPct,
-          holdYears: Math.round(base.holdMonths / 12),
-          rentGrowth: base.rentGrowthPct,
-          vacancyAssumption: base.vacancyPct,
-          capexDeduction: base.capitalImprovementsYr1,
-          // The screening engine prices off cash flows and an exit cap, not a
-          // discount rate — claiming one would be inventing an assumption.
-          discountRate: null,
-        };
-      })()
-    : null;
+  const opinion = base ? modelOpinion(base) : null;
+  // On a note or a plan deal the model's IRRs and going-in cap are not the
+  // buyer's: said above the table, and on the copied line where the model's
+  // own column is one side of the bridge.
+  const caveat = screeningModelCaveat(
+    (deal.extraction as ExtractionResult | null) ?? null,
+    (deal.first_signal as FirstSignal | null) ?? null,
+    { cap: true },
+  );
+  const ours: NamedValuation | null = opinion?.valuation ?? null;
+  // Where the model carries Year-1 capital its cap is on the all-in basis,
+  // and the cell says so, with the cap on the price alone beside it.
+  const oursNotes: ColumnData["notes"] =
+    opinion?.allIn && base
+      ? {
+          goingInCap: {
+            chip: "all-in",
+            title: `NOI over the price plus the model's ${usdShort(base.capitalImprovementsYr1)} of Year-1 capital, the base a BOV caps before it deducts the capital${
+              opinion.capOnPrice != null ? ` — on the price alone it is ${(opinion.capOnPrice * 100).toFixed(2)}%` : ""
+            }.`,
+          },
+        }
+      : {};
 
-  // Signed URLs for the extracted BOVs, so a page citation can open its source.
+  // The extracted BOVs' own documents, so a page citation can open its
+  // source: each through the route that signs the file when it is clicked
+  // (lib/deal-file-link), never a signed URL minted here, which expired an
+  // hour after the page rendered. Only this deal's documents are linked.
   const docIds = valuations.map((v) => v.sourceDocumentId).filter((x): x is string => !!x);
   const docUrls = new Map<string, string>();
   if (docIds.length) {
     const { data: docs } = await supabase
       .from("deal_documents")
-      .select("id, deal_id, storage_path")
+      .select("id, storage_path")
+      .eq("deal_id", id)
       .in("id", docIds);
-    await Promise.all(
-      (docs ?? []).map(async (d) => {
-        const url = await signedSupplementUrl(d.storage_path as string, {
-          kind: "deal",
-          dealId: String(d.deal_id),
-        });
-        if (url) docUrls.set(String(d.id), url);
-      }),
-    );
+    for (const d of (docs ?? []) as { id: string; storage_path: string | null }[]) {
+      const url = dealFileLinkFor(id, d.storage_path);
+      if (url) docUrls.set(String(d.id), url);
+    }
   }
 
   const columns: ColumnData[] = [
@@ -171,6 +197,15 @@ export default async function ValuationsPage({
         values: Object.fromEntries(VALUATION_FIELDS.map((f) => [f, named[f]])) as ColumnData["values"],
         citations: v.citations,
         derivedFields: v.derivedFields,
+        // A figure the user corrected on a document's column is theirs.
+        notes: v.extracted
+          ? Object.fromEntries(
+              v.editedFields.map((f) => [
+                f,
+                { chip: "edited", title: "You entered this figure; it replaces what the document stated." },
+              ]),
+            )
+          : {},
         implied: {
           ok: implied.ok,
           error: implied.error,
@@ -195,6 +230,7 @@ export default async function ValuationsPage({
             ) as ColumnData["values"],
             citations: {},
             derivedFields: [],
+            notes: oursNotes,
             implied: (() => {
               const r = impliedReturns(base!, ours);
               return {
@@ -227,7 +263,11 @@ export default async function ValuationsPage({
   const b = bId ? byId.get(bId)! : null;
   const bridge = a && b ? reconcileValuations(a, b) : null;
   const tally = a && b ? scoreAggressiveness(a, b) : null;
-  const summary = bridge?.ok ? bridgeSummaryLine(bridge) : null;
+  const summary = bridge?.ok
+    ? caveat && (aId === "__ours" || bId === "__ours")
+      ? `${bridgeSummaryLine(bridge)} ${caveat.copy}`
+      : bridgeSummaryLine(bridge)
+    : null;
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
@@ -240,9 +280,18 @@ export default async function ValuationsPage({
         </p>
       </header>
 
-      {errorCode && ERRORS[errorCode] ? (
+      {errorText ? (
         <p className="rounded-lg border border-kill/30 bg-kill/5 px-4 py-3 text-sm text-kill">
-          {ERRORS[errorCode]}
+          {errorText}
+        </p>
+      ) : null}
+
+      {caveat && ours ? (
+        <p
+          data-caveat={caveat.kind}
+          className="rounded-lg border border-caution/30 bg-caution/5 px-4 py-3 text-sm text-ink"
+        >
+          {caveat.text}
         </p>
       ) : null}
 
@@ -373,8 +422,10 @@ export default async function ValuationsPage({
                 {FIELD_LABELS[f]} ({FIELD_HINT[f]})
                 <input
                   name={f}
-                  inputMode="decimal"
-                  placeholder={PCT_FIELDS.has(f) ? "e.g. 6.5" : ""}
+                  inputMode={FIELD_KIND[f] === "usd" ? undefined : "decimal"}
+                  placeholder={
+                    FIELD_KIND[f] === "pct" ? "e.g. 6.5" : FIELD_KIND[f] === "years" ? "e.g. 10" : "e.g. $65.8M"
+                  }
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-sm text-ink"
                 />
               </label>
@@ -460,10 +511,8 @@ export default async function ValuationsPage({
                           {FIELD_LABELS[f]} ({FIELD_HINT[f]})
                           <input
                             name={f}
-                            inputMode="decimal"
-                            defaultValue={
-                              v[f] == null ? "" : PCT_FIELDS.has(f) ? (v[f]! * 100).toFixed(3).replace(/\.?0+$/, "") : String(v[f])
-                            }
+                            inputMode={FIELD_KIND[f] === "usd" ? undefined : "decimal"}
+                            defaultValue={fieldText(f, v[f])}
                             className="rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-sm text-ink"
                           />
                         </label>

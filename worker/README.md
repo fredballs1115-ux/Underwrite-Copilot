@@ -52,7 +52,9 @@ SIGTERM-resume and attempts-cap paths.
    - Environment: `ANTHROPIC_API_KEY`, `NEXT_PUBLIC_SUPABASE_URL`,
      `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_PUBLIC_APP_URL` (same values as the
      web service), plus `RESEND_API_KEY` / `RESEND_FROM` if analysis emails
-     are on — the worker is what sends them now.
+     are on — the worker is what sends them now — and, optionally,
+     `RESEND_REPLY_TO` and `OPERATOR_EMAILS` (the operators alerted when
+     screens stop for a reason only they can fix).
    - One instance is the supported shape (claims are atomic, so a second
      instance is safe, just unnecessary).
 3. Watch its logs until you see `schema OK — processing jobs`.

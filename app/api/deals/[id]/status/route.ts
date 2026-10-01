@@ -28,9 +28,12 @@ export async function GET(
     );
   }
 
+  // created_at is when the run on the row was asked for — every claim of the
+  // deal's one job row restamps it (lib/jobs) — so the page's clock counts
+  // from the run's start, not from the moment the page was loaded.
   const { data, error } = await supabase
     .from("analysis_jobs")
-    .select("status, step, progress, error, updated_at")
+    .select("status, step, progress, error, updated_at, created_at")
     .eq("deal_id", id)
     .order("created_at", { ascending: false })
     .limit(1)
@@ -45,6 +48,6 @@ export async function GET(
   }
 
   return Response.json(
-    data ?? { status: "none", step: null, progress: 0, error: null, updated_at: null },
+    data ?? { status: "none", step: null, progress: 0, error: null, updated_at: null, created_at: null },
   );
 }

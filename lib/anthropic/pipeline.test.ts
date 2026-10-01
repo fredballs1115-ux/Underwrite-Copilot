@@ -148,7 +148,13 @@ vi.mock("@/lib/supabase/admin", () => ({ createSupabaseAdminClient: vi.fn() }));
 vi.mock("@/lib/storage", () => ({
   downloadOmPdf: vi.fn(async () => Buffer.from("%PDF-1.4\n")),
 }));
-vi.mock("@/lib/email", () => ({ notifyAnalysisReady: vi.fn(async () => {}) }));
+vi.mock("@/lib/email", () => ({ notifyAnalysisReady: vi.fn(async () => {}), notifyAnalysisFailed: vi.fn(async () => {}) }));
+// The memorandum's cover, lifted beside the steps after the extraction
+// (lib/deal-picture's search is its own test's; here, what the screen asks).
+vi.mock("@/lib/deal-picture", () => ({
+  ensureDealPicture: vi.fn(async () => null),
+  pictureMayBeInMemorandum: vi.fn(() => true),
+}));
 vi.mock("@/lib/criteria-server", () => ({ getBuyBoxForDeal: vi.fn(async () => null) }));
 vi.mock("@/lib/model-parse", () => ({ parseModelFile: vi.fn() }));
 vi.mock("./first-signal", () => ({ readFirstSignal: vi.fn() }));
@@ -177,7 +183,8 @@ vi.mock("./om-source", async (importOriginal) => {
   };
 });
 
-import { runAnalysis, textLayerMissed } from "./pipeline";
+import { SCREEN_PICTURE_WAIT_MS, runAnalysis, textLayerMissed } from "./pipeline";
+import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import { recordUsage, type CallUsage, type UsageSummary } from "./usage";
 import { PRICES } from "./models";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -285,6 +292,8 @@ beforeEach(() => {
   vi.mocked(scrutinizeComps).mockResolvedValue(COMPS);
   vi.mocked(checkMarket).mockResolvedValue(MARKET);
   vi.mocked(synthesizeVerdict).mockResolvedValue(VERDICT);
+  vi.mocked(ensureDealPicture).mockResolvedValue(null);
+  vi.mocked(pictureMayBeInMemorandum).mockReturnValue(true);
   errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -313,6 +322,8 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     });
     vi.mocked(extractTerms).mockImplementation(async () => {
       meter("Extraction", { cacheRead: 300_000, output: 6_000 });
+      // A run that takes time, so its own start-to-finish time is measurable.
+      await new Promise((r) => setTimeout(r, 25));
       return EXTRACTION;
     });
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
@@ -323,8 +334,72 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     expect(usage?.totals).toEqual({ input: 2_000, cacheWrite: 300_000, cacheRead: 300_000, output: 6_500 });
     expect(usage?.usd).toBeGreaterThan(0);
     expect(usage?.unpriced).toEqual([]);
+    // The run's own time, start to finish — what "your screens usually take"
+    // reads (lib/screen-duration) — never the calls' metered times summed.
+    expect(usage?.wallMs).toBeGreaterThanOrEqual(15);
+    expect(usage?.wallMs).not.toBe(usage?.ms);
     expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[pipeline\] screen usage for deal d1: 2 calls/));
     logSpy.mockRestore();
+  });
+
+  it("a screen that stops emails its owner the deal page's own sentence; one that finishes does not (pass 14)", async () => {
+    const { notifyAnalysisFailed } = await import("@/lib/email");
+    vi.mocked(notifyAnalysisFailed).mockClear();
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      throw apiError(529, "overloaded_error", "Overloaded");
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(notifyAnalysisFailed).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(notifyAnalysisFailed).mock.calls[0]?.[1]).toBe("d1");
+    expect(vi.mocked(notifyAnalysisFailed).mock.calls[0]?.[2]).toBe(job().error);
+
+    state = freshState();
+    vi.mocked(notifyAnalysisFailed).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue(EXTRACTION);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(notifyAnalysisFailed).not.toHaveBeenCalled();
+  });
+
+  it("hands both emails the user who asked for the run — from its arguments, or a resumed attempt's payload — and keeps them on the checkpoint", async () => {
+    const { notifyAnalysisFailed, notifyAnalysisReady } = await import("@/lib/email");
+    const ASKER = "22222222-2222-4222-8222-222222222222";
+    vi.mocked(notifyAnalysisReady).mockClear();
+    vi.mocked(notifyAnalysisFailed).mockClear();
+
+    // In-process: the action's caller rides in the run's own arguments.
+    await runAnalysis("d1", { requestedBy: ASKER.toUpperCase() });
+    expect(job().status).toBe("done");
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: ASKER }]);
+
+    state = freshState();
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      throw apiError(529, "overloaded_error", "Overloaded");
+    });
+    await runAnalysis("d1", { requestedBy: ASKER });
+    expect(vi.mocked(notifyAnalysisFailed).mock.calls[0]?.slice(1)).toEqual(["d1", job().error, { requestedBy: ASKER }]);
+    vi.mocked(extractTerms).mockResolvedValue(EXTRACTION);
+
+    // Worker, resumed: the payload names who asked.
+    state = freshState();
+    state.deals.d1.extraction = EXTRACTION;
+    state.jobs[0].payload = { kind: "screen", requestedBy: ASKER, completed: ["signal", "extract", "reconcile_docs", "ingest_actuals"] };
+    vi.mocked(notifyAnalysisReady).mockClear();
+    await runAnalysis("d1", { resume: true });
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: ASKER }]);
+
+    // A checkpoint written from a payload that had none keeps the run's own.
+    state = freshState();
+    state.jobs[0].payload = { kind: "screen", completed: [] };
+    await runAnalysis("d1", { resume: true, requestedBy: ASKER });
+    expect((state.jobs[0].payload as { requestedBy?: string }).requestedBy).toBe(ASKER);
+
+    // A run that recorded no one hands no one on: the creator is emailed, as before.
+    state = freshState();
+    vi.mocked(notifyAnalysisReady).mockClear();
+    await runAnalysis("d1");
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: null }]);
   });
 
   it("a failed screen still records what it spent; a run with no model calls records nothing", async () => {
@@ -345,6 +420,36 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     expect((state.jobs[0] as { usage?: unknown }).usage).toBeUndefined();
     expect(state.writes.some((w) => w.table === "analysis_jobs" && "usage" in w.patch)).toBe(false);
   });
+
+  it("the screen's own time goes only on a run that finished in one attempt: a failed run and a resumed one carry none (the audit of 2026-10-01)", async () => {
+    const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
+    // A failed run's time is no screen's: "your screens usually take" would
+    // average in a run that stopped in three seconds, or timed out.
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      meter("Extraction");
+      throw apiError(529, "overloaded_error", "Overloaded");
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    const failed = (state.jobs[0] as { usage?: UsageSummary }).usage;
+    expect(failed?.calls.map((c) => c.what)).toEqual(["Extraction"]);
+    expect(failed?.wallMs).toBeUndefined();
+
+    // A resumed attempt ran only the steps an earlier one left it.
+    state = freshState();
+    state.deals.d1.extraction = EXTRACTION;
+    state.jobs[0].payload = { kind: "screen", completed: ["signal", "extract", "reconcile_docs", "ingest_actuals"] };
+    vi.mocked(challengeAssumptions).mockImplementation(async () => {
+      meter("Challenge");
+      return CHALLENGES;
+    });
+    await runAnalysis("d1", { resume: true });
+    expect(job().status).toBe("done");
+    const resumed = (state.jobs[0] as { usage?: UsageSummary }).usage;
+    expect(resumed?.calls.map((c) => c.what)).toEqual(["Challenge"]);
+    expect(resumed?.wallMs).toBeUndefined();
+    logSpy.mockRestore();
+  });
 });
 
 describe("runAnalysis — the happy path", () => {
@@ -352,7 +457,8 @@ describe("runAnalysis — the happy path", () => {
     await runAnalysis("d1");
     expect(job().status).toBe("done");
     expect(job().step).toBe("verdict");
-    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    // Stored with how it was read: the PDF itself, here (omSourceFor's fake).
+    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual(COMPS);
     // A deal with no address sits in no covered market: the check ran on
@@ -363,6 +469,91 @@ describe("runAnalysis — the happy path", () => {
     expect(staleAfterFailure(job()).size).toBe(0);
     // A pipeline step never sees the provider's raw error on this path.
     expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("hands the challenger today's rates, dated, from the table the model is seeded from (the audit of 2026-09-30)", async () => {
+    state.rates = [
+      { series_id: "DGS5", obs_date: "2026-09-22", value: 3.9 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.2 },
+      { series_id: "SOFR30DAYAVG", obs_date: "2026-09-22", value: 4.05 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    // The day before the screen's: said as the latest published, dated, never as today's.
+    expect(note).toContain("LATEST PUBLISHED RATES (FRED, each dated the day it is for): the 5-yr Treasury 3.90% (Sep 22, 2026)");
+    expect(note).toContain("the 10-yr Treasury 4.20% (Sep 22, 2026)");
+    expect(note).toContain("30-day avg SOFR 4.05% (Sep 22, 2026)");
+  });
+
+  it("hands the challenger and the verdict one rates line, naming the class's screening spread — and on land, no permanent loan (research pass 18)", async () => {
+    state.rates = [
+      { series_id: "DGS5", obs_date: "2026-09-22", value: 3.9 },
+      { series_id: "SOFR30DAYAVG", obs_date: "2026-09-22", value: 4.05 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+      expect(job().status).toBe("done");
+      const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+      expect(note).toContain(
+        "the 5-yr Treasury 3.90% (Sep 22, 2026), which the site's model prices a fixed-rate permanent loan off for its hold of 5 years, adding a 200 bps multifamily spread — the site's screening default",
+      );
+      const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+      expect(input.ratesLine).toBeTruthy();
+      expect(note).toContain(input.ratesLine!);
+      const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+      expect(buildBrief(input)).toContain(`## The latest published rates\n\n${input.ratesLine}`);
+
+      // Land: the model carries no permanent loan, and the line says so.
+      vi.mocked(challengeAssumptions).mockClear();
+      vi.mocked(synthesizeVerdict).mockClear();
+      vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Land" } as unknown as ExtractionResult);
+      await runAnalysis("d1");
+      const land = vi.mocked(synthesizeVerdict).mock.calls[0][0].ratesLine ?? "";
+      expect(land).toContain("the site's model carries no permanent loan on land, so it prices none off it");
+      expect(land).not.toContain("prices a fixed-rate permanent loan off");
+      expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").toContain(land);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("hands the challenger the class the deck turned out to be where the deal was filed Auto, so it reads that class's traps alone (research pass 18)", async () => {
+    state.deals.d1.asset_class = "auto";
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Hospitality" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][1]).toBe("hospitality_str");
+
+    // A phrase no class resolves keeps every list, as before.
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Specialty asset" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][1]).toBe("auto");
+
+    // A class the analyst filed stays theirs, whatever the deck says.
+    vi.mocked(challengeAssumptions).mockClear();
+    state.deals.d1.asset_class = "office";
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Multifamily" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][1]).toBe("office");
+  });
+
+  it("hands the challenger no rates where the table holds nothing fresh — nothing is claimed as current", async () => {
+    state.rates = [{ series_id: "DGS5", obs_date: "2026-01-02", value: 3.9 }];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("PUBLISHED RATES");
   });
 
   it("a deal in a covered market hands the market check the metro's published figures, dated, and stores what it read", async () => {
@@ -411,6 +602,203 @@ describe("runAnalysis — the happy path", () => {
       ["sloos_multifamily", -5.7],
     ]);
     expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("an office in a covered metro is handed the metro's jobs and no housing figure; an apartment building the same day still is (research pass 18)", async () => {
+    state.deals.d1.asset_class = "office";
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [
+      { series_id: "WASH911URN", obs_date: "2026-08-01", value: 3.4 },
+      { series_id: "WASH911PBSV_YOY", obs_date: "2026-08-01", value: -1.2 },
+      { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
+      { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
+    state.benchmarks = [
+      { metric: "zori_rent", metro: "Washington DC", low: 2310, as_of: "2026-08-31", note: "Washington, DC", source: "Zillow" },
+      { metric: "zori_rent_yoy", metro: "Washington DC", low: 2.1, as_of: "2026-08-31", note: "", source: "Zillow" },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+      expect(job().status).toBe("done");
+      const office = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+      expect(office).toContain("- Unemployment 3.4% (Aug 2026, Washington MSA; FRED)");
+      expect(office).toContain("- Payrolls in professional and business services, the sector that fills offices: -1.2% from a year ago");
+      expect(office).toContain("- Debt market — 10-year Treasury 4.90%");
+      expect(office).not.toContain("Rental vacancy");
+      expect(office).not.toContain("Asking rent");
+      expect(office).not.toContain("Zillow");
+      const stored = state.deals.d1.market as { liveBrief?: { figures: { key: string }[] } | null };
+      expect(stored.liveBrief?.figures.map((f) => f.key)).toEqual(["unemployment", "sector_jobs_yoy", "dgs10"]);
+
+      // The same metro, the same day, an apartment building: every housing line.
+      vi.mocked(checkMarket).mockClear();
+      state.deals.d1.asset_class = "multifamily";
+      await runAnalysis("d1");
+      const apartments = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+      expect(apartments).toContain("- Rental vacancy, metro area, Washington MSA: 6.2% with a ±2.2 pt margin of error");
+      expect(apartments).toContain("- Asking rent, all home types: $2,310/mo, +2.1% from a year ago");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("reads the debt market for the class the deal is filed as, not the deck's word for it", async () => {
+    // The analyst filed an office; the deck calls itself multifamily. Every
+    // page shows the office (shownAssetClass), so the check reads a
+    // nonresidential loan's standards, never a multifamily loan's.
+    state.deals.d1.asset_class = "office";
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+      { series_id: "SUBLPDRCSM", obs_date: "2026-07-01", value: -5.7 },
+      { series_id: "SUBLPDRCSN", obs_date: "2026-07-01", value: 3.1 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3];
+    expect(handed).toContain("banks tightening standards for nonfarm nonresidential loans");
+    expect(handed).not.toContain("banks tightening standards for multifamily loans");
+  });
+
+  it("reads the plan the first signal names, as the deal page does: a conversion reads what building costs (the audit of 2026-09-30)", async () => {
+    // Nothing in the extraction names a plan (its strategy is unknown); the
+    // first signal calls it a conversion. The deal page reads the signal
+    // beside the extraction, and the screen's market check now does too.
+    state.deals.d1.asset_class = "office";
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+    } as unknown as ExtractionResult);
+    vi.mocked(readFirstSignal).mockResolvedValue({
+      ...SIGNAL,
+      assetClass: "office",
+      take: "A conversion of a vacant office tower to apartments — check the budget against the floor plates.",
+    } as unknown as FirstSignal);
+    state.rates = [
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+      { series_id: "SUBLPDRCSC", obs_date: "2026-07-01", value: 8.2 },
+      { series_id: "WPUIP2312001_YOY", obs_date: "2026-08-01", value: 2.4 },
+      { series_id: "CES2000000003_YOY", obs_date: "2026-08-01", value: 4.1 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3];
+    expect(handed).toContain("construction and land development loans");
+    expect(handed).toContain("Construction costs —");
+  });
+
+  it("every step names the kind the first signal names: the challenger, the comps, the market check and the verdict read one kind (research pass 18)", async () => {
+    // The same deal as above: the extraction names no plan, the first
+    // signal calls it a conversion. The market figures read the signal; the
+    // deal context, the challenger and the verdict had read the extraction
+    // alone and called it stabilized beside construction-cost lines.
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+    } as unknown as ExtractionResult);
+    const signal = {
+      ...SIGNAL,
+      take: "A conversion of a vacant office tower to apartments — check the budget against the floor plates.",
+    } as unknown as FirstSignal;
+    vi.mocked(readFirstSignal).mockResolvedValue(signal);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const challenger = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    const comps = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    const market = vi.mocked(checkMarket).mock.calls[0][2] ?? "";
+    expect(challenger).toContain("DEAL STRATEGY: Conversion");
+    expect(comps).toContain("Deal type: Conversion");
+    expect(market).toContain("Deal type: Conversion");
+    for (const text of [challenger, comps, market]) expect(text).not.toContain("Stabilized");
+    // The verdict is handed the signal, and its brief reads the same kind.
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(input.firstSignal).toEqual(signal);
+    const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+    const brief = buildBrief(input);
+    expect(brief).toContain("DEAL STRATEGY: Conversion");
+    expect(brief).not.toContain("Stabilized");
+  });
+
+  it("the verdict is handed the deal page's own buy-box checks and the red lines tripped, not the bare criteria (research pass 18)", async () => {
+    const { getBuyBoxForDeal } = await import("@/lib/criteria-server");
+    const box = { priceMaxM: 15, minCapPct: 6.5, dealbreakers: { maxPriceM: 18 } };
+    const signal = { ...SIGNAL, askPrice: "$20,000,000", size: "", goingInCap: "", perUnit: "", take: "A stabilized asset." } as FirstSignal;
+    vi.mocked(readFirstSignal).mockResolvedValue(signal);
+    vi.mocked(getBuyBoxForDeal).mockResolvedValueOnce(box);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(input.buyBox).toEqual(["Price: $15.0M max", "Min going-in cap: 6.5%", "Dealbreakers: price ≤ $18M"]);
+    // The page's read: the extraction, the first signal, the address — the same checks the chip folds.
+    const { evaluateBuyBox } = await import("@/lib/criteria");
+    const { dealCheckSource } = await import("@/lib/buy-box-chip");
+    expect(input.buyBoxChecks?.checks).toEqual(evaluateBuyBox("multifamily", dealCheckSource(EXTRACTION, signal, null), box));
+    expect(input.buyBoxChecks?.checks.find((c) => c.label === "Price")).toEqual({
+      label: "Price",
+      status: "miss",
+      detail: "Mandate is $15.0M max — the ask is $20.0M. Beyond the mandate.",
+    });
+    expect(input.buyBoxChecks?.tripped).toEqual(["price $20.0M over the $18.0M ceiling"]);
+
+    // A read of the checks that fails (here, a first signal stored without
+    // its going-in cap) leaves the criteria in the brief, as before.
+    vi.mocked(synthesizeVerdict).mockClear();
+    vi.mocked(readFirstSignal).mockResolvedValue(SIGNAL);
+    vi.mocked(getBuyBoxForDeal).mockResolvedValueOnce(box);
+    await runAnalysis("d1");
+    const again = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(again.buyBox).toEqual(input.buyBox);
+    expect(again.buyBoxChecks).toBeNull();
+  });
+
+  it("the verdict is handed the deal context the comps and the market check read, built once — on a resumed run too (research pass 18)", async () => {
+    const share = {
+      ...EXTRACTION,
+      interest: { kind: "partial_interest", summary: "", share: "49% limited partnership interest", groundLease: "", loan: "", page: "p. 3" },
+      metrics: [...EXTRACTION.metrics, { label: "Units", value: "240", flagged: false, page: "p. 3", basis: "na", locatorSnippet: "" }],
+    } as unknown as ExtractionResult;
+    vi.mocked(extractTerms).mockResolvedValue(share);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const comps = vi.mocked(scrutinizeComps).mock.calls[0][1];
+    expect(comps).toContain("What is being sold: a share of the owning entity.");
+    expect(vi.mocked(checkMarket).mock.calls[0][2]).toBe(comps);
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(input.dealContext).toBe(comps);
+    expect(input.assetClass).toBe("multifamily");
+    const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+    const brief = buildBrief(input);
+    expect(brief).toContain(`## What the screen established about the deal, checked in code\n\n${comps}`);
+    expect(brief).toContain("THE BUILDING'S BASIS, computed in code: $170k/unit");
+
+    // An attempt resumed past the comps and the market check still tells the verdict.
+    vi.clearAllMocks();
+    vi.mocked(createSupabaseAdminClient).mockImplementation(() => ({ from: (t: string) => new FakeQuery(state, t) }) as never);
+    vi.mocked(synthesizeVerdict).mockResolvedValue(VERDICT);
+    state.jobs[0].payload = {
+      kind: "screen",
+      completed: ["signal", "extract", "reconcile_docs", "ingest_actuals", "challenge", "comps", "market"],
+    };
+    await runAnalysis("d1", { resume: true });
+    expect(job().status).toBe("done");
+    expect(vi.mocked(scrutinizeComps)).not.toHaveBeenCalled();
+    expect(vi.mocked(checkMarket)).not.toHaveBeenCalled();
+    // The stored flags were read, never looked up again.
+    expect(vi.mocked(claimSiteFlags)).not.toHaveBeenCalled();
+    expect(vi.mocked(synthesizeVerdict).mock.calls[0][0].dealContext).toBe(comps);
   });
 
   it("a suburb its address's words miss reads its metro area's figures, placed by its tract's county and said so (#447)", async () => {
@@ -828,6 +1216,26 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a self-storage facility: the challenger reads its occupancies and rates and what to check by name (#471)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "self_storage",
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Economic occupancy", value: "84%", flagged: false, page: "", basis: "in_place" },
+        { label: "In-place rent", value: "$1.38/SF/month", flagged: false, page: "", basis: "in_place" },
+        { label: "Street rate", value: "$1.14/SF/month", flagged: false, page: "", basis: "in_place" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("SELF-STORAGE AS STATED:");
+    expect(note).toContain("21.1% over it, the premium years of rate increases built");
+    expect(note).toContain("the street rate against the rates the facility's own recent move-ins signed at");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("the third-party reports: the challenger reads what they found and the site-report traps (#465)", async () => {
     vi.mocked(extractTerms).mockResolvedValue({
       ...EXTRACTION,
@@ -1025,6 +1433,82 @@ describe("runAnalysis — the memorandum's call for offers (#467)", () => {
   });
 });
 
+describe("runAnalysis — the building's photograph, lifted beside the screen", () => {
+  it("looks for the memorandum's cover right after the extraction, in the bytes the screen already downloaded, the cover alone", async () => {
+    const { downloadOmPdf } = await import("@/lib/storage");
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(ensureDealPicture).toHaveBeenCalledTimes(1);
+    const [, id, opts] = vi.mocked(ensureDealPicture).mock.calls[0];
+    expect(id).toBe("d1");
+    // The gallery's sixteen pages are left to the deal's first view.
+    expect(opts).toMatchObject({ omPath: "u/d1.pdf", isSample: false, cache: null, gallery: false, waitMs: SCREEN_PICTURE_WAIT_MS });
+    // One download for the whole run: the search reads the screen's own copy.
+    expect(downloadOmPdf).toHaveBeenCalledTimes(1);
+    expect(opts.pdf).toBe(await vi.mocked(downloadOmPdf).mock.results[0].value);
+    // Asked only once the extraction had landed, and only where a search is due.
+    expect(vi.mocked(extractTerms).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(ensureDealPicture).mock.invocationCallOrder[0],
+    );
+    expect(pictureMayBeInMemorandum).toHaveBeenCalledWith({ omPath: "u/d1.pdf", isSample: false, cache: null });
+  });
+
+  it("reads beside the steps after the extraction, never in front of them", async () => {
+    // The lift cannot finish until the challenger has run: a screen that
+    // waited on it before its next step would never get there.
+    let challenged!: () => void;
+    const reached = new Promise<void>((resolve) => (challenged = resolve));
+    vi.mocked(challengeAssumptions).mockImplementation(async () => {
+      challenged();
+      return CHALLENGES;
+    });
+    vi.mocked(ensureDealPicture).mockImplementation(async () => {
+      await reached;
+      return null;
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(state.deals.d1.verdict).toMatchObject({ verdict: "caution" });
+  });
+
+  it("a lift that fails leaves the screen exactly as it was: done, every result written, the failure logged and never shown", async () => {
+    vi.mocked(ensureDealPicture).mockRejectedValue(new Error("storage is down"));
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(job().error).toBeNull();
+    expect(state.deals.d1.challenges).toEqual(CHALLENGES);
+    expect(state.deals.d1.comps).toEqual(COMPS);
+    expect(state.deals.d1.verdict).toMatchObject({ verdict: "caution" });
+    expect(errSpy).not.toHaveBeenCalled();
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining("was not lifted for deal d1"), "storage is down");
+    warnSpy.mockRestore();
+  });
+
+  it("never lifts for the sample deal, a deal whose photograph needs no search, or a deal typed in by hand", async () => {
+    state.deals.d1.is_sample = true;
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(ensureDealPicture).not.toHaveBeenCalled();
+
+    state = freshState();
+    vi.mocked(pictureMayBeInMemorandum).mockReturnValue(false);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(pictureMayBeInMemorandum).toHaveBeenCalled();
+    expect(ensureDealPicture).not.toHaveBeenCalled();
+
+    // A manual deal has no memorandum to read.
+    state = freshState();
+    vi.mocked(pictureMayBeInMemorandum).mockReturnValue(true);
+    state.deals.d1.om_storage_path = null;
+    state.deals.d1.extraction = EXTRACTION;
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(ensureDealPicture).not.toHaveBeenCalled();
+  });
+});
+
 describe("runAnalysis — what a failure leaves behind, and what it tells the analyst", () => {
   it("a provider overload becomes one sentence; the raw text goes to the log; the results it never reached stay the previous screen's", async () => {
     vi.mocked(scrutinizeComps).mockRejectedValue(apiError(529, "overloaded_error", "Overloaded"));
@@ -1038,7 +1522,7 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
 
     // The mixed generation: this run's extraction and challenges beside the
     // previous screen's comps, market and verdict.
-    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual({ old: true });
     expect(state.deals.d1.verdict).toEqual({ old: true });
@@ -1067,7 +1551,7 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, metrics: [] });
     await runAnalysis("d1");
     expect(job().status).toBe("error");
-    expect(job().error).toMatch(/scan or password-protected/);
+    expect(job().error).toMatch(/from its text or its pages/);
     expect(state.deals.d1.extraction).toEqual({ old: true });
     expect(challengeAssumptions).not.toHaveBeenCalled();
     expect(synthesizeVerdict).not.toHaveBeenCalled();
@@ -1081,7 +1565,8 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     const logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     await runAnalysis("d1");
     expect(job().status).toBe("done");
-    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    // The fall-back is recorded with the extraction, for Ask (research pass 18).
+    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
     expect(extractTerms).toHaveBeenCalledTimes(2);
     expect(vi.mocked(extractTerms).mock.calls[0][0]).toBe(pages);
     expect(vi.mocked(extractTerms).mock.calls[1][0]).toBe(buffer);
@@ -1098,8 +1583,26 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, metrics: [] });
     await runAnalysis("d1");
     expect(job().status).toBe("error");
-    expect(job().error).toMatch(/scan or password-protected/);
+    expect(job().error).toMatch(/from its text or its pages/);
     expect(state.deals.d1.extraction).toEqual({ old: true });
+  });
+
+  it("stores the text layer's exact page count on the extraction, and the model's own where the pages were read (research pass 18)", async () => {
+    // The model counted 12; pdfjs walked 38 pages of the layer. The facts
+    // were validated against 38 while the extraction kept 12, so a page the
+    // citation rows accept was dropped by every reader of `totalPages`.
+    const layer = { kind: "pages" as const, text: "[[page 1]]\nthe deck", pages: 38, sparsePages: 0 };
+    vi.mocked(omSourceFor).mockResolvedValueOnce(layer);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect((state.deals.d1.extraction as ExtractionResult).totalPages).toBe(38);
+    expect((state.deals.d1.extraction as ExtractionResult).metrics).toEqual(EXTRACTION.metrics);
+    expect((state.deals.d1.extraction as ExtractionResult).omRead).toBe("text");
+
+    // Read as pages: the model's count stands.
+    state = freshState();
+    await runAnalysis("d1");
+    expect((state.deals.d1.extraction as ExtractionResult).totalPages).toBe(12);
   });
 
   it("the previous first signal survives a failed first read (it is no longer cleared ahead of the call)", async () => {
@@ -1128,8 +1631,10 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
 describe("runAnalysis — the run keeps its claim alive and cleans up after itself", () => {
   it("heartbeats the job row between step boundaries, and stops when the run ends", async () => {
     process.env.ANALYSIS_HEARTBEAT_MS = "10";
+    // A step long enough for two beats even when the whole suite loads the
+    // machine: at 80 ms, one beat landed under a full run (2026-10-01).
     vi.mocked(extractTerms).mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve(EXTRACTION), 80)),
+      () => new Promise((resolve) => setTimeout(() => resolve(EXTRACTION), 250)),
     );
     await runAnalysis("d1");
     const beats = () =>
@@ -1222,7 +1727,8 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     expect(job().status).toBe("done");
     expect(extractTerms).toHaveBeenCalledTimes(2);
     expect(vi.mocked(extractTerms).mock.calls[1][0]).toBe(buffer);
-    expect(state.deals.d1.extraction).toEqual(EXTRACTION);
+    // The fall-back to the pages is recorded with the extraction, for Ask.
+    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
     expect(vi.mocked(challengeAssumptions).mock.calls[0][0]).toBe(buffer);
 
     // A layer that read the NOI is the deck: one read, no fallback.
@@ -1236,6 +1742,8 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     expect(vi.mocked(extractTerms).mock.calls.length).toBe(extractsBefore + 1);
     expect(vi.mocked(omSourceFor).mock.calls.length).toBe(sourcesBefore + 1);
     expect(vi.mocked(challengeAssumptions).mock.calls.at(-1)?.[0]).toBe(pages);
+    // …and is recorded as read from its text layer.
+    expect((state.deals.d1.extraction as ExtractionResult).omRead).toBe("text");
   });
 
   it("an attempt resumed after the fallback to the pages reads the pages from the start — the payload remembers", async () => {

@@ -56,6 +56,8 @@ export function resolveGoingInCap(v: ValuationFacts): ResolvedCap {
 }
 
 export interface BridgeComponent {
+  /** `residual` — the part of the gap the stated components do not account
+   *  for — is present only where it is a dollar or more */
   key: "noi" | "cap" | "deduction" | "residual";
   label: string;
   /** dollars of value; positive means it pushed B's value ABOVE A's */
@@ -157,8 +159,19 @@ export function reconcileValuations(
       amount: deductionEffect,
       share: share(deductionEffect),
     },
-    { key: "residual", label: "Unexplained", amount: residual, share: share(residual) },
   ];
+  // The residual is the part of the gap the stated components do not
+  // account for, and its label says so — not "Unexplained", which read as a
+  // verdict on the documents. Under a dollar it is rounding, and there is
+  // no such line: two opinions that agree reconcile to nothing.
+  if (Math.abs(residual) >= 1) {
+    components.push({
+      key: "residual",
+      label: deductionComparable ? "Not in the stated NOI, cap or capex" : "Not in the stated NOI or cap",
+      amount: residual,
+      share: share(residual),
+    });
+  }
 
   return {
     ok: true,
@@ -249,6 +262,25 @@ export function scoreAggressiveness(
   }
 
   return { rows, aCount, bCount, comparable };
+}
+
+/**
+ * The tally in one sentence. A tie reads as a tie — "each is more
+ * aggressive on 2 of the 5" — never "Neither is more aggressive on 2 of 5",
+ * which said the opposite of the rows under it; two sources that agree on
+ * every input they both state say that.
+ */
+export function tallySentence(tally: AggressivenessTally, aLabel: string, bLabel: string): string {
+  const n = tally.comparable;
+  const inputs = `${n} comparable input${n === 1 ? "" : "s"}`;
+  if (n === 0) return "No input is stated by both, so neither can be called the more optimistic.";
+  if (tally.aCount === tally.bCount) {
+    return tally.aCount === 0
+      ? `The two agree on all ${inputs}.`
+      : `A tie: each is more aggressive on ${tally.aCount} of the ${inputs}.`;
+  }
+  const [who, count] = tally.aCount > tally.bCount ? [aLabel, tally.aCount] : [bLabel, tally.bCount];
+  return `${who} is more aggressive on ${count} of ${inputs}.`;
 }
 
 // ---------------------------------------------------------------------------

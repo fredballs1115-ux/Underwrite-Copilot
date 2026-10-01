@@ -15,7 +15,7 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
-import { staleAfterFailure } from "@/lib/screen-run";
+import { verdictBehind } from "@/lib/screen-run";
 import { coverPictureFor } from "@/lib/memo/cover-aerial";
 import type { DealVisualCache } from "@/lib/deal-location";
 
@@ -77,9 +77,10 @@ export async function GET(
       302,
     );
   }
-  // A screen that failed before reaching the verdict left today's terms
-  // beside the previous screen's call — a memo pairing the two would read as
-  // one screen. Refuse it until the run is re-run.
+  // A screen that failed before reaching the verdict, or one still running
+  // that has not reached it yet, leaves this run's terms beside the previous
+  // screen's call — a memo pairing the two would read as one screen. Refuse
+  // it until the run finishes, or is run again (lib/screen-run).
   const { data: latestJob } = await supabase
     .from("analysis_jobs")
     .select("status, step")
@@ -87,9 +88,10 @@ export async function GET(
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (staleAfterFailure(latestJob).has("verdict")) {
+  const behind = verdictBehind(latestJob);
+  if (behind) {
     return Response.redirect(
-      new URL(`/deals/${id}?error=memostale`, req.url),
+      new URL(`/deals/${id}?error=${behind === "running" ? "memorunning" : "memostale"}`, req.url),
       302,
     );
   }

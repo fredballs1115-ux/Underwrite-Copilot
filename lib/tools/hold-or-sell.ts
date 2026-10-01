@@ -44,6 +44,8 @@
 // export. Neither is re-derived here.
 
 import { readDebt } from "@/lib/tools/debt-math";
+// $12.4M in the note, where a full figure would swamp the sentence.
+import { usd } from "@/lib/tools/format";
 
 export interface HoldYear {
   /** 1 = hold one more year from today */
@@ -95,7 +97,8 @@ export interface HoldResult {
   note: string;
 }
 
-const EMPTY: HoldResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: HoldResult = {
   netProceedsNow: null,
   sellingCostNow: null,
   loanPayoffNow: null,
@@ -270,7 +273,7 @@ export function readHold(t: HoldInput): HoldResult {
   if (nextYearReturnPct === null) {
     note = "There is no equity to redeploy — the loan and the costs take the whole sale.";
   } else if (sellYear === 1) {
-    note = `Holding one more year earns ${nextYearReturnPct}% on the ${fmtShort(netProceedsNow)} you could take out today. That is under the hurdle, so the year to sell is now.`;
+    note = `Holding one more year earns ${nextYearReturnPct}% on the ${usd(netProceedsNow)} you could take out today. That is under the hurdle, so the year to sell is now.`;
   } else if (sellYear !== null) {
     note = `The marginal return clears the hurdle for ${sellYear - 1} more year${sellYear - 1 === 1 ? "" : "s"} and falls under it in year ${sellYear}. That is the year to sell, and the lifetime IRR will not say so for years afterwards.`;
   } else {
@@ -289,11 +292,4 @@ export function readHold(t: HoldInput): HoldResult {
     naiveNextYearReturnPct,
     note,
   };
-}
-
-/** $12.4M — only for the note, where a full figure would swamp the sentence. */
-function fmtShort(n: number): string {
-  const a = Math.abs(n);
-  if (a >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
-  return `$${Math.round(n).toLocaleString("en-US")}`;
 }

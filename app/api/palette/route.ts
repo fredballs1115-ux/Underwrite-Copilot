@@ -1,10 +1,14 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { PALETTE_LIMIT, nameSearchPattern } from "@/lib/palette-search";
 
 // Feeds the ⌘K command palette: the caller's deals (RLS-scoped — own +
-// team), newest first, trimmed to what the jump list renders. Search text
-// also carries the property address and document filenames so the palette
-// works as a global search, not just a name matcher.
-export async function GET() {
+// team), newest first, trimmed to what the jump list renders. With no query
+// it lists the most recently updated; with one (`?q=`) it searches every
+// deal the caller can see by its name (lib/palette-search), so a deal
+// updated long ago is still found. Search text also carries the property
+// address and document filenames so the palette works as a global search
+// over what it holds, not just a name matcher.
+export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
@@ -14,11 +18,10 @@ export async function GET() {
     return Response.json({ deals: [] }, { status: 401 });
   }
 
-  const { data, error } = await supabase
-    .from("deals")
-    .select("id, name, market:extraction->>market, verdict, stage")
-    .order("updated_at", { ascending: false })
-    .limit(50);
+  const pattern = nameSearchPattern(new URL(request.url).searchParams.get("q"));
+  let query = supabase.from("deals").select("id, name, market:extraction->>market, verdict, stage");
+  if (pattern) query = query.ilike("name", pattern);
+  const { data, error } = await query.order("updated_at", { ascending: false }).limit(PALETTE_LIMIT);
 
   if (error) {
     return Response.json({ deals: [] }, { status: 500 });

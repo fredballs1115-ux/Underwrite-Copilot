@@ -7,6 +7,7 @@ import {
   countNoun,
   isResidentialClass,
   perSuffix,
+  rentQuotedMonthly,
 } from "./asset-words";
 
 describe("the asset-words table", () => {
@@ -123,6 +124,20 @@ describe("the asset-words table", () => {
     expect(isResidentialClass(null)).toBe(false);
   });
 
+  it("reads a rent roll a month a unit where the class's rent is quoted that way", () => {
+    for (const key of ["multifamily", "sfr_btr", "student_housing", "manufactured_housing", "senior_housing", "parking"]) {
+      expect(rentQuotedMonthly(key), key).toBe(true);
+    }
+    // Mixed-use is rental housing priced by the foot, its roll suites and
+    // apartments together; a hotel's rate is nightly; a data centre's rent is
+    // a month a kilowatt, not a unit.
+    for (const key of ["mixed_use", "office", "industrial", "retail", "net_lease", "self_storage", "hospitality_str", "data_center", "land_infill", "auto"]) {
+      expect(rentQuotedMonthly(key), key).toBe(false);
+    }
+    expect(rentQuotedMonthly(null)).toBe(false);
+    expect(rentQuotedMonthly("Garden-style apartments")).toBe(true);
+  });
+
   it("files a class the model phrased itself by its words", () => {
     expect(assetClassKey("Boutique hotel")).toBe("hospitality_str");
     expect(assetClassKey("NNN retail")).toBe("net_lease");
@@ -134,12 +149,79 @@ describe("the asset-words table", () => {
     expect(assetClassKey("Medical office building")).toBe("medical_office");
     expect(assetClassKey("Mixed-use")).toBe("mixed_use");
     expect(assetClassKey("HOSPITALITY_STR")).toBe("hospitality_str");
+    // A warehouse or a yard that stores things is industrial; only storage
+    // rented to the public by the unit is self-storage (the pass of
+    // 2026-09-30 found the bare word "storage" filing both as self-storage).
+    expect(assetClassKey("Cold Storage Warehouse")).toBe("industrial");
+    expect(assetClassKey("Refrigerated distribution")).toBe("industrial");
+    expect(assetClassKey("Industrial Outdoor Storage (IOS)")).toBe("industrial");
+    expect(assetClassKey("IOS")).toBe("industrial");
+    expect(assetClassKey("Self-Storage")).toBe("self_storage");
+    expect(assetClassKey("Self storage with outdoor storage")).toBe("self_storage");
+    expect(assetClassKey("Climate-controlled storage")).toBe("self_storage");
+    expect(assetClassKey("Mini-storage")).toBe("self_storage");
+    // Rental housing named by its program is rental housing; a student,
+    // senior, manufactured or single-family phrase keeps its own class.
+    expect(assetClassKey("Affordable Housing (LIHTC)")).toBe("multifamily");
+    expect(assetClassKey("Workforce Housing")).toBe("multifamily");
+    expect(assetClassKey("Section 8 housing")).toBe("multifamily");
+    expect(assetClassKey("Senior housing")).toBe("senior_housing");
+    expect(assetClassKey("Manufactured housing community")).toBe("manufactured_housing");
+    expect(assetClassKey("Single-family housing portfolio")).toBe("sfr_btr");
+    // "Portfolios" and "studios" hold "ios" inside a word, never as one.
+    expect(assetClassKey("Studios")).toBeNull();
     // A stored key is itself.
     for (const key of ASSET_CLASS_KEYS) expect(assetClassKey(key)).toBe(key);
     // Nothing, "auto" and a phrase naming no class resolve to nothing.
     expect(assetClassKey("auto")).toBeNull();
     expect(assetClassKey("")).toBeNull();
     expect(assetClassKey("Something else entirely")).toBeNull();
+  });
+
+  it("files a site as land only where no lease comes with it, and scattered-site housing as housing", () => {
+    // The land rule's bare "site" ran first and filed all three as land: no
+    // NOI, no rate seed, the land traps.
+    expect(assetClassKey("Scattered-site SFR portfolio")).toBe("sfr_btr");
+    expect(assetClassKey("Scattered site single-family rentals")).toBe("sfr_btr");
+    // A site sold with its lease is income: one tenant named or implied is
+    // a net lease.
+    expect(assetClassKey("Retail pad site (ground lease)")).toBe("net_lease");
+    expect(assetClassKey("Ground-leased parcel, leased to Chick-fil-A")).toBe("net_lease");
+    expect(assetClassKey("Land leased to a single tenant")).toBe("net_lease");
+    expect(assetClassKey("Cell tower site")).toBe("net_lease");
+    expect(assetClassKey("Billboard site")).toBe("net_lease");
+    // A site under lease to several tenants is no net lease and no land.
+    expect(assetClassKey("Retail pad sites leased to three tenants")).toBe("retail");
+    expect(assetClassKey("Pad sites leased to tenants")).toBeNull();
+    // A bare pad or development site, with no lease words, stays land.
+    expect(assetClassKey("Pad site")).toBe("land_infill");
+    expect(assetClassKey("Development site")).toBe("land_infill");
+    expect(assetClassKey("Infill parcel")).toBe("land_infill");
+    // What a net lease already was, it stays.
+    expect(assetClassKey("NNN pad site")).toBe("net_lease");
+    // A class the site's words never reached keeps its own rule.
+    expect(assetClassKey("Parking lot")).toBe("parking");
+    expect(assetClassKey("Office tower")).toBe("office");
+  });
+
+  it("files a continuing care, life plan or active adult community as senior housing, and a 55+ park as a park", () => {
+    // Each resolved to no class at all.
+    for (const phrase of [
+      "CCRC",
+      "Continuing care retirement community",
+      "Continuing-care community",
+      "Life plan community",
+      "Active adult community",
+      "Active adult (55+) apartments",
+      "Retirement community",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("senior_housing");
+    }
+    // An age-restricted park is a park: the manufactured-housing rule reads
+    // it first.
+    expect(assetClassKey("55+ manufactured home community")).toBe("manufactured_housing");
+    expect(assetClassKey("55+ mobile home park")).toBe("manufactured_housing");
+    expect(assetClassKey("Active adult manufactured housing community")).toBe("manufactured_housing");
   });
 
   it("gives an unknown phrase the generic words under its own label", () => {

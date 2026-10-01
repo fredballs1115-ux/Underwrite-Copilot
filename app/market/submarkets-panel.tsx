@@ -1,6 +1,5 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { listSubmarkets } from "@/lib/market/store";
 import type { Submarket } from "@/lib/market/types";
+import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
 import { createSubmarket } from "@/app/(app)/submarkets/actions";
 import { SubmarketCards } from "./submarket-cards";
 
@@ -22,22 +21,17 @@ const ERRORS: Record<string, string> = {
   notfound: "That submarket no longer exists.",
 };
 
-export async function SubmarketsPanel({
-  userId,
+export function SubmarketsPanel({
+  submarkets,
   errorCode,
 }: {
-  userId: string;
+  /** the reader's own submarkets, read by the page beside its memory (the
+   *  page orders its sections by whether there are any); empty on a schema
+   *  without migration 0033, and the empty state stands */
+  submarkets: readonly Submarket[];
   /** carried across from a create/delete redirect — see ERRORS */
   errorCode?: string;
 }) {
-  const supabase = await createSupabaseServerClient();
-  let submarkets: Submarket[] = [];
-  try {
-    submarkets = await listSubmarkets(supabase, userId);
-  } catch {
-    // Migration 0033 not applied yet: the table is missing. The empty state
-    // stands; a create attempt surfaces its own "couldn't create" message.
-  }
   const message = errorCode ? ERRORS[errorCode] : undefined;
 
   return (
@@ -111,12 +105,16 @@ export async function SubmarketsPanel({
             Asset class
             <select
               name="assetClass"
+              defaultValue="industrial"
               className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
             >
-              <option value="industrial">Industrial</option>
-              <option value="office">Office</option>
-              <option value="retail">Retail</option>
-              <option value="multifamily">Multifamily</option>
+              {/* The site's own class list, the one every deal is filed
+                  under (lib/asset-class) — not four of its sixteen. */}
+              {ASSET_CLASS_OPTIONS.map(([key, label]) => (
+                <option key={key} value={key}>
+                  {label}
+                </option>
+              ))}
             </select>
           </label>
           <label className="flex flex-col gap-1 text-xs text-muted">

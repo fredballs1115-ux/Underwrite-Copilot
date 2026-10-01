@@ -9,6 +9,16 @@ export const moneyCompact = (n: number): string =>
       : `$${Math.round(n)}`;
 
 /**
+ * A plan's yield on cost as every surface that shows the deal prints it, and
+ * as the Claude steps are handed it: to two decimals, the precision of the
+ * caps and the basis-point spreads it stands beside. "11.67%" over a "6.00%"
+ * reference cap is the grid's "+567 bps"; "11.7%" would make it 570, and a
+ * verdict quoting "8.75%" beside a strip's "8.8%" showed one number rounded
+ * two ways on one page.
+ */
+export const yieldOnCostText = (d: number): string => `${(d * 100).toFixed(2)}%`;
+
+/**
  * The facts a plan is judged on, as label/value pairs — identical on every
  * surface that shows them (the deal page's plan strip, the shared screen a
  * partner or lender opens): the five figures, plus the all-in basis per
@@ -39,10 +49,7 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
         : "not stated",
     ],
     ["Total cost", plan.totalCost != null ? moneyCompact(plan.totalCost) : "—"],
-    [
-      "Yield on cost",
-      plan.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : "—",
-    ],
+    ["Yield on cost", plan.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : "—"],
     // The basis a comp is held against on a plan deal — what a finished
     // unit costs all-in, in the class's own noun (a hotel's per key). Only
     // when the OM states the planned count.

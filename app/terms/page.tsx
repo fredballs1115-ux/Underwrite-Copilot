@@ -1,13 +1,13 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
+import { publicMetadata } from "@/lib/page-meta";
 
-export const metadata: Metadata = {
+export const metadata = publicMetadata({
   title: "Terms of service",
   description:
     "The plain-English terms for using Underwrite Copilot's CRE deal-screening service.",
-  alternates: { canonical: "/terms" },
-};
+  canonical: "/terms",
+});
 
 const SECTIONS: { h: string; body: string[] }[] = [
   {

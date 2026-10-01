@@ -1,6 +1,6 @@
 name: rates
 # Weekday FRED pull → the `rates` table, so every market figure on the site
-# — the Treasury curve, SOFR, the credit spreads, the mortgage survey,
+# — the Treasury curve, SOFR, corporate credit, the mortgage survey,
 # inflation, the supply pipeline — is today's rather than one somebody
 # typed. The series list is data/fred-series.json.
 #
@@ -42,10 +42,10 @@ jobs:
     runs-on: ubuntu-latest
     # A FRED rate-limit stall costs 20 s a series; a run past this is a hang,
     # not a pull, and the next weekday's run is the retry.
-    # A stall guard, not a budget: the real pull of 785 series runs about
-    # eleven minutes, and a DRY RUN — two requests a series, the title
-    # beside the figure — took twenty-three (run 35933147137) once the
-    # states' series went in, one short of the old cap.
+    # A stall guard, not a budget: the real pull of about a thousand series
+    # runs about twenty minutes (run 36756375104), and a DRY RUN — two
+    # requests a series, the title beside the figure — took thirty-one
+    # (run 36786467096, 1,023 series).
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
@@ -64,8 +64,8 @@ jobs:
           PROBE_IDS: ${{ inputs.probe_ids }}
           PROBE_SEARCH: ${{ inputs.probe_search }}
           PROBE_BLS: ${{ inputs.probe_bls }}
-          # A probe on its own skips the table's walk: with 785 series the
-          # walk is two requests a series and twenty-odd minutes, and a
+          # A probe on its own skips the table's walk: with a thousand series
+          # the walk is two requests a series and half an hour, and a
           # probe is a question about a handful of ids. Tick dry_run beside
           # a probe to walk the table too.
           PROBE_ONLY: ${{ (inputs.probe_ids != '' || inputs.probe_search != '' || inputs.probe_bls != '') && inputs.dry_run != true && '1' || '' }}

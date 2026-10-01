@@ -95,7 +95,8 @@ export interface EgiResult {
   note: string;
 }
 
-const EMPTY: EgiResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: EgiResult = {
   gpr: null,
   lines: [],
   netRentalIncome: null,

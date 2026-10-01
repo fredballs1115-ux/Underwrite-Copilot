@@ -3,14 +3,20 @@
 import { useState } from "react";
 import { deleteAccount } from "./actions";
 import { PendingButton } from "../pending-button";
+import type { DeletionDone } from "@/lib/account-deletion";
 
-/** Type-to-confirm account deletion — the server re-checks the phrase. */
-export function DeleteAccountForm() {
+/** Type-to-confirm account deletion — the server re-checks the phrase. A
+ *  try that stopped part way had already done something (handed the team's
+ *  deals over, cancelled the plan), and the next try carries that in, so
+ *  the page it lands on says it even when there is nothing left to do. */
+export function DeleteAccountForm({ carried = null }: { carried?: DeletionDone | null }) {
   const [value, setValue] = useState("");
   const armed = value.trim() === "DELETE";
 
   return (
     <form action={deleteAccount} className="mt-4 flex flex-wrap items-center gap-2">
+      {carried?.movedToTeam ? <input type="hidden" name="moved" value={carried.movedToTeam} /> : null}
+      {carried?.cancelled ? <input type="hidden" name="cancelled" value="1" /> : null}
       <input
         name="confirm"
         value={value}

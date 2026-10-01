@@ -4,7 +4,7 @@
 // "unavailable", never a silent absence. Data: deals.site_flags
 // (lib/site-flags, migration 0030).
 
-import { isMinimalHazard, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { OZ_NEXT_ROUND_NOTE, isMinimalHazard, opportunityZoneRead, type SiteFlagsResult } from "@/lib/site-flags/core";
 
 function Chip({ label, cls }: { label: string; cls: string }) {
   return (
@@ -22,6 +22,10 @@ export function SiteFlagsCard({
   hasAddress: boolean;
 }) {
   if (!hasAddress) return null;
+  // The Opportunity Zone as the stored lookup can say it (lib/site-flags):
+  // on the list, off it (by the 2010 tract, or the current number with its
+  // caveat), or not checked and why.
+  const oz = result ? opportunityZoneRead(result) : null;
   return (
     <section className="rounded-xl border border-line bg-surface p-4">
       <h2 className="text-sm font-semibold">Site flags</h2>
@@ -58,17 +62,28 @@ export function SiteFlagsCard({
               />
             )}
             {/* Opportunity Zone */}
-            {result.opportunityZone === "unchecked" ? (
-              <Chip label="Opportunity Zone: not checked (registry unavailable)" cls="bg-faint text-muted" />
-            ) : result.opportunityZone === null ? (
-              <Chip label="Not in an Opportunity Zone" cls="bg-line/60 text-muted" />
-            ) : (
-              <Chip label="Opportunity Zone tract" cls="bg-pass/10 text-pass" />
+            {oz && (
+              <Chip
+                label={oz.label}
+                cls={
+                  oz.kind === "listed"
+                    ? "bg-pass/10 text-pass"
+                    : oz.kind === "not_listed"
+                      ? "bg-line/60 text-muted"
+                      : "bg-faint text-muted"
+                }
+              />
             )}
             {result.tractGeoid && (
               <span className="text-xs text-muted">tract {result.tractGeoid}</span>
             )}
+            {/* The number the zone was checked by, where 2010's differs. */}
+            {result.ozTract?.vintage === "2010" && result.ozTract.geoid !== result.tractGeoid && (
+              <span className="text-xs text-muted">2010 tract {result.ozTract.geoid}</span>
+            )}
           </div>
+          {oz?.caveat && <p className="mt-2 text-xs text-muted">{oz.caveat}</p>}
+          {oz && oz.kind !== "unchecked" && <p className="mt-2 text-xs text-muted">{OZ_NEXT_ROUND_NOTE}</p>}
           <p className="mt-2 text-xs text-muted">{result.note}</p>
           {result.error && <p className="mt-1 text-xs text-caution">{result.error}</p>}
         </>

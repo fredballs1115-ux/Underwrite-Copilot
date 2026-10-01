@@ -11,6 +11,7 @@
  * connection-error name, the parser's own message), never by class.
  */
 import { recordUsage, usageOfResponse } from "./usage";
+import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE } from "./operator-failures";
 
 /** An error whose message was written for the analyst and shows as it is. */
 export class ScreenError extends Error {
@@ -30,16 +31,26 @@ export interface RunFailure {
   detail: string;
 }
 
-const CREDENTIALS =
-  "The analysis service isn't accepting our credentials. That is a configuration problem on our side, not your deal — it needs the operator, not a retry.";
+const CREDENTIALS = CREDENTIALS_FAILURE;
 const RATE_LIMITED =
   "The analysis service is rate-limiting us right now — wait a minute and try again.";
 const OVERLOADED =
   "The analysis service is overloaded right now — try again in a few minutes.";
 const TOO_LARGE =
   "The analysis service refused this document as too large — try a smaller PDF.";
+// A scanned deck reads fine (the service reads the pages as pictures), and a
+// file that needs a password to open or runs past the page limit is refused
+// at the upload (lib/pdf-open), so neither is the advice here: what is left
+// is a secured copy the service turned away, or a passing fault.
 const REJECTED =
-  "The analysis service could not accept this document — if the OM is scanned, password-protected or very long, try a text-based PDF; otherwise try again.";
+  "The analysis service could not accept this document — if it is a secured copy, save an unlocked one (print it to PDF) and upload it with Replace OM; otherwise try again.";
+// The provider answers a spent credit balance or a workspace's usage limit
+// with a 400 like any malformed request; read as REJECTED, it blamed the
+// analyst's document for the operator's account.
+const ACCOUNT_PAUSED = ACCOUNT_PAUSED_FAILURE;
+/** A 400 whose words are the provider's account, never the request: a
+ *  credit balance, a usage or spend limit, billing. */
+const ACCOUNT_LIMIT = /credit balance|usage limit|spend(?:ing)? limit|purchase credits|plans? (?:&|and) billing/i;
 const UNREACHABLE =
   "We couldn't reach the analysis service — check back in a minute and try again.";
 const UNREADABLE =
@@ -112,7 +123,9 @@ export function describeRunFailure(err: unknown): RunFailure {
     if (status === 401 || status === 403) return { message: CREDENTIALS, detail };
     if (status === 429) return { message: RATE_LIMITED, detail };
     if (status === 413) return { message: TOO_LARGE, detail };
-    if (status === 400 || status === 422) return { message: REJECTED, detail };
+    if (status === 400 || status === 422) {
+      return { message: ACCOUNT_LIMIT.test(messageOf(err)) ? ACCOUNT_PAUSED : REJECTED, detail };
+    }
     if (status === 408 || status === 409 || status >= 500) return { message: OVERLOADED, detail };
     return { message: UNEXPECTED, detail };
   }

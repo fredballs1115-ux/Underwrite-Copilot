@@ -6,9 +6,15 @@
 // a screen away; these tests pin the two numbers and their relationship so a
 // future metro addition has to update both deliberately.
 
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { MarketsGallery } from "@/app/markets-gallery";
+import { visibleText } from "@/lib/render-lint";
 import metrosSeed from "@/data/research/metros.json";
 import { MARKET_COUNT } from "@/app/markets-marquee";
+import { BRIEF_COUNT, MARKETS_READ } from "@/lib/market-count";
+import { DATA_METROS } from "@/lib/market-match";
 
 const metros = (metrosSeed.metros ?? []) as { id: string; region?: string }[];
 
@@ -27,5 +33,20 @@ describe("coverage scope", () => {
 
   it("never lets the entry count masquerade as the market count", () => {
     expect(MARKET_COUNT).toBeLessThan(metros.length);
+    expect(BRIEF_COUNT).toBe(metros.length);
+  });
+
+  it("counts every market read the same way: the briefed markets plus the metro areas read without a brief", () => {
+    expect(MARKETS_READ).toBe(MARKET_COUNT + DATA_METROS.length);
+    expect(MARKETS_READ).toBe(41);
+  });
+
+  it("says why the gallery shows more tiles than the markets its heading counts", () => {
+    const text = visibleText(renderToStaticMarkup(React.createElement(MarketsGallery)));
+    expect(text).toContain(`The ${MARKET_COUNT} covered markets.`);
+    // Four briefs, not "four jurisdictions": Northern Virginia is several.
+    expect(text).toContain(`${BRIEF_COUNT} briefs, 4 of them for the Washington area.`);
+    const line = text.split("\n").find((l) => l.includes(" briefs")) ?? "";
+    expect(line).not.toMatch(/jurisdiction|skyline/i);
   });
 });

@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { costAssumptionsLine } from "@/lib/underwrite/cost-note";
+import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
 import {
   sliderValues,
   runScenario,
@@ -13,7 +15,8 @@ import {
   type ScenarioMetrics,
 } from "@/lib/underwrite/playground";
 import { METRIC_FIND, type BuyBox } from "@/lib/criteria";
-import { scoreMandateFit, type MandateVerdict } from "@/lib/mandate";
+import { scoreMandateFit } from "@/lib/mandate";
+import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
 import { solveMaxBid, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
 
 /** Everything the playground needs, computed server-side once. */
@@ -35,34 +38,27 @@ export interface PlaygroundData {
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
 
-const MANDATE_CHIP: Record<MandateVerdict, string> = {
-  PURSUE: "bg-pass/15 text-pass",
-  WATCH: "bg-caution/15 text-caution",
-  PASS: "bg-kill/15 text-kill",
-};
-const MANDATE_LABEL: Record<MandateVerdict, string> = {
-  PURSUE: "Pursue",
-  WATCH: "Watch",
-  PASS: "Pass",
-};
+const finite = (n: number | null): n is number => n != null && Number.isFinite(n);
 
 /** Swap the scenario's computed IRR / CoC into the metric set the mandate
- *  score reads, replacing the OM's broker figures — same scorer, model basis. */
-function withScenarioReturns(
+ *  score reads, replacing the OM's broker figures — same scorer, model basis.
+ *  A return the model could not compute swaps nothing: the memorandum's own
+ *  row stays, so the score never loses a dimension the chip's line then
+ *  calls "the memorandum's figures". */
+export function withScenarioReturns(
   metrics: { label: string; value: string }[],
   irrDec: number | null,
   cocDec: number | null,
 ): { label: string; value: string }[] {
-  const kept = metrics.filter(
-    (m) => !METRIC_FIND.irr.inc.test(m.label) && !METRIC_FIND.coc.inc.test(m.label),
+  const swapIrr = finite(irrDec);
+  const swapCoc = finite(cocDec);
+  const out = metrics.filter(
+    (m) =>
+      !(swapIrr && METRIC_FIND.irr.inc.test(m.label)) &&
+      !(swapCoc && METRIC_FIND.coc.inc.test(m.label)),
   );
-  const out = [...kept];
-  if (irrDec != null && Number.isFinite(irrDec)) {
-    out.push({ label: "IRR", value: `${(irrDec * 100).toFixed(1)}%` });
-  }
-  if (cocDec != null && Number.isFinite(cocDec)) {
-    out.push({ label: "Cash-on-cash", value: `${(cocDec * 100).toFixed(1)}%` });
-  }
+  if (swapIrr) out.push({ label: "IRR", value: `${(irrDec * 100).toFixed(1)}%` });
+  if (swapCoc) out.push({ label: "Cash-on-cash", value: `${(cocDec * 100).toFixed(1)}%` });
   return out;
 }
 
@@ -70,7 +66,9 @@ function withScenarioReturns(
  * The Sensitivity Playground (Feature 2): three levers over the deal's
  * underwriting model, recomputed in-browser on every drag — returns, and the
  * mandate verdict + fit score, move live. Pure math (the tested engine); the
- * LLM pipeline is never re-run from here.
+ * LLM pipeline is never re-run from here. On a plan deal it says its returns
+ * are the screening model's (PLAN_RETURNS_CAVEAT, lib/underwrite/plan-caveat,
+ * which the workbook's Deal Summary prints too).
  */
 export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const { inputs, dealAssetClass, checkSource, box } = data;
@@ -141,13 +139,16 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     [inputs, vacs, vacIdx],
   );
 
-  // Live mandate fit on the SAME scorer, with the model's IRR/CoC swapped in.
-  // Compared against the playground's own base (also model-based) so the
-  // delta isolates the sliders, not the OM-vs-model difference.
+  // Live mandate fit on the header chip's own rule (lib/buy-box-chip), with
+  // the model's IRR/CoC swapped in for the memorandum's. Compared against
+  // the playground's own base (also model-based) so the delta isolates the
+  // sliders, not the OM-vs-model difference. The memorandum's own read —
+  // the header's number — is carried beside it and never folded into it:
+  // the two score different figures, and the chip says which it scores.
   const score = useMemo(() => {
     if (!box || !checkSource) return null;
     const at = (m: ScenarioMetrics) =>
-      scoreMandateFit(
+      buyBoxRead(
         dealAssetClass,
         {
           ...checkSource,
@@ -157,8 +158,22 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       );
     const b = at(base);
     const c = dirty ? at(current) : b;
-    if (c.score == null || !c.verdict) return null;
-    return { current: c, base: b };
+    if (c.mandate?.score == null || !c.mandate.verdict) return null;
+    // The returns the box scores that the model, not the memorandum, put
+    // in: a floor the box does not set, or a return with no root, swaps
+    // nothing, and the chip must not claim it.
+    const m = dirty ? current : base;
+    const scored = [
+      box.minIrrPct != null && finite(m.leveredIrrPct) ? "IRR" : null,
+      box.minCoCPct != null && finite(m.cocYr1Pct) ? "cash-on-cash" : null,
+    ].filter((s): s is string => s != null);
+    return {
+      chip: c.chip,
+      score: c.mandate.score,
+      base: b.mandate?.score ?? null,
+      scored,
+      onMemorandum: scoreMandateFit(dealAssetClass, checkSource, box).score,
+    };
   }, [box, checkSource, dealAssetClass, base, current, dirty]);
 
   // Max bid: the highest price that still clears the box's return floors,
@@ -240,6 +255,18 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         <Metric label="Year-1 CoC" value={fmtPct(current.cocYr1Pct)} cur={current.cocYr1Pct} was={base.cocYr1Pct} baseText={fmtPct(base.cocYr1Pct)} dirty={dirty} />
         <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={dirty} />
       </div>
+      {/* The costs these returns carry and the card cannot show: the
+          model's defaults, said as defaults (lib/underwrite/cost-note). */}
+      <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">
+        {costAssumptionsLine(inputs)}
+      </p>
+      {planDeal && (
+        // The full report leaves these out on a plan deal for this reason
+        // (lib/memo/report-document); the page says it beside them.
+        <p className="mt-1.5 text-[11px] leading-relaxed text-caution" data-qa="playground-plan-caveat">
+          {PLAN_RETURNS_CAVEAT}
+        </p>
+      )}
 
       {bid && (
         <MaxBidCard
@@ -258,28 +285,16 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         {score ? (
-          <p className="flex items-center gap-2 text-xs text-muted">
+          // The header's chip ("Fit 63 · Outside box"), read on the model's
+          // returns, and what it scored said beside it — with the
+          // memorandum's own read, which is the header's, kept apart.
+          <p className="flex items-center gap-2 text-xs text-muted" data-qa="playground-fit">
             <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${MANDATE_CHIP[score.current.verdict!]}`}
+              className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${BUY_BOX_CHIP_CLS[score.chip.tone]}`}
             >
-              {MANDATE_LABEL[score.current.verdict!]} · {score.current.score}/100
+              {score.chip.label}
             </span>
-            {dirty && score.base.score != null && score.base.score !== score.current.score && (
-              <span>
-                base {score.base.score}/100 — fit moves through IRR and
-                cash-on-cash only
-              </span>
-            )}
-            {dirty && score.base.score === score.current.score && (
-              // The score is recomputed on every drag; when it legitimately
-              // doesn't move (returns stay on the same side of every mandate
-              // threshold), say so — a static chip must never read as broken.
-              <span>
-                fit unchanged — these returns don&apos;t cross a mandate
-                threshold
-              </span>
-            )}
-            {!dirty && <span>mandate fit at the model&apos;s base case</span>}
+            <span>{playgroundFitLine(score, dirty)}</span>
           </p>
         ) : box && checkSource ? (
           // A box IS set but no configured dimension is computable for this
@@ -304,6 +319,37 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       </div>
     </section>
   );
+}
+
+/**
+ * What the playground's fit chip scored, beside it: the returns the model
+ * put in where the memorandum's figures stood, the base case's fit once a
+ * slider has moved, and the memorandum's own fit — the deal header's number
+ * — each said as what it is, never one folded into the other.
+ */
+export function playgroundFitLine(
+  s: { score: number; base: number | null; scored: string[]; onMemorandum: number | null },
+  dirty: boolean,
+): string {
+  const parts = [
+    s.scored.length > 0
+      ? `with the model's ${s.scored.join(" and ")} scored`
+      : "mandate fit on the memorandum's figures",
+  ];
+  if (dirty && s.base != null) {
+    // Recomputed on every drag; when it legitimately does not move (the
+    // returns stay on the same side of every threshold), say so — a still
+    // chip must never read as a broken one.
+    parts.push(
+      s.base === s.score
+        ? "unchanged — these returns don't cross a mandate threshold"
+        : `Fit ${s.base} at the base case`,
+    );
+  }
+  if (s.scored.length > 0 && s.onMemorandum != null) {
+    parts.push(`Fit ${s.onMemorandum} on the memorandum's figures`);
+  }
+  return parts.join(" · ");
 }
 
 /** Parse "$2,000,000", "2000000", "2m", "2.5 MM", "750k" → dollars. */
@@ -401,7 +447,7 @@ function PriceCapControls({
         </label>
         <label className="block">
           <span className="text-[11px] uppercase tracking-wide text-muted">
-            {planDeal ? "Cap on Yr-1 income (as modelled)" : "Going-in cap"}
+            {planDeal ? "Cap on Yr-1 income (as modelled)" : "Cap on Yr-1 NOI (as modelled)"}
           </span>
           <input
             inputMode="decimal"

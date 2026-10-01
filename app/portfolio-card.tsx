@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { assetWords } from "@/lib/asset-words";
 import { isStateMarket } from "@/lib/market-match";
-import { portfolioFacts, propertyFigures, shareBasisWord, type PortfolioRead } from "@/lib/portfolio";
+import { portfolioFacts, propertyFigures, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
 
 /**
  * A portfolio OM's properties, drawn — the pure card for `lib/portfolio`.
@@ -26,8 +26,9 @@ export function PortfolioCard({
   const p = portfolio;
   const noun = assetWords(assetClass ?? undefined).noun ?? { one: "unit", many: "units" };
   const basisWord = shareBasisWord(p, noun);
-  const widest = Math.max(1, ...(p.shares ?? []), ...(p.noiShares ?? []));
-  const width = (v: number) => `${Math.max(1.5, (v / widest) * 100)}%`;
+  // A share of the whole fills that share of its track (a sliver at least,
+  // so a small property's bar is still there).
+  const width = (sharePct: number) => `${Math.max(1.5, shareOfTrack(sharePct) * 100)}%`;
   const facts = portfolioFacts(p);
 
   return (

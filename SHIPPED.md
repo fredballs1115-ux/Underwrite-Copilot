@@ -68,7 +68,8 @@ confirmed equal to the main tip after each batch.
   $190,455 paper loss on a building that made money.
 
   **The gain at the sale has three rates, not one.** What you depreciated
-  on the building comes back as unrecaptured 1250 gain at 25%; anything a
+  on the building comes back as unrecaptured 1250 gain at the owner's
+  ordinary rate, capped at 25%; anything a
   cost segregation study carved out comes back under section 1245 at your
   ordinary rate; only appreciation over the original price is capital
   gain. The card draws them as one bar and names the error: $11.45M at 20%

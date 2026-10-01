@@ -23,9 +23,22 @@ export interface AllDayEvent {
   now: Date;
 }
 
-/** A text value escaped as RFC 5545 §3.3.11 requires. */
+/**
+ * A text value escaped as RFC 5545 §3.3.11 requires. Every line break —
+ * CRLF, LF and a lone CR alike — becomes the `\n` escape: a raw CR left in
+ * a value ends the content line for a reader that splits on it, and what
+ * follows (a deal's name is whatever its owner typed) would be read as a
+ * property of its own. The other control characters TEXT does not allow
+ * (everything below a space but the tab, and DEL) have no escape, so they
+ * are dropped.
+ */
 export function icsText(s: string): string {
-  return s.replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+  return s
+    .replace(/\\/g, "\\\\")
+    .replace(/;/g, "\\;")
+    .replace(/,/g, "\\,")
+    .replace(/\r\n|\r|\n/g, "\\n")
+    .replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "");
 }
 
 /** A content line folded at 75 octets (§3.1), each continuation led by a

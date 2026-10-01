@@ -7,10 +7,26 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { INSURANCE_INDEX_ID, periodLabel, rentIndexFor } from "@/lib/live-market-brief";
 import { isStateMarket } from "@/lib/market-match";
 import { datedLong } from "@/lib/debt-index";
-import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import {
+  IMPLIED_CAP_CEILING,
+  askingPriceOf,
+  buildingPriceOf,
+  inferStrategy,
+  isPlanDeal,
+  noiFigures,
+  signalGoingInCap,
+} from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
+import { interestOf } from "@/lib/interest";
 import { shownAssetClass } from "@/lib/pipeline-slots";
-import { bandText, trackerFor, type TrackerRead } from "@/lib/tracker-read";
+import {
+  bandText,
+  figureCitation,
+  figureRead,
+  trackerFor,
+  type FigureRead,
+  type TrackerRead,
+} from "@/lib/tracker-read";
 
 /**
  * The model's assumptions against the published figures — pure, no model
@@ -56,18 +72,23 @@ export type CheckTone =
   | "widens"
   | "compresses"
   | "level"
-  | "stated";
+  | "stated"
+  | "aside";
 
 export const TONE_LABEL: Record<CheckTone, string> = {
   ahead: "ahead of the published figures",
   inside: "inside the published range",
   behind: "behind the published figures",
-  tighter: "tighter than the metro",
-  looser: "looser than the metro",
+  // The figures a vacancy is read against may be the metro area's, the
+  // region's, the state's or a tracker's own area (Suburban Maryland's,
+  // Manhattan's), so the chip names none of them.
+  tighter: "tighter than the published figures",
+  looser: "looser than the published figures",
   widens: "spread widens at the exit",
   compresses: "assumes cap compression",
   level: "spread held at the exit",
   stated: "spread stated",
+  aside: "beside a narrower stock",
 };
 
 export interface PublishedFigure {
@@ -77,6 +98,9 @@ export interface PublishedFigure {
   text: string;
   /** the figure in its own unit — a percent change, or a level in percent */
   value: number;
+  /** the figure's own date: a feed's observation day (ISO), or a research
+   *  figure's period as its file states it ("Q2 2026") — "undated" where
+   *  the file states none, never the day the research was read */
   asOf: string;
   /** "Zillow Research", "BLS via FRED", "Census Bureau" */
   publisher: string;
@@ -122,6 +146,11 @@ export interface ModelVsMarketInput {
   plan?: boolean;
   /** the going-in cap, percent, as the page shows it — null on a plan deal */
   goingInCapPct?: number | null;
+  /** where that cap came from: stated by the documents (the default), or
+   *  implied by their NOI over their price where they state none
+   *  (`impliedGoingInCap`) — over the whole price a share implies, for a
+   *  share — and said as such */
+  goingInCapSource?: "stated" | "implied" | "implied_whole";
   metro?: { id: string; name: string } | null;
   /** the metro's own series (`readMetroRates`) */
   rates?: readonly LiveRate[];
@@ -141,31 +170,47 @@ export interface ModelVsMarketInput {
   now: Date;
 }
 
-/** "as of Aug 25, 2026; colliers.com" — how a tracker figure is dated and sourced in a sentence. */
-function trackerWhen(t: TrackerRead): string {
-  const parts = [t.asOf ? `as of ${datedLong(t.asOf)}` : "undated", t.source ?? "the research tracker"];
-  return parts.join("; ");
+/**
+ * "Colliers, Suburban Maryland (Montgomery and Prince George's together, not
+ * a county split), Q1 2026 (read Aug 25, 2026)" — a tracker figure's own
+ * house, area and period as the file states them (lib/tracker-read's
+ * `figureCitation`, "undated" where it states no period), then the day the
+ * research sweep read it, said as the day read and never as the figure's.
+ */
+function trackerCite(t: TrackerRead, f: FigureRead): string {
+  return `${figureCitation(f)}${t.asOf ? ` (read ${datedLong(t.asOf)})` : ""}`;
 }
 
-function trackerPublisher(t: TrackerRead): string {
-  return `research tracker${t.source ? ` (${t.source})` : ""}`;
+function trackerPublisher(f: FigureRead): string {
+  return f.house ? `research tracker: ${f.house}` : "research tracker";
 }
 
-/** The tracker's vacancy band as published figures — one for a point, the low and the high for a band. */
-function trackerVacancyFigures(t: TrackerRead): PublishedFigure[] {
-  if (t.vacancyLow === null) return [];
-  const hi = t.vacancyHigh ?? t.vacancyLow;
-  const asOf = t.asOf ?? "";
-  const publisher = trackerPublisher(t);
-  const label = `${t.sectorLabel[0].toUpperCase()}${t.sectorLabel.slice(1)} vacancy, metro (tracker)`;
-  if (Math.abs(hi - t.vacancyLow) < 0.005) {
-    return [{ label, text: `${t.vacancyLow.toFixed(1)}%${t.asOf ? ` (as of ${datedLong(t.asOf)})` : ""}`, value: t.vacancyLow, asOf, publisher }];
-  }
-  const suffix = t.asOf ? ` (as of ${datedLong(t.asOf)})` : "";
-  return [
-    { label: `${label}, low read`, text: `${t.vacancyLow.toFixed(1)}%${suffix}`, value: t.vacancyLow, asOf, publisher },
-    { label: `${label}, high read`, text: `${hi.toFixed(1)}%${suffix}`, value: hi, asOf, publisher },
-  ];
+const initialCap = (s: string): string => `${s[0].toUpperCase()}${s.slice(1)}`;
+
+/** A figure with nothing named — for a read built without its provenance. */
+const UNNAMED: FigureRead = figureRead(null, []);
+
+/**
+ * A tracker figure as published figures — one for a point, the low and the
+ * high for a band — each labelled with the area it covers where the file
+ * states one (never "metro" by default) and dated by its own period.
+ */
+function trackerFigures(t: TrackerRead, f: FigureRead, what: "vacancy" | "cap", low: number, high: number): PublishedFigure[] {
+  const dp = what === "cap" ? 2 : 1;
+  const label = `${initialCap(t.sectorLabel)} ${what} (research tracker)${f.area ? `, ${f.area}` : ""}`;
+  const when = f.period ?? "undated";
+  const publisher = trackerPublisher(f);
+  const figure = (value: number, end?: string): PublishedFigure => ({
+    label: end ? `${label}, ${end}` : label,
+    text: `${value.toFixed(dp)}% (${when})`,
+    value,
+    asOf: when,
+    publisher,
+  });
+  if (Math.abs(high - low) < 0.005) return [figure(low)];
+  return what === "cap"
+    ? [figure(low, "low end"), figure(high, "high end")]
+    : [figure(low, "low read"), figure(high, "high read")];
 }
 
 /**
@@ -179,10 +224,41 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
   const t = input.tracker;
   if (!t || t.sector === "multifamily" || t.vacancyLow === null) return null;
   const hi = t.vacancyHigh ?? t.vacancyLow;
-  const published = trackerVacancyFigures(t);
+  const f = t.vacancy ?? UNNAMED;
+  const published = trackerFigures(t, f, "vacancy", t.vacancyLow, hi);
   const band = bandText(t.vacancyLow, hi);
+  // A figure the file says is for a narrower stock than the class (`slice`:
+  // Northern Virginia's small-bay space) is shown and named, and the model
+  // is not held to it — capBandTail's rule for a cap. A bulk warehouse read
+  // against a small-bay band was called a point looser than "the industrial
+  // stock the figure covers" (the audit of 2026-10-01).
+  if (f.slice) {
+    const point = Math.abs(hi - t.vacancyLow) < SAME;
+    const where =
+      v > hi + SAME
+        ? `${pts(v - hi)} over ${point ? "it" : "its high end"}`
+        : v < t.vacancyLow - SAME
+          ? `${pts(t.vacancyLow - v)} under ${point ? "it" : "its low end"}`
+          : point
+            ? "at it"
+            : "inside it";
+    return {
+      key: "vacancy",
+      title: "Stabilized vacancy",
+      model: `${v.toFixed(1)}%`,
+      modelSource: sourceWords(input.sources?.vacancyPct),
+      published,
+      tone: "aside",
+      toneLabel: TONE_LABEL.aside,
+      scope: "metro",
+      read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f)} — a research print, not a feed. That figure is for ${f.slice}, not the ${t.sectorLabel} market as a whole, so the model is not held to it; its vacancy sits ${where}.`,
+    };
+  }
   const tone: CheckTone = v < t.vacancyLow - SAME ? "tighter" : v > hi + SAME ? "looser" : "inside";
-  const stock = `the metro's ${t.sectorLabel} stock`;
+  // The stock the figure covers — the file's area, which is not always the
+  // market's (Suburban Maryland's office figure is filed under both of its
+  // counties) — so the sentence never calls it the metro's.
+  const stock = `the ${t.sectorLabel} stock the figure covers`;
   const clause =
     tone === "tighter"
       ? `The building would run ${pts(t.vacancyLow - v)} tighter than ${stock} — a leased building against a market average, and the figure to hold the rent roll and the rollover to.`
@@ -198,7 +274,7 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
-    read: `The model holds ${v.toFixed(1)}% vacancy. The metro's ${t.sectorLabel} vacancy reads ${band} on the research tracker (${trackerWhen(t)}) — a quarterly print, not a feed. ${clause}`,
+    read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f)} — a research print, not a feed. ${clause}`,
   };
 }
 
@@ -392,6 +468,25 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
   const insuranceClause = insurance
     ? ` Insurance is the line that reprices hardest: commercial property premiums are ${signed(insurance.value)}% nationally over the year to ${periodLabel(insurance.obsDate, insurance.meta.cadence)} (the BLS's index of commercial multiple peril premiums), and a memorandum's premium is the seller's expiring policy, so the index is the floor for the other lines and this is the one to re-quote.`
     : " Insurance and taxes reprice on their own cycles, so the index is the floor for the other lines, not the whole answer.";
+  // The bond market's own forecast beside the trailing year (2026-09-30):
+  // what inflation is expected to average over the next ten years, the
+  // 10-year breakeven (the Treasury yield less the inflation-protected
+  // one), already on the rates strip. A ten-year horizon, not the hold's,
+  // and never in the tone's range: the assumption is read against what
+  // prices did, and this says what the market expects them to do.
+  const breakeven = fresh(input.national, (r) => r.meta.id === "T10YIE");
+  if (breakeven) {
+    published.push({
+      label: "Expected inflation, next ten years (10-year breakeven)",
+      text: `${breakeven.value.toFixed(2)}% a year (${periodLabel(breakeven.obsDate, breakeven.meta.cadence)})`,
+      value: breakeven.value,
+      asOf: breakeven.obsDate,
+      publisher: "FRED",
+    });
+  }
+  const breakevenClause = breakeven
+    ? ` The bond market expects inflation to average ${breakeven.value.toFixed(2)}% a year over the next ten years (the 10-year breakeven, ${periodLabel(breakeven.obsDate, breakeven.meta.cadence)}; FRED) — its forecast over ten years, not the hold's.`
+    : "";
   return {
     key: "expense_growth",
     title: "Expense growth",
@@ -401,7 +496,7 @@ function expenseGrowthCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "national",
-    read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause}${insuranceClause}`,
+    read: `The model grows expenses ${e.toFixed(1)}%/yr against consumer prices ${signed(cpi.value)}% over the year to ${when}${core ? ` (core ${signed(core.value)}%)` : ""}; BLS via FRED. ${clause}${insuranceClause}${breakevenClause}`,
   };
 }
 
@@ -425,7 +520,10 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
   // against the Census Bureau's of every rental), so it is shown, never
   // the anchor.
   const t = input.tracker && input.tracker.sector === "multifamily" && input.tracker.vacancyLow !== null ? input.tracker : null;
-  const trackerTail = t ? ` The research tracker's apartment read for the metro is ${bandText(t.vacancyLow!, t.vacancyHigh)} (${trackerWhen(t)}) — a house's survey of managed stock, shown beside the Census figure rather than in its place.` : "";
+  const tf = t?.vacancy ?? UNNAMED;
+  const trackerTail = t
+    ? ` The research tracker's apartment vacancy reads ${bandText(t.vacancyLow!, t.vacancyHigh)}: ${trackerCite(t, tf)} — research, shown beside the Census figure rather than in its place.`
+    : "";
   if (metro) {
     const when = periodLabel(metro.obsDate, metro.meta.cadence);
     published.push({
@@ -470,7 +568,7 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
     title: "Stabilized vacancy",
     model: `${v.toFixed(1)}%`,
     modelSource: sourceWords(input.sources?.vacancyPct),
-    published: t ? [...published, ...trackerVacancyFigures(t)] : published,
+    published: t ? [...published, ...trackerFigures(t, tf, "vacancy", t.vacancyLow!, t.vacancyHigh ?? t.vacancyLow!)] : published,
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
@@ -479,38 +577,47 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
 }
 
 /**
- * The tracker's cap range for the sector in the metro, where it has one,
- * beside the 10-year read: the published figures it adds and the sentence
- * that sets the exit cap against the range — over its high end is the
- * conservative direction for an exit, under its low end is a cap tighter
- * than the market's own range.
+ * The tracker's cap figure for the sector, where it has one, beside the
+ * 10-year read: the published figures it adds and the sentence that sets
+ * the exit cap against it, with the figure's own house, area and period.
+ * Over a range's high end (or a single figure) is the conservative
+ * direction for an exit; under its low end is a cap tighter than the
+ * market's own figure. A figure the file says is for a narrower stock than
+ * the class (`slice` — Chicago's average is its Class B/C small buildings')
+ * is shown and named, and the exit is not held to it: a Class A exit read
+ * against it would call a sound assumption cap compression.
  */
 function capBandTail(input: ModelVsMarketInput, x: number): { figures: PublishedFigure[]; sentence: string } {
   const t = input.tracker;
   if (!t || t.capLow === null) return { figures: [], sentence: "" };
-  const hi = t.capHigh ?? t.capLow;
-  const asOf = t.asOf ?? "";
-  const publisher = trackerPublisher(t);
-  const label = `${t.sectorLabel[0].toUpperCase()}${t.sectorLabel.slice(1)} cap range, metro (tracker)`;
-  const suffix = t.asOf ? ` (as of ${datedLong(t.asOf)})` : "";
-  const figures: PublishedFigure[] =
-    Math.abs(hi - t.capLow) < 0.005
-      ? [{ label, text: `${t.capLow.toFixed(2)}%${suffix}`, value: t.capLow, asOf, publisher }]
-      : [
-          { label: `${label}, low end`, text: `${t.capLow.toFixed(2)}%${suffix}`, value: t.capLow, asOf, publisher },
-          { label: `${label}, high end`, text: `${hi.toFixed(2)}%${suffix}`, value: hi, asOf, publisher },
-        ];
-  const band = bandText(t.capLow, hi, 2);
+  const lo = t.capLow;
+  const hi = t.capHigh ?? lo;
+  const point = Math.abs(hi - lo) < 0.005;
+  const f = t.cap ?? UNNAMED;
+  const figures = trackerFigures(t, f, "cap", lo, hi);
+  const bps = (n: number): string => `${Math.round(n * 100)} bps`;
+  const head = ` The research tracker's ${t.sectorLabel} cap ${point ? "is" : "range is"} ${bandText(lo, hi, 2)}${
+    f.construct ? ` (${f.construct})` : ""
+  }: ${trackerCite(t, f)}`;
+  const over = point ? "it" : "its high end";
+  const under = point ? "it" : "its low end";
+  if (f.slice) {
+    const where =
+      x > hi + SAME ? `${bps(x - hi)} over ${over}` : x < lo - SAME ? `${bps(lo - x)} under ${under}` : point ? "at it" : "inside it";
+    return {
+      figures,
+      sentence: `${head}. That figure is for ${f.slice}, not the ${t.sectorLabel} market as a whole, so the exit is not held to it; the exit cap sits ${where}.`,
+    };
+  }
   const position =
     x > hi + SAME
-      ? `the exit cap sits ${Math.round((x - hi) * 100)} bps over its high end — the conservative direction for an exit.`
-      : x < t.capLow - SAME
-        ? `the exit cap sits ${Math.round((t.capLow - x) * 100)} bps under its low end — an exit priced tighter than the market's own range today, which is cap compression on top of the spread read.`
-        : "the exit cap sits inside it.";
-  return {
-    figures,
-    sentence: ` The research tracker's ${t.sectorLabel} cap range for the metro is ${band} (${trackerWhen(t)}), and ${position}`,
-  };
+      ? `the exit cap sits ${bps(x - hi)} over ${over} — the conservative direction for an exit.`
+      : x < lo - SAME
+        ? `the exit cap sits ${bps(lo - x)} under ${under} — an exit priced tighter than the market's own ${point ? "figure" : "range"} today, which is cap compression on top of the spread read.`
+        : point
+          ? "the exit cap sits at it."
+          : "the exit cap sits inside it.";
+  return { figures, sentence: `${head}, and ${position}` };
 }
 
 function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
@@ -548,6 +655,14 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
   const inSpread = Math.round((g - ten.value) * 100);
   const delta = exitSpread - inSpread;
   const tone: CheckTone = delta > 0 ? "widens" : delta < 0 ? "compresses" : "level";
+  // A cap the documents imply rather than state is said as the arithmetic
+  // it is, so the reader can see what the exit is being set against.
+  const entry =
+    input.goingInCapSource === "implied"
+      ? `The going-in cap implied by the OM's NOI over its price, ${g.toFixed(2)}%,`
+      : input.goingInCapSource === "implied_whole"
+        ? `The going-in cap implied by the OM's NOI over the whole price its share implies, ${g.toFixed(2)}%,`
+        : `The going-in cap ${g.toFixed(2)}%`;
   const clause =
     tone === "widens"
       ? `so the exit assumes the spread widens ${delta} bps with the 10-year where it is today — the conservative direction.`
@@ -563,7 +678,7 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel: TONE_LABEL[tone],
     scope,
-    read: `${head} The going-in cap ${g.toFixed(2)}% is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}${band.sentence}`,
+    read: `${head} ${entry} is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}${band.sentence}`,
   };
 }
 
@@ -592,13 +707,86 @@ export interface MarketReads {
 }
 
 /**
+ * The going-in cap the documents imply where they state none: the OM's
+ * in-place NOI, else its Year-1, over the price the building's own figures
+ * describe — the pairing the plausibility check holds a stated cap to
+ * (`assessPlausibility`), through the same shared readers: `noiFigures`,
+ * `askingPriceOf` (a range at its top) and `buildingPriceOf` (a share's
+ * price grossed up to the whole, `whole`; none for a note, whose price is a
+ * loan's, or a leased fee, whose price is the land's). Null where either
+ * figure is missing, and outside the band a cap can be — at or under 0.5%,
+ * or at IMPLIED_CAP_CEILING and past it, where the NOI is no going-in
+ * figure on this price. A plan deal has no going-in cap; the caller says
+ * which deal it is.
+ */
+export function impliedGoingInCap(extraction: ExtractionResult | null): { pct: number; whole: boolean } | null {
+  if (!extraction) return null;
+  const figs = noiFigures(extraction.metrics ?? []);
+  const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1");
+  if (!going || !(going.value > 0)) return null;
+  const asked = askingPriceOf(extraction);
+  const price = buildingPriceOf(extraction, asked);
+  if (asked == null || price == null || !(price > 0)) return null;
+  const cap = going.value / price;
+  if (!(cap > 0.005) || !(cap < IMPLIED_CAP_CEILING)) return null;
+  return { pct: cap * 100, whole: price !== asked };
+}
+
+/** A deal's going-in cap, percent, and where it came from. */
+export interface DealGoingInCap {
+  pct: number;
+  /** stated by the documents (or the first signal); implied by their NOI
+   *  over their price; or implied on the whole a share's price grosses up to */
+  source: "stated" | "implied" | "implied_whole";
+}
+
+/**
+ * THE going-in cap an exit is set against, wherever one is: the
+ * extraction's stated cap, else the first signal's where it can be a cap on
+ * the price (`signalGoingInCap`); where neither states one, the cap the
+ * documents' NOI implies on their price (`impliedGoingInCap`); and none on a
+ * plan deal (its year-1 cap is a dark building's) or a note (the
+ * collateral's income over a loan's price is a cap nobody earns, #414).
+ * `modelVsMarketFor` reads it, and so does the submarket check's supply
+ * warning, so no two surfaces set one exit against two going-in caps.
+ */
+export function dealGoingInCap(
+  extraction: ExtractionResult | null,
+  firstSignal?: FirstSignal | null,
+): DealGoingInCap | null {
+  const planDeal = isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
+  if (planDeal || interestOf(extraction).kind === "note") return null;
+  const capText = findGoingInCap(extraction?.metrics ?? [])?.value ?? null;
+  const parsed = capText ? parsePct(capText) : null;
+  const stated =
+    parsed != null && Number.isFinite(parsed) && parsed > 0
+      ? parsed
+      : capText == null
+        ? (signalGoingInCap(firstSignal)?.pct ?? null)
+        : null;
+  if (stated != null) return { pct: stated, source: "stated" };
+  // Where the documents state no going-in cap, the one their own NOI and
+  // price imply: without it a deal whose NOI is 7.50% of its price read "no
+  // going-in cap to set it against" while the model's 6.00% default exit
+  // priced 150 bps of compression unsaid.
+  const implied = impliedGoingInCap(extraction);
+  return implied ? { pct: implied.pct, source: implied.whole ? "implied_whole" : "implied" } : null;
+}
+
+/**
  * The read for a deal, from what every surface already holds — the derived
- * model, the extraction, the stored class, the covered metro and today's
- * figures — so the deal page, the report route and the workbook route call
- * ONE function and cannot disagree about the class the deck turned out to
- * be (`shownAssetClass`), whether the deal is a plan (`inferStrategy`), or
- * which cap is the going-in cap (the page's own summary figure where it
- * passes one, else the extraction's, and none on a plan deal).
+ * model, the extraction, the first signal, the stored class, the covered
+ * metro and today's figures — so the deal page, the report route and the
+ * workbook route call ONE function and cannot disagree about the class the
+ * deck turned out to be (`shownAssetClass`), whether the deal is a plan
+ * (`inferStrategy`), or which cap is the going-in cap: the extraction's
+ * stated one, else the first signal's where it can be a cap on the price
+ * (`signalGoingInCap`, the page's summary bar's own fallback); where
+ * neither states one, the cap the documents' NOI implies on their price;
+ * and none on a plan deal or a note. The rule lives here and nowhere else:
+ * the page once handed in its summary bar's figure while the report and
+ * the workbook read the implied cap, and one deal's exit read 60 bps of
+ * widening on the page and 20 in the documents.
  */
 export function modelVsMarketFor(args: {
   derived: Pick<DerivedModel, "inputs" | "sources">;
@@ -612,25 +800,22 @@ export function modelVsMarketFor(args: {
    *  research tracker's */
   metro: { id: string; name: string; placedBy?: unknown } | null;
   reads: MarketReads;
-  /** the going-in cap as the page shows it; leave undefined to read the
-   *  extraction's, pass null for none */
-  goingInCapText?: string | null;
 }): ModelVsMarket | null {
   const { derived, extraction, storedAssetClass, metro, reads } = args;
   const planDeal = isPlanDeal(inferStrategy(extraction, args.firstSignal ?? null).kind);
-  const capText =
-    args.goingInCapText !== undefined
-      ? args.goingInCapText
-      : planDeal
-        ? null
-        : (findGoingInCap(extraction?.metrics ?? [])?.value ?? null);
+  // A note's price is a loan's (#414): the cap its memorandum states is the
+  // collateral's, never the buyer's, so the exit is set against no going-in
+  // cap on a note — stated, passed in or implied — on every surface; nor on
+  // a plan deal. One reader says which cap it is (`dealGoingInCap`).
+  const goingIn = dealGoingInCap(extraction, args.firstSignal ?? null);
   const assetClass = shownAssetClass(storedAssetClass ?? null, extraction) || null;
   return modelVsMarket({
     inputs: derived.inputs,
     sources: derived.sources,
     assetClass,
     plan: planDeal,
-    goingInCapPct: capText ? parsePct(capText) : null,
+    goingInCapPct: goingIn?.pct ?? null,
+    goingInCapSource: goingIn?.source,
     metro,
     rates: reads.rates,
     zori: reads.zori,
@@ -639,8 +824,10 @@ export function modelVsMarketFor(args: {
     // research layer, dated, beside the feeds. Research, so only for a
     // market the address names: a deal its county alone placed (#447) reads
     // the metro area's published figures, and the tracker's may be the core
-    // county's — Los Angeles's office vacancy is not Orange County's.
-    tracker: metro && !metro.placedBy ? trackerFor(metro.id, assetClass) : null,
+    // county's — Los Angeles's office vacancy is not Orange County's. The
+    // deck's own class words ride along, so a lab, a yard or a cold-storage
+    // warehouse the analyst filed as plain office or industrial reads none.
+    tracker: metro && !metro.placedBy ? trackerFor(metro.id, assetClass, extraction?.assetClass ?? null) : null,
     now: reads.now,
   });
 }

@@ -17,6 +17,10 @@ type Supp = {
 type SuppMap = Record<string, Supp>;
 
 const MAX_FILE = 32 * 1024 * 1024;
+// Every tab the deal page renders an "Add info" box on (deal-view.tsx's
+// AddData calls) must be here, or its note and file are dropped without a
+// word — the Documents tab's were, until "documents" was added.
+// lib/supplement-actions.test.ts drives each tab the page names.
 const VALID_TABS = new Set([
   "terms",
   "challenger",
@@ -24,6 +28,7 @@ const VALID_TABS = new Set([
   "reconciler",
   "market",
   "verdict",
+  "documents",
   "overview",
 ]);
 

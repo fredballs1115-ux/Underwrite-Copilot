@@ -37,6 +37,11 @@ export interface Benchmark {
   as_of: string;
   status: ResearchStatus;
   note?: string | null;
+  /** a research-tracker figure's own provenance in one line — its house,
+   *  the area it covers and its period, as its block states them
+   *  (lib/tracker-read's `figureNote`); a row that carries one has `as_of`
+   *  as the day the research was read, not the figure's date */
+  cite?: string | null;
 }
 
 /** What the evaluator knows about this deal + buyer. Every field optional —
@@ -52,8 +57,9 @@ export interface RuleSubject {
   units?: number;
   building_permit_year?: number;
   built_year?: number;
-  /** "now" for rolling-age tests (MoCo's under-23-years exemption) — injected
-   *  so evaluation stays deterministic and testable */
+  /** "now" for rolling-age tests (MoCo's under-23-years exemption, the CA and
+   *  WA caps' new-building exemptions) — injected so evaluation stays
+   *  deterministic and testable */
   current_year?: number;
   municipality_population?: number;
   /** CURRENT status ("vacant_registered", "non_owner_occupied_rental", …) —
@@ -212,7 +218,10 @@ function evalCondition(key: string, want: unknown, s: RuleSubject): Tri {
       .map((w) => evalConditions(w as Record<string, unknown>, s).result)
       .reduce<Tri>((acc, t) => or(acc, t), "no");
   }
-  if (key === "see_rule") return "yes"; // cross-reference, informational only
+  // A cross-reference `evaluateRules` could not resolve to the rule it names
+  // is an open question, never a pass: read as "yes", it had exempted every
+  // rental deal in Prince George's County from the county's rent cap.
+  if (key === "see_rule") return "unknown";
 
   // permit/built-date comparisons operate on years — the deal stores a year
   if (key === "building_permit_issued_after") {
@@ -251,15 +260,22 @@ function evalCondition(key: string, want: unknown, s: RuleSubject): Tri {
     if (occ === undefined || s.units === undefined) return "unknown";
     return occ && s.units <= w ? "yes" : "no";
   }
-  // Rolling-age tests (MoCo's under-23-years exemption). The base
-  // "building_age_years" is derived, not a subject field — without this the
-  // generic sweep below would read undefined and stay unknown forever.
+  // Rolling-age tests: MoCo's under-23-years exemption, and the new-building
+  // exemptions from California's statewide cap (under 15 years) and
+  // Washington's (under 12). The base "building_age_years" is derived, not a
+  // subject field — without this the generic sweep below would read
+  // undefined and stay unknown forever. Read against `current_year`, so a
+  // window advances every January 1 on its own; a fixed "built after" date
+  // would be right for one year only.
   if (key === "building_age_years_lt") {
     const w = typeof want === "number" ? want : Number(want);
-    if (s.built_year === undefined || s.current_year === undefined || !Number.isFinite(w)) {
-      return "unknown";
-    }
-    return s.current_year - s.built_year < w ? "yes" : "no";
+    if (s.current_year === undefined || !Number.isFinite(w)) return "unknown";
+    if (s.built_year !== undefined) return s.current_year - s.built_year < w ? "yes" : "no";
+    // A permit comes before the building it permits, so a permit younger
+    // than the window proves the building is too; an older one proves
+    // nothing about when it was finished.
+    if (s.building_permit_year !== undefined && s.current_year - s.building_permit_year < w) return "yes";
+    return "unknown";
   }
 
   // comparator suffixes over numeric subject fields
@@ -305,6 +321,28 @@ function evalConditions(
  *  whether it sits inside the rule's city (`jurisdictionOf` "unknown"). */
 export const WITHIN_CITY_LIMITS = "within_city_limits";
 
+/**
+ * A rule's exemption conditions with its cross-reference resolved: an
+ * `exempt_if` of `{ see_rule: "<id>" }` means "exempt where the rule it names
+ * exempts", so the named rule's own `exempt_if` conditions stand in its
+ * place (Prince George's rent cap is lifted exactly where the county's
+ * small-landlord exemption holds). One level only; a reference to a rule the
+ * list does not hold, or one with no conditions, stays and reads "unknown".
+ */
+export function exemptionConditions(
+  rule: RegulatoryRule,
+  rules: readonly RegulatoryRule[],
+): Record<string, unknown> | null {
+  const conds = rule.exempt_if ?? null;
+  const ref = conds?.see_rule;
+  if (!conds || typeof ref !== "string") return conds;
+  const named = rules.find((r) => r.id === ref);
+  const theirs = named && named.id !== rule.id ? named.exempt_if : null;
+  if (!theirs || Object.keys(theirs).length === 0) return conds;
+  const rest = Object.fromEntries(Object.entries(conds).filter(([k]) => k !== "see_rule"));
+  return { ...rest, ...theirs };
+}
+
 /** Evaluate every jurisdiction-matched rule. Rules outside the deal's
  *  jurisdiction are omitted entirely (they're noise, not unknowns); a rule
  *  whose city the deal's names cannot place it in or out of (#452) reads
@@ -315,9 +353,10 @@ export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): Ru
     const where = jurisdictionOf(rule, subject);
     if (where === "no") continue;
     const applies = evalConditions(rule.applies_if, subject);
-    const exempt = evalConditions(rule.exempt_if ?? null, subject);
+    const exemptIf = exemptionConditions(rule, rules);
+    const exempt = evalConditions(exemptIf, subject);
     // exempt_if of null/{} means "no exemption path", not "always exempt":
-    const hasExemption = !!rule.exempt_if && Object.keys(rule.exempt_if).length > 0;
+    const hasExemption = !!exemptIf && Object.keys(exemptIf).length > 0;
     const exemptTri: Tri = hasExemption ? exempt.result : "no";
 
     let outcome: RuleEvaluation["outcome"];
@@ -345,6 +384,14 @@ export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): Ru
 export function hoursSince(iso: string, now = new Date()): number {
   const t = Date.parse(iso);
   return Number.isFinite(t) ? (now.getTime() - t) / 3_600_000 : Infinity;
+}
+
+/** A research figure's date as a page says it: "as of 2026-08-21", or
+ *  "undated" where its file states none — never a date the file does not
+ *  carry (hard-coded fallback dates once stood in for a missing one). */
+export function asOfLabel(asOf: string | null | undefined): string {
+  const d = typeof asOf === "string" ? asOf.trim() : "";
+  return d ? `as of ${d}` : "undated";
 }
 
 /** >180 days old = stale, per the build spec. */

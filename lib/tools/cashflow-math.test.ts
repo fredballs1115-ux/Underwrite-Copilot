@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { analyzeStrip, readStrip } from "./cashflow-math";
+import { irr } from "@/lib/underwrite/engine";
+import { analyzeStrip, readStrip, signChanges } from "./cashflow-math";
 
 describe("reading a pasted column", () => {
   it("takes what Excel's clipboard actually puts on it", () => {
@@ -158,11 +159,60 @@ describe("the strips that have no answer, said out loud", () => {
 
   it("says so when no single rate solves the strip", () => {
     // Two sign changes: the classic multiple-IRR shape. Reporting one root
-    // of several as "the" IRR is the wrong answer, not a rounding issue.
+    // of several as "the" IRR is the wrong answer, not a rounding issue —
+    // and this test used to let it through: the engine returns the lower
+    // root, 100%, and the assertion only ran when the IRR was null.
     const r = analyzeStrip([-1000, 5000, -6000]);
-    if (r.irrPct === null) expect(r.note).toContain("ambiguous");
-    // Either way the multiple and profit are still true and still shown.
+    expect(r.irrPct).toBeNull();
+    expect(r.irrRoots.map((x) => Math.round(x * 10) / 10)).toEqual([100, 200]);
+    expect(r.note).toContain("More than one rate solves this strip — 100.0% and 200.0% both do");
+    // The multiple and profit are still true and still shown.
     expect(r.profit).toBe(-2000);
+  });
+
+  it("never prints one of two rates as THE IRR", () => {
+    // −100 + 230/(1+r) − 132/(1+r)² is zero at 10% and at 20%. The card
+    // printed 10.0% with no warning.
+    const r = analyzeStrip([-100, 230, -132]);
+    expect(r.irrPct).toBeNull();
+    expect(r.irrRoots.map((x) => Math.round(x * 1000) / 1000)).toEqual([10, 20]);
+    expect(r.note).toContain("10.0% and 20.0% both do");
+    expect(r.fromResidualPct).toBeNull();
+  });
+
+  it("finds a conventional strip's one rate past the engine's scan, and never calls it ambiguous", () => {
+    // One sign change has exactly one rate. The engine scans −90% to 500%
+    // and found neither of these, and the card said the strip "changes sign
+    // more than once" — of a strip that changes sign once.
+    const big = analyzeStrip([-100, 700]);
+    expect(big.irrPct).toBeCloseTo(600, 6);
+    expect(big.note).toBe("");
+    const lost = analyzeStrip([-100, 5]);
+    expect(lost.irrPct).toBeCloseTo(-95, 6);
+    expect(lost.note).toBe("");
+  });
+
+  it("says a rate past even the wide search is outside it, not ambiguous", () => {
+    const r = analyzeStrip([-1, 0.0000001]);
+    expect(r.irrPct).toBeNull();
+    expect(r.note).toBe("The rate is outside the range searched, between -99.99% and 100,000%.");
+    expect(r.note).not.toContain("more than once");
+  });
+
+  it("keeps the engine's figure, the workbook's, wherever it has one", () => {
+    const seed = [-10_000_000, 650_000, 700_000, 750_000, 800_000, 15_200_000];
+    expect(analyzeStrip(seed).irrPct).toBe(irr(seed)! * 100);
+    // Three sign changes and one rate found: shown, and said to be possibly
+    // not the only one.
+    const r = analyzeStrip([-100, 300, -300, 100.9]);
+    expect(r.irrPct).toBe(irr([-100, 300, -300, 100.9])! * 100);
+    expect(r.note).toContain("may not be unique");
+  });
+
+  it("counts the sign changes, zeros skipped", () => {
+    expect(signChanges([-100, 0, 50, 60])).toBe(1);
+    expect(signChanges([-100, 230, -132])).toBe(2);
+    expect(signChanges([0, 0, 5])).toBe(0);
   });
 
   it("every note it can produce is a sentence", () => {

@@ -25,9 +25,11 @@
  */
 
 import { withArticle } from "@/lib/article";
-import { groundRentOf, interestOf } from "@/lib/interest";
+import { dealTypeLabel, groundRentOf, interestOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { assetWords } from "@/lib/asset-words";
+import { assetClassKey, assetWords } from "@/lib/asset-words";
+import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
+import { yieldOnCostText } from "@/lib/plan-facts";
 import {
   LATER_YEAR,
   METRIC_FIND,
@@ -86,6 +88,24 @@ export const STRATEGY_READING: Record<StrategyKind, string> = {
  *  US property; anything past it is a pro forma on a different basis or a
  *  misread. */
 export const IMPLIED_CAP_CEILING = 0.25;
+
+/**
+ * The first signal's going-in cap, where it can be a cap on the price at
+ * all: the signal is a fast read with no label to check, so a figure at or
+ * under 0.5%, or past IMPLIED_CAP_CEILING (a 105% "cap" is a yield on cost
+ * or a pro forma), is none. The deal page's summary bar and the model's
+ * market read (`modelVsMarketFor`, behind the page, the report and the
+ * workbook) both fall back to it where the extraction states no going-in
+ * cap, so the three set the exit against one figure.
+ */
+export function signalGoingInCap(
+  signal: { goingInCap?: string | null } | null | undefined,
+): { text: string; pct: number } | null {
+  const text = signal?.goingInCap?.trim() || null;
+  if (!text) return null;
+  const pct = Number(text.replace(/[^\d.]/g, ""));
+  return Number.isFinite(pct) && pct > 0.5 && pct <= IMPLIED_CAP_CEILING * 100 ? { text, pct } : null;
+}
 
 interface MetricLike {
   label: string;
@@ -296,12 +316,68 @@ const NON_STABILIZED: ReadonlySet<StrategyKind> = new Set([
 /** A deal with a plan: the stabilized figures describe the finished project. */
 export const isPlanDeal = (kind: StrategyKind): boolean => NON_STABILIZED.has(kind);
 
+/**
+ * Whether the deal builds something, so what building costs speaks to it:
+ * a development or a conversion, or a value-add that states its budget (in
+ * total, or a door at a time). A lease-up's building is already built, and
+ * a value-add with no budget has none to check an escalation against — the
+ * construction-cost lines of the market check read this, never the wider
+ * `isPlanDeal` (the audit of 2026-09-30).
+ */
+export function buildsSomething(extraction: ExtractionResult | null | undefined, kind: StrategyKind): boolean {
+  if (kind === "development" || kind === "conversion") return true;
+  if (kind !== "value_add" || !extraction) return false;
+  const metrics = extraction.metrics ?? [];
+  return capitalBudgetFromMetrics(metrics, null) != null || renovationProgramBudget(metrics, null) != null;
+}
+
 // ── The plan's cost ──────────────────────────────────────────────────────
 
-const BUDGET_INCLUDE =
-  /renovation (budget|cost|plan)|capex budget|capital (budget|plan|improvements?|expenditures?)|construction (cost|budget)|hard costs?|redevelopment (cost|budget)|conversion (cost|budget)|improvement budget|total (project|development) cost|all[- ]?in (cost|basis)/i;
-const BUDGET_EXCLUDE = /\bper\b|\/|psf|unit|reserve|annual|\byr\b|year/i;
-const ALL_IN = /total (project|development) cost|all[- ]?in/i;
+// The plan's cost is read from ONE row, and never from a line of the
+// budget. The first matching row had won, so an extraction that listed
+// "Hard costs" before "Total project cost" dropped the soft costs and the
+// land, and flattered the yield on cost.
+//
+// A TOTAL — the whole project's cost, the price inside it — wins wherever
+// it sits.
+const TOTAL_ROW = /total (project|development) (cost|budget)s?|total capitali[sz]ation|all[- ]?in (cost|basis|budget)/i;
+// Else a budget for the WORKS as a whole: hard and soft, the price outside it.
+const WORKS_ROW =
+  /renovation (budget|cost|plan)|capex budget|capital (budget|plan|improvements?|expenditures?)|construction (cost|budget)|redevelopment (cost|budget)|conversion (cost|budget)|improvement budget|hard (and|&|\+) soft/i;
+// A rate, an annual figure or a reserve is no budget. An interest reserve a
+// total says it includes is a note on the total, not a reserve row.
+const BUDGET_EXCLUDE = /\bper\b|\/|psf|unit|(?<!interest[\s-])reserve|annual|\byr\b|year/i;
+const ALL_IN = /total (project|development) (cost|budget)|total capitali[sz]ation|all[- ]?in/i;
+// A LINE of the budget, never the whole of it: hard costs without the soft
+// (or soft without the hard), the land or the site, a contingency, a
+// developer's fee, FF&E, the interest reserve or the financing — unless the
+// label names it only to say what the figure includes or leaves out
+// ("incl. contingency", "excl. land").
+const LINE_ITEM =
+  /\bhard\b|\bsoft\b|\bland\b|\bsite\b|\bcontingenc(?:y|ies)\b|\bdevelop(?:er|ment)(?:'s|s)?\s+fees?\b|\bff\s*&\s*e\b|\bffe\b|\bfurniture\b|\binterest\s+reserves?\b|\bcapitali[sz]ed\s+interest\b|\bcarry(?:ing\s+costs?)?\b|\bfinancing\s+(?:costs?|fees?)\b/gi;
+const NOTE_BEFORE =
+  /\b(?:incl(?:\.|uding|udes|usive\s+of)?|with|plus|excl(?:\.|uding|udes|usive\s+of)?|ex\.|net\s+of|before|without|less|except|not\s+including)(?=\W|$)/i;
+const NOTE_AFTER = /^\s*(?:(?:is|are)\s+)?(?:excluded|included|not\s+included)\b/i;
+const CLAUSE_BREAK = /[;:(),–—|]/g;
+
+/** Whether a works row's label names one line of the budget rather than
+ *  the whole (a hard-costs line, a contingency) — hard and soft together
+ *  are the works' whole. */
+function isLineItemRow(label: string): boolean {
+  const items: string[] = [];
+  for (const m of label.matchAll(LINE_ITEM)) {
+    const at = m.index ?? 0;
+    const lead = label.slice(0, at);
+    const clause = lead.slice(Math.max(0, ...[...lead.matchAll(CLAUSE_BREAK)].map((b) => (b.index ?? 0) + 1)));
+    const tail = label.slice(at + m[0].length).split(CLAUSE_BREAK)[0];
+    if (NOTE_BEFORE.test(clause) || NOTE_AFTER.test(tail)) continue;
+    items.push(m[0].toLowerCase());
+  }
+  const others = items.filter((i) => i !== "hard" && i !== "soft");
+  const hard = items.includes("hard");
+  const soft = items.includes("soft");
+  return others.length > 0 || hard !== soft;
+}
 
 export interface CapitalBudget {
   /** the plan's spend, $ — excludes the price even when the OM stated an all-in figure */
@@ -314,6 +390,11 @@ export interface CapitalBudget {
   /** the renovation program's doors times its cost a door, both as stated,
    *  the memorandum stating no total (#460) — derived, and labelled so */
   program?: boolean;
+  /** the budget's own words say it already carries the construction loan's
+   *  interest reserve — capitalized interest, carry, financing costs (lib/
+   *  construction-debt `budgetIncludesInterestReserve`); set only when true,
+   *  and the construction panel then adds no reserve on top */
+  includesReserve?: boolean;
   label: string;
   page?: string;
 }
@@ -332,20 +413,30 @@ function budgetPlausible(budget: number, price: number | null, priceIsWholeAsset
 }
 
 /**
- * The plan's cost from the metrics. A "total project cost" includes the
- * price; a budget line does not. Bounded so a mis-parsed figure never lands
- * here (nothing, or ten times a whole-asset price, is not a budget) — and
- * never invented: absent is absent. On a development the price is the
- * LAND cost, routinely a tenth of the works or less, so the ten-times
- * bound applies only when the price is the whole asset's
- * (`priceIsWholeAsset`, which callers read off the price row's label).
+ * The plan's cost from the metrics. A total — "total project cost", "total
+ * development cost", "total capitalization", an all-in cost — includes the
+ * price and wins wherever it sits among the rows; else a budget for the
+ * works as a whole ("construction budget", "renovation budget", hard and
+ * soft together), which does not. A line of the budget — hard costs alone,
+ * soft costs alone, the land, a contingency, a developer fee, FF&E — is
+ * never taken for the total, and several lines are never summed into one:
+ * with only lines stated there is no stated total, and the reader says
+ * none. Bounded so a mis-parsed figure never lands here (nothing, or ten
+ * times a whole-asset price, is not a budget) — and never invented: absent
+ * is absent. On a development the price is the LAND cost, routinely a
+ * tenth of the works or less, so the ten-times bound applies only when the
+ * price is the whole asset's (`priceIsWholeAsset`, which callers read off
+ * the price row's label).
  */
 export function capitalBudgetFromMetrics(
   metrics: MetricLike[],
   price: number | null,
   priceIsWholeAsset = true,
 ): CapitalBudget | null {
-  const m = findMetric(metrics, BUDGET_INCLUDE, BUDGET_EXCLUDE) as MetricLike | null;
+  const m =
+    metrics.find((r) => TOTAL_ROW.test(r.label) && !BUDGET_EXCLUDE.test(r.label)) ??
+    metrics.find((r) => WORKS_ROW.test(r.label) && !BUDGET_EXCLUDE.test(r.label) && !isLineItemRow(r.label)) ??
+    null;
   if (!m) return null;
   // A cost is read as a price is (#466): a range's top, the end that does
   // not flatter the yield on it.
@@ -357,7 +448,14 @@ export function capitalBudgetFromMetrics(
   const allIn = statedAllIn && price != null;
   const budget = statedAllIn && price != null ? raw - price : raw;
   if (!budgetPlausible(budget, price, priceIsWholeAsset)) return null;
-  return { budget, allIn, isTotal: statedAllIn && price == null, label: m.label, page: m.page };
+  return {
+    budget,
+    allIn,
+    isTotal: statedAllIn && price == null,
+    ...(budgetIncludesInterestReserve(m.label, m.value) ? { includesReserve: true } : {}),
+    label: m.label,
+    page: m.page,
+  };
 }
 
 /** Whether a price row is the land or site — a development's acquisition
@@ -417,6 +515,25 @@ export function buildingPriceOf(
 export function statedBasisIsBuildings(extraction: ExtractionResult | null | undefined): boolean {
   const { kind } = interestOf(extraction);
   return kind !== "note" && kind !== "leased_fee" && kind !== "partial_interest";
+}
+
+// An outdoor-storage yard's words: industrial outdoor storage, a truck
+// terminal or yard, a storage yard.
+const YARD_WORDS = /\b(industrial outdoor storage|outdoor storage|ios|truck (terminal|yard)|storage yard)\b/i;
+const SELF_STORAGE_WORDS = /\b(self[- ]?storage|mini[- ]?storage)\b/i;
+
+/**
+ * Whether the deal's class, in the deck's own words, is an outdoor-storage
+ * yard. A yard trades by the usable acre, and its price over the small shop
+ * building on it is no basis — so the plausibility check holds it to no
+ * per-SF band, and no surface prints, ticks or pools a per-SF figure for it
+ * (the pipeline card's basis, the comps' subject tick, the market memory,
+ * the internal comps). A self-storage facility that also lets outdoor
+ * storage is priced by its buildings' feet, and is not one.
+ */
+export function isOutdoorStorageYard(assetClass: string | null | undefined): boolean {
+  const words = assetClass ?? "";
+  return YARD_WORDS.test(words) && !SELF_STORAGE_WORDS.test(words);
 }
 
 /** The price row a figure is wanted from — the LOI's prefill: among the
@@ -537,6 +654,7 @@ export function budgetFromText(
     budget,
     allIn,
     isTotal,
+    ...(budgetIncludesInterestReserve(null, text) ? { includesReserve: true } : {}),
     label: isTotal ? "stated total project cost" : "stated capital budget",
   };
 }
@@ -857,6 +975,14 @@ export function assessPlausibility(
   // A leased fee's price buys the land alone: over the building's units or
   // feet it is no basis any building market trades at, and never a misread.
   const landOnly = interest.kind === "leased_fee";
+  // A data center is priced by its power, not its floor, so a fitted one
+  // runs past the ceiling any warehouse sets; and an outdoor-storage yard's
+  // price over the small building on it says nothing about the yard, which
+  // trades by the usable acre. Neither is a misread (the site-researcher's
+  // pass of 2026-09-30): the data center is held to the band's floor only,
+  // the yard to no per-SF band at all.
+  const perSfCeiling = assetClassKey(cls) === "data_center" ? Number.POSITIVE_INFINITY : 3_000;
+  const yard = isOutdoorStorageYard(extraction.assetClass);
   if (!landOnly && basisTotal != null && cls && words.basis === "unit" && units != null && units >= 1 && units <= 50_000) {
     const perUnit = basisTotal / units;
     if (perUnit < 15_000 || perUnit > 2_500_000) {
@@ -867,9 +993,9 @@ export function assessPlausibility(
         detail: misread(`${noun.one} count`),
       });
     }
-  } else if (!landOnly && basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
+  } else if (!landOnly && !yard && basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
     const perSf = basisTotal / sf;
-    if (perSf < 5 || perSf > 3_000) {
+    if (perSf < 5 || perSf > perSfCeiling) {
       findings.push({
         code: "basis_out_of_band",
         severity: "medium",
@@ -920,7 +1046,9 @@ function planLine(plan: PlanSummary): string {
       : "construction / renovation budget not stated in the figures",
   );
   if (plan.totalCost != null) parts.push(`total cost ${money(plan.totalCost)}`);
-  if (plan.yieldOnCost != null) parts.push(`yield on total cost ${pct(plan.yieldOnCost, 1)}`);
+  // As the deal page prints it, so a verdict that quotes it quotes the
+  // page's own figure.
+  if (plan.yieldOnCost != null) parts.push(`yield on total cost ${yieldOnCostText(plan.yieldOnCost)}`);
   parts.push(plan.timeline ? `timeline: ${plan.timeline}` : "timeline to stabilization not stated");
   if (plan.capitalBudgetText) parts.push(`budget as worded: ${plan.capitalBudgetText}`);
   return parts.join("; ");
@@ -935,16 +1063,20 @@ export function plausibilityNote(
   findings: PlausibilityFinding[],
   strategy: DealStrategy,
   plan: PlanSummary | null = null,
+  /** the extraction, which says what the price buys: on a note or a leased
+   *  fee the type is said as whose strategy it is (lib/interest
+   *  `dealTypeLabel`), the collateral's or the leaseholder's building's */
+  extraction: ExtractionResult | null = null,
 ): string {
   const bits: string[] = [];
   if (isPlanDeal(strategy.kind)) {
     // An inferred plan deal's summary IS the reading line; print it once.
     const reading = STRATEGY_READING[strategy.kind];
     const summary = strategy.summary && strategy.summary !== reading ? ` — ${strategy.summary}` : "";
-    bits.push(`DEAL STRATEGY: ${strategy.label}${summary} ${reading}`);
+    bits.push(`DEAL STRATEGY: ${dealTypeLabel(strategy.label, extraction)}${summary} ${reading}`);
     if (plan) bits.push(`THE PLAN AS THE OM STATES IT: ${planLine(plan)}.`);
     bits.push(
-      "The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income, and it is expected to sit far above the acquisition price. Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.",
+      "The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today. Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.",
     );
   }
   if (findings.length) {

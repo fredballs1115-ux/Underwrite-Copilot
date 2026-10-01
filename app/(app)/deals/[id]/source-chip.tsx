@@ -16,7 +16,9 @@ export function SourceChip({
   note,
 }: {
   fact: DealFact;
-  /** signed OM url; when present a located chip links to #page=N */
+  /** the deal's OM route (lib/om-link: `/api/deals/<id>/om`, which signs the
+   *  file when clicked); when present a located chip links to it at
+   *  `#page=N` */
   omUrl?: string | null;
   /** plain-English derivation for an ƒ chip */
   note?: string;
@@ -58,6 +60,10 @@ export function SourceChip({
   const hover = [fact.locatorSnippet, fact.docLabel].filter(Boolean).join(" · ");
   const chip = `p.${fact.pageNumber}`;
   if (omUrl) {
+    // The page rides as the fragment on the route's URL. The route answers
+    // with a redirect whose Location has no fragment, and a browser keeps
+    // the request's fragment across such a redirect, so the signed PDF
+    // opens at this page.
     return (
       <a
         href={`${omUrl}#page=${fact.pageNumber}`}

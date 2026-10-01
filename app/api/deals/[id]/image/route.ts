@@ -17,8 +17,9 @@
 // from the reader's own pipeline, the deal page's sticky bar and the
 // pipeline map's hover card: the overheads are never tried, and where no
 // photograph of the building answers, the deal's cover is drawn instead
-// (lib/deal-cover-art `coverSvg`: its gradient and its kind of building,
-// the one the pipeline's card wears). A cover, plainly not a photograph.
+// (lib/deal-cover-art `coverSvg`: its kind of building under its own sky,
+// the one the pipeline's card wears, laid out for the frame asked for). An
+// illustration, plainly not a photograph.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
@@ -27,7 +28,7 @@ import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT, SEARCH_WAIT_MS, ensureDealPicture, pictureSizeFor } from "@/lib/deal-picture";
 import { IMAGE_CREDIT, fetchBestBuildingImage } from "@/lib/imagery";
 import { coverFor } from "@/lib/deal-cover";
-import { coverSvg } from "@/lib/deal-cover-art";
+import { COVER_EDITION, coverSvg } from "@/lib/deal-cover-art";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 
 const SIZE = { min: 48, max: 1280, defaultW: 800, defaultH: 450 };
@@ -81,7 +82,7 @@ export async function GET(
   // deals' pictures the next day rather than after a week of aerials.
   const etag = picture
     ? `W/"${picture[pictureSizeFor({ width, height })]}"`
-    : `W/"map:${cache?.geoAt ?? ""}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? ":cover" : ""}"`;
+    : `W/"map:${cache?.geoAt ?? ""}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? `:cover${COVER_EDITION}` : ""}"`;
   const revalidate = { etag, "cache-control": "private, no-cache" };
   if (req.headers.get("if-none-match") === etag) {
     return new NextResponse(null, { status: 304, headers: revalidate });
@@ -101,7 +102,7 @@ export async function GET(
       seed: id,
       assetClass: shownAssetClass(row.asset_class ?? null, { assetClass: row.extracted_class ?? null }),
     });
-    return new NextResponse(coverSvg(cover.kind, cover.tone, width, height), {
+    return new NextResponse(coverSvg(cover, width, height), {
       headers: {
         "content-type": "image/svg+xml; charset=utf-8",
         // An SVG opened on its own is a document: this one carries no script

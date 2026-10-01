@@ -114,9 +114,12 @@ export interface FloatingRead {
   /** Whether the cap engages before the covenant breaks. The headline. */
   capProtects: boolean | null;
 
-  /** The all-in rate if the index sat at the strike all year. */
+  /** The highest all-in rate the loan can pay: the strike plus the spread,
+   *  or the floor plus the spread where the floor sits above the strike. */
   worstCaseRatePct: number | null;
   worstCaseDscr: number | null;
+  /** Which term sets the worst case — the card labels its DSCR by it. */
+  worstCaseAt: "strike" | "floor" | null;
   /** DSCR with no cap at all, at the breach point — always the covenant. */
   rateBandLowPct: number | null;
   rateBandHighPct: number | null;
@@ -181,6 +184,7 @@ export function readFloating(t: FloatingTerms): FloatingRead {
     capProtects: null,
     worstCaseRatePct: null,
     worstCaseDscr: null,
+    worstCaseAt: null,
     rateBandLowPct: null,
     rateBandHighPct: null,
     capCostBps: null,
@@ -248,8 +252,18 @@ export function readFloating(t: FloatingTerms): FloatingRead {
         ? t.capStrikePct < breachIndexPct
         : false;
 
+  // The highest rate the loan can pay. Above the strike the cap holds it at
+  // the strike plus the spread — but a floor set ABOVE the strike is paid in
+  // full whenever the index sits under it, with no cap payment below the
+  // strike and only a partial one between the two, so there the worst is
+  // the floor plus the spread (the rule-2 formula, maximised). The first
+  // version took the strike whatever the floor: 7.00% on a loan that pays
+  // 7.50% at a 4.50% floor over a 4.00% strike.
+  const floorPctOrNull = real(t.indexFloorPct) ? t.indexFloorPct : null;
+  const floorAboveStrike =
+    floorPctOrNull !== null && positive(t.capStrikePct) && floorPctOrNull > t.capStrikePct;
   const worstCaseRatePct = positive(t.capStrikePct)
-    ? round2(t.capStrikePct + spreadPct)
+    ? round2((floorAboveStrike ? (floorPctOrNull as number) : t.capStrikePct) + spreadPct)
     : null;
   const worstK =
     worstCaseRatePct === null ? null : loanConstant(worstCaseRatePct, t.amortYears, io);
@@ -259,9 +273,15 @@ export function readFloating(t: FloatingTerms): FloatingRead {
       ? Math.round((t.noi / worstDs) * 100) / 100
       : null;
 
-  const rateBandLowPct = real(t.indexFloorPct)
-    ? round2(t.indexFloorPct + spreadPct)
-    : round2(spreadPct);
+  // …and the lowest: the floor plus the spread — except where the floor is
+  // above the strike, when an index past the floor is reimbursed down to the
+  // strike, so the band runs from the strike to the floor rather than the
+  // other way up.
+  const rateBandLowPct = floorAboveStrike
+    ? round2((t.capStrikePct as number) + spreadPct)
+    : floorPctOrNull !== null
+      ? round2(floorPctOrNull + spreadPct)
+      : round2(spreadPct);
   const rateBandHighPct = worstCaseRatePct;
 
   // Rule 3: the premium said as a rate, which is the only unit in which it
@@ -299,6 +319,7 @@ export function readFloating(t: FloatingTerms): FloatingRead {
     capProtects,
     worstCaseRatePct,
     worstCaseDscr,
+    worstCaseAt: worstCaseRatePct === null ? null : floorAboveStrike ? "floor" : "strike",
     rateBandLowPct,
     rateBandHighPct,
     capCostBps,
@@ -314,6 +335,8 @@ export function readFloating(t: FloatingTerms): FloatingRead {
       atCap,
       dscr,
       covenantDscr: positive(t.covenantDscr) ? t.covenantDscr : null,
+      indexPct: t.indexPct,
+      floorPct: floorPctOrNull,
     }),
   };
 }
@@ -327,6 +350,8 @@ function noteFor(s: {
   atCap: boolean;
   dscr: number | null;
   covenantDscr: number | null;
+  indexPct: number;
+  floorPct: number | null;
 }): string | null {
   // Worst first: already through the covenant is not a warning about the
   // future, it is a description of now.
@@ -338,6 +363,16 @@ function noteFor(s: {
   }
   if (s.capProtects === false && s.capStrikePct === null) {
     return "No cap: nothing stops the rate, and the covenant is the only limit.";
+  }
+  if (s.atCap && s.atFloor && s.floorPct !== null) {
+    // Over the strike and under the floor at once, which only a floor set
+    // ABOVE the strike allows: the note charges the floor and the cap pays
+    // back the index's run over the strike, so the rate sits over the
+    // strike's by the floor less the index — and a fall in the index takes
+    // the cap's payment away while the floor holds, raising the rate. The
+    // sentence below had said the rate was fixed at the strike here.
+    const overBps = round((s.floorPct - s.indexPct) * 100);
+    return `The index sits between the strike and a floor set above it: the note charges the ${s.floorPct.toFixed(2)}% floor and the cap pays back only the index's run over the strike, so the rate is ${overBps} bps over the strike's — and a further fall in the index raises it.`;
   }
   if (s.atCap) {
     return "The index is above the strike, so the cap is paying and the rate is fixed at the strike.";

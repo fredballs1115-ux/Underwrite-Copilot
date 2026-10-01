@@ -36,13 +36,30 @@
 //
 // THE COLLATERAL'S VALUE IS THE OM'S. Loan-to-value at the balance and at
 // the price are two divisions by the value the memorandum states — the
-// cushion under the lender and under the buyer — never a value of ours.
+// cushion under the lender and under the buyer — never a value of ours. And
+// only for a note nothing ranks ahead of: a mezzanine loan, a second or
+// junior lien, a B-note, subordinate debt or a position behind a senior loan
+// is at risk from its LAST dollar, which sits on top of the senior balance —
+// $15M behind a $60M senior loan on a $70M value had read 21% where the
+// stack is 107%. The memorandum states no senior balance (the extraction has
+// no row for one), so the loan-to-value is withheld, never computed. The
+// position is read from the words only where they place THIS note (a second
+// lien, a B-note, a junior participation, "behind a $60M senior loan"); a
+// mention of other debt beside a first-lien note leaves it first, a negated
+// one ("no mezzanine or junior debt") is no mention, and a bare mention with
+// nothing to place the note is said as unclear, never as a senior loan ahead
+// of it (the audit of 2026-10-01).
 
 import { withArticle } from "@/lib/article";
 import { parseUsd } from "@/lib/money";
 import { irr } from "@/lib/underwrite/engine";
 
 export type NoteStatus = "performing" | "non_performing";
+
+/** Where the note sits, as its words place it: "first" (nothing named
+ *  ahead of it), "behind" (the words put this note behind other debt), or
+ *  "unclear" (they name other debt without saying which comes first). */
+export type NotePosition = "first" | "behind" | "unclear";
 
 export interface NoteTerms {
   /** the unpaid principal balance, as stated */
@@ -61,6 +78,13 @@ export interface NoteTerms {
   status: NoteStatus | null;
   /** the collateral's value as the OM states it */
   collateralValue: number | null;
+  /** the note sits behind other debt, or may, as the memorandum's words for
+   *  it say (`isSubordinateNote`): its loan-to-value needs a senior balance
+   *  the memorandum does not state, and is withheld */
+  subordinate: boolean;
+  /** which of the two: placed behind other debt, or named beside it with no
+   *  order stated (`notePosition`); absent reads as `subordinate` says */
+  position?: NotePosition;
 }
 
 export interface NoteRead {
@@ -81,9 +105,12 @@ export interface NoteRead {
    *  years from today's balance", or run interest-only where the OM states
    *  an interest-only period beside an amortization */
   paymentBasis: string | null;
-  /** the balance over the collateral's stated value, percent */
+  /** the balance over the collateral's stated value, percent — null on a
+   *  subordinate note, whose loan-to-value runs on top of a senior balance
+   *  the memorandum does not state */
   ltvAtBalancePct: number | null;
-  /** the price over the collateral's stated value, percent */
+  /** the price over the collateral's stated value, percent — null on a
+   *  subordinate note, as above */
   ltvAtPricePct: number | null;
   /** past maturity on the reading's date */
   matured: boolean;
@@ -149,7 +176,84 @@ export function parseStatedDate(text: string | null | undefined, minYear: number
   return null;
 }
 
-type MetricRows = { metrics?: Array<{ label: string; value: string }> } | null | undefined;
+type MetricRows =
+  | {
+      metrics?: Array<{ label: string; value: string }>;
+      /** the interest as the extraction states it — its sentence and the
+       *  loan's terms, read for the note's position */
+      interest?: { summary?: string | null; loan?: string | null } | null;
+    }
+  | null
+  | undefined;
+
+// The note named AHEAD of the other loan: "senior to a $10M B-note", "ahead
+// of the mezzanine loan", "a $5M mezzanine loan sits behind it".
+const THIS_NOTE = String.raw`(?:it|this\s+(?:loan|note|mortgage|lien))\b`;
+const RANKS_AHEAD = new RegExp(
+  String.raw`\bsenior\s+to\b|\bahead\s+of\b|\bbehind\s+${THIS_NOTE}|\b(?:subordinat(?:e|ed)|junior)\s+to\s+${THIS_NOTE}`,
+  "i",
+);
+// The note placed BEHIND another: "behind a $60M senior loan", "a position
+// behind the senior lender", "subordinate to the A-note", "junior to the
+// first mortgage". "Behind" alone is no position: a borrower "4 months
+// behind on payments" is a payment status.
+const RANKS_BEHIND = new RegExp(
+  String.raw`\bbehind\s+(?!${THIS_NOTE})(?:an?|the|its|\$)[^.;]{0,60}?\b(?:loans?|liens?|mortgages?|notes?|lenders?|debt|financing)\b|\b(?:subordinat(?:e|ed)|junior)\s+to\b(?!\s+${THIS_NOTE})`,
+  "i",
+);
+// Words that describe THIS note as subordinate by what it is: a second
+// lien, a B-note or B-piece, a junior or subordinate participation, piece,
+// note or lien, a note said to be junior, or the sale of a mezzanine loan.
+const SUBORDINATE_SELF =
+  /\b(?:second|2nd|third|3rd)[\s-]+(?:lien|mortgage|position|priority|trust[\s-]+deed|deed[\s-]+of[\s-]+trust)\b|\bb[\s-]?notes?\b|\bb[\s-]pieces?\b|\b(?:junior|subordinat(?:e|ed))[\s-]+(?:participations?|pieces?|tranches?|interests?|notes?|loans?|liens?|positions?|debt|financing|mortgages?)\b|\b(?:is|are|ranks?|sits?)\s+(?:junior|subordinat(?:e|ed))\b|\b(?:sale|offering|purchase|acquisition)\s+of\s+(?:an?|the)\s+(?:\$[\d.,]+\s*[mk]?\s+)?(?:(?:non[\s-]?)?performing\s+)?mezz(?:anine)?\b|\(\s*mezz(?:anine)?\s*\)/i;
+// A junior piece OF a first loan is still junior: "a junior participation
+// in a $50M first mortgage loan", "the B-note of a first mortgage".
+const PIECE_OF_FIRST = /\b(?:junior|subordinat(?:e|ed)|b)[\s-]+(?:participations?|pieces?|tranches?|interests?|notes?)\s+(?:in|of)\b/i;
+// A mention of other debt that does not say whose it is.
+const OTHER_DEBT = /\bmezz(?:anine)?\b|\bjunior\b|\bsubordinat(?:e|ed)\b/i;
+// The note's own first position.
+const FIRST_SELF =
+  /\b(?:first|1st)[\s-]+(?:lien|mortgage|position|priority|trust[\s-]+deed|deed[\s-]+of[\s-]+trust)\b|\bsenior\s+(?:secured\s+)?(?:loan|note|mortgage|lien|position|debt)\b|\bA-notes?\b/i;
+// A mention struck by its own negation: "no mezzanine or junior debt", "not
+// subordinated to any other debt", "without any subordinate financing",
+// "non-subordinated". Its words are no evidence either way.
+const SUB_KEY = String.raw`(?:mezz(?:anine)?|junior|subordinat(?:e|ed|ion)|b[\s-]?notes?|b[\s-]pieces?|second[\s-]+(?:liens?|mortgages?)|2nd[\s-]+(?:liens?|mortgages?)|other\s+(?:debt|liens?|financing))`;
+const NEGATED = new RegExp(
+  String.raw`\b(?:no|not|non|nor|without|never|neither|free\s+(?:and\s+clear\s+)?of)[\s-]+(?:(?:any|other|additional|further|outstanding|existing)\s+){0,3}${SUB_KEY}(?:\s*(?:,|\bor\b|\bnor\b|\band\b)\s*(?:(?:any|other)\s+)?${SUB_KEY})*(?:\s+(?:to|debt|loans?|liens?|financing|interests?|positions?|notes?)\b(?:\s+(?:any|other|the|an?)\b)*(?:\s+(?:debt|loans?|liens?|financing|mortgages?))?)?`,
+  "gi",
+);
+
+/**
+ * Where the words for a note place it (the audit of 2026-10-01: a first-lien
+ * note "4 months behind on payments", or one stating "no mezzanine or junior
+ * debt", had been printed as sitting behind a senior loan):
+ * - "behind" where the words place THIS note behind other debt — a second
+ *   lien, a B-note, a junior participation, "behind a $60M senior loan",
+ *   "subordinate to the A-note" — unless they name it ahead of the other
+ *   ("a $40M A-note senior to a $10M B-note");
+ * - "first" where they name nothing behind which it sits, or name its own
+ *   first position beside a mention of other debt ("first mortgage note;
+ *   the borrower also has a mezzanine loan");
+ * - "unclear" where they mention other debt and nothing places the note.
+ * A negated mention is struck before any of it is read.
+ */
+export function notePosition(words: string | null | undefined): NotePosition {
+  const w = (words ?? "").replace(NEGATED, " ");
+  const behind = RANKS_BEHIND.test(w);
+  if (RANKS_AHEAD.test(w) && !behind) return "first";
+  if (behind) return "behind";
+  const first = FIRST_SELF.test(w);
+  if (SUBORDINATE_SELF.test(w)) return first && !PIECE_OF_FIRST.test(w) ? "first" : "behind";
+  if (OTHER_DEBT.test(w)) return first ? "first" : "unclear";
+  return "first";
+}
+
+/** Whether a note's loan-to-value must be withheld: its words place it
+ *  behind other debt, or name other debt with no order stated — a
+ *  loan-to-value withheld is the error that prints no wrong figure. */
+export function isSubordinateNote(words: string | null | undefined): boolean {
+  return notePosition(words) !== "first";
+}
 
 const rowOf = (ex: MetricRows, re: RegExp, not?: RegExp) =>
   (ex?.metrics ?? []).find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
@@ -194,9 +298,20 @@ export function noteTermRows<M extends { label: string; value: string }>(metrics
 }
 
 /** The note's terms from the rows the extraction is asked to label them
- *  — each only as stated, null where the OM says nothing. */
+ *  — each only as stated, null where the OM says nothing. Its position is
+ *  read from the interest's own sentence and terms and the note's rows. */
 export function readNoteTerms(ex: MetricRows): NoteTerms {
   const { balanceRow, rateRow, maturityRow, amortRow, ioRow, statusRow, valueRow } = noteRowsOf(ex);
+  // The payment status is no position ("4 months behind on payments"), so
+  // its row is not read for one.
+  const position = [
+    ex?.interest?.summary,
+    ex?.interest?.loan,
+    ...[balanceRow, rateRow, maturityRow, amortRow, ioRow].flatMap((r) => (r ? [r.label, r.value] : [])),
+  ]
+    .filter(Boolean)
+    .join(". ");
+  const placed = notePosition(position);
 
   const amortText = amortRow?.value ?? "";
   const statesIo =
@@ -225,6 +340,8 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
     amortYears,
     status,
     collateralValue: valueRow ? money(valueRow.value) : null,
+    subordinate: placed !== "first",
+    position: placed,
   };
 }
 
@@ -290,8 +407,11 @@ export function readNote(terms: NoteTerms, price: number | null, asOf: Date): No
     monthsLeft: months != null && !matured ? months : null,
     ytmPct,
     paymentBasis,
-    ltvAtBalancePct: terms.collateralValue != null ? (balance / terms.collateralValue) * 100 : null,
-    ltvAtPricePct: terms.collateralValue != null ? (price / terms.collateralValue) * 100 : null,
+    // Behind a senior loan the note's last dollar sits on top of a balance
+    // the memorandum does not state: withheld, never struck on the note's
+    // own balance alone.
+    ltvAtBalancePct: terms.collateralValue != null && !terms.subordinate ? (balance / terms.collateralValue) * 100 : null,
+    ltvAtPricePct: terms.collateralValue != null && !terms.subordinate ? (price / terms.collateralValue) * 100 : null,
     matured,
   };
 }

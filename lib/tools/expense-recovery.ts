@@ -28,9 +28,11 @@
  *   3. **A cap is cumulative or it is not**, and over a term the difference
  *      compounds. A **non-cumulative** cap measures each year against what
  *      was actually CHARGED last year, so unused headroom is lost — the
- *      tenant-friendly version. A **cumulative** cap measures against the
- *      base year compounded, so a quiet year banks room for a loud one.
- *      Both are called "a 5% cap" in a term sheet.
+ *      tenant-friendly version, and the reason it needs last year's
+ *      controllable figure (`priorControllable`) once the base year is more
+ *      than a year back. A **cumulative** cap measures against the base year
+ *      compounded, so a quiet year banks room for a loud one. Both are
+ *      called "a 5% cap" in a term sheet.
  *
  * Caps apply to CONTROLLABLE expenses only. Taxes, insurance and utilities
  * are conventionally carved out, which is why a 5% cap on a building whose
@@ -101,6 +103,10 @@ export interface RecoveryTerms {
   controllablePct: number | null;
   /** years between the base year and the year being reconciled */
   yearsSinceBase: number | null;
+  /** LAST year's controllable expenses as charged — building-wide, grossed
+   *  up, after last year's cap. What a non-cumulative cap is measured
+   *  against; the base year stands in only where it IS last year. */
+  priorControllable?: number | null;
   /** what the tenant paid in monthly estimates over the year */
   estimatedPaid: number | null;
 }
@@ -119,8 +125,10 @@ export interface RecoveryRead {
   increase: number | null;
   /** the cap's ceiling on the controllable part, null when uncapped */
   capCeiling: number | null;
-  /** what the cap took off the bill */
+  /** what the cap took off the bill — null where the cap cannot be measured */
   capSaved: number | null;
+  /** why a cap the lease has is not applied, where it cannot be */
+  capNote: string | null;
   /** the part of the increase the cap never touches */
   carvedOut: number | null;
   /** the increase after the cap */
@@ -145,6 +153,7 @@ const EMPTY: RecoveryRead = {
   increase: null,
   capCeiling: null,
   capSaved: null,
+  capNote: null,
   carvedOut: null,
   billable: null,
   tenantShare: null,
@@ -251,20 +260,38 @@ export function readRecovery(t: RecoveryTerms): RecoveryRead {
 
   let capCeiling: number | null = null;
   let capSaved = 0;
+  let capNote: string | null = null;
   if (t.capType !== "none" && positive(t.capPct)) {
     const years = positive(t.yearsSinceBase) ? Math.floor(t.yearsSinceBase) : 1;
     const c = t.capPct / 100;
     const baseControllable = baseGrossedUp * (controllable / 100);
     // Cumulative banks the unused room and compounds off the base year;
-    // non-cumulative measures one year at a time, so it is the allowance
-    // for a SINGLE year however long ago the base was struck. Same words
-    // in a term sheet, and over a term they are not the same money.
+    // non-cumulative measures one year at a time — against LAST year's
+    // controllable expenses as charged, plus one year's cap. Same words in a
+    // term sheet, and over a term they are not the same money. The first
+    // version struck the non-cumulative ceiling on the BASE year plus one
+    // year however long ago the base was struck, so $1M of controllable
+    // expenses rising 4% a year for three years under a 5% cap had $74,864
+    // of the $124,864 increase held back, where the cap holds back nothing:
+    // no year rose 5% on the year before it.
+    const prior = positive(t.priorControllable)
+      ? t.priorControllable
+      : years <= 1
+        ? baseControllable
+        : null;
     const ceilingTotal =
       t.capType === "cumulative"
         ? baseControllable * Math.pow(1 + c, years)
-        : baseControllable * (1 + c);
-    capCeiling = Math.max(0, ceilingTotal - baseControllable);
-    capSaved = Math.max(0, cappable - capCeiling);
+        : prior === null
+          ? null
+          : prior * (1 + c);
+    if (ceilingTotal === null) {
+      capNote =
+        "A non-cumulative cap is measured against last year's controllable expenses as charged, not the base year's — enter them to apply it. Until then nothing is held back.";
+    } else {
+      capCeiling = Math.max(0, ceilingTotal - baseControllable);
+      capSaved = Math.max(0, cappable - capCeiling);
+    }
   }
 
   const billable = increase - capSaved;
@@ -321,7 +348,8 @@ export function readRecovery(t: RecoveryTerms): RecoveryRead {
     baseGrossUpAdj: round(baseGrossUpAdj),
     increase: shownIncrease,
     capCeiling: capCeiling === null ? null : round(capCeiling),
-    capSaved: shownCapSaved,
+    capSaved: capNote === null ? shownCapSaved : null,
+    capNote,
     carvedOut: shownCarvedOut,
     billable: shownIncrease - shownCapSaved,
     tenantShare: shownShare,

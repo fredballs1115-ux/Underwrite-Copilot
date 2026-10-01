@@ -51,6 +51,7 @@
 
 import { withArticle } from "@/lib/article";
 import { readDebt } from "./debt-math";
+import { usdExact } from "./format";
 
 /** A swap longer than this is a typo rather than a term. */
 export const MAX_TERM_YEARS = 30;
@@ -305,8 +306,10 @@ export function readSwap(t: SwapTerms): SwapRead {
   return { ...read, note: noteFor(read, t) };
 }
 
+/** Whole dollars through the shared writer, the size alone: each sentence
+ *  says the direction in words ("costs", "an ASSET"). */
 function usd(n: number): string {
-  return `$${Math.round(Math.abs(n)).toLocaleString("en-US")}`;
+  return usdExact(Math.abs(n));
 }
 
 function years(months: number): string {

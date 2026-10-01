@@ -16,6 +16,50 @@ export interface BidFloors {
   minCap?: number;
 }
 
+/**
+ * The buy box's return floors as the solver takes them — the deal page's
+ * own mapping (the sensitivity playground's max bid): each floor the box
+ * sets, percent points over 100, and nothing it leaves blank. Null where
+ * the box sets no floor at all, which is no max bid on the page either.
+ */
+export function bidFloors(
+  box: { minIrrPct?: number | null; minCoCPct?: number | null; minCapPct?: number | null } | null | undefined,
+): BidFloors | null {
+  if (!box) return null;
+  const floors: BidFloors = {
+    ...(box.minIrrPct != null ? { minIrr: box.minIrrPct / 100 } : {}),
+    ...(box.minCoCPct != null ? { minCoc: box.minCoCPct / 100 } : {}),
+    ...(box.minCapPct != null ? { minCap: box.minCapPct / 100 } : {}),
+  };
+  return floors.minIrr == null && floors.minCoc == null && floors.minCap == null ? null : floors;
+}
+
+/** A solved bid as the deal page prints it: rounded DOWN at display
+ *  precision, so the printed bid still clears the floors — "$9.74M" never
+ *  stands for a solved $9,738,000. */
+export function fmtBid(n: number): string {
+  if (n >= 1e9) return `$${(Math.floor(n / 1e7) / 100).toFixed(2)}B`;
+  if (n >= 1e6) return `$${(Math.floor(n / 1e4) / 100).toFixed(2)}M`;
+  return `$${Math.floor(n / 1e3).toLocaleString("en-US")}k`;
+}
+
+const floorPct = (d: number) => `${Number((d * 100).toFixed(2))}%`;
+
+/** One floor in words: "13% IRR", "5% cash-on-cash", "5.75% going-in cap". */
+export function floorWords(key: keyof BidFloors, floors: BidFloors): string {
+  const v = floors[key];
+  if (v == null) return "";
+  return key === "minIrr" ? `${floorPct(v)} IRR` : key === "minCoc" ? `${floorPct(v)} cash-on-cash` : `${floorPct(v)} going-in cap`;
+}
+
+/** Every floor set, in the page's order: "13% IRR, 5% cash-on-cash, 5.75% going-in cap". */
+export function floorsWords(floors: BidFloors): string {
+  return (["minIrr", "minCoc", "minCap"] as const)
+    .map((k) => floorWords(k, floors))
+    .filter(Boolean)
+    .join(", ");
+}
+
 export interface BidMetrics {
   irr: number | null;
   coc: number | null;

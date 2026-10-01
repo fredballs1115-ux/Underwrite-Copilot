@@ -10,12 +10,16 @@ export function DealActions({
   dealId,
   dealName,
   canDelete = true,
+  canRename = true,
 }: {
   dealId: string;
   dealName: string;
   /** Deleting is the creator's or the team owner's; a teammate sees no
    *  Delete rather than a refusal after the fact. */
   canDelete?: boolean;
+  /** The sample keeps its name — the name is what marks it as the sample
+   *  on every list — so it offers no Rename (renameDeal refuses it too). */
+  canRename?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<"menu" | "rename" | "delete">("menu");
@@ -37,6 +41,9 @@ export function DealActions({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+
+  // Nothing to offer is no menu, never an empty one.
+  if (!canRename && !canDelete) return null;
 
   return (
     <div className="relative">
@@ -71,13 +78,15 @@ export function DealActions({
           <div className="shadow-float absolute right-0 z-30 mt-1.5 w-64 rounded-xl border border-line bg-surface p-1.5">
             {mode === "menu" && (
               <>
-                <button
-                  type="button"
-                  onClick={() => setMode("rename")}
-                  className={`${itemCls} hover:bg-faint`}
-                >
-                  Rename
-                </button>
+                {canRename && (
+                  <button
+                    type="button"
+                    onClick={() => setMode("rename")}
+                    className={`${itemCls} hover:bg-faint`}
+                  >
+                    Rename
+                  </button>
+                )}
                 {canDelete && (
                   <button
                     type="button"
@@ -90,7 +99,7 @@ export function DealActions({
               </>
             )}
 
-            {mode === "rename" && (
+            {mode === "rename" && canRename && (
               <form action={renameDeal} className="space-y-2 p-1.5">
                 <input type="hidden" name="dealId" value={dealId} />
                 <input

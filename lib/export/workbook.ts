@@ -1,6 +1,6 @@
 import "server-only";
 import ExcelJS from "exceljs";
-import type { Lease } from "@/lib/rentroll/schema";
+import { isIsoDate, type Lease } from "@/lib/rentroll/schema";
 import type { WorkbookInputs } from "./cashflow";
 import { buildRentRollCashFlow } from "./cashflow";
 
@@ -33,6 +33,8 @@ const GREEN = { argb: "FF107C41" };
 const INK = { argb: "FF18211F" };
 const BRAND = { argb: "FF114E54" };
 const MUTED = { argb: "FF5F6B69" };
+/** the site's caution tone (--color-caution), for the line read before the IRR */
+const CAUTION = { argb: "FFA05A1C" };
 const WHITE = { argb: "FFFFFFFF" };
 const HEADFILL = "FF114E54";
 const BANDFILL = "FFF2F1EC";
@@ -50,8 +52,11 @@ const FMT = {
   date: "mm/dd/yyyy",
 } as const;
 
-/** Excel serial for an ISO date, off the 1899-12-30 epoch. */
+/** Excel serial for an ISO date, off the 1899-12-30 epoch — null for a day
+ *  that does not exist, which the engine would roll forward (30 February
+ *  into 2 March) where the page treats the lease as undated. */
 export function isoToSerial(iso: string): number | null {
+  if (!isIsoDate(iso)) return null;
   const t = Date.parse(`${iso}T00:00:00Z`);
   if (Number.isNaN(t)) return null;
   return Math.round((t - Date.UTC(1899, 11, 30)) / 86_400_000);
@@ -182,11 +187,18 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
   label(ws.getCell(2, 1), "Blue = input you edit · Black = formula · Green = link to another tab", {
     color: MUTED,
   });
+  // What the export assumes and leaves to the reader, said before any figure
+  // is read — words only: the cells below and every formula are unchanged.
   label(
     ws.getCell(3, 1),
-    "Free rent and downtime are priced as leasing capital below NOI, not as a haircut to revenue.",
-    { color: MUTED },
+    `Before you read the IRR: general vacancy (row ${A.vacancy}) comes off every year's revenue on top of the space the lease-up leaves empty${
+      inputs.reimbursementPct === 0
+        ? `, and expense recovery (row ${A.reimbursement}) is 0% — no tenant reimburses an expense`
+        : ""
+    }. Set both to your own view.`,
+    { bold: true, color: CAUTION },
   );
+  const notes = inputs.notes ?? {};
 
   const row = (
     r: number,
@@ -213,7 +225,9 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
 
   sectionHeader(ws, 4, "Property", 1, 3);
   row(A.nra, "Net rentable area (SF)", inputs.nra, FMT.int, "Every per-SF figure is against this.");
-  row(A.asOf, "Analysis start date", isoToSerial(inputs.asOf), FMT.date, "The rent roll's as-of date. Drives years-to-expiry.");
+  // Never "the rent roll's as-of date" unless the caller says the roll gave it:
+  // a roll that states none starts from the day the file was made.
+  row(A.asOf, "Analysis start date", isoToSerial(inputs.asOf), FMT.date, notes.asOf ?? "Years to expiry are counted from it.");
   row(A.holdYears, "Hold period (years)", inputs.holdYears, FMT.int, "Sale at the end of this year, on forward NOI.");
   row(A.price, "Purchase price", inputs.purchasePrice, FMT.usd, "");
   row(A.closingPct, "Closing costs (% of price)", inputs.closingCostPct, FMT.pct2, "");
@@ -222,22 +236,47 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
   row(A.marketRent, "Market rent ($/SF/yr)", inputs.profile.marketRentPsf, FMT.psf, "What rolled and vacant space re-leases at.");
   row(A.renewalProb, "Renewal probability", inputs.profile.renewalProbability, FMT.pct1, "Weights the renewal and new-deal cost branches.");
   row(A.termYears, "New lease term (years)", inputs.profile.termYears, FMT.num1, "Term the leasing commission is paid on.");
-  row(A.escalation, "Annual escalation", inputs.profile.escalationPct, FMT.pct2, "Applied to contract, re-leased and lease-up rent.");
+  row(
+    A.escalation,
+    "Annual escalation",
+    inputs.profile.escalationPct,
+    FMT.pct2,
+    "Applied to contract, re-leased and lease-up rent alike — each lease's own escalation on the Rent Roll tab is shown, not used.",
+  );
   row(A.renewalTi, "Renewal TI ($/SF)", inputs.profile.renewalTiPsf, FMT.psf, "");
   row(A.newTi, "New-deal TI ($/SF)", inputs.profile.newTiPsf, FMT.psf, "");
   row(A.renewalLc, "Renewal LC (% of term rent)", inputs.profile.renewalLcPct, FMT.pct2, "");
   row(A.newLc, "New-deal LC (% of term rent)", inputs.profile.newLcPct, FMT.pct2, "");
-  row(A.downtimeMonths, "Downtime on a new deal (months)", inputs.profile.downtimeMonths, FMT.num1, "Carried at market rent. Zero on a renewal.");
+  row(
+    A.downtimeMonths,
+    "Downtime on a new deal (months)",
+    inputs.profile.downtimeMonths,
+    FMT.num1,
+    "Carried at market rent. Zero on a renewal. Free rent and downtime are priced as leasing capital below NOI, not as a haircut to revenue.",
+  );
   row(A.renewalFree, "Free rent — renewal (months)", inputs.profile.renewalFreeRentMonths, FMT.num1, "");
   row(A.newFree, "Free rent — new deal (months)", inputs.profile.newFreeRentMonths, FMT.num1, "");
-  row(A.absorption, "Absorption (SF / month)", inputs.absorptionSfPerMonth, FMT.int, "Pace the vacant SF leases up at.");
+  row(A.absorption, "Absorption (SF / month)", inputs.absorptionSfPerMonth, FMT.int, notes.absorption ?? "Pace the vacant SF leases up at.");
 
   sectionHeader(ws, 25, "Operations", 1, 3);
   row(A.otherIncome, "Other income ($/yr)", inputs.otherIncomeAnnual, FMT.usd, "");
-  row(A.vacancy, "General vacancy & credit loss", inputs.vacancyPct, FMT.pct1, "On potential gross revenue.");
+  row(
+    A.vacancy,
+    "General vacancy & credit loss",
+    inputs.vacancyPct,
+    FMT.pct1,
+    notes.vacancy ??
+      "On potential gross revenue every year, on top of the vacant space the Cash Flow tab leaves out until its lease-up line absorbs it.",
+  );
   row(A.opexPsf, "Operating expenses ($/SF/yr)", inputs.opexPsf, FMT.psf, "");
   row(A.expenseGrowth, "Expense growth", inputs.expenseGrowthPct, FMT.pct2, "");
-  row(A.reimbursement, "Expense recovery (% of opex)", inputs.reimbursementPct, FMT.pct1, "Reimbursed by tenants.");
+  row(
+    A.reimbursement,
+    "Expense recovery (% of opex)",
+    inputs.reimbursementPct,
+    FMT.pct1,
+    notes.reimbursement ?? "The share of operating expenses tenants reimburse.",
+  );
   row(A.mgmtFee, "Management fee (% of EGR)", inputs.mgmtFeePct, FMT.pct2, "");
   row(A.reservesPsf, "Capital reserves ($/SF/yr)", inputs.reservesPsf, FMT.psf, "");
   row(A.capImprovements, "Capital improvements — Year 1", inputs.capitalImprovementsYr1, FMT.usd, "");
@@ -248,7 +287,7 @@ function buildAssumptions(ws: ExcelJS.Worksheet, inputs: WorkbookInputs): void {
 
   sectionHeader(ws, 39, "Debt", 1, 3);
   row(A.ltc, "Loan to cost", inputs.ltc, FMT.pct1, "Sized off price + closing, excluding financing fees.");
-  row(A.rate, "All-in rate", inputs.allInRatePct, FMT.pct2, "");
+  row(A.rate, "All-in rate", inputs.allInRatePct, FMT.pct2, notes.rate ?? "");
   row(A.ioMonths, "Interest-only period (months)", inputs.ioMonths, FMT.int, "");
   row(A.amortMonths, "Amortization (months)", inputs.amortMonths, FMT.int, "");
   row(A.financingPct, "Financing costs (% of loan)", inputs.financingCostPct, FMT.pct2, "");

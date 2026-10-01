@@ -3,8 +3,10 @@
 // negative leverage means the deal loses money on every borrowed dollar
 // until growth bails it out, so it gets named, not buried.
 //
-// The benchmark we can source daily is the 30-yr fixed (FRED PMMS) — an
-// owner-occupier rate. Investor debt on small multifamily prices ABOVE it,
+// The benchmark we can source for any day is the 30-yr fixed (FRED PMMS) — a
+// WEEKLY survey (data/fred-series.json: MORTGAGE30US, cadence "weekly"), so
+// the figure read is the latest week's, and an owner-occupier rate. Investor
+// debt on small multifamily prices ABOVE it,
 // so the honest read is one-sided: negative at the benchmark is certainly
 // negative in practice, while "positive" at the benchmark still needs the
 // real quote. THIN_BPS draws that line.

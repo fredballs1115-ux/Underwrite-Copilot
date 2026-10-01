@@ -90,8 +90,10 @@ export default async function NewsPage({
       supabase
         .from("regulatory_alerts")
         .select("id, rule_id, headline, url, detail, detected_at")
-        // A dismissed banner must stay dismissed here too.
-        .is("dismissed_at", null)
+        // The archive: the newest alerts whether or not a banner was
+        // dismissed. A dismissal is one browser's (regulatory-alert-banner),
+        // and the shared `dismissed_at` column is not read — every signed-in
+        // user may write it, so it would let anyone hide an alert from all.
         .order("detected_at", { ascending: false })
         .limit(5),
     ]);

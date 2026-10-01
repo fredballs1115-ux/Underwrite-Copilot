@@ -55,6 +55,8 @@
  */
 
 import { loanConstant } from "./deal-math";
+import { usdExact } from "./format";
+import { MAX_LOAN_MONTHS, heldTo } from "./limits";
 
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
@@ -198,7 +200,8 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
     return { ...EMPTY, note: "Enter the loan's rate and the months left to maturity." };
   }
 
-  const months = Math.round(monthsRemaining);
+  // A month at a time, so held to the longest the card runs (lib/tools/limits).
+  const months = Math.round(heldTo(monthsRemaining, MAX_LOAN_MONTHS));
   const io = !positive(amortYears);
   const k = loanConstant(loanRatePct, amortYears, io);
   if (k === null) {
@@ -215,7 +218,7 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
       payment,
       balloon,
       note:
-        `The loan pays ${round(payment)} a month and balloons at ${balloon}. ` +
+        `The loan pays ${usdExact(payment)} a month and balloons at ${usdExact(balloon)}. ` +
         "Enter the Treasury rate for the remaining term to price getting out.",
     };
   }
@@ -238,7 +241,11 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
   const hard = real(defeasanceCosts) && defeasanceCosts > 0 ? defeasanceCosts : 0;
   const defeasance = round(defeasanceSpread + hard);
 
-  const open = real(monthsToOpen) && monthsToOpen > 0 ? Math.round(monthsToOpen) : 0;
+  // A blank "open in" is a window nobody stated, not an open loan: only a
+  // typed zero says the loan prepays at par today. The first version read
+  // the blank as zero and said "prepays at par" over a loan carrying its
+  // full yield maintenance.
+  const open = real(monthsToOpen) && monthsToOpen >= 0 ? Math.round(monthsToOpen) : null;
   let cheaper: PrepayRead["cheaper"] =
     defeasance < yieldMaintenance ? "defeasance" : "yield maintenance";
   let cost = Math.min(defeasance, yieldMaintenance);
@@ -256,7 +263,7 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
   // Only meaningful when leaving early actually costs something. Where
   // it pays, there is nothing to buy back by waiting and a rate per
   // month of waiting is a number with no meaning.
-  const costOfNotWaiting = open > 0 && cost > 0 ? round(cost / open) : null;
+  const costOfNotWaiting = open !== null && open > 0 && cost > 0 ? round(cost / open) : null;
 
   const notes: string[] = [];
   if (open === 0) {
@@ -266,29 +273,39 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
   } else {
     notes.push(
       cost > 0
-        ? `Getting out costs ${cost} through ${cheaper}. ` +
-            `Yield maintenance is ${yieldMaintenance}${atFloor ? " — all of it the floor" : ""}, ` +
-            `defeasance ${defeasance}.`
-        : `Getting out PAYS ${Math.abs(cost)} through ${cheaper}, rather than costing anything. ` +
-            `Yield maintenance would be ${yieldMaintenance}${atFloor ? " — all of it the floor" : ""}.`,
+        ? `Getting out costs ${usdExact(cost)} through ${cheaper}. ` +
+            `Yield maintenance is ${usdExact(yieldMaintenance)}${atFloor ? " — all of it the floor" : ""}, ` +
+            `defeasance ${usdExact(defeasance)}.`
+        : `Getting out PAYS ${usdExact(Math.abs(cost))} through ${cheaper}, rather than costing anything. ` +
+            `Yield maintenance would be ${usdExact(yieldMaintenance)}${atFloor ? " — all of it the floor" : ""}.`,
     );
     if (atFloor) {
+      // The floor binds in two different worlds. Only where the Treasury is
+      // at or above the coupon does the lender lose nothing — the loan's own
+      // stream is then worth no more than its balance. Below the coupon the
+      // lender does lose, just less than the floor, and saying "rates have
+      // risen past the coupon" there was false (a 5% loan at a 4.80%
+      // Treasury loses the lender $92,388 on $20M, under a $200,000 floor).
       notes.push(
-        `Rates have risen past the ${loanRatePct}% coupon, so the lender loses nothing by ` +
-          "being repaid and yield maintenance is the floor rather than a real loss.",
+        treasuryRatePct >= loanRatePct
+          ? `Rates have ${treasuryRatePct > loanRatePct ? "risen past" : "reached"} the ${loanRatePct}% coupon, so the lender loses nothing by ` +
+              "being repaid and yield maintenance is the floor rather than a real loss."
+          : `With the Treasury at ${treasuryRatePct}%, under the ${loanRatePct}% coupon, the lender ` +
+              `does lose interest by being repaid — ${usdExact(yieldMaintenanceRaw)} — ` +
+              "but less than the floor, so the floor sets the penalty.",
       );
     }
     if (defeasanceSpread < 0) {
       notes.push(
-        `The Treasury portfolio costs ${Math.abs(defeasanceSpread)} LESS than the balance it ` +
-          `retires, so defeasance is a gain before its ${round(hard)} of hard costs — ` +
+        `The Treasury portfolio costs ${usdExact(Math.abs(defeasanceSpread))} LESS than the balance it ` +
+          `retires, so defeasance is a gain before its ${usdExact(hard)} of hard costs — ` +
           "which is why it beats a penalty that can never go below its floor.",
       );
     }
     if (costOfNotWaiting !== null) {
       notes.push(
         `The loan goes open in ${open} months, where it would cost nothing. ` +
-          `Closing sooner is ${costOfNotWaiting} a month of waiting bought back.`,
+          `Closing sooner is ${usdExact(costOfNotWaiting)} a month of waiting bought back.`,
       );
     }
   }
@@ -298,10 +315,10 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
   if (debtMarkToMarket !== null && debtMarkToMarket > 0) {
     notes.push(
       cost > 0
-        ? `The loan is ${debtMarkToMarket} below market, which is what a buyer assuming it ` +
-            `would be getting — ${debtMarkToMarket > cost ? "more" : "less"} than the ${cost} it ` +
+        ? `The loan is ${usdExact(debtMarkToMarket)} below market, which is what a buyer assuming it ` +
+            `would be getting — ${debtMarkToMarket > cost ? "more" : "less"} than the ${usdExact(cost)} it ` +
             `costs to retire, so ${debtMarkToMarket > cost ? "assumption is worth pricing into the bid" : "retiring it is the cleaner trade"}.`
-        : `The same rate move that makes this cheap to retire makes it ${debtMarkToMarket} below ` +
+        : `The same rate move that makes this cheap to retire makes it ${usdExact(debtMarkToMarket)} below ` +
             "market to a buyer who could assume it. Both are worth having; only one can be had.",
     );
   }

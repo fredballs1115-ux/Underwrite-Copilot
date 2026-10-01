@@ -64,34 +64,92 @@ export interface AskEntry {
   at: string;
   q: string;
   answer: string;
+  /** the pages the answer cites — since the stamp below, only pages inside
+   *  the deck it read (lib/facts `locatedPage`) */
   cites: { page: string; note: string }[];
+  /** the memorandum it was asked of: a fingerprint of the OM's bytes
+   *  (lib/om-fingerprint) — absent on an entry saved before entries were
+   *  stamped */
+  om?: string;
+  /** who asked it: their user id, the stable identity (emails change) —
+   *  absent on an entry saved before askers were recorded */
+  by?: string;
+  /** READ, never stored: asked of a memorandum the deal has since replaced,
+   *  so its answer and its pages are that memorandum's (`parseDealQa`) */
+  earlier?: boolean;
 }
 
+/** What replacing the OM appends to the thread (the deal actions'
+ *  `replaceOm`). The thread only grows (migration 0036), so the answers
+ *  asked of the old memorandum stay where they are, and this marker after
+ *  them says the memorandum changed. It is no question: it counts toward no
+ *  cap and draws no row of its own. */
+export interface AskOmReplaced {
+  at: string;
+  event: typeof OM_REPLACED;
+  /** the new memorandum's fingerprint */
+  om: string;
+}
+
+export const OM_REPLACED = "om_replaced";
+
+const isOmReplaced = (e: unknown): e is AskOmReplaced =>
+  !!e && typeof e === "object" && (e as { event?: unknown }).event === OM_REPLACED;
+
+const isAskEntry = (e: unknown): e is AskEntry =>
+  !!e &&
+  typeof e === "object" &&
+  typeof (e as { at?: unknown }).at === "string" &&
+  typeof (e as { q?: unknown }).q === "string" &&
+  typeof (e as { answer?: unknown }).answer === "string";
+
+/**
+ * The thread's questions, in order, each saying whether it was asked of the
+ * memorandum the deal holds now. The current one, as far as the thread can
+ * say, is the newest replacement marker's. An answer stamped with another
+ * fingerprint was asked of an earlier memorandum, wherever it sits — an
+ * answer to the old deck that landed after the marker included. An answer
+ * saved before answers were stamped was asked of an earlier memorandum
+ * only where a marker follows it; with none after it, it reads as asked of
+ * the current OM. That is the honest reading of what the thread holds: a
+ * replacement made before the markers existed left nothing to say
+ * otherwise.
+ */
 export function parseDealQa(raw: unknown): AskEntry[] {
   if (!Array.isArray(raw)) return [];
-  return raw
-    .filter(
-      (e): e is AskEntry =>
-        !!e &&
-        typeof e === "object" &&
-        typeof (e as { at?: unknown }).at === "string" &&
-        typeof (e as { q?: unknown }).q === "string" &&
-        typeof (e as { answer?: unknown }).answer === "string",
-    )
-    .map((e) => ({
-      ...e,
-      cites: Array.isArray(e.cites)
-        ? e.cites
-            .filter(
-              (c): c is { page: string; note: string } =>
-                !!c &&
-                typeof c === "object" &&
-                typeof (c as { page?: unknown }).page === "string" &&
-                typeof (c as { note?: unknown }).note === "string",
-            )
-            .slice(0, 6)
-        : [],
-    }));
+  let lastMarker = -1;
+  raw.forEach((e, i) => {
+    if (isOmReplaced(e)) lastMarker = i;
+  });
+  const current = lastMarker >= 0 ? (raw[lastMarker] as AskOmReplaced).om : null;
+  return raw.flatMap((e, i): AskEntry[] => {
+    if (!isAskEntry(e)) return [];
+    const om = typeof e.om === "string" && e.om ? e.om : undefined;
+    const by = typeof e.by === "string" && e.by ? e.by : undefined;
+    const earlier =
+      lastMarker < 0 ? false : om && typeof current === "string" && current ? om !== current : i < lastMarker;
+    return [
+      {
+        at: e.at,
+        q: e.q,
+        answer: e.answer,
+        cites: Array.isArray(e.cites)
+          ? e.cites
+              .filter(
+                (c): c is { page: string; note: string } =>
+                  !!c &&
+                  typeof c === "object" &&
+                  typeof (c as { page?: unknown }).page === "string" &&
+                  typeof (c as { note?: unknown }).note === "string",
+              )
+              .slice(0, 6)
+          : [],
+        ...(om ? { om } : {}),
+        ...(by ? { by } : {}),
+        earlier,
+      },
+    ];
+  });
 }
 
 /** The six analysis steps, in order, keyed to the columns on `deals`. */

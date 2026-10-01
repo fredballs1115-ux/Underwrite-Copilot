@@ -1,6 +1,15 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
-import { deriveAnalytics, median, type AnalyticsRow } from "./analytics";
+import {
+  deriveAnalytics,
+  fmtUsdCompact,
+  median,
+  middleRead,
+  middleText,
+  parsedPhrase,
+  type AnalyticsRow,
+} from "./analytics";
+import { MEDIAN_FLOOR } from "./public-comps/core";
 
 const metric = (label: string, value: string): ExtractedMetric => ({
   label,
@@ -169,5 +178,48 @@ describe("deriveAnalytics — the $/unit series is multifamily's, never a pool o
     expect(deals.find((d) => d.id === "4")?.perUnit).toBeCloseTo(180_000_000 / 612, 3);
     const units = deals.map((d) => d.perUnit).filter((v): v is number => v != null);
     expect(median(units)).toBeCloseTo((50_000_000 / 248 + 180_000_000 / 612) / 2, 3);
+  });
+});
+
+describe("middleRead — a median needs three figures (the site's MEDIAN_FLOOR)", () => {
+  const pct = (v: number) => `${v.toFixed(1)}%`;
+
+  it("reads the floor from lib/public-comps, never a copy of it", () => {
+    expect(MEDIAN_FLOOR).toBe(3);
+  });
+
+  it("three figures or more are a median", () => {
+    const r = middleRead([5.4, 5.0, 6.1]);
+    expect(r).toEqual({ kind: "median", n: 3, value: 5.4 });
+    expect(middleText(r, pct)).toBe("5.4%");
+    expect(middleRead([5.0, 5.2, 5.6, 6.0])).toEqual({ kind: "median", n: 4, value: 5.4 });
+  });
+
+  it("one figure is that deal's, never a median", () => {
+    const r = middleRead([5.2]);
+    expect(r).toEqual({ kind: "one", n: 1, value: 5.2 });
+    expect(middleText(r, pct)).toBe("5.2%");
+  });
+
+  it("two figures are the two, low and high — never their midpoint called a median", () => {
+    const r = middleRead([5.4, 5.0]);
+    expect(r).toEqual({ kind: "two", n: 2, low: 5.0, high: 5.4 });
+    expect(middleText(r, pct)).toBe("5.0%–5.4%");
+    expect(middleText(middleRead([240_000, 215_000]), fmtUsdCompact)).toBe("$215k–$240k");
+    // Two that agree print once.
+    expect(middleText(middleRead([5.2, 5.2]), pct)).toBe("5.2%");
+  });
+
+  it("nothing is nothing, and a value that is not a number is not a figure", () => {
+    expect(middleRead([])).toEqual({ kind: "none", n: 0 });
+    expect(middleText(middleRead([]), pct)).toBeNull();
+    expect(middleRead([Number.NaN, 5.2])).toEqual({ kind: "one", n: 1, value: 5.2 });
+  });
+
+  it("says the count behind a read as what it is — never '1 deals'", () => {
+    expect(parsedPhrase(0)).toBe("none parsed");
+    expect(parsedPhrase(1)).toBe("the one deal that parsed");
+    expect(parsedPhrase(2)).toBe("the two deals that parsed");
+    expect(parsedPhrase(7)).toBe("7 deals parsed");
   });
 });

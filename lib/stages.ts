@@ -24,6 +24,13 @@ export const STAGE_LABEL: Record<Stage, string> = {
   dead: "Dead",
 };
 
+/** A deal still in play: on the ladder short of Closed and Dead. The Monday
+ *  digest counts these as the pipeline's open deals — it had called every
+ *  deal but a dead one "live", a closed one included. */
+export function isOpenStage(stage: Stage): boolean {
+  return stage !== "closed" && stage !== "dead";
+}
+
 /** Legacy values (pre-migration-0013 rows, stale tabs) fold onto the new
  *  ladder so the UI never renders an unknown stage. */
 export function normalizeStage(raw: string | null | undefined): Stage {

@@ -1,5 +1,6 @@
 import type { MetroDemand } from "@/lib/metro-demand";
 import { supplySentence, type MetroSupply } from "@/lib/metro-supply";
+import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
 
 /**
  * The demand side of a market as bars: a metro area's payrolls by sector
@@ -62,8 +63,9 @@ export function DemandBars({ demand }: { demand: MetroDemand }) {
  * area permitted in buildings of two or more over the last twelve months
  * against the twelve before, the share of everything permitted, and where
  * the two counts came from — the total less the single-family series,
- * which is the only split FRED publishes for a metro. The sentence is one
- * JS string, so the phrase live-verify greps has no separator inside it.
+ * since FRED carries no multi-unit series for a metro (lib/permit-split).
+ * The sentence is one JS string, so the phrase live-verify greps has no
+ * separator inside it.
  */
 export function SupplyLine({ supply }: { supply: MetroSupply }) {
   return (
@@ -79,7 +81,7 @@ export function SupplyLine({ supply }: { supply: MetroSupply }) {
       <a href={supply.hrefSingle} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-brand">
         single-family
       </a>
-      {", the only split published for a metro or a state"}
+      {` — ${NO_MULTI_UNIT_SERIES}`}
     </p>
   );
 }

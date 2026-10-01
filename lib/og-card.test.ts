@@ -4,9 +4,18 @@
  * drawn by next/og over the photograph, a 1200 × 630 JPEG.
  */
 import sharp from "sharp";
-import { describe, expect, it } from "vitest";
-import { OG_CARD, OVERHEAD_CARD_CREDIT, cardCanDraw, cardPhotoCredit, marketCard } from "./og-card";
-import { skylineFor } from "./skyline";
+import { beforeEach, describe, expect, it } from "vitest";
+import {
+  OG_CARD,
+  OG_PHOTO_WIDTH,
+  OVERHEAD_CARD_CREDIT,
+  cachedMarketCard,
+  cardCanDraw,
+  cardPhotoCredit,
+  forgetCards,
+  marketCard,
+} from "./og-card";
+import { SKYLINE_WIDTHS, skylineFor } from "./skyline";
 import { marketPages } from "./public-pages";
 
 describe("the card's credit line", () => {
@@ -60,4 +69,49 @@ describe("marketCard", () => {
     expect(lum(1100, 20)).toBeGreaterThan(150);
     expect(lum(1150, 620)).toBeLessThan(60);
   }, 30_000);
+});
+
+describe("a market's card, drawn once a process (the security review, 2026-09-30)", () => {
+  beforeEach(() => forgetCards());
+
+  it("draws once for the asks that arrive together, then answers from the card it keeps", async () => {
+    let draws = 0;
+    const draw = async () => {
+      draws++;
+      await new Promise((r) => setTimeout(r, 15));
+      return Buffer.from("a card");
+    };
+    const [a, b, c] = await Promise.all([
+      cachedMarketCard("pittsburgh", draw),
+      cachedMarketCard("pittsburgh", draw),
+      cachedMarketCard("pittsburgh", draw),
+    ]);
+    expect(a?.toString()).toBe("a card");
+    expect(b).toBe(a);
+    expect(c).toBe(a);
+    expect(await cachedMarketCard("pittsburgh", draw)).toBe(a);
+    expect(draws).toBe(1);
+    // Another market is its own card.
+    await cachedMarketCard("dc", draw);
+    expect(draws).toBe(2);
+  });
+
+  it("keeps nothing from a draw that had nothing, or failed, so the next ask draws again", async () => {
+    let draws = 0;
+    expect(await cachedMarketCard("dc", async () => (draws++, null))).toBeNull();
+    expect(
+      await cachedMarketCard("dc", async () => {
+        draws++;
+        throw new Error("next/og fell over");
+      }),
+    ).toBeNull();
+    expect((await cachedMarketCard("dc", async () => (draws++, Buffer.from("drawn"))))?.toString()).toBe("drawn");
+    expect(draws).toBe(3);
+  });
+
+  it("asks for the skyline at a width the route serves, one that covers the card's height", () => {
+    expect(SKYLINE_WIDTHS).toContain(OG_PHOTO_WIDTH);
+    // A 2.5:1 panorama at this width is at least as tall as the card.
+    expect(OG_PHOTO_WIDTH / 2.5).toBeGreaterThanOrEqual(OG_CARD.height);
+  });
 });

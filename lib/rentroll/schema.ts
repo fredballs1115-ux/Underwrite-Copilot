@@ -12,6 +12,18 @@
 
 export type RentBasis = "NNN" | "MG" | "FSG" | "unknown";
 
+/** Whether a stored date is a real day, yyyy-mm-dd — a 13th month or a 31st
+ *  of June is not one. An import saved before the parser checked its dates
+ *  can carry "2028-31-12", which turned WALT into NaN; every reader treats
+ *  such a lease as undated instead, as it does a blank. */
+export function isIsoDate(s: string | null | undefined): s is string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s ?? "");
+  if (!m) return false;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  if (mo < 1 || mo > 12 || d < 1) return false;
+  return d <= new Date(Date.UTC(y, mo, 0)).getUTCDate();
+}
+
 /** One normalized lease. Every optional figure is `null` when the file didn't
  *  state it — never 0, which would silently sink WALT and rent totals. */
 export interface Lease {
@@ -137,13 +149,14 @@ export const CANONICAL_FIELDS: CanonicalField[] = [
     aliases: [
       "annual rent", "base rent annual", "annual base rent", "rent annual",
       "yearly rent", "annual contract rent", "base rent", "rent", "contract rent",
-      "current rent", "in place rent", "scheduled rent",
+      "current rent", "in place rent", "scheduled rent", "actual rent", "lease rent",
+      "rent charged", "charged rent",
     ],
     monthlyAliases: [
       "monthly rent", "base rent monthly", "monthly base rent", "rent monthly",
       "rent per month", "monthly contract rent", "current monthly rent", "mo rent",
     ],
-    help: "Monthly columns are recognised by their header and annualized on import.",
+    help: "The rent the tenant pays — never a market or asking rent. A header that says month is annualized on import, and so is one that names no period on a roll that leases by the month.",
   },
   {
     key: "rentPsf",
@@ -239,16 +252,39 @@ export const VACANT_MARKERS = [
   "n/a",
 ];
 
-/** Words that mark a row as a TOTAL / subtotal line rather than a lease —
- *  summing a file that includes its own totals doubles the building. */
-export const TOTAL_MARKERS = [
+/**
+ * The words a TOTAL / subtotal / average line is labelled with — summing a
+ * file that includes its own totals doubles the building. A word alone does
+ * not make a totals line: "Total Wine & More" and "Sum Kitchen" are tenants.
+ * lib/rentroll/parse `isTotalsLabel` reads a label as a totals line only where
+ * every other word in it names what is totalled (TOTAL_QUALIFIERS).
+ */
+export const TOTAL_WORDS: ReadonlySet<string> = new Set([
   "total",
   "totals",
   "subtotal",
-  "sub-total",
-  "grand total",
+  "subtotals",
   "sum",
-  "building total",
+  "sums",
   "average",
-  "weighted average",
-];
+  "averages",
+  "avg",
+  "mean",
+]);
+
+/** Words that say WHAT a totals line totals ("Grand Total", "Total Occupied
+ *  SF", "Vacant Total", "Total Rentable Area", "Building Total"). A label's
+ *  other words must all be these (or a number, or a building's letter) for it
+ *  to read as a totals line. */
+export const TOTAL_QUALIFIERS: ReadonlySet<string> = new Set([
+  "grand", "sub", "weighted", "wtd", "overall", "combined", "all", "the", "and",
+  "building", "buildings", "bldg", "property", "properties", "portfolio", "project",
+  "center", "centre", "park", "site", "phase", "campus", "roll",
+  "occupied", "vacant", "leased", "unleased", "available",
+  "net", "gross", "rentable", "usable", "current", "in", "place",
+  "sf", "rsf", "gla", "nra", "sq", "ft", "square", "feet", "footage", "area",
+  "rent", "rents", "rental", "income", "revenue", "base", "contract",
+  "annual", "annualized", "monthly", "psf", "per", "rate", "rates",
+  "units", "unit", "suites", "suite", "tenants", "tenant", "leases", "lease",
+  "spaces", "space", "expiring",
+]);

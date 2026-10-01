@@ -127,6 +127,25 @@ describe("readAfterTax — the gain has three rates, not one", () => {
     expect(r.sale!.tax).toBeGreaterThan(r.totalGain! * 0.2);
   });
 
+  it("taxes the building's depreciation at the owner's own rate where it is under 25%", () => {
+    // Unrecaptured section 1250 gain is taxed at the ordinary rate, capped at
+    // 25% — a ceiling, not a flat rate. At a 22% bracket and 15% capital
+    // gains: $5,454,545 at 22% and $6,000,000 at 15% is $2,100,000. The
+    // first version charged every owner 25% and printed $2,263,636 — and
+    // "what you keep" as −$163,636 on a shelter that comes back at exactly
+    // the rate it saved, which nets to nothing.
+    const r = readAfterTax({ ...SEED, ordinaryRatePct: 22, capGainsRatePct: 15 });
+    expect(r.recaptureRatePct).toBe(22);
+    expect(r.sale!.tax).toBe(2_100_000);
+    expect(r.sale!.tax).toBe(Math.round(5_454_545.45 * 0.22 + 6_000_000 * 0.15));
+    expect(r.netOfRecapture).toBe(0);
+  });
+
+  it("holds an owner above 25% to the ceiling, and keeps it where no rate is given", () => {
+    expect(readAfterTax(SEED).recaptureRatePct).toBe(25);
+    expect(readAfterTax({ ...SEED, ordinaryRatePct: null }).recaptureRatePct).toBe(25);
+  });
+
   it("charges no recapture on a sale below the depreciated basis", () => {
     const r = readAfterTax({ ...SEED, salePrice: 12_000_000 });
     expect(r.totalGain!).toBeLessThan(0);

@@ -1,19 +1,22 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { MarketsMarquee } from "@/app/markets-marquee";
-import { FULL_NOTES, LONG_NOTE, blurbExcerpt, changelogArchive, changelogEntries } from "@/lib/changelog";
+import { FULL_NOTES, LONG_NOTE, blurbExcerpt, changelogArchive, changelogEntries, changelogSince } from "@/lib/changelog";
+import { publicMetadata } from "@/lib/page-meta";
 
 // ISR, five-minute window — same freshness cap as the homepage, so a new
 // changelog entry shows here within minutes of deploying.
 export const revalidate = 300;
 
-export const metadata: Metadata = {
+// The log does not reach back to launch, so the description says how far
+// it does — the month of its oldest entry, read from the log itself.
+const since = changelogSince();
+
+export const metadata = publicMetadata({
   title: "What's new",
-  description:
-    "Every product improvement to Underwrite Copilot, newest first — the same log the homepage and the app draw from.",
-  alternates: { canonical: "/whats-new" },
-};
+  description: `Product improvements to Underwrite Copilot${since ? ` since ${since}` : ""}, newest first — the same log the homepage and the app draw from.`,
+  canonical: "/whats-new",
+});
 
 /** PUBLIC changelog — no login needed. The homepage's shipped block and the
  *  pipeline's What's-new card both link here; one checked-in source feeds
@@ -66,7 +69,7 @@ export default function WhatsNewPage() {
           What&apos;s new
         </h1>
         <p className="mt-3 max-w-2xl text-sm leading-relaxed text-muted">
-          Every product improvement, newest first; the footer names the build the site is running.
+          Product improvements, newest first; the footer names the build the site is running.
         </p>
         {entries.length > 0 && oldest && (
           <p className="mt-2 text-xs font-medium text-brand">

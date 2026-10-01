@@ -1209,6 +1209,4618 @@
           "note": "The Cleveland skyline across Lake Erie from Lakewood Park — Erik Drost, CC BY 4.0. The chosen file, in lib/skyline.ts (contact sheet 11, run 35943831078)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:41940",
+      "city": "San Jose, California",
+      "area": "San Jose-Sunnyvale-Santa Clara, CA",
+      "wikipedia": [
+        "San Jose, California",
+        "Downtown San Jose",
+        "Plaza de César Chávez",
+        "Santana Row"
+      ],
+      "categories": [
+        "Skylines of San Jose, California",
+        "Views of San Jose, California",
+        "Downtown San Jose",
+        "Guadalupe River Park",
+        "San Jose City Hall (California)",
+        "Panoramics of San Jose, California",
+        "Skylines of San Jose",
+        "Views of San Jose"
+      ],
+      "queries": [
+        "San Jose California skyline",
+        "Downtown San Jose skyline night",
+        "San Jose California downtown aerial"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown SJ at Night cropped1.jpg",
+          "note": "San Jose-Sunnyvale-Santa Clara, CA — Ben Loomis, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816505479)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:39300",
+      "city": "Providence, Rhode Island",
+      "area": "Providence-Warwick, RI-MA",
+      "wikipedia": [
+        "Providence, Rhode Island",
+        "Downtown Providence, Rhode Island"
+      ],
+      "categories": [
+        "Skylines of Providence",
+        "Providence skyline",
+        "Views of Providence",
+        "Panoramics of Providence",
+        "Aerial photographs of Providence"
+      ],
+      "queries": [
+        "Providence skyline panorama",
+        "Providence downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Providence RI skyline.jpg",
+          "note": "Providence, RI — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750289515)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:33340",
+      "city": "Milwaukee",
+      "area": "Milwaukee-Waukesha, WI",
+      "wikipedia": [
+        "Milwaukee",
+        "Downtown Milwaukee"
+      ],
+      "categories": [
+        "Skylines of Milwaukee",
+        "Milwaukee skyline",
+        "Views of Milwaukee",
+        "Panoramics of Milwaukee",
+        "Aerial photographs of Milwaukee"
+      ],
+      "queries": [
+        "Milwaukee skyline panorama",
+        "Milwaukee downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Milwaukee Skyline Looking Southeast Towards Lake Michigan From Northwest by Isaac Rowlett.jpg",
+          "note": "Milwaukee, WI — Bfkenney, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750289515)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:36420",
+      "city": "Oklahoma City",
+      "area": "Oklahoma City, OK",
+      "wikipedia": [
+        "Oklahoma City",
+        "Downtown Oklahoma City"
+      ],
+      "categories": [
+        "Skylines of Oklahoma City",
+        "Oklahoma City skyline",
+        "Views of Oklahoma City",
+        "Panoramics of Oklahoma City",
+        "Aerial photographs of Oklahoma City"
+      ],
+      "queries": [
+        "Oklahoma City skyline panorama",
+        "Oklahoma City downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Oklahoma City skyline from drone.jpg",
+          "note": "Oklahoma City, OK — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751888862)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:31140",
+      "city": "Louisville, Kentucky",
+      "area": "Louisville/Jefferson County, KY-IN",
+      "wikipedia": [
+        "Louisville, Kentucky",
+        "Downtown Louisville"
+      ],
+      "categories": [
+        "Skylines of Louisville",
+        "Louisville skyline",
+        "Views of Louisville",
+        "Panoramics of Louisville",
+        "Aerial photographs of Louisville"
+      ],
+      "queries": [
+        "Louisville skyline panorama",
+        "Louisville downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Panorama de Louisville.jpg",
+          "note": "Louisville, KY — Anindya Chakraborty, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750289515)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:32820",
+      "city": "Memphis, Tennessee",
+      "area": "Memphis, TN-MS-AR",
+      "wikipedia": [
+        "Memphis, Tennessee",
+        "Downtown Memphis, Tennessee"
+      ],
+      "categories": [
+        "Skylines of Memphis",
+        "Memphis skyline",
+        "Views of Memphis",
+        "Panoramics of Memphis",
+        "Aerial photographs of Memphis"
+      ],
+      "queries": [
+        "Memphis skyline panorama",
+        "Memphis downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline of Memphis, TN.jpg",
+          "note": "Memphis, TN — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750289515)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:13820",
+      "city": "Birmingham, Alabama",
+      "area": "Birmingham, AL",
+      "wikipedia": [
+        "Birmingham, Alabama",
+        "Downtown Birmingham, Alabama"
+      ],
+      "categories": [
+        "Skylines of Birmingham, Alabama",
+        "Views of Birmingham, Alabama",
+        "Panoramics of Birmingham, Alabama",
+        "Aerial photographs of Birmingham, Alabama"
+      ],
+      "queries": [
+        "Birmingham Alabama skyline",
+        "Birmingham Alabama downtown",
+        "Birmingham Alabama Vulcan view"
+      ],
+      "candidates": [
+        {
+          "file": "Birmingham, Alabama.jpg",
+          "note": "Birmingham, AL — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36754192984), after the first run searched Birmingham, England's categories."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:25540",
+      "city": "Hartford, Connecticut",
+      "area": "Hartford-West Hartford-East Hartford, CT",
+      "wikipedia": [
+        "Hartford, Connecticut",
+        "Downtown Hartford"
+      ],
+      "categories": [
+        "Skylines of Hartford",
+        "Hartford skyline",
+        "Views of Hartford",
+        "Panoramics of Hartford",
+        "Aerial photographs of Hartford"
+      ],
+      "queries": [
+        "Hartford skyline panorama",
+        "Hartford downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Hartford, CT skyline (cropped).jpg",
+          "note": "Hartford, CT — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750496544)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:15380",
+      "city": "Buffalo, New York",
+      "area": "Buffalo-Cheektowaga, NY",
+      "wikipedia": [
+        "Buffalo, New York",
+        "Downtown Buffalo"
+      ],
+      "categories": [
+        "Skylines of Buffalo",
+        "Buffalo skyline",
+        "Views of Buffalo",
+        "Panoramics of Buffalo",
+        "Aerial photographs of Buffalo"
+      ],
+      "queries": [
+        "Buffalo skyline panorama",
+        "Buffalo downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Buffalo, NY skyline.jpg",
+          "note": "Buffalo, NY — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36752030741)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:35380",
+      "city": "New Orleans",
+      "area": "New Orleans-Metairie, LA",
+      "wikipedia": [
+        "New Orleans",
+        "Central Business District, New Orleans"
+      ],
+      "categories": [
+        "Skylines of New Orleans",
+        "New Orleans skyline",
+        "Views of New Orleans",
+        "Panoramics of New Orleans",
+        "Aerial photographs of New Orleans"
+      ],
+      "queries": [
+        "New Orleans skyline panorama",
+        "New Orleans downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "New Orleans from the Air September 2019 - Central Business District Skyline (cropped).jpg",
+          "note": "New Orleans, LA — George Bannister, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36752856482)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:46060",
+      "city": "Tucson, Arizona",
+      "area": "Tucson, AZ",
+      "wikipedia": [
+        "Tucson, Arizona",
+        "Downtown Tucson"
+      ],
+      "categories": [
+        "Skylines of Tucson",
+        "Tucson skyline",
+        "Views of Tucson",
+        "Panoramics of Tucson",
+        "Aerial photographs of Tucson"
+      ],
+      "queries": [
+        "Tucson skyline panorama",
+        "Tucson downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "View of Tucson from Sentinel Peak 2.jpg",
+          "note": "Tucson, AZ — John Diebolt, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36750496544)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:46140",
+      "city": "Tulsa, Oklahoma",
+      "area": "Tulsa, OK",
+      "wikipedia": [
+        "Tulsa, Oklahoma",
+        "Downtown Tulsa, Oklahoma"
+      ],
+      "categories": [
+        "Skylines of Tulsa",
+        "Tulsa skyline",
+        "Views of Tulsa",
+        "Panoramics of Tulsa",
+        "Aerial photographs of Tulsa"
+      ],
+      "queries": [
+        "Tulsa skyline panorama",
+        "Tulsa downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Tulsa skyline aerial, April 2023.jpg",
+          "note": "Tulsa, OK — Nils Huenerfuerst, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36752971792)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:46520",
+      "city": "Honolulu",
+      "area": "Urban Honolulu, HI",
+      "wikipedia": [
+        "Honolulu",
+        "Downtown Honolulu"
+      ],
+      "categories": [
+        "Skylines of Honolulu",
+        "Honolulu skyline",
+        "Views of Honolulu",
+        "Panoramics of Honolulu",
+        "Aerial photographs of Honolulu"
+      ],
+      "queries": [
+        "Honolulu skyline panorama",
+        "Honolulu downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "2022 Views from Diamond Head 02.jpg",
+          "note": "Honolulu, HI — Farragutful, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:36540",
+      "city": "Omaha, Nebraska",
+      "area": "Omaha, NE-IA",
+      "wikipedia": [
+        "Omaha, Nebraska",
+        "Downtown Omaha"
+      ],
+      "categories": [
+        "Skylines of Omaha",
+        "Omaha skyline",
+        "Views of Omaha",
+        "Panoramics of Omaha",
+        "Aerial photographs of Omaha"
+      ],
+      "queries": [
+        "Omaha skyline panorama",
+        "Omaha downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "City of Omaha, Nebraska Skyline on the Missouri River (30899969517).jpg",
+          "note": "Omaha, NE — Tony Webster from Minneapolis, Minnesota, United States, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:14860",
+      "city": "Stamford, Connecticut",
+      "area": "Bridgeport-Stamford-Danbury, CT",
+      "wikipedia": [
+        "Stamford, Connecticut",
+        "Bridgeport, Connecticut"
+      ],
+      "categories": [
+        "Skylines of Stamford",
+        "Stamford skyline",
+        "Views of Stamford",
+        "Panoramics of Stamford",
+        "Aerial photographs of Stamford"
+      ],
+      "queries": [
+        "Stamford skyline panorama",
+        "Stamford downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Bridgeport, Connecticut downtown.jpg",
+          "note": "Bridgeport, CT — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:24340",
+      "city": "Grand Rapids, Michigan",
+      "area": "Grand Rapids-Wyoming-Kentwood, MI",
+      "wikipedia": [
+        "Grand Rapids, Michigan",
+        "Downtown Grand Rapids"
+      ],
+      "categories": [
+        "Skylines of Grand Rapids",
+        "Grand Rapids skyline",
+        "Views of Grand Rapids",
+        "Panoramics of Grand Rapids",
+        "Aerial photographs of Grand Rapids"
+      ],
+      "queries": [
+        "Grand Rapids skyline panorama",
+        "Grand Rapids downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Grand Rapids, Michigan skyline May 2022.jpg",
+          "note": "Grand Rapids, MI — WMrapids, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:23420",
+      "city": "Fresno, California",
+      "area": "Fresno, CA",
+      "wikipedia": [
+        "Fresno, California",
+        "Downtown Fresno",
+        "Tower District"
+      ],
+      "categories": [
+        "Skylines of Fresno, California",
+        "Views of Fresno, California",
+        "Downtown Fresno",
+        "Fresno County Courthouse",
+        "Tower District, Fresno, California",
+        "Skylines of Fresno",
+        "Views of Fresno"
+      ],
+      "queries": [
+        "Fresno California skyline",
+        "Fresno California downtown",
+        "Fresno Tower Theatre"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Fresno Skyline.jpg",
+          "note": "Fresno, CA — JMora24, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816641545)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:24860",
+      "city": "Greenville, South Carolina",
+      "area": "Greenville-Anderson-Greer, SC",
+      "wikipedia": [
+        "Greenville, South Carolina",
+        "Downtown Greenville, South Carolina"
+      ],
+      "categories": [
+        "Skylines of Greenville",
+        "Greenville skyline",
+        "Views of Greenville",
+        "Panoramics of Greenville",
+        "Aerial photographs of Greenville"
+      ],
+      "queries": [
+        "Greenville skyline panorama",
+        "Greenville downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "2024-4-12-Falls Park Waterfall Greenville South Carolina by Yousef AbdulHusain.jpg",
+          "note": "Greenville, SC — CantoV, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36750858237)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:10740",
+      "city": "Albuquerque, New Mexico",
+      "area": "Albuquerque, NM",
+      "wikipedia": [
+        "Albuquerque, New Mexico",
+        "Downtown Albuquerque"
+      ],
+      "categories": [
+        "Skylines of Albuquerque",
+        "Albuquerque skyline",
+        "Views of Albuquerque",
+        "Panoramics of Albuquerque",
+        "Aerial photographs of Albuquerque"
+      ],
+      "queries": [
+        "Albuquerque skyline panorama",
+        "Albuquerque downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Albuquerque, New Mexico skyline.jpg",
+          "note": "Albuquerque, NM — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36753099586)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:14260",
+      "city": "Boise, Idaho",
+      "area": "Boise City, ID",
+      "wikipedia": [
+        "Boise, Idaho",
+        "Downtown Boise"
+      ],
+      "categories": [
+        "Skylines of Boise",
+        "Boise skyline",
+        "Views of Boise",
+        "Panoramics of Boise",
+        "Aerial photographs of Boise"
+      ],
+      "queries": [
+        "Boise skyline panorama",
+        "Boise downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Boise, Idaho.jpg",
+          "note": "Boise, ID — Jyoni Shuler, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751130861)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:16700",
+      "city": "Charleston, South Carolina",
+      "area": "Charleston-North Charleston, SC",
+      "wikipedia": [
+        "Charleston, South Carolina",
+        "Charleston Historic District"
+      ],
+      "categories": [
+        "Skylines of Charleston",
+        "Charleston skyline",
+        "Views of Charleston",
+        "Panoramics of Charleston",
+        "Aerial photographs of Charleston"
+      ],
+      "queries": [
+        "Charleston skyline panorama",
+        "Charleston downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Rainbow Row Panorama.jpg",
+          "note": "Charleston, SC — Something Original, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751130861)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:28940",
+      "city": "Knoxville, Tennessee",
+      "area": "Knoxville, TN",
+      "wikipedia": [
+        "Knoxville, Tennessee",
+        "Downtown Knoxville"
+      ],
+      "categories": [
+        "Skylines of Knoxville",
+        "Knoxville skyline",
+        "Views of Knoxville",
+        "Panoramics of Knoxville",
+        "Aerial photographs of Knoxville"
+      ],
+      "queries": [
+        "Knoxville skyline panorama",
+        "Knoxville downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Knoxville Skyline from Marriott - panoramio.jpg",
+          "note": "Knoxville, TN — Bohao Zhao, CC BY 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751130861)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:19780",
+      "city": "Des Moines, Iowa",
+      "area": "Des Moines-West Des Moines, IA",
+      "wikipedia": [
+        "Des Moines, Iowa",
+        "Downtown Des Moines"
+      ],
+      "categories": [
+        "Skylines of Des Moines",
+        "Des Moines skyline",
+        "Views of Des Moines",
+        "Panoramics of Des Moines",
+        "Aerial photographs of Des Moines"
+      ],
+      "queries": [
+        "Des Moines skyline panorama",
+        "Des Moines downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline downtown Des Moines.jpg",
+          "note": "Des Moines, IA — BarbaraLN, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36751130861)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:31540",
+      "city": "Madison, Wisconsin",
+      "area": "Madison, WI",
+      "wikipedia": [
+        "Madison, Wisconsin",
+        "Wisconsin State Capitol",
+        "Lake Monona",
+        "Monona Terrace"
+      ],
+      "categories": [
+        "Skylines of Madison, Wisconsin",
+        "Views of Madison, Wisconsin",
+        "Wisconsin State Capitol",
+        "Monona Terrace",
+        "Lake Monona",
+        "Skylines of Madison",
+        "Views of Madison"
+      ],
+      "queries": [
+        "Madison Wisconsin skyline Lake Monona",
+        "Madison Wisconsin isthmus",
+        "Wisconsin State Capitol Madison skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Gfp-wisconsin-madison-city-skyline-in-the-winter.jpg",
+          "note": "Madison, WI — Yinan Chen, Public Domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36816573981)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:40380",
+      "city": "Rochester, New York",
+      "area": "Rochester, NY",
+      "wikipedia": [
+        "Rochester, New York",
+        "Downtown Rochester"
+      ],
+      "categories": [
+        "Skylines of Rochester, New York",
+        "Views of Rochester, New York",
+        "Panoramics of Rochester, New York",
+        "Aerial photographs of Rochester, New York",
+        "Downtown Rochester, New York"
+      ],
+      "queries": [
+        "Rochester, New York skyline panorama",
+        "Rochester, New York downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline Rochester, NY.jpg",
+          "note": "Rochester, NY — Evilarry at English Wikipedia, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36781253352)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:10580",
+      "city": "Albany, New York",
+      "area": "Albany-Schenectady-Troy, NY",
+      "wikipedia": [
+        "Albany, New York",
+        "Downtown Albany"
+      ],
+      "categories": [
+        "Skylines of Albany, New York",
+        "Views of Albany, New York",
+        "Panoramics of Albany, New York",
+        "Aerial photographs of Albany, New York",
+        "Downtown Albany, New York"
+      ],
+      "queries": [
+        "Albany, New York skyline panorama",
+        "Albany, New York downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "EmpireStatePlazaPanorama.jpg",
+          "note": "Albany, NY — UpstateNYer, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36779692322)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:21340",
+      "city": "El Paso, Texas",
+      "area": "El Paso, TX",
+      "wikipedia": [
+        "El Paso, Texas",
+        "Downtown El Paso"
+      ],
+      "categories": [
+        "Skylines of El Paso",
+        "El Paso skyline",
+        "Views of El Paso",
+        "Panoramics of El Paso",
+        "Aerial photographs of El Paso"
+      ],
+      "queries": [
+        "El Paso skyline panorama",
+        "El Paso downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "El Paso Cityscape (cropped).jpg",
+          "note": "El Paso, TX — WmCheez, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36779692322)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:12940",
+      "city": "Baton Rouge, Louisiana",
+      "area": "Baton Rouge, LA",
+      "wikipedia": [
+        "Baton Rouge, Louisiana",
+        "Downtown Baton Rouge"
+      ],
+      "categories": [
+        "Skylines of Baton Rouge",
+        "Baton Rouge skyline",
+        "Views of Baton Rouge",
+        "Panoramics of Baton Rouge",
+        "Aerial photographs of Baton Rouge"
+      ],
+      "queries": [
+        "Baton Rouge skyline panorama",
+        "Baton Rouge downtown cityscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:17900",
+      "city": "Columbia, South Carolina",
+      "area": "Columbia, SC",
+      "wikipedia": [
+        "Columbia, South Carolina",
+        "Downtown Columbia, South Carolina"
+      ],
+      "categories": [
+        "Skylines of Columbia, South Carolina",
+        "Views of Columbia, South Carolina",
+        "Panoramics of Columbia, South Carolina",
+        "Aerial photographs of Columbia, South Carolina",
+        "Downtown Columbia, South Carolina"
+      ],
+      "queries": [
+        "Columbia, South Carolina skyline panorama",
+        "Columbia, South Carolina downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Fall skyline of Columbia SC from Arsenal Hill.jpg",
+          "note": "Columbia, SC — Akhenaton06, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36779692322)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:17820",
+      "city": "Colorado Springs, Colorado",
+      "area": "Colorado Springs, CO",
+      "wikipedia": [
+        "Colorado Springs, Colorado",
+        "Downtown Colorado Springs"
+      ],
+      "categories": [
+        "Skylines of Colorado Springs",
+        "Colorado Springs skyline",
+        "Views of Colorado Springs",
+        "Panoramics of Colorado Springs",
+        "Aerial photographs of Colorado Springs"
+      ],
+      "queries": [
+        "Colorado Springs skyline panorama",
+        "Colorado Springs downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Colorado Springs, Colorado (cropped).jpg",
+          "note": "Colorado Springs, CO — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36779692322)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:19430",
+      "city": "Dayton, Ohio",
+      "area": "Dayton-Kettering-Beavercreek, OH",
+      "wikipedia": [
+        "Dayton, Ohio",
+        "Downtown Dayton"
+      ],
+      "categories": [
+        "Skylines of Dayton, Ohio",
+        "Views of Dayton, Ohio",
+        "Panoramics of Dayton, Ohio",
+        "Aerial photographs of Dayton, Ohio",
+        "Downtown Dayton, Ohio"
+      ],
+      "queries": [
+        "Dayton, Ohio skyline panorama",
+        "Dayton, Ohio downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Dayton Skyline - Sunset September 2022 (cropped).jpg",
+          "note": "Dayton, OH — Blervis, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:49340",
+      "city": "Worcester, Massachusetts",
+      "area": "Worcester, MA",
+      "wikipedia": [
+        "Worcester, Massachusetts",
+        "Downtown Worcester"
+      ],
+      "categories": [
+        "Skylines of Worcester, Massachusetts",
+        "Views of Worcester, Massachusetts",
+        "Panoramics of Worcester, Massachusetts",
+        "Aerial photographs of Worcester, Massachusetts",
+        "Downtown Worcester, Massachusetts"
+      ],
+      "queries": [
+        "Worcester, Massachusetts skyline panorama",
+        "Worcester, Massachusetts downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Worcester, Massachusetts.jpg",
+          "note": "Worcester, MA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36781435010)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:30780",
+      "city": "Little Rock, Arkansas",
+      "area": "Little Rock-North Little Rock-Conway, AR",
+      "wikipedia": [
+        "Little Rock, Arkansas",
+        "Downtown Little Rock"
+      ],
+      "categories": [
+        "Skylines of Little Rock",
+        "Little Rock skyline",
+        "Views of Little Rock",
+        "Panoramics of Little Rock",
+        "Aerial photographs of Little Rock"
+      ],
+      "queries": [
+        "Little Rock skyline panorama",
+        "Little Rock downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Little Rock, Arkansas skyline.jpg",
+          "note": "Little Rock, AR — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:45060",
+      "city": "Syracuse, New York",
+      "area": "Syracuse, NY",
+      "wikipedia": [
+        "Syracuse, New York",
+        "Downtown Syracuse"
+      ],
+      "categories": [
+        "Skylines of Syracuse, New York",
+        "Views of Syracuse, New York",
+        "Panoramics of Syracuse, New York",
+        "Aerial photographs of Syracuse, New York",
+        "Downtown Syracuse, New York"
+      ],
+      "queries": [
+        "Syracuse, New York skyline panorama",
+        "Syracuse, New York downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Syracuse, New York skyline (cropped).jpg",
+          "note": "Syracuse, NY — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:16860",
+      "city": "Chattanooga, Tennessee",
+      "area": "Chattanooga, TN-GA",
+      "wikipedia": [
+        "Chattanooga, Tennessee",
+        "Downtown Chattanooga"
+      ],
+      "categories": [
+        "Skylines of Chattanooga",
+        "Chattanooga skyline",
+        "Views of Chattanooga",
+        "Panoramics of Chattanooga",
+        "Aerial photographs of Chattanooga"
+      ],
+      "queries": [
+        "Chattanooga skyline panorama",
+        "Chattanooga downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Chattanooga Skyline.JPG",
+          "note": "Chattanooga, TN — James Pressley, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:44060",
+      "city": "Spokane, Washington",
+      "area": "Spokane-Spokane Valley, WA",
+      "wikipedia": [
+        "Spokane, Washington",
+        "Downtown Spokane"
+      ],
+      "categories": [
+        "Skylines of Spokane",
+        "Spokane skyline",
+        "Views of Spokane",
+        "Panoramics of Spokane",
+        "Aerial photographs of Spokane"
+      ],
+      "queries": [
+        "Spokane skyline panorama",
+        "Spokane downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Spokane, Washington skyline (cropped).jpg",
+          "note": "Spokane, WA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780772501)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:35840",
+      "city": "Sarasota, Florida",
+      "area": "North Port-Bradenton-Sarasota, FL",
+      "wikipedia": [
+        "Sarasota, Florida",
+        "Downtown Sarasota"
+      ],
+      "categories": [
+        "Skylines of Sarasota",
+        "Sarasota skyline",
+        "Views of Sarasota",
+        "Panoramics of Sarasota",
+        "Aerial photographs of Sarasota"
+      ],
+      "queries": [
+        "Sarasota skyline panorama",
+        "Sarasota downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Ringling Causeway from Bird Key.jpg",
+          "note": "Sarasota, FL — The Grid, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:15980",
+      "city": "Fort Myers, Florida",
+      "area": "Cape Coral-Fort Myers, FL",
+      "wikipedia": [
+        "Fort Myers, Florida",
+        "Downtown Fort Myers",
+        "Cape Coral, Florida",
+        "Caloosahatchee River"
+      ],
+      "categories": [
+        "Skylines of Fort Myers",
+        "Fort Myers skyline",
+        "Views of Fort Myers",
+        "Panoramics of Fort Myers",
+        "Aerial photographs of Fort Myers",
+        "Downtown Fort Myers",
+        "Cape Coral, Florida",
+        "Views of Cape Coral",
+        "Caloosahatchee River"
+      ],
+      "queries": [
+        "Fort Myers skyline",
+        "Fort Myers riverfront Caloosahatchee",
+        "Cape Coral Florida aerial",
+        "Fort Myers downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Caloosahatchee River sunset from Ford estate Ft Myers (15510875243).jpg",
+          "note": "Fort Myers, FL — Russ, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36781668552)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:48620",
+      "city": "Wichita, Kansas",
+      "area": "Wichita, KS",
+      "wikipedia": [
+        "Wichita, Kansas",
+        "Downtown Wichita"
+      ],
+      "categories": [
+        "Skylines of Wichita",
+        "Wichita skyline",
+        "Views of Wichita",
+        "Panoramics of Wichita",
+        "Aerial photographs of Wichita"
+      ],
+      "queries": [
+        "Wichita skyline panorama",
+        "Wichita downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Wichita, Kansas skyline.jpg",
+          "note": "Wichita, KS — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:45780",
+      "city": "Toledo, Ohio",
+      "area": "Toledo, OH",
+      "wikipedia": [
+        "Toledo, Ohio",
+        "Downtown Toledo"
+      ],
+      "categories": [
+        "Skylines of Toledo, Ohio",
+        "Views of Toledo, Ohio",
+        "Panoramics of Toledo, Ohio",
+        "Aerial photographs of Toledo, Ohio",
+        "Downtown Toledo, Ohio"
+      ],
+      "queries": [
+        "Toledo, Ohio skyline panorama",
+        "Toledo, Ohio downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Anthony Wayne Bridge, Toledo, OH from Middlegrounds Metropark Full Span.jpg",
+          "note": "Toledo, OH — Limpfster94, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:30460",
+      "city": "Lexington, Kentucky",
+      "area": "Lexington-Fayette, KY",
+      "wikipedia": [
+        "Lexington, Kentucky",
+        "Downtown Lexington, Kentucky"
+      ],
+      "categories": [
+        "Skylines of Lexington, Kentucky",
+        "Views of Lexington, Kentucky",
+        "Panoramics of Lexington, Kentucky",
+        "Aerial photographs of Lexington, Kentucky",
+        "Downtown Lexington, Kentucky"
+      ],
+      "queries": [
+        "Lexington, Kentucky skyline panorama",
+        "Lexington, Kentucky downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Rupp Arena view from Triangle Park.jpg",
+          "note": "Lexington, KY — Ezugger, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:39900",
+      "city": "Reno, Nevada",
+      "area": "Reno, NV",
+      "wikipedia": [
+        "Reno, Nevada",
+        "Downtown Reno"
+      ],
+      "categories": [
+        "Skylines of Reno, Nevada",
+        "Views of Reno, Nevada",
+        "Panoramics of Reno, Nevada",
+        "Aerial photographs of Reno, Nevada",
+        "Downtown Reno, Nevada"
+      ],
+      "queries": [
+        "Reno, Nevada skyline panorama",
+        "Reno, Nevada downtown cityscape"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Reno 2.jpg",
+          "note": "Reno, NV — Downtowngal, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36780959488)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:10900",
+      "city": "Allentown, Pennsylvania",
+      "area": "Allentown-Bethlehem-Easton, PA-NJ",
+      "wikipedia": [
+        "Allentown, Pennsylvania",
+        "Bethlehem, Pennsylvania",
+        "Easton, Pennsylvania",
+        "Lehigh Valley"
+      ],
+      "categories": [
+        "Skylines of Allentown, Pennsylvania",
+        "Views of Allentown, Pennsylvania",
+        "Panoramics of Allentown, Pennsylvania",
+        "Aerial photographs of Allentown, Pennsylvania",
+        "Downtown Allentown, Pennsylvania",
+        "Views of Bethlehem, Pennsylvania",
+        "SteelStacks"
+      ],
+      "queries": [
+        "Allentown Pennsylvania skyline",
+        "Bethlehem Pennsylvania SteelStacks",
+        "Lehigh Valley aerial"
+      ],
+      "candidates": [
+        {
+          "file": "2017 - Hamilton Street Christmas Skyline - Allentown PA.jpg",
+          "note": "Allentown, PA — Atwngirl, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:35300",
+      "city": "New Haven, Connecticut",
+      "area": "New Haven, CT",
+      "wikipedia": [
+        "New Haven, Connecticut",
+        "New Haven Green",
+        "East Rock Park"
+      ],
+      "categories": [
+        "Skylines of New Haven, Connecticut",
+        "Views of New Haven, Connecticut",
+        "Panoramics of New Haven, Connecticut",
+        "Aerial photographs of New Haven, Connecticut",
+        "New Haven Green",
+        "East Rock Park"
+      ],
+      "queries": [
+        "New Haven Connecticut skyline",
+        "New Haven from East Rock",
+        "New Haven Green aerial"
+      ],
+      "candidates": [
+        {
+          "file": "New Haven, Connecticut skyline (cropped).jpg",
+          "note": "New Haven, CT — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:12540",
+      "city": "Bakersfield, California",
+      "area": "Bakersfield-Delano, CA",
+      "wikipedia": [
+        "Bakersfield, California"
+      ],
+      "categories": [
+        "Skylines of Bakersfield, California",
+        "Views of Bakersfield, California",
+        "Panoramics of Bakersfield, California",
+        "Aerial photographs of Bakersfield, California",
+        "Downtown Bakersfield, California"
+      ],
+      "queries": [
+        "Bakersfield California skyline",
+        "Bakersfield California downtown",
+        "Bakersfield California aerial"
+      ],
+      "candidates": [
+        {
+          "file": "BakersfieldSkyline.jpg",
+          "note": "Bakersfield, CA — Robert Hale, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783419278)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:32580",
+      "city": "McAllen, Texas",
+      "area": "McAllen-Edinburg-Mission, TX",
+      "wikipedia": [
+        "McAllen, Texas",
+        "Edinburg, Texas",
+        "Mission, Texas",
+        "Rio Grande Valley"
+      ],
+      "categories": [
+        "Skylines of McAllen, Texas",
+        "Views of McAllen, Texas",
+        "Panoramics of McAllen, Texas",
+        "Aerial photographs of McAllen, Texas",
+        "McAllen, Texas"
+      ],
+      "queries": [
+        "McAllen Texas skyline",
+        "McAllen Texas aerial",
+        "McAllen Texas downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline of McAllen.jpg",
+          "note": "McAllen, TX — Theunderratedtaco, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:37100",
+      "city": "Ventura, California",
+      "area": "Oxnard-Thousand Oaks-Ventura, CA",
+      "wikipedia": [
+        "Ventura, California",
+        "Oxnard, California",
+        "Thousand Oaks, California",
+        "Ventura County, California"
+      ],
+      "categories": [
+        "Skylines of Ventura, California",
+        "Views of Ventura, California",
+        "Panoramics of Ventura, California",
+        "Aerial photographs of Ventura, California",
+        "Ventura Pier",
+        "Views of Oxnard, California",
+        "Channel Islands Harbor",
+        "Views of Thousand Oaks, California"
+      ],
+      "queries": [
+        "Ventura California pier coast",
+        "Oxnard California harbor",
+        "Thousand Oaks California hills",
+        "Ventura County coast aerial"
+      ],
+      "candidates": [
+        {
+          "file": "CI Harbor Panorama (cropped).jpg",
+          "note": "Oxnard, CA — Fettlemap, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:24660",
+      "city": "Greensboro, North Carolina",
+      "area": "Greensboro-High Point, NC",
+      "wikipedia": [
+        "Greensboro, North Carolina",
+        "Downtown Greensboro",
+        "High Point, North Carolina"
+      ],
+      "categories": [
+        "Skylines of Greensboro, North Carolina",
+        "Views of Greensboro, North Carolina",
+        "Panoramics of Greensboro, North Carolina",
+        "Aerial photographs of Greensboro, North Carolina",
+        "Downtown Greensboro, North Carolina"
+      ],
+      "queries": [
+        "Greensboro North Carolina skyline",
+        "Greensboro North Carolina downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Greensboro skyline from the Depot.jpg",
+          "note": "Greensboro, NC — Mx._Granger, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782733907)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:49180",
+      "city": "Winston-Salem, North Carolina",
+      "area": "Winston-Salem, NC",
+      "wikipedia": [
+        "Winston-Salem, North Carolina",
+        "Downtown Winston-Salem"
+      ],
+      "categories": [
+        "Skylines of Winston-Salem, North Carolina",
+        "Views of Winston-Salem, North Carolina",
+        "Panoramics of Winston-Salem, North Carolina",
+        "Aerial photographs of Winston-Salem, North Carolina",
+        "Downtown Winston-Salem, North Carolina"
+      ],
+      "queries": [
+        "Winston-Salem North Carolina skyline",
+        "Winston-Salem downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Winston-Salem skyline.jpg",
+          "note": "Winston-Salem, NC — Indy beetle, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:10420",
+      "city": "Akron, Ohio",
+      "area": "Akron, OH",
+      "wikipedia": [
+        "Akron, Ohio",
+        "Downtown Akron"
+      ],
+      "categories": [
+        "Skylines of Akron, Ohio",
+        "Views of Akron, Ohio",
+        "Panoramics of Akron, Ohio",
+        "Aerial photographs of Akron, Ohio",
+        "Downtown Akron, Ohio"
+      ],
+      "queries": [
+        "Akron Ohio skyline",
+        "Akron Ohio downtown"
+      ],
+      "candidates": [
+        {
+          "file": "AkronPanorama.jpg",
+          "note": "Akron, OH — Sleepydre, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:25420",
+      "city": "Harrisburg, Pennsylvania",
+      "area": "Harrisburg-Carlisle, PA",
+      "wikipedia": [
+        "Harrisburg, Pennsylvania",
+        "Pennsylvania State Capitol",
+        "Susquehanna River"
+      ],
+      "categories": [
+        "Skylines of Harrisburg, Pennsylvania",
+        "Views of Harrisburg, Pennsylvania",
+        "Panoramics of Harrisburg, Pennsylvania",
+        "Aerial photographs of Harrisburg, Pennsylvania",
+        "Downtown Harrisburg, Pennsylvania"
+      ],
+      "queries": [
+        "Harrisburg Pennsylvania skyline Susquehanna",
+        "Harrisburg skyline from City Island",
+        "Pennsylvania State Capitol Harrisburg"
+      ],
+      "candidates": [
+        {
+          "file": "Harrisburg, PA Skyline 2021.jpg",
+          "note": "Harrisburg, PA — Jeffrey Hayes, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:29540",
+      "city": "Lancaster, Pennsylvania",
+      "area": "Lancaster, PA",
+      "wikipedia": [
+        "Lancaster, Pennsylvania",
+        "Lancaster County, Pennsylvania"
+      ],
+      "categories": [
+        "Skylines of Lancaster, Pennsylvania",
+        "Views of Lancaster, Pennsylvania",
+        "Panoramics of Lancaster, Pennsylvania",
+        "Aerial photographs of Lancaster, Pennsylvania",
+        "Downtown Lancaster, Pennsylvania",
+        "Farms in Lancaster County, Pennsylvania"
+      ],
+      "queries": [
+        "Lancaster Pennsylvania skyline",
+        "Lancaster Pennsylvania downtown",
+        "Lancaster County Pennsylvania farmland"
+      ],
+      "candidates": [
+        {
+          "file": "Lancaster Pennsylvania downtown.jpg",
+          "note": "Lancaster, PA — Randolph Carney, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:38860",
+      "city": "Portland, Maine",
+      "area": "Portland-South Portland, ME",
+      "wikipedia": [
+        "Portland, Maine",
+        "Old Port",
+        "Portland Head Light"
+      ],
+      "categories": [
+        "Skylines of Portland, Maine",
+        "Views of Portland, Maine",
+        "Panoramics of Portland, Maine",
+        "Aerial photographs of Portland, Maine",
+        "Old Port (Portland, Maine)",
+        "Portland Head Light"
+      ],
+      "queries": [
+        "Portland Maine skyline",
+        "Portland Maine waterfront Old Port",
+        "Portland Maine harbor aerial"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline waterfront.jpg",
+          "note": "Portland, ME — Metrodogmedia, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:42340",
+      "city": "Savannah, Georgia",
+      "area": "Savannah, GA",
+      "wikipedia": [
+        "Savannah, Georgia",
+        "Savannah Historic District",
+        "Forsyth Park",
+        "Savannah River"
+      ],
+      "categories": [
+        "Skylines of Savannah, Georgia",
+        "Views of Savannah, Georgia",
+        "Panoramics of Savannah, Georgia",
+        "Aerial photographs of Savannah, Georgia",
+        "Savannah Historic District",
+        "Forsyth Park",
+        "River Street (Savannah, Georgia)"
+      ],
+      "queries": [
+        "Savannah Georgia skyline river",
+        "Savannah Georgia Forsyth Park fountain",
+        "Savannah Georgia River Street waterfront"
+      ],
+      "candidates": [
+        {
+          "file": "Forsyth fountain 2019.jpeg",
+          "note": "Savannah, GA — Seasider53, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782855933)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:11700",
+      "city": "Asheville, North Carolina",
+      "area": "Asheville, NC",
+      "wikipedia": [
+        "Asheville, North Carolina",
+        "Downtown Asheville"
+      ],
+      "categories": [
+        "Skylines of Asheville, North Carolina",
+        "Views of Asheville, North Carolina",
+        "Panoramics of Asheville, North Carolina",
+        "Aerial photographs of Asheville, North Carolina",
+        "Downtown Asheville, North Carolina"
+      ],
+      "queries": [
+        "Asheville skyline Blue Ridge",
+        "Asheville North Carolina downtown mountains"
+      ],
+      "candidates": [
+        {
+          "file": "Asheville North Carolina Skyline July 2023.jpg",
+          "note": "Asheville, NC — Asheville Photography, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:26620",
+      "city": "Huntsville, Alabama",
+      "area": "Huntsville, AL",
+      "wikipedia": [
+        "Huntsville, Alabama",
+        "Downtown Huntsville"
+      ],
+      "categories": [
+        "Skylines of Huntsville, Alabama",
+        "Views of Huntsville, Alabama",
+        "Panoramics of Huntsville, Alabama",
+        "Aerial photographs of Huntsville, Alabama",
+        "Downtown Huntsville, Alabama",
+        "Big Spring International Park"
+      ],
+      "queries": [
+        "Huntsville Alabama skyline",
+        "Huntsville Alabama downtown Big Spring Park"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Huntsville, Alabama.jpg",
+          "note": "Huntsville, AL — No machine-readable author provided. Anivron assumed (based on copyright claims)., CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:11260",
+      "city": "Anchorage, Alaska",
+      "area": "Anchorage, AK",
+      "wikipedia": [
+        "Anchorage, Alaska",
+        "Downtown Anchorage"
+      ],
+      "categories": [
+        "Skylines of Anchorage, Alaska",
+        "Views of Anchorage, Alaska",
+        "Panoramics of Anchorage, Alaska",
+        "Aerial photographs of Anchorage, Alaska",
+        "Downtown Anchorage, Alaska"
+      ],
+      "queries": [
+        "Anchorage Alaska skyline Chugach",
+        "Anchorage Alaska skyline from Earthquake Park"
+      ],
+      "candidates": [
+        {
+          "file": "Anchorage eastward view from Hotel Captain Cook.jpg",
+          "note": "Anchorage, AK — Joseph, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:20500",
+      "city": "Durham, North Carolina",
+      "area": "Durham-Chapel Hill, NC",
+      "wikipedia": [
+        "Durham, North Carolina",
+        "Downtown Durham",
+        "Chapel Hill, North Carolina"
+      ],
+      "categories": [
+        "Skylines of Durham, North Carolina",
+        "Views of Durham, North Carolina",
+        "Panoramics of Durham, North Carolina",
+        "Aerial photographs of Durham, North Carolina",
+        "Downtown Durham, North Carolina",
+        "American Tobacco Campus"
+      ],
+      "queries": [
+        "Durham North Carolina skyline",
+        "Durham North Carolina downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline Panorama of Durham, North Carolina.jpg",
+          "note": "Durham, NC — DiscoA340, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:12260",
+      "city": "Augusta, Georgia",
+      "area": "Augusta-Richmond County, GA-SC",
+      "wikipedia": [
+        "Augusta, Georgia",
+        "Augusta Riverwalk",
+        "Downtown Augusta"
+      ],
+      "categories": [
+        "Skylines of Augusta, Georgia",
+        "Views of Augusta, Georgia",
+        "Panoramics of Augusta, Georgia",
+        "Aerial photographs of Augusta, Georgia",
+        "Downtown Augusta, Georgia",
+        "Augusta Riverwalk"
+      ],
+      "queries": [
+        "Augusta Georgia skyline Savannah River",
+        "Augusta Georgia downtown Broad Street"
+      ],
+      "candidates": [
+        {
+          "file": "Augusta, GA Downtown Skyline 2017.jpg",
+          "note": "Augusta, GA — c_live_lee, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:27140",
+      "city": "Jackson, Mississippi",
+      "area": "Jackson, MS",
+      "wikipedia": [
+        "Jackson, Mississippi",
+        "Downtown Jackson, Mississippi"
+      ],
+      "categories": [
+        "Skylines of Jackson, Mississippi",
+        "Views of Jackson, Mississippi",
+        "Panoramics of Jackson, Mississippi",
+        "Aerial photographs of Jackson, Mississippi",
+        "Downtown Jackson, Mississippi"
+      ],
+      "queries": [
+        "Jackson Mississippi skyline",
+        "Jackson Mississippi downtown"
+      ],
+      "candidates": [
+        {
+          "file": "JacksonMS Downtown Panorama.jpg",
+          "note": "Jackson, MS — chmeredith from Jackson, MS, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36782967654)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:37860",
+      "city": "Pensacola, Florida",
+      "area": "Pensacola-Ferry Pass-Brent, FL",
+      "wikipedia": [
+        "Pensacola, Florida",
+        "Pensacola Beach, Florida",
+        "Downtown Pensacola"
+      ],
+      "categories": [
+        "Skylines of Pensacola, Florida",
+        "Views of Pensacola, Florida",
+        "Panoramics of Pensacola, Florida",
+        "Aerial photographs of Pensacola, Florida",
+        "Pensacola Beach, Florida",
+        "Palafox Street"
+      ],
+      "queries": [
+        "Pensacola Florida skyline bay",
+        "Pensacola Beach Florida aerial",
+        "Pensacola Florida downtown Palafox"
+      ],
+      "candidates": [
+        {
+          "file": "Pensacola Beach, United States (Unsplash).jpg",
+          "note": "Pensacola, FL — Fede Casanova fedecasanova, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783120462)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:42540",
+      "city": "Scranton, Pennsylvania",
+      "area": "Scranton--Wilkes-Barre, PA",
+      "wikipedia": [
+        "Scranton, Pennsylvania",
+        "Wilkes-Barre, Pennsylvania",
+        "Wyoming Valley"
+      ],
+      "categories": [
+        "Skylines of Scranton, Pennsylvania",
+        "Views of Scranton, Pennsylvania",
+        "Panoramics of Scranton, Pennsylvania",
+        "Aerial photographs of Scranton, Pennsylvania",
+        "Views of Wilkes-Barre, Pennsylvania",
+        "Skylines of Wilkes-Barre, Pennsylvania"
+      ],
+      "queries": [
+        "Scranton Pennsylvania skyline",
+        "Wilkes-Barre Pennsylvania skyline Susquehanna"
+      ],
+      "candidates": [
+        {
+          "file": "Scranton - Downtown (48472890492).jpg",
+          "note": "Scranton, PA — Ajay Suresh from New York, NY, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783120462)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:44700",
+      "city": "Stockton, California",
+      "area": "Stockton-Lodi, CA",
+      "wikipedia": [
+        "Stockton, California",
+        "Downtown Stockton",
+        "Port of Stockton"
+      ],
+      "categories": [
+        "Skylines of Stockton, California",
+        "Views of Stockton, California",
+        "Panoramics of Stockton, California",
+        "Aerial photographs of Stockton, California",
+        "Downtown Stockton, California",
+        "Stockton Channel"
+      ],
+      "queries": [
+        "Stockton California skyline waterfront",
+        "Stockton California downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Aerial view of Stockton, California skyline.jpg",
+          "note": "Stockton, CA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783120462)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:33700",
+      "city": "Modesto, California",
+      "area": "Modesto, CA",
+      "wikipedia": [
+        "Modesto, California",
+        "Modesto Arch"
+      ],
+      "categories": [
+        "Skylines of Modesto, California",
+        "Views of Modesto, California",
+        "Panoramics of Modesto, California",
+        "Aerial photographs of Modesto, California",
+        "Downtown Modesto, California",
+        "Modesto Arch"
+      ],
+      "queries": [
+        "Modesto California downtown arch",
+        "Modesto California skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Modesto Arch.JPG",
+          "note": "Modesto, CA — Carl Skaggs, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36783579706)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:19660",
+      "city": "Daytona Beach, Florida",
+      "area": "Deltona-Daytona Beach-Ormond Beach, FL",
+      "wikipedia": [
+        "Daytona Beach, Florida",
+        "Ormond Beach, Florida",
+        "Deltona, Florida",
+        "Daytona Beach Main Street Pier"
+      ],
+      "categories": [
+        "Skylines of Daytona Beach, Florida",
+        "Views of Daytona Beach, Florida",
+        "Panoramics of Daytona Beach, Florida",
+        "Aerial photographs of Daytona Beach, Florida",
+        "Daytona Beach Main Street Pier",
+        "Views of Ormond Beach, Florida"
+      ],
+      "queries": [
+        "Daytona Beach Florida skyline beach",
+        "Daytona Beach Florida aerial ocean",
+        "Ormond Beach Florida"
+      ],
+      "candidates": [
+        {
+          "file": "Daytona Beach looking north from pier.jpg",
+          "note": "Daytona Beach, FL — Dough4872, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36783120462)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:29460",
+      "city": "Lakeland, Florida",
+      "area": "Lakeland-Winter Haven, FL",
+      "wikipedia": [
+        "Lakeland, Florida",
+        "Lake Mirror",
+        "Winter Haven, Florida"
+      ],
+      "categories": [
+        "Skylines of Lakeland, Florida",
+        "Views of Lakeland, Florida",
+        "Panoramics of Lakeland, Florida",
+        "Aerial photographs of Lakeland, Florida",
+        "Lake Mirror",
+        "Views of Winter Haven, Florida"
+      ],
+      "queries": [
+        "Lakeland Florida Lake Mirror skyline",
+        "Lakeland Florida downtown lake",
+        "Winter Haven Florida lake"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown-Lakeland.jpg",
+          "note": "Lakeland, FL — Nkadambi, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:36260",
+      "city": "Ogden, Utah",
+      "area": "Ogden, UT",
+      "wikipedia": [
+        "Ogden, Utah",
+        "Ogden Union Station",
+        "Historic 25th Street"
+      ],
+      "categories": [
+        "Skylines of Ogden, Utah",
+        "Views of Ogden, Utah",
+        "Panoramics of Ogden, Utah",
+        "Aerial photographs of Ogden, Utah",
+        "Ogden Union Station"
+      ],
+      "queries": [
+        "Ogden Utah downtown mountains",
+        "Ogden Utah skyline Wasatch",
+        "Ogden Utah 25th Street"
+      ],
+      "candidates": [
+        {
+          "file": "Ogden Utah downtown.jpg",
+          "note": "Ogden, UT — Scott Catron from Sandy, Utah, USA, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:39340",
+      "city": "Provo, Utah",
+      "area": "Provo-Orem-Lehi, UT",
+      "wikipedia": [
+        "Provo, Utah",
+        "Orem, Utah",
+        "Utah Lake",
+        "Mount Timpanogos"
+      ],
+      "categories": [
+        "Skylines of Provo, Utah",
+        "Views of Provo, Utah",
+        "Panoramics of Provo, Utah",
+        "Aerial photographs of Provo, Utah",
+        "Views of Orem, Utah",
+        "Utah Valley"
+      ],
+      "queries": [
+        "Provo Utah skyline mountains",
+        "Provo Utah downtown Mount Timpanogos",
+        "Utah Valley Provo Orem aerial"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Provo.jpg",
+          "note": "Provo, UT — Javin Weaver (printed as \"Creator: Javin Weaver\"), CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:37340",
+      "city": "Melbourne, Florida",
+      "area": "Palm Bay-Melbourne-Titusville, FL",
+      "wikipedia": [
+        "Melbourne, Florida",
+        "Palm Bay, Florida",
+        "Titusville, Florida",
+        "Cocoa Beach, Florida",
+        "Indian River Lagoon"
+      ],
+      "categories": [
+        "Skylines of Melbourne, Florida",
+        "Views of Melbourne, Florida",
+        "Panoramics of Melbourne, Florida",
+        "Aerial photographs of Melbourne, Florida",
+        "Views of Palm Bay, Florida",
+        "Views of Cocoa Beach, Florida",
+        "Views of Titusville, Florida"
+      ],
+      "queries": [
+        "Melbourne Florida Indian River",
+        "Cocoa Beach Florida pier",
+        "Titusville Florida Indian River",
+        "Palm Bay Florida"
+      ],
+      "candidates": [
+        {
+          "file": "Cocoa Beach Pier from the beach 2023-05-19 (2).JPG",
+          "note": "Palm Bay-Melbourne-Titusville, FL — Benoît Prieur, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:22220",
+      "city": "Fayetteville, Arkansas",
+      "area": "Fayetteville-Springdale-Rogers, AR",
+      "wikipedia": [
+        "Fayetteville, Arkansas",
+        "Bentonville, Arkansas",
+        "Rogers, Arkansas",
+        "Springdale, Arkansas",
+        "Northwest Arkansas"
+      ],
+      "categories": [
+        "Skylines of Fayetteville, Arkansas",
+        "Views of Fayetteville, Arkansas",
+        "Panoramics of Fayetteville, Arkansas",
+        "Aerial photographs of Fayetteville, Arkansas",
+        "Views of Bentonville, Arkansas",
+        "Views of Rogers, Arkansas"
+      ],
+      "queries": [
+        "Fayetteville Arkansas downtown square",
+        "Bentonville Arkansas square",
+        "Fayetteville Arkansas Ozarks view",
+        "Northwest Arkansas aerial"
+      ],
+      "candidates": [
+        {
+          "file": "Mount Sequoyah and Fayetteville from University of Arkansas.jpg",
+          "note": "Fayetteville, AR — Brandonrush, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36786974652)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:44180",
+      "city": "Springfield, Missouri",
+      "area": "Springfield, MO",
+      "wikipedia": [
+        "Springfield, Missouri",
+        "Park Central Square"
+      ],
+      "categories": [
+        "Skylines of Springfield, Missouri",
+        "Views of Springfield, Missouri",
+        "Panoramics of Springfield, Missouri",
+        "Aerial photographs of Springfield, Missouri",
+        "Park Central Square (Springfield, Missouri)"
+      ],
+      "queries": [
+        "Springfield Missouri skyline",
+        "Springfield Missouri downtown",
+        "Springfield Missouri Park Central Square"
+      ]
+    },
+    {
+      "metroId": "cbsa:34820",
+      "city": "Myrtle Beach, South Carolina",
+      "area": "Myrtle Beach-Conway-North Myrtle Beach, SC",
+      "wikipedia": [
+        "Myrtle Beach, South Carolina",
+        "North Myrtle Beach, South Carolina",
+        "SkyWheel Myrtle Beach",
+        "Grand Strand"
+      ],
+      "categories": [
+        "Skylines of Myrtle Beach, South Carolina",
+        "Views of Myrtle Beach, South Carolina",
+        "Panoramics of Myrtle Beach, South Carolina",
+        "Aerial photographs of Myrtle Beach, South Carolina",
+        "Grand Strand",
+        "Views of North Myrtle Beach, South Carolina"
+      ],
+      "queries": [
+        "Myrtle Beach South Carolina beach skyline",
+        "Myrtle Beach South Carolina oceanfront aerial",
+        "Grand Strand South Carolina beach"
+      ],
+      "candidates": [
+        {
+          "file": "Panorama of the Myrtle Beach Beachfront 3 (cropped).jpg",
+          "note": "Myrtle Beach, SC — DiscoA340, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787138337)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:49620",
+      "city": "York, Pennsylvania",
+      "area": "York-Hanover, PA",
+      "wikipedia": [
+        "York, Pennsylvania",
+        "Hanover, Pennsylvania",
+        "York County, Pennsylvania"
+      ],
+      "categories": [
+        "Skylines of York, Pennsylvania",
+        "Views of York, Pennsylvania",
+        "Panoramics of York, Pennsylvania",
+        "Aerial photographs of York, Pennsylvania",
+        "Views of Hanover, Pennsylvania"
+      ],
+      "queries": [
+        "York Pennsylvania downtown",
+        "York Pennsylvania skyline",
+        "York County Pennsylvania farmland"
+      ],
+      "candidates": [
+        {
+          "file": "Hanover, PA 17331, USA - panoramio (2).jpg",
+          "note": "York-Hanover, PA — Idawriter, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791223837)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:28660",
+      "city": "Killeen, Texas",
+      "area": "Killeen-Temple, TX",
+      "wikipedia": [
+        "Killeen, Texas",
+        "Temple, Texas",
+        "Belton, Texas",
+        "Belton Lake"
+      ],
+      "categories": [
+        "Skylines of Killeen, Texas",
+        "Views of Killeen, Texas",
+        "Panoramics of Killeen, Texas",
+        "Aerial photographs of Killeen, Texas",
+        "Views of Temple, Texas",
+        "Views of Belton, Texas"
+      ],
+      "queries": [
+        "Killeen Texas",
+        "Temple Texas downtown",
+        "Belton Texas downtown",
+        "Belton Lake Texas"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown belton.jpg",
+          "note": "Killeen-Temple, TX — NativeTexan55, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787138337)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:18580",
+      "city": "Corpus Christi, Texas",
+      "area": "Corpus Christi, TX",
+      "wikipedia": [
+        "Corpus Christi, Texas",
+        "Corpus Christi Bay",
+        "Harbor Bridge (Corpus Christi, Texas)"
+      ],
+      "categories": [
+        "Skylines of Corpus Christi, Texas",
+        "Views of Corpus Christi, Texas",
+        "Panoramics of Corpus Christi, Texas",
+        "Aerial photographs of Corpus Christi, Texas",
+        "Corpus Christi Bay",
+        "Harbor Bridge (Corpus Christi)"
+      ],
+      "queries": [
+        "Corpus Christi Texas skyline bay",
+        "Corpus Christi Texas bayfront",
+        "Corpus Christi Texas downtown aerial"
+      ],
+      "candidates": [
+        {
+          "file": "Corpus Christi skyline.jpg",
+          "note": "Corpus Christi, TX — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787138337)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:41420",
+      "city": "Salem, Oregon",
+      "area": "Salem, OR",
+      "wikipedia": [
+        "Salem, Oregon",
+        "Oregon State Capitol",
+        "Willamette River"
+      ],
+      "categories": [
+        "Skylines of Salem, Oregon",
+        "Views of Salem, Oregon",
+        "Panoramics of Salem, Oregon",
+        "Aerial photographs of Salem, Oregon",
+        "Oregon State Capitol"
+      ],
+      "queries": [
+        "Salem Oregon downtown",
+        "Salem Oregon State Capitol",
+        "Salem Oregon Willamette River"
+      ],
+      "candidates": [
+        {
+          "file": "Salem Oregon downtown.JPG",
+          "note": "Salem, OR — M.O. Stevens, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787138337)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:47300",
+      "city": "Visalia, California",
+      "area": "Visalia, CA",
+      "wikipedia": [
+        "Visalia, California",
+        "Tulare County, California"
+      ],
+      "categories": [
+        "Skylines of Visalia, California",
+        "Views of Visalia, California",
+        "Panoramics of Visalia, California",
+        "Aerial photographs of Visalia, California",
+        "Views of Tulare County, California"
+      ],
+      "queries": [
+        "Visalia California downtown",
+        "Visalia California Sierra Nevada",
+        "Tulare County California"
+      ],
+      "candidates": [
+        {
+          "file": "Visalia CA downtown 2.jpg",
+          "note": "Visalia, CA — Original uploader was VisalianNsf at en.wikipedia, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791296577)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:46700",
+      "city": "Vallejo, California",
+      "area": "Vallejo, CA",
+      "wikipedia": [
+        "Vallejo, California",
+        "Carquinez Bridge",
+        "Mare Island",
+        "Benicia, California"
+      ],
+      "categories": [
+        "Skylines of Vallejo, California",
+        "Views of Vallejo, California",
+        "Panoramics of Vallejo, California",
+        "Aerial photographs of Vallejo, California",
+        "Carquinez Bridge",
+        "Views of Benicia, California"
+      ],
+      "queries": [
+        "Vallejo California waterfront",
+        "Carquinez Bridge Vallejo",
+        "Benicia California waterfront"
+      ],
+      "candidates": [
+        {
+          "file": "Mare Island Ferry Terminal from Vallejo, May 2019.JPG",
+          "note": "Vallejo, CA — Pi.1415926535, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787230817)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:42220",
+      "city": "Santa Rosa, California",
+      "area": "Santa Rosa-Petaluma, CA",
+      "wikipedia": [
+        "Santa Rosa, California",
+        "Petaluma, California",
+        "Sonoma County, California"
+      ],
+      "categories": [
+        "Skylines of Santa Rosa, California",
+        "Views of Santa Rosa, California",
+        "Panoramics of Santa Rosa, California",
+        "Aerial photographs of Santa Rosa, California",
+        "Views of Petaluma, California",
+        "Vineyards in Sonoma County, California"
+      ],
+      "queries": [
+        "Santa Rosa California downtown",
+        "Petaluma California river downtown",
+        "Sonoma County California vineyards"
+      ],
+      "candidates": [
+        {
+          "file": "Sonomamtnvineyard.jpg",
+          "note": "Santa Rosa-Petaluma, CA — w:en:User:Anlace, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791355974)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:23060",
+      "city": "Fort Wayne, Indiana",
+      "area": "Fort Wayne, IN",
+      "wikipedia": [
+        "Fort Wayne, Indiana",
+        "Promenade Park (Fort Wayne)"
+      ],
+      "categories": [
+        "Skylines of Fort Wayne, Indiana",
+        "Views of Fort Wayne, Indiana",
+        "Panoramics of Fort Wayne, Indiana",
+        "Aerial photographs of Fort Wayne, Indiana"
+      ],
+      "queries": [
+        "Fort Wayne Indiana skyline",
+        "Fort Wayne Indiana downtown",
+        "Fort Wayne Indiana riverfront"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Fort Wayne, Indiana Skyline from Old Fort, May 2014.jpg",
+          "note": "Fort Wayne, IN — Momoneymoproblemz, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36787230817)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:15180",
+      "city": "Brownsville, Texas",
+      "area": "Brownsville-Harlingen, TX",
+      "wikipedia": [
+        "Brownsville, Texas",
+        "Harlingen, Texas",
+        "South Padre Island, Texas"
+      ],
+      "categories": [
+        "Skylines of Brownsville, Texas",
+        "Views of Brownsville, Texas",
+        "Panoramics of Brownsville, Texas",
+        "Aerial photographs of Brownsville, Texas",
+        "Views of South Padre Island, Texas",
+        "Views of Harlingen, Texas"
+      ],
+      "queries": [
+        "Brownsville Texas downtown",
+        "South Padre Island Texas beach",
+        "Harlingen Texas downtown"
+      ],
+      "candidates": [
+        {
+          "file": "South Padre Island beach panorama.jpg",
+          "note": "Brownsville-Harlingen, TX — Spheroidite, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36787230817)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:38940",
+      "city": "Port St. Lucie, Florida",
+      "area": "Port St. Lucie, FL",
+      "wikipedia": [
+        "Port St. Lucie, Florida",
+        "Stuart, Florida",
+        "Fort Pierce, Florida"
+      ],
+      "categories": [
+        "Skylines of Port St. Lucie, Florida",
+        "Views of Port St. Lucie, Florida",
+        "Panoramics of Port St. Lucie, Florida",
+        "Aerial photographs of Port St. Lucie, Florida",
+        "Views of Stuart, Florida",
+        "Views of Fort Pierce, Florida"
+      ],
+      "queries": [
+        "Port St. Lucie Florida",
+        "Stuart Florida waterfront",
+        "Fort Pierce Florida waterfront"
+      ],
+      "candidates": [
+        {
+          "file": "Fort Pierce Inlet State Park.jpg",
+          "note": "Port St. Lucie, FL — JonathanPuello, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791449560)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:45220",
+      "city": "Tallahassee, Florida",
+      "area": "Tallahassee, FL",
+      "wikipedia": [
+        "Tallahassee, Florida",
+        "Florida State Capitol"
+      ],
+      "categories": [
+        "Skylines of Tallahassee, Florida",
+        "Views of Tallahassee, Florida",
+        "Panoramics of Tallahassee, Florida",
+        "Aerial photographs of Tallahassee, Florida",
+        "Florida State Capitol"
+      ],
+      "queries": [
+        "Tallahassee Florida skyline",
+        "Tallahassee Florida Capitol",
+        "Tallahassee Florida downtown"
+      ],
+      "candidates": [
+        {
+          "file": "TallahasseeSkyline2.JPG",
+          "note": "Tallahassee, FL — UrbanTallahassee, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791060658)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:41980",
+      "city": "San Juan, Puerto Rico",
+      "area": "San Juan-Bayamón-Caguas, PR",
+      "wikipedia": [
+        "San Juan, Puerto Rico",
+        "Old San Juan",
+        "Condado, San Juan, Puerto Rico"
+      ],
+      "categories": [
+        "Skylines of San Juan, Puerto Rico",
+        "Views of San Juan, Puerto Rico",
+        "Old San Juan",
+        "Condado (San Juan)"
+      ],
+      "queries": [
+        "San Juan Puerto Rico skyline",
+        "Old San Juan",
+        "Condado San Juan"
+      ],
+      "candidates": [
+        {
+          "file": "Castillo San Felipe del Morro aerial, May 2024 - 01.jpg",
+          "note": "San Juan-Bayamón-Caguas, PR — Nils Huenerfuerst, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:33660",
+      "city": "Mobile, Alabama",
+      "area": "Mobile, AL",
+      "wikipedia": [
+        "Mobile, Alabama",
+        "RSA Battle House Tower"
+      ],
+      "categories": [
+        "Skylines of Mobile, Alabama",
+        "Views of Mobile, Alabama",
+        "Downtown Mobile, Alabama"
+      ],
+      "queries": [
+        "Mobile Alabama skyline",
+        "Mobile Alabama downtown",
+        "Mobile River skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Mobile, Alabama skyline.jpg",
+          "note": "Mobile, AL — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:43340",
+      "city": "Shreveport, Louisiana",
+      "area": "Shreveport-Bossier City, LA",
+      "wikipedia": [
+        "Shreveport, Louisiana",
+        "Bossier City, Louisiana"
+      ],
+      "categories": [
+        "Skylines of Shreveport, Louisiana",
+        "Views of Shreveport, Louisiana",
+        "Downtown Shreveport, Louisiana"
+      ],
+      "queries": [
+        "Shreveport Louisiana skyline",
+        "Shreveport Red River",
+        "Shreveport downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Shreveport-Bossier City Skyline over Red River.jpg",
+          "note": "Shreveport-Bossier City, LA — Shreveport-Bossier Convention and Tourist Bureau, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:29620",
+      "city": "Lansing, Michigan",
+      "area": "Lansing-East Lansing, MI",
+      "wikipedia": [
+        "Lansing, Michigan",
+        "Michigan State Capitol"
+      ],
+      "categories": [
+        "Skylines of Lansing, Michigan",
+        "Views of Lansing, Michigan",
+        "Michigan State Capitol",
+        "Downtown Lansing, Michigan",
+        "Michigan State University campus",
+        "Beaumont Tower"
+      ],
+      "queries": [
+        "Lansing Michigan skyline",
+        "Lansing Michigan Capitol",
+        "Lansing Grand River",
+        "Lansing Michigan downtown",
+        "Michigan State University campus",
+        "Beaumont Tower East Lansing"
+      ],
+      "candidates": [
+        {
+          "file": "Lansing Skyline 2022.jpg",
+          "note": "Lansing-East Lansing, MI — WeaponizingArchitecture, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:11460",
+      "city": "Ann Arbor, Michigan",
+      "area": "Ann Arbor, MI",
+      "wikipedia": [
+        "Ann Arbor, Michigan",
+        "Michigan Theater"
+      ],
+      "categories": [
+        "Views of Ann Arbor, Michigan",
+        "Downtown Ann Arbor, Michigan",
+        "Main Street (Ann Arbor, Michigan)"
+      ],
+      "queries": [
+        "Ann Arbor Michigan downtown",
+        "Ann Arbor Main Street",
+        "Ann Arbor skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Ann Arbor Skyline 2021.jpg",
+          "note": "Ann Arbor, MI — WeaponizingArchitecture, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:30700",
+      "city": "Lincoln, Nebraska",
+      "area": "Lincoln, NE",
+      "wikipedia": [
+        "Lincoln, Nebraska",
+        "Nebraska State Capitol"
+      ],
+      "categories": [
+        "Skylines of Lincoln, Nebraska",
+        "Views of Lincoln, Nebraska",
+        "Nebraska State Capitol",
+        "Downtown Lincoln, Nebraska",
+        "Haymarket (Lincoln, Nebraska)",
+        "Memorial Stadium (Lincoln, Nebraska)"
+      ],
+      "queries": [
+        "Lincoln Nebraska skyline",
+        "Lincoln Nebraska Capitol",
+        "Lincoln Haymarket",
+        "Nebraska State Capitol tower",
+        "Lincoln Nebraska downtown",
+        "Memorial Stadium Lincoln Nebraska"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline of Downtown Lincoln, Nebraska, U.S. (2021 photograph).jpg",
+          "note": "Lincoln, NE — Hanyou23, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800019700)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:48900",
+      "city": "Wilmington, North Carolina",
+      "area": "Wilmington, NC",
+      "wikipedia": [
+        "Wilmington, North Carolina",
+        "Wrightsville Beach, North Carolina"
+      ],
+      "categories": [
+        "Skylines of Wilmington, North Carolina",
+        "Views of Wilmington, North Carolina",
+        "Cape Fear River"
+      ],
+      "queries": [
+        "Wilmington North Carolina riverfront",
+        "Wilmington NC downtown",
+        "Wilmington Cape Fear River"
+      ],
+      "candidates": [
+        {
+          "file": "BRIDGE 2024-05-07 Cape Fear Memorial Bridge Press Conf-831-155 (cropped).jpg",
+          "note": "Wilmington, NC — NCDOTcommunications, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36798176732)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:22180",
+      "city": "Fayetteville, North Carolina",
+      "area": "Fayetteville, NC",
+      "wikipedia": [
+        "Fayetteville, North Carolina",
+        "Market House (Fayetteville, North Carolina)"
+      ],
+      "categories": [
+        "Views of Fayetteville, North Carolina",
+        "Downtown Fayetteville, North Carolina",
+        "Market House (Fayetteville, North Carolina)"
+      ],
+      "queries": [
+        "Fayetteville North Carolina downtown",
+        "Fayetteville NC Market House",
+        "Fayetteville North Carolina skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Fayetteville, NC Downtown Skyline.jpg",
+          "note": "Fayetteville, NC — Public domain, City of Fayetteville, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36798176732)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:43900",
+      "city": "Spartanburg, South Carolina",
+      "area": "Spartanburg, SC",
+      "wikipedia": [
+        "Spartanburg, South Carolina",
+        "Morgan Square"
+      ],
+      "categories": [
+        "Views of Spartanburg, South Carolina",
+        "Downtown Spartanburg, South Carolina"
+      ],
+      "queries": [
+        "Spartanburg South Carolina downtown",
+        "Spartanburg Morgan Square",
+        "Spartanburg skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Spartanburg skyline - Sept. 2025.jpg",
+          "note": "Spartanburg, SC — PegasusRacer28, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36798176732)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:34940",
+      "city": "Naples, Florida",
+      "area": "Naples-Marco Island, FL",
+      "wikipedia": [
+        "Naples, Florida",
+        "Naples Pier"
+      ],
+      "categories": [
+        "Views of Naples, Florida",
+        "Naples Pier",
+        "Beaches of Naples, Florida"
+      ],
+      "queries": [
+        "Naples Florida pier",
+        "Naples Florida beach",
+        "Naples Florida downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Naples FL pier seen from 8th Avenue Beach at sunset.jpg",
+          "note": "Naples-Marco Island, FL — P,TO 19104, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36798176732)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:36100",
+      "city": "Ocala, Florida",
+      "area": "Ocala, FL",
+      "wikipedia": [
+        "Ocala, Florida",
+        "Marion County, Florida",
+        "Silver Springs State Park"
+      ],
+      "categories": [
+        "Views of Ocala, Florida",
+        "Downtown Ocala, Florida",
+        "Silver Springs State Park",
+        "Horse farms in Marion County, Florida"
+      ],
+      "queries": [
+        "Ocala Florida downtown",
+        "Ocala Florida square",
+        "Ocala skyline",
+        "Silver Springs Florida glass bottom boat",
+        "Ocala Florida horse farm",
+        "Ocala downtown square"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:23540",
+      "city": "Gainesville, Florida",
+      "area": "Gainesville, FL",
+      "wikipedia": [
+        "Gainesville, Florida",
+        "University of Florida",
+        "Century Tower"
+      ],
+      "categories": [
+        "Views of Gainesville, Florida",
+        "Downtown Gainesville, Florida",
+        "University of Florida",
+        "Century Tower (University of Florida)",
+        "Paynes Prairie Preserve State Park"
+      ],
+      "queries": [
+        "Gainesville Florida downtown",
+        "Gainesville Florida skyline",
+        "University of Florida campus",
+        "University of Florida Century Tower",
+        "Paynes Prairie"
+      ],
+      "candidates": [
+        {
+          "file": "Sweetwater Wetlands Park.jpg",
+          "note": "Gainesville, FL — Flatwoods 36, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808459092)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:42200",
+      "city": "Santa Barbara, California",
+      "area": "Santa Maria-Santa Barbara, CA",
+      "wikipedia": [
+        "Santa Barbara, California",
+        "Stearns Wharf",
+        "Santa Barbara County Courthouse"
+      ],
+      "categories": [
+        "Views of Santa Barbara, California",
+        "Skylines of Santa Barbara, California",
+        "Stearns Wharf"
+      ],
+      "queries": [
+        "Santa Barbara California waterfront",
+        "Santa Barbara Stearns Wharf",
+        "Santa Barbara skyline"
+      ],
+      "candidates": [
+        {
+          "file": "View of Santa Barbara, California from the Stearns Wharf.jpg",
+          "note": "Santa Maria-Santa Barbara, CA — Gatorfan252525, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36799416970)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:41500",
+      "city": "Salinas, California",
+      "area": "Salinas, CA",
+      "wikipedia": [
+        "Salinas, California",
+        "Monterey, California",
+        "Cannery Row"
+      ],
+      "categories": [
+        "Views of Salinas, California",
+        "Views of Monterey, California",
+        "Cannery Row"
+      ],
+      "queries": [
+        "Salinas California downtown",
+        "Monterey California harbor",
+        "Monterey Cannery Row"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:14500",
+      "city": "Boulder, Colorado",
+      "area": "Boulder, CO",
+      "wikipedia": [
+        "Boulder, Colorado",
+        "Flatirons",
+        "Pearl Street Mall"
+      ],
+      "categories": [
+        "Views of Boulder, Colorado",
+        "Flatirons",
+        "Pearl Street Mall"
+      ],
+      "queries": [
+        "Boulder Colorado Flatirons",
+        "Boulder Colorado downtown",
+        "Boulder Pearl Street"
+      ],
+      "candidates": [
+        {
+          "file": "Flatirons view from Broomfield, Colorado.jpg",
+          "note": "Boulder, CO — Kpsudeep, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36799416970)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:22660",
+      "city": "Fort Collins, Colorado",
+      "area": "Fort Collins-Loveland, CO",
+      "wikipedia": [
+        "Fort Collins, Colorado",
+        "Old Town Fort Collins"
+      ],
+      "categories": [
+        "Views of Fort Collins, Colorado",
+        "Old Town Fort Collins"
+      ],
+      "queries": [
+        "Fort Collins Colorado Old Town",
+        "Fort Collins Colorado downtown",
+        "Fort Collins skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:21660",
+      "city": "Eugene, Oregon",
+      "area": "Eugene-Springfield, OR",
+      "wikipedia": [
+        "Eugene, Oregon",
+        "Skinner Butte"
+      ],
+      "categories": [
+        "Skylines of Eugene, Oregon",
+        "Views of Eugene, Oregon",
+        "Skinner Butte"
+      ],
+      "queries": [
+        "Eugene Oregon skyline",
+        "Eugene Oregon Skinner Butte",
+        "Eugene Oregon downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Eugene Oregon from Skinner Butte.JPG",
+          "note": "Eugene-Springfield, OR — Laura Alier, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36799416970)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:49660",
+      "city": "Youngstown, Ohio",
+      "area": "Youngstown-Warren, OH",
+      "wikipedia": [
+        "Youngstown, Ohio",
+        "Mahoning River"
+      ],
+      "categories": [
+        "Skylines of Youngstown, Ohio",
+        "Views of Youngstown, Ohio",
+        "Downtown Youngstown, Ohio"
+      ],
+      "queries": [
+        "Youngstown Ohio skyline",
+        "Youngstown Ohio downtown",
+        "Youngstown Mahoning River"
+      ],
+      "candidates": [
+        {
+          "file": "Youngstown skyline Wean Park.jpg",
+          "note": "Youngstown-Warren, OH — Dblcut3, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36799416970)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:44140",
+      "city": "Springfield, Massachusetts",
+      "area": "Springfield, MA",
+      "wikipedia": [
+        "Springfield, Massachusetts",
+        "Metro Center, Springfield, Massachusetts"
+      ],
+      "categories": [
+        "Skylines of Springfield, Massachusetts",
+        "Views of Springfield, Massachusetts",
+        "Connecticut River in Springfield, Massachusetts"
+      ],
+      "queries": [
+        "Springfield Massachusetts skyline",
+        "Springfield Massachusetts Connecticut River",
+        "Springfield Massachusetts downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Springfield, MA city skyline 2026 (cropped).jpg",
+          "note": "Springfield, MA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800324942)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:28880",
+      "city": "Poughkeepsie, New York",
+      "area": "Kiryas Joel-Poughkeepsie-Newburgh, NY",
+      "wikipedia": [
+        "Poughkeepsie, New York",
+        "Walkway over the Hudson",
+        "Newburgh, New York"
+      ],
+      "categories": [
+        "Walkway over the Hudson",
+        "Views of Poughkeepsie, New York",
+        "Newburgh, New York"
+      ],
+      "queries": [
+        "Walkway over the Hudson",
+        "Poughkeepsie Hudson River",
+        "Newburgh New York waterfront"
+      ],
+      "candidates": [
+        {
+          "file": "Poughkeepsie, NY with evening balloon take-off-crop.jpg",
+          "note": "Kiryas Joel-Poughkeepsie-Newburgh, NY — Juliancolton, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36800324942)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:31700",
+      "city": "Manchester, New Hampshire",
+      "area": "Manchester-Nashua, NH",
+      "wikipedia": [
+        "Manchester, New Hampshire",
+        "Amoskeag Millyard Historic District",
+        "Nashua, New Hampshire"
+      ],
+      "categories": [
+        "Amoskeag Millyard",
+        "Skylines of Manchester, New Hampshire",
+        "Views of Manchester, New Hampshire"
+      ],
+      "queries": [
+        "Manchester New Hampshire millyard",
+        "Manchester New Hampshire skyline",
+        "Merrimack River Manchester"
+      ],
+      "candidates": [
+        {
+          "file": "Skyline of Manchester, New Hampshire, USA.jpg",
+          "note": "Manchester-Nashua, NH — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800324942)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:45940",
+      "city": "Trenton, New Jersey",
+      "area": "Trenton-Princeton, NJ",
+      "wikipedia": [
+        "Trenton, New Jersey",
+        "Princeton, New Jersey",
+        "Nassau Hall"
+      ],
+      "categories": [
+        "Skylines of Trenton, New Jersey",
+        "New Jersey State House",
+        "Nassau Hall"
+      ],
+      "queries": [
+        "Trenton New Jersey skyline",
+        "Trenton Makes bridge",
+        "Princeton University Nassau Hall"
+      ],
+      "candidates": [
+        {
+          "file": "2014-12-27 15 54 11 Panorama of the front of the New Jersey State House on West State Street in Trenton, New Jersey.JPG",
+          "note": "Trenton-Princeton, NJ — Famartin, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800324942)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:39740",
+      "city": "Reading, Pennsylvania",
+      "area": "Reading, PA",
+      "wikipedia": [
+        "Reading, Pennsylvania",
+        "Reading Pagoda"
+      ],
+      "categories": [
+        "Reading Pagoda",
+        "Views of Reading, Pennsylvania",
+        "Skylines of Reading, Pennsylvania"
+      ],
+      "queries": [
+        "Reading Pennsylvania pagoda",
+        "Reading Pennsylvania skyline",
+        "Reading Pennsylvania downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:12100",
+      "city": "Atlantic City, New Jersey",
+      "area": "Atlantic City-Hammonton, NJ",
+      "wikipedia": [
+        "Atlantic City, New Jersey",
+        "Atlantic City Boardwalk"
+      ],
+      "categories": [
+        "Skylines of Atlantic City, New Jersey",
+        "Atlantic City Boardwalk",
+        "Views of Atlantic City, New Jersey"
+      ],
+      "queries": [
+        "Atlantic City skyline",
+        "Atlantic City boardwalk beach",
+        "Atlantic City New Jersey aerial"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:24580",
+      "city": "Green Bay, Wisconsin",
+      "area": "Green Bay, WI",
+      "wikipedia": [
+        "Green Bay, Wisconsin",
+        "Lambeau Field"
+      ],
+      "categories": [
+        "Skylines of Green Bay, Wisconsin",
+        "Lambeau Field",
+        "Fox River in Green Bay, Wisconsin"
+      ],
+      "queries": [
+        "Green Bay Wisconsin skyline",
+        "Green Bay Fox River downtown",
+        "Lambeau Field exterior"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Green Bay CityDeck along the Fox River.jpg",
+          "note": "Green Bay, WI — Chris Rand, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:40420",
+      "city": "Rockford, Illinois",
+      "area": "Rockford, IL",
+      "wikipedia": [
+        "Rockford, Illinois",
+        "Anderson Japanese Gardens"
+      ],
+      "categories": [
+        "Skylines of Rockford, Illinois",
+        "Views of Rockford, Illinois",
+        "Rock River in Rockford, Illinois"
+      ],
+      "queries": [
+        "Rockford Illinois skyline",
+        "Rockford Illinois Rock River",
+        "Rockford Illinois downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Rockford, IL Downtown 02.JPG",
+          "note": "Rockford, IL — Ben Jacobson ( Kranar Drogin ), CC BY 2.5. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:43780",
+      "city": "South Bend, Indiana",
+      "area": "South Bend-Mishawaka, IN-MI",
+      "wikipedia": [
+        "South Bend, Indiana",
+        "University of Notre Dame",
+        "Main Building (University of Notre Dame)"
+      ],
+      "categories": [
+        "Skylines of South Bend, Indiana",
+        "Main Building (University of Notre Dame)",
+        "St. Joseph River in South Bend, Indiana"
+      ],
+      "queries": [
+        "South Bend Indiana skyline",
+        "Notre Dame Golden Dome",
+        "South Bend St. Joseph River"
+      ],
+      "candidates": [
+        {
+          "file": "North Quad from Fr. Hesburgh's Office in the Hesburgh Library.JPG",
+          "note": "South Bend, IN — Know1one1, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:21780",
+      "city": "Evansville, Indiana",
+      "area": "Evansville, IN",
+      "wikipedia": [
+        "Evansville, Indiana"
+      ],
+      "categories": [
+        "Skylines of Evansville, Indiana",
+        "Views of Evansville, Indiana",
+        "Ohio River in Evansville, Indiana"
+      ],
+      "queries": [
+        "Evansville Indiana skyline",
+        "Evansville riverfront Ohio River",
+        "Evansville Indiana downtown"
+      ],
+      "candidates": [
+        {
+          "file": "EvansvilleSkyline.jpg",
+          "note": "Evansville, IN — Vasiliymeshko, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:37900",
+      "city": "Peoria, Illinois",
+      "area": "Peoria, IL",
+      "wikipedia": [
+        "Peoria, Illinois",
+        "Murray Baker Bridge"
+      ],
+      "categories": [
+        "Skylines of Peoria, Illinois",
+        "Views of Peoria, Illinois",
+        "Illinois River in Peoria, Illinois"
+      ],
+      "queries": [
+        "Peoria Illinois skyline",
+        "Peoria Illinois riverfront",
+        "Peoria Illinois Illinois River"
+      ],
+      "candidates": [
+        {
+          "file": "Peoria Illinois Skyline (cropped) (cropped).jpg",
+          "note": "Peoria, IL — Scott Tranchitella from West Peoria, Illinois, USA, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:19340",
+      "city": "Davenport, Iowa",
+      "area": "Davenport-Moline-Rock Island, IA-IL",
+      "wikipedia": [
+        "Davenport, Iowa",
+        "Quad Cities",
+        "Moline, Illinois"
+      ],
+      "categories": [
+        "Skylines of Davenport, Iowa",
+        "Views of Davenport, Iowa",
+        "Centennial Bridge (Mississippi River)"
+      ],
+      "queries": [
+        "Davenport Iowa skyline",
+        "Quad Cities Mississippi River",
+        "Davenport Iowa riverfront"
+      ],
+      "candidates": [
+        {
+          "file": "2018 Davenport skyline 02 (cropped).jpg",
+          "note": "Davenport, IA — Farragutful, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:33860",
+      "city": "Montgomery, Alabama",
+      "area": "Montgomery, AL",
+      "wikipedia": [
+        "Montgomery, Alabama",
+        "Alabama State Capitol"
+      ],
+      "categories": [
+        "Skylines of Montgomery, Alabama",
+        "Alabama State Capitol",
+        "Views of Montgomery, Alabama"
+      ],
+      "queries": [
+        "Montgomery Alabama skyline",
+        "Montgomery Alabama riverfront",
+        "Alabama State Capitol"
+      ],
+      "candidates": [
+        {
+          "file": "Aerial view of Montgomery, Alabama LCCN2011646683.jpg",
+          "note": "Montgomery, AL — Carol M. Highsmith, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36808145480)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:29180",
+      "city": "Lafayette, Louisiana",
+      "area": "Lafayette, LA",
+      "wikipedia": [
+        "Lafayette, Louisiana"
+      ],
+      "categories": [
+        "Skylines of Lafayette, Louisiana",
+        "Views of Lafayette, Louisiana",
+        "Downtown Lafayette, Louisiana"
+      ],
+      "queries": [
+        "Lafayette Louisiana skyline",
+        "Lafayette Louisiana downtown",
+        "Lafayette Louisiana Vermilion River"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Lafayette LA 2021.jpg",
+          "note": "Lafayette, LA — TheLionHasSeen, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808145480)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:31180",
+      "city": "Lubbock, Texas",
+      "area": "Lubbock, TX",
+      "wikipedia": [
+        "Lubbock, Texas",
+        "Texas Tech University"
+      ],
+      "categories": [
+        "Skylines of Lubbock, Texas",
+        "Views of Lubbock, Texas",
+        "Texas Tech University"
+      ],
+      "queries": [
+        "Lubbock Texas skyline",
+        "Lubbock Texas downtown",
+        "Texas Tech University campus"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:29700",
+      "city": "Laredo, Texas",
+      "area": "Laredo, TX",
+      "wikipedia": [
+        "Laredo, Texas"
+      ],
+      "categories": [
+        "Skylines of Laredo, Texas",
+        "Views of Laredo, Texas",
+        "Rio Grande in Laredo, Texas"
+      ],
+      "queries": [
+        "Laredo Texas skyline",
+        "Laredo Texas downtown",
+        "Laredo Rio Grande"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:18880",
+      "city": "Destin, Florida",
+      "area": "Crestview-Fort Walton Beach-Destin, FL",
+      "wikipedia": [
+        "Destin, Florida",
+        "Fort Walton Beach, Florida",
+        "Okaloosa Island"
+      ],
+      "categories": [
+        "Beaches of Destin, Florida",
+        "Views of Destin, Florida",
+        "Destin Harbor"
+      ],
+      "queries": [
+        "Destin Florida beach",
+        "Destin Florida harbor",
+        "Fort Walton Beach Florida"
+      ],
+      "candidates": [
+        {
+          "file": "View of Destin, Florida from the Destin Harbor.jpg",
+          "note": "Crestview-Fort Walton Beach-Destin, FL — Destin Vacation Boat Rentals, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808145480)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:25060",
+      "city": "Biloxi, Mississippi",
+      "area": "Gulfport-Biloxi, MS",
+      "wikipedia": [
+        "Biloxi, Mississippi",
+        "Gulfport, Mississippi",
+        "Biloxi Lighthouse"
+      ],
+      "categories": [
+        "Biloxi Lighthouse",
+        "Views of Biloxi, Mississippi",
+        "Beaches of Mississippi"
+      ],
+      "queries": [
+        "Biloxi Mississippi beach",
+        "Biloxi Lighthouse",
+        "Gulfport Mississippi waterfront"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:13460",
+      "city": "Bend, Oregon",
+      "area": "Bend, OR",
+      "wikipedia": [
+        "Bend, Oregon",
+        "Mount Bachelor"
+      ],
+      "categories": [
+        "Views of Bend, Oregon",
+        "Deschutes River in Bend, Oregon",
+        "Drake Park"
+      ],
+      "queries": [
+        "Bend Oregon Deschutes River",
+        "Bend Oregon Mirror Pond",
+        "Bend Oregon downtown mountains"
+      ],
+      "candidates": [
+        {
+          "file": "Drake Park, Bend (July 2012) - 1.JPG",
+          "note": "Bend, OR — Another Believer, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:42100",
+      "city": "Santa Cruz, California",
+      "area": "Santa Cruz-Watsonville, CA",
+      "wikipedia": [
+        "Santa Cruz, California",
+        "Santa Cruz Beach Boardwalk",
+        "Santa Cruz Wharf"
+      ],
+      "categories": [
+        "Santa Cruz Beach Boardwalk",
+        "Santa Cruz Wharf",
+        "Views of Santa Cruz, California"
+      ],
+      "queries": [
+        "Santa Cruz California boardwalk",
+        "Santa Cruz wharf beach",
+        "Santa Cruz California coast"
+      ],
+      "candidates": [
+        {
+          "file": "Boats in Santa Cruz Harbor (6868331295).jpg",
+          "note": "Santa Cruz-Watsonville, CA — Don DeBold from San Jose, CA, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:42020",
+      "city": "San Luis Obispo, California",
+      "area": "San Luis Obispo-Paso Robles, CA",
+      "wikipedia": [
+        "San Luis Obispo, California",
+        "Mission San Luis Obispo de Tolosa",
+        "Bishop Peak"
+      ],
+      "categories": [
+        "Mission San Luis Obispo de Tolosa",
+        "Views of San Luis Obispo, California",
+        "Bishop Peak"
+      ],
+      "queries": [
+        "San Luis Obispo downtown",
+        "San Luis Obispo mission",
+        "San Luis Obispo Bishop Peak"
+      ],
+      "candidates": [
+        {
+          "file": "Mission San Luis Obispo (cropped).jpg",
+          "note": "San Luis Obispo-Paso Robles, CA — Rennett Stowe, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:42140",
+      "city": "Santa Fe, New Mexico",
+      "area": "Santa Fe, NM",
+      "wikipedia": [
+        "Santa Fe, New Mexico",
+        "Santa Fe Plaza",
+        "Cathedral Basilica of St. Francis of Assisi"
+      ],
+      "categories": [
+        "Santa Fe Plaza",
+        "Cathedral Basilica of St. Francis of Assisi (Santa Fe)",
+        "Views of Santa Fe, New Mexico"
+      ],
+      "queries": [
+        "Santa Fe New Mexico plaza",
+        "Santa Fe New Mexico adobe",
+        "Santa Fe Sangre de Cristo"
+      ],
+      "candidates": [
+        {
+          "file": "Palace of the Governors.jpg",
+          "note": "Santa Fe, NM — Tony Hisgett from Birmingham, UK, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:41100",
+      "city": "St. George, Utah",
+      "area": "St. George, UT",
+      "wikipedia": [
+        "St. George, Utah",
+        "Snow Canyon State Park"
+      ],
+      "categories": [
+        "Views of St. George, Utah",
+        "Snow Canyon State Park",
+        "St. George Utah Temple"
+      ],
+      "queries": [
+        "St. George Utah red cliffs",
+        "St. George Utah skyline",
+        "St. George Utah temple"
+      ],
+      "candidates": [
+        {
+          "file": "EM ST. GEORGE, UTAH (2624012794).jpg",
+          "note": "St. George, UT — Eddie Maloney from North Las Vegas, USA, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:36500",
+      "city": "Olympia, Washington",
+      "area": "Olympia-Lacey-Tumwater, WA",
+      "wikipedia": [
+        "Olympia, Washington",
+        "Washington State Capitol",
+        "Capitol Lake"
+      ],
+      "categories": [
+        "Washington State Capitol",
+        "Capitol Lake",
+        "Views of Olympia, Washington"
+      ],
+      "queries": [
+        "Olympia Washington Capitol Lake",
+        "Olympia Washington capitol",
+        "Olympia Washington waterfront"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:47930",
+      "city": "Waterbury, Connecticut",
+      "area": "Waterbury-Shelton, CT",
+      "wikipedia": [
+        "Waterbury, Connecticut",
+        "Union Station (Waterbury, Connecticut)"
+      ],
+      "categories": [
+        "Skylines of Waterbury, Connecticut",
+        "Views of Waterbury, Connecticut",
+        "Union Station (Waterbury, Connecticut)"
+      ],
+      "queries": [
+        "Waterbury Connecticut skyline",
+        "Waterbury Connecticut downtown",
+        "Waterbury Union Station clock tower"
+      ],
+      "candidates": [
+        {
+          "file": "Waterbury, Connecticut 3.jpg",
+          "note": "Waterbury-Shelton, CT — Hayden Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816098960)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:35980",
+      "city": "New London, Connecticut",
+      "area": "Norwich-New London-Willimantic, CT",
+      "wikipedia": [
+        "New London, Connecticut",
+        "Mystic, Connecticut",
+        "Norwich, Connecticut"
+      ],
+      "categories": [
+        "Mystic River Bascule Bridge",
+        "Views of Mystic, Connecticut",
+        "Views of New London, Connecticut",
+        "Skylines of New London, Connecticut"
+      ],
+      "queries": [
+        "Mystic Connecticut drawbridge",
+        "New London Connecticut waterfront",
+        "Mystic Connecticut harbor"
+      ],
+      "candidates": [
+        {
+          "file": "Norwich, Connecticut 2.jpg",
+          "note": "Norwich-New London-Willimantic, CT — Hayden Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816098960)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:25180",
+      "city": "Hagerstown, Maryland",
+      "area": "Hagerstown-Martinsburg, MD-WV",
+      "wikipedia": [
+        "Hagerstown, Maryland",
+        "Martinsburg, West Virginia"
+      ],
+      "categories": [
+        "Skylines of Hagerstown, Maryland",
+        "Views of Hagerstown, Maryland",
+        "Downtown Hagerstown, Maryland",
+        "Antietam National Battlefield"
+      ],
+      "queries": [
+        "Hagerstown Maryland downtown",
+        "Hagerstown Maryland skyline",
+        "Martinsburg West Virginia downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:21500",
+      "city": "Erie, Pennsylvania",
+      "area": "Erie, PA",
+      "wikipedia": [
+        "Erie, Pennsylvania",
+        "Presque Isle State Park"
+      ],
+      "categories": [
+        "Skylines of Erie, Pennsylvania",
+        "Views of Erie, Pennsylvania",
+        "Bicentennial Tower (Erie, Pennsylvania)",
+        "Presque Isle Bay"
+      ],
+      "queries": [
+        "Erie Pennsylvania skyline",
+        "Erie Pennsylvania bayfront",
+        "Presque Isle Bay Erie"
+      ],
+      "candidates": [
+        {
+          "file": "Presque Isle Pennsylvania aerial view.jpg",
+          "note": "Erie, PA — Ken Winters, U.S. Army Corps of Engineers, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36816098960)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:12700",
+      "city": "Hyannis, Massachusetts",
+      "area": "Barnstable Town, MA",
+      "wikipedia": [
+        "Cape Cod",
+        "Hyannis, Massachusetts",
+        "Provincetown, Massachusetts"
+      ],
+      "categories": [
+        "Hyannis Harbor",
+        "Views of Provincetown, Massachusetts",
+        "Chatham Light",
+        "Views of Hyannis, Massachusetts"
+      ],
+      "queries": [
+        "Hyannis harbor",
+        "Provincetown harbor",
+        "Cape Cod Chatham harbor"
+      ],
+      "candidates": [
+        {
+          "file": "Old Harbor Life Saving Station, Sunset.JPG",
+          "note": "Barnstable Town, MA — JCefaly, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816098960)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:15540",
+      "city": "Burlington, Vermont",
+      "area": "Burlington-South Burlington, VT",
+      "wikipedia": [
+        "Burlington, Vermont",
+        "Church Street Marketplace"
+      ],
+      "categories": [
+        "Skylines of Burlington, Vermont",
+        "Views of Burlington, Vermont",
+        "Church Street Marketplace",
+        "Burlington Waterfront"
+      ],
+      "queries": [
+        "Burlington Vermont Lake Champlain",
+        "Burlington Vermont downtown",
+        "Burlington Vermont skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:15940",
+      "city": "Canton, Ohio",
+      "area": "Canton-Massillon, OH",
+      "wikipedia": [
+        "Canton, Ohio",
+        "Pro Football Hall of Fame"
+      ],
+      "categories": [
+        "Skylines of Canton, Ohio",
+        "Views of Canton, Ohio",
+        "Downtown Canton, Ohio",
+        "Pro Football Hall of Fame"
+      ],
+      "queries": [
+        "Canton Ohio skyline",
+        "Canton Ohio downtown",
+        "Canton Ohio Market Avenue"
+      ],
+      "candidates": [
+        {
+          "file": "Pro Football Hall of Fame (23945852607).jpg",
+          "note": "Canton-Massillon, OH — Erik Drost, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:22420",
+      "city": "Flint, Michigan",
+      "area": "Flint, MI",
+      "wikipedia": [
+        "Flint, Michigan"
+      ],
+      "categories": [
+        "Skylines of Flint, Michigan",
+        "Views of Flint, Michigan",
+        "Saginaw Street (Flint, Michigan)",
+        "Downtown Flint, Michigan"
+      ],
+      "queries": [
+        "Flint Michigan downtown",
+        "Flint Michigan Vehicle City arch",
+        "Flint Michigan skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Flint, Michigan.jpg",
+          "note": "Flint, MI — WMrapids, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:28020",
+      "city": "Kalamazoo, Michigan",
+      "area": "Kalamazoo-Portage, MI",
+      "wikipedia": [
+        "Kalamazoo, Michigan",
+        "Bronson Park"
+      ],
+      "categories": [
+        "Skylines of Kalamazoo, Michigan",
+        "Views of Kalamazoo, Michigan",
+        "Downtown Kalamazoo, Michigan",
+        "Bronson Park"
+      ],
+      "queries": [
+        "Kalamazoo Michigan skyline",
+        "Kalamazoo Michigan downtown",
+        "Kalamazoo Mall"
+      ]
+    },
+    {
+      "metroId": "cbsa:43620",
+      "city": "Sioux Falls, South Dakota",
+      "area": "Sioux Falls, SD-MN",
+      "wikipedia": [
+        "Sioux Falls, South Dakota",
+        "Falls Park (Sioux Falls, South Dakota)"
+      ],
+      "categories": [
+        "Falls Park (Sioux Falls, South Dakota)",
+        "Skylines of Sioux Falls, South Dakota",
+        "Views of Sioux Falls, South Dakota"
+      ],
+      "queries": [
+        "Sioux Falls Falls Park",
+        "Sioux Falls skyline",
+        "Sioux Falls downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Falls Park and Downtown 09-17-23.jpg",
+          "note": "Sioux Falls, SD — Maxpower2727, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:22020",
+      "city": "Fargo, North Dakota",
+      "area": "Fargo, ND-MN",
+      "wikipedia": [
+        "Fargo, North Dakota",
+        "Fargo Theatre"
+      ],
+      "categories": [
+        "Skylines of Fargo, North Dakota",
+        "Views of Fargo, North Dakota",
+        "Downtown Fargo, North Dakota",
+        "Fargo Theatre"
+      ],
+      "queries": [
+        "Fargo North Dakota skyline",
+        "Fargo downtown Broadway",
+        "Fargo Moorhead Red River"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Fargo District 01.jpg",
+          "note": "Fargo, ND — P. Hughes, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:16300",
+      "city": "Cedar Rapids, Iowa",
+      "area": "Cedar Rapids, IA",
+      "wikipedia": [
+        "Cedar Rapids, Iowa",
+        "Mays Island (Iowa)"
+      ],
+      "categories": [
+        "Skylines of Cedar Rapids, Iowa",
+        "Views of Cedar Rapids, Iowa",
+        "Cedar River (Iowa)"
+      ],
+      "queries": [
+        "Cedar Rapids Iowa skyline",
+        "Cedar Rapids downtown Cedar River",
+        "Cedar Rapids Iowa"
+      ],
+      "candidates": [
+        {
+          "file": "Cedar Rapids Skyline (2022).jpg",
+          "note": "Cedar Rapids, IA — WeaponizingArchitecture, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:13140",
+      "city": "Beaumont, Texas",
+      "area": "Beaumont-Port Arthur, TX",
+      "wikipedia": [
+        "Beaumont, Texas",
+        "Port Arthur, Texas"
+      ],
+      "categories": [
+        "Skylines of Beaumont, Texas",
+        "Views of Beaumont, Texas",
+        "Downtown Beaumont, Texas"
+      ],
+      "queries": [
+        "Beaumont Texas skyline",
+        "Beaumont Texas downtown",
+        "Neches River Beaumont"
+      ]
+    },
+    {
+      "metroId": "cbsa:47380",
+      "city": "Waco, Texas",
+      "area": "Waco, TX",
+      "wikipedia": [
+        "Waco, Texas",
+        "Waco Suspension Bridge"
+      ],
+      "categories": [
+        "Waco Suspension Bridge",
+        "Skylines of Waco, Texas",
+        "Views of Waco, Texas",
+        "Brazos River in Waco, Texas"
+      ],
+      "queries": [
+        "Waco suspension bridge Brazos",
+        "Waco Texas skyline",
+        "Waco Texas downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:25860",
+      "city": "Hickory, North Carolina",
+      "area": "Hickory-Lenoir-Morganton, NC",
+      "wikipedia": [
+        "Hickory, North Carolina",
+        "Morganton, North Carolina"
+      ],
+      "categories": [
+        "Views of Hickory, North Carolina",
+        "Downtown Hickory, North Carolina",
+        "Lake Hickory",
+        "Views of Morganton, North Carolina"
+      ],
+      "queries": [
+        "Hickory North Carolina downtown",
+        "Lake Hickory North Carolina",
+        "Morganton North Carolina downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Train Depot, Morganton, North Carolina (2008).jpg",
+          "note": "Hickory-Lenoir-Morganton, NC — Ron Reiring, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816286360)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:26580",
+      "city": "Huntington, West Virginia",
+      "area": "Huntington-Ashland, WV-KY-OH",
+      "wikipedia": [
+        "Huntington, West Virginia",
+        "Ashland, Kentucky"
+      ],
+      "categories": [
+        "Skylines of Huntington, West Virginia",
+        "Views of Huntington, West Virginia",
+        "Downtown Huntington Historic District"
+      ],
+      "queries": [
+        "Huntington West Virginia skyline",
+        "Huntington West Virginia Ohio River",
+        "Huntington West Virginia downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:17300",
+      "city": "Clarksville, Tennessee",
+      "area": "Clarksville, TN-KY",
+      "wikipedia": [
+        "Clarksville, Tennessee"
+      ],
+      "categories": [
+        "Views of Clarksville, Tennessee",
+        "Downtown Clarksville, Tennessee",
+        "Cumberland River in Clarksville, Tennessee"
+      ],
+      "queries": [
+        "Clarksville Tennessee downtown",
+        "Clarksville Tennessee Cumberland River",
+        "Clarksville Tennessee skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:40220",
+      "city": "Roanoke, Virginia",
+      "area": "Roanoke, VA",
+      "wikipedia": [
+        "Roanoke, Virginia",
+        "Mill Mountain Star"
+      ],
+      "categories": [
+        "Skylines of Roanoke, Virginia",
+        "Views of Roanoke, Virginia",
+        "Mill Mountain Star",
+        "Views from Mill Mountain"
+      ],
+      "queries": [
+        "Roanoke Virginia skyline",
+        "Roanoke Virginia from Mill Mountain",
+        "Roanoke Virginia downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Roanoke City (Virginia) from Mill Mountain Star at Dusk.jpg",
+          "note": "Roanoke, VA — Joe Ravi, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816286360)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:28700",
+      "city": "Bristol, Tennessee",
+      "area": "Kingsport-Bristol, TN-VA",
+      "wikipedia": [
+        "Bristol, Tennessee",
+        "Bristol, Virginia",
+        "Kingsport, Tennessee"
+      ],
+      "categories": [
+        "Bristol Sign",
+        "State Street (Bristol)",
+        "Views of Kingsport, Tennessee",
+        "Downtown Kingsport, Tennessee"
+      ],
+      "queries": [
+        "Bristol Virginia Tennessee sign",
+        "Bristol State Street",
+        "Kingsport Tennessee downtown"
+      ],
+      "candidates": [
+        {
+          "file": "State Street - Bristol, TN-VA.jpg",
+          "note": "Kingsport, TN — AppalachianCentrist, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816361727)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:46220",
+      "city": "Tuscaloosa, Alabama",
+      "area": "Tuscaloosa, AL",
+      "wikipedia": [
+        "Tuscaloosa, Alabama"
+      ],
+      "categories": [
+        "Skylines of Tuscaloosa, Alabama",
+        "Views of Tuscaloosa, Alabama",
+        "Downtown Tuscaloosa, Alabama",
+        "Black Warrior River"
+      ],
+      "queries": [
+        "Tuscaloosa Alabama skyline",
+        "Tuscaloosa downtown",
+        "Tuscaloosa Black Warrior River"
+      ]
+    },
+    {
+      "metroId": "cbsa:17980",
+      "city": "Columbus, Georgia",
+      "area": "Columbus, GA-AL",
+      "wikipedia": [
+        "Columbus, Georgia",
+        "Chattahoochee RiverWalk"
+      ],
+      "categories": [
+        "Skylines of Columbus, Georgia",
+        "Views of Columbus, Georgia",
+        "Chattahoochee River in Columbus, Georgia",
+        "Chattahoochee RiverWalk"
+      ],
+      "queries": [
+        "Columbus Georgia skyline",
+        "Columbus Georgia riverwalk",
+        "Columbus Georgia Chattahoochee"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Columbus, Georgia skyline.jpg",
+          "note": "Columbus, GA — PghPhxNfk, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816361727)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:31340",
+      "city": "Lynchburg, Virginia",
+      "area": "Lynchburg, VA",
+      "wikipedia": [
+        "Lynchburg, Virginia",
+        "Monument Terrace"
+      ],
+      "categories": [
+        "Skylines of Lynchburg, Virginia",
+        "Views of Lynchburg, Virginia",
+        "Downtown Lynchburg, Virginia",
+        "James River in Lynchburg, Virginia"
+      ],
+      "queries": [
+        "Lynchburg Virginia skyline",
+        "Lynchburg Virginia James River",
+        "Lynchburg Virginia downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Lynchburg zoomed in.jpg",
+          "note": "Lynchburg, VA — Northern-Virginia-Photographer, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816361727)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:17780",
+      "city": "College Station, Texas",
+      "area": "College Station-Bryan, TX",
+      "wikipedia": [
+        "College Station, Texas",
+        "Bryan, Texas",
+        "Texas A&M University"
+      ],
+      "categories": [
+        "Views of College Station, Texas",
+        "Downtown Bryan, Texas",
+        "Texas A&M University campus",
+        "Kyle Field"
+      ],
+      "queries": [
+        "Texas A&M campus aerial",
+        "Bryan Texas downtown",
+        "College Station Texas"
+      ]
+    },
+    {
+      "metroId": "cbsa:16620",
+      "city": "Charleston, West Virginia",
+      "area": "Charleston, WV",
+      "wikipedia": [
+        "Charleston, West Virginia",
+        "West Virginia State Capitol"
+      ],
+      "categories": [
+        "Skylines of Charleston, West Virginia",
+        "Views of Charleston, West Virginia",
+        "West Virginia State Capitol",
+        "Kanawha River in Charleston, West Virginia"
+      ],
+      "queries": [
+        "Charleston West Virginia skyline",
+        "Charleston West Virginia Kanawha River",
+        "West Virginia State Capitol Kanawha"
+      ],
+      "candidates": [
+        {
+          "file": "The Capitol from the air (35064567685).jpg",
+          "note": "Charleston, WV — Josh Stapler from Charleston, United States, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816361727)."
+        }
+      ]
+    },
+    {
+      "metroId": "cbsa:24540",
+      "city": "Greeley, Colorado",
+      "area": "Greeley, CO",
+      "wikipedia": [
+        "Greeley, Colorado"
+      ],
+      "categories": [
+        "Views of Greeley, Colorado",
+        "Downtown Greeley, Colorado",
+        "Skylines of Greeley, Colorado"
+      ],
+      "queries": [
+        "Greeley Colorado downtown",
+        "Greeley Colorado skyline",
+        "Greeley Colorado"
+      ]
+    },
+    {
+      "metroId": "cbsa:28420",
+      "city": "Kennewick, Washington",
+      "area": "Kennewick-Richland, WA",
+      "wikipedia": [
+        "Tri-Cities, Washington",
+        "Kennewick, Washington",
+        "Richland, Washington"
+      ],
+      "categories": [
+        "Cable Bridge",
+        "Views of Kennewick, Washington",
+        "Views of Richland, Washington",
+        "Columbia River in the Tri-Cities, Washington"
+      ],
+      "queries": [
+        "Tri-Cities Washington Columbia River",
+        "Kennewick Washington Cable Bridge",
+        "Richland Washington"
+      ]
+    },
+    {
+      "metroId": "cbsa:13380",
+      "city": "Bellingham, Washington",
+      "area": "Bellingham, WA",
+      "wikipedia": [
+        "Bellingham, Washington",
+        "Bellingham Bay"
+      ],
+      "categories": [
+        "Skylines of Bellingham, Washington",
+        "Views of Bellingham, Washington",
+        "Bellingham Bay"
+      ],
+      "queries": [
+        "Bellingham Washington skyline Mount Baker",
+        "Bellingham Bay waterfront",
+        "Bellingham Washington downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:34900",
+      "city": "Napa, California",
+      "area": "Napa, CA",
+      "wikipedia": [
+        "Napa, California",
+        "Napa Valley AVA"
+      ],
+      "categories": [
+        "Views of Napa, California",
+        "Napa River in Napa, California",
+        "Vineyards in Napa County, California"
+      ],
+      "queries": [
+        "Napa Valley vineyards",
+        "Napa California downtown riverfront",
+        "Napa Valley landscape"
+      ]
+    },
+    {
+      "metroId": "cbsa:27980",
+      "city": "Kahului, Hawaii",
+      "area": "Kahului-Wailuku, HI",
+      "wikipedia": [
+        "Maui",
+        "Kahului, Hawaii",
+        "Wailuku, Hawaii"
+      ],
+      "categories": [
+        "Views of Maui",
+        "Iao Valley",
+        "Kahului Harbor",
+        "Wailuku, Hawaii"
+      ],
+      "queries": [
+        "Maui coastline",
+        "Iao Valley Maui",
+        "Kahului Maui"
+      ]
+    },
+    {
+      "metroId": "cbsa:32780",
+      "city": "Medford, Oregon",
+      "area": "Medford, OR",
+      "wikipedia": [
+        "Medford, Oregon",
+        "Table Rocks",
+        "Jacksonville, Oregon"
+      ],
+      "categories": [
+        "Medford, Oregon",
+        "Table Rocks",
+        "Roxy Ann Peak",
+        "Rogue River (Oregon)",
+        "Jacksonville, Oregon"
+      ],
+      "queries": [
+        "Medford Oregon",
+        "Table Rocks Oregon",
+        "Jacksonville Oregon historic town"
+      ]
+    },
+    {
+      "metroId": "cbsa:31420",
+      "city": "Macon, Georgia",
+      "area": "Macon-Bibb County, GA",
+      "wikipedia": [
+        "Macon, Georgia",
+        "Ocmulgee Mounds National Historical Park"
+      ],
+      "categories": [
+        "Views of Macon, Georgia",
+        "Downtown Macon, Georgia",
+        "Skylines of Macon, Georgia",
+        "Ocmulgee Mounds National Historical Park"
+      ],
+      "queries": [
+        "Macon Georgia downtown",
+        "Macon Georgia skyline",
+        "Macon Georgia cherry blossoms"
+      ]
+    },
+    {
+      "metroId": "cbsa:12020",
+      "city": "Athens, Georgia",
+      "area": "Athens-Clarke County, GA",
+      "wikipedia": [
+        "Athens, Georgia",
+        "University of Georgia"
+      ],
+      "categories": [
+        "Views of Athens, Georgia",
+        "Downtown Athens, Georgia",
+        "The Arch (University of Georgia)",
+        "University of Georgia North Campus"
+      ],
+      "queries": [
+        "Athens Georgia downtown",
+        "University of Georgia arch",
+        "Athens Georgia skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:25940",
+      "city": "Hilton Head Island, South Carolina",
+      "area": "Hilton Head Island-Bluffton-Port Royal, SC",
+      "wikipedia": [
+        "Hilton Head Island, South Carolina",
+        "Harbour Town Lighthouse",
+        "Beaufort, South Carolina",
+        "Bluffton, South Carolina"
+      ],
+      "categories": [
+        "Harbour Town Lighthouse",
+        "Beaches of Hilton Head Island",
+        "Views of Hilton Head Island, South Carolina",
+        "Beaufort, South Carolina"
+      ],
+      "queries": [
+        "Harbour Town lighthouse Hilton Head",
+        "Hilton Head Island beach",
+        "Beaufort South Carolina waterfront"
+      ]
+    },
+    {
+      "metroId": "cbsa:37460",
+      "city": "Panama City, Florida",
+      "area": "Panama City-Panama City Beach, FL",
+      "wikipedia": [
+        "Panama City, Florida",
+        "Panama City Beach, Florida",
+        "St. Andrews State Park"
+      ],
+      "categories": [
+        "Panama City Beach, Florida",
+        "Beaches of Panama City Beach, Florida",
+        "Views of Panama City, Florida",
+        "St. Andrews State Park"
+      ],
+      "queries": [
+        "Panama City Beach Florida beach",
+        "Panama City Florida marina",
+        "Panama City Beach pier"
+      ]
+    },
+    {
+      "metroId": "cbsa:19300",
+      "city": "Fairhope, Alabama",
+      "area": "Daphne-Fairhope-Foley, AL",
+      "wikipedia": [
+        "Fairhope, Alabama",
+        "Gulf Shores, Alabama",
+        "Orange Beach, Alabama",
+        "Baldwin County, Alabama"
+      ],
+      "categories": [
+        "Fairhope Municipal Pier",
+        "Gulf Shores, Alabama",
+        "Beaches of Gulf Shores, Alabama",
+        "Orange Beach, Alabama"
+      ],
+      "queries": [
+        "Fairhope pier Mobile Bay",
+        "Gulf Shores Alabama beach",
+        "Orange Beach Alabama"
+      ]
+    },
+    {
+      "metroId": "cbsa:39460",
+      "city": "Punta Gorda, Florida",
+      "area": "Punta Gorda, FL",
+      "wikipedia": [
+        "Punta Gorda, Florida",
+        "Port Charlotte, Florida",
+        "Charlotte Harbor (estuary)"
+      ],
+      "categories": [
+        "Punta Gorda, Florida",
+        "Charlotte Harbor",
+        "Views of Punta Gorda, Florida",
+        "Fishermen's Village"
+      ],
+      "queries": [
+        "Punta Gorda Florida harbor",
+        "Punta Gorda Florida waterfront",
+        "Charlotte Harbor Florida"
+      ]
+    },
+    {
+      "metroId": "cbsa:11100",
+      "city": "Amarillo, Texas",
+      "area": "Amarillo, TX",
+      "wikipedia": [
+        "Amarillo, Texas",
+        "Palo Duro Canyon State Park",
+        "Cadillac Ranch"
+      ],
+      "categories": [
+        "Skylines of Amarillo, Texas",
+        "Views of Amarillo, Texas",
+        "Downtown Amarillo, Texas",
+        "Palo Duro Canyon"
+      ],
+      "queries": [
+        "Amarillo Texas skyline",
+        "Amarillo Texas downtown",
+        "Palo Duro Canyon"
+      ]
+    },
+    {
+      "metroId": "cbsa:46340",
+      "city": "Tyler, Texas",
+      "area": "Tyler, TX",
+      "wikipedia": [
+        "Tyler, Texas"
+      ],
+      "categories": [
+        "Views of Tyler, Texas",
+        "Downtown Tyler, Texas",
+        "Tyler Rose Garden",
+        "Skylines of Tyler, Texas"
+      ],
+      "queries": [
+        "Tyler Texas downtown",
+        "Tyler Texas skyline",
+        "Tyler Texas rose garden"
+      ]
+    },
+    {
+      "metroId": "cbsa:30980",
+      "city": "Longview, Texas",
+      "area": "Longview, TX",
+      "wikipedia": [
+        "Longview, Texas"
+      ],
+      "categories": [
+        "Views of Longview, Texas",
+        "Downtown Longview, Texas",
+        "Longview, Texas"
+      ],
+      "queries": [
+        "Longview Texas downtown",
+        "Longview Texas",
+        "Longview Texas skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:33260",
+      "city": "Midland, Texas",
+      "area": "Midland, TX",
+      "wikipedia": [
+        "Midland, Texas"
+      ],
+      "categories": [
+        "Skylines of Midland, Texas",
+        "Views of Midland, Texas",
+        "Downtown Midland, Texas"
+      ],
+      "queries": [
+        "Midland Texas skyline",
+        "Midland Texas downtown",
+        "Midland Texas"
+      ]
+    },
+    {
+      "metroId": "cbsa:29340",
+      "city": "Lake Charles, Louisiana",
+      "area": "Lake Charles, LA",
+      "wikipedia": [
+        "Lake Charles, Louisiana"
+      ],
+      "categories": [
+        "Views of Lake Charles, Louisiana",
+        "Skylines of Lake Charles, Louisiana",
+        "Lake Charles, Louisiana",
+        "Calcasieu River"
+      ],
+      "queries": [
+        "Lake Charles Louisiana skyline",
+        "Lake Charles Louisiana lakefront",
+        "Lake Charles Louisiana downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:43640",
+      "city": "Covington, Louisiana",
+      "area": "Slidell-Mandeville-Covington, LA",
+      "wikipedia": [
+        "Covington, Louisiana",
+        "Mandeville, Louisiana",
+        "Slidell, Louisiana",
+        "Fontainebleau State Park"
+      ],
+      "categories": [
+        "Mandeville, Louisiana",
+        "Covington, Louisiana",
+        "Fontainebleau State Park",
+        "Slidell, Louisiana"
+      ],
+      "queries": [
+        "Mandeville Louisiana lakefront",
+        "Covington Louisiana downtown",
+        "Fontainebleau State Park Louisiana"
+      ]
+    },
+    {
+      "metroId": "cbsa:29200",
+      "city": "Lafayette, Indiana",
+      "area": "Lafayette-West Lafayette, IN",
+      "wikipedia": [
+        "Lafayette, Indiana",
+        "West Lafayette, Indiana",
+        "Purdue University",
+        "Tippecanoe County Courthouse"
+      ],
+      "categories": [
+        "Views of Lafayette, Indiana",
+        "Tippecanoe County Courthouse",
+        "Purdue University campus",
+        "Downtown Lafayette, Indiana"
+      ],
+      "queries": [
+        "Lafayette Indiana downtown courthouse",
+        "Purdue University campus",
+        "Lafayette Indiana Wabash River"
+      ]
+    },
+    {
+      "metroId": "cbsa:16580",
+      "city": "Champaign, Illinois",
+      "area": "Champaign-Urbana, IL",
+      "wikipedia": [
+        "Champaign, Illinois",
+        "Urbana, Illinois",
+        "University of Illinois Urbana-Champaign"
+      ],
+      "categories": [
+        "Views of Champaign, Illinois",
+        "Downtown Champaign, Illinois",
+        "Main Quad (University of Illinois at Urbana-Champaign)",
+        "Skylines of Champaign, Illinois"
+      ],
+      "queries": [
+        "Champaign Illinois skyline",
+        "University of Illinois quad",
+        "Champaign Illinois downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:40340",
+      "city": "Rochester, Minnesota",
+      "area": "Rochester, MN",
+      "wikipedia": [
+        "Rochester, Minnesota",
+        "Mayo Clinic",
+        "Plummer Building"
+      ],
+      "categories": [
+        "Skylines of Rochester, Minnesota",
+        "Views of Rochester, Minnesota",
+        "Downtown Rochester, Minnesota",
+        "Plummer Building"
+      ],
+      "queries": [
+        "Rochester Minnesota skyline",
+        "Rochester Minnesota downtown",
+        "Mayo Clinic Rochester"
+      ]
+    },
+    {
+      "metroId": "cbsa:20260",
+      "city": "Duluth, Minnesota",
+      "area": "Duluth, MN-WI",
+      "wikipedia": [
+        "Duluth, Minnesota",
+        "Aerial Lift Bridge",
+        "Superior, Wisconsin"
+      ],
+      "categories": [
+        "Aerial Lift Bridge",
+        "Skylines of Duluth, Minnesota",
+        "Views of Duluth, Minnesota",
+        "Canal Park (Duluth)"
+      ],
+      "queries": [
+        "Duluth aerial lift bridge",
+        "Duluth Minnesota skyline",
+        "Duluth Lake Superior harbor"
+      ]
+    },
+    {
+      "metroId": "cbsa:11540",
+      "city": "Appleton, Wisconsin",
+      "area": "Appleton, WI",
+      "wikipedia": [
+        "Appleton, Wisconsin"
+      ],
+      "categories": [
+        "Views of Appleton, Wisconsin",
+        "Downtown Appleton, Wisconsin",
+        "Appleton, Wisconsin",
+        "Fox River in Appleton, Wisconsin"
+      ],
+      "queries": [
+        "Appleton Wisconsin downtown",
+        "Appleton Wisconsin Fox River",
+        "Appleton Wisconsin skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:45820",
+      "city": "Topeka, Kansas",
+      "area": "Topeka, KS",
+      "wikipedia": [
+        "Topeka, Kansas",
+        "Kansas State Capitol"
+      ],
+      "categories": [
+        "Kansas State Capitol",
+        "Skylines of Topeka, Kansas",
+        "Views of Topeka, Kansas",
+        "Downtown Topeka, Kansas"
+      ],
+      "queries": [
+        "Topeka Kansas skyline",
+        "Kansas State Capitol Topeka",
+        "Topeka Kansas downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:16820",
+      "city": "Charlottesville, Virginia",
+      "area": "Charlottesville, VA",
+      "wikipedia": [
+        "Charlottesville, Virginia",
+        "The Rotunda (University of Virginia)",
+        "Monticello",
+        "Downtown Mall (Charlottesville, Virginia)"
+      ],
+      "categories": [
+        "The Rotunda (University of Virginia)",
+        "Monticello",
+        "Charlottesville Downtown Mall",
+        "Views of Charlottesville, Virginia"
+      ],
+      "queries": [
+        "Charlottesville Virginia Rotunda",
+        "Charlottesville Virginia downtown mall",
+        "Charlottesville Virginia Blue Ridge"
+      ]
+    },
+    {
+      "metroId": "cbsa:13780",
+      "city": "Binghamton, New York",
+      "area": "Binghamton, NY",
+      "wikipedia": [
+        "Binghamton, New York"
+      ],
+      "categories": [
+        "Skylines of Binghamton, New York",
+        "Views of Binghamton, New York",
+        "Downtown Binghamton",
+        "Susquehanna River in Binghamton, New York"
+      ],
+      "queries": [
+        "Binghamton New York skyline",
+        "Binghamton New York downtown",
+        "Binghamton Susquehanna River"
+      ]
+    },
+    {
+      "metroId": "cbsa:46540",
+      "city": "Utica, New York",
+      "area": "Utica-Rome, NY",
+      "wikipedia": [
+        "Utica, New York",
+        "Rome, New York",
+        "Union Station (Utica, New York)"
+      ],
+      "categories": [
+        "Views of Utica, New York",
+        "Downtown Utica, New York",
+        "Skylines of Utica, New York",
+        "Rome, New York"
+      ],
+      "queries": [
+        "Utica New York skyline",
+        "Utica New York downtown",
+        "Utica New York Genesee Street"
+      ]
+    },
+    {
+      "metroId": "cbsa:28740",
+      "city": "Kingston, New York",
+      "area": "Kingston, NY",
+      "wikipedia": [
+        "Kingston, New York",
+        "Ashokan Reservoir",
+        "Catskill Mountains"
+      ],
+      "categories": [
+        "Views of Kingston, New York",
+        "Rondout Creek",
+        "Ashokan Reservoir",
+        "Uptown Kingston, New York"
+      ],
+      "queries": [
+        "Kingston New York Rondout",
+        "Kingston New York uptown stockade",
+        "Ashokan Reservoir Catskills"
+      ]
+    },
+    {
+      "metroId": "cbsa:44300",
+      "city": "State College, Pennsylvania",
+      "area": "State College, PA",
+      "wikipedia": [
+        "State College, Pennsylvania",
+        "Pennsylvania State University",
+        "Beaver Stadium"
+      ],
+      "categories": [
+        "Views of State College, Pennsylvania",
+        "Pennsylvania State University",
+        "Old Main (Pennsylvania State University)",
+        "Mount Nittany"
+      ],
+      "queries": [
+        "State College Pennsylvania downtown",
+        "Penn State Old Main",
+        "Mount Nittany State College"
+      ]
+    },
+    {
+      "metroId": "cbsa:47220",
+      "city": "Vineland, New Jersey",
+      "area": "Vineland, NJ",
+      "wikipedia": [
+        "Vineland, New Jersey",
+        "Millville, New Jersey",
+        "Bridgeton, New Jersey"
+      ],
+      "categories": [
+        "Vineland, New Jersey",
+        "Views of Vineland, New Jersey",
+        "Millville, New Jersey",
+        "Bridgeton, New Jersey"
+      ],
+      "queries": [
+        "Vineland New Jersey Landis Avenue",
+        "Millville New Jersey Maurice River",
+        "Bridgeton New Jersey"
+      ]
+    },
+    {
+      "metroId": "cbsa:14740",
+      "city": "Bremerton, Washington",
+      "area": "Bremerton-Silverdale-Port Orchard, WA",
+      "wikipedia": [
+        "Bremerton, Washington",
+        "Port Orchard, Washington",
+        "Poulsbo, Washington",
+        "Kitsap County, Washington"
+      ],
+      "categories": [
+        "Views of Bremerton, Washington",
+        "Bremerton waterfront",
+        "Poulsbo, Washington",
+        "Port Orchard, Washington"
+      ],
+      "queries": [
+        "Bremerton Washington waterfront",
+        "Poulsbo Washington harbor",
+        "Bremerton Washington ferry Olympic Mountains"
+      ]
+    },
+    {
+      "metroId": "cbsa:49420",
+      "city": "Yakima, Washington",
+      "area": "Yakima, WA",
+      "wikipedia": [
+        "Yakima, Washington",
+        "Yakima Valley AVA"
+      ],
+      "categories": [
+        "Views of Yakima, Washington",
+        "Downtown Yakima, Washington",
+        "Yakima Valley",
+        "Yakima River"
+      ],
+      "queries": [
+        "Yakima Washington downtown",
+        "Yakima Valley vineyards",
+        "Yakima Valley hop fields"
+      ]
+    },
+    {
+      "metroId": "cbsa:32900",
+      "city": "Merced, California",
+      "area": "Merced, CA",
+      "wikipedia": [
+        "Merced, California",
+        "University of California, Merced"
+      ],
+      "categories": [
+        "Views of Merced, California",
+        "Downtown Merced, California",
+        "Merced County Courthouse",
+        "University of California, Merced"
+      ],
+      "queries": [
+        "Merced California downtown",
+        "Merced California courthouse",
+        "Merced County California farmland"
+      ]
+    },
+    {
+      "metroId": "cbsa:17020",
+      "city": "Chico, California",
+      "area": "Chico, CA",
+      "wikipedia": [
+        "Chico, California",
+        "Bidwell Park",
+        "Oroville Dam"
+      ],
+      "categories": [
+        "Bidwell Park",
+        "Views of Chico, California",
+        "Downtown Chico, California",
+        "Oroville Dam"
+      ],
+      "queries": [
+        "Chico California downtown",
+        "Bidwell Park Chico",
+        "Lake Oroville"
+      ]
+    },
+    {
+      "metroId": "cbsa:39150",
+      "city": "Prescott, Arizona",
+      "area": "Prescott Valley-Prescott, AZ",
+      "wikipedia": [
+        "Prescott, Arizona",
+        "Prescott Valley, Arizona",
+        "Granite Dells",
+        "Sedona, Arizona"
+      ],
+      "categories": [
+        "Yavapai County Courthouse",
+        "Granite Dells",
+        "Views of Prescott, Arizona",
+        "Watson Lake (Arizona)"
+      ],
+      "queries": [
+        "Prescott Arizona courthouse square",
+        "Watson Lake Granite Dells",
+        "Prescott Arizona downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:29740",
+      "city": "Las Cruces, New Mexico",
+      "area": "Las Cruces, NM",
+      "wikipedia": [
+        "Las Cruces, New Mexico",
+        "Organ Mountains",
+        "Mesilla, New Mexico"
+      ],
+      "categories": [
+        "Organ Mountains",
+        "Views of Las Cruces, New Mexico",
+        "Mesilla, New Mexico",
+        "Downtown Las Cruces, New Mexico"
+      ],
+      "queries": [
+        "Las Cruces Organ Mountains",
+        "Las Cruces New Mexico downtown",
+        "Mesilla plaza New Mexico"
+      ]
     }
   ]
 }

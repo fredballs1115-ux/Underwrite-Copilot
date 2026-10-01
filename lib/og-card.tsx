@@ -1,6 +1,7 @@
 import "server-only";
 import { ImageResponse } from "next/og";
-import type { SkylineShot } from "@/lib/skyline";
+import { SKYLINE_WIDTH, type SkylineShot } from "@/lib/skyline";
+import { RunGate } from "@/lib/anthropic/run-gate";
 
 // A market page's link preview (#436): the market's own photograph — the
 // skyline the page opens on — with its name, what the page holds and the
@@ -14,6 +15,14 @@ import type { SkylineShot } from "@/lib/skyline";
 // photograph as a PNG is megabytes where a JPEG is a tenth of that.
 
 export const OG_CARD = { width: 1200, height: 630 } as const;
+
+/**
+ * The width the card's skyline is fetched at: the route's default width,
+ * the one most surfaces already ask for (so it is usually held), and wide
+ * enough that a 2.5:1 panorama covers the card's 630px height — at 1280 it
+ * was 512 tall and stretched.
+ */
+export const OG_PHOTO_WIDTH = SKYLINE_WIDTH.default;
 
 /** The overhead's credit, where a market's card falls back to it: a US
  *  federal work in the public domain. */
@@ -107,15 +116,92 @@ async function wordsLayer(name: string, credit: string): Promise<Buffer> {
   return Buffer.from(await layer.arrayBuffer());
 }
 
+/** Two cards drawn at once a process: each is next/og's render and a sharp
+ *  composite, a second or so of CPU, and the route is public. */
+const DRAW_GATE = new RunGate(() => 2);
+
 /** The card: the photograph cut to 1200 × 630, the words laid over it, a
  *  JPEG. */
 export async function marketCard(photo: Buffer, name: string, credit: string): Promise<Buffer> {
-  const sharp = (await import("sharp")).default;
-  const words = await wordsLayer(name, credit);
-  return sharp(photo)
-    .rotate()
-    .resize(OG_CARD.width, OG_CARD.height, { fit: "cover", position: "centre" })
-    .composite([{ input: words, top: 0, left: 0 }])
-    .jpeg({ quality: 84, mozjpeg: true })
-    .toBuffer();
+  const release = await DRAW_GATE.acquire();
+  try {
+    const sharp = (await import("sharp")).default;
+    const words = await wordsLayer(name, credit);
+    return await sharp(photo)
+      .rotate()
+      .resize(OG_CARD.width, OG_CARD.height, { fit: "cover", position: "centre" })
+      .composite([{ input: words, top: 0, left: 0 }])
+      .jpeg({ quality: 84, mozjpeg: true })
+      .toBuffer();
+  } finally {
+    release();
+  }
+}
+
+/**
+ * The cards this process has drawn, one a market (the security review of
+ * 2026-09-30): every ask for a market's card had fetched its photograph and
+ * drawn the words and the JPEG anew. Now a card is drawn once a market a
+ * process — the words change only with a deploy, the photograph only with
+ * the table — and held like the photographs it is made from
+ * (lib/skyline-fetch): bounded on count and on total bytes, oldest out
+ * first, a failure kept by nobody so the next ask tries again, and one draw
+ * a market at a time, shared by whoever asks while it runs.
+ */
+const CARD_MAX_ENTRIES = 64;
+const CARD_MAX_TOTAL_BYTES = 12_000_000;
+const cards = new Map<string, Buffer>();
+let cardBytes = 0;
+const drawing = new Map<string, Promise<Buffer | null>>();
+
+function keepCard(key: string, card: Buffer) {
+  const old = cards.get(key);
+  if (old) {
+    cardBytes -= old.byteLength;
+    cards.delete(key);
+  }
+  cards.set(key, card);
+  cardBytes += card.byteLength;
+  while (cards.size > CARD_MAX_ENTRIES || cardBytes > CARD_MAX_TOTAL_BYTES) {
+    const oldest = cards.keys().next().value;
+    if (oldest === undefined || oldest === key) break;
+    cardBytes -= cards.get(oldest)!.byteLength;
+    cards.delete(oldest);
+  }
+}
+
+/** Forget every held card (tests). */
+export function forgetCards(): void {
+  cards.clear();
+  drawing.clear();
+  cardBytes = 0;
+}
+
+/** The market's card from this process's copy, or drawn now by `draw` and
+ *  kept; null where `draw` has nothing, and then nothing is kept. */
+export async function cachedMarketCard(key: string, draw: () => Promise<Buffer | null>): Promise<Buffer | null> {
+  const hit = cards.get(key);
+  if (hit) {
+    // Re-inserted, so a card in demand stays.
+    keepCard(key, hit);
+    return hit;
+  }
+  const running = drawing.get(key);
+  if (running) return running;
+  const work = (async () => {
+    let card: Buffer | null = null;
+    try {
+      card = await draw();
+    } catch {
+      card = null;
+    }
+    if (card) keepCard(key, card);
+    return card;
+  })();
+  drawing.set(key, work);
+  try {
+    return await work;
+  } finally {
+    drawing.delete(key);
+  }
 }

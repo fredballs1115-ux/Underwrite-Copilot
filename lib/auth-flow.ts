@@ -14,7 +14,16 @@
  * the exchange — or after it fails.
  */
 
-export type AuthIntent = "signin" | "signup" | "reset";
+/** The sign-in page's forms: sign in, create an account, email a reset link,
+ *  email a fresh confirmation link. */
+export type LoginMode = "signin" | "signup" | "reset" | "resend";
+
+/** What the person was doing when the auth service said no: one of the
+ *  sign-in page's forms, or setting a new password on the Account page. */
+export type AuthIntent = LoginMode | "password";
+
+/** A session-bound request with no session behind it. */
+export const SIGNED_OUT = "You're signed out — sign in again to continue.";
 
 const SUPPORT = "underwritecopilot.support@gmail.com";
 
@@ -31,24 +40,57 @@ const COPY = {
   signupsClosed: `New sign-ups are closed right now — email ${SUPPORT} and we'll set you up.`,
   emailNotAllowed: `We can't send email to that address yet — a setup problem on our side, not yours. Email ${SUPPORT} and we'll get you in.`,
   tooMany: "Too many attempts — wait a minute and try again.",
+  // The project's own hourly cap on the emails the auth service sends: it
+  // trips during a sign-up spike, for people who never asked before, so it
+  // says what happened on our side and never "wait before asking again".
+  emailBusy:
+    "Our email is rate-limited right now, so the link didn't go out — please try again shortly.",
   banned: `This account is suspended — email ${SUPPORT} if you think that's a mistake.`,
   linkExpired: "That link has expired — request a new one.",
   unreachable: "Couldn't reach the sign-in service — please try again in a moment.",
   emailOff: `Email sign-in is switched off — a setup problem on our side, not yours. Email ${SUPPORT}.`,
+  samePassword: "That's already your password — choose a different one.",
+  // The auth service asked for a recent sign-in before a password change (the
+  // project's secure-password-change setting); the page has no second-factor
+  // step, so a fresh session is the way through.
+  reauthenticate: "For your security, sign out and sign back in, then set your new password.",
 } as const;
 
 const GENERIC: Record<AuthIntent, string> = {
   signin: "Something went wrong signing you in — please try again.",
   signup: "Something went wrong creating your account — please try again.",
   reset: "Something went wrong sending the reset link — please try again.",
+  resend: "Something went wrong sending the confirmation link — please try again.",
+  password: "Something went wrong saving your new password — please try again.",
 };
 
-/** "For security purposes, you can only request this after 47 seconds." */
-function waitCopy(message: string): string {
+/** What the page says once a fresh confirmation link is asked for. The auth
+ *  service answers alike for an address waiting to be confirmed, one already
+ *  confirmed and one it has never seen, so the page does too. */
+export const CONFIRMATION_RESENT =
+  "If that address is waiting to be confirmed, a fresh link is on its way. Open it in this browser — it confirms your email and signs you in.";
+
+/**
+ * Whether an auth failure means the address was never confirmed — the
+ * sign-in that answers "Confirm your email first", which the page follows
+ * with a way to have the link sent again.
+ */
+export function awaitingConfirmation(err: { message?: string | null; code?: string | null }): boolean {
+  if (err.code) return err.code === "email_not_confirmed";
+  return (err.message ?? "").toLowerCase().includes("email not confirmed");
+}
+
+/**
+ * The auth service's one code for two different limits. "For security
+ * purposes, you can only request this after 47 seconds." is the person's own
+ * address asked again inside the minute, and says the wait. "Email rate limit
+ * exceeded" is the project's hourly cap on the emails it sends — reached by
+ * everyone's sign-ups and resets together, so the person reading it may have
+ * asked for nothing before.
+ */
+function emailLimitCopy(message: string): string {
   const m = /after (\d+) seconds?/i.exec(message);
-  return m
-    ? `Wait about ${m[1]} seconds before requesting another link.`
-    : "Wait a minute before requesting another link.";
+  return m ? `Wait about ${m[1]} seconds before requesting another link.` : COPY.emailBusy;
 }
 
 /**
@@ -83,12 +125,21 @@ export function authErrorCopy(
     case "provider_disabled":
       return COPY.emailOff;
     case "over_email_send_rate_limit":
-      return waitCopy(m);
+      return emailLimitCopy(m);
     case "over_request_rate_limit":
     case "over_sms_send_rate_limit":
       return COPY.tooMany;
     case "user_banned":
       return COPY.banned;
+    case "same_password":
+      return COPY.samePassword;
+    case "reauthentication_needed":
+    case "reauthentication_not_valid":
+    case "reauth_nonce_missing":
+      return COPY.reauthenticate;
+    case "session_not_found":
+    case "session_expired":
+      return SIGNED_OUT;
     case "otp_expired":
     case "flow_state_expired":
     case "flow_state_not_found":
@@ -106,8 +157,11 @@ export function authErrorCopy(
   if (m.includes("already registered") || m.includes("already been registered"))
     return ACCOUNT_EXISTS;
   if (m.includes("email not confirmed")) return COPY.confirmFirst;
-  if (m.includes("for security purposes")) return waitCopy(m);
+  if (m.includes("for security purposes")) return emailLimitCopy(m);
+  if (m.includes("email rate limit")) return COPY.emailBusy;
   if (m.includes("rate limit")) return COPY.tooMany;
+  if (m.includes("should be different from the old password")) return COPY.samePassword;
+  if (m.includes("requires reauthentication")) return COPY.reauthenticate;
   if (m.includes("password should") || m.includes("password is too weak") || m.includes("weak password"))
     return COPY.weakPassword;
   if (m.includes("signups not allowed") || m.includes("signup is disabled")) return COPY.signupsClosed;
@@ -135,6 +189,37 @@ export function safeNextPath(next: string | null): string | null {
     return null;
   }
   return next;
+}
+
+/** A page worth carrying past the sign-in page: a safe path that is neither
+ *  the site root nor the sign-in page itself (which would only loop). */
+function onwardPath(next: string | null): string | null {
+  const safe = safeNextPath(next);
+  return safe && safe !== "/" && !safe.startsWith("/login") ? safe : null;
+}
+
+/** The page a sign-in page path was carrying in its own `next` — an invite,
+ *  a plan — read whole and held to the same rule. */
+function carriedBy(loginPath: string): string | null {
+  const q = loginPath.indexOf("?");
+  if (q === -1) return null;
+  return onwardPath(new URLSearchParams(loginPath.slice(q + 1)).get("next"));
+}
+
+/**
+ * Where a sign-up's confirmation email points: the sign-in page's "Email
+ * confirmed" banner, carrying the page the person was headed to as `next` —
+ * the invite they signed up from (`/team/join/<token>`), the plan they picked
+ * (`/billing`, `/team`) — so the confirmed person lands there and not on an
+ * empty pipeline of their own. A same-origin path only; anything else is
+ * dropped and the link points where it always did. (Should the auth service
+ * refuse the longer URL, it falls back to the project's Site URL and the
+ * handoff lands in the pipeline, as before.)
+ */
+export function confirmationRedirect(origin: string, next: string | null): string {
+  const base = `${origin}/login?confirmed=1`;
+  const onward = onwardPath(next);
+  return onward ? `${base}&next=${encodeURIComponent(onward)}` : base;
 }
 
 /** The query keys an auth link arrives with. */
@@ -171,14 +256,17 @@ export function authLinkHandoff(url: URL): string | null {
  * Where a person lands once the code became a session. A recovery link goes
  * to the Account page's reset banner unless it asked for somewhere more
  * specific; anything else goes where the link pointed, or into the app —
- * never back to the sign-in page they no longer need.
+ * never back to the sign-in page they no longer need. A confirmation link
+ * points at the sign-in page, so the page it carries (`confirmationRedirect`)
+ * is where the person goes: the invite they signed up from, accepted from
+ * its own page, rather than an empty pipeline of their own.
  */
 export function landingAfterExchange(next: string | null, redirectType: string | null): string {
   const safe = safeNextPath(next);
   const specific = safe && safe !== "/" ? safe : null;
   if (redirectType === "recovery") return specific ?? "/account?reset=1";
   if (specific && !specific.startsWith("/login")) return specific;
-  return "/deals";
+  return (specific && carriedBy(specific)) ?? "/deals";
 }
 
 /**
@@ -187,19 +275,24 @@ export function landingAfterExchange(next: string | null, redirectType: string |
  * with a code in hand the address is confirmed even when the sign-in half
  * failed (a second click, a different browser) — say so and ask for a sign-in.
  * Without a code the link itself was refused (expired, already used), and the
- * page says that instead.
+ * page says that instead. Either way the page the link carried rides along,
+ * so the sign-in that follows still goes there.
  */
 export function landingAfterFailedExchange(next: string | null, hadCode: boolean): string {
   const safe = safeNextPath(next) ?? "";
   const confirming = /[?&]confirmed=1(?:&|$)/.test(safe);
-  if (confirming) return hadCode ? "/login?confirmed=1" : "/login?confirmed=1&link=expired";
+  if (confirming) {
+    const onward = carriedBy(safe);
+    const tail = onward ? `&next=${encodeURIComponent(onward)}` : "";
+    return hadCode ? `/login?confirmed=1${tail}` : `/login?confirmed=1&link=expired${tail}`;
+  }
   return "/login?link=expired";
 }
 
 export type LinkBanner = { tone: "ok" | "warn"; text: string };
 
 export const CONFIRM_LINK_FAILED =
-  "That confirmation link has expired or was already used. Try signing in — if your email still isn't confirmed, use Create account again with the same email and we'll send a fresh link.";
+  "That confirmation link has expired or was already used. Try signing in — if your email still isn't confirmed, use Resend the confirmation link below for a fresh one.";
 export const RESET_LINK_FAILED =
   "That reset link has expired, was already used, or was opened in a different browser than the one you asked from. Request a fresh one below and open it in this browser.";
 export const EMAIL_CONFIRMED = "Email confirmed — sign in below and your pipeline is ready.";
@@ -234,7 +327,7 @@ export function initialLoginMode(params: {
   mode?: string | null;
   link?: string | null;
   confirmed?: string | null;
-}): AuthIntent {
+}): LoginMode {
   if (params.mode === "signup") return "signup";
   if (params.mode === "reset") return "reset";
   // A refused reset link opens straight on "email me a new one".

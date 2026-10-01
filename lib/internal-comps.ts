@@ -10,6 +10,7 @@ import {
   buildingPriceOf,
   findPriceMetric,
   inferStrategy,
+  isOutdoorStorageYard,
   planSummary,
   statedBasisIsBuildings,
   type StrategyKind,
@@ -92,6 +93,9 @@ function deriveBasis(
   /** the OM's own per-unit line may be read — false where the price is not
    *  for the building bought outright (#415) */
   statedLine = true,
+  /** the price over the building's feet is a basis — false for an
+   *  outdoor-storage yard, which trades by the usable acre */
+  perSfBasis = true,
 ): string | null {
   const suffix = allIn ? " all-in" : "";
 
@@ -116,7 +120,7 @@ function deriveBasis(
     if (n != null && n > 0) return `${fmtCompact(price / n)}${perSuffix(words)}${suffix}`;
     return null;
   }
-  if (price == null) return null;
+  if (price == null || !perSfBasis) return null;
   // Priced per SF: dollars per square foot, over the building's size — the
   // shared reader, never the land's or a unit's.
   const n = buildingSfFromMetrics(metrics);
@@ -174,6 +178,9 @@ export function deriveInternalComps(
     const priceNum = price ? parsePrice(price.value) : null;
     const capNum = cap ? parsePct(cap.value) : null;
     if (priceNum == null && capNum == null && yoc == null) continue;
+    // An outdoor-storage yard trades by the acre: no per-SF column for its
+    // shop building.
+    const perSfBasis = !isOutdoorStorageYard(extraction?.assetClass) && !isOutdoorStorageYard(row.asset_class);
 
     comps.push({
       dealId: row.id,
@@ -188,9 +195,9 @@ export function deriveInternalComps(
       capLabel: capNum != null ? cap!.value : null,
       basisLabel: plan
         ? plan.totalCost != null
-          ? deriveBasis(metrics, wanted, plan.totalCost, true)
+          ? deriveBasis(metrics, wanted, plan.totalCost, true, true, perSfBasis)
           : null
-        : deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext)),
+        : deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext), perSfBasis),
       kind: strategy.kind,
       kindLabel: plan ? strategy.label : null,
       yieldOnCostLabel: yoc != null ? `${(yoc * 100).toFixed(1)}%` : null,

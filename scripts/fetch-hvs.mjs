@@ -41,6 +41,8 @@
 import { createClient } from "@supabase/supabase-js";
 import { createRequire } from "node:module";
 import ExcelJS from "exceljs";
+// A failure said on the run's page, not only in its log (plain Node strips its types).
+import { annotation, missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
 
 const require = createRequire(import.meta.url);
 const { metroSeries = [] } = require("../data/fred-series.json");
@@ -57,8 +59,16 @@ const FILES = ["tab4_msa_26_rvr.xlsx", "tab4b_msa_15_25_rvr.xlsx"];
 const dryRun = process.env.DRY_RUN === "1";
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!dryRun && (!url || !key)) {
-  console.error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY are required (or DRY_RUN=1).");
+// A missing secret is a failed run, never a quiet one.
+const unset = dryRun ? [] : missingSecrets({ SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: key });
+if (unset.length > 0) {
+  console.log(
+    missingSecretsError(
+      "fetch-hvs",
+      unset,
+      "Set what is missing where this pull runs (the repository's Actions secrets), or run with DRY_RUN=1 to fetch and print without writing.",
+    ),
+  );
   process.exit(1);
 }
 const supabase = dryRun ? null : createClient(url, key, { auth: { persistSession: false } });
@@ -155,13 +165,23 @@ async function readWorkbook(buf, file) {
 }
 
 const figures = [];
+/** A workbook that could not be read: one annotation each, since a run that
+ *  reads the other still writes and stays green. */
+const workbookFailed = (file, why) =>
+  console.log(annotation("warning", `HVS: ${file}: ${why}; its quarters are not written this run`, "Census HVS workbook failed"));
 for (const file of FILES) {
-  const res = await fetch(BASE + file, {
-    headers: { "user-agent": "UnderwriteCopilot/1.0 (+https://underwrite-copilot.onrender.com)" },
-    signal: AbortSignal.timeout(60_000),
-  });
+  let res;
+  try {
+    res = await fetch(BASE + file, {
+      headers: { "user-agent": "UnderwriteCopilot/1.0 (+https://underwrite-copilot.onrender.com)" },
+      signal: AbortSignal.timeout(60_000),
+    });
+  } catch (err) {
+    workbookFailed(file, err instanceof Error ? err.message : String(err));
+    continue;
+  }
   if (!res.ok) {
-    console.error(`HVS: HTTP ${res.status} from ${BASE + file}`);
+    workbookFailed(file, `HTTP ${res.status} from ${BASE + file}`);
     continue;
   }
   const buf = Buffer.from(await res.arrayBuffer());
@@ -175,11 +195,11 @@ for (const file of FILES) {
         (dryRun ? " · dry run, not written" : ""),
     );
   } catch (err) {
-    console.error(`HVS: ${file}: ${err instanceof Error ? err.message : String(err)}`);
+    workbookFailed(file, err instanceof Error ? err.message : String(err));
   }
 }
 if (figures.length === 0) {
-  console.error("HVS: no figure read from either workbook");
+  console.log(annotation("error", "HVS: no figure read from either workbook; nothing was written", "Census HVS pull failed"));
   process.exit(1);
 }
 
@@ -208,15 +228,28 @@ for (const s of SERIES) {
       `matched "${names.join('" / "')}"${names.length > 1 ? " (two spellings, one area)" : ""}`,
   );
 }
-for (const miss of missed) console.error(`${miss}: no row in either workbook`);
+// One annotation for the misses: each metro named keeps its last quarter.
+if (missed.length > 0) {
+  console.log(
+    annotation(
+      "warning",
+      `HVS: ${missed.length} of ${SERIES.length} metros have no row in either workbook and keep their last quarter: ${missed.join(", ")}`,
+      "Census HVS: metros missed",
+    ),
+  );
+}
 
 if (supabase && out.length > 0) {
   const { error } = await supabase.from("rates").upsert(out, { onConflict: "series_id,obs_date" });
   if (error) {
-    console.error(`rates upsert: ${error.message}`);
+    console.log(annotation("error", `rates upsert: ${error.message}; nothing was written`, "Census HVS pull failed"));
     process.exit(1);
   }
   console.log(`rates: upserted ${out.length} rows`);
 }
 console.log(`HVS ROLL-UP: ${matched} of ${SERIES.length} metros matched${missed.length ? `; missed: ${missed.join(", ")}` : ""}`);
-process.exit(matched === 0 ? 1 : 0);
+if (matched === 0) {
+  console.log(annotation("error", "HVS: no metro matched a row, so the pull fails (see the warnings above).", "Census HVS pull failed"));
+  process.exit(1);
+}
+process.exit(0);

@@ -100,6 +100,42 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(conv.getCell(13).value).toBe("2026-09-08");
   });
 
+  it("a call the latest screen has not re-run says so beside the call it shows", async () => {
+    const ws = (
+      await load([
+        { ...STABILIZED, verdictBehind: "running" },
+        { ...CONVERSION, verdictBehind: "failed" },
+        { ...LEGACY, verdict: null, verdictBehind: "running" },
+      ])
+    ).getWorksheet("Pipeline")!;
+    const cells = [6, 7, 8].map((r) => ws.getRow(r).getCell(11).value);
+    expect(cells).toContain("Re-screening (was Caution)");
+    expect(cells).toContain("Screen failed (was Caution)");
+    // No call on file: a first screen running prints no invented call.
+    expect(cells).toContain("—");
+  });
+
+  it("a buy-box fit judged on the first signal says so on its cell, as the pipeline card's \"First read\" does", async () => {
+    const ws = (
+      await load([
+        { ...STABILIZED, fit: "near", fitFirstRead: true },
+        { ...CONVERSION, fit: "fits" },
+        { ...LEGACY, fit: null, fitFirstRead: true },
+      ])
+    ).getWorksheet("Pipeline")!;
+    const cells = [6, 7, 8].map((r) => ws.getRow(r).getCell(10));
+    const first = cells.find((c) => String(c.value).startsWith("Near"))!;
+    expect(first.value).toBe("Near (first read)");
+    expect(first.font?.italic).toBe(true);
+    expect(JSON.stringify(first.note)).toContain("judged on the first pass over the memorandum");
+    // The full screen's fit stands as it was, unmarked and with no note.
+    const full = cells.find((c) => String(c.value).startsWith("Fits"))!;
+    expect(full.value).toBe("Fits");
+    expect(full.note).toBeUndefined();
+    // No fit at all is a dash, never a mark on nothing.
+    expect(cells.map((c) => c.value)).toContain("—");
+  });
+
   it("a share's price keeps its figure and carries what it buys as the cell's note; a building's has none (#415)", async () => {
     const ws = (await load([{ ...STABILIZED, interest: "49% share" }, CONVERSION])).getWorksheet("Pipeline")!;
     const share = ws.getRow(6).getCell(7);

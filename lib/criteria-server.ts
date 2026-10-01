@@ -95,25 +95,20 @@ export async function getActiveBuyBox(
 }
 
 /** The active box for a specific deal (used by the background verdict step —
- *  team deals judge against the team box, personal deals the creator's). */
+ *  team deals judge against the team box, personal deals the creator's).
+ *  `strict` throws where the read fails, rather than answering "no box": the
+ *  screen-complete email says the box was not read instead of claiming the
+ *  account has none. */
 export async function getBuyBoxForDeal(
   dealUserId: string,
   dealTeamId: string | null,
+  opts?: { strict?: boolean },
 ): Promise<BuyBox | null> {
   const admin = createSupabaseAdminClient();
-  if (dealTeamId) {
-    const { data } = await admin
-      .from("teams")
-      .select("criteria")
-      .eq("id", dealTeamId)
-      .maybeSingle();
-    return activeBox(resolveBuyBoxStore(data?.criteria ?? null));
-  }
-  const { data } = await admin
-    .from("profiles")
-    .select("criteria")
-    .eq("id", dealUserId)
-    .maybeSingle();
+  const { data, error } = dealTeamId
+    ? await admin.from("teams").select("criteria").eq("id", dealTeamId).maybeSingle()
+    : await admin.from("profiles").select("criteria").eq("id", dealUserId).maybeSingle();
+  if (error && opts?.strict) throw new Error(`the buy box could not be read: ${error.message}`);
   return activeBox(resolveBuyBoxStore(data?.criteria ?? null));
 }
 

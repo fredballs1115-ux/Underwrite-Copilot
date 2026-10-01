@@ -13,6 +13,7 @@ import {
 } from "@/lib/live-rates";
 import { monthOf } from "@/lib/zori";
 import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
+import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
 
 /**
  * A covered metro's own figures, live from FRED — the four things a metro
@@ -184,11 +185,13 @@ export function MetroLive({
       {sectors.length > 0 && <SectorJobsPicture sectors={sectors} allJobs={allJobs} metroId={metroId} />}
       {supply && <SupplyPicture supply={supply} metroId={metroId} />}
       <p className="mt-2 text-[11px] text-muted">
-        Pulled every weekday; each figure links to its series.
+        {hasMsaVacancy
+          ? "Pulled every weekday, the survey's metro vacancy each quarter; each figure links to its series."
+          : "Pulled every weekday; each figure links to its series."}
         {sectors.length > 0 &&
           " Jobs by sector are the BLS's payroll counts for the metro area by supersector, each against a year ago beside all payrolls: the sector that fills a building's kind is the demand an underwrite of it is assuming, and a screen of a deal here is handed that sector's line."}
         {supply &&
-          " Housing supply is the Census Bureau's building permits for the metro area, twelve months against the twelve before, because a month of permits is the season: the units in buildings of two or more are the total less the single-family series, the only split FRED publishes for a metro or a state, and they are the pipeline an apartment underwrite competes with."}
+          ` Housing supply is the Census Bureau's building permits for the metro area, twelve months against the twelve before, because a month of permits is the season: the units in buildings of two or more are the total less the single-family series, since ${NO_MULTI_UNIT_SERIES}, and they are the pipeline an apartment underwrite competes with.`}
         {hasRentIndex &&
           " The rent index is what sitting tenants pay across the area's leases; the asking rent above is this month's new ones."}
         {fromBls &&
@@ -281,8 +284,9 @@ function SectorJobsPicture({
  * more in the brand tone, since those are the pipeline a rental underwrite
  * competes with — with the figures beside them and both counts linked to
  * their series. The multi-unit figure is the total less the single-family
- * series, and the caption says so: FRED publishes no other split for a
- * metro. A metro with one year and no year before draws one bar.
+ * series, and the caption says why: FRED carries no multi-unit series for
+ * a metro (lib/permit-split). A metro with one year and no year before
+ * draws one bar.
  */
 function SupplyPicture({ supply, metroId }: { supply: MetroSupply; metroId: string }) {
   // A borrowed count wears the MSA's name on the heading, as a tile does.
@@ -332,7 +336,7 @@ function SupplyPicture({ supply, metroId }: { supply: MetroSupply; metroId: stri
         <a href={supply.hrefSingle} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-brand">
           single-family
         </a>
-        {", the only split published for a metro or a state"}
+        {` — ${NO_MULTI_UNIT_SERIES}`}
       </p>
     </div>
   );

@@ -11,6 +11,7 @@
 
 import metrosSeed from "@/data/research/metros.json";
 import { DATA_METROS } from "@/lib/market-match";
+import { MARKETS_READ } from "@/lib/market-count";
 import { SECTORS } from "@/lib/research-sectors";
 
 export interface MarketPage {
@@ -35,7 +36,7 @@ export interface PageMeta {
 }
 
 /** The site's own branded card (app/opengraph-image.tsx). */
-const SITE_CARD = {
+export const SITE_CARD = {
   url: "/opengraph-image",
   width: 1200,
   height: 630,
@@ -111,10 +112,12 @@ export function marketMeta(metro: MarketPage | null, sector: SectorPage | null):
       image: SITE_CARD,
     };
   }
-  const count = marketPages().length;
+  // Counted as the homepage counts: the Washington area's four briefs are
+  // one market, so this and "the 15 covered markets" add up (lib/market-count).
+  const count = MARKETS_READ;
   return {
     title: "CRE market data: rates, rents, vacancy and jobs",
-    description: `Live commercial real estate market data for ${count} US metro areas: today's Treasury curve and lending rates, asking rents, rental vacancy, jobs by sector and building permits — each figure dated and linked to its source.`,
+    description: `Live commercial real estate market data for ${count} US markets: today's Treasury curve and lending rates, asking rents, rental vacancy, jobs by sector and building permits — each figure dated and linked to its source.`,
     canonical: "/market",
     image: SITE_CARD,
   };

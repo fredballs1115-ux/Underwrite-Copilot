@@ -22,11 +22,29 @@ const PLAN_WORK: Record<StrategyKind, string | null> = {
  *  not control — the letter says so. A renovation or a lease-up does not. */
 const NEEDS_ENTITLEMENTS = new Set<StrategyKind>(["conversion", "development"]);
 
+/** A fact the letter takes from the memorandum (lib/loi-terms): its own
+ *  words ("" where it states none) and its page ("" where not located). */
+interface StatedFact {
+  stated: string;
+  page: string;
+}
+
 export interface LoiParams {
   /** the deal's plan, when it has one: a conversion or a development gets an
    *  entitlements contingency and a diligence clause that names the work; a
    *  value-add or a lease-up names the work only. Null on a stabilized asset. */
   plan?: { kind: StrategyKind; label: string } | null;
+  /** a leasehold, as the memorandum states it: the letter names the
+   *  leasehold interest under its ground lease as what is bought, marked
+   *  for review. Null on a fee simple. */
+  leasehold?: StatedFact | null;
+  /** a seller that is not the owner, as the memorandum states it: the
+   *  letter names the court-appointed receiver or the lender that took the
+   *  property back, marked for review. Null where the owner sells. */
+  seller?: ({ method: "receivership" | "reo" } & StatedFact) | null;
+  /** a portfolio's properties, as the memorandum lists them: the letter
+   *  lists them by name, marked for review. Empty for one property. */
+  properties?: { name: string; address: string }[];
   buyerName: string;
   propertyName: string;
   propertyAddress: string;
@@ -76,16 +94,75 @@ function numbered(n: number, title: string, body: string): Paragraph[] {
   ];
 }
 
+/** A stretch of a sentence: plain, or read off the memorandum and marked
+ *  (highlighted) for the reviewer. */
+type Part = string | { review: string };
+
+function sentence(parts: Part[]): Paragraph {
+  return new Paragraph({
+    spacing: { before: 120, after: 120 },
+    children: parts.map(
+      (p) =>
+        new TextRun({
+          text: typeof p === "string" ? p : p.review,
+          color: INK,
+          size: 22,
+          font: "Calibri",
+          ...(typeof p === "string" ? {} : { highlight: "yellow" as const }),
+        }),
+    ),
+  });
+}
+
+/** The note beside a line the memorandum decided: bracketed, italic and
+ *  highlighted, so it is read and taken out before the letter is sent. */
+function reviewNote(text: string): Paragraph {
+  return new Paragraph({
+    spacing: { before: 0, after: 120 },
+    children: [
+      new TextRun({
+        text: `[${text}]`,
+        italics: true,
+        color: INK,
+        size: 20,
+        font: "Calibri",
+        highlight: "yellow",
+      }),
+    ],
+  });
+}
+
+/** How much of the memorandum's own sentence a note quotes. */
+const QUOTE_MAX = 240;
+
+/** The memorandum's own words for a note — quoted, never re-worded; cut at
+ *  a word where they run long — and its page where located. */
+function quoted(f: StatedFact): string {
+  const t = f.stated.trim().replace(/\s+/g, " ").replace(/[.;,:\s]+$/, "");
+  const page = f.page.trim();
+  if (!t) return page ? ` (${page})` : "";
+  const at = t.lastIndexOf(" ", QUOTE_MAX);
+  const cut = t.length > QUOTE_MAX ? `${t.slice(0, at > 0 ? at : QUOTE_MAX)}…` : t;
+  return ` — “${cut}”${page ? `, ${page}` : ""}`;
+}
+
 /**
  * A clean, deliberately conservative non-binding LOI draft: the standard
  * skeleton an acquisitions team marks up, not a novel legal instrument.
- * Every figure comes from the form the analyst just reviewed.
+ * Every figure comes from the form the analyst just reviewed. What is
+ * bought and from whom comes from the memorandum where it says the sale is
+ * not the property from its owner (lib/loi-terms) — a leasehold, a
+ * receiver's or a lender's sale, a portfolio — each such line highlighted
+ * beside a note for review, and no clause added for it. The deals this
+ * skeleton is the wrong document for never reach it (lib/loi-refusal).
  */
 export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
   // XML 1.0 cannot carry these control characters; docx writes them verbatim
   // and Word then refuses the file — strip every string that reaches a run.
   const clean = (s: string) =>
     s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, "");
+  const cleanFact = <F extends StatedFact>(f: F | null | undefined): F | null =>
+    f ? { ...f, stated: clean(f.stated), page: clean(f.page) } : null;
   p = {
     ...p,
     buyerName: clean(p.buyerName),
@@ -95,7 +172,65 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     deposit: clean(p.deposit),
     dateStr: clean(p.dateStr),
     firmName: p.firmName ? clean(p.firmName).trim() : null,
+    leasehold: cleanFact(p.leasehold),
+    seller: cleanFact(p.seller),
+    properties: (p.properties ?? []).map((x) => ({ name: clean(x.name).trim(), address: clean(x.address).trim() })),
   };
+
+  // What is bought and from whom, where the memorandum says it is not the
+  // property from its owner: a leasehold under its ground lease, a
+  // portfolio's properties, a receiver or a lender selling. Each such
+  // stretch is marked, with a note quoting the memorandum, and no clause is
+  // added for it — the legal terms are the buyer's counsel's to write. With
+  // none of them the opening is the usual sentence, word for word.
+  const properties = p.properties ?? [];
+  const several = properties.length > 1;
+  const what: string | null = p.leasehold
+    ? several
+      ? "the leasehold interest in the properties listed below under the ground lease (together, the “Property”)"
+      : "the leasehold interest in the above-referenced property under the ground lease (the “Property”)"
+    : several
+      ? "the properties listed below (together, the “Property”)"
+      : null;
+  const from: string | null = p.seller
+    ? p.seller.method === "receivership"
+      ? "the court-appointed receiver selling it (“Seller”)"
+      : "the lender that took it back (“Seller”)"
+    : null;
+  const opening: Paragraph[] =
+    what || from
+      ? [
+          sentence([
+            `${p.buyerName} (“Buyer”) is pleased to submit this non-binding letter of intent to acquire `,
+            what ? { review: what } : "the above-referenced property (the “Property”)",
+            " from ",
+            from ? { review: from } : "its owner (“Seller”)",
+            " on the principal terms set out below.",
+          ]),
+          ...(p.leasehold
+            ? [reviewNote(`Review before sending: the memorandum sells a leasehold under a ground lease${quoted(p.leasehold)}.`)]
+            : []),
+          ...(p.seller
+            ? [
+                reviewNote(
+                  p.seller.method === "receivership"
+                    ? `Review before sending: the memorandum says a court-appointed receiver is selling the property${quoted(p.seller)}.`
+                    : `Review before sending: the memorandum says the lender that took the property back is selling it${quoted(p.seller)}.`,
+                ),
+              ]
+            : []),
+          ...(several
+            ? [
+                ...properties.map((x, i) => sentence([{ review: `(${i + 1}) ${x.name}${x.address ? ` — ${x.address}` : ""}` }])),
+                reviewNote("Review before sending: the properties as the memorandum lists them."),
+              ]
+            : []),
+        ]
+      : [
+          para(
+            `${p.buyerName} (“Buyer”) is pleased to submit this non-binding letter of intent to acquire the above-referenced property (the “Property”) from its owner (“Seller”) on the principal terms set out below.`,
+          ),
+        ];
 
   const financing =
     p.ltvPct !== null
@@ -189,9 +324,7 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
       bold: true,
       before: 200,
     }),
-    para(
-      `${p.buyerName} (“Buyer”) is pleased to submit this non-binding letter of intent to acquire the above-referenced property (the “Property”) from its owner (“Seller”) on the principal terms set out below.`,
-    ),
+    ...opening,
     ...sections.flatMap(([title, body], i) => numbered(i + 1, title, body)),
     para(
       "NON-BINDING: This letter is an expression of mutual interest only. Except for this paragraph, no provision of this letter creates any legally binding obligation on either party, and no such obligation shall arise unless and until a definitive PSA is executed and delivered by both parties. Either party may discontinue discussions at any time for any reason.",

@@ -8,6 +8,8 @@ import { askDealQuestion, dealContextFor } from "@/lib/anthropic/ask";
 import { ScreenError } from "@/lib/anthropic/failure";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { parseDealQa } from "@/lib/deals";
+import { locatedPage } from "@/lib/facts";
+import { omFingerprint } from "@/lib/om-fingerprint";
 
 export type AskState =
   | { error?: string; ok?: boolean; question?: string }
@@ -20,7 +22,7 @@ const MAX_QUESTIONS = 25;
 /**
  * Ask-the-deal: one question, answered from the stored OM with page cites,
  * appended to the deal's Q&A thread. Runs inline (the analyst is waiting) —
- * a single Claude call, ~15–30 seconds. Returns useActionState-style state
+ * a single Claude call over the whole deck. Returns useActionState-style state
  * so errors render next to the form instead of bouncing the page.
  */
 export async function askDeal(
@@ -85,26 +87,40 @@ export async function askDeal(
     };
   }
 
+  // The questions asked — a replaced OM's marker on the thread is none.
   const qa = parseDealQa(deal.qa);
   if (qa.length >= MAX_QUESTIONS) {
     return {
       error: `This deal reached its ${MAX_QUESTIONS}-question cap — the thread above should have it covered.`,
+      // The typed question stays in the box, as on every other refusal.
+      ...keep,
     };
   }
 
   try {
     const pdf = await downloadOmPdf(deal.om_storage_path as string, { kind: "deal", dealId });
-    const result = await askDealQuestion(
-      pdf,
-      question,
-      dealContextFor((deal.extraction as ExtractionResult | null) ?? null),
-      { dealId },
-    );
+    const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+    const result = await askDealQuestion(pdf, question, dealContextFor(extraction), {
+      dealId,
+      // How the screen read this memorandum, off the row already in hand:
+      // a question reads the figures the screen read, with no second read
+      // of the deal (null for a deal screened before the read was kept).
+      omRead: extraction?.omRead ?? null,
+    });
     const entry = {
       at: new Date().toISOString(),
       q: question,
       answer: result.answer,
-      cites: result.cites.slice(0, 6),
+      // A cited page is kept only where it falls inside the deck this answer
+      // read — the extraction's absolute rule (lib/facts): a page the model
+      // named past the memorandum's end, or one no length could validate,
+      // is never shown as a citation.
+      cites: result.cites.filter((c) => locatedPage(c.page, result.pages) != null).slice(0, 6),
+      // The memorandum it was asked of, so a reissued deck never inherits
+      // this answer's pages (lib/deals `parseDealQa`).
+      om: omFingerprint(pdf),
+      // Who asked, by user id: a team deal's thread names them.
+      by: user.id,
     };
     // Atomic append (RPC, 0017) so two concurrent asks never overwrite each
     // other's paid answers; read-modify-write only as the pre-RPC fallback.
@@ -113,10 +129,13 @@ export async function askDeal(
       p_entry: entry,
     });
     if (rpcErr) {
-      qa.push(entry);
+      // The thread as stored, never as parsed: the parse leaves out the
+      // markers a replaced OM appended and adds what it reads, and the
+      // database keeps every entry already there, in order (migration 0036).
+      const stored: unknown[] = Array.isArray(deal.qa) ? deal.qa : [];
       const { error } = await supabase
         .from("deals")
-        .update({ qa, updated_at: new Date().toISOString() })
+        .update({ qa: [...stored, entry], updated_at: new Date().toISOString() })
         .eq("id", dealId);
       if (error) throw new Error(error.message);
     }

@@ -3,6 +3,14 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { loadSubmarketView } from "@/lib/market/store";
+import { trailingYearBasis, unverifiedMark } from "@/lib/market/metrics";
+import {
+  PERIOD_FIELDS,
+  PIPELINE_FIELDS,
+  importSentence,
+  mappingSentence,
+  unpackMapping,
+} from "@/lib/market/import";
 import { exclusionSummary } from "@/lib/market/exclusions";
 import { RENT_BASIS_LABEL, RENT_BASES } from "@/lib/market/types";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -28,6 +36,13 @@ const ERRORS: Record<string, string> = {
   empty: "That file has no rows.",
   norows: "No rows in that file mapped to the expected columns.",
   period: "A period needs a full date (yyyy-mm-dd), usually the quarter end.",
+  sourceurl: "A web-sourced figure needs its source link — it is shown with that link everywhere.",
+  importsave:
+    "The import could not be saved, so nothing from that file was written — what was loaded before is unchanged. Try it again.",
+  importreplace:
+    "The new rows could not replace the ones loaded before, so the import was taken back out — what was loaded before is unchanged. Try it again.",
+  save: "That change could not be saved. Try it again.",
+  delete: "That could not be deleted. Try it again.",
 };
 
 const sfFmt = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
@@ -39,10 +54,41 @@ export default async function SubmarketPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; imported?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    imported?: string;
+    replaced?: string;
+    skipped?: string;
+    doubled?: string;
+    kind?: string;
+    file?: string;
+    cols?: string;
+  }>;
 }) {
   const { id } = await params;
-  const { error: errorCode, imported } = await searchParams;
+  const { error: errorCode, imported, replaced, skipped, doubled, kind, file, cols } = await searchParams;
+  // What the last import did, said from what the action carried here.
+  const importKind = kind === "pipeline" || kind === "periods" ? kind : null;
+  const importFields = importKind === "pipeline" ? PIPELINE_FIELDS : PERIOD_FIELDS;
+  const importRead = importKind ? unpackMapping(cols, importFields) : [];
+  const importNote = imported
+    ? {
+        done: importSentence({
+          kind: importKind,
+          imported: Number(imported) || 0,
+          replaced: replaced == null ? null : Number(replaced) || 0,
+          skipped: Number(skipped) || 0,
+          doubled: Number(doubled) || 0,
+          file: file ?? null,
+        }),
+        read: importKind
+          ? mappingSentence(
+              importRead,
+              importFields.filter((f) => !importRead.some((c) => c.key === f.key)).map((f) => f.label),
+            )
+          : "",
+      }
+    : null;
 
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
@@ -62,7 +108,54 @@ export default async function SubmarketPage({
       ? `${metrics.supply.months.toFixed(1)} months`
       : metrics.supply.status === "supply_exceeds_demand"
         ? "Supply exceeds demand"
-        : "—";
+        : metrics.supply.status === "not_computable"
+          ? "Not computable"
+          : "—";
+  const yearBasis = trailingYearBasis(metrics.absorption);
+
+  // Each headline figure: its label, its value, where it came from, and how
+  // many web-sourced periods went into it — the mark is part of the figure.
+  const headline: { label: string; value: string; note: string; unverified: number }[] = [
+    {
+      label: "Months of supply",
+      value: supplyLine,
+      note:
+        metrics.supply.status === "ok"
+          ? `${sfFmt(metrics.supply.ucSf)} UC ÷ ${sfFmt(metrics.supply.monthlyAbsorption)}/mo (${yearBasis})`
+          : metrics.supply.status === "supply_exceeds_demand"
+            ? `${sfFmt(metrics.supply.ucSf)} UC, ${sfFmt(metrics.supply.t12Absorption)} T12 absorption (${yearBasis})`
+            : metrics.supply.reason,
+      unverified: metrics.unverified.supply,
+    },
+    {
+      label: "UC % of inventory",
+      value: pct1(metrics.ucShare),
+      note: metrics.latest ? `as of ${metrics.latest.period}` : "no period",
+      unverified: metrics.unverified.ucShare,
+    },
+    {
+      label: "T12 net absorption",
+      value:
+        metrics.absorption.sf != null
+          ? sfFmt(metrics.absorption.sf)
+          : metrics.absorption.periods.length
+            ? "Not computable"
+            : "—",
+      note: metrics.absorption.sf != null ? yearBasis : (metrics.absorption.reason ?? "no absorption data"),
+      unverified: metrics.unverified.absorption,
+    },
+    {
+      label: "Rent CAGR",
+      value: metrics.rent.cagr == null ? "—" : `${(metrics.rent.cagr * 100).toFixed(2)}%`,
+      note:
+        metrics.rent.cagr == null
+          ? "needs two periods on one basis"
+          : `${metrics.rent.cagrFrom} → ${metrics.rent.cagrTo}, ${
+              metrics.rent.cagrBasis ? RENT_BASIS_LABEL[metrics.rent.cagrBasis] : "basis not stated"
+            }`,
+      unverified: metrics.unverified.cagr,
+    },
+  ];
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
@@ -74,7 +167,7 @@ export default async function SubmarketPage({
           ← Market data · your submarkets
         </Link>
         {market ? (
-          <MarketBand metro={market.id} eyebrow={market.name} name={submarket.name} as="h1" />
+          <MarketBand metro={market.id} eyebrow={market.name} name={submarket.name} as="h1" eager />
         ) : (
           <h1 className="text-2xl font-semibold tracking-tight text-ink">{submarket.name}</h1>
         )}
@@ -101,52 +194,23 @@ export default async function SubmarketPage({
           {ERRORS[errorCode]}
         </p>
       ) : null}
-      {imported ? (
-        <p className="rounded-lg border border-pass/30 bg-pass/5 px-4 py-3 text-sm text-pass">
-          Imported {imported} row{imported === "1" ? "" : "s"}.
-        </p>
+      {importNote ? (
+        <div className="rounded-lg border border-pass/30 bg-pass/5 px-4 py-3 text-sm">
+          <p className="text-pass">{importNote.done}</p>
+          {importNote.read ? <p className="mt-1 text-xs text-muted">{importNote.read}</p> : null}
+        </div>
       ) : null}
 
       {/* ── Headline metrics ──────────────────────────────────────────── */}
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(
-          [
-            [
-              "Months of supply",
-              supplyLine,
-              metrics.supply.status === "ok"
-                ? `${sfFmt(metrics.supply.ucSf)} UC ÷ ${sfFmt(metrics.supply.monthlyAbsorption)}/mo`
-                : metrics.supply.status === "supply_exceeds_demand"
-                  ? `${sfFmt(metrics.supply.ucSf)} UC, ${sfFmt(metrics.supply.t12Absorption)} T12 absorption`
-                  : metrics.supply.reason,
-            ],
-            [
-              "UC % of inventory",
-              pct1(metrics.ucShare),
-              metrics.latest ? `as of ${metrics.latest.period}` : "no period",
-            ],
-            [
-              "T12 net absorption",
-              metrics.absorption.sf == null ? "—" : sfFmt(metrics.absorption.sf),
-              metrics.absorption.periods.length
-                ? `${metrics.absorption.quartersUsed} qtr: ${metrics.absorption.periods.join(", ")}`
-                : "no absorption data",
-            ],
-            [
-              "Rent CAGR",
-              metrics.rent.cagr == null ? "—" : `${(metrics.rent.cagr * 100).toFixed(2)}%`,
-              metrics.rent.cagr == null
-                ? "needs two periods on one basis"
-                : `${metrics.rent.cagrFrom} → ${metrics.rent.cagrTo}, ${
-                    metrics.rent.cagrBasis ? RENT_BASIS_LABEL[metrics.rent.cagrBasis] : "basis not stated"
-                  }`,
-            ],
-          ] as const
-        ).map(([label, value, note]) => (
+        {headline.map(({ label, value, note, unverified }) => (
           <div key={label} className="rounded-lg border border-line bg-surface px-4 py-3">
             <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
             <dd className="mt-0.5 font-mono text-lg text-ink">{value}</dd>
             <p className="mt-0.5 text-[11px] text-muted">{note}</p>
+            {unverified > 0 ? (
+              <p className="mt-0.5 text-[11px] font-medium text-caution">{unverifiedMark(unverified)}</p>
+            ) : null}
           </div>
         ))}
       </dl>
@@ -169,7 +233,7 @@ export default async function SubmarketPage({
 
       {/* ── Trends ────────────────────────────────────────────────────── */}
       <section className="rounded-lg border border-line bg-surface p-4">
-        <h2 className="text-sm font-semibold text-ink">Absorption and asking rent</h2>
+        <h2 className="text-sm font-semibold text-ink">Vacancy and asking rent</h2>
         <div className="mt-3">
           <DualAxisTrend
             bars={metrics.vacancy.length ? metrics.vacancy : []}
@@ -264,8 +328,10 @@ export default async function SubmarketPage({
       <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Import a market export</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          CSV or XLSX, mapped like the rent roll. A re-import replaces the rows its file wrote
-          before, so nothing doubles.
+          CSV or XLSX. Each column is matched to a field by its header, with no step to confirm
+          the match — the import says which header it read for each field. A grid replaces the
+          periods loaded for its dates; a pipeline replaces what its file wrote before and any
+          building with the same name and address, so a renamed copy does not double it.
         </p>
         <form action={importSubmarketFile} className="mt-4 flex flex-wrap items-end gap-3">
           <input type="hidden" name="submarketId" value={id} />

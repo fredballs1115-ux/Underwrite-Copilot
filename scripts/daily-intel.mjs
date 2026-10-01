@@ -17,6 +17,8 @@
 // dates only), and the Anthropic call goes through fetch.
 
 import { createClient } from "@supabase/supabase-js";
+// A failure said on the run's page, not only in its log (plain Node strips its types).
+import { missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
 
 // One watch query per jurisdiction rule-set + per sector the buyer tracks.
 // Keep queries SPECIFIC — Google News RSS returns ~100 items per query and
@@ -43,8 +45,17 @@ const DIGEST_THRESHOLD = 6; // relevance >= this makes the digest
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const anthropicKey = process.env.ANTHROPIC_API_KEY;
-if (!url || !key || !anthropicKey) {
-  console.error("SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, ANTHROPIC_API_KEY are required.");
+// A missing secret is a failed run, never a quiet one: all three are needed
+// (the stories are scored by Claude before they are written).
+const unset = missingSecrets({ SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: key, ANTHROPIC_API_KEY: anthropicKey });
+if (unset.length > 0) {
+  console.log(
+    missingSecretsError(
+      "daily-intel",
+      unset,
+      "Set what is missing where this pull runs (the repository's Actions secrets, or the Render cron's environment).",
+    ),
+  );
   process.exit(1);
 }
 const supabase = createClient(url, key, { auth: { persistSession: false } });

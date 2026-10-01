@@ -315,19 +315,19 @@
    "exempt_if": {
     "any_of": [
      {
-      "building_permit_issued_after": "2011-01-01"
+      "building_age_years_lt": 15
      },
      {
       "owner_occupied_with_units_lte": 2
      }
     ]
    },
-   "effect": "California AB 1482 (Tenant Protection Act) caps annual rent increases statewide at 5% + regional CPI, max 10%, and requires just cause after 12 months. EXEMPT: housing issued a certificate of occupancy within the last 15 YEARS (rolling - the 2011 date encoded here is the 2026 snapshot and moves forward each year), and an owner-occupied DUPLEX where the owner lives in the other unit for the whole tenancy. Separately-owned SFR/condos have their own exemption unless held by a corporation/REIT. City ordinances (LA RSO, SF) override where stricter.",
+   "effect": "California AB 1482 (Tenant Protection Act) caps annual rent increases statewide at 5% + regional CPI, max 10%, and requires just cause after 12 months. For the Los Angeles area the maximum is 8.7% for increases from Aug 1, 2026 to July 31, 2027 (LAHD); regional CPI differs by region, so other regions' caps differ. EXEMPT: housing issued a certificate of occupancy within the last 15 YEARS (a rolling window, read here as the building's age in whole years from its year built), and an owner-occupied DUPLEX where the owner lives in the other unit for the whole tenancy. Separately-owned SFR/condos have their own exemption unless held by a corporation/REIT. City ordinances (LA RSO, SF) override where stricter.",
    "quote": "A duplex in which the owner occupies one of the units as the owner's principal place of residence for the duration of the tenancy is exempt",
    "source": "https://caanet.org/topics/ab-1482/",
-   "as_of": "2026-08-22",
+   "as_of": "2026-09-30",
    "status": "verified",
-   "verification": "snippet-confirmed across California Apartment Association, Fresno Housing Authority Q&A PDF, and three practitioner guides; 15-year rolling window cross-confirmed (2026: C of O after Jan 1, 2011)"
+   "verification": "snippet-confirmed across California Apartment Association, Fresno Housing Authority Q&A PDF, and three practitioner guides; 15-year rolling window cross-confirmed (2026: C of O after Jan 1, 2011); 2026-09-30: the Los Angeles area's maximum read from LAHD's City of Los Angeles Renter Protections Notice (updated 07.01.2026, https://housing.lacity.gov/wp-content/uploads/2023/06/LA-RENTER-Protections-Notification.pdf), page 2 - 'Effective August 1, 2026 to July 31, 2027, the maximum allowable increase is 8.7%'"
   },
   {
    "id": "ca-la-rso-coverage",
@@ -342,12 +342,12 @@
    "exempt_if": {
     "building_permit_issued_after": "1978-10-01"
    },
-   "effect": "City of Los Angeles RSO covers properties of 2+ units first built ON OR BEFORE Oct 1, 1978 (~624,000 units): capped annual increases, just-cause eviction, relocation fees. CURRENT CAP: 3% for increases effective July 1, 2025 - June 30, 2026; utility add-on percentages end Feb 2, 2026; and from July 1, 2026 the amended formula (ordinance eff. Jan 24, 2026) sets increases at 90% of average CPI with a 1% floor and 4% ceiling (was 3%-8%). Applies inside LA city limits only; LA County unincorporated areas have their own RSO, and AB 1482 covers the rest. NOTE: the year-level check here approximates the Oct 1, 1978 cutoff.",
+   "effect": "City of Los Angeles RSO covers properties of 2+ units first built ON OR BEFORE Oct 1, 1978 (~624,000 units): capped annual increases, just-cause eviction, relocation fees. CURRENT CAP: 3% for increases effective July 1, 2026 - June 30, 2027 (it was 3% for July 1, 2025 - June 30, 2026, and 4% the year before); from Feb 2, 2026 the annual increase may not include any added percentage for utilities; and from July 1, 2026 the amended formula (ordinance eff. Jan 24, 2026) sets increases at 90% of average CPI with a 1% floor and 4% ceiling (was 3%-8%). Applies inside LA city limits only; LA County unincorporated areas have their own RSO, and AB 1482 covers the rest. NOTE: the year-level check here approximates the Oct 1, 1978 cutoff.",
    "quote": "The RSO applies to properties in the city of Los Angeles with two or more units built before October 1, 1978",
    "source": "https://housing.lacity.gov/residents/what-is-covered-under-the-rso",
-   "as_of": "2026-08-22",
+   "as_of": "2026-09-30",
    "status": "verified",
-   "verification": "coverage snippet-confirmed across three LAHD (housing.lacity.gov) pages; cap/formula cross-confirmed 2026-08-22 via the LAHD rent-increase calculator page, AAGLA, and two practitioner analyses (upgraded from single-source)"
+   "verification": "coverage snippet-confirmed across three LAHD (housing.lacity.gov) pages; cap/formula cross-confirmed 2026-08-22 via the LAHD rent-increase calculator page, AAGLA, and two practitioner analyses (upgraded from single-source); 2026-09-30: the current cap read from LAHD's City of Los Angeles Renter Protections Notice (updated 07.01.2026, https://housing.lacity.gov/wp-content/uploads/2023/06/LA-RENTER-Protections-Notification.pdf), page 1 - allowable RSO increases 3% for 7/1/2026 - 6/30/2027, 3% for 7/1/2025 - 6/30/2026, 4% for 7/1/2024 - 6/30/2025, and from Feb 2, 2026 no additional percentage for utilities; the 90%-of-CPI formula wording was not re-read there"
   },
   {
    "id": "wa-rent-cap-hb1217",
@@ -360,19 +360,19 @@
    "exempt_if": {
     "any_of": [
      {
-      "building_permit_issued_after": "2014-01-01"
+      "building_age_years_lt": 12
      },
      {
       "owner_occupied_with_units_lte": 2
      }
     ]
    },
-   "effect": "Washington HB 1217 (signed May 2025, effective immediately) caps annual rent increases statewide at the lesser of 7% + CPI or 10% - 10% for 2025, 9.683% for increases taking effect in 2026 - with NO increase allowed in a tenancy's first 12 months. EXEMPT from the cap: buildings within 12 YEARS of first certificate of occupancy (rolling - 2014 here is the 2026 snapshot) and owner-occupied single-family homes renting out no more than 2 units/bedrooms (incl. ADU). Exempt properties still owe the notice/parity requirements (RCW 59.18.710).",
+   "effect": "Washington HB 1217 (signed May 2025, effective immediately) caps annual rent increases statewide at the lesser of 7% + CPI or 10% - 10% for 2025, 9.683% for increases taking effect in 2026, 10% for increases taking effect in 2027 (7% + 4.53% CPI = 11.53%, capped at 10%) - with NO increase allowed in a tenancy's first 12 months. EXEMPT from the cap: buildings within 12 YEARS of first certificate of occupancy (a rolling window, read here as the building's age in whole years from its year built) and owner-occupied single-family homes renting out no more than 2 units/bedrooms (incl. ADU). Exempt properties still owe the notice/parity requirements (RCW 59.18.710).",
    "quote": "up to 7% plus the Consumer Price Index, or 10 percent, whichever is less",
    "source": "https://www.commerce.wa.gov/housing-policy/hb1217-landlord-resource-center/",
-   "as_of": "2026-08-22",
+   "as_of": "2026-09-30",
    "status": "verified",
-   "verification": "snippet-confirmed across WA Dept of Commerce, WA Realtors, Stoel Rives, Multifamily NW (4 independent, 1 primary); 2026 cap 9.683% cross-confirmed"
+   "verification": "snippet-confirmed across WA Dept of Commerce, WA Realtors, Stoel Rives, Multifamily NW (4 independent, 1 primary); 2026 cap 9.683% cross-confirmed; 2026-09-30: the 2027 cap read from Commerce's HB 1217 Landlord Resource Center page (the rule's source) - 'The maximum annual rent increase percentage allowed ... between 1/1/2027 and 12/31/2027 is 10%', computed there as 7% + 4.53% CPI = 11.53%, capped at 10%"
   },
   {
    "id": "il-rent-control-preemption",
@@ -559,9 +559,9 @@
   "Carolinas/GA/FL landlord-tenant regimes + preemption statutes — not yet screened (preemption widely reported but not primary-confirmed this pass)",
   "Baltimore City Code Art. 13 licensing text direct fetch (currently on People's Law Library authority)",
   "DC TOPA single-family and 2-4 unit tier timelines verbatim (§§ 42-3404.09-.11)",
-  "FY2026 2BR FMRs for Chicago/LA/SF/Seattle/Boston/Dallas metro areas - aggregator figures conflicted, did not meet the 2-source bar (huduser pull queued); NYC $2,910 confirmed by two independent republishers",
+  "HUD fair market rents are read from HUD's own yearly FMR file for every covered metro (metros.json `fmr` blocks); the HUD API pull that keeps them current without an edit (scripts/fetch-fmr.mjs) waits on a HUD API token",
   "FL 166.043 statute text direct pull (currently one practitioner source)",
-  "Rolling exemption windows (CA 15yr / WA 12yr / OR 15yr) encoded as 2026-snapshot dates - steward re-verification advances them annually",
+  "Rolling exemption windows (CA 15yr / WA 12yr) encoded as building ages (building_age_years_lt) read against the current year, so they advance on their own; the read is to the year built, not the certificate-of-occupancy date the statutes count from",
   "SCOPE NOTE (2026-08-22, per direction): rules for jurisdictions outside the 15 covered markets were REMOVED from the product (recoverable in git history). The screener says 'no rules on file - unscreened, not unregulated' outside the covered set."
  ]
 }

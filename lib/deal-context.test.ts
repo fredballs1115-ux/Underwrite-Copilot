@@ -27,7 +27,7 @@ describe("dealContextFor — what the screen established, for every step that re
   it("names the kind, the stabilized NOI over total cost, the all-in basis per planned unit and the timeline", () => {
     const ctx = dealContextFor(CONVERSION)!;
     expect(ctx).toContain("Deal type: Conversion — Convert the vacant office building into 612 apartments.");
-    expect(ctx).toContain("over $180.0M of total cost it is an 11.7% yield on cost");
+    expect(ctx).toContain("over $180.0M of total cost it is an 11.67% yield on cost");
     expect(ctx).toContain("Total cost is $294k per planned unit (612 units)");
     expect(ctx).toContain("never the shell's price");
     // One period, even though the OM's timeline ended with its own.
@@ -59,9 +59,44 @@ describe("dealContextFor — what the screen established, for every step that re
       strategy: { ...CONVERSION.strategy!, timeline: "" },
       metrics: CONVERSION.metrics.filter((x) => !/^units/i.test(x.label)),
     })!;
-    expect(ctx).toContain("11.7% yield on cost");
+    expect(ctx).toContain("11.67% yield on cost");
     expect(ctx).not.toContain("per planned unit");
     expect(ctx).not.toContain("Timeline as stated");
+  });
+
+  it("reads the kind with the first signal beside the extraction, as the market figures and the deal page do (research pass 18)", () => {
+    // The extraction names no plan; the first signal calls it a conversion.
+    const unnamed: ExtractionResult = {
+      ...CONVERSION,
+      dealName: "1200 K Street",
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$20,000,000"), m("NOI (in place)", "$1,200,000")],
+    };
+    const signal = { take: "A conversion of a vacant office tower to apartments — check the budget." };
+    expect(dealContextFor(unnamed)).toBe("Deal type: Stabilized.");
+    const read = dealContextFor(unnamed, null, signal)!;
+    expect(read).toMatch(/^Deal type: Conversion — /);
+    expect(read).not.toContain("Stabilized");
+    // A signal that names no plan changes nothing.
+    expect(dealContextFor(unnamed, null, { take: "A stabilized asset — check the rent roll." })).toBe("Deal type: Stabilized.");
+  });
+
+  it("a price stated as a range says which end every figure is struck at (#466, research pass 18)", () => {
+    const ranged: ExtractionResult = {
+      ...CONVERSION,
+      dealName: "Maddox Apartments",
+      strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$40,000,000 – $42,000,000"), m("Units", "150")],
+    };
+    expect(dealContextFor(ranged)).toBe(
+      "The asking price is stated as a range, $40–42M: every figure here is struck at its top, $42.0M, the end that does not flatter a return. Deal type: Stabilized.",
+    );
+    // Guidance in the OM's own shorthand reads the same.
+    expect(dealContextFor({ ...ranged, metrics: [m("Pricing guidance", "$40–42M")] })).toContain(
+      "The pricing guidance is stated as a range, $40–42M: every figure here is struck at its top, $42.0M",
+    );
+    // One figure: nothing said.
+    expect(dealContextFor({ ...ranged, metrics: [m("Asking price", "$42,000,000")] })).toBe("Deal type: Stabilized.");
   });
 
   it("a stabilized asset gets only its type; an unknown strategy gets nothing", () => {
@@ -280,6 +315,25 @@ describe("dealContextFor — a manufactured-housing park (#470)", () => {
     expect(ctx).toContain("Manufactured housing: It has 150 pads at $62,000 a pad, 132 occupied (88%); 18 carry a home the park owns");
     expect(ctx).toContain("The average lot rent is $430 a month against the memorandum's market $525");
     expect(ctx).toContain("The water and sewer are the park's own (as stated: Private well and septic)");
+  });
+});
+
+describe("dealContextFor — a self-storage facility (#471)", () => {
+  it("says the two occupancies and the in-place rent against the street rate, each as stated", () => {
+    const storage: ExtractionResult = {
+      dealName: "Lakewood Self Storage",
+      assetClass: "self_storage",
+      metrics: [
+        m("Asking price", "$9,800,000"),
+        m("Physical occupancy", "91%"),
+        m("Economic occupancy", "84%"),
+        m("In-place rent", "$1.38/SF/month"),
+        m("Street rate", "$1.14/SF/month"),
+      ],
+    };
+    const ctx = dealContextFor(storage)!;
+    expect(ctx).toContain("Self-storage: It is 91% occupied by units, 84% economically: the 7 points between the units let and the rent collected");
+    expect(ctx).toContain("21.1% over it, the premium years of rate increases built");
   });
 });
 

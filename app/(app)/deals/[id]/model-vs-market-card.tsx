@@ -1,5 +1,6 @@
 import { datedLong } from "@/lib/debt-index";
 import type { CheckTone, ModelVsMarket } from "@/lib/model-vs-market";
+import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 
 /**
  * The model's assumptions against the published figures — the pure card
@@ -19,30 +20,17 @@ const TONE_CLASS: Record<CheckTone, string> = {
   compresses: "bg-kill/10 text-kill",
   level: "bg-faint text-muted",
   stated: "bg-faint text-muted",
+  aside: "bg-faint text-muted",
 };
-
-/** "rent growth, expense growth, stabilized vacancy and exit cap" — the rows the read has, so the scope sentence never names a row it lacks. */
-export function checkTitles(read: ModelVsMarket): string {
-  const titles = read.checks.map((c) => c.title.toLowerCase());
-  if (titles.length <= 1) return titles[0] ?? "";
-  return `${titles.slice(0, -1).join(", ")} and ${titles[titles.length - 1]}`;
-}
 
 export function ModelVsMarketCard({ read }: { read: ModelVsMarket | null }) {
   if (!read || read.checks.length === 0) return null;
-  const readOn = datedLong(read.readOn);
-  const what = checkTitles(read);
-  // A deal outside the covered metros reads its state's rows, and the
-  // sentence says so rather than calling a state a market.
-  const scope = read.metro
-    ? read.grain === "state"
-      ? `The model's ${what}, set against what the state of ${read.metro} and the national series have actually done, read on ${readOn} — the address lies outside the metros the site tracks, so the state's figures stand in for a metro's.`
-      : `The model's ${what}, set against what the ${read.metro} market and the national series have actually done, read on ${readOn}.`
-    : `The model's ${what}, set against the national series, read on ${readOn}.`;
-  const grainNote =
-    read.grain === "state"
-      ? "a state figure is the state's, not any metro's, the submarket's or the building's."
-      : "a metro figure is the metro area's, not the submarket's or the building's.";
+  // The one scope sentence the report and the workbook print too
+  // (lib/model-vs-market-scope): a deal outside the covered metros reads its
+  // state's rows, and the sentence says so rather than calling a state a
+  // market; the figures are the published ones, a forecast among them.
+  const scope = readScope(read, datedLong(read.readOn));
+  const grainNote = readGrainNote(read);
   return (
     <section
       className="rounded-2xl border border-line bg-surface shadow-card"

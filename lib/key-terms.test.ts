@@ -68,8 +68,9 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Note rate", value: "5.25%", flagged: false },
       { label: "Unpaid principal balance", value: "$24,400,000", flagged: false },
     ];
-    // The collateral's size still says what secures the loan; its cap
-    // comes after, among the flagged rows.
+    // The collateral's size still says what secures the loan; its cap is
+    // not printed at all, flagged or not — among the rows it would read as
+    // a cap on the note's price (the audit of 2026-09-30).
     expect(keyTermRows(note, "stabilized", 7, "note").map((m) => m.label)).toEqual([
       "Asking price",
       "Unpaid principal balance",
@@ -77,8 +78,29 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       "Maturity date",
       "Payment status",
       "Units",
-      "Going-in cap rate",
+      "Yield to maturity (at ask)",
     ]);
+    expect(keyTermRows(note, "stabilized", 20, "note").map((m) => m.label)).not.toContain("Going-in cap rate");
+    // Nor any other cap on the collateral's income, flagged or not — only
+    // the one going-in row had been dropped, and a memo printed "Cap rate
+    // (pro forma) 6.1%" under a note (the audit of 2026-10-01). An interest
+    // rate cap is a term of the loan and stays.
+    const caps = [
+      ...note,
+      { label: "Cap rate (pro forma)", value: "6.1%", flagged: true },
+      { label: "Stabilized cap rate", value: "6.5%", flagged: false },
+      { label: "Exit cap", value: "6.0%", flagged: false },
+      { label: "In-place cap", value: "5.2%", flagged: false },
+      { label: "Capitalization rate (T-12)", value: "5.4%", flagged: false },
+      { label: "Interest rate cap", value: "SOFR 4.00% strike, through 2027", flagged: false },
+      { label: "Capital improvements", value: "$1,200,000", flagged: false },
+    ];
+    const shown = keyTermRows(caps, "stabilized", 30, "note").map((m) => m.label);
+    expect(shown.filter((l) => /cap\b|capitalization/i.test(l) && !/interest rate cap/i.test(l))).toEqual([]);
+    expect(shown).toContain("Interest rate cap");
+    expect(shown).toContain("Capital improvements");
+    // Read as a building, every one of them prints.
+    expect(keyTermRows(caps, "stabilized", 30).map((m) => m.label)).toEqual(expect.arrayContaining(["Cap rate (pro forma)", "Exit cap", "In-place cap"]));
     // The same rows read as a building lead with its cap and count.
     expect(keyTermRows(note, "stabilized", 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Units"]);
   });
@@ -213,6 +235,17 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
       { label: "Asking price", value: "$9,300,000", flagged: false },
     ];
     expect(keyTermRows(park, "stabilized", 4).map((m) => m.label)).toEqual(["Asking price", "Lot rent", "Market lot rent", "Water and sewer"]);
+  });
+
+  it("a storage facility's economic occupancy and rates lead after the price (#471)", () => {
+    const storage = [
+      { label: "Occupancy", value: "91%", flagged: false },
+      { label: "In-place rent", value: "$1.38/SF/month", flagged: false },
+      { label: "Street rate", value: "$1.14/SF/month", flagged: false },
+      { label: "Economic occupancy", value: "84%", flagged: false },
+      { label: "Asking price", value: "$9,800,000", flagged: false },
+    ];
+    expect(keyTermRows(storage, "stabilized", 4).map((m) => m.label)).toEqual(["Asking price", "Economic occupancy", "Street rate", "In-place rent"]);
   });
 
   it("what the third-party reports found leads after the price (#465)", () => {

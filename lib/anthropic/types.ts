@@ -128,9 +128,19 @@ export interface ExtractionResult {
   /** Full street address ("" if the OM never states it). Optional for
    *  backward-compatibility. The screen anchors on the address. */
   address?: string;
-  /** The OM's total page count as the model read it, used to validate cited
-   *  pages. 0 / absent when unknown or for pre-citation extractions. */
+  /** The OM's total page count, used to validate cited pages: the text
+   *  layer's exact count where the screen read the layer, else the model's
+   *  own count of the PDF. 0 / absent when unknown or for pre-citation
+   *  extractions. */
   totalPages?: number;
+  /** How the screen read the memorandum: "text" — its own text layer,
+   *  page-tagged — or "pdf" — the PDF itself, where the layer was not dense
+   *  enough to stand in for the pages, or was found wanting (no figures, or
+   *  no NOI: the tables were pictures) and the pages were read instead.
+   *  Recorded with the extraction so Ask reads the memorandum the way the
+   *  screen did (lib/anthropic/ask). Absent on an extraction saved before
+   *  it was recorded, and on a deal entered by hand. */
+  omRead?: "pdf" | "text";
   /** Free-text context typed by the buyer on MANUAL (no-OM) deals — condition,
    *  tenancy, the story. Never set by the OM extraction; rendered as prose,
    *  not a metric, and fed verbatim to the analysis fact sheet. */

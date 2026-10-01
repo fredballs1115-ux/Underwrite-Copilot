@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { LeaseTermBar } from "@/app/lease-term-bar";
 import { termEndLabel } from "@/lib/ground-lease-term";
-import { noteCaption, noteYieldSentence, type InterestRead } from "@/lib/interest";
+import { noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRead } from "@/lib/interest";
 
 /**
  * What is being sold (#414) — the pure panel for `lib/interest`, drawn by
@@ -23,7 +23,10 @@ import { noteCaption, noteYieldSentence, type InterestRead } from "@/lib/interes
  * the balance filled light and the price dark over it — the loan-to-value
  * at each, and the empty remainder the cushion. A note that is not paying,
  * or is past its maturity, keeps its sentence: a large yield there is one
- * nobody earns.
+ * nobody earns. A note behind other debt draws no collateral track — its
+ * cushion sits on top of a senior balance the memorandum does not state —
+ * so its price is drawn against its balance, and the sentence under it
+ * says why the loan-to-value is withheld.
  *
  * A ground lease's term is drawn under the lead where the memorandum states
  * when it ends (#421): the years left today, and the extension options
@@ -60,9 +63,14 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         ].filter((t): t is { label: string; value: string; sub: string } => t != null)
       : [];
   // The tiles say the yield; without them the sentence does. The cushion is
-  // always the collateral's bar where the memorandum states the value.
-  const text = n && tiles.length === 0 ? [r.lead, noteYieldSentence(n)].filter(Boolean).join(" ") : r.lead;
+  // always the collateral's bar where the memorandum states the value. The
+  // first sentence leads and the rest folds, whole in the HTML, as every
+  // deal-type panel reads.
+  const said = n && tiles.length === 0 ? [...r.leadSentences, noteYieldSentence(n)].filter(Boolean) : r.leadSentences;
   const caption = tiles.length > 0 ? noteCaption(n) : "";
+  // Behind a senior loan the loan-to-value is withheld (lib/note-yield), and
+  // the reason stands where the collateral's track would.
+  const ltvWithheld = n?.terms.subordinate ? noteCollateralSentence(n) : "";
   const collateral =
     n && n.terms.collateralValue != null && n.ltvAtBalancePct != null && n.ltvAtPricePct != null
       ? (() => {
@@ -131,7 +139,16 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         <span className="text-sm font-semibold">{r.label}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
-      <p className="mt-1 text-sm leading-relaxed">{text}</p>
+      {said.length > 0 && <p className="mt-1 text-sm leading-relaxed">{said[0]}</p>}
+      {said.length > 1 && (
+        <details className="group mt-1 text-sm leading-relaxed">
+          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
+            <span className="group-open:hidden">{`Read the rest (${said.length - 1} more)`}</span>
+            <span className="hidden group-open:inline">Less</span>
+          </summary>
+          <p className="mt-1">{said.slice(1).join(" ")}</p>
+        </details>
+      )}
       {r.term && r.termLine && (
         <div className="mt-2.5">
           <LeaseTermBar yearsLeft={r.term.yearsLeft} endLabel={termEndLabel(r.term)} optionYears={r.term.options?.years ?? null} />
@@ -161,11 +178,27 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
               <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink" style={{ left: `${collateral.tick * 100}%` }} />
             )}
           </div>
-          <div className="mt-1 flex flex-wrap justify-between gap-x-3 gap-y-0.5 text-[11px] text-muted">
-            <span>{`Price ${collateral.priceText} · ${collateral.ltvAtPrice}% of the collateral's value`}</span>
-            <span>{`Unpaid balance ${collateral.balanceText} · ${collateral.ltvAtBalance}%`}</span>
-            <span className="text-right">{`The collateral, as stated ${money(collateral.value)}`}</span>
-          </div>
+          {/* A key, as every other bar has: the price dark, the balance light
+              under it, and the collateral's value the whole track — or, on a
+              loan under water, the tick. */}
+          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted" data-qa="note-collateral-key">
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/70" />
+              {`Price ${collateral.priceText} · ${collateral.ltvAtPrice}% of the collateral's value`}
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/25" />
+              {`Unpaid balance ${collateral.balanceText} · ${collateral.ltvAtBalance}%`}
+            </li>
+            <li className="flex items-center gap-1.5">
+              {collateral.tick != null ? (
+                <span aria-hidden className="inline-block h-3 w-0.5 shrink-0 rounded-full bg-ink" />
+              ) : (
+                <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-line" />
+              )}
+              {`The collateral, as stated ${money(collateral.value)}`}
+            </li>
+          </ul>
         </div>
       )}
       {bar && (
@@ -178,6 +211,11 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
             <span className="text-right">{bar.right}</span>
           </div>
         </div>
+      )}
+      {ltvWithheld && (
+        <p className="mt-1 text-[11px] leading-snug text-muted" data-qa="note-ltv-withheld">
+          {ltvWithheld}
+        </p>
       )}
       {(r.summary || r.groundLease || r.loan) && (
         <ul className="mt-2 space-y-0.5 text-xs leading-relaxed text-muted">

@@ -5,6 +5,8 @@ import { buildUnderwriteWorkbook } from "./workbook";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import { buildSensitivityGrids } from "./sensitivity";
+import type { UnderwriteInputs } from "./engine";
+import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 /**
@@ -233,7 +235,7 @@ describe("generated workbook — LIVE sensitivity grids match the engine", () =>
   // ci, column = 3 + index, IRR on row 23, EM on row 24. We read those NUMBERS
   // (not the display string, whose TEXT("%") HyperFormula renders unlike Excel)
   // and compare to the unit-tested engine.
-  it("every live scenario block computes the engine's IRR/EM within rounding", async () => {
+  it("every live scenario block computes the engine's IRR/EM", async () => {
     const { hf } = await loadIntoHf(await buildUnderwriteWorkbook(model));
     const engId = hf.getSheetId("Sensitivity Engine")!;
     const grids = buildSensitivityGrids(model.inputs);
@@ -245,8 +247,11 @@ describe("generated workbook — LIVE sensitivity grids match the engine", () =>
           const col = 2 + gi * 25 + ri * 5 + ci; // 0-based; C = 2
           const irr = hf.getCellValue({ sheet: engId, row: 22, col }) as number; // row 23
           const em = hf.getCellValue({ sheet: engId, row: 23, col }) as number; // row 24
-          expect(Math.abs(Number(irr) - eng.irrPct), `grid ${gi} [${ri}][${ci}] irr`).toBeLessThan(0.0015);
-          expect(Math.abs(Number(em) - eng.emx), `grid ${gi} [${ri}][${ci}] em`).toBeLessThan(0.02);
+          // To HyperFormula's own IRR precision, and the multiple exactly: a
+          // price scenario's closing costs struck at the base price had left
+          // the price grid 1.5 bps off, inside the 15 bps this once allowed.
+          expect(Math.abs(Number(irr) - eng.irrPct), `grid ${gi} [${ri}][${ci}] irr`).toBeLessThan(1e-8);
+          expect(Math.abs(Number(em) - eng.emx), `grid ${gi} [${ri}][${ci}] em`).toBeLessThan(1e-9);
         }
       }
     }
@@ -261,6 +266,118 @@ describe("generated workbook — LIVE sensitivity grids match the engine", () =>
       expect(hf.getCellValue({ sheet: engId, row: 22, col }) as number).toBeCloseTo(base.leveredIrrPct!, 3);
       expect(hf.getCellValue({ sheet: engId, row: 23, col }) as number).toBeCloseTo(base.leveredEquityMultiple!, 2);
     }
+  });
+});
+
+// ── The Sensitivity tab's axes are live ─────────────────────────────────────
+// The research pass changed one input at a time in a recalculated workbook:
+// the Deal Summary moved and every grid stayed centred on the inputs as
+// exported, its bold "base scenario" still the old IRR, because each axis
+// value and each scenario's override was a number written at export. Each
+// axis cell is now a formula off its named input, every scenario reads its
+// axis cells, and a price scenario strikes its closing costs at its own
+// price, as the engine does — so a cell is the engine's run at the values
+// the tab shows, whatever has been typed into the file since.
+describe("the Sensitivity tab stays centred on the inputs as they stand", () => {
+  type Hf = ReturnType<typeof HyperFormula.buildFromSheets>;
+  type At = { sheet: number; row: number; col: number };
+  type Key = "exitCapPct" | "holdMonths" | "purchasePrice" | "ltc" | "allInRatePct";
+
+  /** A defined name's cell, as HyperFormula addresses it. */
+  function namedAt(book: ExcelJS.Workbook, h: Hf, name: string): At {
+    const dn = (book.definedNames as unknown as { model: { name: string; ranges: string[] }[] }).model.find((d) => d.name === name)!;
+    const m = dn.ranges[0].match(/(?:'([^']+)'|([^!]+))!\$?([A-Z]+)\$?(\d+)/)!;
+    return {
+      sheet: h.getSheetId(m[1] ?? m[2])!,
+      row: Number(m[4]) - 1,
+      col: m[3].split("").reduce((a, ch) => a * 26 + (ch.charCodeAt(0) - 64), 0) - 1,
+    };
+  }
+
+  /** The three grids by their titles, with the input each axis varies. */
+  const GRIDS: { title: string; row: Key; col: Key }[] = [
+    { title: "EXIT CAP × HOLD PERIOD", row: "holdMonths", col: "exitCapPct" },
+    { title: "EXIT CAP × PURCHASE PRICE", row: "purchasePrice", col: "exitCapPct" },
+    { title: "LEVERAGE × RATE", row: "allInRatePct", col: "ltc" },
+  ];
+
+  /** A grid as the visible tab shows it: under its title a row of matrix
+   *  labels, the column axis, then five rows — the row axis in column A,
+   *  the IRR matrix in B..F and the equity multiple in H..L. */
+  function gridAt(book: ExcelJS.Workbook, h: Hf, title: string) {
+    const ws = book.getWorksheet("Sensitivity")!;
+    const top = findRow(ws, 1, title);
+    const sheet = h.getSheetId("Sensitivity")!;
+    const v = (row: number, col: number) => h.getCellValue({ sheet, row: row - 1, col: col - 1 });
+    const five = [0, 1, 2, 3, 4];
+    return {
+      colAxis: five.map((ci) => Number(v(top + 2, 2 + ci))),
+      emColAxis: five.map((ci) => Number(v(top + 2, 8 + ci))),
+      rowAxis: five.map((ri) => Number(v(top + 3 + ri, 1))),
+      irr: five.map((ri) => five.map((ci) => v(top + 3 + ri, 2 + ci))),
+      em: five.map((ri) => five.map((ci) => v(top + 3 + ri, 8 + ci))),
+    };
+  }
+
+  /** Every cell of every grid against computeUnderwrite at the axis values
+   *  the tab shows: the IRR to HyperFormula's own precision, the multiple
+   *  exactly — a closing cost struck at the wrong price moves the multiple
+   *  in its seventh figure. */
+  function expectEngineAgrees(book: ExcelJS.Workbook, h: Hf, base: UnderwriteInputs) {
+    for (const g of GRIDS) {
+      const v = gridAt(book, h, g.title);
+      expect(v.emColAxis, `${g.title} EM axis`).toEqual(v.colAxis);
+      for (let ri = 0; ri < 5; ri++) {
+        for (let ci = 0; ci < 5; ci++) {
+          const r = computeUnderwrite({ ...base, [g.row]: v.rowAxis[ri], [g.col]: v.colAxis[ci] }).returns;
+          const at = `${g.title} [${ri}][${ci}]`;
+          expect(Math.abs(Number(v.irr[ri][ci]) - r.leveredIrrPct!), `${at} irr`).toBeLessThan(1e-8);
+          expect(Math.abs(Number(v.em[ri][ci]) - r.leveredEquityMultiple!), `${at} em`).toBeLessThan(1e-9);
+        }
+      }
+    }
+  }
+
+  it("re-centres every grid on an input changed in the file: its centre is the Deal Summary's levered IRR", async () => {
+    const { hf, wb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    const changes: [string, Key, number][] = [
+      ["ExitCap", "exitCapPct", 0.07],
+      ["PurchasePrice", "purchasePrice", 45_000_000],
+      ["AllInRate", "allInRatePct", 0.07],
+      ["LTC", "ltc", 0.65],
+    ];
+    for (const [name, key, value] of changes) {
+      const at = namedAt(wb, hf, name);
+      const before = hf.getCellValue(at);
+      hf.setCellContents(at, value);
+      const irr = Number(named(hf, "LeveredIRR"));
+      const em = Number(named(hf, "LeveredEM"));
+      // The Deal Summary moved to the engine's run at the new input...
+      expect(Math.abs(irr - computeUnderwrite({ ...model.inputs, [key]: value }).returns.leveredIrrPct!), name).toBeLessThan(1e-8);
+      for (const g of GRIDS) {
+        const v = gridAt(wb, hf, g.title);
+        // ...and every grid's bold centre moved with it.
+        expect(Math.abs(Number(v.irr[2][2]) - irr), `${name}: ${g.title} centre IRR`).toBeLessThan(1e-8);
+        expect(Math.abs(Number(v.em[2][2]) - em), `${name}: ${g.title} centre EM`).toBeLessThan(1e-9);
+        // The axis that varies the input is centred on the value typed in.
+        if (g.row === key) expect(v.rowAxis[2], `${name}: ${g.title} row axis`).toBeCloseTo(value, 12);
+        if (g.col === key) expect(v.colAxis[2], `${name}: ${g.title} column axis`).toBeCloseTo(value, 12);
+      }
+      hf.setCellContents(at, before as number);
+    }
+  });
+
+  it("runs every scenario as the engine does at the values its axes show, closing costs struck at the scenario's own price", async () => {
+    const { hf, wb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expectEngineAgrees(wb, hf, model.inputs);
+    // A price typed into the file: the price grid's scenarios run at the
+    // new axis, each with its closing costs and fee at its own price.
+    const at = namedAt(wb, hf, "PurchasePrice");
+    hf.setCellContents(at, 45_000_000);
+    const v = gridAt(wb, hf, "EXIT CAP × PURCHASE PRICE");
+    expect(v.rowAxis[2]).toBe(45_000_000);
+    expect(v.rowAxis[4] - v.rowAxis[2]).toBeGreaterThan(0);
+    expectEngineAgrees(wb, hf, { ...model.inputs, purchasePrice: 45_000_000 });
   });
 });
 
@@ -483,10 +600,10 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     // figure over uses plus the capital plan, and the year-1 cap says it is
     // the cap on modelled year-1 income.
     const summary = wb.getWorksheet("Deal Summary")!;
-    expect(() => findRow(summary, 4, "Going-In Cap")).toThrow();
+    expect(() => findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)")).toThrow();
     expect(() => findRow(summary, 4, "Stabilized Yield (on cost)")).toThrow();
     findRow(summary, 4, "Cap on Yr-1 Income (as modelled)");
-    findRow(summary, 4, "Yield on Cost (OM stabilized NOI / total cost)");
+    findRow(summary, 4, "Yield on Cost (OM stabilized NOI / uses + capital plan)");
     const noiRow = findRow(summary, 1, "OM Stabilized NOI (pro forma)");
     expect(summary.getCell(noiRow, 2).value).toBe(21_000_000);
     expect(String(summary.getCell(noiRow, 3).value)).toBe("OM p. 12");
@@ -496,8 +613,44 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     expect(totalCost).toBeCloseTo(planEngine.sourcesUses.totalUses + 160_000_000, 0);
     expect(Number(named(hf, "YieldOnCost"))).toBeCloseTo(21_000_000 / totalCost, 6);
     // Live: the yield reads through the named cells, not a pasted number.
-    const yocRow = findRow(summary, 4, "Yield on Cost (OM stabilized NOI / total cost)");
+    const yocRow = findRow(summary, 4, "Yield on Cost (OM stabilized NOI / uses + capital plan)");
     expect(String((summary.getCell(yocRow, 5).value as { formula?: string }).formula)).toMatch(/StabilizedNOI\/TotalCost/);
+  });
+
+  it("says under the headline tiles that a plan deal's returns are the screening model's — the deal page's own sentence", () => {
+    // The tiles lead with a levered IRR, a multiple and a year-1
+    // cash-on-cash struck with the whole budget in year 1; the deal page
+    // prints its caveat over the same returns, and the full report leaves
+    // them out. The sentence sits on the row under the tiles' values.
+    const summary = wb.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "PURCHASE PRICE");
+    expect(summary.getCell(tiles + 1, 2).value).toMatchObject({ formula: expect.stringContaining("IRR(") });
+    expect(summary.getCell(tiles + 2, 1).value).toBe(PLAN_RETURNS_CAVEAT_WORKBOOK);
+    // The workbook solves no bid, so its caveat says nothing of one.
+    expect(PLAN_RETURNS_CAVEAT_WORKBOOK).not.toMatch(/bid/);
+    expect(summary.getCell(tiles + 2, 1).alignment?.wrapText).toBe(true);
+  });
+
+  it("says under Sources how the capital plan is paid: out of year-1 cash flow, not the loan or the equity", () => {
+    // The loan is sized on the acquisition cost and the equity is the plug
+    // on uses that leave the budget out — the engine spends the budget in
+    // year 1's cash flow — so Sources says where it is.
+    const summary = wb.getWorksheet("Deal Summary")!;
+    const row = findRow(summary, 1, "Capital Plan (yr 1)");
+    expect(row).toBe(findRow(summary, 1, "Sources = Uses") + 1);
+    expect(summary.getCell(row, 2).value).toMatchObject({ formula: "CapImprovements" });
+    expect(summary.getCell(row, 2).font?.color?.argb).toBe("FF107C41"); // a link, green
+    expect(summary.getCell(row + 1, 1).value).toBe("paid from year-1 cash flow, not these sources");
+    const id = hf.getSheetId("Deal Summary")!;
+    expect(hf.getCellValue({ sheet: id, row: row - 1, col: 1 })).toBe(160_000_000);
+    // What the line says is what the engine does: the budget is year 1's
+    // capital, outside the loan and the equity.
+    expect(planEngine.cashFlow[0].capitalImprovements).toBe(160_000_000);
+    expect(Number(named(hf, "LoanAmount"))).toBeCloseTo(planEngine.sourcesUses.loanAmount, 0);
+    expect(Number(named(hf, "Equity"))).toBeCloseTo(planEngine.sourcesUses.totalUses - planEngine.sourcesUses.loanAmount, 0);
+    // And the LTC input says what it is struck on.
+    const assum = wb.getWorksheet("Assumptions")!;
+    expect(assum.getCell(findRow(assum, 1, "Loan to Cost (acquisition cost)"), 2).value).toBe(plan.inputs.ltc);
   });
 
   it("a plan deal whose OM states no stabilized NOI says so, and the yield cell reads n/a rather than erroring", async () => {
@@ -526,6 +679,10 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     const cover = sb.getWorksheet("Cover")!;
     const cr = findRow(cover, 2, "Deal type");
     expect(String(cover.getCell(cr + 1, 3).value)).not.toMatch(/capital budget/);
+    // No plan caveat over a stabilized deal's returns; the capital plan's
+    // line under Sources stands on every deal, since any deal can carry one.
+    summary.eachRow((row) => row.eachCell((cell) => expect(cell.value).not.toBe(PLAN_RETURNS_CAVEAT_WORKBOOK)));
+    findRow(summary, 1, "Capital Plan (yr 1)");
   });
 
   it("still has zero formula errors, and total uses tie to the engine", () => {
@@ -541,6 +698,157 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
     expect(errors).toEqual([]);
     expect(Number(named(hf, "TotalUses"))).toBeCloseTo(planEngine.sourcesUses.totalUses, 0);
   });
+});
+
+// ── Labels and colours that say what their cells are ──────────────────────
+describe("the workbook's labels and colours say what their cells are", () => {
+  /** Units and an occupancy, no size: the RSF is the count × a typical
+   *  unit, an assumption. */
+  const counted: ExtractionResult = {
+    ...extraction,
+    metrics: [
+      ...extraction.metrics.filter((m) => !/square feet/i.test(m.label)),
+      { label: "Units", value: "240", flagged: false, page: "p. 4" },
+      { label: "Occupancy", value: "93%", flagged: false, page: "p. 4" },
+    ],
+  };
+  const countedModel = deriveUnderwriteInputs(counted, "fallback");
+
+  async function book(m: typeof model, read?: Parameters<typeof buildUnderwriteWorkbook>[2]): Promise<ExcelJS.Workbook> {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(m, null, read)) as unknown as ArrayBuffer);
+    return wb;
+  }
+
+  it("the hold says it is fixed and why, and never offers a re-export that gives the same hold", async () => {
+    const assum = (await book(model)).getWorksheet("Assumptions")!;
+    const row = findRow(assum, 1, "Hold Period (months) — fixed");
+    expect(assum.getCell(row, 2).value).toBe(model.inputs.holdMonths);
+    expect(String(assum.getCell(row, 3).value)).toContain(
+      "Fixed: the Cash Flow tab's years and the sale year are built for this hold, so typing over it recalculates only part of the model.",
+    );
+    assum.eachRow((r) => r.eachCell((c) => expect(String(c.value ?? "")).not.toMatch(/re-export/i)));
+  });
+
+  it("the Contents list every visible tab after the Cover, in the order the tabs sit — Operating Metrics included", async () => {
+    const read = {
+      readOn: "2026-09-21",
+      metro: "Washington DC",
+      checks: [
+        {
+          key: "exit_cap" as const,
+          title: "Exit cap",
+          model: "6.00%",
+          modelSource: "derived from the documents",
+          published: [{ label: "10-year Treasury", text: "4.94% on Sep 17, 2026", value: 4.94, asOf: "2026-09-17", publisher: "FRED" }],
+          tone: "widens" as const,
+          toneLabel: "spread widens at the exit",
+          scope: "national" as const,
+          read: "The exit cap 6.00% is 106 bps over today's 10-year.",
+        },
+      ],
+    };
+    for (const wb of [await book(model), await book(model, read)]) {
+      const cover = wb.getWorksheet("Cover")!;
+      const listed: string[] = [];
+      for (let r = findRow(cover, 2, "CONTENTS") + 1; cover.getCell(r, 2).value; r++) listed.push(String(cover.getCell(r, 2).value));
+      const tabs = wb.worksheets.filter((ws) => ws.state === "visible" && ws.name !== "Cover").map((ws) => ws.name);
+      expect(listed).toEqual(tabs);
+      expect(listed).toContain("Operating Metrics");
+    }
+  });
+
+  it("the Deal Summary marks a rentable SF that is an assumption, as the Operating Metrics tab does", async () => {
+    expect(countedModel.sources.rsf?.provenance).toBe("assumption");
+    const assumed = (await book(countedModel)).getWorksheet("Deal Summary")!;
+    expect(assumed.getCell(findRow(assumed, 1, "Rentable SF (assumed)"), 2).value).toMatchObject({ formula: "RSF" });
+    const stated = (await book(model)).getWorksheet("Deal Summary")!;
+    expect(model.sources.rsf?.provenance).toBe("extracted");
+    expect(stated.getCell(findRow(stated, 1, "Rentable SF"), 2).value).toMatchObject({ formula: "RSF" });
+  });
+
+  it("the TI input says it is charged on the whole building's SF every year, never a per-lease allowance", async () => {
+    const wb = await book(model);
+    const assum = wb.getWorksheet("Assumptions")!;
+    const row = findRow(assum, 1, "TI $/SF/yr, whole building");
+    expect(assum.getCell(row, 2).name).toBe("TIPSF");
+    expect(String(assum.getCell(row, 3).value)).toBe("Charged on every SF of the building, every year — not a per-lease allowance");
+    // What the label says is what the ladder does: TI × RSF in every year.
+    const cf = wb.getWorksheet("Cash Flow")!;
+    const ti = findRow(cf, 1, "Tenant Improvements");
+    for (let y = 1; y <= engine.holdYears; y++) expect(cf.getCell(ti, 2 + y).value).toMatchObject({ formula: "-TIPSF*RSF" });
+  });
+
+  it("heads the forward year as the NOI the exit capitalises, the one the Deal Summary's sale reads", async () => {
+    const { hf, wb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    const cf = wb.getWorksheet("Cash Flow")!;
+    const fwd = 3 + engine.holdYears; // the column after the last year owned
+    const cfId = hf.getSheetId("Cash Flow")!;
+    expect(hf.getCellValue({ sheet: cfId, row: 1, col: fwd - 1 })).toBe(`Yr ${engine.holdYears + 1} (exit NOI)`);
+    expect(hf.getCellValue({ sheet: cfId, row: 1, col: fwd - 2 })).toBe(`Yr ${engine.holdYears}`);
+    const summary = wb.getWorksheet("Deal Summary")!;
+    const residual = summary.getCell(findRow(summary, 1, "Residual NOI (forward)"), 2).value as { formula: string };
+    const noiRow = findRow(cf, 1, "Net Operating Income");
+    expect(residual.formula).toBe(`'Cash Flow'!${String.fromCharCode(64 + fwd)}${noiRow}`);
+    expect(hf.getCellValue({ sheet: cfId, row: noiRow - 1, col: fwd - 1 }) as number).toBeCloseTo(engine.residual.residualNoi, 2);
+  });
+
+  it("says what the breakeven occupancy covers — the expenses and the debt service, before reserves, capital and the fee", async () => {
+    const ws = (await book(model)).getWorksheet("Operating Metrics")!;
+    let note = "";
+    ws.eachRow((row) => {
+      const v = String(row.getCell(1).value ?? "");
+      if (v.startsWith("Breakeven occupancy =")) note = v;
+    });
+    expect(note).toBe(
+      "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
+    );
+  });
+
+  it("styles a cell green only where it links another tab, and blue only where it is a typed value", async () => {
+    const plan = deriveUnderwriteInputs(conversion, "fallback");
+    for (const m of [model, plan, countedModel]) {
+      const wb = await book(m);
+      const nameSheet = new Map(
+        (wb.definedNames as unknown as { model: { name: string; ranges: string[] }[] }).model.map((d) => [
+          d.name,
+          (d.ranges[0].match(/^(?:'([^']+)'|([^!]+))!/) ?? [])[1] ?? (d.ranges[0].match(/^(?:'([^']+)'|([^!]+))!/) ?? [])[2],
+        ]),
+      );
+      wb.eachSheet((ws) => {
+        // The Cover's legend draws each colour on its own name.
+        if (ws.name === "Cover") return;
+        ws.eachRow((row) =>
+          row.eachCell((cell) => {
+            const where = `${ws.name}!${cell.address}`;
+            const color = cell.font?.color?.argb;
+            const v = cell.value as { formula?: string } | number | string | null;
+            const formula = v && typeof v === "object" && "formula" in v ? v.formula : undefined;
+            if (color === "FF107C41") {
+              expect(formula, `${where} is green and holds no formula`).toBeTruthy();
+              const readsOtherTab =
+                formula!.includes("!") ||
+                [...nameSheet].some(([n, sheet]) => sheet !== ws.name && new RegExp(`\\b${n}\\b`).test(formula!));
+              expect(readsOtherTab, `${where} is green and reads no other tab: =${formula}`).toBe(true);
+            }
+            if (color === "FF0000CC") expect(formula, `${where} is blue and holds a formula`).toBeUndefined();
+          }),
+        );
+      });
+    }
+    // The three typed values the research pass found styled as links are
+    // inputs: the OM's stabilized NOI, the unit count, the in-place occupancy.
+    const planBook = await book(plan);
+    const summary = planBook.getWorksheet("Deal Summary")!;
+    expect(summary.getCell(findRow(summary, 1, "OM Stabilized NOI (pro forma)"), 2).font?.color?.argb).toBe("FF0000CC");
+    const countedBook = await book(countedModel);
+    const ops = countedBook.getWorksheet("Operating Metrics")!;
+    expect(ops.getCell(findRow(ops, 1, "Units"), 2).font?.color?.argb).toBe("FF0000CC");
+    const cs = countedBook.getWorksheet("Deal Summary")!;
+    const occ = findRow(cs, 4, "In-Place Occupancy");
+    expect(cs.getCell(occ, 5).value).toBeCloseTo(0.93, 10);
+    expect(cs.getCell(occ, 5).font?.color?.argb).toBe("FF0000CC");
+  }, 30000);
 });
 
 describe("the per-unit rows in the class's own noun (lib/asset-words)", () => {
@@ -615,8 +923,9 @@ describe("the Market Read tab — the assumptions against the published figures,
     expect(names.indexOf("Market Read")).toBe(names.indexOf("Assumptions") + 1);
     const ws = wb.getWorksheet("Market Read")!;
     expect(ws.getCell(1, 1).value).toBe("Assumptions against the published figures");
+    // The day in the deal page's own words (lib/debt-index `datedLong`).
     expect(String(ws.getCell(2, 1).value)).toBe(
-      "The model's rent growth and exit cap, set against what the Washington DC market and the national series have actually done, read on 2026-09-21.",
+      "The model's rent growth and exit cap, set against the published figures for the Washington DC market and the nation, read on Sep 21, 2026.",
     );
     expect(String(ws.getCell(3, 1).value)).toContain("not a forecast");
     expect(ws.getCell(5, 1).value).toBe("ASSUMPTION");
@@ -627,8 +936,13 @@ describe("the Market Read tab — the assumptions against the published figures,
     expect(ws.getCell(6, 2).value).toBe("3.0%/yr");
     expect(ws.getCell(6, 3).value).toBe("a screening default");
     expect(ws.getCell(6, 4).value).toBe("Asking rent, all home types: +2.3% over the year to Aug 2026");
+    // The figure raw, so it sorts and computes, shown in its unit — every
+    // published figure is a percent (lib/model-vs-market's PublishedFigure).
     expect(ws.getCell(6, 5).value).toBe(2.3);
-    expect(ws.getCell(6, 6).value).toBe("2026-08-31");
+    expect(ws.getCell(6, 5).numFmt).toBe('0.00"%"');
+    // A dated figure's day is a date, so the column sorts by it.
+    expect(ws.getCell(6, 6).value).toEqual(new Date(Date.UTC(2026, 7, 31)));
+    expect(ws.getCell(6, 6).numFmt).toBe("mmm d, yyyy");
     expect(ws.getCell(6, 7).value).toBe("Zillow Research");
     expect(ws.getCell(6, 8).value).toBe("inside the published range");
     expect(String(ws.getCell(6, 9).value)).toContain("The model grows rents 3.0%/yr.");
@@ -639,6 +953,7 @@ describe("the Market Read tab — the assumptions against the published figures,
     // The second check starts on the next row.
     expect(ws.getCell(8, 1).value).toBe("Exit cap");
     expect(ws.getCell(8, 5).value).toBe(4.94);
+    expect(ws.getCell(8, 5).numFmt).toBe('0.00"%"');
     expect(ws.getCell(8, 8).value).toBe("spread widens at the exit");
     // A data tab: nothing on it is a formula.
     ws.eachRow((row) => {
@@ -647,6 +962,26 @@ describe("the Market Read tab — the assumptions against the published figures,
         expect(v && typeof v === "object" && "formula" in v, cell.address).toBe(false);
       });
     });
+  });
+
+  it("keeps a research figure's period as the file states it: a quarter, or undated, is not a day", async () => {
+    const tracked: ModelVsMarket = {
+      ...read,
+      checks: [
+        {
+          ...read.checks[1],
+          published: [
+            { label: "Office cap (research tracker), low end", text: "6.50% (Q1 2026)", value: 6.5, asOf: "Q1 2026", publisher: "research tracker: CBRE" },
+            { label: "Office cap (research tracker), high end", text: "7.25% (undated)", value: 7.25, asOf: "undated", publisher: "research tracker" },
+          ],
+        },
+      ],
+    };
+    const ws = (await load(await buildUnderwriteWorkbook(model, null, tracked))).getWorksheet("Market Read")!;
+    expect(ws.getCell(6, 6).value).toBe("Q1 2026");
+    expect(ws.getCell(7, 6).value).toBe("undated");
+    expect(ws.getCell(6, 5).value).toBe(6.5);
+    expect(ws.getCell(7, 5).numFmt).toBe('0.00"%"');
   });
 
   it("is absent with nothing read, rather than an empty tab", async () => {
@@ -729,13 +1064,20 @@ describe("the Portfolio tab — each property as the memorandum states it, the s
       if (row.getCell(2).value === "Portfolio") listed = true;
     });
     expect(listed).toBe(true);
-    // Excel's own data bars on the three shares, from zero.
+    // Excel's own data bars on the three shares, from zero to the whole: a
+    // share fills its share of the cell, never its length against the
+    // column's largest (a 53% share had filled 97% of it).
     const cfs = (
       ws as unknown as { conditionalFormattings: { ref: string; rules: { type: string; cfvo?: { type: string; value?: number }[] }[] }[] }
     ).conditionalFormattings;
     const bars = cfs.filter((cf) => cf.rules.some((r) => r.type === "dataBar"));
     expect(bars.map((cf) => cf.ref).sort()).toEqual([`L${first}:L${first + 2}`, `M${first}:M${first + 2}`, `N${first}:N${first + 2}`]);
-    expect(bars[0].rules[0].cfvo?.map((c) => c.type)).toEqual(["num", "max"]);
+    for (const cf of bars) {
+      expect(cf.rules[0].cfvo?.map((c) => [c.type, Number(c.value)])).toEqual([
+        ["num", 0],
+        ["num", 1],
+      ]);
+    }
   });
 
   it("computes what lib/portfolio reads, and draws the count's share the moment the missing count is typed in", async () => {
@@ -784,6 +1126,23 @@ describe("the Portfolio tab — each property as the memorandum states it, the s
   });
 });
 
+// ── When it was built ─────────────────────────────────────────────────────
+describe("the workbook says the day it was built, which its \"from today\" lines count from", () => {
+  it("prints the build day on the cover and stamps the file's created and modified time with it, never 1970", async () => {
+    const builtAt = new Date(Date.UTC(2026, 8, 30, 15, 4));
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(model, null, null, null, builtAt)) as unknown as ArrayBuffer);
+    const cover = wb.getWorksheet("Cover")!;
+    expect(cover.getCell(findRow(cover, 2, "Built"), 3).value).toBe("Sep 30, 2026");
+    expect(wb.created?.toISOString()).toBe(builtAt.toISOString());
+    expect(wb.modified?.toISOString()).toBe(builtAt.toISOString());
+    // A caller that passes no time is stamped now, not with the epoch.
+    const now = new ExcelJS.Workbook();
+    await now.xlsx.load((await buildUnderwriteWorkbook(model)) as unknown as ArrayBuffer);
+    expect(now.created!.getUTCFullYear()).toBeGreaterThanOrEqual(2026);
+  });
+});
+
 // ── What is being sold, on the cover (#414) ────────────────────────────────
 describe("the cover says what is being sold, and what the model is and is not on it", () => {
   it("a note: the line and the caveat under the deal type; a fee simple: neither", async () => {
@@ -803,6 +1162,37 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(String(cover.getCell(r + 1, 3).value)).toContain("not the note's return");
     const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "What is being sold")).toThrow();
+  });
+
+  it("says whose strategy the deal type is on a note or a leased fee — on the Cover, the Assumptions tab and the Deal Summary alike", async () => {
+    const sold = (kind: "note" | "leased_fee" | "fee_simple") =>
+      deriveUnderwriteInputs(
+        {
+          ...extraction,
+          strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+          interest: { kind, summary: "", share: "", groundLease: "", loan: "", page: "" },
+          metrics: [
+            ...extraction.metrics,
+            ...(kind === "note" ? [{ label: "Unpaid principal balance", value: "$62,500,000", flagged: false, page: "p. 3" }] : []),
+          ],
+        },
+        "fallback",
+      );
+    const labels = async (m: ReturnType<typeof sold>) => {
+      const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+      const cover = wb.getWorksheet("Cover")!;
+      const assum = wb.getWorksheet("Assumptions")!;
+      const summary = wb.getWorksheet("Deal Summary")!;
+      return [
+        cover.getCell(findRow(cover, 2, "Deal type"), 3).value,
+        assum.getCell(findRow(assum, 1, "Deal Type"), 2).value,
+        summary.getCell(findRow(summary, 1, "Deal Type"), 2).value,
+      ];
+    };
+    expect(await labels(sold("note"))).toEqual(Array(3).fill("Stabilized (the collateral)"));
+    expect(await labels(sold("leased_fee"))).toEqual(Array(3).fill("Stabilized (the leaseholder's building)"));
+    // A price that buys the building keeps the label as it stands.
+    expect(await labels(sold("fee_simple"))).toEqual(Array(3).fill("Stabilized"));
   });
 
   it("a covenant on the rents (#453): the restriction, then what the model's one growth rate is not on it", async () => {
@@ -922,6 +1312,29 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^Closed by the sale, the gap to the memorandum's market lot rent is \$150k a year of income/);
     const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The park")).toThrow();
+  });
+
+  it("a self-storage facility (#471): its occupancies and rates, then what the model does with the premium over street", async () => {
+    const storage = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "self_storage",
+        metrics: [
+          ...extraction.metrics,
+          { label: "Economic occupancy", value: "84%", flagged: false, page: "p. 5" },
+          { label: "In-place rent", value: "$1.38/SF/month", flagged: false, page: "p. 5" },
+          { label: "Street rate", value: "$1.14/SF/month", flagged: false, page: "p. 5" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(storage));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The facility");
+    expect(String(cover.getCell(r, 3).value)).toMatch(/84% economic; in-place \$1\.38\/SF a month against street \$1\.14\/SF a month \(\+21\.1%\)$/);
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model grows today's rent, the rate increases' premium included/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The facility")).toThrow();
   });
 
   it("the third-party reports (#465): what they found, then what the model does with the immediate repairs", async () => {

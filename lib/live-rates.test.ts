@@ -120,7 +120,7 @@ describe("the series table", () => {
     for (const id of ["DGS2", "DGS10", "SOFR", "SOFR30DAYAVG", "DPRIME"]) {
       expect(seriesMeta(id)!.contractRate, id).toBe(true);
     }
-    for (const id of ["MORTGAGE30US", "DRCRELEXFACBS", "DFF", "CPIAUCSL_YOY", "HOUST5F", "BAMLC0A0CM"]) {
+    for (const id of ["MORTGAGE30US", "DRCRELEXFACBS", "DFF", "CPIAUCSL_YOY", "HOUST5F", "HQMCB10YR"]) {
       expect(seriesMeta(id)!.contractRate, id).toBe(false);
     }
   });
@@ -164,7 +164,8 @@ describe("reading the table", () => {
     expect(of("DGS10").value).toBe(4.94);
     expect(of("DGS10").obsDate).toBe("2026-09-17");
     expect(of("SOFR").value).toBe(3.85);
-    expect(of("BAMLH0A0HYM2").value).toBe(2.68);
+    expect(of("HQMCB10YR").value).toBe(5.58);
+    expect(of("HQMCB10YR").obsDate).toBe("2026-08-01");
     expect(of("WPUSI012011_YOY").value).toBeCloseTo(10.089, 3);
     expect(of("HOUST5F").value).toBe(344);
   });
@@ -354,8 +355,11 @@ describe("how a figure is said", () => {
   });
 
   it("says a spread in basis points, because nobody says 0.77% over", () => {
-    expect(formatValue(of("BAMLC0A0CM"))).toBe("77 bps");
-    expect(formatValue(of("BAMLH0A0HYM2"))).toBe("268 bps");
+    // No series on the strip is a spread today (ICE's were taken off it,
+    // 2026-09-30); the unit stays, so one added later reads right.
+    const spread = { ...of("DGS10"), meta: { ...of("DGS10").meta, unit: "spread" as const } };
+    expect(formatValue({ ...spread, value: 0.77 })).toBe("77 bps");
+    expect(formatValue({ ...spread, value: 2.68 })).toBe("268 bps");
   });
 
   it("says a share or a change to one place, signed", () => {
@@ -522,7 +526,7 @@ describe("what may become a number in a box", () => {
     expect(seedRate(read, "DRCRELEXFACBS")).toBeNull();
     expect(seedRate(read, "CPIAUCSL_YOY")).toBeNull();
     expect(seedRate(read, "HOUST5F")).toBeNull();
-    expect(seedRate(read, "BAMLH0A0HYM2")).toBeNull();
+    expect(seedRate(read, "HQMCB10YR")).toBeNull();
   });
 
   it("stops seeding a contract rate that went stale", () => {
@@ -1279,5 +1283,24 @@ describe("the states' series — the fallback grain for a deal outside the cover
     const later = readMarketRates("state:PA", rows, new Date("2027-06-01T00:00:00Z"));
     expect(later.find((x) => x.meta.id === "PARVAC")!.fresh).toBe(false);
     expect(later.find((x) => x.meta.id === "PARVAC")!.meta.cadence).toBe("annual");
+  });
+});
+
+describe("the table carries nothing its publisher licenses to FRED alone", () => {
+  it("no ICE BofA, Moody's, S&P / Case-Shiller or Dow Jones series, national or local", () => {
+    // The rates workflow's probe prints each candidate's notes and a terms
+    // line (run 36785223477, 2026-09-30): Moody's forbids copying or
+    // redistributing its yields outright, and ICE's indices are ICE's
+    // property, used by FRED under licence. A public page republishing
+    // either is not ours to do, so the Treasury's own high-quality
+    // corporate curve stands in for them.
+    const licensedWords = /\b(ICE|BofA|Moody's|S&P|Case-Shiller|Dow Jones)\b/i;
+    const licensedIds = /^(BAML|DBAA|DAAA|AAA10Y|BAA10Y|SPCS|CSUSHPI)/;
+    const all = [...table.series, ...table.metroSeries, ...table.regionSeries, ...table.stateSeries] as { id: string; label?: string }[];
+    expect(all.length).toBeGreaterThan(50);
+    for (const s of all) {
+      expect(s.id, s.id).not.toMatch(licensedIds);
+      if (s.label) expect(s.label, s.id).not.toMatch(licensedWords);
+    }
   });
 });

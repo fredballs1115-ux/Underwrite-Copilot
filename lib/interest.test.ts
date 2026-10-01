@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtractedInterest, ExtractionResult } from "@/lib/anthropic/types";
 import {
   INTEREST_LABEL,
+  dealTypeLabel,
+  dealTypeLabelFor,
   groundRentOf,
   incomeBeforeGroundRentOf,
   interestContextLine,
@@ -9,6 +11,7 @@ import {
   interestOf,
   interestShortLine,
   noteCaption,
+  noteCollateralSentence,
   parseSharePct,
   readInterest,
 } from "./interest";
@@ -54,11 +57,93 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
     expect(parseSharePct(undefined)).toBeNull();
   });
 
+  it("reads only a percentage its own words call an ownership share — never a return, a rate or an occupancy", () => {
+    // The bug: any lone percentage was the share, so a $15M preferred-equity
+    // price grossed up to $125M on its 12% preferred return.
+    expect(parseSharePct("Preferred equity, 12% preferred return")).toBeNull();
+    expect(parseSharePct("a 49% tenant-in-common interest")).toBe(49);
+    expect(parseSharePct("a 90% interest in the partnership with an 8% preferred return")).toBe(90);
+    // Each kind of ownership share, by its own words, after the figure or
+    // before it in its clause.
+    expect(parseSharePct("a 51% membership interest in the owning LLC")).toBe(51);
+    expect(parseSharePct("49% of the LLC")).toBe(49);
+    expect(parseSharePct("a 25% ownership stake")).toBe(25);
+    expect(parseSharePct("a 33.3% undivided tenancy in common")).toBe(33.3);
+    expect(parseSharePct("Ownership interest: 49%")).toBe(49);
+    expect(parseSharePct("TIC interest (49%)")).toBe(49);
+    expect(parseSharePct("a 49% interest in the fee simple")).toBe(49);
+    // A return, a pref, a rate, a coupon, a yield, a cap, an IRR, a fee, a
+    // promote or an occupancy is never the share, whatever sits beside it.
+    for (const text of [
+      "8% pref",
+      "Preferred return of 8%",
+      "5.25% interest rate",
+      "a 6.5% coupon",
+      "7% current yield",
+      "a 5.5% cap",
+      "15% IRR",
+      "2% acquisition fee",
+      "a 20% promote",
+      "20% carried interest",
+      "95% occupied",
+      "a 12% preferred equity interest",
+    ]) {
+      expect(parseSharePct(text), text).toBeNull();
+    }
+    // The non-share percentages beside a share drop out, and the share stands.
+    expect(parseSharePct("a 49% LP interest; 8% preferred return; 20% promote over a 12% IRR")).toBe(49);
+    expect(parseSharePct("a 49% interest in a property that is 95% leased")).toBe(49);
+    expect(parseSharePct("a 90% stake (10% retained by the sponsor)")).toBe(90);
+    // A percentage among words that name nothing, or a range, is no share.
+    expect(parseSharePct("roughly 49% of it")).toBeNull();
+    expect(parseSharePct("a 49%–51% interest")).toBeNull();
+    // The field is the share's: one percentage and nothing else is the share
+    // (a table's "Interest offered: 49%" cell), and a range still is not.
+    expect(parseSharePct("49%")).toBe(49);
+    expect(parseSharePct(" 12.5 percent ")).toBe(12.5);
+    expect(parseSharePct("49–51%")).toBeNull();
+    expect(parseSharePct("100%")).toBeNull();
+    // Two different shares remain two: withheld.
+    expect(parseSharePct("a 49% LP interest (the sponsor keeps a 51% GP interest)")).toBeNull();
+  });
+
+  it("a preferred-equity price is never grossed up on its return", () => {
+    const pref = ex(interest({ kind: "partial_interest", share: "Preferred equity, 12% preferred return" }));
+    expect(interestOf(pref)).toEqual({ kind: "partial_interest", sharePct: null });
+    const r = readInterest(pref, 15_000_000)!;
+    expect(r.impliedWhole).toBeNull();
+    expect(r.headline).toContain("states no single percentage for it");
+  });
+
   it("interestOf reads an older extraction as fee simple, and a share only on a partial interest", () => {
     expect(interestOf(ex(undefined))).toEqual({ kind: "fee_simple", sharePct: null });
     expect(interestOf(null)).toEqual({ kind: "fee_simple", sharePct: null });
     expect(interestOf(ex(interest({ kind: "partial_interest", share: "49% LP interest" })))).toEqual({ kind: "partial_interest", sharePct: 49 });
     expect(interestOf(ex(interest({ kind: "note", share: "49%" })))).toEqual({ kind: "note", sharePct: null });
+  });
+});
+
+describe("dealTypeLabel — the header's deal type says whose strategy it is (2026-09-30)", () => {
+  it("names the collateral on a note and the leaseholder's building on a leased fee", () => {
+    // The research pass: the header said "Deal type: Stabilized" over a note
+    // and a leased fee, a word for a building the price does not buy.
+    expect(dealTypeLabel("Stabilized", ex(interest({ kind: "note" })))).toBe("Stabilized (the collateral)");
+    expect(dealTypeLabel("Stabilized", ex(interest({ kind: "leased_fee" })))).toBe("Stabilized (the leaseholder's building)");
+  });
+
+  it("says the same from the interest's kind alone, for the workbook's cover", () => {
+    expect(dealTypeLabelFor("Stabilized", "note")).toBe("Stabilized (the collateral)");
+    expect(dealTypeLabelFor("Stabilized", "leased_fee")).toBe("Stabilized (the leaseholder's building)");
+    expect(dealTypeLabelFor("Value-add", "fee_simple")).toBe("Value-add");
+    expect(dealTypeLabelFor("Value-add", undefined)).toBe("Value-add");
+  });
+
+  it("leaves every interest that buys the building, or a share of it, as it was", () => {
+    for (const kind of ["fee_simple", "leasehold", "partial_interest", "unknown"] as const) {
+      expect(dealTypeLabel("Value-add", ex(interest({ kind })))).toBe("Value-add");
+    }
+    expect(dealTypeLabel("Stabilized", ex(undefined))).toBe("Stabilized");
+    expect(dealTypeLabel("Stabilized", null)).toBe("Stabilized");
   });
 });
 
@@ -217,6 +302,40 @@ describe("readInterest — what the price buys, said", () => {
       expect(lease, trap).toContain(trap);
     }
   });
+
+  // Research pass 18: the leasehold's coverage trap said "the NOI over the
+  // ground rent" where the code divides the building's income before the
+  // ground rent — a trap reading 4.5× where the panel says 5.5×.
+  it("the leasehold's coverage trap is the code's division: the income before the ground rent over the rent", () => {
+    const lease = interestNote(readInterest(ex(interest({ kind: "leasehold" })), 20_000_000)!);
+    expect(lease).toContain("(d) COVERAGE — the building's income before the ground rent over the ground rent, the lender's first test");
+    expect(lease).not.toContain("the NOI over the ground rent");
+  });
+
+  // Research pass 18: the challenger's two shared traps — the tax line reset
+  // on the sale, the seller's legacy insurance premium — reached every deal,
+  // and do not fit a note, a share or a leased fee as written.
+  it("reads the two shared traps for a note, a share and a leased fee, conditionally where the law varies; a fee simple and a leasehold keep them", () => {
+    const note = interestNote(readInterest(ex(interest({ kind: "note" })), 20_000_000)!);
+    expect(note).toContain("THE TWO SHARED TRAPS, read for a note in place of the tax reset and the legacy insurance premium");
+    expect(note).toContain("a note's sale transfers no property — the borrower still owns the collateral");
+    expect(note).toContain("whether that transfer resets the assessment is the jurisdiction's rule to say");
+    const share = interestNote(readInterest(ex(interest({ kind: "partial_interest", share: "49%" })), 20_000_000)!);
+    expect(share).toContain("THE TWO SHARED TRAPS, read for a share");
+    expect(share).toContain("depends on the jurisdiction's change-of-ownership rule");
+    expect(share).toContain("never assume a reset or its absence");
+    // A share of no stated percentage is still a share: the entity keeps the property.
+    expect(interestNote(readInterest(ex(interest({ kind: "partial_interest" })), 20_000_000)!)).toContain("THE TWO SHARED TRAPS, read for a share");
+    const fee = interestNote(readInterest(ex(interest({ kind: "leased_fee" })), 20_000_000)!);
+    expect(fee).toContain("THE TWO SHARED TRAPS, read for a leased fee");
+    expect(fee).toContain("rarely carries either line — the ground lease decides who pays the property's taxes and insures the building");
+    for (const kept of [
+      interestNote(readInterest(ex(interest({ kind: "leasehold" })), 20_000_000)!),
+      interestNote(readInterest(ex(interest({ kind: "fee_simple", groundLease: "Pad 3 is let on a ground lease" })), 20_000_000)!),
+    ]) {
+      expect(kept).not.toContain("THE TWO SHARED TRAPS");
+    }
+  });
 });
 
 describe("a note, underwritten as a note (#416)", () => {
@@ -310,6 +429,63 @@ describe("a note, underwritten as a note (#416)", () => {
     expect(interestShortLine(bare)).toBe(
       "A loan secured by the property, not the property — the $20.0M price is an 18.0% discount to the $24.4M balance",
     );
+  });
+
+  it("a note behind a senior loan: no loan-to-value, and every surface says why", () => {
+    // $15M of mezzanine behind a $60M senior loan on a $70M value read "21%"
+    // when the stack is 107%. The memorandum states no senior balance.
+    const mezz = ex(
+      interest({ kind: "note", summary: "Sale of a $15M mezzanine loan", loan: "$15M mezzanine loan behind a $60M senior loan", page: "p. 5" }),
+      [row("Unpaid principal balance", "$15,000,000"), row("Note rate", "11.0%"), row("Maturity date", "March 31, 2028"), row("Whole-asset value", "$70,000,000"), row("Payment status", "Performing")],
+    );
+    const r = readInterest(mezz, 15_000_000, AS_OF)!;
+    expect(r.note!.terms.subordinate).toBe(true);
+    expect(r.note!.ltvAtBalancePct).toBeNull();
+    expect(r.note!.ltvAtPricePct).toBeNull();
+    const WITHHELD =
+      "The collateral's stated $70.0M is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.";
+    expect(noteCollateralSentence(r.note)).toBe(WITHHELD);
+    expect(r.headline).toContain(WITHHELD);
+    expect(r.headline).not.toMatch(/puts the balance at \d+%/);
+    expect(r.headline).not.toContain("21%");
+    // The memo's and the workbook cover's short line never carried the
+    // loan-to-value, and carries none now.
+    expect(interestShortLine(r)).not.toMatch(/\d+% of/);
+    expect(gluedWords(r.headline)).toEqual([]);
+    // The deal context and the challenger read the headline.
+    vi.useFakeTimers({ now: AS_OF, toFake: ["Date"] });
+    expect(dealContextFor(mezz)).toContain(WITHHELD);
+    expect(interestNote(readInterest(mezz, askingPriceOf(mezz))!)).toContain(WITHHELD);
+  });
+
+  it("a note named beside other debt with no order stated says so, and asserts no senior loan (the audit of 2026-10-01)", () => {
+    const unclear = ex(
+      interest({ kind: "note", summary: "Sale of a performing note", loan: "The property also carries $5M of mezzanine financing", page: "p. 5" }),
+      [row("Unpaid principal balance", "$15,000,000"), row("Note rate", "11.0%"), row("Maturity date", "March 31, 2028"), row("Whole-asset value", "$70,000,000"), row("Payment status", "Performing")],
+    );
+    const r = readInterest(unclear, 15_000_000, AS_OF)!;
+    expect(r.note!.ltvAtBalancePct).toBeNull();
+    const s = noteCollateralSentence(r.note);
+    expect(s).toContain("names other debt on the property without saying which loan comes first");
+    expect(s).not.toContain("sits behind a senior loan");
+    expect(r.headline).toContain(s);
+    // A first-lien note four months behind on its payments is still first.
+    const late = ex(
+      interest({ kind: "note", summary: "First-lien mortgage note", loan: "", page: "p. 5" }),
+      [row("Unpaid principal balance", "$15,000,000"), row("Note rate", "6.0%"), row("Maturity date", "March 31, 2028"), row("Whole-asset value", "$30,000,000"), row("Payment status", "Non-performing; borrower 4 months behind on payments")],
+    );
+    const l = readInterest(late, 12_000_000, AS_OF)!;
+    expect(l.note!.terms.subordinate).toBe(false);
+    expect(noteCollateralSentence(l.note)).toMatch(/puts the balance at 50% of its value and the price at 40%/);
+  });
+
+  it("a first-lien note keeps its loan-to-value exactly as before", () => {
+    const first = note("Performing", [...TERMS]);
+    const withWords = { ...first, interest: { ...first.interest!, summary: "Sale of the first mortgage note", loan: "$24.4M first mortgage, 5.25% coupon" } };
+    const r = readInterest(withWords, 20_000_000, AS_OF)!;
+    expect(r.note!.terms.subordinate).toBe(false);
+    expect(noteCollateralSentence(r.note)).toBe(CUSHION);
+    expect(r.headline).toContain(CUSHION);
   });
 
   it("the deal context and the challenger read the note's yield on the day they run", () => {

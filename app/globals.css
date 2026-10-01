@@ -342,6 +342,21 @@ body {
   font-size: 11px;
   color: var(--color-muted);
 }
+/* The same card on a touch screen: a popup a pin's first tap opens, the
+   whole card a link into the deal and its chevron saying so. */
+.uc-map .uc-maptip-pop .leaflet-popup-content {
+  margin: 6px;
+}
+.uc-map .leaflet-popup-content a.uc-maptip {
+  color: inherit;
+  font-weight: inherit;
+  text-decoration: none;
+}
+.uc-maptip-go {
+  flex-shrink: 0;
+  margin-left: auto;
+  color: var(--color-muted);
+}
 
 /* Landing research ticker (site-polish 2): seamless marquee — content is
    rendered twice, track slides one copy's width. Motion-sensitive users get
@@ -406,7 +421,12 @@ body {
 .ticker-track {
   animation: ticker-slide 55s linear infinite;
 }
-.ticker-track:hover {
+/* A band that moves on its own must be stoppable (WCAG 2.2.2): under the
+   pointer, while a link in it has the keyboard's focus, and by its own
+   pause button (app/pausable-ticker.tsx, which sets data-ticker-paused). */
+.ticker-track:hover,
+.ticker-track:focus-within,
+[data-ticker-paused] .ticker-track {
   animation-play-state: paused;
 }
 /* Second across-the-screen band (covered markets): opposite direction and a
@@ -418,7 +438,9 @@ body {
 .ticker-track-reverse {
   animation: ticker-slide-reverse 70s linear infinite;
 }
-.ticker-track-reverse:hover {
+.ticker-track-reverse:hover,
+.ticker-track-reverse:focus-within,
+[data-ticker-paused] .ticker-track-reverse {
   animation-play-state: paused;
 }
 @media (prefers-reduced-motion: reduce) {

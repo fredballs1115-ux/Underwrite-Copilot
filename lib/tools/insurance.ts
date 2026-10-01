@@ -85,7 +85,8 @@ export interface InsuranceResult {
   note: string;
 }
 
-const EMPTY: InsuranceResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: InsuranceResult = {
   sellerPerSf: null,
   sellerPerUnit: null,
   quotedPerSf: null,

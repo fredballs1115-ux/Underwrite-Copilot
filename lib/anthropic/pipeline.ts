@@ -20,7 +20,7 @@ import { reconcileModel } from "./reconcile";
 import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
-import { countPdfPages } from "@/lib/pdf";
+import { MAX_OM_PAGES, countPdfPages } from "@/lib/pdf";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
@@ -30,6 +30,7 @@ import {
   assessPlausibility,
   inferStrategy,
   isPlanDeal,
+  buildsSomething,
   noiFigures,
   planSummary,
   plausibilityNote,
@@ -48,22 +49,33 @@ import { readSellerFinancing, sellerFinancingNote } from "@/lib/seller-financing
 import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
 import { readStudentHousing, studentNote } from "@/lib/student-housing";
 import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
+import { readSelfStorage, storageNote } from "@/lib/self-storage";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
+import { debtSeeds, isDebtSeedSeries, ratesPromptLine } from "@/lib/debt-index";
+import { HOLD_MONTHS, permanentLoanSpread } from "@/lib/underwrite/inputs";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
 import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
+import { shownAssetClass } from "@/lib/pipeline-slots";
+import { assetClassKey } from "@/lib/asset-words";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxLines } from "@/lib/criteria";
-import { notifyAnalysisReady } from "@/lib/email";
+import { buyBoxLines, evaluateBuyBox, hasNoDealbreakers, type BuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import { evalDealbreakers } from "@/lib/mandate";
+import { notifyAnalysisFailed, notifyAnalysisReady } from "@/lib/email";
+import { requesterOf } from "@/lib/jobs";
+import type { DealVisualCache } from "@/lib/deal-location";
+import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import type {
   AssetClass,
   ExtractionResult,
+  FirstSignal,
   ChallengerResult,
   BrokerCompsResult,
   ReconciliationResult,
@@ -128,10 +140,11 @@ function heartbeatMs(): number {
 // stalled and never invites a second pipeline on the same deal.
 const runGate = new RunGate(concurrencyFromEnv);
 
-// The provider reads a PDF of up to about 600 pages in one request; a longer
-// deck came back as a raw 400. The byte counter (lib/pdf.ts) only ever
-// UNDER-counts, so a count past the cap is certain, never a false alarm.
-const MAX_OM_PAGES = 600;
+// The provider reads a PDF of up to about 600 pages in one request
+// (MAX_OM_PAGES, lib/pdf); a longer deck came back as a raw 400. The upload
+// refuses one first (lib/pdf-open); this stop catches a deck uploaded before
+// that check. The byte counter only ever UNDER-counts, so a count past the
+// cap is certain, never a false alarm.
 
 /** Keep the job row fresh while a run is alive; returns the stop function. */
 function startHeartbeat(dealId: string): () => void {
@@ -171,23 +184,44 @@ function pause(ms: number): { done: Promise<void>; cancel: () => void } {
  * geocoder or FEMA leaves the screen to read the market by the address, as
  * it always did. Null where nothing has answered.
  */
+/** The deal's stored site flags beside the address line they must match. */
+async function readStoredFlags(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+): Promise<{ label: string; flags: SiteFlagsResult | null }> {
+  try {
+    const { data } = await admin.from("deals").select("address, site_flags").eq("id", dealId).maybeSingle();
+    const row = data as { address?: { label?: string } | null; site_flags?: SiteFlagsResult | null } | null;
+    return { label: row?.address?.label?.trim() ?? "", flags: row?.site_flags ?? null };
+  } catch {
+    return { label: "", flags: null };
+  }
+}
+
+/** Answered, and for the address the deal has now: flags looked up before
+ *  an edit are the old address's. */
+const flagsAnswered = ({ label, flags }: { label: string; flags: SiteFlagsResult | null }) =>
+  !!flags && flags.status !== "pending" && !siteFlagsStale(flags, label);
+
+/**
+ * The site flags as stored, with no lookup — for a step that runs after the
+ * comps and the market check already asked (a resumed run's verdict, a
+ * reconcile against the buyer's model). Null where nothing has answered.
+ */
+async function storedSiteFlags(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+): Promise<SiteFlagsResult | null> {
+  const stored = await readStoredFlags(admin, dealId);
+  return flagsAnswered(stored) ? stored.flags : null;
+}
+
 async function siteFlagsForScreen(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
 ): Promise<SiteFlagsResult | null> {
-  const read = async (): Promise<{ label: string; flags: SiteFlagsResult | null }> => {
-    try {
-      const { data } = await admin.from("deals").select("address, site_flags").eq("id", dealId).maybeSingle();
-      const row = data as { address?: { label?: string } | null; site_flags?: SiteFlagsResult | null } | null;
-      return { label: row?.address?.label?.trim() ?? "", flags: row?.site_flags ?? null };
-    } catch {
-      return { label: "", flags: null };
-    }
-  };
-  // Answered, and for the address the deal has now: flags looked up before
-  // an edit are the old address's.
-  const answered = ({ label, flags }: { label: string; flags: SiteFlagsResult | null }) =>
-    !!flags && flags.status !== "pending" && !siteFlagsStale(flags, label);
+  const read = () => readStoredFlags(admin, dealId);
+  const answered = flagsAnswered;
   const first = await read();
   // No address, no lookup: the address matchers read nothing either.
   if (!first.label) return null;
@@ -219,6 +253,96 @@ async function siteFlagsForScreen(
   return answered(last) ? last.flags : null;
 }
 
+/** How long the screen's lift of the memorandum's cover waits for a turn.
+ *  The turns are the ones the deal pages' own searches take
+ *  (lib/deal-picture); nothing is waiting on this one, so it may wait. */
+export const SCREEN_PICTURE_WAIT_MS = 30_000;
+/** The most the screen waits, at its end, for a lift still running. */
+export const SCREEN_PICTURE_MS = 60_000;
+
+/**
+ * The building's own photograph, lifted out of the memorandum right after
+ * the extraction and beside the steps that follow. A deal's photograph used
+ * to be looked for only on its first view, so a new deal's first pipeline
+ * view showed a placeholder, and a batch upload's first view queued every
+ * deal behind the picture search's two turns. The screen already holds the
+ * memorandum's bytes, so the search reads those rather than downloading the
+ * file again, and it lifts the cover alone (#464's rule for the worker): the
+ * gallery's sixteen pages wait for the deal's first view.
+ *
+ * Never the sample deal, and only where lib/deal-picture says a search is
+ * due (`pictureMayBeInMemorandum`: no photograph stored, none looked for
+ * under today's rules). It never fails or slows the screen: the steps after
+ * the extraction run while it reads, a failure is logged and dropped, and
+ * what it returns settles within `SCREEN_PICTURE_MS` whatever the search
+ * does — the screen waits for it only at its end, to release its turn with
+ * the memorandum the lift read.
+ */
+function liftPictureBeside(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+  omPath: string,
+  pdf: Uint8Array,
+): Promise<void> {
+  const limit = pause(SCREEN_PICTURE_MS);
+  const lift = (async () => {
+    const { data } = await admin.from("deals").select("photo, is_sample").eq("id", dealId).maybeSingle();
+    const row = data as { photo?: DealVisualCache | null; is_sample?: boolean } | null;
+    if (!row || row.is_sample) return "skipped" as const;
+    const cache = row.photo ?? null;
+    if (!pictureMayBeInMemorandum({ omPath, isSample: false, cache })) return "skipped" as const;
+    await ensureDealPicture(admin, dealId, {
+      omPath,
+      isSample: false,
+      cache,
+      waitMs: SCREEN_PICTURE_WAIT_MS,
+      gallery: false,
+      pdf,
+    });
+    return "done" as const;
+  })().catch((err) => {
+    console.warn(
+      `[pipeline] the memorandum's photograph was not lifted for deal ${dealId}:`,
+      err instanceof Error ? err.message : err,
+    );
+    return "failed" as const;
+  });
+  return Promise.race([lift, limit.done.then(() => "running" as const)])
+    .then((outcome) => {
+      if (outcome === "running") {
+        console.warn(`[pipeline] the memorandum's photograph for deal ${dealId} is still being read; the screen ends without waiting for it`);
+      }
+    })
+    .finally(() => limit.cancel());
+}
+
+/**
+ * Today's debt indices for the challenger (lib/debt-index `ratesPromptLine`):
+ * it is told to judge the OM's financing at current rates, so it is handed
+ * them — the same figures the site's own model is seeded from, read bare
+ * because the worker has no Next cache. Best-effort: a read that fails, or a
+ * table with nothing fresh, hands the step no rates, and it reasons as it
+ * did before.
+ */
+async function todaysRatesLine(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  /** the deal's extraction, whose class sets the spread the site's model
+   *  adds (lib/underwrite/inputs `permanentLoanSpread`) — named in the line
+   *  as its screening default, and on land, no permanent loan at all */
+  extraction: ExtractionResult | null,
+): Promise<string | null> {
+  try {
+    const rows = await fetchSeriesRows(admin, SERIES.filter(isDebtSeedSeries));
+    return ratesPromptLine(
+      debtSeeds(readRates(rows, new Date()), HOLD_MONTHS),
+      HOLD_MONTHS,
+      permanentLoanSpread(extraction?.assetClass),
+    );
+  } catch {
+    return null;
+  }
+}
+
 /**
  * What the screen established about the deal — its kind and, on a plan deal,
  * the plan's figures — for the steps that read the OM after the extraction.
@@ -230,12 +354,14 @@ async function dealContextFromDb(
   flags: SiteFlagsResult | null,
 ): Promise<string | null> {
   try {
-    const { data } = await admin.from("deals").select("extraction").eq("id", dealId).single();
+    const { data } = await admin.from("deals").select("extraction, first_signal").eq("id", dealId).single();
     // Where the FEMA lookup has answered (`siteFlagsForScreen`), the step
-    // reads the flood zone too (#426).
+    // reads the flood zone too (#426). The deal's kind is read with the
+    // first signal beside the extraction, as the market figures read it.
     return dealContextFor(
       (data?.extraction as ExtractionResult | null) ?? null,
       flags && flags.status !== "pending" ? { flood: flags.flood } : null,
+      (data?.first_signal as FirstSignal | null | undefined) ?? null,
     );
   } catch {
     return null;
@@ -276,7 +402,7 @@ async function liveMarketFromDb(
   try {
     const { data } = await admin
       .from("deals")
-      .select("address, asset_class, extraction")
+      .select("address, asset_class, extraction, first_signal")
       .eq("id", dealId)
       .single();
     // The column holds the structured object the deal form saved (the deals
@@ -302,11 +428,24 @@ async function liveMarketFromDb(
     // under `state:PA`), said as the state's. A deal with no readable state
     // or county reads nothing of its own, as before.
     const metro = placeDeal(address, countyOf(address, flags)).live;
-    // The debt-market lines read the class the deck turned out to be, and
-    // whether the deal is a plan, so the lending-standards series is the
-    // one a bank reports for this kind of loan.
-    const assetClass = ex?.assetClass || (data?.asset_class as string | null) || null;
-    const plan = isPlanDeal(inferStrategy(ex).kind);
+    // The debt-market lines read the deal's class, and whether the deal is
+    // a plan, so the lending-standards series is the one a bank reports for
+    // this kind of loan. The class is the one every page shows
+    // (`shownAssetClass`): the analyst's where they filed one, the deck's
+    // where they left it to "Auto" — it had read the deck's first, so a
+    // deal filed as an office and pitched as mixed-use was checked as one
+    // thing and shown as the other.
+    const assetClass = shownAssetClass((data?.asset_class as string | null) ?? null, ex) || null;
+    // The first signal read beside the extraction, as the deal page reads it:
+    // a deal only the first signal calls a development or a conversion is a
+    // plan here too, and reads what building costs (the audit of 2026-09-30).
+    const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
+    const kind = inferStrategy(ex, firstSignal).kind;
+    const plan = isPlanDeal(kind);
+    // What building costs is read only where the deal builds something — a
+    // development, a conversion, a value-add with a stated budget — never a
+    // lease-up's finished building (lib/deal-strategy buildsSomething).
+    const builds = buildsSomething(ex, kind);
     const others = otherPortfolioMarkets(ex, metro?.id ?? null);
     if (!metro && !others) return { primary: null, others: [] };
     const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)));
@@ -323,13 +462,14 @@ async function liveMarketFromDb(
       return liveMarketBrief({
         metro: market,
         rates: readMetroRates(market.id, rateRows, now),
-        zori: zoriFor(bench, market.name),
-        realtor: realtorFor(bench, market.name),
+        zori: zoriFor(bench, market.name, now),
+        realtor: realtorFor(bench, market.name, now),
         now,
         national: withNational ? national : undefined,
         assetClass,
         portfolio,
         plan,
+        builds,
       });
     };
     const whole = portfolioFor(ex, metro?.id ?? "");
@@ -361,23 +501,34 @@ async function liveMarketFromDb(
  * Re-synthesize the one-screen verdict from whatever results the deal currently
  * has stored. Called at the end of the main run and again after a reconcile, so
  * the verdict always reflects the latest evidence.
+ *
+ * `dealContext` is what the screen established about the deal (lib/deal-
+ * context: what is being sold, how it is sold, the kind, the plan's figures,
+ * the flood zone) — the same text the comps, the market check, Ask and the
+ * reconciler read, built once by the caller and handed in, so the verdict
+ * never judges a share's price over the whole building's units or a note's
+ * price as a property's while every step before it was told otherwise.
  */
 async function regenerateVerdict(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
+  dealContext: string | null,
 ): Promise<void> {
   const { data } = await admin
     .from("deals")
-    .select("extraction, challenges, comps, reconciliation, market, user_id, team_id")
+    .select("asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
     .eq("id", dealId)
     .single();
+  const extraction = (data?.extraction as ExtractionResult | null | undefined) ?? null;
+  const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
 
   // Fetch the buyer's standing criteria so the verdict judges fit against
   // THEIR box. Best-effort: a missing box (or pre-0008 schema) just means no
   // buy-box section in the brief.
   let buyBox: string[] | null = null;
+  let box: BuyBox | null = null;
   try {
-    const box = await getBuyBoxForDeal(
+    box = await getBuyBoxForDeal(
       (data?.user_id as string) ?? "",
       (data?.team_id as string) ?? null,
     );
@@ -385,14 +536,48 @@ async function regenerateVerdict(
   } catch {
     buyBox = null;
   }
+  // The deal page's own read of the box (lib/buy-box-chip, which the
+  // screen-complete email makes too): the extraction, the first signal and
+  // the address the page reads, the same checks and the same red lines — so
+  // the verdict is handed the calls the chip shows, never left to re-derive
+  // a fit from the bare criteria. Best-effort on its own: a read that fails
+  // leaves the criteria in the brief, as before.
+  let buyBoxChecks: { checks: BuyBoxCheck[]; tripped: string[] } | null = null;
+  if (box && buyBox) {
+    try {
+      const address =
+        addressUpgrade(data?.address, extraction) ?? (data?.address as StructuredAddress | null | undefined) ?? null;
+      const source = dealCheckSource(extraction, firstSignal, address);
+      const filedAs = (data?.asset_class as string | null | undefined) ?? "auto";
+      buyBoxChecks = {
+        checks: evaluateBuyBox(filedAs, source, box),
+        tripped: source && !hasNoDealbreakers(box.dealbreakers) ? evalDealbreakers(filedAs, source, box).tripped : [],
+      };
+    } catch {
+      buyBoxChecks = null;
+    }
+  }
 
   const verdict = await synthesizeVerdict({
-    extraction: (data?.extraction as ExtractionResult) ?? null,
+    extraction,
+    // The deal's kind is read with the first signal beside the extraction,
+    // as every other step reads it.
+    firstSignal,
+    // The class the deal is filed as, read with the deck's where the
+    // analyst left "Auto" (shownAssetClass) — the noun the building's basis
+    // is said in, as the pipeline card says it.
+    assetClass: (data?.asset_class as string | null | undefined) ?? null,
+    dealContext,
     challenges: (data?.challenges as ChallengerResult) ?? null,
     comps: (data?.comps as BrokerCompsResult) ?? null,
     reconciliation: (data?.reconciliation as ReconciliationResult) ?? null,
     market: (data?.market as MarketResult) ?? null,
     buyBox,
+    buyBoxChecks,
+    // The latest published rates, the line the challenger is handed: the
+    // debt deal-killer is read against a dated index and the site's own
+    // screening spread, never a rate remembered as current.
+    ratesLine: await todaysRatesLine(admin, extraction),
   });
 
   await admin
@@ -422,9 +607,12 @@ async function regenerateVerdict(
  * said once in the log. Best-effort: a deployment without the column
  * (migration 0035) or a deal deleted under the run records nothing.
  */
-async function writeUsage(dealId: string, ledger: UsageLedger): Promise<void> {
+async function writeUsage(dealId: string, ledger: UsageLedger, wallMs?: number): Promise<void> {
   if (ledger.calls.length === 0) return;
-  const summary = summarizeUsage(ledger);
+  const summary = {
+    ...summarizeUsage(ledger),
+    ...(wallMs != null && Number.isFinite(wallMs) && wallMs > 0 ? { wallMs: Math.round(wallMs) } : {}),
+  };
   console.log(usageLogLine(dealId, summary));
   try {
     const admin = createSupabaseAdminClient();
@@ -444,27 +632,55 @@ export async function runAnalysis(
      *  previous interrupted attempt already finished, recording new steps as
      *  they land (migration 0016). In-process runs never pass this. */
     resume?: boolean;
+    /** the user who asked for this run — the action's caller in-process, the
+     *  payload's `requestedBy` in the worker — whom the screen's emails go
+     *  to (lib/email); absent, they go to the deal's creator, as before */
+    requestedBy?: string | null;
   },
 ): Promise<void> {
-  // Every model call inside the run records its meters into this ledger.
+  // Every model call inside the run records its meters into this ledger,
+  // and the run's own time rides with it (the deal page's "your screens
+  // usually take", lib/screen-duration): its wait for a turn included,
+  // stopped at the moment the job was marked done.
   const ledger = newLedger();
+  const started = Date.now();
+  let finished: RunFinish | null = null;
   try {
-    await withUsageLedger(ledger, () => runAnalysisSteps(dealId, opts));
+    finished = await withUsageLedger(ledger, () => runAnalysisSteps(dealId, opts));
   } finally {
-    await writeUsage(dealId, ledger);
+    // A screen's time only where this attempt ran the screen from its first
+    // step to done: a failed run's time is no screen's, and a resumed
+    // attempt's covers only the steps an earlier one left it.
+    await writeUsage(dealId, ledger, finished?.whole ? finished.doneAt - started : undefined);
   }
+}
+
+/** How a screen ended, for its clock: when the job was marked done, and
+ *  whether this attempt ran every step itself (no checkpoint skipped). */
+interface RunFinish {
+  doneAt: number;
+  whole: boolean;
 }
 
 async function runAnalysisSteps(
   dealId: string,
-  opts?: { snapshotPrior?: boolean; resume?: boolean },
-): Promise<void> {
+  opts?: { snapshotPrior?: boolean; resume?: boolean; requestedBy?: string | null },
+): Promise<RunFinish | null> {
   const snapshotPrior = opts?.snapshotPrior ?? true;
   const resume = opts?.resume ?? false;
+  // Who asked for this run: the screen's emails go to them (lib/email). A
+  // resumed attempt that was not handed one reads its payload's.
+  let requestedBy = requesterOf(opts?.requestedBy);
+  let finished: RunFinish | null = null;
+  // Steps an earlier attempt of this run had already finished (worker mode).
+  let resumedSteps = 0;
   // The OM's transport for this run — released in `finally` when it is a
   // Files-API object, so a large OM never leaves an orphaned upload behind.
   let omSource: OmSource | null = null;
   let releaseSlot: (() => void) | null = null;
+  // The memorandum's photograph, lifted beside the steps after the
+  // extraction; settled, bounded, before the run gives up its turn.
+  let pictureLift: Promise<void> | null = null;
   const stopHeartbeat = startHeartbeat(dealId);
   try {
     releaseSlot = await runGate.acquire();
@@ -518,20 +734,28 @@ async function runAnalysisSteps(
         payload = (jobRow?.payload as Record<string, unknown>) ?? {};
         for (const s of (payload.completed as string[]) ?? []) completed.add(s);
         pagesRead = payload.omPages === true;
+        requestedBy ??= requesterOf(payload.requestedBy);
       } catch {
         // no checkpoints — run everything
       }
     }
+    resumedSteps = completed.size;
     const writeCheckpoint = async () => {
       if (!resume) return;
       try {
         // The handoff contract rides along: a checkpoint written from an
         // unread payload must still say what kind of job this row is, or a
-        // re-queued attempt fails it as "unrecognized type".
+        // re-queued attempt fails it as "unrecognized type" — and whom the
+        // run was asked for by, or a later attempt emails the creator.
         await admin
           .from("analysis_jobs")
           .update({
-            payload: { ...payload, kind: payload.kind ?? "screen", completed: [...completed] },
+            payload: {
+              ...payload,
+              kind: payload.kind ?? "screen",
+              ...(requestedBy && !payload.requestedBy ? { requestedBy } : {}),
+              completed: [...completed],
+            },
           })
           .eq("deal_id", dealId);
       } catch {
@@ -672,14 +896,44 @@ async function runAnalysisSteps(
         await writeCheckpoint();
         extraction = await extractTerms(om(), assetClass);
       }
-      // A scan, a password-protected file or an empty deck yields a
-      // schema-valid extraction with no figures at all. Stored, it flowed to
-      // a Caution verdict on a document the product never read — stop here.
+      // A deck with no figures in it — a teaser, a cover letter, pages too
+      // faint to read — yields a schema-valid extraction with none at all.
+      // Stored, it flowed to a Caution verdict on a document the product
+      // never read — stop here. (A scan is read as pictures, and a file that
+      // needs a password to open is refused at the upload, lib/pdf-open.)
       if (extraction.metrics.length === 0) {
         throw new ScreenError(
-          "We couldn't read any figures out of this PDF — it may be a scan or password-protected. Try a text-based PDF.",
+          "We couldn't read any figures out of this PDF, from its text or its pages — check it is the offering memorandum rather than a teaser or a cover letter, or upload a clearer copy with Replace OM.",
         );
       }
+      // The memorandum's page count, as exact as this run can make it: the
+      // text layer's own (pdfjs walked the pages); else the model's count of
+      // the PDF it read (robust to object-stream / bookmarked PDFs the byte
+      // counter mis-reads); else the fail-safe byte counter, only where the
+      // model did not report. Stored as the extraction's own count, so every
+      // reader that holds a cited page to `totalPages` (what is being sold,
+      // a portfolio's properties, the sale, the reports) agrees with the
+      // citation rows below — the model's count had been stored even where
+      // the layer's exact one was in hand.
+      const pageCount =
+        omSource?.kind === "pages"
+          ? omSource.pages
+          : extraction.totalPages && extraction.totalPages > 0
+            ? extraction.totalPages
+            : pdf
+              ? countPdfPages(pdf)
+              : 0;
+      if (pageCount != null && pageCount > 0 && pageCount !== extraction.totalPages) {
+        extraction = { ...extraction, totalPages: pageCount };
+      }
+      // How this read was made — the deck's text layer, or the PDF itself
+      // (the layer never dense enough, or found wanting above and re-read as
+      // pages) — stored with the extraction, where the checkpoint payload
+      // was the only record and lasted only the run: Ask reads the
+      // memorandum the same way (lib/anthropic/ask `askTextFirst`), and
+      // never answers "the OM doesn't state" a figure the screen found in a
+      // picture on a page.
+      extraction = { ...extraction, omRead: omSource?.kind === "pages" ? "text" : "pdf" };
       await admin
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })
@@ -725,19 +979,7 @@ async function runAnalysisSteps(
       // never shown). Best-effort — a pre-0018 schema or a write failure must
       // never sink the screen.
       try {
-        // The text layer's page count is exact (pdfjs walked the pages).
-        // Otherwise prefer the model's own count (it read the native PDF —
-        // robust to object-stream / bookmarked PDFs the byte counter
-        // mis-reads), and fall back to the fail-safe byte counter only when
-        // the model didn't report.
-        const pageCount =
-          omSource?.kind === "pages"
-            ? omSource.pages
-            : extraction.totalPages && extraction.totalPages > 0
-              ? extraction.totalPages
-              : pdf
-                ? countPdfPages(pdf)
-                : 0;
+        // The same count the extraction now stores (above).
         const facts = buildDealFacts(extraction.metrics, pageCount);
         await admin.from("deal_facts").delete().eq("deal_id", dealId);
         const rows = toFactRows(dealId, facts);
@@ -749,6 +991,12 @@ async function runAnalysisSteps(
       await markDone("extract");
     }
     if (manual) await markDone("extract");
+
+    // The building's own photograph, out of the memorandum the run already
+    // holds — beside the steps below, never in their way (liftPictureBeside).
+    if (pdf && !manual) {
+      pictureLift = liftPictureBeside(admin, dealId, deal.om_storage_path as string, pdf);
+    }
 
     // Step 1b — multi-document reconciliation (best-effort). Compares the OM
     // against any rent roll / T-12 / financials and stores the deal's
@@ -782,10 +1030,13 @@ async function runAnalysisSteps(
       // Feed the reconciliation red flags to the skeptic so it puts concrete
       // OM-vs-rent-roll / OM-vs-T-12 discrepancies to the broker.
       let reconNote: string | undefined;
+      // The extraction the notes below read, kept for the rates line's
+      // class spread after them.
+      let challengeEx: ExtractionResult | null = null;
       try {
         const { data: dr } = await admin
           .from("deals")
-          .select("discrepancies, extraction")
+          .select("discrepancies, extraction, first_signal")
           .eq("id", dealId)
           .single();
         const disc = (dr?.discrepancies as {
@@ -799,9 +1050,12 @@ async function runAnalysisSteps(
         const notes: string[] = [];
 
         // The deal's kind first: it decides which OM figure the T-12 is held
-        // against and how the plan's figures are read below.
+        // against and how the plan's figures are read below. Read with the
+        // first signal beside the extraction, as the deal context, the market
+        // figures and the verdict read it — one kind for the whole screen.
         const ex = (dr?.extraction as ExtractionResult | null) ?? null;
-        const strategy = inferStrategy(ex);
+        challengeEx = ex;
+        const strategy = inferStrategy(ex, (dr?.first_signal as FirstSignal | null | undefined) ?? null);
 
         // Feature 1: the OM-assumed vs T-12-actual NOI gap is the skeptic's
         // first-order fact — a material (>5%) or red-flag (>10%) delta means
@@ -855,6 +1109,7 @@ async function runAnalysisSteps(
           assessPlausibility(ex, strategy),
           strategy,
           planSummary(ex, strategy),
+          ex,
         );
         if (plausibility) notes.push(plausibility);
 
@@ -933,6 +1188,11 @@ async function runAnalysisSteps(
         // park runs, the rent rules and the age restriction's compliance.
         const park = readManufacturedHousing(ex);
         if (park) notes.push(mhNote(park));
+        // A self-storage facility (#471): the street rate against recent
+        // move-ins, the premium sitting tenants pay, the economic
+        // occupancy's definition, new supply and the platform's income.
+        const storage = readSelfStorage(ex);
+        if (storage) notes.push(storageNote(storage));
 
         if (flagged.length) {
           notes.push(
@@ -950,7 +1210,19 @@ async function runAnalysisSteps(
       } catch {
         // no discrepancies stored — the challenger runs on the OM alone
       }
-      const challenges = await challengeAssumptions(om(), assetClass, reconNote);
+      // Today's rates, dated: the challenger judges the financing against
+      // them rather than against a rate it remembers as current — and the
+      // spread the site's model adds for the deal's class, as its default.
+      const ratesLine = await todaysRatesLine(admin, challengeEx);
+      if (ratesLine) reconNote = reconNote ? `${reconNote} ${ratesLine}` : ratesLine;
+      // The class the deck turned out to be, where the deal was filed
+      // "Auto" (shownAssetClass, as every page shows it): the extraction has
+      // read it by now, so the challenger is handed that class's own trap
+      // list rather than all sixteen (14.7k characters against 5.7k for an
+      // apartment building). A phrase no class resolves keeps them all.
+      const challengeClass =
+        (assetClassKey(shownAssetClass(assetClass, challengeEx)) as AssetClass | null) ?? assetClass;
+      const challenges = await challengeAssumptions(om(), challengeClass, reconNote);
       await admin
         .from("deals")
         .update({ challenges, updated_at: new Date().toISOString() })
@@ -965,13 +1237,15 @@ async function runAnalysisSteps(
     // established — the deal's kind and, on a plan deal, the plan's figures —
     // so a conversion's comps are held against total cost, not the shell.
     // The site flags once, for both steps: the flood zone for the deal
-    // context (#426), the census tract's county for the market (#447).
+    // context (#426), the census tract's county for the market (#447). A
+    // run resumed past both reads the flags as stored, never looks again.
     const siteFlags =
-      !completed.has("comps") || !completed.has("market") ? await siteFlagsForScreen(admin, dealId) : null;
-    const dealContext =
       !completed.has("comps") || !completed.has("market")
-        ? await dealContextFromDb(admin, dealId, siteFlags)
-        : null;
+        ? await siteFlagsForScreen(admin, dealId)
+        : await storedSiteFlags(admin, dealId);
+    // What the screen established, built ONCE for the comps, the market
+    // check and the verdict, so the three are told the same thing.
+    const dealContext = await dealContextFromDb(admin, dealId, siteFlags);
     if (!completed.has("comps")) {
       await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
       const comps = manual ? manualCompsStub() : await scrutinizeComps(om(), dealContext);
@@ -1015,9 +1289,10 @@ async function runAnalysisSteps(
       await markDone("market");
     }
 
-    // Step 5 — verdict (synthesizes everything gathered above)
+    // Step 5 — verdict (synthesizes everything gathered above), told what
+    // the screen established, as the comps and the market check were.
     await patchJob(dealId, { status: "running", step: "verdict", progress: 90 });
-    await regenerateVerdict(admin, dealId);
+    await regenerateVerdict(admin, dealId, dealContext);
 
     await patchJob(dealId, {
       status: "done",
@@ -1025,10 +1300,14 @@ async function runAnalysisSteps(
       progress: 100,
       error: null,
     });
+    // The run's clock stops here, when the reader sees the screen done —
+    // never after the email, the picture lift or the cleanup below.
+    finished = { doneAt: Date.now(), whole: resumedSteps === 0 };
 
-    // Heads-up email (key-ready; silently off without RESEND_API_KEY, and
-    // best-effort by design — the screen itself is already complete).
-    await notifyAnalysisReady(admin, dealId);
+    // Heads-up email (paused until RESEND_API_KEY and a sender a customer
+    // receives mail from are set, lib/email; best-effort by design — the
+    // screen itself is already complete), to whoever asked for the run.
+    await notifyAnalysisReady(admin, dealId, { requestedBy });
   } catch (err) {
     // One sentence the analyst can act on; the raw failure goes to the log.
     const failure = describeRunFailure(err);
@@ -1036,11 +1315,18 @@ async function runAnalysisSteps(
     await patchJob(dealId, { status: "error", error: failure.message }).catch(() => {
       // the deal (and its job row) is gone — nothing left to tell
     });
+    // The analyst has usually tabbed away; the screen-complete email never
+    // comes for a run that stopped, so this one says so (best-effort).
+    await notifyAnalysisFailed(createSupabaseAdminClient(), dealId, failure.message, { requestedBy });
   } finally {
+    // Never rejects, and settles within SCREEN_PICTURE_MS: the turn is given
+    // up with the memorandum the lift read, not while it still holds it.
+    await pictureLift;
     releaseSlot?.();
     stopHeartbeat();
     await releaseOmSource(omSource);
   }
+  return finished;
 }
 
 /**
@@ -1076,7 +1362,7 @@ async function runReconciliationSteps(
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
       .from("deals")
-      .select("id, om_storage_path, extraction")
+      .select("id, om_storage_path, extraction, first_signal")
       .eq("id", dealId)
       .single();
 
@@ -1096,12 +1382,17 @@ async function runReconciliationSteps(
     const parsed = await parseModelFile(model.name, model.buffer);
     omSource = await omSourceFor(omPdf);
     // The reconciler is told the deal's kind, so a buyer's model that carries
-    // construction and downtime is compared to the OM on the plan's terms.
-    const reconciliation = await reconcileModel(
-      omSource,
-      parsed,
-      dealContextFor((deal.extraction as ExtractionResult | null) ?? null),
+    // construction and downtime is compared to the OM on the plan's terms —
+    // the kind read with the first signal, as the screen's steps read it.
+    // Built once, with the flood zone the screen's lookup stored, for the
+    // reconciler and the verdict both.
+    const flags = await storedSiteFlags(admin, dealId);
+    const dealContext = dealContextFor(
+      (deal.extraction as ExtractionResult | null) ?? null,
+      flags ? { flood: flags.flood } : null,
+      (deal.first_signal as FirstSignal | null | undefined) ?? null,
     );
+    const reconciliation = await reconcileModel(omSource, parsed, dealContext);
 
     await admin
       .from("deals")
@@ -1110,7 +1401,7 @@ async function runReconciliationSteps(
 
     // Fold the reconciliation into the verdict so the headline reflects it.
     await patchJob(dealId, { status: "running", step: "verdict", progress: 80 });
-    await regenerateVerdict(admin, dealId);
+    await regenerateVerdict(admin, dealId, dealContext);
 
     await patchJob(dealId, {
       status: "done",

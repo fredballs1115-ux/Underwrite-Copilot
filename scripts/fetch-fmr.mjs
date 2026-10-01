@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // HUD Fair Market Rents → benchmarks table, straight from huduser's API.
-// Closes the repo's standing gap (INTEGRATION_NOTES top-10 #3): ten metros'
-// FY2026 FMRs never passed the two-source bar from search snippets — this is
-// the primary source, fetched with a (free) HUD API token.
+// The research files carry each covered metro's figures as read from HUD's
+// own yearly file; this pull is the primary source kept current, fetched
+// with a (free) HUD API token, so a new fiscal year lands without an edit.
 //
 //   HUD_API_TOKEN=... SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... \
 //     node scripts/fetch-fmr.mjs
@@ -11,40 +11,63 @@
 // Areas are matched by NAME against the API's own listMetroAreas output —
 // no hardcoded entity ids that could silently go stale; an unmatched metro
 // is a loud log line, never a guessed number.
+//
+// The rows are the app's own shape: lib/fmr's `fmrRows`, the builder the
+// app's seeds and scripts/seed-research.mjs use, under each metro's own
+// label (`fmrMetroLabel` — the Washington area's for `dc`). So a row written
+// here replaces the checked-in file's row of the same key, and a fiscal year
+// newer than the file's supersedes it on every page (`newestFmrOnly`).
 
 import { createClient } from "@supabase/supabase-js";
+import { createRequire } from "node:module";
+// The one FMR row builder (plain Node strips its types).
+import { FMR_BEDS, fiscalYearOn, fmrMetroLabel, fmrRows, fyStart } from "../lib/fmr.ts";
+// A failure said on the run's page, not only in its log.
+import { annotation, missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
+
+const require = createRequire(import.meta.url);
+const { metros: METROS } = require("../data/research/metros.json");
 
 const token = process.env.HUD_API_TOKEN;
 const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-if (!token || !url || !key) {
-  console.error("HUD_API_TOKEN, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY are required.");
+// A missing secret is a failed run, never a quiet one. All three are
+// needed: the token for HUD's API, the other two to write what it returns.
+const unset = missingSecrets({ HUD_API_TOKEN: token, SUPABASE_URL: url, SUPABASE_SERVICE_ROLE_KEY: key });
+if (unset.length > 0) {
+  console.log(
+    missingSecretsError(
+      "fetch-fmr",
+      unset,
+      "Set what is missing where this pull runs (the repository's Actions secrets, or the Render cron's environment); HUD's API token is free with a huduser.gov account.",
+    ),
+  );
   process.exit(1);
 }
 const supabase = createClient(url, key, { auth: { persistSession: false } });
 
-// metro id → regex the HUD area name must match (anchored on the HUD-style
-// area names already recorded in metros.json notes). DMV entries share the
-// Washington HMFA; Dallas and Fort Worth price separately.
+// metro id → regex the HUD area name must match (anchored on the area names
+// metros.json's `fmr` blocks record). DMV entries share the Washington HUD
+// area; Dallas and Fort Worth price separately.
 const AREA_MATCHERS = [
-  { id: "dc", name: "Washington DC", re: /washington-arlington-alexandria/i },
-  { id: "pg_county", name: "Prince George's County MD", re: /washington-arlington-alexandria/i },
-  { id: "montgomery_county", name: "Montgomery County MD", re: /washington-arlington-alexandria/i },
-  { id: "nova", name: "Northern Virginia", re: /washington-arlington-alexandria/i },
-  { id: "baltimore", name: "Baltimore MD", re: /baltimore-columbia-towson/i },
-  { id: "richmond", name: "Richmond VA", re: /^richmond, va/i },
-  { id: "norfolk_hampton_roads", name: "Norfolk / Hampton Roads VA", re: /virginia beach-norfolk/i },
-  { id: "philadelphia", name: "Philadelphia PA", re: /philadelphia-camden-wilmington/i },
-  { id: "newark_jc", name: "Newark / Jersey City", re: /^newark, nj/i },
-  { id: "nyc", name: "New York City", re: /new york, ny hud metro|new york-newark-jersey city/i },
-  { id: "boston", name: "Boston", re: /boston-cambridge/i },
-  { id: "chicago", name: "Chicago", re: /chicago-joliet-naperville/i },
-  { id: "los_angeles", name: "Los Angeles", re: /los angeles-long beach/i },
-  { id: "san_francisco", name: "San Francisco", re: /san francisco/i },
-  { id: "seattle", name: "Seattle", re: /seattle-bellevue/i },
-  { id: "miami", name: "Miami", re: /miami-miami beach-kendall/i },
-  { id: "atlanta", name: "Atlanta", re: /atlanta-sandy springs/i },
-  { id: "dallas", name: "Dallas-Fort Worth", re: /^dallas, tx/i },
+  { id: "dc", re: /washington-arlington-alexandria/i },
+  { id: "pg_county", re: /washington-arlington-alexandria/i },
+  { id: "montgomery_county", re: /washington-arlington-alexandria/i },
+  { id: "nova", re: /washington-arlington-alexandria/i },
+  { id: "baltimore", re: /baltimore-columbia-towson/i },
+  { id: "richmond", re: /^richmond, va/i },
+  { id: "norfolk_hampton_roads", re: /virginia beach-norfolk/i },
+  { id: "philadelphia", re: /philadelphia-camden-wilmington/i },
+  { id: "newark_jc", re: /^newark, nj/i },
+  { id: "nyc", re: /new york, ny hud metro|new york-newark-jersey city/i },
+  { id: "boston", re: /boston-cambridge/i },
+  { id: "chicago", re: /chicago-joliet-naperville/i },
+  { id: "los_angeles", re: /los angeles-long beach/i },
+  { id: "san_francisco", re: /san francisco/i },
+  { id: "seattle", re: /seattle-bellevue/i },
+  { id: "miami", re: /miami-miami beach-kendall/i },
+  { id: "atlanta", re: /atlanta-sandy springs/i },
+  { id: "dallas", re: /^dallas, tx/i },
 ];
 
 const HUD = "https://www.huduser.gov/hudapi/public";
@@ -57,26 +80,44 @@ const hud = async (path) => {
   return res.json();
 };
 
-const areas = await hud("/fmr/listMetroAreas");
+let areas;
+try {
+  areas = await hud("/fmr/listMetroAreas");
+} catch (err) {
+  console.log(annotation("error", `listMetroAreas failed — ${String(err).slice(0, 300)}; nothing was written`, "HUD FMR pull failed"));
+  process.exit(1);
+}
 if (!Array.isArray(areas) || !areas.length) {
-  console.error("listMetroAreas returned nothing usable — inspect the API response shape.");
+  console.log(annotation("error", "listMetroAreas returned nothing usable — inspect the API response shape; nothing was written", "HUD FMR pull failed"));
   process.exit(1);
 }
 const nameKey = ["area_name", "metro_name", "name"].find((k) => k in areas[0]);
 const codeKey = ["cbsa_code", "code", "metro_code", "entityid"].find((k) => k in areas[0]);
 if (!nameKey || !codeKey) {
-  console.error(`unexpected area fields: ${Object.keys(areas[0]).join(", ")}`);
+  console.log(annotation("error", `unexpected area fields: ${Object.keys(areas[0]).join(", ")}; nothing was written`, "HUD FMR pull failed"));
   process.exit(1);
 }
 
-// Current FMR fiscal year: HUD FY starts Oct 1 (FY2026 = 2025-10-01…).
-const now = new Date();
-const fy = now.getUTCMonth() >= 9 ? now.getUTCFullYear() + 1 : now.getUTCFullYear();
+// The fiscal year in force today: HUD's FY N starts Oct 1 of N−1.
+const today = new Date().toISOString().slice(0, 10);
+const fy = fiscalYearOn(today);
+
+// The API's field names for each bedroom count, in lib/fmr's order.
+const BED_FIELDS = {
+  "0br": ["Efficiency", "efficiency", "studio"],
+  "1br": ["One-Bedroom", "one_bedroom", "1br"],
+  "2br": ["Two-Bedroom", "two_bedroom", "2br"],
+  "3br": ["Three-Bedroom", "three_bedroom", "3br"],
+  "4br": ["Four-Bedroom", "four_bedroom", "4br"],
+};
 
 let ok = 0;
 let failures = 0;
 for (const m of AREA_MATCHERS) {
+  const entry = METROS.find((e) => e.id === m.id);
+  const label = entry ? fmrMetroLabel(entry) : m.id;
   try {
+    if (!entry) throw new Error(`no metros.json entry for ${m.id}`);
     const hits = areas.filter((a) => m.re.test(String(a[nameKey] ?? "")));
     if (hits.length === 0) throw new Error(`no HUD area matched ${m.re}`);
     // Prefer the HMFA/exact-shortest name when several match (SAFMR splits).
@@ -89,43 +130,45 @@ for (const m of AREA_MATCHERS) {
     const row = Array.isArray(basic)
       ? basic.find((r) => !r.zip_code) ?? null
       : basic ?? null;
-    if (!row) throw new Error(`no basicdata for ${area[nameKey]} FY${fy} (SAFMR array without metro row?)`);
-    const beds = [
-      ["0br", ["Efficiency", "efficiency", "studio"]],
-      ["1br", ["One-Bedroom", "one_bedroom", "1br"]],
-      ["2br", ["Two-Bedroom", "two_bedroom", "2br"]],
-      ["3br", ["Three-Bedroom", "three_bedroom", "3br"]],
-      ["4br", ["Four-Bedroom", "four_bedroom", "4br"]],
-    ];
-    const rows = [];
-    for (const [suffix, candidates] of beds) {
-      const k = candidates.find((c) => c in row);
+    if (!row) throw new Error(`no basicdata for ${area[nameKey]}, fiscal year ${fy} (SAFMR array without metro row?)`);
+    const rents = {};
+    for (const bed of FMR_BEDS) {
+      const k = BED_FIELDS[bed].find((c) => c in row);
       const v = k ? Number(row[k]) : NaN;
-      if (!Number.isFinite(v) || v <= 0) continue;
-      rows.push({
-        sector: "multifamily",
-        metro: m.name,
-        metric: `hud_fmr_fy${fy}_${suffix}`,
-        low: v,
-        high: v,
-        unit: "usd_month",
-        source: "https://www.huduser.gov/portal/dataset/fmr-api.html",
-        as_of: now.toISOString().slice(0, 10),
-        status: "verified", // primary source, fetched directly
-        note: `FY${fy} FMR, ${area[nameKey]} (HUD FMR API, entity ${area[codeKey]})`,
-      });
+      rents[bed] = Number.isFinite(v) && v > 0 ? v : null;
     }
+    const rows = fmrRows(
+      {
+        fy,
+        // The API states no effective day; the fiscal year's first day
+        // stands for it (a mid-year revision takes effect later).
+        effective: fyStart(fy),
+        area: String(area[nameKey]),
+        rents,
+        status: "verified", // primary source, fetched directly
+        sources: ["https://www.huduser.gov/portal/dataset/fmr-api.html"],
+        asOf: today,
+        note: `HUD FMR API, entity ${area[codeKey]}`,
+      },
+      label,
+    );
     if (!rows.length) throw new Error(`no bedroom rents parsed — fields: ${Object.keys(row).join(", ")}`);
     const { error } = await supabase
       .from("benchmarks")
       .upsert(rows, { onConflict: "sector,metro,metric" });
     if (error) throw new Error(`benchmarks upsert: ${error.message}`);
     ok += 1;
-    console.log(`${m.name}: FY${fy} 2BR $${rows.find((r) => r.metric.endsWith("_2br"))?.low ?? "?"} (${area[nameKey]})`);
+    console.log(`${label}: ${rows[0].note.split(".")[0]} — 2BR $${rents["2br"] ?? "?"} (${area[nameKey]})`);
   } catch (err) {
     failures += 1;
-    console.error(`${m.name}: ${String(err).slice(0, 300)}`);
+    // One annotation a metro: the run stays green if any metro was written,
+    // and the page says which kept its last rows.
+    console.log(annotation("warning", `${label}: ${String(err).slice(0, 300)}; its rows keep what they held`, "HUD FMR metro failed"));
   }
 }
 console.log(`fmr fetch: ${ok} metros updated, ${failures} failed.`);
-process.exit(ok > 0 ? 0 : 1); // partial success is success (same policy as fetch-rates)
+if (ok === 0) {
+  console.log(annotation("error", `No metro was updated: all ${failures} failed (see the warnings above).`, "HUD FMR pull failed"));
+  process.exit(1);
+}
+process.exit(0); // partial success is success (same policy as fetch-rates)

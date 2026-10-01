@@ -4,6 +4,8 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getDealSubmarket } from "@/lib/market/store";
+import { dealSubmarketCheck } from "@/lib/market/deal-checks";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 
 async function requireDeal(dealId: string) {
   const supabase = await createSupabaseServerClient();
@@ -54,6 +56,21 @@ export async function dismissSubmarketWarning(formData: FormData) {
   const link = await getDealSubmarket(ctx.supabase, dealId);
   if (!link) return;
 
+  // The override is written against the gap the warning states now
+  // (lib/market/checks' `figure`), read here rather than taken from the
+  // form, so it stands only while the gap reads the same. A check that
+  // cannot be run leaves the figure unknown, which stands as before.
+  const { data: deal } = await ctx.supabase.from("deals").select("name, extraction").eq("id", dealId).maybeSingle();
+  const check = deal
+    ? await dealSubmarketCheck(
+        ctx.supabase,
+        dealId,
+        String(deal.name ?? ""),
+        (deal.extraction as ExtractionResult | null) ?? null,
+      ).catch(() => null)
+    : null;
+  const figure = check?.warnings.find((w) => w.code === code)?.figure ?? null;
+
   const dismissals = [
     ...link.dismissals.filter((d) => d.code !== code),
     {
@@ -61,6 +78,7 @@ export async function dismissSubmarketWarning(formData: FormData) {
       reason: reason.slice(0, 300),
       by: ctx.user.email ?? ctx.user.id,
       at: new Date().toISOString(),
+      figure,
     },
   ];
 

@@ -5,8 +5,11 @@ import { parseModelFile } from "@/lib/model-parse";
 import { describeRunFailure } from "@/lib/anthropic/failure";
 import { extractDocFacts } from "@/lib/anthropic/model-extract";
 import { reconcileDocs } from "@/lib/anthropic/model-reconcile";
-import { DOC_KIND_LABEL } from "@/lib/documents";
+import { liveDebtSeeds } from "@/lib/debt-index-read";
+import { modelRatesLine } from "@/lib/model-market";
+import { HOLD_MONTHS, permanentLoanSpread } from "@/lib/underwrite/inputs";
 import { computeModel, planCaveats } from "./compute";
+import { documentLabel } from "./provenance";
 import type { DocFacts, UnderwritingModel } from "./types";
 
 type JobPatch = {
@@ -40,12 +43,17 @@ type DocRow = {
 export async function runModelGeneration(dealId: string): Promise<void> {
   try {
     const admin = createSupabaseAdminClient();
-    const { data: docsData } = await admin
-      .from("deal_documents")
-      .select("id, kind, filename, storage_path")
-      .eq("deal_id", dealId)
-      .order("created_at", { ascending: true });
+    const [{ data: docsData }, { data: dealData }] = await Promise.all([
+      admin
+        .from("deal_documents")
+        .select("id, kind, filename, storage_path")
+        .eq("deal_id", dealId)
+        .order("created_at", { ascending: true }),
+      admin.from("deals").select("is_sample, extraction").eq("id", dealId).maybeSingle(),
+    ]);
     const docs = (docsData as DocRow[] | null) ?? [];
+    const dealRow = dealData as { is_sample?: boolean | null; extraction?: { assetClass?: string | null } | null } | null;
+    const isSample = !!dealRow?.is_sample;
     if (docs.length === 0) {
       throw new Error(
         "Add at least one document (start with the OM and a rent roll) before generating a model.",
@@ -84,7 +92,19 @@ export async function runModelGeneration(dealId: string): Promise<void> {
 
     // Pass 2 — reconcile across all sources.
     await patchJob(dealId, { status: "running", step: "model", progress: 62 });
-    const recon = await reconcileDocs(allFacts);
+    // Today's debt indices, dated — the model's loan rate is built from
+    // them where no document states one (liveDebtSeeds never throws; a
+    // table with nothing fresh hands the step no rates). None on the
+    // sample, whose figures are pinned (lib/model-market). The line names
+    // the spread the site's own model adds for the deal's class, as its
+    // screening default, and on land that it carries no permanent loan.
+    const ratesLine = modelRatesLine(
+      isSample,
+      await liveDebtSeeds(HOLD_MONTHS),
+      HOLD_MONTHS,
+      permanentLoanSpread(dealRow?.extraction?.assetClass),
+    );
+    const recon = await reconcileDocs(allFacts, ratesLine);
 
     // Pass 3 — compute the cash flow and returns deterministically.
     const { cashFlow, returns } = computeModel(recon.inputs);
@@ -100,9 +120,13 @@ export async function runModelGeneration(dealId: string): Promise<void> {
     }
 
     const model: UnderwritingModel = {
-      generatedFrom: docs.map(
-        (d) => `${DOC_KIND_LABEL[d.kind] ?? "Document"}: ${d.filename}`,
-      ),
+      // One label rule, the tab's own (lib/model/provenance), so a model
+      // stored before it kept ids is still compared label for label.
+      generatedFrom: docs.map(documentLabel),
+      // When, and from exactly which documents: the tab says the build's
+      // day and what the deal's documents gained or lost since.
+      generatedAt: new Date().toISOString(),
+      generatedFromIds: docs.map((d) => d.id),
       holdYears: recon.inputs.holdYears,
       metrics: recon.metrics,
       conflicts: recon.metrics.filter((m) => m.isConflict),

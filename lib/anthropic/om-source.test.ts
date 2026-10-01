@@ -4,6 +4,7 @@ import { Document, Page, Text, renderToBuffer } from "@react-pdf/renderer";
 import {
   omFromBuffer,
   omSourceFor,
+  omSourceWithPages,
   omDocument,
   omReadMode,
   omRequestOptions,
@@ -76,6 +77,22 @@ describe("om-source — the deck goes text first", () => {
     if (sparse.kind === "pages") expect(sparse.sparsePages).toBe(4);
     process.env.OM_READ = "nonsense";
     expect(omReadMode()).toBe("auto");
+  });
+
+  it("says the memorandum's length where the read can: the layer's own count, dense or not, else the byte counter", async () => {
+    // Dense: read as its pages.
+    const dense = await omSourceWithPages(await deck(6, 12), "om.pdf", { textFirst: true });
+    expect(dense.om.kind).toBe("pages");
+    expect(dense.pages).toBe(6);
+    // Mostly pictures: sent as the PDF, and the layer still counted it.
+    const sparse = await omSourceWithPages(await deck(5, 1), "om.pdf", { textFirst: true });
+    expect(sparse.om.kind).toBe("buffer");
+    expect(sparse.pages).toBe(5);
+    // The layer not read: the byte counter, which only ever under-counts.
+    process.env.OM_READ = "pdf";
+    expect((await omSourceWithPages(await deck(3, 12), "om.pdf", { textFirst: true })).pages).toBe(3);
+    // Nothing that reads as a page: no length, so no page can be held to it.
+    expect((await omSourceWithPages(Buffer.from("%PDF-1.4 no pages"), "om.pdf", { textFirst: true })).pages).toBeNull();
   });
 });
 

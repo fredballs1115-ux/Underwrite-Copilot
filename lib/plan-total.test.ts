@@ -92,7 +92,7 @@ describe("a stated total cost with no price is still a total cost", () => {
     const facts = Object.fromEntries(planFacts(planSummary(OWNED_LAND)!));
     expect(facts["Budget"]).toBe("inside the stated total");
     expect(facts["Total cost"]).toBe("$60.0M");
-    expect(facts["Yield on cost"]).toBe("7.5%");
+    expect(facts["Yield on cost"]).toBe("7.50%");
     expect(facts["Price"]).toBe("not stated");
     expect(facts["Basis per unit (all-in)"]).toBe("$250k");
     // No unit count, no basis row — never a guess.
@@ -108,7 +108,7 @@ describe("a stated total cost with no price is still a total cost", () => {
     expect(note).toContain("$60.0M all-in");
     expect(note).toContain("the acquisition inside it is not separable");
     expect(note).toContain("total cost $60.0M");
-    expect(note).toContain("yield on total cost 7.5%");
+    expect(note).toContain("yield on total cost 7.50%");
     expect(note).not.toContain("less the price");
   });
 });

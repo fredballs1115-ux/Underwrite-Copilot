@@ -49,13 +49,14 @@ import {
   type StrategyKind,
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
 import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/student-housing";
 import { mhModelLine, mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
-import { allInPct, debtRateNote, type DebtIndex, type RateSeed } from "@/lib/debt-index";
+import { readSelfStorage, storageModelLine, storageShortLine } from "@/lib/self-storage";
+import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
 
@@ -100,7 +101,7 @@ export interface WorkbookMeta {
   /** what is being sold (lib/interest, #414) — a note, a share, a
    *  leasehold: the cover says it in one line and what the model is and is
    *  not; absent for a plain fee simple */
-  interest?: { line: string; modelCaveat: string | null } | null;
+  interest?: { line: string; modelCaveat: string | null; kind?: InterestKind } | null;
   /** the seller's loan offered for assumption (lib/assumable-debt, #419):
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
@@ -161,6 +162,11 @@ export interface WorkbookMeta {
    *  does with the gap to market, the park-owned homes and a private
    *  system. Absent on anything else. */
   mh?: { line: string; read: string } | null;
+  /** a self-storage facility (lib/self-storage, #471): its occupancies,
+   *  rates and platform in a line, then what the model does with the
+   *  premium sitting tenants pay over street and with a lease-up. Absent on
+   *  anything else. */
+  storage?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -248,11 +254,26 @@ const normalizeClass = (c: string): keyof typeof CLASS_DEFAULTS => {
   return key && CLASS_DEFAULTS[key] ? key : "auto";
 };
 
+/**
+ * The spread the model adds to the day's index for a deal's class, read as
+ * `deriveUnderwriteInputs` reads it (the extraction's class, the class's
+ * `spreadBps`, none where the class operates nothing), with the words its
+ * note uses — so a Claude step handed the day's rates (lib/debt-index
+ * `ratesPromptLine`) is told the spread the site's own model adds, as the
+ * screening default it is, instead of inventing one. A read of the table,
+ * never a change to it.
+ */
+export function permanentLoanSpread(assetClass: string | null | undefined): PermanentSpread {
+  const key = normalizeClass(assetClass ?? "auto");
+  const bps = assetWords(assetClass).operating ? (CLASS_DEFAULTS[key].spreadBps ?? null) : null;
+  return { bps, label: `${(assetClassLabel(key) || "generic").toLowerCase()} spread` };
+}
+
 /** The cover's line about what is being sold, and what the model is and
  *  is not on it — null for a plain fee simple. */
 function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["interest"] {
   const r = readInterest(extraction, askingPriceOf(extraction));
-  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat } : null;
+  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat, kind: r.kind } : null;
 }
 
 /** The cover's lines about the seller's loan offered for assumption
@@ -308,6 +329,17 @@ function mhMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): 
   const r = readManufacturedHousing(extraction);
   if (!r) return null;
   return { line: mhShortLine(r), read: mhModelLine(r, { rentGrowthPct: inputs.rentGrowthPct, exitCapPct: inputs.exitCapPct }) };
+}
+
+/** The cover's lines about a self-storage facility (#471): the read, then
+ *  what the model does with the premium over street and with a lease-up. */
+function storageMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["storage"] {
+  const r = readSelfStorage(extraction);
+  if (!r) return null;
+  return {
+    line: storageShortLine(r),
+    read: storageModelLine(r, { rentAnnual: inputs.inPlaceRentAnnual, exitCapPct: inputs.exitCapPct, vacancyPct: inputs.vacancyPct * 100 }),
+  };
 }
 
 /** The cover's lines about a multi-tenant property's listed tenants
@@ -874,6 +906,7 @@ export function deriveUnderwriteInputs(
         : null,
       student: studentMeta(extraction, inputs),
       mh: mhMeta(extraction, inputs),
+      storage: storageMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

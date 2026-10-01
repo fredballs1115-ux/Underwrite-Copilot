@@ -25,6 +25,7 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { GET } from "@/app/auth/callback/route";
+import { authLinkHandoff, confirmationRedirect } from "@/lib/auth-flow";
 
 const ok = (redirectType: string | null): ExchangeResult => ({
   data: { session: { access_token: "t" }, user: { id: "u1" }, redirectType },
@@ -106,5 +107,35 @@ describe("GET /auth/callback", () => {
   it("never follows an off-site destination", async () => {
     exchange = async () => ok(null);
     expect(await land("https://app.test/auth/callback?code=abc&next=https%3A%2F%2Fevil.example%2F")).toBe("/deals");
+  });
+});
+
+describe("an invitee who creates an account lands on the invite, not an empty pipeline", () => {
+  // The confirmation link as the auth service sends it back: the target the
+  // sign-up asked for (confirmationRedirect), with the code appended.
+  const fromEmail = (next: string | null) =>
+    new URL(`${confirmationRedirect("https://app.test", next)}&code=abc`);
+  /** The proxy's handoff, then the callback, as a browser would follow them. */
+  const follow = async (url: URL) => land(`https://app.test${authLinkHandoff(url)!}`);
+
+  it("signs the person in and opens the invite they signed up from", async () => {
+    exchange = async () => ok(null);
+    expect(await follow(fromEmail("/team/join/0a1b2c3d"))).toBe("/team/join/0a1b2c3d");
+    expect(await follow(fromEmail("/billing"))).toBe("/billing");
+    expect(await follow(fromEmail(null))).toBe("/deals");
+  });
+
+  it("a confirmation whose sign-in half failed keeps the invite for the sign-in that follows", async () => {
+    exchange = async () => refused("bad_code_verifier", "opened in another browser");
+    expect(await follow(fromEmail("/team/join/0a1b2c3d"))).toBe("/login?confirmed=1&next=%2Fteam%2Fjoin%2F0a1b2c3d");
+  });
+
+  it("a hostile next carried on the link lands in the app", async () => {
+    exchange = async () => ok(null);
+    // Built by hand: confirmationRedirect itself would drop it.
+    const forged = new URL("https://app.test/login?confirmed=1&next=https%3A%2F%2Fevil.example%2F&code=abc");
+    expect(await follow(forged)).toBe("/deals");
+    const protocolRelative = new URL("https://app.test/login?confirmed=1&next=%2F%2Fevil.example&code=abc");
+    expect(await follow(protocolRelative)).toBe("/deals");
   });
 });

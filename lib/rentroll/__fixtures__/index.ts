@@ -35,6 +35,38 @@ export const MISSING_EXPIRIES_CSV = `Unit,Tenant,SF,Expiry,Annual Rent
 4,,2000,,
 `;
 
+/** Tenants whose names open on a totals word, beside the roll's real totals
+ *  line — the shape that once dropped "Total Wine & More" (18,000 SF,
+ *  $522,000) as a totals row. */
+export const TOTAL_NAMED_TENANTS_CSV = `Suite,Tenant,RSF,Commencement,Expiration,Annual Rent,Notes
+100,Acme Law LLP,24000,1/1/2020,12/31/2030,912000,"Total SF includes a 1,000 SF mezzanine"
+150,Total Wine & More,18000,6/1/2019,5/31/2034,522000,
+210,Northside Dental,4000,1/1/2022,12/31/2028,148000,
+220,Vacant,6000,,,,
+430,Total Recall Media,4000,1/1/2024,12/31/2029,150000,
+Total,,56000,,,1732000,
+`;
+
+/** An apartment roll as a property-management system exports it: a monthly
+ *  "Market Rent" beside the monthly "Actual Rent" the resident pays, a
+ *  move-in date beside the lease's own start, one-year leases, and a unit
+ *  type no lease basis is read from. Twelve units, one vacant. */
+export function apartmentCsv(): string {
+  const rows = ["Unit,Unit Type,SF,Resident,Market Rent,Actual Rent,Move-In,Lease Start,Lease End,Deposit"];
+  for (let i = 0; i < 12; i++) {
+    const [type, sf, market] = i % 2 === 0 ? (["1x1", 720, 1650] as const) : (["2x2", 1040, 2150] as const);
+    const unit = 101 + i;
+    if (i === 5) {
+      rows.push(`${unit},${type},${sf},VACANT,${market},,,,,`);
+      continue;
+    }
+    const actual = market - 50 - (i % 3) * 25;
+    const month = i + 1;
+    rows.push(`${unit},${type},${sf},Resident ${unit},${market},${actual},3/1/2023,${month}/1/2026,${month}/28/2027,500`);
+  }
+  return `${rows.join("\n")}\n`;
+}
+
 /** 40 tenants, staggered expiries — the "rollover schedule IS the deal" case. */
 export function fortyTenantCsv(): string {
   const rows = [`Suite,Tenant,Rentable SF,Lease Expiration,Annual Rent,Lease Type`];

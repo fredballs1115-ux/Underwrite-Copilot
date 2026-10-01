@@ -56,6 +56,8 @@
 
 import { irr } from "../underwrite/engine";
 import { readDebt } from "./debt-math";
+import { usd as compactUsd } from "./format";
+import { MAX_HOLD_YEARS, heldTo } from "./limits";
 
 /** How far the price search will look, as a multiple of the asking price. */
 const PRICE_SEARCH_CEILING = 2;
@@ -326,7 +328,9 @@ export function readAssumption(t: AssumptionTerms): AssumptionRead {
     return { ...EMPTY, note: "Enter a hold of at least a year." };
   }
 
-  const hold = Math.round(t.holdYears);
+  // A year at a time, and bisected, so held to the longest the card runs
+  // (lib/tools/limits): a million-year hold ran for minutes.
+  const hold = Math.round(heldTo(t.holdYears, MAX_HOLD_YEARS));
   const base = bothAt(t, t.price, hold);
   if (base === null || base.assume === null || base.newLoan === null) {
     return { ...EMPTY, note: "Enter the loan's remaining term, its amortisation and the exit cap." };
@@ -420,13 +424,24 @@ function noteFor(x: AssumptionRead, t: AssumptionTerms): string {
       x.termExceedsHold === true && x.yearsThatCount !== null
         ? ` Only ${x.yearsThatCount} of its remaining years are being bought — the term past the hold adds nothing to that figure.`
         : "";
-    return `The loan is worth ${usd(x.pricePremium)} of price — ${x.pricePremiumPctOfPrice}% — even though assuming it takes ${usd(Math.abs(x.extraEquity))} ${x.extraEquity > 0 ? "MORE" : "less"} equity than a new one. A seller who does not ask for that hands it over.${over}`;
+    // "Even though" only where the equity is a cost: a SMALLER cheque is a
+    // second reason for the premium, not a reason against it.
+    const equity =
+      x.extraEquity > 0
+        ? `even though assuming it takes ${usd(x.extraEquity)} MORE equity than a new one`
+        : `and assuming it takes ${usd(Math.abs(x.extraEquity))} less equity than a new one as well`;
+    return `The loan is worth ${usd(x.pricePremium)} of price — ${x.pricePremiumPctOfPrice}% — ${equity}. A seller who does not ask for that hands it over.${over}`;
   }
   if (x.irrGapPts !== null && x.irrGapPts < 0 && x.extraEquity !== null && x.extraEquity > 0) {
     // Never "the coupon saves": on a loan at or near today's rate the whole
     // saving is the smaller balance, and crediting the rate for it is the
-    // error this card exists to correct.
-    return `Assuming returns ${Math.abs(x.irrGapPts)} points LESS than a new loan here: debt service is ${usd(x.annualDebtServiceSaved ?? 0)} a year lower and the cheque is ${usd(x.extraEquity)} larger, and the equity wins. The rate on its own never says that.`;
+    // error this card exists to correct. And the debt service follows its
+    // sign: an assumed loan on a short amortisation costs MORE a year, and
+    // the first version called $397,895 more "a year lower".
+    const saved = x.annualDebtServiceSaved ?? 0;
+    return saved > 0
+      ? `Assuming returns ${Math.abs(x.irrGapPts)} points LESS than a new loan here: debt service is ${usd(saved)} a year lower and the cheque is ${usd(x.extraEquity)} larger, and the equity wins. The rate on its own never says that.`
+      : `Assuming returns ${Math.abs(x.irrGapPts)} points LESS than a new loan here: debt service is ${usd(Math.abs(saved))} a year HIGHER and the cheque is ${usd(x.extraEquity)} larger, so both work against it.`;
   }
   if (x.assume?.refinanced) {
     return `The loan balloons ${t.assumedRemainingYears} ${Math.round(t.assumedRemainingYears ?? 0) === 1 ? "year" : "years"} in, inside the hold, so most of what is being marketed is refinanced at today's rate before the sale — which is why a short remaining term is worth so little.`;
@@ -437,11 +452,10 @@ function noteFor(x: AssumptionRead, t: AssumptionTerms): string {
   return "Enter the loan's remaining term and the exit cap to compare the two positions.";
 }
 
+/** The shared writer's compact form, the size alone: each sentence says
+ *  the direction in words ("MORE", "less", "HIGHER"). */
 function usd(n: number): string {
-  const a = Math.abs(n);
-  return a >= 1_000_000
-    ? `$${(a / 1_000_000).toFixed(2)}M`
-    : `$${Math.round(a).toLocaleString("en-US")}`;
+  return compactUsd(Math.abs(n));
 }
 
 function rnd(n: number, places = 0): number {

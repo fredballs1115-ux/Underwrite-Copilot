@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { UPLOAD_MAX_BYTES, tooLargeMessage } from "@/lib/upload-limit";
 
 /**
  * A styled stand-in for a bare `<input type="file">` inside compact forms:
@@ -31,10 +32,8 @@ export function FileField({
         className="sr-only"
         onChange={(e) => {
           const f = e.currentTarget.files?.[0] ?? null;
-          if (f && f.size > 32 * 1024 * 1024) {
-            alert(
-              `"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is 32 MB. Try compressing or splitting it.`,
-            );
+          if (f && f.size > UPLOAD_MAX_BYTES) {
+            alert(tooLargeMessage(f.name, f.size, UPLOAD_MAX_BYTES));
             e.currentTarget.value = "";
             setFileName(null);
             return;

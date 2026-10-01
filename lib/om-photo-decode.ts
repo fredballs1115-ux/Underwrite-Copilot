@@ -32,14 +32,22 @@
  * - A photograph stored as PIXELS (`/FlateDecode`, usually with PNG
  *   predictors): a PNG, or an image a layout tool flattened or edited,
  *   rather than the camera's JPEG.
+ * - A photograph stored as JPEG 2000 (`/JPXDecode`), which Acrobat's
+ *   optimiser writes. pdfjs decodes it with its WebAssembly decoder, and
+ *   only once it is told where that lives (`lib/pdfjs-wasm`): before, every
+ *   such picture failed to decode and was passed over.
  *
  * It never throws: a file it cannot read, or one that runs past its time,
  * reads as no photograph, and says whether the file was read at all
  * (`opened`) and whether the cover page was (`pageOneRead`) so the caller
- * knows when the byte scan's guess is all there is.
+ * knows when the byte scan's guess is all there is — and whether the read
+ * reached its answer (`complete`): a read the time budget cut short found
+ * nothing because it never looked, which is no reason to say the
+ * memorandum has no photograph.
  */
 
 import { COVER_ASPECT, COVER_MIN } from "@/lib/om-photo";
+import { pdfjsWasmUrl } from "@/lib/pdfjs-wasm";
 
 /** How many pages are searched: the cover, and a page or three after it. */
 export const COVER_PAGES = 4;
@@ -92,6 +100,12 @@ export interface OmCoverRead {
   opened: boolean;
   /** every image the cover page paints was weighed, inside the time */
   pageOneRead: boolean;
+  /** the read reached its answer, one another read would give again: every
+   *  page it covers was read to its end (or the cover page's photograph
+   *  ended it), or the file cannot be opened at all — a password to open, a
+   *  file pdfjs cannot parse. Never a read the time budget cut short, nor
+   *  one made without pdfjs to make it. */
+  complete: boolean;
 }
 
 /**
@@ -262,20 +276,24 @@ interface PaintedPixels {
  * pages paint to `visit`, decoded, in page order; an image painted on
  * several pages is visited once. `visit` answers false to end the walk, and
  * `pageDone` is asked after each page whether to go on. Never throws: says
- * whether the file opened and which pages were read to their end, inside
- * the time.
+ * whether the file opened, which pages were read to their end, inside the
+ * time, and whether the walk was `cut` short before its end — by the time
+ * budget, or for want of pdfjs to walk with — rather than ended by its own
+ * choice or by a file that cannot be opened.
  */
 async function walkPaintedImages(
   pdf: Uint8Array,
   opts: { pages: number; budgetMs: number },
   visit: (img: PaintedPixels) => boolean | Promise<boolean>,
   pageDone?: (page: number) => boolean,
-): Promise<{ opened: boolean; completed: Set<number> }> {
-  const out = { opened: false, completed: new Set<number>() };
+): Promise<{ opened: boolean; completed: Set<number>; cut: boolean }> {
+  const out = { opened: false, completed: new Set<number>(), cut: false };
   let pdfjs: Pdfjs;
   try {
     pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
   } catch {
+    // Nothing to read with: nothing is known about the file.
+    out.cut = true;
     return out;
   }
   const deadline = Date.now() + opts.budgetMs;
@@ -291,13 +309,19 @@ async function walkPaintedImages(
       isOffscreenCanvasSupported: false,
       isImageDecoderSupported: false,
       maxImageSize: MAX_DECODE_PIXELS,
+      // Its WebAssembly decoders, without which a photograph stored as JPEG
+      // 2000 (`/JPXDecode`) cannot be decoded at all (lib/pdfjs-wasm).
+      wasmUrl: pdfjsWasmUrl(),
     });
     const doc = await before(task.promise, deadline);
     out.opened = true;
     const last = Math.min(doc.numPages, opts.pages);
     let going = true;
     for (let p = 1; p <= last && going; p++) {
-      if (Date.now() >= deadline) break;
+      if (Date.now() >= deadline) {
+        out.cut = true;
+        break;
+      }
       let page: PdfPage | null = null;
       try {
         page = await before(doc.getPage(p), deadline);
@@ -324,8 +348,13 @@ async function walkPaintedImages(
         }
         if (going) out.completed.add(p);
       } catch {
-        // A page that fails or runs out of time: keep what earlier pages gave.
-        if (Date.now() >= deadline) break;
+        // A page that fails or runs out of time: keep what earlier pages
+        // gave. A page that fails on its own is the file's, and another read
+        // fails it again; one the time ran out on is a read cut short.
+        if (Date.now() >= deadline) {
+          out.cut = true;
+          break;
+        }
       } finally {
         page?.cleanup();
       }
@@ -333,7 +362,9 @@ async function walkPaintedImages(
     }
     return out;
   } catch {
-    // A password to open, a file pdfjs cannot parse, or no time left to open it.
+    // A password to open, a file pdfjs cannot parse — the file's own, and
+    // another read meets it again — or no time left to open it: cut short.
+    if (Date.now() >= deadline) out.cut = true;
     return out;
   } finally {
     try {
@@ -362,14 +393,15 @@ function candidateOf(img: PaintedPixels): ImageCandidate {
  * rule), with what the read managed: a file that needs a password to open,
  * one pdfjs cannot parse, or a search out of time finds no cover and says
  * so. Page one is read first, and when it holds a photograph the pages
- * after it are never decoded.
+ * after it are never decoded. `budgetMs` is `DECODE_BUDGET_MS` but where a
+ * test asks for a read the time cuts short.
  */
-export async function decodeOmCover(pdf: Uint8Array): Promise<OmCoverRead> {
-  const read: OmCoverRead = { cover: null, opened: false, pageOneRead: false };
+export async function decodeOmCover(pdf: Uint8Array, opts: { budgetMs?: number } = {}): Promise<OmCoverRead> {
+  const read: OmCoverRead = { cover: null, opened: false, pageOneRead: false, complete: false };
   let best: ImageCandidate | null = null;
   const walk = await walkPaintedImages(
     pdf,
-    { pages: COVER_PAGES, budgetMs: DECODE_BUDGET_MS },
+    { pages: COVER_PAGES, budgetMs: opts.budgetMs ?? DECODE_BUDGET_MS },
     (img) => {
       const candidate = candidateOf(img);
       if (pickDecodedCover(best ? [best, candidate] : [candidate]) === candidate && candidate !== best) {
@@ -385,6 +417,7 @@ export async function decodeOmCover(pdf: Uint8Array): Promise<OmCoverRead> {
   );
   read.opened = walk.opened;
   read.pageOneRead = walk.completed.has(1);
+  read.complete = !walk.cut;
   return read;
 }
 
@@ -422,7 +455,7 @@ export async function decodeOmPhotos(
     budgetMs?: number;
     yieldTo?: () => boolean;
   } = {},
-): Promise<{ opened: boolean; found: number; aborted: boolean }> {
+): Promise<{ opened: boolean; found: number; aborted: boolean; cut: boolean }> {
   const max = opts.max ?? GALLERY_MAX;
   const taken: bigint[] = [...(opts.skip ?? [])];
   let found = 0;
@@ -431,7 +464,7 @@ export async function decodeOmPhotos(
     if (opts.yieldTo?.()) aborted = true;
     return aborted;
   };
-  if (max <= 0) return { opened: false, found, aborted };
+  if (max <= 0) return { opened: false, found, aborted, cut: false };
   const walk = await walkPaintedImages(
     pdf,
     { pages: opts.pages ?? GALLERY_PAGES, budgetMs: opts.budgetMs ?? GALLERY_BUDGET_MS },
@@ -447,5 +480,7 @@ export async function decodeOmPhotos(
     },
     () => !give(),
   );
-  return { opened: walk.opened, found, aborted };
+  // `cut`: the time budget ended the walk before its pages did, so the
+  // photographs found are the ones read so far, not the file's.
+  return { opened: walk.opened, found, aborted, cut: walk.cut && !aborted };
 }

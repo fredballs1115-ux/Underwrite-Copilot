@@ -40,8 +40,73 @@ describe("compFigures — reads a comp's stated basis and cap, nothing more", ()
     expect(compFigures("")).toEqual(none);
     expect(compFigures(null)).toEqual(none);
     expect(compFigures(undefined)).toEqual(none);
-    // A "unit" price below $1,000 is a rent or a fee, never a basis.
+    // A "unit" price below $5,000 is a rent or a fee, never a basis.
     expect(compFigures("$5/unit/mo").perUnit).toBeNull();
+    expect(compFigures("$3,500 a unit").perUnit).toBeNull();
+  });
+
+  it("reads a figure its own clause calls a rent as no basis, whatever its period (the audit, 2026-10-01)", () => {
+    expect(compFigures("Avg rent $2,100 a unit").perUnit).toBeNull();
+    expect(compFigures("Asking rents $28/SF").perSf).toBeNull();
+    expect(compFigures("ADR $185/key").perUnit).toBeNull();
+    // A rent in its own clause leaves the price beside it alone.
+    expect(compFigures("Rents $2,100/mo · $248k/unit").perUnit).toBe(248_000);
+  });
+
+  it("reads one cap where a year, a count or a T-12 sits before it", () => {
+    for (const [line, cap] of [
+      ["T-12 cap 5.2%", 5.2],
+      ["Year 1 cap rate 5.4%", 5.4],
+      ["Sold 2024 — 5.6% cap", 5.6],
+      ["Built 1985 - 5.5% cap", 5.5],
+      ["Units: 48 – 5.6% cap", 5.6],
+      ["at a 5.4% cap", 5.4],
+    ] as const) {
+      expect(compFigures(line).capPct, line).toBe(cap);
+    }
+  });
+});
+
+describe("compFigures — every shape a comp's detail line comes in (WILL_TODO's reader item, 2026-10-01)", () => {
+  it("reads a per-unit basis however the line words it, in each class's own word", () => {
+    for (const [line, perUnit] of [
+      ["$252,000 a unit", 252_000],
+      ["$252k/apartment", 252_000],
+      ["$60k/space", 60_000],
+      ["$35,000 per key", 35_000],
+      ["$95,000/home", 95_000],
+      ["Price/Unit: $252,000", 252_000],
+      ["$/door $252K", 252_000],
+      ["PPU $252K", 252_000],
+    ] as const) {
+      expect(compFigures(line).perUnit, line).toBe(perUnit);
+    }
+  });
+
+  it("reads a per-SF basis on rentable, net or gross feet, or a foot alone", () => {
+    for (const line of ["$410/RSF", "$410/NRSF", "$410 per GSF", "$410 per foot", "$410 a foot", "Price/SF: $410", "$/SF $410", "PSF $410"]) {
+      expect(compFigures(line).perSf, line).toBe(410);
+    }
+  });
+
+  it("reads a cap without its percent sign, and with words between", () => {
+    expect(compFigures("sold at a 5.4 cap").capPct).toBe(5.4);
+    expect(compFigures("a 5 cap").capPct).toBe(5);
+    expect(compFigures("cap rate was 5.4%").capPct).toBe(5.4);
+    expect(compFigures("cap rate of approximately 5.4%").capPct).toBe(5.4);
+  });
+
+  it("reads no cap from a range, a year, capex or a bare percentage", () => {
+    for (const line of ["5.25%-5.75% cap", "5.25 to 5.75% cap", "cap rate 5.25%-5.75%", "2023 cap ex", "$1.2M of cap-ex", "5.4% on in-place NOI"]) {
+      expect(compFigures(line).capPct, line).toBeNull();
+    }
+  });
+
+  it("reads a rent per month or per year as no basis at all", () => {
+    for (const line of ["$1,200 per unit per month", "$1,450/unit/mo", "$2,100 a unit monthly", "$25/SF/yr", "$32.50 per SF per year", "$28 psf annually"]) {
+      const f = compFigures(line);
+      expect([f.perUnit, f.perSf], line).toEqual([null, null]);
+    }
   });
 });
 
@@ -60,6 +125,20 @@ describe("subjectBasis — the deal's own basis from the shared readers", () => 
 
   it("gives nothing when the OM states no price", () => {
     expect(subjectBasis([{ label: "Units", value: "248" }], "stabilized")).toEqual({ perUnit: null, perSf: null });
+  });
+
+  it("gives an outdoor-storage yard no per-SF basis: it trades by the acre, not by its shop building", () => {
+    const yard = [
+      { label: "Asking price", value: "$12,000,000" },
+      { label: "Building SF", value: "4,000" },
+      { label: "Usable acres", value: "8.5" },
+    ];
+    // $12M over a 4,000 SF shop read $3,000/SF, and the comps drew it as a tick.
+    expect(subjectBasis(yard, "stabilized", undefined, "Industrial Outdoor Storage (IOS)")).toEqual({ perUnit: null, perSf: null });
+    expect(subjectBasis(yard, "stabilized", undefined, "Truck terminal").perSf).toBeNull();
+    // A warehouse on the same figures is priced by its feet, as before.
+    expect(subjectBasis(yard, "stabilized", undefined, "Industrial").perSf).toBe(3_000);
+    expect(subjectBasis(yard, "stabilized").perSf).toBe(3_000);
   });
 });
 

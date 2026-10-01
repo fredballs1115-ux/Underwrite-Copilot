@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import { METRO_VIEWS } from "@/lib/metro-imagery";
-import { creditLine, skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { metroView } from "@/lib/metro-imagery";
+import { skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline";
+import { SkylineCreditText } from "./photo-credit";
 
 /**
  * The picture of a covered market, and the honest sentence under it.
@@ -34,17 +35,39 @@ import { creditLine, skylineFor, skylineSrcSet, skylineTag } from "@/lib/skyline
  * A panorama cropped into a squarer tile is covered by its HEIGHT, so a
  * tile's `sizes` says the width the picture must be drawn at to fill the
  * tile's height, not the tile's own width.
+ *
+ * The page's opening picture (`eager`) is asked for at once and ahead of
+ * everything else on the page; every other one waits until it is near.
+ * Asked for that early, it can fail before the page hydrates, when its
+ * `error` fires with no listener to hear it, so the component also checks
+ * on mount — a finished load with no pixels is a failure too (DealBanner's
+ * rule) — and the fallback to the overhead holds either way.
+ *
+ * Behind a band's words (`layer`), the credit comes AFTER the words in the
+ * markup. It is drawn at the band's foot, but it sat first in the markup,
+ * so on the homepage Tab reached the photographer and the licence before
+ * "Get started free", and a screen reader read the credit before the page's
+ * heading. So the band hands its words in as `children`: the picture (and
+ * its scrim) fill the layer's box, the words follow, and the credit comes
+ * last in a box of the same shape, which keeps it where it was on screen.
+ * The state that decides which credit that is stays here, with the picture.
  */
 export function CityPhoto({
   metro,
   width,
   height,
   className,
-  creditClassName = "absolute bottom-3 right-4 z-10 text-[10px] text-white/75",
+  // pointer-events-auto: the credit's links sit inside a backdrop that
+  // lets clicks through to the band's own words
+  creditClassName = "pointer-events-auto absolute bottom-3 right-4 z-10 text-[10px] text-white/75",
   alt,
+  describe = false,
   eager = false,
   showCredit = true,
   sizes,
+  layer,
+  overlay,
+  children,
 }: {
   /** a metro id from data/research/metros.json */
   metro: string;
@@ -55,20 +78,51 @@ export function CityPhoto({
   creditClassName?: string;
   /** empty for a decorative backdrop, descriptive when the picture is content */
   alt?: string;
+  /** the alt text says what the picture on screen shows — the photograph's
+   *  own description, or the overhead's place "from above" — and follows the
+   *  fallback as the credit does: a fixed "skyline" is false of an overhead */
+  describe?: boolean;
   /** the page's opening picture paints with the page; every other one waits */
   eager?: boolean;
   showCredit?: boolean;
   /** how wide the slot draws, for the browser to pick a file by; unset,
    *  the one file at `width`, as before */
   sizes?: string;
+  /** a band's picture layer: the box the picture fills behind the band's
+   *  words ("absolute inset-0", or the hero's strip), and the shape of the
+   *  box its credit is drawn in after them. Unset, the picture and its
+   *  credit are drawn bare, as before. */
+  layer?: string;
+  /** drawn over the picture inside its layer: the band's scrim */
+  overlay?: ReactNode;
+  /** the band's words, drawn between the picture and its credit */
+  children?: ReactNode;
 }) {
   const shot = skylineFor(metro);
-  const view = METRO_VIEWS[metro];
+  const view = metroView(metro);
   const [mode, setMode] = useState<"skyline" | "aerial" | "none">(
     shot ? "skyline" : view ? "aerial" : "none",
   );
+  const ref = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    // A picture that settled before hydration fired its event unheard.
+    const img = ref.current;
+    if (!img?.complete || img.naturalWidth > 0) return;
+    setMode((m) => (m === "skyline" && view ? "aerial" : "none"));
+  }, [mode, view]);
 
-  if (mode === "none") return null;
+  if (mode === "none") {
+    // Neither picture: the band's own colour carries on under its scrim,
+    // and its words with it.
+    return layer ? (
+      <>
+        <div className={`pointer-events-none ${layer}`}>{overlay}</div>
+        {children}
+      </>
+    ) : (
+      <>{children}</>
+    );
+  }
 
   const skyline = mode === "skyline" && shot;
   // `v` is a cache buster, not a parameter the route reads: the bytes are
@@ -78,11 +132,13 @@ export function CityPhoto({
   const src = skyline
     ? `/api/imagery/skyline/${metro}?w=${width}&v=${skylineTag(metro)}`
     : `/api/imagery/metro/${metro}?w=${width}&h=${height}`;
-  const credit = skyline
-    ? creditLine(shot)
-    : view
-      ? `${view.place} from above · USGS`
-      : "";
+  // The photographer linked to the file's page and the licence to its
+  // text, and "cropped to fit": what a Creative Commons credit carries.
+  const credit = skyline ? (
+    <SkylineCreditText shot={shot} linkClassName="underline decoration-dotted underline-offset-2 hover:text-white" />
+  ) : view ? (
+    `${view.place} from above · USGS`
+  ) : null;
   // The overhead is drawn at the size asked for, so twice the size is the
   // same frame at twice the grain, inside the route's 1600px ceiling.
   const double = width * 2 <= 1600 && height * 2 <= 1600;
@@ -94,24 +150,46 @@ export function CityPhoto({
         ? `${src} 1x, /api/imagery/metro/${metro}?w=${width * 2}&h=${height * 2} 2x`
         : undefined;
 
+  const picture = (
+    /* eslint-disable-next-line @next/next/no-img-element -- a proxied route
+       that sets its own immutable cache headers; next/image would add a
+       second cache layer over it and cannot express the fallback chain */
+    <img
+      ref={ref}
+      src={src}
+      srcSet={srcSet}
+      sizes={srcSet ? sizes : undefined}
+      alt={describe ? (skyline ? shot.place : view ? `${view.place} from above` : "") : (alt ?? "")}
+      width={width}
+      height={height}
+      loading={eager ? "eager" : "lazy"}
+      fetchPriority={eager ? "high" : undefined}
+      decoding="async"
+      onError={() => setMode(skyline && view ? "aerial" : "none")}
+      className={className}
+    />
+  );
+  const caption = showCredit && credit ? <p className={creditClassName}>{credit}</p> : null;
+
+  if (!layer) {
+    return (
+      <>
+        {picture}
+        {children}
+        {caption}
+      </>
+    );
+  }
   return (
     <>
-      {/* eslint-disable-next-line @next/next/no-img-element -- a proxied route
-          that sets its own immutable cache headers; next/image would add a
-          second cache layer over it and cannot express the fallback chain */}
-      <img
-        src={src}
-        srcSet={srcSet}
-        sizes={srcSet ? sizes : undefined}
-        alt={alt ?? ""}
-        width={width}
-        height={height}
-        loading={eager ? "eager" : "lazy"}
-        decoding="async"
-        onError={() => setMode(skyline && view ? "aerial" : "none")}
-        className={className}
-      />
-      {showCredit && credit ? <p className={creditClassName}>{credit}</p> : null}
+      <div className={`pointer-events-none ${layer}`}>
+        {picture}
+        {overlay}
+      </div>
+      {children}
+      {/* After the words, in a box of the picture's own shape, so it is
+          drawn where it always was: at the foot of the picture. */}
+      {caption ? <div className={`pointer-events-none ${layer}`}>{caption}</div> : null}
     </>
   );
 }

@@ -114,6 +114,25 @@ export function consolidateRentRoll(
   }
   const weightedAvgRentPsf = rentDen > 0 ? rentNum / rentDen : null;
 
+  // In-place rent a month per occupied unit — the way a residential roll is
+  // read — over the occupied units that state a rent: a stated monthly rent
+  // wins, else the unit's rent per SF a year × its SF ÷ 12 (the mirror of
+  // the PSF derivation above). A unit that states neither is left out.
+  let monthlySum = 0;
+  let rentUnits = 0;
+  for (const r of occupied) {
+    const sf = sfOf(r.sf);
+    const monthly =
+      typeof r.inPlaceRentMonthly === "number" && r.inPlaceRentMonthly > 0
+        ? r.inPlaceRentMonthly
+        : typeof r.rentPsf === "number" && r.rentPsf > 0 && sf > 0
+          ? (r.rentPsf * sf) / 12
+          : null;
+    if (monthly == null) continue;
+    monthlySum += monthly;
+    rentUnits++;
+  }
+
   return {
     unitCount: rows.length,
     occupiedUnits: occupied.length,
@@ -122,6 +141,8 @@ export function consolidateRentRoll(
     sfWeightedOccupancy,
     waltYears,
     weightedAvgRentPsf,
+    avgRentMonthly: rentUnits > 0 ? monthlySum / rentUnits : null,
+    rentUnits,
     expiryBuckets,
     expiryCoveredSf,
     truncated: x.truncated,
@@ -201,10 +222,16 @@ export function pickOmNoi(
   return { label: pick.label, value: raw?.value ?? "", noi: pick.value, basis: pick.kind };
 }
 
+/** The band the property-actuals card calls "In line": the OM's NOI within
+ *  5% of the actual, either way. The Overview's risk digest grades a
+ *  reconciliation gap on the same band, so one gap never reads "In line"
+ *  on the card and HIGH beside it. */
+export const NOI_IN_LINE_BAND = 0.05;
+
 export function severityForNoiDelta(deltaPct: number): ActualsSeverity {
   const abs = Math.abs(deltaPct);
   if (abs > 0.1) return "red_flag";
-  if (abs > 0.05) return "material";
+  if (abs > NOI_IN_LINE_BAND) return "material";
   return "in_line";
 }
 

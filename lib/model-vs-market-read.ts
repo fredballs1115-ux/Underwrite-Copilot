@@ -29,8 +29,10 @@ export async function todayReads(
 ): Promise<TodayReads> {
   const [rates, zori, realtor, national] = await Promise.all([
     metro ? liveMetroRates(metro.id, now) : Promise.resolve([] as LiveRate[]),
-    metro ? liveZori(metro.name) : Promise.resolve(null),
-    metro ? liveRealtor(metro.name) : Promise.resolve(null),
+    // Read on the same day as the series beside them, so a figure past its
+    // publisher's cadence is left out of both checks alike.
+    metro ? liveZori(metro.name, now) : Promise.resolve(null),
+    metro ? liveRealtor(metro.name, now) : Promise.resolve(null),
     liveRates(now),
   ]);
   return { rates, zori, realtor, national, now };

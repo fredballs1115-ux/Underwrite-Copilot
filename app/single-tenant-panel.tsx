@@ -44,6 +44,11 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
       ? { lease: inc.annualPct, model: model.rentGrowthPct * 100, how: inc.kind === "flat" ? "flat" : inc.how }
       : null;
   const scale = growth ? Math.max(growth.lease, growth.model, 1) : 1;
+  // The lease's growth a year, then the lease's own words where they say it
+  // differently ("10% every 5 years", "flat") — never "3% a year — 3% a
+  // year" for an annual bump the reader already words that way.
+  const perYear = growth ? `${pct2(growth.lease)} a year` : "";
+  const leaseText = growth && growth.how !== perYear ? `${perYear} — ${growth.how}` : perYear;
   const modelLine = model ? singleTenantModelLine(r, model) : "";
   const facts = [
     { k: "Guarantor", v: r.guarantor || "None named in the memorandum" },
@@ -65,7 +70,19 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
         <span className="text-sm font-semibold">{r.tenant}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
-      <p className="mt-1 text-sm leading-relaxed">{r.headline}</p>
+      {/* Who leases it and who guarantees it lead; the term, the options
+          and the increases are one click away and whole in the HTML, since
+          the pictures below draw them. */}
+      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
+      {r.sentences.length > 1 && (
+        <details className="group mt-1 text-sm leading-relaxed">
+          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
+            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
+            <span className="hidden group-open:inline">Less</span>
+          </summary>
+          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
+        </details>
+      )}
 
       {eff && eff.yearsLeft > 0 && (
         <div className="mt-2.5" data-qa="single-tenant-term">
@@ -82,7 +99,7 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
       {growth && (
         <ul className="mt-3 space-y-1.5" data-qa="single-tenant-growth">
           {[
-            { key: "lease", label: "The lease's increases", pct: growth.lease, text: `${pct2(growth.lease)} a year — ${growth.how}`, tone: "bg-brand/70", bar: "lease-increase" },
+            { key: "lease", label: "The lease's increases", pct: growth.lease, text: leaseText, tone: "bg-brand/70", bar: "lease-increase" },
             { key: "model", label: "The model's rent growth", pct: growth.model, text: `${pct1(growth.model)} a year`, tone: "bg-muted/50", bar: "model-growth" },
           ].map((g) => (
             <li key={g.key} className="text-[11px]">
@@ -99,14 +116,22 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
       )}
 
       {facts.length > 0 && (
-        <dl className="mt-3 grid grid-cols-[minmax(7rem,11rem)_1fr] gap-x-3 gap-y-1 text-xs" data-qa="single-tenant-facts">
-          {facts.map((f) => (
-            <div key={f.k} className="contents">
-              <dt className="font-medium text-ink">{f.k}</dt>
-              <dd className="min-w-0 text-muted">{f.v}</dd>
-            </div>
-          ))}
-        </dl>
+        // A fact's label over its value until the panel itself is 28rem
+        // wide: beside an 11rem label column a phone left the value 75px,
+        // and "Walgreens Boots Alliance, Inc." broke a word a line.
+        <div className="@container/tenant mt-3">
+          <dl
+            className="grid grid-cols-1 gap-y-1.5 text-xs @md/tenant:grid-cols-[minmax(7rem,11rem)_1fr] @md/tenant:gap-x-3 @md/tenant:gap-y-1"
+            data-qa="single-tenant-facts"
+          >
+            {facts.map((f) => (
+              <div key={f.k} className="@md/tenant:contents">
+                <dt className="font-medium text-ink">{f.k}</dt>
+                <dd className="min-w-0 text-muted">{f.v}</dd>
+              </div>
+            ))}
+          </dl>
+        </div>
       )}
 
       {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}

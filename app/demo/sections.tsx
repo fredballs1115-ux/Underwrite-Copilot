@@ -133,6 +133,7 @@ export function DemoSections({ data }: { data: DemoData }) {
           <ChallengerView
             result={data.challenges}
             dealName="The Maddox at Brewerytown"
+            totalPages={data.extraction.totalPages ?? null}
           />
         )}
         {tab === "comps" && (

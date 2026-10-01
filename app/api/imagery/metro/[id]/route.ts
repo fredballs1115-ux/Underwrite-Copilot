@@ -13,30 +13,8 @@
 // the homepage costs nothing to serve and needs no key.
 
 import { NextResponse } from "next/server";
-import { metroView } from "@/lib/metro-imagery";
+import { metroFrame, metroView } from "@/lib/metro-imagery";
 import { fetchMetroOverhead } from "@/lib/metro-overhead";
-
-// 1600 is the hero's backdrop (lib/photos HERO_AERIAL): a 1.2km frame across
-// 1600px is ~0.75 m/px, still inside NAIP's native 0.6–1.0 m/px, so even
-// the largest frame is not upscaled.
-const SIZE = { min: 96, max: 1600, defaultW: 480, defaultH: 360 };
-
-function clamp(raw: string | null, lo: number, hi: number, fallback: number): number {
-  // A MISSING dimension is the default, not the floor. This is the same
-  // defect the skyline route carried: `Number(null)` and `Number("")` are
-  // both 0, which is finite, so the "not a number" branch never fired for
-  // the one case it was written for — only for nonsense like `?w=abc`. A
-  // request without `?w=` came back 96px wide instead of 480, and without
-  // `?h=` 96 tall instead of 360. Nothing renders wrong today because
-  // CityPhoto always passes both; it is anyone hitting the route directly
-  // who got a thumbnail. The two imagery routes are the only two places in
-  // the codebase with this shape — everywhere else guards the empty string
-  // before converting.
-  if (raw === null || raw.trim() === "") return fallback;
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(hi, Math.max(lo, Math.round(n)));
-}
 
 export async function GET(
   req: Request,
@@ -47,9 +25,14 @@ export async function GET(
   // Unknown market -> 404, never a guessed location.
   if (!view) return new NextResponse(null, { status: 404 });
 
+  // Only the frames the site's own pages ask for are drawn (METRO_FRAMES,
+  // up to 1600px: a 1.2km frame across 1600px is ~0.75 m/px, still inside
+  // NAIP's native 0.6–1.0 m/px, so even the largest is not upscaled). Any
+  // other size is snapped to the nearest of them rather than refused, so a
+  // public route cannot be made to draw a new frame per request; a missing
+  // size is the gallery tile's.
   const q = new URL(req.url).searchParams;
-  const width = clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW);
-  const height = clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH);
+  const [width, height] = metroFrame(q.get("w"), q.get("h"));
 
   // The fetch, its success test and the finish live in lib/metro-overhead
   // (#436), shared with the link preview's card.

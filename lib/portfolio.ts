@@ -243,6 +243,17 @@ export function shareBasisWord(p: PortfolioRead, noun: Noun): string | null {
 }
 
 /**
+ * How much of its track a share's bar fills, 0 to 1: the share of the
+ * whole, so a 53% share fills 53% of the track — the deal page's card and
+ * the report's portfolio page draw through this one rule. The bars had been
+ * scaled to the largest share in either set, so a 53% share drew at 97%
+ * beside its own "53%".
+ */
+export function shareOfTrack(sharePct: number): number {
+  return Number.isFinite(sharePct) ? Math.max(0, Math.min(1, sharePct / 100)) : 0;
+}
+
+/**
  * The facts a buyer should see before pricing any of it: one property
  * carrying the income, an income split the memorandum does not state, an
  * allocation that does or does not add up to the ask, a property whose

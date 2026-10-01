@@ -19,7 +19,7 @@ export function ChangePasswordForm() {
           name="password"
           type="password"
           required
-          minLength={6}
+          minLength={8}
           autoComplete="new-password"
           className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
         />
@@ -33,7 +33,7 @@ export function ChangePasswordForm() {
           name="confirm"
           type="password"
           required
-          minLength={6}
+          minLength={8}
           autoComplete="new-password"
           className="rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
         />

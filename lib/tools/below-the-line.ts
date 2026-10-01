@@ -18,13 +18,16 @@
 //    fact that an accountant capitalises it does not make the money stay in
 //    the bank. The test is recurrence, not accounting treatment.
 //
-// 2. LEASING CAPITAL IS NOT OPTIONAL, AND ITS ANNUAL COST IS NOT ITS
-//    INVOICE. A building with five-year leases re-leases a fifth of itself
-//    every year on average. Spending nothing this year does not mean the
-//    cost is zero — it means it is due later, and the run-rate is the
-//    invoice divided by the term. `leasingAnnual` is that: the per-foot
-//    TI and commission over the lease term, on the share of space that
-//    actually rolls.
+// 2. LEASING CAPITAL IS NOT OPTIONAL, AND ITS ANNUAL COST IS AN AVERAGE
+//    YEAR'S INVOICE, NOT THIS YEAR'S. A building with five-year leases
+//    re-leases a fifth of itself every year on average. Spending nothing
+//    this year does not mean the cost is zero — it means it is due later.
+//    `leasingAnnual` is the space that rolls in an average year times the
+//    TI and commission a foot of it costs — which is the whole building's
+//    re-leasing invoice spread over the term, said the other way round. The
+//    roll already IS the term (a fifth a year is five-year leases), so the
+//    year's roll is never divided by the term again: the first version did,
+//    counted the term twice, and printed a fifth of the cost.
 //
 // 3. A RENEWAL IS CHEAPER THAN A NEW LEASE, AND THE MIX IS AN ASSUMPTION.
 //    Blending them at 50/50 is a choice, not a fact, so the renewal
@@ -35,10 +38,12 @@
 // 4. THE COST IS SAID AS A PRICE. Everything here is an annual figure, and
 //    an annual figure at a cap rate is a dollar amount of value. That is
 //    the number to argue about, and it is the one nobody prints: on the
-//    seeded 200,000-foot building the three lines come to $310,000 a year,
-//    which at a 5.5% cap is $5.6M of price.
+//    seeded 200,000-foot building the lines come to $1,344,000 a year,
+//    which at a 5.5% cap is $24.4M of price — half the ask.
 //
 // The seeded building is deliberately ordinary. Nothing here is padding.
+
+import { usdExact } from "./format";
 
 export interface BelowLine {
   label: string;
@@ -75,7 +80,8 @@ export interface BelowResult {
   note: string;
 }
 
-const EMPTY: BelowResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: BelowResult = {
   brokerNoi: null,
   lines: [],
   totalAnnual: null,
@@ -106,10 +112,10 @@ export interface BelowInput {
   priceUsd?: number | null;
   /** the reserve, per square foot per year */
   reservePerSf?: number | null;
-  /** how much of the building rolls in an average year, as a percent */
+  /** how much of the building rolls in an average year, as a percent — on
+   *  five-year leases a fifth of it, so this IS the lease term, said as a
+   *  share (rule 2) */
   annualRolloverPct?: number | null;
-  /** the average lease term, over which leasing capital is spread */
-  leaseTermYears?: number | null;
   /** allowance on a NEW lease, per square foot of the space leased */
   newTiPerSf?: number | null;
   /** …and on a renewal, which is always the smaller */
@@ -127,16 +133,17 @@ export function readBelow(t: BelowInput): BelowResult {
   if (!real(t.brokerNoi) || !real(t.buildingSf) || t.buildingSf <= 0) return EMPTY;
 
   const sf = t.buildingSf;
-  // Rule 2. The space that rolls in a year, and what re-leasing it costs
-  // spread over the term it buys. Spending nothing this year does not make
-  // the cost zero; it makes it late.
+  // Rule 2. The space that rolls in an average year, times what re-leasing
+  // a foot of it costs. That is already a year's cost — the roll is the
+  // term said as a share — so it is not divided by the term again.
+  // Spending nothing this year does not make the cost zero; it makes it
+  // late.
   const rollingSf = sf * (atLeastZero(t.annualRolloverPct) / 100);
-  const term = real(t.leaseTermYears) && t.leaseTermYears > 0 ? t.leaseTermYears : 1;
   const newCost = atLeastZero(t.newTiPerSf) + atLeastZero(t.newLcPerSf);
   const renewCost = atLeastZero(t.renewalTiPerSf) + atLeastZero(t.renewalLcPerSf);
 
-  const leasingIfAllRenew = round((rollingSf * renewCost) / term);
-  const leasingIfNoneRenew = round((rollingSf * newCost) / term);
+  const leasingIfAllRenew = round(rollingSf * renewCost);
+  const leasingIfNoneRenew = round(rollingSf * newCost);
   // Rule 3: the mix is an assumption, so it is an input and both ends are
   // reported. A memorandum quoting only the renewal number is quoting the
   // best case as the expectation.
@@ -144,7 +151,7 @@ export function readBelow(t: BelowInput): BelowResult {
     ? Math.max(0, Math.min(100, t.renewalProbabilityPct)) / 100
     : 0.5;
   const blendedPerSf = renewCost * p + newCost * (1 - p);
-  const leasingAnnual = round((rollingSf * blendedPerSf) / term);
+  const leasingAnnual = round(rollingSf * blendedPerSf);
 
   const reserveAnnual = round(sf * atLeastZero(t.reservePerSf));
   const other = round(atLeastZero(t.otherAnnual));
@@ -190,7 +197,7 @@ export function readBelow(t: BelowInput): BelowResult {
   } else if (capGapBps !== null) {
     note = `The cover page's NOI is ${capGapBps}bp of cap rate above the one a lender would underwrite.`;
   } else {
-    note = `${round(totalAnnual).toLocaleString("en-US")} a year sits below the line. Enter a price to see what it is worth.`;
+    note = `${usdExact(totalAnnual)} a year sits below the line. Enter a price to see what it is worth.`;
   }
 
   return {

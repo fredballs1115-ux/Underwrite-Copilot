@@ -47,6 +47,8 @@
  * Pure, no I/O. Rents and costs are per rentable square foot throughout.
  */
 
+import { usdCents } from "./format";
+
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
 }
@@ -225,8 +227,10 @@ function noteFor(x: FeasibilityRead): string {
   return "Enter today's market rent to see whether a new building pencils against it.";
 }
 
+/** A rent a foot to the cent through the shared writer, the size alone:
+ *  each sentence says the direction in words ("MORE", "more"). */
 function usd(n: number): string {
-  return `$${Math.abs(n).toFixed(2)}`;
+  return usdCents(Math.abs(n));
 }
 
 function round(n: number, places = 0): number {

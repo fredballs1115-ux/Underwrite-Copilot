@@ -64,7 +64,7 @@ describe("a manufactured-housing park, read as stated (#470)", () => {
     );
     expect(r.headline).toContain("The 18 vacant pads earn nothing until a home is moved onto each");
     expect(r.headline).toContain(
-      "The average lot rent is $430 a month against the memorandum's market $525: $95 a month (22.1%) under, $150,480 a year across the 132 occupied pads were every lot at market.",
+      "The average lot rent is $430 a month against the memorandum's market $525: $95 a month under, 22.1% of the rent in place, $150,480 a year across the 132 occupied pads were every lot at market.",
     );
     expect(r.headline).toContain(
       "A park-owned home rents for $895 a month, $465 above its lot's $430: across the 18 homes, up to $100,440 a year of the income is the homes' rather than the land's.",
@@ -90,6 +90,17 @@ describe("a manufactured-housing park, read as stated (#470)", () => {
     expect(readUtilities("City water and sewer", "Not billed back").billing).toBe("park");
     expect(utilityLabel(readUtilities("Municipal water; septic system"))).toBe("Public water, private sewer");
     expect(utilityLabel(readUtilities("Private well and septic"))).toBe("Private water & sewer");
+  });
+
+  it("reads a bare source word by what the row's label names (#471)", () => {
+    const both = readManufacturedHousing(park([row("Pads", "80"), row("Water/Sewer", "Public")]))!;
+    expect(both.utilities).toMatchObject({ water: "public", sewer: "public", kind: "public", stated: "Public" });
+    // Rows of their own are read together.
+    const apart = readManufacturedHousing(park([row("Pads", "80"), row("Water", "City"), row("Sewer", "Septic system")]))!;
+    expect(apart.utilities).toMatchObject({ water: "public", sewer: "private", kind: "mixed", stated: "Water: City; Sewer: Septic system" });
+    expect(readManufacturedHousing(park([row("Pads", "80"), row("Utilities", "Private")]))!.utilities).toMatchObject({ kind: "private" });
+    // A bare word under a label that names neither is no source.
+    expect(readManufacturedHousing(park([row("Pads", "80"), row("Utilities", "$48,000")]))).toBeNull();
   });
 
   it("reads a monthly rent to the cent, never a range as an average, and a market range at its low end", () => {

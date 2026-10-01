@@ -12,9 +12,17 @@ import type {
 } from "@/lib/model/types";
 import { computeModel, type CashFlowYear } from "@/lib/model/compute";
 import {
+  builtSentence,
+  changedSinceSentence,
+  modelProvenance,
+  sourcingSentence,
+  statedByDocument,
+} from "@/lib/model/provenance";
+import {
   computeSensitivityGrid,
   SENSITIVITY_PRICE_FACTORS,
 } from "@/lib/model/sensitivity";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
 import {
   addDealDocument,
   removeDealDocument,
@@ -42,36 +50,55 @@ export function ModelView({
   documents,
   active,
   isPro,
+  isSample = false,
+  interest = null,
 }: {
   dealId: string;
   model: UnderwritingModel | null;
   documents: DealDocument[];
   active: boolean;
   isPro: boolean;
+  /** the sample deal, whose model lists the fixture's documents and which
+   *  has no document rows of its own to compare them with */
+  isSample?: boolean;
+  /** what the price buys, read by the compare table's rule (lib/compare-
+   *  interest `modelReturnsRead`): a note's or a share's returns withheld */
+  interest?: ModelReturnsRead | null;
 }) {
+  // Returns the price did not buy are withheld — and so are the stress
+  // panel's and the grid's, which recompute the same returns.
+  const withheld = interest?.withheld ?? null;
   return (
     <div className="flex flex-col gap-6">
       {model ? (
         <>
-          <FirstDraftBanner />
-          <ReturnsHeadline model={model} />
-          <StressPanel model={model} />
-          <Sensitivity model={model} />
+          <FirstDraftBanner model={model} documents={documents} compare={!isSample} />
+          <ReturnsHeadline model={model} interest={interest} />
+          {!withheld && <StressPanel model={model} />}
+          {!withheld && <Sensitivity model={model} />}
           <Conflicts conflicts={model.conflicts} />
-          <Assumptions metrics={model.metrics} />
+          <Assumptions metrics={model.metrics} generatedFrom={model.generatedFrom} />
           <CapexPanel model={model} />
           <CashFlow cashFlow={model.cashFlow} />
           <SummaryCaveats summary={model.summary} caveats={model.caveats} />
-          {isPro ? (
-            <DownloadRow dealId={dealId} />
-          ) : (
-            <Link
-              href="/billing?upsell=underwrite"
-              className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-4 py-2.5 text-sm font-medium text-caution transition-colors hover:bg-caution/10"
-            >
-              Upgrade to Pro to download the Excel model
-            </Link>
-          )}
+          <div className="flex flex-col gap-1.5">
+            {isPro ? (
+              <DownloadRow dealId={dealId} />
+            ) : (
+              <Link
+                href="/billing?upsell=underwrite"
+                className="inline-flex w-fit items-center gap-1.5 rounded-lg border border-caution/30 bg-caution/5 px-4 py-2.5 text-sm font-medium text-caution transition-colors hover:bg-caution/10"
+              >
+                Upgrade to Pro to download the OM underwrite model (.xlsx)
+              </Link>
+            )}
+            {/* Two models, said as two: the card's returns are this
+                first draft's; the workbook's are the OM underwrite's. */}
+            <p data-qa="workbook-note" className="max-w-2xl text-xs leading-relaxed text-muted">
+              The workbook is a separate model, built from the memorandum’s
+              terms — its returns can differ from the ones above.
+            </p>
+          </div>
         </>
       ) : (
         <Intro />
@@ -96,8 +123,7 @@ function Intro() {
       </h2>
       <p className="mt-1.5 max-w-2xl text-sm leading-relaxed text-muted">
         Upload what you have — one document is enough to start. Actuals beat
-        pro forma, every conflict is shown, and the Excel comes with every
-        number sourced.
+        pro forma, and every conflict is shown with its sources.
       </p>
     </div>
   );
@@ -147,14 +173,43 @@ function InputsNeeded({ documents }: { documents: DealDocument[] }) {
   );
 }
 
-function FirstDraftBanner() {
+// The first-draft workbook this card once exported, and its Conflicts sheet,
+// were retired (2d036c4): the one Excel download is the OM underwrite
+// (lib/underwrite/workbook.ts), a separate model built from the
+// memorandum's figures. The card says so beside its download button.
+//
+// What the banner says is counted, never claimed (lib/model/provenance):
+// how many assumptions a document states and how many the model chose where
+// none does, when the model was built and from which documents, and what
+// the deal's documents gained or lost since — with the way to rebuild.
+function FirstDraftBanner({
+  model,
+  documents,
+  compare,
+}: {
+  model: UnderwritingModel;
+  documents: DealDocument[];
+  /** compare the deal's documents with the model's — never on the sample */
+  compare: boolean;
+}) {
+  const read = modelProvenance(model, documents);
+  const changed = compare ? changedSinceSentence(read) : "";
   return (
     <div className="rounded-xl border border-line border-l-4 border-l-caution bg-caution/5 px-4 py-3">
       <p className="text-sm font-medium">First-draft model — verify before relying on it</p>
-      <p className="mt-0.5 text-xs leading-relaxed text-muted">
-        Every number traces to a source; conflicts are listed below and on the
-        Excel’s Conflicts sheet.
+      <p className="mt-0.5 text-xs leading-relaxed text-muted">{sourcingSentence(read)}</p>
+      <p data-qa="model-built" className="mt-1 text-xs leading-relaxed text-muted">
+        {builtSentence(read)}
       </p>
+      {changed && (
+        <p data-qa="model-changed" className="mt-1 text-xs font-medium leading-relaxed text-caution">
+          {changed}{" "}
+          <a href="#model-documents" className="underline underline-offset-2 transition-colors hover:text-ink">
+            Regenerate the model
+          </a>{" "}
+          to build from the documents the deal has now.
+        </p>
+      )}
     </div>
   );
 }
@@ -189,9 +244,20 @@ function Stat({
  *  misread — either way not a return. Mirrors lib/deal-strategy. */
 const IMPLAUSIBLE_CAP = 0.25;
 
-export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
+export function ReturnsHeadline({
+  model,
+  interest = null,
+}: {
+  model: UnderwritingModel;
+  /** what the price buys (lib/compare-interest `modelReturnsRead`): a
+   *  note's or a share's returns are withheld, with the reason */
+  interest?: ModelReturnsRead | null;
+}) {
   const r = model.returns;
-  const implausible = r.purchasePrice > 0 && r.year1Noi / r.purchasePrice >= IMPLAUSIBLE_CAP;
+  const withheld = interest?.withheld ?? null;
+  // The building's NOI over a loan's or a share's price is no misread plan:
+  // the price is not the building's, and the line above the figures says so.
+  const implausible = !withheld && r.purchasePrice > 0 && r.year1Noi / r.purchasePrice >= IMPLAUSIBLE_CAP;
   return (
     <section>
       <div className="flex items-center justify-between gap-3">
@@ -241,15 +307,36 @@ export function ReturnsHeadline({ model }: { model: UnderwritingModel }) {
           />
         </div>
       )}
+      {interest?.line && (
+        <p data-qa="returns-withheld" className="mt-3 max-w-2xl text-xs leading-relaxed text-muted">
+          {interest.line}
+        </p>
+      )}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Levered IRR" value={pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
-        <Stat label="Cash-on-cash (Yr 1)" value={pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
-        <Stat label="Equity multiple" value={mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
-        <Stat
-          label={r.yieldOnCostPct != null ? "Going-in cap (Yr 1)" : "Going-in cap"}
-          value={pct(r.goingInCapPct)}
-          tone={implausible ? "kill" : r.goingInCapPct < 0 ? "caution" : undefined}
-        />
+        <Stat label="Levered IRR" value={withheld ? `n/a — ${withheld}` : pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Cash-on-cash (Yr 1)" value={withheld ? `n/a — ${withheld}` : pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Equity multiple" value={withheld ? `n/a — ${withheld}` : mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
+        {withheld === "note" ? (
+          // A note has no cap: its yield to maturity at its price where it
+          // pays or may, the deal header's own slot (lib/compare-interest).
+          interest?.noteYtmPct != null ? (
+            <Stat label="Yield to maturity" value={pct(interest.noteYtmPct)} />
+          ) : (
+            <Stat label="Going-in cap" value="n/a — note" />
+          )
+        ) : interest?.share ? (
+          // A share's cap is struck on the whole its price implies.
+          <Stat
+            label="Going-in cap (on the whole)"
+            value={interest.cap != null ? pct(interest.cap) : "n/a — share"}
+          />
+        ) : (
+          <Stat
+            label={r.yieldOnCostPct != null ? "Going-in cap (Yr 1)" : "Going-in cap"}
+            value={pct(r.goingInCapPct)}
+            tone={implausible ? "kill" : r.goingInCapPct < 0 ? "caution" : undefined}
+          />
+        )}
         <Stat label="Purchase price" value={usd(r.purchasePrice)} />
         <Stat label="Equity" value={usd(r.equity)} />
         <Stat
@@ -277,14 +364,14 @@ function irrTone(v: number | null): string {
   return "text-kill";
 }
 
-// Live exit-cap × price IRR grid — re-runs the deterministic cash-flow engine
-// at each grid point (same math the Excel sensitivity table uses).
+// Live exit-cap × price IRR grid — re-runs this model's own cash-flow engine
+// (lib/model/compute) at each grid point. The Excel download is the OM
+// underwrite (lib/underwrite), a separate model with its own grids.
 export function Sensitivity({ model }: { model: UnderwritingModel }) {
   const base = model.inputs;
   if (!base?.exitCapPct || !base?.purchasePrice) return null;
 
-  // Same shared engine + grid definition the Excel builder uses — "same math
-  // as the workbook" is true by construction.
+  // The grid definition lib/model/sensitivity keeps once for this card.
   const rows = computeSensitivityGrid(base).map((g) => ({
     exit: g.exitCapPct,
     cells: g.cells.map((c) => ({ irr: c.irrPct, isBase: c.isBase })),
@@ -347,7 +434,8 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
 
 /* ------------------------------------------------------------------ */
 /* Stress the assumptions — the four levers a screen turns on,         */
-/* recomputed live through the same deterministic engine as the Excel. */
+/* recomputed live through this model's own engine (lib/model/compute; */
+/* the Excel download is lib/underwrite's, a separate model).          */
 /* ------------------------------------------------------------------ */
 
 type StressAdjust = {
@@ -446,7 +534,7 @@ export function StressPanel({ model }: { model: UnderwritingModel }) {
         <h2 className="text-sm font-semibold tracking-tight">
           Stress the assumptions{" "}
           <span className="font-normal text-muted">
-            · live, same math as the Excel
+            · live, on this model
           </span>
         </h2>
         {dirty && (
@@ -624,13 +712,28 @@ export function Conflicts({ conflicts }: { conflicts: ReconciledMetric[] }) {
   );
 }
 
-export function Assumptions({ metrics }: { metrics: ReconciledMetric[] }) {
+export function Assumptions({
+  metrics,
+  generatedFrom = [],
+}: {
+  metrics: ReconciledMetric[];
+  /** the documents the model was built from, which a row's source may cite
+   *  by file name (lib/model/provenance) */
+  generatedFrom?: string[];
+}) {
   const [open, setOpen] = useState(false);
   const shown = open ? metrics : metrics.slice(0, 8);
+  // Counted, never claimed: a row no document states is the model's own.
+  const assumed = metrics.filter((m) => !statedByDocument(m, generatedFrom)).length;
   return (
     <section>
       <h2 className="text-sm font-semibold tracking-tight">
-        Assumptions <span className="font-normal text-muted">· every value sourced</span>
+        Assumptions{" "}
+        <span className="font-normal text-muted">
+          {assumed === 0
+            ? "· each from your documents"
+            : `· ${metrics.length - assumed} from your documents, ${assumed} assumed`}
+        </span>
       </h2>
       <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[40rem] text-sm">
@@ -660,7 +763,21 @@ export function Assumptions({ metrics }: { metrics: ReconciledMetric[] }) {
                   <td className="whitespace-nowrap px-4 py-3 font-mono tabular-nums">
                     {m.chosenValue}
                   </td>
-                  <td className="px-4 py-3 text-muted">{m.authority}</td>
+                  <td className="px-4 py-3 text-muted">
+                    {m.authority}
+                    {!statedByDocument(m, generatedFrom) && (
+                      <>
+                        {" "}
+                        <span
+                          data-qa="assumed"
+                          title="No document states this figure — the model chose it"
+                          className="ml-1 inline-flex rounded-full bg-caution/10 px-1.5 py-px text-[10px] font-medium uppercase text-caution"
+                        >
+                          assumed
+                        </span>
+                      </>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <span
                       className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${c.cls}`}
@@ -877,7 +994,7 @@ function DownloadRow({ dealId }: { dealId: string }) {
         <path d="m7 10 5 5 5-5" />
         <path d="M12 15V3" />
       </svg>
-      Download Excel model (.xlsx)
+      Download the OM underwrite model (.xlsx)
     </a>
   );
 }
@@ -896,7 +1013,8 @@ function DocumentsPanel({
   isPro: boolean;
 }) {
   return (
-    <section className="rounded-xl border border-line bg-surface p-5 shadow-sm">
+    // The banner's "Regenerate the model" lands here, at the control.
+    <section id="model-documents" className="scroll-mt-24 rounded-xl border border-line bg-surface p-5 shadow-sm">
       <h2 className="text-sm font-semibold tracking-tight">
         Documents <span className="font-normal text-muted">· {documents.length}</span>
       </h2>
@@ -983,7 +1101,7 @@ function DocumentsPanel({
       ) : (
         <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted">
-            Building the Excel model is a{" "}
+            Building this model from your documents is a{" "}
             <span className="font-medium text-ink">Pro</span> feature.
           </p>
           <Link

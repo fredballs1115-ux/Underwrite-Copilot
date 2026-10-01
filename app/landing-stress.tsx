@@ -14,9 +14,10 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { SLIDER_SWEEP_BPS } from "@/lib/marketing-constants";
 
 const BASE = SAMPLE_DEAL.model.inputs;
-// The exit-cap lever sweeps the SAME band the product's slider claims
-// (SLIDER_SWEEP_BPS total), centered on the broker's base.
-const CAP_HALF = SLIDER_SWEEP_BPS / 200;
+// The exit-cap lever sweeps the SAME band the product's slider does
+// (SLIDER_SWEEP_BPS each way, in percentage points here), centered on the
+// broker's base.
+const CAP_HALF = SLIDER_SWEEP_BPS / 100;
 
 const fmtPct = (n: number | null) =>
   n == null || !isFinite(n) ? "—" : `${n.toFixed(1)}%`;

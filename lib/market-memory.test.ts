@@ -1,12 +1,17 @@
 import { describe, it, expect } from "vitest";
 import {
+  basisLabel,
   buildComps,
+  explorerLeads,
   summarizeMarkets,
   marketMemoryFor,
+  marketsIn,
+  memoryCandidates,
   median,
   normalizeMarketKey,
   fmtCapRange,
   fmtBasisRange,
+  type MemoryKeyRow,
 } from "./market-memory";
 
 function deal(
@@ -154,7 +159,7 @@ describe("summarizeMarkets", () => {
   it("computes cap and basis ranges over the members that carry them", () => {
     const g = groups[0];
     expect(g.cap).toEqual({ min: 5.0, median: 5.2, max: 5.4 });
-    expect(g.perUnit).toEqual({ min: 250_000, median: 275_000, max: 300_000, basis: "unit" });
+    expect(g.perUnit).toEqual({ min: 250_000, median: 275_000, max: 300_000, basis: "unit", noun: "unit" });
   });
   it("tallies the verdict calls", () => {
     expect(groups[0].calls).toEqual({ pass: 1, caution: 1, pass_on: 0 });
@@ -184,6 +189,86 @@ describe("marketMemoryFor — the deal-page strip", () => {
   });
 });
 
+describe("an outdoor-storage yard's shop building is never a market's per-SF basis", () => {
+  const yard = (id: string, metrics: Array<[string, string]>, assetClass = "industrial") => ({
+    ...deal(id, { assetClass, market: "Dallas, TX", metrics }),
+    extraction: { assetClass: "Industrial Outdoor Storage (IOS)", market: "Dallas, TX", metrics: metrics.map(([label, value]) => ({ label, value })) },
+  });
+
+  it("pools the yard's cap and never its price over the shop building", () => {
+    const comps = buildComps([
+      yard("y1", [["Going-in cap rate", "6.0%"], ["Asking price", "$12,000,000"], ["Building SF", "4,000"]]),
+      deal("w1", { assetClass: "industrial", market: "Dallas, TX", metrics: [["Going-in cap rate", "5.5%"], ["Asking price", "$20,000,000"], ["Total SF", "100,000 SF"]] }),
+    ]);
+    const by = Object.fromEntries(comps.map((c) => [c.dealId, c]));
+    expect(by.y1.capPct).toBe(6);
+    expect(by.y1.perUnit).toBeNull();
+    expect(by.y1.perUnitBasis).toBeNull();
+    // The warehouse's $200/SF is the group's whole basis range; the yard's
+    // $3,000/SF never joins it.
+    expect(by.w1.perUnit).toBe(200);
+    expect(summarizeMarkets(comps)[0].perUnit).toEqual({ min: 200, median: 200, max: 200, basis: "sf", noun: null });
+  });
+
+  it("a yard with no cap is no comp at all", () => {
+    expect(buildComps([yard("y2", [["Asking price", "$12,000,000"], ["Building SF", "4,000"]])])).toEqual([]);
+    // Filed under the deck's word too.
+    expect(buildComps([yard("y3", [["Asking price", "$12,000,000"], ["Building SF", "4,000"]], "Truck terminal")])).toEqual([]);
+  });
+});
+
+describe("memoryCandidates — the reader's own deals in this deal's group, read light", () => {
+  const key = (id: string, over: Partial<MemoryKeyRow> = {}): MemoryKeyRow => ({
+    id,
+    asset_class: "multifamily",
+    is_sample: false,
+    market: "Dallas, TX",
+    ext_class: "Multifamily",
+    ...over,
+  });
+
+  it("finds every same-class, same-market deal the way buildComps groups them", () => {
+    const rows = [
+      key("self"),
+      key("a"),
+      key("b", { market: "Dallas TX" }), // punctuation variant, same group
+      key("c", { asset_class: "auto", ext_class: "multifamily" }), // Auto reads the deck's class
+      key("d", { market: "Austin, TX" }),
+      key("e", { asset_class: "office" }),
+      key("f", { asset_class: "auto", ext_class: null }),
+      key("sample", { is_sample: true }),
+      key("g", { market: null }),
+    ];
+    expect(memoryCandidates(rows, "self", "multifamily", "Dallas, TX")).toEqual(["a", "b", "c"]);
+  });
+
+  it("the ids it finds are the group marketMemoryFor aggregates — none left out, whoever else the team screened", () => {
+    const full = [
+      deal("a", { market: "Dallas, TX", metrics: [["Going-in cap rate", "5.0%"], ["Purchase price", "$50,000,000"], ["Units", "200"]] }),
+      deal("b", { market: "Dallas TX", metrics: [["Going-in cap rate", "5.4%"], ["Purchase price", "$60,000,000"], ["Units", "200"]] }),
+      deal("x", { market: "Dallas, TX", metrics: [["Year built", "1985"]] }), // no cap, no basis
+    ];
+    const rows: MemoryKeyRow[] = full.map((d) => ({
+      id: d.id,
+      asset_class: d.asset_class,
+      is_sample: d.is_sample,
+      market: d.extraction?.market ?? null,
+      ext_class: null,
+    }));
+    const ids = memoryCandidates(rows, "self", "multifamily", "Dallas, TX");
+    expect(ids).toEqual(["a", "b", "x"]);
+    const g = marketMemoryFor(buildComps(full.filter((d) => ids.includes(d.id))), "self", "multifamily", "Dallas, TX")!;
+    // Two of the three left a cap or a basis behind — the count the strip
+    // prints, "with a cap or basis on file".
+    expect(g.count).toBe(2);
+  });
+
+  it("finds nothing without a class or a market to match", () => {
+    expect(memoryCandidates([key("a")], "self", "", "Dallas, TX")).toEqual([]);
+    expect(memoryCandidates([key("a")], "self", "multifamily", "  ")).toEqual([]);
+  });
+});
+
 describe("basis is consistent within an asset class (no mixed unit/SF range)", () => {
   it("non-multifamily always uses $/SF, even with a stray per-unit metric", () => {
     const comps = buildComps([
@@ -201,7 +286,104 @@ describe("basis is consistent within an asset class (no mixed unit/SF range)", (
     expect(comps.every((c) => c.perUnitBasis === "sf")).toBe(true);
     const g = summarizeMarkets(comps)[0];
     // Both $18M/90k and $20M/100k = $200/SF — one clean unit, never mixed.
-    expect(g.perUnit).toEqual({ min: 200, median: 200, max: 200, basis: "sf" });
+    expect(g.perUnit).toEqual({ min: 200, median: 200, max: 200, basis: "sf", noun: null });
+  });
+});
+
+describe("a basis wears its class's noun — a hotel's keys, a park's pads — never 'unit'", () => {
+  const hotel = (id: string, countLabel: string, count: string, price: string) =>
+    deal(id, {
+      assetClass: "hospitality_str",
+      market: "Nashville, TN",
+      metrics: [["Purchase price", price], [countLabel, count]],
+    });
+
+  it("a hotel's basis is per key, and the card's label says so", () => {
+    const [g] = summarizeMarkets(
+      buildComps([hotel("h1", "Keys", "200", "$40,000,000"), hotel("h2", "Keys", "160", "$36,000,000")]),
+    );
+    expect(g.perUnit).toEqual({ min: 200_000, median: 212_500, max: 225_000, basis: "unit", noun: "key" });
+    expect(fmtBasisRange(g.perUnit!)).toBe("$200–225k/key");
+    expect(basisLabel(g)).toBe("Basis / key");
+  });
+
+  it("a park's is per pad", () => {
+    const [g] = summarizeMarkets(
+      buildComps([
+        deal("p1", {
+          assetClass: "manufactured_housing",
+          market: "Ocala, FL",
+          metrics: [["Purchase price", "$12,000,000"], ["Pads", "200"]],
+        }),
+      ]),
+    );
+    expect(fmtBasisRange(g.perUnit!)).toBe("$60k/pad");
+    expect(basisLabel(g)).toBe("Basis / pad");
+  });
+
+  it("a group whose memoranda count in different words takes the class's noun, never a mix", () => {
+    const comps = buildComps([
+      hotel("h1", "Keys", "200", "$40,000,000"),
+      hotel("h2", "Guest rooms", "150", "$33,000,000"),
+    ]);
+    expect(comps.map((c) => c.perUnitNoun)).toEqual(["key", "room"]);
+    const [g] = summarizeMarkets(comps);
+    expect(g.count).toBe(2);
+    expect(g.perUnit?.noun).toBe("key");
+    expect(fmtBasisRange(g.perUnit!)).toBe("$200–220k/key");
+    // Every member counted in rooms: the memoranda's own word stands.
+    const rooms = summarizeMarkets(
+      buildComps([hotel("r1", "Guest rooms", "200", "$40,000,000"), hotel("r2", "Rooms", "100", "$22,000,000")]),
+    )[0];
+    expect(fmtBasisRange(rooms.perUnit!)).toBe("$200–220k/room");
+  });
+
+  it("the deal page's strip reads the same noun for its group", () => {
+    const comps = buildComps([hotel("h1", "Keys", "200", "$40,000,000"), hotel("h2", "Keys", "160", "$36,000,000")]);
+    const g = marketMemoryFor(comps, "h1", "hospitality_str", "Nashville, TN")!;
+    expect(fmtBasisRange(g.perUnit!)).toBe("$225k/key");
+  });
+
+  it("an office is per SF, and land — which the memory has no basis for — says its own", () => {
+    const [office] = summarizeMarkets(
+      buildComps([
+        deal("o1", { assetClass: "office", market: "Austin, TX", metrics: [["Cap rate", "6.0%"], ["Purchase price", "$30,000,000"], ["Total SF", "150,000 SF"]] }),
+      ]),
+    );
+    expect(basisLabel(office)).toBe("Basis / SF");
+    expect(basisLabel({ assetClass: "land_infill", perUnit: null })).toBe("Basis / acre");
+    expect(basisLabel({ assetClass: "hospitality_str", perUnit: null })).toBe("Basis / key");
+  });
+});
+
+describe("explorerLeads — /market opens on the covered markets for a reader with nothing of their own", () => {
+  const base = { signedIn: true, memoryFailed: false, groups: 0, submarkets: 0 };
+  it("a signed-in reader with no screens on file and no submarkets gets the explorer first", () => {
+    expect(explorerLeads(base)).toBe(true);
+  });
+  it("anything of their own keeps it in its place, and so does a memory that failed to load", () => {
+    expect(explorerLeads({ ...base, groups: 1 })).toBe(false);
+    expect(explorerLeads({ ...base, submarkets: 2 })).toBe(false);
+    expect(explorerLeads({ ...base, memoryFailed: true })).toBe(false);
+  });
+  it("a visitor signed out has no memory above it to move past", () => {
+    expect(explorerLeads({ ...base, signedIn: false })).toBe(false);
+  });
+});
+
+describe("marketsIn — /market's 'N screens across M markets' counts markets, not cards", () => {
+  it("three classes screened in one market are three cards and one market", () => {
+    const groups = summarizeMarkets(
+      buildComps([
+        deal("m1", { market: "Dallas, TX", metrics: [["Going-in cap rate", "5.0%"], ["Purchase price", "$50,000,000"], ["Units", "200"]] }),
+        deal("o1", { assetClass: "office", market: "Dallas TX", metrics: [["Cap rate", "6.5%"], ["Purchase price", "$30,000,000"], ["Total SF", "150,000 SF"]] }),
+        deal("i1", { assetClass: "industrial", market: "dallas, tx", metrics: [["Cap rate", "5.9%"], ["Purchase price", "$20,000,000"], ["Total SF", "200,000 SF"]] }),
+        deal("m2", { market: "Austin, TX", metrics: [["Going-in cap rate", "5.2%"], ["Purchase price", "$40,000,000"], ["Units", "160"]] }),
+      ]),
+    );
+    expect(groups).toHaveLength(4);
+    expect(marketsIn(groups)).toBe(2);
+    expect(marketsIn([])).toBe(0);
   });
 });
 

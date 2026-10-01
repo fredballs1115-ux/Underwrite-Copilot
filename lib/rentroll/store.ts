@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { ColumnMapping } from "./parse";
+import { matchSavedMapping, type ColumnMapping, type Grid } from "./parse";
 import type { Lease } from "./schema";
 import type { ValidationIssue } from "./validate";
 import { defaultProfileFor, normalizeProfile, type MarketLeasingProfile, type ProfileDraft } from "./profiles";
@@ -73,20 +73,26 @@ export async function getRentRollImport(
 // Saved column mappings
 // ---------------------------------------------------------------------------
 
-/** A mapping the user already confirmed for this header shape, if any. */
-export async function savedMappingFor(
+/** A mapping the user already confirmed for this file's shape, if any, at
+ *  the row its header sits on now — any row the detector reads, not only the
+ *  one it picked (lib/rentroll/parse `matchSavedMapping`). A user keeps a
+ *  handful of these, so they are read whole and matched here. */
+export async function savedMappingForGrid(
   supabase: SupabaseClient,
   userId: string,
-  signature: string,
+  grid: Grid,
+  detectedRow: number,
 ): Promise<ColumnMapping | null> {
-  if (!signature) return null;
   const { data } = await supabase
     .from("rent_roll_mappings")
-    .select("mapping")
+    .select("header_signature, mapping")
     .eq("user_id", userId)
-    .eq("header_signature", signature)
-    .maybeSingle();
-  return (data?.mapping as ColumnMapping | undefined) ?? null;
+    .order("updated_at", { ascending: false })
+    .limit(500);
+  const saved = ((data ?? []) as { header_signature: string; mapping: ColumnMapping }[])
+    .filter((r) => r.header_signature && r.mapping)
+    .map((r) => ({ signature: r.header_signature, mapping: r.mapping }));
+  return matchSavedMapping(grid, detectedRow, saved);
 }
 
 /** Remember a confirmed mapping so the next file from the same source is one
@@ -142,8 +148,10 @@ function parseProfile(row: Record<string, unknown>, fallback: ProfileDraft): Mar
   };
 }
 
-/** The user's saved profiles, newest first. Empty is normal — the asset-class
- *  default stands in until they save one. */
+/** The user's saved profiles, newest first, whatever class each was saved for
+ *  — the page lists them all to pick from, and opens a deal only on one of
+ *  its own family (lib/rentroll/profiles `openingProfile`). Empty is normal —
+ *  the asset-class default stands in until they save one. */
 export async function listProfiles(
   supabase: SupabaseClient,
   userId: string,

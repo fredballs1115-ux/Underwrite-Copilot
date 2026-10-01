@@ -1,15 +1,21 @@
 name: cbsa-counties
-# The Census Bureau's metro-area delineation → data/cbsa-counties.json
-# (#447): every county of every metropolitan statistical area and the metro
-# area it belongs to, so a deal in a suburb reads its metro's figures rather
-# than its state's (scripts/fetch-cbsa-counties.mjs says why and what the
-# runner printed of the file).
+# Federal reference tables the sandbox cannot fetch, each read from the
+# publisher's own file on this runner and published to a branch of its own,
+# force-pushed each run and never merged: the sandbox can fetch a branch of
+# this repository, so a table is read from there and committed with the code
+# that reads it. Dispatch only — neither table changes more than every few
+# years.
 #
-# The table goes to its own branch, `cbsa-counties`, force-pushed each run
-# and never merged: the sandbox cannot reach census.gov, but it can fetch a
-# branch of this repository, so the table is read from there and committed
-# with the code that reads it. Dispatch only — the delineation changes when
-# OMB redraws the areas, every few years.
+# - `counties`: the Census Bureau's metro-area delineation →
+#   data/cbsa-counties.json on the `cbsa-counties` branch (#447): every
+#   county of every metropolitan statistical area and the metro area it
+#   belongs to, so a deal in a suburb reads its metro's figures rather than
+#   its state's (scripts/fetch-cbsa-counties.mjs says why and what the
+#   runner printed of the file).
+# - `qoz`: the CDFI Fund's list of designated Qualified Opportunity Zone
+#   tracts → data/qoz-tracts.json on the `qoz-tracts` branch (#473): every
+#   designated tract by its 2010 number, so the site flags answer the
+#   Opportunity Zone question in every state (scripts/fetch-qoz-tracts.mjs).
 on:
   workflow_dispatch:
 permissions:
@@ -39,3 +45,27 @@ jobs:
           git commit -q -m "cbsa-counties $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
           git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" cbsa-counties
           echo "Pushed cbsa-counties.json to the cbsa-counties branch."
+  qoz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npm install --omit=dev --no-audit --no-fund
+      - name: Read the designated tracts
+        run: node scripts/fetch-qoz-tracts.mjs
+      - name: Publish the list to its own branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mkdir out
+          cp data/qoz-tracts.json out/
+          cd out
+          git init -q -b qoz-tracts
+          git config user.name "qoz-tracts"
+          git config user.email "qoz-tracts@users.noreply.github.com"
+          git add -A
+          git commit -q -m "qoz-tracts $(date -u +%Y-%m-%dT%H:%MZ) [skip ci]"
+          git push -q --force "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" qoz-tracts
+          echo "Pushed qoz-tracts.json to the qoz-tracts branch."

@@ -48,21 +48,90 @@ import { readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
 
 export type { InterestKind };
 
+// A percentage is a share only where its own words say what it is a share
+// OF. Any lone percentage had been read as the share, so "Preferred equity,
+// 12% preferred return" read as a 12% stake and grossed a $15M price up to
+// $125M. A return, a pref, a rate, a coupon, a yield, a cap, an IRR, a fee,
+// a promote or an occupancy is never an ownership share, and the words
+// naming one win over any share word beside them ("a 12% preferred equity
+// interest" is withheld, not read). The fee simple and the leased fee are
+// estates, not a fee or an occupancy.
+const NOT_A_SHARE =
+  /\breturns?\b|\bpref(?:s|erred|erence)?\b|\brates?\b|\bcoupons?\b|\byield|\bcaps?\b|\bcapped\b|\bcapitali[sz]ation\b|\birrs?\b|(?<!leased[\s-])\bfees?\b(?![\s-]+simple)|\bpromote[sd]?\b|\bcarr(?:y|ied)\b|\bprofits?\b|\boccup(?:ancy|ied)\b|\bleased\b(?![\s-]+fee)|\bvacan(?:t|cy)\b|\bhurdles?\b|\bearn|\bpa(?:y|ys|ying|id|yable)\b|\bdistribut|\baccru|\bdividends?\b|\bannual(?:ly)?\b|\bannum\b|\bcompound|\bcash[\s-]+on[\s-]+cash\b|\bltv\b|\bltc\b|\bloan[\s-]+to[\s-]+(?:value|cost)\b|\bdiscount|\bpremium|\bcommission|\bspread|\bmargin|\bcoverage\b|\bescalat|\bincrease|\bbumps?\b|\binterest[\s-]+(?:only|income|expense|reserve|payments?)\b|\bdefault\b/i;
+// What an ownership share is called: an interest, a stake, ownership, a
+// share, a tenancy in common, a membership or a partnership interest — or
+// the entity it is a share of ("49% of the LLC").
+const SHARE_WORDS =
+  /\binterests?\b|\bstakes?\b|\bown(?:ed|er|ers|ership)\b|\bshares?\b|\bten(?:ant|ants|ancy)[\s-]+in[\s-]+common\b|\btic\b|\bmember(?:s|ships?)?\b|\bpartner(?:s|ships?)?\b|\bllcs?\b|\bentity\b|\b(?:joint[\s-]+)?ventures?\b|\bjv\b/i;
+const PCT_MENTION = /(?<![\d.])(\d{1,2}(?:\.\d+)?)\s*(?:%|percent\b|per cent\b)/gi;
+// Where a percentage's own words end: its clause's end, a sentence's, or a
+// word that starts the next clause.
+const CLAUSE_WORD = String.raw`\s(?:and|with|plus|while|which|whereas|but|at|or|versus|vs\.?|including|excluding|where|when)\s`;
+const WORDS_AFTER_END = new RegExp(String.raw`[,;:)\]\n]|\.(?=\s|$)|${CLAUSE_WORD}`, "i");
+// The words before it run back to its clause's start — never past a colon or
+// an opening parenthesis, which put a label in front ("Ownership: 49%",
+// "TIC interest (49%)").
+const WORDS_BEFORE_START = new RegExp(String.raw`[,;\n]|\.(?=\s|$)|${CLAUSE_WORD}`, "gi");
+
+/** What one percentage's own words say it is: "share", "not" (a return, a
+ *  rate, an occupancy…), or null where they name neither. */
+function readShareWords(words: string): "share" | "not" | null {
+  if (NOT_A_SHARE.test(words)) return "not";
+  return SHARE_WORDS.test(words) ? "share" : null;
+}
+
 /** A partial interest's share, in percent, read off the OM's own words
- *  ("49% limited partnership interest", "a 90 percent stake"); null where
- *  no single percentage under 100 is stated. */
+ *  ("49% limited partnership interest", "a 90 percent stake", "Ownership
+ *  interest: 49%"); null where no single percentage under 100 is stated AS a
+ *  share. A percentage counts only where the words right after it — or,
+ *  where those name nothing, the words right before it in its clause — name
+ *  an ownership share and no return, rate or occupancy; a percentage among
+ *  other words that name nothing is withheld, and so is a range ("49–51%").
+ *  A field that is ONE percentage and nothing else is the share, since the
+ *  field is the share's. */
 export function parseSharePct(text: string | null | undefined): number | null {
-  const t = (text ?? "").replace(/,/g, "");
-  const hits = [...t.matchAll(/(\d{1,2}(?:\.\d+)?)\s*(?:%|percent\b|per cent\b)/gi)].map((m) => Number(m[1]));
-  const valid = [...new Set(hits.filter((n) => Number.isFinite(n) && n > 0 && n < 100))];
-  // Two different percentages ("a 49% LP interest and a 2% GP interest") is
-  // not one share: withheld rather than picked.
+  const t = text ?? "";
+  // The share field is filled only on a partial interest, so a field that
+  // is nothing but one percentage ("49%", read off a table's "Interest
+  // offered" cell) IS the share: there are no words beside it to be a
+  // return's or a rate's.
+  const lone = t.trim().match(/^(\d{1,2}(?:\.\d+)?)\s*(?:%|percent|per cent)$/i);
+  if (lone) {
+    const n = Number(lone[1]);
+    return n > 0 && n < 100 ? n : null;
+  }
+  const hits = [...t.matchAll(PCT_MENTION)].map((m, i, all) => {
+    const start = m.index ?? 0;
+    const end = start + m[0].length;
+    // Up to the next percentage, and the point where this one's clause ends
+    // inside that stretch (-1: it runs to the next percentage).
+    const upTo = i + 1 < all.length ? (all[i + 1].index ?? t.length) : t.length;
+    const tail = t.slice(end, upTo);
+    return { n: Number(m[1]), start, end, tail, cut: tail.search(WORDS_AFTER_END) };
+  });
+  const shares = hits.flatMap((h, i) => {
+    if (!Number.isFinite(h.n) || !(h.n > 0) || !(h.n < 100)) return [];
+    // A range is no one share.
+    if (/\d\s*%?\s*(?:[-–—]|\bto)\s*$/i.test(t.slice(0, h.start)) || /^\s*(?:[-–—]|to\b)\s*\d/i.test(t.slice(h.end))) return [];
+    const after = h.cut >= 0 ? h.tail.slice(0, h.cut) : h.tail;
+    // The words before it are the ones after the previous percentage's own
+    // clause ended — never that percentage's words ("a 90% stake (10%
+    // retained by the sponsor)" is one share, not two).
+    const prev = i > 0 ? hits[i - 1] : null;
+    const lead = !prev ? t.slice(0, h.start) : prev.cut >= 0 ? prev.tail.slice(prev.cut) : "";
+    const clauseStart = [...lead.matchAll(WORDS_BEFORE_START)].at(-1);
+    const before = clauseStart ? lead.slice((clauseStart.index ?? 0) + clauseStart[0].length) : lead;
+    return (readShareWords(after) ?? readShareWords(before)) === "share" ? [h.n] : [];
+  });
+  const valid = [...new Set(shares)];
+  // Two different shares ("a 49% LP interest and a 2% GP interest") is not
+  // one share: withheld rather than picked.
   return valid.length === 1 ? valid[0] : null;
 }
 
 /** The minimum the price readers need: the kind, and a partial interest's
- *  share where one percentage is stated. An extraction saved before the
- *  interest was read is fee simple. */
+ *  share where one percentage is stated as the share (`parseSharePct`). An
+ *  extraction saved before the interest was read is fee simple. */
 export function interestOf(ex: ExtractionResult | null | undefined): { kind: InterestKind; sharePct: number | null } {
   const kind = ex?.interest?.kind ?? "fee_simple";
   return { kind, sharePct: kind === "partial_interest" ? parseSharePct(ex?.interest?.share) : null };
@@ -90,6 +159,27 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
       return yrs ? `Leased fee, reverts in ${yrs}` : "Leased fee";
     default:
       return null;
+  }
+}
+
+/** The deal type as the header names it, said whose strategy it is where
+ *  the price does not buy the building: a note's "Stabilized" describes the
+ *  collateral that secures the loan, a leased fee's the building someone
+ *  else owns on the land. Elsewhere the label as it stands. */
+export function dealTypeLabel(strategyLabel: string, ex: ExtractionResult | null | undefined): string {
+  return dealTypeLabelFor(strategyLabel, interestOf(ex).kind);
+}
+
+/** The same label from the interest's kind alone, for a surface that holds
+ *  the kind rather than the extraction (the workbook's cover). */
+export function dealTypeLabelFor(strategyLabel: string, kind: InterestKind | null | undefined): string {
+  switch (kind) {
+    case "note":
+      return `${strategyLabel} (the collateral)`;
+    case "leased_fee":
+      return `${strategyLabel} (the leaseholder's building)`;
+    default:
+      return strategyLabel;
   }
 }
 
@@ -146,6 +236,9 @@ export interface InterestRead {
    *  above the figures it draws; the headline itself on every other
    *  interest */
   lead: string;
+  /** the lead's sentences, one a line — the panel says the first and folds
+   *  the rest */
+  leadSentences: string[];
   /** what the property model on this deal is and is not, for the surfaces
    *  that draw one — null where it is simply the buyer's model */
   modelCaveat: string | null;
@@ -229,9 +322,24 @@ export function noteYieldSentence(n: NoteRead | null): string {
 
 /** The note's cushion (#416): the loan-to-value at the balance and at the
  *  price, over the value the OM states for the collateral — "" where it
- *  states none. */
+ *  states none. On a note behind other debt (a mezzanine loan, a junior
+ *  lien, a B-note) the loan-to-value is withheld and the sentence says why:
+ *  at its last dollar it needs the senior loan's balance, which the
+ *  memorandum does not state. Every surface that prints the cushion — the
+ *  headline the deal context and the challenger read, the panel, the
+ *  report's note terms — prints this sentence. */
 export function noteCollateralSentence(n: NoteRead | null): string {
-  if (!n || n.ltvAtBalancePct == null || n.ltvAtPricePct == null || n.terms.collateralValue == null) return "";
+  if (!n || n.terms.collateralValue == null) return "";
+  // Named beside other debt with no order stated: said as that, never as a
+  // senior loan the words do not place ahead of it (the audit of
+  // 2026-10-01).
+  if (n.terms.position === "unclear") {
+    return `The collateral's stated ${money(n.terms.collateralValue)} is not set against this note alone: the memorandum names other debt on the property without saying which loan comes first, so a loan-to-value at this note's last dollar cannot be read from it.`;
+  }
+  if (n.terms.subordinate) {
+    return `The collateral's stated ${money(n.terms.collateralValue)} is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.`;
+  }
+  if (n.ltvAtBalancePct == null || n.ltvAtPricePct == null) return "";
   return `The collateral's stated ${money(n.terms.collateralValue)} puts the balance at ${Math.round(n.ltvAtBalancePct)}% of its value and the price at ${Math.round(n.ltvAtPricePct)}%.`;
 }
 
@@ -318,39 +426,47 @@ export function readInterest(
       ? `the building's ${money(incomeBeforeGroundRent)} of income before the ground rent covers the ${money(groundRent)} rent ${times(groundRentCoverage)}`
       : null;
 
-  let headline: string;
+  // The lead, a sentence a line: the panel says the first and folds the
+  // rest; every other surface reads them as one paragraph.
+  const lead: string[] = [];
   let modelCaveat: string | null = null;
   switch (kind) {
     case "note":
-      headline =
-        "This memorandum sells a LOAN secured by the property, not the property: the buyer steps into the lender's position, and the return is the note's coupon and its discount to the balance — or, on a default, what the collateral fetches after foreclosure.";
+      lead.push(
+        "This memorandum sells a LOAN secured by the property, not the property: the buyer steps into the lender's position, and the return is the note's coupon and its discount to the balance — or, on a default, what the collateral fetches after foreclosure.",
+      );
       if (discountPct != null && price != null && balance != null) {
-        headline += ` The ${money(price)} price is ${discountPhrase(discountPct)} the ${money(balance)} unpaid balance.`;
+        lead.push(`The ${money(price)} price is ${discountPhrase(discountPct)} the ${money(balance)} unpaid balance.`);
       }
       modelCaveat =
         "The screening model underwrites the collateral as if it were bought outright at the note's price. That is not the note's return, and its cap rate and IRR are not figures this buyer earns.";
       break;
     case "partial_interest":
-      headline =
+      lead.push(
         sharePct != null && price != null && impliedWhole != null
           ? `This memorandum sells ${withArticle(shareText(sharePct))} share of the owning entity, not the whole asset: ${money(price)} for the share is ${money(impliedWhole)} for the whole, grossed up — the whole building's income is set against that, and a minority share is worth less than its slice once control, the promote and the exit rights are priced.`
-          : "This memorandum sells a share of the owning entity, not the whole asset, and states no single percentage for it — the whole building's income cannot be set against the share's price until the share is known.";
+          : "This memorandum sells a share of the owning entity, not the whole asset, and states no single percentage for it — the whole building's income cannot be set against the share's price until the share is known.",
+      );
       modelCaveat =
         sharePct != null && impliedWhole != null
           ? `The screening model runs the whole asset at the ${money(impliedWhole)} the share's price implies; the share earns its ${shareText(sharePct)} of those cash flows only before the waterfall's promote and the sponsor's fees.`
           : "The screening model runs the whole asset at the share's price, which it cannot gross up without a stated percentage — its returns are not the share's.";
       break;
     case "leasehold":
-      headline =
-        "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land. The ground rent comes ahead of the debt, and at the lease's end the building reverts — a capitalised NOI values a perpetuity that ends.";
-      if (coverageClause) headline += ` Here ${coverageClause}.`;
+      lead.push(
+        "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land.",
+        "The ground rent comes ahead of the debt, and at the lease's end the building reverts — a capitalised NOI values a perpetuity that ends.",
+      );
+      if (coverageClause) lead.push(`Here ${coverageClause}.`);
       modelCaveat =
         "The screening model capitalises the exit like a fee-simple building. On a leasehold the value at exit is what the term left will bear — run the ground lease calculator on the stated term.";
       break;
     case "leased_fee":
-      headline = `This memorandum sells a LEASED FEE: the land under a building someone else owns, with its ground lease. The buyer collects the ground rent — the income here, not an expense and never the building's NOI — and when the lease ends the building reverts to the buyer. The rent is safe while the building's own income covers it${
-        coverageClause ? `, and ${coverageClause}` : ""
-      }.`;
+      lead.push(
+        "This memorandum sells a LEASED FEE: the land under a building someone else owns, with its ground lease.",
+        "The buyer collects the ground rent — the income here, not an expense and never the building's NOI — and when the lease ends the building reverts to the buyer.",
+        `The rent is safe while the building's own income covers it${coverageClause ? `, and ${coverageClause}` : ""}.`,
+      );
       modelCaveat =
         "The screening model runs the ground rent as a building's NOI, with a building's growth, vacancy and expense assumptions. A ground rent grows by its lease's own schedule and resets, has no vacancy while the lease stands, and ends in the reversion of the land and the building — run the ground lease calculator's leased-fee side on the stated terms.";
       break;
@@ -359,9 +475,12 @@ export function readInterest(
       // part of its site, or one that collects it (a pad let on a ground
       // lease, common on a retail center) — the lease as stated says which,
       // and the sentence must not guess (#415).
-      headline =
-        "Part of the site is under a ground lease. Whether this owner pays the ground rent (an expense ahead of the debt) or collects it (a pad let on a ground lease), the lease's term and resets decide what that part is worth — the lease as stated says which.";
+      lead.push(
+        "Part of the site is under a ground lease.",
+        "Whether this owner pays the ground rent (an expense ahead of the debt) or collects it (a pad let on a ground lease), the lease's term and resets decide what that part is worth — the lease as stated says which.",
+      );
   }
+  const headline = lead.join(" ");
   return {
     kind,
     label: INTEREST_LABEL[kind],
@@ -382,6 +501,7 @@ export function readInterest(
     // cushion — the panel draws both and says the lead alone.
     headline: [headline, noteYieldSentence(note), noteCollateralSentence(note)].filter(Boolean).join(" "),
     lead: headline,
+    leadSentences: lead,
     modelCaveat,
     term,
     termLine: term ? groundLeaseTermLine(term) : "",
@@ -412,7 +532,7 @@ export function interestNote(r: InterestRead): string {
     partial_interest:
       "PARTIAL-INTEREST TRAPS, checked by name where the OM gives the inputs: (a) THE PRICE IS FOR A SHARE — hold the whole asset's income against the price grossed up by the share, never against the share's price; (b) CONTROL — who decides a sale, a refinance and a budget, and what a minority holder can block; (c) THE WATERFALL — the share's economics after the sponsor's promote and fees, not its pro-rata slice; (d) EXIT RIGHTS — buy-sell, right of first refusal, drag and tag, and how a minority share is ever sold; (e) CAPITAL CALLS — what happens to a holder who does not fund one.",
     leasehold:
-      "LEASEHOLD TRAPS, checked by name where the OM gives the inputs: (a) THE TERM LEFT — against the loan's term (a lender wants years of margin) and the hold; (b) THE RESETS — a rent struck at a share of then-current land value is an uncapped repricing; (c) SUBORDINATION — an unsubordinated ground rent outranks the mortgage, and a default ends the lease, the building and the loan together; (d) COVERAGE — the NOI over the ground rent, the lender's first test; (e) THE REVERSION — at expiry the building goes to the landowner, so the exit is worth what the remaining term will bear.",
+      "LEASEHOLD TRAPS, checked by name where the OM gives the inputs: (a) THE TERM LEFT — against the loan's term (a lender wants years of margin) and the hold; (b) THE RESETS — a rent struck at a share of then-current land value is an uncapped repricing; (c) SUBORDINATION — an unsubordinated ground rent outranks the mortgage, and a default ends the lease, the building and the loan together; (d) COVERAGE — the building's income before the ground rent over the ground rent, the lender's first test; (e) THE REVERSION — at expiry the building goes to the landowner, so the exit is worth what the remaining term will bear.",
     leased_fee:
       "LEASED-FEE TRAPS, checked by name where the OM gives the inputs: (a) THE RENT IS THE INCOME — the ground rent with its bumps and resets, never the building's NOI, which belongs to the building's owner; (b) COVERAGE — the building's income over the ground rent is the whole margin of safety, and a thin one is a tenant that stops paying first; (c) SUBORDINATION — a subordinated ground lease has pledged the land to the leasehold's lender, so a default can cost the buyer the land itself, where an unsubordinated rent sits ahead of that mortgage; (d) THE RESETS — a rent reset to a share of then-current land value is where the growth lives, and a lease on fixed bumps alone has none; (e) THE REVERSION — the years until the building reverts to the buyer, and what it will be worth then; (f) PURCHASE OPTIONS — a tenant's option to buy the land caps the reversion.",
     fee_simple:
@@ -420,8 +540,30 @@ export function interestNote(r: InterestRead): string {
     unknown:
       "GROUND-LEASE TRAP, checked by name: part of the site is under a ground lease — say which side this owner is on: paying the rent (an expense ahead of the debt, whose term and resets can reprice that part) or collecting it (the ground tenant's credit, and the reversion of its improvements at the lease's end).",
   };
-  return `${interestContextLine(r)} ${traps[r.kind]}`;
+  const shared = SHARED_TRAPS_READ[r.kind];
+  return `${interestContextLine(r)} ${traps[r.kind]}${shared ? ` ${shared}` : ""}`;
 }
+
+/**
+ * The two traps the challenger's base instruction gives every property — the
+ * tax line reset on the sale, and insurance at the seller's legacy premium
+ * instead of a new owner's quote — read for an interest they do not fit as
+ * written (research pass 18). Each says only what holds in general and
+ * leaves to the documents, or the jurisdiction, what varies: a note's sale
+ * transfers no property; whether a share's sale resets the assessment is the
+ * jurisdiction's change-of-ownership rule; a leased fee's owner rarely
+ * carries either line, and the ground lease decides. Appended to the
+ * interest's note, after the document like the rest of the challenger's
+ * notes. A fee simple and a leasehold keep the traps as written.
+ */
+const SHARED_TRAPS_READ: Partial<Record<InterestKind, string>> = {
+  note:
+    "THE TWO SHARED TRAPS, read for a note in place of the tax reset and the legacy insurance premium as the instruction above words them: a note's sale transfers no property — the borrower still owns the collateral — so neither the tax reset on a sale nor a new owner's insurance quote applies to this buyer. Read both as the borrower's: whether the collateral's taxes are paid and its insurance in force, which reach the note through the borrower's capacity to pay and the collateral's value. Should the buyer take the property in a foreclosure, its taxes and insurance become the buyer's from then, and whether that transfer resets the assessment is the jurisdiction's rule to say.",
+  partial_interest:
+    "THE TWO SHARED TRAPS, read for a share in place of the tax reset and the legacy insurance premium as the instruction above words them: the owning entity keeps the property, so whether this sale resets the tax assessment depends on the jurisdiction's change-of-ownership rule for a transfer of an interest in the entity that owns it — say which rule applies where the OM gives the facts, and never assume a reset or its absence. The insurance stays the entity's own policy, so the trap reads as its next renewal, not a new owner's quote.",
+  leased_fee:
+    "THE TWO SHARED TRAPS, read for a leased fee in place of the tax reset and the legacy insurance premium as the instruction above words them: the owner of the land under a ground lease rarely carries either line — the ground lease decides who pays the property's taxes and insures the building — so read both through the lease as stated. Where the lease puts them on the leaseholder, a reassessment or a repriced policy reaches this buyer only as a thinner cover of the ground rent; where it leaves either with the landowner, that line is this buyer's.",
+};
 
 /** "; the lease ends Dec 2071, 45.3 years from today" — the term's end in a
  *  clause for the short line (#422), where the memorandum states it and it

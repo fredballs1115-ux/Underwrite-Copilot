@@ -14,8 +14,10 @@ import {
 } from "@/lib/storage";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { MAX_PICTURE_BYTES, clearOmPicture, picturePaths, storePicture } from "@/lib/deal-picture";
+import { floodFramePaths } from "@/lib/flood-frame-core";
 import { getBilling } from "@/lib/billing";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { dealLanding } from "@/lib/personal-deal";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import {
   claimJob,
@@ -32,7 +34,8 @@ import {
   type Stage,
 } from "@/lib/stages";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
-import { parseDealNotes } from "@/lib/deals";
+import { OM_REPLACED, parseDealNotes } from "@/lib/deals";
+import { omFingerprint } from "@/lib/om-fingerprint";
 import {
   factsFromForm,
   manualFactsProblem,
@@ -40,6 +43,7 @@ import {
   firstSignalFromExtraction,
 } from "@/lib/manual-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
+import { checkPdfOpens } from "@/lib/pdf-open";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -60,11 +64,15 @@ export type CreateDealError =
   | "file"
   | "pdf"
   | "size"
+  | "locked"
+  | "pages"
   | "save"
   | "upload";
 
 export type CreateDealResult =
-  | { ok: true; dealId: string; deduped?: boolean }
+  // personal: a team member's deal filed in their own pipeline, where the
+  // team does not see it (lib/personal-deal) — said where they land.
+  | { ok: true; dealId: string; deduped?: boolean; personal?: boolean }
   | { ok: false; error: CreateDealError };
 
 /**
@@ -117,6 +125,13 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   if (!buffer.subarray(0, 5).toString("latin1").startsWith("%PDF-")) {
     return { ok: false, error: "pdf" };
   }
+  // A memorandum the screen cannot read at all is refused here, before it
+  // becomes a deal and takes a free slot (lib/pdf-open): one that asks for a
+  // password to open, or one longer than the analysis reads in one pass. A
+  // broker's "secured" copy opens without asking and goes ahead.
+  const opens = await checkPdfOpens(buffer);
+  if (opens.verdict === "password") return { ok: false, error: "locked" };
+  if (opens.verdict === "too_long") return { ok: false, error: "pages" };
 
   // Idempotency: a raced double-submit (fast double-click, back-then-resubmit)
   // would otherwise create duplicate deals and duplicate Claude runs. If an
@@ -124,21 +139,25 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   // as the same intent and go to it instead of creating a twin.
   const { data: recent } = await supabase
     .from("deals")
-    .select("id, created_at")
+    .select("id, created_at, team_id")
     .eq("user_id", user.id)
     .eq("name", name)
     .gte("created_at", new Date(Date.now() - 15_000).toISOString())
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (recent?.id) return { ok: true, dealId: recent.id as string, deduped: true };
+  if (recent?.id) {
+    return { ok: true, dealId: recent.id as string, deduped: true, personal: !!billing.team && !recent.team_id };
+  }
 
   // On a team, new deals land in the shared pipeline while the team plan or
   // trial allows it; otherwise fall back to a personal deal so a personal-Pro
-  // (or under-cap) member is never blocked by the team's spent trial.
+  // (or under-cap) member is never blocked by the team's spent trial — and
+  // say so, since the shared pipeline will not show it.
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
+  const personal = !!billing.team && !teamAllowed;
   const { data: deal, error: insertErr } = await supabase
     .from("deals")
     .insert({
@@ -199,7 +218,7 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
         dealId,
         "signal",
         workerMode
-          ? { workerPayload: { kind: "screen" }, snapshotPrior: true }
+          ? { workerPayload: { kind: "screen", requestedBy: user.id }, snapshotPrior: true }
           : undefined,
       ),
     );
@@ -210,15 +229,17 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     return { ok: false, error: "upload" };
   }
 
-  if (!workerMode) after(() => runAnalysis(dealId));
+  // The screen's emails go to whoever asked for it (lib/email).
+  if (!workerMode) after(() => runAnalysis(dealId, { requestedBy: user.id }));
 
-  return { ok: true, dealId };
+  return { ok: true, dealId, personal };
 }
 
-/** Create a deal from the new-deal form, then land on it. */
+/** Create a deal from the new-deal form, then land on it — saying so where
+ *  a team member's deal went into their own pipeline. */
 export async function createDeal(formData: FormData) {
   const result = await createDealCore(formData);
-  if (result.ok) redirect(`/deals/${result.dealId}`);
+  if (result.ok) redirect(dealLanding(result.dealId, !!result.personal));
   if (result.error === "auth") {
     // Round-trip through login BACK to an error state — landing without an
     // error would read as success and clear the localStorage draft.
@@ -272,7 +293,7 @@ export async function createManualDeal(
   if (!billing.canCreateDeal) {
     return {
       error: billing.team
-        ? "Your team’s trial deals and your personal free deals are used up — start the Team plan or upgrade to Pro."
+        ? "Your team’s trial deals and your personal free deals are all in use — start the Team plan or upgrade to Pro."
         : "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.",
     };
   }
@@ -281,14 +302,14 @@ export async function createManualDeal(
   // mint twin deals and twin Claude runs.
   const { data: recent } = await supabase
     .from("deals")
-    .select("id")
+    .select("id, team_id")
     .eq("user_id", user.id)
     .eq("name", facts.name)
     .gte("created_at", new Date(Date.now() - 15_000).toISOString())
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
-  if (recent?.id) redirect(`/deals/${recent.id}`);
+  if (recent?.id) redirect(dealLanding(recent.id as string, !!billing.team && !recent.team_id));
 
   // A structured autocomplete pick fills the market for the pipeline table
   // and geography checks, and so does a typed line, from the city and state
@@ -305,6 +326,7 @@ export async function createManualDeal(
   const teamAllowed =
     !!billing.team &&
     (billing.team.active || billing.team.dealCount < TEAM_TRIAL_DEALS);
+  const personal = !!billing.team && !teamAllowed;
   const { data: deal, error: insertErr } = await supabase
     .from("deals")
     .insert({
@@ -340,7 +362,7 @@ export async function createManualDeal(
     newJobRow(
       dealId,
       "signal",
-      workerMode ? { workerPayload: { kind: "screen" } } : undefined,
+      workerMode ? { workerPayload: { kind: "screen", requestedBy: user.id } } : undefined,
     ),
   );
   if (jobErr) {
@@ -349,8 +371,8 @@ export async function createManualDeal(
     return { error: "Couldn’t start the screen. Please try again." };
   }
 
-  if (!workerMode) after(() => runAnalysis(dealId));
-  redirect(`/deals/${dealId}`);
+  if (!workerMode) after(() => runAnalysis(dealId, { requestedBy: user.id }));
+  redirect(dealLanding(dealId, personal));
 }
 
 /**
@@ -398,7 +420,7 @@ export async function updateManualFacts(
     supabase,
     dealId,
     "signal",
-    workerMode ? { kind: "screen" } : undefined,
+    workerMode ? { kind: "screen", requestedBy: user.id } : undefined,
     workerMode ? "running" : "queued",
   );
   if (claim.outcome === "busy") {
@@ -410,7 +432,7 @@ export async function updateManualFacts(
         dealId,
         "signal",
         workerMode
-          ? { status: "running", workerPayload: { kind: "screen" } }
+          ? { status: "running", workerPayload: { kind: "screen", requestedBy: user.id } }
           : undefined,
       ),
     );
@@ -505,7 +527,7 @@ export async function updateManualFacts(
       .eq("step", "signal")
       .eq("progress", 0);
   } else {
-    after(() => runAnalysis(dealId, { snapshotPrior: false }));
+    after(() => runAnalysis(dealId, { snapshotPrior: false, requestedBy: user.id }));
   }
   revalidatePath(`/deals/${dealId}`);
   redirect(`/deals/${dealId}`);
@@ -714,7 +736,10 @@ export async function setOffersDue(formData: FormData) {
   redirect(`/deals/${dealId}`);
 }
 
-/** Rename a deal. RLS scopes the update to the caller's own deal. */
+/** Rename a deal. RLS scopes the update to the caller's own deal. The
+ *  sample keeps its name: the name is what marks it as the sample on every
+ *  list, and a renamed sample read there as a real deal. The deal page
+ *  offers it no Rename; this refuses one sent anyway. */
 export async function renameDeal(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const name = String(formData.get("name") ?? "").trim();
@@ -725,6 +750,13 @@ export async function renameDeal(formData: FormData) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const { data: deal } = await supabase
+    .from("deals")
+    .select("id, is_sample")
+    .eq("id", dealId)
+    .maybeSingle();
+  if (!deal || (deal as { is_sample?: boolean }).is_sample) redirect(`/deals/${dealId}`);
 
   await supabase
     .from("deals")
@@ -761,7 +793,10 @@ export async function deleteDeal(formData: FormData) {
   // deal's own shapes before the service role removes it — a path on the row
   // that names another deal's object is skipped, never swept.
   const scope = { kind: "deal", dealId } as const;
-  const paths: string[] = [...picturePaths((deal.photo as DealVisualCache | null) ?? null)];
+  const paths: string[] = [
+    ...picturePaths((deal.photo as DealVisualCache | null) ?? null),
+    ...floodFramePaths((deal.photo as DealVisualCache | null) ?? null),
+  ];
   if (deal.om_storage_path) {
     paths.push(deal.om_storage_path as string);
     // A worker-mode reconcile may have parked a model file here; removing a
@@ -831,11 +866,13 @@ export async function rerunAnalysis(formData: FormData) {
     analysisWorkerEnabled() && (await workerSchemaReady(supabase));
   // A retry of a FAILED worker run keeps the steps that finished (the same
   // OM, the same checkpoints): the failing step and the ones after it re-run.
+  // The run records who asked: any member may re-screen a team deal, and
+  // the screen's emails go to them (lib/email).
   const claim = await claimJob(
     supabase,
     dealId,
     "signal",
-    workerMode ? { kind: "screen" } : undefined,
+    workerMode ? { kind: "screen", requestedBy: user.id } : undefined,
     "queued",
     { keepCheckpoints: true },
   );
@@ -848,7 +885,7 @@ export async function rerunAnalysis(formData: FormData) {
       newJobRow(
         dealId,
         "signal",
-        workerMode ? { workerPayload: { kind: "screen" } } : undefined,
+        workerMode ? { workerPayload: { kind: "screen", requestedBy: user.id } } : undefined,
       ),
     );
     if (insErr) redirect(`/deals/${dealId}?error=busy`);
@@ -857,7 +894,7 @@ export async function rerunAnalysis(formData: FormData) {
   // Snapshot for the retrade diff only when the stored results are a
   // coherent, completed generation — never after a failed/partial run.
   if (!workerMode) {
-    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
+    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done", requestedBy: user.id }));
   }
   redirect(`/deals/${dealId}`);
 }
@@ -924,6 +961,11 @@ export async function replaceOm(formData: FormData) {
   if (!replacementBytes.subarray(0, 5).toString("latin1").startsWith("%PDF-")) {
     redirect(`/deals/${dealId}?error=ompdf`);
   }
+  // The upload's own check (lib/pdf-open): a replacement the screen cannot
+  // read is refused before the old OM is replaced and a run is claimed.
+  const replacementOpens = await checkPdfOpens(replacementBytes);
+  if (replacementOpens.verdict === "password") redirect(`/deals/${dealId}?error=omlocked`);
+  if (replacementOpens.verdict === "too_long") redirect(`/deals/${dealId}?error=ompages`);
 
   // Claim the run BEFORE the multi-second upload — the claim is a single
   // conditional UPDATE, so a concurrent replace/re-run on the same deal gets
@@ -939,7 +981,7 @@ export async function replaceOm(formData: FormData) {
     supabase,
     dealId,
     "signal",
-    workerMode ? { kind: "screen" } : undefined,
+    workerMode ? { kind: "screen", requestedBy: user.id } : undefined,
     workerMode ? "running" : "queued",
   );
   if (claim.outcome === "busy") {
@@ -951,7 +993,7 @@ export async function replaceOm(formData: FormData) {
         dealId,
         "signal",
         workerMode
-          ? { status: "running", workerPayload: { kind: "screen" } }
+          ? { status: "running", workerPayload: { kind: "screen", requestedBy: user.id } }
           : undefined,
       ),
     );
@@ -983,6 +1025,23 @@ export async function replaceOm(formData: FormData) {
   // one, so the next view finds this one's. A picture the reader uploaded
   // is theirs and stays.
   await clearOmPicture(supabase, dealId, (deal.photo as DealVisualCache | null) ?? null);
+  // Ask's answers stay on the thread — it only grows (migration 0036) — so
+  // the thread is told the memorandum changed, through the same append Ask
+  // writes with: an answer before this marker, or stamped with another
+  // deck's fingerprint, reads as asked of the earlier memorandum, its pages
+  // that deck's (lib/deals `parseDealQa`). A deal with no OM before has no
+  // answers to mark. Best-effort: the new deck is in place either way.
+  if (deal.om_storage_path) {
+    try {
+      const { error: markErr } = await supabase.rpc("append_deal_qa", {
+        p_deal: dealId,
+        p_entry: { at: new Date().toISOString(), event: OM_REPLACED, om: omFingerprint(replacementBytes) },
+      });
+      if (markErr) console.error(`[replaceOm] the Ask thread of ${dealId} was not marked: ${markErr.message}`);
+    } catch (err) {
+      console.error(`[replaceOm] the Ask thread of ${dealId} was not marked:`, err);
+    }
+  }
 
   // Only diff against results from a COMPLETED previous run — snapshotting
   // after a failed run would pair a half-new extraction with an old verdict.
@@ -996,7 +1055,7 @@ export async function replaceOm(formData: FormData) {
       .eq("step", "signal")
       .eq("progress", 0);
   } else {
-    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
+    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done", requestedBy: user.id }));
   }
   redirect(`/deals/${dealId}`);
 }

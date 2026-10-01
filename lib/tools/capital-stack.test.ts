@@ -279,6 +279,21 @@ describe("what it says with nothing to go on", () => {
   });
 });
 
+describe("the note says its dollars the way the card does", () => {
+  // It printed "owed 13480465 at the sale" under a tile that said $13.48M.
+  const RAW_FIGURE = /(?<![$\d,.])\d{4,}(?![\d,])/;
+
+  it("writes the accrual, and an oversized stack, with the sign and the commas", () => {
+    const r = readStack(SEED);
+    expect(r.note).toContain(
+      "is owed $13,480,465 at the sale — $5,480,465 of accrual, of which $1,080,465 is the compounding alone.",
+    );
+    const over = readStack({ ...SEED, seniorAmount: 95_000_000 });
+    expect(over.note).toContain("The funded layers come to $13,000,000 MORE than the deal costs.");
+    for (const n of [r.note, over.note]) expect(n).not.toMatch(RAW_FIGURE);
+  });
+});
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }

@@ -1,5 +1,6 @@
 import { datedLong, type Benchmark30, type DebtIndex } from "@/lib/debt-index";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
+import { asOfLabel } from "@/lib/research";
 
 /**
  * The sample screen's leverage check — the same lib/leverage code path
@@ -51,7 +52,7 @@ export function SampleLeverageCard({
         <span className="font-mono font-semibold tabular-nums">
           {bench30.value}%
         </span>{" "}
-        30-yr fixed ({bench30.source}, as of {bench30.asOf}).
+        30-yr fixed ({bench30.source}, {asOfLabel(bench30.asOf)}).
       </p>
       {capSpread && tenYear && (
         <p className="mt-1 text-sm leading-relaxed text-muted">

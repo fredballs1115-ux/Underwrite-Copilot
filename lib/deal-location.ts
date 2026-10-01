@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredAddress } from "@/lib/address";
 import type { Point } from "@/lib/basemaps";
 import { geocodeAddress, type Geocoded, type GeocodeSource } from "@/lib/geocode";
+import type { FloodFrameRecord } from "@/lib/flood-frame-core";
 
 /**
  * Where a deal IS, resolved once and cached — the shared dependency of every
@@ -37,21 +38,34 @@ export interface DealVisualCache {
   geoFor?: string;
   /** a geocode that definitively found nothing, so we stop re-asking */
   geoMiss?: boolean;
-  /** the building's own photograph, stored as two derivatives (lib/deal-picture) */
+  /** the building's own photograph, stored as its derivatives (lib/deal-picture) */
   picture?: DealPicture;
   /** when the memorandum was last searched for one and none was found */
   pictureCheckedAt?: string;
   /** the search rules that verdict was reached under; see PICTURE_SEARCH_VERSION */
   pictureSearchV?: number;
+  /** reads of the memorandum in a row that the time budget cut short before
+   *  they found a photograph (lib/deal-picture): how many, when the last one
+   *  ended, under which search rules. Such a read writes no verdict; the
+   *  next one waits, and the third in a row is taken as the verdict */
+  pictureRetry?: { n: number; at: string; v: number };
   /** the memorandum's other photographs, beside the cover, in page order
-   *  (#448, lib/deal-picture) — each stored as two derivatives */
+   *  (#448, lib/deal-picture) — each stored as the cover's derivatives are */
   gallery?: DealPicture[];
   /** the rules the gallery was read under; see GALLERY_VERSION. Set, with
    *  no gallery, where the memorandum held no other photograph */
   galleryV?: number;
+  /** gallery reads in a row that the time budget cut short (lib/deal-
+   *  picture, as `pictureRetry` counts the cover's): such a read stores what
+   *  it found without `galleryV`, the next waits its turn, and the third in
+   *  a row is taken as the gallery */
+  galleryRetry?: { n: number; at: string; v: number };
+  /** the Flood view's drawn frame (#472, lib/flood-map) — the picture and
+   *  the classes each crop shows, for the point it was drawn around */
+  floodFrame?: FloodFrameRecord;
 }
 
-/** The building's own photograph — where it came from and where its two sizes live. */
+/** The building's own photograph — where it came from and where its sizes live. */
 export interface DealPicture {
   /** `photos/<dealId>/<stamp>-hero.jpg`, up to 1600px on the long side */
   hero: string;
@@ -60,6 +74,16 @@ export interface DealPicture {
   /** the hero's pixel size */
   width: number;
   height: number;
+  /** `photos/<dealId>/<stamp>-full.jpg`, up to 2560px on the long side:
+   *  kept only where the source is larger than the hero, for a dense screen
+   *  and the full-screen viewer (lib/deal-picture) */
+  full?: string;
+  /** the full derivative's pixel size */
+  fullWidth?: number;
+  fullHeight?: number;
+  /** the derivatives' rules it was made under (lib/deal-picture's
+   *  DERIVED_VERSION); absent on one made before they were counted */
+  derivedV?: number;
   /** lifted from the memorandum's cover, or uploaded by the reader */
   source: "om" | "upload";
   at: string;

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import metrosSeed from "@/data/research/metros.json";
 import { DATA_METROS } from "@/lib/market-match";
+import { MARKET_COUNT, MARKETS_READ } from "@/lib/market-count";
 import { SECTORS } from "@/lib/research-sectors";
 import { marketMeta, marketPageFor, marketPages, marketPath, sectorPageFor, sectorPages } from "./public-pages";
 
@@ -36,7 +37,11 @@ describe("public pages — every market and sector page, named for itself (#430)
     expect(sectorPageFor("moon_base")).toBeNull();
     const base = marketMeta(null, null);
     expect(base.canonical).toBe("/market");
-    expect(base.description).toContain(`${marketPages().length} US metro areas`);
+    // Counted as the homepage counts — the Washington area's four briefs are
+    // one market — never the 44 pages the catalogue holds.
+    expect(base.description).toContain(`${MARKETS_READ} US markets`);
+    expect(MARKETS_READ).toBe(MARKET_COUNT + DATA_METROS.length);
+    expect(MARKETS_READ).toBeLessThan(marketPages().length);
     expect(marketPath("a b")).toBe("/market?metro=a%20b");
   });
 

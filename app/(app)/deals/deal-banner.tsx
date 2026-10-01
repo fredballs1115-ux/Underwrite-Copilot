@@ -63,6 +63,7 @@ export function DealBanner({
   slide = 0,
   onPhoto,
   onSlideGone,
+  onMarket,
 }: {
   sources: BannerSource[];
   /** the deal's name, for the picture's alt text */
@@ -96,6 +97,9 @@ export function DealBanner({
   onPhoto?: (shown: boolean) => void;
   /** told of another photograph that failed to load, by its route */
   onSlideGone?: (src: string) => void;
+  /** told which market photograph is the picture on screen (its table id),
+   *  or none, for the page's one credit line — and none once unmounted */
+  onMarket?: (marketId: string | null) => void;
 }) {
   // A photograph nobody has looked for yet (`pending`, #440) is asked for
   // OVER the next picture, which shows at once; it fades in the moment it
@@ -124,10 +128,18 @@ export function DealBanner({
   // The other photographs (#450): which has loaded whole, and which failed.
   const [slideLoaded, setSlideLoaded] = useState<string | null>(null);
   const [slideGone, setSlideGone] = useState<ReadonlySet<string>>(new Set());
-  const photoOnScreen = (lifted === "shown" ? lift : rest[at])?.kind === "photo";
+  const screen = lifted === "shown" ? lift : rest[at];
+  const photoOnScreen = screen?.kind === "photo";
   useEffect(() => {
     onPhoto?.(photoOnScreen);
   }, [photoOnScreen, onPhoto]);
+  // The market photograph on screen, for the page's one credit line: one
+  // that failed, or one a memorandum photograph loaded over, is not.
+  const marketOnScreen = screen?.kind === "market" ? (screen.marketId ?? null) : null;
+  useEffect(() => {
+    onMarket?.(marketOnScreen);
+    return () => onMarket?.(null);
+  }, [marketOnScreen, onMarket]);
 
   const base = rest[at];
   const baseLoaded = !!base && loaded !== null && loaded.endsWith(base.src);

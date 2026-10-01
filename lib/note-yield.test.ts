@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { monthsBetween, parseMaturity, readNote, readNoteTerms, type NoteTerms } from "./note-yield";
+import { isSubordinateNote, monthsBetween, notePosition, parseMaturity, readNote, readNoteTerms, type NoteTerms } from "./note-yield";
 
 const row = (label: string, value: string) => ({ label, value });
 
@@ -13,6 +13,8 @@ const TERMS: NoteTerms = {
   amortYears: null,
   status: "performing",
   collateralValue: 34_000_000,
+  subordinate: false,
+  position: "first",
 };
 const AS_OF = new Date(Date.UTC(2025, 8, 30));
 
@@ -98,7 +100,111 @@ describe("readNoteTerms — each term from its own row, and only as stated", () 
       amortYears: null,
       status: null,
       collateralValue: null,
+      subordinate: false,
+      position: "first",
     });
+  });
+});
+
+describe("a note behind other debt — its loan-to-value needs a senior balance the OM does not state", () => {
+  it("reads the words that put a note behind other debt", () => {
+    for (const words of [
+      "$15M mezzanine loan behind a $60M senior loan",
+      "Sale of a mezz loan secured by a pledge of the membership interests",
+      "Second lien position",
+      "2nd mortgage, 9% coupon",
+      "Junior participation in a $50M first mortgage loan",
+      "$10M B-note, subordinate to a $40M A-note",
+      "Subordinate debt, 11% coupon",
+      "Performing note in a position behind the senior lender",
+    ]) {
+      expect(isSubordinateNote(words), words).toBe(true);
+    }
+  });
+
+  it("a first lien is not, even where its terms name a loan behind it", () => {
+    for (const words of [
+      "",
+      "Sale of the first mortgage note",
+      "$24.4M UPB, 5.25% coupon, matures 2027, 90 days delinquent",
+      "A $40M A-note senior to a $10M B-note",
+      "$24.4M first mortgage; a $5M mezzanine loan sits behind it",
+      "First mortgage, ahead of the $5M mezzanine loan",
+      "Borrower has a subordination agreement with the ground lessor",
+    ]) {
+      expect(isSubordinateNote(words), words).toBe(false);
+    }
+  });
+
+  it("never reads a first lien as behind from a payment status or a negated mention (the audit of 2026-10-01)", () => {
+    for (const words of [
+      // A payment status is no position.
+      "First-lien mortgage note. Non-performing; borrower 4 months behind on payments",
+      "Borrower is 90 days behind",
+      // A negated mention is no mention.
+      "First mortgage note; there is no mezzanine or junior debt",
+      "Senior first-lien loan, not subordinated to any other debt",
+      "No mezzanine, junior or subordinate financing encumbers the property",
+      "Performing loan without any subordinate financing",
+      "A non-subordinated first mortgage",
+      "Free and clear of any other liens; first mortgage note",
+      // A first-lien note beside other debt it names stays first.
+      "First mortgage note. The borrower also has a $5M mezzanine loan.",
+    ]) {
+      expect(notePosition(words), words).toBe("first");
+      expect(isSubordinateNote(words), words).toBe(false);
+    }
+    // A negation in one clause leaves the next clause's words read.
+    expect(notePosition("There is no mezzanine debt, but the note is subordinate to a $60M A-note")).toBe("behind");
+    // A junior piece of a first loan is junior.
+    expect(notePosition("Junior participation in a $50M first mortgage loan")).toBe("behind");
+  });
+
+  it("other debt named with nothing to place the note is unclear: the loan-to-value is withheld, and no senior loan is asserted", () => {
+    const words = "Performing note; the property also carries $5M of mezzanine financing";
+    expect(notePosition(words)).toBe("unclear");
+    expect(isSubordinateNote(words)).toBe(true);
+    const unclear = readNoteTerms({
+      metrics: [row("Unpaid principal balance", "$15,000,000"), row("Whole-asset value", "$70,000,000")],
+      interest: { summary: "Performing note", loan: "The property also carries $5M of mezzanine financing" },
+    });
+    expect(unclear.position).toBe("unclear");
+    expect(unclear.subordinate).toBe(true);
+    expect(readNote(unclear, 15_000_000, AS_OF)!.ltvAtBalancePct).toBeNull();
+    // The payment status row is never read for a position.
+    const status = readNoteTerms({
+      metrics: [row("Unpaid principal balance", "$15,000,000"), row("Payment status", "Non-performing; 4 months behind on payments")],
+      interest: { summary: "First-lien mortgage note", loan: "" },
+    });
+    expect(status.position).toBe("first");
+  });
+
+  it("reads the position from the interest's words and the note's rows, and withholds the loan-to-value", () => {
+    const rows = [
+      row("Unpaid principal balance", "$15,000,000"),
+      row("Note rate", "11.0%"),
+      row("Maturity date", "March 31, 2028"),
+      row("Amortization", "Interest-only"),
+      row("Whole-asset value", "$70,000,000"),
+    ];
+    const mezz = readNoteTerms({ metrics: rows, interest: { summary: "Sale of a $15M mezzanine loan", loan: "Behind a $60M senior mortgage" } });
+    expect(mezz.subordinate).toBe(true);
+    expect(mezz.collateralValue).toBe(70_000_000);
+    // A row of the note's own saying so is read too.
+    expect(readNoteTerms({ metrics: [row("Unpaid principal balance", "$15,000,000 (mezzanine)"), ...rows.slice(1)] }).subordinate).toBe(true);
+    // $15M over $70M alone read 21%; with the $60M ahead of it the stack is
+    // 107% — a figure the memorandum's rows cannot give, so none is given.
+    const r = readNote(mezz, 15_000_000, AS_OF)!;
+    expect(r.ltvAtBalancePct).toBeNull();
+    expect(r.ltvAtPricePct).toBeNull();
+    // Everything that is the note's own is still read.
+    expect(r.cents).toBeCloseTo(100, 6);
+    expect(r.currentYieldPct).toBeCloseTo(11, 6);
+    expect(r.ytmPct).toBeCloseTo(11, 1);
+    // A first-lien note with the same rows is exactly as before.
+    const first = readNoteTerms({ metrics: rows, interest: { summary: "Sale of the first mortgage note", loan: "" } });
+    expect(first.subordinate).toBe(false);
+    expect(readNote(first, 15_000_000, AS_OF)!.ltvAtBalancePct).toBeCloseTo((15 / 70) * 100, 6);
   });
 });
 

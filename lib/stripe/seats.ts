@@ -3,6 +3,21 @@ import { getStripe } from "@/lib/stripe/client";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { planSeatSync } from "@/lib/stripe/team-billing";
 import { knownPrices } from "@/lib/stripe/prices";
+import { upstreamNote } from "@/lib/upstream-note";
+
+/** A Stripe secret, restricted or publishable key, or a webhook secret, as
+ *  an error message may echo one: Stripe masks most of a rejected key in
+ *  its message, not all of it. */
+const STRIPE_KEY = /\b(?:(?:sk|rk|pk)_(?:live|test)|whsec)_[^\s"'<>,;]*/g;
+
+/** The one line a failed seat sync leaves in the server log: the team and
+ *  Stripe's message, short, with anything key- or credential-shaped struck
+ *  out (lib/upstream-note) — never the error object, which can carry the
+ *  request it was sent with. */
+export function seatSyncFailureLine(teamId: string, err: unknown): string {
+  const message = err instanceof Error ? err.message : String(err);
+  return `[seats] syncing team ${teamId}'s seats with Stripe failed: ${upstreamNote(message.replace(STRIPE_KEY, "[redacted]"), 300)}`;
+}
 
 /**
  * Keep the team subscription's seat item in step with the roster.
@@ -10,7 +25,8 @@ import { knownPrices } from "@/lib/stripe/prices";
  * base + per-seat items (current) and the legacy single graduated item.
  * Best-effort: billing drift is corrected on the next call (or manually in
  * the Stripe portal), so a Stripe hiccup here must never break the
- * join/remove action itself.
+ * join/remove action itself — but it says so in the server log, one line
+ * naming the team, or a seat count left wrong had no trace at all.
  */
 export async function syncTeamSeats(teamId: string): Promise<void> {
   try {
@@ -58,7 +74,8 @@ export async function syncTeamSeats(teamId: string): Promise<void> {
       case "none":
         break;
     }
-  } catch {
-    // Best-effort by design — see above.
+  } catch (err) {
+    // Best-effort by design — see above — and never silent.
+    console.error(seatSyncFailureLine(teamId, err));
   }
 }

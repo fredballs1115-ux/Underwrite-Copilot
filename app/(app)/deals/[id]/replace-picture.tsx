@@ -3,6 +3,7 @@
 import { useRef } from "react";
 import { useFormStatus } from "react-dom";
 import { replacePicture } from "../actions";
+import { tooLargeMessage } from "@/lib/upload-limit";
 
 /** The size the action refuses past — said here before the upload starts. */
 const MAX_MB = 12;
@@ -37,7 +38,7 @@ function PickButton({ hasPicture, tone }: { hasPicture: boolean; tone: PickTone 
           const f = e.currentTarget.files?.[0];
           if (!f) return;
           if (f.size > MAX_MB * 1024 * 1024) {
-            alert(`"${f.name}" is ${(f.size / 1048576).toFixed(0)} MB — the limit is ${MAX_MB} MB.`);
+            alert(tooLargeMessage(f.name, f.size, MAX_MB * 1024 * 1024).replace(" Try compressing or splitting it.", " Try a smaller copy."));
             e.currentTarget.value = "";
             return;
           }

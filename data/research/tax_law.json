@@ -18,18 +18,18 @@
     "note": "Stated as absence-of-change across reviewed sources rather than an affirmative statutory confirmation."
   },
   "opportunity_zones_2": {
-    "summary": "OZ program made PERMANENT by OBBBA. New designations every 10 years — first round designated July 1, 2026, EFFECTIVE January 1, 2027; old zones overlap until December 31, 2028. Post-2026 investments get a rolling 5-year deferral. Rural enhancements: substantial-improvement basis requirement lowered to 50% for rural-QOZ property (determinations on/after July 4, 2025); new rural QOF investments get a 30% basis step-up.",
+    "summary": "OZ program made PERMANENT by OBBBA. New designations every 10 years — the first round's nominations opened July 1, 2026 and its zones take EFFECT January 1, 2027; old zones overlap until December 31, 2028. Post-2026 investments get a rolling 5-year deferral. Rural enhancements: substantial-improvement basis requirement lowered to 50% for rural-QOZ property (determinations on/after July 4, 2025); new rural QOF investments get a 30% basis step-up.",
     "status": "sourced",
     "sources": [
       "https://www.crowe.com/insights/tax-news-highlights/obbba-makes-enhanced-opportunity-zones-permanent",
       "https://www.nahb.org/blog/2025/08/opprtunity-zones-one-big-beautiful-bill-act",
       "https://www.hud.gov/opportunity-zones/updates"
     ],
-    "note": "TIMING EDGE for this buyer: the 2026-07-01 designation list is now public — East Coast target ZIPs should be cross-checked against new-zone maps before the Jan 1, 2027 effective date; deals closed inside a newly designated zone can pair value-add with OZ 2.0 basis benefits."
+    "note": "TIMING EDGE for this buyer: July 1, 2026 opened the governors' nominations and designated nothing (corrected 2026-09-30: this note had called that date's list the designations) — East Coast target ZIPs should be cross-checked against the new-zone maps once the round is designated, before the Jan 1, 2027 effective date; deals closed inside a newly designated zone can pair value-add with OZ 2.0 basis benefits."
   },
   "gaps": [
     "State conformity: whether DC/MD/VA conform to federal bonus depreciation (nonconformity changes state taxable income materially)",
-    "Cross-check target ZIPs against the July 2026 OZ designation list (not fetched this pass)",
+    "Cross-check target ZIPs against the next round's designation list once it is published (nominations opened July 1, 2026; the zones take effect January 1, 2027)",
     "Qualified Small Landlord provisions, if any, in 2025-2026 federal acts — not searched"
   ]
 }

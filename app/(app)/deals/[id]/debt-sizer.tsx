@@ -13,9 +13,12 @@ import {
 } from "@/lib/deal-strategy";
 import { ConstructionDebtPanel } from "./construction-debt-panel";
 import type { UnderwritingModel } from "@/lib/model/types";
+import { statedModelRate } from "@/lib/model/stated-rate";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
+import { interestOf } from "@/lib/interest";
+import { assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -119,21 +122,49 @@ function amortPreview(
   return rows;
 }
 
-/** Loan terms the OM itself states — shown with their page references. */
-function omLoanTerms(extraction: ExtractionResult | null) {
+type OmTerm = { label: string; value: string; page?: string };
+
+/**
+ * Loan terms the OM itself states — shown with their page references, each
+ * under whose loan it is. The seller's loan offered for assumption (#417)
+ * and the note the seller offers to carry (#462) are read by their own
+ * finders and listed as theirs, never as the buyer's new financing. On a
+ * note the loan's terms are the asset being sold (#416), and on a leased
+ * fee the property's debt is the leaseholder's building's (`assumableApplies`)
+ * — neither is financing this buyer takes, so neither lists any.
+ */
+export function omLoanTerms(extraction: ExtractionResult | null): {
+  offered: OmTerm[];
+  assumable: OmTerm[];
+  seller: OmTerm[];
+} {
+  const none = { offered: [], assumable: [], seller: [] };
+  const { kind } = interestOf(extraction);
+  if (kind === "note" || kind === "leased_fee") return none;
   const metrics = extraction?.metrics ?? [];
-  const picks: { label: string; value: string; page?: string }[] = [];
+  const as = (term: string, m: { value: string; page?: string }): OmTerm => ({ label: term, value: m.value, page: m.page });
+  const assumableRows = assumableStatedRows(metrics);
+  const sellerRows = sellerNoteStatedRows(metrics);
+  const claimed = new Set<unknown>([...assumableRows, ...sellerRows].map((e) => e.row));
+  // The rest is what the OM states of a loan with no owner named: its own
+  // financing assumptions (the LTV it underwrites, the rate it quotes).
+  const rest = metrics.filter((m) => !claimed.has(m));
+  const offered: OmTerm[] = [];
   const take = (label: string, inc: RegExp, exc?: RegExp) => {
-    const m = findMetric(metrics, inc, exc);
-    if (m) picks.push({ label, value: m.value, page: (m as { page?: string }).page });
+    const m = findMetric(rest, inc, exc);
+    if (m) offered.push(as(label, m as { value: string; page?: string }));
   };
-  take("Loan amount", /loan amount|existing (debt|loan)|assumable (debt|loan)|first mortgage/i, /rate|ltv/i);
+  take("Loan amount", /loan amount|existing (debt|loan)|first mortgage/i, /rate|ltv/i);
   take("LTV", /loan[- ]to[- ]value|\bltv\b/i);
   take("Rate", /interest rate|\bloan rate\b|\bcoupon\b/i, /cap ?rate|growth|tax|vacancy/i);
   take("Amortization", /amortiz/i);
   take("Interest-only", /interest[- ]only|\bi\/?o\b period/i);
   take("Maturity", /maturity|loan term/i, /amortiz/i);
-  return picks;
+  return {
+    offered,
+    assumable: assumableRows.map((e) => as(e.term, e.row)),
+    seller: sellerRows.map((e) => as(e.term, e.row)),
+  };
 }
 
 interface Seed {
@@ -165,10 +196,18 @@ function deriveSeed(
   const plausible = (noi: number | null, price: number | null) =>
     noi != null && noi > 0 && (price == null || noi / price < IMPLIED_CAP_CEILING) ? noi : null;
   if (model?.inputs) {
-    const price = model.inputs.purchasePrice || null;
+    // A note's or the land's price is no property loan's basis (#415), and a
+    // share's is not the building's: the first-draft model runs at the
+    // share's price while its NOI is the whole building's, so the price the
+    // loan is tested on is the whole the share implies — the same reader
+    // the branch without a model takes below.
+    const modelPrice = model.inputs.purchasePrice || null;
+    const price = buildingPriceOf(extraction, modelPrice);
     // A loan the documents state outranks the day's index: a term sheet's
-    // rate is a quote, and a quote beats a benchmark.
-    const stated = model.inputs.loan?.ratePct ?? null;
+    // rate is a quote, and a quote beats a benchmark. The first-draft model
+    // carries a rate whether or not a document states one, so only a rate a
+    // document states is taken as the quote (lib/model/stated-rate).
+    const stated = statedModelRate(model);
     return {
       price,
       noi: plausible(model.cashFlow?.[0]?.noi ?? null, price),
@@ -197,6 +236,21 @@ function deriveSeed(
     seededFrom: price != null || noi != null ? "extraction" : "defaults",
     rateNote: today ? today.note : null,
   };
+}
+
+/** A loan's stated terms as chips, each with its page. */
+function TermChips({ terms, qa }: { terms: OmTerm[]; qa: string }) {
+  return (
+    <ul className="mt-2 flex flex-wrap gap-1.5" data-qa={qa}>
+      {terms.map((t) => (
+        <li key={t.label} className="rounded-full border border-line bg-paper px-2.5 py-1 text-xs">
+          <span className="text-muted">{t.label}:</span>{" "}
+          <span className="font-mono font-medium tabular-nums">{t.value}</span>
+          {t.page && <span className="text-muted"> · {t.page}</span>}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function SubHead({ children }: { children: React.ReactNode }) {
@@ -422,27 +476,35 @@ export function DebtSizer({
       <div className="border-t border-line p-5">
         <p className="text-sm text-muted">
           {seed.seededFrom === "model"
-            ? "No AI here — seeded from your model."
+            ? "The arithmetic here is code; its figures start from the first-draft model's."
             : seed.seededFrom === "extraction"
-              ? "No AI here — seeded from the OM extraction."
-              : "No AI here — enter the deal's figures."}
+              ? "The arithmetic here is code; its figures start from the OM's."
+              : "The arithmetic here is code — enter the deal's figures."}
         </p>
 
-        {omTerms.length > 0 && (
+        {/* What the OM states of a loan, under whose loan it is: its own
+            financing assumptions, the seller's loan offered for assumption,
+            the note the seller offers to carry. A note's terms and a leased
+            fee's debt are never listed here (omLoanTerms). */}
+        {omTerms.offered.length > 0 && (
           <>
             <SubHead>Financing stated in the OM</SubHead>
-            <ul className="mt-2 flex flex-wrap gap-1.5">
-              {omTerms.map((t) => (
-                <li
-                  key={t.label}
-                  className="rounded-full border border-line bg-paper px-2.5 py-1 text-xs"
-                >
-                  <span className="text-muted">{t.label}:</span>{" "}
-                  <span className="font-mono font-medium tabular-nums">{t.value}</span>
-                  {t.page && <span className="text-muted"> · {t.page}</span>}
-                </li>
-              ))}
-            </ul>
+            <TermChips terms={omTerms.offered} qa="om-financing" />
+          </>
+        )}
+        {omTerms.assumable.length > 0 && (
+          <>
+            <SubHead>The loan in place, offered for assumption</SubHead>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              {"The seller's loan, as the OM states it — not a quote for new financing."}
+            </p>
+            <TermChips terms={omTerms.assumable} qa="om-assumable" />
+          </>
+        )}
+        {omTerms.seller.length > 0 && (
+          <>
+            <SubHead>{"The seller's note, offered to carry the price"}</SubHead>
+            <TermChips terms={omTerms.seller} qa="om-seller-note" />
           </>
         )}
 
@@ -591,15 +653,15 @@ export function DebtSizer({
                       <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
                         <th className="py-1.5 pr-3 font-medium">Rate</th>
                         <th className="py-1.5 pr-3 text-right font-medium">Max loan re-sized</th>
-                        <th className="py-1.5 pr-3 text-right font-medium">Δ vs today</th>
-                        <th className="py-1.5 text-right font-medium">DSCR holding today&rsquo;s loan</th>
+                        <th className="py-1.5 pr-3 text-right font-medium">Δ vs entered rate</th>
+                        <th className="py-1.5 text-right font-medium">DSCR holding the sized loan</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-line">
                       {rateStrip.map((s) => (
                         <tr key={s.rate} className={s.d === 0 ? "bg-faint/60" : undefined}>
                           <td className="whitespace-nowrap py-1.5 pr-3 font-mono text-xs tabular-nums">
-                            {s.rate.toFixed(2)}%{s.d === 0 ? " (today)" : ""}
+                            {s.rate.toFixed(2)}%{s.d === 0 ? " (entered)" : ""}
                           </td>
                           <td className="whitespace-nowrap py-1.5 pr-3 text-right font-mono text-xs tabular-nums">
                             {s.sizedLoan != null ? fmtUsdCol(s.sizedLoan) : "—"}

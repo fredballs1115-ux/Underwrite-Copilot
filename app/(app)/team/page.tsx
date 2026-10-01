@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { getTeam, memberLabel, TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import { getTeam, memberLabel, INVITE_DAYS, TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { TEAM_PRICE_LABEL, teamMonthlyTotal, fmtUsd } from "@/lib/billing";
 import {
   createTeam,
@@ -18,9 +18,23 @@ import { PendingButton } from "../pending-button";
 
 export const metadata: Metadata = { title: "Team" };
 
+/** What a member who leaves, or is removed, keeps of the deals they added:
+ *  the deals stay in the team's pipeline under their name (removeMember and
+ *  leaveTeam move nothing), and row-level security reads a deal by its
+ *  creator — so they still open it, mint a share link to it and delete it
+ *  (0007's read and delete policies, 0017's share links). An edit to the
+ *  deal itself is refused while it stays in a team they are not on (0007's
+ *  update check). */
+const LEAVING_KEEPS = {
+  them: "The deals they added stay in the team pipeline, and they keep access to them: they can still open them, share them by link and delete them.",
+  you: "You'll stop seeing your teammates' deals. The deals you added stay in the team pipeline, and you keep access to them: you can still open them, share them by link and delete them.",
+};
+
+const TEAM_UNAVAILABLE = { cls: "bg-kill/10 text-kill", text: "Team checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you set up." };
 const MESSAGES: Record<string, { cls: string; text: string }> = {
   created: { cls: "bg-pass/10 text-pass", text: "Team created — invite your first teammate below." },
   success: { cls: "bg-pass/10 text-pass", text: "Team plan active — the shared pipeline is unlimited. Thank you!" },
+  activating: { cls: "bg-faint text-muted", text: "Checkout complete — the Team plan switches on as soon as Stripe confirms it, usually within a minute. Refresh shortly." },
   cancelled: { cls: "bg-faint text-muted", text: "Checkout cancelled — no charge was made." },
   name: { cls: "bg-kill/10 text-kill", text: "Give the team a name." },
   already: { cls: "bg-kill/10 text-kill", text: "You're already on a team — leave it before creating or joining another." },
@@ -30,7 +44,7 @@ const MESSAGES: Record<string, { cls: string; text: string }> = {
   remove: { cls: "bg-kill/10 text-kill", text: "Couldn't remove that member — please try again." },
   leave: { cls: "bg-kill/10 text-kill", text: "Couldn't leave the team — please try again." },
   ownerleave: { cls: "bg-kill/10 text-kill", text: "Owners can't leave their own team. Transfer isn't supported yet — email underwritecopilot.support@gmail.com and we'll handle it." },
-  config: { cls: "bg-kill/10 text-kill", text: "Team checkout isn't available right now — email underwritecopilot.support@gmail.com and we'll get you set up." },
+  config: TEAM_UNAVAILABLE,
   save: { cls: "bg-kill/10 text-kill", text: "Couldn't save the team's billing profile — please try again." },
   checkout: { cls: "bg-kill/10 text-kill", text: "Couldn't start checkout — please try again." },
   nocustomer: { cls: "bg-faint text-muted", text: "No team subscription on file yet — start with the Team plan below." },
@@ -41,11 +55,13 @@ const MESSAGES: Record<string, { cls: string; text: string }> = {
   confirmdelete: { cls: "bg-kill/10 text-kill", text: "Type DELETE (all caps) in the box to confirm deleting the team." },
   deletesub: { cls: "bg-kill/10 text-kill", text: "We couldn't convert the team's subscription, so nothing was deleted. Try again, or email underwritecopilot.support@gmail.com." },
   delete: { cls: "bg-kill/10 text-kill", text: "Couldn't delete the team — nothing was removed. Please try again." },
-  // Config-specific causes from lib/stripe/diagnose.ts — operator-fixable.
-  stripekey: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe rejected the API key. Site owner — STRIPE_SECRET_KEY is missing, truncated, or from the wrong account; paste the full live secret key and save." },
-  price: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: Stripe couldn't find a configured team price. Site owner — this is almost always a Test-mode price ID used with a Live key; copy the live price_… IDs into STRIPE_TEAM_PRICE_ID and STRIPE_TEAM_SEAT_PRICE_ID." },
-  pricetype: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: a configured Stripe price is one-time, but subscriptions need Recurring · Monthly. Site owner — recreate the price as recurring and update the ID." },
-  appurl: { cls: "bg-kill/10 text-kill", text: "Billing setup problem: the app's public URL is misconfigured. Site owner — set NEXT_PUBLIC_APP_URL to the full https:// address of this site." },
+  // A setup problem on our side (lib/stripe/diagnose.ts) reads as team
+  // checkout not being available; which knob is wrong goes to the server
+  // log for the operator, never onto a customer's page.
+  stripekey: TEAM_UNAVAILABLE,
+  price: TEAM_UNAVAILABLE,
+  pricetype: TEAM_UNAVAILABLE,
+  appurl: TEAM_UNAVAILABLE,
 };
 
 export default async function TeamPage({
@@ -54,19 +70,23 @@ export default async function TeamPage({
   searchParams: Promise<{ created?: string; error?: string; status?: string }>;
 }) {
   const { created, error, status } = await searchParams;
-  const banner = created
-    ? MESSAGES.created
-    : status
-      ? MESSAGES[status]
-      : error
-        ? MESSAGES[error]
-        : null;
 
   const supabase = await createSupabaseServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Request-cached: the (app) layout's own auth call, not a second hop.
+  const user = await getCurrentUser();
   const team = user ? await getTeam(supabase, user.id) : null;
+  // Stripe returns the buyer here when checkout completes, which can be a
+  // moment before its webhook switches the plan: "Team plan active" waits
+  // for the team's plan to say so.
+  const banner = created
+    ? MESSAGES.created
+    : status === "success" && !team?.planActive
+      ? MESSAGES.activating
+      : status
+        ? MESSAGES[status]
+        : error
+          ? MESSAGES[error]
+          : null;
   // Whether the owner personally pays for Pro — decides which upgrade path
   // the Start-Team button takes (in-place conversion vs a new checkout).
   const ownerIsPersonalPro =
@@ -93,7 +113,7 @@ export default async function TeamPage({
         <h1 className="text-3xl font-semibold tracking-tight">Team</h1>
         <p className="mt-1 text-sm text-muted">
           One shared pipeline — every teammate sees, screens, and compares the
-          same deals.
+          deals in it.
         </p>
       </div>
 
@@ -110,10 +130,16 @@ export default async function TeamPage({
             <h2 className="text-sm font-semibold tracking-tight">
               Create your team
             </h2>
+            {/* What the create actions do (app/(app)/deals/actions.ts
+                `teamAllowed`): the team's while its trial or plan allows,
+                else the adder's own, which the team does not see. */}
             <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted">
-              Name it, invite teammates with a link, and every deal anyone
-              uploads lands in one shared pipeline. Your existing personal
-              deals stay personal.
+              Name it, invite teammates with a link, and the deals you all add
+              land in one shared pipeline: up to {TEAM_TRIAL_DEALS}{" "}on the
+              free trial, every one on the Team plan. Once the trial&apos;s
+              deals are in use, a new deal goes into its adder&apos;s own
+              pipeline, which teammates don&apos;t see, until the plan starts.
+              Your existing personal deals stay personal.
             </p>
             <form action={createTeam} className="mt-4 flex max-w-md gap-2">
               <input
@@ -140,9 +166,9 @@ export default async function TeamPage({
             </h2>
             <ul className="mt-3 space-y-2 text-sm text-muted">
               {[
-                "Everyone on the team sees the same pipeline — deals, verdicts, models, and memos.",
-                `The first ${TEAM_TRIAL_DEALS} shared deals are free to try. After that, the Team plan is ${TEAM_PRICE_LABEL} — billed only for the seats you actually have.`,
-                "The Team plan unlocks the Excel model, PDF memo, and comp search for every member.",
+                "Everyone on the team sees the shared pipeline — its deals, verdicts, models, and memos.",
+                `Up to ${TEAM_TRIAL_DEALS} shared deals are free to try. Past that, the Team plan is ${TEAM_PRICE_LABEL} — billed only for the seats you actually have.`,
+                "The Team plan unlocks everything in Pro for every member.",
                 "Joining is one click on an invite link. You can be on one team at a time.",
               ].map((t) => (
                 <li key={t} className="flex items-start gap-2.5">
@@ -218,9 +244,13 @@ export default async function TeamPage({
                     {team.role === "owner" && m.userId !== user?.id && (
                       <form action={removeMember}>
                         <input type="hidden" name="memberId" value={m.userId} />
+                        {/* What row-level security leaves a departed member
+                            (migrations 0007, 0017): a deal's creator still
+                            reads it, links it and deletes it; an edit is
+                            refused while it is in a team they are not on. */}
                         <ConfirmSubmit
                           label="Remove"
-                          confirmText={`Remove ${memberLabel(m)} from ${team.name}? Their deals stay in the team pipeline.`}
+                          confirmText={`Remove ${memberLabel(m)} from ${team.name}? ${LEAVING_KEEPS.them}`}
                           danger
                         />
                       </form>
@@ -233,7 +263,7 @@ export default async function TeamPage({
               <form action={leaveTeam} className="mt-4 border-t border-line pt-4">
                 <ConfirmSubmit
                   label="Leave team"
-                  confirmText={`Leave ${team.name}? You'll stop seeing the shared pipeline.`}
+                  confirmText={`Leave ${team.name}? ${LEAVING_KEEPS.you}`}
                   danger
                 />
               </form>
@@ -248,9 +278,12 @@ export default async function TeamPage({
                   <h2 className="text-sm font-semibold tracking-tight">
                     Invite teammates
                   </h2>
+                  {/* Single use since migration 0012; an unused link's
+                      expiry is 0007's default (lib/teams INVITE_DAYS). */}
                   <p className="mt-1 text-sm text-muted">
-                    Each link works until it expires (14 days) and can be
-                    revoked anytime.
+                    Each link lets one person join, once. An unused link
+                    expires {INVITE_DAYS} days after you make it, and you
+                    can revoke it anytime.
                   </p>
                 </div>
                 <form action={createInvite}>

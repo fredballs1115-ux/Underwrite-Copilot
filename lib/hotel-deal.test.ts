@@ -185,6 +185,30 @@ describe("the hotel against the model, and on every summary", () => {
     expect(gluedWords(note)).toEqual([]);
   });
 
+  it("says each trap as the facts above it say, never 'none stated' over what the memorandum gives (research pass 18)", () => {
+    // A brand encumbrance had fallen through to "the memorandum does not say
+    // whether the sale is encumbered", under a line saying it was.
+    const branded = readHotelDeal(ex([row("Franchise expiration", "June 30, 2034")], { hotel: hotel({ encumbrance: "brand" }) }), TODAY)!;
+    const brandNote = hotelNote(branded);
+    expect(brandNote).toContain("(b) THE BRAND ENCUMBRANCE — the sale carries the franchise");
+    expect(brandNote).not.toContain("does not say whether the sale is encumbered");
+    // A PIP stated in words, with no cost, is the memorandum's words.
+    const worded = readHotelDeal(ex([], { hotel: hotel({ pip: "Marriott will require a change-of-ownership PIP" }) }), TODAY)!;
+    expect(hotelNote(worded)).toContain('(a) THE PIP — stated in words, with no cost ("Marriott will require a change-of-ownership PIP")');
+    // A franchise whose stated end has passed may run on: asked, never "none stated" or "cannot be right".
+    const lapsed = readHotelDeal(ex([row("Franchise expiration", "March 31, 2025")]), TODAY)!;
+    expect(hotelNote(lapsed)).toContain("(c) THE FLAG'S TERM — the franchise's stated end, Mar 2025, has passed: ask whether the hotel runs on an extension or month to month");
+    expect(lapsed.headline).toContain("it may run on an extension or month to month");
+    expect(lapsed.headline).not.toContain("cannot be right");
+    // A franchise stated in words with no end read as a date says the words.
+    const noEnd = readHotelDeal(ex([]), TODAY)!;
+    expect(hotelNote(noEnd)).toContain('(c) THE FLAG\'S TERM — the franchise as stated ("Marriott franchise agreement through June 30, 2034');
+    // An independent hotel has no flag's term and no brand's PIP to ask about.
+    const indie = readHotelDeal(ex([], { hotel: hotel({ brand: "Independent", franchise: "", encumbrance: "unencumbered" }) }), TODAY)!;
+    expect(hotelNote(indie)).toContain("(c) NO FLAG — the hotel is independent");
+    expect(hotelNote(indie)).toContain("(a) NO BRAND'S PIP");
+  });
+
   it("the key terms lead with the PIP, the franchise's end and RevPAR", () => {
     expect(hotelTermRows(COURTYARD.metrics).map((m) => m.label)).toEqual(["PIP cost", "Franchise expiration", "RevPAR"]);
   });

@@ -24,6 +24,11 @@
 //   EVERYTHING ELSE STANDS. A leasehold's and a leased fee's model runs at
 //   what the price buys (the lease's building, the land's rent), and the
 //   price row says which, with the years to the lease's end.
+//
+// The first rule reaches past the table (the audit of 2026-09-30): the deal
+// header, the pipeline card and the meeting workbook printed a note's
+// collateral cap as its going-in cap, and the deal page's leverage read ran
+// on it. `noteCapSlot` and `goingInCapFigure` say it for them.
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
@@ -81,4 +86,68 @@ export function compareInterest(
   }
 
   return { tag, cap: modelCap, noteYtmPct: null, withheld: null };
+}
+
+/**
+ * The deal page's Model tab under the same rules: the first-draft model it
+ * draws is the one this table reads, run at the documents' price, and it
+ * printed a note's or a share's cap and returns as figures beside the very
+ * deals whose returns this table withholds. Its rule and why, in one
+ * sentence the tab prints over the withheld figures — null where they stand.
+ */
+export interface ModelReturnsRead extends CompareInterest {
+  /** a share of the owning entity: its cap is the whole's, said so */
+  share: boolean;
+  line: string | null;
+}
+
+export function modelReturnsRead(
+  ex: ExtractionResult | null | undefined,
+  model: CompareModel | null | undefined,
+  asOf: Date = new Date(),
+): ModelReturnsRead {
+  const ci = compareInterest(ex, model, asOf);
+  const line =
+    ci.withheld === "note"
+      ? "A note's price is a loan's: this model runs the collateral as if bought outright at it, so its cap and returns are the collateral's, not the note's, and are withheld."
+      : ci.withheld === "share"
+        ? ci.cap != null
+          ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
+          : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+        : null;
+  return { ...ci, share: !!ex && interestOf(ex).kind === "partial_interest", line };
+}
+
+/**
+ * A note's going-in cap slot, by the first rule above, wherever a deal's
+ * figures are summarized — the deal header, the pipeline card and the
+ * meeting workbook withhold the cap this table withholds: the collateral's
+ * income over a loan's price is a cap nobody earns. In its place, the
+ * note's yield to maturity at its price, where the note pays or may. Null on
+ * anything but a note, whose cap slot stands.
+ */
+export function noteCapSlot(
+  ex: ExtractionResult | null | undefined,
+  asOf: Date = new Date(),
+): { ytmPct: number | null } | null {
+  if (!ex || interestOf(ex).kind !== "note") return null;
+  return { ytmPct: compareInterest(ex, null, asOf).noteYtmPct };
+}
+
+/**
+ * The going-in cap slot beside a deal's price in its header (and the bar
+ * that repeats it): the cap as the memorandum states it — or, on a note,
+ * its yield to maturity at its price where it pays or may, else the cap
+ * withheld ("n/a — note", the compare table's words).
+ */
+export function goingInCapFigure(
+  ex: ExtractionResult | null | undefined,
+  statedCap: string | null,
+  asOf: Date = new Date(),
+): { label: string; value: string | null } {
+  const note = noteCapSlot(ex, asOf);
+  if (!note) return { label: "Going-in cap", value: statedCap };
+  return note.ytmPct != null
+    ? { label: "Yield to maturity", value: `${note.ytmPct.toFixed(1)}%` }
+    : { label: "Going-in cap", value: "n/a — note" };
 }

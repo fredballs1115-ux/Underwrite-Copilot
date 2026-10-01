@@ -15,6 +15,8 @@
  * so "$21.0" and "M" read as "$21.0M" and a table's cells stay one line.
  */
 
+import { pdfjsWasmUrl } from "@/lib/pdfjs-wasm";
+
 export interface PdfTextPage {
   /** 1-based */
   page: number;
@@ -144,6 +146,10 @@ export async function pdfTextLayer(pdf: Buffer): Promise<PdfTextLayer> {
       data: new Uint8Array(pdf),
       useSystemFonts: false,
       verbosity: 0,
+      // Text needs no image decoder, but pdfjs keeps the decoders' location
+      // process-wide, set by each document it opens: this read must not take
+      // it away from a picture read running beside it (lib/pdfjs-wasm).
+      wasmUrl: pdfjsWasmUrl(),
     });
     const doc = await task.promise;
     const pages: PdfTextPage[] = [];

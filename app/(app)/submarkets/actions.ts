@@ -7,6 +7,9 @@ import { signatureMismatch } from "@/lib/storage";
 import {
   PERIOD_FIELDS,
   PIPELINE_FIELDS,
+  mappingSummary,
+  packMapping,
+  pipelineRowsToReplace,
   readGrid,
   suggestMarketMapping,
   toPeriods,
@@ -14,6 +17,7 @@ import {
 } from "@/lib/market/import";
 import { RENT_BASES, type ExclusionRules, type RentBasis } from "@/lib/market/types";
 import { getSubmarket } from "@/lib/market/store";
+import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
 
 const MAX_FILE = 32 * 1024 * 1024;
 
@@ -51,13 +55,18 @@ export async function createSubmarket(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) redirect(listError("name"));
 
+  // One of the site's own classes (lib/asset-class), the list every deal is
+  // filed under; anything else posted is not a class.
+  const classRaw = String(formData.get("assetClass") ?? "").trim().toLowerCase();
+  const assetClass = Object.prototype.hasOwnProperty.call(ASSET_CLASS_LABEL, classRaw) ? classRaw : "industrial";
+
   const { data, error } = await supabase
     .from("submarkets")
     .insert({
       user_id: user.id,
       name,
       metro: String(formData.get("metro") ?? "").trim() || null,
-      asset_class: String(formData.get("assetClass") ?? "industrial"),
+      asset_class: assetClass,
       exclusion_rules: {},
       supply_warning_months: num(formData.get("supplyWarningMonths")) ?? 24,
     })
@@ -96,7 +105,7 @@ export async function saveExclusionRules(formData: FormData) {
     excludeOwnerOccupied: formData.get("excludeOwnerOccupied") === "on",
   };
 
-  await supabase
+  const { error } = await supabase
     .from("submarkets")
     .update({
       exclusion_rules: rules,
@@ -104,6 +113,10 @@ export async function saveExclusionRules(formData: FormData) {
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
+  if (error) {
+    console.error("[submarkets] rules update failed", error.message);
+    redirect(`/submarkets/${id}?error=save`);
+  }
 
   revalidatePath(`/submarkets/${id}`);
   redirect(`/submarkets/${id}`);
@@ -135,39 +148,101 @@ export async function importSubmarketFile(formData: FormData) {
   if (!grid.length) redirect(`/submarkets/${id}?error=empty`);
 
   const asOf = new Date().toISOString().slice(0, 10);
+  // What the import did, carried to the page: how many rows, how many of them
+  // replaced rows already loaded, how many it skipped, and which header each
+  // field was read from — there is no step to confirm the column matching,
+  // so the page says what it matched.
+  const done = (params: Record<string, string | number>) =>
+    `/submarkets/${id}?${new URLSearchParams(
+      Object.entries(params).map(([k, v]) => [k, String(v)]),
+    ).toString()}`;
 
   if (kind === "pipeline") {
     const mapping = suggestMarketMapping(grid, PIPELINE_FIELDS);
-    const { rows } = toPipeline(grid, mapping, file.name, asOf);
+    const { rows, skipped, headers } = toPipeline(grid, mapping, file.name, asOf);
     if (!rows.length) redirect(`/submarkets/${id}?error=norows`);
-    // Replace rather than append: a re-import of the same export should not
-    // double the pipeline, which is the surest way to make trap 3 fire on your
-    // own data.
-    await supabase.from("pipeline_properties").delete().eq("submarket_id", id).eq("source", file.name);
-    await supabase.from("pipeline_properties").insert(
-      rows.map((r) => ({
-        submarket_id: id,
-        name: r.name,
-        address: r.address,
-        sf: r.sf,
-        status: r.status,
-        expected_delivery: r.expectedDelivery,
-        subtype: r.subtype,
-        owner_occupied: r.ownerOccupied,
-        stale_flag: r.staleFlag,
-        stale_reason: r.staleReason,
-        source: r.source,
-        notes: r.notes,
-      })),
+
+    // Replace rather than append — the rows this file wrote before, and any
+    // stored row that is one of these buildings by name and address, so a
+    // renamed copy of the same export does not double the pipeline.
+    const { data: existing, error: readError } = await supabase
+      .from("pipeline_properties")
+      .select("id, name, address, source")
+      .eq("submarket_id", id)
+      .limit(5000);
+    if (readError) {
+      console.error("[submarkets] pipeline read failed", readError.message);
+      redirect(`/submarkets/${id}?error=importsave`);
+    }
+    const replace = pipelineRowsToReplace(
+      (existing ?? []) as { id: string; name: string | null; address: string | null; source: string | null }[],
+      rows,
+      file.name,
     );
+
+    // The new rows go in FIRST: a write that fails then leaves what was
+    // loaded before untouched, never a pipeline deleted and not replaced.
+    const { data: inserted, error: insertError } = await supabase
+      .from("pipeline_properties")
+      .insert(
+        rows.map((r) => ({
+          submarket_id: id,
+          name: r.name,
+          address: r.address,
+          sf: r.sf,
+          status: r.status,
+          expected_delivery: r.expectedDelivery,
+          subtype: r.subtype,
+          owner_occupied: r.ownerOccupied,
+          stale_flag: r.staleFlag,
+          stale_reason: r.staleReason,
+          source: r.source,
+          notes: r.notes,
+        })),
+      )
+      .select("id");
+    if (insertError) {
+      console.error("[submarkets] pipeline insert failed", insertError.message);
+      redirect(`/submarkets/${id}?error=importsave`);
+    }
+    if (replace.length) {
+      const removed = await deleteRows(supabase, replace);
+      if (!removed) {
+        // Both copies would stand: take the new rows back out, so the
+        // pipeline is what it was, and say so.
+        await deleteRows(supabase, ((inserted ?? []) as { id: string }[]).map((r) => r.id));
+        redirect(`/submarkets/${id}?error=importreplace`);
+      }
+    }
     revalidatePath(`/submarkets/${id}`);
-    redirect(`/submarkets/${id}?imported=${rows.length}`);
+    redirect(
+      done({
+        imported: rows.length,
+        replaced: replace.length,
+        skipped,
+        kind: "pipeline",
+        file: file.name.slice(0, 80),
+        cols: packMapping(mappingSummary(mapping, headers, PIPELINE_FIELDS).read),
+      }),
+    );
   }
 
   const mapping = suggestMarketMapping(grid, PERIOD_FIELDS);
-  const { rows } = toPeriods(grid, mapping, file.name);
+  const { rows, skipped, doubled, headers } = toPeriods(grid, mapping, file.name);
   if (!rows.length) redirect(`/submarkets/${id}?error=norows`);
-  await supabase.from("submarket_periods").upsert(
+  // A period already loaded for one of these dates is REPLACED by the import
+  // (one row a date) — counted, so the page can say how many.
+  const dates = [...new Set(rows.map((r) => r.period))];
+  const { data: before, error: beforeError } = await supabase
+    .from("submarket_periods")
+    .select("period")
+    .eq("submarket_id", id)
+    .in("period", dates);
+  // Unread is unsaid: a count the read could not make is left off the page.
+  const replaced = beforeError
+    ? null
+    : new Set(((before ?? []) as { period: string }[]).map((p) => String(p.period).slice(0, 10))).size;
+  const { error: upsertError } = await supabase.from("submarket_periods").upsert(
     rows.map((r) => ({
       submarket_id: id,
       period: r.period,
@@ -183,9 +258,39 @@ export async function importSubmarketFile(formData: FormData) {
     })),
     { onConflict: "submarket_id,period" },
   );
+  if (upsertError) {
+    console.error("[submarkets] period upsert failed", upsertError.message);
+    redirect(`/submarkets/${id}?error=importsave`);
+  }
 
   revalidatePath(`/submarkets/${id}`);
-  redirect(`/submarkets/${id}?imported=${rows.length}`);
+  redirect(
+    done({
+      imported: rows.length,
+      ...(replaced == null ? {} : { replaced }),
+      skipped,
+      ...(doubled ? { doubled } : {}),
+      kind: "periods",
+      file: file.name.slice(0, 80),
+      cols: packMapping(mappingSummary(mapping, headers, PERIOD_FIELDS).read),
+    }),
+  );
+}
+
+/** Delete pipeline rows by id, a few hundred at a time so the request's
+ *  filter stays a sane length. True when every batch went. */
+async function deleteRows(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  ids: readonly string[],
+): Promise<boolean> {
+  for (let i = 0; i < ids.length; i += 200) {
+    const { error } = await supabase.from("pipeline_properties").delete().in("id", ids.slice(i, i + 200));
+    if (error) {
+      console.error("[submarkets] pipeline delete failed", error.message);
+      return false;
+    }
+  }
+  return true;
 }
 
 /** Add or correct one period by hand. */
@@ -200,8 +305,11 @@ export async function saveSubmarketPeriod(formData: FormData) {
   const vacancy = num(formData.get("vacancyPct"));
   const unverified = formData.get("unverified") === "on";
   const sourceUrl = String(formData.get("sourceUrl") ?? "").trim() || null;
+  // The form says a web-sourced figure needs its link, and every surface
+  // marks it with that link — so one without is refused, not stored bare.
+  if (unverified && !sourceUrl) redirect(`/submarkets/${id}?error=sourceurl`);
 
-  await supabase.from("submarket_periods").upsert(
+  const { error } = await supabase.from("submarket_periods").upsert(
     {
       submarket_id: id,
       period,
@@ -219,6 +327,10 @@ export async function saveSubmarketPeriod(formData: FormData) {
     },
     { onConflict: "submarket_id,period" },
   );
+  if (error) {
+    console.error("[submarkets] period save failed", error.message);
+    redirect(`/submarkets/${id}?error=save`);
+  }
 
   revalidatePath(`/submarkets/${id}`);
   redirect(`/submarkets/${id}`);
@@ -229,7 +341,11 @@ export async function deleteSubmarketPeriod(formData: FormData) {
   const id = String(formData.get("submarketId") ?? "");
   const periodId = String(formData.get("periodId") ?? "");
   if (!id || !periodId) return;
-  await supabase.from("submarket_periods").delete().eq("id", periodId).eq("submarket_id", id);
+  const { error } = await supabase.from("submarket_periods").delete().eq("id", periodId).eq("submarket_id", id);
+  if (error) {
+    console.error("[submarkets] period delete failed", error.message);
+    redirect(`/submarkets/${id}?error=delete`);
+  }
   revalidatePath(`/submarkets/${id}`);
   redirect(`/submarkets/${id}`);
 }
@@ -238,7 +354,11 @@ export async function deleteSubmarketPipeline(formData: FormData) {
   const { supabase } = await requireUser();
   const id = String(formData.get("submarketId") ?? "");
   if (!id) return;
-  await supabase.from("pipeline_properties").delete().eq("submarket_id", id);
+  const { error } = await supabase.from("pipeline_properties").delete().eq("submarket_id", id);
+  if (error) {
+    console.error("[submarkets] pipeline clear failed", error.message);
+    redirect(`/submarkets/${id}?error=delete`);
+  }
   revalidatePath(`/submarkets/${id}`);
   redirect(`/submarkets/${id}`);
 }
