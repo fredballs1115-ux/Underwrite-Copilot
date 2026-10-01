@@ -107,7 +107,7 @@ import {
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
-import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
+import { BUY_BOX_CHIP_CLS, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import {
   signalGoingInCap,
@@ -983,15 +983,10 @@ export default async function DealPage({
 
   // The buy-box call as one chip (lib/buy-box-chip's `buyBoxChip`: the
   // mandate-fit score leads — "Fit 82 · Pursue" — unless a hard "outside"
-  // fold wins, and the older fold stands in without a score), toned here.
-  const CHIP_CLS: Record<BuyBoxChipTone, string> = {
-    pass: "bg-pass/10 text-pass",
-    caution: "bg-caution/10 text-caution",
-    kill: "bg-kill/10 text-kill",
-    muted: "bg-faint text-muted",
-  };
+  // fold wins, and the older fold stands in without a score), toned by the
+  // same map the sensitivity playground's chip reads.
   const buyBoxChip = boxRead
-    ? { label: boxRead.chip.label, cls: CHIP_CLS[boxRead.chip.tone] }
+    ? { label: boxRead.chip.label, cls: BUY_BOX_CHIP_CLS[boxRead.chip.tone] }
     : null;
 
   const addressLine =

@@ -33,6 +33,15 @@ export function dealCheckSource(
 
 export type BuyBoxChipTone = "pass" | "caution" | "kill" | "muted";
 
+/** The chip's colours by tone — the deal header's, and the sensitivity
+ *  playground's, which draws its own read of the box in the same chip. */
+export const BUY_BOX_CHIP_CLS: Record<BuyBoxChipTone, string> = {
+  pass: "bg-pass/10 text-pass",
+  caution: "bg-caution/10 text-caution",
+  kill: "bg-kill/10 text-kill",
+  muted: "bg-faint text-muted",
+};
+
 export interface BuyBoxChip {
   label: string;
   tone: BuyBoxChipTone;

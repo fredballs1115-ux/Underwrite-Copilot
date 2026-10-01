@@ -24,7 +24,13 @@ import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { ToastProvider } from "@/app/(app)/toaster";
 import { DealView } from "@/app/(app)/deals/[id]/deal-view";
-import { PLAN_RETURNS_CAVEAT, SensitivityPlayground } from "@/app/(app)/deals/[id]/sensitivity-playground";
+import {
+  PLAN_RETURNS_CAVEAT,
+  SensitivityPlayground,
+  playgroundFitLine,
+  type PlaygroundData,
+} from "@/app/(app)/deals/[id]/sensitivity-playground";
+import { buyBoxRead } from "@/lib/buy-box-chip";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -750,6 +756,43 @@ describe("the sensitivity playground says whose figures it runs", () => {
       React.createElement(SensitivityPlayground, { data: { ...p.playground, strategy } as never }),
     );
   };
+
+  it("its fit chip is the header's chip, says what it scored, and keeps the memorandum's fit apart (2026-09-30)", () => {
+    // The research pass: the header read "Fit 63 · Outside box" and the Buy
+    // box tab "63 / 100 · Watch", while the playground said a red
+    // "Pass · 36/100" — the model's IRR and cash-on-cash scored against the
+    // box's 13% and 5% floors, with nothing saying so.
+    const p = sampleProps(null) as unknown as { playground: PlaygroundData };
+    const html = renderToStaticMarkup(React.createElement(SensitivityPlayground, { data: p.playground }));
+    const at = html.indexOf('data-qa="playground-fit"');
+    expect(at).toBeGreaterThan(-1);
+    const fit = textOf(html.slice(html.indexOf(">", at) + 1));
+    expect(fit).toMatch(/^Fit 36 · Pass\s+with the model's IRR and cash-on-cash scored · Fit 63 on the memorandum's figures/);
+    expect(fit).not.toMatch(/\/100/);
+    // "The memorandum's figures" is the header's own read: the same scorer
+    // on the same source the page's chip folds.
+    const header = buyBoxRead(SAMPLE_DEAL.asset_class, p.playground.checkSource as never, SAMPLE_DEMO_BOX);
+    expect(header.chip.label).toBe("Fit 63 · Outside box");
+    expect(header.mandate?.score).toBe(63);
+    expect(gluedWords(textOf(html))).toEqual([]);
+  });
+
+  it("says what a moved slider's fit is against, and names nothing it did not score", () => {
+    const s = { score: 52, base: 36, scored: ["IRR", "cash-on-cash"], onMemorandum: 63 };
+    expect(playgroundFitLine(s, false)).toBe("with the model's IRR and cash-on-cash scored · Fit 63 on the memorandum's figures");
+    expect(playgroundFitLine(s, true)).toBe(
+      "with the model's IRR and cash-on-cash scored · Fit 36 at the base case · Fit 63 on the memorandum's figures",
+    );
+    expect(playgroundFitLine({ ...s, score: 36 }, true)).toBe(
+      "with the model's IRR and cash-on-cash scored · unchanged — these returns don't cross a mandate threshold · Fit 63 on the memorandum's figures",
+    );
+    // A box with no return floor scores nothing of the model's: the chip is
+    // the memorandum's own read, said once.
+    expect(playgroundFitLine({ score: 63, base: 63, scored: [], onMemorandum: 63 }, false)).toBe(
+      "mandate fit on the memorandum's figures",
+    );
+    expect(playgroundFitLine({ ...s, scored: ["IRR"] }, false)).toBe("with the model's IRR scored · Fit 63 on the memorandum's figures");
+  });
 
   it("says a plan deal's returns are the screening model's, not the plan's", () => {
     const plan = textOf(playground("conversion"));
