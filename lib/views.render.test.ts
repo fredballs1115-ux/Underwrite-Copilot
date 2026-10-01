@@ -3595,15 +3595,19 @@ describe("the deal math tools", () => {
 
   it("says what a sale-leaseback's rent is really buying", () => {
     // #346, rules 1 and 2. The seller writes the lease, so $5.4M of the
-    // $27M price is the lease rather than the building — and the rent
-    // reverts at year 20 while the building does not, which is $3,973,557
-    // a buyer capitalising the contract NOI has not priced at all.
+    // $27M price is the lease rather than the building. The buyer pays
+    // $3,973,557 over the term and the reversion; $1,434,633 of it is the
+    // rent premium reverting at year 20, and $2,538,924 would be paid at
+    // market rent too — the 6% credit cap against the 8% discount rate. (The
+    // note had laid all $3,973,557 on the reversion.)
     expect(text).toContain("The sale-leaseback");
     expect(text).toContain("$27,000,000");
     expect(text).toContain("$5,400,000");
+    expect(text).toContain("$3,973,557");
     expect(text).toContain(
-      "The rent reverts at year 20, and the building does not — which is $3,973,557 of the price, 14.7% of it.",
+      "The rent reverts at year 20, and the building does not — which is $1,434,633 of the price, 5.3% of it.",
     );
+    expect(text).toContain("The other $2,538,924 would be paid at market rent too");
   });
 
   it("sets the escalating rent against a coupon that never moves", () => {
@@ -3613,6 +3617,8 @@ describe("the deal math tools", () => {
     expect(text).toContain("6.09");
     expect(text).toContain("8.87");
     expect(text).toContain("The rent passes it in year 5 and never comes back under");
+    // The years under the coupon are the crossing's, four on the seed.
+    expect(text).toContain("costs less than the coupon for its first 4 years");
     expect(text).toContain("$12,816,579");
   });
 
