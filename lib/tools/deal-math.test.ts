@@ -132,13 +132,26 @@ describe("sizing a loan", () => {
     expect(s.constant).toBeCloseTo(0.07585, 4);
   });
 
-  it("refuses both coverage tests on a building with no income", () => {
-    // Dividing by a negative NOI would size a NEGATIVE loan, and a negative
-    // number is smaller than every real test — it would silently become the
-    // binding constraint and report a loan nobody could draw.
+  it("lends nothing on either coverage test to a building with no income", () => {
+    // Dividing by a negative NOI would size a NEGATIVE loan, which is not a
+    // smaller loan but nonsense — so each coverage test allows $0, and binds.
+    // This test used to pin the opposite: both coverage tests dropped and a
+    // $13,000,000 loan sized on loan-to-value alone against a building losing
+    // $50,000 a year, which no coverage test would lend a dollar on.
     const s = sizeLoan({ ...base, noi: -50_000 });
-    expect(s.tests.map((t) => t.key)).toEqual(["ltv"]);
-    expect(s.loan).toBeCloseTo(13_000_000, 6);
+    expect(s.tests.map((t) => t.key)).toEqual(["ltv", "dscr", "debtYield"]);
+    expect(s.tests.find((t) => t.key === "dscr")!.maxLoan).toBe(0);
+    expect(s.tests.find((t) => t.key === "debtYield")!.maxLoan).toBe(0);
+    expect(s.tests.filter((t) => t.binding).map((t) => t.key)).toEqual(["dscr", "debtYield"]);
+    expect(s.loan).toBe(0);
+    expect(s.equity).toBe(20_000_000);
+    expect(s.annualDebtService).toBe(0);
+    // A building that breaks even exactly is the same answer.
+    expect(sizeLoan({ ...base, noi: 0 }).loan).toBe(0);
+    // And with LTV the only test set, LTV sizes it — a blank test is not a
+    // test, and a blank NOI is no coverage test either.
+    expect(sizeLoan({ ...base, noi: -50_000, minDscr: null, minDebtYieldPct: null }).loan).toBeCloseTo(13_000_000, 6);
+    expect(sizeLoan({ ...base, noi: null }).tests.map((t) => t.key)).toEqual(["ltv"]);
   });
 
   it("sizes off coverage alone when there is no price yet", () => {

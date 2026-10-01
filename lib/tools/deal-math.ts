@@ -161,23 +161,26 @@ export function sizeLoan(inp: SizingInputs): Sizing {
       maxLoan: inp.price * (inp.maxLtvPct / 100),
     });
   }
-  // Both coverage tests need a positive NOI: a building with no income
-  // supports no debt on either test, and dividing by a negative would size
-  // a negative loan, which is not a smaller loan — it is nonsense.
-  if (positive(inp.noi) && positive(inp.minDscr) && positive(constant)) {
+  // A building with no income supports no debt on either coverage test: at
+  // or below zero NOI each allows $0 — and binds. Dividing by a negative NOI
+  // would size a negative loan, which is not a smaller loan, it is nonsense;
+  // the first version avoided that by DROPPING both tests, and then sized
+  // the loan on loan-to-value alone — $13,000,000 against a building losing
+  // $50,000 a year. A blank NOI is still no test at all.
+  if (real(inp.noi) && positive(inp.minDscr) && positive(constant)) {
     tests.push({
       key: "dscr",
       label: "Debt service coverage",
       setAt: `${trim(inp.minDscr, 2)}x`,
-      maxLoan: inp.noi / (inp.minDscr * constant),
+      maxLoan: inp.noi > 0 ? inp.noi / (inp.minDscr * constant) : 0,
     });
   }
-  if (positive(inp.noi) && positive(inp.minDebtYieldPct)) {
+  if (real(inp.noi) && positive(inp.minDebtYieldPct)) {
     tests.push({
       key: "debtYield",
       label: "Debt yield",
       setAt: `${trim(inp.minDebtYieldPct)}%`,
-      maxLoan: inp.noi / (inp.minDebtYieldPct / 100),
+      maxLoan: inp.noi > 0 ? inp.noi / (inp.minDebtYieldPct / 100) : 0,
     });
   }
 

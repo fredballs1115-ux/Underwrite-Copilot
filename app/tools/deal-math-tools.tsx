@@ -541,7 +541,14 @@ function DebtSizer() {
             ))}
           </div>
 
-          {binding ? (
+          {binding && s.loan === 0 && binding.key !== "ltv" ? (
+            // No income to cover debt service: a coverage test lends nothing,
+            // and that is not a term to negotiate.
+            <p className="mt-4 text-sm text-ink">
+              With no NOI to cover it, the coverage tests allow no debt at all — the
+              building has to earn before it can borrow.
+            </p>
+          ) : binding ? (
             <p className="mt-4 text-sm text-ink">
               <span className="font-semibold">{binding.label}</span> governs at{" "}
               {binding.setAt}. That is the constraint to negotiate.
