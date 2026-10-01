@@ -4461,6 +4461,26 @@ describe("DealHero — the building's picture beside its name and its figures (#
     expect(visibleText(ranged)).not.toContain("$9,000,000");
   });
 
+  it("gives a label two lines rather than truncating it, and keeps a row's figures at the foot of their tiles", () => {
+    // The research pass of 2026-09-30: one truncated line cut "Price ·
+    // Leasehold, 45 yrs left" to "PRICE · LEASEHOLD, 45 Y…" even at 1280px.
+    const tagged = renderToStaticMarkup(
+      React.createElement(DealHero, {
+        title: "The Maddox",
+        subtitle: "Philadelphia, PA · Multifamily",
+        figures: [{ label: "Price · Leasehold, 45 yrs left", value: "$68,000,000", figure: true }, ...figures.slice(1)],
+      }),
+    );
+    const tiles = [...tagged.matchAll(/<div class="([^"]*)"><dt class="([^"]*)">([^<]*)<\/dt>/g)];
+    expect(tiles).toHaveLength(4);
+    for (const [, tile, dt] of tiles) {
+      expect(dt.split(" ")).toContain("line-clamp-2");
+      expect(dt.split(" ")).not.toContain("truncate");
+      expect(tile).toContain("flex-col justify-between");
+    }
+    expect(tiles[0][3]).toBe("Price · Leasehold, 45 yrs left");
+  });
+
   it("with no picture, the header is one column and marks nothing to split around", () => {
     expect(bare).not.toContain('data-hero-picture="true"');
     expect(bare).not.toContain("[grid-area:pic]");

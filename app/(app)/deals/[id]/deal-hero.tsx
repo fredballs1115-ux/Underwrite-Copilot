@@ -101,11 +101,15 @@ export function DealHero({
             <p className="mt-1 line-clamp-2 text-sm text-muted">{subtitle}</p>
           </div>
           {/* Four across only where a tile holds a nine-figure price on one
-              line; a figure never breaks inside itself. */}
+              line; a figure never breaks inside itself. A label may take two
+              lines — "Price · Leasehold, 45 yrs left" is the fact the price
+              turns on, and one truncated line cut it off at every width —
+              and a row's figures stay on one line with each other, each at
+              the foot of its tile. */}
           <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-line bg-line @2xl/facts:grid-cols-4">
             {figures.map((f) => (
-              <div key={f.label} className="min-w-0 bg-surface px-3.5 py-2.5">
-                <dt className="truncate text-[11px] uppercase tracking-wide text-muted">{f.label}</dt>
+              <div key={f.label} className="flex min-w-0 flex-col justify-between bg-surface px-3.5 py-2.5">
+                <dt className="line-clamp-2 text-[11px] uppercase tracking-wide text-muted">{f.label}</dt>
                 <dd
                   className={`mt-0.5 text-base font-semibold @xs/facts:text-lg ${
                     f.figure ? "whitespace-nowrap font-mono tabular-nums" : "break-words"
