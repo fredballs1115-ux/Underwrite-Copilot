@@ -234,7 +234,9 @@ export async function deleteAccount(formData: FormData) {
     }
   }
 
-  // 3. Shared team deals transfer to the team owner instead of vanishing.
+  // 3. Shared team deals transfer to the team owner instead of vanishing —
+  //    counted, so the sign-in page can say they stayed.
+  let handedOver = 0;
   if (team) {
     const { data: owner } = await admin
       .from("teams")
@@ -242,11 +244,12 @@ export async function deleteAccount(formData: FormData) {
       .eq("id", team.id)
       .maybeSingle();
     if (owner?.owner_id) {
-      await admin
+      const { count } = await admin
         .from("deals")
-        .update({ user_id: owner.owner_id })
+        .update({ user_id: owner.owner_id }, { count: "exact" })
         .eq("team_id", team.id)
         .eq("user_id", user.id);
+      handedOver = count ?? 0;
     }
     await admin
       .from("team_members")
@@ -322,5 +325,7 @@ export async function deleteAccount(formData: FormData) {
   if (team) await syncTeamSeats(team.id);
 
   await supabase.auth.signOut();
-  redirect("/login?deleted=1");
+  // The sign-in page says what happened: everything gone, or — where deals
+  // went to the team's owner in step 3 — what stayed and with whom.
+  redirect(handedOver > 0 ? "/login?deleted=team" : "/login?deleted=1");
 }

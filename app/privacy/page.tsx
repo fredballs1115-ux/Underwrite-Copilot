@@ -35,7 +35,7 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "Retention and deletion",
     body: [
-      "Deleting a deal deletes its documents and analyses. You can delete your whole account and everything in it instantly, yourself, from the Account page — it cancels any live subscription and removes your files. Prefer email? Write to underwritecopilot.support@gmail.com from your account address and we'll remove it within 30 days. Either way, deletion is complete except where the law requires retention (for example, billing records).",
+      "Deleting a deal deletes its documents and analyses. You can delete your whole account and everything in it instantly, yourself, from the Account page — it cancels any live subscription and removes your files. Prefer email? Write to underwritecopilot.support@gmail.com from your account address and we'll remove it within 30 days. Either way, everything is deleted except two things: the deals you added to a team's pipeline, which stay with the team, handed to its owner; and what the law requires us to keep (for example, billing records).",
     ],
   },
   {

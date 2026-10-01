@@ -54,8 +54,11 @@ export default async function LoginPage({
 
           {deleted && (
             <p className="mt-6 rounded-lg bg-surface/95 px-3 py-2 text-center text-sm text-ink shadow-card">
-              Your account and all its data have been deleted. Thanks for trying
-              Underwrite Copilot.
+              {/* A team member's deals in the team's pipeline are handed to
+                  the team's owner, not deleted (deleteAccount, step 3). */}
+              {deleted === "team"
+                ? "Your account has been deleted, with your own deals and files. The deals you added to your team's pipeline stay with the team, handed to its owner. Thanks for trying Underwrite Copilot."
+                : "Your account and all its data have been deleted. Thanks for trying Underwrite Copilot."}
             </p>
           )}
           {linkBanner && (
