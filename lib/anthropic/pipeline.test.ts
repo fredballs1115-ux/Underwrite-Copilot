@@ -1296,7 +1296,7 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, metrics: [] });
     await runAnalysis("d1");
     expect(job().status).toBe("error");
-    expect(job().error).toMatch(/scan or password-protected/);
+    expect(job().error).toMatch(/from its text or its pages/);
     expect(state.deals.d1.extraction).toEqual({ old: true });
     expect(challengeAssumptions).not.toHaveBeenCalled();
     expect(synthesizeVerdict).not.toHaveBeenCalled();
@@ -1327,7 +1327,7 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, metrics: [] });
     await runAnalysis("d1");
     expect(job().status).toBe("error");
-    expect(job().error).toMatch(/scan or password-protected/);
+    expect(job().error).toMatch(/from its text or its pages/);
     expect(state.deals.d1.extraction).toEqual({ old: true });
   });
 

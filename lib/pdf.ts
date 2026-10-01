@@ -1,3 +1,8 @@
+/** The most pages the analysis service reads in one pass: the upload refuses
+ *  a longer memorandum before it becomes a deal (lib/pdf-open), and the
+ *  pipeline stops one that got past it before any model call. */
+export const MAX_OM_PAGES = 600;
+
 /**
  * Best-effort page count from a PDF's bytes — a FALLBACK only. The authoritative
  * count comes from the model that reads the native PDF (extraction.totalPages);

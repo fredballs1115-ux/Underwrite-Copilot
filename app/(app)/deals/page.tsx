@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { FREE_DEAL_LIMIT, getBilling } from "@/lib/billing";
+import { MAX_OM_PAGES } from "@/lib/pdf";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { dealAllowance } from "@/lib/deal-allowance";
 import { type DealRow } from "@/lib/deals";
@@ -35,6 +36,8 @@ const ERRORS: Record<string, string> = {
   file: "Please choose a PDF offering memorandum to upload.",
   pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
   size: "That PDF is larger than 32 MB — please try a smaller file for now.",
+  locked: "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password (or ask the broker for one) and upload that. Nothing was saved.",
+  pages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the financial sections on their own. Nothing was saved.`,
   save: "Couldn’t save the deal. Please try again.",
   upload: "The upload didn’t complete — nothing was saved. Please try again.",
   // The limits read from the constants the gates count by (lib/billing,

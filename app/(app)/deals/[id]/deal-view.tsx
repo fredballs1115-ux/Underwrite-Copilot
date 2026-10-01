@@ -79,6 +79,7 @@ import type { ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
+import { MAX_OM_PAGES } from "@/lib/pdf";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
@@ -184,6 +185,9 @@ const MODEL_ERRORS: Record<string, string> = {
   omfile: "Choose the reissued OM (PDF) to upload.",
   ompdf: "The replacement OM must be a PDF.",
   omsize: "That PDF is larger than 32 MB — please try a smaller file.",
+  omlocked:
+    "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password and upload that. The stored OM is unchanged.",
+  ompages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the financial sections on their own. The stored OM is unchanged.`,
   omupload:
     "The upload didn’t complete — the stored OM is unchanged. Please try again.",
   ompermission:

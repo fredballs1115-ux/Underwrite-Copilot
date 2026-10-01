@@ -20,7 +20,7 @@ import { reconcileModel } from "./reconcile";
 import { checkMarket } from "./market";
 import { synthesizeVerdict } from "./verdict";
 import { parseModelFile } from "@/lib/model-parse";
-import { countPdfPages } from "@/lib/pdf";
+import { MAX_OM_PAGES, countPdfPages } from "@/lib/pdf";
 import { buildDealFacts, toFactRows } from "@/lib/facts";
 import { runDocReconciliation } from "./reconcile-facts";
 import { runActualsIngestion } from "./actuals-ingest";
@@ -136,10 +136,11 @@ function heartbeatMs(): number {
 // stalled and never invites a second pipeline on the same deal.
 const runGate = new RunGate(concurrencyFromEnv);
 
-// The provider reads a PDF of up to about 600 pages in one request; a longer
-// deck came back as a raw 400. The byte counter (lib/pdf.ts) only ever
-// UNDER-counts, so a count past the cap is certain, never a false alarm.
-const MAX_OM_PAGES = 600;
+// The provider reads a PDF of up to about 600 pages in one request
+// (MAX_OM_PAGES, lib/pdf); a longer deck came back as a raw 400. The upload
+// refuses one first (lib/pdf-open); this stop catches a deck uploaded before
+// that check. The byte counter only ever UNDER-counts, so a count past the
+// cap is certain, never a false alarm.
 
 /** Keep the job row fresh while a run is alive; returns the stop function. */
 function startHeartbeat(dealId: string): () => void {
@@ -799,12 +800,14 @@ async function runAnalysisSteps(
         await writeCheckpoint();
         extraction = await extractTerms(om(), assetClass);
       }
-      // A scan, a password-protected file or an empty deck yields a
-      // schema-valid extraction with no figures at all. Stored, it flowed to
-      // a Caution verdict on a document the product never read — stop here.
+      // A deck with no figures in it — a teaser, a cover letter, pages too
+      // faint to read — yields a schema-valid extraction with none at all.
+      // Stored, it flowed to a Caution verdict on a document the product
+      // never read — stop here. (A scan is read as pictures, and a file that
+      // needs a password to open is refused at the upload, lib/pdf-open.)
       if (extraction.metrics.length === 0) {
         throw new ScreenError(
-          "We couldn't read any figures out of this PDF — it may be a scan or password-protected. Try a text-based PDF.",
+          "We couldn't read any figures out of this PDF, from its text or its pages — check it is the offering memorandum rather than a teaser or a cover letter, or upload a clearer copy with Replace OM.",
         );
       }
       await admin

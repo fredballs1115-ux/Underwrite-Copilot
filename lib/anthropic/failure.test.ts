@@ -40,8 +40,10 @@ describe("describeRunFailure — the analyst reads a sentence, the log keeps the
     expect(describeRunFailure(apiError(500, "api_error", "boom")).message).toMatch(/overloaded/);
     expect(describeRunFailure(apiError(413, "invalid_request_error", "too big")).message).toMatch(/too large/);
     expect(describeRunFailure(apiError(400, "invalid_request_error", "pdf pages")).message).toMatch(
-      /text-based PDF/,
+      /Replace OM/,
     );
+    // A scan is read as pictures: the advice never blames one.
+    expect(describeRunFailure(apiError(400, "invalid_request_error", "pdf pages")).message).not.toMatch(/scan/i);
   });
 
   it("a 400 about the account — a spent credit balance, a usage limit — is ours, never the document's (pass 14, 2026-10-01)", () => {

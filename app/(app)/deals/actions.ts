@@ -41,6 +41,7 @@ import {
   firstSignalFromExtraction,
 } from "@/lib/manual-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
+import { checkPdfOpens } from "@/lib/pdf-open";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -61,6 +62,8 @@ export type CreateDealError =
   | "file"
   | "pdf"
   | "size"
+  | "locked"
+  | "pages"
   | "save"
   | "upload";
 
@@ -118,6 +121,13 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
   if (!buffer.subarray(0, 5).toString("latin1").startsWith("%PDF-")) {
     return { ok: false, error: "pdf" };
   }
+  // A memorandum the screen cannot read at all is refused here, before it
+  // becomes a deal and takes a free slot (lib/pdf-open): one that asks for a
+  // password to open, or one longer than the analysis reads in one pass. A
+  // broker's "secured" copy opens without asking and goes ahead.
+  const opens = await checkPdfOpens(buffer);
+  if (opens.verdict === "password") return { ok: false, error: "locked" };
+  if (opens.verdict === "too_long") return { ok: false, error: "pages" };
 
   // Idempotency: a raced double-submit (fast double-click, back-then-resubmit)
   // would otherwise create duplicate deals and duplicate Claude runs. If an
@@ -928,6 +938,11 @@ export async function replaceOm(formData: FormData) {
   if (!replacementBytes.subarray(0, 5).toString("latin1").startsWith("%PDF-")) {
     redirect(`/deals/${dealId}?error=ompdf`);
   }
+  // The upload's own check (lib/pdf-open): a replacement the screen cannot
+  // read is refused before the old OM is replaced and a run is claimed.
+  const replacementOpens = await checkPdfOpens(replacementBytes);
+  if (replacementOpens.verdict === "password") redirect(`/deals/${dealId}?error=omlocked`);
+  if (replacementOpens.verdict === "too_long") redirect(`/deals/${dealId}?error=ompages`);
 
   // Claim the run BEFORE the multi-second upload — the claim is a single
   // conditional UPDATE, so a concurrent replace/re-run on the same deal gets

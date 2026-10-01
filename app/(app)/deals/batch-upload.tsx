@@ -9,6 +9,7 @@ import {
 // Each file's deal is named from its file name — a starting point the user
 // can edit before the batch runs; the single upload pre-fills the same way.
 import { nameFromFile } from "@/lib/deal-name";
+import { MAX_OM_PAGES } from "@/lib/pdf";
 
 const MAX_FILES = 4;
 const MAX_BYTES = 32 * 1024 * 1024;
@@ -21,6 +22,8 @@ const ERROR_COPY: Record<string, string> = {
   file: "The file didn't arrive — try again.",
   pdf: "Not a valid PDF.",
   size: "Over the 32 MB limit.",
+  locked: "Needs a password to open — upload an unlocked copy.",
+  pages: `Over ${MAX_OM_PAGES} pages — upload the financial sections.`,
   save: "Couldn't save the deal — try again.",
   upload: "Upload failed — try again.",
 };
