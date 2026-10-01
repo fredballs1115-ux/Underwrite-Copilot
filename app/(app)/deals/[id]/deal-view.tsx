@@ -1104,10 +1104,14 @@ const MANDATE_META: Record<
 function MandateScoreHeader({
   mandate,
   unscored,
+  outsideOn = [],
 }: {
   mandate: MandateScore;
   /** buy-box criteria that are checked (below) but not part of the fit score */
   unscored: string[];
+  /** criteria the deal misses outright — the header's chip reads "Outside
+   *  box" on any of them, whatever the score's call */
+  outsideOn?: string[];
 }) {
   const score = mandate.score!;
   const meta = MANDATE_META[mandate.verdict!];
@@ -1157,6 +1161,9 @@ function MandateScoreHeader({
           : ""}
         {mandate.unresolvedDealbreakers > 0 && !mandate.dealbreakerTripped
           ? ` ${mandate.unresolvedDealbreakers} dealbreaker${mandate.unresolvedDealbreakers > 1 ? "s" : ""} couldn't be checked — verify manually.`
+          : ""}
+        {outsideOn.length > 0 && mandate.verdict !== "PASS"
+          ? ` It misses the box outright on ${outsideOn.join(" and ")}, so the deal's chip reads Outside box whatever the score's call.`
           : ""}
       </p>
     </div>
@@ -1260,6 +1267,10 @@ export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
           unscored={data.checks
             .filter((c) => c.label === "Price" || c.label.startsWith("Basis / "))
             .map((c) => (c.label === "Price" ? "price" : c.label.toLowerCase()))}
+          // The criteria the deal misses outright: the header's chip folds
+          // every check and reads "Outside box" on any of them (lib/buy-box-
+          // chip), so the gauge says why it differs from its own call.
+          outsideOn={data.checks.filter((c) => c.status === "miss").map((c) => c.label.toLowerCase())}
         />
       )}
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
