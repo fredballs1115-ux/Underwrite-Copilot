@@ -70,9 +70,37 @@ describe("FeedsCard — every feed's row, current or named stale", () => {
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toMatch(/feeds are not current/);
-    expect(text).toMatch(/10-yr Treasury/);
+    // The stale series named, as a reader reads them (the lint's text
+    // breaks at every closing span), each hyphenated word kept whole so a
+    // line never ends on "5-" with "yr" on the next.
+    expect(text.replace(/\s+/g, " ")).toMatch(/1-mo , 3-mo , 6-mo .*10-yr Treasury/);
+    expect(html).toContain('<span class="whitespace-nowrap">5-yr</span>');
+    expect(html).not.toMatch(/(?<!<span class="whitespace-nowrap">)\b\d+-(?:mo|yr)\b/);
     expect(text).toMatch(/no rows/);
     expect(html).toContain("bg-amber-500/10");
+  });
+
+  it("on a phone, stacks each feed with its status, its newest figure, its series and the stale series' names in view", () => {
+    // At 390px the table's six columns scrolled its last two — the series
+    // and the status with the stale series' names — out of its card; a
+    // phone gets an entry a feed instead, and the table keeps `sm` up.
+    const html = render(new Date("2026-10-05T12:00:00Z"), [], []);
+    expect(a11yIssues(html)).toEqual([]);
+    const list = html.match(/<ul class="([^"]*)" data-qa="feeds-list">([\s\S]*?)<\/ul>/);
+    expect(list?.[1]).toMatch(/(^|\s)sm:hidden(\s|$)/);
+    expect(html).toContain('<div class="mt-3 hidden overflow-x-auto sm:block"><table');
+    const entries = [...(list?.[2] ?? "").matchAll(/<li [^>]*>([\s\S]*?)<\/li>/g)].map((m) => visibleText(m[1]).replace(/\s+/g, " ").trim());
+    // An entry a feed, as the table has a row a feed.
+    expect(entries.length).toBeGreaterThan(0);
+    expect(entries).toHaveLength((html.match(/<tr class="border-t /g) ?? []).length);
+    // The daily feed, stale: its name and status first, then everything the
+    // table's columns said, the stale series named last.
+    const daily = entries.find((e) => e.startsWith("Rates — daily series")) ?? "";
+    expect(daily).toMatch(/^Rates — daily series stale FRED · .+ Newest observation 2026-09-21 · 14 days old Series 0 of \d+ current Not current .*10-yr Treasury/);
+    // A feed with no rows says so, with dashes for the figures it has none of.
+    expect(entries.some((e) => /no rows .* Newest observation — Series —$/.test(e))).toBe(true);
+    // Every stale feed's entry is tinted, as its table row is.
+    expect((list?.[2].match(/<li class="[^"]*bg-amber-500\/10/g) ?? []).length).toBe((html.match(/<tr class="border-t border-line\/60 bg-amber-500\/10"/g) ?? []).length);
   });
 
   it("a file left behind by its pull tints the feed's row and names the file with its month", () => {
