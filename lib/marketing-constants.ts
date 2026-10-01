@@ -109,9 +109,15 @@ export const FREE_DEALS = 3;
 // list to them: a new gate with no line, or a line whose gate is gone,
 // fails there.
 
+/** The free allowance as a page says it. The cap counts the deals a reader
+ *  has now — the create action and the database's trigger count the deals
+ *  that exist, samples left out — so it is "up to", never "your first", and
+ *  it promises nothing about the rule staying as it is. */
+export const FREE_DEALS_LINE = `Up to ${FREE_DEALS} deals free`;
+
 /** The free plan's card, on the homepage and the billing page alike. */
 export const FREE_PLAN: readonly string[] = [
-  `${FREE_DEALS} deals, the full six-stage screen on each`,
+  `Up to ${FREE_DEALS} deals, the full six-stage screen on each`,
   "Sourced ranges + the three deal-killers",
   "Recorded-sales comps + local rent-rule check by address",
   "Risk digest and side-by-side deal comparison",

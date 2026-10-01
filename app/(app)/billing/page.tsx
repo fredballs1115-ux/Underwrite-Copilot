@@ -183,7 +183,7 @@ export default async function BillingPage({
               <p className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
                 {allowance?.teamTrial
                   ? `Your team's ${TEAM_TRIAL_DEALS} trial deals and your own ${FREE_DEAL_LIMIT} free deals are all in use — the next OM needs Pro.`
-                  : `You've screened all ${FREE_DEAL_LIMIT} free deals — the next OM needs Pro.`}{" "}
+                  : `Your ${FREE_DEAL_LIMIT} free deals are all in use — the next OM needs Pro.`}{" "}
                 Your existing deals stay right where they are.
               </p>
             )}
@@ -207,7 +207,7 @@ export default async function BillingPage({
             <span className="text-3xl font-semibold tracking-tight">$0</span>
           </p>
           <p className="mt-1 text-sm text-muted">
-            The full screen, on your first {FREE_DEAL_LIMIT} deals.
+            The full screen, on up to {FREE_DEAL_LIMIT} deals.
           </p>
           <ul className="mt-5 flex-1 space-y-2.5">
             {FREE_PLAN.map((f) => (

@@ -17,10 +17,12 @@ import {
   PRICE_TEAM_BASE_MONTHLY,
   PRICE_TEAM_MEMBER_MONTHLY,
   FREE_DEALS,
+  FREE_DEALS_LINE,
   FREE_PLAN,
   PRO_PLAN_LINES,
   SAMPLE_COMP_PREMIUM_LINE,
 } from "@/lib/marketing-constants";
+import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 // The Excel-preview rows are COMPUTED from the live engine on the sample
 // model at render time — hardcoded copies of these figures are exactly what
 // drifted (the page said 7.1% while the engine computed 6.9%).
@@ -689,7 +691,7 @@ export default function Home() {
                       See a full screen
                     </Link>
                   </div>
-                  <p className="mt-4 text-xs text-white/70">First {FREE_DEALS} deals free · no card</p>
+                  <p className="mt-4 text-xs text-white/70">{FREE_DEALS_LINE} · no card</p>
                 </div>
 
                 {/* Product preview */}
@@ -1065,7 +1067,7 @@ export default function Home() {
                 <p className="mt-2 flex items-baseline gap-1">
                   <span className="text-4xl font-semibold tracking-tight">$0</span>
                 </p>
-                <p className="mt-1 text-sm text-muted">The full screen on your next {FREE_DEALS} deals.</p>
+                <p className="mt-1 text-sm text-muted">The full screen on up to {FREE_DEALS} deals.</p>
                 <ul className="mt-5 flex-1 space-y-2.5">
                   {FREE_PLAN.map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
@@ -1130,7 +1132,7 @@ export default function Home() {
                     "One shared pipeline — same deals, same verdicts",
                     "Invite teammates with a link",
                     "Billing follows your seat count automatically",
-                    `${FREE_DEALS} shared deals free to try it`,
+                    `Up to ${TEAM_TRIAL_DEALS} shared deals free to try it`,
                   ].map((f) => (
                     <li key={f} className="flex items-start gap-2.5 text-sm">
                       <span className="mt-0.5 flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-full bg-brand/10 text-[10px] font-bold text-brand">
@@ -1226,7 +1228,7 @@ export default function Home() {
               </Link>
             </div>
             <p className="mt-4 text-xs text-white/50">
-              First {FREE_DEALS} deals free · no credit card
+              {FREE_DEALS_LINE} · no credit card
             </p>
           </div>
         </section>

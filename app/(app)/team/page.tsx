@@ -149,7 +149,7 @@ export default async function TeamPage({
             <ul className="mt-3 space-y-2 text-sm text-muted">
               {[
                 "Everyone on the team sees the same pipeline — deals, verdicts, models, and memos.",
-                `The first ${TEAM_TRIAL_DEALS} shared deals are free to try. After that, the Team plan is ${TEAM_PRICE_LABEL} — billed only for the seats you actually have.`,
+                `Up to ${TEAM_TRIAL_DEALS} shared deals are free to try. Past that, the Team plan is ${TEAM_PRICE_LABEL} — billed only for the seats you actually have.`,
                 "The Team plan unlocks everything in Pro for every member.",
                 "Joining is one click on an invite link. You can be on one team at a time.",
               ].map((t) => (

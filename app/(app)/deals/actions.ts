@@ -283,7 +283,7 @@ export async function createManualDeal(
   if (!billing.canCreateDeal) {
     return {
       error: billing.team
-        ? "Your team’s trial deals and your personal free deals are used up — start the Team plan or upgrade to Pro."
+        ? "Your team’s trial deals and your personal free deals are all in use — start the Team plan or upgrade to Pro."
         : "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.",
     };
   }

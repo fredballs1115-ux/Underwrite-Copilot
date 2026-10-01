@@ -47,7 +47,7 @@ const ERRORS: Record<string, string> = {
     "Couldn’t build that export just now — please try again in a moment.",
   auth:
     "You were signed out, so the upload didn’t start. You’re back in now — everything you typed is still filled in below; just re-attach the PDF.",
-  teamlimit: `Your team’s ${TEAM_TRIAL_DEALS} trial deals and your personal free deals are used up. Start the Team plan for unlimited shared deals, or upgrade to Pro.`,
+  teamlimit: `Your team’s ${TEAM_TRIAL_DEALS} trial deals and your personal free deals are all in use. Start the Team plan for unlimited shared deals, or upgrade to Pro.`,
 };
 
 // Fixed metric slots for the pipeline table — every row fills the SAME

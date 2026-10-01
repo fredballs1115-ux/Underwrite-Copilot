@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
-import { PRO_PLAN, PRO_PLAN_LINES, PRO_UPSELL } from "./marketing-constants";
+import { FREE_DEALS, FREE_DEALS_LINE, FREE_PLAN, PRO_PLAN, PRO_PLAN_LINES, PRO_UPSELL } from "./marketing-constants";
 
 const ROOT = process.cwd();
 const read = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
@@ -103,5 +103,31 @@ describe("the homepage and the billing page draw the one list", () => {
     const src = read("app/(app)/billing/page.tsx");
     expect(src).toContain("Object.hasOwn(PRO_UPSELL, upsell)");
     expect(src).not.toContain("UPSELL_LABELS");
+  });
+});
+
+// The free cap counts the deals a reader has now — the create actions read
+// `getBilling`'s count of the deals that exist, and so does the database's
+// trigger (migration 0036), samples left out — and the team trial counts
+// the team's the same way. "Your first 3 deals" promised a once-only
+// allowance the code does not keep; every page says "up to" instead, and
+// nothing about the rule staying as it is.
+describe("the free allowance is said as the cap counts it", () => {
+  it("no page says a first or next few deals, all of them screened, or the trial used up", () => {
+    const once =
+      /\b(?:first|next)\s+\$?\{(?:FREE_DEALS|FREE_DEAL_LIMIT|TEAM_TRIAL_DEALS)\}|screened all \$\{FREE_DEAL_LIMIT\}|deals are used up/i;
+    expect(APP.filter((f) => once.test(read(f)))).toEqual([]);
+  });
+
+  it("the team trial is counted by its own constant, never the personal one", () => {
+    expect(APP.filter((f) => /\$\{FREE_DEALS\} shared deals/.test(read(f)))).toEqual([]);
+    expect(read("app/page.tsx")).toContain("`Up to ${TEAM_TRIAL_DEALS} shared deals free to try it`");
+  });
+
+  it("the plan card and the calls to sign up read one line", () => {
+    expect(FREE_DEALS_LINE).toBe(`Up to ${FREE_DEALS} deals free`);
+    expect(FREE_PLAN[0]).toBe(`Up to ${FREE_DEALS} deals, the full six-stage screen on each`);
+    expect(read("app/page.tsx").match(/\{FREE_DEALS_LINE\}/g) ?? []).toHaveLength(2);
+    expect(read("app/demo/page.tsx")).toContain("{FREE_DEALS_LINE}");
   });
 });

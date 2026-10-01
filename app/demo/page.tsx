@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { FREE_DEALS, DEEP_TOOLS } from "@/lib/marketing-constants";
+import { FREE_DEALS_LINE, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/criteria";
@@ -472,7 +472,7 @@ export default async function DemoPage() {
               Run this screen on your own OM
             </h2>
             <p className="mx-auto mt-2 max-w-md text-sm text-white/70">
-              First {FREE_DEALS} deals free · no card.
+              {FREE_DEALS_LINE} · no card.
             </p>
             <Link
               href="/login?mode=signup"
