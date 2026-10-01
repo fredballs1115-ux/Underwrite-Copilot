@@ -177,6 +177,23 @@ way in this batch):
   - ground lease: the 10-year term margin is said as "the margin lenders
     look for";
   - after tax and 1031: recapture is filled first.
+- **The Pro and team features** (research pass 17, 2026-10-01). The pass's
+  errors are being fixed; these are yours:
+  - **Equity multiple:** the engine nets the year-1 capital call into the
+    multiple's numerator. Standard practice is distributions over
+    contributions. This is model math.
+  - **Construction debt:** a plan deal's loan is sized on the acquisition
+    cost alone, with no construction debt behind the budget. This is model
+    math.
+  - **Departing members:** a member who leaves or is removed keeps reading,
+    editing and deleting the deals they uploaded (pass 8's item, still
+    open). The team page will say so; whether it should stay that way is
+    your call.
+  - **Invites by address:** invites bound to an email address need SMTP and
+    a migration.
+  - **Roles:** read-only or custom roles, as Dealpath and Northspyre offer
+    them. This is a billing question.
+  - **Ask quotas:** per-user limits on Ask (pass 8's run quotas).
 
 ## 🟢 2026-09-25 — being found, and the site's own address (#430)
 
