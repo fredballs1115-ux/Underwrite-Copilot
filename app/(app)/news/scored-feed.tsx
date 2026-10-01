@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ruleName } from "@/lib/research-data";
 
 /** One story the weekday intel sweep gathered and scored for this buyer. */
 export interface ItemRow {
@@ -38,11 +39,15 @@ export const SECTOR_LABEL: Record<string, string> = {
   "construction-supply": "construction",
 };
 
-const fmtDay = (iso: string) =>
+/** "Monday, Sep 14" — the day a story was picked up, as its group's
+ *  heading says it; with its year ("Monday, Sep 14, 2026") for an alert,
+ *  since the strip keeps the newest few whenever they came. */
+const fmtDay = (iso: string, withYear = false) =>
   new Date(iso).toLocaleDateString("en-US", {
     weekday: "long",
     month: "short",
     day: "numeric",
+    ...(withYear ? { year: "numeric" as const } : {}),
     timeZone: "UTC",
   });
 
@@ -92,26 +97,34 @@ export function ScoredFeedView({
             Law &amp; rule changes
           </h2>
           <ul className="mt-2 space-y-1.5 text-sm">
-            {alerts.map((a) => (
-              <li key={a.id} className="leading-snug">
-                {a.url ? (
-                  <a
-                    href={a.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline decoration-dotted underline-offset-2 hover:text-brand"
-                  >
-                    {a.headline}
-                  </a>
-                ) : (
-                  a.headline
-                )}{" "}
-                <span className="ml-1 text-[11px] text-muted">
-                  {a.detected_at.slice(0, 10)}
-                  {a.rule_id ? ` · affects ${a.rule_id}` : ""}
-                </span>
-              </li>
-            ))}
+            {alerts.map((a) => {
+              // The rule the sweep matched, by its name in the research file
+              // (lib/research-data `ruleName`) — an id the file does not hold
+              // says nothing rather than print itself.
+              const rule = ruleName(a.rule_id);
+              return (
+                <li key={a.id} className="leading-snug">
+                  {a.url ? (
+                    <a
+                      href={a.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline decoration-dotted underline-offset-2 hover:text-brand"
+                    >
+                      {a.headline}
+                    </a>
+                  ) : (
+                    a.headline
+                  )}{" "}
+                  <span className="ml-1 text-[11px] text-muted">
+                    <time dateTime={a.detected_at} className="whitespace-nowrap">
+                      {fmtDay(a.detected_at, true)}
+                    </time>
+                    {rule ? ` · affects ${rule}` : ""}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         </section>
       )}

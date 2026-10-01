@@ -11,6 +11,7 @@ import {
   mergeRules,
   metroFmr,
   ruleCounts,
+  ruleName,
   seedBenchmarks,
   seedRules,
   twoToFourMedian,
@@ -420,6 +421,34 @@ describe("ruleCounts — the homepage's claim about the rules on file", () => {
     // control, as of this writing) keeps the two counts apart.
     const unsourced = seedRules().filter((r) => !r.source || r.source.trim() === "").length;
     expect(all - sourced).toBe(unsourced);
+  });
+});
+
+describe("ruleName — a rule named for a reader, never by its raw id", () => {
+  it("names a rule by what it is and where it holds, from the file's own fields", () => {
+    expect(ruleName("md-moco-rent-stabilization")).toBe("rent control (Montgomery County, MD)");
+    expect(ruleName("dc-topa-sale-trigger")).toBe("TOPA (Washington, DC)");
+    expect(ruleName("dc-topa-2-4-unit-exemption")).toBe("TOPA exemption (Washington, DC)");
+    expect(ruleName("md-baltimore-rental-license")).toBe("rental licensing (Baltimore City, MD)");
+    // A statewide rule is named for its state, spelled out.
+    expect(ruleName("va-no-local-rent-control")).toBe("no local rent control (Virginia)");
+    expect(ruleName("ca-ab1482-rent-cap")).toBe("rent control coverage (California)");
+    expect(ruleName("nj-municipal-rent-control")).toBe("rent control (New Jersey)");
+  });
+
+  it("names every rule on file in words — no underscore, no id — and an id the file does not hold not at all", () => {
+    for (const r of seedRules()) {
+      const name = ruleName(r.id);
+      expect(name, r.id).toBeTruthy();
+      expect(name, r.id).not.toMatch(/_/);
+      expect(name, r.id).not.toContain(r.id);
+      expect(name, r.id).toMatch(/\(.+\)$/);
+    }
+    // The intel sweep's rule id is whatever it matched: one the file does
+    // not hold is said by nothing, never printed.
+    expect(ruleName("md-rent-cap")).toBeNull();
+    expect(ruleName(null)).toBeNull();
+    expect(ruleName("")).toBeNull();
   });
 });
 

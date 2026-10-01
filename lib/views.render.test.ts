@@ -2309,13 +2309,23 @@ describe("News scored feed", () => {
     item({ url: "https://x.test/3", title: "Local bakery opens second location", relevance: null }),
   ];
   const alerts: AlertRow[] = [
+    // A rule the research file holds, and an id the intel sweep matched
+    // that the file does not.
     {
       id: "a1",
-      rule_id: "md-rent-cap",
-      headline: "Maryland rent stabilization act signed",
+      rule_id: "md-moco-rent-stabilization",
+      headline: "Montgomery County sets its 2027 rent stabilization cap",
       url: "https://x.test/law",
       detail: null,
       detected_at: "2026-09-14T10:00:00Z",
+    },
+    {
+      id: "a2",
+      rule_id: "md-rent-cap",
+      headline: "Maryland rent stabilization act signed",
+      url: "https://x.test/law2",
+      detail: null,
+      detected_at: "2025-11-03T15:00:00Z",
     },
   ];
 
@@ -2324,7 +2334,18 @@ describe("News scored feed", () => {
     const text = visibleText(html);
     expect(text).toContain("rule changes");
     expect(text).toContain("Maryland rent stabilization act signed");
-    expect(text).toContain("affects md-rent-cap");
+    // The strip says when, as the day headings do (with the year, since it
+    // keeps the newest few whenever they came), and names the rule by the
+    // research file's words — never an ISO date or a raw rule id; an id the
+    // file does not hold says nothing.
+    const flat = text.replace(/\s+/g, " ");
+    expect(flat).toContain("Montgomery County sets its 2027 rent stabilization cap Monday, Sep 14, 2026 · affects rent control (Montgomery County, MD)");
+    expect(flat).toContain("Maryland rent stabilization act signed Monday, Nov 3, 2025");
+    expect(flat).not.toMatch(/Nov 3, 2025 · affects/);
+    expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
+    expect(text).not.toContain("md-rent-cap");
+    expect(text).not.toContain("md-moco-rent-stabilization");
+    expect(html).toContain('<time dateTime="2026-09-14T10:00:00Z" class="whitespace-nowrap">');
     expect(text).toContain("Monday, Sep 14");
     expect(text).toContain("Sunday, Sep 13");
     expect(text).toContain("8/10");

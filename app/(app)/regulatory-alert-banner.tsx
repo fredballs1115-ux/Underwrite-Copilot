@@ -15,6 +15,7 @@
 import { cookies } from "next/headers";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { safeHttpUrl } from "@/lib/safe-url";
+import { ruleName } from "@/lib/research-data";
 import { alertWindowStart, dismissedCookie, dismissedFor, undismissed } from "@/lib/dismissed-alerts";
 
 interface AlertRow {
@@ -76,6 +77,9 @@ export async function RegulatoryAlertBanner() {
         // The row is shared state written outside this request — only a real
         // web URL ever becomes a link (the same allowlist the comps map uses).
         const href = safeHttpUrl(a.url);
+        // The rule by its name in the research file, never its raw id; an
+        // id the file does not hold says nothing.
+        const rule = ruleName(a.rule_id);
         return (
         <div
           key={a.id}
@@ -92,9 +96,7 @@ export async function RegulatoryAlertBanner() {
             ) : (
               a.headline
             )}
-            {a.rule_id && (
-              <span className="ml-2 text-white/80">affects rule: {a.rule_id}</span>
-            )}
+            {rule && <span className="ml-2 text-white/80">affects {rule}</span>}
           </span>
           <form action={dismissAlert}>
             <input type="hidden" name="id" value={a.id} />

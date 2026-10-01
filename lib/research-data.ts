@@ -17,6 +17,7 @@ import seniorSeed from "@/data/research/senior_housing.json";
 import mhcSeed from "@/data/research/manufactured_housing.json";
 import specialtySeed from "@/data/research/specialty.json";
 import type { Benchmark, RegulatoryRule, RuleSubject } from "@/lib/research";
+import { US_STATE_ABBREV } from "@/lib/address";
 import { fmrBenchmarkRows, fmrOf, newestFmrOnly, type Fmr } from "@/lib/fmr";
 import { figureNote, figureRead } from "@/lib/tracker-read";
 
@@ -36,6 +37,47 @@ export function ruleCounts(): { all: number; sourced: number } {
     all: rules.length,
     sourced: rules.filter((r) => typeof r.source === "string" && r.source.trim() !== "").length,
   };
+}
+
+/** A state's name for a page, from the address table ("Virginia", "New
+ *  Jersey", "District of Columbia"), by its code. */
+const STATE_NAME: Record<string, string> = Object.fromEntries(
+  Object.entries(US_STATE_ABBREV).map(([name, code]) => [
+    code,
+    name
+      .split(" ")
+      .map((w) => (w === "of" ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+      .join(" "),
+  ]),
+);
+
+/** A rule's type in words: the file's own type with its underscores spaces,
+ *  but an acronym in capitals and two types that read badly as words said
+ *  plainly. */
+const RULE_TYPE_WORDS: Record<string, string> = {
+  topa: "TOPA",
+  topa_exemption: "TOPA exemption",
+  rent_control_absence: "no local rent control",
+  licensing: "rental licensing",
+};
+
+/**
+ * A rule's name for a sentence, from the research file's own fields: what
+ * kind of rule it is and where it holds — "rent control (Montgomery County,
+ * MD)", "TOPA (Washington, DC)", "no local rent control (Virginia)". The
+ * file gives no rule a title of its own; the deal page's rules panel names
+ * one by the same two fields. Null for an id the file does not hold (an
+ * alert's rule id is whatever the intel sweep matched), so a page never
+ * shows a reader a raw id.
+ */
+export function ruleName(id: string | null | undefined): string | null {
+  if (!id) return null;
+  const rule = seedRules().find((r) => r.id === id);
+  if (!rule) return null;
+  const words = RULE_TYPE_WORDS[rule.rule_type] ?? rule.rule_type.replace(/_/g, " ");
+  const state = rule.jurisdiction_state.trim().toUpperCase();
+  const place = rule.jurisdiction_local ? `${rule.jurisdiction_local}, ${state}` : (STATE_NAME[state] ?? state);
+  return `${words} (${place})`;
 }
 
 /** A value's JSON with every object's keys sorted, so a rule's conditions
