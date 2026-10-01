@@ -5167,6 +5167,624 @@
         "Table Rocks Oregon",
         "Jacksonville Oregon historic town"
       ]
+    },
+    {
+      "metroId": "cbsa:31420",
+      "city": "Macon, Georgia",
+      "area": "Macon-Bibb County, GA",
+      "wikipedia": [
+        "Macon, Georgia",
+        "Ocmulgee Mounds National Historical Park"
+      ],
+      "categories": [
+        "Views of Macon, Georgia",
+        "Downtown Macon, Georgia",
+        "Skylines of Macon, Georgia",
+        "Ocmulgee Mounds National Historical Park"
+      ],
+      "queries": [
+        "Macon Georgia downtown",
+        "Macon Georgia skyline",
+        "Macon Georgia cherry blossoms"
+      ]
+    },
+    {
+      "metroId": "cbsa:12020",
+      "city": "Athens, Georgia",
+      "area": "Athens-Clarke County, GA",
+      "wikipedia": [
+        "Athens, Georgia",
+        "University of Georgia"
+      ],
+      "categories": [
+        "Views of Athens, Georgia",
+        "Downtown Athens, Georgia",
+        "The Arch (University of Georgia)",
+        "University of Georgia North Campus"
+      ],
+      "queries": [
+        "Athens Georgia downtown",
+        "University of Georgia arch",
+        "Athens Georgia skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:25940",
+      "city": "Hilton Head Island, South Carolina",
+      "area": "Hilton Head Island-Bluffton-Port Royal, SC",
+      "wikipedia": [
+        "Hilton Head Island, South Carolina",
+        "Harbour Town Lighthouse",
+        "Beaufort, South Carolina",
+        "Bluffton, South Carolina"
+      ],
+      "categories": [
+        "Harbour Town Lighthouse",
+        "Beaches of Hilton Head Island",
+        "Views of Hilton Head Island, South Carolina",
+        "Beaufort, South Carolina"
+      ],
+      "queries": [
+        "Harbour Town lighthouse Hilton Head",
+        "Hilton Head Island beach",
+        "Beaufort South Carolina waterfront"
+      ]
+    },
+    {
+      "metroId": "cbsa:37460",
+      "city": "Panama City, Florida",
+      "area": "Panama City-Panama City Beach, FL",
+      "wikipedia": [
+        "Panama City, Florida",
+        "Panama City Beach, Florida",
+        "St. Andrews State Park"
+      ],
+      "categories": [
+        "Panama City Beach, Florida",
+        "Beaches of Panama City Beach, Florida",
+        "Views of Panama City, Florida",
+        "St. Andrews State Park"
+      ],
+      "queries": [
+        "Panama City Beach Florida beach",
+        "Panama City Florida marina",
+        "Panama City Beach pier"
+      ]
+    },
+    {
+      "metroId": "cbsa:19300",
+      "city": "Fairhope, Alabama",
+      "area": "Daphne-Fairhope-Foley, AL",
+      "wikipedia": [
+        "Fairhope, Alabama",
+        "Gulf Shores, Alabama",
+        "Orange Beach, Alabama",
+        "Baldwin County, Alabama"
+      ],
+      "categories": [
+        "Fairhope Municipal Pier",
+        "Gulf Shores, Alabama",
+        "Beaches of Gulf Shores, Alabama",
+        "Orange Beach, Alabama"
+      ],
+      "queries": [
+        "Fairhope pier Mobile Bay",
+        "Gulf Shores Alabama beach",
+        "Orange Beach Alabama"
+      ]
+    },
+    {
+      "metroId": "cbsa:39460",
+      "city": "Punta Gorda, Florida",
+      "area": "Punta Gorda, FL",
+      "wikipedia": [
+        "Punta Gorda, Florida",
+        "Port Charlotte, Florida",
+        "Charlotte Harbor (estuary)"
+      ],
+      "categories": [
+        "Punta Gorda, Florida",
+        "Charlotte Harbor",
+        "Views of Punta Gorda, Florida",
+        "Fishermen's Village"
+      ],
+      "queries": [
+        "Punta Gorda Florida harbor",
+        "Punta Gorda Florida waterfront",
+        "Charlotte Harbor Florida"
+      ]
+    },
+    {
+      "metroId": "cbsa:11100",
+      "city": "Amarillo, Texas",
+      "area": "Amarillo, TX",
+      "wikipedia": [
+        "Amarillo, Texas",
+        "Palo Duro Canyon State Park",
+        "Cadillac Ranch"
+      ],
+      "categories": [
+        "Skylines of Amarillo, Texas",
+        "Views of Amarillo, Texas",
+        "Downtown Amarillo, Texas",
+        "Palo Duro Canyon"
+      ],
+      "queries": [
+        "Amarillo Texas skyline",
+        "Amarillo Texas downtown",
+        "Palo Duro Canyon"
+      ]
+    },
+    {
+      "metroId": "cbsa:46340",
+      "city": "Tyler, Texas",
+      "area": "Tyler, TX",
+      "wikipedia": [
+        "Tyler, Texas"
+      ],
+      "categories": [
+        "Views of Tyler, Texas",
+        "Downtown Tyler, Texas",
+        "Tyler Rose Garden",
+        "Skylines of Tyler, Texas"
+      ],
+      "queries": [
+        "Tyler Texas downtown",
+        "Tyler Texas skyline",
+        "Tyler Texas rose garden"
+      ]
+    },
+    {
+      "metroId": "cbsa:30980",
+      "city": "Longview, Texas",
+      "area": "Longview, TX",
+      "wikipedia": [
+        "Longview, Texas"
+      ],
+      "categories": [
+        "Views of Longview, Texas",
+        "Downtown Longview, Texas",
+        "Longview, Texas"
+      ],
+      "queries": [
+        "Longview Texas downtown",
+        "Longview Texas",
+        "Longview Texas skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:33260",
+      "city": "Midland, Texas",
+      "area": "Midland, TX",
+      "wikipedia": [
+        "Midland, Texas"
+      ],
+      "categories": [
+        "Skylines of Midland, Texas",
+        "Views of Midland, Texas",
+        "Downtown Midland, Texas"
+      ],
+      "queries": [
+        "Midland Texas skyline",
+        "Midland Texas downtown",
+        "Midland Texas"
+      ]
+    },
+    {
+      "metroId": "cbsa:29340",
+      "city": "Lake Charles, Louisiana",
+      "area": "Lake Charles, LA",
+      "wikipedia": [
+        "Lake Charles, Louisiana"
+      ],
+      "categories": [
+        "Views of Lake Charles, Louisiana",
+        "Skylines of Lake Charles, Louisiana",
+        "Lake Charles, Louisiana",
+        "Calcasieu River"
+      ],
+      "queries": [
+        "Lake Charles Louisiana skyline",
+        "Lake Charles Louisiana lakefront",
+        "Lake Charles Louisiana downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:43640",
+      "city": "Covington, Louisiana",
+      "area": "Slidell-Mandeville-Covington, LA",
+      "wikipedia": [
+        "Covington, Louisiana",
+        "Mandeville, Louisiana",
+        "Slidell, Louisiana",
+        "Fontainebleau State Park"
+      ],
+      "categories": [
+        "Mandeville, Louisiana",
+        "Covington, Louisiana",
+        "Fontainebleau State Park",
+        "Slidell, Louisiana"
+      ],
+      "queries": [
+        "Mandeville Louisiana lakefront",
+        "Covington Louisiana downtown",
+        "Fontainebleau State Park Louisiana"
+      ]
+    },
+    {
+      "metroId": "cbsa:29200",
+      "city": "Lafayette, Indiana",
+      "area": "Lafayette-West Lafayette, IN",
+      "wikipedia": [
+        "Lafayette, Indiana",
+        "West Lafayette, Indiana",
+        "Purdue University",
+        "Tippecanoe County Courthouse"
+      ],
+      "categories": [
+        "Views of Lafayette, Indiana",
+        "Tippecanoe County Courthouse",
+        "Purdue University campus",
+        "Downtown Lafayette, Indiana"
+      ],
+      "queries": [
+        "Lafayette Indiana downtown courthouse",
+        "Purdue University campus",
+        "Lafayette Indiana Wabash River"
+      ]
+    },
+    {
+      "metroId": "cbsa:16580",
+      "city": "Champaign, Illinois",
+      "area": "Champaign-Urbana, IL",
+      "wikipedia": [
+        "Champaign, Illinois",
+        "Urbana, Illinois",
+        "University of Illinois Urbana-Champaign"
+      ],
+      "categories": [
+        "Views of Champaign, Illinois",
+        "Downtown Champaign, Illinois",
+        "Main Quad (University of Illinois at Urbana-Champaign)",
+        "Skylines of Champaign, Illinois"
+      ],
+      "queries": [
+        "Champaign Illinois skyline",
+        "University of Illinois quad",
+        "Champaign Illinois downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:40340",
+      "city": "Rochester, Minnesota",
+      "area": "Rochester, MN",
+      "wikipedia": [
+        "Rochester, Minnesota",
+        "Mayo Clinic",
+        "Plummer Building"
+      ],
+      "categories": [
+        "Skylines of Rochester, Minnesota",
+        "Views of Rochester, Minnesota",
+        "Downtown Rochester, Minnesota",
+        "Plummer Building"
+      ],
+      "queries": [
+        "Rochester Minnesota skyline",
+        "Rochester Minnesota downtown",
+        "Mayo Clinic Rochester"
+      ]
+    },
+    {
+      "metroId": "cbsa:20260",
+      "city": "Duluth, Minnesota",
+      "area": "Duluth, MN-WI",
+      "wikipedia": [
+        "Duluth, Minnesota",
+        "Aerial Lift Bridge",
+        "Superior, Wisconsin"
+      ],
+      "categories": [
+        "Aerial Lift Bridge",
+        "Skylines of Duluth, Minnesota",
+        "Views of Duluth, Minnesota",
+        "Canal Park (Duluth)"
+      ],
+      "queries": [
+        "Duluth aerial lift bridge",
+        "Duluth Minnesota skyline",
+        "Duluth Lake Superior harbor"
+      ]
+    },
+    {
+      "metroId": "cbsa:11540",
+      "city": "Appleton, Wisconsin",
+      "area": "Appleton, WI",
+      "wikipedia": [
+        "Appleton, Wisconsin"
+      ],
+      "categories": [
+        "Views of Appleton, Wisconsin",
+        "Downtown Appleton, Wisconsin",
+        "Appleton, Wisconsin",
+        "Fox River in Appleton, Wisconsin"
+      ],
+      "queries": [
+        "Appleton Wisconsin downtown",
+        "Appleton Wisconsin Fox River",
+        "Appleton Wisconsin skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:45820",
+      "city": "Topeka, Kansas",
+      "area": "Topeka, KS",
+      "wikipedia": [
+        "Topeka, Kansas",
+        "Kansas State Capitol"
+      ],
+      "categories": [
+        "Kansas State Capitol",
+        "Skylines of Topeka, Kansas",
+        "Views of Topeka, Kansas",
+        "Downtown Topeka, Kansas"
+      ],
+      "queries": [
+        "Topeka Kansas skyline",
+        "Kansas State Capitol Topeka",
+        "Topeka Kansas downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:16820",
+      "city": "Charlottesville, Virginia",
+      "area": "Charlottesville, VA",
+      "wikipedia": [
+        "Charlottesville, Virginia",
+        "The Rotunda (University of Virginia)",
+        "Monticello",
+        "Downtown Mall (Charlottesville, Virginia)"
+      ],
+      "categories": [
+        "The Rotunda (University of Virginia)",
+        "Monticello",
+        "Charlottesville Downtown Mall",
+        "Views of Charlottesville, Virginia"
+      ],
+      "queries": [
+        "Charlottesville Virginia Rotunda",
+        "Charlottesville Virginia downtown mall",
+        "Charlottesville Virginia Blue Ridge"
+      ]
+    },
+    {
+      "metroId": "cbsa:13780",
+      "city": "Binghamton, New York",
+      "area": "Binghamton, NY",
+      "wikipedia": [
+        "Binghamton, New York"
+      ],
+      "categories": [
+        "Skylines of Binghamton, New York",
+        "Views of Binghamton, New York",
+        "Downtown Binghamton",
+        "Susquehanna River in Binghamton, New York"
+      ],
+      "queries": [
+        "Binghamton New York skyline",
+        "Binghamton New York downtown",
+        "Binghamton Susquehanna River"
+      ]
+    },
+    {
+      "metroId": "cbsa:46540",
+      "city": "Utica, New York",
+      "area": "Utica-Rome, NY",
+      "wikipedia": [
+        "Utica, New York",
+        "Rome, New York",
+        "Union Station (Utica, New York)"
+      ],
+      "categories": [
+        "Views of Utica, New York",
+        "Downtown Utica, New York",
+        "Skylines of Utica, New York",
+        "Rome, New York"
+      ],
+      "queries": [
+        "Utica New York skyline",
+        "Utica New York downtown",
+        "Utica New York Genesee Street"
+      ]
+    },
+    {
+      "metroId": "cbsa:28740",
+      "city": "Kingston, New York",
+      "area": "Kingston, NY",
+      "wikipedia": [
+        "Kingston, New York",
+        "Ashokan Reservoir",
+        "Catskill Mountains"
+      ],
+      "categories": [
+        "Views of Kingston, New York",
+        "Rondout Creek",
+        "Ashokan Reservoir",
+        "Uptown Kingston, New York"
+      ],
+      "queries": [
+        "Kingston New York Rondout",
+        "Kingston New York uptown stockade",
+        "Ashokan Reservoir Catskills"
+      ]
+    },
+    {
+      "metroId": "cbsa:44300",
+      "city": "State College, Pennsylvania",
+      "area": "State College, PA",
+      "wikipedia": [
+        "State College, Pennsylvania",
+        "Pennsylvania State University",
+        "Beaver Stadium"
+      ],
+      "categories": [
+        "Views of State College, Pennsylvania",
+        "Pennsylvania State University",
+        "Old Main (Pennsylvania State University)",
+        "Mount Nittany"
+      ],
+      "queries": [
+        "State College Pennsylvania downtown",
+        "Penn State Old Main",
+        "Mount Nittany State College"
+      ]
+    },
+    {
+      "metroId": "cbsa:47220",
+      "city": "Vineland, New Jersey",
+      "area": "Vineland, NJ",
+      "wikipedia": [
+        "Vineland, New Jersey",
+        "Millville, New Jersey",
+        "Bridgeton, New Jersey"
+      ],
+      "categories": [
+        "Vineland, New Jersey",
+        "Views of Vineland, New Jersey",
+        "Millville, New Jersey",
+        "Bridgeton, New Jersey"
+      ],
+      "queries": [
+        "Vineland New Jersey Landis Avenue",
+        "Millville New Jersey Maurice River",
+        "Bridgeton New Jersey"
+      ]
+    },
+    {
+      "metroId": "cbsa:14740",
+      "city": "Bremerton, Washington",
+      "area": "Bremerton-Silverdale-Port Orchard, WA",
+      "wikipedia": [
+        "Bremerton, Washington",
+        "Port Orchard, Washington",
+        "Poulsbo, Washington",
+        "Kitsap County, Washington"
+      ],
+      "categories": [
+        "Views of Bremerton, Washington",
+        "Bremerton waterfront",
+        "Poulsbo, Washington",
+        "Port Orchard, Washington"
+      ],
+      "queries": [
+        "Bremerton Washington waterfront",
+        "Poulsbo Washington harbor",
+        "Bremerton Washington ferry Olympic Mountains"
+      ]
+    },
+    {
+      "metroId": "cbsa:49420",
+      "city": "Yakima, Washington",
+      "area": "Yakima, WA",
+      "wikipedia": [
+        "Yakima, Washington",
+        "Yakima Valley AVA"
+      ],
+      "categories": [
+        "Views of Yakima, Washington",
+        "Downtown Yakima, Washington",
+        "Yakima Valley",
+        "Yakima River"
+      ],
+      "queries": [
+        "Yakima Washington downtown",
+        "Yakima Valley vineyards",
+        "Yakima Valley hop fields"
+      ]
+    },
+    {
+      "metroId": "cbsa:32900",
+      "city": "Merced, California",
+      "area": "Merced, CA",
+      "wikipedia": [
+        "Merced, California",
+        "University of California, Merced"
+      ],
+      "categories": [
+        "Views of Merced, California",
+        "Downtown Merced, California",
+        "Merced County Courthouse",
+        "University of California, Merced"
+      ],
+      "queries": [
+        "Merced California downtown",
+        "Merced California courthouse",
+        "Merced County California farmland"
+      ]
+    },
+    {
+      "metroId": "cbsa:17020",
+      "city": "Chico, California",
+      "area": "Chico, CA",
+      "wikipedia": [
+        "Chico, California",
+        "Bidwell Park",
+        "Oroville Dam"
+      ],
+      "categories": [
+        "Bidwell Park",
+        "Views of Chico, California",
+        "Downtown Chico, California",
+        "Oroville Dam"
+      ],
+      "queries": [
+        "Chico California downtown",
+        "Bidwell Park Chico",
+        "Lake Oroville"
+      ]
+    },
+    {
+      "metroId": "cbsa:39150",
+      "city": "Prescott, Arizona",
+      "area": "Prescott Valley-Prescott, AZ",
+      "wikipedia": [
+        "Prescott, Arizona",
+        "Prescott Valley, Arizona",
+        "Granite Dells",
+        "Sedona, Arizona"
+      ],
+      "categories": [
+        "Yavapai County Courthouse",
+        "Granite Dells",
+        "Views of Prescott, Arizona",
+        "Watson Lake (Arizona)"
+      ],
+      "queries": [
+        "Prescott Arizona courthouse square",
+        "Watson Lake Granite Dells",
+        "Prescott Arizona downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:29740",
+      "city": "Las Cruces, New Mexico",
+      "area": "Las Cruces, NM",
+      "wikipedia": [
+        "Las Cruces, New Mexico",
+        "Organ Mountains",
+        "Mesilla, New Mexico"
+      ],
+      "categories": [
+        "Organ Mountains",
+        "Views of Las Cruces, New Mexico",
+        "Mesilla, New Mexico",
+        "Downtown Las Cruces, New Mexico"
+      ],
+      "queries": [
+        "Las Cruces Organ Mountains",
+        "Las Cruces New Mexico downtown",
+        "Mesilla plaza New Mexico"
+      ]
     }
   ]
 }
