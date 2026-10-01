@@ -45,6 +45,14 @@ describe("a team member's own deal, said as one", () => {
     expect(page).toContain("onTeam={!!billing?.team}");
   });
 
+  it("the homepage's FAQ says what the shared pipeline takes, not that every deal lands there", () => {
+    const home = read("app/page.tsx");
+    expect(home).not.toContain("every deal anyone uploads");
+    expect(home).toContain(
+      "the deals you all add land in one shared pipeline, with the same screens, verdicts, models, and memos for everyone: up to ${TEAM_TRIAL_DEALS} shared deals free to try it, and every one on the Team plan.",
+    );
+  });
+
   it("/team says what the create actions do with a member's deal past the trial", () => {
     const src = read("app/(app)/team/page.tsx").replace(/\s+/g, " ");
     expect(src).not.toContain("every deal anyone uploads lands in one shared pipeline");

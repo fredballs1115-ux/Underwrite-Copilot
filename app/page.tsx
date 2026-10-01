@@ -308,7 +308,7 @@ const FAQ: { q: string; a: string }[] = [
   },
   {
     q: "Can my team share one pipeline?",
-    a: `Yes. Create a team, send teammates an invite link, and every deal anyone uploads lands in one shared pipeline — same screens, verdicts, models, and memos for everyone. The Team plan is ${PRICE_TEAM_BASE_MONTHLY} per month — which includes the account owner — plus ${PRICE_TEAM_MEMBER_MONTHLY} per month for each added member, on one subscription that adjusts automatically as people join or leave.`,
+    a: `Yes. Create a team, send teammates an invite link, and the deals you all add land in one shared pipeline, with the same screens, verdicts, models, and memos for everyone: up to ${TEAM_TRIAL_DEALS} shared deals free to try it, and every one on the Team plan. The Team plan is ${PRICE_TEAM_BASE_MONTHLY} per month — which includes the account owner — plus ${PRICE_TEAM_MEMBER_MONTHLY} per month for each added member, on one subscription that adjusts automatically as people join or leave.`,
   },
   {
     q: "Can I cancel anytime?",
