@@ -965,3 +965,24 @@ describe("the sensitivity playground says whose figures it runs", () => {
     expect(held).not.toMatch(/Going-in cap/);
   });
 });
+
+describe("DealView — the LOI panel says what the download drafts", () => {
+  it("hands the panel the terms the page read on the server, the LOI route's own reader (lib/loi-terms)", () => {
+    // A deal of the reader's own on the Documents tab, where the panel sits.
+    const html = render({
+      ...sampleProps("documents"),
+      isSample: false,
+      isPro: true,
+      loi: { plan: { kind: "conversion", label: "Conversion" } },
+    } as Props);
+    // The panel's own section (the tab around it carries the OM controls).
+    const at = html.lastIndexOf("<section", html.indexOf(">LOI draft<"));
+    const panel = html.slice(at, html.indexOf("</section>", at) + "</section>".length);
+    expect(panel).toMatch(/Download LOI draft/);
+    expect(a11yIssues(panel)).toEqual([]);
+    const text = textOf(panel);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/This deal is a conversion: the draft’s diligence clause covers/);
+    expect(text).toMatch(/carries an entitlements contingency/);
+  });
+});

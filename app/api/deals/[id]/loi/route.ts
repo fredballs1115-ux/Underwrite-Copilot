@@ -3,10 +3,10 @@ import { isPro } from "@/lib/billing";
 import { buildLoiDocx } from "@/lib/loi";
 import { getBrandingForDeal } from "@/lib/branding-server";
 import { parseUsd } from "@/lib/money";
-import { inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { loiTermsFor } from "@/lib/loi-terms";
 import type { DealRow } from "@/lib/deals";
 import type { StructuredAddress } from "@/lib/address";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
 export const runtime = "nodejs";
 
@@ -128,14 +128,16 @@ export async function GET(
 
   // The deal's kind shapes the paper: a conversion or a development carries
   // an entitlements contingency; every plan deal's diligence names the work.
-  const strategy = inferStrategy(
-    ((deal as { extraction?: ExtractionResult | null }).extraction as ExtractionResult | null) ??
-      null,
+  // Read with the first signal through the panel's own reader, so the
+  // letter carries exactly the clauses the panel said it would.
+  const terms = loiTermsFor(
+    (deal as { extraction?: ExtractionResult | null }).extraction ?? null,
+    ((deal as { first_signal?: unknown }).first_signal as FirstSignal | null) ?? null,
   );
 
   try {
     const buffer = await buildLoiDocx({
-      plan: isPlanDeal(strategy.kind) ? { kind: strategy.kind, label: strategy.label } : null,
+      plan: terms.plan,
       buyerName,
       firmName,
       propertyName: deal.name,

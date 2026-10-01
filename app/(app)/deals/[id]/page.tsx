@@ -46,6 +46,7 @@ import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { readPortfolio } from "@/lib/portfolio";
+import { loiTermsFor } from "@/lib/loi-terms";
 import { PICTURE_CREDIT, ensureDealPicture, memorandumPhotoCredit } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords, countNoun } from "@/lib/asset-words";
@@ -1479,6 +1480,10 @@ export default async function DealPage({
         assumable={assumable}
         sellerNote={sellerNote}
         leaseholdExit={leaseholdExit}
+        // What the letter of intent drafts, read by the LOI route's own
+        // reader from the same row — so the panel names the clauses the
+        // download carries (lib/loi-terms).
+        loi={loiTermsFor(extraction, firstSignal)}
         metroDemand={
           reads && liveMarket
             ? metroDemand(reads.rates, readClass)

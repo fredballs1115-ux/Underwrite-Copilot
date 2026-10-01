@@ -5,6 +5,7 @@ import Link from "next/link";
 import { withArticle } from "@/lib/article";
 import { parsePrice } from "@/lib/criteria";
 import { parseUsd } from "@/lib/money";
+import type { LoiTerms } from "@/lib/loi-terms";
 
 /**
  * LOI draft: a prefilled, editable form → a .docx download. The numbers come
@@ -15,15 +16,17 @@ export function LoiPanel({
   dealId,
   askingPrice,
   isPro,
-  plan = null,
+  terms = null,
 }: {
   dealId: string;
   /** the extraction's asking-price string — a development's land cost — "" when unknown */
   askingPrice: string;
   isPro: boolean;
-  /** the deal's plan, when it has one — the draft's clauses follow it */
-  plan?: { kind: string; label: string } | null;
+  /** what the draft carries, read on the server by the route's own reader
+   *  (lib/loi-terms), so the panel describes the download it links to */
+  terms?: LoiTerms | null;
 }) {
+  const plan = terms?.plan ?? null;
   const needsEntitlements = plan?.kind === "conversion" || plan?.kind === "development";
   // The ask as every surface reads it — a range at its top (#466) — and a
   // figure only where it is a price at all.

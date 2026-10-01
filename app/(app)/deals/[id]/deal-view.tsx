@@ -69,7 +69,8 @@ import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
 import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
-import { findPricedMetric, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
+import type { LoiTerms } from "@/lib/loi-terms";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
 import { interestOf } from "@/lib/interest";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
@@ -264,15 +265,6 @@ function askingPriceValue(extraction: ExtractionResult | null, signal: FirstSign
   return findPricedMetric(extraction?.metrics ?? [], inferStrategy(extraction, signal).kind)?.value ?? "";
 }
 
-/** The deal's plan for the LOI draft — its clauses follow the kind. */
-function loiPlan(
-  extraction: ExtractionResult | null,
-  signal: FirstSignal | null,
-): { kind: string; label: string } | null {
-  const s = inferStrategy(extraction, signal);
-  return isPlanDeal(s.kind) ? { kind: s.kind, label: s.label } : null;
-}
-
 function isActive(status: string | undefined): boolean {
   return status === "queued" || status === "running";
 }
@@ -351,6 +343,7 @@ export function DealView({
   assumable = null,
   sellerNote = null,
   leaseholdExit = null,
+  loi = null,
 }: {
   dealId: string;
   dealName: string;
@@ -387,6 +380,10 @@ export function DealView({
    *  the model's sale (lib/leasehold-exit, #421) — plain data; null unless
    *  a leasehold states when its lease ends */
   leaseholdExit?: LeaseholdExitView | null;
+  /** what the letter of intent drafts — read on the server by the LOI
+   *  route's own reader (lib/loi-terms), so the panel and the download
+   *  cannot disagree; null leaves the panel with no plan to name */
+  loi?: LoiTerms | null;
   /** the metro area's payrolls by sector today, with this building's
    *  sector marked (lib/metro-demand); null outside the covered markets */
   metroDemand?: MetroDemand | null;
@@ -406,7 +403,8 @@ export function DealView({
   userEmail?: string | null;
   qa?: AskEntry[];
   isSample?: boolean;
-  /** the ~30s first read, so the LOI infers the deal's kind as the page does */
+  /** the ~30s first read, so the LOI's prefill and the comps' subject read
+   *  the deal's kind as the page does */
   firstSignal?: FirstSignal | null;
   userId?: string | null;
   marketMemory?: MarketGroup | null;
@@ -960,7 +958,7 @@ export function DealView({
                 dealId={dealId}
                 askingPrice={askingPriceValue(results.extraction, firstSignal)}
                 isPro={isPro}
-                plan={loiPlan(results.extraction, firstSignal)}
+                terms={loi}
               />
             )}
           </div>
