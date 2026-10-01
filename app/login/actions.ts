@@ -11,6 +11,7 @@ import {
   safeNextPath,
   type AuthIntent,
 } from "@/lib/auth-flow";
+import { appUrl } from "@/lib/app-url";
 
 /** `intent` names the form that produced the state, so the sign-in tab never
  *  shows the sign-up tab's error. `resend` asks the page to offer a fresh
@@ -26,9 +27,10 @@ export type AuthState = {
 
 const UNREACHABLE = "Couldn't reach the sign-in service — try again in a moment.";
 
-/** The site's own origin, where the email links come back to. */
+/** The site's own origin, where the email links come back to: the one
+ *  reader the emails use too (lib/app-url), a blank setting read as unset. */
 function siteOrigin(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  return appUrl();
 }
 
 /**

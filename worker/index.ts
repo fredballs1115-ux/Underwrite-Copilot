@@ -367,7 +367,8 @@ async function main(): Promise<void> {
   log(
     `starting — poll ${POLL_MS}ms, heartbeat ${HEARTBEAT_MS}ms, max ${MAX_ATTEMPTS} attempts, job timeout ${Math.round(JOB_TIMEOUT_MS / 60000)}min`,
   );
-  if (process.env.RESEND_API_KEY && !process.env.NEXT_PUBLIC_APP_URL) {
+  // A blank setting is unset, as lib/app-url reads it.
+  if (process.env.RESEND_API_KEY && !process.env.NEXT_PUBLIC_APP_URL?.trim()) {
     log(
       "note: RESEND_API_KEY is set but NEXT_PUBLIC_APP_URL isn't — email links will use the default host",
     );

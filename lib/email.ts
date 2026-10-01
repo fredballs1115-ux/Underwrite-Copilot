@@ -8,6 +8,7 @@ import type { ExtractionResult, FirstSignal, VerdictResult } from "@/lib/anthrop
 import type { DealVisualCache } from "@/lib/deal-location";
 import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import { emailPictureUrl } from "@/lib/email-picture";
+import { appUrl } from "@/lib/app-url";
 
 /**
  * Analysis-ready email via Resend's REST API (plain fetch — no SDK to carry).
@@ -94,10 +95,6 @@ function readySetup(): { key: string; from: string } | null {
  *  anything, and what the account page says beside its two switches. */
 export function emailEnabled(): boolean {
   return readySetup() !== null;
-}
-
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "https://underwrite-copilot.onrender.com";
 }
 
 export async function sendEmail(

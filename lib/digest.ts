@@ -4,6 +4,7 @@ import { weeklyDigestEmail } from "@/lib/email-template";
 import { sendEmail, emailEnabled } from "@/lib/email";
 import { STAGES, STAGE_LABEL, normalizeStage } from "@/lib/stages";
 import { emailPictureUrl } from "@/lib/email-picture";
+import { appUrl } from "@/lib/app-url";
 
 const VERDICT_EMAIL: Record<string, { label: string; color: string }> = {
   pass: { label: "Go", color: "#1b7a5e" },
@@ -17,10 +18,6 @@ const DUE_FMT = new Intl.DateTimeFormat("en-US", {
   day: "numeric",
   timeZone: "UTC",
 });
-
-function appUrl(): string {
-  return process.env.NEXT_PUBLIC_APP_URL ?? "https://underwrite-copilot.onrender.com";
-}
 
 interface DigestDealRow {
   id: string;
