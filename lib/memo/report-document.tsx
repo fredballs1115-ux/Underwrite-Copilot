@@ -31,6 +31,7 @@ export function rangeRead(omSays: string, typicalRange: string): number | null {
   return basePosition({ low: m[1], base: omSays, high: m[2] });
 }
 import {
+  gridTakeaway,
   heatBucket,
   heatCellIrr,
   heatCellEm,
@@ -55,7 +56,7 @@ import {
 import { planFacts } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
-import { assetWords } from "@/lib/asset-words";
+import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
 import { interestOf, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
@@ -604,7 +605,10 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
           {str(f)}
         </Text>
       ))}
-      <View style={[s.tableHead, { marginTop: 8 }]}>
+      {/* The table's own View: its header repeats on a page a long list of
+          properties runs onto. */}
+      <View>
+      <View style={[s.tableHead, { marginTop: 8 }]} fixed>
         <Text style={[s.headText, { width: "30%" }]}>Property</Text>
         <Text style={[s.headText, { width: "22%" }]}>{p.shares && basisWord ? "Share" : ""}</Text>
         <Text style={[s.headText, { width: "40%" }]}>What the memorandum states</Text>
@@ -634,6 +638,7 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
           <Text style={{ width: "8%", fontSize: 7.5, color: C.muted }}>{a.page ? str(a.page) : "—"}</Text>
         </View>
       ))}
+      </View>
       <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 8 }}>
         {str(
           "An allocation is the seller's split of the price, set for transfer taxes and financing rather than by value; a cap struck on it is the allocation's cap, not the property's. Each property's market is read from its own address; the market check's published figures are the one market's that the deal's address on file sits in, never the portfolio's.",
@@ -1465,6 +1470,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // The plan's finished product in the class's own noun (lib/asset-words):
   // a hotel development is costed per key, never per unit.
   const planNoun = assetWords(memo.assetClass).noun ?? { one: "unit", many: "units" };
+  // A hotel's model grows its rooms revenue at the growth lever: the grid's
+  // axis and its takeaway call it RevPAR growth, not rent growth.
+  const hotelGrid = assetClassKey(memo.assetClass) === "hospitality_str";
   const extraction = deal.extraction as ExtractionResult | null;
   // One OM, several properties (#411): the portfolio page, read by the same
   // reader as the deal page's card; null for a single property.
@@ -1789,7 +1797,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <View wrap={false}>
             <HeatGrid
               axisLabel="EXIT CAP"
-              spanLabel="RENT GROWTH (ANNUAL)"
+              spanLabel={hotelGrid ? "REVPAR GROWTH (ANNUAL)" : "RENT GROWTH (ANNUAL)"}
               colLabels={sensitivity.grid.growthCols.map((g) => `${(g * 100).toFixed(1)}%`)}
               rowLabels={sensitivity.grid.capRows.map((cap) => `${(cap * 100).toFixed(2)}%`)}
               cells={sensitivity.grid.cells}
@@ -1798,7 +1806,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               hurdlePct={sensitivity.hurdlePct}
             />
             <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-              {str(sensitivity.takeaway)}
+              {str(hotelGrid ? gridTakeaway(sensitivity.grid, sensitivity.hurdlePct, "RevPAR growth") : sensitivity.takeaway)}
             </Text>
 
             {/* Legend — shared by both grids. */}
@@ -1950,7 +1958,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             Every figure the screen pulled from the OM, with its basis and
             source page. Flagged rows deserve independent verification.
           </Text>
-          <View style={s.tableHead}>
+          {/* The table's own View, so its header row — fixed — repeats at
+              the top of every page the rows run onto. */}
+          <View>
+          <View style={s.tableHead} fixed>
             <Text style={[s.headText, { width: "34%" }]}>Term</Text>
             <Text style={[s.headText, { width: "24%" }]}>Value</Text>
             <Text style={[s.headText, { width: "16%" }]}>Basis</Text>
@@ -1982,6 +1993,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               </View>
             </View>
           ))}
+          </View>
         </PageChrome>
       )}
 
@@ -2150,7 +2162,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             The OM&rsquo;s key assumptions against typical ranges for the asset
             class — rules of thumb, not a live comps feed.
           </Text>
-          <View style={s.tableHead}>
+          {/* The table's own View: its header repeats on a page the rows
+              run onto. */}
+          <View>
+          <View style={s.tableHead} fixed>
             <Text style={[s.headText, { width: "24%" }]}>Assumption</Text>
             <Text style={[s.headText, { width: "14%" }]}>OM says</Text>
             <Text style={[s.headText, { width: "14%" }]}>Typical</Text>
@@ -2226,6 +2241,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               </View>
             );
           })}
+          </View>
           {str(market?.summary) ? (
             <View style={s.summaryBox} wrap={false}>
               <Text style={s.summaryText}>{str(market?.summary)}</Text>
@@ -2255,7 +2271,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             Where the OM and your own underwriting disagree, framed from your
             side of the table.
           </Text>
-          <View style={s.tableHead}>
+          {/* The table's own View: its header repeats on a page the rows
+              run onto. */}
+          <View>
+          <View style={s.tableHead} fixed>
             <Text style={[s.headText, { width: "26%" }]}>Metric</Text>
             <Text style={[s.headText, { width: "22%" }]}>OM</Text>
             <Text style={[s.headText, { width: "22%" }]}>Your model</Text>
@@ -2325,6 +2344,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               </View>
             );
           })}
+          </View>
           {gapShares.some((g) => g !== null) ? (
             <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3 }}>
               Bars: each gap scaled to the widest of its kind; favorable right, unfavorable left.

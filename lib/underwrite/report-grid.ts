@@ -204,7 +204,12 @@ const clears = (cell: HeatCell, hurdlePct: number): boolean =>
  * how little growth still clears the hurdle; along the BASE growth column,
  * how much exit-cap expansion the deal survives.
  */
-export function gridTakeaway(grid: CapGrowthGrid, hurdlePct: number): string {
+export function gridTakeaway(
+  grid: CapGrowthGrid,
+  hurdlePct: number,
+  /** what the growth axis grows: a hotel's is its RevPAR, not a rent */
+  growth = "rent growth",
+): string {
   const p = (n: number) => `${Number(n.toFixed(1))}%`;
   const baseRow = grid.cells[grid.baseRow];
   const growthsClearing = grid.growthCols.filter((_, c) =>
@@ -224,10 +229,10 @@ export function gridTakeaway(grid: CapGrowthGrid, hurdlePct: number): string {
 
   const growthPart =
     growthsClearing.length === 0
-      ? `no tested rent growth clears it at the base exit cap`
+      ? `no tested ${growth} clears it at the base exit cap`
       : growthsClearing.length === grid.growthCols.length
         ? `every tested growth rate clears it at the base exit cap`
-        : `needs at least ${fmtPctPt(Math.min(...growthsClearing))} rent growth at the base exit cap`;
+        : `needs at least ${fmtPctPt(Math.min(...growthsClearing))} ${growth} at the base exit cap`;
 
   return `The deal ${capPart}, and ${growthPart}.`;
 }

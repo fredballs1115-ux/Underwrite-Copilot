@@ -19,7 +19,7 @@ const tinyDataUri = (rgb: [number, number, number]) => `data:image/png;base64,${
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { evaluateBuyBox } from "@/lib/criteria";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import { buildSensitivityData, pageBaseLevers } from "@/lib/underwrite/report-grid";
+import { buildSensitivityData, gridTakeaway, pageBaseLevers } from "@/lib/underwrite/report-grid";
 import { bidFloors, fmtBid, solveMaxBid } from "@/lib/underwrite/solver";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildPlanReport } from "@/lib/plan-sensitivity";
@@ -1295,6 +1295,61 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain(
       "Figures the check read beside the rules of thumb: the Dallas-Fort Worth market's, as published, read on Sep 23, 2026. The deal was placed in this market by its county: Collin County, TX, which the Census Bureau files in the Dallas-Fort Worth-Arlington, TX metro area. Its address names no place the market's own list does, so these are the metro area's figures, not the county's.",
     );
+  }, 60000);
+
+  it("repeats a long table's column headers on every page its rows run onto", async () => {
+    const metrics = [
+      ...SAMPLE_DEAL.extraction.metrics,
+      ...Array.from({ length: 60 }, (_, i) => ({ label: `Figure ${i + 1} from the rent roll summary`, value: `$${(i + 1) * 1000}`, flagged: i % 7 === 0, page: `p. ${i + 2}`, basis: "in_place" })),
+    ];
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "multifamily",
+      extraction: { ...SAMPLE_DEAL.extraction, metrics, totalPages: 80 },
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const pages = pdfPageTextsOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input: buildReportData(deal, "September 30, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    );
+    const termPages = pages.filter((p) => /Figure \d+ from the rent roll summary/.test(p));
+    expect(termPages.length).toBeGreaterThanOrEqual(2);
+    for (const p of termPages) expect(p, p.slice(0, 200)).toMatch(/\nTERM\nVALUE\nBASIS\nPAGE\nFLAG\n/);
+  }, 45000);
+
+  it("calls a hotel's growth axis RevPAR growth, which is what the model's growth lever grows there", async () => {
+    const hotel = {
+      dealName: "Hilton Garden Inn Midtown",
+      assetClass: "hospitality",
+      market: "Nashville, TN",
+      metrics: [
+        { label: "Asking price", value: "$36,000,000", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Keys", value: "180", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Going-in cap", value: "8.0%", flagged: false, page: "p. 5", basis: "in_place" },
+        { label: "NOI (T-12)", value: "$2,880,000", flagged: false, page: "p. 5", basis: "in_place" },
+      ],
+    } as unknown as ExtractionResult;
+    const render = async (ex: ExtractionResult, cls: string) => {
+      const deal = { name: ex.dealName, asset_class: cls, extraction: ex, challenges: null, comps: null, market: null, reconciliation: null, verdict: SAMPLE_DEAL.verdict, prior_screen: null } as unknown as DealRow;
+      const derived = deriveUnderwriteInputs(ex, ex.dealName!);
+      const sensitivity = buildSensitivityData(derived.inputs, null, { sources: derived.sources });
+      const text = pdfTextOf(
+        await renderToBuffer(React.createElement(ReportDocument, { input: buildReportData(deal, "September 30, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0]),
+      ).replace(/\s+/g, " ");
+      return { text, takeaway: gridTakeaway(sensitivity.grid, sensitivity.hurdlePct, "RevPAR growth") };
+    };
+    const { text, takeaway } = await render(hotel, "hospitality_str");
+    expect(text).toContain("REVPAR GROWTH (ANNUAL)");
+    expect(text).not.toContain("RENT GROWTH (ANNUAL)");
+    expect(text).toContain(takeaway);
+    expect(text).not.toMatch(/rent growth at the base exit cap/);
+    // An apartment building's axis is its rent.
+    const sample = await render(SAMPLE_DEAL.extraction as ExtractionResult, SAMPLE_DEAL.asset_class);
+    expect(sample.text).toContain("RENT GROWTH (ANNUAL)");
   }, 60000);
 
   it("prints a stored day the way a reader writes it, and a value that is no date as stored", () => {
