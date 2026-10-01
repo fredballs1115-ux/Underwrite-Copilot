@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gapFigure, gapScale, gapShare } from "./gap-detail";
+import { gapFigure, gapScale, gapShare, incomeGapShare } from "./gap-detail";
 import { SAMPLE_DEAL } from "./sample-deal";
 
 describe("gapFigure — the magnitude a reconciliation gap states", () => {
@@ -70,6 +70,32 @@ describe("gapShare — a gap as a share of the model's own figure, the actuals c
     expect(gapShare({ gap: "$174k below", myValue: "Not modelled" })).toBeNull();
     expect(gapShare({ gap: "$174k below", myValue: null })).toBeNull();
     expect(gapShare({ gap: "In agreement", myValue: "5.45%" })).toBeNull();
+  });
+});
+
+describe("a dollar gap is a share only of a figure on its own footing", () => {
+  it("refuses a month's gap over a year's figure, and one door's gap over the building", () => {
+    // The audit's two: 0.52% and 0.002% read LOW where the true shares are
+    // 6.25% and unknowable.
+    expect(gapShare({ gap: "$150/mo below the OM", myValue: "$28,800 / unit / yr" })).toBeNull();
+    expect(gapShare({ gap: "$150 per unit below", myValue: "$6,499,500" })).toBeNull();
+    expect(gapShare({ gap: "$1.50/SF below", myValue: "$3,706,500" })).toBeNull();
+    expect(gapShare({ gap: "$150 a month below", myValue: "$3,706,500" })).toBeNull();
+  });
+
+  it("divides where the two agree, a year being the period an unstated total is quoted in", () => {
+    expect(gapShare({ gap: "$150/unit/mo below", myValue: "$2,400 / unit / mo" })).toBeCloseTo(0.0625, 10);
+    expect(gapShare({ gap: "$174k a year below the OM", myValue: "$3,706,500" })).toBeCloseTo(174_000 / 3_706_500, 10);
+    expect(gapShare({ gap: "$174k below", myValue: "$3,706,500 / yr" })).toBeCloseTo(174_000 / 3_706_500, 10);
+    expect(gapShare({ gap: "$1.50 per SF below", myValue: "$24.00/SF" })).toBeCloseTo(0.0625, 10);
+  });
+
+  it("grades only a dollar row on the income's band; a rate's gap keeps its grade", () => {
+    expect(gapShare({ gap: "25 bps tighter", myValue: "5.50%" })).toBeCloseTo(0.25 / 5.5, 10);
+    expect(incomeGapShare({ gap: "25 bps tighter", myValue: "5.50%" })).toBeNull();
+    expect(incomeGapShare({ gap: "3 pts higher", myValue: "9.0%" })).toBeNull();
+    expect(incomeGapShare({ gap: "$174k below", myValue: "$3,706,500" })).toBeCloseTo(174_000 / 3_706_500, 10);
+    expect(incomeGapShare({ gap: "+4.2% below the OM", myValue: "$3,706,500" })).toBeCloseTo(0.042, 10);
   });
 });
 

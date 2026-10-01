@@ -18,7 +18,7 @@ import { CompsMap, type MapComp } from "./comps-map";
 import { geocodeCandidates } from "@/lib/geo";
 import { safeHttpUrl } from "@/lib/safe-url";
 import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/comp-detail";
-import { gapScale, gapShare, type GapUnit } from "@/lib/gap-detail";
+import { gapScale, incomeGapShare, type GapUnit } from "@/lib/gap-detail";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/analyze";
 import type { DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
@@ -321,8 +321,10 @@ export function deriveRisks(results: Results): RiskItem[] {
       // figure (lib/gap-detail), on the property-actuals card's "In line"
       // band. The sample's $174k NOI gap is 4.7% of the model's NOI, and
       // that card calls the same gap In line. A gap inside the band is
-      // never HIGH. A size the row does not state keeps the old grade.
-      const share = gapShare(r);
+      // never HIGH. A size the row does not state, a dollar gap on another
+      // footing, and a rate's gap (the band is the income's, not a cap's)
+      // keep the old grade.
+      const share = incomeGapShare(r);
       risks.push({
         severity: share != null && share <= NOI_IN_LINE_BAND ? "low" : "high",
         title: `${r.metric}: model less favorable than the OM`,

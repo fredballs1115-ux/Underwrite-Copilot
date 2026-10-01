@@ -60,6 +60,43 @@ export function gapFigure(text: string | null | undefined): GapFigure | null {
 // percentage points"), not as a share of the figure.
 const POINTS = /percentage points?|\bpts?\b|\bpp\b/i;
 
+// The footing a dollar figure states: its period and what it is per. A gap
+// line written "$150/mo below the OM" beside a model figure of "$28,800 /
+// unit / yr" is a month's gap over a year's figure, and "$150 per unit"
+// beside a building's "$6,499,500" is one door's gap over the whole: the
+// share each division reads (0.5%, 0.002%) is no share at all.
+const MONTHLY = /\/\s*(?:mo|month)\b|\bper\s+month\b|\ba\s+month\b|\bmonthly\b|\bmo\b/i;
+const YEARLY = /\/\s*(?:yr|year|annum)\b|\bper\s+(?:year|annum)\b|\ba\s+year\b|\bannual(?:ly)?\b|\byr\b|\bp\.a\./i;
+const PER_UNIT = /(?:\/\s*|\bper\s+|\ban?\s+)(?:unit|door|apartment|key|room|bed|pad|home|space|site)s?\b/i;
+const PER_AREA = /(?:\/\s*|\bper\s+|\ban?\s+)(?:sf|sq\.?\s?ft|square\s+foot|square\s+feet|ft2|acre)\b|\bpsf\b/i;
+
+interface Footing {
+  period: "mo" | "yr" | null;
+  per: "unit" | "area" | null;
+}
+
+function footingOf(text: string | null | undefined): Footing {
+  const s = text ?? "";
+  return {
+    period: MONTHLY.test(s) ? "mo" : YEARLY.test(s) ? "yr" : null,
+    per: PER_UNIT.test(s) ? "unit" : PER_AREA.test(s) ? "area" : null,
+  };
+}
+
+/** Whether a dollar gap and a dollar figure are on one footing. What each
+ *  is per must agree, an unstated "per" on both sides being the building's
+ *  whole. A period stated on one side and not the other is read as the
+ *  stated one's only where that is a year, the period a reconciliation's
+ *  totals are quoted in; a month beside an unstated figure, or a month
+ *  beside a year, is not one footing. */
+function oneFooting(gap: Footing, base: Footing): boolean {
+  if (gap.per !== base.per) return false;
+  if (gap.period === base.period) return true;
+  if (gap.period === null) return base.period === "yr";
+  if (base.period === null) return gap.period === "yr";
+  return false;
+}
+
 /**
  * A gap's size as a share of the buyer's own figure: the property-actuals
  * card's delta, (OM − actual) ÷ |actual|, with the row's model figure in the
@@ -73,7 +110,8 @@ const POINTS = /percentage points?|\bpts?\b|\bpp\b/i;
  * Null where the two are not on one footing, or where either is unstated.
  * A dollar gap on a rate is not on one footing. Neither is a bare "4%"
  * beside a rate: it could be a share of the rate or points of it, and the
- * words do not say which.
+ * words do not say which. Nor is a dollar gap stated by the month, or per
+ * unit or per foot, beside a figure stated another way (`oneFooting`).
  */
 export function gapShare(row: { gap?: string | null; myValue?: string | null }): number | null {
   const g = gapFigure(row.gap);
@@ -81,7 +119,9 @@ export function gapShare(row: { gap?: string | null; myValue?: string | null }):
   if (!g || !base || base.value <= 0) return null;
   switch (g.unit) {
     case "usd":
-      return base.unit === "usd" ? g.value / base.value : null;
+      return base.unit === "usd" && oneFooting(footingOf(row.gap), footingOf(row.myValue))
+        ? g.value / base.value
+        : null;
     case "bps":
       return base.unit === "pct" ? g.value / 100 / base.value : null;
     case "pct": {
@@ -90,6 +130,18 @@ export function gapShare(row: { gap?: string | null; myValue?: string | null }):
       return base.unit === "pct" && points ? g.value / base.value : null;
     }
   }
+}
+
+/**
+ * The share a reconciliation risk is graded on, on the property-actuals
+ * card's NOI band: only a row whose model figure is in dollars (an income,
+ * an expense, a value). A rate's gap over the rate — 25 bps on a 5.50% cap
+ * is 4.5% of it, 3 points on a 9% vacancy a third of it — is not a share
+ * of the income, and the NOI band says nothing about it; such a row keeps
+ * its grade.
+ */
+export function incomeGapShare(row: { gap?: string | null; myValue?: string | null }): number | null {
+  return gapFigure(row.myValue)?.unit === "usd" ? gapShare(row) : null;
 }
 
 export interface GapScale {
