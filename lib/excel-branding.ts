@@ -18,9 +18,13 @@ export interface ExportBranding {
 const HF_MAX = 90;
 const hf = (s: string) => s.slice(0, HF_MAX).replace(/&/g, "&&");
 
+/** The page numbers every printed tab carries, branded or not. */
+const PAGE_NUMBERS = "&R&8Page &P of &N";
+
 /** Stamp the firm identity onto a workbook: creator/company properties and a
  *  print header (firm · deal) + footer (custom line · page numbers) on the
- *  given sheets. No-ops back to the default identity when branding is empty. */
+ *  given sheets. With branding empty, the default identity and a plain
+ *  footer with the page numbers alone — a printed tab is never unnumbered. */
 export function applyWorkbookBranding(
   wb: ExcelJS.Workbook,
   sheets: ExcelJS.Worksheet[],
@@ -31,12 +35,15 @@ export function applyWorkbookBranding(
   const footer = branding?.footerText?.trim() || null;
   wb.creator = firm ?? "Underwrite Copilot";
   if (firm) wb.company = firm;
-  if (!firm && !footer) return;
+  if (!firm && !footer) {
+    for (const ws of sheets) ws.headerFooter = { ...ws.headerFooter, oddFooter: PAGE_NUMBERS };
+    return;
+  }
   for (const ws of sheets) {
     ws.headerFooter = {
       ...ws.headerFooter,
       oddHeader: `&L&9${hf(firm ?? "")}&R&9${hf(dealName)}`,
-      oddFooter: `&L&8${hf(footer ?? "")}&R&8Page &P of &N`,
+      oddFooter: `&L&8${hf(footer ?? "")}${PAGE_NUMBERS}`,
     };
   }
 }
