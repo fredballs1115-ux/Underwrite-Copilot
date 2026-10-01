@@ -69,6 +69,7 @@ import { buyBoxLines, evaluateBuyBox, hasNoDealbreakers, type BuyBox, type BuyBo
 import { dealCheckSource } from "@/lib/buy-box-chip";
 import { evalDealbreakers } from "@/lib/mandate";
 import { notifyAnalysisFailed, notifyAnalysisReady } from "@/lib/email";
+import { requesterOf } from "@/lib/jobs";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import type {
@@ -631,6 +632,10 @@ export async function runAnalysis(
      *  previous interrupted attempt already finished, recording new steps as
      *  they land (migration 0016). In-process runs never pass this. */
     resume?: boolean;
+    /** the user who asked for this run — the action's caller in-process, the
+     *  payload's `requestedBy` in the worker — whom the screen's emails go
+     *  to (lib/email); absent, they go to the deal's creator, as before */
+    requestedBy?: string | null;
   },
 ): Promise<void> {
   // Every model call inside the run records its meters into this ledger,
@@ -659,10 +664,13 @@ interface RunFinish {
 
 async function runAnalysisSteps(
   dealId: string,
-  opts?: { snapshotPrior?: boolean; resume?: boolean },
+  opts?: { snapshotPrior?: boolean; resume?: boolean; requestedBy?: string | null },
 ): Promise<RunFinish | null> {
   const snapshotPrior = opts?.snapshotPrior ?? true;
   const resume = opts?.resume ?? false;
+  // Who asked for this run: the screen's emails go to them (lib/email). A
+  // resumed attempt that was not handed one reads its payload's.
+  let requestedBy = requesterOf(opts?.requestedBy);
   let finished: RunFinish | null = null;
   // Steps an earlier attempt of this run had already finished (worker mode).
   let resumedSteps = 0;
@@ -726,6 +734,7 @@ async function runAnalysisSteps(
         payload = (jobRow?.payload as Record<string, unknown>) ?? {};
         for (const s of (payload.completed as string[]) ?? []) completed.add(s);
         pagesRead = payload.omPages === true;
+        requestedBy ??= requesterOf(payload.requestedBy);
       } catch {
         // no checkpoints — run everything
       }
@@ -736,11 +745,17 @@ async function runAnalysisSteps(
       try {
         // The handoff contract rides along: a checkpoint written from an
         // unread payload must still say what kind of job this row is, or a
-        // re-queued attempt fails it as "unrecognized type".
+        // re-queued attempt fails it as "unrecognized type" — and whom the
+        // run was asked for by, or a later attempt emails the creator.
         await admin
           .from("analysis_jobs")
           .update({
-            payload: { ...payload, kind: payload.kind ?? "screen", completed: [...completed] },
+            payload: {
+              ...payload,
+              kind: payload.kind ?? "screen",
+              ...(requestedBy && !payload.requestedBy ? { requestedBy } : {}),
+              completed: [...completed],
+            },
           })
           .eq("deal_id", dealId);
       } catch {
@@ -1291,8 +1306,8 @@ async function runAnalysisSteps(
 
     // Heads-up email (paused until RESEND_API_KEY and a sender a customer
     // receives mail from are set, lib/email; best-effort by design — the
-    // screen itself is already complete).
-    await notifyAnalysisReady(admin, dealId);
+    // screen itself is already complete), to whoever asked for the run.
+    await notifyAnalysisReady(admin, dealId, { requestedBy });
   } catch (err) {
     // One sentence the analyst can act on; the raw failure goes to the log.
     const failure = describeRunFailure(err);
@@ -1302,7 +1317,7 @@ async function runAnalysisSteps(
     });
     // The analyst has usually tabbed away; the screen-complete email never
     // comes for a run that stopped, so this one says so (best-effort).
-    await notifyAnalysisFailed(createSupabaseAdminClient(), dealId, failure.message);
+    await notifyAnalysisFailed(createSupabaseAdminClient(), dealId, failure.message, { requestedBy });
   } finally {
     // Never rejects, and settles within SCREEN_PICTURE_MS: the turn is given
     // up with the memorandum the lift read, not while it still holds it.

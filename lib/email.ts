@@ -10,6 +10,7 @@ import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture"
 import { emailPictureUrl } from "@/lib/email-picture";
 import { appUrl } from "@/lib/app-url";
 import { emailEnabled, occasionKey, sendEmail } from "@/lib/email-send";
+import { requesterOf } from "@/lib/jobs";
 
 /**
  * The screen emails — the screen-complete one and the screen-stopped one —
@@ -40,13 +41,6 @@ const VERDICT_EMAIL: Record<string, { label: string; color: string }> = {
 export const BUY_BOX_NOT_READ = "couldn't be read just now — open the deal to see it";
 
 /**
- * One email per completed analysis: deal name, buy-box verdict, link to the
- * deal page. Fully best-effort — reads the owner's toggle (default ON, including
- * on a pre-0014 schema where the column doesn't exist yet), derives the same
- * buy-box chip the deal header shows (lib/buy-box-chip, from the same
- * inputs), and swallows every failure.
- */
-/**
  * The account's "Email when an analysis finishes" switch, read for one
  * send: ON for an account with no profile row yet (the switch's default),
  * OFF where the reader turned it off — and OFF where the read fails. It
@@ -68,9 +62,73 @@ export async function wantsAnalysisEmail(admin: SupabaseClient, userId: string):
   }
 }
 
+/** Whose run a screen email is about: the user who asked for it, where the
+ *  run recorded one (lib/jobs `requesterOf`). */
+export interface ScreenEmailOptions {
+  requestedBy?: string | null;
+}
+
+/**
+ * Who a screen's email goes to. The person who asked for the run, where the
+ * run recorded one — any member can re-screen a team deal, and the email had
+ * gone to the deal's creator, who had asked for nothing. A run with no
+ * recorded requester (one queued before the requester was carried) emails
+ * the deal's creator, as before.
+ *
+ * Never anyone the deal's row-level security would hide it from: the
+ * requester must be the deal's creator or a member of its team when the
+ * email is built — the id rides on a job row any member can write, and a
+ * person who has left the team since asking is no longer shown the deal.
+ * Null, and no email, where they are not (or the check cannot be read).
+ */
+export async function screenEmailRecipient(
+  admin: SupabaseClient,
+  deal: { user_id: string | null; team_id: string | null },
+  requestedBy?: string | null,
+): Promise<string | null> {
+  const who = requesterOf(requestedBy) ?? deal.user_id ?? null;
+  if (!who) return null;
+  if (who === deal.user_id) return who;
+  if (!deal.team_id) return null; // a personal deal is its creator's alone
+  try {
+    const { data, error } = await admin
+      .from("team_members")
+      .select("user_id")
+      .eq("team_id", deal.team_id)
+      .eq("user_id", who)
+      .maybeSingle();
+    return !error && data ? who : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The recipient's address, under their own switch: the email they asked
+ *  for, where they have not turned these emails off. */
+async function screenEmailAddress(
+  admin: SupabaseClient,
+  deal: { user_id: string | null; team_id: string | null },
+  requestedBy?: string | null,
+): Promise<string | null> {
+  const recipient = await screenEmailRecipient(admin, deal, requestedBy);
+  if (!recipient) return null;
+  if (!(await wantsAnalysisEmail(admin, recipient))) return null;
+  const { data: userRes } = await admin.auth.admin.getUserById(recipient);
+  return userRes?.user?.email ?? null;
+}
+
+/**
+ * One email per completed analysis: deal name, the call, the buy-box chip,
+ * a link to the deal page — to whoever asked for the run
+ * (`screenEmailRecipient`), under their own switch (default ON, and OFF
+ * where it cannot be read). Fully best-effort: derives the same buy-box chip
+ * the deal header shows (lib/buy-box-chip, from the same inputs), and
+ * swallows every failure.
+ */
 export async function notifyAnalysisReady(
   admin: SupabaseClient,
   dealId: string,
+  opts: ScreenEmailOptions = {},
 ): Promise<void> {
   if (!emailEnabled()) return;
   try {
@@ -85,12 +143,11 @@ export async function notifyAnalysisReady(
     const verdict = deal.verdict as VerdictResult | null;
     if (!verdict?.verdict) return;
 
-    if (!(await wantsAnalysisEmail(admin, deal.user_id as string))) return;
-
-    const { data: userRes } = await admin.auth.admin.getUserById(
-      deal.user_id as string,
+    const to = await screenEmailAddress(
+      admin,
+      { user_id: (deal.user_id as string | null) ?? null, team_id: (deal.team_id as string | null) ?? null },
+      opts.requestedBy,
     );
-    const to = userRes?.user?.email;
     if (!to) return;
 
     // The deal header's own chip (lib/buy-box-chip): the same box, the same
@@ -160,26 +217,30 @@ export async function notifyAnalysisReady(
 
 /**
  * A screen that stopped before its verdict (pass 14, 2026-10-01): the deal
- * page's own failure sentence, to the deal's owner, under the same switch as
- * the screen-complete email. Never for the sample, never when email is
- * paused, never a reason anything else fails.
+ * page's own failure sentence, to whoever asked for the run
+ * (`screenEmailRecipient`), under the same switch as the screen-complete
+ * email. Never for the sample, never when email is paused, never a reason
+ * anything else fails.
  */
 export async function notifyAnalysisFailed(
   admin: SupabaseClient,
   dealId: string,
   message: string,
+  opts: ScreenEmailOptions = {},
 ): Promise<void> {
   if (!emailEnabled() || !message.trim()) return;
   try {
     const { data: deal } = await admin
       .from("deals")
-      .select("name, user_id, is_sample")
+      .select("name, user_id, team_id, is_sample")
       .eq("id", dealId)
       .maybeSingle();
     if (!deal || deal.is_sample) return;
-    if (!(await wantsAnalysisEmail(admin, deal.user_id as string))) return;
-    const { data: userRes } = await admin.auth.admin.getUserById(deal.user_id as string);
-    const to = userRes?.user?.email;
+    const to = await screenEmailAddress(
+      admin,
+      { user_id: (deal.user_id as string | null) ?? null, team_id: (deal.team_id as string | null) ?? null },
+      opts.requestedBy,
+    );
     if (!to) return;
     const { subject, html, text } = screenStoppedEmail({
       dealName: (deal.name as string) ?? "Your deal",

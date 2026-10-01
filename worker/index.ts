@@ -37,6 +37,7 @@ import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { downloadDealFile, removeSupplementFile, type StorageScope } from "@/lib/storage";
 import { runWeeklyDigests } from "@/lib/digest";
 import { notifyAnalysisFailed } from "@/lib/email";
+import { requesterOf } from "@/lib/jobs";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Tunables — env-overridable so the test rig can run the real binary fast.
@@ -87,6 +88,9 @@ interface ClaimedJob {
     kind?: string;
     snapshotPrior?: boolean;
     model?: { name: string; path: string };
+    /** who asked for the run (lib/jobs `WorkerPayload`), read through
+     *  `requesterOf`: the screen's emails go to them */
+    requestedBy?: unknown;
   };
 }
 
@@ -228,8 +232,12 @@ async function claimNext(): Promise<ClaimedJob | null> {
       }
       // The account page promises an email when a screen fails before its
       // verdict; the pipeline sends it on its own failures, and these are
-      // the worker's.
-      if (payload.kind === "screen") await notifyAnalysisFailed(admin, next.deal_id as string, INTERRUPTED_MSG);
+      // the worker's — to whoever asked for the run.
+      if (payload.kind === "screen") {
+        await notifyAnalysisFailed(admin, next.deal_id as string, INTERRUPTED_MSG, {
+          requestedBy: requesterOf(payload.requestedBy),
+        });
+      }
     }
     return null;
   }
@@ -336,6 +344,7 @@ async function runJob(job: ClaimedJob): Promise<void> {
   await runAnalysis(job.dealId, {
     snapshotPrior: job.payload.snapshotPrior === true,
     resume: true,
+    requestedBy: requesterOf(job.payload.requestedBy),
   });
 }
 
@@ -435,7 +444,9 @@ async function main(): Promise<void> {
       log(`job ${job.id} threw unexpectedly: ${err instanceof Error ? err.message : err}`);
       const message = "The analysis hit an unexpected worker error — please try again.";
       const failed = await failJob(job.id, message, { status: "running" });
-      if (failed && job.payload.kind === "screen") await notifyAnalysisFailed(admin, job.dealId, message);
+      if (failed && job.payload.kind === "screen") {
+        await notifyAnalysisFailed(admin, job.dealId, message, { requestedBy: requesterOf(job.payload.requestedBy) });
+      }
     } finally {
       clearTimeout(timer);
       current = null;

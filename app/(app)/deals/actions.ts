@@ -218,7 +218,7 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
         dealId,
         "signal",
         workerMode
-          ? { workerPayload: { kind: "screen" }, snapshotPrior: true }
+          ? { workerPayload: { kind: "screen", requestedBy: user.id }, snapshotPrior: true }
           : undefined,
       ),
     );
@@ -229,7 +229,8 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     return { ok: false, error: "upload" };
   }
 
-  if (!workerMode) after(() => runAnalysis(dealId));
+  // The screen's emails go to whoever asked for it (lib/email).
+  if (!workerMode) after(() => runAnalysis(dealId, { requestedBy: user.id }));
 
   return { ok: true, dealId, personal };
 }
@@ -361,7 +362,7 @@ export async function createManualDeal(
     newJobRow(
       dealId,
       "signal",
-      workerMode ? { workerPayload: { kind: "screen" } } : undefined,
+      workerMode ? { workerPayload: { kind: "screen", requestedBy: user.id } } : undefined,
     ),
   );
   if (jobErr) {
@@ -370,7 +371,7 @@ export async function createManualDeal(
     return { error: "Couldn’t start the screen. Please try again." };
   }
 
-  if (!workerMode) after(() => runAnalysis(dealId));
+  if (!workerMode) after(() => runAnalysis(dealId, { requestedBy: user.id }));
   redirect(dealLanding(dealId, personal));
 }
 
@@ -419,7 +420,7 @@ export async function updateManualFacts(
     supabase,
     dealId,
     "signal",
-    workerMode ? { kind: "screen" } : undefined,
+    workerMode ? { kind: "screen", requestedBy: user.id } : undefined,
     workerMode ? "running" : "queued",
   );
   if (claim.outcome === "busy") {
@@ -431,7 +432,7 @@ export async function updateManualFacts(
         dealId,
         "signal",
         workerMode
-          ? { status: "running", workerPayload: { kind: "screen" } }
+          ? { status: "running", workerPayload: { kind: "screen", requestedBy: user.id } }
           : undefined,
       ),
     );
@@ -526,7 +527,7 @@ export async function updateManualFacts(
       .eq("step", "signal")
       .eq("progress", 0);
   } else {
-    after(() => runAnalysis(dealId, { snapshotPrior: false }));
+    after(() => runAnalysis(dealId, { snapshotPrior: false, requestedBy: user.id }));
   }
   revalidatePath(`/deals/${dealId}`);
   redirect(`/deals/${dealId}`);
@@ -865,11 +866,13 @@ export async function rerunAnalysis(formData: FormData) {
     analysisWorkerEnabled() && (await workerSchemaReady(supabase));
   // A retry of a FAILED worker run keeps the steps that finished (the same
   // OM, the same checkpoints): the failing step and the ones after it re-run.
+  // The run records who asked: any member may re-screen a team deal, and
+  // the screen's emails go to them (lib/email).
   const claim = await claimJob(
     supabase,
     dealId,
     "signal",
-    workerMode ? { kind: "screen" } : undefined,
+    workerMode ? { kind: "screen", requestedBy: user.id } : undefined,
     "queued",
     { keepCheckpoints: true },
   );
@@ -882,7 +885,7 @@ export async function rerunAnalysis(formData: FormData) {
       newJobRow(
         dealId,
         "signal",
-        workerMode ? { workerPayload: { kind: "screen" } } : undefined,
+        workerMode ? { workerPayload: { kind: "screen", requestedBy: user.id } } : undefined,
       ),
     );
     if (insErr) redirect(`/deals/${dealId}?error=busy`);
@@ -891,7 +894,7 @@ export async function rerunAnalysis(formData: FormData) {
   // Snapshot for the retrade diff only when the stored results are a
   // coherent, completed generation — never after a failed/partial run.
   if (!workerMode) {
-    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
+    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done", requestedBy: user.id }));
   }
   redirect(`/deals/${dealId}`);
 }
@@ -978,7 +981,7 @@ export async function replaceOm(formData: FormData) {
     supabase,
     dealId,
     "signal",
-    workerMode ? { kind: "screen" } : undefined,
+    workerMode ? { kind: "screen", requestedBy: user.id } : undefined,
     workerMode ? "running" : "queued",
   );
   if (claim.outcome === "busy") {
@@ -990,7 +993,7 @@ export async function replaceOm(formData: FormData) {
         dealId,
         "signal",
         workerMode
-          ? { status: "running", workerPayload: { kind: "screen" } }
+          ? { status: "running", workerPayload: { kind: "screen", requestedBy: user.id } }
           : undefined,
       ),
     );
@@ -1052,7 +1055,7 @@ export async function replaceOm(formData: FormData) {
       .eq("step", "signal")
       .eq("progress", 0);
   } else {
-    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done" }));
+    after(() => runAnalysis(dealId, { snapshotPrior: claim.priorStatus === "done", requestedBy: user.id }));
   }
   redirect(`/deals/${dealId}`);
 }

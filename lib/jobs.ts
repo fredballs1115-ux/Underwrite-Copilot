@@ -57,6 +57,26 @@ export interface WorkerPayload {
   kind: "screen" | "reconcile";
   /** reconcile only — the model file parked in Storage for the worker */
   model?: { name: string; path: string };
+  /** screen only — the user who asked for this run (any member can screen a
+   *  team deal): the screen's emails go to them (lib/email). A claim on a
+   *  row any member can write, read through `requesterOf` and checked
+   *  against the deal's visibility before anything is sent. */
+  requestedBy?: string;
+}
+
+const USER_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The user a run was asked for by, as its payload or its caller recorded
+ * it: a user id, lower-cased, or null where none is recorded (a run queued
+ * before the requester was carried) or what is recorded is not a user id.
+ * No migration: the id rides in the worker payload's JSON, or in the
+ * in-process run's own arguments.
+ */
+export function requesterOf(raw: unknown): string | null {
+  if (typeof raw !== "string") return null;
+  const id = raw.trim();
+  return USER_ID.test(id) ? id.toLowerCase() : null;
 }
 
 /** Build an analysis_jobs insert row. ONE place composes the worker payload

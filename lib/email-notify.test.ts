@@ -31,6 +31,7 @@ import {
   notifyAnalysisFailed,
   notifyAnalysisReady,
   occasionKey,
+  screenEmailRecipient,
   sendEmail,
   senderDomain,
   wantsAnalysisEmail,
@@ -371,12 +372,148 @@ describe("the analysis emails go only where the reader has not said no", () => {
     expect(await wantsAnalysisEmail(prefs("throw"), "u1")).toBe(false);
   });
 
-  it("the worker emails a screen it gives up on, or that throws, as the pipeline does its own", () => {
+  it("the worker emails a screen it gives up on, or that throws, as the pipeline does its own — to whoever asked", () => {
     const src = readFileSync(join(process.cwd(), "worker/index.ts"), "utf8");
-    expect(src).toMatch(/if \(payload\.kind === "screen"\) await notifyAnalysisFailed\(admin, next\.deal_id as string, INTERRUPTED_MSG\)/);
-    expect(src).toMatch(/if \(failed && job\.payload\.kind === "screen"\) await notifyAnalysisFailed\(admin, job\.dealId, message\)/);
+    expect(src).toMatch(
+      /if \(payload\.kind === "screen"\) \{\s*await notifyAnalysisFailed\(admin, next\.deal_id as string, INTERRUPTED_MSG, \{\s*requestedBy: requesterOf\(payload\.requestedBy\),/,
+    );
+    expect(src).toMatch(
+      /if \(failed && job\.payload\.kind === "screen"\) \{\s*await notifyAnalysisFailed\(admin, job\.dealId, message, \{ requestedBy: requesterOf\(job\.payload\.requestedBy\) \}\)/,
+    );
+    expect(src).toMatch(/requestedBy: requesterOf\(job\.payload\.requestedBy\),\s*\}\);/);
     const email = readFileSync(join(process.cwd(), "lib/email.ts"), "utf8");
-    // Both notifiers read the switch through the one reader.
-    expect(email.match(/await wantsAnalysisEmail\(admin, deal\.user_id as string\)/g)).toHaveLength(2);
+    // Both notifiers find the recipient, and read their switch, through the one reader.
+    expect(email.match(/await screenEmailAddress\(/g)).toHaveLength(2);
+    expect(email.match(/await wantsAnalysisEmail\(admin, recipient\)/g)).toHaveLength(1);
+  });
+});
+
+// Any member can re-screen a team deal; the screen's emails went to the
+// deal's creator, who had asked for nothing. They go to the person who
+// asked — never to anyone the deal's row-level security would hide it from.
+describe("a screen's emails go to whoever asked for the run", () => {
+  const CREATOR = "11111111-1111-4111-8111-111111111111";
+  const MEMBER = "22222222-2222-4222-8222-222222222222";
+  const OUTSIDER = "33333333-3333-4333-8333-333333333333";
+  const TEAM = "44444444-4444-4444-8444-444444444444";
+
+  interface World {
+    deal: Record<string, unknown>;
+    members: string[];
+    membersFail?: boolean;
+    switches: Record<string, boolean>;
+    emails: Record<string, string>;
+  }
+
+  /** A fake that answers each read by what it was asked for. */
+  function worldAdmin(w: World): SupabaseClient {
+    return {
+      from: (table: string) => {
+        const eqs: Record<string, unknown> = {};
+        const q = {
+          select: () => q,
+          eq: (col: string, val: unknown) => {
+            eqs[col] = val;
+            return q;
+          },
+          order: () => q,
+          limit: () => q,
+          maybeSingle: async () => {
+            if (table === "deals") return { data: w.deal, error: null };
+            if (table === "team_members") {
+              if (w.membersFail) return { data: null, error: { message: "timeout" } };
+              const hit = eqs.team_id === w.deal.team_id && w.members.includes(String(eqs.user_id));
+              return { data: hit ? { user_id: eqs.user_id } : null, error: null };
+            }
+            if (table === "profiles") {
+              const on = w.switches[String(eqs.id)];
+              return { data: on === undefined ? null : { email_on_analysis: on }, error: null };
+            }
+            if (table === "analysis_jobs") return { data: { status: "error", step: "comps", created_at: "2026-10-05T12:00:00Z" }, error: null };
+            return { data: null, error: null };
+          },
+        };
+        return q;
+      },
+      auth: {
+        admin: {
+          getUserById: async (id: string) => ({ data: { user: w.emails[id] ? { email: w.emails[id] } : null } }),
+        },
+      },
+    } as unknown as SupabaseClient;
+  }
+
+  const world = (over: Partial<World> = {}): World => ({
+    deal: {
+      name: "The Maddox",
+      user_id: CREATOR,
+      team_id: TEAM,
+      asset_class: "multifamily",
+      extraction: null,
+      verdict: { verdict: "pass", reason: "", generatedAt: "2026-10-05T13:00:00Z" },
+      is_sample: false,
+      photo: null,
+      om_storage_path: null,
+    },
+    members: [CREATOR, MEMBER],
+    switches: { [CREATOR]: true, [MEMBER]: true, [OUTSIDER]: true },
+    emails: { [CREATOR]: "creator@firm.example", [MEMBER]: "member@firm.example", [OUTSIDER]: "outsider@else.example" },
+    ...over,
+  });
+
+  const recipients: string[][] = [];
+  beforeEach(() => {
+    recipients.length = 0;
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_FROM = "Underwrite Copilot <notify@underwrite.example>";
+    process.env.RESEND_BASE_URL = "https://resend.test";
+    pic.may = false;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { body: string }) => {
+        recipients.push(JSON.parse(init.body).to);
+        return new Response("{}", { status: 200 });
+      }),
+    );
+  });
+
+  it("names the member who asked, the creator where no one is recorded, and nobody the deal is hidden from", async () => {
+    const w = world();
+    const admin = worldAdmin(w);
+    const deal = { user_id: CREATOR, team_id: TEAM };
+    expect(await screenEmailRecipient(admin, deal, MEMBER)).toBe(MEMBER);
+    expect(await screenEmailRecipient(admin, deal, MEMBER.toUpperCase())).toBe(MEMBER);
+    expect(await screenEmailRecipient(admin, deal, CREATOR)).toBe(CREATOR);
+    // A run queued before the requester was carried — or a value that is no user id.
+    expect(await screenEmailRecipient(admin, deal, null)).toBe(CREATOR);
+    expect(await screenEmailRecipient(admin, deal, "not-a-user")).toBe(CREATOR);
+    // Someone who is not on the deal's team (never a member, or since left).
+    expect(await screenEmailRecipient(admin, deal, OUTSIDER)).toBeNull();
+    // A personal deal is its creator's alone.
+    expect(await screenEmailRecipient(admin, { user_id: CREATOR, team_id: null }, MEMBER)).toBeNull();
+    // A membership read that fails names nobody.
+    expect(await screenEmailRecipient(worldAdmin(world({ membersFail: true })), deal, MEMBER)).toBeNull();
+  });
+
+  it("emails the screen-complete and the stopped screen to the member who asked, under the member's own switch", async () => {
+    await notifyAnalysisReady(worldAdmin(world()), DEAL, { requestedBy: MEMBER });
+    await notifyAnalysisFailed(worldAdmin(world()), DEAL, "The analysis service is overloaded right now.", { requestedBy: MEMBER });
+    expect(recipients).toEqual([["member@firm.example"], ["member@firm.example"]]);
+
+    // The member turned these emails off: nothing goes — never to the creator instead.
+    recipients.length = 0;
+    const off = world({ switches: { [CREATOR]: true, [MEMBER]: false } });
+    await notifyAnalysisReady(worldAdmin(off), DEAL, { requestedBy: MEMBER });
+    await notifyAnalysisFailed(worldAdmin(off), DEAL, "Stopped.", { requestedBy: MEMBER });
+    expect(recipients).toEqual([]);
+  });
+
+  it("emails nobody for a requester the deal is hidden from, and the creator for a run that recorded no one", async () => {
+    await notifyAnalysisReady(worldAdmin(world()), DEAL, { requestedBy: OUTSIDER });
+    await notifyAnalysisFailed(worldAdmin(world()), DEAL, "Stopped.", { requestedBy: OUTSIDER });
+    expect(recipients).toEqual([]);
+    await notifyAnalysisReady(worldAdmin(world()), DEAL);
+    await notifyAnalysisFailed(worldAdmin(world()), DEAL, "Stopped.");
+    expect(recipients).toEqual([["creator@firm.example"], ["creator@firm.example"]]);
   });
 });

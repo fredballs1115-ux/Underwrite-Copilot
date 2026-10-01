@@ -362,6 +362,46 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     expect(notifyAnalysisFailed).not.toHaveBeenCalled();
   });
 
+  it("hands both emails the user who asked for the run — from its arguments, or a resumed attempt's payload — and keeps them on the checkpoint", async () => {
+    const { notifyAnalysisFailed, notifyAnalysisReady } = await import("@/lib/email");
+    const ASKER = "22222222-2222-4222-8222-222222222222";
+    vi.mocked(notifyAnalysisReady).mockClear();
+    vi.mocked(notifyAnalysisFailed).mockClear();
+
+    // In-process: the action's caller rides in the run's own arguments.
+    await runAnalysis("d1", { requestedBy: ASKER.toUpperCase() });
+    expect(job().status).toBe("done");
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: ASKER }]);
+
+    state = freshState();
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      throw apiError(529, "overloaded_error", "Overloaded");
+    });
+    await runAnalysis("d1", { requestedBy: ASKER });
+    expect(vi.mocked(notifyAnalysisFailed).mock.calls[0]?.slice(1)).toEqual(["d1", job().error, { requestedBy: ASKER }]);
+    vi.mocked(extractTerms).mockResolvedValue(EXTRACTION);
+
+    // Worker, resumed: the payload names who asked.
+    state = freshState();
+    state.deals.d1.extraction = EXTRACTION;
+    state.jobs[0].payload = { kind: "screen", requestedBy: ASKER, completed: ["signal", "extract", "reconcile_docs", "ingest_actuals"] };
+    vi.mocked(notifyAnalysisReady).mockClear();
+    await runAnalysis("d1", { resume: true });
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: ASKER }]);
+
+    // A checkpoint written from a payload that had none keeps the run's own.
+    state = freshState();
+    state.jobs[0].payload = { kind: "screen", completed: [] };
+    await runAnalysis("d1", { resume: true, requestedBy: ASKER });
+    expect((state.jobs[0].payload as { requestedBy?: string }).requestedBy).toBe(ASKER);
+
+    // A run that recorded no one hands no one on: the creator is emailed, as before.
+    state = freshState();
+    vi.mocked(notifyAnalysisReady).mockClear();
+    await runAnalysis("d1");
+    expect(vi.mocked(notifyAnalysisReady).mock.calls[0]?.slice(1)).toEqual(["d1", { requestedBy: null }]);
+  });
+
   it("a failed screen still records what it spent; a run with no model calls records nothing", async () => {
     vi.mocked(extractTerms).mockImplementation(async () => {
       meter("Extraction");
