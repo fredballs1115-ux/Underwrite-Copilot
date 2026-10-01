@@ -120,6 +120,43 @@ describe("the floor and the cap are different instruments", () => {
     expect(r.allInRatePct).toBeLessThan(r.rateBandHighPct!);
   });
 
+  it("takes the worst case at the floor where the floor sits above the strike", () => {
+    // A 4.50% floor over a 4.00% strike on SOFR + 300: below the strike the
+    // cap pays nothing and the floor is paid, so the loan can pay 7.50% —
+    // the worst case read 7.00%, the strike's. And the band runs from the
+    // strike (an index past the floor, reimbursed down to it) to the floor.
+    const r = readFloating({ ...SEED, indexFloorPct: 4.5, capStrikePct: 4.0 });
+    expect(r.worstCaseRatePct).toBe(7.5);
+    expect(r.worstCaseAt).toBe("floor");
+    // $1,660,000 over 7.50% interest-only on $20M, $1,500,000: 1.11×, where
+    // the strike's 7.00% had read 1.19×.
+    expect(r.worstCaseDscr).toBe(1.11);
+    expect(r.rateBandHighPct).toBe(7.5);
+    expect(r.rateBandLowPct).toBe(7);
+    // The index the loan pays at today sits inside it.
+    expect(r.allInRatePct).toBe(7.5);
+    // With the floor under the strike nothing moves.
+    expect(readFloating(SEED).worstCaseRatePct).toBe(7);
+    expect(readFloating(SEED).worstCaseAt).toBe("strike");
+    expect(readFloating({ ...SEED, capStrikePct: null }).worstCaseAt).toBeNull();
+  });
+
+  it("never calls the rate fixed at the strike while a floor above it is paid", () => {
+    // SOFR at 4.20% between a 4.00% strike and a 4.50% floor: the note
+    // charges 4.50%, the cap pays back 0.20%, so the loan pays 7.30% — 30
+    // bps over the strike's 7.00%, and a fall to 4.10% would make it 7.40%.
+    const between = { ...SEED, indexPct: 4.2, indexFloorPct: 4.5, capStrikePct: 4.0, noi: 2_000_000 };
+    const r = readFloating(between);
+    expect(r.allInRatePct).toBe(7.3);
+    expect(r.atCap).toBe(true);
+    expect(r.atFloor).toBe(true);
+    expect(r.note).not.toContain("fixed at the strike");
+    expect(r.note).toContain("30 bps over the strike's");
+    expect(readFloating({ ...between, indexPct: 4.1 }).allInRatePct).toBe(7.4);
+    // Past the floor the cap holds the rate at the strike, and says so.
+    expect(readFloating({ ...between, indexPct: 4.8 }).note).toContain("fixed at the strike");
+  });
+
   it("has no ceiling to the band with no cap", () => {
     const r = readFloating({ ...SEED, capStrikePct: null });
     expect(r.rateBandHighPct).toBeNull();

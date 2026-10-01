@@ -3543,7 +3543,7 @@ function FloatingRate({
             tone={r.breachHeadroomBps !== null && r.breachHeadroomBps < 0 ? "brand" : "muted"}
           />
           <Stat
-            label="DSCR at the strike"
+            label={r.worstCaseAt === "floor" ? "DSCR at the floor" : "DSCR at the strike"}
             value={r.worstCaseDscr !== null ? `${r.worstCaseDscr.toFixed(2)}x` : "—"}
             tone="muted"
           />
