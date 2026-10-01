@@ -9,7 +9,9 @@ import { DeleteAccountForm } from "./delete-account-form";
 import { EmailToggle } from "./email-toggle";
 import { BrandingSection } from "./branding-section";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { emailEnabled } from "@/lib/email";
+import { emailEnabled } from "@/lib/email-send";
+import { emailNotes } from "@/lib/email-notes";
+import { analysisWorkerEnabled, workerSchemaReady } from "@/lib/jobs";
 import { deletionStopNotice, doneFromQuery } from "@/lib/account-deletion";
 
 export const metadata: Metadata = { title: "Account" };
@@ -77,9 +79,14 @@ export default async function AccountPage({
   const allowance = billing ? dealAllowance(billing) : null;
   const emailOnAnalysis = prefs.onAnalysis;
   const emailWeeklyDigest = prefs.weeklyDigest;
-  // Paused (no key, or no sender a customer receives mail from — lib/email):
-  // the switches still save a choice, and the section says nothing is sent.
-  const emailSending = emailEnabled();
+  // What each switch promises, and which process sends each email
+  // (lib/email-notes): this service's own setup (no key, or no sender a
+  // customer receives mail from — lib/email-send) speaks only for what this
+  // service sends. The digest always goes from the background worker, and
+  // so do the screen emails once screens run there, as the deal actions
+  // decide it (the flag, and the worker's columns in place).
+  const workerMode = analysisWorkerEnabled() && (await workerSchemaReady(supabase));
+  const notes = emailNotes({ sending: emailEnabled(), workerMode });
 
   return (
     <div className="space-y-6">
@@ -134,7 +141,7 @@ export default async function AccountPage({
 
       {/* Notifications */}
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
-        {!emailSending && (
+        {notes.paused && (
           <p
             data-qa="email-paused"
             className="mb-5 flex flex-wrap items-center gap-2 rounded-lg bg-faint px-3 py-2 text-sm text-muted"
@@ -142,10 +149,7 @@ export default async function AccountPage({
             <span className="rounded-full bg-surface px-2.5 py-0.5 text-xs font-semibold text-ink">
               Paused
             </span>
-            <span>
-              Both emails are paused for now — none is being sent. Each
-              switch keeps your choice for when sending starts.
-            </span>
+            <span>{notes.paused}</span>
           </p>
         )}
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -153,11 +157,12 @@ export default async function AccountPage({
             <h2 className="text-sm font-semibold tracking-tight">
               Email when an analysis finishes
             </h2>
-            <p className="mt-1 max-w-md text-sm text-muted">
-              One email per completed screen — the verdict, the buy-box call,
-              and a link to the deal page — and one if a screen fails before
-              its verdict, saying why.
-            </p>
+            <p className="mt-1 max-w-md text-sm text-muted">{notes.analysis}</p>
+            {notes.analysisSentBy && (
+              <p data-qa="email-sent-by-worker" className="mt-1 max-w-md text-xs text-muted">
+                {notes.analysisSentBy}
+              </p>
+            )}
           </div>
           <EmailToggle
             enabled={emailOnAnalysis}
@@ -170,9 +175,9 @@ export default async function AccountPage({
             <h2 className="text-sm font-semibold tracking-tight">
               Weekly pipeline digest
             </h2>
-            <p className="mt-1 max-w-md text-sm text-muted">
-              Monday morning: your deals by stage, offers due this week, and
-              the verdicts that landed since last week.
+            <p className="mt-1 max-w-md text-sm text-muted">{notes.digest}</p>
+            <p data-qa="digest-sent-by-worker" className="mt-1 max-w-md text-xs text-muted">
+              {notes.digestSentBy}
             </p>
           </div>
           <EmailToggle
