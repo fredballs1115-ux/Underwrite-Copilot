@@ -1107,8 +1107,11 @@ export default function Home() {
                     </li>
                   ))}
                 </ul>
+                {/* The plan rides through sign-up and its confirmation link
+                    (lib/auth-flow's confirmationRedirect), so a new account
+                    lands on Billing rather than an empty pipeline. */}
                 <Link
-                  href="/login?mode=signup"
+                  href="/login?mode=signup&next=%2Fbilling"
                   className="mt-6 rounded-lg bg-brand px-4 py-2.5 text-center text-sm font-medium text-white transition-colors hover:bg-brand-strong"
                 >
                   Start with Pro
@@ -1143,7 +1146,7 @@ export default function Home() {
                   ))}
                 </ul>
                 <Link
-                  href="/login?mode=signup"
+                  href="/login?mode=signup&next=%2Fteam"
                   className="mt-6 rounded-lg border border-brand/40 px-4 py-2.5 text-center text-sm font-medium text-brand transition-colors hover:bg-brand/5"
                 >
                   Start a team

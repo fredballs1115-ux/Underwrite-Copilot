@@ -137,6 +137,37 @@ export function safeNextPath(next: string | null): string | null {
   return next;
 }
 
+/** A page worth carrying past the sign-in page: a safe path that is neither
+ *  the site root nor the sign-in page itself (which would only loop). */
+function onwardPath(next: string | null): string | null {
+  const safe = safeNextPath(next);
+  return safe && safe !== "/" && !safe.startsWith("/login") ? safe : null;
+}
+
+/** The page a sign-in page path was carrying in its own `next` — an invite,
+ *  a plan — read whole and held to the same rule. */
+function carriedBy(loginPath: string): string | null {
+  const q = loginPath.indexOf("?");
+  if (q === -1) return null;
+  return onwardPath(new URLSearchParams(loginPath.slice(q + 1)).get("next"));
+}
+
+/**
+ * Where a sign-up's confirmation email points: the sign-in page's "Email
+ * confirmed" banner, carrying the page the person was headed to as `next` —
+ * the invite they signed up from (`/team/join/<token>`), the plan they picked
+ * (`/billing`, `/team`) — so the confirmed person lands there and not on an
+ * empty pipeline of their own. A same-origin path only; anything else is
+ * dropped and the link points where it always did. (Should the auth service
+ * refuse the longer URL, it falls back to the project's Site URL and the
+ * handoff lands in the pipeline, as before.)
+ */
+export function confirmationRedirect(origin: string, next: string | null): string {
+  const base = `${origin}/login?confirmed=1`;
+  const onward = onwardPath(next);
+  return onward ? `${base}&next=${encodeURIComponent(onward)}` : base;
+}
+
 /** The query keys an auth link arrives with. */
 const LINK_KEYS = ["code", "error", "error_code", "error_description"] as const;
 
@@ -171,14 +202,17 @@ export function authLinkHandoff(url: URL): string | null {
  * Where a person lands once the code became a session. A recovery link goes
  * to the Account page's reset banner unless it asked for somewhere more
  * specific; anything else goes where the link pointed, or into the app —
- * never back to the sign-in page they no longer need.
+ * never back to the sign-in page they no longer need. A confirmation link
+ * points at the sign-in page, so the page it carries (`confirmationRedirect`)
+ * is where the person goes: the invite they signed up from, accepted from
+ * its own page, rather than an empty pipeline of their own.
  */
 export function landingAfterExchange(next: string | null, redirectType: string | null): string {
   const safe = safeNextPath(next);
   const specific = safe && safe !== "/" ? safe : null;
   if (redirectType === "recovery") return specific ?? "/account?reset=1";
   if (specific && !specific.startsWith("/login")) return specific;
-  return "/deals";
+  return (specific && carriedBy(specific)) ?? "/deals";
 }
 
 /**
@@ -187,12 +221,17 @@ export function landingAfterExchange(next: string | null, redirectType: string |
  * with a code in hand the address is confirmed even when the sign-in half
  * failed (a second click, a different browser) — say so and ask for a sign-in.
  * Without a code the link itself was refused (expired, already used), and the
- * page says that instead.
+ * page says that instead. Either way the page the link carried rides along,
+ * so the sign-in that follows still goes there.
  */
 export function landingAfterFailedExchange(next: string | null, hadCode: boolean): string {
   const safe = safeNextPath(next) ?? "";
   const confirming = /[?&]confirmed=1(?:&|$)/.test(safe);
-  if (confirming) return hadCode ? "/login?confirmed=1" : "/login?confirmed=1&link=expired";
+  if (confirming) {
+    const onward = carriedBy(safe);
+    const tail = onward ? `&next=${encodeURIComponent(onward)}` : "";
+    return hadCode ? `/login?confirmed=1${tail}` : `/login?confirmed=1&link=expired${tail}`;
+  }
   return "/login?link=expired";
 }
 

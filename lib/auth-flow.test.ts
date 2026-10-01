@@ -12,11 +12,25 @@ import {
   authErrorCopy,
   authLinkBanner,
   authLinkHandoff,
+  confirmationRedirect,
   initialLoginMode,
   landingAfterExchange,
   landingAfterFailedExchange,
   safeNextPath,
 } from "./auth-flow";
+
+/** Every shape of `next` that must never leave the site or loop. */
+const HOSTILE_NEXT = [
+  "https://evil.example/",
+  "//evil.example",
+  "/\\evil.example",
+  "javascript:alert(1)",
+  "/team/join/0a1b\n",
+  " /billing",
+  "/billing#x",
+  "/a b",
+  "/deals@evil.example",
+];
 
 describe("authErrorCopy — the auth service's codes become sentences", () => {
   it("names each sign-up refusal instead of 'something went wrong'", () => {
@@ -84,6 +98,29 @@ describe("safeNextPath — same-origin paths only", () => {
     expect(safeNextPath("//evil.example")).toBeNull();
     expect(safeNextPath("")).toBeNull();
     expect(safeNextPath(null)).toBeNull();
+    for (const n of HOSTILE_NEXT) expect(safeNextPath(n), JSON.stringify(n)).toBeNull();
+  });
+});
+
+describe("confirmationRedirect — where a sign-up was headed rides through its confirmation link", () => {
+  it("carries the invite the person signed up from, and the plan they picked", () => {
+    expect(confirmationRedirect("https://app.test", "/team/join/0a1b2c3d")).toBe(
+      "https://app.test/login?confirmed=1&next=%2Fteam%2Fjoin%2F0a1b2c3d",
+    );
+    expect(confirmationRedirect("https://app.test", "/billing")).toBe("https://app.test/login?confirmed=1&next=%2Fbilling");
+    expect(confirmationRedirect("https://app.test", "/team")).toBe("https://app.test/login?confirmed=1&next=%2Fteam");
+  });
+
+  it("points where it always did with nothing worth carrying", () => {
+    for (const n of [null, "", "/", "/login", "/login?confirmed=1&next=%2Fbilling"]) {
+      expect(confirmationRedirect("https://app.test", n), String(n)).toBe("https://app.test/login?confirmed=1");
+    }
+  });
+
+  it("refuses a hostile next, leaving the link as it was", () => {
+    for (const n of HOSTILE_NEXT) {
+      expect(confirmationRedirect("https://app.test", n), JSON.stringify(n)).toBe("https://app.test/login?confirmed=1");
+    }
   });
 });
 
@@ -125,6 +162,22 @@ describe("landingAfterExchange — where a fresh session goes", () => {
     expect(landingAfterExchange("/deals/abc", null)).toBe("/deals/abc");
     expect(landingAfterExchange("https://evil.example/", null)).toBe("/deals");
   });
+
+  it("a confirmation link that carried an invite or a plan lands there", () => {
+    expect(landingAfterExchange("/login?confirmed=1&next=%2Fteam%2Fjoin%2F0a1b2c3d", null)).toBe("/team/join/0a1b2c3d");
+    expect(landingAfterExchange("/login?confirmed=1&next=%2Fbilling", null)).toBe("/billing");
+    // The auth service may re-order the query when it appends the code.
+    expect(landingAfterExchange("/login?next=%2Fteam&confirmed=1", null)).toBe("/team");
+  });
+
+  it("a carried next that is hostile, or the sign-in page again, lands in the app", () => {
+    for (const n of HOSTILE_NEXT) {
+      const carried = `/login?confirmed=1&next=${encodeURIComponent(n)}`;
+      expect(landingAfterExchange(carried, null), JSON.stringify(n)).toBe("/deals");
+    }
+    expect(landingAfterExchange("/login?confirmed=1&next=%2Flogin%3Fnext%3D%252Fbilling", null)).toBe("/deals");
+    expect(landingAfterExchange("/login?confirmed=1&next=%2F", null)).toBe("/deals");
+  });
 });
 
 describe("landingAfterFailedExchange — where a refused link goes", () => {
@@ -139,6 +192,22 @@ describe("landingAfterFailedExchange — where a refused link goes", () => {
   it("a failed reset opens the sign-in page on the expired-link banner", () => {
     expect(landingAfterFailedExchange("/account?reset=1", true)).toBe("/login?link=expired");
     expect(landingAfterFailedExchange(null, false)).toBe("/login?link=expired");
+  });
+
+  it("keeps the page a confirmation carried, so the sign-in that follows goes there", () => {
+    const invite = "/login?confirmed=1&next=%2Fteam%2Fjoin%2F0a1b2c3d";
+    expect(landingAfterFailedExchange(invite, true)).toBe("/login?confirmed=1&next=%2Fteam%2Fjoin%2F0a1b2c3d");
+    expect(landingAfterFailedExchange(invite, false)).toBe(
+      "/login?confirmed=1&link=expired&next=%2Fteam%2Fjoin%2F0a1b2c3d",
+    );
+    for (const n of HOSTILE_NEXT) {
+      const carried = `/login?confirmed=1&next=${encodeURIComponent(n)}`;
+      const landed = landingAfterFailedExchange(carried, true);
+      // Never carried on. (A path whose own characters fail the rule — the
+      // bare parentheses of "javascript:alert(1)" — is refused whole, and
+      // lands on the plain expired-link page.)
+      expect(landed, JSON.stringify(n)).toMatch(/^\/login\?(confirmed=1|link=expired)$/);
+    }
   });
 });
 

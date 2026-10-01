@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   ACCOUNT_EXISTS,
   authErrorCopy,
+  confirmationRedirect,
   safeNextPath,
   type AuthIntent,
 } from "@/lib/auth-flow";
@@ -14,6 +15,11 @@ import {
 export type AuthState = { error?: string; notice?: string; intent?: AuthIntent } | null;
 
 const UNREACHABLE = "Couldn't reach the sign-in service — try again in a moment.";
+
+/** The site's own origin, where the email links come back to. */
+function siteOrigin(): string {
+  return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+}
 
 /**
  * One server action handles both sign-in and sign-up — the form sends an
@@ -27,6 +33,10 @@ export async function authenticate(
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const intent: AuthIntent = formData.get("intent") === "signup" ? "signup" : "signin";
+  // Where the person was headed — an invite, a plan, a deep link — read once
+  // and held to same-origin paths; a sign-in goes there now, a sign-up after
+  // its confirmation link.
+  const next = safeNextPath(String(formData.get("next") ?? "") || null);
 
   if (!email || !password) {
     return { intent, error: "Email and password are required." };
@@ -42,11 +52,13 @@ export async function authenticate(
             password,
             options: {
               // The confirmation email's link lands back here with a banner
-              // instead of dead-ending on the marketing homepage. The URL
-              // must be on the Supabase project's redirect allowlist; the
-              // proxy hands the link's code to /auth/callback, which signs
-              // the person in.
-              emailRedirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/login?confirmed=1`,
+              // instead of dead-ending on the marketing homepage, carrying
+              // `next` so an invitee lands on the invite rather than on an
+              // empty pipeline of their own. The URL must be on the Supabase
+              // project's redirect allowlist; the proxy hands the link's code
+              // to /auth/callback, which signs the person in and sends them
+              // on (lib/auth-flow's landingAfterExchange).
+              emailRedirectTo: confirmationRedirect(siteOrigin(), next),
             },
           })
         : await supabase.auth.signInWithPassword({ email, password }));
@@ -81,7 +93,6 @@ export async function authenticate(
 
   // Success — the session cookie is set; send them into the app (or back to
   // the invite/deep link they were headed to — same-origin paths only).
-  const next = safeNextPath(String(formData.get("next") ?? "") || null);
   redirect(next ?? "/deals");
 }
 
@@ -96,14 +107,13 @@ export async function requestPasswordReset(
   if (!email) return { intent: "reset", error: "Enter your account email first." };
 
   const supabase = await createSupabaseServerClient();
-  const origin = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   let error;
   try {
     // The target stays the Account page — it is on the project's redirect
     // allowlist today, and the proxy routes the link's code through the
     // callback on the way there.
     ({ error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${origin}/account?reset=1`,
+      redirectTo: `${siteOrigin()}/account?reset=1`,
     }));
   } catch {
     return { intent: "reset", error: UNREACHABLE };
