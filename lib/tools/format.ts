@@ -10,14 +10,20 @@
  * Pure, no I/O, no "use client": the page and the modules import it alike.
  */
 
-// The sign goes OUTSIDE the dollar. Interpolating a negative straight in
+// The sign goes OUTSIDE the dollar, and it is the minus sign (U+2212), the
+// way the rest of the site writes money: "−$1.5M" on a re-screen's diff,
+// "−$578/mo" under a fair market rent. Interpolating a negative straight in
 // gives "$-385,213", which is not how money is written anywhere, and it
 // shows up wherever a figure can legitimately go below zero — a stack
 // oversized against its basis, a residual that does not work at any
-// price, a defeasance that pays you. The cards' tiles and the modules'
-// sentences share these writers, so the rule is fixed once here.
-export const money = (n: number, body: (abs: number) => string): string =>
-  `${n < 0 ? "-" : ""}$${body(Math.abs(n))}`;
+// price, a defeasance that pays you. A figure that rounds to nothing
+// carries no sign: "−$0" is not an amount. The cards' tiles and the
+// modules' sentences share these writers, so the rule is fixed once here,
+// and lib/tools/format.test.ts fails on a dollar written anywhere else.
+export const money = (n: number, body: (abs: number) => string): string => {
+  const figure = body(Math.abs(n));
+  return `${n < 0 && /[1-9]/.test(figure) ? "−" : ""}$${figure}`;
+};
 
 /** $13.48M at a million and over, $560,000 under it; "—" for no figure. */
 export const usd = (n: number | null): string =>

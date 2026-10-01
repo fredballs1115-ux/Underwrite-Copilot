@@ -3175,9 +3175,11 @@ describe("the deal math tools", () => {
     expect(text).toContain("What it costs to get out of the loan early");
     expect(text).toContain("$200,000"); // yield maintenance, all of it the floor
     // The sign goes outside the dollar, which it did not before this
-    // card made a negative headline figure impossible to miss.
-    expect(text).toContain("-$385,213"); // defeasance, a gain after hard costs
+    // card made a negative headline figure impossible to miss — and it is
+    // the minus sign, as everywhere the site writes money (lib/tools/format).
+    expect(text).toContain("−$385,213"); // defeasance, a gain after hard costs
     expect(text).not.toContain("$-");
+    expect(text).not.toContain("-$");
     expect(text).toContain("Yield maintenance — all of it the floor");
     // Two rows, each a left and a right half of the same centre line.
     expect((html.match(/data-bar="prepay"/g) ?? []).length).toBe(4);
