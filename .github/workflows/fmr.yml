@@ -12,6 +12,10 @@ name: fmr
 on:
   schedule:
     - cron: "45 12 3 * *" # the 3rd of each month
+    # And the day a new fiscal year takes effect: the script reads the year in
+    # force on the day it runs, so with only the 3rd's run every surface said
+    # the old year had "ended" on Oct 1 and 2 with nothing in its place.
+    - cron: "15 7 1 10 *" # Oct 1, 07:15 UTC (03:15 in Washington)
   workflow_dispatch:
 jobs:
   fmr:

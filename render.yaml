@@ -185,15 +185,17 @@ services:
 
   # ── Monthly HUD FMR pull (public-data registry build) ──────────────────────
   # huduser FMR API → benchmarks table, PRIMARY source for every covered
-  # metro's fair market rents (closes the FY2026 verification gap). Monthly
-  # because FMRs change annually (Oct 1) with occasional mid-year revisions.
+  # metro's fair market rents. Monthly because FMRs change annually (Oct 1)
+  # with occasional mid-year revisions; on the 1st as well as the 3rd, since
+  # the script reads the year in force on the day it runs and a 3rd-only
+  # schedule left Oct 1 and 2 with the old year "ended" and nothing after it.
   # Free token: https://www.huduser.gov/hudapi/public/register
   - type: cron
     name: underwrite-copilot-fmr
     runtime: node
     plan: starter
     branch: main
-    schedule: "45 12 3 * *"
+    schedule: "45 12 1,3 * *"
     buildCommand: npm install --omit=dev
     startCommand: node scripts/fetch-fmr.mjs
     envVars:
