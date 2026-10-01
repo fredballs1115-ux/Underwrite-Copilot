@@ -34,6 +34,7 @@ import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
 import { compareSortValues, type SortDir } from "@/lib/pipeline-sort";
+import { PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
@@ -1519,6 +1520,61 @@ function MetaLine({
   );
 }
 
+/** A tag's tone in its words, and in the outline its chip wears on a line
+ *  of its own (on the picture, a chip is white). */
+const TAG_TEXT: Record<TagTone, string> = { brand: "text-brand", caution: "text-caution", kill: "text-kill" };
+const TAG_BORDER: Record<TagTone, string> = { brand: "border-brand/30", caution: "border-caution/35", kill: "border-kill/35" };
+
+/** A deal's tags (lib/pipeline-tags) on a line of their own under its
+ *  figures, wrapping: a chip each, never cut — a tag longer than the line
+ *  wraps inside its chip rather than losing its end, and a figure never
+ *  shares a line with them, so no tag can push a figure off one. The
+ *  caller names the line's display (`flex`, or a card's width tiers'), and
+ *  a card's own tiers for each chip. */
+function TagLine({
+  tags,
+  className = "flex",
+  chipClass,
+}: {
+  tags: readonly DealTag[];
+  className?: string;
+  chipClass?: (t: DealTag) => string;
+}) {
+  if (tags.length === 0) return null;
+  return (
+    <p className={`flex-wrap gap-1 ${className}`} data-tags="line">
+      {tags.map((t, idx) => (
+        <Fragment key={t.key}>
+          {idx > 0 && " "}
+          <span
+            title={t.title}
+            className={`max-w-full rounded-full border bg-surface px-2 py-0.5 text-[11px] font-semibold leading-tight ${TAG_BORDER[t.tone]} ${TAG_TEXT[t.tone]} ${chipClass?.(t) ?? ""}`}
+          >
+            {t.text}
+          </span>
+        </Fragment>
+      ))}
+    </p>
+  );
+}
+
+/** Drawn at the picture widths a mask names — one digit a tier of
+ *  lib/pipeline-tags `PICTURE_TIERS`: under 278px, 278 to 347, 348 up — as
+ *  the card's picture and tag row ask of themselves (`@container/card`).
+ *  A chip shows as a block (a flex item either way); the line as a flex
+ *  row. Every class is written out whole, for Tailwind's scanner. */
+const AT_TIERS: Record<string, { block: string; flex: string }> = {
+  "111": { block: "", flex: "flex" },
+  "100": { block: "@min-[278px]/card:hidden", flex: "flex @min-[278px]/card:hidden" },
+  "010": { block: "hidden @min-[278px]/card:block @min-[348px]/card:hidden", flex: "hidden @min-[278px]/card:flex @min-[348px]/card:hidden" },
+  "001": { block: "hidden @min-[348px]/card:block", flex: "hidden @min-[348px]/card:flex" },
+  "110": { block: "@min-[348px]/card:hidden", flex: "flex @min-[348px]/card:hidden" },
+  "011": { block: "hidden @min-[278px]/card:block", flex: "hidden @min-[278px]/card:flex" },
+  "101": { block: "@min-[278px]/card:hidden @min-[348px]/card:block", flex: "flex @min-[278px]/card:hidden @min-[348px]/card:flex" },
+  "000": { block: "hidden", flex: "hidden" },
+};
+const atTiers = (shown: readonly boolean[]) => AT_TIERS[shown.map((on) => (on ? "1" : "0")).join("")] ?? AT_TIERS["111"];
+
 /** A slot the live screen has not read yet: a quiet shimmer where the figure
  *  will land (`.skeleton` moves only where motion is welcome), named for a
  *  screen reader — never the dash that says the memorandum states none. */
@@ -1615,156 +1671,13 @@ const DealRow = memo(function DealRow({
       {compactPrice(d.slots.price)}
     </span>
   ) : null;
-  // What the price buys where it is not the building (#415): a share's
-  // price, a note's, the land's under a ground lease — said beside the
-  // figure so a $20M share never reads as a $20M building.
-  const interestBit = d.slots.interest ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.interest}: the price does not buy the building outright — the deal page says what it buys`}
-    >
-      {d.slots.interest}
-    </span>
-  ) : null;
-  // The seller's loan, where it is offered for assumption (#419) — the deal
-  // page prices it against today's rate.
-  const debtBit = d.slots.debt ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate`}
-    >
-      {d.slots.debt}
-    </span>
-  ) : null;
-  // A covenant or a contract that sets the rents (#453): a restricted
-  // building's rents move with the limits, not the market — said beside the
-  // price, where the pipeline is scanned.
-  const affordableBit = d.slots.affordable ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.affordable}: a covenant or a contract sets these rents — the deal page says until when`}
-    >
-      {d.slots.affordable}
-    </span>
-  ) : null;
-  // One tenant leases the whole property (#454): the lease is the income,
-  // and how long it has left is what the price is paid for.
-  const tenancyBit = d.slots.tenancy ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.tenancy}: one lease is the whole income — the deal page reads its guarantor, its term and its increases`}
-    >
-      {d.slots.tenancy}
-    </span>
-  ) : null;
-  // What a hotel is sold with (#455): the encumbrance and the PIP change
-  // what the price buys.
-  const hotelBit = d.slots.hotel ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.hotel}: what the hotel is sold with — the deal page reads the flag, the manager and the PIP`}
-    >
-      {d.slots.hotel}
-    </span>
-  ) : null;
-  // The listed tenants (#457): an anchor not in the sale, and the share of
-  // the rent expiring before the model's sale.
-  const rosterBit = d.slots.roster ? (
-    <span
-      className="whitespace-nowrap font-medium text-caution"
-      title={`${d.slots.roster}: the listed tenants against the model's sale — the deal page reads the roll, the anchors and their rights`}
-    >
-      {d.slots.roster}
-    </span>
-  ) : null;
-  // A renovation program (#460): the premium it is priced on, and its
-  // return on the cost of a door.
-  const valueAddBit = d.slots.valueAdd ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.valueAdd}: the renovation program as stated — the deal page reads its proof, its pace and what the model does not carry`}
-    >
-      {d.slots.valueAdd}
-    </span>
-  ) : null;
-  // A note the seller will carry (#462): its rate, beside the price.
-  const sellerNoteBit = d.slots.sellerNote ? (
-    <span
-      className="whitespace-nowrap font-medium text-brand"
-      title={`${d.slots.sellerNote}: the seller offers to carry financing — the deal page prices the note against today's rate`}
-    >
-      {d.slots.sellerNote}
-    </span>
-  ) : null;
-  // A student building's pre-leasing against last year's (#468): behind
-  // the pace, or a drive to campus, in the warning tone.
-  const studentBit = d.slots.student ? (
-    <span
-      className={`whitespace-nowrap font-medium ${/−|Drive-to/.test(d.slots.student) ? "text-caution" : "text-brand"}`}
-      title={`${d.slots.student}: a student building's leasing for the coming year — the deal page reads the pace, the beds and the walk to campus`}
-    >
-      {d.slots.student}
-    </span>
-  ) : null;
-  // A manufactured-housing park's lot rent against the market's (#470): a
-  // private water or sewer system in the warning tone.
-  const mhBit = d.slots.mh ? (
-    <span
-      className={`whitespace-nowrap font-medium ${/Private/.test(d.slots.mh) ? "text-caution" : "text-brand"}`}
-      title={`${d.slots.mh}: a manufactured-housing park — the deal page reads the lot rent against the market's, the park-owned homes and the water and sewer`}
-    >
-      {d.slots.mh}
-    </span>
-  ) : null;
-  // A self-storage facility (#471): a lease-up in the warning tone.
-  const storageBit = d.slots.storage ? (
-    <span
-      className={`whitespace-nowrap font-medium ${/Lease-up/.test(d.slots.storage) ? "text-caution" : "text-brand"}`}
-      title={`${d.slots.storage}: a self-storage facility — the deal page reads its two occupancies and the rent sitting tenants pay against the street rate`}
-    >
-      {d.slots.storage}
-    </span>
-  ) : null;
-  // What the third-party reports found (#465): the most serious finding.
-  const reportsBit = d.slots.reports ? (
-    <span
-      className="whitespace-nowrap font-medium text-caution"
-      title={`${d.slots.reports}: from the third-party reports the memorandum cites — the deal page reads them`}
-    >
-      {d.slots.reports}
-    </span>
-  ) : null;
-  // A tax abatement (#461): the NOI is on an abated bill, how long it has
-  // and what the owner pays more once it ends.
-  const abatementBit = d.slots.abatement ? (
-    <span
-      className="whitespace-nowrap font-medium text-caution"
-      title={`${d.slots.abatement}: the NOI is on an abated tax bill — the deal page reads when it ends and what it is worth`}
-    >
-      {d.slots.abatement}
-    </span>
-  ) : null;
-  // How it is sold (#456): an auction's figure is where the bidding opens,
-  // and a court's or a lender's sale is as-is.
-  const saleBit = d.slots.sale ? (
-    <span
-      className="whitespace-nowrap font-medium text-caution"
-      title={`${d.slots.sale}: the figure is where the bidding opens or the seller is not an owner — the deal page reads the sale`}
-    >
-      {d.slots.sale}
-    </span>
-  ) : null;
-  // A Special Flood Hazard Area (#426): a federally backed loan requires
-  // flood insurance there, which is a cost and a lender's condition — said
-  // beside the price, where a list of deals is read.
-  const floodBit = d.flood?.tag ? (
-    <span
-      className="whitespace-nowrap font-medium text-kill"
-      title={`${d.flood.tag}: FEMA's Special Flood Hazard Area — a federally backed loan requires flood insurance; the deal page draws the map`}
-    >
-      {d.flood.tag}
-    </span>
-  ) : null;
+  // What the price buys where it is not the building, the seller's loan, a
+  // covenant on the rents, a flood zone… (lib/pipeline-tags): said on a
+  // line of their own under the figures at every width, so a tag never
+  // pushes the price, the cap or the fit off a one-line truncation — the
+  // phone's line had read "$41.3M · 49% share · 5…" — and is never cut
+  // itself.
+  const tags = dealTags(d.slots, d.flood);
   // A plan deal has no going-in cap; its yield on total cost is the figure
   // that answers the same question, so it takes the slot — labelled.
   const capBit = d.slots.cap ? (
@@ -1902,136 +1815,137 @@ const DealRow = memo(function DealRow({
     );
 
   const inner = (
-    <>
-      {compareMode && (
-        <span
-          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
-            checked
-              ? "border-brand bg-brand text-white"
-              : "border-line bg-surface"
-          }`}
-          aria-hidden
-        >
-          {checked && (
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={3}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              className="h-3 w-3"
-            >
-              <path d="M20 6 9 17l-5-5" />
-            </svg>
+    // Two rows: the picture beside the deal's line and its columns, then
+    // the deal's tags under them (lib/pipeline-tags) — once, at every
+    // width, starting under the name and running the row's whole width
+    // (under the columns from `md`), so a tag wraps only where the row
+    // runs out and never shares a line with a figure it could push off.
+    <div className="grid min-w-0 flex-1 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3">
+      <div className="flex items-center gap-3">
+        {compareMode && (
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+              checked
+                ? "border-brand bg-brand text-white"
+                : "border-line bg-surface"
+            }`}
+            aria-hidden
+          >
+            {checked && (
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-3 w-3"
+              >
+                <path d="M20 6 9 17l-5-5" />
+              </svg>
+            )}
+          </span>
+        )}
+        <DealThumb sources={d.thumbs ?? []} cover={d.cover ?? null} label={d.name} />
+      </div>
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="min-w-0 flex-1">
+          {/* The name is the row: two lines before an ellipsis at every
+              width, so "The Maddox at Brewerytown" is never "The Maddox at
+              Bre…" beside a half-empty column. */}
+          <p className="line-clamp-2 font-medium" title={d.name}>
+            {d.name}
+          </p>
+          {/* A phone gets two lines — where the deal is (the row's coloured
+              edge already says what it is), then what it costs and how it
+              fits — so the price, the cap and the fit are never the part a
+              one-line truncation cuts off. */}
+          <MetaLine className="md:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, addedByBit]} />
+          {/* On a phone the price line leads with the call; from `sm` to `md`
+              the call has its own column and the line is the figures alone. */}
+          <div className="mt-1 flex items-center gap-2 md:hidden">
+            <span className="flex shrink-0 sm:hidden">{status}</span>
+            <MetaLine flush className="min-w-0" bits={[priceBit, capBit, fitBit]} />
+          </div>
+          <MetaLine className="hidden md:block lg:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, fitBit, dateBit, addedByBit]} />
+          <MetaLine className="hidden lg:block xl:hidden" bits={[dueBit, marketBit, coveredBit, dateBit, addedByBit]} />
+          <MetaLine className="hidden xl:block" bits={[dueBit, marketBit, coveredBit, addedByBit]} />
+          {fitBar}
+        </div>
+        {/* Column cells — widths, order, and gaps mirror the header row. */}
+        <span className="hidden w-24 shrink-0 items-center gap-1.5 truncate text-sm text-muted lg:flex">
+          {d.assetClass ? (
+            <>
+              <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${asset.dot}`} />
+              <span className="truncate" title={assetClassLabel(d.assetClass)}>
+                {assetClassLabel(d.assetClass)}
+              </span>
+            </>
+          ) : (
+            // An "Auto-detect" deal's class is the deck's, read with the terms.
+            <Unstated reading={!!d.reading} width="w-16" />
           )}
         </span>
-      )}
-      <DealThumb sources={d.thumbs ?? []} cover={d.cover ?? null} label={d.name} />
-      <div className="min-w-0 flex-1">
-        {/* The name is the row: two lines before an ellipsis at every
-            width, so "The Maddox at Brewerytown" is never "The Maddox at
-            Bre…" beside a half-empty column. */}
-        <p className="line-clamp-2 font-medium" title={d.name}>
-          {d.name}
-        </p>
-        {/* A phone gets two lines — where the deal is (the row's coloured
-            edge already says what it is), then what it costs and how it
-            fits — so the price, the cap and the fit are never the part a
-            one-line truncation cuts off. */}
-        <MetaLine className="md:hidden" bits={[dueBit, marketBit, coveredBit, assetBit, addedByBit]} />
-        {/* On a phone the price line leads with the call; from `sm` to `md`
-            the call has its own column and the line is the figures alone. */}
-        <div className="mt-1 flex items-center gap-2 md:hidden">
-          <span className="flex shrink-0 sm:hidden">{status}</span>
-          <MetaLine flush className="min-w-0" bits={[priceBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, storageBit, floodBit, capBit, fitBit]} />
-        </div>
-        <MetaLine
-          className="hidden md:block lg:hidden"
-          bits={[dueBit, marketBit, coveredBit, assetBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, storageBit, floodBit, fitBit, dateBit, addedByBit]}
-        />
-        <MetaLine
-          className="hidden lg:block xl:hidden"
-          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, storageBit, dateBit, addedByBit]}
-        />
-        <MetaLine
-          className="hidden xl:block"
-          bits={[dueBit, marketBit, coveredBit, saleBit, interestBit, debtBit, sellerNoteBit, affordableBit, tenancyBit, rosterBit, valueAddBit, abatementBit, hotelBit, reportsBit, studentBit, mhBit, storageBit, addedByBit]}
-        />
-        {fitBar}
-      </div>
-      {/* Column cells — widths, order, and gaps mirror the header row. */}
-      <span className="hidden w-24 shrink-0 items-center gap-1.5 truncate text-sm text-muted lg:flex">
-        {d.assetClass ? (
-          <>
-            <span aria-hidden className={`h-2 w-2 shrink-0 rounded-full ${asset.dot}`} />
-            <span className="truncate" title={assetClassLabel(d.assetClass)}>
-              {assetClassLabel(d.assetClass)}
+        <span
+          className="hidden w-20 shrink-0 truncate text-right font-mono text-sm tabular-nums md:block"
+          title={
+            d.slots.price
+              ? [d.slots.price, d.slots.basis, d.slots.interest?.toLowerCase()].filter(Boolean).join(" — ")
+              : undefined
+          }
+        >
+          {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
+        </span>
+        <span className="hidden w-12 shrink-0 text-right font-mono text-sm tabular-nums md:block">
+          {d.slots.cap ??
+            (d.slots.yoc ? (
+              <span title="Yield on total cost — a plan deal has no going-in cap" className="text-brand">
+                {d.slots.yoc}
+                <span className="ml-0.5 text-[9px] font-sans font-medium uppercase">yoc</span>
+              </span>
+            ) : d.slots.noteYield ? (
+              // A note has no going-in cap: its yield to maturity, labelled.
+              <span title={NOTE_CAP_TITLE} className="text-brand">
+                {d.slots.noteYield}{" "}
+                <span className="text-[9px] font-sans font-medium uppercase">ytm</span>
+              </span>
+            ) : d.slots.capWithheld === "note" ? (
+              <span title={NOTE_CAP_TITLE} className="font-sans text-xs text-muted">
+                n/a
+              </span>
+            ) : (
+              <Unstated reading={!!d.reading} width="w-10" />
+            ))}
+        </span>
+        <span className="hidden w-16 shrink-0 flex-col items-end text-right text-xs font-semibold lg:flex">
+          {scored ? (
+            // The score, and the score drawn: a 0–100 bar in the call's colour.
+            <span
+              className={`flex flex-col items-end gap-1 tabular-nums ${fitCls}`}
+              title={fitTitle ?? undefined}
+            >
+              {scored.score}
+              <FitBar score={scored.score} />
+              {firstReadMark}
             </span>
-          </>
-        ) : (
-          // An "Auto-detect" deal's class is the deck's, read with the terms.
-          <Unstated reading={!!d.reading} width="w-16" />
-        )}
-      </span>
-      <span
-        className="hidden w-20 shrink-0 truncate text-right font-mono text-sm tabular-nums md:block"
-        title={
-          d.slots.price
-            ? [d.slots.price, d.slots.basis, d.slots.interest?.toLowerCase()].filter(Boolean).join(" — ")
-            : undefined
-        }
-      >
-        {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
-      </span>
-      <span className="hidden w-12 shrink-0 text-right font-mono text-sm tabular-nums md:block">
-        {d.slots.cap ??
-          (d.slots.yoc ? (
-            <span title="Yield on total cost — a plan deal has no going-in cap" className="text-brand">
-              {d.slots.yoc}
-              <span className="ml-0.5 text-[9px] font-sans font-medium uppercase">yoc</span>
-            </span>
-          ) : d.slots.noteYield ? (
-            // A note has no going-in cap: its yield to maturity, labelled.
-            <span title={NOTE_CAP_TITLE} className="text-brand">
-              {d.slots.noteYield}{" "}
-              <span className="text-[9px] font-sans font-medium uppercase">ytm</span>
-            </span>
-          ) : d.slots.capWithheld === "note" ? (
-            <span title={NOTE_CAP_TITLE} className="font-sans text-xs text-muted">
-              n/a
-            </span>
+          ) : d.fit ? (
+            <>
+              <span className={FIT_META[d.fit].cls} title={firstRead ? FIRST_READ_TITLE : undefined}>
+                {FIT_META[d.fit].label}
+              </span>
+              {firstReadMark}
+            </>
           ) : (
-            <Unstated reading={!!d.reading} width="w-10" />
-          ))}
-      </span>
-      <span className="hidden w-16 shrink-0 flex-col items-end text-right text-xs font-semibold lg:flex">
-        {scored ? (
-          // The score, and the score drawn: a 0–100 bar in the call's colour.
-          <span
-            className={`flex flex-col items-end gap-1 tabular-nums ${fitCls}`}
-            title={fitTitle ?? undefined}
-          >
-            {scored.score}
-            <FitBar score={scored.score} />
-            {firstReadMark}
-          </span>
-        ) : d.fit ? (
-          <>
-            <span className={FIT_META[d.fit].cls} title={firstRead ? FIRST_READ_TITLE : undefined}>
-              {FIT_META[d.fit].label}
-            </span>
-            {firstReadMark}
-          </>
-        ) : (
-          <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
-        )}
-      </span>
-      <span className="hidden w-24 shrink-0 justify-end sm:flex">{status}</span>
-      <span className="hidden w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted xl:block">
-        {fmtDate(d.createdAt)}
-      </span>
-    </>
+            <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
+          )}
+        </span>
+        <span className="hidden w-24 shrink-0 justify-end sm:flex">{status}</span>
+        <span className="hidden w-24 shrink-0 whitespace-nowrap text-right font-mono text-xs tabular-nums text-muted xl:block">
+          {fmtDate(d.createdAt)}
+        </span>
+      </div>
+      <TagLine tags={tags} className="col-start-2 mt-1.5 flex" />
+    </div>
   );
 
   return (
@@ -2245,34 +2159,24 @@ const DealTile = memo(function DealTile({
   const place = d.coveredMarket ?? d.readMarket ?? d.market;
   const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
   const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
-  // What the picture must not hide: a Special Flood Hazard Area, what the
-  // price buys where it is not the building, the seller's loan, a covenant
-  // on the rents, the one lease a single-tenant building is.
-  const tags = [
-    d.flood?.tag ? { text: d.flood.tag, cls: "text-kill", title: `${d.flood.tag}: FEMA's Special Flood Hazard Area — a federally backed loan requires flood insurance` } : null,
-    d.slots.interest ? { text: d.slots.interest, cls: "text-brand", title: `${d.slots.interest}: the price does not buy the building outright` } : null,
-    d.slots.debt ? { text: d.slots.debt, cls: "text-brand", title: `${d.slots.debt}: the seller's loan is offered for assumption` } : null,
-    d.slots.affordable ? { text: d.slots.affordable, cls: "text-brand", title: `${d.slots.affordable}: a covenant or a contract sets these rents` } : null,
-    d.slots.tenancy ? { text: d.slots.tenancy, cls: "text-brand", title: `${d.slots.tenancy}: one lease is the whole income` } : null,
-    d.slots.roster ? { text: d.slots.roster, cls: "text-caution", title: `${d.slots.roster}: the listed tenants against the model's sale` } : null,
-    d.slots.valueAdd ? { text: d.slots.valueAdd, cls: "text-brand", title: `${d.slots.valueAdd}: the renovation program as stated` } : null,
-    d.slots.abatement ? { text: d.slots.abatement, cls: "text-caution", title: `${d.slots.abatement}: the NOI is on an abated tax bill` } : null,
-    d.slots.sellerNote ? { text: d.slots.sellerNote, cls: "text-brand", title: `${d.slots.sellerNote}: the seller offers to carry financing` } : null,
-    d.slots.hotel ? { text: d.slots.hotel, cls: "text-brand", title: `${d.slots.hotel}: what the hotel is sold with` } : null,
-    d.slots.sale ? { text: d.slots.sale, cls: "text-caution", title: `${d.slots.sale}: the figure is where the bidding opens or the seller is not an owner` } : null,
-    d.slots.reports ? { text: d.slots.reports, cls: "text-caution", title: `${d.slots.reports}: from the third-party reports the memorandum cites` } : null,
-    d.slots.student
-      ? { text: d.slots.student, cls: /−|Drive-to/.test(d.slots.student) ? "text-caution" : "text-brand", title: `${d.slots.student}: a student building's leasing for the coming year` }
-      : null,
-    d.slots.mh ? { text: d.slots.mh, cls: /Private/.test(d.slots.mh) ? "text-caution" : "text-brand", title: `${d.slots.mh}: a manufactured-housing park's lot rent and utilities` } : null,
-    d.slots.storage
-      ? { text: d.slots.storage, cls: /Lease-up/.test(d.slots.storage) ? "text-caution" : "text-brand", title: `${d.slots.storage}: a self-storage facility's occupancy and rates` }
-      : null,
-  ].filter((t): t is { text: string; cls: string; title: string } => t !== null);
+  // What the picture must not hide — a Special Flood Hazard Area, how it is
+  // sold, what the price buys where it is not the building, the seller's
+  // loan… (lib/pipeline-tags). A chip rides on the picture only where it
+  // fits whole on a picture as wide as this card's (each of the tiers'
+  // widths, asked by container query), two at most; the rest wait on the
+  // card's line under the figures. A chip is never cut: the picture's had
+  // truncated "Shadow-anchored, 56% rolls in 5 …" at 390px.
+  const placed = placeTagsByTier(dealTags(d.slots, d.flood));
+  const pictureTags = placed.filter((p) => p.onPicture.some(Boolean));
+  const lineTags = placed.filter((p) => p.onPicture.some((on) => !on));
+  const lineAt = new Map(lineTags.map((p) => [p.tag.key, p.onPicture.map((on) => !on)]));
+  const lineShown = PICTURE_TIERS.map((_, k) => lineTags.some((p) => !p.onPicture[k]));
 
   const inner = (
     <>
-      <div className="relative">
+      {/* A container (`@container/card`), so the chips on it ask the
+          picture's own width. */}
+      <div className="@container/card relative">
         <DealBanner
           sources={d.pictures ?? []}
           cover={d.cover ?? null}
@@ -2308,23 +2212,31 @@ const DealTile = memo(function DealTile({
             </span>
           )}
         </span>
-        {tags.length > 0 && (
-          // Each tag truncates inside the column's 58%, never past it: a
-          // flex item sized to its content ran leftward over the call.
-          <span className="absolute right-3 top-3 flex max-w-[58%] flex-col items-end gap-1">
-            {tags.map((t) => (
-              <span
-                key={t.text}
-                title={t.title}
-                className={`max-w-full truncate rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold shadow-sm ${t.cls}`}
-              >
-                {t.text}
-              </span>
+        {pictureTags.length > 0 && (
+          // Inside the column's 58%, never past it: a flex item sized to its
+          // content ran leftward over the call. Every chip here fits that
+          // column whole on the narrowest card (lib/pipeline-tags), so none
+          // is truncated.
+          <span className="absolute right-3 top-3 flex max-w-[58%] flex-col items-end gap-1" data-tags="picture">
+            {pictureTags.map(({ tag: t, onPicture }, idx) => (
+              <Fragment key={t.key}>
+                {idx > 0 && " "}
+                <span
+                  title={t.title}
+                  className={`max-w-full rounded-full bg-white/95 px-2 py-0.5 text-[11px] font-semibold shadow-sm ${TAG_TEXT[t.tone]} ${atTiers(onPicture).block}`}
+                >
+                  {t.text}
+                </span>
+              </Fragment>
             ))}
           </span>
         )}
       </div>
-      <div className="flex flex-1 flex-col px-4 pb-3.5 pt-3">
+      {/* The card's rows — the picture, the name and place, the figures,
+          the tags under them — are the grid row's own (`grid-rows-subgrid`
+          on the card), so a row of cards lines up its figures whatever the
+          names' lengths, and whichever cards carry tags under them. */}
+      <div className="px-4 pb-3 pt-3">
         <p className="line-clamp-2 text-[15px] font-semibold leading-snug tracking-tight" title={d.name}>
           {d.name}
         </p>
@@ -2342,59 +2254,67 @@ const DealTile = memo(function DealTile({
             </span>
           ) : null}
         </p>
-        {/* Pushes the figures to the card's foot, so a row of cards lines
-            its figures up whatever the names' lengths. */}
-        <span aria-hidden className="min-h-3 flex-1" />
-        {/* The price is the longest figure ("$9–9.5M", "$124.5M"), so its
-            column is the widest. */}
-        <dl className="grid grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,3fr)] gap-3 border-t border-line pt-3">
-          {/* While a first screen has not read the terms, an empty slot
-              shimmers ("not read yet"); once a read finds none, the dash
-              ("not stated"). */}
-          <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
-            {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
-          </TileStat>
-          {/* A plan deal has no going-in cap; its yield on total cost takes
-              the slot, labelled. Nor has a note: its yield to maturity
-              takes it where the note pays or may, else it says n/a. */}
-          <TileStat
-            label={!d.slots.cap && d.slots.yoc ? "Yield on cost" : !d.slots.cap && d.slots.noteYield ? "Note yield" : "Cap"}
-            title={!d.slots.cap && !d.slots.yoc && d.slots.capWithheld === "note" ? NOTE_CAP_TITLE : undefined}
-            sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? "to maturity" : undefined}
-          >
-            {d.slots.cap ??
-              d.slots.yoc ??
-              d.slots.noteYield ??
-              (d.slots.capWithheld === "note" ? "n/a" : <Unstated reading={!!d.reading} width="w-10" />)}
-          </TileStat>
-          <div className="min-w-0">
-            <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>
-            <dd className="mt-0.5 text-sm font-semibold">
-              {scored ? (
-                <span
-                  className={`flex items-center gap-1.5 tabular-nums ${fitCls}`}
-                  title={d.fitFirstRead ? `${scored.score} / 100 mandate fit. ${FIRST_READ_TITLE}` : `${scored.score} / 100 mandate fit`}
-                >
-                  {scored.score}
-                  <FitBar score={scored.score} />
-                </span>
-              ) : d.fit ? (
-                <span className={FIT_META[d.fit].cls} title={d.fitFirstRead ? FIRST_READ_TITLE : undefined}>
-                  {FIT_META[d.fit].label}
-                </span>
-              ) : (
-                <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
-              )}
+      </div>
+      {/* The price is the longest figure ("$9–9.5M", "$124.5M"), so its
+          column is the widest. */}
+      <dl className="grid grid-cols-[minmax(0,4fr)_minmax(0,3fr)_minmax(0,3fr)] gap-3 border-t border-line mx-4 pt-3">
+        {/* While a first screen has not read the terms, an empty slot
+            shimmers ("not read yet"); once a read finds none, the dash
+            ("not stated"). */}
+        <TileStat label="Price" title={d.slots.price ?? undefined} sub={d.slots.basis}>
+          {d.slots.price ? compactPrice(d.slots.price) : <Unstated reading={!!d.reading} width="w-14" />}
+        </TileStat>
+        {/* A plan deal has no going-in cap; its yield on total cost takes
+            the slot, labelled. Nor has a note: its yield to maturity
+            takes it where the note pays or may, else it says n/a. */}
+        <TileStat
+          label={!d.slots.cap && d.slots.yoc ? "Yield on cost" : !d.slots.cap && d.slots.noteYield ? "Note yield" : "Cap"}
+          title={!d.slots.cap && !d.slots.yoc && d.slots.capWithheld === "note" ? NOTE_CAP_TITLE : undefined}
+          sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? "to maturity" : undefined}
+        >
+          {d.slots.cap ??
+            d.slots.yoc ??
+            d.slots.noteYield ??
+            (d.slots.capWithheld === "note" ? "n/a" : <Unstated reading={!!d.reading} width="w-10" />)}
+        </TileStat>
+        <div className="min-w-0">
+          <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>
+          <dd className="mt-0.5 text-sm font-semibold">
+            {scored ? (
+              <span
+                className={`flex items-center gap-1.5 tabular-nums ${fitCls}`}
+                title={d.fitFirstRead ? `${scored.score} / 100 mandate fit. ${FIRST_READ_TITLE}` : `${scored.score} / 100 mandate fit`}
+              >
+                {scored.score}
+                <FitBar score={scored.score} />
+              </span>
+            ) : d.fit ? (
+              <span className={FIT_META[d.fit].cls} title={d.fitFirstRead ? FIRST_READ_TITLE : undefined}>
+                {FIT_META[d.fit].label}
+              </span>
+            ) : (
+              <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
+            )}
+          </dd>
+          {/* Judged on the first signal while the extraction is on its
+              way: said under the fit, as the deal page says it. */}
+          {d.fitFirstRead && (scored || d.fit) ? (
+            <dd className="truncate text-[10px] font-medium uppercase tracking-wide text-brand" title={FIRST_READ_TITLE} data-qa="fit-first-read">
+              First read
             </dd>
-            {/* Judged on the first signal while the extraction is on its
-                way: said under the fit, as the deal page says it. */}
-            {d.fitFirstRead && (scored || d.fit) ? (
-              <dd className="truncate text-[10px] font-medium uppercase tracking-wide text-brand" title={FIRST_READ_TITLE} data-qa="fit-first-read">
-                First read
-              </dd>
-            ) : null}
-          </div>
-        </dl>
+          ) : null}
+        </div>
+      </dl>
+      {/* The tags the picture could not carry whole, on a line of their own
+          under the figures, at the widths where it could not; a card with
+          none keeps only the padding. A container, as the picture is, so
+          the two ask the same width. */}
+      <div className="@container/card pb-3.5">
+        <TagLine
+          tags={lineTags.map((p) => p.tag)}
+          className={`px-4 pt-2.5 ${atTiers(lineShown).flex}`}
+          chipClass={(t) => atTiers(lineAt.get(t.key) ?? []).block}
+        />
       </div>
     </>
   );
@@ -2427,17 +2347,20 @@ const DealTile = memo(function DealTile({
             }
           : undefined
       }
-      className={`group relative flex flex-col overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
+      // Five rows of the grid's own (the picture, the name and place, the
+      // figures, the tags under them, the footer), so every card in a row
+      // of the grid shares their heights.
+      className={`group relative row-span-5 grid grid-rows-subgrid gap-y-0 overflow-hidden rounded-2xl border bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-lg ${
         checked ? "border-brand ring-2 ring-brand/40" : "border-line"
       } ${isDead ? "opacity-60" : ""}`}
     >
       {compareMode ? (
-        <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} className="flex flex-1 flex-col text-left">
+        <button type="button" onClick={() => onToggle(d.id)} aria-pressed={checked} className="row-span-4 grid grid-rows-subgrid text-left">
           {inner}
         </button>
       ) : (
         <>
-          <Link href={`/deals/${d.id}`} className="flex flex-1 flex-col">
+          <Link href={`/deals/${d.id}`} className="row-span-4 grid grid-rows-subgrid">
             {inner}
           </Link>
           {/* The deal's other photographs (#450), flipped through where a

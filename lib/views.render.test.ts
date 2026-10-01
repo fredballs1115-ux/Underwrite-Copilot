@@ -151,6 +151,40 @@ function funnelRungs(html: string): { title: string; disabled: boolean; markup: 
   }));
 }
 
+/** The picture-width tiers a chip or a tag line is drawn at, read back from
+ *  its container-query classes (lib/pipeline-tags `PICTURE_TIERS`: under
+ *  278px, from 278, from 348). */
+function shownAtTiers(cls: string): boolean[] {
+  let on = !/(^|\s)hidden(\s|$)/.test(cls);
+  const out = [on];
+  for (const w of [278, 348]) {
+    if (cls.includes(`@min-[${w}px]/card:hidden`)) on = false;
+    if (cls.includes(`@min-[${w}px]/card:block`) || cls.includes(`@min-[${w}px]/card:flex`)) on = true;
+    out.push(on);
+  }
+  return out;
+}
+
+/** Each card's chips — on its picture, and on its line under the figures —
+ *  with the tiers each is drawn at (a line's chip only where its line is). */
+function cardChips(html: string): Map<string, { text: string; where: "picture" | "line"; tiers: boolean[]; cls: string }[]> {
+  const cards = new Map<string, { text: string; where: "picture" | "line"; tiers: boolean[]; cls: string }[]>();
+  const chipsIn = (markup: string) => [...markup.matchAll(/<span title="[^"]*" class="([^"]*)">([^<]*)<\/span>/g)].map((m) => ({ cls: m[1], text: m[2].replace(/&amp;/g, "&") }));
+  for (const part of html.split(/(?=<li [^>]*data-deal-tile=")/).slice(1)) {
+    const id = part.match(/data-deal-tile="([^"]+)"/)?.[1] ?? "";
+    const list: { text: string; where: "picture" | "line"; tiers: boolean[]; cls: string }[] = [];
+    const picture = part.match(/data-tags="picture">([\s\S]*?<\/span>)<\/span>/)?.[1] ?? "";
+    for (const c of chipsIn(picture)) list.push({ ...c, where: "picture", tiers: shownAtTiers(c.cls) });
+    const line = part.match(/<p class="([^"]*)" data-tags="line">([\s\S]*?)<\/p>/);
+    if (line) {
+      const lineAt = shownAtTiers(line[1]);
+      for (const c of chipsIn(line[2])) list.push({ ...c, where: "line", tiers: shownAtTiers(c.cls).map((on, k) => on && lineAt[k]) });
+    }
+    if (list.length) cards.set(id, list);
+  }
+  return cards;
+}
+
 describe("Pipeline — every card shape renders and reads clean", () => {
   it("renders the pipeline with twelve deals in every state", () => {
     const html = render(
@@ -256,46 +290,61 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // asset filter both say "Self-storage", and the key never shows.
     expect(text).toContain("Self-storage");
     expect(text).not.toMatch(/self_storage|Self_storage/);
-    // A share's price is said as a share's beside the figure, at every
-    // width, and the wide price column's tooltip carries it too; a deal
-    // bought outright says nothing more.
-    expect((text.match(/49% share/g) ?? []).length).toBe(4);
+    // A deal's tags are said once, on a line of their own under its
+    // figures (lib/pipeline-tags), drawn at every width — no breakpoint
+    // hides the line and no chip truncates — and the price line a phone
+    // truncates holds the figures alone: it had read "$41.3M · 49% share ·
+    // 5…", the cap cut, and from `md` up the tags rode a meta line that
+    // cut them off whole.
+    const tagLines = html.match(/<p class="[^"]*" data-tags="line">[\s\S]*?<\/p>/g) ?? [];
+    expect(tagLines).toHaveLength(8);
+    for (const line of tagLines) {
+      expect(line.match(/class="([^"]*)"/)?.[1]).toBe("flex-wrap gap-1 col-start-2 mt-1.5 flex");
+      expect(line).not.toMatch(/truncate|hidden/);
+    }
+    const priceLines = html.match(/<div class="mt-1 flex items-center gap-2 md:hidden">[\s\S]*?<\/div>/g) ?? [];
+    expect(priceLines.length).toBeGreaterThan(0);
+    for (const l of priceLines) expect(visibleText(l)).not.toMatch(/share|Assumable|LIHTC|tenant|Mgmt|Auction|Shadow|Reno|abated|Seller financing|Flood/);
+    expect(visibleText(priceLines.find((l) => l.includes("$41.3M")) ?? "").replace(/\s+/g, " ")).toContain("$41.3M · 5.9% cap");
+    // A share's price is said as a share's under the figure, and the wide
+    // price column's tooltip carries it too; a deal bought outright says
+    // nothing more.
+    expect((text.match(/49% share/g) ?? []).length).toBe(1);
     expect(html).toContain("49% share: the price does not buy the building outright");
     expect(html).toContain('title="$41,250,000 — 49% share"');
-    // The seller's loan offered for assumption is said beside the figure
-    // at every width too (#419); a deal financed fresh says nothing.
-    expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(4);
+    // The seller's loan offered for assumption (#419); a deal financed
+    // fresh says nothing.
+    expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(1);
     expect(html).toContain("Assumable 3.45%: the seller&#x27;s loan is offered for assumption");
-    // A covenant on the rents is said beside the figure at every width too
-    // (#453); a market-rate deal says nothing.
-    expect((text.match(/LIHTC, 75% restricted/g) ?? []).length).toBe(4);
+    // A covenant on the rents (#453); a market-rate deal says nothing.
+    expect((text.match(/LIHTC, 75% restricted/g) ?? []).length).toBe(1);
     expect(html).toContain("LIHTC, 75% restricted: a covenant or a contract sets these rents");
-    // One tenant's lease is said beside the figure at every width too
-    // (#454); a multi-tenant deal says nothing.
-    expect((text.match(/Single tenant, 6 yrs left/g) ?? []).length).toBe(4);
+    // One tenant's lease (#454); a multi-tenant deal says nothing.
+    expect((text.match(/Single tenant, 6 yrs left/g) ?? []).length).toBe(1);
     expect(html).toContain("Single tenant, 6 yrs left: one lease is the whole income");
-    // What a hotel is sold with, at every width too (#455).
-    expect((text.match(/Mgmt encumbered, PIP \$35k\/key/g) ?? []).length).toBe(4);
+    // What a hotel is sold with (#455).
+    expect((text.match(/Mgmt encumbered, PIP \$35k\/key/g) ?? []).length).toBe(1);
     expect(html).toContain("Mgmt encumbered, PIP $35k/key: what the hotel is sold with");
-    // How the property is sold, at every width too (#456): the figure
-    // beside it is where the bidding opens, not a price.
-    expect((text.match(/Auction, 5% premium/g) ?? []).length).toBe(4);
+    // How the property is sold (#456): the figure beside it is where the
+    // bidding opens, not a price.
+    expect((text.match(/Auction, 5% premium/g) ?? []).length).toBe(1);
     expect(html).toContain("Auction, 5% premium: the figure is where the bidding opens or the seller is not an owner");
-    // The listed tenants, at every width too (#457): an anchor not in the
-    // sale, and the rent rolling before the model's.
-    expect((text.match(/Shadow-anchored, 56% rolls in 5 yrs/g) ?? []).length).toBe(4);
+    // The listed tenants (#457): an anchor not in the sale, and the rent
+    // rolling before the model's.
+    expect((text.match(/Shadow-anchored, 56% rolls in 5 yrs/g) ?? []).length).toBe(1);
     expect(html).toContain("Shadow-anchored, 56% rolls in 5 yrs: the listed tenants against the model&#x27;s sale");
-    // A renovation program, at every width too (#460): the premium and
-    // the memorandum's own return on cost.
-    expect((text.match(/Reno \$250\/mo, 20% on cost/g) ?? []).length).toBe(4);
+    // A renovation program (#460): the premium and the memorandum's own
+    // return on cost.
+    expect((text.match(/Reno \$250\/mo, 20% on cost/g) ?? []).length).toBe(1);
     expect(html).toContain("Reno $250/mo, 20% on cost: the renovation program as stated");
-    // A tax abatement, at every width too (#461): the years left and the
-    // step-up when it ends.
-    expect((text.match(/Tax abated, 4 yrs left, \+\$450k\/yr/g) ?? []).length).toBe(4);
+    // A tax abatement (#461): the years left and the step-up when it ends.
+    expect((text.match(/Tax abated, 4 yrs left, \+\$450k\/yr/g) ?? []).length).toBe(1);
     expect(html).toContain("Tax abated, 4 yrs left, +$450k/yr: the NOI is on an abated tax bill");
-    // A note the seller will carry, at every width too (#462).
-    expect((text.match(/Seller financing 5\.00%/g) ?? []).length).toBe(4);
+    // A note the seller will carry (#462).
+    expect((text.match(/Seller financing 5\.00%/g) ?? []).length).toBe(1);
     expect(html).toContain("Seller financing 5.00%: the seller offers to carry financing");
+    // A flood zone (#426) rides the same line, in the warning's red.
+    expect((text.match(/Flood AE/g) ?? []).length).toBe(1);
   });
 
   it("names every rung of the funnel, an empty one included, for sight and for a screen reader", () => {
@@ -448,18 +497,39 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((html.match(/>Failed</g) ?? []).length).toBe(2);
     expect((html.match(/>Stalled</g) ?? []).length).toBe(1);
     expect(text).toContain("Screening…");
-    // What the picture must not hide is chipped on it, once a card.
-    expect((text.match(/Flood AE/g) ?? []).length).toBe(1);
-    expect((text.match(/49% share/g) ?? []).length).toBe(1);
-    expect((text.match(/Assumable 3\.45%/g) ?? []).length).toBe(1);
-    expect((text.match(/LIHTC, 75% restricted/g) ?? []).length).toBe(1);
-    expect((text.match(/Single tenant, 6 yrs left/g) ?? []).length).toBe(1);
-    expect((text.match(/Mgmt encumbered, PIP \$35k\/key/g) ?? []).length).toBe(1);
-    expect((text.match(/Auction, 5% premium/g) ?? []).length).toBe(1);
-    expect((text.match(/Shadow-anchored, 56% rolls in 5 yrs/g) ?? []).length).toBe(1);
-    expect((text.match(/Reno \$250\/mo, 20% on cost/g) ?? []).length).toBe(1);
-    expect((text.match(/Tax abated, 4 yrs left, \+\$450k\/yr/g) ?? []).length).toBe(1);
-    expect((text.match(/Seller financing 5\.00%/g) ?? []).length).toBe(1);
+    // What the picture must not hide is chipped on it where the chip fits
+    // whole, and waits on the card's line under the figures where it does
+    // not (lib/pipeline-tags): every tag shows exactly once at each width
+    // the cards are drawn at, and no chip truncates — the picture's had
+    // cut "Shadow-anchored, 56% rolls in 5 …" at 390px.
+    const chips = cardChips(html);
+    expect([...chips.values()].flat().map((c) => c.text).filter((t, k, all) => all.indexOf(t) === k).sort()).toEqual(
+      ["49% share", "Assumable 3.45%", "Auction, 5% premium", "Flood AE", "LIHTC, 75% restricted", "Mgmt encumbered, PIP $35k/key", "Reno $250/mo, 20% on cost", "Seller financing 5.00%", "Shadow-anchored, 56% rolls in 5 yrs", "Single tenant, 6 yrs left", "Tax abated, 4 yrs left, +$450k/yr"],
+    );
+    for (const [id, list] of chips) {
+      for (const t of new Set(list.map((c) => c.text))) {
+        expect([0, 1, 2].map((k) => list.filter((c) => c.text === t && c.tiers[k]).length), `${id}: ${t}`).toEqual([1, 1, 1]);
+      }
+      for (const c of list) expect(c.cls, `${id}: ${c.text}`).not.toContain("truncate");
+    }
+    const where = (id: string, t: string) => [0, 1, 2].map((k) => chips.get(id)?.find((c) => c.text === t && c.tiers[k])?.where);
+    // Short chips ride on every picture.
+    expect(where("l", "Flood AE")).toEqual(["picture", "picture", "picture"]);
+    expect(where("g", "49% share")).toEqual(["picture", "picture", "picture"]);
+    expect(where("p", "Assumable 3.45%")).toEqual(["picture", "picture", "picture"]);
+    // The chip found cut — 206.6px drawn, more room than any picture has —
+    // never rides on one.
+    expect(where("e", "Shadow-anchored, 56% rolls in 5 yrs")).toEqual(["line", "line", "line"]);
+    // A chip whole only on the wider pictures rides on them, and waits on
+    // the line under the figures on the narrower.
+    expect(where("e", "Auction, 5% premium")).toEqual(["line", "picture", "picture"]);
+    expect(where("p", "Tax abated, 4 yrs left, +$450k/yr")).toEqual(["line", "line", "picture"]);
+    // The card's rows are the grid row's own, so a row of cards lines up
+    // its figures whichever carry tags under them; the picture and the tag
+    // row each ask their own width (a container cannot be a subgrid).
+    expect((html.match(/<li [^>]*class="group relative row-span-5 grid grid-rows-subgrid gap-y-0 /g) ?? []).length).toBe(live.length);
+    expect((html.match(/class="@container\/card relative"/g) ?? []).length).toBe(live.length);
+    expect((html.match(/class="@container\/card pb-3\.5"/g) ?? []).length).toBe(live.length);
     // The three figures a pipeline is read by; a plan deal's yield on cost
     // takes the cap's slot under its own label.
     expect(text).toContain("$68.0M");
