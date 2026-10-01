@@ -729,13 +729,20 @@ describe("the Portfolio tab — each property as the memorandum states it, the s
       if (row.getCell(2).value === "Portfolio") listed = true;
     });
     expect(listed).toBe(true);
-    // Excel's own data bars on the three shares, from zero.
+    // Excel's own data bars on the three shares, from zero to the whole: a
+    // share fills its share of the cell, never its length against the
+    // column's largest (a 53% share had filled 97% of it).
     const cfs = (
       ws as unknown as { conditionalFormattings: { ref: string; rules: { type: string; cfvo?: { type: string; value?: number }[] }[] }[] }
     ).conditionalFormattings;
     const bars = cfs.filter((cf) => cf.rules.some((r) => r.type === "dataBar"));
     expect(bars.map((cf) => cf.ref).sort()).toEqual([`L${first}:L${first + 2}`, `M${first}:M${first + 2}`, `N${first}:N${first + 2}`]);
-    expect(bars[0].rules[0].cfvo?.map((c) => c.type)).toEqual(["num", "max"]);
+    for (const cf of bars) {
+      expect(cf.rules[0].cfvo?.map((c) => [c.type, Number(c.value)])).toEqual([
+        ["num", 0],
+        ["num", 1],
+      ]);
+    }
   });
 
   it("computes what lib/portfolio reads, and draws the count's share the moment the missing count is typed in", async () => {

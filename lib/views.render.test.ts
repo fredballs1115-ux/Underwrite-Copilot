@@ -5404,6 +5404,16 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
     expect(html.match(/data-qa="portfolio-property"/g)).toHaveLength(3);
     expect(html.match(/data-bar="portfolio"/g)).toHaveLength(3);
     expect(html.match(/data-bar="portfolio-noi"/g)).toHaveLength(3);
+    // A share of the whole fills that share of its track — Ohio City
+    // Commons' 52.8% of the units at 52.8% — never its length against the
+    // largest share in either set (the research pass of 2026-09-30: drawn at
+    // 97%, beside its own "53%").
+    const read = readPortfolio(extraction)!;
+    const widths = (bar: string) => [...html.matchAll(new RegExp(`data-bar="${bar}" style="width:([\\d.]+)%"`, "g"))].map((m) => Number(m[1]));
+    expect(widths("portfolio")).toHaveLength(3);
+    widths("portfolio").forEach((w, i) => expect(w).toBeCloseTo(read.shares![i], 6));
+    widths("portfolio-noi").forEach((w, i) => expect(w).toBeCloseTo(read.noiShares![i], 6));
+    expect(text).toContain("53% of the units");
     // The markets: two the site reads, linked; the state, not.
     expect(html).toContain('href="/market?metro=pittsburgh"');
     expect(html).toContain('href="/market?metro=cleveland"');

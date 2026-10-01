@@ -828,8 +828,10 @@ function buildPortfolio(ws: ExcelJS.Worksheet, p: PortfolioRead, noun: { one: st
   });
   formula(ws.getCell(gap, 9), `IF(AND(ISNUMBER(I${total}),ISNUMBER(I${ask}),I${ask}>0),I${total}/I${ask}-1,"")`, FMT.pct1, true);
 
-  // Excel's own data bars on the three shares, from zero so a property's bar
-  // is its share's length against the largest.
+  // Excel's own data bars on the three shares, from zero to the whole (1,
+  // 100%), so a property's bar fills its share of the cell — a 53% share
+  // half the cell, as on the deal page's card and the report's page. Scaled
+  // to the column's largest share, a 53% share filled 97% of it.
   for (const letter of ["L", "M", "N"]) {
     ws.addConditionalFormatting({
       ref: `${letter}${first}:${letter}${last}`,
@@ -842,7 +844,10 @@ function buildPortfolio(ws: ExcelJS.Worksheet, p: PortfolioRead, noun: { one: st
           maxLength: 100,
           showValue: true,
           border: false,
-          cfvo: [{ type: "num", value: 0 }, { type: "max" }],
+          cfvo: [
+            { type: "num", value: 0 },
+            { type: "num", value: 1 },
+          ],
           color: { argb: "FFB5CDC9" },
         } as unknown as ExcelJS.ConditionalFormattingRule,
       ],

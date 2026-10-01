@@ -244,3 +244,22 @@ export function pdfFillCountOf(pdf: Buffer): number {
   }
   return count;
 }
+
+/**
+ * Every rectangle the document fills, in drawing order, in the units of the
+ * transform it is drawn under: react-pdf paints a View's background as
+ * `x y w h re f` inside the View's own clip, so a bar's length is its `w`.
+ * Lets a test say a bar is drawn at the length its figure says, not merely
+ * that it is drawn.
+ */
+export function pdfFillRectsOf(pdf: Buffer): Array<{ x: number; y: number; w: number; h: number }> {
+  const strings = new RegExp(STRING, "g");
+  const rect = new RegExp(String.raw`(?:^|\s)(${NUM})\s+(${NUM})\s+(${NUM})\s+(${NUM})\s+re\s+f\*?(?=\s|$)`, "g");
+  const out: Array<{ x: number; y: number; w: number; h: number }> = [];
+  for (const content of streamsOf(pdf)) {
+    for (const m of content.replace(strings, "()").matchAll(rect)) {
+      out.push({ x: Number(m[1]), y: Number(m[2]), w: Number(m[3]), h: Number(m[4]) });
+    }
+  }
+  return out;
+}

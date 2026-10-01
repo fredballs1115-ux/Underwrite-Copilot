@@ -77,7 +77,7 @@ import { exitMoney, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
-import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, type PortfolioRead } from "@/lib/portfolio";
+import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
 
 const C = {
   brand: "#114e54",
@@ -579,9 +579,10 @@ function LeaseholdBlock({ view }: { view: LeaseholdExitView | null | undefined }
 function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: { one: string; many: string } }) {
   const p = portfolio;
   const basisWord = shareBasisWord(p, noun);
-  const widest = Math.max(1, ...(p.shares ?? []), ...(p.noiShares ?? []));
+  // A share of the whole fills that share of the track, as on the deal
+  // page's card (`shareOfTrack`).
   const track = 84;
-  const bar = (v: number) => Math.max(1.5, (v / widest) * track);
+  const bar = (sharePct: number) => Math.max(1.5, shareOfTrack(sharePct) * track);
   return (
     <View>
       <Text style={s.sub}>

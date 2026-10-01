@@ -11,7 +11,8 @@ import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, rangeRead, readDay, ReportDocument } from "./report-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
-import { pdfFillCountOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
+import { pdfFillCountOf, pdfFillRectsOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
+import { readPortfolio } from "@/lib/portfolio";
 import { TINY_PNG_DATA_URI, tinyPng } from "./test-png";
 import { floodZoneLine, type FloodMapView } from "@/lib/site-flags/core";
 
@@ -1219,6 +1220,21 @@ describe("ReportDocument (full report)", () => {
     // draws twelve fewer shapes.
     const unbarred = await render({ ...extraction, properties: properties.map((x, i) => (i === 2 ? { ...x, count: "" } : x)) });
     expect(pdfFillCountOf(buf) - pdfFillCountOf(unbarred)).toBe(properties.length * 4);
+    // Each fill is its share of the whole along the 84pt track — Ohio City
+    // Commons' 52.8% of the units at 44.3pt — never its length against the
+    // largest share in either set, which drew that 52.8% at 81.7pt.
+    const rects = pdfFillRectsOf(buf);
+    const read = readPortfolio(extraction)!;
+    const rows = rects.flatMap((r, i) =>
+      r.w === 84 && r.h === 4 && rects[i + 1]?.h === 4 && rects[i + 2]?.w === 84 && rects[i + 2]?.h === 2.5 && rects[i + 3]?.h === 2.5
+        ? [{ units: rects[i + 1].w, noi: rects[i + 3].w }]
+        : [],
+    );
+    expect(rows).toHaveLength(properties.length);
+    rows.forEach((row, i) => {
+      expect(row.units).toBeCloseTo((read.shares![i] / 100) * 84, 3);
+      expect(row.noi).toBeCloseTo((read.noiShares![i] / 100) * 84, 3);
+    });
     expect((await pdfTextOf(unbarred)).replace(/\s+/g, " ")).toContain("No bars: the properties do not all state a count, nor all an area");
   }, 60000);
 
