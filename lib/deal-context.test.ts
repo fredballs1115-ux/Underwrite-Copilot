@@ -64,6 +64,23 @@ describe("dealContextFor — what the screen established, for every step that re
     expect(ctx).not.toContain("Timeline as stated");
   });
 
+  it("reads the kind with the first signal beside the extraction, as the market figures and the deal page do (research pass 18)", () => {
+    // The extraction names no plan; the first signal calls it a conversion.
+    const unnamed: ExtractionResult = {
+      ...CONVERSION,
+      dealName: "1200 K Street",
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$20,000,000"), m("NOI (in place)", "$1,200,000")],
+    };
+    const signal = { take: "A conversion of a vacant office tower to apartments — check the budget." };
+    expect(dealContextFor(unnamed)).toBe("Deal type: Stabilized.");
+    const read = dealContextFor(unnamed, null, signal)!;
+    expect(read).toMatch(/^Deal type: Conversion — /);
+    expect(read).not.toContain("Stabilized");
+    // A signal that names no plan changes nothing.
+    expect(dealContextFor(unnamed, null, { take: "A stabilized asset — check the rent roll." })).toBe("Deal type: Stabilized.");
+  });
+
   it("a stabilized asset gets only its type; an unknown strategy gets nothing", () => {
     expect(
       dealContextFor({

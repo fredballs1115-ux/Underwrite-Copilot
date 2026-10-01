@@ -35,12 +35,19 @@ const compact = (n: number): string =>
  * unknown and the OM offers one property: nothing established, nothing
  * asserted. Pure — no I/O — so it is testable and the worker can
  * use it.
+ *
+ * The deal's kind is read with the first signal beside the extraction, as
+ * the deal page and the market check's figures read it (lib/deal-strategy
+ * `inferStrategy`): a deal only the first signal calls a conversion is a
+ * conversion in every step's context, never "Stabilized" in one and a plan
+ * in the next. A caller with no signal (Ask) reads as before.
  */
 export function dealContextFor(
   extraction: ExtractionResult | null,
   site?: { flood?: SiteFlagsResult["flood"] } | null,
+  signal?: { take?: string; dealName?: string | null } | null,
 ): string | null {
-  const strategy = inferStrategy(extraction);
+  const strategy = inferStrategy(extraction, signal ?? null);
   // A portfolio is said whatever the strategy: several properties in one
   // OM change what every whole-deal figure means (lib/portfolio).
   const portfolio = readPortfolio(extraction);

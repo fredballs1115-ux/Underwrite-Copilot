@@ -10,6 +10,7 @@ import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import type {
   ExtractionResult,
+  FirstSignal,
   ChallengerResult,
   BrokerCompsResult,
   ReconciliationResult,
@@ -53,6 +54,11 @@ const VerdictSchema = z.object({
 
 export interface VerdictInputs {
   extraction: ExtractionResult | null;
+  /** the first signal, read beside the extraction for the deal's kind
+   *  (lib/deal-strategy `inferStrategy`) — as the deal context, the
+   *  challenger and the market figures read it, so the verdict never calls
+   *  stabilized a deal every other step read as a plan */
+  firstSignal?: FirstSignal | null;
   challenges: ChallengerResult | null;
   comps: BrokerCompsResult | null;
   reconciliation: ReconciliationResult | null;
@@ -99,7 +105,7 @@ export function buildBrief(input: VerdictInputs): string {
   // building's, judged on yield on total cost; on a stabilized asset an NOI
   // above the price is a misread. The brief says which.
   if (ex) {
-    const strategy = inferStrategy(ex);
+    const strategy = inferStrategy(ex, input.firstSignal ?? null);
     const note = plausibilityNote(
       assessPlausibility(ex, strategy),
       strategy,

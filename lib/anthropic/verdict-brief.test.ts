@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildBrief } from "./verdict";
-import type { MarketResult } from "./types";
+import type { ExtractionResult, FirstSignal, MarketResult } from "./types";
 
 const market: MarketResult = {
   checks: [
@@ -72,6 +72,32 @@ describe("a portfolio across markets: each other market's figures under its own 
     expect(brief).toContain("Each is dated and is the state's — it speaks for the properties in Virginia alone");
     // A market that read nothing adds no heading.
     expect(brief).not.toContain("Ohio");
+  });
+});
+
+describe("the verdict reads the deal's kind as every other step does (research pass 18)", () => {
+  const unnamed = {
+    dealName: "1200 K Street",
+    assetClass: "Office",
+    market: "Washington, DC",
+    address: "1200 K St NW, Washington, DC 20005",
+    totalPages: 40,
+    strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+    metrics: [
+      { label: "Asking price", value: "$20,000,000", flagged: false, page: "p. 3", basis: "na" },
+      { label: "NOI (in place)", value: "$1,200,000", flagged: false, page: "p. 9", basis: "in_place" },
+    ],
+  } as unknown as ExtractionResult;
+  const none = { challenges: null, comps: null, reconciliation: null, market: null };
+
+  it("with the first signal beside the extraction: a conversion the signal names is a conversion here too", () => {
+    const signal = { take: "A conversion of a vacant office tower to apartments — check the budget." } as unknown as FirstSignal;
+    const read = buildBrief({ extraction: unnamed, firstSignal: signal, ...none });
+    expect(read).toContain("DEAL STRATEGY: Conversion");
+    // Without the signal the brief is the old one: a stabilized asset says nothing here.
+    const bare = buildBrief({ extraction: unnamed, ...none });
+    expect(bare).not.toContain("DEAL STRATEGY");
+    expect(buildBrief({ extraction: unnamed, firstSignal: null, ...none })).toBe(bare);
   });
 });
 

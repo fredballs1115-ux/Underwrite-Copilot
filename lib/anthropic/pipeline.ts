@@ -319,12 +319,14 @@ async function dealContextFromDb(
   flags: SiteFlagsResult | null,
 ): Promise<string | null> {
   try {
-    const { data } = await admin.from("deals").select("extraction").eq("id", dealId).single();
+    const { data } = await admin.from("deals").select("extraction, first_signal").eq("id", dealId).single();
     // Where the FEMA lookup has answered (`siteFlagsForScreen`), the step
-    // reads the flood zone too (#426).
+    // reads the flood zone too (#426). The deal's kind is read with the
+    // first signal beside the extraction, as the market figures read it.
     return dealContextFor(
       (data?.extraction as ExtractionResult | null) ?? null,
       flags && flags.status !== "pending" ? { flood: flags.flood } : null,
+      (data?.first_signal as FirstSignal | null | undefined) ?? null,
     );
   } catch {
     return null;
@@ -471,7 +473,7 @@ async function regenerateVerdict(
 ): Promise<void> {
   const { data } = await admin
     .from("deals")
-    .select("extraction, challenges, comps, reconciliation, market, user_id, team_id")
+    .select("extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
     .eq("id", dealId)
     .single();
 
@@ -491,6 +493,9 @@ async function regenerateVerdict(
 
   const verdict = await synthesizeVerdict({
     extraction: (data?.extraction as ExtractionResult) ?? null,
+    // The deal's kind is read with the first signal beside the extraction,
+    // as every other step reads it.
+    firstSignal: (data?.first_signal as FirstSignal | null | undefined) ?? null,
     challenges: (data?.challenges as ChallengerResult) ?? null,
     comps: (data?.comps as BrokerCompsResult) ?? null,
     reconciliation: (data?.reconciliation as ReconciliationResult) ?? null,
@@ -921,7 +926,7 @@ async function runAnalysisSteps(
       try {
         const { data: dr } = await admin
           .from("deals")
-          .select("discrepancies, extraction")
+          .select("discrepancies, extraction, first_signal")
           .eq("id", dealId)
           .single();
         const disc = (dr?.discrepancies as {
@@ -935,9 +940,11 @@ async function runAnalysisSteps(
         const notes: string[] = [];
 
         // The deal's kind first: it decides which OM figure the T-12 is held
-        // against and how the plan's figures are read below.
+        // against and how the plan's figures are read below. Read with the
+        // first signal beside the extraction, as the deal context, the market
+        // figures and the verdict read it — one kind for the whole screen.
         const ex = (dr?.extraction as ExtractionResult | null) ?? null;
-        const strategy = inferStrategy(ex);
+        const strategy = inferStrategy(ex, (dr?.first_signal as FirstSignal | null | undefined) ?? null);
 
         // Feature 1: the OM-assumed vs T-12-actual NOI gap is the skeptic's
         // first-order fact — a material (>5%) or red-flag (>10%) delta means
@@ -1233,7 +1240,7 @@ async function runReconciliationSteps(
     const admin = createSupabaseAdminClient();
     const { data: deal, error } = await admin
       .from("deals")
-      .select("id, om_storage_path, extraction")
+      .select("id, om_storage_path, extraction, first_signal")
       .eq("id", dealId)
       .single();
 
@@ -1253,11 +1260,16 @@ async function runReconciliationSteps(
     const parsed = await parseModelFile(model.name, model.buffer);
     omSource = await omSourceFor(omPdf);
     // The reconciler is told the deal's kind, so a buyer's model that carries
-    // construction and downtime is compared to the OM on the plan's terms.
+    // construction and downtime is compared to the OM on the plan's terms —
+    // the kind read with the first signal, as the screen's steps read it.
     const reconciliation = await reconcileModel(
       omSource,
       parsed,
-      dealContextFor((deal.extraction as ExtractionResult | null) ?? null),
+      dealContextFor(
+        (deal.extraction as ExtractionResult | null) ?? null,
+        null,
+        (deal.first_signal as FirstSignal | null | undefined) ?? null,
+      ),
     );
 
     await admin

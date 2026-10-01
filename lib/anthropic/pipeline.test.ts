@@ -566,6 +566,38 @@ describe("runAnalysis — the happy path", () => {
     expect(handed).toContain("Construction costs —");
   });
 
+  it("every step names the kind the first signal names: the challenger, the comps, the market check and the verdict read one kind (research pass 18)", async () => {
+    // The same deal as above: the extraction names no plan, the first
+    // signal calls it a conversion. The market figures read the signal; the
+    // deal context, the challenger and the verdict had read the extraction
+    // alone and called it stabilized beside construction-cost lines.
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+    } as unknown as ExtractionResult);
+    const signal = {
+      ...SIGNAL,
+      take: "A conversion of a vacant office tower to apartments — check the budget against the floor plates.",
+    } as unknown as FirstSignal;
+    vi.mocked(readFirstSignal).mockResolvedValue(signal);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const challenger = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    const comps = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    const market = vi.mocked(checkMarket).mock.calls[0][2] ?? "";
+    expect(challenger).toContain("DEAL STRATEGY: Conversion");
+    expect(comps).toContain("Deal type: Conversion");
+    expect(market).toContain("Deal type: Conversion");
+    for (const text of [challenger, comps, market]) expect(text).not.toContain("Stabilized");
+    // The verdict is handed the signal, and its brief reads the same kind.
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(input.firstSignal).toEqual(signal);
+    const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+    const brief = buildBrief(input);
+    expect(brief).toContain("DEAL STRATEGY: Conversion");
+    expect(brief).not.toContain("Stabilized");
+  });
+
   it("a suburb its address's words miss reads its metro area's figures, placed by its tract's county and said so (#447)", async () => {
     const label = "5000 Main St, Frisco, TX 75034";
     state.deals.d1.address = { label, street: "5000 Main St", city: "Frisco", state: "TX", zip: "75034", county: "", submarket: "" };
