@@ -668,7 +668,7 @@ function CapTriangle() {
           <Stat label="Per unit" value={usdExact(perUnit)} />
         </div>
         <div className="flex items-end pb-1">
-          <Stat label="Per SF" value={perSf === null ? "—" : `$${perSf.toFixed(0)}`} />
+          <Stat label="Per SF" value={usdExact(perSf)} />
         </div>
       </div>
     </Card>
@@ -852,11 +852,11 @@ function RentConverter() {
       <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
         <Stat
           label="$ / SF / yr"
-          value={q.perSfYear === null ? "—" : `$${q.perSfYear.toFixed(2)}`}
+          value={usdCents(q.perSfYear)}
         />
         <Stat
           label="$ / SF / mo"
-          value={q.perSfMonth === null ? "—" : `$${q.perSfMonth.toFixed(2)}`}
+          value={usdCents(q.perSfMonth)}
         />
         <Stat
           label="$ / unit / mo"
@@ -868,7 +868,7 @@ function RentConverter() {
       <p className="mt-4 text-sm text-muted">
         Gross equivalent of that net rent:{" "}
         <span className="font-semibold tabular-nums text-ink">
-          {gross === null ? "—" : `$${gross.toFixed(2)}`}
+          {usdCents(gross)}
         </span>{" "}
         per SF per year.
       </p>
@@ -1147,26 +1147,19 @@ function NetEffectiveRent() {
           <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-3 lg:grid-cols-5">
             <Stat
               label="Net effective"
-              value={r.nerPsfYr === null ? "—" : `$${r.nerPsfYr.toFixed(2)}`}
+              value={usdCents(r.nerPsfYr)}
               tone="brand"
             />
-            <Stat
-              label="…discounted"
-              value={
-                r.discountedNerPsfYr === null ? "—" : `$${r.discountedNerPsfYr.toFixed(2)}`
-              }
-            />
+            <Stat label="…discounted" value={usdCents(r.discountedNerPsfYr)} />
             <Stat label="Below face" value={pct(r.discountToFacePct, 1)} />
             <Stat
               label="Collected / SF"
-              value={r.collectedPsf === null ? "—" : `$${r.collectedPsf.toFixed(0)}`}
+              value={usdExact(r.collectedPsf)}
               tone="muted"
             />
             <Stat
               label="Cost to sign / SF"
-              value={
-                cost === null ? "—" : `$${(cost.free + cost.ti + cost.lc).toFixed(0)}`
-              }
+              value={cost === null ? "—" : usdExact(cost.free + cost.ti + cost.lc)}
               tone="muted"
             />
           </div>
@@ -1174,7 +1167,7 @@ function NetEffectiveRent() {
           <p className="mt-4 text-sm text-muted">
             The face rent is{" "}
             <span className="font-semibold tabular-nums text-ink">
-              ${num(rent)?.toFixed(2) ?? "—"}
+              {usdCents(num(rent))}
             </span>
             . Straight-line net effective is the simple one most memoranda quote;
             the discounted figure charges the landlord for waiting, so it is
@@ -1418,7 +1411,7 @@ function ResidualLand() {
           <Stat label="Land, residual" value={usd(r.land)} tone={negative ? "muted" : "brand"} />
           <Stat
             label="Per buildable SF"
-            value={r.landPerBuildableSf === null ? "—" : `$${r.landPerBuildableSf.toFixed(2)}`}
+            value={usdCents(r.landPerBuildableSf)}
           />
           <Stat label="Per unit" value={usdExact(r.landPerUnit)} />
           <Stat
@@ -2633,7 +2626,7 @@ function PercentageRent() {
           {/* Cents, not whole dollars: usdExact would round $59.33 to $59,
               and a rent per foot is quoted to the cent everywhere it is
               quoted at all. */}
-          ${r.baseRentPsf.toFixed(2)} a foot base, ${r.allInPsf.toFixed(2)} all in.
+          {usdCents(r.baseRentPsf)} a foot base, {usdCents(r.allInPsf)} all in.
           {r.salesToClearCeiling === null ? (
             <>
               {" "}
@@ -4449,11 +4442,11 @@ function RentableUsable() {
       {r.rentPerUsf !== null && (
         <p className="mt-4 text-sm text-muted">
           <span className="font-semibold tabular-nums text-ink">
-            ${(num(rentPerRsf) ?? 0).toFixed(2)} per rentable foot
+            {usdCents(num(rentPerRsf) ?? 0)} per rentable foot
           </span>{" "}
           is{" "}
           <span className="font-semibold tabular-nums text-brand">
-            ${r.rentPerUsf.toFixed(2)} per foot you can furnish
+            {usdCents(r.rentPerUsf)} per foot you can furnish
           </span>
           . That is the figure that compares two buildings, because a lower
           quote at a heavier load can be the more expensive space.
@@ -4512,10 +4505,7 @@ function OpexTranslator() {
 
       <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
         <Stat label="Per unit" value={usdExact(r.perUnit)} tone="brand" />
-        <Stat
-          label="Per SF"
-          value={r.perSf === null ? "—" : `$${r.perSf.toFixed(2)}`}
-        />
+        <Stat label="Per SF" value={usdCents(r.perSf)} />
         <Stat label="Expense ratio" value={pct(ratio, 1)} />
         <Stat label="NOI" value={usd(r.noi)} />
       </div>
@@ -6244,7 +6234,7 @@ function UnitMix() {
                 <Stat label="Avg SF" value={t.avgSf === null ? "—" : t.avgSf.toLocaleString("en-US")} tone="muted" />
                 <Stat
                   label="Rent / SF, in place"
-                  value={t.inPlacePerSf === null ? "—" : `$${t.inPlacePerSf.toFixed(2)}`}
+                  value={usdCents(t.inPlacePerSf)}
                   tone="muted"
                 />
                 <Stat label="GPR at market" value={usd(t.gprMarket)} tone="muted" />
@@ -6503,7 +6493,7 @@ function FeasibilityRent() {
                       <span
                         className={`font-mono tabular-nums ${row.brand ? "font-semibold text-brand" : "text-ink"}`}
                       >
-                        {row.value === null ? "—" : `$${row.value.toFixed(2)}`}
+                        {usdCents(row.value)}
                       </span>
                     </div>
                     <div className="mt-1 h-2 w-full overflow-hidden rounded-full bg-faint">
@@ -6518,7 +6508,7 @@ function FeasibilityRent() {
               </div>
 
               <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
-                <Stat label="Replacement cost" value={`$${(f.costPerSf ?? 0).toFixed(2)}`} tone="muted" />
+                <Stat label="Replacement cost" value={usdCents(f.costPerSf ?? 0)} tone="muted" />
                 <Stat
                   label="…of which land"
                   value={pct(f.landShareOfCostPct, 1)}
@@ -6538,15 +6528,27 @@ function FeasibilityRent() {
                 />
               </div>
 
-              {f.breakEvenHardCostPerSf !== null && (
+              {f.breakEvenHardCostPerSf !== null && f.breakEvenHardCostPerSf >= 0 && (
                 <p className="mt-4 text-sm text-muted">
                   The gap closes from either side. Today&apos;s rent already pencils at a hard cost
                   of{" "}
                   <span className="font-semibold text-ink">
-                    ${f.breakEvenHardCostPerSf.toFixed(2)}
+                    {usdCents(f.breakEvenHardCostPerSf)}
                   </span>{" "}
-                  a foot against the {`$${(num(hard) ?? 0).toFixed(2)}`} assumed — the cost side is
+                  a foot against the {usdCents(num(hard) ?? 0)} assumed — the cost side is
                   the one nobody models.
+                </p>
+              )}
+              {/* A negative break-even is the module's own finding, said as
+                  one: no hard cost pencils, not a cost below zero that does. */}
+              {f.breakEvenHardCostPerSf !== null && f.breakEvenHardCostPerSf < 0 && (
+                <p className="mt-4 text-sm text-muted">
+                  The gap does not close from the cost side: the break-even hard cost is{" "}
+                  <span className="font-semibold text-ink">
+                    {usdCents(f.breakEvenHardCostPerSf)}
+                  </span>{" "}
+                  a foot, so the land alone is dear enough that free construction would not make
+                  the site work at today&apos;s rent.
                 </p>
               )}
             </>
@@ -7022,7 +7024,7 @@ function Hotel() {
           <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Stat
               label="RevPAR"
-              value={h.revpar === null ? "\u2014" : `$${h.revpar.toFixed(2)}`}
+              value={usdCents(h.revpar)}
               tone="brand"
             />
             <Stat label="GOP margin" value={pct(h.gopMarginPct, 1)} />
@@ -7034,7 +7036,7 @@ function Hotel() {
             <div className="mt-5">
               <p className="text-xs uppercase tracking-wide text-muted">
                 The same RevPAR of{" "}
-                {h.revparAfterLift === null ? "\u2014" : `$${h.revparAfterLift.toFixed(2)}`}, reached
+                {usdCents(h.revparAfterLift)}, reached
                 two ways
               </p>
               <div className="mt-2 space-y-2">
@@ -7062,9 +7064,12 @@ function Hotel() {
                 ))}
               </div>
               <p className="mt-2 text-xs text-muted">
-                {usd(h.leverGap)} a year apart, {usd(h.leverGapValue)} of value at the stated cap.
+                {/* "Apart" is a size: the gap is signed rate less occupancy, and
+                    the bars above already say which way it runs. */}
+                {usd(h.leverGap === null ? null : Math.abs(h.leverGap))} a year apart,{" "}
+                {usd(h.leverGapValue)} of value at the stated cap.
                 Occupancy overtakes rate once ancillary spend passes{" "}
-                {h.leverCrossingPerRoom === null ? "\u2014" : `$${h.leverCrossingPerRoom.toFixed(2)}`} an
+                {usdCents(h.leverCrossingPerRoom)} an
                 occupied room — the variable cost plus what
                 the management fee and the reserve take out of it.
               </p>

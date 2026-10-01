@@ -129,4 +129,22 @@ describe("no /tools module writes a dollar of its own", () => {
       `write these through lib/tools/format (usd, usdExact, usdCents):\n${report.join("\n")}`,
     ).toEqual([]);
   });
+
+  it("and the page's own cards, whose tiles and sentences sit beside the modules' notes", () => {
+    // Twenty-three figures on the page were written by hand, among them a
+    // negative break-even hard cost printed "$-12.34" and a negative land
+    // residual a foot printed the same way.
+    const dir = join(process.cwd(), "app/tools");
+    const files = readdirSync(dir).filter((f) => /\.tsx?$/.test(f));
+    expect(files).toContain("deal-math-tools.tsx");
+    const report = files.flatMap((f) =>
+      handWrittenDollars(f, readFileSync(join(dir, f), "utf8")).map(
+        (h) => `app/tools/${f}:${h.line}: ${h.text}`,
+      ),
+    );
+    expect(
+      report,
+      `write these through lib/tools/format (usd, usdExact, usdCents):\n${report.join("\n")}`,
+    ).toEqual([]);
+  });
 });
