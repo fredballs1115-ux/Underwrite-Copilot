@@ -104,7 +104,10 @@ describe("a deal's cover (#442)", () => {
         }
       }
     }
-  });
+    // Every kind under every sky drawn through sharp: about 1.4 s alone, and
+    // past the default 5 s on a machine running the whole suite beside
+    // other work, where it timed out rather than failed.
+  }, 30_000);
 
   it("names the place from the address, then the market, then the memorandum's words", () => {
     expect(coverPlace({ city: "Waco", state: "TX" }, "Dallas-Fort Worth TX", "Central Texas")).toBe("Waco, TX");
