@@ -37,7 +37,15 @@ export interface AssumptionWarning {
   message: string;
   /** where the comparison figure came from — no orphan numbers */
   basis: string;
+  /** the gap itself, compactly ("4.0% vs 2.94% CAGR") — what an override is
+   *  written against, and kept with it */
+  figure: string;
+  /** the override that stands: one written against this same figure (or
+   *  one recorded before figures were kept) */
   dismissed: Dismissal | null;
+  /** an override written against a DIFFERENT figure: the gap has moved
+   *  since, so it no longer stands, and the card says what it was */
+  staleOverride: Dismissal | null;
 }
 
 const pct = (v: number, dp = 1) => `${(v * 100).toFixed(dp)}%`;
@@ -98,8 +106,15 @@ export function assumptionWarnings(
 ): AssumptionWarning[] {
   const byCode = new Map(dismissals.map((d) => [d.code, d]));
   const out: AssumptionWarning[] = [];
-  const push = (w: Omit<AssumptionWarning, "dismissed">) =>
-    out.push({ ...w, dismissed: byCode.get(w.code) ?? null });
+  // An override is keyed to the gap it was written against as well as the
+  // check: a reason given for 4.0% growth against a 2.9% trend is not a
+  // reason for 6.0% against it. One recorded before the figure was kept
+  // stands as it did.
+  const push = (w: Omit<AssumptionWarning, "dismissed" | "staleOverride">) => {
+    const d = byCode.get(w.code) ?? null;
+    const stands = d != null && (d.figure == null || d.figure === w.figure);
+    out.push({ ...w, dismissed: stands ? d : null, staleOverride: d && !stands ? d : null });
+  };
 
   // A plan deal (conversion, development, lease-up, value-add) is not a
   // bystander to the construction pipeline — it IS part of it. Its lease-up
@@ -127,8 +142,13 @@ export function assumptionWarnings(
         }`,
         metrics.unverified.cagr,
       ),
+      figure: `${pct(inputs.rentGrowthPct, 2)} vs ${pct(rent.cagr, 2)} CAGR, ${rent.cagrFrom} to ${rent.cagrTo}`,
     });
   }
+
+  // The exit cap against the going-in cap, as an override is written
+  // against it: plain words, no symbols a printed memo cannot set.
+  const exitFigure = `exit ${pct(inputs.exitCapPct, 2)}${goingIn ? ` vs ${goingIn.pct.toFixed(2)}% going-in` : ""}`;
 
   // ── Months of supply vs the exit cap against the going-in cap ───────────
   const threshold = submarket.supplyWarningMonths;
@@ -158,6 +178,9 @@ export function assumptionWarnings(
         `${trailingYearBasis(metrics.absorption)}: ${metrics.absorption.periods.join(", ")}${goingInBasis}`,
         metrics.unverified.supply,
       ),
+      figure: `${Math.round(metrics.supply.ucSf).toLocaleString("en-US")} SF UC vs ${Math.round(
+        metrics.supply.t12Absorption,
+      ).toLocaleString("en-US")} SF trailing-year absorption; ${exitFigure}`,
     });
   } else if (metrics.supply.status === "ok" && metrics.supply.months > threshold) {
     push({
@@ -176,6 +199,7 @@ export function assumptionWarnings(
         ).toLocaleString("en-US")} SF/mo absorption (${trailingYearBasis(metrics.absorption)})${goingInBasis}`,
         metrics.unverified.supply,
       ),
+      figure: `${metrics.supply.months.toFixed(0)} months of supply vs a ${threshold}-month threshold; ${exitFigure}`,
     });
   }
 
@@ -190,6 +214,7 @@ export function assumptionWarnings(
         submarket.name
       } has never been tighter than ${pct(trough.value)} in the data you've loaded.`,
       basis: marked(`trough was ${trough.period}`, metrics.unverified.trough),
+      figure: `${pct(inputs.vacancyPct, 2)} vs a ${pct(trough.value, 2)} trough, ${trough.period}`,
     });
   }
 
@@ -201,6 +226,9 @@ export function assumptionWarnings(
       title: "Pipeline doesn't tie",
       message: metrics.reconciliation.message,
       basis: marked(`latest period ${metrics.latest?.period ?? "—"}`, metrics.unverified.latest),
+      figure: `grid ${Math.round(metrics.reconciliation.gridSf).toLocaleString("en-US")} SF vs list ${Math.round(
+        metrics.reconciliation.listSf,
+      ).toLocaleString("en-US")} SF, ${metrics.latest?.period ?? "no period"}`,
     });
   }
 
@@ -211,6 +239,7 @@ export function assumptionWarnings(
       title: "Rent series changes basis",
       message: metrics.rent.basisFlag!,
       basis: `${metrics.periodsCovered} periods loaded`,
+      figure: metrics.rent.segments.map((s) => `${s.basisLabel} from ${s.points[0]?.period ?? "?"}`).join("; "),
     });
   }
 
@@ -224,6 +253,7 @@ export function assumptionWarnings(
         stale.length === 1 ? "" : "s"
       } (${stale.map((d) => d.quarter).join(", ")}) contain buildings flagged as stale — round-number placeholders, or a delivery date that has passed with the status unchanged.`,
       basis: "property-level pipeline",
+      figure: `stale in ${stale.map((d) => d.quarter).join(", ")}`,
     });
   }
 
@@ -231,8 +261,9 @@ export function assumptionWarnings(
 }
 
 /** The lines that go into the deal memo: what was flagged, and why the analyst
- *  overrode it. An override with no reason never gets here, because the form
- *  requires one. */
+ *  overrode it — only an override that still stands (one written against
+ *  the figure the warning states now). An override with no reason never gets
+ *  here, because the form requires one. */
 export function memoLinesFor(warnings: AssumptionWarning[]): string[] {
   return warnings
     .filter((w) => w.dismissed)

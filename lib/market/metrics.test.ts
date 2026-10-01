@@ -36,7 +36,13 @@ import {
   PIPELINE_FIELDS,
 } from "./import";
 import { parseCsv } from "@/lib/rentroll/parse";
-import { EMPTY_RULES, type PipelineProperty, type Submarket, type SubmarketPeriod } from "./types";
+import {
+  EMPTY_RULES,
+  parseDismissals,
+  type PipelineProperty,
+  type Submarket,
+  type SubmarketPeriod,
+} from "./types";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 
 // ---------------------------------------------------------------------------
@@ -651,13 +657,61 @@ describe("assumptionWarnings", () => {
         reason: "Signed LOI at $11.00 with the anchor; trend lags the last two deals.",
         by: "analyst@example.com",
         at: "2026-01-15T00:00:00Z",
+        // recorded before the figure was kept: it stands as it did
+        figure: null,
       },
     ]);
     const w = dismissed.find((x) => x.code === "rent_growth_above_trend")!;
     expect(w.dismissed).not.toBeNull();
+    expect(w.staleOverride).toBeNull();
     const memo = memoLinesFor(dismissed);
     expect(memo).toHaveLength(1);
     expect(memo[0]).toContain("overridden: Signed LOI");
+  });
+
+  it("keys an override to the gap it was written against, not the check alone", () => {
+    const live = assumptionWarnings(INPUTS, metrics, SUBMARKET).find((x) => x.code === "rent_growth_above_trend")!;
+    expect(live.figure).toMatch(/^4\.00% vs \d+\.\d\d% CAGR, 2025-03-31 to 2025-12-31$/);
+    const override = {
+      code: "rent_growth_above_trend",
+      reason: "Signed LOI at $11.00 with the anchor.",
+      by: "analyst@example.com",
+      at: "2026-01-15T00:00:00Z",
+      figure: live.figure,
+    };
+    // The same gap: the override stands, and goes in the memo.
+    const same = assumptionWarnings(INPUTS, metrics, SUBMARKET, [override]);
+    expect(same.find((x) => x.code === "rent_growth_above_trend")!.dismissed?.reason).toBe(override.reason);
+    expect(memoLinesFor(same)).toHaveLength(1);
+    // The gap moved — 6% growth now, not 4% — so a reason given for the old
+    // one no longer stands: the warning is live again, the old override is
+    // shown as written against another figure, and the memo carries none.
+    const moved = assumptionWarnings({ ...INPUTS, rentGrowthPct: 0.06 } as UnderwriteInputs, metrics, SUBMARKET, [override]);
+    const w = moved.find((x) => x.code === "rent_growth_above_trend")!;
+    expect(w.dismissed).toBeNull();
+    expect(w.staleOverride?.figure).toBe(live.figure);
+    expect(w.figure).not.toBe(live.figure);
+    expect(memoLinesFor(moved)).toEqual([]);
+  });
+
+  it("reads the figure an override was stored with, and none from an older row", () => {
+    expect(parseDismissals([{ code: "c", reason: "r", by: "b", at: "a", figure: "4.00% vs 2.94% CAGR" }])[0].figure).toBe(
+      "4.00% vs 2.94% CAGR",
+    );
+    expect(parseDismissals([{ code: "c", reason: "r", by: "b", at: "a" }])[0].figure).toBeNull();
+  });
+
+  it("writes every figure in plain words a printed memo can set — no arrows", () => {
+    const heavy = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
+      applyExclusionRules(PIPELINE, EMPTY_RULES, AS_OF).properties,
+    );
+    const all = assumptionWarnings(INPUTS, heavy, SUBMARKET, [], "stabilized", { pct: 6, source: "stated" });
+    expect(all.length).toBeGreaterThan(1);
+    for (const w of all) {
+      expect(w.figure.length, w.code).toBeGreaterThan(0);
+      expect(w.figure, w.code).not.toMatch(/[→←÷−]/);
+    }
   });
 });
 
