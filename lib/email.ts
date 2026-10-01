@@ -1,6 +1,9 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { screenStoppedEmail, analysisReadyEmail } from "@/lib/email-template";
+import { escapeHtml, screenStoppedEmail, analysisReadyEmail } from "@/lib/email-template";
+import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE, needsOperator } from "@/lib/anthropic/operator-failures";
+import { operatorEmails } from "@/lib/operator";
+import { screenedOn, verdictBehind } from "@/lib/screen-run";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
@@ -219,8 +222,10 @@ export async function notifyAnalysisReady(
  * A screen that stopped before its verdict (pass 14, 2026-10-01): the deal
  * page's own failure sentence, to whoever asked for the run
  * (`screenEmailRecipient`), under the same switch as the screen-complete
- * email. Never for the sample, never when email is paused, never a reason
- * anything else fails.
+ * email — and, on a re-screen, the call the deal still shows, with its day.
+ * Where the failure is the operator's to fix (`needsOperator`), the
+ * operators are told too (`alertOperators`). Never for the sample, never
+ * when email is paused, never a reason anything else fails.
  */
 export async function notifyAnalysisFailed(
   admin: SupabaseClient,
@@ -229,10 +234,11 @@ export async function notifyAnalysisFailed(
   opts: ScreenEmailOptions = {},
 ): Promise<void> {
   if (!emailEnabled() || !message.trim()) return;
+  if (needsOperator(message)) await alertOperators(message);
   try {
     const { data: deal } = await admin
       .from("deals")
-      .select("name, user_id, team_id, is_sample")
+      .select("name, user_id, team_id, is_sample, verdict")
       .eq("id", dealId)
       .maybeSingle();
     if (!deal || deal.is_sample) return;
@@ -242,15 +248,24 @@ export async function notifyAnalysisFailed(
       opts.requestedBy,
     );
     if (!to) return;
+    const job = await latestJob(admin, dealId);
+    // The call the deal still shows is the previous screen's only where the
+    // run's job row says the run never reached its verdict (lib/screen-run,
+    // the deal page's own read); an unread job row says nothing about it.
+    const stored = deal.verdict as VerdictResult | null;
+    const previous =
+      stored?.verdict && verdictBehind(job) === "failed"
+        ? (VERDICT_EMAIL[stored.verdict] ?? { label: "Screened", color: "#114e54" })
+        : null;
     const { subject, html, text } = screenStoppedEmail({
       dealName: (deal.name as string) ?? "Your deal",
       message,
       dealUrl: `${appUrl()}/deals/${dealId}`,
       settingsUrl: `${appUrl()}/account`,
+      previousCall: previous ? { ...previous, on: screenedOn(stored?.generatedAt) } : null,
     });
     // The occasion is the run: its job row's created_at, restamped by every
     // claim (lib/jobs), so a run's one failure is one email.
-    const job = await latestJob(admin, dealId);
     await sendEmail(to, subject, html, text, {
       idempotencyKey: occasionKey("screen-stopped", dealId, job?.created_at),
     });
@@ -259,6 +274,51 @@ export async function notifyAnalysisFailed(
       `[email] screen-stopped notification failed for ${dealId}:`,
       err instanceof Error ? err.message : err,
     );
+  }
+}
+
+/** The operator alert's subject and kind, by the failure it is about. */
+const OPERATOR_ALERT: Record<string, { kind: string; subject: string }> = {
+  [CREDENTIALS_FAILURE]: {
+    kind: "credentials",
+    subject: "Screens are stopping: the analysis service refuses our credentials",
+  },
+  [ACCOUNT_PAUSED_FAILURE]: {
+    kind: "account-paused",
+    subject: "Screens are stopping: the analysis service paused our account",
+  },
+};
+
+/**
+ * A failure that is the operator's to fix (lib/anthropic/operator-failures
+ * `needsOperator`: the analysis service refusing our credentials, or pausing
+ * our account) stops every screen the same way until someone acts, and the
+ * person who asked can do nothing about it — so the operators named in
+ * OPERATOR_EMAILS (lib/operator, the setting /data-health already reads)
+ * are told, whatever any customer's switch says. At most once an hour for
+ * one kind of failure: the idempotency key names the hour, and the body
+ * names no deal (the server log does), so a second send inside the hour is
+ * the same email. Unset names nobody, and nothing is sent. Never throws.
+ */
+export async function alertOperators(message: string, now: number = Date.now()): Promise<boolean> {
+  const alert = OPERATOR_ALERT[message.trim()];
+  const to = [...operatorEmails(process.env.OPERATOR_EMAILS)];
+  if (!alert || to.length === 0) return false;
+  const hour = new Date(now).toISOString().slice(0, 13);
+  const text = [
+    message.trim(),
+    ``,
+    `Every screen stops this way until it is fixed. Each deal's page shows the sentence above and offers no retry.`,
+    `The server log names each deal it stopped ("[pipeline] screen failed for deal …") with the service's own response.`,
+    ``,
+    `Sent at most once an hour (this one for the hour from ${hour}:00 UTC).`,
+  ].join("\n");
+  try {
+    return await sendEmail(to, alert.subject, `<p style="font-family:sans-serif;font-size:14px;line-height:1.5;white-space:pre-line;">${escapeHtml(text)}</p>`, text, {
+      idempotencyKey: occasionKey("operator-alert", alert.kind, hour),
+    });
+  } catch {
+    return false;
   }
 }
 

@@ -134,6 +134,12 @@ services:
       #   sync: false
       # - key: RESEND_REPLY_TO
       #   sync: false
+      # Optional: the operators emailed when screens stop for a reason only
+      # they can fix (the analysis service refusing our credentials, or
+      # pausing our account) — the same list as the web service's. In worker
+      # mode the screens run here, so the alert is sent from here.
+      # - key: OPERATOR_EMAILS
+      #   sync: false
 
   # ── The four crons below all have FREE GitHub Actions twins ────────────────
   # .github/workflows/{intel,rates,fmr,steward}.yml run the identical scripts

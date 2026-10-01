@@ -4,6 +4,7 @@ import {
   analysisReadyEmail,
   bannerAlt,
   previewLine,
+  previousCallLine,
   screenStoppedEmail,
   weeklyDigestEmail,
   type DigestInput,
@@ -222,6 +223,25 @@ describe("a screen that stopped says so by email (pass 14, 2026-10-01)", () => {
     dealUrl: "https://app.example/deals/d1",
     settingsUrl: "https://app.example/account",
   };
+
+  it("on a re-screen, says the previous call still stands, with its day", () => {
+    const { html, text } = screenStoppedEmail({ ...input, previousCall: { label: "Go", color: "#1b7a5e", on: "Sep 12, 2026" } });
+    expect(text).toContain("The previous call still stands: Go, screened Sep 12, 2026. It stays on the deal until a screen finishes.");
+    // The pill, then the sentence beside it — the call said once in the card.
+    expect(html).toMatch(/background-color:#1b7a5e;[^"]*">Go<\/span>/);
+    expect(html).toContain("The previous call still stands, screened Sep 12, 2026. It stays on the deal until a screen finishes.");
+    // And in the inbox's preview, after why it stopped.
+    expect(/<div style="display:none;[^"]*">([^<]*)<\/div>/.exec(html)![1]).toMatch(/^The analysis service is overloaded.*The previous call still stands: Go/);
+    // A call saved before the pipeline dated one is said without a day.
+    expect(screenStoppedEmail({ ...input, previousCall: { label: "No-go", color: "#b23a30", on: null } }).text).toContain(
+      "The previous call still stands: No-go. It stays",
+    );
+    expect(previousCallLine({ label: "Caution", on: "Oct 1, 2026" })).toBe(
+      "The previous call still stands: Caution, screened Oct 1, 2026. It stays on the deal until a screen finishes.",
+    );
+    // A first screen has no call to stand.
+    expect(screenStoppedEmail(input).text).not.toContain("still stands");
+  });
 
   it("names the deal, says the deal page's own sentence and links back", () => {
     const { subject, html, text } = screenStoppedEmail(input);

@@ -62,8 +62,11 @@ const DIGEST_DOW = int0(process.env.WORKER_DIGEST_DOW, 1);
 const DIGEST_HOUR_UTC = int0(process.env.WORKER_DIGEST_HOUR_UTC, 13);
 const DIGEST_CHECK_MS = int(process.env.WORKER_DIGEST_CHECK_MS, 15 * 60_000);
 
+// Said to the analyst on the deal page and in the stopped-screen email, so
+// in plain words: what happened, and the deal page's own button.
 const INTERRUPTED_MSG =
-  "The screen was interrupted repeatedly (worker restarts) and stopped retrying — hit “Try again” to run it fresh.";
+  `The screen was interrupted ${MAX_ATTEMPTS} time${MAX_ATTEMPTS === 1 ? "" : "s"} while our servers restarted, ` +
+  "so it stopped trying on its own. Choose “Try again” on the deal page to run it fresh.";
 
 function int(v: string | undefined, fallback: number): number {
   const n = Number(v);

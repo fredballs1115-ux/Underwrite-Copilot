@@ -194,6 +194,15 @@ export interface ScreenStoppedEmailInput {
   message: string;
   dealUrl: string;
   settingsUrl: string;
+  /** on a re-screen, the call the deal still shows — the previous screen's
+   *  (lib/screen-run `verdictBehind` "failed") — and the day it was made
+   *  (`screenedOn`, null for a call saved before the pipeline dated one) */
+  previousCall?: { label: string; color: string; on: string | null } | null;
+}
+
+/** The sentence a stopped re-screen says about the call that stands. */
+export function previousCallLine(call: { label: string; on: string | null }): string {
+  return `The previous call still stands: ${call.label}${call.on ? `, screened ${call.on}` : ""}. It stays on the deal until a screen finishes.`;
 }
 
 /**
@@ -209,25 +218,43 @@ export function screenStoppedEmail(input: ScreenStoppedEmailInput): {
   text: string;
 } {
   const subject = `${input.dealName} — the screen stopped`;
+  const stands = input.previousCall ? previousCallLine(input.previousCall) : null;
   const text = [
     `${input.dealName} — the screen stopped before its verdict.`,
     ``,
     input.message,
+    stands ? `` : null,
+    stands,
     ``,
     `Open the deal: ${input.dealUrl}`,
     ``,
     `You're getting this because analysis emails are on. Turn them off on your Account page: ${input.settingsUrl}`,
-  ].join("\n");
+  ]
+    .filter((l): l is string => l !== null)
+    .join("\n");
+  // The call that stands, drawn as the pill the screen-complete email drew,
+  // the sentence beside it (the plain text says the call in words).
+  const standing = input.previousCall
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+              <tr>
+                <td style="padding-right:10px;vertical-align:top;">
+                  <span style="display:inline-block;background-color:${esc(input.previousCall.color)};color:#ffffff;border-radius:999px;padding:3px 12px;font-size:12px;font-weight:600;">${esc(input.previousCall.label)}</span>
+                </td>
+                <td style="font-size:13px;line-height:1.5;color:#5f6b69;vertical-align:top;">The previous call still stands${input.previousCall.on ? `, screened ${esc(input.previousCall.on)}` : ""}. It stays on the deal until a screen finishes.</td>
+              </tr>
+            </table>`
+    : "";
   const html = emailDocument({
     title: subject,
-    // Why it stopped, first.
-    preheader: input.message,
+    // Why it stopped, first; then the call that stands.
+    preheader: [input.message, stands].filter(Boolean).join(" "),
     rows: `
         <tr>
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#a8432f;">The screen stopped</p>
             <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${esc(input.dealName)}</h1>
             <p style="margin:16px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(input.message)}</p>
+            ${standing}
             ${button(input.dealUrl, "Open the deal")}
           </td>
         </tr>${footerRow(

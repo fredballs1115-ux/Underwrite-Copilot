@@ -24,8 +24,10 @@ vi.mock("@/lib/deal-picture", () => ({
 }));
 vi.mock("@/lib/criteria-server", () => ({ getBuyBoxForDeal: async () => null }));
 
+import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE } from "./anthropic/operator-failures";
 import {
   EMAIL_PICTURE_WAIT_MS,
+  alertOperators,
   emailPicture,
   emailSetup,
   notifyAnalysisFailed,
@@ -385,6 +387,102 @@ describe("the analysis emails go only where the reader has not said no", () => {
     // Both notifiers find the recipient, and read their switch, through the one reader.
     expect(email.match(/await screenEmailAddress\(/g)).toHaveLength(2);
     expect(email.match(/await wantsAnalysisEmail\(admin, recipient\)/g)).toHaveLength(1);
+  });
+});
+
+// The stopped-screen email: on a re-screen the call that still stands, and
+// for a failure only the operator can fix, a word to the operators too.
+describe("a stopped screen's email says what stands, and tells the operators what is theirs", () => {
+  const sends: { to: string[]; subject: string; text: string; key: string | undefined }[] = [];
+  const saved: Record<string, string | undefined> = {};
+  beforeEach(() => {
+    sends.length = 0;
+    saved.OPERATOR_EMAILS = process.env.OPERATOR_EMAILS;
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_FROM = "Underwrite Copilot <notify@underwrite.example>";
+    process.env.RESEND_BASE_URL = "https://resend.test";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { body: string; headers: Record<string, string> }) => {
+        const body = JSON.parse(init.body);
+        sends.push({ to: body.to, subject: body.subject, text: body.text, key: init.headers["Idempotency-Key"] });
+        return new Response("{}", { status: 200 });
+      }),
+    );
+  });
+  afterEach(() => {
+    if (saved.OPERATOR_EMAILS === undefined) delete process.env.OPERATOR_EMAILS;
+    else process.env.OPERATOR_EMAILS = saved.OPERATOR_EMAILS;
+  });
+
+  const admin = (verdict: unknown, job: unknown, analysisSwitch = true) =>
+    ({
+      from: (table: string) => {
+        const q = {
+          select: () => q,
+          eq: () => q,
+          order: () => q,
+          limit: () => q,
+          maybeSingle: async () => ({
+            data:
+              table === "deals"
+                ? { name: "The Maddox", user_id: "u1", team_id: null, is_sample: false, verdict }
+                : table === "analysis_jobs"
+                  ? job
+                  : { email_on_analysis: analysisSwitch },
+            error: null,
+          }),
+        };
+        return q;
+      },
+      auth: { admin: { getUserById: async () => ({ data: { user: { email: "buyer@example.com" } } }) } },
+    }) as unknown as SupabaseClient;
+  const CALL = { verdict: "pass", reason: "", generatedAt: "2026-09-12T15:00:00Z" };
+  const FAILED_RUN = { status: "error", step: "comps", created_at: "2026-10-05T12:00:00Z" };
+
+  it("says the previous call still stands where the run never reached its verdict", async () => {
+    await notifyAnalysisFailed(admin(CALL, FAILED_RUN), DEAL, "The analysis service is overloaded right now.");
+    expect(sends[0].text).toContain("The previous call still stands: Go, screened Sep 12, 2026.");
+    // A first screen has no call; an unread job row says nothing of one.
+    await notifyAnalysisFailed(admin(null, FAILED_RUN), DEAL, "Stopped.");
+    await notifyAnalysisFailed(admin(CALL, null), DEAL, "Stopped.");
+    expect(sends.slice(1).map((s) => s.text.includes("still stands"))).toEqual([false, false]);
+  });
+
+  it("tells the operators named in OPERATOR_EMAILS of a failure only they can fix, at most once an hour, whatever the customer's switch", async () => {
+    process.env.OPERATOR_EMAILS = "Ops@Underwrite.example; second@underwrite.example";
+    const now = Date.parse("2026-10-05T13:42:00Z");
+    expect(await alertOperators(CREDENTIALS_FAILURE, now)).toBe(true);
+    expect(sends[0].to).toEqual(["ops@underwrite.example", "second@underwrite.example"]);
+    expect(sends[0].subject).toBe("Screens are stopping: the analysis service refuses our credentials");
+    expect(sends[0].key).toBe("operator-alert/credentials/2026-10-05T13");
+    expect(sends[0].text).toContain(CREDENTIALS_FAILURE);
+    // The body names no deal: a second send inside the hour is the same email.
+    expect(sends[0].text).not.toContain(DEAL);
+
+    // Through the stopped-screen email, with the customer's own switch off.
+    sends.length = 0;
+    await notifyAnalysisFailed(admin(CALL, FAILED_RUN, false), DEAL, ACCOUNT_PAUSED_FAILURE);
+    expect(sends.map((s) => s.to)).toEqual([["ops@underwrite.example", "second@underwrite.example"]]);
+    expect(sends[0].key).toMatch(/^operator-alert\/account-paused\/\d{4}-\d{2}-\d{2}T\d{2}$/);
+  });
+
+  it("alerts nobody for an ordinary failure, or where no operator is named", async () => {
+    process.env.OPERATOR_EMAILS = "ops@underwrite.example";
+    expect(await alertOperators("The analysis service is overloaded right now — try again in a few minutes.")).toBe(false);
+    delete process.env.OPERATOR_EMAILS;
+    expect(await alertOperators(CREDENTIALS_FAILURE)).toBe(false);
+    await notifyAnalysisFailed(admin(CALL, FAILED_RUN), DEAL, CREDENTIALS_FAILURE);
+    // Only the customer's email.
+    expect(sends.map((s) => s.to)).toEqual([["buyer@example.com"]]);
+  });
+
+  it("says a worker that gave up in plain words, with the deal page's own button", () => {
+    const src = readFileSync(join(process.cwd(), "worker/index.ts"), "utf8");
+    const msg = /const INTERRUPTED_MSG =([\s\S]*?);\n/.exec(src)![1];
+    expect(msg).not.toMatch(/worker|hit /);
+    expect(msg).toContain("while our servers restarted");
+    expect(msg).toContain("Choose “Try again” on the deal page");
   });
 });
 
