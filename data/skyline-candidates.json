@@ -4518,6 +4518,12 @@
         "Waterbury Connecticut skyline",
         "Waterbury Connecticut downtown",
         "Waterbury Union Station clock tower"
+      ],
+      "candidates": [
+        {
+          "file": "Waterbury, Connecticut 3.jpg",
+          "note": "Waterbury-Shelton, CT — Hayden Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816098960)."
+        }
       ]
     },
     {
@@ -4539,6 +4545,12 @@
         "Mystic Connecticut drawbridge",
         "New London Connecticut waterfront",
         "Mystic Connecticut harbor"
+      ],
+      "candidates": [
+        {
+          "file": "Norwich, Connecticut 2.jpg",
+          "note": "Norwich-New London-Willimantic, CT — Hayden Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816098960)."
+        }
       ]
     },
     {
@@ -4579,6 +4591,12 @@
         "Erie Pennsylvania skyline",
         "Erie Pennsylvania bayfront",
         "Presque Isle Bay Erie"
+      ],
+      "candidates": [
+        {
+          "file": "Presque Isle Pennsylvania aerial view.jpg",
+          "note": "Erie, PA — Ken Winters, U.S. Army Corps of Engineers, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36816098960)."
+        }
       ]
     },
     {
@@ -4640,6 +4658,12 @@
         "Canton Ohio skyline",
         "Canton Ohio downtown",
         "Canton Ohio Market Avenue"
+      ],
+      "candidates": [
+        {
+          "file": "Pro Football Hall of Fame (23945852607).jpg",
+          "note": "Canton-Massillon, OH — Erik Drost, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
       ]
     },
     {
@@ -4659,6 +4683,12 @@
         "Flint Michigan downtown",
         "Flint Michigan Vehicle City arch",
         "Flint Michigan skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Flint, Michigan.jpg",
+          "note": "Flint, MI — WMrapids, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
       ]
     },
     {
@@ -4698,6 +4728,12 @@
         "Sioux Falls Falls Park",
         "Sioux Falls skyline",
         "Sioux Falls downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Falls Park and Downtown 09-17-23.jpg",
+          "note": "Sioux Falls, SD — Maxpower2727, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
       ]
     },
     {
@@ -4718,6 +4754,12 @@
         "Fargo North Dakota skyline",
         "Fargo downtown Broadway",
         "Fargo Moorhead Red River"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Fargo District 01.jpg",
+          "note": "Fargo, ND — P. Hughes, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
       ]
     },
     {
@@ -4737,6 +4779,12 @@
         "Cedar Rapids Iowa skyline",
         "Cedar Rapids downtown Cedar River",
         "Cedar Rapids Iowa"
+      ],
+      "candidates": [
+        {
+          "file": "Cedar Rapids Skyline (2022).jpg",
+          "note": "Cedar Rapids, IA — WeaponizingArchitecture, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816207134)."
+        }
       ]
     },
     {

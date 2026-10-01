@@ -704,6 +704,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Buffalo, NY",
     size: [4032, 2268],
   },
+  // Canton-Massillon, OH: skyline-sheet run 36816207134 — the Pro Football Hall of Fame, an article's lead and the landmark the place is known by, its dome and bronze relief under a clear sky, whole on the card and at 16:9; the 21:9 crop sets the dome's cap against its top edge. Over downtown's skyline across warehouse roofs under a blue sky, downtown behind autumn leaves across a parking lot, City Hall's tower behind a signal pole and over a wall, a soft winter strip 513px tall, a 1909 plate of the fire station and a night postcard of the square.
+  "cbsa:15940": {
+    file: "Pro Football Hall of Fame (23945852607).jpg",
+    place: "The Pro Football Hall of Fame, its white dome and bronze relief, under a clear sky",
+    credit: "Erik Drost",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Canton-Massillon, OH",
+    size: [6000, 4011],
+  },
   // Fort Myers, FL: skyline-sheet run 36781668552 — a widened run's pick of twenty-one (Cape Coral and the Caloosahatchee searched beside Fort Myers), over the two downtown buildings the first runs found.
   "cbsa:15980": {
     file: "Caloosahatchee River sunset from Ford estate Ft Myers (15510875243).jpg",
@@ -713,6 +723,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     name: "Fort Myers, FL",
     size: [5805, 3870],
+  },
+  // Cedar Rapids, IA: skyline-sheet run 36816207134 — downtown across the river under a grey sky, from the city's article, every tower whole in both crops, the water along the foot. Over the same skyline at night under a rising moon, whose card goes black above the towers and below the water, brick fronts from the pavement with a skywalk, a bridge's underside over a gravel bar and a highway bridge behind a railing.
+  "cbsa:16300": {
+    file: "Cedar Rapids Skyline (2022).jpg",
+    place: "Downtown Cedar Rapids across the river under a grey sky",
+    credit: "WeaponizingArchitecture",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Cedar Rapids, IA",
+    size: [3855, 1554],
   },
   // Charleston, SC: skyline-sheet run 36751130861 — the picture the city is known by; the credit is the name the runner printed, without the talk-page link printed after it.
   "cbsa:16700": {
@@ -834,6 +854,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "El Paso, TX",
     size: [3159, 1751],
   },
+  // Erie, PA: skyline-sheet run 36816098960 — Presque Isle and its bay from the air in autumn, the city along the shore, an article's lead, an oblique with cloud and a horizon, whole in both crops; a 1500px slide scan, served at its own width as Belton's is. Over the downtown bayfront from the tower's deck, whose card is the pier's parking lot and its cars, its PNG original, downtown a sliver across the bay twice, a wooded creek, and Corry's painted wall behind a rail-crossing signal under an orange filter.
+  "cbsa:21500": {
+    file: "Presque Isle Pennsylvania aerial view.jpg",
+    place: "Presque Isle curving round its bay into Lake Erie, the city along the shore, from the air in autumn",
+    credit: "Ken Winters, U.S. Army Corps of Engineers",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Erie, PA",
+    size: [1500, 1052],
+  },
   // Eugene-Springfield, OR: skyline-sheet run 36799416970 — the city among its evergreens from Skinner Butte under a clear sky, Spencer Butte behind, whole in both crops, over the same view under white and grey skies at 614 and 584px tall, Autzen Stadium from a drone and on a game day, a warehouse's signs over a parking lot, a park path and a 1908 print.
   "cbsa:21660": {
     file: "Eugene Oregon from Skinner Butte.JPG",
@@ -854,6 +884,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Evansville, IN",
     size: [2200, 1020],
   },
+  // Fargo, ND: skyline-sheet run 36816207134 — downtown's historic storefronts in sun under a deep blue sky, every cornice and the pediment whole in both crops, the parked cars at the kerb under the card's words. Over an aerial whose deal-page crops lose the horizon and read as rooftops, an archive frame of passengers before a train, a street corner of signals and signs under a white sky, and two brick warehouses with water towers under a white sky.
+  "cbsa:22020": {
+    file: "Downtown Fargo District 01.jpg",
+    place: "Downtown Fargo's historic brick and stone storefronts under a deep blue sky",
+    credit: "P. Hughes",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Fargo, ND",
+    size: [6048, 4024],
+  },
   // Fayetteville, NC: skyline-sheet run 36798176732 — downtown's church spires and tree-lined street from above in clear daylight, every spire whole in both crops, over the Market House down Hay Street on a grey winter day through a heavy phone filter. The runner printed the author as "Public domain, City of Fayetteville"; the credit is the name in it.
   "cbsa:22180": {
     file: "Fayetteville, NC Downtown Skyline.jpg",
@@ -873,6 +913,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Fayetteville, AR",
     size: [4000, 3000],
+  },
+  // Flint, MI: skyline-sheet run 36816207134 — the city article's lead, downtown from above the river with the Vehicle City arch at its foot under cumulus, an oblique with a horizon, every tower whole in both crops. Over the tower with the globe and its neighbours, backlit over parked SUVs, downtown at dusk under heavy cloud across a plaza, the towers across the river 750px tall and soft, a dusk strip 375px tall with a seam in its sky, a road bridge with a van and a truck, and a White House photograph of President Obama sipping filtered water.
+  "cbsa:22420": {
+    file: "Flint, Michigan.jpg",
+    place: "Downtown Flint from above the river, its Vehicle City arch over the street, under cumulus",
+    credit: "WMrapids",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Flint, MI",
+    size: [3989, 2244],
   },
   // Fort Wayne, IN: skyline-sheet run 36787230817 — its tallest towers and a domed clock tower whole in both crops under a clear sky, over the same skyline smaller behind Promenade Park.
   "cbsa:23060": {
@@ -1204,6 +1254,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Sarasota, FL",
     size: [4032, 3024],
   },
+  // Norwich-New London-Willimantic, CT: skyline-sheet run 36816098960 — an article's lead, Norwich's harbour, downtown and the hills from the air in low sun, an oblique with a horizon, whole in both crops; the card names the metro area, Norwich its first-named city. Over New London's waterfront across the water (on the card a band between sky and water), New London from the air under an overcast sky, the Garde Arts Center's marquee, Mystic from the air with its horizon lost at 21:9 over parked cars, the harbour at night and a linen postcard of Mystic's drawbridge.
+  "cbsa:35980": {
+    file: "Norwich, Connecticut 2.jpg",
+    place: "Norwich's harbour and downtown from the air in low sun, wooded hills behind",
+    credit: "Hayden Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Norwich-New London-Willimantic, CT",
+    size: [4000, 3000],
+  },
   // Ogden, UT: skyline-sheet run 36786974652 — the mountains, downtown and a church spire whole in both crops, over a street view that is half asphalt.
   "cbsa:36260": {
     file: "Ogden Utah downtown.jpg",
@@ -1456,6 +1516,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Shreveport-Bossier City, LA",
     size: [3840, 2160],
   },
+  // Sioux Falls, SD: skyline-sheet run 36816207134 — Falls Park and downtown under a clear sky, the falls running over pink rock between green lawns, every building whole in both crops, two cranes small beside the tallest block. Over the article's lead, the same view in March under grey cloud with bare trees, two frames of the falls under tower cranes and a building's frame (one in snow), downtown across a highway barrier, a street at dusk behind a parking sign and a 1908 panorama.
+  "cbsa:43620": {
+    file: "Falls Park and Downtown 09-17-23.jpg",
+    place: "The falls in Falls Park and downtown behind them, under a clear sky",
+    credit: "Maxpower2727",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Sioux Falls, SD",
+    size: [4000, 2252],
+  },
   // South Bend, IN: skyline-sheet run 36800398141 — Notre Dame's Golden Dome and the Basilica's spire against an orange sky, the picture the area is known by, whole in every crop, over downtown on its river in soft light (an article's lead, the owner's alternative), two aerial views of the river, one steep enough to read as a map and one under a white haze, a riverbank with a date burned into its corner and the river's lights at night.
   "cbsa:43780": {
     file: "North Quad from Fr. Hesburgh's Office in the Hesburgh Library.JPG",
@@ -1595,6 +1665,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "http://creativecommons.org/licenses/by-sa/3.0/",
     name: "Visalia, CA",
     size: [1818, 1228],
+  },
+  // Waterbury-Shelton, CT: skyline-sheet run 36816098960 — an article's lead, downtown and the Union Station clock tower from the air on a clear day, an oblique with a horizon, whole in both crops, over a winter street whose church spire the deal page's 21:9 cuts, with traffic signals, cars and a gas station's price sign across its foot.
+  "cbsa:47930": {
+    file: "Waterbury, Connecticut 3.jpg",
+    place: "Downtown Waterbury and its Union Station clock tower from the air, wooded hills behind",
+    credit: "Hayden Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Waterbury-Shelton, CT",
+    size: [4000, 3000],
   },
   // Wichita, KS: skyline-sheet run 36780959488 — the article's lead.
   "cbsa:48620": {
