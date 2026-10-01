@@ -238,9 +238,12 @@ function useShared(key: string, initial: string): [string, (v: string) => void] 
  * The link is text anyone can edit, and a value no option matches is a trap
  * with two sides: a `<select>` shows its FIRST option while the card's sum
  * reads the raw string, so the capital stack drew "Accrues" and computed
- * "Pays current" (the research pass of 2026-10-01). Read through here, the
- * control and the sum see the same value, and the options handed back are
- * the ones the control draws.
+ * "Pays current", and the tax card "Reassessed to price" over a bill that
+ * carried the assessment over (the research pass of 2026-10-01). Read
+ * through here, the control and the sum see the same value, and the options
+ * handed back are the ones the control draws. The page's other dropdowns
+ * read a value no option names as their seed, which is each one's first
+ * option, so their control and sum agree already; a new one belongs here.
  */
 function useChoice<T extends string>(
   key: string,
@@ -359,7 +362,7 @@ function Choice<T extends string>({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  options: { value: T; label: string }[];
+  options: readonly { value: T; label: string }[];
 }) {
   return (
     <label className="block w-full">
@@ -3899,7 +3902,10 @@ function CapitalStack() {
   const [mezzRate, setMezzRate] = useShared("csmr", "9");
   const [pref, setPref] = useShared("csp", "8,000,000");
   const [prefRate, setPrefRate] = useShared("cspr", "11");
-  const [accrues, setAccrues] = useShared("csac", "yes");
+  const [accrues, setAccrues, accrual] = useChoice("csac", "yes", [
+    { value: "yes", label: "Accrues" },
+    { value: "no", label: "Pays current" },
+  ]);
   const [hold, setHold] = useShared("csh", "5");
   const [target, setTarget] = useShared("cst", "15");
 
@@ -3966,15 +3972,7 @@ function CapitalStack() {
         <Field label="Pref rate" suffix="%" value={prefRate} onChange={setPrefRate} placeholder="11" />
         <Field label="Hold" suffix="yr" value={hold} onChange={setHold} placeholder="5" />
         <Field label="Equity target" suffix="%" value={target} onChange={setTarget} placeholder="15" />
-        <Choice
-          label="Preferred"
-          value={accrues}
-          onChange={setAccrues}
-          options={[
-            { value: "yes", label: "Accrues" },
-            { value: "no", label: "Pays current" },
-          ]}
-        />
+        <Choice label="Preferred" value={accrues} onChange={setAccrues} options={accrual} />
       </div>
 
       {r.layers.length > 0 && (
@@ -4143,7 +4141,10 @@ function TaxReassessment() {
   const [rate, setRate] = useShared("txt", "1.5");
   const [phase, setPhase] = useShared("txph", "3");
   const [noi, setNoi] = useShared("txn", "1,500,000");
-  const [rule, setRule] = useShared("txrule", "yes");
+  const [rule, setRule, rules] = useChoice("txrule", "yes", [
+    { value: "yes", label: "Reassessed to price" },
+    { value: "no", label: "Assessment carries over" },
+  ]);
 
   const r = useMemo(
     () =>
@@ -4187,15 +4188,7 @@ function TaxReassessment() {
         <Field label="Assessment ratio" suffix="%" value={ratio} onChange={setRatio} placeholder="100" />
         <Field label="Tax rate" suffix="%" value={rate} onChange={setRate} placeholder="1.5" />
         <Field label="Phase-in" suffix="yr" value={phase} onChange={setPhase} placeholder="1" />
-        <Choice
-          label="On transfer"
-          value={rule}
-          onChange={setRule}
-          options={[
-            { value: "yes", label: "Reassessed to price" },
-            { value: "no", label: "Assessment carries over" },
-          ]}
-        />
+        <Choice label="On transfer" value={rule} onChange={setRule} options={rules} />
       </div>
 
       {r.newTax !== null && (
