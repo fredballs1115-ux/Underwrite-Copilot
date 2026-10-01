@@ -228,7 +228,7 @@ export async function importSubmarketFile(formData: FormData) {
   }
 
   const mapping = suggestMarketMapping(grid, PERIOD_FIELDS);
-  const { rows, skipped, headers } = toPeriods(grid, mapping, file.name);
+  const { rows, skipped, doubled, headers } = toPeriods(grid, mapping, file.name);
   if (!rows.length) redirect(`/submarkets/${id}?error=norows`);
   // A period already loaded for one of these dates is REPLACED by the import
   // (one row a date) — counted, so the page can say how many.
@@ -269,6 +269,7 @@ export async function importSubmarketFile(formData: FormData) {
       imported: rows.length,
       ...(replaced == null ? {} : { replaced }),
       skipped,
+      ...(doubled ? { doubled } : {}),
       kind: "periods",
       file: file.name.slice(0, 80),
       cols: packMapping(mappingSummary(mapping, headers, PERIOD_FIELDS).read),

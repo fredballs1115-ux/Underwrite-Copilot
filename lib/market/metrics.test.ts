@@ -851,6 +851,23 @@ describe("the import says what it read", () => {
     expect(line).toContain("No column matched Rent basis.");
   });
 
+  it("keeps one row a date: a year's line beside its Q4 is dropped for the quarter, and said", () => {
+    const grid = parseCsv(`Period,Inventory SF,Net Absorption SF,Vacancy
+2025,20000000,600000,6.0%
+2025 Q3,20000000,140000,6.1%
+2025 Q4,20000000,150000,6.0%
+2025 Q4,20000000,999999,9.9%`);
+    const { rows, doubled } = toPeriods(grid, suggestMarketMapping(grid, PERIOD_FIELDS), "x.csv");
+    expect(rows.map((r) => [r.period, r.netAbsorptionSf])).toEqual([
+      ["2025-12-31", 150_000],
+      ["2025-09-30", 140_000],
+    ]);
+    expect(doubled).toBe(2);
+    expect(importSentence({ kind: "periods", imported: 2, replaced: 0, skipped: 0, doubled: 2, file: "x.csv" })).toBe(
+      "Imported 2 periods from x.csv; 2 rows dropped for a date another row already gave (a year's line ends on its fourth quarter's date, and the quarter is kept).",
+    );
+  });
+
   it("says how many rows it wrote, replaced and skipped", () => {
     expect(importSentence({ kind: "periods", imported: 8, replaced: 3, skipped: 1, file: "grid.csv" })).toBe(
       "Imported 8 periods from grid.csv — 3 replaced the periods already loaded for those dates; 1 row skipped with no readable period.",

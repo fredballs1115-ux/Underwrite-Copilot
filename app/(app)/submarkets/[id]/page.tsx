@@ -59,13 +59,14 @@ export default async function SubmarketPage({
     imported?: string;
     replaced?: string;
     skipped?: string;
+    doubled?: string;
     kind?: string;
     file?: string;
     cols?: string;
   }>;
 }) {
   const { id } = await params;
-  const { error: errorCode, imported, replaced, skipped, kind, file, cols } = await searchParams;
+  const { error: errorCode, imported, replaced, skipped, doubled, kind, file, cols } = await searchParams;
   // What the last import did, said from what the action carried here.
   const importKind = kind === "pipeline" || kind === "periods" ? kind : null;
   const importFields = importKind === "pipeline" ? PIPELINE_FIELDS : PERIOD_FIELDS;
@@ -77,6 +78,7 @@ export default async function SubmarketPage({
           imported: Number(imported) || 0,
           replaced: replaced == null ? null : Number(replaced) || 0,
           skipped: Number(skipped) || 0,
+          doubled: Number(doubled) || 0,
           file: file ?? null,
         }),
         read: importKind

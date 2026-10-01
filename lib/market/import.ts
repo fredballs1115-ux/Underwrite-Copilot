@@ -249,12 +249,19 @@ export type PipelineDraft = Omit<
 export interface ImportResult<T> {
   rows: T[];
   skipped: number;
+  /** rows dropped for a period another row of the file already gave */
+  doubled?: number;
   mapping: MarketMapping<string>;
   headers: string[];
 }
 
 /** Submarket statistics rows. A row with no readable period is skipped and
- *  counted — never dated to today. */
+ *  counted — never dated to today. Two rows that land on one period-end date
+ *  are one row: a year's line ("2025") ends on its fourth quarter's Dec 31,
+ *  and the table holds one row a date, so the two had either failed the
+ *  whole import or let one overwrite the other unsaid. The quarter is kept
+ *  over a year's summary line, otherwise the first; the other is counted
+ *  (`doubled`) and the import says so. */
 export function toPeriods(
   grid: Grid,
   mapping: MarketMapping<PeriodKey>,
@@ -262,6 +269,8 @@ export function toPeriods(
 ): ImportResult<PeriodDraft> {
   const rows: PeriodDraft[] = [];
   let skipped = 0;
+  let doubled = 0;
+  const seen = new Map<string, { at: number; yearOnly: boolean }>();
   const at = (row: Grid[number], key: PeriodKey) => {
     const c = mapping.columns[key];
     return c === undefined ? null : (row[c] ?? null);
@@ -270,12 +279,13 @@ export function toPeriods(
   for (let r = mapping.headerRow + 1; r < grid.length; r++) {
     const row = grid[r];
     if (!row || row.every((c) => c == null || String(c).trim() === "")) continue;
-    const period = parsePeriodLabel(at(row, "period"));
+    const label = at(row, "period");
+    const period = parsePeriodLabel(label);
     if (!period) {
       skipped++;
       continue;
     }
-    rows.push({
+    const draft: PeriodDraft = {
       period,
       inventorySf: parseNumber(at(row, "inventorySf")),
       vacancyPct: parsePercent(at(row, "vacancyPct")),
@@ -286,12 +296,25 @@ export function toPeriods(
       source,
       unverified: false,
       sourceUrl: null,
-    });
+    };
+    const yearOnly = /^\d{4}$/.test(String(label ?? "").trim());
+    const prior = seen.get(period);
+    if (prior) {
+      doubled++;
+      if (prior.yearOnly && !yearOnly) {
+        rows[prior.at] = draft;
+        seen.set(period, { at: prior.at, yearOnly });
+      }
+      continue;
+    }
+    seen.set(period, { at: rows.length, yearOnly });
+    rows.push(draft);
   }
 
   return {
     rows,
     skipped,
+    doubled,
     mapping: mapping as MarketMapping<string>,
     headers: (grid[mapping.headerRow] ?? []).map((c) => String(c ?? "").trim()),
   };
@@ -466,6 +489,8 @@ export function importSentence(args: {
   imported: number;
   replaced: number | null;
   skipped: number;
+  /** periods only: rows dropped for a date another row already gave */
+  doubled?: number;
   file: string | null;
 }): string {
   const from = args.file ? ` from ${args.file}` : "";
@@ -484,7 +509,11 @@ export function importSentence(args: {
         ? ` — ${args.replaced} replaced the ${args.replaced === 1 ? "period already loaded for its date" : "periods already loaded for those dates"}`
         : "";
     const skipped = args.skipped > 0 ? `; ${plural(args.skipped, "row")} skipped with no readable period` : "";
-    return `Imported ${plural(args.imported, "period")}${from}${replaced}${skipped}.`;
+    const doubled =
+      args.doubled && args.doubled > 0
+        ? `; ${plural(args.doubled, "row")} dropped for a date another row already gave (a year's line ends on its fourth quarter's date, and the quarter is kept)`
+        : "";
+    return `Imported ${plural(args.imported, "period")}${from}${replaced}${skipped}${doubled}.`;
   }
   return `Imported ${plural(args.imported, "row")}.`;
 }
