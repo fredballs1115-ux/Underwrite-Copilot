@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
-import { hoursSince } from "@/lib/research";
+import { stewardLine, stewardOverdue } from "@/lib/steward-line";
 import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import { liveZillowFiles } from "@/lib/zori-read";
 import { liveRealtorFiles } from "@/lib/realtor-read";
@@ -98,16 +98,15 @@ export default async function DataHealthPage() {
   let changes: ChangeRow[] = [];
   let migrated = true;
   try {
-    // The corrections are everyone's; the runs and the open issues are
-    // read only for the operator who will see them.
+    // The corrections are everyone's, and so is the newest run's date (the
+    // page's opening sentence says when the steward last ran); the runs'
+    // detail and the open issues are read only for the operator.
     const [r, i, c] = await Promise.all([
-      operator
-        ? supabase
-            .from("steward_runs")
-            .select("id, started_at, finished_at, checks_run, issues_found, notes")
-            .order("started_at", { ascending: false })
-            .limit(10)
-        : null,
+      supabase
+        .from("steward_runs")
+        .select(operator ? "id, started_at, finished_at, checks_run, issues_found, notes" : "id, started_at, finished_at")
+        .order("started_at", { ascending: false })
+        .limit(operator ? 10 : 1),
       operator
         ? supabase
             .from("data_issues")
@@ -122,8 +121,8 @@ export default async function DataHealthPage() {
         .order("changed_at", { ascending: false })
         .limit(20),
     ]);
-    if (r?.error) migrated = false;
-    runs = (r?.data as RunRow[] | null) ?? [];
+    if (r.error) migrated = false;
+    runs = (r.data as unknown as RunRow[] | null) ?? [];
     issues = (i?.data as IssueRow[] | null) ?? [];
     changes = (c.data as ChangeRow[] | null) ?? [];
   } catch {
@@ -131,7 +130,7 @@ export default async function DataHealthPage() {
   }
 
   const latest = runs[0] ?? null;
-  const overdue = !latest || hoursSince(latest.finished_at ?? latest.started_at) > 48;
+  const overdue = stewardOverdue(latest);
 
   // What the last screens cost — their ledgers, newest first. A schema
   // without the column (pre-0035) reads as an error here, never a throw.
@@ -177,16 +176,13 @@ export default async function DataHealthPage() {
     <div className="space-y-6">
       <header>
         <h1 className="text-xl font-semibold tracking-tight">Data health</h1>
-        <p className="mt-1 max-w-2xl text-sm text-muted">
-          A nightly steward re-checks source links, feed freshness and the oldest singly-sourced
-          claims; a figure it corrects lands here, never silently.
-        </p>
+        <p className="mt-1 max-w-2xl text-sm text-muted">{stewardLine(latest)}</p>
       </header>
 
       {operator && (
         <>
           <p className="text-xs text-muted">
-            Operator view — customers see only the corrections.
+            Operator view — customers see the corrections and the last run&apos;s date.
           </p>
 
           <section className="rounded-xl border border-line bg-surface p-4">
