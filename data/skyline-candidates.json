@@ -3711,16 +3711,23 @@
       "city": "Ocala, Florida",
       "area": "Ocala, FL",
       "wikipedia": [
-        "Ocala, Florida"
+        "Ocala, Florida",
+        "Marion County, Florida",
+        "Silver Springs State Park"
       ],
       "categories": [
         "Views of Ocala, Florida",
-        "Downtown Ocala, Florida"
+        "Downtown Ocala, Florida",
+        "Silver Springs State Park",
+        "Horse farms in Marion County, Florida"
       ],
       "queries": [
         "Ocala Florida downtown",
         "Ocala Florida square",
-        "Ocala skyline"
+        "Ocala skyline",
+        "Silver Springs Florida glass bottom boat",
+        "Ocala Florida horse farm",
+        "Ocala downtown square"
       ],
       "candidates": []
     },
@@ -3730,17 +3737,24 @@
       "area": "Gainesville, FL",
       "wikipedia": [
         "Gainesville, Florida",
-        "University of Florida"
+        "University of Florida",
+        "University of Florida",
+        "Century Tower"
       ],
       "categories": [
         "Views of Gainesville, Florida",
         "Downtown Gainesville, Florida",
-        "University of Florida"
+        "University of Florida",
+        "Century Tower (University of Florida)",
+        "Paynes Prairie Preserve State Park"
       ],
       "queries": [
         "Gainesville Florida downtown",
         "Gainesville Florida skyline",
-        "University of Florida campus"
+        "University of Florida campus",
+        "University of Florida Century Tower",
+        "University of Florida campus",
+        "Paynes Prairie"
       ],
       "candidates": []
     },
