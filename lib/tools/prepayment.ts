@@ -241,7 +241,11 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
   const hard = real(defeasanceCosts) && defeasanceCosts > 0 ? defeasanceCosts : 0;
   const defeasance = round(defeasanceSpread + hard);
 
-  const open = real(monthsToOpen) && monthsToOpen > 0 ? Math.round(monthsToOpen) : 0;
+  // A blank "open in" is a window nobody stated, not an open loan: only a
+  // typed zero says the loan prepays at par today. The first version read
+  // the blank as zero and said "prepays at par" over a loan carrying its
+  // full yield maintenance.
+  const open = real(monthsToOpen) && monthsToOpen >= 0 ? Math.round(monthsToOpen) : null;
   let cheaper: PrepayRead["cheaper"] =
     defeasance < yieldMaintenance ? "defeasance" : "yield maintenance";
   let cost = Math.min(defeasance, yieldMaintenance);
@@ -259,7 +263,7 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
   // Only meaningful when leaving early actually costs something. Where
   // it pays, there is nothing to buy back by waiting and a rate per
   // month of waiting is a number with no meaning.
-  const costOfNotWaiting = open > 0 && cost > 0 ? round(cost / open) : null;
+  const costOfNotWaiting = open !== null && open > 0 && cost > 0 ? round(cost / open) : null;
 
   const notes: string[] = [];
   if (open === 0) {
@@ -276,9 +280,19 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
             `Yield maintenance would be ${usdExact(yieldMaintenance)}${atFloor ? " — all of it the floor" : ""}.`,
     );
     if (atFloor) {
+      // The floor binds in two different worlds. Only where the Treasury is
+      // at or above the coupon does the lender lose nothing — the loan's own
+      // stream is then worth no more than its balance. Below the coupon the
+      // lender does lose, just less than the floor, and saying "rates have
+      // risen past the coupon" there was false (a 5% loan at a 4.80%
+      // Treasury loses the lender $92,388 on $20M, under a $200,000 floor).
       notes.push(
-        `Rates have risen past the ${loanRatePct}% coupon, so the lender loses nothing by ` +
-          "being repaid and yield maintenance is the floor rather than a real loss.",
+        treasuryRatePct >= loanRatePct
+          ? `Rates have ${treasuryRatePct > loanRatePct ? "risen past" : "reached"} the ${loanRatePct}% coupon, so the lender loses nothing by ` +
+              "being repaid and yield maintenance is the floor rather than a real loss."
+          : `With the Treasury at ${treasuryRatePct}%, under the ${loanRatePct}% coupon, the lender ` +
+              `does lose interest by being repaid — $${yieldMaintenanceRaw.toLocaleString("en-US")} — ` +
+              "but less than the floor, so the floor sets the penalty.",
       );
     }
     if (defeasanceSpread < 0) {
