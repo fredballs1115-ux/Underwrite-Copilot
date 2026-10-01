@@ -232,6 +232,15 @@ export default async function RentRollPage({
           Client data: stored under this deal with row-level security, never logged, never shared
           across accounts.
         </p>
+        {/* Two readers of one file, said plainly: the deal's model never reads
+            this page (lib/anthropic/actuals-ingest reads the document the
+            upload files, at the next screen). */}
+        <p data-qa="rent-roll-reader" className="mt-1 max-w-2xl text-xs text-muted">
+          The deal&apos;s model does not read this page. Its next screen reads the newest rent roll
+          filed on the deal — an upload here files one — with its own extraction, not this column
+          mapping, for the model&apos;s occupancy, area and unit count (the Property actuals card), so
+          those can differ from the figures here.
+        </p>
       </section>
 
       {record ? (
@@ -281,9 +290,10 @@ export default async function RentRollPage({
             <input type="hidden" name="importId" value={record.id} />
             <button
               type="submit"
+              title="Removes the import and the rent-roll file it filed on the deal; the model drops what it read from that file at its next screen"
               className="text-xs text-muted underline-offset-2 hover:text-kill hover:underline"
             >
-              Delete this import
+              Delete this import and its file
             </button>
           </form>
         </>

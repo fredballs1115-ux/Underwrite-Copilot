@@ -3,7 +3,13 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { downloadDealFile, signatureMismatch, uploadSupplement, documentPath } from "@/lib/storage";
+import {
+  downloadDealFile,
+  removeSupplementFile,
+  signatureMismatch,
+  uploadSupplement,
+  documentPath,
+} from "@/lib/storage";
 import {
   headerSignature,
   readGrid,
@@ -244,13 +250,47 @@ export async function saveLeasingProfile(formData: FormData) {
   redirect(`/deals/${dealId}/rent-roll`);
 }
 
+/**
+ * Delete an import AND the rent-roll file it filed on the deal. The upload
+ * files the file as a `rent_roll` document, and the next screen reads the
+ * newest such document into the deal's model (lib/anthropic/actuals-ingest),
+ * so an import deleted with its file left behind kept feeding the model.
+ * The document goes the way the deal page's own document removal takes it
+ * (`removeDealDocument`): the stored file, then the row — only where it is
+ * this deal's rent roll and no other import still reads it. What the model
+ * already read from it stays until its next screen, which reads the newest
+ * rent roll left, or clears the actuals where none is.
+ */
 export async function deleteRentRollImport(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const importId = String(formData.get("importId") ?? "");
   if (!dealId || !importId) return;
   const ctx = await requireDeal(dealId);
   if (!ctx) return;
+  const record = await getRentRollImport(ctx.supabase, importId);
   await ctx.supabase.from("rent_roll_imports").delete().eq("id", importId).eq("deal_id", dealId);
+
+  const docId = record?.dealId === dealId ? record.sourceDocumentId : null;
+  if (docId) {
+    const { count, error } = await ctx.supabase
+      .from("rent_roll_imports")
+      .select("id", { count: "exact", head: true })
+      .eq("source_document_id", docId);
+    if (!error && count === 0) {
+      const { data: doc } = await ctx.supabase
+        .from("deal_documents")
+        .select("id, kind, storage_path")
+        .eq("id", docId)
+        .eq("deal_id", dealId)
+        .maybeSingle();
+      const filed = doc as { kind: string; storage_path: string } | null;
+      if (filed?.kind === "rent_roll") {
+        await removeSupplementFile(filed.storage_path, { kind: "deal", dealId });
+        await ctx.supabase.from("deal_documents").delete().eq("id", docId).eq("deal_id", dealId);
+      }
+    }
+  }
   revalidatePath(`/deals/${dealId}/rent-roll`);
+  revalidatePath(`/deals/${dealId}`);
   redirect(`/deals/${dealId}/rent-roll`);
 }
