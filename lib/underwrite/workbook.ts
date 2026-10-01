@@ -542,6 +542,7 @@ function buildCover(
     ["Cash Flow", "Annual property and investment cash flow through exit"],
     ["Monthly Cash Flow", "Monthly operating detail with per-year ties to the annual tab"],
     ["Debt Schedule", "Month-by-month amortization; exit payoff ties to Deal Summary"],
+    ["Operating Metrics", "Margins, coverage and breakeven occupancy by year; year-1 yardsticks per unit and per SF where the count and size are stated"],
     ["Sensitivity", "Live IRR and equity-multiple matrices across 75 scenarios"],
   ];
   for (const [name, desc] of toc) {
@@ -609,12 +610,14 @@ function buildAssumptions(
     if (key) src(r, key);
     r++;
   };
+  // A formula over this tab's own inputs: black, per the cover's legend —
+  // green is a link pulled from another tab, which none of these is.
   const derived = (lab: string, formula: string, name: string, fmt: string, bold = false) => {
     label(ws.getCell(r, 1), lab, { bold, indent: 1 });
     const c = ws.getCell(r, 2);
     c.value = { formula } as ExcelJS.CellFormulaValue;
     c.name = name;
-    styleFormula(c, fmt, bold ? INK : GREEN, bold);
+    styleFormula(c, fmt, INK, bold);
     r++;
   };
   const header = (t: string) => { sectionHeader(ws, r, t, 1, 3); r++; };
@@ -637,10 +640,17 @@ function buildAssumptions(
   input("Purchase Price", inp.purchasePrice, "PurchasePrice", FMT.usd, "purchasePrice", true);
   // Hold is STRUCTURAL: it sets the number of cash-flow years and the sale
   // year, which are baked at export. Not a flex input — editing it in the file
-  // would only partially recalc (a longer-hold IRR would be wrong). Re-export
-  // to change it.
-  input("Hold Period (months) — fixed; re-export to change", inp.holdMonths, "HoldMonths", FMT.int, "holdMonths", false);
+  // would only partially recalc (a longer-hold IRR would be wrong). Nor does a
+  // re-export change it: every export runs the model's one hold
+  // (lib/underwrite/inputs HOLD_MONTHS), so the cell says it is fixed and why.
+  input("Hold Period (months) — fixed", inp.holdMonths, "HoldMonths", FMT.int);
   ws.getCell(r - 1, 2).font = { name: ARIAL, size: 10, color: INK }; // black (formula-like), not blue input
+  {
+    const sc = ws.getCell(r - 1, 3);
+    const said = sources.holdMonths ? `${sourceText(sources.holdMonths)}. ` : "";
+    sc.value = `${said}Fixed: the Cash Flow tab's years and the sale year are built for this hold, so typing over it recalculates only part of the model.`;
+    sc.font = { name: ARIAL, size: 9, color: provColor(sources.holdMonths?.provenance) };
+  }
   input("Acquisition Fee %", inp.acqFeePct, "AcqFeePct", FMT.pct2, "acqFeePct");
   input("Acquisition Fee Cap", inp.acqFeeCap, "AcqFeeCap", FMT.usd);
 
@@ -682,7 +692,11 @@ function buildAssumptions(
   input("Rentable SF", inp.rsf, "RSF", FMT.int, "rsf");
   input("Capital Reserves $/SF/yr", inp.reservesPsf, "ReservesPSF", FMT.psf, "reservesPsf");
   input("Capital Improvements (yr 1)", inp.capitalImprovementsYr1, "CapImprovements", FMT.usd, "capitalImprovementsYr1");
-  input("Tenant Improvements $/SF", inp.tiPsf, "TIPSF", FMT.psf);
+  // The engine charges TI × the building's whole rentable SF in every year
+  // (the Cash Flow tab's Tenant Improvements line) — so the label says so,
+  // and a per-lease allowance on the space that rolls is not typed in here.
+  input("TI $/SF/yr, whole building", inp.tiPsf, "TIPSF", FMT.psf);
+  label(ws.getCell(r - 1, 3), "Charged on every SF of the building, every year — not a per-lease allowance", { color: MUTED, size: 9 });
   input("Leasing Commission % of rent", inp.lcPct, "LCPct", FMT.pct1);
 
   header("Fees");
@@ -1139,20 +1153,27 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
 
   // ── PROJECT OVERVIEW ──
   sectionHeader(ws, r, "Project Overview", 1, 5); r++;
-  label(ws.getCell(r, 1), "Building Name"); label(ws.getCell(r, 2), meta.dealName, { color: GREEN });
-  label(ws.getCell(r, 4), "Asset Class"); label(ws.getCell(r, 5), meta.assetClass, { color: GREEN }); r++;
-  label(ws.getCell(r, 1), "Address"); label(ws.getCell(r, 2), meta.address || "—", { color: GREEN });
-  label(ws.getCell(r, 4), "Market"); label(ws.getCell(r, 5), meta.market || "—", { color: GREEN }); r++;
-  label(ws.getCell(r, 1), "Rentable SF");
+  // The deal's facts are text written into the file, as the Cover prints
+  // them — plain, never the green the legend keeps for a link to another tab.
+  label(ws.getCell(r, 1), "Building Name"); label(ws.getCell(r, 2), meta.dealName);
+  label(ws.getCell(r, 4), "Asset Class"); label(ws.getCell(r, 5), meta.assetClass); r++;
+  label(ws.getCell(r, 1), "Address"); label(ws.getCell(r, 2), meta.address || "—");
+  label(ws.getCell(r, 4), "Market"); label(ws.getCell(r, 5), meta.market || "—"); r++;
+  // A size the documents do not state is the count × a typical unit or a
+  // placeholder (the Assumptions tab names which) — marked here as the
+  // Operating Metrics tab marks it by leaving its per-SF figures out.
+  label(ws.getCell(r, 1), model.sources.rsf?.provenance === "assumption" ? "Rentable SF (assumed)" : "Rentable SF");
   ws.getCell(r, 2).value = { formula: "RSF" } as ExcelJS.CellFormulaValue; styleLink(ws.getCell(r, 2), FMT.int);
   label(ws.getCell(r, 4), "In-Place Occupancy");
-  if (meta.occupancyPct != null) { ws.getCell(r, 5).value = meta.occupancyPct; styleLink(ws.getCell(r, 5), FMT.pct1); }
+  // The documents' figure, typed in: an input's blue (it is read for the
+  // vacancy at export; nothing in the book reads this cell).
+  if (meta.occupancyPct != null) { ws.getCell(r, 5).value = meta.occupancyPct; styleInput(ws.getCell(r, 5), FMT.pct1); }
   else label(ws.getCell(r, 5), "n/a", { color: MUTED });
   // Deal type, and on a plan deal the budget the returns have to pay for —
   // a live link to the Assumptions cell, so flexing it flows through.
   if (dealKind !== "unknown") {
     r++;
-    label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind], { color: GREEN });
+    label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), STRATEGY_LABEL[dealKind]);
     if (planDeal) {
       label(ws.getCell(r, 4), "Capital Budget (yr 1)");
       ws.getCell(r, 5).value = { formula: "CapImprovements" } as ExcelJS.CellFormulaValue; styleLink(ws.getCell(r, 5), FMT.usd);
@@ -1165,9 +1186,9 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
       label(ws.getCell(r, 1), "OM Stabilized NOI (pro forma)");
       const noiCell = ws.getCell(r, 2);
       if (meta.stabilizedNoi) {
+        // The OM's figure typed in, which the yield below reads: an input.
         noiCell.value = meta.stabilizedNoi.value;
-        noiCell.numFmt = FMT.usd;
-        noiCell.font = { name: ARIAL, size: 10, color: GREEN };
+        styleInput(noiCell, FMT.usd);
         noiCell.alignment = { horizontal: "right" };
         label(ws.getCell(r, 3), meta.stabilizedNoi.page ? `OM ${meta.stabilizedNoi.page}` : "OM", { color: MUTED, size: 9 });
       } else {
@@ -1666,7 +1687,8 @@ function buildOperatingMetrics(
     const u = ws.getCell(r, 2);
     u.value = units;
     u.name = "UnitsCount";
-    styleLink(u, FMT.int);
+    // The documents' count typed in, which every per-unit row reads: an input.
+    styleInput(u, FMT.int);
     u.alignment = { horizontal: "right" };
     r++;
     twoCol(`Price / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));

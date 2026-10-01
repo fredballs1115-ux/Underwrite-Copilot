@@ -698,6 +698,131 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
   });
 });
 
+// ── Labels and colours that say what their cells are ──────────────────────
+describe("the workbook's labels and colours say what their cells are", () => {
+  /** Units and an occupancy, no size: the RSF is the count × a typical
+   *  unit, an assumption. */
+  const counted: ExtractionResult = {
+    ...extraction,
+    metrics: [
+      ...extraction.metrics.filter((m) => !/square feet/i.test(m.label)),
+      { label: "Units", value: "240", flagged: false, page: "p. 4" },
+      { label: "Occupancy", value: "93%", flagged: false, page: "p. 4" },
+    ],
+  };
+  const countedModel = deriveUnderwriteInputs(counted, "fallback");
+
+  async function book(m: typeof model, read?: Parameters<typeof buildUnderwriteWorkbook>[2]): Promise<ExcelJS.Workbook> {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(m, null, read)) as unknown as ArrayBuffer);
+    return wb;
+  }
+
+  it("the hold says it is fixed and why, and never offers a re-export that gives the same hold", async () => {
+    const assum = (await book(model)).getWorksheet("Assumptions")!;
+    const row = findRow(assum, 1, "Hold Period (months) — fixed");
+    expect(assum.getCell(row, 2).value).toBe(model.inputs.holdMonths);
+    expect(String(assum.getCell(row, 3).value)).toContain(
+      "Fixed: the Cash Flow tab's years and the sale year are built for this hold, so typing over it recalculates only part of the model.",
+    );
+    assum.eachRow((r) => r.eachCell((c) => expect(String(c.value ?? "")).not.toMatch(/re-export/i)));
+  });
+
+  it("the Contents list every visible tab after the Cover, in the order the tabs sit — Operating Metrics included", async () => {
+    const read = {
+      readOn: "2026-09-21",
+      metro: "Washington DC",
+      checks: [
+        {
+          key: "exit_cap" as const,
+          title: "Exit cap",
+          model: "6.00%",
+          modelSource: "derived from the documents",
+          published: [{ label: "10-year Treasury", text: "4.94% on Sep 17, 2026", value: 4.94, asOf: "2026-09-17", publisher: "FRED" }],
+          tone: "widens" as const,
+          toneLabel: "spread widens at the exit",
+          scope: "national" as const,
+          read: "The exit cap 6.00% is 106 bps over today's 10-year.",
+        },
+      ],
+    };
+    for (const wb of [await book(model), await book(model, read)]) {
+      const cover = wb.getWorksheet("Cover")!;
+      const listed: string[] = [];
+      for (let r = findRow(cover, 2, "CONTENTS") + 1; cover.getCell(r, 2).value; r++) listed.push(String(cover.getCell(r, 2).value));
+      const tabs = wb.worksheets.filter((ws) => ws.state === "visible" && ws.name !== "Cover").map((ws) => ws.name);
+      expect(listed).toEqual(tabs);
+      expect(listed).toContain("Operating Metrics");
+    }
+  });
+
+  it("the Deal Summary marks a rentable SF that is an assumption, as the Operating Metrics tab does", async () => {
+    expect(countedModel.sources.rsf?.provenance).toBe("assumption");
+    const assumed = (await book(countedModel)).getWorksheet("Deal Summary")!;
+    expect(assumed.getCell(findRow(assumed, 1, "Rentable SF (assumed)"), 2).value).toMatchObject({ formula: "RSF" });
+    const stated = (await book(model)).getWorksheet("Deal Summary")!;
+    expect(model.sources.rsf?.provenance).toBe("extracted");
+    expect(stated.getCell(findRow(stated, 1, "Rentable SF"), 2).value).toMatchObject({ formula: "RSF" });
+  });
+
+  it("the TI input says it is charged on the whole building's SF every year, never a per-lease allowance", async () => {
+    const wb = await book(model);
+    const assum = wb.getWorksheet("Assumptions")!;
+    const row = findRow(assum, 1, "TI $/SF/yr, whole building");
+    expect(assum.getCell(row, 2).name).toBe("TIPSF");
+    expect(String(assum.getCell(row, 3).value)).toBe("Charged on every SF of the building, every year — not a per-lease allowance");
+    // What the label says is what the ladder does: TI × RSF in every year.
+    const cf = wb.getWorksheet("Cash Flow")!;
+    const ti = findRow(cf, 1, "Tenant Improvements");
+    for (let y = 1; y <= engine.holdYears; y++) expect(cf.getCell(ti, 2 + y).value).toMatchObject({ formula: "-TIPSF*RSF" });
+  });
+
+  it("styles a cell green only where it links another tab, and blue only where it is a typed value", async () => {
+    const plan = deriveUnderwriteInputs(conversion, "fallback");
+    for (const m of [model, plan, countedModel]) {
+      const wb = await book(m);
+      const nameSheet = new Map(
+        (wb.definedNames as unknown as { model: { name: string; ranges: string[] }[] }).model.map((d) => [
+          d.name,
+          (d.ranges[0].match(/^(?:'([^']+)'|([^!]+))!/) ?? [])[1] ?? (d.ranges[0].match(/^(?:'([^']+)'|([^!]+))!/) ?? [])[2],
+        ]),
+      );
+      wb.eachSheet((ws) => {
+        // The Cover's legend draws each colour on its own name.
+        if (ws.name === "Cover") return;
+        ws.eachRow((row) =>
+          row.eachCell((cell) => {
+            const where = `${ws.name}!${cell.address}`;
+            const color = cell.font?.color?.argb;
+            const v = cell.value as { formula?: string } | number | string | null;
+            const formula = v && typeof v === "object" && "formula" in v ? v.formula : undefined;
+            if (color === "FF107C41") {
+              expect(formula, `${where} is green and holds no formula`).toBeTruthy();
+              const readsOtherTab =
+                formula!.includes("!") ||
+                [...nameSheet].some(([n, sheet]) => sheet !== ws.name && new RegExp(`\\b${n}\\b`).test(formula!));
+              expect(readsOtherTab, `${where} is green and reads no other tab: =${formula}`).toBe(true);
+            }
+            if (color === "FF0000CC") expect(formula, `${where} is blue and holds a formula`).toBeUndefined();
+          }),
+        );
+      });
+    }
+    // The three typed values the research pass found styled as links are
+    // inputs: the OM's stabilized NOI, the unit count, the in-place occupancy.
+    const planBook = await book(plan);
+    const summary = planBook.getWorksheet("Deal Summary")!;
+    expect(summary.getCell(findRow(summary, 1, "OM Stabilized NOI (pro forma)"), 2).font?.color?.argb).toBe("FF0000CC");
+    const countedBook = await book(countedModel);
+    const ops = countedBook.getWorksheet("Operating Metrics")!;
+    expect(ops.getCell(findRow(ops, 1, "Units"), 2).font?.color?.argb).toBe("FF0000CC");
+    const cs = countedBook.getWorksheet("Deal Summary")!;
+    const occ = findRow(cs, 4, "In-Place Occupancy");
+    expect(cs.getCell(occ, 5).value).toBeCloseTo(0.93, 10);
+    expect(cs.getCell(occ, 5).font?.color?.argb).toBe("FF0000CC");
+  }, 30000);
+});
+
 describe("the per-unit rows in the class's own noun (lib/asset-words)", () => {
   it("a hotel's workbook prices per key, off its Keys row, and never says unit", async () => {
     const hotel: ExtractionResult = {
