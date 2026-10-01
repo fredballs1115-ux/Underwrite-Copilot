@@ -2718,7 +2718,7 @@ function WhatYouBelieve() {
               {
                 label: "What the return requires",
                 amount: r.requiredGrowthPct,
-                tone: r.reach === "at market" ? "bg-brand" : "bg-kill",
+                tone: r.reach === "at market" || r.reach === "below market" ? "bg-brand" : "bg-kill",
               },
               {
                 label: "What you called ordinary",
