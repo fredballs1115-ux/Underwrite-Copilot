@@ -198,6 +198,66 @@ way in this batch):
   - **Roles:** read-only or custom roles, as Dealpath and Northspyre offer
     them. This is a billing question.
   - **Ask quotas:** per-user limits on Ask (pass 8's run quotas).
+- **The screen's Claude steps** (research pass 18, 2026-10-01). Its errors
+  are fixed in this batch; these are yours:
+  - **The prompt cache and structured outputs.** Anthropic's
+    structured-outputs page says a change of output format invalidates the
+    prompt cache, and each step that reads the memorandum sends its own
+    format, so the deck may be written to the cache several times and read
+    back never. The cost card on /data-health shows a screen's cache reads;
+    restructuring the calls is a cost decision.
+  - **The first-draft model's prompt:** telling it what is being sold and
+    the site's spread, and labelling its 2% / 1% / $250–300-a-unit
+    defaults, changes the model's inputs.
+  - **A value-add's basis** on the pipeline card and the comps tick: the
+    price, or the all-in cost (the comps step is told all-in).
+  - **Summing a T-12 and dividing a rent roll's annual rent in code**
+    rather than by the model.
+  - **The research tracker's cited vacancy band** handed to the market
+    check for a commercial deal.
+- **The public market pages** (research pass 19, 2026-10-01). Its dating,
+  ranking and wording errors are being fixed; these are yours:
+  - **Licensed or scraped material on public pages:** tracker figures
+    credited to CoStar (Dallas retail, Los Angeles's multifamily cap,
+    Baltimore office's low end), a Homes.com listing count in
+    Philadelphia's note (Homes.com is CoStar's), Moody's via JPMorgan for
+    San Francisco's multifamily vacancy, and Bright MLS listings in the
+    example-properties block (now dated and sourced, not removed). Keep,
+    credit, or remove each.
+  - **The strip's commercial property price figure** is the Fed's index
+    built on CoStar's composite excluding multifamily (the runner printed
+    the Fed's own description, zori run 36814538224, and the change matched
+    figure for figure, rates run 36814949981). It now says it excludes
+    apartments and names the index; whether a CoStar-built index stays on a
+    public page is yours.
+  - **Freddie Mac's mortgage survey:** FRED's notes say "Copyright, 2016,
+    Freddie Mac. Reprinted with permission." Whether the 30- and 15-year
+    tiles may be republished is a terms question.
+  - **Redfin's attribution rule** for the multifamily summary's source.
+  - **"Weekday intel"** on /market is scored against your own buy box and
+    shown to strangers; it is now dated and labelled. Keep it public or
+    move it behind sign-in.
+- **The emails** (research pass 21, 2026-10-01). Its code items are being
+  fixed; these are yours:
+  - **Sign-up and password-reset email** (item 5 above): Supabase Auth's
+    SMTP through Resend on a verified domain, the templates and sender
+    name, the rate limit, and the Site URL and Redirect URLs
+    (`/login?confirmed=1&next=…` and `/account?reset=1`). Until then a
+    stranger cannot confirm an account or reset a password.
+  - **The sending domain:** verify `RESEND_FROM`'s domain in Resend (SPF,
+    DKIM, DMARC); the code refuses only resend.dev, and an unverified
+    sender fails quietly, one log line an email.
+  - **The worker's settings:** the Monday digest always sends from the
+    worker, and so do screen emails in worker mode, so `RESEND_API_KEY`,
+    `RESEND_FROM`, `NEXT_PUBLIC_APP_URL` and the same
+    `SUPABASE_SERVICE_ROLE_KEY` belong on the worker as well as the web
+    service. The pictures in emails already sent are signed with a key
+    derived from the service-role key, so rotating it (item 2) breaks
+    them; nothing else breaks.
+  - **A reply address** that is not Gmail, and bounce and complaint
+    suppression in Resend.
+  - **Team deal emails:** whether a creator who has left the team should
+    still get its screen emails (the departing-members question above).
 
 ## 🟢 2026-09-25 — being found, and the site's own address (#430)
 
