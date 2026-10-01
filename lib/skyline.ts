@@ -2002,11 +2002,18 @@ export function skylineCreditParts(shot: SkylineShot): CreditPart[] {
   return [`${c.place} · `, ...photographerParts(c.author, c.license, true)];
 }
 
+/** One photograph in a grid's credit: what it shows, linked to its own
+ *  page, and the licence that photograph is under, linked to its text. */
+export interface GalleryPhoto extends CreditLink {
+  license: CreditLink;
+}
+
 /** One photographer in a grid's credit, with every one of their photographs
- *  the grid shows, each by what it shows and linked to its own page. */
+ *  the grid shows, each by what it shows and linked to its own page, each
+ *  with its own licence. */
 export interface GalleryAuthor {
   name: string;
-  photos: CreditLink[];
+  photos: GalleryPhoto[];
 }
 
 /**
@@ -2014,8 +2021,9 @@ export interface GalleryAuthor {
  * of theirs the grid shows linked to its own file's page — the first cut
  * linked a photographer's name to their first file only, so on the
  * homepage, where Bruce Emmerling took both Richmond's and Norfolk's,
- * Norfolk's photograph was linked nowhere — and each licence once, linked to
- * its text. Null where no market shown has a photograph.
+ * Norfolk's photograph was linked nowhere — each with the licence it is
+ * under, and the licences the grid's photographs are under, each once.
+ * Null where no market shown has a photograph.
  */
 export function galleryCreditParts(ids: readonly string[]): { authors: GalleryAuthor[]; licenses: CreditLink[] } | null {
   const shots = ids.map((id) => skylineFor(id)).filter((s): s is SkylineShot => Boolean(s));
@@ -2025,7 +2033,7 @@ export function galleryCreditParts(ids: readonly string[]): { authors: GalleryAu
     const name = authorOf(s);
     const author = authors.get(name) ?? { name, photos: [] };
     const url = commonsPage(s.file);
-    if (!author.photos.some((p) => p.url === url)) author.photos.push({ name: s.place, url });
+    if (!author.photos.some((p) => p.url === url)) author.photos.push({ name: s.place, url, license: { name: s.license, url: s.licenseUrl } });
     authors.set(name, author);
   }
   const licenses = new Map<string, CreditLink>();
@@ -2041,35 +2049,38 @@ export function galleryCreditParts(ids: readonly string[]): { authors: GalleryAu
  * their name linked to it; one with several is their name, then each of
  * those photographs by what it shows, linked to its own page — "Bruce
  * Emmerling (Downtown Richmond; Downtown Norfolk from the Elizabeth River)",
- * semicolons because a place can hold a comma. Then each licence, linked to
- * its text, and that the photographs are cropped. Null where no market shown
- * has a photograph. "Photographs", not "Skyline photographs": a market is
- * shown by the photograph it is known by, which may be a memorial, a wheel
- * on the river or a row of houses.
+ * semicolons because a place can hold a comma. Each photographer's licence
+ * follows them, linked to its text — or, where their photographs shown are
+ * under different licences, each photograph's follows it — so a reader can
+ * tell which photograph is under which licence. The line had listed the
+ * grid's licences once each at its end ("CC BY 2.0 / CC BY-SA 4.0 / Public
+ * domain"), which said none of that (the research pass of 2026-10-01).
+ * Then where they came from and that the photographs are cropped. Null
+ * where no market shown has a photograph. "Photographs", not "Skyline
+ * photographs": a market is shown by the photograph it is known by, which
+ * may be a memorial, a wheel on the river or a row of houses.
  */
 export function galleryCreditLine(ids: readonly string[]): CreditPart[] | null {
   const parts = galleryCreditParts(ids);
   if (!parts) return null;
   const out: CreditPart[] = ["Photographs by "];
   parts.authors.forEach((a, i) => {
-    if (i) out.push(", ");
+    if (i) out.push(" · ");
     if (a.photos.length === 1) {
-      out.push({ name: a.name, url: a.photos[0].url });
+      out.push({ name: a.name, url: a.photos[0].url }, ", ", a.photos[0].license);
       return;
     }
+    const one = a.photos.every((p) => p.license.name === a.photos[0].license.name);
     out.push(`${a.name} (`);
     a.photos.forEach((p, j) => {
       if (j) out.push("; ");
-      out.push(p);
+      out.push({ name: p.name, url: p.url });
+      if (!one) out.push(", ", p.license);
     });
     out.push(")");
+    if (one) out.push(", ", a.photos[0].license);
   });
-  out.push(" — via Wikimedia Commons, ");
-  parts.licenses.forEach((l, i) => {
-    if (i) out.push(" / ");
-    out.push(l);
-  });
-  out.push(`, ${CROPPED_WORDS}.`);
+  out.push(` — via Wikimedia Commons, ${CROPPED_WORDS}.`);
   return out;
 }
 

@@ -46,7 +46,37 @@ describe("a market photograph's credit, with its links", () => {
     expect(skylineCredit(pd!).license.url).toBe("");
   });
 
-  it("gives a grid one line: every photograph shown linked to its own page, each photographer and licence named once, the same words as galleryCredit", () => {
+  it("says each photograph's licence beside it, so a reader can tell which photograph is under which (2026-10-01)", () => {
+    // The line had listed the grid's licences once each at its end ("CC BY
+    // 2.0 / CC BY-SA 4.0 / Public domain"), which said nothing of which
+    // photograph is under which.
+    const sf = SKYLINES.san_francisco;
+    const chi = SKYLINES.chicago;
+    const text = galleryCredit(["richmond", "norfolk_hampton_roads", "san_francisco", "chicago"]);
+    expect(text).toBe(
+      `Photographs by ${SKYLINES.richmond.credit} (${SKYLINES.richmond.place}; ${SKYLINES.norfolk_hampton_roads.place}), ${SKYLINES.richmond.license} · ` +
+        `${sf.credit}, ${sf.license} · ${chi.credit}, ${chi.license} — via Wikimedia Commons, cropped to fit.`,
+    );
+    expect(SKYLINES.richmond.license).toBe(SKYLINES.norfolk_hampton_roads.license);
+    // A photographer whose photographs shown are under different licences:
+    // each photograph's follows it.
+    const [sanJuan, tulsa] = [SKYLINES["cbsa:41980"], SKYLINES["cbsa:46140"]];
+    expect(sanJuan.credit).toBe(tulsa.credit);
+    expect(sanJuan.license).not.toBe(tulsa.license);
+    const mixed = galleryCredit(["cbsa:41980", "cbsa:46140"]);
+    expect(mixed).toBe(`Photographs by ${sanJuan.credit} (${sanJuan.place}, ${sanJuan.license}; ${tulsa.place}, ${tulsa.license}) — via Wikimedia Commons, cropped to fit.`);
+    const markup = html(React.createElement(GalleryCreditText, { ids: ["cbsa:41980", "cbsa:46140"] }));
+    expect(words(markup)).toBe(mixed);
+    expect(hrefs(markup)).toEqual([commonsPage(sanJuan.file), sanJuan.licenseUrl, commonsPage(tulsa.file), tulsa.licenseUrl]);
+    // Every photograph in the table: its photographer's or its own licence
+    // is named next to it, never only in a list at the end.
+    for (const [id, shot] of Object.entries(SKYLINES)) {
+      const one = galleryCredit([id]);
+      expect(one, id).toBe(`Photographs by ${shot.credit && shot.credit !== "unknown" ? shot.credit : "Wikimedia Commons"}, ${shot.license} — via Wikimedia Commons, cropped to fit.`);
+    }
+  });
+
+  it("gives a grid one line: every photograph shown linked to its own page, each photographer named once, the same words as galleryCredit", () => {
     const ids = Object.keys(SKYLINES);
     const markup = html(React.createElement(GalleryCreditText, { ids }));
     expect(words(markup)).toBe(galleryCredit(ids));
