@@ -95,7 +95,8 @@ export interface HoldResult {
   note: string;
 }
 
-const EMPTY: HoldResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: HoldResult = {
   netProceedsNow: null,
   sellingCostNow: null,
   loanPayoffNow: null,

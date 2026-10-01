@@ -79,7 +79,8 @@ export interface BidResult {
   note: string;
 }
 
-const EMPTY: BidResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: BidResult = {
   maxPrice: null,
   capAtMaxPricePct: null,
   loan: null,

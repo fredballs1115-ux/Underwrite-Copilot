@@ -3279,6 +3279,9 @@ describe("the deal math tools", () => {
     expect(text).toContain("6.46%");
     expect(text).toContain("Rebuilt, it returns");
     expect(text).toContain("15.0%");
+    // Every field a card needs is seeded, so no card opens asking for one
+    // (lib/tools/blanks: a blank field is named, never read as zero).
+    expect(text).not.toContain("a blank is not read as zero");
   });
 
   it("names which lender test governs, and where it changes hands", () => {

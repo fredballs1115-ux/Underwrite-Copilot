@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { aOrAn, withArticle } from "@/lib/article";
 import { readFigure } from "@/lib/money";
 import { usd, usdExact } from "@/lib/tools/format";
+import { blanks, fillIn } from "@/lib/tools/blanks";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
@@ -28,9 +29,9 @@ import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
 import { readTrailing } from "@/lib/tools/trailing-window";
 import { readEgi } from "@/lib/tools/economic-occupancy";
-import { readHold } from "@/lib/tools/hold-or-sell";
+import { EMPTY as NO_HOLD, readHold } from "@/lib/tools/hold-or-sell";
 import { readBelow } from "@/lib/tools/below-the-line";
-import { readBid } from "@/lib/tools/max-bid";
+import { EMPTY as NO_BID, readBid } from "@/lib/tools/max-bid";
 import { readBuyout } from "@/lib/tools/lease-buyout";
 import { readDraw } from "@/lib/tools/construction-draw";
 import { readFloating } from "@/lib/tools/floating-rate";
@@ -4532,23 +4533,36 @@ function HoldOrSell() {
   const [amort, setAmort] = useShared("hsA", "30");
   const [tax, setTax] = useShared("hsT", "");
 
-  const r = useMemo(
-    () =>
-      readHold({
-        currentValue: num(value) ?? 0,
-        nextYearNoi: num(noi) ?? 0,
-        noiGrowthPct: num(growth) ?? 0,
-        exitCapPct: num(cap) ?? 0,
-        sellingCostPct: num(cost) ?? 0,
-        reinvestmentRatePct: num(hurdle) ?? 0,
-        loanBalance: num(loan) ?? 0,
-        ratePct: num(rate) ?? 0,
-        amortYears: num(amort) ?? 0,
-        taxOnSaleNow: num(tax),
-        horizonYears: 10,
-      }),
-    [value, noi, growth, cap, cost, hurdle, loan, rate, amort, tax],
-  );
+  const r = useMemo(() => {
+    const needs: Array<readonly [string, string]> = [
+      ["what it is worth today", value],
+      ["next year's NOI", noi],
+      ["the NOI growth", growth],
+      ["the exit cap", cap],
+      ["the cost to sell", cost],
+      ["what the next deal earns", hurdle],
+    ];
+    // A cleared balance is no loan — the module's own "or clear the
+    // balance" — so the rate and the amortisation are needed beside one.
+    const levered = (num(loan) ?? 0) > 0;
+    if (levered) needs.push(["the loan rate", rate], ["the amortisation", amort]);
+    const missing = blanks(needs);
+    if (missing.length > 0) return { ...NO_HOLD, note: fillIn(missing) };
+    return readHold({
+      currentValue: num(value)!,
+      nextYearNoi: num(noi)!,
+      noiGrowthPct: num(growth)!,
+      exitCapPct: num(cap)!,
+      sellingCostPct: num(cost)!,
+      reinvestmentRatePct: num(hurdle)!,
+      loanBalance: levered ? num(loan)! : 0,
+      // Unread without a loan; never a stand-in zero beside one.
+      ratePct: levered ? num(rate)! : Number.NaN,
+      amortYears: levered ? num(amort)! : Number.NaN,
+      taxOnSaleNow: num(tax),
+      horizonYears: 10,
+    });
+  }, [value, noi, growth, cap, cost, hurdle, loan, rate, amort, tax]);
 
   // Every year drawn against the first year's return, so the DECAY is the
   // shape of the picture — the thing a lifetime IRR can never show. The
@@ -4585,7 +4599,10 @@ function HoldOrSell() {
             <Stat label="Holding one more year" value={pct(r.nextYearReturnPct, 1)} tone="brand" />
             <Stat
               label="The year to sell"
-              value={r.sellYear === null ? "not yet" : `Year ${r.sellYear}`}
+              // "not yet" is an answer: it needs a schedule that ran.
+              value={
+                r.years.length === 0 ? "—" : r.sellYear === null ? "not yet" : `Year ${r.sellYear}`
+              }
               tone={r.sellYear === null ? "muted" : undefined}
             />
             <Stat
@@ -4689,26 +4706,40 @@ function MaxBid() {
   const [amort, setAmort] = useShared("mbA", "30");
   const [close, setClose] = useShared("mbC", "1.5");
 
-  const r = useMemo(
-    () =>
-      readBid({
-        year1Noi: num(noi) ?? 0,
-        noiGrowthPct: num(growth) ?? 0,
-        holdYears: num(hold) ?? 0,
-        exitCapPct: num(exitCap) ?? 0,
-        sellingCostPct: num(sellCost) ?? 0,
-        targetLeveredIrrPct: num(target) ?? Number.NaN,
-        maxLtvPct: num(ltv),
-        minDscr: num(dscr),
-        minDebtYieldPct: num(dy),
-        ratePct: num(rate) ?? 0,
-        amortYears: num(amort) ?? 0,
-        ioYears: 0,
-        loanFeePct: 1,
-        closingCostPct: num(close),
-      }),
-    [noi, growth, hold, exitCap, sellCost, target, ltv, dscr, dy, rate, amort, close],
-  );
+  const r = useMemo(() => {
+    const needs: Array<readonly [string, string]> = [
+      ["the year 1 NOI", noi],
+      ["the NOI growth", growth],
+      ["the hold", hold],
+      ["the exit cap", exitCap],
+      ["the cost to sell", sellCost],
+      ["what the equity needs", target],
+    ];
+    // A lender test left blank is not applied (`sizeLoan`'s rule), and with
+    // none set the bid is all cash; any test set sizes a loan, which needs
+    // its rate and its amortisation.
+    const lending = [ltv, dscr, dy].some((v) => (num(v) ?? 0) > 0);
+    if (lending) needs.push(["the loan rate", rate], ["the amortisation", amort]);
+    const missing = blanks(needs);
+    if (missing.length > 0) return { ...NO_BID, note: fillIn(missing) };
+    return readBid({
+      year1Noi: num(noi)!,
+      noiGrowthPct: num(growth)!,
+      holdYears: num(hold)!,
+      exitCapPct: num(exitCap)!,
+      sellingCostPct: num(sellCost)!,
+      targetLeveredIrrPct: num(target)!,
+      maxLtvPct: num(ltv),
+      minDscr: num(dscr),
+      minDebtYieldPct: num(dy),
+      // Unread with no lender test set; never a stand-in zero beside one.
+      ratePct: lending ? num(rate)! : Number.NaN,
+      amortYears: lending ? num(amort)! : Number.NaN,
+      ioYears: 0,
+      loanFeePct: 1,
+      closingCostPct: num(close),
+    });
+  }, [noi, growth, hold, exitCap, sellCost, target, ltv, dscr, dy, rate, amort, close]);
 
   // The three lender tests on one track, scaled to the largest, so the
   // binding one is the SHORTEST bar — which is the whole reading.
