@@ -3759,7 +3759,12 @@
         "University of Florida Century Tower",
         "Paynes Prairie"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Sweetwater Wetlands Park.jpg",
+          "note": "Gainesville, FL — Flatwoods 36, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808459092)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:42200",
@@ -4215,7 +4220,12 @@
         "Montgomery Alabama riverfront",
         "Alabama State Capitol"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Aerial view of Montgomery, Alabama LCCN2011646683.jpg",
+          "note": "Montgomery, AL — Carol M. Highsmith, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36808145480)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:29180",
@@ -4234,7 +4244,12 @@
         "Lafayette Louisiana downtown",
         "Lafayette Louisiana Vermilion River"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Lafayette LA 2021.jpg",
+          "note": "Lafayette, LA — TheLionHasSeen, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808145480)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:31180",
@@ -4294,7 +4309,12 @@
         "Destin Florida harbor",
         "Fort Walton Beach Florida"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "View of Destin, Florida from the Destin Harbor.jpg",
+          "note": "Crestview-Fort Walton Beach-Destin, FL — Destin Vacation Boat Rentals, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808145480)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:25060",
@@ -4335,7 +4355,12 @@
         "Bend Oregon Mirror Pond",
         "Bend Oregon downtown mountains"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Drake Park, Bend (July 2012) - 1.JPG",
+          "note": "Bend, OR — Another Believer, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:42100",
@@ -4356,7 +4381,12 @@
         "Santa Cruz wharf beach",
         "Santa Cruz California coast"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Boats in Santa Cruz Harbor (6868331295).jpg",
+          "note": "Santa Cruz-Watsonville, CA — Don DeBold from San Jose, CA, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:42020",
@@ -4377,7 +4407,12 @@
         "San Luis Obispo mission",
         "San Luis Obispo Bishop Peak"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Mission San Luis Obispo (cropped).jpg",
+          "note": "San Luis Obispo-Paso Robles, CA — Rennett Stowe, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:42140",
@@ -4398,7 +4433,12 @@
         "Santa Fe New Mexico adobe",
         "Santa Fe Sangre de Cristo"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Palace of the Governors.jpg",
+          "note": "Santa Fe, NM — Tony Hisgett from Birmingham, UK, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:41100",
@@ -4418,7 +4458,12 @@
         "St. George Utah skyline",
         "St. George Utah temple"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "EM ST. GEORGE, UTAH (2624012794).jpg",
+          "note": "St. George, UT — Eddie Maloney from North Las Vegas, USA, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36808230184)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:36500",

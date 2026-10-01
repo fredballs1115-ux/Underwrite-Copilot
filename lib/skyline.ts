@@ -634,6 +634,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Bakersfield, CA",
     size: [3088, 2048],
   },
+  // Bend, OR: skyline-sheet run 36808230184 — the Deschutes beside Drake Park under a blue sky, its banks mirrored in the water, sharp and whole in both crops, over a downtown street at dawn under the Tower Theatre's sign with a bronze figure on a bench in its foreground, Mount Bachelor under a grey sky (the area's mountain, not the city), and two panoramas of the river 560 and 592px tall at their own width.
+  "cbsa:13460": {
+    file: "Drake Park, Bend (July 2012) - 1.JPG",
+    place: "The Deschutes River beside Drake Park in Bend, its banks mirrored in the water",
+    credit: "Another Believer",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Bend, OR",
+    size: [4000, 3000],
+  },
   // Birmingham, AL: skyline-sheet run 36754192984 — the Alabama article's lead, sharp under a clear sky, every tower whole on the card and the deal page's crop; the first run searched Birmingham, England's categories.
   "cbsa:13820": {
     file: "Birmingham, Alabama.jpg",
@@ -754,6 +764,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Corpus Christi, TX",
     size: [8064, 4827],
   },
+  // Crestview-Fort Walton Beach-Destin, FL: skyline-sheet run 36808145480 — Destin's harbour, an article's lead, its boats and white sand under a blue sky with the condominium towers across the water, whole in both crops; the card names the metro area, since the harbour is Destin's. Over the harbour at night, black under the card's shade, Fort Walton Beach's city hall, two 1970s archive frames, sea oats before the Gulf 651px tall at 2400 wide, a volleyball net at dusk and gulls under a grey sky.
+  "cbsa:18880": {
+    file: "View of Destin, Florida from the Destin Harbor.jpg",
+    place: "Destin's harbour, its boats and white sand, condominium towers across the water",
+    credit: "Destin Vacation Boat Rentals",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Crestview-Fort Walton Beach-Destin, FL",
+    size: [3872, 2022],
+  },
   // Davenport, IA: skyline-sheet run 36800398141 — the riverfront across the Mississippi under a clear sky, the clock tower and a white-cabled skybridge whole in every crop, over the article's lead, whose casino boat is the centre of the card, a grey-sky panorama, two street-level frames over trees and a road, Rock Island's riverfront and Moline's clock tower, which the card cuts.
   "cbsa:19340": {
     file: "2018 Davenport skyline 02 (cropped).jpg",
@@ -864,6 +884,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Fort Wayne, IN",
     size: [2880, 1304],
   },
+  // Gainesville, FL: skyline-sheet run 36808459092 — a one-market run's pick of nineteen: Sweetwater Wetlands Park from above under a sky of cumulus, an oblique with a horizon, sharp and whole in both crops, over Century Tower, whose crown the wide crop cuts, the county's buildings behind signals and street signs, a museum at the card's foot, a camera's viewfinder and a coastal lab's sign; the six-market sheet had held parked cars under a crane, a steep aerial of Depot Park and a watermarked drone frame.
+  "cbsa:23540": {
+    file: "Sweetwater Wetlands Park.jpg",
+    place: "Sweetwater Wetlands Park's pools and levee path from above, marsh and forest to the horizon",
+    credit: "Flatwoods 36",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Gainesville, FL",
+    size: [3992, 2242],
+  },
   // Grand Rapids, MI: skyline-sheet run 36750858237 — blue hour with the lit bridge, sharp and whole.
   "cbsa:24340": {
     file: "Grand Rapids, Michigan skyline May 2022.jpg",
@@ -973,6 +1003,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/3.0",
     name: "Knoxville, TN",
     size: [5374, 3583],
+  },
+  // Lafayette, LA: skyline-sheet run 36808145480 — the city article's lead, downtown's towers from a rooftop under a clear sky, whole in both crops, over the same rooftops from other angles, a panorama whose card keeps neither tower whole, a PNG (never served), a 2008 parking lot under a white sky, a 2008 tower close up under haze, and a bank tower over a parking lot.
+  "cbsa:29180": {
+    file: "Downtown Lafayette LA 2021.jpg",
+    place: "Downtown Lafayette's towers, one wrapped in a mural, from a rooftop under a clear sky",
+    credit: "TheLionHasSeen",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Lafayette, LA",
+    size: [8000, 6000],
   },
   // Lakeland, FL: skyline-sheet run 36786974652 — the towers, fountain and waterside arches whole in both crops, over a softer daylight frame of the same shore and grey, distant views from Lake Morton.
   "cbsa:29460": {
@@ -1103,6 +1143,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "",
     name: "Modesto, CA",
     size: [3456, 2304],
+  },
+  // Montgomery, AL: skyline-sheet run 36808145480 — downtown and its riverfront from the air in warm light, the article's lead, an oblique with a horizon, whole in both crops, over Commerce Street's brick fronts with parked cars along the road, the State Capitol small under a pale overcast sky, and a book's black-and-white plate of the Capitol.
+  "cbsa:33860": {
+    file: "Aerial view of Montgomery, Alabama LCCN2011646683.jpg",
+    place: "Downtown Montgomery and its riverfront from the air, in warm afternoon light",
+    credit: "Carol M. Highsmith",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Montgomery, AL",
+    size: [4734, 3282],
   },
   // Myrtle Beach, SC: skyline-sheet run 36787138337 — the towers and the beach whole in both crops in daylight, over a hazy high view up the strand to Cherry Grove Pier.
   "cbsa:34820": {
@@ -1294,6 +1344,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Rockford, IL",
     size: [3456, 2304],
   },
+  // St. George, UT: skyline-sheet run 36808230184 — the city below its red sandstone bluffs, snow-capped mountains under cloud beyond, an article's lead, whole in both crops, over four views of Snow Canyon State Park — red and white sandstone and sage, the park rather than the city, one with a dark shadow across a third of the card.
+  "cbsa:41100": {
+    file: "EM ST. GEORGE, UTAH (2624012794).jpg",
+    place: "St. George below its red sandstone bluffs, snow-capped mountains under cloud beyond",
+    credit: "Eddie Maloney from North Las Vegas, USA",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    name: "St. George, UT",
+    size: [3872, 2592],
+  },
   // Salem, OR: skyline-sheet run 36787138337 — the city article's lead, its spire whole in both crops, over buses at the transit centre and railway aerials.
   "cbsa:41420": {
     file: "Salem Oregon downtown.JPG",
@@ -1313,6 +1373,36 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "San Juan-Bayamón-Caguas, PR",
     size: [4032, 2268],
+  },
+  // San Luis Obispo-Paso Robles, CA: skyline-sheet run 36808230184 — the Mission, an article's lead, in warm evening light beside its eucalyptus, whole on the card and at 16:9; the 21:9 crop takes the head and arms of the cross on its gable, where the gable stays whole. Over the Mission's side in hard sun with its gable cut on the card, Bishop Peak behind a passenger train under a white sky, a hotel corner under a tree's shadow, a courtyard under a white sky, a c.1900 photograph and a 1920 book plate.
+  "cbsa:42020": {
+    file: "Mission San Luis Obispo (cropped).jpg",
+    place: "Mission San Luis Obispo de Tolosa in warm evening light, eucalyptus beside it",
+    credit: "Rennett Stowe",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "San Luis Obispo-Paso Robles, CA",
+    size: [3888, 2047],
+  },
+  // Santa Cruz-Watsonville, CA: skyline-sheet run 36808230184 — the harbour's sailboats under a blue sky with cloud, sharp and whole in both crops, over downtown's clock tower with its spire cut by the file's own top edge in hazy light, the Boardwalk across the water under a grey overcast, the bay from the wharf that is mostly open water on the card, a trolley, men on a dock and an old boat.
+  "cbsa:42100": {
+    file: "Boats in Santa Cruz Harbor (6868331295).jpg",
+    place: "Sailboats moored in Santa Cruz Harbor under a blue sky with cloud",
+    credit: "Don DeBold from San Jose, CA, USA",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Santa Cruz-Watsonville, CA",
+    size: [4288, 2848],
+  },
+  // Santa Fe, NM: skyline-sheet run 36808230184 — the Palace of the Governors' portal on the Plaza, an article's lead and the picture the city is known by, under a blue sky with cumulus, whole in both crops, over the Plaza's obelisk among trees, the rail depot over parked cars, an 1866 photograph, a c.1930 painting and two 1982 slides.
+  "cbsa:42140": {
+    file: "Palace of the Governors.jpg",
+    place: "The Palace of the Governors' portal on the Plaza under a blue sky with cumulus",
+    credit: "Tony Hisgett from Birmingham, UK",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Santa Fe, NM",
+    size: [5050, 2318],
   },
   // Santa Maria-Santa Barbara, CA: skyline-sheet run 36799416970 — the palms, the red-roofed town and the mountains behind, whole in both crops under a clear sky, over the harbour's fishing boats at golden hour, whose ridge the wide crop clips, a drone's view of the harbour and the wharf under a washed-out haze, a shopping plaza and a hazy view across the rooftops.
   "cbsa:42200": {
