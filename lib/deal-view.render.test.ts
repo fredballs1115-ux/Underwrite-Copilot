@@ -542,6 +542,16 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(form).toMatch(/<button type="submit" class="[^"]*self-end[^"]*sm:self-auto"/);
   });
 
+  it("the challenger's 'Copy broker email' keeps one line, its row wrapping under the title (2026-09-30)", () => {
+    // The research pass: at 390px it was squeezed onto three lines beside
+    // "Assumption challenger" and the severity bar.
+    const html = render(sampleProps("analyses", "challenger"));
+    expect(html).toMatch(
+      /<div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-2"><h2 class="text-sm font-semibold tracking-tight">Assumption challenger<\/h2><div class="flex flex-wrap items-center gap-x-3 gap-y-1">/,
+    );
+    expect(html).toMatch(/<button type="button" class="whitespace-nowrap [^"]*">Copy broker email<\/button>/);
+  });
+
   it("the reconciler tab draws each stated gap as a bar from a centre line", () => {
     const html = render(sampleProps("analyses", "reconciler"));
     // Two of the sample's three rows state a figure — "$174k below the OM"

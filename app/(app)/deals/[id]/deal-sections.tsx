@@ -158,8 +158,10 @@ const IconPaperclip = (p: { className?: string }) => (
 /* ================================================================== */
 
 function SectionHeader({ title, aside }: { title: string; aside?: ReactNode }) {
+  // An aside with no room beside the title takes its own row beneath it,
+  // rather than squeezing its words onto three lines.
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
       <h2 className="text-sm font-semibold tracking-tight">{title}</h2>
       {aside}
     </div>
@@ -695,7 +697,7 @@ export function ChallengerView({
       <SectionHeader
         title="Assumption challenger"
         aside={
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <SeverityTally challenges={ordered} />
             {ordered.some((c) => c.question) && (
               <CopyAllQuestions challenges={ordered} dealName={dealName} />
@@ -830,7 +832,7 @@ function CopyAllQuestions({
           toast("Couldn't copy — select the text instead.", "error");
         }
       }}
-      className="text-xs font-medium text-brand transition-colors hover:text-brand-strong"
+      className="whitespace-nowrap text-xs font-medium text-brand transition-colors hover:text-brand-strong"
     >
       Copy broker email
     </button>
