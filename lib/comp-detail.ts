@@ -52,16 +52,40 @@ const SF_LABEL_FIRST = new RegExp(
   String.raw`(?:\bprice\s*(?:/|per)\s*${SF_WORD}|\$\s*/\s*${SF_WORD}|\bp\.?p?s\.?f\.?)\b\s*(?:of|:|=|was|is)?\s*${MONEY}`,
   "i",
 );
-// "5.4% cap", "5.40% going-in cap", "a 5.4 cap" — the figure right before
-// the word, a percent sign or not; never a year ("2023 cap ex") or capex.
-const CAP_AFTER = /(?<![\d.$,])(\d{1,2}(?:\.\d{1,2})?)\s*%?\s*(?:going[- ]in\s+)?cap\b(?!\s*-?\s*ex)/i;
+// "5.4% cap", "5.40% going-in cap" — the figure right before the word, with
+// its percent sign; never a year ("2023 cap ex") or capex. A figure with no
+// sign is a cap only after "a" or "an" ("a 5.4 cap"): read bare, "T-12 cap
+// 5.2%" was a 12% cap and "Year 1 cap rate 5.4%" a 1% one.
+const CAP_AFTER = /(?<![\d.$,])(\d{1,2}(?:\.\d{1,2})?)\s*%\s*(?:going[- ]in\s+)?cap\b(?!\s*-?\s*ex)/i;
+const CAP_AFTER_ARTICLE = /\ban?\s+(\d{1,2}(?:\.\d{1,2})?)\s*%?\s*(?:going[- ]in\s+)?cap\b(?!\s*-?\s*ex)/i;
 // "cap rate of 5.4%", "cap rate was approximately 5.4%", "cap: 5.4%".
 const CAP_BEFORE =
   /\bcap(?:\s*rate)?\s*(?:(?:of|was|is|at|@|:|around|about|approximately|approx\.?|roughly|near|~)\s*){0,2}(\d{1,2}(?:\.\d+)?)\s*%/i;
 // A cap stated as a range — "5.25%-5.75% cap", "5.25 to 5.75% cap" — is no
-// single cap, and is read as none rather than as either end.
-const CAP_RANGE = /(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:going[- ]in\s+)?cap\b/i;
+// single cap, and is read as none rather than as either end. A range runs
+// low to high inside a cap's own bounds (`capRange`), and its low end is a
+// figure of its own, never a year's last digits: "Sold 2024 — 5.6% cap",
+// "Built 1985 - 5.5% cap" and "Units: 48 – 5.6% cap" each state one cap.
+const CAP_RANGE = /(?<![\d.$,])(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:going[- ]in\s+)?cap\b/i;
 const CAP_RANGE_AFTER = /\bcap(?:\s*rate)?\s*(?:of|:|at|@)?\s*(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%/i;
+const MAX_CAP_PCT = 20;
+
+function capRange(text: string): boolean {
+  for (const re of [CAP_RANGE, CAP_RANGE_AFTER]) {
+    const m = text.match(re);
+    if (m && Number(m[1]) < Number(m[2]) && Number(m[2]) <= MAX_CAP_PCT) return true;
+  }
+  return false;
+}
+
+// A figure the words before it call a rent — "Avg rent $2,100 a unit",
+// "asking rents $28/SF" — is a rent with its period left out, never a
+// price. The words count only inside the figure's own clause.
+const RENT_BEFORE = /\b(?:rents?|rental|adr|revpar)\b[^$·;|]*$/i;
+
+/** A basis under this a unit is a rent or a fee: nothing a building's
+ *  units, keys, pads or stalls trade at. */
+const MIN_PER_UNIT = 5_000;
 
 function money(m: RegExpMatchArray): number | null {
   const whole = m[1].replace(/,/g, "");
@@ -76,21 +100,22 @@ export function compFigures(detail: string | null | undefined): CompFigures {
   const text = (detail ?? "").trim();
   if (!text) return { perUnit: null, perSf: null, capPct: null };
 
+  const isRent = (m: RegExpMatchArray | null) => m != null && RENT_BEFORE.test(text.slice(0, m.index ?? 0));
   const unitMatch = text.match(PER_UNIT) ?? text.match(UNIT_LABEL_FIRST);
-  const unit = unitMatch ? money(unitMatch) : null;
+  const unit = unitMatch && !isRent(unitMatch) ? money(unitMatch) : null;
   const sfMatch = text.match(PER_SF) ?? text.match(SF_LABEL_FIRST);
-  const sf = sfMatch ? money(sfMatch) : null;
-  const ranged = CAP_RANGE.test(text) || CAP_RANGE_AFTER.test(text);
-  const capMatch = ranged ? null : (text.match(CAP_AFTER) ?? text.match(CAP_BEFORE));
+  const sf = sfMatch && !isRent(sfMatch) ? money(sfMatch) : null;
+  const capMatch = capRange(text)
+    ? null
+    : (text.match(CAP_AFTER) ?? text.match(CAP_AFTER_ARTICLE) ?? text.match(CAP_BEFORE));
   const cap = capMatch ? Number(capMatch[1]) : null;
 
   return {
-    // A basis under $1,000 a unit is a rent or a fee, not a price.
-    perUnit: unit != null && unit >= 1_000 ? unit : null,
+    perUnit: unit != null && unit >= MIN_PER_UNIT ? unit : null,
     perSf: sf != null && sf > 0 ? sf : null,
     // A cap rate outside (0, 20] is not one — a growth rate or an occupancy
     // wearing the word.
-    capPct: cap != null && cap > 0 && cap <= 20 ? cap : null,
+    capPct: cap != null && cap > 0 && cap <= MAX_CAP_PCT ? cap : null,
   };
 }
 

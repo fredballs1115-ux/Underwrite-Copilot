@@ -40,8 +40,30 @@ describe("compFigures — reads a comp's stated basis and cap, nothing more", ()
     expect(compFigures("")).toEqual(none);
     expect(compFigures(null)).toEqual(none);
     expect(compFigures(undefined)).toEqual(none);
-    // A "unit" price below $1,000 is a rent or a fee, never a basis.
+    // A "unit" price below $5,000 is a rent or a fee, never a basis.
     expect(compFigures("$5/unit/mo").perUnit).toBeNull();
+    expect(compFigures("$3,500 a unit").perUnit).toBeNull();
+  });
+
+  it("reads a figure its own clause calls a rent as no basis, whatever its period (the audit, 2026-10-01)", () => {
+    expect(compFigures("Avg rent $2,100 a unit").perUnit).toBeNull();
+    expect(compFigures("Asking rents $28/SF").perSf).toBeNull();
+    expect(compFigures("ADR $185/key").perUnit).toBeNull();
+    // A rent in its own clause leaves the price beside it alone.
+    expect(compFigures("Rents $2,100/mo · $248k/unit").perUnit).toBe(248_000);
+  });
+
+  it("reads one cap where a year, a count or a T-12 sits before it", () => {
+    for (const [line, cap] of [
+      ["T-12 cap 5.2%", 5.2],
+      ["Year 1 cap rate 5.4%", 5.4],
+      ["Sold 2024 — 5.6% cap", 5.6],
+      ["Built 1985 - 5.5% cap", 5.5],
+      ["Units: 48 – 5.6% cap", 5.6],
+      ["at a 5.4% cap", 5.4],
+    ] as const) {
+      expect(compFigures(line).capPct, line).toBe(cap);
+    }
   });
 });
 
