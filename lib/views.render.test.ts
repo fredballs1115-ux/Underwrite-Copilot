@@ -3834,6 +3834,8 @@ describe("the deal math tools", () => {
     expect(text).toContain("20.8 pts");
     expect(text).toContain("$837,410");
     expect((html.match(/data-bar="ecri"/g) ?? []).length).toBe(2);
+    // The occupancy gap's words follow its sign; the seed's units run ahead.
+    expect(text).toContain("Unit occupancy runs 4 points above square-foot occupancy");
   });
 
   it("and the runway each one spends, year by year", () => {

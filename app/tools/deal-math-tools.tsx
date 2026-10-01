@@ -6715,9 +6715,14 @@ function StorageEcri() {
           <p className="mt-3 text-xs text-muted">
             A free month costs one month out of the whole tenancy, so the same offer is{" "}
             {pct(st.concessionCostPct, 1)} here and {pct(st.concessionCostIfShortStayPct, 1)} in a
-            market where tenants leave a quarter sooner. Unit occupancy runs{" "}
-            {st.occupancyGapPts === null ? "\u2014" : `${st.occupancyGapPts} points`} above square-foot
-            occupancy because small units fill first, and an OM quotes whichever is higher.
+            market where tenants leave a quarter sooner.{" "}
+            {/* The gap's words follow its sign: "runs -4 points above" was
+                what a facility whose large units were the fuller ones read. */}
+            {st.occupancyGapPts !== null && st.occupancyGapPts < 0
+              ? `Unit occupancy runs ${Math.abs(st.occupancyGapPts)} points below square-foot occupancy here \u2014 the large units are the fuller ones \u2014 and an OM quotes whichever is higher.`
+              : st.occupancyGapPts === 0
+                ? "Unit and square-foot occupancy agree here; where they differ, an OM quotes whichever is higher."
+                : `Unit occupancy runs ${st.occupancyGapPts === null ? "\u2014" : `${st.occupancyGapPts} points`} above square-foot occupancy because small units fill first, and an OM quotes whichever is higher.`}
           </p>
         </div>
       </div>
