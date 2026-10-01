@@ -185,10 +185,14 @@ way in this batch):
   - **Construction debt:** a plan deal's loan is sized on the acquisition
     cost alone, with no construction debt behind the budget. This is model
     math.
-  - **Departing members:** a member who leaves or is removed keeps reading,
-    editing and deleting the deals they uploaded (pass 8's item, still
-    open). The team page will say so; whether it should stay that way is
-    your call.
+  - **Departing members:** a member who leaves or is removed can still
+    open, share by link and delete the deals they added (editing is
+    refused), and deleting one takes the teammates' versions, valuations,
+    tasks and documents on it with it (pass 8's item, still open). The team
+    page's Remove and Leave confirmations now say so; whether removing or
+    leaving should hand the deals to the team's owner is your call. An
+    account deleted after leaving now hands its team deals to the owner, as
+    the privacy page promised.
   - **Invites by address:** invites bound to an email address need SMTP and
     a migration.
   - **Roles:** read-only or custom roles, as Dealpath and Northspyre offer
