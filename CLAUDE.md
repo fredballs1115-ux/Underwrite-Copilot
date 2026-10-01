@@ -1433,9 +1433,24 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the seed. It reads through **`useSyncExternalStore`, whose server
   snapshot is the seed** — reading `window.location` during render is the
   hydration bug this avoids, and the render test asserts the server's
-  HTML carries the seeded figures. A table's Copy button writes it
+  HTML carries the seeded figures. **A key belongs to the page, not its
+  card** (2026-10-01): seven keys were each read by two cards, so the
+  first card on the page claimed the key and the second showed the
+  first's figure on every visit (the rent roll read the refinance rate's
+  7.25, the closing statement a price of 3.75); `catalog.test.ts` holds
+  every key to one field of one card, and a dropdown reads through
+  `useChoice`, which holds a link's value to the card's own options, else
+  its default. A table's Copy button writes it
   tab-delimited with headers and the numbers RAW, never the formatted
-  ones, so a paste lands in a spreadsheet as numbers.
+  ones, so a paste lands in a spreadsheet as numbers. Three habits every
+  card shares: one dollar writer for the cards and the modules' sentences
+  (`lib/tools/format.ts` — "owed $13,480,465", never "owed 13480465"); a
+  blank required field named rather than read as zero
+  (`lib/tools/blanks.ts`: "Fill in the loan rate — a blank is not read as
+  zero"; a blank lender test is still dropped, never sized at nothing);
+  and the longest each horizon runs (`lib/tools/limits.ts`: a hold of 30
+  years, a lease of 99, a ground lease of 999), said on the card when a
+  figure is capped, since a million-year hold froze the page.
 - A lease, and an expense: `lib/tools/lease-math.ts` (pure). `readLease`
   gives BOTH net effective rents and names them — straight-line, the one
   most memoranda quote, and discounted, which charges the landlord for
