@@ -48,6 +48,8 @@
  * Pure, no I/O.
  */
 
+import { MAX_GROUND_LEASE_YEARS, heldTo } from "./limits";
+
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
 }
@@ -219,7 +221,7 @@ export function readGroundLease(input: GroundLeaseTerms): GroundLeaseRead {
     };
   }
 
-  const years = Math.max(1, Math.round(yearsRemaining));
+  const years = Math.max(1, Math.round(heldTo(yearsRemaining, MAX_GROUND_LEASE_YEARS)));
   const growth = real(noiGrowthPct) ? noiGrowthPct : 0;
   const esc = real(escalationPct) ? escalationPct : 0;
 

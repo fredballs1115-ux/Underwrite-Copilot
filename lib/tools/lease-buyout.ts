@@ -76,6 +76,7 @@
  */
 
 import { usdCents, usdExact } from "./format";
+import { MAX_DOWNTIME_MONTHS, MAX_LEASE_YEARS, heldTo } from "./limits";
 
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
@@ -233,11 +234,17 @@ export function readBuyout(terms: BuyoutTerms): BuyoutRead {
 
   const esc = real(inPlaceEscalationPct) ? inPlaceEscalationPct : 0;
   const growth = real(marketGrowthPct) ? marketGrowthPct : 0;
-  const down = real(downtimeMonths) && downtimeMonths > 0 ? Math.round(downtimeMonths) : 0;
-  const newTerm = positive(newTermYears) ? newTermYears : 0;
+  // The streams run a month at a time, so the terms and the downtime are
+  // held to the longest the card runs (lib/tools/limits).
+  const down =
+    real(downtimeMonths) && downtimeMonths > 0
+      ? Math.round(heldTo(downtimeMonths, MAX_DOWNTIME_MONTHS))
+      : 0;
+  const newTerm = positive(newTermYears) ? heldTo(newTermYears, MAX_LEASE_YEARS) : 0;
   const ti = real(tiPsf) && tiPsf > 0 ? round(tiPsf * sf) : 0;
 
-  const remainMonths = Math.round(yearsRemaining * 12);
+  const yearsLeft = heldTo(yearsRemaining, MAX_LEASE_YEARS);
+  const remainMonths = Math.round(yearsLeft * 12);
   const newTermMonths = Math.round(newTerm * 12);
   // One horizon for both streams, long enough that each reaches the end of
   // the same replacement lease. Comparing streams of different lengths is
@@ -331,7 +338,7 @@ export function readBuyout(terms: BuyoutTerms): BuyoutRead {
   } else {
     notes.push(
       `Ending the lease is worth ${usdExact(buyoutValue)} to the landlord: ` +
-        `${Math.round((yearsRemaining ?? 0) * 10) / 10} years of market rent instead of in-place, ` +
+        `${Math.round(yearsLeft * 10) / 10} years of market rent instead of in-place, ` +
         "less the cost of turning the space over sooner than it had to be turned over.",
     );
     if (naiveSpreadPv > buyoutValue) {

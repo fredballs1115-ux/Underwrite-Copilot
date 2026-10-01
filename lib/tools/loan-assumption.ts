@@ -56,6 +56,7 @@
 
 import { irr } from "../underwrite/engine";
 import { readDebt } from "./debt-math";
+import { MAX_HOLD_YEARS, heldTo } from "./limits";
 
 /** How far the price search will look, as a multiple of the asking price. */
 const PRICE_SEARCH_CEILING = 2;
@@ -326,7 +327,9 @@ export function readAssumption(t: AssumptionTerms): AssumptionRead {
     return { ...EMPTY, note: "Enter a hold of at least a year." };
   }
 
-  const hold = Math.round(t.holdYears);
+  // A year at a time, and bisected, so held to the longest the card runs
+  // (lib/tools/limits): a million-year hold ran for minutes.
+  const hold = Math.round(heldTo(t.holdYears, MAX_HOLD_YEARS));
   const base = bothAt(t, t.price, hold);
   if (base === null || base.assume === null || base.newLoan === null) {
     return { ...EMPTY, note: "Enter the loan's remaining term, its amortisation and the exit cap." };

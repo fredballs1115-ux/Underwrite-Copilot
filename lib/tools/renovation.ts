@@ -62,6 +62,7 @@
  */
 
 import { irr } from "../underwrite/engine";
+import { MAX_HOLD_YEARS, heldTo } from "./limits";
 
 /**
  * The discount rate the present-value split is measured at — rule 4. An
@@ -327,7 +328,8 @@ export function readRenovation(t: RenovationTerms): RenovationRead {
   const breakEvenPremium = cap === null ? null : (netCostPerDoor * cap) / 12;
 
   // Rule 4. The schedule.
-  const hold = positive(t.holdYears) ? Math.round(t.holdYears) : null;
+  // Held to the longest the card runs (lib/tools/limits).
+  const hold = positive(t.holdYears) ? Math.round(heldTo(t.holdYears, MAX_HOLD_YEARS)) : null;
   const schedule =
     pace === null || pace <= 0 || paceTooSlow
       ? []

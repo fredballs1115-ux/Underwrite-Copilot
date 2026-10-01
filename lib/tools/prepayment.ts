@@ -56,6 +56,7 @@
 
 import { loanConstant } from "./deal-math";
 import { usdExact } from "./format";
+import { MAX_LOAN_MONTHS, heldTo } from "./limits";
 
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
@@ -199,7 +200,8 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
     return { ...EMPTY, note: "Enter the loan's rate and the months left to maturity." };
   }
 
-  const months = Math.round(monthsRemaining);
+  // A month at a time, so held to the longest the card runs (lib/tools/limits).
+  const months = Math.round(heldTo(monthsRemaining, MAX_LOAN_MONTHS));
   const io = !positive(amortYears);
   const k = loanConstant(loanRatePct, amortYears, io);
   if (k === null) {

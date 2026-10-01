@@ -5,6 +5,16 @@ import { aOrAn, withArticle } from "@/lib/article";
 import { readFigure } from "@/lib/money";
 import { usd, usdCents, usdExact } from "@/lib/tools/format";
 import { blanks, fillIn } from "@/lib/tools/blanks";
+import {
+  MAX_BUILD_MONTHS,
+  MAX_DOWNTIME_MONTHS,
+  MAX_GROUND_LEASE_YEARS,
+  MAX_HOLD_YEARS,
+  MAX_LEASE_YEARS,
+  MAX_LOAN_MONTHS,
+  heldNote,
+  heldTo,
+} from "@/lib/tools/limits";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
@@ -294,6 +304,23 @@ const mult = (n: number | null) => (n === null ? "—" : `${n.toFixed(2)}x`);
 /** An area, in the unit a zoning code and a rent roll both use. */
 const sf = (n: number | null) =>
   n === null ? "—" : `${Math.round(n).toLocaleString("en-US")} SF`;
+
+/**
+ * Under a card's fields: each figure the card read at the longest it runs
+ * (lib/tools/limits). A million-year hold answers at once as thirty years,
+ * and the card says it did rather than holding the figure quietly.
+ */
+function HeldNotes({
+  notes,
+  className = "",
+}: {
+  notes: (string | null)[];
+  className?: string;
+}) {
+  const shown = notes.filter((n): n is string => n !== null);
+  if (shown.length === 0) return null;
+  return <p className={`text-xs text-caution ${className}`}>{shown.join(" ")}</p>;
+}
 
 /** A figure with its name under it — the shape every result here takes. */
 function Stat({
@@ -2631,6 +2658,7 @@ function WhatYouBelieve() {
         <Field label="Cost of sale" suffix="%" value={saleCost} onChange={setSaleCost} placeholder="2" />
         <Field label="Ordinary growth" suffix="%" value={market} onChange={setMarket} placeholder="3" />
       </div>
+      <HeldNotes className="mt-2" notes={[heldNote(num(hold), MAX_HOLD_YEARS, "Hold", "years")]} />
 
       {r.requiredGrowthPct !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
@@ -2985,6 +3013,10 @@ function GroundLease() {
           ]}
         />
       </div>
+      <HeldNotes
+        className="mt-2"
+        notes={[heldNote(num(years), MAX_GROUND_LEASE_YEARS, "Years left", "years")]}
+      />
 
       {r.leaseholdValue !== null && r.asIfPerpetual !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
@@ -3000,7 +3032,8 @@ function GroundLease() {
                 tone: "bg-kill",
               },
               {
-                label: `Worth over the ${years} years that are left`,
+                // The years the module ran, held as it holds them.
+                label: `Worth over the ${Math.max(1, Math.round(heldTo(num(years) ?? 0, MAX_GROUND_LEASE_YEARS)))} years that are left`,
                 amount: r.leaseholdValue,
                 tone: "bg-brand",
               },
@@ -3172,6 +3205,10 @@ function ConstructionDraw() {
           ]}
         />
       </div>
+      <HeldNotes
+        className="mt-2"
+        notes={[heldNote(num(months), MAX_BUILD_MONTHS, "Works", "months")]}
+      />
 
       {r.interestReserve !== null && (
         <div className="mt-5 grid grid-cols-2 gap-4 border-t border-line pt-5 sm:grid-cols-4">
@@ -3508,6 +3545,7 @@ function Prepayment({ curve = [] }: { curve?: readonly CurveSeed[] }) {
         <Field label="Open in" suffix="mo" value={open} onChange={setOpen} placeholder="24" />
         <Field label="Market loan rate" suffix="%" value={mkt} onChange={setMkt} placeholder="6.5" />
       </div>
+      <HeldNotes className="mt-2" notes={[heldNote(num(months), MAX_LOAN_MONTHS, "Months left")]} />
 
       {r.yieldMaintenance !== null && r.defeasance !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
@@ -3676,6 +3714,14 @@ function LeaseBuyout() {
         <Field label="Vacant possession worth" value={outside} onChange={setOutside} placeholder="0" />
         <Field label="Tenant moving cost" value={moving} onChange={setMoving} placeholder="750,000" />
       </div>
+      <HeldNotes
+        className="mt-2"
+        notes={[
+          heldNote(num(years), MAX_LEASE_YEARS, "Years left", "years"),
+          heldNote(num(down), MAX_DOWNTIME_MONTHS, "Downtime", "months"),
+          heldNote(num(newTerm), MAX_LEASE_YEARS, "New term", "years"),
+        ]}
+      />
 
       {r.buyoutValue !== null && r.naiveSpreadPv !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
@@ -6653,6 +6699,10 @@ function LoanAssumption() {
           <Field label="New loan LTV" suffix="%" value={ltv} onChange={setLtv} placeholder="60" />
           <Field label="New amort" suffix="yrs" value={newAmort} onChange={setNewAmort} placeholder="30" />
           <Field label="New loan fee" suffix="% loan" value={newFee} onChange={setNewFee} placeholder="1" />
+          <HeldNotes
+            className="col-span-full"
+            notes={[heldNote(num(hold), MAX_HOLD_YEARS, "Hold", "years")]}
+          />
         </div>
 
         <div>
@@ -7043,6 +7093,10 @@ function Renovation() {
           <Field label="Exit cap" suffix="%" value={exitCap} onChange={setExitCap} placeholder="5.00" />
           <Field label="Hold" suffix="yrs" value={hold} onChange={setHold} placeholder="5" />
           <Field label="Claimed program" suffix="mo" value={claimed} onChange={setClaimed} placeholder="24" />
+          <HeldNotes
+            className="col-span-full"
+            notes={[heldNote(num(hold), MAX_HOLD_YEARS, "Hold", "years")]}
+          />
         </div>
 
         <div>

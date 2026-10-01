@@ -58,6 +58,7 @@
  */
 
 import { withArticle } from "@/lib/article";
+import { MAX_HOLD_YEARS, heldTo } from "./limits";
 
 // No `irr` import here on purpose: the solve works on the NPV at the
 // target rate, which is cheaper and exact. The agreement WITH the shared
@@ -235,7 +236,8 @@ export function readBelief(input: BeliefInputs): BeliefRead {
     };
   }
 
-  const years = Math.max(1, Math.round(holdYears));
+  // Held to the longest the card runs (lib/tools/limits).
+  const years = Math.max(1, Math.round(heldTo(holdYears, MAX_HOLD_YEARS)));
   const sale = real(sellingCostPct) ? sellingCostPct : 0;
 
   // Rule 2: NPV at the target rate is monotone in growth, so its zero is
