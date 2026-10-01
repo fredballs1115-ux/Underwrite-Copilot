@@ -17,6 +17,7 @@ import {
 } from "@/lib/market/import";
 import { RENT_BASES, type ExclusionRules, type RentBasis } from "@/lib/market/types";
 import { getSubmarket } from "@/lib/market/store";
+import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
 
 const MAX_FILE = 32 * 1024 * 1024;
 
@@ -54,13 +55,18 @@ export async function createSubmarket(formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   if (!name) redirect(listError("name"));
 
+  // One of the site's own classes (lib/asset-class), the list every deal is
+  // filed under; anything else posted is not a class.
+  const classRaw = String(formData.get("assetClass") ?? "").trim().toLowerCase();
+  const assetClass = Object.prototype.hasOwnProperty.call(ASSET_CLASS_LABEL, classRaw) ? classRaw : "industrial";
+
   const { data, error } = await supabase
     .from("submarkets")
     .insert({
       user_id: user.id,
       name,
       metro: String(formData.get("metro") ?? "").trim() || null,
-      asset_class: String(formData.get("assetClass") ?? "industrial"),
+      asset_class: assetClass,
       exclusion_rules: {},
       supply_warning_months: num(formData.get("supplyWarningMonths")) ?? 24,
     })
