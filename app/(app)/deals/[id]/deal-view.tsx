@@ -75,6 +75,7 @@ import { interestOf } from "@/lib/interest";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { servedInline } from "@/lib/inline-types";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
+import { revealScrollLeft } from "@/lib/tab-strip";
 import type { ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
@@ -570,6 +571,33 @@ export function DealView({
     setSection(key);
     syncUrl(key);
   }
+
+  // The section bar scrolls sideways on a phone, and the tab a link, the
+  // URL or a jump from the Overview selects can sit past its end (Analyses
+  // sat at x 369–497 of a 390px screen). On mount and on every change of
+  // section the STRIP scrolls the selected tab into view (lib/tab-strip):
+  // its own scrollLeft, never the page's, so the page never jumps.
+  const tabStrip = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const strip = tabStrip.current;
+    const tab = strip?.querySelector<HTMLElement>(`#tab-${section}`);
+    if (!strip || !tab) return;
+    const s = strip.getBoundingClientRect();
+    const t = tab.getBoundingClientRect();
+    // A tab under the phone's faded right edge (1.75rem, where the strip
+    // carries its mask) is not yet read.
+    const css = getComputedStyle(strip);
+    const mask = css.getPropertyValue("mask-image") || css.getPropertyValue("-webkit-mask-image");
+    const fade = /gradient/.test(mask)
+      ? 1.75 * parseFloat(getComputedStyle(document.documentElement).fontSize)
+      : 0;
+    const left = revealScrollLeft(
+      { left: s.left, clientWidth: strip.clientWidth, scrollWidth: strip.scrollWidth, scrollLeft: strip.scrollLeft },
+      { left: t.left, right: t.right },
+      fade,
+    );
+    if (left != null) strip.scrollLeft = left;
+  }, [section]);
   function selectAnalysis(key: AnalysisKey) {
     setAnalysis(key);
     setSection("analyses");
@@ -733,7 +761,11 @@ export function DealView({
       )}
 
       {/* Section bar — one section visible at a time. */}
-      <div className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]">
+      <div
+        ref={tabStrip}
+        data-tab-strip
+        className="overflow-x-auto max-md:[mask-image:linear-gradient(90deg,#000_calc(100%_-_1.75rem),transparent)]"
+      >
         <div
           role="tablist"
           aria-label="Deal sections"

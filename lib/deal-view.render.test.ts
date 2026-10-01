@@ -516,6 +516,19 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(unread.find((r) => r.title.startsWith("Exit cap:"))?.severity).toBe("high");
   });
 
+  it("the section bar scrolls its own strip to the selected tab, never the page (2026-09-30)", () => {
+    // The research pass: at 390px the selected Analyses tab sat at x 369–497,
+    // off the screen. The effect is a browser's to run (lib/tab-strip holds
+    // its arithmetic); here the strip it scrolls and the call are held.
+    const html = render(sampleProps("analyses", "verdict"));
+    expect(html).toMatch(/<div data-tab-strip="true" class="overflow-x-auto[^"]*"><div role="tablist"/);
+    const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-view.tsx"), "utf8");
+    // Set on mount and on every change of section, on the strip itself: a
+    // scrollIntoView would move the page to a strip scrolled out of sight.
+    expect(src).toMatch(/if \(left != null\) strip\.scrollLeft = left;\s*\}, \[section\]\);/);
+    expect(src).not.toMatch(/scrollIntoView\(/);
+  });
+
   it("the reconciler tab draws each stated gap as a bar from a centre line", () => {
     const html = render(sampleProps("analyses", "reconciler"));
     // Two of the sample's three rows state a figure — "$174k below the OM"
