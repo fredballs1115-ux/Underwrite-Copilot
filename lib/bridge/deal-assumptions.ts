@@ -2,7 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
-import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, deriveUnderwriteInputs, type DerivedModel } from "@/lib/underwrite/inputs";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
 import type { Assumptions } from "./model";
@@ -22,6 +22,23 @@ export async function currentDealAssumptions(
   dealName: string,
   extraction: ExtractionResult | null,
 ): Promise<Assumptions | null> {
+  return (await currentDealModel(supabase, dealId, dealName, extraction))?.inputs ?? null;
+}
+
+/**
+ * The same derivation with its sources and meta — for a caller that says
+ * where each input came from — seeded for the hold the caller's own model
+ * runs on: the Treasury tenor nearest it (lib/debt-index), so a ten-year
+ * workbook prices its loan off the 10-year where the deal page's five-year
+ * model prices off the 5-year. Null before the deal is screened.
+ */
+export async function currentDealModel(
+  supabase: SupabaseClient,
+  dealId: string,
+  dealName: string,
+  extraction: ExtractionResult | null,
+  holdMonths: number = HOLD_MONTHS,
+): Promise<DerivedModel | null> {
   if (!extraction) return null;
 
   // The same rate read as the deal page: the current set's all-in rate is
@@ -45,7 +62,7 @@ export async function currentDealAssumptions(
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle(),
-    liveDebtSeeds(HOLD_MONTHS),
+    liveDebtSeeds(holdMonths),
     supabase.from("deals").select("is_sample").eq("id", dealId).maybeSingle(),
   ]);
   const isSample = !!(dealRes.data as { is_sample?: boolean | null } | null)?.is_sample;
@@ -65,5 +82,5 @@ export async function currentDealAssumptions(
         : null,
     },
     modelMarketFor(isSample, debt),
-  ).inputs;
+  );
 }

@@ -1832,9 +1832,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   30-day average SOFR for construction debt (overnight SOFR only where the
   average is not fresh; Term SOFR is CME's and not on FRED) — and
   `lib/debt-index-read.ts` (`server-only`, `liveDebtSeeds`) hands it to
-  EVERY surface that derives the model: the deal page, the workbook route,
-  the report route and the bridge's current-assumptions read, so the page
-  and the workbook cannot print two rates for one deal on one day.
+  EVERY surface that derives the model: the deal page, the underwrite
+  workbook route, the report route and the bridge's current-assumptions
+  read (`currentDealModel` in lib/bridge/deal-assumptions, which the
+  rent-roll workbook route reads too), so the page and the underwrite
+  workbook cannot print two rates for one deal on one day. The rent-roll
+  workbook asks for its own ten-year hold (`EXPORT_HOLD_YEARS`), so its
+  rate is the 10-year tenor's plus the class spread, and its Assumptions
+  tab says so beside the input.
   `deriveUnderwriteInputs` takes it as a fourth argument (`MarketForModel`)
   and sets `allInRatePct` to index + `CLASS_DEFAULTS[cls].spreadBps` — the
   index is the fact, the spread is the assumption, and the note says both

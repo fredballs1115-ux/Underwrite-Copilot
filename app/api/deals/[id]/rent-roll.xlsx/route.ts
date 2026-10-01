@@ -6,10 +6,7 @@ import { getRentRollImport, latestRentRollImport, listProfiles } from "@/lib/ren
 import { openingProfile } from "@/lib/rentroll/profiles";
 import { DEFAULT_LEASE_UP_MONTHS, analyzeRentRoll, defaultAbsorptionSfPerMonth } from "@/lib/rentroll/analytics";
 import { shownAssetClass } from "@/lib/pipeline-slots";
-import { deriveUnderwriteInputs, type ActualsForModel, type DerivedModel } from "@/lib/underwrite/inputs";
-import { liveDebtSeeds } from "@/lib/debt-index-read";
-import { modelMarketFor } from "@/lib/model-market";
-import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
+import { currentDealModel } from "@/lib/bridge/deal-assumptions";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export const runtime = "nodejs";
@@ -19,49 +16,6 @@ export const runtime = "nodejs";
  *  that the caller reading the tenor asks for the hold its model runs on
  *  (lib/debt-index). It had borrowed the deal page's five-year pricing. */
 const EXPORT_HOLD_YEARS = 10;
-
-type Supabase = Awaited<ReturnType<typeof createSupabaseServerClient>>;
-
-/**
- * The deal's own model, as the underwrite workbook derives it — the
- * documents, the property actuals the screen read, and today's index — but
- * seeded for this workbook's hold. Null where the deal has not been screened.
- */
-async function dealModelForExport(
-  supabase: Supabase,
-  dealId: string,
-  dealName: string,
-  extraction: ExtractionResult | null,
-  isSample: boolean,
-): Promise<DerivedModel | null> {
-  if (!extraction) return null;
-  const [rrRes, t12Res, debt] = await Promise.all([
-    supabase
-      .from("deal_rent_rolls")
-      .select("as_of_date, summary")
-      .eq("deal_id", dealId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    supabase
-      .from("deal_t12_statements")
-      .select("period_end_date, summary")
-      .eq("deal_id", dealId)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    liveDebtSeeds(EXPORT_HOLD_YEARS * 12),
-  ]);
-  const actuals: ActualsForModel = {
-    rentRoll: rrRes.data?.summary
-      ? { summary: rrRes.data.summary as RentRollSummary, asOf: (rrRes.data.as_of_date as string | null) ?? null }
-      : null,
-    t12: t12Res.data?.summary
-      ? { summary: t12Res.data.summary as T12Summary, periodEnd: (t12Res.data.period_end_date as string | null) ?? null }
-      : null,
-  };
-  return deriveUnderwriteInputs(extraction, dealName, actuals, modelMarketFor(isSample, debt));
-}
 
 /** "Oct 1, 2026" */
 const longDay = (iso: string): string =>
@@ -109,7 +63,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   const { data: deal, error } = await supabase
     .from("deals")
-    .select("id, name, asset_class, extraction, is_sample")
+    .select("id, name, asset_class, extraction")
     .eq("id", id)
     .maybeSingle();
   if (error) return Response.redirect(new URL(`/deals/${id}/rent-roll?error=exportfail`, req.url), 302);
@@ -138,12 +92,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   // The deal's own assumptions when it's been screened; documented screening
   // defaults when it hasn't. Either way they land as editable blue inputs.
-  const model = await dealModelForExport(
+  // The deal's own model, derived as every other surface derives it
+  // (lib/bridge/deal-assumptions), but seeded for this workbook's hold.
+  const model = await currentDealModel(
     supabase,
     id,
     deal.name as string,
     (deal.extraction as ExtractionResult | null) ?? null,
-    !!(deal as { is_sample?: boolean | null }).is_sample,
+    EXPORT_HOLD_YEARS * 12,
   );
   const base = model?.inputs ?? null;
 

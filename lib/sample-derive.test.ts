@@ -104,7 +104,6 @@ describe("the signed-in sample deal is never seeded — its IRR does not move wi
       [
         join("app", "(app)", "deals", "[id]", "page.tsx"),
         join("app", "api", "deals", "[id]", "report", "route.ts"),
-        join("app", "api", "deals", "[id]", "rent-roll.xlsx", "route.ts"),
         join("app", "api", "deals", "[id]", "underwrite.xlsx", "route.ts"),
         join("lib", "bridge", "deal-assumptions.ts"),
         join("lib", "model", "build-model.ts"),
