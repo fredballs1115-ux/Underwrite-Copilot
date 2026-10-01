@@ -390,6 +390,15 @@ export interface LeaseUpCurve {
   stabilizedOccupancyPct: number;
 }
 
+/** The lease-up pace the page and the workbook start from until the user
+ *  sets one: the vacancy leased over three years. A screening placeholder,
+ *  never a market absorption figure, and every surface says so. */
+export const DEFAULT_LEASE_UP_MONTHS = 36;
+
+export function defaultAbsorptionSfPerMonth(vacantSf: number): number {
+  return vacantSf > 0 ? Math.round(vacantSf / DEFAULT_LEASE_UP_MONTHS) : 0;
+}
+
 /**
  * Absorption of the vacant SF at a stated pace, building-wide.
  *
@@ -583,7 +592,12 @@ export interface RentRollAnalytics {
   totalSf: number;
   occupiedSf: number;
   vacantSf: number;
+  /** occupied SF over `nra` */
   occupancyPct: number | null;
+  /** the area occupancy is over: the building's NRA where the user stated
+   *  one, else the roll's own leased + vacant SF */
+  nra: number | null;
+  nraStated: boolean;
   inPlaceRentAnnual: number;
   weightedInPlacePsf: number | null;
   walt: Walt;
@@ -603,7 +617,8 @@ export function analyzeRentRoll(
   const vacantSf = leases.filter((l) => l.vacant).reduce((s, l) => s + (l.sf ?? 0), 0);
   const occupiedSf = totalSf - vacantSf;
   const inPlaceRentAnnual = leases.reduce((s, l) => s + (l.baseRentAnnual ?? 0), 0);
-  const nra = options.nra ?? (totalSf > 0 ? totalSf : null);
+  const statedNra = options.nra != null && options.nra > 0 ? options.nra : null;
+  const nra = statedNra ?? (totalSf > 0 ? totalSf : null);
 
   const walt = computeWalt(leases, options.asOf);
   const rollover = rolloverSchedule(leases, { nra });
@@ -621,6 +636,8 @@ export function analyzeRentRoll(
     occupiedSf,
     vacantSf,
     occupancyPct: nra && nra > 0 ? occupiedSf / nra : null,
+    nra,
+    nraStated: statedNra != null,
     inPlaceRentAnnual,
     weightedInPlacePsf: occupiedSf > 0 ? inPlaceRentAnnual / occupiedSf : null,
     walt,

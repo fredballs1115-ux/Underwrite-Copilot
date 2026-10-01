@@ -57,6 +57,26 @@ export interface WorkbookInputs {
   ioMonths: number;
   amortMonths: number;
   financingCostPct: number;
+
+  /** what the Assumptions tab says beside the inputs a caller seeded — where
+   *  each came from, with its date — so no reader takes a placeholder for a
+   *  finding. Words only: no note changes a figure or a formula. */
+  notes?: WorkbookNotes;
+}
+
+export interface WorkbookNotes {
+  /** where the analysis start came from: the roll's own as-of date, or the
+   *  day the file was made, said as that */
+  asOf?: string;
+  /** the lease-up pace, and whether anybody set it */
+  absorption?: string;
+  /** the loan rate's index, its date and the spread */
+  rate?: string;
+  /** general vacancy: where the figure came from, and what this export does
+   *  with it */
+  vacancy?: string;
+  /** expense recovery: what this export assumes */
+  reimbursement?: string;
 }
 
 /** Everything read off the rent roll, resolved once so the workbook writes the

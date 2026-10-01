@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_LEASE_UP_MONTHS,
   analyzeRentRoll,
   blendedRolloverCostPsf,
   computeWalt,
   concentrationFlags,
+  defaultAbsorptionSfPerMonth,
   leaseUpCurve,
   markToMarket,
   rolloverCostForecast,
@@ -321,6 +323,21 @@ describe("concentrationFlags", () => {
 });
 
 describe("analyzeRentRoll", () => {
+  it("says which area its occupancy is over, and starts the lease-up at a pace named as a placeholder", () => {
+    const own = analyzeRentRoll(CLEAN, { asOf: AS_OF });
+    expect(own.nra).toBe(100_000);
+    expect(own.nraStated).toBe(false);
+    const stated = analyzeRentRoll(CLEAN, { asOf: AS_OF, nra: 130_000 });
+    expect(stated.nra).toBe(130_000);
+    expect(stated.nraStated).toBe(true);
+    expect(stated.occupancyPct).toBeCloseTo(85_000 / 130_000, 12);
+    // A stated NRA of nothing is no NRA: the roll's own area stands in.
+    expect(analyzeRentRoll(CLEAN, { asOf: AS_OF, nra: 0 }).nraStated).toBe(false);
+    expect(DEFAULT_LEASE_UP_MONTHS).toBe(36);
+    expect(defaultAbsorptionSfPerMonth(15_000)).toBe(Math.round(15_000 / 36));
+    expect(defaultAbsorptionSfPerMonth(0)).toBe(0);
+  });
+
   it("rolls the whole roll up in one pass", () => {
     const a = analyzeRentRoll(CLEAN, { asOf: AS_OF, nra: 100_000 });
     expect(a.leaseCount).toBe(4);

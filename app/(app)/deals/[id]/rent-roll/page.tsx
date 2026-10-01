@@ -5,6 +5,7 @@ import { downloadDealFile } from "@/lib/storage";
 import { readGrid } from "@/lib/rentroll/parse";
 import {
   analyzeRentRoll,
+  defaultAbsorptionSfPerMonth,
   leaseUpCurve,
   markToMarket,
   rolloverCostForecast,
@@ -38,11 +39,6 @@ const ERRORS: Record<string, string> = {
   nodoc: "The uploaded file is no longer in storage, so the mapping can't be re-applied.",
   exportfail: "Couldn't build the workbook just now — please try again in a moment.",
 };
-
-/** Absorption pace used for the lease-up curve until the user overrides it:
- *  the vacancy leased over three years, which is a screening placeholder and
- *  is labelled as one on screen. */
-const defaultAbsorption = (vacantSf: number) => (vacantSf > 0 ? Math.round(vacantSf / 36) : 0);
 
 export default async function RentRollPage({
   params,
@@ -135,13 +131,15 @@ export default async function RentRollPage({
         FSG: activeProfile.marketRentPsf,
       })
     : null;
+  // The lease-up runs at the placeholder pace (the vacancy over three years)
+  // until the user sets one in the workbook, and the dashboard says so.
   const curve =
     analytics && schedule
       ? leaseUpCurve({
           vacantSf: schedule.vacantSf,
           occupiedSf: analytics.occupiedSf,
           nra: analytics.totalSf,
-          absorptionSfPerMonth: defaultAbsorption(schedule.vacantSf),
+          absorptionSfPerMonth: defaultAbsorptionSfPerMonth(schedule.vacantSf),
         })
       : null;
 
@@ -272,6 +270,13 @@ export default async function RentRollPage({
               with native <code className="font-mono text-xs">IRR</code>,{" "}
               <code className="font-mono text-xs">XIRR</code> and equity multiple.
             </p>
+            {/* What the export assumes and does not set — said where it is
+                downloaded, so nobody takes its IRR for a finished underwrite. */}
+            <p data-qa="export-caveat" className="basis-full text-xs text-muted">
+              It takes the deal model&apos;s general vacancy off every year&apos;s revenue on top of the
+              lease-up, and assumes no tenant reimburses an expense: set both on its Assumptions tab
+              before you read the IRR.
+            </p>
           </div>
 
           {analytics && mtm && cost && curve ? (
@@ -282,6 +287,8 @@ export default async function RentRollPage({
               leaseUp={curve}
               issues={record.issues}
               filename={record.filename}
+              asOfFrom={record.asOfDate ? "roll" : "today"}
+              paceIsDefault
             />
           ) : null}
 

@@ -1507,12 +1507,19 @@ import { rentTrend } from "@/lib/market/metrics";
 import type { SubmarketPeriod } from "@/lib/market/types";
 
 describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
-  const renderRoll = (csv: string, opts: { leasesShort?: boolean } = {}) => {
+  const renderRoll = (
+    csv: string,
+    opts: { leasesShort?: boolean; nra?: number; asOfFrom?: "roll" | "today"; paceIsDefault?: boolean } = {},
+  ) => {
     const grid = parseCsv(csv);
     const parsed = toLeases(grid, suggestMapping(grid));
     const leases = parsed.leases;
     const profile = opts.leasesShort ? PROFILE_DEFAULTS.multifamily : PROFILE_DEFAULTS.office;
-    const analytics = analyzeRentRoll(leases, { asOf: "2026-01-01", nra: null, leasesShort: opts.leasesShort });
+    const analytics = analyzeRentRoll(leases, {
+      asOf: "2026-01-01",
+      nra: opts.nra ?? null,
+      leasesShort: opts.leasesShort,
+    });
     const schedule = rolloverSchedule(leases, { nra: null });
     const rent = profile.marketRentPsf;
     const mtm = markToMarket(leases, { default: rent, NNN: rent, MG: rent, FSG: rent });
@@ -1529,6 +1536,8 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
           }),
           issues: validateLeases(leases, { nra: null, parse: parsed }),
           filename: "rent-roll.csv",
+          asOfFrom: opts.asOfFrom,
+          paceIsDefault: opts.paceIsDefault,
         }),
       );
     dumpView(
@@ -1565,6 +1574,18 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("Left out 1 totals line");
     expect(text).toContain("(row 11)");
+  });
+
+  it("says the day years to expiry count from, which area occupancy is over, and that the lease-up pace is a placeholder", () => {
+    const today = renderRoll(CLEAN_CSV, { nra: 130_000, asOfFrom: "today", paceIsDefault: true });
+    expect(gluedWords(today.text)).toEqual([]);
+    expect(today.text).toContain("Years to expiry are counted from today, Jan 1, 2026 — the roll states no as-of date");
+    expect(today.text).toContain("85,000 SF of the stated 130,000 SF NRA — the roll lists 100,000 SF");
+    expect(today.text).toMatch(/an assumed pace, the vacancy leased over 36 months: a placeholder, not the market's absorption/);
+    const stated = renderRoll(CLEAN_CSV);
+    expect(stated.text).toContain("Years to expiry are counted from Jan 1, 2026, the roll's as-of date.");
+    expect(stated.text).toContain("85,000 SF of 100,000 SF");
+    expect(stated.text).not.toContain("a placeholder");
   });
 
   it("an apartment roll is read for loss to lease, with no rollover-cliff or WALT flag", () => {
