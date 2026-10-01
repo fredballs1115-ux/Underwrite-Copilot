@@ -304,6 +304,9 @@ if (probeBls.length > 0) {
 // FRED's own title, cadence, units and newest observation so a list drafted
 // from memory can be checked against what the series actually is before
 // any of it is trusted. A dry-run facility only: nothing here is written.
+// An id may carry one of FRED's own transforms after a colon
+// ("BOGZ1FL075035503Q:pc1"), printed with the three newest observations —
+// how one series is checked to be another's change, figure against figure.
 const probe = (process.env.PROBE_IDS ?? "").split(/\s+/).filter(Boolean);
 if (probe.length > 0) {
   if (!dryRun) {
@@ -311,7 +314,8 @@ if (probe.length > 0) {
     process.exit(1);
   }
   console.log(`\nPROBE: ${probe.length} candidate ids, written nowhere`);
-  for (const id of probe) {
+  for (const raw of probe) {
+    const [id, transform] = raw.split(":");
     try {
       const meta = await fred("series", { series_id: id });
       const m = meta.seriess?.[0];
@@ -320,13 +324,18 @@ if (probe.length > 0) {
         series_id: id,
         sort_order: "desc",
         limit: "3",
+        ...(transform ? { units: transform } : {}),
       });
-      const o = (body.observations ?? []).find((x) => x.value && x.value !== ".");
+      const seen = (body.observations ?? []).filter((x) => x.value && x.value !== ".");
+      const o = seen[0];
       console.log(
-        `  ${id}: "${m?.title ?? "?"}" · ${m?.frequency ?? "?"} · ${m?.units ?? "?"} · ` +
+        `  ${raw}: "${m?.title ?? "?"}" · ${m?.frequency ?? "?"} · ${transform ? `units=${transform}` : (m?.units ?? "?")} · ` +
           `${m?.seasonal_adjustment_short ?? ""} · newest ${o ? `${o.value} (${o.date})` : "none"}` +
           ` · last updated ${m?.last_updated ?? "?"}`,
       );
+      if (transform && seen.length > 1) {
+        console.log(`      the newest ${seen.length}: ${seen.map((x) => `${x.value} (${x.date})`).join(", ")}`);
+      }
       // The notes carry the source and any copyright — a series FRED shows
       // may still be a licensed index (Case-Shiller is S&P's), so a
       // candidate is judged on this line as much as on its title.
@@ -339,7 +348,7 @@ if (probe.length > 0) {
         console.log(`      notes: ${notes.slice(0, 2000)}`);
       }
     } catch (err) {
-      console.log(`  ${id}: NOT FOUND — ${err instanceof Error ? err.message : String(err)}`);
+      console.log(`  ${raw}: NOT FOUND — ${err instanceof Error ? err.message : String(err)}`);
     }
     await sleep(PACE_MS);
   }
