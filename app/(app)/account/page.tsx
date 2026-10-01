@@ -189,14 +189,15 @@ export default async function AccountPage({
         </a>
       </p>
 
-      {/* Sign out */}
+      {/* Data health: the corrections ledger every reader sees (the
+          operator's working view is on the same page, for the operator) */}
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold tracking-tight">Data health</h2>
             <p className="mt-1 text-sm text-muted">
-              The nightly verification steward&apos;s ledger: runs, open
-              issues, and every correction made in the open.
+              Every correction the nightly steward makes to the site&apos;s
+              data, with its evidence.
             </p>
           </div>
           <Link
@@ -208,6 +209,7 @@ export default async function AccountPage({
         </div>
       </section>
 
+      {/* Sign out */}
       <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>

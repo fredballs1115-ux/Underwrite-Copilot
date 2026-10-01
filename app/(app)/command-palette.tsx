@@ -137,7 +137,7 @@ const ACTIONS: Item[] = [
   {
     key: "a-data-health",
     label: "Data health",
-    hint: "steward runs, issues, changelog",
+    hint: "corrections to the site's data",
     href: "/data-health",
     group: "actions",
     icon: (

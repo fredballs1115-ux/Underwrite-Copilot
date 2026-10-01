@@ -6,14 +6,15 @@ import { liveMetroRates, liveRates } from "@/lib/live-rates-read";
 import { liveZillowFiles } from "@/lib/zori-read";
 import { liveRealtorFiles } from "@/lib/realtor-read";
 import { SAMPLE_METRO, SAMPLE_STATE, feedHealth, type FeedStatus } from "@/lib/feed-health";
+import { isSiteOperator } from "@/lib/operator-server";
 import { CostCard, type UsageRow } from "./cost-card";
 import { FeedsCard } from "./feeds-card";
 
 export const metadata: Metadata = { title: "Data health" };
 
-/** The live service probes — signed-in JSON endpoints that report what each
- *  service actually returned from THIS deployment. The checks an operator is
- *  asked to run live here, on the page, not in a chat transcript. */
+/** The live service probes — JSON endpoints that report what each service
+ *  actually returned from THIS deployment. The checks an operator is asked
+ *  to run live here, on the page, not in a chat transcript. */
 const PROBES: { href: string; name: string; what: string }[] = [
   {
     href: "/api/comps/health",
@@ -33,9 +34,14 @@ const PROBES: { href: string; name: string; what: string }[] = [
 ];
 export const dynamic = "force-dynamic";
 
-// The steward's public ledger: every nightly run, every open issue, every
-// correction — the "our data polices itself" claim, backed by rows. Nothing
-// here is synthesized; empty tables render as honest empty states.
+// Two readers. Every signed-in reader sees the steward's corrections ledger —
+// a figure that changed at its source, old beside new, with the evidence:
+// the "our data polices itself" claim, backed by rows. The operator — an
+// address the server's OPERATOR_EMAILS names (lib/operator) — sees the
+// working view as well: the service probes, the feeds, what each screen
+// cost, the nightly runs and the open issues, with the setup each needs.
+// That view had shown to every customer. Nothing here is synthesized;
+// empty tables render as honest empty states.
 
 interface RunRow {
   id: string;
@@ -83,6 +89,8 @@ const fmtTs = (iso: string) =>
 export default async function DataHealthPage() {
   const user = await getCurrentUser();
   if (!user) redirect("/login?next=/data-health");
+  // Unset OPERATOR_EMAILS names nobody: every reader is then a customer.
+  const operator = isSiteOperator(user);
 
   const supabase = await createSupabaseServerClient();
   let runs: RunRow[] = [];
@@ -90,28 +98,34 @@ export default async function DataHealthPage() {
   let changes: ChangeRow[] = [];
   let migrated = true;
   try {
-    const [{ data: r, error }, { data: i }, { data: c }] = await Promise.all([
-      supabase
-        .from("steward_runs")
-        .select("id, started_at, finished_at, checks_run, issues_found, notes")
-        .order("started_at", { ascending: false })
-        .limit(10),
-      supabase
-        .from("data_issues")
-        .select("id, kind, subject, detail, detected_at")
-        .is("resolved_at", null)
-        .order("detected_at", { ascending: false })
-        .limit(50),
+    // The corrections are everyone's; the runs and the open issues are
+    // read only for the operator who will see them.
+    const [r, i, c] = await Promise.all([
+      operator
+        ? supabase
+            .from("steward_runs")
+            .select("id, started_at, finished_at, checks_run, issues_found, notes")
+            .order("started_at", { ascending: false })
+            .limit(10)
+        : null,
+      operator
+        ? supabase
+            .from("data_issues")
+            .select("id, kind, subject, detail, detected_at")
+            .is("resolved_at", null)
+            .order("detected_at", { ascending: false })
+            .limit(50)
+        : null,
       supabase
         .from("data_changelog")
         .select("id, subject, old_value, new_value, reason, source_url, changed_at")
         .order("changed_at", { ascending: false })
         .limit(20),
     ]);
-    if (error) migrated = false;
-    runs = (r as RunRow[] | null) ?? [];
-    issues = (i as IssueRow[] | null) ?? [];
-    changes = (c as ChangeRow[] | null) ?? [];
+    if (r?.error) migrated = false;
+    runs = (r?.data as RunRow[] | null) ?? [];
+    issues = (i?.data as IssueRow[] | null) ?? [];
+    changes = (c.data as ChangeRow[] | null) ?? [];
   } catch {
     migrated = false;
   }
@@ -123,38 +137,40 @@ export default async function DataHealthPage() {
   // without the column (pre-0035) reads as an error here, never a throw.
   let screens: UsageRow[] = [];
   let usageColumn = true;
-  try {
-    const { data, error } = await supabase
-      .from("analysis_jobs")
-      .select("id, usage, updated_at")
-      .not("usage", "is", null)
-      .order("updated_at", { ascending: false })
-      .limit(20);
-    if (error) usageColumn = false;
-    else screens = (data as UsageRow[] | null) ?? [];
-  } catch {
-    usageColumn = false;
-  }
-
   // What each feed last wrote (lib/feed-health): the same cached reads the
   // public pages draw from, judged feed by feed on each one's own cadence —
   // Zillow's and Realtor.com's file by file, current or not, since the
   // pages' reads leave a stale figure out and the card must see it.
   // A read that fails leaves an empty card that says so.
   let feeds: FeedStatus[] = [];
-  try {
-    const now = new Date();
-    const [rates, metro, state, zillow, realtor] = await Promise.all([
-      liveRates(now),
-      liveMetroRates(SAMPLE_METRO.id, now),
-      // The states' series, judged on one state's rows under its market id.
-      liveMetroRates(SAMPLE_STATE.id, now),
-      liveZillowFiles(SAMPLE_METRO.name),
-      liveRealtorFiles(SAMPLE_METRO.name),
-    ]);
-    feeds = feedHealth({ rates, metro, state, zillow, realtor, now });
-  } catch (err) {
-    console.warn("feed health unavailable:", err instanceof Error ? err.message : err);
+  if (operator) {
+    try {
+      const { data, error } = await supabase
+        .from("analysis_jobs")
+        .select("id, usage, updated_at")
+        .not("usage", "is", null)
+        .order("updated_at", { ascending: false })
+        .limit(20);
+      if (error) usageColumn = false;
+      else screens = (data as UsageRow[] | null) ?? [];
+    } catch {
+      usageColumn = false;
+    }
+
+    try {
+      const now = new Date();
+      const [rates, metro, state, zillow, realtor] = await Promise.all([
+        liveRates(now),
+        liveMetroRates(SAMPLE_METRO.id, now),
+        // The states' series, judged on one state's rows under its market id.
+        liveMetroRates(SAMPLE_STATE.id, now),
+        liveZillowFiles(SAMPLE_METRO.name),
+        liveRealtorFiles(SAMPLE_METRO.name),
+      ]);
+      feeds = feedHealth({ rates, metro, state, zillow, realtor, now });
+    } catch (err) {
+      console.warn("feed health unavailable:", err instanceof Error ? err.message : err);
+    }
   }
 
   return (
@@ -163,111 +179,119 @@ export default async function DataHealthPage() {
         <h1 className="text-xl font-semibold tracking-tight">Data health</h1>
         <p className="mt-1 max-w-2xl text-sm text-muted">
           A nightly steward re-checks source links, feed freshness and the oldest singly-sourced
-          claims; corrections land here and in the changelog, never silently.
+          claims; a figure it corrects lands here, never silently.
         </p>
       </header>
 
-      <section className="rounded-xl border border-line bg-surface p-4">
-        <h2 className="text-sm font-semibold">Service probes</h2>
-        <p className="mt-1 text-sm text-muted">
-          Each opens as JSON and names what the service actually said from this
-          deployment, so a thin feature is diagnosed rather than guessed at.
-        </p>
-        <ul className="mt-3 grid gap-2 sm:grid-cols-3">
-          {PROBES.map((p) => (
-            <li key={p.href} className="rounded-lg border border-line/70 p-3">
-              <a
-                href={p.href}
-                target="_blank"
-                rel="noreferrer"
-                className="text-sm font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
-              >
-                {p.name}
-              </a>
-              <p className="mt-1 text-xs leading-relaxed text-muted">{p.what}</p>
-              <p className="mt-1 font-mono text-[10px] text-muted">{p.href}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <FeedsCard feeds={feeds} sample={SAMPLE_METRO.name} />
-
-      <CostCard screens={screens} usageColumn={usageColumn} />
-
-      <section
-        className={`rounded-xl border p-4 ${
-          overdue ? "border-red-500/40 bg-red-500/5" : "border-line bg-surface"
-        }`}
-      >
-        <h2 className="text-sm font-semibold">Steward heartbeat</h2>
-        {!migrated ? (
-          <p className="mt-1 text-sm text-muted">
-            The steward tables don&apos;t exist yet — run migration 0028, then
-            schedule <code className="rounded bg-faint px-1">node scripts/steward.mjs</code>{" "}
-            nightly (Render cron in render.yaml, or the steward GitHub Action).
+      {operator && (
+        <>
+          <p className="text-xs text-muted">
+            Operator view — customers see only the corrections.
           </p>
-        ) : latest ? (
-          <p className="mt-1 text-sm">
-            Last run {fmtTs(latest.finished_at ?? latest.started_at)} —{" "}
-            {latest.checks_run} checks, {latest.issues_found} issue flags.
-            {overdue && (
-              <span className="ml-2 font-medium text-red-600">
-                More than 48 hours ago — the nightly cron looks dead. That
-                itself is the signal this panel exists for.
-              </span>
-            )}
-          </p>
-        ) : (
-          <p className="mt-1 text-sm text-muted">
-            No steward runs recorded yet. Schedule{" "}
-            <code className="rounded bg-faint px-1">node scripts/steward.mjs</code>{" "}
-            nightly — until the first run lands, &quot;data last verified&quot;
-            has honestly never happened.
-          </p>
-        )}
-        {runs.length > 1 && (
-          <ul className="mt-2 space-y-0.5 text-[11px] text-muted">
-            {runs.slice(1, 6).map((r) => (
-              <li key={r.id} className="font-mono tabular-nums">
-                {fmtTs(r.started_at)} · {r.checks_run} checks · {r.issues_found} flags
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
 
-      <section className="rounded-xl border border-line bg-surface p-4">
-        <h2 className="text-sm font-semibold">
-          Open issues{" "}
-          <span className="ml-1 font-normal text-muted">({issues.length})</span>
-        </h2>
-        {issues.length === 0 ? (
-          <p className="mt-1 text-sm text-muted">
-            Nothing open. Issues appear here the night something breaks — a
-            source link dies, a feed goes quiet, an invariant fails, a claim
-            stops matching its source.
-          </p>
-        ) : (
-          <ul className="mt-2 space-y-2">
-            {issues.map((i) => {
-              const meta = KIND_META[i.kind] ?? { label: i.kind, cls: "bg-faint text-muted" };
-              return (
-                <li key={i.id} className="text-sm leading-snug">
-                  <span className={`mr-2 rounded px-1.5 py-px text-[11px] font-medium ${meta.cls}`}>
-                    {meta.label}
-                  </span>
-                  <span className="break-all font-mono text-[12px]">{i.subject}</span>
-                  {i.detail && <span className="text-muted"> — {i.detail}</span>}{" "}
-                  <span className="ml-1 text-[11px] text-muted">
-                    ({i.detected_at.slice(0, 10)})
-                  </span>
+          <section className="rounded-xl border border-line bg-surface p-4">
+            <h2 className="text-sm font-semibold">Service probes</h2>
+            <p className="mt-1 text-sm text-muted">
+              Each opens as JSON and names what the service actually said from this
+              deployment, so a thin feature is diagnosed rather than guessed at.
+            </p>
+            <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+              {PROBES.map((p) => (
+                <li key={p.href} className="rounded-lg border border-line/70 p-3">
+                  <a
+                    href={p.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-sm font-medium underline decoration-dotted underline-offset-2 hover:text-brand"
+                  >
+                    {p.name}
+                  </a>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">{p.what}</p>
+                  <p className="mt-1 font-mono text-[10px] text-muted">{p.href}</p>
                 </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+              ))}
+            </ul>
+          </section>
+
+          <FeedsCard feeds={feeds} sample={SAMPLE_METRO.name} />
+
+          <CostCard screens={screens} usageColumn={usageColumn} />
+
+          <section
+            className={`rounded-xl border p-4 ${
+              overdue ? "border-red-500/40 bg-red-500/5" : "border-line bg-surface"
+            }`}
+          >
+            <h2 className="text-sm font-semibold">Steward heartbeat</h2>
+            {!migrated ? (
+              <p className="mt-1 text-sm text-muted">
+                The steward tables don&apos;t exist yet — run migration 0028, then
+                schedule <code className="rounded bg-faint px-1">node scripts/steward.mjs</code>{" "}
+                nightly (Render cron in render.yaml, or the steward GitHub Action).
+              </p>
+            ) : latest ? (
+              <p className="mt-1 text-sm">
+                Last run {fmtTs(latest.finished_at ?? latest.started_at)} —{" "}
+                {latest.checks_run} checks, {latest.issues_found} issue flags.
+                {overdue && (
+                  <span className="ml-2 font-medium text-red-600">
+                    More than 48 hours ago — the nightly cron looks dead. That
+                    itself is the signal this panel exists for.
+                  </span>
+                )}
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-muted">
+                No steward runs recorded yet. Schedule{" "}
+                <code className="rounded bg-faint px-1">node scripts/steward.mjs</code>{" "}
+                nightly — until the first run lands, &quot;data last verified&quot;
+                has honestly never happened.
+              </p>
+            )}
+            {runs.length > 1 && (
+              <ul className="mt-2 space-y-0.5 text-[11px] text-muted">
+                {runs.slice(1, 6).map((r) => (
+                  <li key={r.id} className="font-mono tabular-nums">
+                    {fmtTs(r.started_at)} · {r.checks_run} checks · {r.issues_found} flags
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-line bg-surface p-4">
+            <h2 className="text-sm font-semibold">
+              Open issues{" "}
+              <span className="ml-1 font-normal text-muted">({issues.length})</span>
+            </h2>
+            {issues.length === 0 ? (
+              <p className="mt-1 text-sm text-muted">
+                Nothing open. Issues appear here the night something breaks — a
+                source link dies, a feed goes quiet, an invariant fails, a claim
+                stops matching its source.
+              </p>
+            ) : (
+              <ul className="mt-2 space-y-2">
+                {issues.map((i) => {
+                  const meta = KIND_META[i.kind] ?? { label: i.kind, cls: "bg-faint text-muted" };
+                  return (
+                    <li key={i.id} className="text-sm leading-snug">
+                      <span className={`mr-2 rounded px-1.5 py-px text-[11px] font-medium ${meta.cls}`}>
+                        {meta.label}
+                      </span>
+                      <span className="break-all font-mono text-[12px]">{i.subject}</span>
+                      {i.detail && <span className="text-muted"> — {i.detail}</span>}{" "}
+                      <span className="ml-1 text-[11px] text-muted">
+                        ({i.detected_at.slice(0, 10)})
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </section>
+        </>
+      )}
 
       <section className="rounded-xl border border-line bg-surface p-4">
         <h2 className="text-sm font-semibold">Changelog — corrections in the open</h2>

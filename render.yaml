@@ -47,6 +47,13 @@ services:
         sync: false
       - key: CANONICAL_HOST
         sync: false
+      # Who sees the operator's working view on /data-health — the cost of a
+      # screen, the feeds, the service probes, the steward's heartbeat and
+      # its setup lines (lib/operator): a comma-separated list of sign-in
+      # addresses, on confirmed accounts. Unset = nobody; every reader then
+      # sees the corrections ledger alone.
+      - key: OPERATOR_EMAILS
+        sync: false
       # Stripe billing — set in the dashboard (see .env.example for how to get each).
       # All FIVE price/secret vars belong here: the webhook checks every
       # incoming subscription's price ids against them and ALERTS instead of
