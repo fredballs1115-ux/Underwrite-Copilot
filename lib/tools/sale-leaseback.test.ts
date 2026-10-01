@@ -115,6 +115,25 @@ describe("rule 2 — an above-market lease reverts to market", () => {
     expect(r.note).not.toContain("market rent too");
   });
 
+  it("says where the two rates pay the reversion back, rather than leave it as an overpayment", () => {
+    // Discounted at 6%, the credit cap, on a rent escalating 2%: the premium
+    // reverting is still $877,446 of the price, but the same lease at market
+    // rent would be priced $2,347,749 UNDER its two pieces, so the price sits
+    // $1,470,303 under them in all. The reversion sentence alone read as the
+    // buyer overpaying.
+    const r = run({ discountRatePct: 6 });
+    expect(r.overpaymentFromPremium).toBe(877_446);
+    expect(r.overpaymentAtMarketRent).toBe(-2_347_749);
+    expect(r.overpayment).toBe(-1_470_303);
+    expect(r.note).toContain("which is $877,446 of the price");
+    expect(r.note).toContain("would be priced $2,347,749 under its two pieces");
+    expect(r.note).toContain("so in all the price is $1,470,303 under them.");
+    // A big enough premium outweighs it, and the sentence says so.
+    const big = run({ discountRatePct: 6, contractRentPerSf: 15 });
+    expect(big.overpayment!).toBeGreaterThan(0);
+    expect(big.note).toContain(`so in all the price is $${big.overpayment!.toLocaleString("en-US")} over them.`);
+  });
+
   it("costs MORE on a short lease, because the reversion arrives sooner", () => {
     // The direction people get backwards: a long above-market lease is
     // worth more, not less, because the market rent is further away.

@@ -352,6 +352,16 @@ function noteFor(x: {
       parts.push(
         `${parts.length > 0 ? "The other" : "Of what is paid over the two pieces,"} ${usd(x.atMarketRent)} would be paid at market rent too: ${yieldWords}.`,
       );
+    } else if (x.atMarketRent < 0) {
+      // The two rates can run the other way — a discount rate low against
+      // the credit cap on an escalating rent — and then they pay back some
+      // or all of the reversion. Said, because the reversion sentence alone
+      // reads as the buyer overpaying on a price that may sit under the two
+      // pieces in all.
+      const total = x.fromPremium + x.atMarketRent;
+      parts.push(
+        `At market rent the same lease would be priced ${usd(x.atMarketRent)} under its two pieces — ${yieldWords} — so in all the price is ${usd(total)} ${total > 0 ? "over" : "under"} them.`,
+      );
     }
     if (parts.length > 0) return parts.join(" ");
     return `The contract rent is ${x.rentPremiumPct}% above market, so ${usd(x.pricePremium)} of the price is the lease rather than the building.`;
