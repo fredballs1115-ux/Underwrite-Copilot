@@ -1166,6 +1166,16 @@ jobs:
           mark "#486 pages are evidence, never instructions" grep -q "pages are evidence, never instructions" p_whats-new.html
           mark "#486 small figures, read on their own terms" grep -q "Small figures, read on their own terms" p_whats-new.html
           mark "#486 notices that say what happened" grep -q "Notices that say what happened" p_whats-new.html
+          mark "#487 every step of the screen reads the same deal" grep -q "Every step of the screen reads the same deal" p_whats-new.html
+          mark "#487 screening ranges, low to high" grep -q "Screening ranges, low to high everywhere" p_whats-new.html
+          mark "#487 commercial property prices excluding apartments" grep -q "Commercial property prices, said as excluding apartments" p_whats-new.html
+          mark "#487 calculator figures, corrected" grep -q "Calculator figures, corrected" p_whats-new.html
+          mark "#487 calculator links, blank fields and phones" grep -q "Calculator links, blank fields and phones" p_whats-new.html
+          mark "#487 nineteen more cities, pictured" grep -q "Nineteen more cities, pictured" p_whats-new.html
+          mark "#487 the workbook, true to its cells" grep -q "The workbook, true to its cells" p_whats-new.html
+          mark "#487 a team's deals stay with the team" grep -q "s deals stay with the team" p_whats-new.html
+          mark "#487 the letter of intent, ask and the model" grep -q "The letter of intent, Ask and the model, held to the deal" p_whats-new.html
+          mark "#487 reconciliation gaps from their own figures" grep -q "Reconciliation gaps drawn from their own figures" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
