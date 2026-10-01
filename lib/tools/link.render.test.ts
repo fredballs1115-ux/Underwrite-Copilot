@@ -61,6 +61,24 @@ describe("the harness reads a link the way the browser does", () => {
   });
 });
 
+describe("a ground lease worth less than nothing", () => {
+  it("says the income does not cover the rent, with the figure, and no share past 100%", async () => {
+    // A $2.1M NOI under the seed's $2M rent and its year-16 reset to $3.6M.
+    // The card read "it is worth $-111,559 — -75.9% of that figure is a
+    // reversion the fee owner keeps, and 181.5% is the rent reset".
+    const html = await fromLink("?gln=2100000");
+    const text = textOf(html, "ground-lease");
+    expect(text).toContain(
+      "the building's income does not cover the ground rent: the term's cash flows come to " +
+        "−$111,559, so the leasehold is worth nothing.",
+    );
+    expect(text).toContain("Leasehold, over the term");
+    expect(text).not.toContain("of that figure");
+    expect(text).not.toContain("$-");
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
 describe("a negative written by the page, through the shared writer", () => {
   it("says a negative break-even hard cost as no cost penciling, never as one that does", async () => {
     // Land dear enough that free construction would not work: the solved

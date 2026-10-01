@@ -201,6 +201,37 @@ export function leaseholdPv(
   return pv;
 }
 
+/**
+ * Whether the term never gets ahead: every running total of its cash flows,
+ * from year 1, at or below zero.
+ *
+ * That is what "worth nothing at ANY discount rate" needs, and it is more
+ * than a value at or below zero at the rate entered. Summed by parts, the
+ * value at a rate r ≥ 0 is the running totals weighted by x^t(1 − x) and
+ * the last by x^n, with x = 1/(1 + r) — every weight at or above zero — so
+ * totals that never rise above zero give a value at or below zero at every
+ * rate. A lease whose early years pay and whose later years do not is
+ * different: at a high enough rate the early years win, so its value is
+ * below zero only at some rates, and the card says so at the rate entered.
+ */
+function neverAhead(
+  noi: number,
+  groundRent: number,
+  growth: number,
+  escalation: number,
+  years: number,
+  reset: RentReset | null,
+): boolean {
+  const g = growth / 100;
+  const e = escalation / 100;
+  let total = 0;
+  for (let t = 1; t <= years; t += 1) {
+    total += noi * Math.pow(1 + g, t - 1) - rentInYear(groundRent, e, t, reset);
+    if (total > 0) return false;
+  }
+  return true;
+}
+
 export function readGroundLease(input: GroundLeaseTerms): GroundLeaseRead {
   const {
     noi,
@@ -330,19 +361,44 @@ export function readGroundLease(input: GroundLeaseTerms): GroundLeaseRead {
 
   const usd = usdExact;
   const notes: string[] = [];
-  if (overstatementPct !== null && overstatementPct > 0) {
+  if (leaseholdValue <= 0) {
+    // A leasehold worth nothing is said as what it is — the building's
+    // income over the term does not cover the ground rent — and never as a
+    // share of the capitalised figure: against a value below zero that share
+    // runs past 100% ("2043.9% of that figure is a reversion"), and a share
+    // of a figure that is itself below zero means nothing. The figure is the
+    // shared writer's, the minus sign outside the dollar.
+    const rate = `${trimmed(discountRatePct)}%`;
+    const cash = `the term's cash flows come to ${usd(leaseholdValue)}`;
+    if (neverAhead(noi, groundRent, growth, esc, years, reset)) {
+      notes.push(
+        "The ground rent consumes the building over the remaining term: the leasehold is worth " +
+          `nothing at any discount rate, and at ${rate} ${cash}.`,
+      );
+    } else {
+      const opening =
+        asIfPerpetual !== null && asIfPerpetual > 0
+          ? `Capitalising the leasehold's NOI as though it ran forever says ${usd(asIfPerpetual)}, but over`
+          : "Over";
+      notes.push(
+        `${opening} ${years} years, discounted at ${rate}, the building's income does not cover ` +
+          `the ground rent: ${cash}, so the leasehold is worth nothing.`,
+      );
+    }
+  } else if (overstatementPct !== null && overstatementPct > 0) {
+    // Each share is said only where it is one: a reversion share at or
+    // below zero — the term worth more than the capitalised figure until the
+    // reset lands — leaves the whole gap to the reset, said as such.
     const split =
       resetSharePct !== null && resetSharePct > 0 && reversionPct !== null
-        ? `${reversionPct.toFixed(1)}% of that figure is a reversion the fee owner keeps, and ${resetSharePct.toFixed(1)}% is the rent reset in year ${resetYear}.`
+        ? reversionPct > 0
+          ? `${reversionPct.toFixed(1)}% of that figure is a reversion the fee owner keeps, and ${resetSharePct.toFixed(1)}% is the rent reset in year ${resetYear}.`
+          : `${overstatementPct.toFixed(1)}% under that figure, and the whole gap is the rent reset in year ${resetYear}: without it the term would be worth more than the capitalised figure.`
         : `${overstatementPct}% of that figure is a reversion the fee owner keeps.`;
     notes.push(
       `Capitalising the leasehold's NOI as though it ran forever says ` +
         `${usd(asIfPerpetual!)}; over ${years} years it is worth ` +
         `${usd(leaseholdValue)} — ${split}`,
-    );
-  } else if (leaseholdValue <= 0) {
-    notes.push(
-      "The ground rent consumes the building over the remaining term: the leasehold is worth nothing at any discount rate.",
     );
   }
   if (resetCoverage !== null && resetRent !== null) {

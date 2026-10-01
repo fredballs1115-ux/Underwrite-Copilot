@@ -103,6 +103,81 @@ describe("the error the card exists to prevent", () => {
     expect(r.leaseholdNoi).toBe(-1_000_000);
     expect(r.leaseholdValue).toBeLessThan(0);
     expect(r.note).toContain("worth nothing at any discount rate");
+    // …with the figure at the rate entered, the minus sign outside the dollar.
+    expect(r.note).toContain("at 8% the term's cash flows come to −$7,277,335");
+    expect(r.note).not.toContain("$-");
+  });
+});
+
+describe("a leasehold worth less than nothing", () => {
+  // Today's leasehold NOI is $100,000, so the capitalised figure is $2M —
+  // but the year-16 reset to $3.6M outruns the building's income, and over
+  // the forty years the term is worth −$111,559 at 8%.
+  const thin = { ...SEED, noi: 2_100_000 };
+
+  it("is said as what it is: the income over the term does not cover the ground rent", () => {
+    const r = readGroundLease(thin);
+    expect(r.asIfPerpetual).toBe(2_000_000);
+    expect(r.leaseholdValue).toBe(-111_559);
+    expect(r.note).toContain(
+      "Capitalising the leasehold's NOI as though it ran forever says $2,000,000, but over 40 years, " +
+        "discounted at 8%, the building's income does not cover the ground rent: the term's cash " +
+        "flows come to −$111,559, so the leasehold is worth nothing.",
+    );
+  });
+
+  it("is never a share of the capitalised figure past 100%, nor a negative one", () => {
+    // It read "it is worth $-111,559 — -75.9% of that figure is a reversion
+    // the fee owner keeps, and 181.5% is the rent reset": a value below
+    // zero puts the gap past the whole figure, so no share describes it.
+    for (const over of [thin, { ...thin, feeSimpleCapPct: 3 }, { ...SEED, groundRent: 7_900_000, escalationPct: 4, resetPctOfLand: null }]) {
+      const r = readGroundLease(over);
+      expect(r.leaseholdValue!).toBeLessThan(0);
+      expect(r.note).not.toContain("of that figure");
+      for (const share of r.note.matchAll(/(-?[\d.]+)% of/g)) {
+        expect(Number(share[1])).toBeGreaterThanOrEqual(0);
+        expect(Number(share[1])).toBeLessThanOrEqual(100);
+      }
+    }
+  });
+
+  it("says 'worth nothing at any discount rate' only where it is true, cap set or not", () => {
+    // The rent above the NOI from the first year, growing slower than it:
+    // the term never gets ahead, so it is below zero at every rate — the
+    // claim holds, with the fee-simple cap set (the seed's 5%) or blank.
+    const never = { ...SEED, groundRent: 9_000_000, resetPctOfLand: null };
+    for (const rate of [0, 1, 4, 8, 20, 60, 500]) {
+      expect(leaseholdPv(8_000_000, 9_000_000, 2.5, 2, 40, rate)).toBeLessThan(0);
+    }
+    expect(readGroundLease(never).note).toContain("worth nothing at any discount rate");
+    expect(readGroundLease({ ...never, feeSimpleCapPct: null }).note).toContain(
+      "worth nothing at any discount rate",
+    );
+    // A rent just under the NOI and escalating faster: the early years pay,
+    // so at a steep enough rate the term is worth something, and the card
+    // says it is worth nothing at the 8% entered — not at any rate.
+    expect(leaseholdPv(8_000_000, 7_900_000, 2.5, 4, 40, 8)).toBeLessThan(0);
+    expect(leaseholdPv(8_000_000, 7_900_000, 2.5, 4, 40, 1_000)).toBeGreaterThan(0);
+    const early = readGroundLease({ ...SEED, groundRent: 7_900_000, escalationPct: 4, resetPctOfLand: null });
+    expect(early.note).toContain("discounted at 8%, the building's income does not cover the ground rent");
+    expect(early.note).toContain("so the leasehold is worth nothing.");
+    expect(early.note).not.toContain("at any discount rate");
+    // The thin lease above is the same shape: worth something at a steep rate.
+    expect(readGroundLease(thin).note).not.toContain("at any discount rate");
+  });
+
+  it("leaves a reset that makes the whole gap to the reset, never a negative reversion share", () => {
+    // Today's leasehold NOI is thin and grows faster than the rent, so before
+    // the reset the term is worth MORE than the capitalised figure: the
+    // reversion's "share" was −27.8% and the reset's 90.8%.
+    const r = readGroundLease({ ...SEED, noi: 2_200_000 });
+    expect(r.leaseholdValue).toBe(1_481_903);
+    expect(r.leaseholdValueBeforeReset!).toBeGreaterThan(r.asIfPerpetual!);
+    expect(r.note).toContain(
+      "over 40 years it is worth $1,481,903 — 63.0% under that figure, and the whole gap is the " +
+        "rent reset in year 16: without it the term would be worth more than the capitalised figure.",
+    );
+    expect(r.note).not.toMatch(/-\d/);
   });
 });
 
