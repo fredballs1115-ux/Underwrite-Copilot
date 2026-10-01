@@ -5891,6 +5891,36 @@ describe("LeaseholdExitCard — the term, the two exits, and the model's returns
 import { AffordablePanel } from "@/app/affordable-panel";
 import { readAffordable } from "@/lib/affordable";
 
+/**
+ * The affordable and hotel clocks' layout (the research pass of 2026-09-30):
+ * on a phone the label's 11rem column and an unshrinking date left each bar
+ * 0px wide and ran the dates 31–38px past the panel. A clock now stacks —
+ * its label, its bar the panel's full width, its date — and sits side by
+ * side only where its own container is 28rem wide, the date in a column of
+ * one width so every bar is drawn on one track.
+ */
+function expectClocksStack(html: string, qa: string, rows: number) {
+  const at = html.indexOf(`data-qa="${qa}"`);
+  expect(at).toBeGreaterThan(-1);
+  // The container the rows read their width from opens just before them.
+  expect(html.lastIndexOf("@container/clocks", at)).toBeGreaterThan(html.lastIndexOf("<section", at));
+  const block = html.slice(at, html.indexOf("</dl>", at));
+  const classes = [...block.matchAll(/<div class="([^"]*)"><dt class="font-medium text-ink">/g)].map((m) => m[1]);
+  expect(classes).toHaveLength(rows);
+  for (const c of classes) {
+    expect(c.split(" ")).toContain("grid-cols-1");
+    expect(c).toContain("@md/clocks:grid-cols-[minmax(7rem,11rem)_1fr]");
+  }
+  // Each drawn date: a full line under its bar on a phone, a fixed column
+  // side by side — never a bare shrink-0 that squeezes the bar to nothing.
+  const dates = [...block.matchAll(/<span class="(font-mono tabular-nums text-muted[^"]*)">/g)].map((m) => m[1]);
+  expect(dates.length).toBeGreaterThan(0);
+  for (const d of dates) {
+    expect(d.split(" ")).not.toContain("shrink-0");
+    expect(d).toContain("@md/clocks:w-36");
+  }
+}
+
 describe("AffordablePanel — a covenant or a contract that sets the rents, drawn", () => {
   const AS_OF = new Date(Date.UTC(2026, 8, 30));
   const row = (label: string, value: string, page = "p. 14") => ({ label, value, flagged: false, page, basis: "na" as const });
@@ -5944,6 +5974,7 @@ describe("AffordablePanel — a covenant or a contract that sets the rents, draw
     expect(text).toContain("to Dec 2054 · 28.3 years");
     expect(text).toContain("to Jun 2029 · 2.8 years");
     expect(text).toContain("Stated end 2025 — passed");
+    expectClocksStack(html, "affordable-clocks", 3);
     // The rents: each restricted tier against the limit it states.
     expect(html.match(/data-bar="affordable-rent"/g)).toHaveLength(2);
     expect(text).toContain("$1,020 of a $1,090 limit");
@@ -6152,6 +6183,7 @@ describe("HotelPanel — what a hotel is sold with, drawn", () => {
     expect(text).toContain("to Jun 2034 · 7.8 years");
     expect(text).toContain("2031 · 5.3 years");
     expect(text).toContain("The line is the model's sale, 5 years out");
+    expectClocksStack(html, "hotel-clocks", 2);
     // The rooms: the equation, and the index against 100.
     // The equation is six inline runs; read as one line of text.
     expect(text.replace(/\s+/g, " ")).toContain("ADR $189.50 × occupancy 74.0% = RevPAR $140.23");
