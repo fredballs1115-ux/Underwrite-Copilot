@@ -1544,7 +1544,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   free current CRE price figure: the BIS series FRED also carries stopped
   at 2025 Q2 and the private indexes are licensed; the probe now prints a
   candidate's notes and a terms line, and caught Case-Shiller's
-  copyright where this series names none), inflation and cost (CPI, core, rent, OER, the five
+  copyright where this series names none. **It excludes apartments**
+  (2026-10-01): the Fed builds the index, since 1996, on "the Costar U.S.
+  Composite Index Excluding Multifamily" (its series analyzer, read by the
+  URL probe, which now quotes a page's own lines — zori run 36814538224),
+  and this series is that index's change, figure for figure (the FRED
+  probe's `ID:pc1` form, rates run 36814949981), so the tile reads "CRE
+  prices excl. apartments y/y" and its label names the index it is built
+  on; whether a CoStar-built index stays on the strip is the owner's
+  call), inflation and cost (CPI, core, rent, OER, the five
   lessor rent indexes — #390: the BLS producer price indexes for the
   rents lessors of nonresidential buildings charge, by the building let —
   office, retail, industrial, self-storage operators and the aggregate,
@@ -4480,10 +4488,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   pipeline reads the seven national series bare; the page's
   since-this-screen reads them through `liveRates`; the prompt clause
   names the exit cap and the debt assumptions as what they answer. After
-  them, for a building that trades on its income (never land), **what
-  the capital buys** (#410, `CRE_PRICE_ID`): national commercial real
-  estate prices against a year ago, a "Capital markets —" line said as
-  the nation's, a trailing year, not this market's and not a cap rate,
+  them, for a building that trades on its income (never land, and never
+  rental housing, which the index excludes), **what the capital buys**
+  (#410, `CRE_PRICE_ID`): national commercial real estate prices
+  excluding apartments against a year ago, a "Capital markets —" line
+  said as the nation's, built on CoStar's composite excluding
+  multifamily, a trailing year, not this market's and not a cap rate,
   and the clause sets an exit value that leans on prices rising against
   it. **A deal that builds something reads what building costs**
   (2026-09-30, `CONSTRUCTION_COST_IDS`, gated by `buildsSomething` in

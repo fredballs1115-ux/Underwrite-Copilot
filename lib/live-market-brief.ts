@@ -101,6 +101,15 @@ export interface LiveMarketInput {
  * Case-Shiller's) before it was trusted. A trailing year of prices, said
  * as the nation's — never this market's, never a forecast, and never a
  * cap rate.
+ *
+ * It EXCLUDES apartments. The Fed's series analyzer says the Financial
+ * Accounts index is built, since 1996, from "the Costar U.S. Composite Index
+ * Excluding Multifamily: Value Weighted" (zori probe run 36814538224), and
+ * this series is that index's own change from a year ago, figure for figure
+ * (rates run 36814949981: 8.80683, 7.54922, 1.59015 against 8.8068348464,
+ * 7.5492240848, 1.5901502087). So it is said as excluding apartments, with
+ * the index it is built on, and a rental-housing deal is not handed it: it
+ * says nothing about what apartments sell for.
  */
 export const CRE_PRICE_ID = "BOGZ1FL010000386Q";
 
@@ -609,12 +618,14 @@ function debtMarketLines(
     });
   }
   // What the capital buys: commercial property prices, for a building that
-  // trades on its income. Land's value is its entitlement, not this index.
+  // trades on its income. Land's value is its entitlement, not this index,
+  // and rental housing is outside it: the index excludes apartments.
   const prices = by.get(CRE_PRICE_ID);
-  if (prices && assetWords(assetClass ?? undefined).operating) {
+  const words = assetWords(assetClass ?? undefined);
+  if (prices && words.operating && !words.residential) {
     out.push({
-      line: `Capital markets — commercial real estate prices, national: ${signed(prices.value)}% from a year ago (${periodLabel(prices.obsDate, prices.meta.cadence)}; the Fed's Financial Accounts via FRED) — the nation's, a trailing year, not this market's and not a cap rate`,
-      figures: [{ key: "cre_prices_yoy", label: "Commercial real estate prices, national", value: prices.value, unit: "pts", asOf: prices.obsDate }],
+      line: `Capital markets — commercial real estate prices excluding apartments, national: ${signed(prices.value)}% from a year ago (${periodLabel(prices.obsDate, prices.meta.cadence)}; the Fed's Financial Accounts, built on CoStar's composite index excluding multifamily, via FRED) — the nation's, a trailing year, not this market's and not a cap rate`,
+      figures: [{ key: "cre_prices_yoy", label: "Commercial real estate prices excluding apartments, national", value: prices.value, unit: "pts", asOf: prices.obsDate }],
     });
   }
   return out;

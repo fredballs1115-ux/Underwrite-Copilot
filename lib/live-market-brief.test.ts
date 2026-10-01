@@ -316,21 +316,29 @@ describe("the debt market — national, for every deal, after the metro's lines"
       "Debt market — banks tightening standards for multifamily loans: a net -5.7% of banks (Q3 2026; Fed SLOOS via FRED; negative is a net share easing)",
       "Debt market — CRE loan delinquency at commercial banks 1.53% (Q2 2026; FRED)",
       "Debt market — bank CRE lending +3.6% from a year ago (Sep 9, 2026; FRED, from the Fed's H.8)",
-      "Capital markets — commercial real estate prices, national: +8.8% from a year ago (Q2 2026; the Fed's Financial Accounts via FRED) — the nation's, a trailing year, not this market's and not a cap rate",
     ]);
     expect(b.figures.map((f) => [f.key, f.value, f.unit])).toEqual([
       ["dgs10", 4.94, "pct"],
       ["sloos_multifamily", -5.7, "pts"],
       ["cre_delinquency", 1.53, "pct"],
       ["cre_loans_yoy", 3.56389, "pts"],
-      ["cre_prices_yoy", 8.8068348464, "pts"],
     ]);
   });
 
-  it("the commercial property price index is said for every building that trades on its income, never for land, and nothing without the series", () => {
+  it("the commercial property price index is said for every building that trades on its income, never for land or rental housing, and nothing without the series", () => {
     const priceLine = (b: { lines: string[] } | null) => b?.lines.find((l) => l.startsWith("Capital markets")) ?? null;
     for (const cls of ["office", "industrial", "retail", "hospitality_str", "self_storage", "net_lease"]) {
       expect(priceLine(liveMarketBrief({ ...base, assetClass: cls })), cls).toContain("+8.8% from a year ago (Q2 2026");
+    }
+    // The index is built on CoStar's composite EXCLUDING multifamily (the
+    // Fed's series analyzer, zori probe run 36814538224; the change matched
+    // figure for figure in rates run 36814949981), so it says so, and it
+    // says nothing about what apartments sell for.
+    expect(priceLine(liveMarketBrief({ ...base, assetClass: "office" }))).toBe(
+      "Capital markets — commercial real estate prices excluding apartments, national: +8.8% from a year ago (Q2 2026; the Fed's Financial Accounts, built on CoStar's composite index excluding multifamily, via FRED) — the nation's, a trailing year, not this market's and not a cap rate",
+    );
+    for (const cls of ["multifamily", "sfr_btr", "student_housing", "manufactured_housing", "mixed_use"]) {
+      expect(priceLine(liveMarketBrief({ ...base, assetClass: cls })), cls).toBeNull();
     }
     expect(priceLine(liveMarketBrief({ ...base, assetClass: "land_infill" }))).toBeNull();
     const without = national.filter((r) => r.meta.id !== CRE_PRICE_ID);
