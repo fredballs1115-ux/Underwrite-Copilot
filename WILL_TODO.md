@@ -34,6 +34,36 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 4. **Your own domain**: steps under 2026-09-25 below. It is a purchase, so
    it is your move.
 
+**Before a public launch** (research pass 14 walked a stranger's path from
+the homepage to a first screen; the code's half of each is done or under
+way in this batch):
+5. **Prove a stranger can sign up and reset a password.** Without custom
+   SMTP, Supabase's built-in mailer refuses any address outside your
+   organization and sends two emails an hour. Do A1 below, raise Auth's
+   email rate limit above the 30-an-hour custom-SMTP default, replace the
+   default confirm and reset templates and sender name, then sign up and
+   reset a password from an address outside the organization.
+6. **Stop deploys from killing screens.** A screen runs inside the web
+   process until `ANALYSIS_WORKER=1` is set on the web service with the
+   worker service live (E below); main took 27 deploys on Sept 30, and a
+   screen that overlaps one stalls and must be run again from the start.
+7. **The Upgrade button**: finish Stripe (B1 below: live prices, the
+   webhook, a customer portal set to cancel at the end of the period to
+   match the Terms, and a run of `scripts/stripe-test-flow.mjs`), or ask
+   me to replace Upgrade with "Contact us" until you do. A setup problem
+   now reads to a customer as "checkout isn't available right now"; which
+   knob is wrong is in the server log as `[billing] Stripe setup problem`.
+8. **Email's sender**: verify a domain in Resend and set `RESEND_FROM` on
+   BOTH the web service and the worker; Resend's default sender delivers
+   only to the Resend account's owner.
+9. **Before charging anyone**: the legal entity, governing law and venue on
+   the Terms and Privacy pages, and a support address that is not Gmail —
+   with counsel.
+10. **The free tier's rule** (a decision): today it is "3 deals at a time"
+    (deleting one frees a slot), re-screens are unlimited and sign-up has no
+    CAPTCHA, at about $3 a screen. The pages now say what is enforced; tell
+    me the rule you want and I will make the code and the copy match it.
+
 **What changed without asking you, and why:**
 - The rates strip's **three ICE BofA credit spreads and Moody's Baa yield
   are gone.** The runner printed their terms (run 36785223477):
