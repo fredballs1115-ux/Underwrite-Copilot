@@ -11,6 +11,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const db = vi.hoisted(() => ({
   team: null as { id: string; role: "owner" | "member" } | null,
   handedOver: 0,
+  /** the team's deals, as the list read answers them */
+  teamDealIds: [] as string[],
+  /** a write that fails, by table */
+  failOn: null as string | null,
+  deleted: false,
   writes: [] as { table: string; op: string; values?: unknown; opts?: unknown; filters: unknown[] }[],
 }));
 
@@ -19,7 +24,11 @@ function query(table: string) {
   const q = { table, op: "select", values: undefined as unknown, opts: undefined as unknown, filters: [] as unknown[] };
   const answer = (single: boolean) => {
     if (q.op !== "select") db.writes.push({ ...q });
+    if (q.op !== "select" && db.failOn === table) return { data: null, error: { message: "write refused" } };
     if (q.op === "update" && table === "deals") return { data: null, error: null, count: db.handedOver };
+    if (q.op === "select" && table === "deals" && q.filters.some((f) => (f as unknown[])[0] === "team_id")) {
+      return { data: db.teamDealIds.map((id) => ({ id })), error: null };
+    }
     if (q.op !== "select") return { data: null, error: null };
     if (table === "teams") return { data: { owner_id: "owner-1" }, error: null };
     if (table === "profiles") return { data: single ? {} : [], error: null };
@@ -61,7 +70,14 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/supabase/admin", () => ({
   createSupabaseAdminClient: () => ({
     from: (table: string) => query(table),
-    auth: { admin: { deleteUser: async () => ({ error: null }) } },
+    auth: {
+      admin: {
+        deleteUser: async () => {
+          db.deleted = true;
+          return { error: null };
+        },
+      },
+    },
   }),
 }));
 vi.mock("@/lib/teams", () => ({ getTeam: async () => db.team }));
@@ -118,6 +134,9 @@ async function signInPage(deleted: string): Promise<string> {
 beforeEach(() => {
   db.team = null;
   db.handedOver = 0;
+  db.teamDealIds = [];
+  db.failOn = null;
+  db.deleted = false;
   db.writes.length = 0;
 });
 
@@ -147,6 +166,36 @@ describe("deleting an account says what happened to a team's deals", () => {
     db.team = null;
     expect(await landing()).toBe("/login?deleted=1");
     expect(await signInPage("1")).toContain("Your account and all its data have been deleted.");
+  });
+
+  it("a member's versions, valuations and rent roll imports on the team's deals move to the owner with the deals (pass 14)", async () => {
+    db.team = { id: "team-1", role: "member" };
+    db.handedOver = 1;
+    db.teamDealIds = ["deal-a", "deal-b"];
+    expect(await landing()).toBe("/login?deleted=team");
+    for (const table of ["deal_versions", "valuations", "rent_roll_imports"]) {
+      expect(db.writes.find((w) => w.table === table && w.op === "update"), table).toMatchObject({
+        values: { user_id: "owner-1" },
+        filters: [
+          ["deal_id", ["deal-a", "deal-b"]],
+          ["user_id", "member-1"],
+        ],
+      });
+    }
+    // A share link the member minted is revoked with them, never handed on.
+    expect(db.writes.some((w) => w.table === "deal_shares")).toBe(false);
+    expect(db.deleted).toBe(true);
+  });
+
+  it("a handover that fails stops before the account is deleted, so nothing cascades away", async () => {
+    db.team = { id: "team-1", role: "member" };
+    db.teamDealIds = ["deal-a"];
+    for (const table of ["deals", "valuations"]) {
+      db.failOn = table;
+      db.deleted = false;
+      expect(await landing(), table).toBe("/account?error=handover");
+      expect(db.deleted, table).toBe(false);
+    }
   });
 
   it("a team's owner is still refused, before anything is touched", async () => {

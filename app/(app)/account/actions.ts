@@ -238,18 +238,42 @@ export async function deleteAccount(formData: FormData) {
   //    counted, so the sign-in page can say they stayed.
   let handedOver = 0;
   if (team) {
-    const { data: owner } = await admin
+    const { data: owner, error: ownerErr } = await admin
       .from("teams")
       .select("owner_id")
       .eq("id", team.id)
       .maybeSingle();
-    if (owner?.owner_id) {
-      const { count } = await admin
-        .from("deals")
-        .update({ user_id: owner.owner_id }, { count: "exact" })
-        .eq("team_id", team.id)
-        .eq("user_id", user.id);
-      handedOver = count ?? 0;
+    // With no owner to hand them to, the account's deletion would cascade
+    // the team's deals away: stop, with nothing touched.
+    if (ownerErr || !owner?.owner_id) redirect("/account?error=handover");
+    const ownerId = owner.owner_id as string;
+    const { count, error: moveErr } = await admin
+      .from("deals")
+      .update({ user_id: ownerId }, { count: "exact" })
+      .eq("team_id", team.id)
+      .eq("user_id", user.id);
+    // A handover that failed leaves the team's deals on this account, and
+    // deleting it would cascade them away — the error had gone unread.
+    if (moveErr) redirect("/account?error=handover");
+    handedOver = count ?? 0;
+    // The member's own work on the team's deals — saved versions, valuations
+    // and rent roll imports — is the team's too, and moves with the deals
+    // rather than cascading away with the account (pass 14, 2026-10-01). A
+    // share link the member minted is revoked with them (deal_shares
+    // cascades), so no one outside keeps access on the word of someone who
+    // has left.
+    const { data: teamDeals, error: listErr } = await admin.from("deals").select("id").eq("team_id", team.id);
+    if (listErr) redirect("/account?error=handover");
+    const teamDealIds = ((teamDeals ?? []) as { id: string }[]).map((d) => d.id);
+    if (teamDealIds.length) {
+      for (const table of ["deal_versions", "valuations", "rent_roll_imports"] as const) {
+        const { error: workErr } = await admin
+          .from(table)
+          .update({ user_id: ownerId })
+          .in("deal_id", teamDealIds)
+          .eq("user_id", user.id);
+        if (workErr) redirect("/account?error=handover");
+      }
     }
     await admin
       .from("team_members")

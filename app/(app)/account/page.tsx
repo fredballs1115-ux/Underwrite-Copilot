@@ -22,6 +22,8 @@ const DELETE_ERRORS: Record<string, string> = {
   cancelsub:
     "We couldn't cancel your subscription automatically — nothing was deleted. Cancel it from the Billing page first, then try again.",
   delete: "Deletion failed — nothing was removed. Please try again, or email underwritecopilot.support@gmail.com.",
+  handover:
+    "We couldn't hand your work on the team's deals to the team's owner, so your account was not deleted. Please try again, or email underwritecopilot.support@gmail.com.",
   // Report branding (Feature 6)
   brandowner:
     "Team branding is managed by the team owner — ask them to update it.",
