@@ -3447,6 +3447,367 @@
           "note": "Tallahassee, FL — UrbanTallahassee, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36791060658)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:41980",
+      "city": "San Juan, Puerto Rico",
+      "area": "San Juan-Bayamón-Caguas, PR",
+      "wikipedia": [
+        "San Juan, Puerto Rico",
+        "Old San Juan",
+        "Condado, San Juan, Puerto Rico"
+      ],
+      "categories": [
+        "Skylines of San Juan, Puerto Rico",
+        "Views of San Juan, Puerto Rico",
+        "Old San Juan",
+        "Condado (San Juan)"
+      ],
+      "queries": [
+        "San Juan Puerto Rico skyline",
+        "Old San Juan",
+        "Condado San Juan"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:33660",
+      "city": "Mobile, Alabama",
+      "area": "Mobile, AL",
+      "wikipedia": [
+        "Mobile, Alabama",
+        "RSA Battle House Tower"
+      ],
+      "categories": [
+        "Skylines of Mobile, Alabama",
+        "Views of Mobile, Alabama",
+        "Downtown Mobile, Alabama"
+      ],
+      "queries": [
+        "Mobile Alabama skyline",
+        "Mobile Alabama downtown",
+        "Mobile River skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:43340",
+      "city": "Shreveport, Louisiana",
+      "area": "Shreveport-Bossier City, LA",
+      "wikipedia": [
+        "Shreveport, Louisiana",
+        "Bossier City, Louisiana"
+      ],
+      "categories": [
+        "Skylines of Shreveport, Louisiana",
+        "Views of Shreveport, Louisiana",
+        "Downtown Shreveport, Louisiana"
+      ],
+      "queries": [
+        "Shreveport Louisiana skyline",
+        "Shreveport Red River",
+        "Shreveport downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:29620",
+      "city": "Lansing, Michigan",
+      "area": "Lansing-East Lansing, MI",
+      "wikipedia": [
+        "Lansing, Michigan",
+        "Michigan State Capitol"
+      ],
+      "categories": [
+        "Skylines of Lansing, Michigan",
+        "Views of Lansing, Michigan",
+        "Michigan State Capitol"
+      ],
+      "queries": [
+        "Lansing Michigan skyline",
+        "Lansing Michigan Capitol",
+        "Lansing Grand River"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:11460",
+      "city": "Ann Arbor, Michigan",
+      "area": "Ann Arbor, MI",
+      "wikipedia": [
+        "Ann Arbor, Michigan",
+        "Michigan Theater"
+      ],
+      "categories": [
+        "Views of Ann Arbor, Michigan",
+        "Downtown Ann Arbor, Michigan",
+        "Main Street (Ann Arbor, Michigan)"
+      ],
+      "queries": [
+        "Ann Arbor Michigan downtown",
+        "Ann Arbor Main Street",
+        "Ann Arbor skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:30700",
+      "city": "Lincoln, Nebraska",
+      "area": "Lincoln, NE",
+      "wikipedia": [
+        "Lincoln, Nebraska",
+        "Nebraska State Capitol"
+      ],
+      "categories": [
+        "Skylines of Lincoln, Nebraska",
+        "Views of Lincoln, Nebraska",
+        "Nebraska State Capitol"
+      ],
+      "queries": [
+        "Lincoln Nebraska skyline",
+        "Lincoln Nebraska Capitol",
+        "Lincoln Haymarket"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:48900",
+      "city": "Wilmington, North Carolina",
+      "area": "Wilmington, NC",
+      "wikipedia": [
+        "Wilmington, North Carolina",
+        "Wrightsville Beach, North Carolina"
+      ],
+      "categories": [
+        "Skylines of Wilmington, North Carolina",
+        "Views of Wilmington, North Carolina",
+        "Cape Fear River"
+      ],
+      "queries": [
+        "Wilmington North Carolina riverfront",
+        "Wilmington NC downtown",
+        "Wilmington Cape Fear River"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:22180",
+      "city": "Fayetteville, North Carolina",
+      "area": "Fayetteville, NC",
+      "wikipedia": [
+        "Fayetteville, North Carolina",
+        "Market House (Fayetteville, North Carolina)"
+      ],
+      "categories": [
+        "Views of Fayetteville, North Carolina",
+        "Downtown Fayetteville, North Carolina",
+        "Market House (Fayetteville, North Carolina)"
+      ],
+      "queries": [
+        "Fayetteville North Carolina downtown",
+        "Fayetteville NC Market House",
+        "Fayetteville North Carolina skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:43900",
+      "city": "Spartanburg, South Carolina",
+      "area": "Spartanburg, SC",
+      "wikipedia": [
+        "Spartanburg, South Carolina",
+        "Morgan Square"
+      ],
+      "categories": [
+        "Views of Spartanburg, South Carolina",
+        "Downtown Spartanburg, South Carolina"
+      ],
+      "queries": [
+        "Spartanburg South Carolina downtown",
+        "Spartanburg Morgan Square",
+        "Spartanburg skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:34940",
+      "city": "Naples, Florida",
+      "area": "Naples-Marco Island, FL",
+      "wikipedia": [
+        "Naples, Florida",
+        "Naples Pier"
+      ],
+      "categories": [
+        "Views of Naples, Florida",
+        "Naples Pier",
+        "Beaches of Naples, Florida"
+      ],
+      "queries": [
+        "Naples Florida pier",
+        "Naples Florida beach",
+        "Naples Florida downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:36100",
+      "city": "Ocala, Florida",
+      "area": "Ocala, FL",
+      "wikipedia": [
+        "Ocala, Florida"
+      ],
+      "categories": [
+        "Views of Ocala, Florida",
+        "Downtown Ocala, Florida"
+      ],
+      "queries": [
+        "Ocala Florida downtown",
+        "Ocala Florida square",
+        "Ocala skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:23540",
+      "city": "Gainesville, Florida",
+      "area": "Gainesville, FL",
+      "wikipedia": [
+        "Gainesville, Florida",
+        "University of Florida"
+      ],
+      "categories": [
+        "Views of Gainesville, Florida",
+        "Downtown Gainesville, Florida",
+        "University of Florida"
+      ],
+      "queries": [
+        "Gainesville Florida downtown",
+        "Gainesville Florida skyline",
+        "University of Florida campus"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:42200",
+      "city": "Santa Barbara, California",
+      "area": "Santa Maria-Santa Barbara, CA",
+      "wikipedia": [
+        "Santa Barbara, California",
+        "Stearns Wharf",
+        "Santa Barbara County Courthouse"
+      ],
+      "categories": [
+        "Views of Santa Barbara, California",
+        "Skylines of Santa Barbara, California",
+        "Stearns Wharf"
+      ],
+      "queries": [
+        "Santa Barbara California waterfront",
+        "Santa Barbara Stearns Wharf",
+        "Santa Barbara skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:41500",
+      "city": "Salinas, California",
+      "area": "Salinas, CA",
+      "wikipedia": [
+        "Salinas, California",
+        "Monterey, California",
+        "Cannery Row"
+      ],
+      "categories": [
+        "Views of Salinas, California",
+        "Views of Monterey, California",
+        "Cannery Row"
+      ],
+      "queries": [
+        "Salinas California downtown",
+        "Monterey California harbor",
+        "Monterey Cannery Row"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:14500",
+      "city": "Boulder, Colorado",
+      "area": "Boulder, CO",
+      "wikipedia": [
+        "Boulder, Colorado",
+        "Flatirons",
+        "Pearl Street Mall"
+      ],
+      "categories": [
+        "Views of Boulder, Colorado",
+        "Flatirons",
+        "Pearl Street Mall"
+      ],
+      "queries": [
+        "Boulder Colorado Flatirons",
+        "Boulder Colorado downtown",
+        "Boulder Pearl Street"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:22660",
+      "city": "Fort Collins, Colorado",
+      "area": "Fort Collins-Loveland, CO",
+      "wikipedia": [
+        "Fort Collins, Colorado",
+        "Old Town Fort Collins"
+      ],
+      "categories": [
+        "Views of Fort Collins, Colorado",
+        "Old Town Fort Collins"
+      ],
+      "queries": [
+        "Fort Collins Colorado Old Town",
+        "Fort Collins Colorado downtown",
+        "Fort Collins skyline"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:21660",
+      "city": "Eugene, Oregon",
+      "area": "Eugene-Springfield, OR",
+      "wikipedia": [
+        "Eugene, Oregon",
+        "Skinner Butte"
+      ],
+      "categories": [
+        "Skylines of Eugene, Oregon",
+        "Views of Eugene, Oregon",
+        "Skinner Butte"
+      ],
+      "queries": [
+        "Eugene Oregon skyline",
+        "Eugene Oregon Skinner Butte",
+        "Eugene Oregon downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:49660",
+      "city": "Youngstown, Ohio",
+      "area": "Youngstown-Warren, OH",
+      "wikipedia": [
+        "Youngstown, Ohio",
+        "Mahoning River"
+      ],
+      "categories": [
+        "Skylines of Youngstown, Ohio",
+        "Views of Youngstown, Ohio",
+        "Downtown Youngstown, Ohio"
+      ],
+      "queries": [
+        "Youngstown Ohio skyline",
+        "Youngstown Ohio downtown",
+        "Youngstown Mahoning River"
+      ],
+      "candidates": []
     }
   ]
 }
