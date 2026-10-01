@@ -3468,7 +3468,12 @@
         "Old San Juan",
         "Condado San Juan"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Castillo San Felipe del Morro aerial, May 2024 - 01.jpg",
+          "note": "San Juan-Bayamón-Caguas, PR — Nils Huenerfuerst, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:33660",
@@ -3488,7 +3493,12 @@
         "Mobile Alabama downtown",
         "Mobile River skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Mobile, Alabama skyline.jpg",
+          "note": "Mobile, AL — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:43340",
@@ -3508,7 +3518,12 @@
         "Shreveport Red River",
         "Shreveport downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Shreveport-Bossier City Skyline over Red River.jpg",
+          "note": "Shreveport-Bossier City, LA — Shreveport-Bossier Convention and Tourist Bureau, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:29620",
@@ -3528,7 +3543,12 @@
         "Lansing Michigan Capitol",
         "Lansing Grand River"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Lansing Skyline 2022.jpg",
+          "note": "Lansing-East Lansing, MI — WeaponizingArchitecture, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:11460",
@@ -3548,7 +3568,12 @@
         "Ann Arbor Main Street",
         "Ann Arbor skyline"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Ann Arbor Skyline 2021.jpg",
+          "note": "Ann Arbor, MI — WeaponizingArchitecture, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36797923875)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:30700",

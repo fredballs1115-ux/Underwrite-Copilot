@@ -38,8 +38,9 @@ describe("the market photograph table", () => {
       const code = /^cbsa:(\d{5})$/.exec(id)?.[1];
       if (code) {
         expect(titles[code], `${id} is not a metro area in the Census delineation`).toBeTruthy();
-        // A card names the place it shows: "San Jose, CA".
-        expect(shot.name ?? "", `${id} has no name for its card`).toMatch(/^[A-Z][A-Za-z .'-]+, [A-Z]{2}$/);
+        // A card names the place it shows: "San Jose, CA" — in the Census
+        // title's own letters, so "San Juan-Bayamón-Caguas, PR" keeps its ó.
+        expect(shot.name ?? "", `${id} has no name for its card`).toMatch(/^\p{Lu}[\p{L} .'-]+, [A-Z]{2}$/u);
         expect(read.has(code), `${id} is a metro area the site reads: its market's own entry serves it`).toBe(false);
         continue;
       }

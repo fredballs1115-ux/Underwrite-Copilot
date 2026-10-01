@@ -594,6 +594,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Anchorage, AK",
     size: [3663, 2108],
   },
+  // Ann Arbor, MI: skyline-sheet run 36797923875 — the city article's skyline, whole in both crops under a clear sky, over the same towers in a washed-out haze, a night frame that goes dark under the card's shade, street corners, a bus station, a bank and a coffee shop.
+  "cbsa:11460": {
+    file: "Ann Arbor Skyline 2021.jpg",
+    place: "Downtown Ann Arbor's rooftops and towers under a blue sky",
+    credit: "WeaponizingArchitecture",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Ann Arbor, MI",
+    size: [4024, 1901],
+  },
   // Asheville, NC: skyline-sheet run 36782967654 — the city under its mountains, over a grey-sky cityscape and a washed-out panorama.
   "cbsa:11700": {
     file: "Asheville North Carolina Skyline July 2023.jpg",
@@ -914,6 +924,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Lancaster, PA",
     size: [2011, 1114],
   },
+  // Lansing-East Lansing, MI: skyline-sheet run 36797923875 — the city article's skyline, its clock tower and the Capitol's dome whole in both crops, though it is 574px tall at 2400 wide, as Louisville's is; the Capitol's own portrait loses its lantern and finial in the wide crop under a grey sky, and the third file is a cigarette card.
+  "cbsa:29620": {
+    file: "Lansing Skyline 2022.jpg",
+    place: "Downtown Lansing's skyline under a bright cloudy sky, the Capitol's dome among its towers",
+    credit: "WeaponizingArchitecture",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Lansing-East Lansing, MI",
+    size: [2618, 626],
+  },
   // Lexington, KY: skyline-sheet run 36780959488 — the landmark the city is known by, sharp at dusk; the downtown aerial was 1544px and dated.
   "cbsa:30460": {
     file: "Rupp Arena view from Triangle Park.jpg",
@@ -973,6 +993,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Milwaukee, WI",
     size: [2048, 1338],
+  },
+  // Mobile, AL: skyline-sheet run 36797923875 — the article's lead, every tower and crown whole on the card and at 16:9; the 21:9 crop trims only the needle above the tallest tower's crown, where the 2008 river skyline holds whole but small under a sky that fills half the card, and the 2008 ground-level frame cuts both crowns in the wide crop.
+  "cbsa:33660": {
+    file: "Mobile, Alabama skyline.jpg",
+    place: "Downtown Mobile's towers from above, the river and the port beyond",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Mobile, AL",
+    size: [10379, 6487],
   },
   // Modesto, CA: skyline-sheet run 36783579706 — the city article's lead and the landmark the city is known by, found only in a one-market run, over ten street views with a date stamp in the corner.
   "cbsa:33700": {
@@ -1154,6 +1184,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Salem, OR",
     size: [3796, 2473],
   },
+  // San Juan-Bayamón-Caguas, PR: skyline-sheet run 36797923875 — El Morro, the picture the city is known by, whole in both crops with a horizon, so it reads as a photograph, not a map; the fort's lawn panorama is 524px tall at 2400 wide, the plane's view of the islet reads as a map, and the rest are hazy views across the water and green hills with the city a strip on the horizon.
+  "cbsa:41980": {
+    file: "Castillo San Felipe del Morro aerial, May 2024 - 01.jpg",
+    place: "Castillo San Felipe del Morro on its headland, Old San Juan behind it, from the air",
+    credit: "Nils Huenerfuerst",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "San Juan-Bayamón-Caguas, PR",
+    size: [4032, 2268],
+  },
   // Santa Rosa-Petaluma, CA: skyline-sheet run 36791355974 — the Sonoma County article's lead, whole in both crops under a blue sky; the county's coast (Arched Rock, Bodega Head) is as fine but farther from the market, and the rest were a train platform, San Francisco and a downtown sign.
   // The runner printed the author as "w:en:User:Anlace" (a link to the
   // English Wikipedia user); the credit is the name in it.
@@ -1185,6 +1225,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     name: "Scranton, PA",
     size: [4177, 2350],
+  },
+  // Shreveport-Bossier City, LA: skyline-sheet run 36797923875 — both banks of the river at golden hour, every tower whole in both crops, an oblique with a horizon; the bureau's other drone frame carries a dark propeller-shaped blur in its corner, the panorama is a grey sky behind a highway barrier, and the Regions tower loses its top in the wide crop over a rooftop.
+  "cbsa:43340": {
+    file: "Shreveport-Bossier City Skyline over Red River.jpg",
+    place: "The Shreveport-Bossier City skyline over the Red River at golden hour, from above",
+    credit: "Shreveport-Bossier Convention and Tourist Bureau",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Shreveport-Bossier City, LA",
+    size: [3840, 2160],
   },
   // Spokane, WA: skyline-sheet run 36780772501 — the article's lead.
   "cbsa:44060": {
