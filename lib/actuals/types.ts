@@ -56,6 +56,13 @@ export interface RentRollSummary {
   waltYears: number | null;
   /** SF-weighted in-place rent PSF (occupied units), null if not derivable */
   weightedAvgRentPsf: number | null;
+  /** in-place rent a month per occupied unit — its stated monthly rent, else
+   *  its rent per SF a year × its SF ÷ 12 — averaged over the occupied units
+   *  that state one; how a residential roll is read. Null where none does,
+   *  and absent on a summary stored before it was read. */
+  avgRentMonthly?: number | null;
+  /** the occupied units that average is over */
+  rentUnits?: number;
   /** buckets over the occupied SF that carried an expiry date, null if none */
   expiryBuckets: ExpiryBuckets | null;
   /** occupied SF that actually carried an expiry date (the buckets' basis) */

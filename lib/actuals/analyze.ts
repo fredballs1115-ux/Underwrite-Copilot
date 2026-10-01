@@ -114,6 +114,25 @@ export function consolidateRentRoll(
   }
   const weightedAvgRentPsf = rentDen > 0 ? rentNum / rentDen : null;
 
+  // In-place rent a month per occupied unit — the way a residential roll is
+  // read — over the occupied units that state a rent: a stated monthly rent
+  // wins, else the unit's rent per SF a year × its SF ÷ 12 (the mirror of
+  // the PSF derivation above). A unit that states neither is left out.
+  let monthlySum = 0;
+  let rentUnits = 0;
+  for (const r of occupied) {
+    const sf = sfOf(r.sf);
+    const monthly =
+      typeof r.inPlaceRentMonthly === "number" && r.inPlaceRentMonthly > 0
+        ? r.inPlaceRentMonthly
+        : typeof r.rentPsf === "number" && r.rentPsf > 0 && sf > 0
+          ? (r.rentPsf * sf) / 12
+          : null;
+    if (monthly == null) continue;
+    monthlySum += monthly;
+    rentUnits++;
+  }
+
   return {
     unitCount: rows.length,
     occupiedUnits: occupied.length,
@@ -122,6 +141,8 @@ export function consolidateRentRoll(
     sfWeightedOccupancy,
     waltYears,
     weightedAvgRentPsf,
+    avgRentMonthly: rentUnits > 0 ? monthlySum / rentUnits : null,
+    rentUnits,
     expiryBuckets,
     expiryCoveredSf,
     truncated: x.truncated,

@@ -171,6 +171,8 @@ export default async function DemoPage() {
         omNoi != null
           ? compareNoi(omNoi, SAMPLE_DEAL.t12.summary.noi!, omPick)
           : null,
+      // An apartment roll, read per unit a month as the app reads it.
+      assetClass: SAMPLE_DEAL.asset_class,
     },
     buyBox: {
       checks: evaluateBuyBox(

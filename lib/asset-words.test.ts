@@ -7,6 +7,7 @@ import {
   countNoun,
   isResidentialClass,
   perSuffix,
+  rentQuotedMonthly,
 } from "./asset-words";
 
 describe("the asset-words table", () => {
@@ -121,6 +122,20 @@ describe("the asset-words table", () => {
     // Nothing read yet claims nothing.
     expect(isResidentialClass("auto")).toBe(false);
     expect(isResidentialClass(null)).toBe(false);
+  });
+
+  it("reads a rent roll a month a unit where the class's rent is quoted that way", () => {
+    for (const key of ["multifamily", "sfr_btr", "student_housing", "manufactured_housing", "senior_housing", "parking"]) {
+      expect(rentQuotedMonthly(key), key).toBe(true);
+    }
+    // Mixed-use is rental housing priced by the foot, its roll suites and
+    // apartments together; a hotel's rate is nightly; a data centre's rent is
+    // a month a kilowatt, not a unit.
+    for (const key of ["mixed_use", "office", "industrial", "retail", "net_lease", "self_storage", "hospitality_str", "data_center", "land_infill", "auto"]) {
+      expect(rentQuotedMonthly(key), key).toBe(false);
+    }
+    expect(rentQuotedMonthly(null)).toBe(false);
+    expect(rentQuotedMonthly("Garden-style apartments")).toBe(true);
   });
 
   it("files a class the model phrased itself by its words", () => {

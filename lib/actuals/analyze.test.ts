@@ -56,6 +56,18 @@ describe("consolidateRentRoll", () => {
     expect(s.weightedAvgRentPsf).toBeCloseTo(23.3333, 3);
   });
 
+  it("averages the in-place rent a month per occupied unit (stated, else derived from the rent per SF)", () => {
+    // $20/SF × 10,000 SF ÷ 12 = $16,666.67, and the stated $12,500: two units.
+    expect(s.avgRentMonthly).toBeCloseTo((200_000 / 12 + 12_500) / 2, 6);
+    expect(s.rentUnits).toBe(2);
+    // An occupied unit that states no rent is left out of the average, never
+    // counted as zero; none at all is null.
+    const partial = consolidateRentRoll(roll([row({ inPlaceRentMonthly: 2_400 }), row({ sf: 900 })]));
+    expect(partial.avgRentMonthly).toBe(2_400);
+    expect(partial.rentUnits).toBe(1);
+    expect(consolidateRentRoll(roll([row({ sf: 900 })])).avgRentMonthly).toBeNull();
+  });
+
   it("buckets lease expiry as % of the occupied SF that carried a date", () => {
     expect(s.expiryCoveredSf).toBe(15_000);
     expect(s.expiryBuckets!.next12mo).toBeCloseTo(10_000 / 15_000, 4); // ~0.667

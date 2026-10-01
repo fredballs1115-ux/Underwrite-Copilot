@@ -304,6 +304,16 @@ export function assetWords(key: string | null | undefined): AssetWords {
   return { key: k, label: assetClassLabel(k), ...row, basisLabel: basisLabelFor(row) };
 }
 
+/** A class whose rent is quoted a month a unit — an apartment's "rent /
+ *  unit / mo", a home's, a bed's, a pad's — so its rent roll is read per
+ *  unit a month, never per foot a year. A mixed-use building is rental
+ *  housing priced by the foot, and its roll mixes suites with apartments:
+ *  it is read by the foot. */
+export function rentQuotedMonthly(key: string | null | undefined): boolean {
+  const w = assetWords(key);
+  return w.noun != null && w.income === `rent / ${w.noun.one} / mo`;
+}
+
 /** Rent control, TOPA and just-cause rules can reach a deal of this class. */
 export function isResidentialClass(key: string | null | undefined): boolean {
   return assetWords(key).residential;

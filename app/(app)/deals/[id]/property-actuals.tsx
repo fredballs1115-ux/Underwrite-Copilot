@@ -1,4 +1,5 @@
 import type { RentRollSummary, T12Summary, NoiComparison } from "@/lib/actuals/types";
+import { rentQuotedMonthly } from "@/lib/asset-words";
 
 const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
   in_line: { label: "In line", cls: "bg-pass/10 text-pass" },
@@ -19,6 +20,16 @@ const pct = (dec: number | null | undefined): string =>
 const num = (n: number | null | undefined, digits = 1): string =>
   n == null || !Number.isFinite(n) ? "—" : n.toFixed(digits);
 
+/** "May 31, 2026" — the way the rest of the deal page writes a day, read in
+ *  UTC so the server's render and the browser's agree; the text as it came
+ *  where it is not a date. */
+function day(iso: string): string {
+  const t = Date.parse(`${iso.trim().slice(0, 10)}T00:00:00Z`);
+  return Number.isFinite(t)
+    ? new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : iso;
+}
+
 export interface ActualsData {
   rentRoll: { asOf: string | null; summary: RentRollSummary } | null;
   t12: { periodEnd: string | null; summary: T12Summary } | null;
@@ -27,6 +38,9 @@ export interface ActualsData {
    *  stabilized pro forma is not — or, when the OM states only the finished
    *  project's NOI, why there is no comparison at all. Null otherwise. */
   noiNote?: string | null;
+  /** the deal's class as the page shows it (shownAssetClass): a roll of a
+   *  class whose rent is quoted a month a unit is read that way */
+  assetClass?: string | null;
 }
 
 /** The OM figure's name on the card, by what it is. */
@@ -48,6 +62,22 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
   if (!rentRoll && !t12) return null;
   const rr = rentRoll?.summary;
   const st = t12?.summary;
+  // An apartment's rent is quoted a month a unit — the memorandum's
+  // "$2,400/mo", the reconciler's — never per foot a year, which is how an
+  // office's is. A summary stored before the monthly figure was read keeps
+  // its per-foot figure, said with its period.
+  const monthly = rentQuotedMonthly(data.assetClass);
+  const avgRent =
+    monthly && rr?.avgRentMonthly != null
+      ? `$${Math.round(rr.avgRentMonthly).toLocaleString("en-US")}/unit/mo`
+      : rr?.weightedAvgRentPsf != null
+        ? `$${num(rr.weightedAvgRentPsf, 2)}/SF${monthly ? "/yr" : ""}`
+        : "—";
+  // An average over fewer units than are occupied says so.
+  const rentBasis =
+    monthly && rr?.avgRentMonthly != null && rr.rentUnits != null && rr.rentUnits < rr.occupiedUnits
+      ? `over ${rr.rentUnits} of ${rr.occupiedUnits} occupied units`
+      : null;
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -85,7 +115,7 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
           stabilized pro forma is not — or why nothing is compared at all. */}
       {noiNote && <p className="mt-2 text-[11px] leading-relaxed text-muted">{noiNote}</p>}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
         {/* Rent roll */}
         {rr && (
           <div className="rounded-xl border border-line/70 p-4">
@@ -94,22 +124,26 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
                 Rent roll
               </h3>
               {rentRoll?.asOf ? (
-                <span className="text-[11px] text-muted">as of {rentRoll.asOf}</span>
+                <span className="text-[11px] text-muted">as of {day(rentRoll.asOf)}</span>
               ) : rr.asOfUsed ? (
                 // The roll stated no as-of date — WALT/expiry were measured
                 // from the screen date, and that basis must be visible.
                 <span className="text-[11px] text-muted">
-                  no stated as-of — measured at screen date {rr.asOfUsed}
+                  no stated as-of — measured at screen date {day(rr.asOfUsed)}
                 </span>
               ) : null}
             </div>
             <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
               <Stat k="Occupancy" v={pct(rr.sfWeightedOccupancy)} />
               <Stat k="WALT" v={rr.waltYears != null ? `${num(rr.waltYears)} yr` : "—"} />
-              <Stat k="Avg rent" v={rr.weightedAvgRentPsf != null ? `$${num(rr.weightedAvgRentPsf, 2)}/SF` : "—"} />
+              <Stat k="Avg rent" v={avgRent} sub={rentBasis} />
               <Stat k="Units" v={`${rr.occupiedUnits} / ${rr.unitCount}`} />
             </dl>
-            {rr.expiryBuckets && (
+            {/* The ladder weighs each lease by its SF and buckets it in years
+                to five-plus — a commercial roll's shape. An apartment roll is
+                counted in units on leases of a year or so, so the ladder
+                does not describe it, and it is left out. */}
+            {rr.expiryBuckets && !monthly && (
               <div className="mt-3">
                 <p className="text-[11px] font-medium uppercase tracking-wide text-muted">
                   Lease expiry (% of occupied SF)
@@ -138,7 +172,7 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
                 T-12 actual operating statement
               </h3>
               {t12?.periodEnd && (
-                <span className="text-[11px] text-muted">TTM to {t12.periodEnd}</span>
+                <span className="text-[11px] text-muted">TTM to {day(t12.periodEnd)}</span>
               )}
             </div>
             <table className="mt-3 w-full text-sm">
@@ -165,11 +199,12 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
   );
 }
 
-function Stat({ k, v }: { k: string; v: string }) {
+function Stat({ k, v, sub = null }: { k: string; v: string; sub?: string | null }) {
   return (
     <div>
       <dt className="text-[11px] text-muted">{k}</dt>
       <dd className="font-mono text-sm font-semibold tabular-nums">{v}</dd>
+      {sub && <dd className="text-[10px] text-muted">{sub}</dd>}
     </div>
   );
 }

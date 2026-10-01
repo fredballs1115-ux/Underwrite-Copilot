@@ -86,6 +86,7 @@ function sampleProps(initialTab: string | null, initialAnalysis: string | null =
       rentRoll: { asOf: SAMPLE_DEAL.rentRoll.as_of_date, summary: SAMPLE_DEAL.rentRoll.summary },
       t12: { periodEnd: SAMPLE_DEAL.t12.period_end_date, summary: SAMPLE_DEAL.t12.summary },
       noiComparison: omPick ? compareNoi(omPick.noi, SAMPLE_DEAL.t12.summary.noi!, omPick) : null,
+      assetClass: SAMPLE_DEAL.asset_class,
     },
     playground: {
       inputs: derived.inputs,

@@ -518,14 +518,24 @@ const rentRollExtraction: RentRollExtraction = {
   page: "roll p.1–6",
 };
 
+const ROLL_OCCUPIED_UNITS = 225;
+const ROLL_OCCUPIED_SF = 200_635;
+const ROLL_RENT_PSF = 32.4;
+
 const rentRollSummary: RentRollSummary = {
   unitCount: 248,
-  occupiedUnits: 225,
+  occupiedUnits: ROLL_OCCUPIED_UNITS,
   totalSf: 220_720,
-  occupiedSf: 200_635,
+  occupiedSf: ROLL_OCCUPIED_SF,
   sfWeightedOccupancy: 0.909,
   waltYears: 0.6,
-  weightedAvgRentPsf: 32.4,
+  weightedAvgRentPsf: ROLL_RENT_PSF,
+  // The same rent said per unit a month, from the figures above: the rent
+  // per SF a year over the occupied SF, ÷ 12, over the occupied units — the
+  // memorandum's "$2,400/mo" in-place rent, and the T-12's collected rent
+  // over the same units.
+  avgRentMonthly: (ROLL_RENT_PSF * ROLL_OCCUPIED_SF) / 12 / ROLL_OCCUPIED_UNITS,
+  rentUnits: ROLL_OCCUPIED_UNITS,
   expiryBuckets: { next12mo: 0.78, y1to3: 0.22, y3to5: 0, y5plus: 0 },
   expiryCoveredSf: 196_400,
   truncated: false,

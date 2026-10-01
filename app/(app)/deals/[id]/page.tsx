@@ -704,6 +704,8 @@ export default async function DealPage({
         ? compareNoi(omNoi, t12Summary.noi, omPick)
         : null,
     noiNote,
+    // An apartment roll is read per unit a month, an office's per foot.
+    assetClass: readClass,
   };
 
   // Sensitivity playground (Feature 2 of the competitive spec): the deal's
