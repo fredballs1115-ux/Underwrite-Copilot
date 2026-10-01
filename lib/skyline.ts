@@ -974,6 +974,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Lexington, KY",
     size: [6088, 4059],
   },
+  // Lincoln, NE: skyline-sheet run 36800019700 — the State Capitol's tower over downtown under a clear sky, the Sower whole in every crop; the Capitol's own portraits lose the Sower in the deal page's crops, the same skyline's other frames are smaller, paler or put a crane against the tower, the night frames are blown by floodlights, and the rest are rooftops, street corners, a theatre, a hotel's canopy and two congressmen.
+  "cbsa:30700": {
+    file: "Skyline of Downtown Lincoln, Nebraska, U.S. (2021 photograph).jpg",
+    place: "Downtown Lincoln across a field, the Nebraska State Capitol's tower above its skyline",
+    credit: "Hanyou23",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Lincoln, NE",
+    size: [2357, 1326],
+  },
   // Little Rock, AR: skyline-sheet run 36780772501 — the article's lead; one search result was Buffalo.
   "cbsa:30780": {
     file: "Little Rock, Arkansas skyline.jpg",

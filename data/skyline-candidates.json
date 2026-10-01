@@ -3605,7 +3605,12 @@
         "Lincoln Nebraska downtown",
         "Memorial Stadium Lincoln Nebraska"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Skyline of Downtown Lincoln, Nebraska, U.S. (2021 photograph).jpg",
+          "note": "Lincoln, NE — Hanyou23, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800019700)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:48900",
