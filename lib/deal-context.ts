@@ -4,7 +4,7 @@ import { withArticle } from "@/lib/article";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { assetWords } from "@/lib/asset-words";
-import { interestContextLine, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestContextLine, readInterest } from "@/lib/interest";
 import { assumableContextLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableContextLine, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantContextLine } from "@/lib/single-tenant";
@@ -113,7 +113,9 @@ export function dealContextFor(
   const tail = [...(portfolio ? [portfolioContextLine(portfolio)] : [])];
   if (strategy.kind === "unknown") return head.length || tail.length ? [...head, ...tail].join(" ") : null;
   const plan = planSummary(extraction, strategy);
-  const lines = [`Deal type: ${strategy.label}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
+  // Whose strategy it is on a note or a leased fee (the deal header's own
+  // label): the steps read the type as the collateral's, never the price's.
+  const lines = [`Deal type: ${dealTypeLabel(strategy.label, extraction)}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
   if (plan?.stabilizedNoi) {
     lines.push(
       `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)} is the finished project's figure${

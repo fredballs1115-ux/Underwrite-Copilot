@@ -1,4 +1,5 @@
 import "server-only";
+import { dealTypeLabelFor } from "@/lib/interest";
 import ExcelJS from "exceljs";
 import type { UnderwriteInputs } from "./engine";
 import { computeUnderwrite } from "./engine";
@@ -284,7 +285,10 @@ function buildCover(
   // model's year 1 — and a reader opening the file cold has to know that.
   const dealKind = meta.strategy ?? "unknown";
   if (dealKind !== "unknown") {
-    fact("Deal type", STRATEGY_LABEL[dealKind]);
+    // Whose strategy it is on a note or a leased fee, the deal header's own
+    // label (lib/interest): the type describes the collateral, or the
+    // leaseholder's building, never what the price buys.
+    fact("Deal type", dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind));
     const reading = ws.getCell(r, 3);
     reading.value = isPlanDeal(dealKind)
       ? `${STRATEGY_READING[dealKind]} This annual model books the capital budget in year 1 and anchors year-1 income on in-place or assumed figures — the Assumptions tab names each source.`

@@ -17,6 +17,7 @@ import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
 import { asOfLabel } from "@/lib/research";
 import { findPriceMetric, inferStrategy, noiFigures } from "@/lib/deal-strategy";
+import { dealTypeLabel } from "@/lib/interest";
 import { bannerSources } from "@/lib/deal-banner";
 import { floodCell, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { affordableTag } from "@/lib/affordable";
@@ -148,7 +149,9 @@ function toCol(
     hasModel: model != null,
     fit,
     fitNote,
-    strategy: strat.kind === "unknown" ? null : strat.label,
+    // Whose strategy it is on a note or a leased fee, as the deal header
+    // says it (lib/interest `dealTypeLabel`).
+    strategy: strat.kind === "unknown" ? null : dealTypeLabel(strat.label, ex),
     planDeal,
     irr: figs.withheld ? null : (r?.leveredIrrPct ?? null),
     em: figs.withheld ? null : (r?.equityMultiple ?? null),

@@ -167,7 +167,13 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
  *  collateral that secures the loan, a leased fee's the building someone
  *  else owns on the land. Elsewhere the label as it stands. */
 export function dealTypeLabel(strategyLabel: string, ex: ExtractionResult | null | undefined): string {
-  switch (interestOf(ex).kind) {
+  return dealTypeLabelFor(strategyLabel, interestOf(ex).kind);
+}
+
+/** The same label from the interest's kind alone, for a surface that holds
+ *  the kind rather than the extraction (the workbook's cover). */
+export function dealTypeLabelFor(strategyLabel: string, kind: InterestKind | null | undefined): string {
+  switch (kind) {
     case "note":
       return `${strategyLabel} (the collateral)`;
     case "leased_fee":

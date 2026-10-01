@@ -49,7 +49,7 @@ import {
   type StrategyKind,
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
 import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/lib/site-reports";
@@ -101,7 +101,7 @@ export interface WorkbookMeta {
   /** what is being sold (lib/interest, #414) — a note, a share, a
    *  leasehold: the cover says it in one line and what the model is and is
    *  not; absent for a plain fee simple */
-  interest?: { line: string; modelCaveat: string | null } | null;
+  interest?: { line: string; modelCaveat: string | null; kind?: InterestKind } | null;
   /** the seller's loan offered for assumption (lib/assumable-debt, #419):
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
@@ -258,7 +258,7 @@ const normalizeClass = (c: string): keyof typeof CLASS_DEFAULTS => {
  *  is not on it — null for a plain fee simple. */
 function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["interest"] {
   const r = readInterest(extraction, askingPriceOf(extraction));
-  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat } : null;
+  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat, kind: r.kind } : null;
 }
 
 /** The cover's lines about the seller's loan offered for assumption

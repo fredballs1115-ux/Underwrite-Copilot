@@ -3,6 +3,7 @@ import type { ExtractedInterest, ExtractionResult } from "@/lib/anthropic/types"
 import {
   INTEREST_LABEL,
   dealTypeLabel,
+  dealTypeLabelFor,
   groundRentOf,
   incomeBeforeGroundRentOf,
   interestContextLine,
@@ -128,6 +129,13 @@ describe("dealTypeLabel — the header's deal type says whose strategy it is (20
     // and a leased fee, a word for a building the price does not buy.
     expect(dealTypeLabel("Stabilized", ex(interest({ kind: "note" })))).toBe("Stabilized (the collateral)");
     expect(dealTypeLabel("Stabilized", ex(interest({ kind: "leased_fee" })))).toBe("Stabilized (the leaseholder's building)");
+  });
+
+  it("says the same from the interest's kind alone, for the workbook's cover", () => {
+    expect(dealTypeLabelFor("Stabilized", "note")).toBe("Stabilized (the collateral)");
+    expect(dealTypeLabelFor("Stabilized", "leased_fee")).toBe("Stabilized (the leaseholder's building)");
+    expect(dealTypeLabelFor("Value-add", "fee_simple")).toBe("Value-add");
+    expect(dealTypeLabelFor("Value-add", undefined)).toBe("Value-add");
   });
 
   it("leaves every interest that buys the building, or a share of it, as it was", () => {
