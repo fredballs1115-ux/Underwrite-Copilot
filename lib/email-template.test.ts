@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analysisReadyEmail, weeklyDigestEmail, type DigestInput } from "./email-template";
+import { analysisReadyEmail, screenStoppedEmail, weeklyDigestEmail, type DigestInput } from "./email-template";
 
 const BANNER = "https://underwrite.example/api/email/picture/3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b.abc.XYZ?s=banner";
 const thumb = (n: number) => `https://underwrite.example/api/email/picture/t${n}?s=thumb`;
@@ -85,5 +85,26 @@ describe("the Monday digest pictures each deal it names (#464)", () => {
     expect(plain.html).not.toContain("<img");
     expect(plain.html).not.toContain('<td width="48"');
     expect(plain.html.indexOf(">Caution</span>")).toBeLessThan(plain.html.indexOf("Harbor Point"));
+  });
+});
+
+describe("a screen that stopped says so by email (pass 14, 2026-10-01)", () => {
+  const input = {
+    dealName: "The Maddox <Brewerytown>",
+    message: "The analysis service is overloaded right now — try again in a few minutes.",
+    dealUrl: "https://app.example/deals/d1",
+    settingsUrl: "https://app.example/account",
+  };
+
+  it("names the deal, says the deal page's own sentence and links back", () => {
+    const { subject, html, text } = screenStoppedEmail(input);
+    expect(subject).toBe("The Maddox <Brewerytown> — the screen stopped");
+    expect(text).toContain("the screen stopped before its verdict");
+    expect(text).toContain(input.message);
+    expect(text).toContain("Open the deal: https://app.example/deals/d1");
+    expect(html).toContain("The Maddox &lt;Brewerytown&gt;");
+    expect(html).not.toContain("<Brewerytown>");
+    expect(html).toContain('href="https://app.example/deals/d1"');
+    expect(html).toContain("Turn them off on your Account page");
   });
 });

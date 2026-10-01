@@ -117,6 +117,80 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
   return { subject, html, text };
 }
 
+/* ------------------------- a screen that stopped ------------------------- */
+
+export interface ScreenStoppedEmailInput {
+  dealName: string;
+  /** the one sentence the deal page shows for the failure (lib/anthropic/
+   *  failure) — written for the analyst, never the provider's raw text */
+  message: string;
+  dealUrl: string;
+  settingsUrl: string;
+}
+
+/**
+ * A screen that stopped before its verdict: the analyst usually tabs away
+ * during the run, and the screen-complete email never comes for a run that
+ * fails, so nothing told them (pass 14, 2026-10-01). The deal page's own
+ * sentence, and the way back to it. Same template family as the
+ * screen-complete email, under the same switch on the Account page.
+ */
+export function screenStoppedEmail(input: ScreenStoppedEmailInput): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  const subject = `${input.dealName} — the screen stopped`;
+  const text = [
+    `${input.dealName} — the screen stopped before its verdict.`,
+    ``,
+    input.message,
+    ``,
+    `Open the deal: ${input.dealUrl}`,
+    ``,
+    `You're getting this because analysis emails are on. Turn them off on your Account page: ${input.settingsUrl}`,
+  ].join("\n");
+  const html = `<!doctype html>
+<html>
+<body style="margin:0;padding:0;background-color:#f2f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f4f4;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border:1px solid #dde3e2;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td style="background-color:#0c3338;padding:18px 28px;">
+            <span style="color:#ffffff;font-size:15px;font-weight:600;letter-spacing:-0.01em;">Underwrite Copilot</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px;">
+            <p style="margin:0;font-size:13px;color:#a8432f;">The screen stopped</p>
+            <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${esc(input.dealName)}</h1>
+            <p style="margin:16px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(input.message)}</p>
+            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:22px;">
+              <tr>
+                <td style="background-color:#114e54;border-radius:8px;">
+                  <a href="${esc(input.dealUrl)}" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Open the deal</a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 28px;border-top:1px solid #eef1f0;">
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#5f6b69;">
+              You're getting this because analysis emails are on.
+              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn them off on your Account page</a>.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+  return { subject, html, text };
+}
+
 /* ------------------------- weekly pipeline digest ------------------------ */
 
 export interface DigestInput {

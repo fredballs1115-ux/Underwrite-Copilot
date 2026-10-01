@@ -1,6 +1,6 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { analysisReadyEmail } from "@/lib/email-template";
+import { screenStoppedEmail, analysisReadyEmail } from "@/lib/email-template";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
@@ -239,6 +239,55 @@ export async function notifyAnalysisReady(
     // Notification-only — the analysis itself already succeeded.
     console.error(
       `[email] analysis-ready notification failed for ${dealId}:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
+
+/**
+ * A screen that stopped before its verdict (pass 14, 2026-10-01): the deal
+ * page's own failure sentence, to the deal's owner, under the same switch as
+ * the screen-complete email. Never for the sample, never when email is
+ * paused, never a reason anything else fails.
+ */
+export async function notifyAnalysisFailed(
+  admin: SupabaseClient,
+  dealId: string,
+  message: string,
+): Promise<void> {
+  if (!emailEnabled() || !message.trim()) return;
+  try {
+    const { data: deal } = await admin
+      .from("deals")
+      .select("name, user_id, is_sample")
+      .eq("id", dealId)
+      .maybeSingle();
+    if (!deal || deal.is_sample) return;
+    let wants = true;
+    try {
+      const { data: prefs, error } = await admin
+        .from("profiles")
+        .select("email_on_analysis")
+        .eq("id", deal.user_id as string)
+        .maybeSingle();
+      if (!error && prefs && prefs.email_on_analysis === false) wants = false;
+    } catch {
+      // pre-0014 schema — default on
+    }
+    if (!wants) return;
+    const { data: userRes } = await admin.auth.admin.getUserById(deal.user_id as string);
+    const to = userRes?.user?.email;
+    if (!to) return;
+    const { subject, html, text } = screenStoppedEmail({
+      dealName: (deal.name as string) ?? "Your deal",
+      message,
+      dealUrl: `${appUrl()}/deals/${dealId}`,
+      settingsUrl: `${appUrl()}/account`,
+    });
+    await sendEmail(to, subject, html, text);
+  } catch (err) {
+    console.error(
+      `[email] screen-stopped notification failed for ${dealId}:`,
       err instanceof Error ? err.message : err,
     );
   }

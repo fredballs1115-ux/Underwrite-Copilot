@@ -65,7 +65,7 @@ import { shownAssetClass } from "@/lib/pipeline-slots";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxLines } from "@/lib/criteria";
-import { notifyAnalysisReady } from "@/lib/email";
+import { notifyAnalysisFailed, notifyAnalysisReady } from "@/lib/email";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import type {
@@ -1185,6 +1185,9 @@ async function runAnalysisSteps(
     await patchJob(dealId, { status: "error", error: failure.message }).catch(() => {
       // the deal (and its job row) is gone — nothing left to tell
     });
+    // The analyst has usually tabbed away; the screen-complete email never
+    // comes for a run that stopped, so this one says so (best-effort).
+    await notifyAnalysisFailed(createSupabaseAdminClient(), dealId, failure.message);
   } finally {
     // Never rejects, and settles within SCREEN_PICTURE_MS: the turn is given
     // up with the memorandum the lift read, not while it still holds it.

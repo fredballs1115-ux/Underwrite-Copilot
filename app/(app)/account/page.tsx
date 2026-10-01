@@ -152,7 +152,8 @@ export default async function AccountPage({
             </h2>
             <p className="mt-1 max-w-md text-sm text-muted">
               One email per completed screen — the verdict, the buy-box call,
-              and a link to the deal page.
+              and a link to the deal page — and one if a screen stops before
+              its verdict, saying why.
             </p>
           </div>
           <EmailToggle

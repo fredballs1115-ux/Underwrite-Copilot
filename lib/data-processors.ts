@@ -53,7 +53,7 @@ export const DATA_PROCESSORS: readonly DataProcessor[] = [
     // Both emails are on for a new account (migrations 0014 and 0017 default
     // the two columns to true); the account page turns each off.
     receives:
-      "your email address, and what our two emails carry (both are on by default; each can be turned off on the Account page): deal names, their screening calls with a line of why and their buy-box fit, pipeline counts and offer deadlines",
+      "your email address, and what our emails carry (two switches, both on by default; each can be turned off on the Account page): deal names, their screening calls with a line of why and their buy-box fit, or the sentence the deal page shows when a screen stops, pipeline counts and offer deadlines",
     hosts: ["api.resend.com"],
   },
   {

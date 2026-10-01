@@ -148,7 +148,7 @@ vi.mock("@/lib/supabase/admin", () => ({ createSupabaseAdminClient: vi.fn() }));
 vi.mock("@/lib/storage", () => ({
   downloadOmPdf: vi.fn(async () => Buffer.from("%PDF-1.4\n")),
 }));
-vi.mock("@/lib/email", () => ({ notifyAnalysisReady: vi.fn(async () => {}) }));
+vi.mock("@/lib/email", () => ({ notifyAnalysisReady: vi.fn(async () => {}), notifyAnalysisFailed: vi.fn(async () => {}) }));
 // The memorandum's cover, lifted beside the steps after the extraction
 // (lib/deal-picture's search is its own test's; here, what the screen asks).
 vi.mock("@/lib/deal-picture", () => ({
@@ -340,6 +340,26 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
     expect(usage?.wallMs).not.toBe(usage?.ms);
     expect(logSpy).toHaveBeenCalledWith(expect.stringMatching(/^\[pipeline\] screen usage for deal d1: 2 calls/));
     logSpy.mockRestore();
+  });
+
+  it("a screen that stops emails its owner the deal page's own sentence; one that finishes does not (pass 14)", async () => {
+    const { notifyAnalysisFailed } = await import("@/lib/email");
+    vi.mocked(notifyAnalysisFailed).mockClear();
+    vi.mocked(extractTerms).mockImplementation(async () => {
+      throw apiError(529, "overloaded_error", "Overloaded");
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(notifyAnalysisFailed).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(notifyAnalysisFailed).mock.calls[0]?.[1]).toBe("d1");
+    expect(vi.mocked(notifyAnalysisFailed).mock.calls[0]?.[2]).toBe(job().error);
+
+    state = freshState();
+    vi.mocked(notifyAnalysisFailed).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue(EXTRACTION);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect(notifyAnalysisFailed).not.toHaveBeenCalled();
   });
 
   it("a failed screen still records what it spent; a run with no model calls records nothing", async () => {
