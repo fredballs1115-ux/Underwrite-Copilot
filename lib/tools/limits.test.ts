@@ -4,10 +4,15 @@ import {
   MAX_DOWNTIME_MONTHS,
   MAX_GROUND_LEASE_YEARS,
   MAX_HOLD_YEARS,
+  MAX_LEASEBACK_YEARS,
+  MAX_LEASE_UP_MONTHS,
   MAX_LEASE_YEARS,
   MAX_LOAN_MONTHS,
+  MAX_LOAN_TERM_YEARS,
+  MAX_ROLLOVER_YEARS,
   heldNote,
   heldTo,
+  pastEndNote,
 } from "./limits";
 import { readPrepayment, type PrepayTerms } from "./prepayment";
 import { readAssumption, type AssumptionTerms } from "./loan-assumption";
@@ -16,6 +21,10 @@ import { readDraw, type DrawTerms } from "./construction-draw";
 import { readBelief, type BeliefInputs } from "./what-you-believe";
 import { readGroundLease, type GroundLeaseTerms } from "./ground-lease";
 import { readBuyout, type BuyoutTerms } from "./lease-buyout";
+import { readDebt } from "./debt-math";
+import { MAX_YEARS, readRollover, type LeaseRow } from "./rollover";
+import { MAX_MONTHS, readLeaseUp, type LeaseUpInput } from "./lease-up";
+import { MAX_TERM, readLeaseback, type SaleLeasebackInput } from "./sale-leaseback";
 
 /**
  * A figure typed — or carried in a link — far past the longest a card runs
@@ -62,6 +71,28 @@ describe("the bound itself", () => {
     expect(heldNote(30, MAX_HOLD_YEARS, "Hold", "years")).toBeNull();
     expect(heldNote(5, MAX_HOLD_YEARS, "Hold", "years")).toBeNull();
     expect(heldNote(null, MAX_HOLD_YEARS, "Hold", "years")).toBeNull();
+  });
+
+  it("says what falls past a schedule's end, where it ends before the answer", () => {
+    expect(pastEndNote(MAX_LEASE_UP_MONTHS, "months", ["the cash is not back by then"])).toBe(
+      "Run to 60 months, the longest this card runs: the cash is not back by then.",
+    );
+    expect(pastEndNote(60, "months", ["one", "two"])).toBe(
+      "Run to 60 months, the longest this card runs: one; two.",
+    );
+    expect(pastEndNote(MAX_LEASE_UP_MONTHS, "months", [])).toBeNull();
+  });
+
+  it("is the one bound each module reads, not a copy of it", () => {
+    // The modules keep their own names for their tests and their callers;
+    // each is the limit here, so the card's sentence and the module's
+    // schedule cannot hold a figure to two different lengths.
+    expect(MAX_YEARS).toBe(MAX_ROLLOVER_YEARS);
+    expect(MAX_MONTHS).toBe(MAX_LEASE_UP_MONTHS);
+    expect(MAX_TERM).toBe(MAX_LEASEBACK_YEARS);
+    expect([MAX_LOAN_TERM_YEARS, MAX_ROLLOVER_YEARS, MAX_LEASEBACK_YEARS, MAX_LEASE_UP_MONTHS]).toEqual([
+      40, 15, 50, 60,
+    ]);
   });
 });
 
@@ -233,5 +264,80 @@ describe("a huge figure returns at once, as the longest the card runs", () => {
     expect(r.result).toEqual(r.bound);
     // …and the note says the years the streams actually ran
     expect(r.result.note).toContain(`${MAX_LEASE_YEARS} years of market rent`);
+  });
+
+  it("the loan over the hold: the term", () => {
+    const seed = { loan: 13_000_000, ratePct: 6.5, amortYears: 30, ioYears: 0, termYears: 10 };
+    const r = promptly(
+      () => readDebt({ ...seed, termYears: HUGE }),
+      () => readDebt({ ...seed, termYears: MAX_LOAN_TERM_YEARS }),
+    );
+    expect(r.ms).toBeLessThan(BUDGET_MS);
+    expect(r.result).toEqual(r.bound);
+    expect(r.result.years).toHaveLength(MAX_LOAN_TERM_YEARS);
+  });
+
+  it("the rollover schedule: the hold", () => {
+    const rows: LeaseRow[] = [
+      { tenant: "Anchor", sf: 60_000, rentPerSf: 8.5, expiryYears: 12, breakYears: null },
+      { tenant: "Ridgeline", sf: 22_000, rentPerSf: 46, expiryYears: 3, breakYears: null },
+    ];
+    const r = promptly(
+      () => readRollover({ rows, holdYears: HUGE }),
+      () => readRollover({ rows, holdYears: MAX_ROLLOVER_YEARS }),
+    );
+    expect(r.ms).toBeLessThan(BUDGET_MS);
+    expect(r.result).toEqual(r.bound);
+    expect(r.result.years).toHaveLength(MAX_ROLLOVER_YEARS);
+  });
+
+  it("the lease-up: the months it runs", () => {
+    const seed: LeaseUpInput = {
+      buildingSf: 120_000,
+      preLeasedSf: 24_000,
+      stabilizedOccupancyPct: 92,
+      absorptionSfPerMonth: 4_000,
+      rentPerSf: 34,
+      freeRentMonths: 6,
+      tiPerSf: 65,
+      lcPerSf: 18,
+      opexPerSf: 11,
+      fixedOpexSharePct: 65,
+      monthlyDebtService: null,
+      maxMonths: MAX_LEASE_UP_MONTHS,
+    };
+    const r = promptly(
+      () => readLeaseUp({ ...seed, maxMonths: HUGE }),
+      () => readLeaseUp(seed),
+    );
+    expect(r.ms).toBeLessThan(BUDGET_MS);
+    expect(r.result).toEqual(r.bound);
+    expect(r.result.months).toHaveLength(MAX_LEASE_UP_MONTHS);
+  });
+
+  it("the sale-leaseback: the term", () => {
+    const seed: SaleLeasebackInput = {
+      buildingSf: 180_000,
+      marketRentPerSf: 7.5,
+      contractRentPerSf: 9,
+      termYears: 20,
+      escalationPct: 2,
+      creditCapPct: 6,
+      marketCapPct: 6.25,
+      discountRatePct: 8,
+      sellingCostPct: 1.5,
+      mortgageRatePct: 6.5,
+      mortgageAmortYears: 25,
+      maxLtvPct: 60,
+      minDscr: 1.3,
+      minDebtYieldPct: 9,
+    };
+    const r = promptly(
+      () => readLeaseback({ ...seed, termYears: HUGE }),
+      () => readLeaseback({ ...seed, termYears: MAX_LEASEBACK_YEARS }),
+    );
+    expect(r.ms).toBeLessThan(BUDGET_MS);
+    expect(r.result).toEqual(r.bound);
+    expect(r.result.note).toContain(`year ${MAX_LEASEBACK_YEARS}`);
   });
 });

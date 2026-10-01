@@ -32,6 +32,20 @@ export const MAX_DOWNTIME_MONTHS = 120;
 /** A ground lease's years left: 999, a term some ground leases are written for. */
 export const MAX_GROUND_LEASE_YEARS = 999;
 
+/** A loan's term to its balloon: forty years, run a month at a time. */
+export const MAX_LOAN_TERM_YEARS = 40;
+
+/** A rent roll's hold: fifteen years, past which a rollover schedule is not a
+ *  screening question. */
+export const MAX_ROLLOVER_YEARS = 15;
+
+/** A sale-leaseback's term: fifty years, past which it is a ground lease. */
+export const MAX_LEASEBACK_YEARS = 50;
+
+/** A lease-up schedule: sixty months, past which it is not a screening
+ *  question. The card has no field for it, so it is the schedule's length. */
+export const MAX_LEASE_UP_MONTHS = 60;
+
 /** A figure held to `max`: itself within it, `max` past it. */
 export function heldTo(n: number, max: number): number {
   return n > max ? max : n;
@@ -50,4 +64,17 @@ export function heldNote(
 ): string | null {
   if (typeof n !== "number" || !(n > max)) return null;
   return `${field} read as ${max.toLocaleString("en-US")}${unit ? ` ${unit}` : ""}, the longest this card runs.`;
+}
+
+/**
+ * What a card says where the schedule it runs ends, at the longest it runs,
+ * before what it was asked for — "Run to 60 months, the longest this card
+ * runs: the cash is not back by then." — so a dash in a tile reads as where
+ * the schedule stopped, never as an answer. Each clause is the card's own,
+ * and they are joined as the separate findings they are; null where nothing
+ * falls past the end.
+ */
+export function pastEndNote(max: number, unit: string, clauses: readonly string[]): string | null {
+  if (clauses.length === 0) return null;
+  return `Run to ${max.toLocaleString("en-US")} ${unit}, the longest this card runs: ${clauses.join("; ")}.`;
 }

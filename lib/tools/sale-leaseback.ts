@@ -58,6 +58,7 @@
 
 import { loanConstant, sizeLoan } from "@/lib/tools/deal-math";
 import { usdExact } from "@/lib/tools/format";
+import { MAX_LEASEBACK_YEARS, heldTo } from "@/lib/tools/limits";
 
 const real = (n: number | null | undefined): n is number =>
   typeof n === "number" && Number.isFinite(n);
@@ -67,8 +68,9 @@ const round = (n: number) => Math.round(n);
 const round1 = (n: number) => Math.round(n * 10) / 10;
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
-/** A term past fifty years is a ground lease, not a leaseback. */
-export const MAX_TERM = 50;
+/** A term past fifty years is a ground lease, not a leaseback — the bound
+ *  lives in lib/tools/limits, where the card reads it to say so. */
+export const MAX_TERM = MAX_LEASEBACK_YEARS;
 
 export interface SaleLeasebackResult {
   /** year-one rent on the lease the seller writes */
@@ -192,7 +194,7 @@ export function readLeaseback(t: SaleLeasebackInput): SaleLeasebackResult {
   if (!positive(t.creditCapPct) || !positive(t.marketCapPct)) {
     return { ...EMPTY, note: "Enter both cap rates — the tenant's credit prices one and the real estate prices the other." };
   }
-  const term = positive(t.termYears) ? Math.min(Math.round(t.termYears), MAX_TERM) : 0;
+  const term = positive(t.termYears) ? heldTo(Math.round(t.termYears), MAX_TERM) : 0;
   if (term <= 0) {
     return { ...EMPTY, note: `Enter the lease term, between one and ${MAX_TERM} years.` };
   }

@@ -43,10 +43,12 @@
 // Pure, no I/O.
 
 import { readFigure } from "@/lib/money";
+import { MAX_ROLLOVER_YEARS, heldTo } from "@/lib/tools/limits";
 import { cellsOf } from "@/lib/tools/unit-mix";
 
-/** A rollover schedule past fifteen years is not a screening question. */
-export const MAX_YEARS = 15;
+/** A rollover schedule past fifteen years is not a screening question — the
+ *  bound lives in lib/tools/limits, where the card reads it to say so. */
+export const MAX_YEARS = MAX_ROLLOVER_YEARS;
 const DEFAULT_HOLD = 5;
 
 const real = (n: number | null | undefined): n is number =>
@@ -303,7 +305,7 @@ export function readRollover(t: RollInput): RollResult {
   const rows = t.rows.filter((r) => positive(r.sf));
   if (rows.length === 0) return EMPTY;
 
-  const hold = positive(t.holdYears) ? Math.min(Math.round(t.holdYears), MAX_YEARS) : DEFAULT_HOLD;
+  const hold = positive(t.holdYears) ? heldTo(Math.round(t.holdYears), MAX_YEARS) : DEFAULT_HOLD;
   const leasedSf = rows.reduce((a, r) => a + r.sf, 0);
   const rentOf = (r: LeaseRow) => (positive(r.rentPerSf) ? r.sf * r.rentPerSf : 0);
   const withRent = rows.filter((r) => positive(r.rentPerSf));

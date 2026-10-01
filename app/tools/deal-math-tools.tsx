@@ -10,10 +10,15 @@ import {
   MAX_DOWNTIME_MONTHS,
   MAX_GROUND_LEASE_YEARS,
   MAX_HOLD_YEARS,
+  MAX_LEASEBACK_YEARS,
+  MAX_LEASE_UP_MONTHS,
   MAX_LEASE_YEARS,
   MAX_LOAN_MONTHS,
+  MAX_LOAN_TERM_YEARS,
+  MAX_ROLLOVER_YEARS,
   heldNote,
   heldTo,
+  pastEndNote,
 } from "@/lib/tools/limits";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
@@ -324,6 +329,16 @@ function HeldNotes({
   if (shown.length === 0) return null;
   return <p className={`text-xs text-caution ${className}`}>{shown.join(" ")}</p>;
 }
+
+/**
+ * A field's figure in whole units, as a module that rounds before it holds
+ * reads it — so "40.3" years is the 40 typed, and only "40.6", which the
+ * module rounds to 41 and then holds, is said to be held.
+ */
+const wholeYears = (raw: string): number | null => {
+  const n = num(raw);
+  return n === null ? null : Math.round(n);
+};
 
 /** A figure with its name under it — the shape every result here takes. */
 function Stat({
@@ -2907,6 +2922,10 @@ function Leaseback() {
             <Field label="Min DSCR" suffix="x" value={dscr} onChange={setDscr} placeholder="1.30" />
             <Field label="Min debt yield" suffix="%" value={dy} onChange={setDy} placeholder="9" />
           </div>
+          <HeldNotes
+            className="mt-2"
+            notes={[heldNote(wholeYears(term), MAX_LEASEBACK_YEARS, "Term", "years")]}
+          />
           <p className="mt-2 text-[11px] leading-relaxed text-muted">
             Two cap rates, deliberately. One prices the tenant&rsquo;s covenant
             and the other prices the building, and a sale-leaseback is the one
@@ -5753,9 +5772,34 @@ function LeaseUp() {
         opexPerSf: num(opex),
         fixedOpexSharePct: num(fixed),
         monthlyDebtService: num(debt),
-        maxMonths: 60,
+        maxMonths: MAX_LEASE_UP_MONTHS,
       }),
     [sf, pre, stab, pace, rent, free, ti, lc, opex, fixed, debt],
+  );
+
+  // The schedule ends at the longest the card runs, and a tile whose answer
+  // falls past it reads "—": said, so the dash is where the schedule stopped
+  // rather than an answer. Not filling at all is the module's own note.
+  const notPaid = r.monthsToStabilize !== null && r.monthsToFullPay === null;
+  const notBack = r.peakFunding !== null && r.peakFunding > 0 && r.paybackMonth === null;
+  // The deepest month is the last one: still going out, so not back either.
+  const stillOut = r.peakFundingMonth !== null && r.peakFundingMonth === r.months.length;
+  const pastEnd = pastEndNote(
+    MAX_LEASE_UP_MONTHS,
+    "months",
+    stillOut
+      ? [
+          notPaid
+            ? "by then it is not paid in full and the cash is still going out, so the worst month may come later"
+            : "the cash is still going out at the end, so the worst month may come later",
+        ]
+      : notPaid && notBack
+        ? ["by then it is not paid in full, nor is the cash back"]
+        : notPaid
+          ? ["it is not paid in full by then"]
+          : notBack
+            ? ["the cash is not back by then"]
+            : [],
   );
 
   // The J-curve, drawn from a centre line: the hole the building digs and
@@ -5845,6 +5889,7 @@ function LeaseUp() {
               tone={r.paybackMonth === null ? "muted" : undefined}
             />
           </div>
+          <HeldNotes className="mt-2" notes={[pastEnd]} />
 
           {r.note && <p className="mt-3 text-sm text-caution">{r.note}</p>}
 
@@ -5975,6 +6020,10 @@ function Rollover() {
             <Field label="Downtime" suffix="mo" value={down} onChange={setDown} placeholder="6" />
             <Field label="Renewal rate" suffix="%" value={renew} onChange={setRenew} placeholder="65" />
           </div>
+          <HeldNotes
+            className="mt-2"
+            notes={[heldNote(wholeYears(hold), MAX_ROLLOVER_YEARS, "Hold", "years")]}
+          />
           {read.skipped.length > 0 && (
             <p className="mt-2 text-xs text-caution">
               Ignored: {read.skipped.slice(0, 3).join(", ")}
@@ -8526,6 +8575,11 @@ function LoanOverTime() {
         />
         <Field label="Term" suffix="yr" value={term} onChange={setTerm} placeholder="10" />
       </div>
+      <HeldNotes
+        className="mt-2"
+        // Whole years, as the schedule reads the term, then held.
+        notes={[heldNote(wholeYears(term), MAX_LOAN_TERM_YEARS, "Term", "years")]}
+      />
 
       {d.years.length > 0 && (
         <>

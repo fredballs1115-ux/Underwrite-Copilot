@@ -79,6 +79,60 @@ describe("a ground lease worth less than nothing", () => {
   });
 });
 
+describe("a figure run to the longest its card runs, said on the card", () => {
+  it("the loan's term, held at forty years", async () => {
+    const html = await fromLink("?dt=99");
+    const text = textOf(html, "the-loan-over-the-hold");
+    expect(text).toContain("Term read as 40 years, the longest this card runs.");
+    expect(text).toContain("Balloon, year 40");
+    // Rounded the way the schedule rounds it: 40.3 years is the 40 typed.
+    expect(textOf(await fromLink("?dt=40.3"), "the-loan-over-the-hold")).not.toContain(
+      "the longest this card runs",
+    );
+  });
+
+  it("the rollover's hold, held at fifteen years", async () => {
+    const text = textOf(await fromLink("?rrh=40"), "rollover");
+    expect(text).toContain("Hold read as 15 years, the longest this card runs.");
+    expect(text).toContain("Year 15");
+    expect(text).not.toContain("Year 16");
+  });
+
+  it("the leaseback's term, held at fifty years", async () => {
+    const text = textOf(await fromLink("?slbt=80"), "sale-leaseback");
+    expect(text).toContain("Term read as 50 years, the longest this card runs.");
+    expect(text).toContain("The rent reverts at year 50");
+  });
+
+  it("the lease-up's sixty months, where an answer falls past them", async () => {
+    // At 1,500 feet a month it fills in month 58, so the free rent runs
+    // past the end, and so does the cash coming back: two dashes, said.
+    const slow = textOf(await fromLink("?lupa=1500"), "lease-up");
+    expect(slow).toContain("Paid in full at");
+    expect(slow).toContain(
+      "Run to 60 months, the longest this card runs: by then it is not paid in full, nor is the cash back.",
+    );
+    // Debt service the stabilized building carries: full on time, the cash
+    // back after the end.
+    expect(textOf(await fromLink("?luds=150000"), "lease-up")).toContain(
+      "Run to 60 months, the longest this card runs: the cash is not back by then.",
+    );
+    // Debt service it does not carry: still going out in the last month.
+    expect(textOf(await fromLink("?luds=300000"), "lease-up")).toContain(
+      "Run to 60 months, the longest this card runs: the cash is still going out at the end, so the worst month may come later.",
+    );
+    expect(textOf(await fromLink("?lupa=1500&luds=300000"), "lease-up")).toContain(
+      "by then it is not paid in full and the cash is still going out, so the worst month may come later.",
+    );
+  });
+
+  it("and nothing where the seed runs within every bound", async () => {
+    // The seeded lease-up is paid in full at month 28 and its cash is back
+    // at 53; no seeded figure is held.
+    expect(visibleText(await fromLink(""))).not.toContain("the longest this card runs");
+  });
+});
+
 describe("a negative written by the page, through the shared writer", () => {
   it("says a negative break-even hard cost as no cost penciling, never as one that does", async () => {
     // Land dear enough that free construction would not work: the solved

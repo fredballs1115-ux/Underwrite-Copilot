@@ -46,9 +46,11 @@
 // Pure, no I/O.
 
 import { usdExact } from "./format";
+import { MAX_LEASE_UP_MONTHS, heldTo } from "./limits";
 
-/** A lease-up past five years is not a screening question. */
-export const MAX_MONTHS = 60;
+/** A lease-up past five years is not a screening question — the bound lives
+ *  in lib/tools/limits, where the card reads it to say what falls past it. */
+export const MAX_MONTHS = MAX_LEASE_UP_MONTHS;
 /** The common date the two shocks are read at — rule 1. */
 export const COMPARE_MONTH = 36;
 const DEFAULT_STABILIZED_PCT = 95;
@@ -185,7 +187,7 @@ function settle(t: LeaseUpInput): Settled | null {
     sf,
     targetSf,
     preLeased: Math.min(targetSf, atLeastZero(t.preLeasedSf)),
-    horizon: positive(t.maxMonths) ? Math.min(Math.round(t.maxMonths), MAX_MONTHS) : MAX_MONTHS,
+    horizon: positive(t.maxMonths) ? heldTo(Math.round(t.maxMonths), MAX_MONTHS) : MAX_MONTHS,
     free: Math.max(0, Math.round(atLeastZero(t.freeRentMonths))),
     capPerSf: atLeastZero(t.tiPerSf) + atLeastZero(t.lcPerSf),
     opexPerSf: atLeastZero(t.opexPerSf),
