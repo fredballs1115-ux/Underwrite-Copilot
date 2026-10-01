@@ -430,9 +430,13 @@ describe("validateLeases", () => {
     expect(issues.map((i) => i.code)).toContain("missing_expiry");
   });
 
-  it("flags a roll that mixes lease bases", () => {
+  it("flags a roll that mixes lease bases, and says what the page can do about it", () => {
     const { leases } = leasesFrom(MESSY_CSV);
-    expect(validateLeases(leases).map((i) => i.code)).toContain("mixed_rent_basis");
+    const issue = validateLeases(leases).find((i) => i.code === "mixed_rent_basis")!;
+    expect(issue).toBeDefined();
+    // The page holds one market rent; there is no per-basis field to set.
+    expect(issue.message).not.toMatch(/set market rents per basis/);
+    expect(issue.message).toContain("save a profile at their basis's market rent");
   });
 
   it("stores the totals lines it left out as a note naming each row and label", () => {

@@ -269,6 +269,25 @@ describe("concentrationFlags", () => {
     expect(flags.find((f) => f.code === "walt_under_hold")).toBeDefined();
   });
 
+  it("weighs the WALT flag by rent where the roll states its rents, and by area — said so — where it does not", () => {
+    const walt = computeWalt(CLEAN, AS_OF);
+    const byRent = concentrationFlags(CLEAN, rolloverSchedule(CLEAN), walt, { nra: 100_000, holdYears: 5 }).find(
+      (f) => f.code === "walt_under_hold",
+    )!;
+    expect(byRent.value).toBeCloseTo(walt.byRent!, 12);
+    expect(byRent.message).toMatch(/^WALT by rent is \d+\.\d years/);
+
+    const noRents = CLEAN.map((l) => ({ ...l, baseRentAnnual: null }));
+    const areaWalt = computeWalt(noRents, AS_OF);
+    expect(areaWalt.coveredSfWithRent).toBe(0);
+    const byArea = concentrationFlags(noRents, rolloverSchedule(noRents), areaWalt, { nra: 100_000, holdYears: 5 }).find(
+      (f) => f.code === "walt_under_hold",
+    )!;
+    expect(byArea.value).toBeCloseTo(areaWalt.bySf!, 12);
+    expect(byArea.message).toContain("WALT by area");
+    expect(byArea.message).not.toMatch(/tenants that pay/);
+  });
+
   it("raises no rollover-year or WALT flag on leases that run a year, and says so", () => {
     const leases = leasesFrom(apartmentCsv());
     const commercial = analyzeRentRoll(leases, { asOf: "2026-10-01" });

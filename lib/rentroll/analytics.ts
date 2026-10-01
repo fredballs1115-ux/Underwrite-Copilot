@@ -43,6 +43,9 @@ export interface Walt {
   /** the SF and rent those figures were measured over */
   coveredSf: number;
   coveredRent: number;
+  /** the dated, leased SF whose lease states a rent — how much of the space
+   *  the rent-weighted figure speaks for */
+  coveredSfWithRent: number;
   /** occupied SF/rent EXCLUDED for want of an expiry date */
   excludedSf: number;
   excludedRent: number;
@@ -55,6 +58,7 @@ export function computeWalt(leases: Lease[], asOf: string): Walt {
   let sfDen = 0;
   let rentNum = 0;
   let rentDen = 0;
+  let sfWithRent = 0;
   let excludedSf = 0;
   let excludedRent = 0;
 
@@ -76,6 +80,7 @@ export function computeWalt(leases: Lease[], asOf: string): Walt {
     if (rent > 0) {
       rentNum += years * rent;
       rentDen += rent;
+      if (sf > 0) sfWithRent += sf;
     }
   }
 
@@ -84,6 +89,7 @@ export function computeWalt(leases: Lease[], asOf: string): Walt {
     byRent: rentDen > 0 ? rentNum / rentDen : null,
     coveredSf: sfDen,
     coveredRent: rentDen,
+    coveredSfWithRent: sfWithRent,
     excludedSf,
     excludedRent,
     asOf,
@@ -534,12 +540,20 @@ export function concentrationFlags(
     }
   }
 
-  if (walt.bySf != null && walt.bySf < holdYears && !options.leasesShort) {
+  // The term that matters is the income's: weighted by rent where the roll
+  // states a rent for most of its dated, leased space (four-fifths of it),
+  // by area otherwise — and the sentence says which it measured.
+  const weighByRent =
+    walt.byRent != null && walt.coveredSf > 0 && walt.coveredSfWithRent >= 0.8 * walt.coveredSf;
+  const term = weighByRent ? walt.byRent : walt.bySf;
+  if (term != null && term < holdYears && !options.leasesShort) {
     flags.push({
       code: "walt_under_hold",
-      severity: walt.bySf < holdYears / 2 ? "critical" : "warning",
-      message: `WALT of ${walt.bySf.toFixed(1)} years is shorter than the ${holdYears}-year hold — the tenants that pay for this deal roll inside it.`,
-      value: walt.bySf,
+      severity: term < holdYears / 2 ? "critical" : "warning",
+      message: weighByRent
+        ? `WALT by rent is ${term.toFixed(1)} years, shorter than the ${holdYears}-year hold — on average the rent rolls before the sale.`
+        : `WALT by area is ${term.toFixed(1)} years, shorter than the ${holdYears}-year hold — on average the leased space rolls before the sale; the roll states too few rents to weigh the income.`,
+      value: term,
     });
   }
 

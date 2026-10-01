@@ -295,7 +295,9 @@ export function validateLeases(
     issues.push({
       severity: "warning",
       code: "mixed_rent_basis",
-      message: `This roll mixes ${[...bases].join(" and ")} leases. A single mark-to-market across them compares different things — set market rents per basis, or split the analysis.`,
+      // The page holds one market rent (the leasing profile's), so the
+      // message says what can be done with that, not a field there is not.
+      message: `This roll mixes ${[...bases].join(" and ")} leases, and the mark to market prices them all against the leasing profile's one market rent, quoted on one basis — so a lease on another is set against a rent that is not its own. Read those rows apart, or save a profile at their basis's market rent and apply it to read them.`,
       rows: [],
     });
   }
