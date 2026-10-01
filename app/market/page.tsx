@@ -42,7 +42,6 @@ import { assetClassLabel } from "@/lib/asset-class";
 import { looseValue, SECTORS } from "@/lib/research-sectors";
 import { COVERAGE_DISCOVERY, COVERAGE_SUMMARY, PROVIDERS, compsFeedLive } from "@/lib/public-comps/core";
 import metrosSeed from "@/data/research/metros.json";
-import multifamilySeed from "@/data/research/multifamily.json";
 import {
   sectorLeaderboard,
   sectorStandings,
@@ -58,6 +57,8 @@ import { MarketCompare } from "./market-compare";
 import { COMPARE_METROS } from "./compare-metros";
 import { Fold } from "./fold";
 import { RuleItem } from "./rule-item";
+import { ExampleListings } from "./example-listings";
+import { examplesFor } from "@/lib/example-listings";
 import { FmrRow } from "./fmr-row";
 
 /** "By asset type" — the metro's sector fundamentals from the research
@@ -683,23 +684,11 @@ async function MetroExplorer({ selected }: { selected?: string }) {
         : compsFeedLive(active.comps_provider)
           ? `Recorded-sales comps LIVE via ${compsProvider?.name ?? active.comps_provider}.`
           : `Recorded-sales comps: ${compsProvider?.name ?? active.comps_provider} is documented, not yet wired.`;
-  // Explicit metro-id → research-metro mapping: name-prefix matching missed
-  // the DMV entry (its metro string is "DMV core (DC / PG County MD / NoVA)")
-  // for the three DMV metros.
-  const EXAMPLE_METRO: Record<string, string> = {
-    dc: "DMV core",
-    pg_county: "DMV core",
-    montgomery_county: "DMV core",
-    nova: "DMV core",
-    philadelphia: "Philadelphia",
-    baltimore: "Baltimore",
-  };
-  const wanted = EXAMPLE_METRO[active.id];
-  const examples = wanted
-    ? ((multifamilySeed.top_east_coast_metros ?? []).find((m) =>
-        m.metro.toLowerCase().startsWith(wanted.toLowerCase())
-      )?.example_properties ?? [])
-    : [];
+  // The research's example listings for this market: each with the day the
+  // research saw it listed and its source, and only where it is in this
+  // market (lib/example-listings) — the DMV block's Dumfries, Virginia duplex
+  // is Northern Virginia's, never Maryland's.
+  const examples = examplesFor(active.id);
   const noteStatus = (active.market_notes as { status?: string } | null)?.status ?? "sourced";
   const noteMeta =
     noteStatus === "verified"
@@ -795,31 +784,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           Screen a deal in {active.name} →
         </Link>
 
-        {examples.length > 0 && (
-          <div>
-            <h3 className="text-[11px] uppercase tracking-wide text-muted">
-              Example properties from the research
-            </h3>
-            <ul className="mt-2 space-y-1.5">
-              {examples.map((e) => (
-                <li key={e.address} className="text-sm">
-                  <span className="font-medium">{e.address}</span>
-                  {typeof e.price === "number" && (
-                    <>
-                      {" "}
-                      <span className="ml-1 font-mono tabular-nums">
-                        ${e.price.toLocaleString()}
-                      </span>
-                    </>
-                  )}{" "}
-                  <span className="ml-1 text-xs text-muted">
-                    {e.metric} — {e.note}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
+        <ExampleListings examples={examples} />
       </div>
     </section>
   );
