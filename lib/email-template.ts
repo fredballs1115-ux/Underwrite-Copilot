@@ -293,6 +293,10 @@ export interface DigestInput {
   }[];
   pipelineUrl: string;
   settingsUrl: string;
+  /** the one-click unsubscribe (lib/email-unsubscribe): drawn in the footer
+   *  beside the Account page's switch, which needs a sign-in; null where no
+   *  link could be minted */
+  unsubscribeUrl?: string | null;
 }
 
 /**
@@ -337,7 +341,9 @@ export function weeklyDigestEmail(input: DigestInput): {
     ``,
     `Open the pipeline: ${input.pipelineUrl}`,
     ``,
-    `You're getting this because the weekly digest is on. Turn it off on your Account page: ${input.settingsUrl}`,
+    input.unsubscribeUrl
+      ? `You're getting this because the weekly digest is on. Unsubscribe in one click: ${input.unsubscribeUrl} — or manage both emails on your Account page: ${input.settingsUrl}`
+      : `You're getting this because the weekly digest is on. Turn it off on your Account page: ${input.settingsUrl}`,
   ]
     .filter((l): l is string => l !== null)
     .join("\n");
@@ -414,7 +420,11 @@ export function weeklyDigestEmail(input: DigestInput): {
             ${button(input.pipelineUrl, "Open the pipeline")}
           </td>
         </tr>${footerRow(
-          `You're getting this because the weekly digest is on.
+          input.unsubscribeUrl
+            ? `You're getting this because the weekly digest is on.
+              <a href="${esc(input.unsubscribeUrl)}" style="color:#114e54;">Unsubscribe in one click</a>, or
+              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">manage both emails on your Account page</a>.`
+            : `You're getting this because the weekly digest is on.
               <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn it off on your Account page</a>.`,
         )}`,
   });

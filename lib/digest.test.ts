@@ -17,6 +17,7 @@ import {
   type DigestJobRow,
 } from "./digest";
 import { weeklyDigestEmail } from "./email-template";
+import { readEmailUnsubscribeToken } from "./email-unsubscribe";
 import { STALE_MS } from "./screen-run";
 
 // Monday, Oct 5, 2026, 13:00 UTC — the digest's hour.
@@ -319,6 +320,29 @@ describe("runWeeklyDigests", () => {
     expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW + 15 * 60_000, pauseMs: 0 })).toBe(1);
     expect(keys).toEqual(["weekly-digest/u1/2026-10-05", "weekly-digest/u1/2026-10-05"]);
     expect(err).toHaveBeenCalled();
+  });
+
+  it("carries RFC 8058's one-click pair and a visible one-click link, both naming that person's digest alone", async () => {
+    const USER = "3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+    const db = dbWith({ profiles: [{ id: USER, email_weekly_digest: true, last_digest_at: LAST_WEEK }] });
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(1);
+    const email = sent[0] as unknown as { headers: Record<string, string>; html: string; text: string };
+    const url = /^<(https:\/\/underwrite\.example\/api\/email\/unsubscribe\/([^>]+))>$/.exec(email.headers["List-Unsubscribe"]);
+    expect(url).not.toBeNull();
+    expect(email.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
+    expect(readEmailUnsubscribeToken(url![2])).toEqual({ userId: USER, setting: "digest" });
+    // The same URI, visible in the footer and the plain text.
+    expect(email.html).toContain(`<a href="${url![1]}" style="color:#114e54;">Unsubscribe in one click</a>`);
+    expect(email.text).toContain(`Unsubscribe in one click: ${url![1]}`);
+  });
+
+  it("without a key to sign with, carries no header and keeps the Account page's switch as the way out", async () => {
+    const db = dbWith();
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(1);
+    const email = sent[0] as unknown as { headers?: Record<string, string>; html: string };
+    expect(email.headers).toBeUndefined();
+    expect(email.html).toContain("Turn it off on your Account page");
   });
 
   it("sends nothing to someone whose deals are all closed or dead", async () => {

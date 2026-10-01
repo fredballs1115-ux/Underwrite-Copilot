@@ -4,6 +4,7 @@ import { weeklyDigestEmail, type DigestInput } from "@/lib/email-template";
 import { sendEmail, emailEnabled, occasionKey } from "@/lib/email";
 import { STAGES, STAGE_LABEL, isOpenStage, normalizeStage } from "@/lib/stages";
 import { emailPictureUrl } from "@/lib/email-picture";
+import { emailUnsubscribeUrl, oneClickHeaders } from "@/lib/email-unsubscribe";
 import { appUrl } from "@/lib/app-url";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
 
@@ -281,16 +282,22 @@ export async function runWeeklyDigests(
       const to = userRes?.user?.email;
       if (!to) continue;
 
+      // One click turns this digest off for this person (lib/email-
+      // unsubscribe): a link in the footer, and the List-Unsubscribe pair a
+      // mail provider's own button POSTs to.
+      const unsubscribeUrl = emailUnsubscribeUrl(site, profile.id, "digest");
       const { subject, html, text } = weeklyDigestEmail({
         ...content,
         pipelineUrl: `${site}/deals`,
         settingsUrl: `${site}/account`,
+        unsubscribeUrl,
       });
       // One digest a person a week: a send that timed out after Resend took
       // it, and the retry the released claim brings, share this key, so the
       // retry inside Resend's 24 hours is not a second email.
       const ok = await sendEmail(to, subject, html, text, {
         idempotencyKey: occasionKey("weekly-digest", profile.id, digestWeek(now)),
+        headers: unsubscribeUrl ? oneClickHeaders(unsubscribeUrl) : null,
       });
       if (!ok) {
         // Release the claim so the next tick retries instead of the guard

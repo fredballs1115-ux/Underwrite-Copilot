@@ -110,6 +110,9 @@ export interface SendOptions {
    * the first — is not a second email. The digest retries exactly that way.
    */
   idempotencyKey?: string | null;
+  /** header fields the message itself carries — the digest's one-click
+   *  unsubscribe pair (lib/email-unsubscribe `oneClickHeaders`) */
+  headers?: Record<string, string> | null;
 }
 
 /** An idempotency key: the email's kind and its occasion's parts, joined
@@ -153,6 +156,7 @@ export async function sendEmail(
         html,
         text,
         ...(replyTo ? { reply_to: replyTo } : {}),
+        ...(opts.headers && Object.keys(opts.headers).length > 0 ? { headers: opts.headers } : {}),
       }),
       signal: ctrl.signal,
     });

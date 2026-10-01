@@ -180,6 +180,17 @@ describe("the Monday digest pictures each deal it names (#464)", () => {
     expect(text).not.toContain("picture");
   });
 
+  it("offers the one-click unsubscribe in its footer where it has one, beside the Account page", () => {
+    const url = "https://underwrite.example/api/email/unsubscribe/tok";
+    const { html, text } = weeklyDigestEmail({ ...base, unsubscribeUrl: url });
+    expect(html).toContain(`<a href="${url}" style="color:#114e54;">Unsubscribe in one click</a>`);
+    expect(html).toContain(">manage both emails on your Account page</a>");
+    expect(text).toContain(`Unsubscribe in one click: ${url} — or manage both emails on your Account page: ${base.settingsUrl}`);
+    expect(a11yIssues(html)).toEqual([]);
+    // Without one, the footer is as it was.
+    expect(weeklyDigestEmail(base).html).toContain(">Turn it off on your Account page</a>");
+  });
+
   it("keeps the picture column for a row with none, so the names start at one x", () => {
     const mixed = weeklyDigestEmail({
       ...base,
