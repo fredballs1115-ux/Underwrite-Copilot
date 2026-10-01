@@ -336,8 +336,11 @@ function sentencesOf(r: HotelFacts): string[] {
     flagSentence(r),
     ENCUMBRANCE_SENTENCE[r.encumbrance],
     pipSentence(r),
-    clockSentence("franchise", r.franchiseEnds, "the flag's term as read cannot be right; check the license"),
-    clockSentence("management agreement", r.managementEnds, "the manager's term as read cannot be right; check the agreement"),
+    // A hotel often runs on past its license's or its agreement's stated
+    // end, on an extension or month to month: said as a question, never as
+    // a misread.
+    clockSentence("franchise", r.franchiseEnds, "it may run on an extension or month to month; ask what the brand requires to keep or relicense the flag"),
+    clockSentence("management agreement", r.managementEnds, "it may run on an extension or month to month; check the agreement"),
     ...roomsSentences(r),
   ].filter(Boolean);
 }
@@ -440,22 +443,37 @@ export function hotelContextLine(r: HotelDealRead): string {
  *  assumption review — beside the class's own hotel trap list. */
 export function hotelNote(r: HotelDealRead): string {
   const traps: string[] = [];
+  const perKey = (n: number) => `${money(n)} ${withArticle(r.keyNoun.replace(/s$/, ""))}`;
+  // Each trap says what the facts above say, never "none stated" over a
+  // figure or words the memorandum gives.
   traps.push(
-    r.pipTotal != null
-      ? `(a) THE PIP — ${money(r.pipTotal)}${r.pipPerKey != null ? `, ${money(r.pipPerKey)} ${withArticle(r.keyNoun.replace(/s$/, ""))}` : ""}: check it against the brand's own PIP report, its timing and the displacement while rooms are out of order, and never read a return that does not pay for it`
-      : "(a) THE PIP — none stated: ask whether the brand requires one on the sale, and what it costs a key",
+    r.pipTotal != null || r.pipPerKey != null
+      ? `(a) THE PIP — ${[r.pipTotal != null ? money(r.pipTotal) : "", r.pipPerKey != null ? perKey(r.pipPerKey) : ""].filter(Boolean).join(", ")}: check it against the brand's own PIP report, its timing and the displacement while rooms are out of order, and never read a return that does not pay for it`
+      : r.pip
+        ? `(a) THE PIP — stated in words, with no cost ("${noPeriod(r.pip)}"): ask for the brand's PIP report and what it costs a key, and never read a return that does not pay for it`
+        : r.independent
+          ? "(a) NO BRAND'S PIP — an independent hotel has no brand to require one, but what its rooms need is the buyer's capital: ask for the property condition report"
+          : "(a) THE PIP — none stated: ask whether the brand requires one on the sale, and what it costs a key",
   );
   traps.push(
     r.encumbrance === "management" || r.encumbrance === "brand_and_management"
       ? "(b) THE MANAGEMENT ENCUMBRANCE — the manager, its base and incentive fees, its term, its termination rights and its key-money are the buyer's to live with: read the agreement, not the summary"
-      : r.encumbrance === "unencumbered"
-        ? "(b) UNENCUMBERED — the buyer chooses the manager and the flag: price the transition, the new franchise's own PIP and application fee, and any downtime"
-        : "(b) THE ENCUMBRANCE — the memorandum does not say whether the sale is encumbered by management or the brand: ask, since it decides who runs the hotel",
+      : r.encumbrance === "brand"
+        ? "(b) THE BRAND ENCUMBRANCE — the sale carries the franchise: its term, its transfer and change-of-ownership terms, the PIP it requires and its fees are the buyer's to live with: read the license agreement, not the summary"
+        : r.encumbrance === "unencumbered"
+          ? "(b) UNENCUMBERED — the buyer chooses the manager and the flag: price the transition, the new franchise's own PIP and application fee, and any downtime"
+          : "(b) THE ENCUMBRANCE — the memorandum does not say whether the sale is encumbered by management or the brand: ask, since it decides who runs the hotel",
   );
   traps.push(
     r.franchiseEnds && r.franchiseEnds.yearsLeft > 0
       ? `(c) THE FLAG'S TERM — the franchise ends ${endLabel(r.franchiseEnds)}, ${yearsText(r.franchiseEnds.yearsLeft)} from today: a relicensing brings a PIP of its own, and a flag that lapses takes its reservation system with it`
-      : "(c) THE FLAG'S TERM — no franchise expiration stated: ask for the license's term and whether it transfers to the buyer",
+      : r.franchiseEnds
+        ? `(c) THE FLAG'S TERM — the franchise's stated end, ${endLabel(r.franchiseEnds)}, has passed: ask whether the hotel runs on an extension or month to month, and what the brand requires to relicense it`
+        : r.independent
+          ? "(c) NO FLAG — the hotel is independent: its bookings are its own to win, and a flag later brings a PIP and fees of its own"
+          : r.franchise
+            ? `(c) THE FLAG'S TERM — the franchise as stated ("${noPeriod(r.franchise)}") gives no end the screen reads as a date: ask for the license's term and whether it transfers to the buyer`
+            : "(c) THE FLAG'S TERM — no franchise expiration stated: ask for the license's term and whether it transfers to the buyer",
   );
   traps.push(
     r.ties === false
