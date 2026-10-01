@@ -7,7 +7,10 @@ import {
   parsePercent,
   parseBasis,
   excelSerialToIso,
+  headerSignature,
   isTotalsLabel,
+  matchSavedMapping,
+  readEscalation,
   suggestMapping,
   toLeases,
   normalizeHeader,
@@ -74,6 +77,47 @@ describe("value coercion", () => {
     expect(parseDate("Feb-2028")).toBe("2028-02-29");
     expect(parseDate("")).toBeNull();
     expect(parseDate("see note")).toBeNull();
+  });
+
+  it("reads an escalation only as an annual percent: a dollar bump is a dollar bump, and a figure that reads two ways is refused", () => {
+    expect(readEscalation("3%").pct).toBeCloseTo(0.03, 12);
+    expect(readEscalation("2.5% annually").pct).toBeCloseTo(0.025, 12);
+    expect(readEscalation("3.0%/yr").pct).toBeCloseTo(0.03, 12);
+    expect(readEscalation(0.03).pct).toBeCloseTo(0.03, 12); // a percent cell's value
+    expect(readEscalation("3").pct).toBeCloseTo(0.03, 12);
+    expect(readEscalation("Flat")).toEqual({ pct: 0 });
+    expect(readEscalation("")).toEqual({ pct: null });
+    expect(readEscalation("$0.50")).toEqual({ pct: null, unread: "dollar" });
+    // "1" had read as 100%: 1%, 100% and a $1 bump are all on the page.
+    expect(readEscalation("1")).toEqual({ pct: null, unread: "ambiguous" });
+    expect(readEscalation(0.5)).toEqual({ pct: null, unread: "ambiguous" });
+    expect(readEscalation("10% every 5 years")).toEqual({ pct: null, unread: "text" });
+    expect(readEscalation("CPI")).toEqual({ pct: null, unread: "text" });
+    expect(readEscalation("25")).toEqual({ pct: null, unread: "implausible" });
+    // The submarket importer's percent reader keeps its own rule.
+    expect(parsePercent(0.25)).toBeCloseTo(0.25, 12);
+  });
+
+  it("says which escalations it left blank, and why, by row", () => {
+    const parsed = leasesFrom(
+      [
+        "Suite,Tenant,SF,Expiration,Annual Rent,Escalation",
+        "100,Acme Law LLP,24000,2030-12-31,912000,3%",
+        "200,Beacon Health,15000,2031-02-28,555000,$0.50",
+        "210,Northside Dental,4000,2028-12-31,148000,1",
+        "220,VACANT,6000,,,$1.00",
+      ].join("\n"),
+    );
+    expect(parsed.leases.map((l) => l.escalationPct)).toEqual([0.03, null, null, null]);
+    // The vacancy's cell is no lease's and goes unsaid.
+    expect(parsed.unreadEscalations.map((u) => [u.row, u.text, u.reason])).toEqual([
+      [3, "$0.50", "dollar"],
+      [4, "1", "ambiguous"],
+    ]);
+    const issue = validateLeases(parsed.leases, { parse: parsed }).find((i) => i.code === "unread_escalation")!;
+    expect(issue.severity).toBe("warning");
+    expect(issue.rows).toEqual([3, 4]);
+    expect(issue.message).toContain("row 3 “$0.50” (a dollar bump, not a percent)");
   });
 
   it("reads Excel serial dates off the 1899-12-30 epoch", () => {
@@ -149,6 +193,22 @@ describe("header detection and mapping", () => {
     const bellweather = leases.find((l) => l.tenant.startsWith("Bellweather"))!;
     expect(bellweather.baseRentAnnual).toBeCloseTo(18_750 * 12, 6);
     expect(bellweather.rentPsf).toBeCloseTo((18_750 * 12) / 12_500, 9);
+  });
+
+  it("finds a saved mapping at the row its header sits on, not only the row the detector picked", () => {
+    const grid = parseCsv(MESSY_CSV);
+    const confirmed = { ...suggestMapping(grid), headerRow: 4 };
+    const saved = [{ signature: headerSignature(grid, 4), mapping: confirmed }];
+    // Confirmed at row 5 (index 4) after a correction; the detector picks another.
+    expect(matchSavedMapping(grid, 0, saved)?.headerRow).toBe(4);
+    // Next month's export carries one more title line: the header moved, the
+    // columns did not, and the mapping goes to the new row.
+    const longer = [["Prepared for the buyer"], ...grid] as typeof grid;
+    const moved = matchSavedMapping(longer, 0, saved);
+    expect(moved?.headerRow).toBe(5);
+    expect(moved?.columns).toEqual(confirmed.columns);
+    expect(matchSavedMapping(grid, 4, [])).toBeNull();
+    expect(matchSavedMapping(parseCsv(CLEAN_CSV), 0, saved)).toBeNull();
   });
 
   it("never assigns two canonical fields to the same source column", () => {

@@ -20,7 +20,7 @@ import {
 } from "@/lib/rentroll/parse";
 import { CANONICAL_FIELDS, type CanonicalKey } from "@/lib/rentroll/schema";
 import { validateLeases } from "@/lib/rentroll/validate";
-import { getRentRollImport, saveMapping, savedMappingFor, saveProfile } from "@/lib/rentroll/store";
+import { getRentRollImport, saveMapping, savedMappingForGrid, saveProfile } from "@/lib/rentroll/store";
 import { defaultProfileFor, leasesShort } from "@/lib/rentroll/profiles";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 
@@ -90,8 +90,9 @@ export async function uploadRentRoll(formData: FormData) {
   if (!grid.length) redirect(`/deals/${dealId}/rent-roll?error=empty`);
 
   const suggested = suggestMapping(grid, undefined, mappingOptions(ctx.assetClass));
-  const signature = headerSignature(grid, suggested.headerRow);
-  const saved = await savedMappingFor(ctx.supabase, ctx.user.id, signature);
+  // A mapping confirmed before, found at whichever row its header sits on —
+  // including one confirmed after the user corrected the header row.
+  const saved = await savedMappingForGrid(ctx.supabase, ctx.user.id, grid, suggested.headerRow);
   const mapping = saved ?? suggested;
 
   const parsed = toLeases(grid, mapping);
@@ -160,7 +161,11 @@ export async function confirmMapping(formData: FormData) {
   const buffer = await downloadDealFile(doc.storage_path as string, { kind: "deal", dealId });
   const grid = await readGrid(String(doc.filename), buffer);
 
-  const headerRow = num(formData.get("headerRow"));
+  // The form counts rows from 1, as the file and the issue list do; the
+  // stored mapping counts from 0.
+  const headerRowNumber = num(formData.get("headerRow"));
+  const headerRow =
+    headerRowNumber != null && Number.isInteger(headerRowNumber) && headerRowNumber >= 1 ? headerRowNumber - 1 : null;
   const columns: Partial<Record<CanonicalKey, number>> = {};
   const monthly: CanonicalKey[] = [];
   for (const f of CANONICAL_FIELDS) {
@@ -174,7 +179,7 @@ export async function confirmMapping(formData: FormData) {
   const mapping: ColumnMapping = {
     columns,
     monthly,
-    headerRow: headerRow != null && headerRow >= 0 ? headerRow : record.mapping.headerRow,
+    headerRow: headerRow ?? record.mapping.headerRow,
     confidence: {},
   };
 

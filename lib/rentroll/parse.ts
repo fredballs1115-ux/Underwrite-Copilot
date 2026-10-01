@@ -359,6 +359,49 @@ export function parseNumber(raw: unknown): number | null {
   return negative ? -n : n;
 }
 
+/** Why an escalation cell was left blank: a dollar bump ("$0.50"), a bare
+ *  figure that reads two ways ("1" — 1%, 100% or $1), words that are no one
+ *  annual percent ("10% every 5 years", "CPI"), or a figure past any annual
+ *  bump. */
+export type EscalationUnread = "dollar" | "ambiguous" | "text" | "implausible";
+
+/** A bare figure as an annual escalation: a decimal under 0.2 is how a
+ *  spreadsheet stores a percent (0.03 is 3%), a figure over 1 and up to 15 is
+ *  a whole percent ("3" is 3%), and one from 0.2 to 1 reads either way — "1"
+ *  was once read as 100% — so it is refused. Past 15 is no annual bump. */
+function escalationOfFigure(n: number): { pct: number | null; unread?: EscalationUnread } {
+  const a = Math.abs(n);
+  if (a === 0) return { pct: 0 };
+  if (a < 0.2) return { pct: n };
+  if (a <= 1) return { pct: null, unread: "ambiguous" };
+  if (a <= 15) return { pct: n / 100 };
+  return { pct: null, unread: "implausible" };
+}
+
+/**
+ * An escalation cell, read only as an annual percent: "3%", "3.0% annually",
+ * 0.03, "3", "Flat". A dollar bump ("$0.50") is a dollar bump, never 50%; a
+ * bare figure that reads two ways and words that state no one annual percent
+ * are refused — null, with the reason, so the import says so rather than
+ * guessing. (`parsePercent` keeps its own rule for the submarket importer's
+ * vacancy, where 0.25 is 25%.)
+ */
+export function readEscalation(raw: unknown): { pct: number | null; unread?: EscalationUnread } {
+  if (raw == null || typeof raw === "boolean") return { pct: null };
+  if (typeof raw === "number") return Number.isFinite(raw) ? escalationOfFigure(raw) : { pct: null };
+  const s = String(raw).trim();
+  if (!s || /^(?:n\/?a|na|-+|—|–)$/i.test(s)) return { pct: null };
+  if (/^(?:flat|none|no|nil)$/i.test(s)) return { pct: 0 };
+  if (s.includes("$")) return { pct: null, unread: "dollar" };
+  const stated = /^(-?\d+(?:\.\d+)?)\s*%\s*(?:(?:\/|per|a|each)\s*(?:yr|year|annum)|annual(?:ly)?|yearly|p\.?\s?a\.?)?$/i.exec(s);
+  if (stated) {
+    const pct = Number(stated[1]) / 100;
+    return Math.abs(pct) <= 0.15 ? { pct } : { pct: null, unread: "implausible" };
+  }
+  const n = parseNumber(s);
+  return n != null ? escalationOfFigure(n) : { pct: null, unread: "text" };
+}
+
 /** A percent column may hold 3, "3%", or 0.03. Values above 1 are read as
  *  whole percents — a 300% annual escalation is not a thing a rent roll says. */
 export function parsePercent(raw: unknown): number | null {
@@ -604,6 +647,9 @@ export interface ParseResult {
   /** dates on occupied leases that name no day that exists (31/31/2028), a
    *  year alone, or a day with no year — blank on the lease, said here */
   unreadDates: UnreadCell[];
+  /** escalation cells on occupied leases read as no annual percent ("$0.50",
+   *  "1", "10% every 5 years") — blank on the lease, said here with why */
+  unreadEscalations: (UnreadCell & { reason: EscalationUnread })[];
   /** the cell that showed the file writes its dates day first ("31/12/2028")
    *  and the day it is, so a date that could be either was read that way;
    *  null where none did */
@@ -679,6 +725,7 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
   const dateOf = (row: Grid[number], key: CanonicalKey): string | null =>
     parseDate(at(row, key), { dayFirst: dayFirst != null });
   const unreadDates: UnreadCell[] = [];
+  const unreadEscalations: ParseResult["unreadEscalations"] = [];
   /** A date cell that holds something, reads as no date, and is no word for
    *  "no date" ("MTM", "N/A") — a date the reader refused. */
   const unreadDate = (row: Grid[number], key: CanonicalKey): string | null => {
@@ -747,12 +794,21 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
       continue;
     }
 
-    // A vacancy's dates are no lease's; an occupied lease's refused date is
-    // left blank and said.
+    // A vacancy's dates are no lease's; an occupied lease's refused date or
+    // escalation is left blank and said.
+    const escalation = readEscalation(at(row, "escalationPct"));
     if (!vacant) {
       for (const field of ["leaseStart", "leaseExpiry"] as const) {
         const said = unreadDate(row, field);
         if (said != null) unreadDates.push({ row: r + 1, field, text: said });
+      }
+      if (escalation.unread) {
+        unreadEscalations.push({
+          row: r + 1,
+          field: "escalationPct",
+          text: text(at(row, "escalationPct")),
+          reason: escalation.unread,
+        });
       }
     }
 
@@ -770,7 +826,7 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
           ? baseRentAnnual / sf
           : null),
       rentBasis: parseBasis(at(row, "rentBasis")),
-      escalationPct: parsePercent(at(row, "escalationPct")),
+      escalationPct: escalation.pct,
       reimbursementType: String(at(row, "reimbursementType") ?? "").trim(),
       renewalOptions: String(at(row, "renewalOptions") ?? "").trim(),
       freeRentMonths: parseNumber(at(row, "freeRentMonths")),
@@ -787,6 +843,7 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
     skippedBlankRows,
     skippedTotals,
     unreadDates,
+    unreadEscalations,
     dayFirst,
   };
 }
@@ -812,6 +869,33 @@ export function headerSignature(grid: Grid, headerRow: number): string {
     .filter(Boolean)
     .join("|")
     .slice(0, 500);
+}
+
+/**
+ * The mapping a user confirmed for this file's shape, wherever its header
+ * now sits. A saved mapping is keyed on the signature of the header row it
+ * was confirmed at — which, after the user corrected the header row, is not
+ * the row the detector picks, so looking up the detected row's signature
+ * never found it again. Every row the detector reads is tried, the detected
+ * row first, and the mapping is applied at the row whose signature matched
+ * (a title block a line longer next month moves the header, not the
+ * columns).
+ */
+export function matchSavedMapping(
+  grid: Grid,
+  detectedRow: number,
+  saved: readonly { signature: string; mapping: ColumnMapping }[],
+  limit = 25,
+): ColumnMapping | null {
+  if (!saved.length) return null;
+  const bySignature = new Map(saved.map((s) => [s.signature, s.mapping]));
+  const rows = [detectedRow, ...Array.from({ length: Math.min(grid.length, limit) }, (_, r) => r)];
+  for (const r of rows) {
+    const signature = headerSignature(grid, r);
+    const mapping = signature ? bySignature.get(signature) : undefined;
+    if (mapping) return { ...mapping, headerRow: r };
+  }
+  return null;
 }
 
 /** Field metadata for the mapping UI, in display order. */

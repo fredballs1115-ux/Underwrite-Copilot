@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import { isPro } from "@/lib/billing";
 import { downloadDealFile } from "@/lib/storage";
 import { readGrid } from "@/lib/rentroll/parse";
 import {
@@ -68,11 +69,14 @@ export default async function RentRollPage({
   // filed one, the deck's where they left "Auto-detect" — so an apartment
   // deal filed Auto leases like an apartment building, not like an office.
   const assetClass = shownAssetClass(deal.asset_class, { assetClass: deal.extracted_class });
-  const [record, profiles] = await Promise.all([
+  const [record, profiles, pro] = await Promise.all([
     importParam
       ? getRentRollImport(supabase, importParam)
       : latestRentRollImport(supabase, id),
     listProfiles(supabase, user.id, assetClass),
+    // Only to mark the download: a failed check shows the badge, and the
+    // route makes the real check.
+    isPro(supabase, user.id).catch(() => false),
   ]);
 
   const activeProfile: ProfileDraft = openingProfile(profiles, assetClass, profileParam);
@@ -187,8 +191,8 @@ export default async function RentRollPage({
       <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Upload a rent roll</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          CSV or XLSX; the header row and columns are found for you, and you confirm the mapping
-          before anything is computed.
+          CSV or XLSX — a workbook&apos;s first worksheet only; the header row and columns are found
+          for you, and you confirm the mapping before anything is computed.
         </p>
         <form action={uploadRentRoll} className="mt-4 flex flex-wrap items-end gap-3">
           <input type="hidden" name="dealId" value={id} />
@@ -257,13 +261,25 @@ export default async function RentRollPage({
 
           {/* ── Download ──────────────────────────────────────────────── */}
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-brand/30 bg-brand/5 p-4">
+            {/* The page is free; the workbook is Pro, and says so before the
+                click rather than after it (the route sends a free reader to
+                billing). */}
             <a
               href={`/api/deals/${id}/rent-roll.xlsx?import=${record.id}${
                 profileParam ? `&profile=${profileParam}` : ""
               }`}
-              className="rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong"
+              title={pro ? undefined : "The live-formula Excel model is part of Pro"}
+              className="flex items-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-strong"
             >
               Download Excel model
+              {pro ? null : (
+                <>
+                  {" "}
+                  <span className="rounded-full bg-white/20 px-1.5 py-px text-[10px] font-semibold text-white">
+                    Pro
+                  </span>
+                </>
+              )}
             </a>
             <p className="text-sm text-muted">
               Four tabs, live formulas. Assumptions, Rent Roll, Rollover, and a ten-year Cash Flow

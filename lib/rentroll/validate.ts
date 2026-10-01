@@ -54,6 +54,7 @@ export interface ValidationIssue {
     | "mixed_rent_basis"
     | "skipped_totals"
     | "unread_date"
+    | "unread_escalation"
     | "dates_day_first"
     | "no_leases";
   message: string;
@@ -68,7 +69,7 @@ export interface ValidateOptions {
   outlierFactor?: number;
   /** what the parser left out of the leases or would not read, so the stored
    *  issues say it */
-  parse?: Partial<Pick<ParseResult, "skippedTotals" | "unreadDates" | "dayFirst">>;
+  parse?: Partial<Pick<ParseResult, "skippedTotals" | "unreadDates" | "unreadEscalations" | "dayFirst">>;
   /** the deal's class (lib/pipeline-slots `shownAssetClass`), which sets the
    *  rent-per-SF ceiling */
   assetClass?: string | null;
@@ -126,6 +127,29 @@ export function validateLeases(
         unreadDates.length === 1 ? "is" : "are"
       } left blank rather than guessed (${quoted(unreadDates.map((u) => u.text))}): no month and day that exist, or no year. A lease whose expiry is blank stays out of WALT and the rollover schedule.`,
       rows: [...new Set(unreadDates.map((u) => u.row))],
+    });
+  }
+  const unreadEscalations = options.parse?.unreadEscalations ?? [];
+  if (unreadEscalations.length) {
+    const why = {
+      dollar: "a dollar bump, not a percent",
+      ambiguous: "1%, 100% or a dollar bump?",
+      text: "not one annual percent",
+      implausible: "past any annual bump",
+    } as const;
+    const examples = unreadEscalations
+      .slice(0, 3)
+      .map((u) => `row ${u.row} “${u.text}” (${why[u.reason]})`)
+      .join(", ");
+    parseIssues.push({
+      severity: "warning",
+      code: "unread_escalation",
+      message: `${unreadEscalations.length} escalation${
+        unreadEscalations.length === 1 ? " was" : "s were"
+      } not read as an annual percent and left blank rather than guessed: ${examples}${
+        unreadEscalations.length > 3 ? "…" : ""
+      }.`,
+      rows: unreadEscalations.map((u) => u.row),
     });
   }
   const dayFirst = options.parse?.dayFirst;

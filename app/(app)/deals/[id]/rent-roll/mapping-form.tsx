@@ -40,11 +40,13 @@ export function MappingForm({
         <input type="hidden" name="importId" value={importId} />
 
         <div className="flex flex-wrap items-end gap-3">
+          {/* Counted from 1, as the file and the issue list count rows; the
+              stored mapping counts from 0. */}
           <label className="flex flex-col gap-1 text-xs text-muted">
-            Header row (0-based)
+            Header row (row number in the file)
             <input
               name="headerRow"
-              defaultValue={mapping.headerRow}
+              defaultValue={mapping.headerRow + 1}
               inputMode="numeric"
               className="w-28 rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-sm text-ink"
             />
