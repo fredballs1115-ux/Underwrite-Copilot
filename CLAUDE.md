@@ -1242,7 +1242,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  Ninety-two are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  One hundred and two are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1268,16 +1268,26 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   sunset), Eugene-Springfield, Santa Maria-Santa Barbara and
   Youngstown-Warren — run 36799416970; then Lincoln, its Capitol's tower
   over downtown, found by a one-market run (36800019700) after its sheet's
-  Capitol portrait lost the Sower in the deal page's crops), each judged
+  Capitol portrait lost the Sower in the deal page's crops; then
+  Springfield (Massachusetts), Kiryas Joel-Poughkeepsie-Newburgh,
+  Manchester-Nashua and Trenton-Princeton (the State House) — run
+  36800324942 — and Green Bay, Rockford, South Bend (Notre Dame's dome, the
+  place it is known by), Evansville, Peoria and Davenport — run
+  36800398141; a file name with an apostrophe is linked as a browser reads
+  it, the credit test decoding React's `&#x27;`), each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
   `cbsa:` row never draws; San Jose, Fresno and Madison had nothing usable,
   Baton Rouge's best frames are PNGs (never served) with its one JPEG a
   steep aerial that reads as a map on a card, and
   Ocala's and Gainesville's sheets held a highway, a feed store's sign,
-  parked cars and a steep aerial, Salinas's nearest was a cluttered marina
-  and Fort Collins's one bright frame loses its tower's spire in every
-  crop, so each keeps the deal's drawn cover. A two-state title is cut to
+  parked cars and a steep aerial, Salinas's nearest was a cluttered marina,
+  Fort Collins's one bright frame loses its tower's spire in every crop,
+  Reading's lead loses its horizon in the card and reads as rooftops, and
+  Atlantic City-Hammonton's held a hazy boardwalk and dune grass, so each
+  keeps the deal's drawn cover (Ocala's one clear frame, spring water filed
+  under Silver Springs, was left out: nothing but its category says where
+  it is). A two-state title is cut to
   its first city and state ("Memphis, TN", "Augusta, GA"), the table's
   own precedent, so a card's name passes the test's one-state pattern. A search result can
   be another city entirely (Los Angeles under Colorado Springs, Buffalo

@@ -3921,7 +3921,12 @@
         "Springfield Massachusetts Connecticut River",
         "Springfield Massachusetts downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Springfield, MA city skyline 2026 (cropped).jpg",
+          "note": "Springfield, MA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800324942)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:28880",
@@ -3942,7 +3947,12 @@
         "Poughkeepsie Hudson River",
         "Newburgh New York waterfront"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Poughkeepsie, NY with evening balloon take-off-crop.jpg",
+          "note": "Kiryas Joel-Poughkeepsie-Newburgh, NY — Juliancolton, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36800324942)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:31700",
@@ -3963,7 +3973,12 @@
         "Manchester New Hampshire skyline",
         "Merrimack River Manchester"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Skyline of Manchester, New Hampshire, USA.jpg",
+          "note": "Manchester-Nashua, NH — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800324942)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:45940",
@@ -3984,7 +3999,12 @@
         "Trenton Makes bridge",
         "Princeton University Nassau Hall"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "2014-12-27 15 54 11 Panorama of the front of the New Jersey State House on West State Street in Trenton, New Jersey.JPG",
+          "note": "Trenton-Princeton, NJ — Famartin, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800324942)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:39740",
@@ -4044,7 +4064,12 @@
         "Green Bay Fox River downtown",
         "Lambeau Field exterior"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Downtown Green Bay CityDeck along the Fox River.jpg",
+          "note": "Green Bay, WI — Chris Rand, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:40420",
@@ -4064,7 +4089,12 @@
         "Rockford Illinois Rock River",
         "Rockford Illinois downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Rockford, IL Downtown 02.JPG",
+          "note": "Rockford, IL — Ben Jacobson ( Kranar Drogin ), CC BY 2.5. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:43780",
@@ -4085,7 +4115,12 @@
         "Notre Dame Golden Dome",
         "South Bend St. Joseph River"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "North Quad from Fr. Hesburgh's Office in the Hesburgh Library.JPG",
+          "note": "South Bend, IN — Know1one1, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:21780",
@@ -4104,7 +4139,12 @@
         "Evansville riverfront Ohio River",
         "Evansville Indiana downtown"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "EvansvilleSkyline.jpg",
+          "note": "Evansville, IN — Vasiliymeshko, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:37900",
@@ -4124,7 +4164,12 @@
         "Peoria Illinois riverfront",
         "Peoria Illinois Illinois River"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "Peoria Illinois Skyline (cropped) (cropped).jpg",
+          "note": "Peoria, IL — Scott Tranchitella from West Peoria, Illinois, USA, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:19340",
@@ -4145,7 +4190,12 @@
         "Quad Cities Mississippi River",
         "Davenport Iowa riverfront"
       ],
-      "candidates": []
+      "candidates": [
+        {
+          "file": "2018 Davenport skyline 02 (cropped).jpg",
+          "note": "Davenport, IA — Farragutful, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36800398141)."
+        }
+      ]
     },
     {
       "metroId": "cbsa:33860",

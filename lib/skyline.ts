@@ -754,6 +754,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Corpus Christi, TX",
     size: [8064, 4827],
   },
+  // Davenport, IA: skyline-sheet run 36800398141 — the riverfront across the Mississippi under a clear sky, the clock tower and a white-cabled skybridge whole in every crop, over the article's lead, whose casino boat is the centre of the card, a grey-sky panorama, two street-level frames over trees and a road, Rock Island's riverfront and Moline's clock tower, which the card cuts.
+  "cbsa:19340": {
+    file: "2018 Davenport skyline 02 (cropped).jpg",
+    place: "Downtown Davenport's riverfront across the Mississippi, its clock tower at the centre",
+    credit: "Farragutful",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Davenport, IA",
+    size: [4607, 1292],
+  },
   // Dayton, OH: skyline-sheet run 36780772501 — the article's lead; the rest were aerials from a plane and a stadium.
   "cbsa:19430": {
     file: "Dayton Skyline - Sunset September 2022 (cropped).jpg",
@@ -814,6 +824,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Eugene-Springfield, OR",
     size: [3456, 2304],
   },
+  // Evansville, IN: skyline-sheet run 36800398141 — the city's skyline across the Ohio River in autumn colour, every tower whole in both crops, over an arena behind its own sign, the Willard Library, whose gable the wide crop cuts, a church in fields under a grey sky 528px tall and a credit union's office behind a parked car.
+  "cbsa:21780": {
+    file: "EvansvilleSkyline.jpg",
+    place: "Downtown Evansville across the Ohio River in autumn, red and gold trees in front",
+    credit: "Vasiliymeshko",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Evansville, IN",
+    size: [2200, 1020],
+  },
   // Fayetteville, NC: skyline-sheet run 36798176732 — downtown's church spires and tree-lined street from above in clear daylight, every spire whole in both crops, over the Market House down Hay Street on a grey winter day through a heavy phone filter. The runner printed the author as "Public domain, City of Fayetteville"; the credit is the name in it.
   "cbsa:22180": {
     file: "Fayetteville, NC Downtown Skyline.jpg",
@@ -853,6 +873,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     name: "Grand Rapids, MI",
     size: [4000, 1475],
+  },
+  // Green Bay, WI: skyline-sheet run 36800398141 — an article's lead, downtown and its riverfront crowd along the Fox River in low sun with the bridges and the horizon beyond, an oblique that reads as a photograph, over Lambeau Field's atrium and its brand logos, the bowl over a crowd's heads, an aerial view across its parking lots, an over-processed empty bowl, the atrium at night in fog, a distant grey view and a panorama 579px tall at 2400 wide.
+  "cbsa:24580": {
+    file: "Downtown Green Bay CityDeck along the Fox River.jpg",
+    place: "Downtown Green Bay's CityDeck along the Fox River in low summer sun, from above",
+    credit: "Chris Rand",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Green Bay, WI",
+    size: [6000, 4000],
   },
   // Greensboro, NC: skyline-sheet run 36782733907 — the skyline from the Depot at 2,703px wide, over the city article's 1,500px lead of the same towers.
   "cbsa:24660": {
@@ -923,6 +953,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Killeen-Temple, TX",
     size: [1491, 926],
+  },
+  // Kiryas Joel-Poughkeepsie-Newburgh, NY: skyline-sheet run 36800324942 — an article's lead, Poughkeepsie's riverfront on the Hudson under a clear evening sky with a balloon rising, whole in every crop, over the Walkway over the Hudson from the shore under bare trees, the same bridge in winter ice, Newburgh's waterfront from Beacon, a Hudson Highlands view whose author is unknown, a military photograph and an 1834 engraving.
+  "cbsa:28880": {
+    file: "Poughkeepsie, NY with evening balloon take-off-crop.jpg",
+    place: "Poughkeepsie's Hudson riverfront at evening, hot-air balloons rising over it",
+    credit: "Juliancolton",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Kiryas Joel-Poughkeepsie-Newburgh, NY",
+    size: [3092, 1980],
   },
   // Knoxville, TN: skyline-sheet run 36751130861 — keeps the Sunsphere, where the alternative was grey and lost it.
   "cbsa:28940": {
@@ -1003,6 +1043,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Louisville, KY",
     size: [9640, 2304],
+  },
+  // Manchester-Nashua, NH: skyline-sheet run 36800324942 — the mills along the river and downtown's towers behind them under a clear sky in full leaf, from the city's article, every top well inside both crops, over the article's lead, a winter view from above of rowhouses over a flat roof, Nashua's millyard on the water, whose clock tower the wide crop takes, a night highway, a frame where the city is a strip under cloud and backlit towers over a parking lot.
+  "cbsa:31700": {
+    file: "Skyline of Manchester, New Hampshire, USA.jpg",
+    place: "Downtown Manchester's towers behind the Amoskeag Millyard on the Merrimack River",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Manchester-Nashua, NH",
+    size: [8064, 5376],
   },
   // McAllen, TX: skyline-sheet run 36782733907 — the city article's lead, over a cityscape led by a parking lot.
   "cbsa:32580": {
@@ -1164,6 +1214,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Pensacola, FL",
     size: [5832, 3888],
   },
+  // Peoria, IL: skyline-sheet run 36800398141 — the skyline across the Illinois River from the article, every top whole in all three crops, over the same photograph's wider cuts — one keeping less of the skyline on the card, one 589px tall at 2400 wide — the Murray Baker Bridge with no city in its frame and a distant view over a warehouse roof.
+  "cbsa:37900": {
+    file: "Peoria Illinois Skyline (cropped) (cropped).jpg",
+    place: "Downtown Peoria's skyline across the Illinois River",
+    credit: "Scott Tranchitella from West Peoria, Illinois, USA",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    name: "Peoria, IL",
+    size: [2802, 1207],
+  },
   // Portland, ME: skyline-sheet run 36782855933 — a picture from the city's own article, the marina in front of downtown, over an aerial and a grey view from the islands.
   "cbsa:38860": {
     file: "Skyline waterfront.jpg",
@@ -1223,6 +1283,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Rochester, NY",
     size: [3601, 1760],
+  },
+  // Rockford, IL: skyline-sheet run 36800398141 — downtown across the Rock River in warm low light, the river and the sky calm and every roof whole in both crops, over the same river's bridge from a dock under a white sky, two street views down East State Street with parked cars and a pickup, and two postcards of Virginia motor courts that the search returned for the word Skyline.
+  "cbsa:40420": {
+    file: "Rockford, IL Downtown 02.JPG",
+    place: "Downtown Rockford across the Rock River in low sun, a bridge's arches at the right",
+    credit: "Ben Jacobson ( Kranar Drogin )",
+    license: "CC BY 2.5",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.5",
+    name: "Rockford, IL",
+    size: [3456, 2304],
   },
   // Salem, OR: skyline-sheet run 36787138337 — the city article's lead, its spire whole in both crops, over buses at the transit centre and railway aerials.
   "cbsa:41420": {
@@ -1296,6 +1366,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Shreveport-Bossier City, LA",
     size: [3840, 2160],
   },
+  // South Bend, IN: skyline-sheet run 36800398141 — Notre Dame's Golden Dome and the Basilica's spire against an orange sky, the picture the area is known by, whole in every crop, over downtown on its river in soft light (an article's lead, the owner's alternative), two aerial views of the river, one steep enough to read as a map and one under a white haze, a riverbank with a date burned into its corner and the river's lights at night.
+  "cbsa:43780": {
+    file: "North Quad from Fr. Hesburgh's Office in the Hesburgh Library.JPG",
+    place: "The University of Notre Dame's Golden Dome and the Basilica's spire against an orange sky, from the Hesburgh Library",
+    credit: "Know1one1",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "South Bend, IN",
+    size: [4000, 3000],
+  },
   // Spartanburg, SC: skyline-sheet run 36798176732 — the city's skyline under a clear sky, every roof whole in both crops, over a Main Street corner whose cupola the wide crop cuts, a mural of words (the article's lead), a cultural centre's façade 522px tall at 2400 wide, a street of parked cars, a corporate tower and its logo, the airport's terminal sign and a postcard.
   "cbsa:43900": {
     file: "Spartanburg skyline - Sept. 2025.jpg",
@@ -1315,6 +1395,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Spokane, WA",
     size: [6933, 3813],
+  },
+  // Springfield, MA: skyline-sheet run 36800324942 — an article's lead, downtown across the river under a clear winter sky, every tower whole on the card and at 16:9; at 21:9 the glass tower's crown sits flush with the top edge and its rooftop masts are trimmed, where the same photographer's closer frame is whole with headroom but its river is a white field of ice, an autumn frame from above, cropped and not, centres on a large flag over a park, the uncropped original leaves the city a thin band between sky and water, a 4.15:1 panorama is 578px tall at 2400 wide and a dusk frame is a heavily processed roadway.
+  "cbsa:44140": {
+    file: "Springfield, MA city skyline 2026 (cropped).jpg",
+    place: "Downtown Springfield across the Connecticut River in winter, a bridge's pylons in front",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Springfield, MA",
+    size: [7497, 5001],
   },
   // Stockton, CA: skyline-sheet run 36783120462 — the city article's lead, downtown in the evening light, over six crops of one waterfront view.
   "cbsa:44700": {
@@ -1355,6 +1445,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Toledo, OH",
     size: [5184, 3456],
+  },
+  // Trenton-Princeton, NJ: skyline-sheet run 36800324942 — the State House, the picture a capital is known by, its dome whole in every crop under a clear sky, over the same building from the north with its dome cut by the wide crop behind a tree, City Hall under a grey sky, the falls of the Delaware with downtown a pale strip, the Trenton Makes bridge's lettering at night, the freeway and a canal under a billboard.
+  "cbsa:45940": {
+    file: "2014-12-27 15 54 11 Panorama of the front of the New Jersey State House on West State Street in Trenton, New Jersey.JPG",
+    place: "The New Jersey State House on West State Street, Trenton, on a winter afternoon",
+    credit: "Famartin",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Trenton-Princeton, NJ",
+    size: [3699, 1878],
   },
   // Tucson, AZ: skyline-sheet run 36750496544 — the article's lead image, whole in every crop.
   "cbsa:46060": {

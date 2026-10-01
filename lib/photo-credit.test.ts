@@ -17,7 +17,13 @@ import { SKYLINES, commonsPage, creditLine, galleryCredit, galleryCreditParts, s
 const html = (el: React.ReactElement) => renderToStaticMarkup(el);
 /** The words as read: visibleText breaks a line after each link. */
 const words = (markup: string) => visibleText(markup).replace(/\n/g, "");
-const hrefs = (markup: string) => [...markup.matchAll(/href="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, "&"));
+/** Each link as a browser reads it: React writes an apostrophe in an
+ *  attribute as &#x27; (South Bend's file is "Fr. Hesburgh's Office"), and
+ *  &amp; is decoded last so a literal entity stays one. */
+const hrefs = (markup: string) =>
+  [...markup.matchAll(/href="([^"]+)"/g)].map((m) =>
+    m[1].replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&"),
+  );
 
 describe("a market photograph's credit, with its links", () => {
   it("says creditLine's words for every photograph in the table, the photographer linked to the file's page and the licence to its text", () => {
