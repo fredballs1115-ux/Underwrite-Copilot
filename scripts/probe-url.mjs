@@ -152,6 +152,30 @@ for (const url of urls) {
     const unique = Array.from(new Set(links));
     console.log(`  an HTML page; ${unique.length} link(s) to a data file${unique.length ? ":" : ""}`);
     for (const l of unique.slice(0, 25)) console.log(`    ${clip(l, 200)}`);
+    // And the page's own words, for what a list of links cannot say — what
+    // the publisher says a series IS (its source, what it covers): the text
+    // with the markup taken out, each match word's lines printed as they
+    // stand, matched without regard to case.
+    if (match.length > 0) {
+      const pageLines = text
+        .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+        .replace(/<br\s*\/?>|<\/(?:p|div|li|tr|td|th|h[1-6]|span)>/gi, "\n")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;|&apos;/g, "'")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&amp;/g, "&")
+        .split("\n")
+        .map((l) => l.replace(/\s+/g, " ").trim())
+        .filter(Boolean);
+      for (const m of match) {
+        const hits = pageLines.filter((l) => l.toLowerCase().includes(m.toLowerCase()));
+        console.log(`  page lines containing "${m}": ${hits.length}`);
+        for (const h of hits.slice(0, 6)) console.log(`    ${clip(h)}`);
+      }
+    }
     continue;
   }
   // A JSON response is one long line, and its first 2,000 characters say
