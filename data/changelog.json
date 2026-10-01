@@ -10,7 +10,7 @@
     {
       "date": "2026-09-30",
       "title": "Research figures, credited one by one",
-      "blurb": "On /market and the homepage, each vacancy rate, asking rent and cap rate from the research tracker now names who published it and the period it covers, and links to its own source, where a market's figures had shared one link and one date. A figure whose period the research does not state says it is undated. Two notes that had lost their dollar signs read $10–15 and $11.04 again.",
+      "blurb": "On /market and the homepage, each vacancy rate, asking rent and cap rate from the research tracker now names who published it, the area and the period it covers where the research states them, and links to its own source where the research ties one to it. Before, a market's figures had shared one link and one date. A figure whose period the research does not state says it is undated, and a figure for a narrower stock, such as Class A space, says so. Two notes that had lost their dollar signs read $10–15 and $11.04 again.",
       "href": "/market"
     },
     {

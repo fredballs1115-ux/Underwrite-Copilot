@@ -11,6 +11,7 @@ import {
   fmtUsd,
 } from "@/lib/billing";
 import { getTeam, TEAM_TRIAL_DEALS } from "@/lib/teams";
+import { dealAllowance, type AllowancePool } from "@/lib/deal-allowance";
 import { PRICE_PRO_MONTHLY } from "@/lib/marketing-constants";
 import { startCheckout, openPortal } from "./actions";
 import { removeMember, openTeamPortal } from "../team/actions";
@@ -70,8 +71,17 @@ export default async function BillingPage({
   const user = await getCurrentUser();
   const billing = user ? await getBilling(supabase, user.id) : null;
   const isPro = billing?.isPro ?? false;
-  const dealCount = billing?.dealCount ?? 0;
-  const atLimit = !isPro && dealCount >= FREE_DEAL_LIMIT;
+  // The pools the next deal comes out of, by the create action's own rule
+  // (lib/deal-allowance): a team's trial first, then the reader's own. The
+  // page had counted the reader's own deals alone, and told a team-trial
+  // member "the next OM needs Pro" while the pipeline's meter, and the
+  // create action, still had team deals left (the audit of 2026-10-01).
+  const allowance = billing ? dealAllowance(billing) : null;
+  const atLimit = !isPro && allowance?.next === null;
+  const pools = [
+    allowance?.teamTrial ? { label: "Team trial deals", pool: allowance.teamTrial } : null,
+    allowance?.personal ? { label: allowance.teamTrial ? "Your own free deals" : "Deals used", pool: allowance.personal } : null,
+  ].filter((x): x is { label: string; pool: AllowancePool } => x !== null);
   // Full team detail (roster, seat count, renewal) for the Team section.
   const team = user && billing?.team ? await getTeam(supabase, user.id) : null;
 
@@ -163,25 +173,29 @@ export default async function BillingPage({
             </form>
           </>
         ) : (
-          <div className="mt-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted">Deals used</span>
-              <span className="font-mono tabular-nums">
-                {dealCount} / {FREE_DEAL_LIMIT}
-              </span>
-            </div>
-            <div className="mt-2 h-2 overflow-hidden rounded-full bg-faint">
-              <div
-                className={`h-full rounded-full ${atLimit ? "bg-caution" : "bg-brand"}`}
-                style={{
-                  width: `${Math.min(100, (dealCount / FREE_DEAL_LIMIT) * 100)}%`,
-                }}
-              />
-            </div>
+          <div className="mt-4 space-y-3">
+            {pools.map(({ label, pool }) => (
+              <div key={label}>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted">{label}</span>
+                  <span className="font-mono tabular-nums">
+                    {pool.used} / {pool.of}
+                  </span>
+                </div>
+                <div className="mt-2 h-2 overflow-hidden rounded-full bg-faint">
+                  <div
+                    className={`h-full rounded-full ${pool.used >= pool.of ? "bg-caution" : "bg-brand"}`}
+                    style={{ width: `${Math.min(100, (pool.used / pool.of) * 100)}%` }}
+                  />
+                </div>
+              </div>
+            ))}
             {atLimit && (
-              <p className="mt-3 rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
-                You&apos;ve screened all {FREE_DEAL_LIMIT} free deals — the next
-                OM needs Pro. Your existing deals stay right where they are.
+              <p className="rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution">
+                {allowance?.teamTrial
+                  ? `Your team's ${TEAM_TRIAL_DEALS} trial deals and your own ${FREE_DEAL_LIMIT} free deals are all in use — the next OM needs Pro.`
+                  : `You've screened all ${FREE_DEAL_LIMIT} free deals — the next OM needs Pro.`}{" "}
+                Your existing deals stay right where they are.
               </p>
             )}
           </div>
