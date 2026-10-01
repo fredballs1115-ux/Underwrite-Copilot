@@ -55,6 +55,7 @@ import type { Submarket } from "@/lib/market/types";
 import { MarketCompare } from "./market-compare";
 import { COMPARE_METROS } from "./compare-metros";
 import { Fold } from "./fold";
+import { RuleItem } from "./rule-item";
 import { FmrRow } from "./fmr-row";
 
 /** "By asset type" — the metro's sector fundamentals from the research
@@ -771,30 +772,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           ) : (
             <ul className="mt-2 space-y-2">
               {rules.map((r) => (
-                <li key={r.id} className="text-sm leading-snug">
-                  <span
-                    className={`mr-2 rounded px-1.5 py-px text-[10px] font-medium ${
-                      r.status === "verified"
-                        ? "bg-emerald-500/10 text-emerald-600"
-                        : r.status === "sourced"
-                          ? "bg-brand/10 text-brand"
-                          : "bg-amber-500/10 text-amber-600"
-                    }`}
-                  >
-                    {r.status}
-                  </span>
-                  {r.effect.split(". ")[0].replace(/\.\s*$/, "")}.
-                  {r.source && (
-                    <a
-                      href={r.source}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="ml-1.5 text-[11px] text-muted underline decoration-dotted underline-offset-2 hover:text-ink"
-                    >
-                      statute
-                    </a>
-                  )}
-                </li>
+                <RuleItem key={r.id} rule={r} />
               ))}
             </ul>
           )}

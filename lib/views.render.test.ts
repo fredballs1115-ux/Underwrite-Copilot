@@ -7816,3 +7816,62 @@ describe("Pipeline — a self-storage facility's tag (#471)", () => {
     }
   });
 });
+
+// ── The rules in force, and a folded note, cut at a whole first sentence ──────
+import { RuleItem } from "@/app/market/rule-item";
+import { Fold } from "@/app/market/fold";
+import { seedRules } from "@/lib/research-data";
+
+describe("RuleItem and Fold — a rule's first sentence whole, its caution in view (the research pass of 2026-10-01)", () => {
+  const rules = seedRules();
+  const html = render(React.createElement("ul", null, ...rules.map((r) => React.createElement(RuleItem, { key: r.id, rule: r }))));
+  const text = visibleText(html);
+
+  it("prints no rule cut at an abbreviation", () => {
+    // Each of these was the whole of its rule's line on the page.
+    expect(text).toContain("Under D.C. Law 26-80 (eff. 2025-12-31), 2-4 unit accommodations are EXEMPT from TOPA");
+    expect(text).toContain("Illinois' Rent Control Preemption Act (50 ILCS 825, eff. Aug 1, 1997) bars every unit of local government");
+    expect(text).toContain("Florida preempts local rent control (Fla. Stat. 166.043) - no Florida municipality");
+    expect(text).toContain("O.C.G.A. 44-7-19 bars any county or municipality");
+    // The first sentence ends where the rule's does: a summary never stops at
+    // "D.C." or inside an open parenthesis.
+    const firsts = [...html.matchAll(/<li class="text-sm leading-snug" data-rule="([^"]+)"><span[^>]*>[^<]*<\/span>([^<]*)/g)];
+    expect(firsts.length).toBe(rules.length);
+    for (const m of firsts) {
+      const first = m[2].replace(/&#x27;/g, "'").replace(/&amp;/g, "&").trim();
+      expect(first, m[1]).not.toMatch(/\b(?:D\.C|Fla|Muni|eff|Ch|Art)\.$/);
+      expect((first.match(/\(/g) ?? []).length, m[1]).toBeLessThanOrEqual((first.match(/\)/g) ?? []).length);
+    }
+  });
+
+  it("keeps the TOPA rule's caution on the page, never folded", () => {
+    const caution = html.match(/<p class="[^"]*" data-qa="rule-caution">([^<]*)<\/p>/)?.[1] ?? "";
+    expect(caution).toContain("CAUTION: statutory text not directly fetched");
+    // In view, not inside the fold that holds the rest of the rule.
+    const topa = html.match(/<li class="text-sm leading-snug" data-rule="dc-topa-2-4-unit-exemption">[\s\S]*?<\/li>/)?.[0] ?? "";
+    expect(topa).toContain('data-qa="rule-caution"');
+    const folded = topa.match(/<details[\s\S]*?<\/details>/)?.[0] ?? "";
+    expect(folded).not.toContain("CAUTION");
+    expect(folded).toContain("Per practitioner analysis");
+  });
+
+  it("links each rule to its source as a source, not a statute", () => {
+    expect(html).not.toMatch(/>statute</);
+    expect((html.match(/>source<\/a>/g) ?? []).length).toBe(rules.filter((r) => r.source).length);
+    expect(a11yIssues(html), "rules").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("folds a note at its first whole sentence and holds a caution in view", () => {
+    const note = "Under D.C. Law 26-80 the rule is new. CAUTION: not fetched. The rest follows.";
+    const out = render(React.createElement(Fold, { text: note, className: "text-xs text-muted" }));
+    expect(out).toContain("<summary");
+    expect(out.match(/<summary[^>]*>([^<]*)/)?.[1]?.trim()).toBe("Under D.C. Law 26-80 the rule is new.");
+    expect(out).toMatch(/data-qa="caution">CAUTION: not fetched\.<\/p>/);
+    expect(out.match(/<details[\s\S]*<\/details>/)?.[0]).not.toContain("CAUTION");
+    // One sentence is itself, unfolded.
+    const one = render(React.createElement(Fold, { text: "Just one (Fla. Stat. 166.043) sentence." }));
+    expect(one).toContain('<p class="">Just one (Fla. Stat. 166.043) sentence.</p>');
+    expect(one).not.toContain("<details");
+  });
+});

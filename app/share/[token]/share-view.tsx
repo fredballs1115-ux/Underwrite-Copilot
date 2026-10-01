@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { placedByClause } from "@/lib/placed-by";
+import { firstSentence } from "@/lib/first-sentence";
 import { screenedOn } from "@/lib/screen-run";
 import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import type {
@@ -168,16 +169,18 @@ function VerdictIcon({ call, className }: { call: VerdictCall | null; className?
 }
 
 /** A first sentence in the open, the rest one click away (the Market data
- *  page's fold). The whole text stays in the HTML. */
+ *  page's fold). The whole text stays in the HTML. The first sentence is
+ *  lib/first-sentence's, which never ends at an abbreviation ("D.C.") or
+ *  inside parentheses. */
 function Fold({ text, className = "" }: { text: string; className?: string }) {
-  const m = /^([\s\S]+?[.!?])\s+([\s\S]+)$/.exec(text);
-  if (!m) return <p className={className}>{text}</p>;
+  const { first, rest } = firstSentence(text);
+  if (!rest) return <p className={className}>{text}</p>;
   return (
     <details className={className}>
       <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
-        {m[1]} <span className="text-[11px] font-medium text-brand">more</span>
+        {first} <span className="text-[11px] font-medium text-brand">more</span>
       </summary>
-      <p className="mt-1">{m[2]}</p>
+      <p className="mt-1">{rest}</p>
     </details>
   );
 }
