@@ -1501,6 +1501,13 @@ function buildDebtSchedule(ws: ExcelJS.Worksheet, inp: UnderwriteInputs) {
  * years beyond it are 0, and trailing zeros don't change IRR — so a single
  * fixed-height block (tall enough for the longest hold) serves every scenario.
  *
+ * The axes are live too: each axis cell on the visible tab is a formula off
+ * its named input (the centre is the input itself, the steps are written at
+ * export), and every override row reads its axis cell or the named input —
+ * never a number — so an input typed into the file re-centres every grid
+ * on it. A price scenario strikes its closing costs and fee at its own
+ * price, as the engine does.
+ *
  * LOAD-BEARING LAYOUT: workbook.test.ts reads the engine tab directly —
  * scenarios start at column C in grid order (index = gi*25 + ri*5 + ci), the
  * IRR sits on sheet row 23 and the EM on row 24. Do not add rows to a block.
@@ -1695,6 +1702,26 @@ function buildOperatingMetrics(
   bottomBorder(ws, r - 1, 1, 2);
 }
 
+/**
+ * One sensitivity axis: the named input it varies, the step between its five
+ * values and the floor under them (lib/underwrite/sensitivity's
+ * `centeredAxis`). The axis cells are LIVE formulas off the input — the
+ * centre is the input itself, so it stays the model's base case whatever is
+ * typed into the file — while the step stays the one written at export.
+ */
+interface SensAxisDef {
+  name: string;
+  step: number;
+  min: number;
+  fmt: string;
+}
+
+/** The axis's value at k steps from the input, as a formula. */
+function axisFormula(a: SensAxisDef, k: number): string {
+  if (k === 0) return a.name;
+  return `MAX(${a.min},${a.name}${k > 0 ? "+" : "-"}${Math.abs(k)}*${a.step})`;
+}
+
 function buildSensitivity(
   wsSens: ExcelJS.Worksheet,
   eng: ExcelJS.Worksheet,
@@ -1702,11 +1729,16 @@ function buildSensitivity(
 ) {
   const inc = defaultIncrements(inp);
   const steps = [-2, -1, 0, 1, 2];
-  const capVals = steps.map((k) => Math.max(0.0025, inp.exitCapPct + k * inc.capStep));
+  const AXES = {
+    cap: { name: "ExitCap", step: inc.capStep, min: 0.0025, fmt: FMT.pct2 },
+    hold: { name: "HoldMonths", step: inc.monthsStep, min: 12, fmt: FMT.int },
+    price: { name: "PurchasePrice", step: inc.priceStep, min: 0, fmt: FMT.usd },
+    ltc: { name: "LTC", step: inc.ltcStep, min: 0, fmt: FMT.pct2 },
+    rate: { name: "AllInRate", step: inc.rateStep, min: 0.0025, fmt: FMT.pct2 },
+  } satisfies Record<string, SensAxisDef>;
+  // The hold is structural (the Assumptions tab says so): the engine blocks
+  // are sized for the longest hold its axis reaches at export.
   const holdVals = steps.map((k) => Math.max(12, inp.holdMonths + k * inc.monthsStep));
-  const priceVals = steps.map((k) => Math.max(0, inp.purchasePrice + k * inc.priceStep));
-  const ltcVals = steps.map((k) => Math.max(0, inp.ltc + k * inc.ltcStep));
-  const rateVals = steps.map((k) => Math.max(0.0025, inp.allInRatePct + k * inc.rateStep));
   const maxHoldM = Math.max(...holdVals, inp.holdMonths);
   const maxYears = Math.max(1, Math.ceil(maxHoldM / 12));
 
@@ -1743,7 +1775,7 @@ function buildSensitivity(
   // ── one scenario column; returns its IRR / EM cell addresses ──
   let col = 3; // scenarios start at column C
   const scenario = (o: {
-    price?: number; ltc?: number; rate?: number; cap?: number; holdM?: number;
+    price?: string; ltc?: string; rate?: string; cap?: string; holdM?: string;
   }): { irr: string; em: string } => {
     const c = col++;
     const A1 = (row: number) => `${eng.getCell(row, c).address}`;
@@ -1754,20 +1786,20 @@ function buildSensitivity(
       row++;
       return a;
     };
-    const putN = (n: number): string => {
-      eng.getCell(row, c).value = n;
-      const a = A1(row);
-      row++;
-      return a;
-    };
-    // overrides (a literal when perturbed, else the global named range)
-    const price = o.price != null ? putN(o.price) : put("PurchasePrice");
-    const ltc = o.ltc != null ? putN(o.ltc) : put("LTC");
-    const rate = o.rate != null ? putN(o.rate) : put("AllInRate");
-    const cap = o.cap != null ? putN(o.cap) : put("ExitCap");
-    const holdM = o.holdM != null ? putN(o.holdM) : put("HoldMonths");
-    // derived
-    const loanBasis = put(`${price}+ClosingCostsTotal+MIN(AcqFeePct*${price},AcqFeeCap)`);
+    // overrides: the visible tab's axis cell where this scenario varies the
+    // input, else the global named range — a formula either way, so a
+    // scenario follows its axis when the input it is centred on changes
+    const price = put(o.price ?? "PurchasePrice");
+    const ltc = put(o.ltc ?? "LTC");
+    const rate = put(o.rate ?? "AllInRate");
+    const cap = put(o.cap ?? "ExitCap");
+    const holdM = put(o.holdM ?? "HoldMonths");
+    // derived — the closing costs and the fee struck at THIS scenario's
+    // price (the Assumptions tab's ClosingCostsTotal formula with the price
+    // swapped), as the engine strikes them at each price it is run at
+    const loanBasis = put(
+      `${price}+${price}*(TransferTaxPct+RecordationTaxPct+GeneralHoldPct)+BuyerLegal+LenderLegal+ThirdPartyReports+MiscClosing+MIN(AcqFeePct*${price},AcqFeeCap)`,
+    );
     const loan = put(`${ltc}*${loanBasis}`);
     const equity = put(`${loanBasis}+FinCostPct*${loan}-${loan}`);
     const mpmt = put(`IF(${rate}=0,${loan}/AmortMonths,${loan}*(${rate}/12)/(1-(1+${rate}/12)^(-AmortMonths)))`);
@@ -1796,28 +1828,51 @@ function buildSensitivity(
   };
 
   // ── the visible matrices ──
-  interface GridDef { title: string; rowLabel: string; colLabel: string; rowVals: number[]; colVals: number[]; override: (rv: number, cv: number) => Parameters<typeof scenario>[0]; }
+  interface GridDef {
+    title: string;
+    rowLabel: string;
+    colLabel: string;
+    rowAxis: SensAxisDef;
+    colAxis: SensAxisDef;
+    /** a scenario's overrides, from its row's and its column's axis cells */
+    override: (rowRef: string, colRef: string) => Parameters<typeof scenario>[0];
+  }
   const grids: GridDef[] = [
-    { title: "Exit Cap × Hold Period", rowLabel: "Hold (months)", colLabel: "Exit cap", rowVals: holdVals, colVals: capVals, override: (h, cp) => ({ holdM: h, cap: cp }) },
-    { title: "Exit Cap × Purchase Price", rowLabel: "Price", colLabel: "Exit cap", rowVals: priceVals, colVals: capVals, override: (p, cp) => ({ price: p, cap: cp }) },
-    { title: "Leverage × Rate", rowLabel: "All-in rate", colLabel: "LTC", rowVals: rateVals, colVals: ltcVals, override: (rt, lt) => ({ rate: rt, ltc: lt }) },
+    { title: "Exit Cap × Hold Period", rowLabel: "Hold (months)", colLabel: "Exit cap", rowAxis: AXES.hold, colAxis: AXES.cap, override: (h, cp) => ({ holdM: h, cap: cp }) },
+    { title: "Exit Cap × Purchase Price", rowLabel: "Price", colLabel: "Exit cap", rowAxis: AXES.price, colAxis: AXES.cap, override: (p, cp) => ({ price: p, cap: cp }) },
+    { title: "Leverage × Rate", rowLabel: "All-in rate", colLabel: "LTC", rowAxis: AXES.rate, colAxis: AXES.ltc, override: (rt, lt) => ({ rate: rt, ltc: lt }) },
   ];
-  const axisFmt = (vals: number[]) => (vals.every((v) => v < 1) ? FMT.pct2 : vals.every((v) => v < 1000) ? FMT.int : FMT.usd);
+  // An axis cell as a scenario on the hidden tab reads it.
+  const axisRef = (row: number, c: number) => `'${wsSens.name}'!${cellA1(row, c).replace(/^([A-Z]+)(\d+)$/, "$$$1$$$2")}`;
 
   wsSens.getColumn(1).width = 16;
   for (let c = 2; c <= 13; c++) wsSens.getColumn(c).width = 11;
   titleRow(wsSens, "Sensitivity");
   let r = 2;
-  label(wsSens.getCell(r, 1), "Live — every cell is a full re-run of the model. Change any assumption and all 75 scenarios recompute.", { color: MUTED, size: 9 });
+  label(
+    wsSens.getCell(r, 1),
+    "Live — every cell is a full re-run of the model, its axes centred on the inputs as they stand. Change any assumption and all 75 scenarios recompute.",
+    { color: MUTED, size: 9 },
+  );
   r += 2;
 
   const IRR_COLS = { from: 2, to: 6 }; // B..F
   const EM_COLS = { from: 8, to: 12 }; // H..L
+  const axisStyle = (cell: ExcelJS.Cell, fmt: string, base: boolean) => {
+    cell.numFmt = fmt;
+    cell.font = { name: ARIAL, size: 9, bold: base, color: MUTED };
+  };
 
   for (const g of grids) {
-    // One scenario per cell, shared by the IRR matrix and the EM matrix.
-    const cells: { irr: string; em: string }[][] = g.rowVals.map((rv) =>
-      g.colVals.map((cv) => scenario(g.override(rv, cv))),
+    // This grid's rows — its title, the matrices' labels, the column axis,
+    // then five rows of scenarios — are fixed before any scenario is
+    // written, so each scenario reads its own axis cells.
+    const axisRow = r + 2;
+    const bodyTop = r + 3;
+    // One scenario per cell, shared by the IRR matrix and the EM matrix, in
+    // grid order (the engine tab's load-bearing layout).
+    const cells: { irr: string; em: string }[][] = steps.map((_k, ri) =>
+      steps.map((_c, ci) => scenario(g.override(axisRef(bodyTop + ri, 1), axisRef(axisRow, IRR_COLS.from + ci)))),
     );
 
     sectionHeader(wsSens, r, g.title, 1, 12);
@@ -1827,26 +1882,25 @@ function buildSensitivity(
     label(wsSens.getCell(r, 1), `${g.rowLabel} ↓ · ${g.colLabel} →`, { color: MUTED, size: 8 });
     r++;
 
-    // Column axis (shared header row for both matrices).
-    g.colVals.forEach((cv, ci) => {
-      for (const base of [IRR_COLS.from, EM_COLS.from]) {
-        const cell = wsSens.getCell(r, base + ci);
-        cell.value = cv;
-        cell.numFmt = axisFmt(g.colVals);
+    // Column axis (shared header row for both matrices): a live formula off
+    // the input over the IRR matrix, which the EM matrix's header reads.
+    steps.forEach((k, ci) => {
+      const ic = wsSens.getCell(r, IRR_COLS.from + ci);
+      ic.value = { formula: axisFormula(g.colAxis, k) } as ExcelJS.CellFormulaValue;
+      const ec = wsSens.getCell(r, EM_COLS.from + ci);
+      ec.value = { formula: cellA1(r, IRR_COLS.from + ci) } as ExcelJS.CellFormulaValue;
+      for (const cell of [ic, ec]) {
+        axisStyle(cell, g.colAxis.fmt, ci === 2);
         cell.alignment = { horizontal: "center" };
-        cell.font = { name: ARIAL, size: 9, bold: ci === 2, color: MUTED };
       }
     });
     r++;
 
-    const bodyTop = r;
-    g.rowVals.forEach((rv, ri) => {
+    steps.forEach((k, ri) => {
       const rl = wsSens.getCell(r, 1);
-      rl.value = rv;
-      rl.numFmt = axisFmt(g.rowVals);
-      rl.font = { name: ARIAL, size: 9, bold: ri === 2, color: MUTED };
-      g.colVals.forEach((cv, ci) => {
-        void cv;
+      rl.value = { formula: axisFormula(g.rowAxis, k) } as ExcelJS.CellFormulaValue;
+      axisStyle(rl, g.rowAxis.fmt, ri === 2);
+      steps.forEach((_c, ci) => {
         const { irr, em } = cells[ri][ci];
         const ic = wsSens.getCell(r, IRR_COLS.from + ci);
         ic.value = { formula: `IF(${irr}="","",${irr})` } as ExcelJS.CellFormulaValue;
@@ -1881,4 +1935,12 @@ function buildSensitivity(
     r += 2;
   }
   label(wsSens.getCell(r, 1), "Center row/column = the model's base case. Bold cell = base scenario.", { color: MUTED, size: 9 });
+  // The centre follows the input; the step does not. Said, so a price typed
+  // into the file is not expected to rescale the price step.
+  const bps = (d: number) => `${Math.round(d * 10_000)} bps`;
+  label(
+    wsSens.getCell(r + 1, 1),
+    `Each axis steps from the input as it stands, by the steps set at export: exit cap ${bps(inc.capStep)}, hold ${inc.monthsStep} months, price $${inc.priceStep.toLocaleString("en-US")}, LTC ${(inc.ltcStep * 100).toFixed(1)} points, rate ${bps(inc.rateStep)}.`,
+    { color: MUTED, size: 9 },
+  );
 }

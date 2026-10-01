@@ -5,6 +5,7 @@ import { buildUnderwriteWorkbook } from "./workbook";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import { buildSensitivityGrids } from "./sensitivity";
+import type { UnderwriteInputs } from "./engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 /**
@@ -233,7 +234,7 @@ describe("generated workbook — LIVE sensitivity grids match the engine", () =>
   // ci, column = 3 + index, IRR on row 23, EM on row 24. We read those NUMBERS
   // (not the display string, whose TEXT("%") HyperFormula renders unlike Excel)
   // and compare to the unit-tested engine.
-  it("every live scenario block computes the engine's IRR/EM within rounding", async () => {
+  it("every live scenario block computes the engine's IRR/EM", async () => {
     const { hf } = await loadIntoHf(await buildUnderwriteWorkbook(model));
     const engId = hf.getSheetId("Sensitivity Engine")!;
     const grids = buildSensitivityGrids(model.inputs);
@@ -245,8 +246,11 @@ describe("generated workbook — LIVE sensitivity grids match the engine", () =>
           const col = 2 + gi * 25 + ri * 5 + ci; // 0-based; C = 2
           const irr = hf.getCellValue({ sheet: engId, row: 22, col }) as number; // row 23
           const em = hf.getCellValue({ sheet: engId, row: 23, col }) as number; // row 24
-          expect(Math.abs(Number(irr) - eng.irrPct), `grid ${gi} [${ri}][${ci}] irr`).toBeLessThan(0.0015);
-          expect(Math.abs(Number(em) - eng.emx), `grid ${gi} [${ri}][${ci}] em`).toBeLessThan(0.02);
+          // To HyperFormula's own IRR precision, and the multiple exactly: a
+          // price scenario's closing costs struck at the base price had left
+          // the price grid 1.5 bps off, inside the 15 bps this once allowed.
+          expect(Math.abs(Number(irr) - eng.irrPct), `grid ${gi} [${ri}][${ci}] irr`).toBeLessThan(1e-8);
+          expect(Math.abs(Number(em) - eng.emx), `grid ${gi} [${ri}][${ci}] em`).toBeLessThan(1e-9);
         }
       }
     }
@@ -261,6 +265,118 @@ describe("generated workbook — LIVE sensitivity grids match the engine", () =>
       expect(hf.getCellValue({ sheet: engId, row: 22, col }) as number).toBeCloseTo(base.leveredIrrPct!, 3);
       expect(hf.getCellValue({ sheet: engId, row: 23, col }) as number).toBeCloseTo(base.leveredEquityMultiple!, 2);
     }
+  });
+});
+
+// ── The Sensitivity tab's axes are live ─────────────────────────────────────
+// The research pass changed one input at a time in a recalculated workbook:
+// the Deal Summary moved and every grid stayed centred on the inputs as
+// exported, its bold "base scenario" still the old IRR, because each axis
+// value and each scenario's override was a number written at export. Each
+// axis cell is now a formula off its named input, every scenario reads its
+// axis cells, and a price scenario strikes its closing costs at its own
+// price, as the engine does — so a cell is the engine's run at the values
+// the tab shows, whatever has been typed into the file since.
+describe("the Sensitivity tab stays centred on the inputs as they stand", () => {
+  type Hf = ReturnType<typeof HyperFormula.buildFromSheets>;
+  type At = { sheet: number; row: number; col: number };
+  type Key = "exitCapPct" | "holdMonths" | "purchasePrice" | "ltc" | "allInRatePct";
+
+  /** A defined name's cell, as HyperFormula addresses it. */
+  function namedAt(book: ExcelJS.Workbook, h: Hf, name: string): At {
+    const dn = (book.definedNames as unknown as { model: { name: string; ranges: string[] }[] }).model.find((d) => d.name === name)!;
+    const m = dn.ranges[0].match(/(?:'([^']+)'|([^!]+))!\$?([A-Z]+)\$?(\d+)/)!;
+    return {
+      sheet: h.getSheetId(m[1] ?? m[2])!,
+      row: Number(m[4]) - 1,
+      col: m[3].split("").reduce((a, ch) => a * 26 + (ch.charCodeAt(0) - 64), 0) - 1,
+    };
+  }
+
+  /** The three grids by their titles, with the input each axis varies. */
+  const GRIDS: { title: string; row: Key; col: Key }[] = [
+    { title: "EXIT CAP × HOLD PERIOD", row: "holdMonths", col: "exitCapPct" },
+    { title: "EXIT CAP × PURCHASE PRICE", row: "purchasePrice", col: "exitCapPct" },
+    { title: "LEVERAGE × RATE", row: "allInRatePct", col: "ltc" },
+  ];
+
+  /** A grid as the visible tab shows it: under its title a row of matrix
+   *  labels, the column axis, then five rows — the row axis in column A,
+   *  the IRR matrix in B..F and the equity multiple in H..L. */
+  function gridAt(book: ExcelJS.Workbook, h: Hf, title: string) {
+    const ws = book.getWorksheet("Sensitivity")!;
+    const top = findRow(ws, 1, title);
+    const sheet = h.getSheetId("Sensitivity")!;
+    const v = (row: number, col: number) => h.getCellValue({ sheet, row: row - 1, col: col - 1 });
+    const five = [0, 1, 2, 3, 4];
+    return {
+      colAxis: five.map((ci) => Number(v(top + 2, 2 + ci))),
+      emColAxis: five.map((ci) => Number(v(top + 2, 8 + ci))),
+      rowAxis: five.map((ri) => Number(v(top + 3 + ri, 1))),
+      irr: five.map((ri) => five.map((ci) => v(top + 3 + ri, 2 + ci))),
+      em: five.map((ri) => five.map((ci) => v(top + 3 + ri, 8 + ci))),
+    };
+  }
+
+  /** Every cell of every grid against computeUnderwrite at the axis values
+   *  the tab shows: the IRR to HyperFormula's own precision, the multiple
+   *  exactly — a closing cost struck at the wrong price moves the multiple
+   *  in its seventh figure. */
+  function expectEngineAgrees(book: ExcelJS.Workbook, h: Hf, base: UnderwriteInputs) {
+    for (const g of GRIDS) {
+      const v = gridAt(book, h, g.title);
+      expect(v.emColAxis, `${g.title} EM axis`).toEqual(v.colAxis);
+      for (let ri = 0; ri < 5; ri++) {
+        for (let ci = 0; ci < 5; ci++) {
+          const r = computeUnderwrite({ ...base, [g.row]: v.rowAxis[ri], [g.col]: v.colAxis[ci] }).returns;
+          const at = `${g.title} [${ri}][${ci}]`;
+          expect(Math.abs(Number(v.irr[ri][ci]) - r.leveredIrrPct!), `${at} irr`).toBeLessThan(1e-8);
+          expect(Math.abs(Number(v.em[ri][ci]) - r.leveredEquityMultiple!), `${at} em`).toBeLessThan(1e-9);
+        }
+      }
+    }
+  }
+
+  it("re-centres every grid on an input changed in the file: its centre is the Deal Summary's levered IRR", async () => {
+    const { hf, wb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    const changes: [string, Key, number][] = [
+      ["ExitCap", "exitCapPct", 0.07],
+      ["PurchasePrice", "purchasePrice", 45_000_000],
+      ["AllInRate", "allInRatePct", 0.07],
+      ["LTC", "ltc", 0.65],
+    ];
+    for (const [name, key, value] of changes) {
+      const at = namedAt(wb, hf, name);
+      const before = hf.getCellValue(at);
+      hf.setCellContents(at, value);
+      const irr = Number(named(hf, "LeveredIRR"));
+      const em = Number(named(hf, "LeveredEM"));
+      // The Deal Summary moved to the engine's run at the new input...
+      expect(Math.abs(irr - computeUnderwrite({ ...model.inputs, [key]: value }).returns.leveredIrrPct!), name).toBeLessThan(1e-8);
+      for (const g of GRIDS) {
+        const v = gridAt(wb, hf, g.title);
+        // ...and every grid's bold centre moved with it.
+        expect(Math.abs(Number(v.irr[2][2]) - irr), `${name}: ${g.title} centre IRR`).toBeLessThan(1e-8);
+        expect(Math.abs(Number(v.em[2][2]) - em), `${name}: ${g.title} centre EM`).toBeLessThan(1e-9);
+        // The axis that varies the input is centred on the value typed in.
+        if (g.row === key) expect(v.rowAxis[2], `${name}: ${g.title} row axis`).toBeCloseTo(value, 12);
+        if (g.col === key) expect(v.colAxis[2], `${name}: ${g.title} column axis`).toBeCloseTo(value, 12);
+      }
+      hf.setCellContents(at, before as number);
+    }
+  });
+
+  it("runs every scenario as the engine does at the values its axes show, closing costs struck at the scenario's own price", async () => {
+    const { hf, wb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expectEngineAgrees(wb, hf, model.inputs);
+    // A price typed into the file: the price grid's scenarios run at the
+    // new axis, each with its closing costs and fee at its own price.
+    const at = namedAt(wb, hf, "PurchasePrice");
+    hf.setCellContents(at, 45_000_000);
+    const v = gridAt(wb, hf, "EXIT CAP × PURCHASE PRICE");
+    expect(v.rowAxis[2]).toBe(45_000_000);
+    expect(v.rowAxis[4] - v.rowAxis[2]).toBeGreaterThan(0);
+    expectEngineAgrees(wb, hf, { ...model.inputs, purchasePrice: 45_000_000 });
   });
 });
 
