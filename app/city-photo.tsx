@@ -66,6 +66,7 @@ export function CityPhoto({
   showCredit = true,
   sizes,
   layer,
+  creditLayer,
   overlay,
   children,
 }: {
@@ -93,6 +94,12 @@ export function CityPhoto({
    *  box its credit is drawn in after them. Unset, the picture and its
    *  credit are drawn bare, as before. */
   layer?: string;
+  /** the box the credit is drawn in after the words, where it is not the
+   *  picture layer's shape: a market's band draws it in a row of its own
+   *  under the picture, so it never lands on the band's words (measured in
+   *  Chromium on 2026-10-01, the credit wrapped over the name on 40 of 45
+   *  market bands at 390px). Unset, `layer`. */
+  creditLayer?: string;
   /** drawn over the picture inside its layer: the band's scrim */
   overlay?: ReactNode;
   /** the band's words, drawn between the picture and its credit */
@@ -188,8 +195,9 @@ export function CityPhoto({
       </div>
       {children}
       {/* After the words, in a box of the picture's own shape, so it is
-          drawn where it always was: at the foot of the picture. */}
-      {caption ? <div className={`pointer-events-none ${layer}`}>{caption}</div> : null}
+          drawn where it always was: at the foot of the picture — or in the
+          box the band names for it (`creditLayer`). */}
+      {caption ? <div className={`pointer-events-none ${creditLayer ?? layer}`}>{caption}</div> : null}
     </>
   );
 }

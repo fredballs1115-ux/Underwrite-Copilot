@@ -174,6 +174,9 @@ export function PlaceBackdrop({
   scrim = "band",
   sizes = "100vw",
   eager = false,
+  layer,
+  creditLayer,
+  creditClassName,
   children,
 }: {
   metro: string;
@@ -185,6 +188,15 @@ export function PlaceBackdrop({
   /** the first thing on the page: fetched at once and ahead of the rest,
    *  never lazily — every other picture waits its turn */
   eager?: boolean;
+  /** the box the picture and its scrim fill, where it is not the band's
+   *  whole box (`MarketBand`: the picture's row of its grid) */
+  layer?: string;
+  /** the box the credit is drawn in, where it is not the picture's
+   *  (`MarketBand`: a row of its own under the picture) */
+  creditLayer?: string;
+  /** the credit's own classes, where the default's place at the picture's
+   *  foot is not where it goes */
+  creditClassName?: string;
   /** the band's words, before the picture's credit in the markup */
   children?: ReactNode;
 }) {
@@ -207,7 +219,9 @@ export function PlaceBackdrop({
       sizes={sizes}
       eager={eager}
       className="h-full w-full object-cover object-[50%_42%]"
-      layer={scrim === "hero" ? HERO_STRIP : "absolute inset-0"}
+      layer={layer ?? (scrim === "hero" ? HERO_STRIP : "absolute inset-0")}
+      creditLayer={creditLayer}
+      {...(creditClassName ? { creditClassName } : {})}
       overlay={<PhotoScrim scrim={scrim} />}
     >
       {children}
@@ -256,6 +270,24 @@ export function PlaceBand({
 }
 
 /**
+ * The market band's two rows (`MarketBand`): the picture, its scrim and the
+ * words share the first; the photograph's credit has the second to itself,
+ * on the band's own dark colour under the picture. The credit had been drawn
+ * at the picture's foot, under the words: measured in Chromium on
+ * 2026-10-01, at 390px it wrapped to two or three lines and climbed over the
+ * name on 40 of the 45 bands /market draws, and at 820px St. Louis's
+ * two-line credit did the same. In a row of its own a longer credit makes
+ * the band taller instead. The picture's row is a grid area with an explicit
+ * end line, since an absolutely placed box whose end line is `auto` reaches
+ * the grid's padding edge — over the credit's row too.
+ */
+export const MARKET_BAND_PICTURE = "absolute inset-0 col-start-1 row-start-1 row-end-2";
+export const MARKET_BAND_CREDIT_ROW = "col-start-1 row-start-2";
+/** The credit's own type: solid band colour behind it, so the tier is
+ *  measured against the band's colour (lib/place-band.contrast.test.ts). */
+export const MARKET_BAND_CREDIT = "pointer-events-auto px-5 pb-3 pt-2 text-right text-[10px] leading-snug text-white/75 sm:px-6";
+
+/**
  * A market's own band: its photograph, an eyebrow and a name.
  *
  * One component for the briefed markets and the ones read without a brief
@@ -264,7 +296,9 @@ export function PlaceBand({
  * them can drift. 15rem on a phone and 21rem from `sm` — the card band was
  * 13rem / 16rem, which `PlaceBand`'s own measure calls a texture — under the
  * "caption" scrim, which is anchored to these words in pixels and leaves the
- * rest of the band to the photograph.
+ * rest of the band to the photograph. The photograph's credit is drawn in a
+ * row of its own under the picture (`MARKET_BAND_CREDIT_ROW`), never over
+ * the words.
  */
 export function MarketBand({
   metro,
@@ -282,10 +316,19 @@ export function MarketBand({
   eager?: boolean;
 }) {
   return (
-    <div className="band-dark relative flex min-h-[15rem] items-end overflow-hidden rounded-2xl text-white sm:min-h-[21rem]">
+    <div className="band-dark relative grid overflow-hidden rounded-2xl text-white" data-qa="market-band">
       {/* Inside a page's column, never wider than its 72rem. */}
-      <PlaceBackdrop metro={metro} height={480} scrim="caption" sizes={PAGE_COLUMN_SIZES} eager={eager}>
-        <div className="on-photo band-words relative w-full px-5 pb-6 pt-10 sm:px-6 sm:pb-7 sm:pt-12">
+      <PlaceBackdrop
+        metro={metro}
+        height={480}
+        scrim="caption"
+        sizes={PAGE_COLUMN_SIZES}
+        eager={eager}
+        layer={MARKET_BAND_PICTURE}
+        creditLayer={MARKET_BAND_CREDIT_ROW}
+        creditClassName={MARKET_BAND_CREDIT}
+      >
+        <div className="on-photo band-words relative col-start-1 row-start-1 flex min-h-[15rem] w-full flex-col justify-end px-5 pb-6 pt-10 sm:min-h-[21rem] sm:px-6 sm:pb-7 sm:pt-12">
           <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
           {/* Two lines at most: the scrim is measured to the top of a name
               wrapped to two lines on a phone, and a submarket's name is

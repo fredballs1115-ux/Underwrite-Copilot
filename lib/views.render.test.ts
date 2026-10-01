@@ -1940,6 +1940,27 @@ describe("SubmarketCards and the submarket's band — the metro its owner typed,
     const section = render(React.createElement(MarketBand, { metro: "richmond", eyebrow: "Mid-Atlantic", name: "Richmond VA" }));
     expect(section).toMatch(/<h3[^>]*>Richmond VA<\/h3>/);
   });
+
+  it("draws the photograph's credit after the name, in a row of its own under the picture, never over the words", () => {
+    // Measured in Chromium on 2026-10-01: at the picture's foot the credit
+    // wrapped over the name on 40 of the 45 bands at 390px.
+    const html = render(React.createElement(MarketBand, { metro: "st_louis", eyebrow: "Read without a brief", name: "St. Louis" }));
+    expect(html).toContain('data-qa="market-band"');
+    const name = html.indexOf(">St. Louis</h3>");
+    const row = html.indexOf('class="pointer-events-none col-start-1 row-start-2"');
+    expect(name).toBeGreaterThan(0);
+    expect(row).toBeGreaterThan(name);
+    // The credit in that row is in the row's flow, not placed over the picture.
+    const credit = /<div class="pointer-events-none col-start-1 row-start-2"><p class="([^"]*)">/.exec(html)?.[1] ?? "";
+    expect(credit).toContain("text-white/75");
+    expect(credit).not.toMatch(/\b(absolute|bottom-3)\b/);
+    // The picture fills its own row only.
+    expect(html).toContain('class="pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-2"');
+    // The credit still names the photograph shown, its licence linked.
+    expect(visibleText(html).replace(/\n/g, "")).toContain(`${SKYLINES.st_louis.place} · `);
+    expect(html).toContain(`href="${commonsPage(SKYLINES.st_louis.file)}"`);
+    expect(a11yIssues(html), "a11y market band").toEqual([]);
+  });
 });
 
 // ── /market in outline while it loads, and the explorer's anchor ───────────

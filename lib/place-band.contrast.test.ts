@@ -1,7 +1,13 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { CAPTION_SCRIM, HERO_SIDE_SCRIM } from "@/app/place-band";
+import {
+  CAPTION_SCRIM,
+  HERO_SIDE_SCRIM,
+  MARKET_BAND_CREDIT,
+  MARKET_BAND_CREDIT_ROW,
+  MARKET_BAND_PICTURE,
+} from "@/app/place-band";
 
 /**
  * The scrim over a market photograph, held to the contrast floor.
@@ -289,6 +295,31 @@ describe("the caption scrim, for a market's own band on /market", () => {
       expect(contrast(WHITE, bg), `white ${px}px up`).toBeGreaterThanOrEqual(7);
       expect(contrast(ACCENT, bg), `accent ${px}px up`).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it("draws the photograph's credit in a row of its own under the picture, never over the words", () => {
+    // Measured in Chromium on 2026-10-01: drawn at the picture's foot, the
+    // credit wrapped to two or three lines at 390px and climbed over the
+    // name on 40 of the 45 bands /market draws (St. Louis's at 820px too).
+    // The band is a grid now: the picture and the words share the first row,
+    // the credit has the second.
+    expect(band).toContain("layer={MARKET_BAND_PICTURE}");
+    expect(band).toContain("creditLayer={MARKET_BAND_CREDIT_ROW}");
+    expect(band).toContain("creditClassName={MARKET_BAND_CREDIT}");
+    expect(band).toMatch(/className="band-dark relative grid /);
+    // The picture's box ends at its own row: an absolutely placed box whose
+    // end line is `auto` reaches the grid's padding edge, over the credit.
+    expect(MARKET_BAND_PICTURE).toMatch(/\brow-start-1\b/);
+    expect(MARKET_BAND_PICTURE).toMatch(/\brow-end-2\b/);
+    expect(MARKET_BAND_CREDIT_ROW).toMatch(/\brow-start-2\b/);
+    // The words are in the picture's row, and the credit is not placed over it.
+    expect(band).toMatch(/className="on-photo band-words relative col-start-1 row-start-1 /);
+    expect(MARKET_BAND_CREDIT).not.toMatch(/\b(absolute|bottom-\d|top-\d)\b/);
+    // On the band's own colour, with no photograph under it: its tier is
+    // measured against the solid band.
+    const tier = Number(/text-white\/(\d+)/.exec(MARKET_BAND_CREDIT)?.[1]) / 100;
+    expect(tier).toBeGreaterThan(0);
+    expect(contrast(over(WHITE, tier, SIDEBAR), SIDEBAR)).toBeGreaterThanOrEqual(4.5);
   });
 
   it("leaves the band above the words to the photograph", () => {
