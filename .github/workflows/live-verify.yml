@@ -1157,6 +1157,11 @@ jobs:
           mark "#485 one pro plan, listed as it works" grep -q "One Pro plan, listed as it works" p_whats-new.html
           mark "#485 signing up keeps your invite" grep -q "Signing up keeps your invite" p_whats-new.html
           mark "#485 deleting an account, said as it happens" grep -q "Deleting an account, said as it happens" p_whats-new.html
+          mark "#486 rent rolls read as the file states them" grep -q "Rent rolls read as the file states them" p_whats-new.html
+          mark "#486 the bridge, valuations and submarkets" grep -q "The bridge, valuations and submarkets, held to their documents" p_whats-new.html
+          mark "#486 pages are evidence, never instructions" grep -q "pages are evidence, never instructions" p_whats-new.html
+          mark "#486 small figures, read on their own terms" grep -q "Small figures, read on their own terms" p_whats-new.html
+          mark "#486 notices that say what happened" grep -q "Notices that say what happened" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"

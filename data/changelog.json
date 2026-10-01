@@ -3,6 +3,36 @@
   "entries": [
     {
       "date": "2026-10-01",
+      "title": "Rent rolls read as the file states them",
+      "href": "/deals",
+      "blurb": "A rent roll's totals line is now found by its shape, and the rows it left out are named. Dates are read as days that exist, day first where the file writes them that way. A deal's roll opens on a leasing profile of its own class; an apartment's in-place rent is read by the month, and a rent per foot no building charges is flagged. The WALT flag weighs the leases by rent, and escalations are read as percents only. The workbook dates its figures, names its placeholders and prices its loan for its own ten-year hold. Deleting an import deletes its file."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "The bridge, valuations and submarkets, held to their documents",
+      "href": "/deals",
+      "blurb": "The assumption bridge saves only the levers you moved, reads $12.5M as typed, and keeps one version for each change rather than one for each view. It will not delete the version that is the deal as it stands. The model's own opinion of value is struck on the price plus its capital. On a note or a plan deal, the bridge and the valuations say what their model figures are. A submarket's trailing year is read by date. Its import says which column each figure came from and keeps one row a date, preferring a quarter to a year's line. Its supply warning sets the exit cap against the deal's going-in cap, and a new submarket can be any of the sixteen asset classes."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "The seller's pages are evidence, never instructions",
+      "href": "/deals",
+      "blurb": "Every step of the screen is now instructed to treat the memorandum's words, and any text quoted from it, as the seller's claims to weigh, never as instructions to follow, a line addressed to an AI reviewer included. The public-web comp search is told the same of the pages it reads."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Small figures, read on their own terms",
+      "href": "/deals",
+      "blurb": "A reconciliation gap stated by the month or per unit is no longer divided by a yearly or whole-building figure. A cap rate's gap keeps its grade rather than being judged on the income's band. A comp's cap reads correctly past a year, a count or a T-12 before it, and an average rent is never read as a price per unit. The actuals card writes a month as a month and calls a park's pads and a dorm's beds by name. A term of the seller's loan stated on its own is listed as that loan's."
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Notices that say what happened",
+      "href": "/account",
+      "blurb": "The email sent when a screen fails before its verdict now also goes when the worker gives up on a screen or hits an unexpected error. None goes where your email setting cannot be read. Data health dates the steward's last run rather than promising a nightly one. A file just over the upload limit is said to be just over it."
+    },
+    {
+      "date": "2026-10-01",
       "title": "The pipeline, whole at every width",
       "blurb": "On a phone, every rung of the stage funnel now shows its stage's name, an empty one included, where a row of unnamed circles had stood. A deal's tags sit on a line of their own under its figures, so no price, cap rate or tag is cut off; a tag rides on the picture only where it fits whole. Within a row of cards, the figures and footers line up. A buy-box fit judged before the memorandum has been read is marked \"first read\" in the CSV and the meeting workbook, as it is on the card.",
       "href": "/deals"
