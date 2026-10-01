@@ -8095,6 +8095,10 @@ function ZoningEnvelope() {
                   </div>
                 </div>
               )}
+              {/* A bonus lifts the density limit, not the site: where another
+                  cap holds the site, this says which, and what would let the
+                  lifted limit fit. */}
+              {z.bonusNote && <p className="mt-3 text-sm text-muted">{z.bonusNote}</p>}
             </>
           )}
 

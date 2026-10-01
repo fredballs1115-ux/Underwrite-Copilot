@@ -3689,9 +3689,15 @@ describe("the deal math tools", () => {
   });
 
   it("prices the density bonus against the bonus it would take to break even", () => {
-    // Rule 4: +20% on a 15% set-aside clears the 6.4% crossing.
+    // Rule 4: the bonus lifts the density limit, not the site. The 20% bonus
+    // takes the limit from 160 to 192, parking still holds the site to 140,
+    // so it adds none of them and, taken as it stands, restricts 21 units
+    // for $252,000 a year. (The card had grossed the parking-bound 140 up to
+    // 168 units and printed +$528,000.)
     expect(text).toContain("The density bonus, against what it costs");
-    expect(text).toContain("168 units");
+    expect(text).not.toContain("168 units");
+    expect(text).toContain("−$252,000");
+    expect(text).toContain("so it adds none of them without relief: 0.77 spaces a unit or fewer would fit all 192");
     expect(text).toContain("Break-even bonus");
     expect(text).toContain("6.4%");
     expect((html.match(/data-bar="setaside"/g) ?? []).length).toBe(2);
