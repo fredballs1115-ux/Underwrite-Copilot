@@ -4,15 +4,25 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   ACCOUNT_EXISTS,
+  CONFIRMATION_RESENT,
   authErrorCopy,
+  awaitingConfirmation,
   confirmationRedirect,
   safeNextPath,
   type AuthIntent,
 } from "@/lib/auth-flow";
 
 /** `intent` names the form that produced the state, so the sign-in tab never
- *  shows the sign-up tab's error. */
-export type AuthState = { error?: string; notice?: string; intent?: AuthIntent } | null;
+ *  shows the sign-up tab's error. `resend` asks the page to offer a fresh
+ *  confirmation link, and `email` is the address the form was sent with, so
+ *  that offer opens on it (React empties the form once its action runs). */
+export type AuthState = {
+  error?: string;
+  notice?: string;
+  intent?: AuthIntent;
+  resend?: boolean;
+  email?: string;
+} | null;
 
 const UNREACHABLE = "Couldn't reach the sign-in service — try again in a moment.";
 
@@ -69,7 +79,10 @@ export async function authenticate(
   }
 
   if (error) {
-    return { intent, error: authErrorCopy(error, intent) };
+    // "Confirm your email first" comes with a way to have the link sent again.
+    return awaitingConfirmation(error)
+      ? { intent, error: authErrorCopy(error, intent), resend: true, email }
+      : { intent, error: authErrorCopy(error, intent) };
   }
 
   // With enumeration protection on, signing up an email that already has an
@@ -88,6 +101,8 @@ export async function authenticate(
       intent,
       notice:
         "Account created. Check your email for the confirmation link — opening it signs you in.",
+      resend: true,
+      email,
     };
   }
 
@@ -124,6 +139,38 @@ export async function requestPasswordReset(
     notice:
       "If that email has an account, a reset link is on its way. Open it in this browser — it signs you in, and you set a new password on the Account page.",
   };
+}
+
+/**
+ * Email a fresh confirmation link to an address that signed up and never
+ * confirmed — the auth service's own resend for a sign-up. It answers alike
+ * whether the address is waiting, already confirmed or unknown, so the page
+ * does too. The link carries `next` exactly as the sign-up's did, so an
+ * invitee still lands on the invite; a limit reads by lib/auth-flow's rule
+ * (the address's own wait with its seconds, or our email's hourly cap — never
+ * "wait a minute" to someone who never asked).
+ */
+export async function resendConfirmation(
+  _prev: AuthState,
+  formData: FormData,
+): Promise<AuthState> {
+  const email = String(formData.get("email") ?? "").trim();
+  if (!email) return { intent: "resend", error: "Enter the email you signed up with." };
+  const next = safeNextPath(String(formData.get("next") ?? "") || null);
+
+  const supabase = await createSupabaseServerClient();
+  let error;
+  try {
+    ({ error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: { emailRedirectTo: confirmationRedirect(siteOrigin(), next) },
+    }));
+  } catch {
+    return { intent: "resend", error: UNREACHABLE, email };
+  }
+  if (error) return { intent: "resend", error: authErrorCopy(error, "resend"), email };
+  return { intent: "resend", notice: CONFIRMATION_RESENT, email };
 }
 
 export async function signOut() {

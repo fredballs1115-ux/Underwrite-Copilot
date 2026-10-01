@@ -24,6 +24,10 @@ vi.mock("@/lib/supabase/server", () => ({
         auth.calls.push({ method: "signInWithPassword", args });
         return { data: { user: { id: "u1", identities: [{ id: "i1" }] }, session: auth.session }, error: auth.error };
       },
+      resend: async (args: Record<string, unknown>) => {
+        auth.calls.push({ method: "resend", args });
+        return { data: { user: null, session: null }, error: auth.error };
+      },
     },
   }),
 }));
@@ -35,7 +39,8 @@ vi.mock("next/navigation", () => ({
   },
 }));
 
-import { authenticate } from "@/app/login/actions";
+import { authenticate, resendConfirmation } from "@/app/login/actions";
+import { CONFIRMATION_RESENT } from "@/lib/auth-flow";
 
 const ORIGIN = "https://app.test";
 
@@ -96,6 +101,63 @@ describe("a sign-up carries where the person was headed through its confirmation
         `${ORIGIN}/login?confirmed=1`,
       );
     }
+  });
+});
+
+describe("Resend the confirmation link", () => {
+  it("asks the auth service's own resend for a sign-up, carrying next as the sign-up did", async () => {
+    const state = await resendConfirmation(
+      null,
+      form({ email: " new@firm.example ", next: "/team/join/0a1b2c3d" }),
+    );
+    expect(lastCall()).toEqual({
+      method: "resend",
+      args: {
+        type: "signup",
+        email: "new@firm.example",
+        options: { emailRedirectTo: `${ORIGIN}/login?confirmed=1&next=%2Fteam%2Fjoin%2F0a1b2c3d` },
+      },
+    });
+    // The service answers alike for any address, and so does the page.
+    expect(state).toEqual({ intent: "resend", notice: CONFIRMATION_RESENT, email: "new@firm.example" });
+  });
+
+  it("refuses a hostile next, and asks for an address before calling anything", async () => {
+    await resendConfirmation(null, form({ email: "new@firm.example", next: "https://evil.example/" }));
+    expect((lastCall().args.options as { emailRedirectTo: string }).emailRedirectTo).toBe(`${ORIGIN}/login?confirmed=1`);
+    auth.calls.length = 0;
+    expect((await resendConfirmation(null, form({ email: "  " })))?.error).toBe("Enter the email you signed up with.");
+    expect(auth.calls).toEqual([]);
+  });
+
+  it("never says 'wait a minute' to someone who never asked: our cap is ours, the address's own wait has its seconds", async () => {
+    auth.error = { code: "over_email_send_rate_limit", message: "Email rate limit exceeded" };
+    const capped = await resendConfirmation(null, form({ email: "new@firm.example" }));
+    expect(capped?.error).toBe("Our email is rate-limited right now, so the link didn't go out — please try again shortly.");
+    expect(capped?.email).toBe("new@firm.example");
+    auth.error = {
+      code: "over_email_send_rate_limit",
+      message: "For security purposes, you can only request this after 41 seconds.",
+    };
+    expect((await resendConfirmation(null, form({ email: "new@firm.example" })))?.error).toBe(
+      "Wait about 41 seconds before requesting another link.",
+    );
+    auth.error = { code: "unexpected_failure", message: "Database error" };
+    expect((await resendConfirmation(null, form({ email: "new@firm.example" })))?.error).toBe(
+      "Something went wrong sending the confirmation link — please try again.",
+    );
+  });
+
+  it("is offered where a confirmation is what stands in the way", async () => {
+    auth.error = { code: "email_not_confirmed", message: "Email not confirmed" };
+    const refused = await authenticate(null, form({ intent: "signin", email: "new@firm.example", password: "a-long-password" }));
+    expect(refused).toMatchObject({ intent: "signin", resend: true, email: "new@firm.example" });
+    expect(refused?.error).toMatch(/Confirm your email first/);
+    auth.error = { code: "invalid_credentials", message: "Invalid login credentials" };
+    expect((await authenticate(null, form({ intent: "signin", email: "a@firm.example", password: "a-long-password" })))?.resend).toBeUndefined();
+    auth.error = null;
+    const created = await authenticate(null, form({ intent: "signup", email: "new@firm.example", password: "a-long-password" }));
+    expect(created).toMatchObject({ intent: "signup", resend: true, email: "new@firm.example" });
   });
 });
 

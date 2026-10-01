@@ -6,11 +6,13 @@
 import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_EXISTS,
+  CONFIRMATION_RESENT,
   CONFIRM_LINK_FAILED,
   EMAIL_CONFIRMED,
   RESET_LINK_FAILED,
   authErrorCopy,
   authLinkBanner,
+  awaitingConfirmation,
   authLinkHandoff,
   confirmationRedirect,
   initialLoginMode,
@@ -100,6 +102,25 @@ describe("authErrorCopy — the auth service's codes become sentences", () => {
       .toBe("Something went wrong sending the reset link — please try again.");
     expect(authErrorCopy({ code: "unexpected_failure", message: "x" }, "signin"))
       .toBe("Something went wrong signing you in — please try again.");
+  });
+});
+
+describe("a confirmation that stands in the way is offered again", () => {
+  it("awaitingConfirmation reads the code, and the message where there is none", () => {
+    expect(awaitingConfirmation({ code: "email_not_confirmed", message: "Email not confirmed" })).toBe(true);
+    expect(awaitingConfirmation({ message: "Email not confirmed" })).toBe(true);
+    expect(awaitingConfirmation({ code: "invalid_credentials", message: "Invalid login credentials" })).toBe(false);
+    // A code that says otherwise wins over words that happen to match.
+    expect(awaitingConfirmation({ code: "over_request_rate_limit", message: "email not confirmed" })).toBe(false);
+  });
+
+  it("the resend's words: neutral about the address, and a fallback of its own", () => {
+    expect(CONFIRMATION_RESENT).toMatch(/^If that address is waiting to be confirmed/);
+    expect(authErrorCopy({ code: "unexpected_failure", message: "x" }, "resend")).toBe(
+      "Something went wrong sending the confirmation link — please try again.",
+    );
+    // The expired-link banner points at the button the page now shows.
+    expect(CONFIRM_LINK_FAILED).toContain("Resend the confirmation link");
   });
 });
 

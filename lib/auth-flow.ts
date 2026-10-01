@@ -14,7 +14,12 @@
  * the exchange — or after it fails.
  */
 
-export type AuthIntent = "signin" | "signup" | "reset";
+/** The sign-in page's forms: sign in, create an account, email a reset link,
+ *  email a fresh confirmation link. */
+export type LoginMode = "signin" | "signup" | "reset" | "resend";
+
+/** What the person was doing when the auth service said no. */
+export type AuthIntent = LoginMode;
 
 const SUPPORT = "underwritecopilot.support@gmail.com";
 
@@ -46,7 +51,24 @@ const GENERIC: Record<AuthIntent, string> = {
   signin: "Something went wrong signing you in — please try again.",
   signup: "Something went wrong creating your account — please try again.",
   reset: "Something went wrong sending the reset link — please try again.",
+  resend: "Something went wrong sending the confirmation link — please try again.",
 };
+
+/** What the page says once a fresh confirmation link is asked for. The auth
+ *  service answers alike for an address waiting to be confirmed, one already
+ *  confirmed and one it has never seen, so the page does too. */
+export const CONFIRMATION_RESENT =
+  "If that address is waiting to be confirmed, a fresh link is on its way. Open it in this browser — it confirms your email and signs you in.";
+
+/**
+ * Whether an auth failure means the address was never confirmed — the
+ * sign-in that answers "Confirm your email first", which the page follows
+ * with a way to have the link sent again.
+ */
+export function awaitingConfirmation(err: { message?: string | null; code?: string | null }): boolean {
+  if (err.code) return err.code === "email_not_confirmed";
+  return (err.message ?? "").toLowerCase().includes("email not confirmed");
+}
 
 /**
  * The auth service's one code for two different limits. "For security
@@ -249,7 +271,7 @@ export function landingAfterFailedExchange(next: string | null, hadCode: boolean
 export type LinkBanner = { tone: "ok" | "warn"; text: string };
 
 export const CONFIRM_LINK_FAILED =
-  "That confirmation link has expired or was already used. Try signing in — if your email still isn't confirmed, use Create account again with the same email and we'll send a fresh link.";
+  "That confirmation link has expired or was already used. Try signing in — if your email still isn't confirmed, use Resend the confirmation link below for a fresh one.";
 export const RESET_LINK_FAILED =
   "That reset link has expired, was already used, or was opened in a different browser than the one you asked from. Request a fresh one below and open it in this browser.";
 export const EMAIL_CONFIRMED = "Email confirmed — sign in below and your pipeline is ready.";
@@ -284,7 +306,7 @@ export function initialLoginMode(params: {
   mode?: string | null;
   link?: string | null;
   confirmed?: string | null;
-}): AuthIntent {
+}): LoginMode {
   if (params.mode === "signup") return "signup";
   if (params.mode === "reset") return "reset";
   // A refused reset link opens straight on "email me a new one".

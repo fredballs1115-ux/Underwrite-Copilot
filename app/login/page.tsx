@@ -2,7 +2,7 @@ import Link from "next/link";
 import { LogoMark } from "@/app/logo";
 import { FREE_DEALS } from "@/lib/marketing-constants";
 import { MARKET_COUNT } from "@/app/markets-marquee";
-import { authLinkBanner, initialLoginMode } from "@/lib/auth-flow";
+import { CONFIRM_LINK_FAILED, authLinkBanner, initialLoginMode } from "@/lib/auth-flow";
 import { publicMetadata } from "@/lib/page-meta";
 import { LoginForm } from "./login-form";
 import { PlaceBackdrop } from "@/app/place-band";
@@ -77,7 +77,11 @@ export default async function LoginPage({
               free — no card required — and one click inside adds a
               fully-worked sample deal to your pipeline.
             </p>
-            <LoginForm initialMode={initialLoginMode(params)} next={next ?? null} />
+            <LoginForm
+              initialMode={initialLoginMode(params)}
+              next={next ?? null}
+              offerResend={linkBanner?.text === CONFIRM_LINK_FAILED}
+            />
           </div>
 
           {/* The login wall is a doorway, not a dead end — the public research
