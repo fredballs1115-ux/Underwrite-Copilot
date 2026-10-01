@@ -195,18 +195,19 @@ describe("ReportDocument (full report)", () => {
     );
     expect(pdfFillCountOf(buf) - pdfFillCountOf(bare)).toBe(saleCount * 3);
 
-    // The reconciliation page draws each stated gap from a centre line — a
-    // track, the fill and the centre tick, three fills a drawn row. Two of
-    // the sample's three rows state a figure ("$174k below", "300 bps
-    // higher"); "In agreement" draws none — so a report whose rows all
-    // agree draws six fewer shapes.
+    // The reconciliation page draws each gap from a centre line — a track,
+    // the fill and the centre tick, three fills a drawn row. Two of the
+    // sample's three rows are a gap (their figures' own: $173,500 and 300
+    // bps); a neutral row draws none — so a report whose rows all agree
+    // draws six fewer shapes. (The bar is the two figures' subtraction, so
+    // agreement is the row's direction, not its line alone.)
     const drawnGaps = SAMPLE_DEAL.reconciliation.rows.filter((r) => r.direction !== "neutral").length;
     expect(drawnGaps).toBe(2);
     const agreed = {
       ...deal,
       reconciliation: {
         ...SAMPLE_DEAL.reconciliation,
-        rows: SAMPLE_DEAL.reconciliation.rows.map((r) => ({ ...r, gap: "In agreement" })),
+        rows: SAMPLE_DEAL.reconciliation.rows.map((r) => ({ ...r, gap: "In agreement", direction: "neutral" })),
       },
     } as unknown as DealRow;
     const flat = await renderToBuffer(
