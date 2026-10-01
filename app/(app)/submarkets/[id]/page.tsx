@@ -4,6 +4,13 @@ import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { loadSubmarketView } from "@/lib/market/store";
 import { trailingYearBasis, unverifiedMark } from "@/lib/market/metrics";
+import {
+  PERIOD_FIELDS,
+  PIPELINE_FIELDS,
+  importSentence,
+  mappingSentence,
+  unpackMapping,
+} from "@/lib/market/import";
 import { exclusionSummary } from "@/lib/market/exclusions";
 import { RENT_BASIS_LABEL, RENT_BASES } from "@/lib/market/types";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -30,6 +37,12 @@ const ERRORS: Record<string, string> = {
   norows: "No rows in that file mapped to the expected columns.",
   period: "A period needs a full date (yyyy-mm-dd), usually the quarter end.",
   sourceurl: "A web-sourced figure needs its source link — it is shown with that link everywhere.",
+  importsave:
+    "The import could not be saved, so nothing from that file was written — what was loaded before is unchanged. Try it again.",
+  importreplace:
+    "The new rows could not replace the ones loaded before, so the import was taken back out — what was loaded before is unchanged. Try it again.",
+  save: "That change could not be saved. Try it again.",
+  delete: "That could not be deleted. Try it again.",
 };
 
 const sfFmt = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
@@ -41,10 +54,39 @@ export default async function SubmarketPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ error?: string; imported?: string }>;
+  searchParams: Promise<{
+    error?: string;
+    imported?: string;
+    replaced?: string;
+    skipped?: string;
+    kind?: string;
+    file?: string;
+    cols?: string;
+  }>;
 }) {
   const { id } = await params;
-  const { error: errorCode, imported } = await searchParams;
+  const { error: errorCode, imported, replaced, skipped, kind, file, cols } = await searchParams;
+  // What the last import did, said from what the action carried here.
+  const importKind = kind === "pipeline" || kind === "periods" ? kind : null;
+  const importFields = importKind === "pipeline" ? PIPELINE_FIELDS : PERIOD_FIELDS;
+  const importRead = importKind ? unpackMapping(cols, importFields) : [];
+  const importNote = imported
+    ? {
+        done: importSentence({
+          kind: importKind,
+          imported: Number(imported) || 0,
+          replaced: replaced == null ? null : Number(replaced) || 0,
+          skipped: Number(skipped) || 0,
+          file: file ?? null,
+        }),
+        read: importKind
+          ? mappingSentence(
+              importRead,
+              importFields.filter((f) => !importRead.some((c) => c.key === f.key)).map((f) => f.label),
+            )
+          : "",
+      }
+    : null;
 
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
@@ -150,10 +192,11 @@ export default async function SubmarketPage({
           {ERRORS[errorCode]}
         </p>
       ) : null}
-      {imported ? (
-        <p className="rounded-lg border border-pass/30 bg-pass/5 px-4 py-3 text-sm text-pass">
-          Imported {imported} row{imported === "1" ? "" : "s"}.
-        </p>
+      {importNote ? (
+        <div className="rounded-lg border border-pass/30 bg-pass/5 px-4 py-3 text-sm">
+          <p className="text-pass">{importNote.done}</p>
+          {importNote.read ? <p className="mt-1 text-xs text-muted">{importNote.read}</p> : null}
+        </div>
       ) : null}
 
       {/* ── Headline metrics ──────────────────────────────────────────── */}
@@ -283,8 +326,10 @@ export default async function SubmarketPage({
       <section className="rounded-lg border border-line bg-surface p-5">
         <h2 className="text-base font-semibold text-ink">Import a market export</h2>
         <p className="mt-1 max-w-2xl text-sm text-muted">
-          CSV or XLSX, mapped like the rent roll. A re-import replaces the rows its file wrote
-          before, so nothing doubles.
+          CSV or XLSX. Each column is matched to a field by its header, with no step to confirm
+          the match — the import says which header it read for each field. A grid replaces the
+          periods loaded for its dates; a pipeline replaces what its file wrote before and any
+          building with the same name and address, so a renamed copy does not double it.
         </p>
         <form action={importSubmarketFile} className="mt-4 flex flex-wrap items-end gap-3">
           <input type="hidden" name="submarketId" value={id} />

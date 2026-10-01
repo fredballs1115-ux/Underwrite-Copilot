@@ -18,7 +18,23 @@ import {
   staleVerdict,
 } from "./exclusions";
 import { assumptionWarnings, memoLinesFor } from "./checks";
-import { parseRentBasis, parsePeriodLabel, parseStatus, suggestMarketMapping, toPeriods, toPipeline, PERIOD_FIELDS, PIPELINE_FIELDS } from "./import";
+import {
+  importSentence,
+  mappingSentence,
+  mappingSummary,
+  packMapping,
+  parseRentBasis,
+  parsePeriodLabel,
+  parseStatus,
+  pipelineIdentity,
+  pipelineRowsToReplace,
+  suggestMarketMapping,
+  toPeriods,
+  toPipeline,
+  unpackMapping,
+  PERIOD_FIELDS,
+  PIPELINE_FIELDS,
+} from "./import";
 import { parseCsv } from "@/lib/rentroll/parse";
 import { EMPTY_RULES, type PipelineProperty, type Submarket, type SubmarketPeriod } from "./types";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -715,5 +731,74 @@ TOTAL,,"1,852,400",,,
     expect(rows[2].staleFlag).toBe(true);
     expect(rows[2].staleReason).toContain("round-number placeholder");
     expect(parseStatus("Under Construction")).toBe("under_construction");
+  });
+});
+
+describe("a pipeline re-import replaces, never doubles", () => {
+  const stored = [
+    { id: "1", name: "Building A", address: "100 Commerce Way", source: "pipeline-export.csv" },
+    { id: "2", name: "Cascade Data Center Campus", address: "", source: "pipeline-export.csv" },
+    { id: "3", name: "Harbor Point", address: "9 Wharf St", source: "county-b.csv" },
+  ];
+
+  it("replaces the same buildings from a renamed copy of the same export", () => {
+    const incoming = [
+      { name: "BUILDING A", address: "100 Commerce Way." },
+      { name: "Cascade Data-Center Campus", address: "" },
+    ];
+    // Keyed on the filename alone, the renamed copy kept both and doubled.
+    expect(pipelineRowsToReplace(stored, incoming, "pipeline-export (1).csv").sort()).toEqual(["1", "2"]);
+  });
+
+  it("drops a building the same file no longer lists, and keeps another file's buildings", () => {
+    const incoming = [{ name: "Building A", address: "100 Commerce Way" }];
+    expect(pipelineRowsToReplace(stored, incoming, "pipeline-export.csv").sort()).toEqual(["1", "2"]);
+    expect(pipelineRowsToReplace(stored, [{ name: "New Site", address: "" }], "new.csv")).toEqual([]);
+  });
+
+  it("never matches two rows that have neither a name nor an address", () => {
+    expect(pipelineIdentity({ name: "", address: "  " })).toBeNull();
+    expect(
+      pipelineRowsToReplace([{ id: "9", name: "", address: "", source: "a.csv" }], [{ name: "", address: "" }], "b.csv"),
+    ).toEqual([]);
+  });
+});
+
+describe("the import says what it read", () => {
+  const CSV = `Period,Inventory SF,Under Construction SF,Net Absorption SF,Direct Vacancy Rate,Total Vacancy Rate,Market Asking Rent/SF
+2025 Q4,20000000,1200000,150000,5.1%,6.0%,9.50
+2026 YTD,20000000,1200000,150000,5.1%,6.0%,9.50`;
+
+  it("names the header each field was read from, and the fields none matched", () => {
+    const grid = parseCsv(CSV);
+    const mapping = suggestMarketMapping(grid, PERIOD_FIELDS);
+    const { rows, skipped, headers } = toPeriods(grid, mapping, "x.csv");
+    expect(rows).toHaveLength(1);
+    expect(skipped).toBe(1);
+    const { read, missing } = mappingSummary(mapping, headers, PERIOD_FIELDS);
+    const back = unpackMapping(packMapping(read), PERIOD_FIELDS);
+    expect(back).toEqual(read);
+    const line = mappingSentence(back, missing);
+    // Two vacancy columns: the reader sees which one was taken.
+    expect(line).toContain("Vacancy from “Direct Vacancy Rate”");
+    expect(line).toContain("No column matched Rent basis.");
+  });
+
+  it("says how many rows it wrote, replaced and skipped", () => {
+    expect(importSentence({ kind: "periods", imported: 8, replaced: 3, skipped: 1, file: "grid.csv" })).toBe(
+      "Imported 8 periods from grid.csv — 3 replaced the periods already loaded for those dates; 1 row skipped with no readable period.",
+    );
+    expect(importSentence({ kind: "pipeline", imported: 1, replaced: 0, skipped: 0, file: null })).toBe(
+      "Imported 1 building.",
+    );
+    expect(importSentence({ kind: "periods", imported: 2, replaced: null, skipped: 0, file: null })).toBe(
+      "Imported 2 periods.",
+    );
+  });
+
+  it("drops a packed entry that names no field", () => {
+    expect(unpackMapping("vacancyPct:Vac|bogus:X|nocolon", PERIOD_FIELDS)).toEqual([
+      { key: "vacancyPct", label: "Vacancy", header: "Vac" },
+    ]);
   });
 });

@@ -355,4 +355,146 @@ export function toPipeline(
   };
 }
 
+// ---------------------------------------------------------------------------
+// What a pipeline re-import replaces
+// ---------------------------------------------------------------------------
+
+/** A building's identity across exports: its name and address, lower-cased,
+ *  punctuation and runs of space folded. Null where it has neither, which
+ *  no other row can be said to be. */
+export function pipelineIdentity(row: { name: string | null; address: string | null }): string | null {
+  const fold = (s: string | null) =>
+    (s ?? "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, " ")
+      .trim();
+  const name = fold(row.name);
+  const address = fold(row.address);
+  return name || address ? `${name}|${address}` : null;
+}
+
+/**
+ * The stored pipeline rows a new import replaces: every row the same file
+ * wrote before (a building dropped from the export goes with it), and every
+ * row that is one of the incoming buildings by name and address, whichever
+ * file wrote it. Keyed on the filename alone, a renamed copy of the same
+ * export doubled the pipeline — the surest way to make the grid-vs-list
+ * check fire on your own data. Two exports of DIFFERENT buildings keep each
+ * other's rows.
+ */
+export function pipelineRowsToReplace(
+  existing: readonly { id: string; name: string | null; address: string | null; source: string | null }[],
+  incoming: readonly { name: string; address: string }[],
+  filename: string,
+): string[] {
+  const keys = new Set(incoming.map((r) => pipelineIdentity(r)).filter((k): k is string => k != null));
+  return existing
+    .filter((e) => {
+      if (e.source === filename) return true;
+      const k = pipelineIdentity(e);
+      return k != null && keys.has(k);
+    })
+    .map((e) => e.id);
+}
+
+// ---------------------------------------------------------------------------
+// What the import read
+// ---------------------------------------------------------------------------
+
+/** One field the import filled, and the header it read it from. */
+export interface MappedColumn {
+  key: string;
+  label: string;
+  header: string;
+}
+
+/**
+ * Which header each field was read from, and which fields no header
+ * matched — said after an import, since columns are matched by their
+ * headers with no step to confirm the match (an export with both a direct
+ * and a total vacancy column has one of them read, and the reader should
+ * see which).
+ */
+export function mappingSummary<K extends string>(
+  mapping: MarketMapping<K>,
+  headers: readonly string[],
+  fields: readonly FieldSpec<K>[],
+): { read: MappedColumn[]; missing: string[] } {
+  const read: MappedColumn[] = [];
+  const missing: string[] = [];
+  for (const f of fields) {
+    const col = mapping.columns[f.key];
+    if (col === undefined) missing.push(f.label);
+    else read.push({ key: f.key, label: f.label, header: (headers[col] ?? "").trim() || `column ${col + 1}` });
+  }
+  return { read, missing };
+}
+
+/** The summary, packed for a redirect's query string: "key:header|key:header",
+ *  each header cut to 40 characters so a long one cannot bloat the URL. */
+export function packMapping(read: readonly MappedColumn[]): string {
+  return read.map((c) => `${c.key}:${c.header.replace(/[|:]/g, " ").slice(0, 40)}`).join("|");
+}
+
+/** The packed summary read back against the fields' own labels; an entry
+ *  naming no known field is dropped. */
+export function unpackMapping(
+  packed: string | null | undefined,
+  fields: readonly { key: string; label: string }[],
+): MappedColumn[] {
+  if (!packed) return [];
+  const label = new Map(fields.map((f) => [f.key, f.label]));
+  return packed.split("|").flatMap((part) => {
+    const at = part.indexOf(":");
+    if (at < 1) return [];
+    const key = part.slice(0, at);
+    const name = label.get(key);
+    return name ? [{ key, label: name, header: part.slice(at + 1) }] : [];
+  });
+}
+
+const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * What an import did, in one sentence: the rows it wrote, how many of them
+ * replaced rows already loaded (a period by its date; a building by the
+ * file that wrote it or by its name and address), and how many it skipped.
+ * `replaced` null is a count the import could not make, and is left unsaid.
+ */
+export function importSentence(args: {
+  kind: "periods" | "pipeline" | null;
+  imported: number;
+  replaced: number | null;
+  skipped: number;
+  file: string | null;
+}): string {
+  const from = args.file ? ` from ${args.file}` : "";
+  if (args.kind === "pipeline") {
+    const replaced =
+      args.replaced && args.replaced > 0
+        ? ` — replacing ${plural(args.replaced, "row")} loaded before: this file's earlier import, or the same buildings by name and address`
+        : "";
+    const skipped =
+      args.skipped > 0 ? `; ${plural(args.skipped, "row")} skipped (a totals line, or no name and no size)` : "";
+    return `Imported ${plural(args.imported, "building")}${from}${replaced}${skipped}.`;
+  }
+  if (args.kind === "periods") {
+    const replaced =
+      args.replaced && args.replaced > 0
+        ? ` — ${args.replaced} replaced the ${args.replaced === 1 ? "period already loaded for its date" : "periods already loaded for those dates"}`
+        : "";
+    const skipped = args.skipped > 0 ? `; ${plural(args.skipped, "row")} skipped with no readable period` : "";
+    return `Imported ${plural(args.imported, "period")}${from}${replaced}${skipped}.`;
+  }
+  return `Imported ${plural(args.imported, "row")}.`;
+}
+
+/** Which header each field was read from, and the fields no header matched. */
+export function mappingSentence(read: readonly MappedColumn[], missing: readonly string[]): string {
+  const parts: string[] = [];
+  if (read.length) parts.push(`Read ${read.map((c) => `${c.label} from “${c.header}”`).join(", ")}.`);
+  if (missing.length) parts.push(`No column matched ${missing.join(", ")}.`);
+  return parts.join(" ");
+}
+
 export { isRoundPlaceholder };
