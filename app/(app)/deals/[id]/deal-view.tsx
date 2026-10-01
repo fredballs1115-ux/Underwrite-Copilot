@@ -1942,7 +1942,8 @@ function ProgressRail({
           </span>
         </div>
         <p className="mt-2 text-xs text-muted">
-          You can keep browsing; a toast will tell you when it lands.
+          It keeps running if you leave; with this page open, a note here
+          says when it lands.
         </p>
       </div>
     );

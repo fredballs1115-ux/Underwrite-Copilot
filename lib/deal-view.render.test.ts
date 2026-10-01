@@ -564,7 +564,9 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(bare).not.toMatch(/2–4 minutes|typically takes|a minute or two|a few minutes|Your screens usually/);
     // The reconciler runs on its own, and the screens' median is not its time.
     const recon = textOf(render(running("reconcile", "about 3 minutes")));
-    expect(recon).toMatch(/You can keep browsing; a toast will tell you when it lands\./);
+    // It runs on if the reader leaves, and the note shows only while the
+    // page is open (pass 14: "a toast will tell you" was true only then).
+    expect(recon).toMatch(/It keeps running if you leave; with this page open, a note here says when it lands\./);
     expect(recon).not.toMatch(/about 3 minutes|a minute or two/);
     // The first step claims no time either.
     expect(textOf(render(running("signal", null)))).not.toMatch(/half a minute/);
