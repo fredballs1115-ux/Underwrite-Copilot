@@ -2728,8 +2728,10 @@ function NewDealForm({
 }) {
   const draftKey = draftKeyFor(viewerId);
   const router = useRouter();
-  // The connection dropped before the server answered the upload: the deal
-  // may or may not exist, so the form says to look before uploading again.
+  // No answer came back for the upload — the connection dropped, or the
+  // server failed before it answered: the deal may or may not exist, so the
+  // form says to look before uploading again (a repeat is merged into the
+  // first only inside 15 seconds; app/(app)/deals/actions.ts).
   const [dropped, setDropped] = useState(false);
   // Two ways in: upload the OM, or type the facts (no document needed —
   // small-multifamily listings rarely come with one). An upload error code
@@ -2873,10 +2875,9 @@ function NewDealForm({
       )}
       {dropped && (
         <p className="mt-3 rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution" role="alert">
-          The upload didn&apos;t finish — the connection dropped before the
-          server answered, so the deal may or may not have been created. Check
-          your pipeline for it before uploading again; everything you typed is
-          still here.
+          No answer came back for the upload, so the deal may or may not have
+          been created. Check your pipeline for it before uploading again;
+          everything you typed is still here.
         </p>
       )}
       <form

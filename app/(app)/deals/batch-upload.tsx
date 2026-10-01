@@ -148,7 +148,10 @@ export function BatchUpload({
           status = { kind: "error", message: ERROR_COPY[res.error] ?? "Something went wrong." };
         }
       } catch {
-        status = { kind: "error", message: "Upload failed — check your connection and retry." };
+        // No answer came back: the connection dropped or the server failed
+        // first, so the deal may exist — a retry after 15 seconds would make
+        // a twin (the create action merges a repeat only inside that window).
+        status = { kind: "error", message: "No answer came back — it may have been created. Check the pipeline before retrying." };
       }
       setItems((prev) => prev.map((it, j) => (j === i ? { ...it, status } : it)));
     }
