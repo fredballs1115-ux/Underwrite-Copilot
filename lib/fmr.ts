@@ -133,9 +133,9 @@ export function fmrOf(entry: unknown): Fmr | null {
 
 /** The two-bedroom figure with the year it is for — what a surface drawing
  *  HUD's rent beside another measure needs; null without one. */
-export function fmrTwoBed(fmr: Fmr | null): { rent: number; fy: number; effective: string } | null {
+export function fmrTwoBed(fmr: Fmr | null): { rent: number; fy: number; effective: string; area: string } | null {
   const rent = fmr?.rents["2br"] ?? null;
-  return fmr && rent !== null ? { rent, fy: fmr.fy, effective: fmr.effective } : null;
+  return fmr && rent !== null ? { rent, fy: fmr.fy, effective: fmr.effective, area: fmr.area } : null;
 }
 
 /** Today as an ISO day, UTC — read by a page outside its render and handed

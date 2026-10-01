@@ -123,8 +123,15 @@ describe("fmrBlock / fmrOf — the one reader", () => {
     expect(fmr.note).toBeNull();
   });
 
-  it("hands the two-bedroom figure over with its year and the day it takes effect", () => {
-    expect(fmrTwoBed(fmrBlock(BLOCK))).toEqual({ rent: 1860, fy: 2027, effective: "2026-10-01" });
+  it("hands the two-bedroom figure over with its year, the day it takes effect and HUD's area", () => {
+    // The area rides along so the asking-rent line can say whose figure each
+    // bar is: Zillow's metro area and HUD's FMR area are often drawn apart.
+    expect(fmrTwoBed(fmrBlock(BLOCK))).toEqual({
+      rent: 1860,
+      fy: 2027,
+      effective: "2026-10-01",
+      area: "Philadelphia-Camden-Wilmington, PA-NJ-DE-MD MSA",
+    });
     expect(fmrTwoBed(null)).toBeNull();
   });
 });

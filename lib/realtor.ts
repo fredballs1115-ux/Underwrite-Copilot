@@ -6,10 +6,12 @@
  * THE FOR-SALE MARKET IS THE OTHER SIDE OF THE RENTER'S DECISION, and the
  * Zillow line above it on the market brief already says the price side (a
  * typical home in years of rent). This is the flow: a market where
- * listings pile up and sit longer is loosening, and a loosening for-sale
- * market is one a renter can buy into; one where listings fall and clear
- * faster keeps them renting. Neither is a rent forecast — it is the demand
- * side an apartment underwrite is quietly assuming.
+ * listings pile up and sit longer is loosening, and the usual reasoning is
+ * that a looser for-sale market is easier for a renter to buy into, while
+ * one where listings fall and clear faster keeps more of them renting. The
+ * page says that as reasoning, never as what renters do (the research pass
+ * of 2026-10-01). Neither is a rent forecast — it is the demand side an
+ * apartment underwrite is quietly assuming.
  *
  * Realtor.com publishes the file monthly, one month per file with the
  * year-ago change already in it as a fraction; the pull stores the figure
@@ -79,9 +81,9 @@ export interface RealtorRead {
  * OTHER: Realtor.com ranks the 300 largest metros each month by how many
  * buyers look at each listing (demand) and how fast homes sell (supply),
  * each measured against the U.S. A hot market is one where buyers
- * compete for homes, and the ones who lose out keep renting — which is
- * the demand side an apartment underwrite is quietly assuming, said as a
- * place in a ranking rather than as a level.
+ * compete for homes, and the usual reasoning is that the ones who lose out
+ * keep renting — the demand side an apartment underwrite is quietly
+ * assuming, said as a place in a ranking rather than as a level.
  *
  * Two rules. THE MOVE IS TWO PRINTED RANKS SUBTRACTED, never a sign read
  * off a column: the pull stores the rank and the rank the same month a

@@ -5,13 +5,18 @@
  * The FMR row on the market brief is HUD's fair market rent — a yearly
  * two-bedroom figure, utilities included, set from survey data two years old
  * by the time it applies; it is not what HUD pays, and the gap to an asking
- * rent is not a premium over it. The ZORI figure is what landlords are
- * ASKING this month, across the listings Zillow sees of every type and size,
- * before concessions, refreshed monthly. They are different numbers about
- * different things, which is why both are shown and neither stands in for
- * the other: an underwrite that takes the FMR for the market rent is a year
- * or two behind, and one that takes the asking rent for the achievable rent
- * has not priced the concessions.
+ * rent is not a premium over it. The ZORI figure is a smoothed index of what
+ * landlords are ASKING, across single-family homes, condos and multifamily
+ * units (the all-homes file, as scripts/fetch-zori.mjs describes it), dated
+ * by its month and refreshed monthly, for Zillow's own metro area — which is
+ * not always the area HUD draws, so the page names both (`area`). They are
+ * different numbers about different things, which is why both are shown and
+ * neither stands in for the other: an underwrite that takes the FMR for the
+ * market rent is a year or two behind, and one that takes an asking rent for
+ * the achievable rent has not priced the concessions. (The page said "this
+ * month's listings … before concessions" until 2026-10-01; a smoothed index
+ * is not this month's listings, and Zillow's methodology page could not be
+ * read from here to say more than the files' own names do.)
  *
  * THE APARTMENT FIGURE IS ITS OWN NUMBER. Zillow's all-homes index runs
  * over houses, condos and apartments together, so in a market of dear
@@ -22,7 +27,8 @@
  *
  * THE HOME VALUE IS THE OTHER SIDE OF THE RENTER'S DECISION. A typical
  * home's price against a year of asking rent — the price-to-rent ratio,
- * said in years — is the arithmetic that keeps a renter renting, and it
+ * said in years — is the usual reasoning for whether renting or buying is
+ * cheaper (said as reasoning on the page, never as what renters do), and it
  * belongs beside the rent rather than on a page of its own.
  *
  * Pure: the page reads the `benchmarks` rows the monthly pull writes
@@ -85,6 +91,13 @@ export interface ZoriRead {
   asOf: string;
   /** The row's own note: the metro area named, and whether it is shared. */
   note: string;
+  /** Zillow's own name for the metro area the figure is for ("Washington,
+   *  DC"), out of the note the pull writes; null where the note names none.
+   *  Set beside HUD's area wherever the gap to the fair market rent is said:
+   *  the two are often different areas (Zillow's Dallas metro area against
+   *  HUD's Dallas FMR area, Los Angeles's against HUD's Los Angeles–Long
+   *  Beach–Glendale). */
+  area?: string | null;
   /** The figure is the MSA's, shown for a suburb that shares it. */
   shared: boolean;
   /** The apartment asking rent — the index over multifamily listings alone — where the pull had the file. */
@@ -122,6 +135,13 @@ export function figureOfMonth(rows: readonly BenchRow[], metroName: string, metr
 /** A metro's Zillow figures on `now`: null unless the all-homes rent is
  *  there and current, and every other figure only where its own row is of
  *  the rent's month. */
+/** Zillow's own name for a row's metro area ("Washington, DC"), out of the
+ *  note the pull writes (`…, Washington, DC metro area, month ending …`). */
+export function zillowAreaOf(note: string): string | null {
+  const m = /, ([^,]+(?:, [A-Z]{2}(?:-[A-Z]{2})*)?) metro area, month ending/.exec(note);
+  return m ? m[1] : null;
+}
+
 export function zoriFor(rows: readonly BenchRow[], metroName: string, now: Date): ZoriRead | null {
   const rent = rows.find((r) => r.metro === metroName && r.metric === "zori_rent");
   if (!rent || typeof rent.low !== "number" || !Number.isFinite(rent.low) || rent.low <= 0 || !rent.as_of) {
@@ -137,6 +157,7 @@ export function zoriFor(rows: readonly BenchRow[], metroName: string, now: Date)
     yoyPct: figureOfMonth(rows, metroName, "zori_rent_yoy", month),
     asOf: month,
     note: rent.note ?? "",
+    area: zillowAreaOf(rent.note ?? ""),
     shared: /shared with the MSA/i.test(rent.note ?? ""),
     mfrRent: mfr !== null && mfr > 0 ? Math.round(mfr) : null,
     mfrYoyPct: figureOfMonth(rows, metroName, "zori_mfr_rent_yoy", month),

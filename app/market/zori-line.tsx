@@ -11,10 +11,16 @@ import { fmrLabel, fmrWhen } from "@/lib/fmr";
  * rent as the price-to-rent ratio.
  *
  * The bars are two different measures, and the words say so: the asking
- * rent is listings of every type and size of home before concessions, the
- * fair market rent a yearly two-bedroom figure with utilities included. The
- * gap between them is not a premium over what HUD pays — the first version
- * called it "above the fair market rent HUD pays", which was not true.
+ * rent is Zillow's smoothed index of asking rents across single-family
+ * homes, condos and multifamily units (the all-homes file the pull reads,
+ * scripts/fetch-zori.mjs), dated by its month, for Zillow's metro area; the
+ * fair market rent a yearly two-bedroom figure with utilities included, for
+ * HUD's own area. Each is said with its area, since the two are often
+ * drawn differently. The gap between them is not a premium over what HUD
+ * pays — the first version called it "above the fair market rent HUD
+ * pays", which was not true — and the second called the index "this
+ * month's listings of every type and size of home, before concessions",
+ * which says more than a smoothed index is.
  *
  * Pure: the page reads the rows and hands the figure in, so this renders on
  * a fixture. Nothing renders with no figure — a metro with no ZORI row gets
@@ -37,7 +43,7 @@ export function ZoriLine({
   today,
 }: {
   z: ZoriRead | null;
-  fmr2br: { rent: number; fy: number; effective?: string | null } | null;
+  fmr2br: { rent: number; fy: number; effective?: string | null; area?: string | null } | null;
   /** today's ISO day, read by the page: past the fair market rent's fiscal
    *  year the line says the year ended (lib/fmr `fmrWhen`) */
   today?: string;
@@ -52,19 +58,29 @@ export function ZoriLine({
   const mfrGapPct =
     z.mfrRent !== null && z.rent > 0 ? Math.round(((z.mfrRent - z.rent) / z.rent) * 1000) / 10 : null;
 
+  // What the index is, said only as far as is certain (Zillow's methodology
+  // page could not be read from here, 2026-10-01): a smoothed index of asking
+  // rents across single-family homes, condos and multifamily units — the
+  // all-homes file the pull reads, as scripts/fetch-zori.mjs describes it —
+  // dated by its month. "This month's listings" was not it. And the gap to
+  // HUD's rent is said with both areas named, since the two are often drawn
+  // differently.
+  const zillowArea = z.area ? `Zillow's ${z.area} metro area` : "Zillow's metro area";
+  const index = `Zillow's smoothed index of asking rents across single-family homes, condos and multifamily units, dated ${monthOf(z.asOf)}`;
+  const bothAreas = Boolean(z.area && fmr2br?.area);
   // One string, so React puts no separators inside a sentence live-verify greps.
   const sentence =
     (gapPct !== null && fmr2br
-      ? "Two different measures on one scale, and neither is the other: the asking rent is this month's listings of every type and size of home, before concessions; " +
-        `HUD's ${fmrLabel(fmr2br.fy)} fair market rent${endedClause} is a yearly figure for a two-bedroom, utilities included. ` +
-        `The asking rent reads ${Math.abs(gapPct).toFixed(1)}% ${gapPct >= 0 ? "above" : "below"} it, a gap between the two measures and not a premium over what HUD pays.`
-      : "The asking rent is this month's listings of every type and size of home, before concessions.") +
+      ? `Two different measures on one scale, and neither is the other: the asking rent is ${index}, for ${zillowArea}; ` +
+        `HUD's ${fmrLabel(fmr2br.fy)} fair market rent${endedClause} is a yearly figure for a two-bedroom, utilities included${fmr2br.area ? `, for HUD's ${fmr2br.area}` : ""}. ` +
+        `The asking rent reads ${Math.abs(gapPct).toFixed(1)}% ${gapPct >= 0 ? "above" : "below"} it, a gap between the two measures${bothAreas ? ", each for the area named," : ""} and not a premium over what HUD pays.`
+      : `The asking rent is ${index}, for ${zillowArea}.`) +
     (z.shared ? " The asking rent is the metro area's, shared across the MSA." : "") +
     (mfrGapPct !== null
       ? ` The apartment figure is Zillow's multifamily listings alone, ${Math.abs(mfrGapPct).toFixed(1)}% ${mfrGapPct < 0 ? "under" : "over"} the all-homes one, which adds houses and condos and runs higher wherever the houses are dear.`
       : "") +
     (z.priceToRentYears !== null
-      ? ` A typical home costs ${z.priceToRentYears.toFixed(1)} years of the all-homes asking rent, which is the arithmetic that keeps a renter renting.`
+      ? ` A typical home costs ${z.priceToRentYears.toFixed(1)} years of the all-homes asking rent: the price-to-rent ratio, the usual reasoning for whether renting or buying is cheaper.`
       : "");
 
   return (

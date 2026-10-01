@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ageDays } from "./live-rates";
-import { ZILLOW_FILES, ZILLOW_FRESH_DAYS, ZILLOW_METRICS, ZORI_CREDIT, monthOf, zillowFileMonths, zillowFresh, zoriFor, type BenchRow } from "./zori";
+import { ZILLOW_FILES, ZILLOW_FRESH_DAYS, ZILLOW_METRICS, ZORI_CREDIT, monthOf, zillowAreaOf, zillowFileMonths, zillowFresh, zoriFor, type BenchRow } from "./zori";
 
 /** The day the fixture is read on: the pull of Sep 20 wrote August, dated its last day. */
 const NOW = new Date("2026-09-23T12:00:00Z");
@@ -48,6 +48,22 @@ describe("a metro's asking rent", () => {
     expect(z.shared).toBe(true);
     // No y/y row was written for the suburb in this fixture — null, not zero.
     expect(z.yoyPct).toBeNull();
+  });
+
+  it("names Zillow's own metro area out of the row's note, so the line can say whose figure it is", () => {
+    expect(zoriFor(ROWS, "Washington DC", NOW)!.area).toBe("Washington, DC");
+    // A suburb's row names the MSA it shares, not the suburb.
+    expect(zoriFor(ROWS, "Prince George's County MD", NOW)!.area).toBe("Washington, DC");
+    // The note as scripts/fetch-zori.mjs writes it, for every shape of
+    // RegionName the pull carries (a period in the city included).
+    for (const region of ["St. Louis, MO", "Virginia Beach, VA", "Salt Lake City, UT", "New York, NY"]) {
+      const note = `Zillow Observed Rent Index (ZORI), all homes, smoothed, ${region} metro area, month ending 2026-08-31. Data: Zillow Research.`;
+      expect(zillowAreaOf(note)).toBe(region);
+    }
+    // A note that names no area names none — never a guess.
+    expect(zillowAreaOf("")).toBeNull();
+    expect(zillowAreaOf("Zillow Observed Rent Index (ZORI). Data: Zillow Research.")).toBeNull();
+    expect(zoriFor([{ ...ROWS[0], note: null }], "Washington DC", NOW)!.area).toBeNull();
   });
 
   it("answers null for a metro with no row, or a row with no figure", () => {

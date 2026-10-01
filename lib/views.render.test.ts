@@ -4250,18 +4250,54 @@ describe("a metro's asking rent, against the FMR", () => {
     const next = visibleText(render(React.createElement(ZoriLine, { z, fmr2br: { rent: 2100, fy: 2028 } })));
     expect(next).toContain("HUD FY2028 2BR");
     expect(next).not.toContain("FY2027");
-    // Zillow's asking rent (every size of home, before concessions) and HUD's
-    // two-bedroom FMR (a yearly figure, utilities included) are different
-    // measures: the gap is said as one, never as a premium over what HUD pays.
+    // Zillow's asking rent (a smoothed index across every type of home) and
+    // HUD's two-bedroom FMR (a yearly figure, utilities included) are
+    // different measures: the gap is said as one, never as a premium over
+    // what HUD pays.
     expect(text).toContain("Two different measures on one scale");
     // live-verify's #364 marker greps this phrase on /market.
     expect(renderToString(React.createElement(ZoriLine, { z, fmr2br: hud }))).toContain("neither is the other");
-    expect(text).toContain("before concessions");
+    expect(text).toContain(
+      "the asking rent is Zillow's smoothed index of asking rents across single-family homes, condos and multifamily units, dated Aug 2026, for Zillow's metro area;",
+    );
     expect(text).toContain("utilities included");
     // (2412 − 2100) / 2100 = 14.857…%
     expect(text).toContain("The asking rent reads 14.9% above it, a gap between the two measures and not a premium over what HUD pays.");
     expect(text).not.toContain("the fair market rent HUD pays");
     expect(text).not.toMatch(/HUD pays for a two-bedroom/);
+    // The research pass of 2026-10-01: a smoothed index is not "this month's
+    // listings", and nothing on the line says so any more.
+    expect(text).not.toContain("this month's listings");
+    expect(text).not.toContain("before concessions");
+  });
+
+  it("names both areas wherever the read and the block state them — Zillow's metro area and HUD's FMR area", () => {
+    const named = visibleText(
+      render(
+        React.createElement(ZoriLine, {
+          z: { ...z, area: "Washington, DC" },
+          fmr2br: { ...hud, area: "Washington-Arlington-Alexandria, DC-VA-MD HUD Metro FMR Area" },
+        }),
+      ),
+    );
+    expect(named).toContain("dated Aug 2026, for Zillow's Washington, DC metro area;");
+    expect(named).toContain(
+      "HUD's FY2027 fair market rent is a yearly figure for a two-bedroom, utilities included, for HUD's Washington-Arlington-Alexandria, DC-VA-MD HUD Metro FMR Area.",
+    );
+    expect(named).toContain("a gap between the two measures, each for the area named, and not a premium over what HUD pays.");
+    // One area named and not the other: each says what it has, and the gap
+    // claims nothing about the two areas.
+    const half = visibleText(render(React.createElement(ZoriLine, { z: { ...z, area: "Washington, DC" }, fmr2br: hud })));
+    expect(half).toContain("for Zillow's Washington, DC metro area;");
+    expect(half).not.toContain("each for the area named");
+    expect(gluedWords(named)).toEqual([]);
+  });
+
+  it("says the price-to-rent ratio as the usual reasoning, not as a law", () => {
+    expect(fullText).toContain(
+      "A typical home costs 21.2 years of the all-homes asking rent: the price-to-rent ratio, the usual reasoning for whether renting or buying is cheaper.",
+    );
+    expect(fullText).not.toContain("the arithmetic that keeps a renter renting");
   });
 
   it("draws the apartment rent as a third bar and says the home value in years of rent", () => {
@@ -4296,7 +4332,9 @@ describe("a metro's asking rent, against the FMR", () => {
     expect(out).not.toContain("HUD FY");
     expect(out).not.toContain("above it");
     expect(out).not.toContain("fair market rent");
-    expect(out).toContain("The asking rent is this month's listings of every type and size of home, before concessions.");
+    expect(out).toContain(
+      "The asking rent is Zillow's smoothed index of asking rents across single-family homes, condos and multifamily units, dated Aug 2026, for Zillow's metro area.",
+    );
   });
 
   it("renders nothing with no figure", () => {
@@ -4341,6 +4379,8 @@ describe("a metro's for-sale market, from Realtor.com", () => {
     expect(text).toContain("listing views per property 35% under the U.S.");
     expect(text).toContain("sells 17 days faster than the U.S.");
     expect(text).toContain("ranks the 300 largest metros");
+    // Who keeps renting is the usual reasoning, said as reasoning.
+    expect(text).toContain("a hot for-sale market is one where buyers compete for homes, and the usual reasoning is that the ones who lose out keep renting.");
     // A rank that climbed, a market that sells slower, the same month said once.
     const hotter = visibleText(render(React.createElement(RealtorLine, {
       r: realtorFor(rows.map((x) => (x.metric === "rdc_hotness_rank" ? { ...x, low: 120 } : x.metric === "rdc_days_on_market_vs_us" ? { ...x, low: 9 } : x)), "Washington DC", read),
@@ -4379,6 +4419,14 @@ describe("a metro's for-sale market, from Realtor.com", () => {
     })));
     expect(mixed).toContain("not clearly loosening or tightening");
     expect(mixed).not.toContain("is loosening");
+    // What a direction means for a renter is the usual reasoning, said as
+    // reasoning — never as what the market does (the research pass of
+    // 2026-10-01).
+    expect(text).toContain("the for-sale market is loosening — the usual reasoning is that a looser market is easier for a renter to buy into.");
+    expect(tight).toContain("the for-sale market is tightening — the usual reasoning is that a tighter market keeps more renters renting.");
+    expect(text).toContain("the flow is the usual read of whether a renter could buy into this market");
+    expect(text).not.toContain("a loosening market is one a renter can buy into");
+    expect(tight).not.toContain("which keeps a renter renting");
   });
 
   it("renders nothing with no figure, and only what the pull had", () => {
@@ -5866,7 +5914,11 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
     expect(html).toContain('href="/market?metro=san_francisco"');
     expect(html).not.toContain('href="/market?metro=pittsburgh"');
     expect((html.match(/data-bar="rentboard"/g) ?? []).length).toBe(3);
-    expect(text).toContain("No apartment figure this month, all homes shown rather than ranked: Detroit MSA +3.8%");
+    expect(text).toContain("No apartment figure for Aug 2026, all homes shown rather than ranked: Detroit MSA +3.8%");
+    // An asking rent is what landlords ask, not what a unit lets at.
+    expect(text).toContain("where this is what landlords are asking for a vacant unit.");
+    expect(text).not.toContain("re-lets at");
+    expect(html).not.toContain("rent-board-older");
     expect(text).toContain("a suburb shares its metro area's row and is not listed twice.");
     expect(text).toContain("Data: Zillow Research.");
     expect(html).toContain('href="https://www.zillow.com/research/data/"');
@@ -5874,14 +5926,19 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
     expect(gluedWords(text)).toEqual([]);
   });
 
-  it("ranks one month's figures: a metro the pull missed this time is left off, never ranked under a month it is not of", () => {
+  it("ranks one month's figures: a metro the pull missed this time is named after them with its month, never ranked under a month it is not of", () => {
     // The August file carried no row for Pittsburgh, so July's stand — still
     // current on the 23rd, and not August's.
     const july = rows.map((r) => (r.metro === "Pittsburgh PA" ? { ...r, as_of: "2026-07-31" } : r));
-    const board = visibleText(render(React.createElement(RentBoard, { markets, reads: new Map(markets.map((m) => [m.name, zoriFor(july, m.name, read)])) })));
+    const boardHtml = render(React.createElement(RentBoard, { markets, reads: new Map(markets.map((m) => [m.name, zoriFor(july, m.name, read)])) }));
+    const board = visibleText(boardHtml);
     expect(board).toContain("2 metro areas ranked, fastest first · Aug 2026");
     expect(board).toContain("San Francisco MSA");
-    expect(board).not.toContain("Pittsburgh MSA");
+    // Not among the ranked rows (no bar of its own)…
+    expect((boardHtml.match(/data-bar="rentboard"/g) ?? []).length).toBe(2);
+    // …but named, so "every metro area the site reads" stays true (the
+    // research pass of 2026-10-01: the board had dropped it in silence).
+    expect(board).toContain("An older month, not ranked against Aug 2026: Pittsburgh MSA (Jul 2026)");
     // And a board read past the figures' cadence is no board at all.
     const late = new Map(markets.map((m) => [m.name, zoriFor(rows, m.name, new Date("2026-10-30T12:00:00Z"))]));
     expect(render(React.createElement(RentBoard, { markets, reads: late }))).not.toContain("Where apartment asking rents");

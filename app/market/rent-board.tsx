@@ -9,7 +9,7 @@ import type { BoardMarket } from "./sector-jobs-board";
  * and the ones read without a brief, forty-four of them — each against the
  * same month a year earlier, ranked fastest first with a signed bar from a
  * centre line, and beside each the typical home's price in years of the
- * all-homes asking rent, the arithmetic that keeps a renter renting. The
+ * all-homes asking rent, the price-to-rent ratio. The
  * apartment figure ranks the board because an apartment underwrite should
  * read it; the all-homes one adds houses and condos and runs higher
  * wherever the houses are dear.
@@ -21,9 +21,11 @@ import type { BoardMarket } from "./sector-jobs-board";
  * change, never ranked on a different measure; nothing renders until the
  * monthly pull has written a row. The board is one month's — the newest any
  * read is of, named in its header — and a metro whose read is of an older
- * month (the pull missed its row this time) is left off rather than ranked
- * under a month it is not of. Zillow's condition for the data is the
- * credit, which is part of the note and not the page's to forget.
+ * month (the pull missed its row this time) is named after the ranked ones
+ * with its own month rather than ranked under a month it is not of (it had
+ * been left off, which made the heading's "every metro area" untrue).
+ * Zillow's condition for the data is the credit, which is part of the note
+ * and not the page's to forget.
  */
 export function RentBoard({
   markets,
@@ -43,6 +45,9 @@ export function RentBoard({
   // whole rather than said under this one.
   const newest = read.map((x) => x.z.asOf).sort().at(-1) ?? null;
   const rows = read.filter((x) => x.z.asOf === newest);
+  // …and named after the ranked ones with its own month, so the heading's
+  // "every metro area the site reads" stays true of the board.
+  const older = read.filter((x) => x.z.asOf !== newest);
   const ranked = rows
     .filter((x): x is typeof x & { z: ZoriRead & { mfrYoyPct: number } } => x.z.mfrYoyPct !== null && Number.isFinite(x.z.mfrYoyPct))
     .sort((a, b) => b.z.mfrYoyPct - a.z.mfrYoyPct);
@@ -99,12 +104,17 @@ export function RentBoard({
       </ol>
       {unranked.length > 0 && (
         <p className="mt-2 text-[11px] text-muted">
-          {"No apartment figure this month, all homes shown rather than ranked: "}
+          {`No apartment figure for ${monthOf(newest)}, all homes shown rather than ranked: `}
           {unranked.map((x, i) => `${i > 0 ? "; " : ""}${areaOf(x.market)}${x.z.yoyPct !== null ? ` ${signed(x.z.yoyPct)}` : ""}`).join("")}
         </p>
       )}
+      {older.length > 0 && (
+        <p className="mt-1 text-[11px] text-muted" data-qa="rent-board-older">
+          {`An older month, not ranked against ${monthOf(newest)}: ${older.map((x) => `${areaOf(x.market)} (${monthOf(x.z.asOf)})`).join("; ")}`}
+        </p>
+      )}
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        {`Zillow's Observed Rent Index over multifamily listings alone — this month's listings before concessions, each against the same month a year earlier — ranks the board; a suburb shares its metro area's row and is not listed twice. The years beside each bar are the typical home's price in years of the all-homes asking rent, and the sitting-tenant rent index on the metro tiles is a different measure: what leases already signed pay, where this is what a vacant unit re-lets at. ${ZORI_CREDIT}.`}{" "}
+        {`Zillow's Observed Rent Index over multifamily listings alone — a smoothed index of asking rents, dated by its month, each against the same month a year earlier — ranks the board; a suburb shares its metro area's row and is not listed twice. The years beside each bar are the typical home's price in years of the all-homes asking rent, and the sitting-tenant rent index on the metro tiles is a different measure: what leases already signed pay, where this is what landlords are asking for a vacant unit. ${ZORI_CREDIT}.`}{" "}
         <a href={ZORI_SOURCE_URL} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-ink">
           Zillow Research
         </a>

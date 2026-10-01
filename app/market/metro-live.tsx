@@ -40,10 +40,11 @@ import { marketOwnArea, namesItsArea } from "@/lib/metro-own-area";
  *   ago, quarterly.
  * - **Rent CPI, y/y** — the CPI's rent of primary residence for the area
  *   against a year ago: what SITTING tenants pay, across every lease the
- *   survey reaches, where the asking rent drawn above it is this month's
- *   new leases. The two are different numbers about different tenants, and
- *   an underwrite needs both — the in-place rent is what a rent roll grows
- *   at, the asking rent is what a vacant unit re-lets at. Eight metros'
+ *   survey reaches, where the asking rent drawn above it is Zillow's
+ *   smoothed index of what landlords ask. The two are different numbers
+ *   about different tenants, and an underwrite needs both — the in-place
+ *   rent is what a rent roll grows at, the asking rent what a vacant unit is
+ *   offered at. Eight metros'
  *   come from FRED; Washington's, Baltimore's, Los Angeles's and San
  *   Francisco's come from the BLS's own API, because FRED does not carry
  *   the CPI areas the BLS redrew in 2018 — and the tile says so.
@@ -203,7 +204,7 @@ export function MetroLive({
         {supply &&
           ` Housing supply is the Census Bureau's building permits for the metro area, twelve months against the twelve before, because a month of permits is the season: the units in buildings of two or more are the total less the single-family series, since ${NO_MULTI_UNIT_SERIES}, and they are the pipeline an apartment underwrite competes with.`}
         {hasRentIndex &&
-          " The rent index is what sitting tenants pay across the area's leases; the asking rent above is this month's new ones."}
+          " The rent index is what sitting tenants pay across the area's leases; the asking rent above is Zillow's smoothed index of what landlords ask."}
         {fromBls &&
           " Where FRED does not carry the area, the rent index comes from the BLS directly."}
         {borrowed.length > 0 &&
