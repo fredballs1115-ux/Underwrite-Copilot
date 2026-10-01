@@ -418,13 +418,16 @@ export default async function DealsPage({
     };
   });
 
-  // Getting-started state — all real, computed from the account's actual data.
+  // Getting-started state — all real, computed from the reader's own data:
+  // the list carries a team's deals too, and a teammate's screened memorandum
+  // or sample is not this reader's first step taken.
+  const own = rows.filter((d) => d.user_id === user?.id);
   const onboarding = {
     hasBuyBox: !!(personalBox || teamBox),
-    sampleId: rows.find((d) => d.is_sample)?.id ?? null,
+    sampleId: own.find((d) => d.is_sample)?.id ?? null,
     // "Screen your first OM" ticks for a memorandum a screen has finished —
     // never a deal typed in by hand, or a screen still running (lib/onboarding).
-    hasScreenedOm: rows.some((d) =>
+    hasScreenedOm: own.some((d) =>
       screenedAnOm({
         isSample: !!d.is_sample,
         omPath: d.om_storage_path ?? null,

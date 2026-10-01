@@ -52,10 +52,20 @@ export default async function AnalyticsPage() {
   const planDeals = deals.filter((d) => isPlanDeal(d.kind));
   // A median needs three figures (lib/public-comps' floor, through
   // lib/analytics `middleRead`); one or two are said as what they are.
-  const yocRead = middleRead(
-    planDeals.map((d) => d.yieldOnCostPct).filter((v): v is number => v != null),
-  );
+  const yocValues = planDeals.map((d) => d.yieldOnCostPct).filter((v): v is number => v != null);
+  const yocRead = middleRead(yocValues);
   const yocText = middleText(yocRead, pct);
+  // The plan deals said as the figures cover them: "judged on yield on cost"
+  // only where every one has one — five plan deals and a median of two had
+  // read as five judged.
+  const planPhrase = (() => {
+    const n = planDeals.length;
+    const counted = `${n} plan deal${n === 1 ? "" : "s"}`;
+    const figure = yocText != null ? ` (${yocRead.kind === "median" ? `median ${yocText}` : yocText})` : "";
+    if (yocValues.length === n) return `${counted} judged on yield on cost${figure}`;
+    if (yocValues.length === 0) return `${counted}, none with a yield on cost`;
+    return `${counted}, ${yocValues.length} with a yield on cost${figure}`;
+  })();
 
   const live = deals.filter((d) => d.stage !== "dead");
   const decided = deals.filter((d) => d.verdict !== null);
@@ -130,7 +140,7 @@ export default async function AnalyticsPage() {
                 value: middleText(capRead, pct) ?? "—",
                 sub:
                   planDeals.length > 0
-                    ? `${capPoints.length} parsed · ${planDeals.length} plan deal${planDeals.length === 1 ? "" : "s"} judged on yield on cost${yocText != null ? ` (${yocRead.kind === "median" ? `median ${yocText}` : yocText})` : ""}`
+                    ? `${capPoints.length} parsed · ${planPhrase}`
                     : parsedPhrase(capPoints.length),
               },
               {
