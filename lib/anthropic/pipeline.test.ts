@@ -638,6 +638,38 @@ describe("runAnalysis — the happy path", () => {
     expect(brief).not.toContain("Stabilized");
   });
 
+  it("the verdict is handed the deal page's own buy-box checks and the red lines tripped, not the bare criteria (research pass 18)", async () => {
+    const { getBuyBoxForDeal } = await import("@/lib/criteria-server");
+    const box = { priceMaxM: 15, minCapPct: 6.5, dealbreakers: { maxPriceM: 18 } };
+    const signal = { ...SIGNAL, askPrice: "$20,000,000", size: "", goingInCap: "", perUnit: "", take: "A stabilized asset." } as FirstSignal;
+    vi.mocked(readFirstSignal).mockResolvedValue(signal);
+    vi.mocked(getBuyBoxForDeal).mockResolvedValueOnce(box);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(input.buyBox).toEqual(["Price: $15.0M max", "Min going-in cap: 6.5%", "Dealbreakers: price ≤ $18M"]);
+    // The page's read: the extraction, the first signal, the address — the same checks the chip folds.
+    const { evaluateBuyBox } = await import("@/lib/criteria");
+    const { dealCheckSource } = await import("@/lib/buy-box-chip");
+    expect(input.buyBoxChecks?.checks).toEqual(evaluateBuyBox("multifamily", dealCheckSource(EXTRACTION, signal, null), box));
+    expect(input.buyBoxChecks?.checks.find((c) => c.label === "Price")).toEqual({
+      label: "Price",
+      status: "miss",
+      detail: "Mandate is $15.0M max — the ask is $20.0M. Beyond the mandate.",
+    });
+    expect(input.buyBoxChecks?.tripped).toEqual(["price $20.0M over the $18.0M ceiling"]);
+
+    // A read of the checks that fails (here, a first signal stored without
+    // its going-in cap) leaves the criteria in the brief, as before.
+    vi.mocked(synthesizeVerdict).mockClear();
+    vi.mocked(readFirstSignal).mockResolvedValue(SIGNAL);
+    vi.mocked(getBuyBoxForDeal).mockResolvedValueOnce(box);
+    await runAnalysis("d1");
+    const again = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+    expect(again.buyBox).toEqual(input.buyBox);
+    expect(again.buyBoxChecks).toBeNull();
+  });
+
   it("the verdict is handed the deal context the comps and the market check read, built once — on a resumed run too (research pass 18)", async () => {
     const share = {
       ...EXTRACTION,

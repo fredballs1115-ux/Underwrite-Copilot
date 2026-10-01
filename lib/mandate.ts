@@ -208,8 +208,10 @@ const fmtM = (d: number) =>
   d >= 1e6 ? `$${(d / 1e6).toFixed(1)}M` : `$${Math.round(d / 1e3)}k`;
 
 /** Evaluate the hard dealbreakers against the screen. Each returns a bucket:
- *  `tripped` (violated), `clear` (satisfied), or `unknown` (no figure yet). */
-function evalDealbreakers(
+ *  `tripped` (violated), `clear` (satisfied), or `unknown` (no figure yet).
+ *  Exported for the verdict's brief, which names the red lines a deal trips
+ *  in these sentences rather than re-deriving them. */
+export function evalDealbreakers(
   dealAssetClass: string,
   extraction: ExtractionLike | null,
   box: BuyBox,

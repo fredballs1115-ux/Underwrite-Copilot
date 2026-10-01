@@ -64,7 +64,9 @@ import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxLines } from "@/lib/criteria";
+import { buyBoxLines, evaluateBuyBox, hasNoDealbreakers, type BuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
+import { evalDealbreakers } from "@/lib/mandate";
 import { notifyAnalysisFailed, notifyAnalysisReady } from "@/lib/email";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
@@ -502,16 +504,19 @@ async function regenerateVerdict(
 ): Promise<void> {
   const { data } = await admin
     .from("deals")
-    .select("asset_class, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
+    .select("asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
     .eq("id", dealId)
     .single();
+  const extraction = (data?.extraction as ExtractionResult | null | undefined) ?? null;
+  const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
 
   // Fetch the buyer's standing criteria so the verdict judges fit against
   // THEIR box. Best-effort: a missing box (or pre-0008 schema) just means no
   // buy-box section in the brief.
   let buyBox: string[] | null = null;
+  let box: BuyBox | null = null;
   try {
-    const box = await getBuyBoxForDeal(
+    box = await getBuyBoxForDeal(
       (data?.user_id as string) ?? "",
       (data?.team_id as string) ?? null,
     );
@@ -519,12 +524,33 @@ async function regenerateVerdict(
   } catch {
     buyBox = null;
   }
+  // The deal page's own read of the box (lib/buy-box-chip, which the
+  // screen-complete email makes too): the extraction, the first signal and
+  // the address the page reads, the same checks and the same red lines — so
+  // the verdict is handed the calls the chip shows, never left to re-derive
+  // a fit from the bare criteria. Best-effort on its own: a read that fails
+  // leaves the criteria in the brief, as before.
+  let buyBoxChecks: { checks: BuyBoxCheck[]; tripped: string[] } | null = null;
+  if (box && buyBox) {
+    try {
+      const address =
+        addressUpgrade(data?.address, extraction) ?? (data?.address as StructuredAddress | null | undefined) ?? null;
+      const source = dealCheckSource(extraction, firstSignal, address);
+      const filedAs = (data?.asset_class as string | null | undefined) ?? "auto";
+      buyBoxChecks = {
+        checks: evaluateBuyBox(filedAs, source, box),
+        tripped: source && !hasNoDealbreakers(box.dealbreakers) ? evalDealbreakers(filedAs, source, box).tripped : [],
+      };
+    } catch {
+      buyBoxChecks = null;
+    }
+  }
 
   const verdict = await synthesizeVerdict({
-    extraction: (data?.extraction as ExtractionResult) ?? null,
+    extraction,
     // The deal's kind is read with the first signal beside the extraction,
     // as every other step reads it.
-    firstSignal: (data?.first_signal as FirstSignal | null | undefined) ?? null,
+    firstSignal,
     // The class the deal is filed as, read with the deck's where the
     // analyst left "Auto" (shownAssetClass) — the noun the building's basis
     // is said in, as the pipeline card says it.
@@ -535,6 +561,7 @@ async function regenerateVerdict(
     reconciliation: (data?.reconciliation as ReconciliationResult) ?? null,
     market: (data?.market as MarketResult) ?? null,
     buyBox,
+    buyBoxChecks,
   });
 
   await admin

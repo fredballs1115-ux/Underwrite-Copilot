@@ -217,3 +217,44 @@ describe("the verdict is told what is being sold and the building's own basis", 
   });
 });
 
+// Research pass 18: the verdict was handed the bare criteria and told to
+// judge fit and name the entry price that would fit — re-deriving in prose
+// what lib/criteria `evaluateBuyBox` already decides in code.
+describe("the verdict is handed the code's buy-box checks, not the bare criteria to re-derive", () => {
+  const none = { extraction: null, challenges: null, comps: null, reconciliation: null, market: null };
+  const lines = ["Price: $15.0M max", "Min going-in cap: 6.25%", "Dealbreakers: price ≤ $18M"];
+  const checks = [
+    { label: "Price", status: "miss" as const, detail: "Mandate is $15.0M max — the ask is $20.0M. Beyond the mandate." },
+    { label: "Going-in cap", status: "near" as const, detail: "Mandate wants ≥6.25% going-in — the deal shows 6.00%, 25bps light. Close; a price cut could clear it." },
+    { label: "Asset class", status: "pass" as const, detail: "Mandate is multifamily — this is multifamily. In scope." },
+    { label: "Target return", status: "unknown" as const, detail: "Mandate targets ≥15% IRR; no parseable IRR in the screen yet." },
+  ];
+
+  it("each check's call and its own sentence, the fold, and the red lines tripped — with the entry price said to be the verdict's own estimate", () => {
+    const brief = buildBrief({ ...none, buyBox: lines, buyBoxChecks: { checks, tripped: ["price $20.0M over the $18.0M ceiling"] } });
+    const at = brief.indexOf("## The buyer's standing buy box");
+    const box = brief.slice(at, brief.indexOf("\n## ", at + 1));
+    expect(box).toContain("- Price: $15.0M max");
+    expect(box).toContain("The code's checks of this deal against the box, computed before you read this");
+    expect(box).toContain("never re-derive a check or recompute its figure");
+    expect(box).toContain("- Price — outside: Mandate is $15.0M max — the ask is $20.0M. Beyond the mandate.");
+    expect(box).toContain("- Going-in cap — near miss: Mandate wants ≥6.25% going-in — the deal shows 6.00%, 25bps light.");
+    expect(box).toContain("- Asset class — fits: Mandate is multifamily — this is multifamily. In scope.");
+    expect(box).toContain("- Target return — not checked: Mandate targets ≥15% IRR; no parseable IRR in the screen yet.");
+    expect(box).toContain("The code's call across the checks: outside the box on at least one criterion.");
+    expect(box).toContain("Red lines the buyer set that this deal trips: price $20.0M over the $18.0M ceiling.");
+    expect(box).toContain("The code computes no entry price: one you name is your own estimate — give its arithmetic and say it is yours.");
+    // A check's call is never the verdict's own word "pass".
+    expect(box).not.toMatch(/— pass\b/);
+  });
+
+  it("with no checks to hand, the criteria alone — and an entry price is still the verdict's own estimate", () => {
+    const brief = buildBrief({ ...none, buyBox: lines });
+    expect(brief).not.toContain("The code's checks");
+    expect(brief).toContain("Judge this deal's fit against these criteria explicitly");
+    expect(brief).toContain("the code computes no entry price, so one you name is your own estimate, and say so");
+    // No box, no section.
+    expect(buildBrief({ ...none, buyBoxChecks: { checks, tripped: [] } })).not.toContain("buy box");
+  });
+});
+

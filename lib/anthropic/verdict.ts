@@ -14,7 +14,7 @@ import {
   plausibilityNote,
   type DealStrategy,
 } from "@/lib/deal-strategy";
-import { parsePrice, priceRange } from "@/lib/criteria";
+import { foldBuyBoxChecks, parsePrice, priceRange, type BuyBoxCheck } from "@/lib/criteria";
 import { interestOf } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
 import { assetWords } from "@/lib/asset-words";
@@ -87,7 +87,28 @@ export interface VerdictInputs {
   market: MarketResult | null;
   /** the buyer's standing criteria, pre-formatted one per line (optional) */
   buyBox?: string[] | null;
+  /** the code's checks of this deal against that box — the deal page's own
+   *  read (lib/buy-box-chip `dealCheckSource`, lib/criteria
+   *  `evaluateBuyBox`): each criterion's call in the code's own sentence,
+   *  and the red lines it trips (lib/mandate `evalDealbreakers`) — so the
+   *  verdict judges fit on the calls the page's chip shows rather than
+   *  re-deriving them; absent with no box */
+  buyBoxChecks?: { checks: BuyBoxCheck[]; tripped: string[] } | null;
 }
+
+/** A check's call in words — never "pass", which is the verdict's own word
+ *  for a deal worth more work. */
+const CHECK_WORD: Record<BuyBoxCheck["status"], string> = {
+  pass: "fits",
+  near: "near miss",
+  miss: "outside",
+  unknown: "not checked",
+};
+const FOLD_WORD: Record<"fits" | "near" | "outside", string> = {
+  fits: "inside the box on every criterion it could check",
+  near: "near the box — a near miss and no outright miss",
+  outside: "outside the box on at least one criterion",
+};
 
 // "$170k", "$40.8M" — as the deal context writes a figure (lib/deal-context).
 const compact = (n: number): string =>
@@ -229,13 +250,33 @@ export function buildBrief(input: VerdictInputs): string {
   }
 
   // The buyer's standing criteria — the verdict must judge fit against THEIR
-  // box, not a generic investor's.
+  // box, not a generic investor's. Where the code has checked the deal
+  // against it (lib/criteria `evaluateBuyBox`, with a note's, a share's and a
+  // price range's own rules), the verdict is handed those calls and their
+  // sentences, as the deal page's chip shows them, rather than the bare
+  // criteria to re-derive a fit from — and told that any entry price it
+  // names is its own estimate, since the code computes none.
   if (input.buyBox && input.buyBox.length) {
+    const checks = input.buyBoxChecks?.checks ?? [];
+    const tripped = input.buyBoxChecks?.tripped ?? [];
+    const fold = foldBuyBoxChecks(checks);
     sections.push(
       "## The buyer's standing buy box",
       [
         ...input.buyBox.map((l) => `- ${l}`),
-        "Judge this deal's fit against these criteria explicitly: reference clear misses in the reason and topRisks, and if the deal fails the box on price/basis, say what entry price WOULD fit in nextSteps. A deal can be well-underwritten and still be outside the box — say so plainly.",
+        ...(checks.length > 0
+          ? [
+              "",
+              "The code's checks of this deal against the box, computed before you read this — the calls the deal page's buy-box chip shows. Use each call and its figure as it stands; never re-derive a check or recompute its figure:",
+              ...checks.map((c) => `- ${c.label} — ${CHECK_WORD[c.status]}: ${c.detail}`),
+              ...(fold ? [`The code's call across the checks: ${FOLD_WORD[fold]}.`] : []),
+              ...(tripped.length > 0 ? [`Red lines the buyer set that this deal trips: ${tripped.join("; ")}.`] : []),
+              "",
+              "Judge this deal's fit on these checks: reference clear misses in the reason and topRisks, and if the deal fails the box on price or basis, say in nextSteps what entry price WOULD fit. The code computes no entry price: one you name is your own estimate — give its arithmetic and say it is yours. A deal can be well-underwritten and still be outside the box — say so plainly.",
+            ]
+          : [
+              "Judge this deal's fit against these criteria explicitly: reference clear misses in the reason and topRisks, and if the deal fails the box on price/basis, say what entry price WOULD fit in nextSteps — the code computes no entry price, so one you name is your own estimate, and say so. A deal can be well-underwritten and still be outside the box — say so plainly.",
+            ]),
       ].join("\n"),
     );
   }
