@@ -13,7 +13,7 @@ import {
 } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createDeal, createSampleDeal } from "./actions";
+import { createDealFromBatch, createSampleDeal } from "./actions";
 import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
 import { DealBanner } from "./deal-banner";
@@ -314,6 +314,7 @@ export function Pipeline({
   onboarding,
   billing,
   initialView = "cards",
+  viewerId = null,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -329,6 +330,8 @@ export function Pipeline({
   billing: BillingInfo | null;
   /** the view the reader last chose, read from its cookie by the page */
   initialView?: PipelineView;
+  /** the signed-in reader's id, whose own the new-deal form's draft is */
+  viewerId?: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [view, setViewState] = useState<PipelineView>(initialView);
@@ -839,7 +842,7 @@ export function Pipeline({
       )}
 
       {showForm && !atLimit && (
-        <NewDealForm errorMessage={errorMessage} prefill={prefillAddress ?? null} />
+        <NewDealForm errorMessage={errorMessage} prefill={prefillAddress ?? null} viewerId={viewerId} />
       )}
       {atLimit && errorMessage && (
         <section className="rounded-xl border border-caution/30 bg-caution/5 p-5">
@@ -2647,11 +2650,19 @@ interface DealDraft {
   nameFromFile?: boolean;
 }
 
+// The unsent draft is kept under the reader's own account: kept under one
+// key for the browser, the next person to sign in on it was offered the last
+// one's deal name and address (pass 14, 2026-10-01). The old shared key is
+// cleared on sight, never read.
 const DRAFT_KEY = "uc:new-deal-draft";
+const draftKeyFor = (viewerId: string | null | undefined) =>
+  viewerId ? `${DRAFT_KEY}:${viewerId.toLowerCase().replace(/[^0-9a-f-]/g, "")}` : null;
 
-function readDraft(): DealDraft | null {
+function readDraft(key: string | null): DealDraft | null {
   try {
-    const raw = window.localStorage.getItem(DRAFT_KEY);
+    window.localStorage.removeItem(DRAFT_KEY);
+    if (!key) return null;
+    const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const d = JSON.parse(raw) as DealDraft;
     return d && typeof d === "object" ? d : null;
@@ -2660,12 +2671,13 @@ function readDraft(): DealDraft | null {
   }
 }
 
-function writeDraft(d: DealDraft | null) {
+function writeDraft(key: string | null, d: DealDraft | null) {
+  if (!key) return;
   try {
     if (!d || (!d.name.trim() && !d.address)) {
-      window.localStorage.removeItem(DRAFT_KEY);
+      window.localStorage.removeItem(key);
     } else {
-      window.localStorage.setItem(DRAFT_KEY, JSON.stringify(d));
+      window.localStorage.setItem(key, JSON.stringify(d));
     }
   } catch {
     // Private mode / quota — drafts are a convenience, never a blocker.
@@ -2675,10 +2687,18 @@ function writeDraft(d: DealDraft | null) {
 function NewDealForm({
   errorMessage,
   prefill,
+  viewerId,
 }: {
   errorMessage: string | null;
   prefill?: StructuredAddress | null;
+  /** the signed-in reader, whose own the unsent draft is */
+  viewerId?: string | null;
 }) {
+  const draftKey = draftKeyFor(viewerId);
+  const router = useRouter();
+  // The connection dropped before the server answered the upload: the deal
+  // may or may not exist, so the form says to look before uploading again.
+  const [dropped, setDropped] = useState(false);
   // Two ways in: upload the OM, or type the facts (no document needed —
   // small-multifamily listings rarely come with one). An upload error code
   // in the URL means the last submit was an upload — open on that mode.
@@ -2700,12 +2720,12 @@ function NewDealForm({
   // rAF defers the setState burst out of the effect body per hooks rules).
   useEffect(() => {
     const raf = requestAnimationFrame(() => {
-      const d = readDraft();
+      const d = readDraft(draftKey);
       if (!d) return;
       if (d.submittedAt && !errorMessage) {
         // Last submit came back without an error — the deal was created and
         // this draft is spent.
-        writeDraft(null);
+        writeDraft(draftKey, null);
         return;
       }
       if (d.name) {
@@ -2721,7 +2741,7 @@ function NewDealForm({
         setAddrKey((k) => k + 1);
       }
       if (d.name || d.address) setRestored(true);
-      if (d.submittedAt) writeDraft({ ...d, submittedAt: null });
+      if (d.submittedAt) writeDraft(draftKey, { ...d, submittedAt: null });
     });
     return () => cancelAnimationFrame(raf);
     // errorMessage is fixed for the lifetime of this render of the page.
@@ -2730,7 +2750,7 @@ function NewDealForm({
 
   function persist(next: Partial<DealDraft>) {
     const draftName = next.name ?? name;
-    writeDraft({
+    writeDraft(draftKey, {
       name,
       assetClass,
       address: addressRef.current,
@@ -2741,7 +2761,7 @@ function NewDealForm({
   }
 
   function clearDraft() {
-    writeDraft(null);
+    writeDraft(draftKey, null);
     filledName.current = null;
     setName("");
     setAssetClass("auto");
@@ -2819,10 +2839,52 @@ function NewDealForm({
           </button>
         </p>
       )}
+      {dropped && (
+        <p className="mt-3 rounded-lg bg-caution/10 px-3 py-2 text-sm text-caution" role="alert">
+          The upload didn&apos;t finish — the connection dropped before the
+          server answered, so the deal may or may not have been created. Check
+          your pipeline for it before uploading again; everything you typed is
+          still here.
+        </p>
+      )}
       <form
-        action={createDeal}
+        // The create's own outcome, read here rather than through a redirect:
+        // a dropped connection mid-upload had reached the app's error page
+        // ("a rendering hiccup"), wiped the draft as a success, and left a
+        // second upload free to make a twin deal (pass 14, 2026-10-01). The
+        // batch panel reads the same action the same way.
+        action={async (fd: FormData) => {
+          setDropped(false);
+          const keep = () =>
+            writeDraft(draftKey, {
+              name,
+              assetClass,
+              address: addressRef.current,
+              submittedAt: null,
+              nameFromFile: nameIsFromFile(name, filledName.current),
+            });
+          let res: Awaited<ReturnType<typeof createDealFromBatch>>;
+          try {
+            res = await createDealFromBatch(fd);
+          } catch {
+            keep();
+            setDropped(true);
+            router.refresh();
+            return;
+          }
+          if (res.ok) {
+            writeDraft(draftKey, null);
+            router.push(`/deals/${res.dealId}`);
+            return;
+          }
+          keep();
+          // Signed out mid-upload: round-trip through sign-in back to the
+          // error, as the server action's own redirect did.
+          if (res.error === "auth") router.push(`/login?next=${encodeURIComponent("/deals?error=auth")}`);
+          else router.push(`/deals?error=${res.error}`);
+        }}
         onSubmit={() =>
-          writeDraft({
+          writeDraft(draftKey, {
             name,
             assetClass,
             address: addressRef.current,

@@ -461,6 +461,7 @@ export default async function DealsPage({
             : null
         }
         initialView={initialView}
+        viewerId={user?.id ?? null}
       />
       {/* The strip's own read streams after the pipeline rather than
           holding it back; nothing is drawn until it has stories. */}
