@@ -41,16 +41,18 @@ export function SelfStoragePanel({ storage, modelLine = "" }: { storage: SelfSto
   const tiles: { key: string; label: string; value: string; sub: string }[] = [];
   if (r.climatePct != null) tiles.push({ key: "climate", label: "Climate-controlled", value: pct1(r.climatePct), sub: r.climateStated });
   if (r.tenantInsurance) tiles.push({ key: "insurance", label: "Tenant insurance", value: r.tenantInsurance, sub: "The operator's program" });
+  // A tile's headline is its figure, or the memorandum's own words where
+  // there is no figure to read — "as stated" is at most the caption.
   if (r.management) {
     tiles.push({
       key: "management",
       label: "Management",
-      value: r.management.thirdParty ? `Third party${r.management.feePct != null ? `, ${pct1(r.management.feePct)}` : ""}` : "As stated",
-      sub: r.management.stated,
+      value: r.management.thirdParty ? `Third party${r.management.feePct != null ? `, ${pct1(r.management.feePct)}` : ""}` : r.management.stated,
+      sub: r.management.thirdParty ? r.management.stated : "As stated",
     });
   }
-  if (r.expansion) tiles.push({ key: "expansion", label: "Expansion", value: "As stated", sub: r.expansion });
-  if (r.perCapita) tiles.push({ key: "per-capita", label: "Supply per person", value: "As stated", sub: r.perCapita });
+  if (r.expansion) tiles.push({ key: "expansion", label: "Expansion", value: r.expansion, sub: "As stated" });
+  if (r.perCapita) tiles.push({ key: "per-capita", label: "Supply per person", value: r.perCapita, sub: "As stated" });
 
   return (
     <section

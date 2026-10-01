@@ -7192,6 +7192,83 @@ describe("SelfStoragePanel (#471) — the occupancies against the 85% line, the 
   });
 });
 
+// ── A tile's headline: its figure, or the memorandum's own words ───────────
+describe('a deal-type tile is headlined by its figure or the memorandum\'s words, never "As stated"', () => {
+  // The research pass of 2026-09-30: the storage panel's expansion and
+  // supply tiles were headlined "As stated", their words in the small
+  // caption under it — and so were a self-managed facility's management, a
+  // walk to campus the reader cannot place, park rent rules it cannot read
+  // as either, and a Phase I finding or zoning it cannot name (the Phase
+  // I's words were only in its hover title). "As stated" is the caption at
+  // most.
+  const row = (label: string, value: string, page = "p. 5") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const ex = (assetClass: string, metrics: ReturnType<typeof row>[]) =>
+    ({ dealName: "Deal", assetClass, totalPages: 80, metrics: [row("Asking price", "$9,800,000", "p. 2"), ...metrics] }) as unknown as ExtractionResult;
+  /** A tile's headline and its caption, by the tile's own data attribute. */
+  const tileOf = (html: string, attr: string) => {
+    const at = html.indexOf(attr);
+    expect(at, attr).toBeGreaterThan(-1);
+    const spans = [...html.slice(at, html.indexOf("</li>", at)).matchAll(/<span class="block [^"]*">([^<]*)<\/span>/g)].map((m) => m[1]);
+    return { value: spans[1], sub: spans[2] ?? "" };
+  };
+  const noStatedHeadline = (html: string) => expect(html).not.toMatch(/font-semibold leading-tight">As stated</);
+
+  it("storage: the expansion, the supply and a self-managed facility's management", () => {
+    const html = render(
+      React.createElement(SelfStoragePanel, {
+        storage: readSelfStorage(
+          ex("self_storage", [
+            row("Physical occupancy", "91%"),
+            row("Management", "Owner-operated"),
+            row("Expansion", "1.8 acres entitled for 25,000 SF"),
+            row("Storage SF per capita", "7.2 SF within 3 miles"),
+          ]),
+        ),
+      }),
+    );
+    expect(tileOf(html, 'data-storage="management"')).toEqual({ value: "Owner-operated", sub: "As stated" });
+    expect(tileOf(html, 'data-storage="expansion"')).toEqual({ value: "1.8 acres entitled for 25,000 SF", sub: "As stated" });
+    expect(tileOf(html, 'data-storage="per-capita"')).toEqual({ value: "7.2 SF within 3 miles", sub: "As stated" });
+    noStatedHeadline(html);
+    // A third party's fee is still the figure, its words the caption.
+    const managed = render(
+      React.createElement(SelfStoragePanel, {
+        storage: readSelfStorage(ex("self_storage", [row("Physical occupancy", "91%"), row("Management", "Third-party managed by Extra Space at 6% of revenue")])),
+      }),
+    );
+    expect(tileOf(managed, 'data-storage="management"')).toEqual({ value: "Third party, 6%", sub: "Third-party managed by Extra Space at 6% of revenue" });
+  });
+
+  it("student housing: a walk the reader cannot place", () => {
+    const html = render(React.createElement(StudentHousingPanel, { student: readStudentHousing(ex("student_housing", [row("Beds", "300"), row("Distance to campus", "Close to campus")])) }));
+    expect(tileOf(html, 'data-student="walk"')).toEqual({ value: "Close to campus", sub: "As stated" });
+    noStatedHeadline(html);
+  });
+
+  it("a park: rent rules the reader cannot read as either", () => {
+    const html = render(
+      React.createElement(ManufacturedHousingPanel, {
+        park: readManufacturedHousing(ex("manufactured_housing", [row("Pads", "150"), row("Lot rent", "$430"), row("Rent control", "Increases require 90 days' notice")])),
+      }),
+    );
+    expect(tileOf(html, 'data-mh="rent-control"')).toEqual({ value: "Increases require 90 days&#x27; notice", sub: "As stated" });
+    noStatedHeadline(html);
+  });
+
+  it("site reports: a Phase I finding and a zoning statement the reader cannot name", () => {
+    const html = render(
+      React.createElement(SiteReportsPanel, {
+        reports: readSiteReports(
+          ex("multifamily", [row("Phase I ESA date", "November 2024"), row("Phase I ESA findings", "Closed with an NFA letter"), row("Zoning conformance", "See zoning report")]),
+        ),
+      }),
+    );
+    expect(tileOf(html, 'data-report="phase-i"')).toEqual({ value: "Closed with an NFA letter", sub: "Dated Nov 2024" });
+    expect(tileOf(html, 'data-report="zoning"')).toEqual({ value: "See zoning report", sub: "As stated" });
+    noStatedHeadline(html);
+  });
+});
+
 describe("ShareView — a self-storage facility (#471)", () => {
   it("draws the facility, and nothing on the sample", () => {
     const withStorage = {

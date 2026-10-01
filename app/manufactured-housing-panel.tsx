@@ -87,8 +87,9 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
     tiles.push({
       key: "rent-control",
       label: "Rent rules",
-      value: r.rentControl.regulated === true ? "Regulated" : r.rentControl.regulated === false ? "Not regulated" : "As stated",
-      sub: r.rentControl.regulated === false ? "The memorandum's claim" : r.rentControl.stated,
+      // Rules the reader cannot read as either are headlined in their own words.
+      value: r.rentControl.regulated === true ? "Regulated" : r.rentControl.regulated === false ? "Not regulated" : r.rentControl.stated,
+      sub: r.rentControl.regulated === false ? "The memorandum's claim" : r.rentControl.regulated === true ? r.rentControl.stated : "As stated",
       tone: r.rentControl.regulated === true ? "caution" : "neutral",
     });
   }
