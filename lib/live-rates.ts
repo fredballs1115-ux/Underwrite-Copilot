@@ -70,6 +70,7 @@
  */
 
 import { withArticle } from "@/lib/article";
+import { monthOf } from "@/lib/zori";
 import table from "@/data/fred-series.json";
 
 /** How often a series publishes; `annual` is the Housing Vacancy Survey's
@@ -1047,16 +1048,33 @@ export function treasuryForTerm(curve: readonly CurveSeed[], months: number | nu
   return best;
 }
 
-/** "Sep 14" — the strip has no room for a year and the figures are all recent. */
-export function shortDate(obsDate: string): string {
+/**
+ * A figure's date by its cadence, the year always in it: a daily or weekly
+ * figure its day ("Sep 17, 2026"), a monthly one its month ("Aug 2026"), a
+ * quarterly one its quarter ("Q2 2026"), an annual one its year ("2025").
+ *
+ * The one formatter every live figure is dated through. FRED dates a monthly
+ * figure the first of its month and a quarterly one the first of its quarter,
+ * so a day says a Q2 figure is an April morning's ("CRE delinquency as of Apr
+ * 1"), and a day with no year says a series that stopped in 2024 is this
+ * year's ("Tampa Bay FL 7.7% (Oct 1)" for the fourth quarter of 2024) — the
+ * strip and the boards printed both until 2026-10-01.
+ */
+export function periodLabel(obsDate: string, cadence: Cadence): string {
   const at = Date.parse(`${obsDate}T00:00:00Z`);
   if (!Number.isFinite(at)) return obsDate;
-  return new Date(at).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
+  const d = new Date(at);
+  if (cadence === "quarterly") return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
+  if (cadence === "annual") return String(d.getUTCFullYear());
+  if (cadence === "monthly") return monthOf(obsDate);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
+
+/** The period a live figure is for: its own date, said by its own cadence. */
+export function periodOf(r: { obsDate: string; meta: Pick<SeriesMeta, "cadence"> }): string {
+  return periodLabel(r.obsDate, r.meta.cadence);
+}
+
 
 /** The series' own page on FRED — the level's page for a transformed series. */
 export function fredUrl(id: string): string {

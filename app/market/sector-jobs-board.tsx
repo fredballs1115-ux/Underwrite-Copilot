@@ -5,7 +5,7 @@ import {
   SECTOR_JOBS_METRICS,
   formatValue,
   metroSeriesFor,
-  shortDate,
+  periodOf,
   type LiveRate,
   type MetroMetric,
   type SectorJobsMetric,
@@ -181,9 +181,9 @@ export function SectorJobsBoard({
                             <td key={metric} className="px-1 py-1">
                               <div
                                 className="rounded-md border border-dashed border-amber-500/60 px-1.5 py-1 text-center font-mono text-[11px] tabular-nums text-muted"
-                                title={`${r.meta.label} — not updating: the newest figure is for ${shortDate(r.obsDate)}`}
+                                title={`${r.meta.label} — not updating: the newest figure is for ${periodOf(r)}`}
                               >
-                                {`${formatValue(r)} · ${shortDate(r.obsDate)}`}
+                                {`${formatValue(r)} · ${periodOf(r)}`}
                               </div>
                             </td>
                           );

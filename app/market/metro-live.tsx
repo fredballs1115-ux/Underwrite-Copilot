@@ -4,9 +4,9 @@ import {
   formatMove,
   formatValue,
   isSectorJobsMetric,
+  periodOf,
   permitsTrailingYear,
   seriesUrl,
-  shortDate,
   type LiveRate,
   type MetroSeriesMeta,
   type SectorJobsMetric,
@@ -139,7 +139,7 @@ export function MetroLive({
                 <RateTile
                   key={r.meta.id}
                   r={r}
-                  value={`${formatValue(r)} in ${shortDate(r.obsDate)}`}
+                  value={`${formatValue(r)} in ${periodOf(r)}`}
                   short={`Permits, one month${owner}`}
                 />
               );
@@ -271,7 +271,7 @@ function SectorJobsPicture({
       </div>
       <p className="mt-1 text-[11px] text-muted">
         {`${monthOf(newest)} · BLS payrolls via FRED · each figure links to its series`}
-        {stale.length > 0 && ` · ${stale.length === 1 ? "one sector's figure is stale" : `${stale.length} sectors' figures are stale`}: ${stale.map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${shortDate(r.obsDate)}`).join(", ")}`}
+        {stale.length > 0 && ` · ${stale.length === 1 ? "one sector's figure is stale" : `${stale.length} sectors' figures are stale`}: ${stale.map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${periodOf(r)}`).join(", ")}`}
       </p>
     </div>
   );

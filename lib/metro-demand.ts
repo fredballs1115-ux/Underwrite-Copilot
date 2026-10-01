@@ -4,8 +4,8 @@ import {
   SECTOR_JOBS_LABEL,
   formatValue,
   isSectorJobsMetric,
+  periodOf,
   seriesUrl,
-  shortDate,
   type LiveRate,
   type MetroSeriesMeta,
   type SectorJobsMetric,
@@ -125,7 +125,7 @@ export function metroDemand(rates: readonly LiveRate[], assetClass: string | nul
   const newest = sectors.map((r) => r.obsDate).sort().at(-1) ?? sectors[0].obsDate;
   const stale = sectors
     .filter((r) => !r.fresh)
-    .map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${shortDate(r.obsDate)}`);
+    .map((r) => `${SECTOR_JOBS_LABEL[(r.meta as MetroSeriesMeta).metric as SectorJobsMetric]} as of ${periodOf(r)}`);
   const mine = rows.find((x) => x.mine)?.label ?? null;
   const grain: MetroDemand["grain"] = (sectors[0].meta as MetroSeriesMeta).metro.startsWith("state:") ? "state" : "metro";
   return {

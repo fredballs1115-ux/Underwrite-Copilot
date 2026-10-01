@@ -1,5 +1,6 @@
 import {
   isSectorJobsMetric,
+  periodLabel,
   permitsTrailingYear,
   type LiveRate,
   type MetroMetric,
@@ -338,16 +339,10 @@ function publisher(source: SeriesSource | undefined): string {
   }
 }
 
-/** "Jul 2026" for a monthly figure, "Q2 2026" for a quarterly one, the day for anything faster. */
-export function periodLabel(obsDate: string, cadence: LiveRate["meta"]["cadence"]): string {
-  const at = Date.parse(`${obsDate}T00:00:00Z`);
-  if (!Number.isFinite(at)) return obsDate;
-  const d = new Date(at);
-  if (cadence === "quarterly") return `Q${Math.floor(d.getUTCMonth() / 3) + 1} ${d.getUTCFullYear()}`;
-  if (cadence === "annual") return String(d.getUTCFullYear());
-  if (cadence === "monthly") return monthOf(obsDate);
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
-}
+/** "Jul 2026" for a monthly figure, "Q2 2026" for a quarterly one, the day
+ *  with its year for anything faster — lib/live-rates' one formatter, which
+ *  every live figure on the site is dated through. */
+export { periodLabel } from "@/lib/live-rates";
 
 interface Said {
   line: string;

@@ -325,7 +325,7 @@ describe("DealView — the sample deal renders every section without a runtime e
         mine: "Professional & business services",
         intro: "Professional & business services is the sector that fills this building's kind, drawn full; the metro area's other sectors are beside it, faded, and all payrolls first.",
         supply: null,
-        stale: ["Leisure & hospitality as of Aug 1"],
+        stale: ["Leisure & hospitality as of Aug 2025"],
         rows: [
           { key: "PHIL942NA_YOY", label: "All payrolls", valuePct: 0.30686, text: "0.3%", href: "https://fred.stlouisfed.org/series/PHIL942NA", obsDate: "2026-08-01", fresh: true, all: true, mine: false },
           { key: "PHIL942PBSV_YOY", label: "Professional & business services", valuePct: 1.7451, text: "1.7%", href: "https://fred.stlouisfed.org/series/PHIL942PBSV", obsDate: "2026-08-01", fresh: true, all: false, mine: true },
@@ -342,7 +342,7 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toMatch(/Professional & business services is the sector that fills this building's kind, drawn full/);
     expect(text).toMatch(/Professional & business services · this building's sector/);
     expect(text).toMatch(/Aug 2026 · BLS payrolls via FRED, against the same month a year earlier/);
-    expect(text).toMatch(/one sector's figure is stale: Leisure & hospitality as of Aug 1/);
+    expect(text).toMatch(/one sector's figure is stale: Leisure & hospitality as of Aug 2025/);
     // Four bars, the deal's own full and the others faded; a negative change draws leftward.
     expect((html.match(/data-bar="demand"/g) ?? []).length).toBe(4);
     expect(html).toContain('data-bar="demand" class="absolute inset-y-0 left-1/2 bg-brand"');

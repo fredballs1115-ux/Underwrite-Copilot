@@ -33,7 +33,7 @@ import { readBelief } from "@/lib/tools/what-you-believe";
 import { readReassessment } from "@/lib/tools/tax-reassessment";
 import {
   NO_SEEDS,
-  shortDate,
+  periodLabel,
   treasuryForTerm,
   type CurveSeed,
   type RateSeeds,
@@ -3601,7 +3601,7 @@ function FloatingRate({
         The premium is what a broker quoted you, never a number this works out:
         pricing a cap needs a volatility surface, which is not screening
         arithmetic. It is a use funded at closing, not a haircut on the loan.
-        {sofrAsOf ? ` The index starts at SOFR as of ${shortDate(sofrAsOf)}.` : ""}
+        {sofrAsOf ? ` The index starts at SOFR as of ${periodLabel(sofrAsOf, "daily")}.` : ""}
       </p>
     </Card>
   );
@@ -3752,7 +3752,7 @@ function Prepayment({ curve = [] }: { curve?: readonly CurveSeed[] }) {
         lower, and a lower rate makes the penalty bigger, so reaching for
         the 10-year understates what getting out costs.
         {seed
-          ? ` The field starts at the ${seed.short} as of ${shortDate(seed.asOf)}: the Treasury tenor nearest the remaining term is what the clause names, so change the months and check the tenor still matches.`
+          ? ` The field starts at the ${seed.short} as of ${periodLabel(seed.asOf, "daily")}: the Treasury tenor nearest the remaining term is what the clause names, so change the months and check the tenor still matches.`
           : ""}
       </p>
     </Card>

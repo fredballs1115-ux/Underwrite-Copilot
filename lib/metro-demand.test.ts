@@ -35,7 +35,7 @@ describe("metroDemand — the metro area's payrolls by sector as a picture's row
     expect(d.rows[1].href).toBe("https://fred.stlouisfed.org/series/WASH911PBSV");
     expect(d.rows[3].href).toBe("https://fred.stlouisfed.org/series/SMU11479004200000001SA");
     expect(d.rows[3].valuePct).toBe(-0.4);
-    expect(d.stale).toEqual(["Leisure & hospitality as of Aug 1"]);
+    expect(d.stale).toEqual(["Leisure & hospitality as of Aug 2025"]);
   });
 
   it("rental housing marks no sector and says so; a suburb reads its metro area's rows; nothing without a sector row", () => {

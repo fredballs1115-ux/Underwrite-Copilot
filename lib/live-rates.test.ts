@@ -19,7 +19,8 @@ import {
   readSeriesTable,
   seedRate,
   seriesMeta,
-  shortDate,
+  periodLabel,
+  periodOf,
   treasuryForTerm,
   yieldCurve,
   type RateRow,
@@ -382,19 +383,29 @@ describe("how a figure is said", () => {
     expect(formatMove({ move: null, moveUnit: "bps" })).toBeNull();
   });
 
-  it("writes a short date with no year", () => {
-    expect(shortDate("2026-09-17")).toBe("Sep 17");
-    expect(shortDate("2026-04-01")).toBe("Apr 1");
+  it("dates a figure by its cadence, the year always in it", () => {
+    // A day with no year read a quarter's figure as an April morning ("CRE
+    // delinquency as of Apr 1" for Q2) and a series that stopped in 2024 as
+    // this year's (the research pass of 2026-10-01).
+    expect(periodLabel("2026-09-17", "daily")).toBe("Sep 17, 2026");
+    expect(periodLabel("2026-09-17", "weekly")).toBe("Sep 17, 2026");
+    expect(periodLabel("2026-08-01", "monthly")).toBe("Aug 2026");
+    expect(periodLabel("2026-04-01", "quarterly")).toBe("Q2 2026");
+    expect(periodLabel("2024-10-01", "quarterly")).toBe("Q4 2024");
+    expect(periodLabel("2025-01-01", "annual")).toBe("2025");
+    // Each series by its own cadence: a quarter's figure is its quarter.
+    expect(periodOf({ obsDate: "2026-04-01", meta: { cadence: "quarterly" } })).toBe("Q2 2026");
   });
 
   it("reads the date in UTC, so it never slips a day", () => {
     // Formatting in the server's local zone would render "Dec 31" for a
     // Jan 1 observation anywhere west of Greenwich.
-    expect(shortDate("2026-01-01")).toBe("Jan 1");
+    expect(periodLabel("2026-01-01", "daily")).toBe("Jan 1, 2026");
+    expect(periodLabel("2026-01-01", "monthly")).toBe("Jan 2026");
   });
 
   it("hands back an unparseable date rather than inventing one", () => {
-    expect(shortDate("whenever")).toBe("whenever");
+    expect(periodLabel("whenever", "daily")).toBe("whenever");
   });
 
   it("links each series to its own FRED page — the level's page for a transform", () => {

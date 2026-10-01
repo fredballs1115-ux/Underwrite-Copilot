@@ -3926,30 +3926,33 @@ describe("the rates strip", () => {
     expect(text).toContain("3.4%"); // CPI y/y: a change, to one place
     expect(text).toContain("−5.7%"); // banks EASING on multifamily, signed
     expect(text).toContain("344k"); // starts, 5+ units: a count
-    expect(text).toContain("10-yr Treasury as of Sep 17");
-    expect(text).toContain("CRE delinquency as of Apr 1");
-    expect(text).toContain("CPI y/y as of Aug 1");
+    // Each by its own cadence, the year always in it (the research pass of
+    // 2026-10-01 read "CRE delinquency as of Apr 1" for a Q2 figure).
+    expect(text).toContain("10-yr Treasury as of Sep 17, 2026");
+    expect(text).toContain("CRE delinquency as of Q2 2026");
+    expect(text).toContain("CPI y/y as of Aug 2026");
+    expect(text).not.toMatch(/as of [A-Z][a-z]{2} \d{1,2}(?!, \d{4})\b/);
   });
 
   it("dates the SOFR the floating-rate card starts from the way the strip dates it", () => {
     // It printed the table's own "as of 2026-09-18" (the research pass of
-    // 2026-10-01), beside a strip that says "Sep 18".
+    // 2026-10-01), beside a strip that says "Sep 18, 2026".
     const page = visibleText(
       render(React.createElement(DealMathTools, { seeds: rateSeeds(rates) })),
     );
-    expect(page).toContain("The index starts at SOFR as of Sep 18.");
+    expect(page).toContain("The index starts at SOFR as of Sep 18, 2026.");
     expect(page).not.toContain("2026-09-18");
   });
 
   it("draws the curve as a picture, today against the tenors, with its slope named", () => {
     expect((html.match(/data-curve/g) ?? []).length).toBe(1);
     expect(html).toContain('role="img"');
-    expect(html).toContain("The Treasury curve as of Sep 17: 1-mo 3.97%, 3-mo 4.12%");
+    expect(html).toContain("The Treasury curve as of Sep 17, 2026: 1-mo 3.97%, 3-mo 4.12%");
     expect(text).toContain("10-yr less 2-yr +27 bps");
     expect(text).toContain("a normal curve, long money dearer than short");
     // With one observation per tenor there is no week-ago line, and the
     // caption does not claim one.
-    expect(text).toContain("Solid is today, as of Sep 17");
+    expect(text).toContain("Solid is today's curve as last posted, Sep 17, 2026.");
     expect(text).not.toContain("dashed a week earlier");
     // Every tenor's figure is written on the picture.
     for (const v of ["3.97", "4.67", "4.94", "5.32", "5.29"]) expect(html).toContain(`>${v}</text>`);
@@ -3964,7 +3967,7 @@ describe("the rates strip", () => {
       }
     }
     const out = render(React.createElement(RatesStrip, { rates: readRates(rows, FIXTURE_NOW) }));
-    expect(visibleText(out)).toContain("Solid is today, dashed a week earlier");
+    expect(visibleText(out)).toContain("Solid is today's curve as last posted, Sep 17, 2026; dashed a week earlier.");
     expect(out).toContain('stroke-dasharray="3 3"');
     // And each tile now carries its recent path — the 2-year and the
     // 10-year have tiles under the picture; the other tenors are the
@@ -4108,7 +4111,7 @@ describe("a metro's own figures, live", () => {
     expect(dcText).toContain("Live from FRED");
     expect(dcText).toContain("Washington MSA");
     expect(dcText).toContain("4.0%");
-    expect(dcText).toContain("Unemployment as of Jul 1");
+    expect(dcText).toContain("Unemployment as of Jul 2026");
     expect(dcText).toContain("1.2%");
     expect(dc).toContain("https://fred.stlouisfed.org/series/WASH911URN\"");
     // The jobs figure links to the LEVEL's page, since the y/y is FRED's transform.
@@ -4136,7 +4139,7 @@ describe("a metro's own figures, live", () => {
     // Washington's comes from the BLS's own API, and the panel says so
     // three ways: the heading, the tile's link, and the note.
     expect(dcText).toContain("Live from FRED, the BLS and the Census Bureau");
-    expect(dcText).toContain("Rent CPI y/y as of Aug 1 · BLS");
+    expect(dcText).toContain("Rent CPI y/y as of Aug 2026 · BLS");
     expect(dc).toContain("https://data.bls.gov/timeseries/CUURS35ASEHA\"");
     expect(dcText).toContain("comes from the BLS directly");
     // And what the figure IS, against the asking rent above it.
@@ -4146,7 +4149,7 @@ describe("a metro's own figures, live", () => {
   it("carries the region's rental vacancy, named as the region's, with the survey's grain said", () => {
     expect(dcText).toContain("Rental vacancy · South Census region");
     expect(dcText).toContain("9.5%");
-    expect(dcText).toContain("as of Apr 1");
+    expect(dcText).toContain("Rental vacancy · South Census region as of Q2 2026");
     expect(dc).toContain("https://fred.stlouisfed.org/series/RRVRSOQ156N\"");
     expect(dcText).toContain("named as the region's");
     // The heading lists the region beside the MSA.
@@ -4159,7 +4162,7 @@ describe("a metro's own figures, live", () => {
     // splits there; the phrase after it is one string.
     expect(dcText).toContain("0.3");
     expect(dcText).toContain("pt on the quarter before · ±2.2 pts margin of error");
-    expect(dcText).toContain("Rental vacancy as of Apr 1 · Census");
+    expect(dcText).toContain("Rental vacancy as of Q2 2026 · Census");
     expect(dc).toContain("https://www.census.gov/housing/hvs/data/rates.html\"");
     expect(dcText).toContain("survey's margin of error beside it");
     // The region's tile still stands beside it, as the steadier figure.
@@ -5261,7 +5264,7 @@ describe("SampleDemandCard — the sample market's payrolls by sector, read toda
     mine: null,
     intro: "Rental housing runs on all payrolls, drawn first; the sectors beneath say where the metro area's jobs are growing.",
     supply: null,
-    stale: ["Leisure & hospitality as of Aug 1"],
+    stale: ["Leisure & hospitality as of Aug 2025"],
     rows: [
       { key: "PHIL942NA_YOY", label: "All payrolls", valuePct: 0.30686, text: "0.3%", href: "https://fred.stlouisfed.org/series/PHIL942NA", obsDate: "2026-08-01", fresh: true, all: true, mine: false },
       { key: "PHIL942PBSV_YOY", label: "Professional & business services", valuePct: 1.7451, text: "1.7%", href: "https://fred.stlouisfed.org/series/PHIL942PBSV", obsDate: "2026-08-01", fresh: true, all: false, mine: false },
@@ -5278,7 +5281,7 @@ describe("SampleDemandCard — the sample market's payrolls by sector, read toda
     expect(text).toContain("Rental housing runs on all payrolls, drawn first");
     expect(text).not.toContain("this building's sector");
     expect(text).toContain("Aug 2026 · BLS payrolls via FRED, against the same month a year earlier");
-    expect(text).toContain("one sector's figure is stale: Leisure & hospitality as of Aug 1");
+    expect(text).toContain("one sector's figure is stale: Leisure & hospitality as of Aug 2025");
     expect(text).toContain("Every screened deal in a covered market gets this picture");
     // Four bars: all payrolls in the neutral tone, every sector full (nothing is faded
     // when nothing is marked), and the retail fall drawn leftward from the centre line.
@@ -5511,7 +5514,7 @@ describe("MetroLive — jobs by sector, one picture beside all payrolls", () => 
     const rows = ROWS.map((r) => ({ ...r, obs_date: r.series_id === "WASH911LEIH_YOY" ? "2026-05-01" : "2026-10-01" }));
     const stale = visibleText(render(React.createElement(MetroLive, { rates: readMetroRates("dc", rows, later), metroId: "dc", metroName: "Washington DC" })));
     expect(stale).toContain("Oct 2026 · BLS payrolls via FRED");
-    expect(stale).toContain("one sector's figure is stale: Leisure & hospitality as of May 1");
+    expect(stale).toContain("one sector's figure is stale: Leisure & hospitality as of May 2026");
   });
 });
 
@@ -5660,8 +5663,8 @@ describe("SectorJobsBoard — payroll growth by market and sector, shaded within
     expect(text).toContain("The last block is the metro areas the site reads without a brief: the same series, ranked in the same columns");
     expect(text).toContain("−1.0%");
     // Richmond's stale office figure is shown with its date, not ranked; a missing series is a dash.
-    expect(text).toContain("0.9% · Aug 1");
-    expect(html).toContain("not updating: the newest figure is for Aug 1");
+    expect(text).toContain("0.9% · Aug 2025");
+    expect(html).toContain("not updating: the newest figure is for Aug 2025");
     expect(html).toContain("No series on FRED for this market and sector");
     expect(text).toContain("newest Aug 2026");
     expect(html).toContain('href="/market?sector=office"');
@@ -5778,7 +5781,7 @@ describe("SurveyVacancyBoard — where rental vacancy is lowest, by the survey, 
     // React writes the apostrophe as an entity inside an attribute.
     expect(html).toContain("the whisker is the survey&#x27;s ±5.1 pt margin of error");
     expect(text).toContain("The thin vertical line is the national rate, 7.3% in Q2 2026.");
-    expect(text).toContain("Not updating, shown rather than ranked: Cleveland OH 8.4% (Apr 1");
+    expect(text).toContain("Not updating, shown rather than ranked: Cleveland OH 8.4% (Q2 2025)");
     expect(text).toContain("two metro areas whose whiskers overlap are not ordered by it, whatever the ranking says.");
     expect(a11yIssues(html), "survey vacancy board").toEqual([]);
     expect(gluedWords(text)).toEqual([]);

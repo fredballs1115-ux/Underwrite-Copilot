@@ -1,6 +1,5 @@
 import Link from "next/link";
-import { metroSeriesFor, shortDate, type LiveRate } from "@/lib/live-rates";
-import { periodLabel } from "@/lib/live-market-brief";
+import { metroSeriesFor, periodLabel, periodOf, type LiveRate } from "@/lib/live-rates";
 import type { BoardMarket } from "./sector-jobs-board";
 
 /**
@@ -97,7 +96,7 @@ export function SurveyVacancyBoard({
       {stale.length > 0 && (
         <p className="mt-2 text-[11px] text-muted">
           {"Not updating, shown rather than ranked: "}
-          {stale.map((x, i) => `${i > 0 ? "; " : ""}${x.market.name} ${x.r.value.toFixed(1)}% (${shortDate(x.r.obsDate)})`).join("")}
+          {stale.map((x, i) => `${i > 0 ? "; " : ""}${x.market.name} ${x.r.value.toFixed(1)}% (${periodOf(x.r)})`).join("")}
         </p>
       )}
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
