@@ -3845,6 +3845,494 @@
         "Youngstown Mahoning River"
       ],
       "candidates": []
+    },
+    {
+      "metroId": "cbsa:44140",
+      "city": "Springfield, Massachusetts",
+      "area": "Springfield, MA",
+      "wikipedia": [
+        "Springfield, Massachusetts",
+        "Metro Center, Springfield, Massachusetts"
+      ],
+      "categories": [
+        "Skylines of Springfield, Massachusetts",
+        "Views of Springfield, Massachusetts",
+        "Connecticut River in Springfield, Massachusetts"
+      ],
+      "queries": [
+        "Springfield Massachusetts skyline",
+        "Springfield Massachusetts Connecticut River",
+        "Springfield Massachusetts downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:28880",
+      "city": "Poughkeepsie, New York",
+      "area": "Kiryas Joel-Poughkeepsie-Newburgh, NY",
+      "wikipedia": [
+        "Poughkeepsie, New York",
+        "Walkway over the Hudson",
+        "Newburgh, New York"
+      ],
+      "categories": [
+        "Walkway over the Hudson",
+        "Views of Poughkeepsie, New York",
+        "Newburgh, New York"
+      ],
+      "queries": [
+        "Walkway over the Hudson",
+        "Poughkeepsie Hudson River",
+        "Newburgh New York waterfront"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:31700",
+      "city": "Manchester, New Hampshire",
+      "area": "Manchester-Nashua, NH",
+      "wikipedia": [
+        "Manchester, New Hampshire",
+        "Amoskeag Millyard Historic District",
+        "Nashua, New Hampshire"
+      ],
+      "categories": [
+        "Amoskeag Millyard",
+        "Skylines of Manchester, New Hampshire",
+        "Views of Manchester, New Hampshire"
+      ],
+      "queries": [
+        "Manchester New Hampshire millyard",
+        "Manchester New Hampshire skyline",
+        "Merrimack River Manchester"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:45940",
+      "city": "Trenton, New Jersey",
+      "area": "Trenton-Princeton, NJ",
+      "wikipedia": [
+        "Trenton, New Jersey",
+        "Princeton, New Jersey",
+        "Nassau Hall"
+      ],
+      "categories": [
+        "Skylines of Trenton, New Jersey",
+        "New Jersey State House",
+        "Nassau Hall"
+      ],
+      "queries": [
+        "Trenton New Jersey skyline",
+        "Trenton Makes bridge",
+        "Princeton University Nassau Hall"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:39740",
+      "city": "Reading, Pennsylvania",
+      "area": "Reading, PA",
+      "wikipedia": [
+        "Reading, Pennsylvania",
+        "Reading Pagoda"
+      ],
+      "categories": [
+        "Reading Pagoda",
+        "Views of Reading, Pennsylvania",
+        "Skylines of Reading, Pennsylvania"
+      ],
+      "queries": [
+        "Reading Pennsylvania pagoda",
+        "Reading Pennsylvania skyline",
+        "Reading Pennsylvania downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:12100",
+      "city": "Atlantic City, New Jersey",
+      "area": "Atlantic City-Hammonton, NJ",
+      "wikipedia": [
+        "Atlantic City, New Jersey",
+        "Atlantic City Boardwalk"
+      ],
+      "categories": [
+        "Skylines of Atlantic City, New Jersey",
+        "Atlantic City Boardwalk",
+        "Views of Atlantic City, New Jersey"
+      ],
+      "queries": [
+        "Atlantic City skyline",
+        "Atlantic City boardwalk beach",
+        "Atlantic City New Jersey aerial"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:24580",
+      "city": "Green Bay, Wisconsin",
+      "area": "Green Bay, WI",
+      "wikipedia": [
+        "Green Bay, Wisconsin",
+        "Lambeau Field"
+      ],
+      "categories": [
+        "Skylines of Green Bay, Wisconsin",
+        "Lambeau Field",
+        "Fox River in Green Bay, Wisconsin"
+      ],
+      "queries": [
+        "Green Bay Wisconsin skyline",
+        "Green Bay Fox River downtown",
+        "Lambeau Field exterior"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:40420",
+      "city": "Rockford, Illinois",
+      "area": "Rockford, IL",
+      "wikipedia": [
+        "Rockford, Illinois",
+        "Anderson Japanese Gardens"
+      ],
+      "categories": [
+        "Skylines of Rockford, Illinois",
+        "Views of Rockford, Illinois",
+        "Rock River in Rockford, Illinois"
+      ],
+      "queries": [
+        "Rockford Illinois skyline",
+        "Rockford Illinois Rock River",
+        "Rockford Illinois downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:43780",
+      "city": "South Bend, Indiana",
+      "area": "South Bend-Mishawaka, IN-MI",
+      "wikipedia": [
+        "South Bend, Indiana",
+        "University of Notre Dame",
+        "Main Building (University of Notre Dame)"
+      ],
+      "categories": [
+        "Skylines of South Bend, Indiana",
+        "Main Building (University of Notre Dame)",
+        "St. Joseph River in South Bend, Indiana"
+      ],
+      "queries": [
+        "South Bend Indiana skyline",
+        "Notre Dame Golden Dome",
+        "South Bend St. Joseph River"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:21780",
+      "city": "Evansville, Indiana",
+      "area": "Evansville, IN",
+      "wikipedia": [
+        "Evansville, Indiana"
+      ],
+      "categories": [
+        "Skylines of Evansville, Indiana",
+        "Views of Evansville, Indiana",
+        "Ohio River in Evansville, Indiana"
+      ],
+      "queries": [
+        "Evansville Indiana skyline",
+        "Evansville riverfront Ohio River",
+        "Evansville Indiana downtown"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:37900",
+      "city": "Peoria, Illinois",
+      "area": "Peoria, IL",
+      "wikipedia": [
+        "Peoria, Illinois",
+        "Murray Baker Bridge"
+      ],
+      "categories": [
+        "Skylines of Peoria, Illinois",
+        "Views of Peoria, Illinois",
+        "Illinois River in Peoria, Illinois"
+      ],
+      "queries": [
+        "Peoria Illinois skyline",
+        "Peoria Illinois riverfront",
+        "Peoria Illinois Illinois River"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:19340",
+      "city": "Davenport, Iowa",
+      "area": "Davenport-Moline-Rock Island, IA-IL",
+      "wikipedia": [
+        "Davenport, Iowa",
+        "Quad Cities",
+        "Moline, Illinois"
+      ],
+      "categories": [
+        "Skylines of Davenport, Iowa",
+        "Views of Davenport, Iowa",
+        "Centennial Bridge (Mississippi River)"
+      ],
+      "queries": [
+        "Davenport Iowa skyline",
+        "Quad Cities Mississippi River",
+        "Davenport Iowa riverfront"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:33860",
+      "city": "Montgomery, Alabama",
+      "area": "Montgomery, AL",
+      "wikipedia": [
+        "Montgomery, Alabama",
+        "Alabama State Capitol"
+      ],
+      "categories": [
+        "Skylines of Montgomery, Alabama",
+        "Alabama State Capitol",
+        "Views of Montgomery, Alabama"
+      ],
+      "queries": [
+        "Montgomery Alabama skyline",
+        "Montgomery Alabama riverfront",
+        "Alabama State Capitol"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:29180",
+      "city": "Lafayette, Louisiana",
+      "area": "Lafayette, LA",
+      "wikipedia": [
+        "Lafayette, Louisiana"
+      ],
+      "categories": [
+        "Skylines of Lafayette, Louisiana",
+        "Views of Lafayette, Louisiana",
+        "Downtown Lafayette, Louisiana"
+      ],
+      "queries": [
+        "Lafayette Louisiana skyline",
+        "Lafayette Louisiana downtown",
+        "Lafayette Louisiana Vermilion River"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:31180",
+      "city": "Lubbock, Texas",
+      "area": "Lubbock, TX",
+      "wikipedia": [
+        "Lubbock, Texas",
+        "Texas Tech University"
+      ],
+      "categories": [
+        "Skylines of Lubbock, Texas",
+        "Views of Lubbock, Texas",
+        "Texas Tech University"
+      ],
+      "queries": [
+        "Lubbock Texas skyline",
+        "Lubbock Texas downtown",
+        "Texas Tech University campus"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:29700",
+      "city": "Laredo, Texas",
+      "area": "Laredo, TX",
+      "wikipedia": [
+        "Laredo, Texas"
+      ],
+      "categories": [
+        "Skylines of Laredo, Texas",
+        "Views of Laredo, Texas",
+        "Rio Grande in Laredo, Texas"
+      ],
+      "queries": [
+        "Laredo Texas skyline",
+        "Laredo Texas downtown",
+        "Laredo Rio Grande"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:18880",
+      "city": "Destin, Florida",
+      "area": "Crestview-Fort Walton Beach-Destin, FL",
+      "wikipedia": [
+        "Destin, Florida",
+        "Fort Walton Beach, Florida",
+        "Okaloosa Island"
+      ],
+      "categories": [
+        "Beaches of Destin, Florida",
+        "Views of Destin, Florida",
+        "Destin Harbor"
+      ],
+      "queries": [
+        "Destin Florida beach",
+        "Destin Florida harbor",
+        "Fort Walton Beach Florida"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:25060",
+      "city": "Biloxi, Mississippi",
+      "area": "Gulfport-Biloxi, MS",
+      "wikipedia": [
+        "Biloxi, Mississippi",
+        "Gulfport, Mississippi",
+        "Biloxi Lighthouse"
+      ],
+      "categories": [
+        "Biloxi Lighthouse",
+        "Views of Biloxi, Mississippi",
+        "Beaches of Mississippi"
+      ],
+      "queries": [
+        "Biloxi Mississippi beach",
+        "Biloxi Lighthouse",
+        "Gulfport Mississippi waterfront"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:13460",
+      "city": "Bend, Oregon",
+      "area": "Bend, OR",
+      "wikipedia": [
+        "Bend, Oregon",
+        "Mount Bachelor"
+      ],
+      "categories": [
+        "Views of Bend, Oregon",
+        "Deschutes River in Bend, Oregon",
+        "Drake Park"
+      ],
+      "queries": [
+        "Bend Oregon Deschutes River",
+        "Bend Oregon Mirror Pond",
+        "Bend Oregon downtown mountains"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:42100",
+      "city": "Santa Cruz, California",
+      "area": "Santa Cruz-Watsonville, CA",
+      "wikipedia": [
+        "Santa Cruz, California",
+        "Santa Cruz Beach Boardwalk",
+        "Santa Cruz Wharf"
+      ],
+      "categories": [
+        "Santa Cruz Beach Boardwalk",
+        "Santa Cruz Wharf",
+        "Views of Santa Cruz, California"
+      ],
+      "queries": [
+        "Santa Cruz California boardwalk",
+        "Santa Cruz wharf beach",
+        "Santa Cruz California coast"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:42020",
+      "city": "San Luis Obispo, California",
+      "area": "San Luis Obispo-Paso Robles, CA",
+      "wikipedia": [
+        "San Luis Obispo, California",
+        "Mission San Luis Obispo de Tolosa",
+        "Bishop Peak"
+      ],
+      "categories": [
+        "Mission San Luis Obispo de Tolosa",
+        "Views of San Luis Obispo, California",
+        "Bishop Peak"
+      ],
+      "queries": [
+        "San Luis Obispo downtown",
+        "San Luis Obispo mission",
+        "San Luis Obispo Bishop Peak"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:42140",
+      "city": "Santa Fe, New Mexico",
+      "area": "Santa Fe, NM",
+      "wikipedia": [
+        "Santa Fe, New Mexico",
+        "Santa Fe Plaza",
+        "Cathedral Basilica of St. Francis of Assisi"
+      ],
+      "categories": [
+        "Santa Fe Plaza",
+        "Cathedral Basilica of St. Francis of Assisi (Santa Fe)",
+        "Views of Santa Fe, New Mexico"
+      ],
+      "queries": [
+        "Santa Fe New Mexico plaza",
+        "Santa Fe New Mexico adobe",
+        "Santa Fe Sangre de Cristo"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:41100",
+      "city": "St. George, Utah",
+      "area": "St. George, UT",
+      "wikipedia": [
+        "St. George, Utah",
+        "Snow Canyon State Park"
+      ],
+      "categories": [
+        "Views of St. George, Utah",
+        "Snow Canyon State Park",
+        "St. George Utah Temple"
+      ],
+      "queries": [
+        "St. George Utah red cliffs",
+        "St. George Utah skyline",
+        "St. George Utah temple"
+      ],
+      "candidates": []
+    },
+    {
+      "metroId": "cbsa:36500",
+      "city": "Olympia, Washington",
+      "area": "Olympia-Lacey-Tumwater, WA",
+      "wikipedia": [
+        "Olympia, Washington",
+        "Washington State Capitol",
+        "Capitol Lake"
+      ],
+      "categories": [
+        "Washington State Capitol",
+        "Capitol Lake",
+        "Views of Olympia, Washington"
+      ],
+      "queries": [
+        "Olympia Washington Capitol Lake",
+        "Olympia Washington capitol",
+        "Olympia Washington waterfront"
+      ],
+      "candidates": []
     }
   ]
 }
