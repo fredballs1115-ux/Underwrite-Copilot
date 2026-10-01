@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { loadSubmarketView } from "@/lib/market/store";
+import { trailingYearBasis, unverifiedMark } from "@/lib/market/metrics";
 import { exclusionSummary } from "@/lib/market/exclusions";
 import { RENT_BASIS_LABEL, RENT_BASES } from "@/lib/market/types";
 import { assetClassLabel } from "@/lib/asset-class";
@@ -28,6 +29,7 @@ const ERRORS: Record<string, string> = {
   empty: "That file has no rows.",
   norows: "No rows in that file mapped to the expected columns.",
   period: "A period needs a full date (yyyy-mm-dd), usually the quarter end.",
+  sourceurl: "A web-sourced figure needs its source link — it is shown with that link everywhere.",
 };
 
 const sfFmt = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
@@ -62,7 +64,54 @@ export default async function SubmarketPage({
       ? `${metrics.supply.months.toFixed(1)} months`
       : metrics.supply.status === "supply_exceeds_demand"
         ? "Supply exceeds demand"
-        : "—";
+        : metrics.supply.status === "not_computable"
+          ? "Not computable"
+          : "—";
+  const yearBasis = trailingYearBasis(metrics.absorption);
+
+  // Each headline figure: its label, its value, where it came from, and how
+  // many web-sourced periods went into it — the mark is part of the figure.
+  const headline: { label: string; value: string; note: string; unverified: number }[] = [
+    {
+      label: "Months of supply",
+      value: supplyLine,
+      note:
+        metrics.supply.status === "ok"
+          ? `${sfFmt(metrics.supply.ucSf)} UC ÷ ${sfFmt(metrics.supply.monthlyAbsorption)}/mo (${yearBasis})`
+          : metrics.supply.status === "supply_exceeds_demand"
+            ? `${sfFmt(metrics.supply.ucSf)} UC, ${sfFmt(metrics.supply.t12Absorption)} T12 absorption (${yearBasis})`
+            : metrics.supply.reason,
+      unverified: metrics.unverified.supply,
+    },
+    {
+      label: "UC % of inventory",
+      value: pct1(metrics.ucShare),
+      note: metrics.latest ? `as of ${metrics.latest.period}` : "no period",
+      unverified: metrics.unverified.ucShare,
+    },
+    {
+      label: "T12 net absorption",
+      value:
+        metrics.absorption.sf != null
+          ? sfFmt(metrics.absorption.sf)
+          : metrics.absorption.periods.length
+            ? "Not computable"
+            : "—",
+      note: metrics.absorption.sf != null ? yearBasis : (metrics.absorption.reason ?? "no absorption data"),
+      unverified: metrics.unverified.absorption,
+    },
+    {
+      label: "Rent CAGR",
+      value: metrics.rent.cagr == null ? "—" : `${(metrics.rent.cagr * 100).toFixed(2)}%`,
+      note:
+        metrics.rent.cagr == null
+          ? "needs two periods on one basis"
+          : `${metrics.rent.cagrFrom} → ${metrics.rent.cagrTo}, ${
+              metrics.rent.cagrBasis ? RENT_BASIS_LABEL[metrics.rent.cagrBasis] : "basis not stated"
+            }`,
+      unverified: metrics.unverified.cagr,
+    },
+  ];
 
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6">
@@ -109,44 +158,14 @@ export default async function SubmarketPage({
 
       {/* ── Headline metrics ──────────────────────────────────────────── */}
       <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {(
-          [
-            [
-              "Months of supply",
-              supplyLine,
-              metrics.supply.status === "ok"
-                ? `${sfFmt(metrics.supply.ucSf)} UC ÷ ${sfFmt(metrics.supply.monthlyAbsorption)}/mo`
-                : metrics.supply.status === "supply_exceeds_demand"
-                  ? `${sfFmt(metrics.supply.ucSf)} UC, ${sfFmt(metrics.supply.t12Absorption)} T12 absorption`
-                  : metrics.supply.reason,
-            ],
-            [
-              "UC % of inventory",
-              pct1(metrics.ucShare),
-              metrics.latest ? `as of ${metrics.latest.period}` : "no period",
-            ],
-            [
-              "T12 net absorption",
-              metrics.absorption.sf == null ? "—" : sfFmt(metrics.absorption.sf),
-              metrics.absorption.periods.length
-                ? `${metrics.absorption.quartersUsed} qtr: ${metrics.absorption.periods.join(", ")}`
-                : "no absorption data",
-            ],
-            [
-              "Rent CAGR",
-              metrics.rent.cagr == null ? "—" : `${(metrics.rent.cagr * 100).toFixed(2)}%`,
-              metrics.rent.cagr == null
-                ? "needs two periods on one basis"
-                : `${metrics.rent.cagrFrom} → ${metrics.rent.cagrTo}, ${
-                    metrics.rent.cagrBasis ? RENT_BASIS_LABEL[metrics.rent.cagrBasis] : "basis not stated"
-                  }`,
-            ],
-          ] as const
-        ).map(([label, value, note]) => (
+        {headline.map(({ label, value, note, unverified }) => (
           <div key={label} className="rounded-lg border border-line bg-surface px-4 py-3">
             <dt className="text-[11px] uppercase tracking-wide text-muted">{label}</dt>
             <dd className="mt-0.5 font-mono text-lg text-ink">{value}</dd>
             <p className="mt-0.5 text-[11px] text-muted">{note}</p>
+            {unverified > 0 ? (
+              <p className="mt-0.5 text-[11px] font-medium text-caution">{unverifiedMark(unverified)}</p>
+            ) : null}
           </div>
         ))}
       </dl>

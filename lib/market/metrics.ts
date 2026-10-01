@@ -57,6 +57,9 @@ export interface RentTrend {
   cagrFrom: string | null;
   cagrTo: string | null;
   cagrYears: number | null;
+  /** how many of the CAGR's two end points are unverified (web-sourced) —
+   *  the figure is struck on those two alone, so they are what it includes */
+  cagrUnverified: number;
 }
 
 const YEAR_MS = 365.25 * 86_400_000;
@@ -105,6 +108,7 @@ export function rentTrend(periods: SubmarketPeriod[]): RentTrend {
 
   let cagr: number | null = null;
   let cagrYears: number | null = null;
+  let cagrUnverified = 0;
   if (best) {
     const from = best.points[0];
     const to = best.points[best.points.length - 1];
@@ -112,6 +116,7 @@ export function rentTrend(periods: SubmarketPeriod[]): RentTrend {
     if (years > 0 && from.value > 0 && to.value > 0) {
       cagr = Math.pow(to.value / from.value, 1 / years) - 1;
       cagrYears = years;
+      cagrUnverified = [from, to].filter((p) => p.unverified).length;
     }
   }
 
@@ -128,6 +133,7 @@ export function rentTrend(periods: SubmarketPeriod[]): RentTrend {
     cagrFrom: best?.points[0]?.period ?? null,
     cagrTo: best?.points[best.points.length - 1]?.period ?? null,
     cagrYears,
+    cagrUnverified,
   };
 }
 
@@ -151,34 +157,169 @@ export function simpleTrend(
 // ---------------------------------------------------------------------------
 
 export interface TrailingAbsorption {
-  /** sum of net absorption over the trailing four quarters (or 12 months) */
+  /** net absorption over the twelve months to the newest loaded period —
+   *  null when the loaded periods do not make up that year */
   sf: number | null;
-  /** the periods it covered, so the figure is never an orphan number */
+  /** the periods inside that year with a net absorption, oldest first, so
+   *  the figure is never an orphan number */
   periods: string[];
-  quartersUsed: number;
+  /** the newest loaded period: the year runs to it */
+  to: string | null;
+  /** months between loaded periods — 3 for a quarterly grid, 12 for annual
+   *  rows; null with fewer than two periods, which say nothing about it */
+  cadenceMonths: number | null;
+  /** why there is no trailing-year figure, when there is none */
+  reason: string | null;
+  /** how many of the periods summed are unverified (web-sourced) */
+  unverified: number;
+}
+
+/** No row carries a net absorption at all — a blank, not a gap. */
+export const NO_ABSORPTION = "No net absorption in this submarket's data.";
+
+/** A period end's month on one count (year × 12 + month), so two period
+ *  ends compare in whole months whatever day of the month each falls on. */
+const monthIndex = (iso: string): number =>
+  Number(iso.slice(0, 4)) * 12 + (Number(iso.slice(5, 7)) - 1);
+
+const MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const monthLabel = (mi: number): string => `${MONTH_ABBR[((mi % 12) + 12) % 12]} ${Math.floor(mi / 12)}`;
+
+/** What one period of a series of this cadence is called, singular and
+ *  plural: a quarterly grid's rows are quarters, annual rows are years. */
+export function periodWords(cadenceMonths: number): [string, string] {
+  switch (cadenceMonths) {
+    case 1:
+      return ["month", "months"];
+    case 3:
+      return ["quarter", "quarters"];
+    case 6:
+      return ["half-year", "half-years"];
+    case 12:
+      return ["year", "years"];
+    default:
+      return [`${cadenceMonths}-month period`, `${cadenceMonths}-month periods`];
+  }
 }
 
 /**
- * Trailing-12 net absorption: the most recent four quarterly periods, summed.
+ * The series' cadence: the shortest gap, in whole months, between two loaded
+ * period ends — a quarterly grid's 3, annual rows' 12. Null with fewer than
+ * two distinct period ends: one period end says nothing about how long the
+ * period was, and a year-end date is a Q4 date too.
+ */
+export function periodCadenceMonths(periods: SubmarketPeriod[]): number | null {
+  const months = [...new Set(periods.map((p) => monthIndex(p.period)))].sort((a, b) => a - b);
+  let cadence: number | null = null;
+  for (let i = 1; i < months.length; i++) {
+    const gap = months[i] - months[i - 1];
+    if (cadence == null || gap < cadence) cadence = gap;
+  }
+  return cadence;
+}
+
+/**
+ * Trailing-12 net absorption: the twelve months to the newest loaded period,
+ * taken by DATE, and given only where the loaded periods make up that year.
  *
- * With fewer than four quarters it sums what exists and says how many it used,
- * rather than annualizing a single quarter — extrapolating one quarter to a
- * year is how a lumpy market becomes a confident wrong number.
+ * A row's net absorption is its own period's — a quarter's on a quarterly
+ * grid, a year's on annual rows (an import reads a bare "2025" as a year
+ * end) — so summing "the last four rows" read four YEARS as twelve months on
+ * annual data (months of supply a quarter of the truth, the flattering way)
+ * and one quarter as a year (four times the truth). Here the series'
+ * cadence is read off the gaps between its period ends, and the year is
+ * summed only when a period with a net absorption sits at every step of it:
+ * four quarters, twelve months, or one year-end row with the year before it
+ * loaded. One period alone, a missing quarter, uneven spacing or two
+ * periods in one month leave it null, with the reason — never a sum of
+ * whatever exists, and never one quarter annualized.
  */
 export function trailing12Absorption(periods: SubmarketPeriod[]): TrailingAbsorption {
-  const rows = sortPeriods(periods).filter((p) => p.netAbsorptionSf != null);
-  if (!rows.length) return { sf: null, periods: [], quartersUsed: 0 };
-  const window = rows.slice(-4);
+  const sorted = sortPeriods(periods);
+  const newest = sorted[sorted.length - 1] ?? null;
+  const none = (reason: string): TrailingAbsorption => ({
+    sf: null,
+    periods: [],
+    to: newest?.period ?? null,
+    cadenceMonths: null,
+    reason,
+    unverified: 0,
+  });
+  if (!newest || !sorted.some((p) => p.netAbsorptionSf != null)) return none(NO_ABSORPTION);
+
+  const end = monthIndex(newest.period);
+  const inYear = sorted.filter((p) => monthIndex(p.period) > end - 12);
+  const summed = inYear.filter((p) => p.netAbsorptionSf != null);
+  const cadence = periodCadenceMonths(sorted);
+  const partial = (reason: string): TrailingAbsorption => ({
+    sf: null,
+    periods: summed.map((p) => p.period),
+    to: newest.period,
+    cadenceMonths: cadence,
+    reason,
+    unverified: summed.filter((p) => p.unverified).length,
+  });
+
+  for (let i = 1; i < sorted.length; i++) {
+    if (monthIndex(sorted[i].period) === monthIndex(sorted[i - 1].period)) {
+      return partial(
+        `Two periods end in ${monthLabel(monthIndex(sorted[i].period))} (${sorted[i - 1].period} and ${sorted[i].period}), so a trailing year would count that month twice.`,
+      );
+    }
+  }
+  if (cadence == null) {
+    return partial(
+      "One period loaded — nothing shows whether its absorption is a month's, a quarter's or a year's, so no trailing year can be read off it.",
+    );
+  }
+  if (12 % cadence !== 0) {
+    return partial(`The periods are ${cadence} months apart, which does not make up a year.`);
+  }
+
+  // The year's steps: the newest period end and every cadence before it,
+  // back to (not including) the same month a year earlier.
+  const steps = Array.from({ length: 12 / cadence }, (_, i) => end - 12 + cadence * (i + 1));
+  if (inYear.some((p) => !steps.includes(monthIndex(p.period)))) {
+    return partial("The loaded periods are not evenly spaced, so they do not make up the trailing year.");
+  }
+  const missing = steps.filter((m) => !summed.some((p) => monthIndex(p.period) === m));
+  if (missing.length) {
+    const [one, many] = periodWords(cadence);
+    return partial(
+      `No net absorption for the ${one} ending ${missing.map(monthLabel).join(", ")} — the year to ${monthLabel(end)} needs all ${steps.length} ${steps.length === 1 ? one : many}.`,
+    );
+  }
+
   return {
-    sf: window.reduce((s, p) => s + (p.netAbsorptionSf ?? 0), 0),
-    periods: window.map((p) => p.period),
-    quartersUsed: window.length,
+    sf: summed.reduce((s, p) => s + (p.netAbsorptionSf ?? 0), 0),
+    periods: summed.map((p) => p.period),
+    to: newest.period,
+    cadenceMonths: cadence,
+    reason: null,
+    unverified: summed.filter((p) => p.unverified).length,
   };
+}
+
+/** "4 quarters to 2025-12-31", "1 year to 2025-12-31" — what a trailing
+ *  year was summed from, for the line under the figure. */
+export function trailingYearBasis(t: TrailingAbsorption): string {
+  if (t.cadenceMonths == null || !t.to) return t.periods.join(", ");
+  const [one, many] = periodWords(t.cadenceMonths);
+  return `${t.periods.length} ${t.periods.length === 1 ? one : many} to ${t.to}`;
+}
+
+/** "includes 1 unverified period" — the mark a figure carries when a
+ *  web-sourced period went into it; "" when none did. */
+export function unverifiedMark(count: number): string {
+  if (count <= 0) return "";
+  return `includes ${count} unverified period${count === 1 ? "" : "s"}`;
 }
 
 export type MonthsOfSupply =
   | { status: "ok"; months: number; ucSf: number; monthlyAbsorption: number }
   | { status: "supply_exceeds_demand"; ucSf: number; t12Absorption: number }
+  /** absorption is loaded, but not a whole trailing year of it */
+  | { status: "not_computable"; reason: string }
   | { status: "unknown"; reason: string };
 
 /**
@@ -187,16 +328,24 @@ export type MonthsOfSupply =
  * Where absorption is zero or negative the answer is NOT infinity and NOT a
  * large number — the market is giving space back while more is being built.
  * That's a different statement and it gets its own status.
+ *
+ * `absorptionReason` is why there is no trailing year, when absorption is
+ * loaded but does not make one up (`trailing12Absorption`'s reason): months
+ * of supply is then NOT COMPUTABLE, and says why, rather than dividing by
+ * whatever periods exist.
  */
 export function monthsOfSupply(
   underConstructionSf: number | null,
   t12AbsorptionSf: number | null,
+  absorptionReason?: string | null,
 ): MonthsOfSupply {
   if (underConstructionSf == null) {
     return { status: "unknown", reason: "No under-construction SF in this submarket's data." };
   }
   if (t12AbsorptionSf == null) {
-    return { status: "unknown", reason: "No net absorption in this submarket's data." };
+    return absorptionReason && absorptionReason !== NO_ABSORPTION
+      ? { status: "not_computable", reason: absorptionReason }
+      : { status: "unknown", reason: NO_ABSORPTION };
   }
   if (t12AbsorptionSf <= 0) {
     return {
@@ -334,6 +483,27 @@ export function reconcilePipeline(
 // Roll-up
 // ---------------------------------------------------------------------------
 
+/**
+ * How many unverified (web-sourced) periods went into each figure — the
+ * mark every surface prints beside it (`unverifiedMark`), because a
+ * web-sourced figure is never blended into an imported series silently.
+ * Zero where a figure has no value.
+ */
+export interface UnverifiedCounts {
+  /** the newest period's UC SF and the trailing year's absorption */
+  supply: number;
+  /** the newest period's UC SF and inventory */
+  ucShare: number;
+  /** the trailing year's periods */
+  absorption: number;
+  /** the CAGR's two end points */
+  cagr: number;
+  /** the trough's own period */
+  trough: number;
+  /** the newest period, whose UC SF the pipeline is reconciled against */
+  latest: number;
+}
+
 export interface SubmarketMetrics {
   latest: SubmarketPeriod | null;
   periodsCovered: number;
@@ -345,9 +515,10 @@ export interface SubmarketMetrics {
   ucShare: number | null;
   /** lowest vacancy in the series — the trough a stabilized assumption is
    *  measured against */
-  troughVacancy: { value: number; period: string } | null;
+  troughVacancy: { value: number; period: string; unverified: boolean } | null;
   deliveries: DeliveryQuarter[];
   reconciliation: PipelineReconciliation;
+  unverified: UnverifiedCounts;
 }
 
 export function submarketMetrics(
@@ -358,23 +529,45 @@ export function submarketMetrics(
   const latest = sorted[sorted.length - 1] ?? null;
   const absorption = trailing12Absorption(sorted);
   const vacancy = simpleTrend(sorted, "vacancyPct");
+  const rent = rentTrend(sorted);
 
-  const trough = vacancy.reduce<{ value: number; period: string } | null>(
-    (best, p) => (best == null || p.value < best.value ? { value: p.value, period: p.period } : best),
+  const trough = vacancy.reduce<{ value: number; period: string; unverified: boolean } | null>(
+    (best, p) =>
+      best == null || p.value < best.value
+        ? { value: p.value, period: p.period, unverified: p.unverified }
+        : best,
     null,
   );
+
+  const supply = monthsOfSupply(latest?.underConstructionSf ?? null, absorption.sf, absorption.reason);
+  const ucShare = ucShareOfInventory(latest?.underConstructionSf ?? null, latest?.inventorySf ?? null);
+  const latestUnverified = latest?.unverified ? 1 : 0;
+  // The newest period is a step of the trailing year whenever the year was
+  // summed, so it is already among the absorption's periods.
+  const supplyUnverified =
+    supply.status === "ok" || supply.status === "supply_exceeds_demand"
+      ? absorption.unverified + (latest && !absorption.periods.includes(latest.period) ? latestUnverified : 0)
+      : 0;
 
   return {
     latest,
     periodsCovered: sorted.length,
-    rent: rentTrend(sorted),
+    rent,
     inventory: simpleTrend(sorted, "inventorySf"),
     vacancy,
     absorption,
-    supply: monthsOfSupply(latest?.underConstructionSf ?? null, absorption.sf),
-    ucShare: ucShareOfInventory(latest?.underConstructionSf ?? null, latest?.inventorySf ?? null),
+    supply,
+    ucShare,
     troughVacancy: trough,
     deliveries: deliverySchedule(properties),
     reconciliation: reconcilePipeline(latest?.underConstructionSf ?? null, properties),
+    unverified: {
+      supply: supplyUnverified,
+      ucShare: ucShare == null ? 0 : latestUnverified,
+      absorption: absorption.sf == null ? 0 : absorption.unverified,
+      cagr: rent.cagr == null ? 0 : rent.cagrUnverified,
+      trough: trough?.unverified ? 1 : 0,
+      latest: latestUnverified,
+    },
   };
 }

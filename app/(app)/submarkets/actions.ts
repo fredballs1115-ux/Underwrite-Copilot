@@ -200,6 +200,9 @@ export async function saveSubmarketPeriod(formData: FormData) {
   const vacancy = num(formData.get("vacancyPct"));
   const unverified = formData.get("unverified") === "on";
   const sourceUrl = String(formData.get("sourceUrl") ?? "").trim() || null;
+  // The form says a web-sourced figure needs its link, and every surface
+  // marks it with that link — so one without is refused, not stored bare.
+  if (unverified && !sourceUrl) redirect(`/submarkets/${id}?error=sourceurl`);
 
   await supabase.from("submarket_periods").upsert(
     {

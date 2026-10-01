@@ -15,7 +15,7 @@
  */
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import { STRATEGY_LABEL, isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
-import type { SubmarketMetrics } from "./metrics";
+import { trailingYearBasis, unverifiedMark, type SubmarketMetrics } from "./metrics";
 import { RENT_BASIS_LABEL, type Dismissal, type Submarket } from "./types";
 
 export type CheckCode =
@@ -41,6 +41,13 @@ export interface AssumptionWarning {
 }
 
 const pct = (v: number, dp = 1) => `${(v * 100).toFixed(dp)}%`;
+
+/** A basis line with the figure's unverified mark on the end, where a
+ *  web-sourced period went into it — never blended in silently. */
+const marked = (basis: string, unverified: number): string => {
+  const mark = unverifiedMark(unverified);
+  return mark ? `${basis}; ${mark}` : basis;
+};
 
 /**
  * Run every check. Dismissed warnings are RETURNED, not filtered out — the card
@@ -79,9 +86,12 @@ export function assumptionWarnings(
       message: `You're underwriting ${pct(inputs.rentGrowthPct)} rent growth. ${
         submarket.name
       } has compounded at ${pct(rent.cagr, 2)} over ${rent.cagrYears?.toFixed(1)} years — you're ${gapBps} bps above what it has actually done.`,
-      basis: `${rent.cagrFrom} → ${rent.cagrTo}, ${
-        rent.cagrBasis ? RENT_BASIS_LABEL[rent.cagrBasis] : "basis not stated"
-      }`,
+      basis: marked(
+        `${rent.cagrFrom} → ${rent.cagrTo}, ${
+          rent.cagrBasis ? RENT_BASIS_LABEL[rent.cagrBasis] : "basis not stated"
+        }`,
+        metrics.unverified.cagr,
+      ),
     });
   }
 
@@ -97,7 +107,10 @@ export function assumptionWarnings(
       )} SF under construction against ${Math.round(metrics.supply.t12Absorption).toLocaleString(
         "en-US",
       )} SF of trailing-12 net absorption — the market is giving space back while more is being built. An exit cap at or below the going-in cap is hard to defend here.${planClause}`,
-      basis: `${metrics.absorption.quartersUsed} quarter(s): ${metrics.absorption.periods.join(", ")}`,
+      basis: marked(
+        `${trailingYearBasis(metrics.absorption)}: ${metrics.absorption.periods.join(", ")}`,
+        metrics.unverified.supply,
+      ),
     });
   } else if (metrics.supply.status === "ok" && metrics.supply.months > threshold) {
     const compressing = inputs.exitCapPct < 0.06;
@@ -112,9 +125,12 @@ export function assumptionWarnings(
           ? ` Your ${pct(inputs.exitCapPct, 2)} exit cap assumes the market tightens while that delivers.`
           : ` Exit cap compression is hard to defend while that delivers.`
       }${planClause}`,
-      basis: `${Math.round(metrics.supply.ucSf).toLocaleString("en-US")} SF UC ÷ ${Math.round(
-        metrics.supply.monthlyAbsorption,
-      ).toLocaleString("en-US")} SF/mo absorption`,
+      basis: marked(
+        `${Math.round(metrics.supply.ucSf).toLocaleString("en-US")} SF UC ÷ ${Math.round(
+          metrics.supply.monthlyAbsorption,
+        ).toLocaleString("en-US")} SF/mo absorption (${trailingYearBasis(metrics.absorption)})`,
+        metrics.unverified.supply,
+      ),
     });
   }
 
@@ -128,7 +144,7 @@ export function assumptionWarnings(
       message: `You're assuming ${pct(inputs.vacancyPct)} vacancy. ${
         submarket.name
       } has never been tighter than ${pct(trough.value)} in the data you've loaded.`,
-      basis: `trough was ${trough.period}`,
+      basis: marked(`trough was ${trough.period}`, metrics.unverified.trough),
     });
   }
 
@@ -139,7 +155,7 @@ export function assumptionWarnings(
       severity: "info",
       title: "Pipeline doesn't tie",
       message: metrics.reconciliation.message,
-      basis: `latest period ${metrics.latest?.period ?? "—"}`,
+      basis: marked(`latest period ${metrics.latest?.period ?? "—"}`, metrics.unverified.latest),
     });
   }
 

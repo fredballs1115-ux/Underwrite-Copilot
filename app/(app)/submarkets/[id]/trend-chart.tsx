@@ -86,7 +86,16 @@ export function DualAxisTrend({
                 <title>{`${p.period} — ${lineLabel}: ${formatLine(p.value)} (${s.basisLabel}; ${p.source}${
                   p.unverified ? ", unverified" : ""
                 })`}</title>
-                <circle cx={x(p.period)} cy={lineY(p.value)} r={3.5} fill="var(--color-caution)" />
+                {/* An unverified (web-sourced) point is drawn hollow, so it
+                    is never blended into the imported series unseen. */}
+                <circle
+                  cx={x(p.period)}
+                  cy={lineY(p.value)}
+                  r={3.5}
+                  fill={p.unverified ? "var(--color-surface)" : "var(--color-caution)"}
+                  stroke="var(--color-caution)"
+                  strokeWidth={p.unverified ? 1.5 : 0}
+                />
                 <text
                   x={x(p.period)}
                   y={lineY(p.value) - 8}
@@ -128,7 +137,7 @@ export function DualAxisTrend({
       </svg>
       <p className="mt-1 text-xs text-muted">
         Bars: {barLabel} · Line: {lineLabel}. A dashed run has no stated basis; a break in the line
-        is a basis change.
+        is a basis change. A darker bar or a hollow point is an unverified, web-sourced period.
       </p>
     </div>
   );

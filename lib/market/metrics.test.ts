@@ -6,7 +6,9 @@ import {
   rentTrend,
   submarketMetrics,
   trailing12Absorption,
+  trailingYearBasis,
   ucShareOfInventory,
+  unverifiedMark,
 } from "./metrics";
 import {
   applyExclusionRules,
@@ -249,17 +251,165 @@ describe("monthsOfSupply", () => {
 });
 
 describe("trailing12Absorption", () => {
-  it("sums the most recent four quarters and names them", () => {
+  it("sums the four quarters to the newest period and names them", () => {
     const t = trailing12Absorption(PERIODS);
     expect(t.sf).toBe(120_000 + 180_000 + 90_000 + 110_000);
-    expect(t.quartersUsed).toBe(4);
+    expect(t.cadenceMonths).toBe(3);
+    expect(t.reason).toBeNull();
     expect(t.periods).toEqual(["2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31"]);
+    expect(trailingYearBasis(t)).toBe("4 quarters to 2025-12-31");
   });
 
-  it("sums what exists rather than annualizing one quarter", () => {
-    const t = trailing12Absorption(PERIODS.slice(0, 1));
-    expect(t.sf).toBe(120_000);
-    expect(t.quartersUsed).toBe(1);
+  it("takes the year by date: older quarters loaded beside it are left out", () => {
+    const t = trailing12Absorption([
+      period({ period: "2024-09-30", netAbsorptionSf: 999_000 }),
+      period({ period: "2024-12-31", netAbsorptionSf: 999_000 }),
+      ...PERIODS,
+    ]);
+    expect(t.sf).toBe(120_000 + 180_000 + 90_000 + 110_000);
+  });
+
+  it("reads no year off one quarter — neither the quarter as a year nor annualized", () => {
+    const t = trailing12Absorption(PERIODS.slice(-1));
+    expect(t.sf).toBeNull();
+    expect(t.reason).toContain("One period loaded");
+    expect(t.periods).toEqual(["2025-12-31"]);
+  });
+
+  it("reads annual rows as years: the year to the newest is that one row", () => {
+    // An import reads a bare "2025" as 2025-12-31. Four year-end rows of
+    // 600,000 SF each are 600,000 SF a year — not 2.4M SF of "T12".
+    const t = trailing12Absorption(
+      ["2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31"].map((d) =>
+        period({ period: d, netAbsorptionSf: 600_000 }),
+      ),
+    );
+    expect(t.cadenceMonths).toBe(12);
+    expect(t.sf).toBe(600_000);
+    expect(t.periods).toEqual(["2025-12-31"]);
+    expect(trailingYearBasis(t)).toBe("1 year to 2025-12-31");
+  });
+
+  it("names the missing quarter rather than summing a year with a gap in it", () => {
+    const gap = PERIODS.filter((p) => p.period !== "2025-09-30");
+    const t = trailing12Absorption(gap);
+    expect(t.sf).toBeNull();
+    expect(t.reason).toContain("quarter ending Sep 2025");
+    expect(t.reason).toContain("needs all 4 quarters");
+  });
+
+  it("counts a quarter loaded without its absorption as a gap", () => {
+    const t = trailing12Absorption(
+      PERIODS.map((p) => (p.period === "2025-06-30" ? { ...p, netAbsorptionSf: null } : p)),
+    );
+    expect(t.sf).toBeNull();
+    expect(t.reason).toContain("Jun 2025");
+  });
+
+  it("refuses periods that are not evenly spaced or share a month", () => {
+    const uneven = trailing12Absorption([
+      period({ period: "2025-01-31" }),
+      period({ period: "2025-03-31" }),
+      period({ period: "2025-08-31" }),
+      period({ period: "2025-12-31" }),
+    ]);
+    expect(uneven.sf).toBeNull();
+    const twice = trailing12Absorption([...PERIODS, period({ period: "2025-12-15" })]);
+    expect(twice.sf).toBeNull();
+    expect(twice.reason).toContain("Two periods end in Dec 2025");
+  });
+
+  it("counts the unverified periods it summed", () => {
+    const t = trailing12Absorption(
+      PERIODS.map((p) => (p.period === "2025-06-30" ? { ...p, unverified: true } : p)),
+    );
+    expect(t.unverified).toBe(1);
+  });
+});
+
+describe("months of supply over the trailing year", () => {
+  const quarters = ["2025-03-31", "2025-06-30", "2025-09-30", "2025-12-31"];
+
+  it("four quarters of 150,000 SF against 1.2M SF UC is 24 months", () => {
+    const m = submarketMetrics(quarters.map((d) => period({ period: d })), []);
+    expect(m.supply.status).toBe("ok");
+    if (m.supply.status !== "ok") throw new Error("unreachable");
+    expect(m.supply.months).toBeCloseTo(24, 9);
+  });
+
+  it("one quarter loaded is not computable — never 96 months", () => {
+    const m = submarketMetrics([period({ period: "2025-12-31" })], []);
+    expect(m.supply.status).toBe("not_computable");
+    if (m.supply.status !== "not_computable") throw new Error("unreachable");
+    expect(m.supply.reason).toContain("One period loaded");
+  });
+
+  it("four annual rows of 600,000 SF against 1.2M SF UC is 24 months — never 6", () => {
+    const m = submarketMetrics(
+      ["2022-12-31", "2023-12-31", "2024-12-31", "2025-12-31"].map((d) =>
+        period({ period: d, netAbsorptionSf: 600_000 }),
+      ),
+      [],
+    );
+    expect(m.supply.status).toBe("ok");
+    if (m.supply.status !== "ok") throw new Error("unreachable");
+    expect(m.supply.months).toBeCloseTo(24, 9);
+  });
+
+  it("a missing quarter leaves it not computable, and the warning stays quiet", () => {
+    const m = submarketMetrics(
+      quarters.filter((d) => d !== "2025-06-30").map((d) => period({ period: d, underConstructionSf: 9_000_000 })),
+      [],
+    );
+    expect(m.supply.status).toBe("not_computable");
+    expect(
+      assumptionWarnings(INPUTS, m, SUBMARKET).some((w) => w.code === "supply_vs_exit_cap"),
+    ).toBe(false);
+  });
+
+  it("with no absorption at all, says the data has none rather than not computable", () => {
+    const m = submarketMetrics(quarters.map((d) => period({ period: d, netAbsorptionSf: null })), []);
+    expect(m.supply.status).toBe("unknown");
+  });
+});
+
+describe("unverified periods are marked on every figure they go into", () => {
+  it("counts them per figure", () => {
+    const m = submarketMetrics(
+      [
+        period({ period: "2023-12-31", askingRent: 7.0, unverified: true, source: "web search", vacancyPct: 0.03 }),
+        period({ period: "2024-12-31", askingRent: 9.0 }),
+        period({ period: "2025-12-31", askingRent: 9.5, unverified: true, source: "web search" }),
+      ],
+      [],
+    );
+    // The CAGR is struck on its two end points, and both are web-sourced.
+    expect(m.unverified.cagr).toBe(2);
+    expect(m.unverified.trough).toBe(1);
+    expect(m.unverified.ucShare).toBe(1);
+    expect(m.unverified.absorption).toBe(1);
+    expect(m.unverified.supply).toBe(1);
+    expect(unverifiedMark(2)).toBe("includes 2 unverified periods");
+    expect(unverifiedMark(0)).toBe("");
+  });
+
+  it("puts the mark on the warnings' basis lines", () => {
+    const m = submarketMetrics(
+      [
+        period({ period: "2023-12-31", askingRent: 7.0, unverified: true, source: "web search", vacancyPct: 0.03 }),
+        period({ period: "2024-12-31", askingRent: 9.0 }),
+        period({ period: "2025-12-31", askingRent: 9.5 }),
+      ],
+      [],
+    );
+    const w = assumptionWarnings({ ...INPUTS, rentGrowthPct: 0.2, vacancyPct: 0.01 } as UnderwriteInputs, m, SUBMARKET);
+    expect(w.find((x) => x.code === "rent_growth_above_trend")!.basis).toContain("includes 1 unverified period");
+    expect(w.find((x) => x.code === "vacancy_below_trough")!.basis).toContain("includes 1 unverified period");
+  });
+
+  it("leaves an imported series unmarked", () => {
+    const m = submarketMetrics(PERIODS, []);
+    expect(Object.values(m.unverified).every((n) => n === 0)).toBe(true);
   });
 });
 
