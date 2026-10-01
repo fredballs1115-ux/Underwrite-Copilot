@@ -970,7 +970,10 @@ function buildCashFlow(ws: ExcelJS.Worksheet, inp: UnderwriteInputs, holdYears: 
   label(ws.getCell(2, 1), "Year", { bold: true });
   for (let y = 0; y <= holdYears + 1; y++) {
     const c = ws.getCell(2, y0Col + y);
-    c.value = { formula: `"Yr "&${y}` } as ExcelJS.CellFormulaValue;
+    // The year after the hold is not a year owned: its NOI is the one the
+    // exit cap capitalises into the sale (the Deal Summary's Residual NOI),
+    // and the header says so.
+    c.value = { formula: y === holdYears + 1 ? `"Yr "&${y}&" (exit NOI)"` : `"Yr "&${y}` } as ExcelJS.CellFormulaValue;
     c.font = { name: ARIAL, size: 8, color: MUTED };
     c.alignment = { horizontal: "right" };
   }
@@ -1666,7 +1669,9 @@ function buildOperatingMetrics(
   r++;
   label(
     ws.getCell(r, 1),
-    "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — where cash flow crosses zero. Screen it against the market's actual vacancy, not the pro forma's.",
+    // What the formula covers, said: the row leaves reserves, capital and
+    // the asset management fee out, so it is not where cash flow crosses zero.
+    "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
     { color: MUTED, size: 9 },
   );
   r += 2;

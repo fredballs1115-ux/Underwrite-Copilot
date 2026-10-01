@@ -777,6 +777,32 @@ describe("the workbook's labels and colours say what their cells are", () => {
     for (let y = 1; y <= engine.holdYears; y++) expect(cf.getCell(ti, 2 + y).value).toMatchObject({ formula: "-TIPSF*RSF" });
   });
 
+  it("heads the forward year as the NOI the exit capitalises, the one the Deal Summary's sale reads", async () => {
+    const { hf, wb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    const cf = wb.getWorksheet("Cash Flow")!;
+    const fwd = 3 + engine.holdYears; // the column after the last year owned
+    const cfId = hf.getSheetId("Cash Flow")!;
+    expect(hf.getCellValue({ sheet: cfId, row: 1, col: fwd - 1 })).toBe(`Yr ${engine.holdYears + 1} (exit NOI)`);
+    expect(hf.getCellValue({ sheet: cfId, row: 1, col: fwd - 2 })).toBe(`Yr ${engine.holdYears}`);
+    const summary = wb.getWorksheet("Deal Summary")!;
+    const residual = summary.getCell(findRow(summary, 1, "Residual NOI (forward)"), 2).value as { formula: string };
+    const noiRow = findRow(cf, 1, "Net Operating Income");
+    expect(residual.formula).toBe(`'Cash Flow'!${String.fromCharCode(64 + fwd)}${noiRow}`);
+    expect(hf.getCellValue({ sheet: cfId, row: noiRow - 1, col: fwd - 1 }) as number).toBeCloseTo(engine.residual.residualNoi, 2);
+  });
+
+  it("says what the breakeven occupancy covers — the expenses and the debt service, before reserves, capital and the fee", async () => {
+    const ws = (await book(model)).getWorksheet("Operating Metrics")!;
+    let note = "";
+    ws.eachRow((row) => {
+      const v = String(row.getCell(1).value ?? "");
+      if (v.startsWith("Breakeven occupancy =")) note = v;
+    });
+    expect(note).toBe(
+      "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
+    );
+  });
+
   it("styles a cell green only where it links another tab, and blue only where it is a typed value", async () => {
     const plan = deriveUnderwriteInputs(conversion, "fallback");
     for (const m of [model, plan, countedModel]) {
