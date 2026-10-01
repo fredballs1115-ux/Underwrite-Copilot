@@ -28,12 +28,14 @@ export interface AnalysisReadyEmailInput {
   picture?: { url: string } | null;
 }
 
-const esc = (s: string) =>
+/** Text made safe inside an email's HTML, in an element or an attribute. */
+export const escapeHtml = (s: string) =>
   s
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+const esc = escapeHtml;
 
 /** The colour a picture's box holds while its image is blocked or loading:
  *  a band of the brand's light tint, never a blank white gap. */
