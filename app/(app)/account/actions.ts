@@ -191,10 +191,10 @@ export async function changePassword(
 const LIVE_SUBSCRIPTION = ["active", "trialing", "past_due", "incomplete"];
 
 /** Cancel a personal subscription — true once Stripe has it cancelled. A
- *  deletion tried again after one that stopped later finds the subscription
- *  it cancelled still live in the profile's mirror until Stripe's webhook
- *  lands, and Stripe will not cancel a subscription twice: one that refuses
- *  is read back, and an ended one counts as cancelled. */
+ *  deletion tried again after one that stopped later can find the
+ *  subscription it cancelled still live in the profile's mirror, until
+ *  Stripe's webhook lands; should Stripe refuse the second cancel, the
+ *  subscription is read back, and one that has ended counts as cancelled. */
 async function cancelSubscription(subId: string): Promise<boolean> {
   try {
     await getStripe().subscriptions.cancel(subId);
@@ -282,8 +282,8 @@ export async function deleteAccount(formData: FormData) {
   //    per deal, so each path is checked against the deal it claims to belong
   //    to before the service role removes anything. Read in pages and looked
   //    up a chunk of deals at a time, as the handover reads: a long list
-  //    stopped at PostgREST's row cap, and every deal's id in one URL failed
-  //    the documents' read outright. Best-effort as before — a failed read
+  //    stopped at PostgREST's row cap, and every deal's id in the documents'
+  //    one URL ran it to tens of KB. Best-effort as before — a failed read
   //    leaves files to sweep, never a half-deleted account.
   const dealRows =
     (await readAll<{
