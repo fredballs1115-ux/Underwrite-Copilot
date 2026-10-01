@@ -258,3 +258,16 @@ describe("the verdict is handed the code's buy-box checks, not the bare criteria
   });
 });
 
+// Research pass 18: the verdict judged the debt with no rate in hand, and the
+// line the challenger read named no spread of the site's own.
+describe("the verdict is handed the latest published rates the challenger reads", () => {
+  const none = { extraction: null, challenges: null, comps: null, reconciliation: null, market: null };
+
+  it("last, as the challenger was handed them; none, no section", () => {
+    const line = "LATEST PUBLISHED RATES (FRED, each dated the day it is for): the 5-yr Treasury 3.90% (Sep 22, 2026), which the site's model prices a fixed-rate permanent loan off for its hold of 5 years, adding a 200 bps multifamily spread — the site's screening default, an assumption a lender's quote replaces, never a quote.";
+    const brief = buildBrief({ ...none, ratesLine: line });
+    expect(brief.endsWith(`## The latest published rates\n\n${line}`)).toBe(true);
+    expect(buildBrief({ ...none, ratesLine: null })).not.toContain("latest published rates");
+  });
+});
+

@@ -129,6 +129,15 @@ describe("runModelGeneration — today's rates, never on the sample", () => {
     expect(vi.mocked(reconcileDocs).mock.calls[0][1]).toMatch(/4\.12%/);
   });
 
+  it("the line names the spread the site's model adds for the deal's class, as its screening default (research pass 18)", async () => {
+    dealRow = { is_sample: false, extraction: { assetClass: "Multifamily" } };
+    vi.mocked(liveDebtSeeds).mockResolvedValueOnce({ permanent: fiveYear, floating: null, tenYear: null, survey30: null });
+    vi.mocked(extractDocFacts).mockResolvedValue({ docName: "om.pdf", kind: "om", facts: [] });
+    vi.mocked(reconcileDocs).mockReset().mockRejectedValue(stop);
+    await runModelGeneration("d1");
+    expect(vi.mocked(reconcileDocs).mock.calls[0][1]).toContain("adding a 200 bps multifamily spread — the site's screening default");
+  });
+
   it("the sample's is handed none, whatever the table holds — its figures are pinned (lib/model-market)", async () => {
     dealRow = { is_sample: true };
     vi.mocked(liveDebtSeeds).mockResolvedValueOnce({ permanent: fiveYear, floating: null, tenYear: null, survey30: null });

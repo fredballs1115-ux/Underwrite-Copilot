@@ -4,6 +4,7 @@ import {
   treasuryForTerm,
   type LiveRate,
 } from "@/lib/live-rates";
+import { withArticle } from "@/lib/article";
 
 /**
  * The index a loan is quoted over, read off today's rates table — the half
@@ -88,6 +89,16 @@ export interface DebtSeeds {
 }
 
 export const NO_DEBT_SEEDS: DebtSeeds = { permanent: null, floating: null, tenYear: null, survey30: null };
+
+/** The spread the site's model adds to the permanent loan's index for a
+ *  deal's class (lib/underwrite/inputs `permanentLoanSpread`): the class's
+ *  screening default in basis points and the words the model's note uses
+ *  ("multifamily spread"); `bps` null where the class carries no permanent
+ *  loan (land). An assumption, said as one wherever it is written. */
+export interface PermanentSpread {
+  bps: number | null;
+  label: string;
+}
 
 /** The construction lender's spread over its floating index — a screening
  *  default (bank construction debt has priced at SOFR + 300 to 400 through
@@ -189,21 +200,38 @@ export function isDebtSeedSeries(s: { id: string; tenorMonths: number | null }):
  * were. Only a fresh contract rate is read (`debtSeeds`' own rule), and null
  * where the table seeds none: then the step reasons as before, with
  * nothing claimed.
+ *
+ * With the deal's `spread` (research pass 18) the line also names the spread
+ * the site's own model adds to the index for the deal's class — its
+ * screening default, said as an assumption a lender's quote replaces — and
+ * the construction panel's, so a step never invents a spread of its own; and
+ * on land, which carries no permanent loan in the model, it says so rather
+ * than claim the model prices one off the tenor.
  */
-export function ratesPromptLine(seeds: DebtSeeds, holdMonths: number): string | null {
+export function ratesPromptLine(seeds: DebtSeeds, holdMonths: number, spread?: PermanentSpread | null): string | null {
   const said = (i: DebtIndex) => `${i.pct.toFixed(2)}% (${datedLong(i.asOf)})`;
   const parts: string[] = [];
   if (seeds.permanent) {
     const years = Math.round(holdMonths / 12);
     parts.push(
-      `the ${indexName(seeds.permanent)} ${said(seeds.permanent)}, which the site's model prices a fixed-rate permanent loan off for its hold of ${years} years`,
+      spread && spread.bps == null
+        ? `the ${indexName(seeds.permanent)} ${said(seeds.permanent)}, the tenor nearest a hold of ${years} years — the site's model carries no permanent loan on land, so it prices none off it`
+        : `the ${indexName(seeds.permanent)} ${said(seeds.permanent)}, which the site's model prices a fixed-rate permanent loan off for its hold of ${years} years${
+            spread?.bps != null
+              ? `, adding ${withArticle(`${spread.bps} bps`)} ${spread.label} — the site's screening default, an assumption a lender's quote replaces, never a quote`
+              : ""
+          }`,
     );
   }
   if (seeds.tenYear && seeds.tenYear.id !== seeds.permanent?.id) {
     parts.push(`the ${indexName(seeds.tenYear)} ${said(seeds.tenYear)}, the benchmark a cap rate's spread is quoted over`);
   }
   if (seeds.floating) {
-    parts.push(`${indexName(seeds.floating)} ${said(seeds.floating)}, a floating, bridge or construction loan's index`);
+    parts.push(
+      `${indexName(seeds.floating)} ${said(seeds.floating)}, a floating, bridge or construction loan's index${
+        spread ? `, which the site's construction panel starts from plus ${CONSTRUCTION_SPREAD_BPS} bps — a screening default too, never a quote` : ""
+      }`,
+    );
   }
   if (parts.length === 0) return null;
   return `LATEST PUBLISHED RATES (FRED, each dated the day it is for): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.`;

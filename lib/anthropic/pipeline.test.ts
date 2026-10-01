@@ -450,6 +450,39 @@ describe("runAnalysis — the happy path", () => {
     expect(note).toContain("30-day avg SOFR 4.05% (Sep 22, 2026)");
   });
 
+  it("hands the challenger and the verdict one rates line, naming the class's screening spread — and on land, no permanent loan (research pass 18)", async () => {
+    state.rates = [
+      { series_id: "DGS5", obs_date: "2026-09-22", value: 3.9 },
+      { series_id: "SOFR30DAYAVG", obs_date: "2026-09-22", value: 4.05 },
+    ];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+      expect(job().status).toBe("done");
+      const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+      expect(note).toContain(
+        "the 5-yr Treasury 3.90% (Sep 22, 2026), which the site's model prices a fixed-rate permanent loan off for its hold of 5 years, adding a 200 bps multifamily spread — the site's screening default",
+      );
+      const input = vi.mocked(synthesizeVerdict).mock.calls[0][0];
+      expect(input.ratesLine).toBeTruthy();
+      expect(note).toContain(input.ratesLine!);
+      const { buildBrief } = await vi.importActual<typeof import("./verdict")>("./verdict");
+      expect(buildBrief(input)).toContain(`## The latest published rates\n\n${input.ratesLine}`);
+
+      // Land: the model carries no permanent loan, and the line says so.
+      vi.mocked(challengeAssumptions).mockClear();
+      vi.mocked(synthesizeVerdict).mockClear();
+      vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Land" } as unknown as ExtractionResult);
+      await runAnalysis("d1");
+      const land = vi.mocked(synthesizeVerdict).mock.calls[0][0].ratesLine ?? "";
+      expect(land).toContain("the site's model carries no permanent loan on land, so it prices none off it");
+      expect(land).not.toContain("prices a fixed-rate permanent loan off");
+      expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").toContain(land);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("hands the challenger no rates where the table holds nothing fresh — nothing is claimed as current", async () => {
     state.rates = [{ series_id: "DGS5", obs_date: "2026-01-02", value: 3.9 }];
     vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });

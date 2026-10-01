@@ -16,6 +16,7 @@ import {
   constructionSeed,
   ratesPromptLine,
   type DebtSeeds,
+  type PermanentSpread,
   type RateSeed,
 } from "@/lib/debt-index";
 import type { MarketForModel } from "@/lib/underwrite/inputs";
@@ -33,11 +34,14 @@ export function constructionSeedFor(isSample: boolean | null | undefined, seeds:
 }
 
 /** Today's rates, dated, for a Claude step that sets the model's loan rate
- *  (the first-draft model's reconciliation) — none for the sample. */
+ *  (the first-draft model's reconciliation) — none for the sample. With the
+ *  deal's class spread (lib/underwrite/inputs `permanentLoanSpread`) the
+ *  line names the spread the site's model adds, as its screening default. */
 export function modelRatesLine(
   isSample: boolean | null | undefined,
   seeds: DebtSeeds,
   holdMonths: number,
+  spread?: PermanentSpread | null,
 ): string | null {
-  return isSample ? null : ratesPromptLine(seeds, holdMonths);
+  return isSample ? null : ratesPromptLine(seeds, holdMonths, spread);
 }

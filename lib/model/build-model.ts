@@ -7,7 +7,7 @@ import { extractDocFacts } from "@/lib/anthropic/model-extract";
 import { reconcileDocs } from "@/lib/anthropic/model-reconcile";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelRatesLine } from "@/lib/model-market";
-import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, permanentLoanSpread } from "@/lib/underwrite/inputs";
 import { computeModel, planCaveats } from "./compute";
 import { documentLabel } from "./provenance";
 import type { DocFacts, UnderwritingModel } from "./types";
@@ -49,10 +49,11 @@ export async function runModelGeneration(dealId: string): Promise<void> {
         .select("id, kind, filename, storage_path")
         .eq("deal_id", dealId)
         .order("created_at", { ascending: true }),
-      admin.from("deals").select("is_sample").eq("id", dealId).maybeSingle(),
+      admin.from("deals").select("is_sample, extraction").eq("id", dealId).maybeSingle(),
     ]);
     const docs = (docsData as DocRow[] | null) ?? [];
-    const isSample = !!(dealData as { is_sample?: boolean | null } | null)?.is_sample;
+    const dealRow = dealData as { is_sample?: boolean | null; extraction?: { assetClass?: string | null } | null } | null;
+    const isSample = !!dealRow?.is_sample;
     if (docs.length === 0) {
       throw new Error(
         "Add at least one document (start with the OM and a rent roll) before generating a model.",
@@ -94,8 +95,15 @@ export async function runModelGeneration(dealId: string): Promise<void> {
     // Today's debt indices, dated — the model's loan rate is built from
     // them where no document states one (liveDebtSeeds never throws; a
     // table with nothing fresh hands the step no rates). None on the
-    // sample, whose figures are pinned (lib/model-market).
-    const ratesLine = modelRatesLine(isSample, await liveDebtSeeds(HOLD_MONTHS), HOLD_MONTHS);
+    // sample, whose figures are pinned (lib/model-market). The line names
+    // the spread the site's own model adds for the deal's class, as its
+    // screening default, and on land that it carries no permanent loan.
+    const ratesLine = modelRatesLine(
+      isSample,
+      await liveDebtSeeds(HOLD_MONTHS),
+      HOLD_MONTHS,
+      permanentLoanSpread(dealRow?.extraction?.assetClass),
+    );
     const recon = await reconcileDocs(allFacts, ratesLine);
 
     // Pass 3 — compute the cash flow and returns deterministically.

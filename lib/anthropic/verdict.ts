@@ -99,6 +99,10 @@ export interface VerdictInputs {
    *  verdict judges fit on the calls the page's chip shows rather than
    *  re-deriving them; absent with no box */
   buyBoxChecks?: { checks: BuyBoxCheck[]; tripped: string[] } | null;
+  /** the latest published rates, dated, with the spread the site's model
+   *  adds for the deal's class (lib/debt-index `ratesPromptLine`) — the line
+   *  the challenger is handed; absent where the table seeds nothing */
+  ratesLine?: string | null;
 }
 
 /** A check's call in words — never "pass", which is the verdict's own word
@@ -396,6 +400,14 @@ export function buildBrief(input: VerdictInputs): string {
       ].join("\n"),
     );
   }
+
+  // The latest published rates the site's model prices its debt off, and
+  // the spread it adds for the deal's class (lib/debt-index) — the line the
+  // challenger is handed — so the debt deal-killer and any financing range
+  // are read against a dated index and a named screening default, never a
+  // rate or a spread remembered as current.
+  const rates = input.ratesLine?.trim();
+  if (rates) sections.push("## The latest published rates", rates);
 
   return sections.join("\n\n");
 }

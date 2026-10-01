@@ -179,6 +179,33 @@ describe("today's rates, as a line a Claude step reads (the audit of 2026-09-30)
 
   it("claims nothing where the table seeds nothing", () => {
     expect(ratesPromptLine(NO_DEBT_SEEDS, 60)).toBeNull();
+    expect(ratesPromptLine(NO_DEBT_SEEDS, 60, { bps: 200, label: "multifamily spread" })).toBeNull();
+  });
+
+  // Research pass 18: the line said "plus the lender's spread" and never the
+  // spread the site's own model adds, so each step invented one; and it
+  // claimed a permanent loan on land, which the model carries none of.
+  it("with the deal's class, names the spread the site's model adds as its screening default, and the construction panel's", () => {
+    const seeds = debtSeeds(rates, 60);
+    const line = ratesPromptLine(seeds, 60, { bps: 200, label: "multifamily spread" })!;
+    expect(line).toContain(
+      `the 5-yr Treasury 4.78% (Sep 17, 2026), which the site's model prices a fixed-rate permanent loan off for its hold of 5 years, adding a 200 bps multifamily spread — the site's screening default, an assumption a lender's quote replaces, never a quote`,
+    );
+    expect(line).toContain(`, which the site's construction panel starts from plus ${CONSTRUCTION_SPREAD_BPS} bps — a screening default too, never a quote`);
+    // The figure decides the article.
+    expect(ratesPromptLine(seeds, 60, { bps: 800, label: "generic spread" })).toContain("adding an 800 bps generic spread");
+    // Without a class the line is the old one.
+    expect(ratesPromptLine(seeds, 60)).not.toContain("screening default");
+  });
+
+  it("on land the tenor is said, and that the site's model carries no permanent loan to price off it", () => {
+    const seeds = debtSeeds(rates, 60);
+    const line = ratesPromptLine(seeds, 60, { bps: null, label: "land / infill spread" })!;
+    expect(line).toContain(
+      "the 5-yr Treasury 4.78% (Sep 17, 2026), the tenor nearest a hold of 5 years — the site's model carries no permanent loan on land, so it prices none off it",
+    );
+    expect(line).not.toContain("prices a fixed-rate permanent loan off");
+    expect(line).not.toContain("land / infill spread");
   });
 
   it("reads exactly the series the seeds are built from: every Treasury tenor and SOFR", () => {

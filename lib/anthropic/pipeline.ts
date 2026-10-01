@@ -57,7 +57,7 @@ import { countyOf, placeDeal } from "@/lib/market-county";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
 import { debtSeeds, isDebtSeedSeries, ratesPromptLine } from "@/lib/debt-index";
-import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
+import { HOLD_MONTHS, permanentLoanSpread } from "@/lib/underwrite/inputs";
 import { fetchBenchRows, fetchSeriesRows } from "@/lib/live-rates-query";
 import { ZILLOW_METRICS, zoriFor } from "@/lib/zori";
 import { REALTOR_METRICS, realtorFor } from "@/lib/realtor";
@@ -322,10 +322,20 @@ function liftPictureBeside(
  * table with nothing fresh, hands the step no rates, and it reasons as it
  * did before.
  */
-async function todaysRatesLine(admin: ReturnType<typeof createSupabaseAdminClient>): Promise<string | null> {
+async function todaysRatesLine(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  /** the deal's extraction, whose class sets the spread the site's model
+   *  adds (lib/underwrite/inputs `permanentLoanSpread`) — named in the line
+   *  as its screening default, and on land, no permanent loan at all */
+  extraction: ExtractionResult | null,
+): Promise<string | null> {
   try {
     const rows = await fetchSeriesRows(admin, SERIES.filter(isDebtSeedSeries));
-    return ratesPromptLine(debtSeeds(readRates(rows, new Date()), HOLD_MONTHS), HOLD_MONTHS);
+    return ratesPromptLine(
+      debtSeeds(readRates(rows, new Date()), HOLD_MONTHS),
+      HOLD_MONTHS,
+      permanentLoanSpread(extraction?.assetClass),
+    );
   } catch {
     return null;
   }
@@ -562,6 +572,10 @@ async function regenerateVerdict(
     market: (data?.market as MarketResult) ?? null,
     buyBox,
     buyBoxChecks,
+    // The latest published rates, the line the challenger is handed: the
+    // debt deal-killer is read against a dated index and the site's own
+    // screening spread, never a rate remembered as current.
+    ratesLine: await todaysRatesLine(admin, extraction),
   });
 
   await admin
@@ -984,6 +998,9 @@ async function runAnalysisSteps(
       // Feed the reconciliation red flags to the skeptic so it puts concrete
       // OM-vs-rent-roll / OM-vs-T-12 discrepancies to the broker.
       let reconNote: string | undefined;
+      // The extraction the notes below read, kept for the rates line's
+      // class spread after them.
+      let challengeEx: ExtractionResult | null = null;
       try {
         const { data: dr } = await admin
           .from("deals")
@@ -1005,6 +1022,7 @@ async function runAnalysisSteps(
         // first signal beside the extraction, as the deal context, the market
         // figures and the verdict read it — one kind for the whole screen.
         const ex = (dr?.extraction as ExtractionResult | null) ?? null;
+        challengeEx = ex;
         const strategy = inferStrategy(ex, (dr?.first_signal as FirstSignal | null | undefined) ?? null);
 
         // Feature 1: the OM-assumed vs T-12-actual NOI gap is the skeptic's
@@ -1161,8 +1179,9 @@ async function runAnalysisSteps(
         // no discrepancies stored — the challenger runs on the OM alone
       }
       // Today's rates, dated: the challenger judges the financing against
-      // them rather than against a rate it remembers as current.
-      const ratesLine = await todaysRatesLine(admin);
+      // them rather than against a rate it remembers as current — and the
+      // spread the site's model adds for the deal's class, as its default.
+      const ratesLine = await todaysRatesLine(admin, challengeEx);
       if (ratesLine) reconNote = reconNote ? `${reconNote} ${ratesLine}` : ratesLine;
       const challenges = await challengeAssumptions(om(), assetClass, reconNote);
       await admin

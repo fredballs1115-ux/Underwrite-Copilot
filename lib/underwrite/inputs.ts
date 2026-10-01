@@ -56,7 +56,7 @@ import { readSiteReports, siteReportsModelLine, siteReportsShortLine } from "@/l
 import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/student-housing";
 import { mhModelLine, mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageModelLine, storageShortLine } from "@/lib/self-storage";
-import { allInPct, debtRateNote, type DebtIndex, type RateSeed } from "@/lib/debt-index";
+import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
 
@@ -253,6 +253,21 @@ const normalizeClass = (c: string): keyof typeof CLASS_DEFAULTS => {
   const key = assetClassKey(c);
   return key && CLASS_DEFAULTS[key] ? key : "auto";
 };
+
+/**
+ * The spread the model adds to the day's index for a deal's class, read as
+ * `deriveUnderwriteInputs` reads it (the extraction's class, the class's
+ * `spreadBps`, none where the class operates nothing), with the words its
+ * note uses — so a Claude step handed the day's rates (lib/debt-index
+ * `ratesPromptLine`) is told the spread the site's own model adds, as the
+ * screening default it is, instead of inventing one. A read of the table,
+ * never a change to it.
+ */
+export function permanentLoanSpread(assetClass: string | null | undefined): PermanentSpread {
+  const key = normalizeClass(assetClass ?? "auto");
+  const bps = assetWords(assetClass).operating ? (CLASS_DEFAULTS[key].spreadBps ?? null) : null;
+  return { bps, label: `${(assetClassLabel(key) || "generic").toLowerCase()} spread` };
+}
 
 /** The cover's line about what is being sold, and what the model is and
  *  is not on it — null for a plain fee simple. */
