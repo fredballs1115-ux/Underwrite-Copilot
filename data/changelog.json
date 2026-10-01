@@ -2,6 +2,30 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-10-01",
+      "title": "Reports that print only what the deal supports",
+      "blurb": "A full report on a memorandum that states no price now leaves out its IRR grids and max bid, and says why. Before, it printed a placeholder price's returns as if they were the deal's. The max bid is solved on every floor your buy box sets, as the deal page solves it, and names the one that binds. A note gets no max bid, and on a share the max bid is said to be the whole building's price. The grids now print the hold, the loan and the dated rate they run on, beside a base case that names each input's source. A new page, \"The call, in full\", prints everything the one-page memo shortens to fit.",
+      "href": "/demo"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "A memorandum the screen cannot read is refused at upload",
+      "blurb": "A PDF that asks for a password to open, or one longer than the analysis reads in one pass, is now refused when you upload it, with the reason. It no longer becomes a deal, takes a free slot and fails a minute later. A broker's secured copy, which opens without asking, still goes ahead. When the analysis service turns a document away, the message points you to Replace OM. It no longer blames a scan, which reads fine.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "The deal header, whole on a phone",
+      "blurb": "On a phone, a price stated as a range now reads short in the deal header, for example $9–9.5M, with the full range one tap away. A label for what the price buys, such as \"Leasehold, 45 yrs left\", wraps instead of being cut off. A hotel's and an affordable deal's clocks stack so their bars are drawn. The older deal-type panels lead with one sentence and fold the rest. Each portfolio property's bar is drawn at its share of the whole, so a 53% share no longer fills 97% of its track.",
+      "href": "/deals"
+    },
+    {
+      "date": "2026-10-01",
+      "title": "Notes held to their own terms",
+      "blurb": "On a deal that sells a loan, your buy box no longer checks the collateral's cap rate against your cap floor. A note's key terms print no cap on the collateral's income, whether pro forma, stabilized or exit. The collateral's loan-to-value is said only where the memorandum shows this note comes first, and a note's payment status or a line such as \"no mezzanine debt\" no longer reads it as a junior note.",
+      "href": "/deals"
+    },
+    {
       "date": "2026-09-30",
       "title": "Your first screen, drawn as it reads",
       "blurb": "While a new deal's first screen is still reading its memorandum, its card, its row and its page show a figure not yet read as being read, never as the dash that means the memorandum does not state it, and the card shows the first read's asking price. The deal page no longer promises how long a screen takes: once you have run three, it says how long yours usually take, start to finish. ⌘K finds any deal you can see by name, not only the fifty changed last, and the free-deal meter counts a team trial's deals the way adding a deal does.",

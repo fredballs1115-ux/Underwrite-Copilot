@@ -1357,8 +1357,10 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
 describe("runAnalysis — the run keeps its claim alive and cleans up after itself", () => {
   it("heartbeats the job row between step boundaries, and stops when the run ends", async () => {
     process.env.ANALYSIS_HEARTBEAT_MS = "10";
+    // A step long enough for two beats even when the whole suite loads the
+    // machine: at 80 ms, one beat landed under a full run (2026-10-01).
     vi.mocked(extractTerms).mockImplementation(
-      () => new Promise((resolve) => setTimeout(() => resolve(EXTRACTION), 80)),
+      () => new Promise((resolve) => setTimeout(() => resolve(EXTRACTION), 250)),
     );
     await runAnalysis("d1");
     const beats = () =>

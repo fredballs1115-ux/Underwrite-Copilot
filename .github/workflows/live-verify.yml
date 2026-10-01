@@ -1148,6 +1148,10 @@ jobs:
           mark "#482 corporate credit, from the Treasury" grep -q "Corporate credit, from the Treasury" p_whats-new.html
           mark "#483 research figures, credited one by one" grep -q "Research figures, credited one by one" p_whats-new.html
           mark "#483 your first screen, drawn as it reads" grep -q "Your first screen, drawn as it reads" p_whats-new.html
+          mark "#484 reports that print only what the deal supports" grep -q "Reports that print only what the deal supports" p_whats-new.html
+          mark "#484 an unreadable memorandum refused at upload" grep -q "A memorandum the screen cannot read is refused at upload" p_whats-new.html
+          mark "#484 the deal header, whole on a phone" grep -q "The deal header, whole on a phone" p_whats-new.html
+          mark "#484 notes held to their own terms" grep -q "Notes held to their own terms" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"

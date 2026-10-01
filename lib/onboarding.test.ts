@@ -41,7 +41,12 @@ describe("screenedAnOm — a memorandum screened to its verdict", () => {
     // The page is a loader over the Supabase rows, so it is held at its
     // source: it ticked for any deal that was not the sample.
     const src = readFileSync("app/(app)/deals/page.tsx", "utf8");
-    expect(src).toMatch(/hasScreenedOm: rows\.some\(\(d\) =>\s*screenedAnOm\(/);
-    expect(src).not.toMatch(/rows\.some\(\(d\) => !d\.is_sample\)/);
+    // The reader's own deals only: the list carries a team's too, and a
+    // teammate's screened memorandum is not this reader's step taken (the
+    // audit of 2026-10-01).
+    expect(src).toMatch(/const own = rows\.filter\(\(d\) => d\.user_id === user\?\.id\);/);
+    expect(src).toMatch(/hasScreenedOm: own\.some\(\(d\) =>\s*screenedAnOm\(/);
+    expect(src).toMatch(/sampleId: own\.find\(\(d\) => d\.is_sample\)/);
+    expect(src).not.toMatch(/(?:rows|own)\.some\(\(d\) => !d\.is_sample\)/);
   });
 });
