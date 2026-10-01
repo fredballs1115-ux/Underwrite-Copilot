@@ -1415,7 +1415,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   than sized at nothing. Every field there reads through `readFigure`
   (`lib/money.ts`), which takes the shorthand an analyst types — `$20M`,
   `500k`, `1.2mm`, `6.5%`, `1.25x`, and a negative, because `sizeLoan`
-  has a deliberate answer for a negative NOI. It shares ONE suffix table
+  has a deliberate answer for a negative NOI — the coverage tests allow
+  nothing and bind at $0 (they used to drop out, leaving loan-to-value to
+  size $13,000,000). It shares ONE suffix table
   with `parseUsd` but keeps its own rules: no floor (the same page holds
   a $36 rent and a $20M price) and no sign rule, and it is strict about
   the whole string where `parseUsd` is loose (a field's contents are the
@@ -1433,8 +1435,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   ratio; it needs the sale stated, because nothing in a bare column says
   where the building was sold, and it says so rather than guessing.
   **`irr` comes from `lib/underwrite/engine`** — the one behind the Excel
-  export, whose formulas CI recalculates against it — so the page and the
-  workbook can never disagree. (`lib/model/compute` holds a second,
+  export, whose formulas CI recalculates against it — so the page and the workbook can never disagree where the engine finds
+  the rate. A strip that changes sign once and falls outside the engine's
+  range gets its one rate from `stripRoots` (−99.99% to 100,000%); a
+  strip with two or more rates prints none as the IRR (`irrRoots` lists
+  them, and the note says to read the NPV); a single rate found on a strip
+  with several sign changes is said to be possibly not unique.
+  (`lib/model/compute` holds a second,
   coarser copy for the model tab; a third would be worse than either.)
   Every field on the page is on `useShared` (in the same client file): the
   value goes into the query string so a sizing travels as a LINK, written
@@ -2362,9 +2369,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   a roof every year forever is a cost of doing business, and the test is
   recurrence rather than accounting treatment. **Leasing capital is not
   optional and its annual cost is not its invoice** — a building on
-  five-year leases re-tenants a fifth of itself a year, so `leasingAnnual`
-  is the per-foot TI and commission over the term, on the share that
-  actually rolls; spending nothing this year means the cost is late, not
+  five-year leases re-tenants a fifth of itself a year, so `leasingAnnual` is the share that rolls in a year times its blended
+  TI and commission a foot, counted once (the first version divided by
+  the term again: $258,800 against $1,294,000); spending nothing this year means the cost is late, not
   absent. **A renewal is cheaper than a new lease and the mix is an
   assumption**, so the probability is an input and BOTH ends are reported
   (`leasingIfAllRenew` / `leasingIfNoneRenew`, a 3.3× range on the seed) —
@@ -2477,8 +2484,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   of it the LEASE, which is cash borrowed rather than value created.
   **An above-market lease reverts to market**, so the buyer is really
   buying the term's rent plus a market-rent building afterwards
-  ($23,026,443); capitalising the contract NOI overpays by $3,973,557, and
-  it is WORSE on a SHORT lease because the reversion arrives sooner — the
+  ($23,026,443); capitalising the contract NOI overpays by $3,973,557, but only
+  $1,434,633 of it (5.3%) is the premium reverting
+  (`overpaymentFromPremium`); the other $2,538,924 would be paid at market
+  rent too (`overpaymentAtMarketRent`, the 6% credit cap against the 8%
+  discount rate). The premium's part is WORSE on a SHORT lease because the reversion arrives sooner — the
   direction people get backwards. The identity that proves the two pieces
   are one model: strip the premium and discount at the market cap and
   `honestValue` equals `marketValue` to the dollar. **The credit is the
@@ -2494,7 +2504,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `overpayment` is still positive — the two inputs simply disagree about
   the yield — so the reversion sentence is gated on there BEING a rent
   premium, or the card calls an artifact of two assumptions a finding
-  about the deal. Bars: `data-bar="slb"` (three values on one track) and
+  about the deal; each part is gated on its own, and where the two rates
+  run the other way the note says where the price lands in all. Bars: `data-bar="slb"` (three values on one track) and
   `data-bar="coupon"` (a year each, against the coupon's dashed line).
 - The insurance line: `lib/tools/insurance.ts` (pure — the expense that
   reprices hardest and gets read least, and structurally the same trap as
@@ -2577,7 +2588,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   price less the land share and never the price. **The gain at the sale has
   THREE rates, not one** — section 1245 property from a cost-segregation
   carve-out recaptures at the ORDINARY rate, the building's depreciation
-  comes back as unrecaptured 1250 gain at 25%, and only appreciation over
+  comes back as unrecaptured 1250 gain at the owner's ordinary rate,
+  capped at 25% (`recaptureRatePct`), and only appreciation over
   the original price is capital gain; they are filled in that order, and
   running the whole gain at the capital-gains rate understates the bill on
   any long hold. And **depreciation is a TIMING benefit** — `netOfRecapture`
@@ -2616,7 +2628,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and can drift, the other is a negotiated number and cannot, so the
   caller says which the lease has. And **a cap is cumulative or it is
   not**: cumulative compounds off the base year and banks unused headroom,
-  non-cumulative allows one year's worth; both are "a 5% cap" in a term
+  non-cumulative holds each year to the cap over last year's controllable
+  as charged (`priorControllable`, asked for once the base year is more
+  than a year back; until it is entered nothing is held back and
+  `capNote` says why); both are "a 5% cap" in a term
   sheet. The cap reaches CONTROLLABLE expenses only and the carve-out is
   reported beside it, because a 5% cap is worth little in a year the
   insurance doubled. Every displayed figure is rounded once and the
@@ -2659,7 +2674,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the page and the workbook can never disagree (the same round trip
   checks the exit-cap solve). **The required growth is a CLAIM, not a
   verdict** — the benchmark is an input and the words ("at market", "a
-  stretch", "heroic", at `STRETCH_POINTS` / `HEROIC_POINTS`) describe the
+  stretch", "heroic", at `STRETCH_POINTS` / `HEROIC_POINTS`, and "below market"
+  at `STRETCH_POINTS` or more under the benchmark) describe the
   DISTANCE from it, never the market. And **cap compression is not a
   plan**: the module solves the other lever too and flags the case that
   should stop a screening, an exit cap required to be TIGHTER than the
@@ -2679,20 +2695,20 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   DIFFERENT rates and no single annuity factor covers it (a test pins it
   against a hand-built schedule for exactly that reason). Capitalising the
   leasehold's NOI at a fee-simple cap values a perpetuity that expires:
-  on the seeded lease that is $120M against $97.5M over 40 years (18.7%
-  imaginary), and the same lease with 10 years left is 62.8% imaginary —
+  on the seeded lease that is $120M against $93.9M over 40 years (21.7% imaginary: 18.7% the
+  reversion, 3.0% the year-16 reset), and the same lease with 10 years left is 62.8% imaginary —
   the error grows as the term shortens, which is why both figures are
   drawn side by side. **Ground rent coverage is the lender's test**, not
   DSCR: on an unsubordinated lease the ground rent outranks the mortgage,
   and a default terminates the lease, the building and the mortgage
   together. **A reset is an uncapped repricing** — a rent struck at a
-  share of THEN-CURRENT land value takes the seeded lease from 4× to
-  2.22× coverage, and doubling land value takes it to 1.11×. And
+  share of THEN-CURRENT land value takes the seeded lease from 4× today to 3.22× on year 16's NOI, and doubling land value
+  takes it to 1.61×. And
   **subordination decides financeability**: `TERM_MARGIN_YEARS` (10) is
   the margin by which an unsubordinated term must outlast the loan, and
   the boundary is stated so it cannot drift. The leased fee is the mirror
   — the rent plus the land coming back — and it moves the OPPOSITE way as
-  the clock runs ($32.7M → $42.3M as the leasehold falls $97.5M → $44.7M),
+  the clock runs ($36.3M → $42.3M as the leasehold falls $93.9M → $44.7M),
   which is why the two halves trade to different buyers.
 - What the taxes become once you own it: `lib/tools/tax-reassessment.ts`
   (pure). **The memorandum's tax line is the SELLER's bill**, struck on
@@ -2796,8 +2812,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   stay). One guard the probe bought: a street rate ABOVE the raised
   in-place rent printed a **736.4%** break-even, which reads as a figure
   and is not one — a facility cannot lose more tenants than it has — so
-  above 100% the answer is null and the note says there is no trade to
-  make. Bars: `data-bar="ecri"` (the assumed response against the
+  above 100% the answer is null. Where the street rate, net of downtime,
+  re-lets at or above the raised rent, there is no trade to make; where it
+  re-lets between the old and the raised rent (the 736.4% case: $160 less
+  a month's downtime is $146.67, between $135 and $148.50), no move-out
+  rate loses revenue, but each move-out gives back part of the gain. Bars: `data-bar="ecri"` (the assumed response against the
   break-even) and `data-bar="runway"` (one a year).
 - Taking over the seller's loan: `lib/tools/loan-assumption.ts` (pure — the
   other half of `prepayment`, which asks what it costs to get OUT of a loan
@@ -2949,8 +2968,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   two corrections run opposite ways, which is why neither is ever made.
   Corrected, the memorandum's 20% on cost is 13.4% and its $9.0M of value
   created is $4.5M. And **the return on cost has no clock in it**: the same
-  program earns 63.7% sold the year it finishes and 31.4% held to a five-year
-  exit, because 90% of its present value is the RESALE rather than the rent —
+  program earns 63.7% sold the year it finishes and 34.7% held to a five-year exit,
+  because 82% of its present value is the RESALE rather than the rent —
   a renovation is a transaction, not an income strategy. Both shocks are
   computed rather than asserted (`PREMIUM_MISS_PCT`, `EXIT_CAP_SHOCK_BPS`):
   the premium usually dominates, since it sets the rent and the exit where
@@ -3130,10 +3149,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   storey. And **a density bonus is a trade with a computable break-even**:
   the set-aside is struck against the BONUSED count, so
   `bonusBreakEvenPct = s(M−R) / (M − s(M−R))` — 8.7% at a 20% set-aside on
-  the seeded rents, and a 5% bonus for that set-aside costs $150,000 a year
-  while reading as free density. The crossing is continuous and apartments
+  the seeded rents, and where density binds (70 units an acre on the same
+  two acres, 140 units) a 5% bonus for that set-aside costs $150,000 a
+  year while reading as free density. The crossing is continuous and apartments
   are whole, so the realised sign flips a little above it (a 9% bonus is
-  still $12,000 down) — documented, not a rounding bug. Bars:
+  still $12,000 down) — documented, not a rounding bug. A bonus lifts the
+  density limit, never the site: the smallest cap is taken again and the
+  one still binding is named (`bindingWithBonus`, `unitsAddedByBonus`,
+  `usableBonusPct`, `bonusNote` with the relief needed). On the seed,
+  parking holds 140 whatever the bonus, so the 20% bonus restricts 21
+  units for nothing, −$252,000 a year (the first version printed 168
+  units and +$528,000). Bars:
   `data-bar="envelope"` (the four caps on one track) and
   `data-bar="setaside"` (restricted against market). **`cap` was already
   taken** by the cap-rate card and the catalog's collision guard caught it.

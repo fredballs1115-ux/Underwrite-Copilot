@@ -674,12 +674,14 @@ jobs:
           mark "#339 the cheque you could take out today is computed" grep -q "14.82M" p_tools2.html
           mark "#339 the decay rule is stated on the card" grep -q "the equity underneath it grows faster" p_tools2.html
           # #341 — below the NOI line. The middle two are computed: the
-          # 64bp is the distance between two caps the module worked out,
-          # and $5,614,545 is the annual cost capitalised at the cover's
-          # own rate — so a `present` on either proves the arithmetic ran.
+          # 280bp is the distance between two caps the module worked out,
+          # and $24,436,364 is the annual cost capitalised at the cover's
+          # own rate — so a `present` on either proves the arithmetic ran
+          # (2026-10-01: the leasing line had divided by the term twice,
+          # and read 64bp and $5,614,545).
           mark "#341 the below-the-line card is on /tools" grep -q "What sits below the NOI line" p_tools2.html
-          mark "#341 the cap gap between the two NOIs is computed" grep -q "is 64bp of cap rate above the one a lender would underwrite" p_tools2.html
-          mark "#341 and the omission is said as a price" grep -q "5,614,545" p_tools2.html
+          mark "#341 the cap gap between the two NOIs is computed" grep -q "is 280bp of cap rate above the one a lender would underwrite" p_tools2.html
+          mark "#341 and the omission is said as a price" grep -q "24,436,364" p_tools2.html
           mark "#341 the run-rate rule is stated on the card" grep -q "the cost is late rather than absent" p_tools2.html
           # #342 — what you can pay. The first counts TWO occurrences, the
           # jump-index chip and the card's own title, so it proves the
