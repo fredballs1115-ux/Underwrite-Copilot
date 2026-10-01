@@ -43,9 +43,9 @@ import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";
 import { readStack } from "@/lib/tools/capital-stack";
 import { readTrailing } from "@/lib/tools/trailing-window";
-import { readEgi } from "@/lib/tools/economic-occupancy";
+import { EMPTY as NO_EGI, readEgi } from "@/lib/tools/economic-occupancy";
 import { EMPTY as NO_HOLD, readHold } from "@/lib/tools/hold-or-sell";
-import { readBelow } from "@/lib/tools/below-the-line";
+import { EMPTY as NO_BELOW, readBelow } from "@/lib/tools/below-the-line";
 import { EMPTY as NO_BID, readBid } from "@/lib/tools/max-bid";
 import { readBuyout } from "@/lib/tools/lease-buyout";
 import { readDraw } from "@/lib/tools/construction-draw";
@@ -54,9 +54,9 @@ import { SEED_MONTHS_REMAINING, readPrepayment } from "@/lib/tools/prepayment";
 import { buildStack } from "@/lib/tools/sources-uses";
 import { readMix, totalMix } from "@/lib/tools/unit-mix";
 import { readRoll, readRollover } from "@/lib/tools/rollover";
-import { readLeaseUp } from "@/lib/tools/lease-up";
-import { readLeaseback } from "@/lib/tools/sale-leaseback";
-import { readInsurance } from "@/lib/tools/insurance";
+import { EMPTY as NO_LEASE_UP, readLeaseUp } from "@/lib/tools/lease-up";
+import { EMPTY as NO_LEASEBACK, readLeaseback } from "@/lib/tools/sale-leaseback";
+import { EMPTY as NO_INSURANCE, readInsurance } from "@/lib/tools/insurance";
 import { runWaterfall } from "@/lib/tools/waterfall-math";
 import { DOWNSIDE_EXIT_HAIRCUT, readFeeDrag } from "@/lib/tools/fee-drag";
 import { readEnvelope } from "@/lib/tools/zoning-envelope";
@@ -2861,26 +2861,49 @@ function Leaseback() {
   const [dscr, setDscr] = useShared("slbc", "1.30");
   const [dy, setDy] = useShared("slby", "9");
 
-  const r = useMemo(
-    () =>
-      readLeaseback({
-        buildingSf: num(sf) ?? 0,
-        marketRentPerSf: num(mkt) ?? 0,
-        contractRentPerSf: num(con) ?? 0,
-        termYears: num(term) ?? 0,
-        escalationPct: num(esc),
-        creditCapPct: num(credit) ?? 0,
-        marketCapPct: num(market) ?? 0,
-        discountRatePct: num(disc),
-        sellingCostPct: num(cost),
-        mortgageRatePct: num(rate),
-        mortgageAmortYears: num(amort),
-        maxLtvPct: num(ltv),
-        minDscr: num(dscr),
-        minDebtYieldPct: num(dy),
-      }),
-    [sf, mkt, con, term, esc, credit, market, disc, cost, rate, amort, ltv, dscr, dy],
-  );
+  const r = useMemo(() => {
+    const needs: Array<readonly [string, string]> = [
+      ["the building's size", sf],
+      ["the market rent", mkt],
+      ["the contract rent", con],
+      ["the term", term],
+      // The rent's path is rule 4's whole comparison: a blank is not a flat
+      // lease. A flat one is typed as 0.
+      ["the escalation", esc],
+      ["the credit cap", credit],
+      ["the market cap", market],
+    ];
+    // A lender test left blank is not applied (`sizeLoan`'s rule), and with
+    // none set there is no loan to size; any test set sizes one, which needs
+    // its rate and its amortisation — Max bid's rule.
+    const lending = [ltv, dscr, dy].some((v) => (num(v) ?? 0) > 0);
+    if (lending) needs.push(["the mortgage rate", rate], ["the amortisation", amort]);
+    const missing = blanks(needs);
+    // One return rather than an early one: with an early return the React
+    // Compiler's lint could not preserve this memo (on these five cards).
+    return missing.length > 0
+      ? { ...NO_LEASEBACK, note: fillIn(missing) }
+      : readLeaseback({
+          buildingSf: num(sf)!,
+          marketRentPerSf: num(mkt)!,
+          contractRentPerSf: num(con)!,
+          termYears: num(term)!,
+          escalationPct: num(esc)!,
+          creditCapPct: num(credit)!,
+          marketCapPct: num(market)!,
+          // A blank discount rate is the market cap, the module's stated
+          // default; a blank cost of sale is none, a cost not stated (Max
+          // bid's closing costs); a blank mortgage rate with no lender test
+          // set draws no coupon.
+          discountRatePct: num(disc),
+          sellingCostPct: num(cost),
+          mortgageRatePct: num(rate),
+          mortgageAmortYears: num(amort),
+          maxLtvPct: num(ltv),
+          minDscr: num(dscr),
+          minDebtYieldPct: num(dy),
+        });
+  }, [sf, mkt, con, term, esc, credit, market, disc, cost, rate, amort, ltv, dscr, dy]);
   // Years the rent costs less than the coupon: every year before it passes.
   const underCoupon = r.yearRentPassesCoupon === null ? null : r.yearRentPassesCoupon - 1;
 
@@ -5076,22 +5099,29 @@ function Insurance() {
   const [altPct, setAltPct] = useShared("insad", "10");
   const [altPrem, setAltPrem] = useShared("insap", "620,000");
 
-  const r = useMemo(
-    () =>
-      readInsurance({
-        sellerPremium: num(seller) ?? 0,
-        quotedPremium: num(quoted) ?? 0,
-        statedNoi: num(noi),
-        advertisedCapPct: num(cap),
-        buildingSf: num(sf),
-        units: num(units),
-        insuredValue: num(insured),
-        namedStormDeductiblePct: num(storm),
-        alternativeDeductiblePct: num(altPct),
-        alternativePremium: num(altPrem),
-      }),
-    [seller, quoted, noi, cap, units, sf, insured, storm, altPct, altPrem],
-  );
+  const r = useMemo(() => {
+    const needs: Array<readonly [string, string]> = [
+      ["the memorandum's premium", seller],
+      ["your quote", quoted],
+    ];
+    const missing = blanks(needs);
+    return missing.length > 0
+      ? { ...NO_INSURANCE, note: fillIn(missing) }
+      : readInsurance({
+          sellerPremium: num(seller)!,
+          quotedPremium: num(quoted)!,
+          // Each of these answers one part of the card, and a blank leaves
+          // that part out — the module reads it as no figure, never as zero.
+          statedNoi: num(noi),
+          advertisedCapPct: num(cap),
+          buildingSf: num(sf),
+          units: num(units),
+          insuredValue: num(insured),
+          namedStormDeductiblePct: num(storm),
+          alternativeDeductiblePct: num(altPct),
+          alternativePremium: num(altPrem),
+        });
+  }, [seller, quoted, noi, cap, units, sf, insured, storm, altPct, altPrem]);
 
   // Rule 1 as a picture: the memorandum's premium against the real one.
   const prem = [
@@ -5241,22 +5271,46 @@ function BelowTheLine() {
   const [renLc, setRenLc] = useShared("blD", "6");
   const [renew, setRenew] = useShared("blE", "65");
 
-  const r = useMemo(
-    () =>
-      readBelow({
-        brokerNoi: num(noi) ?? 0,
-        buildingSf: num(sf) ?? 0,
-        priceUsd: num(price),
-        reservePerSf: num(reserve),
-        annualRolloverPct: num(roll),
-        newTiPerSf: num(newTi),
-        renewalTiPerSf: num(renTi),
-        newLcPerSf: num(newLc),
-        renewalLcPerSf: num(renLc),
-        renewalProbabilityPct: num(renew),
-      }),
-    [noi, sf, price, reserve, roll, newTi, renTi, newLc, renLc, renew],
-  );
+  const r = useMemo(() => {
+    // The lines this card exists to count are the module's three rules: the
+    // reserve (capital that recurs is an expense) and the leasing capital
+    // (not optional, and a year's roll is never nothing). A blank one read
+    // as zero is the line left out, which is the error the card names — so
+    // each is asked for, and a building with none of one types 0.
+    const needs: Array<readonly [string, string]> = [
+      ["the NOI as stated", noi],
+      ["the building's size", sf],
+      ["the reserve", reserve],
+      ["the share that rolls a year", roll],
+    ];
+    // What re-leasing a foot costs is needed only where some of it rolls.
+    if ((num(roll) ?? 0) > 0) {
+      needs.push(
+        ["the new TI", newTi],
+        ["the renewal TI", renTi],
+        ["the new commission", newLc],
+        ["the renewal commission", renLc],
+      );
+    }
+    const missing = blanks(needs);
+    return missing.length > 0
+      ? { ...NO_BELOW, note: fillIn(missing) }
+      : readBelow({
+          brokerNoi: num(noi)!,
+          buildingSf: num(sf)!,
+          // A blank price leaves the caps out, and the note asks for it; a
+          // blank renewal rate blends at the module's 50/50, both ends drawn
+          // beside it.
+          priceUsd: num(price),
+          reservePerSf: num(reserve)!,
+          annualRolloverPct: num(roll)!,
+          newTiPerSf: num(newTi),
+          renewalTiPerSf: num(renTi),
+          newLcPerSf: num(newLc),
+          renewalLcPerSf: num(renLc),
+          renewalProbabilityPct: num(renew),
+        });
+  }, [noi, sf, price, reserve, roll, newTi, renTi, newLc, renLc, renew]);
 
   // The two NOIs on one track, the stated one full width and the owner's
   // as the share of it that survives — so the gap IS the overhang, in the
@@ -5419,22 +5473,30 @@ function EconomicOccupancy() {
   const [opex, setOpex] = useShared("eoX", "1,950,000");
   const [price, setPrice] = useShared("eoP", "52M");
 
-  const r = useMemo(
-    () =>
-      readEgi({
-        units: num(units) ?? 0,
-        marketRentPerUnit: num(market) ?? 0,
-        physicalOccupancyPct: num(occ) ?? -1,
-        lossToLeasePct: num(ltl),
-        concessionsPct: num(conc),
-        nonRevenueUnits: num(nonRev),
-        badDebtPct: num(bad),
-        otherIncomeAnnual: num(other),
-        opexAnnual: num(opex),
-        priceUsd: num(price),
-      }),
-    [units, market, occ, ltl, conc, nonRev, bad, other, opex, price],
-  );
+  const r = useMemo(() => {
+    const missing = blanks([
+      ["the units", units],
+      ["the market rent", market],
+      ["the occupancy", occ],
+    ]);
+    return missing.length > 0
+      ? { ...NO_EGI, note: fillIn(missing) }
+      : readEgi({
+          units: num(units)!,
+          marketRentPerUnit: num(market)!,
+          physicalOccupancyPct: num(occ)!,
+          // An unstated deduction is absent, not nil — the module's own rule
+          // — so a blank one is a line the bridge does not draw; a blank
+          // expense line or price leaves the NOI and the cap out.
+          lossToLeasePct: num(ltl),
+          concessionsPct: num(conc),
+          nonRevenueUnits: num(nonRev),
+          badDebtPct: num(bad),
+          otherIncomeAnnual: num(other),
+          opexAnnual: num(opex),
+          priceUsd: num(price),
+        });
+  }, [units, market, occ, ltl, conc, nonRev, bad, other, opex, price]);
 
   // The two occupancies on ONE track, because the whole point is that they
   // are answers to the same question and they disagree. The economic bar
@@ -5758,24 +5820,41 @@ function LeaseUp() {
   const [fixed, setFixed] = useShared("lufx", "65");
   const [debt, setDebt] = useShared("luds", "");
 
-  const r = useMemo(
-    () =>
-      readLeaseUp({
-        buildingSf: num(sf) ?? 0,
-        preLeasedSf: num(pre),
-        stabilizedOccupancyPct: num(stab),
-        absorptionSfPerMonth: num(pace) ?? 0,
-        rentPerSf: num(rent) ?? 0,
-        freeRentMonths: num(free),
-        tiPerSf: num(ti),
-        lcPerSf: num(lc),
-        opexPerSf: num(opex),
-        fixedOpexSharePct: num(fixed),
-        monthlyDebtService: num(debt),
-        maxMonths: MAX_LEASE_UP_MONTHS,
-      }),
-    [sf, pre, stab, pace, rent, free, ti, lc, opex, fixed, debt],
-  );
+  const r = useMemo(() => {
+    const missing = blanks([
+      ["the building's size", sf],
+      ["the absorption", pace],
+      ["the rent", rent],
+      // The money the module's rules are about: the free rent that makes
+      // leased not paying (rule 3), the allowance and commission due at
+      // signing that put the trough late (rule 4), and the operating cost
+      // an empty building still carries (rule 2). Read as zero, each is the
+      // error its rule names; a lease with none of one is typed as 0.
+      ["the free rent", free],
+      ["the allowance", ti],
+      ["the commission", lc],
+      ["the operating cost", opex],
+    ]);
+    return missing.length > 0
+      ? { ...NO_LEASE_UP, note: fillIn(missing) }
+      : readLeaseUp({
+          buildingSf: num(sf)!,
+          // A blank is the empty building the card is named for; the
+          // stabilized occupancy and the fixed share take the module's own
+          // defaults (95%, 65%); a blank debt service is the unlevered case.
+          preLeasedSf: num(pre),
+          stabilizedOccupancyPct: num(stab),
+          absorptionSfPerMonth: num(pace)!,
+          rentPerSf: num(rent)!,
+          freeRentMonths: num(free)!,
+          tiPerSf: num(ti)!,
+          lcPerSf: num(lc)!,
+          opexPerSf: num(opex)!,
+          fixedOpexSharePct: num(fixed),
+          monthlyDebtService: num(debt),
+          maxMonths: MAX_LEASE_UP_MONTHS,
+        });
+  }, [sf, pre, stab, pace, rent, free, ti, lc, opex, fixed, debt]);
 
   // The schedule ends at the longest the card runs, and a tile whose answer
   // falls past it reads "—": said, so the dash is where the schedule stopped

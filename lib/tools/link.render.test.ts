@@ -133,6 +133,103 @@ describe("a figure run to the longest its card runs, said on the card", () => {
   });
 });
 
+describe("a blank required field is named, never read as zero", () => {
+  // A card that cannot answer without a field answers nothing and says
+  // which (lib/tools/blanks). No figure is left in the card's text: none of
+  // these cards writes a dollar in its fixed copy.
+  const noAnswer = (text: string) => expect(text).not.toMatch(/\$\d/);
+
+  it("the sale-leaseback", async () => {
+    const text = textOf(await fromLink("?slbe="), "sale-leaseback");
+    expect(text).toContain("Fill in the escalation — a blank is not read as zero.");
+    noAnswer(text);
+    expect(textOf(await fromLink("?lbsf=&slbt="), "sale-leaseback")).toContain(
+      "Fill in the building's size and the term — a blank is not read as zero.",
+    );
+    // A lender test set sizes a loan, which needs its rate…
+    expect(textOf(await fromLink("?lbr="), "sale-leaseback")).toContain(
+      "Fill in the mortgage rate — a blank is not read as zero.",
+    );
+    // …and with every test blank there is no loan, so no rate is asked for.
+    const noLoan = textOf(await fromLink("?slbl=&slbc=&slby=&lbr=&lba="), "sale-leaseback");
+    expect(noLoan).not.toContain("Fill in");
+    expect(noLoan).toContain("$27,000,000");
+    // A blank discount rate is the market cap, the module's stated default,
+    // and a typed 0 escalation is a flat lease: both answer.
+    expect(textOf(await fromLink("?slbd="), "sale-leaseback")).not.toContain("Fill in");
+    expect(textOf(await fromLink("?slbe=0"), "sale-leaseback")).toContain("$27,000,000");
+  });
+
+  it("insurance", async () => {
+    const text = textOf(await fromLink("?insp="), "insurance");
+    expect(text).toContain("Fill in the memorandum's premium — a blank is not read as zero.");
+    expect(text).not.toContain("Enter the premium the memorandum states");
+    // The quote's own bar is the figure typed, not an answer: nothing is
+    // derived from it — no cap, no gap, no price.
+    expect(text).not.toContain("bps");
+    expect(text).not.toMatch(/\d\.\d\d%/);
+    // A blank NOI leaves the cap out and answers the rest.
+    const noNoi = textOf(await fromLink("?insn="), "insurance");
+    expect(noNoi).not.toContain("Fill in");
+    expect(noNoi).toContain("$3,250"); // the quote a unit
+  });
+
+  it("the lease-up", async () => {
+    const text = textOf(await fromLink("?luop="), "lease-up");
+    expect(text).toContain("Fill in the operating cost — a blank is not read as zero.");
+    noAnswer(text);
+    expect(textOf(await fromLink("?lufr=&luti="), "lease-up")).toContain(
+      "Fill in the free rent and the allowance — a blank is not read as zero.",
+    );
+    // A blank pre-leasing is the empty building the card is named for, and
+    // a blank debt service the unlevered case: both answer.
+    const empty = textOf(await fromLink("?lupre="), "lease-up");
+    expect(empty).not.toContain("Fill in");
+    expect(empty).toMatch(/Worst month needs/);
+    expect(empty).toMatch(/\$\d/);
+  });
+
+  it("economic occupancy", async () => {
+    // A blank occupancy read as -1 and was told "0 to 100".
+    const text = textOf(await fromLink("?eoO="), "economic-occupancy");
+    expect(text).toContain("Fill in the occupancy — a blank is not read as zero.");
+    expect(text).not.toContain("0 to 100");
+    noAnswer(text);
+    // An unstated deduction is absent, not nil: the bridge draws no line.
+    expect(textOf(await fromLink(""), "economic-occupancy")).toMatch(/Loss to lease \$[\d,]+/);
+    const noLtl = textOf(await fromLink("?eoL="), "economic-occupancy");
+    expect(noLtl).not.toContain("Fill in");
+    expect(noLtl).not.toMatch(/Loss to lease \$/);
+    expect(noLtl).toMatch(/Effective gross income \$[\d,]+/);
+  });
+
+  it("below the line", async () => {
+    // A blank NOI was read as zero: "NOI as stated $0", a cap on the cover
+    // of 0.00%, and an owner's NOI below zero.
+    const text = textOf(await fromLink("?blN="), "below-the-line");
+    expect(text).toContain("Fill in the NOI as stated — a blank is not read as zero.");
+    noAnswer(text);
+    expect(textOf(await fromLink("?blO="), "below-the-line")).toContain(
+      "Fill in the share that rolls a year — a blank is not read as zero.",
+    );
+    expect(textOf(await fromLink("?blA="), "below-the-line")).toContain(
+      "Fill in the new TI — a blank is not read as zero.",
+    );
+    // Nothing rolls, so what re-leasing costs is not asked for…
+    const noRoll = textOf(await fromLink("?blO=0&blA=&blB=&blC=&blD="), "below-the-line");
+    expect(noRoll).not.toContain("Fill in");
+    expect(noRoll).toContain("Replacement reserve");
+    // …and a blank price leaves the caps out, and asks for it.
+    expect(textOf(await fromLink("?blP="), "below-the-line")).toContain(
+      "Enter a price to see what it is worth.",
+    );
+  });
+
+  it("and no seeded card opens asking for a field", async () => {
+    expect(visibleText(await fromLink(""))).not.toContain("a blank is not read as zero");
+  });
+});
+
 describe("a negative written by the page, through the shared writer", () => {
   it("says a negative break-even hard cost as no cost penciling, never as one that does", async () => {
     // Land dear enough that free construction would not work: the solved

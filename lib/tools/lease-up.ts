@@ -113,7 +113,8 @@ export interface LeaseUpResult {
   note: string;
 }
 
-const EMPTY: LeaseUpResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: LeaseUpResult = {
   targetSf: null,
   months: [],
   monthsToStabilize: null,

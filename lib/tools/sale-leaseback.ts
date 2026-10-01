@@ -131,7 +131,8 @@ export interface SaleLeasebackResult {
   note: string;
 }
 
-const EMPTY: SaleLeasebackResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: SaleLeasebackResult = {
   contractNoi: null,
   marketNoi: null,
   rentPremiumPct: null,

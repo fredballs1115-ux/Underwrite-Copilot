@@ -80,7 +80,8 @@ export interface BelowResult {
   note: string;
 }
 
-const EMPTY: BelowResult = {
+/** No answer — exported so a card missing a required field can show one. */
+export const EMPTY: BelowResult = {
   brokerNoi: null,
   lines: [],
   totalAnnual: null,
