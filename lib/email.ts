@@ -232,7 +232,7 @@ export async function notifyAnalysisReady(
       color: "#114e54",
     };
     const dealName = (deal.name as string) ?? "Your deal";
-    const picture = await emailPicture(admin, dealId, dealName, {
+    const picture = await emailPicture(admin, dealId, {
       cache: (deal.photo as DealVisualCache | null) ?? null,
       omPath: (deal.om_storage_path as string | null) ?? null,
     });
@@ -304,21 +304,22 @@ export const EMAIL_PICTURE_WAIT_MS = 15_000;
  * cover is looked for here first where nobody has yet — the cover alone
  * (the gallery is left to the deal's first view), bounded, and never a
  * reason the email is late by more than the wait or not sent at all. The
- * email's picture link then serves whatever is stored when it is opened.
+ * email's picture link then serves whatever is stored when it is OPENED,
+ * which is why the banner's alt is the template's (`bannerAlt`: the deal
+ * and the link, true of either picture) and is no longer decided here — a
+ * "Photograph of …" written at send time could sit over the cover's drawing.
  */
 export async function emailPicture(
   admin: SupabaseClient,
   dealId: string,
-  dealName: string,
   deal: { cache: DealVisualCache | null; omPath: string | null },
-): Promise<{ url: string; alt: string } | null> {
+): Promise<{ url: string } | null> {
   const url = emailPictureUrl(appUrl(), dealId, "banner");
   if (!url) return null;
-  let photo = !!deal.cache?.picture;
   if (pictureMayBeInMemorandum({ omPath: deal.omPath, isSample: false, cache: deal.cache })) {
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const found = await Promise.race([
+      await Promise.race([
         ensureDealPicture(admin, dealId, {
           omPath: deal.omPath,
           isSample: false,
@@ -326,19 +327,16 @@ export async function emailPicture(
           waitMs: EMAIL_PICTURE_WAIT_MS,
           gallery: false,
         }),
-        // Past the wait, the email goes on what the cache held.
-        new Promise<undefined>((resolve) => {
-          timer = setTimeout(() => resolve(undefined), EMAIL_PICTURE_WAIT_MS + 10_000);
+        // Past the wait, the email goes with whatever is stored by then.
+        new Promise<void>((resolve) => {
+          timer = setTimeout(resolve, EMAIL_PICTURE_WAIT_MS + 10_000);
         }),
       ]);
-      // The search's answer is the picture now stored, or none (an old
-      // memorandum picture its rules no longer take for the cover is gone).
-      if (found !== undefined) photo = !!found;
     } catch {
       // The cover's drawing stands in; the email goes regardless.
     } finally {
       if (timer) clearTimeout(timer);
     }
   }
-  return { url, alt: photo ? `Photograph of ${dealName}` : "" };
+  return { url };
 }

@@ -63,51 +63,48 @@ afterEach(() => {
 });
 
 describe("the screen-complete email's picture (#464)", () => {
-  it("looks for the memorandum's cover alone, bounded, and names a photograph it found", async () => {
+  const BANNER_URL = /^https:\/\/underwrite\.example\/api\/email\/picture\/[^?]+\?s=banner$/;
+
+  it("looks for the memorandum's cover alone, bounded, before the email goes", async () => {
     pic.found = PICTURE;
-    const p = await emailPicture(admin, DEAL, "The Maddox", { cache: null, omPath: "u1/d.pdf" });
-    expect(p!.url).toMatch(/^https:\/\/underwrite\.example\/api\/email\/picture\/[^?]+\?s=banner$/);
-    expect(p!.alt).toBe("Photograph of The Maddox");
+    const p = await emailPicture(admin, DEAL, { cache: null, omPath: "u1/d.pdf" });
+    expect(p).toEqual({ url: expect.stringMatching(BANNER_URL) });
     expect(pic.asked).toEqual([
       expect.objectContaining({ omPath: "u1/d.pdf", isSample: false, waitMs: EMAIL_PICTURE_WAIT_MS, gallery: false }),
     ]);
   });
 
-  it("draws the cover, decorative, where the memorandum holds no photograph", async () => {
-    const p = await emailPicture(admin, DEAL, "The Maddox", { cache: null, omPath: "u1/d.pdf" });
-    expect(p!.alt).toBe("");
-  });
-
-  it("never searches for a deal whose picture is stored, and says it is a photograph", async () => {
+  it("never searches for a deal whose picture is stored", async () => {
     pic.may = false;
     const cache: DealVisualCache = { picture: PICTURE };
-    const p = await emailPicture(admin, DEAL, "The Maddox", { cache, omPath: "u1/d.pdf" });
+    const p = await emailPicture(admin, DEAL, { cache, omPath: "u1/d.pdf" });
     expect(pic.asked).toEqual([]);
-    expect(p!.alt).toBe("Photograph of The Maddox");
+    expect(p!.url).toMatch(BANNER_URL);
   });
 
-  it("takes the search's answer over an old picture it no longer takes for the cover", async () => {
-    const p = await emailPicture(admin, DEAL, "The Maddox", { cache: { picture: PICTURE }, omPath: "u1/d.pdf" });
-    expect(pic.asked).toHaveLength(1);
-    expect(p!.alt).toBe("");
+  it("decides no alt at send time: the route serves what is stored when the email is OPENED", async () => {
+    // Whatever the search found, the email names no photograph — the
+    // template's alt (bannerAlt) is true of the photograph and of the cover.
+    for (const found of [PICTURE, null]) {
+      pic.found = found;
+      expect(Object.keys((await emailPicture(admin, DEAL, { cache: null, omPath: "u1/d.pdf" }))!)).toEqual(["url"]);
+    }
   });
 
-  it("goes on what the cache held when the search fails or runs past its bound", async () => {
+  it("goes with what is stored when the search fails or runs past its bound", async () => {
     pic.throws = true;
-    expect((await emailPicture(admin, DEAL, "The Maddox", { cache: { picture: PICTURE }, omPath: "x" }))!.alt).toBe(
-      "Photograph of The Maddox",
-    );
+    expect((await emailPicture(admin, DEAL, { cache: { picture: PICTURE }, omPath: "x" }))!.url).toMatch(BANNER_URL);
     pic.throws = false;
     pic.hang = true;
     vi.useFakeTimers();
-    const pending = emailPicture(admin, DEAL, "The Maddox", { cache: null, omPath: "x" });
+    const pending = emailPicture(admin, DEAL, { cache: null, omPath: "x" });
     await vi.advanceTimersByTimeAsync(EMAIL_PICTURE_WAIT_MS + 10_001);
-    expect((await pending)!.alt).toBe("");
+    expect((await pending)!.url).toMatch(BANNER_URL);
   });
 
   it("carries no picture where no link can be minted", async () => {
     delete process.env.SUPABASE_SERVICE_ROLE_KEY;
-    expect(await emailPicture(admin, DEAL, "The Maddox", { cache: null, omPath: "x" })).toBeNull();
+    expect(await emailPicture(admin, DEAL, { cache: null, omPath: "x" })).toBeNull();
     expect(pic.asked).toEqual([]);
   });
 
@@ -149,7 +146,7 @@ describe("the screen-complete email's picture (#464)", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0].from).toBe("Underwrite Copilot <notify@underwrite.example>");
     expect(sent[0].subject).toBe("Go: The Maddox — screen complete");
-    expect(sent[0].html).toMatch(/<img src="https:\/\/underwrite\.example\/api\/email\/picture\/[^"]+\?s=banner" width="520" height="260" alt="Photograph of The Maddox"/);
+    expect(sent[0].html).toMatch(/<img src="https:\/\/underwrite\.example\/api\/email\/picture\/[^"]+\?s=banner" width="520" height="260" alt="The Maddox — open the deal"/);
   });
 });
 

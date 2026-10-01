@@ -1,5 +1,5 @@
 /**
- * Analysis-ready email — one minimal, on-brand template. Deliberately
+ * The emails' templates — one minimal, on-brand family. Deliberately
  * dependency-free (inline styles, table layout, no imports) so email clients
  * render it faithfully and it can be unit-tested with plain Node.
  */
@@ -21,10 +21,11 @@ export interface AnalysisReadyEmailInput {
   reason: string;
   dealUrl: string;
   settingsUrl: string;
-  /** the building's picture across the top (#464, lib/email-picture): its
-   *  photograph, else its cover; `alt` is "" for the cover, a drawing that
-   *  only holds the frame */
-  picture?: { url: string; alt: string } | null;
+  /** the building's picture across the top (#464, lib/email-picture). Its
+   *  route serves whatever is stored when the email is OPENED — the deal's
+   *  photograph, else its cover — so the alt is the template's, worded to be
+   *  true of either (`bannerAlt`), never decided at send time. */
+  picture?: { url: string } | null;
 }
 
 const esc = (s: string) =>
@@ -33,6 +34,87 @@ const esc = (s: string) =>
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;");
+
+/** The colour a picture's box holds while its image is blocked or loading:
+ *  a band of the brand's light tint, never a blank white gap. */
+const PICTURE_BOX = "#dfe8e7";
+
+/** The longest preview line the hidden preheader carries: an inbox shows
+ *  the first stretch of it after the subject, and the rest is noise. */
+export const PREVIEW_MAX = 140;
+
+/** A preview line: white space folded, cut at a word to `PREVIEW_MAX`. */
+export function previewLine(text: string): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  if (flat.length <= PREVIEW_MAX) return flat;
+  const cut = flat.slice(0, PREVIEW_MAX - 1);
+  const at = cut.lastIndexOf(" ");
+  return `${(at > PREVIEW_MAX / 2 ? cut.slice(0, at) : cut).replace(/[\s,;:—–-]+$/, "")}…`;
+}
+
+/** The banner's alt text, and so its link's name: the deal and where the
+ *  link goes. True of a photograph and of the cover alike — the picture is
+ *  chosen when the email is opened, the alt when it is sent — and it reads
+ *  as a line of its own in the band when images are blocked. */
+export function bannerAlt(dealName: string): string {
+  return `${dealName} — open the deal`;
+}
+
+/**
+ * The document every email is: a head (the charset, a phone's viewport, the
+ * one colour scheme the cards are drawn in, the subject as its title), the
+ * inbox's preview line hidden first in the body — what matters, ahead of
+ * whatever text a client would otherwise lift from the card — then the card:
+ * the masthead, and the rows the email brings.
+ */
+function emailDocument(opts: { title: string; preheader: string; rows: string }): string {
+  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>${esc(opts.title)}</title>
+</head>
+<body style="margin:0;padding:0;background-color:#f2f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <div style="display:none;max-height:0;max-width:0;overflow:hidden;opacity:0;font-size:1px;line-height:1px;color:#f2f4f4;mso-hide:all;">${esc(previewLine(opts.preheader))}</div>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f4f4;padding:32px 16px;">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border:1px solid #dde3e2;border-radius:12px;overflow:hidden;">
+        <tr>
+          <td style="background-color:#0c3338;padding:18px 28px;">
+            <span style="color:#ffffff;font-size:15px;font-weight:600;letter-spacing:-0.01em;">Underwrite Copilot</span>
+          </td>
+        </tr>${opts.rows}
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/** The card's one button: a link that carries its own words. */
+function button(url: string, label: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:22px;">
+              <tr>
+                <td style="background-color:#114e54;border-radius:8px;">
+                  <a href="${esc(url)}" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">${esc(label)}</a>
+                </td>
+              </tr>
+            </table>`;
+}
+
+/** The footer row: why the reader got this, and where to turn it off. */
+function footerRow(inner: string): string {
+  return `
+        <tr>
+          <td style="padding:16px 28px;border-top:1px solid #eef1f0;">
+            <p style="margin:0;font-size:12px;line-height:1.5;color:#5f6b69;">
+              ${inner}
+            </p>
+          </td>
+        </tr>`;
+}
 
 export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
   subject: string;
@@ -55,26 +137,22 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
     .filter((l): l is string => l !== null)
     .join("\n");
 
-  const html = `<!doctype html>
-<html>
-<body style="margin:0;padding:0;background-color:#f2f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f4f4;padding:32px 16px;">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border:1px solid #dde3e2;border-radius:12px;overflow:hidden;">
+  // The call first, then why, then the box — what an inbox's preview shows.
+  const preheader = `${input.verdictLabel}${input.reason ? ` — ${input.reason}` : "."} Buy box: ${input.buyBoxLabel}.`;
+
+  const pictureRow = input.picture
+    ? `
         <tr>
-          <td style="background-color:#0c3338;padding:18px 28px;">
-            <span style="color:#ffffff;font-size:15px;font-weight:600;letter-spacing:-0.01em;">Underwrite Copilot</span>
-          </td>
-        </tr>${
-          input.picture
-            ? `
-        <tr>
-          <td style="padding:0;line-height:0;font-size:0;">
-            <a href="${esc(input.dealUrl)}" style="display:block;text-decoration:none;"><img src="${esc(input.picture.url)}" width="520" height="260" alt="${esc(input.picture.alt)}" style="display:block;width:100%;max-width:520px;height:auto;border:0;outline:none;text-decoration:none;" /></a>
+          <td style="padding:0;line-height:0;font-size:0;background-color:${PICTURE_BOX};">
+            <a href="${esc(input.dealUrl)}" style="display:block;text-decoration:none;background-color:${PICTURE_BOX};"><img src="${esc(input.picture.url)}" width="520" height="260" alt="${esc(bannerAlt(input.dealName))}" style="display:block;width:100%;max-width:520px;height:auto;border:0;outline:none;text-decoration:none;background-color:${PICTURE_BOX};color:#114e54;font-size:15px;font-weight:600;line-height:1.4;text-align:center;" /></a>
           </td>
         </tr>`
-            : ""
-        }
+    : "";
+
+  const html = emailDocument({
+    title: subject,
+    preheader,
+    rows: `${pictureRow}
         <tr>
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#5f6b69;">Screen complete</p>
@@ -94,28 +172,13 @@ export function analysisReadyEmail(input: AnalysisReadyEmailInput): {
                 ? `<p style="margin:16px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(input.reason)}</p>`
                 : ""
             }
-            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:22px;">
-              <tr>
-                <td style="background-color:#114e54;border-radius:8px;">
-                  <a href="${esc(input.dealUrl)}" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Open the deal</a>
-                </td>
-              </tr>
-            </table>
+            ${button(input.dealUrl, "Open the deal")}
           </td>
-        </tr>
-        <tr>
-          <td style="padding:16px 28px;border-top:1px solid #eef1f0;">
-            <p style="margin:0;font-size:12px;line-height:1.5;color:#5f6b69;">
-              You're getting this because analysis emails are on.
-              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn them off on your Account page</a>.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+        </tr>${footerRow(
+          `You're getting this because analysis emails are on.
+              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn them off on your Account page</a>.`,
+        )}`,
+  });
 
   return { subject, html, text };
 }
@@ -153,44 +216,23 @@ export function screenStoppedEmail(input: ScreenStoppedEmailInput): {
     ``,
     `You're getting this because analysis emails are on. Turn them off on your Account page: ${input.settingsUrl}`,
   ].join("\n");
-  const html = `<!doctype html>
-<html>
-<body style="margin:0;padding:0;background-color:#f2f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f4f4;padding:32px 16px;">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border:1px solid #dde3e2;border-radius:12px;overflow:hidden;">
-        <tr>
-          <td style="background-color:#0c3338;padding:18px 28px;">
-            <span style="color:#ffffff;font-size:15px;font-weight:600;letter-spacing:-0.01em;">Underwrite Copilot</span>
-          </td>
-        </tr>
+  const html = emailDocument({
+    title: subject,
+    // Why it stopped, first.
+    preheader: input.message,
+    rows: `
         <tr>
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#a8432f;">The screen stopped</p>
             <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${esc(input.dealName)}</h1>
             <p style="margin:16px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(input.message)}</p>
-            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:22px;">
-              <tr>
-                <td style="background-color:#114e54;border-radius:8px;">
-                  <a href="${esc(input.dealUrl)}" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Open the deal</a>
-                </td>
-              </tr>
-            </table>
+            ${button(input.dealUrl, "Open the deal")}
           </td>
-        </tr>
-        <tr>
-          <td style="padding:16px 28px;border-top:1px solid #eef1f0;">
-            <p style="margin:0;font-size:12px;line-height:1.5;color:#5f6b69;">
-              You're getting this because analysis emails are on.
-              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn them off on your Account page</a>.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+        </tr>${footerRow(
+          `You're getting this because analysis emails are on.
+              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn them off on your Account page</a>.`,
+        )}`,
+  });
   return { subject, html, text };
 }
 
@@ -210,15 +252,17 @@ export interface DigestInput {
 
 /**
  * A digest row's picture cell (#464): the deal's 48px square, the way a
- * listing alert pictures each result, linked to the deal like its name.
- * Decorative (`alt=""`): the name beside it says which deal it is. A
- * section where some rows have a picture keeps the column for all of them,
- * so the names start at one x.
+ * listing alert pictures each result, linked to the deal like its name. The
+ * square's alt is the deal's name — the link's name, and what shows in the
+ * tinted square when images are blocked; the route serves the photograph or
+ * the cover, whichever is stored when the email is opened, and the name is
+ * true of both. A section where some rows have a picture keeps the column
+ * for all of them, so the names start at one x.
  */
-function pictureCell(entry: { url: string; pictureUrl?: string | null }, column: boolean): string {
+function pictureCell(entry: { name: string; url: string; pictureUrl?: string | null }, column: boolean): string {
   if (!column) return "";
   const img = entry.pictureUrl
-    ? `<a href="${esc(entry.url)}" style="display:block;text-decoration:none;"><img src="${esc(entry.pictureUrl)}" width="48" height="48" alt="" style="display:block;width:48px;height:48px;border:0;border-radius:8px;" /></a>`
+    ? `<a href="${esc(entry.url)}" style="display:block;text-decoration:none;"><img src="${esc(entry.pictureUrl)}" width="48" height="48" alt="${esc(entry.name)}" style="display:block;width:48px;height:48px;border:0;border-radius:8px;background-color:${PICTURE_BOX};color:#114e54;font-size:9px;line-height:11px;" /></a>`
     : "";
   return `<td width="48" style="width:48px;padding:6px 12px 6px 0;vertical-align:middle;line-height:0;font-size:0;">${img}</td>`;
 }
@@ -231,7 +275,8 @@ export function weeklyDigestEmail(input: DigestInput): {
   text: string;
 } {
   const live = input.stages.reduce((n, s) => n + s.count, 0);
-  const subject = `Your pipeline this week — ${live} live deal${live === 1 ? "" : "s"}`;
+  const dealsWord = `${live} live deal${live === 1 ? "" : "s"}`;
+  const subject = `Your pipeline this week — ${dealsWord}`;
 
   const text = [
     `Your pipeline this week:`,
@@ -250,6 +295,16 @@ export function weeklyDigestEmail(input: DigestInput): {
   ]
     .filter((l): l is string => l !== null)
     .join("\n");
+
+  // The deadlines first — the one thing in a digest with a date on it — then
+  // the count and the calls.
+  const preheader = [
+    input.offersDue.length ? `Offers due: ${input.offersDue.map((o) => `${o.name} (${o.due})`).join(", ")}.` : null,
+    `${dealsWord} in your pipeline.`,
+    input.verdicts.length ? `${input.verdicts.length} verdict${input.verdicts.length === 1 ? "" : "s"} since last week.` : null,
+  ]
+    .filter((l): l is string => l !== null)
+    .join(" ");
 
   const stageRows = input.stages
     .map(
@@ -295,46 +350,24 @@ export function weeklyDigestEmail(input: DigestInput): {
          <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${rows}</table>`
       : "";
 
-  const html = `<!doctype html>
-<html>
-<body style="margin:0;padding:0;background-color:#f2f4f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
-  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f2f4f4;padding:32px 16px;">
-    <tr><td align="center">
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background-color:#ffffff;border:1px solid #dde3e2;border-radius:12px;overflow:hidden;">
-        <tr>
-          <td style="background-color:#0c3338;padding:18px 28px;">
-            <span style="color:#ffffff;font-size:15px;font-weight:600;letter-spacing:-0.01em;">Underwrite Copilot</span>
-          </td>
-        </tr>
+  const html = emailDocument({
+    title: subject,
+    preheader,
+    rows: `
         <tr>
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#5f6b69;">Monday pipeline digest</p>
-            <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${live} live deal${live === 1 ? "" : "s"} in your pipeline</h1>
+            <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${dealsWord} in your pipeline</h1>
             ${section("By stage", stageRows)}
             ${section("Offers due this week", offerRows)}
             ${section("Verdicts since last week", verdictRows)}
-            <table role="presentation" cellpadding="0" cellspacing="0" style="margin-top:24px;">
-              <tr>
-                <td style="background-color:#114e54;border-radius:8px;">
-                  <a href="${esc(input.pipelineUrl)}" style="display:inline-block;padding:10px 20px;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;">Open the pipeline</a>
-                </td>
-              </tr>
-            </table>
+            ${button(input.pipelineUrl, "Open the pipeline")}
           </td>
-        </tr>
-        <tr>
-          <td style="padding:16px 28px;border-top:1px solid #eef1f0;">
-            <p style="margin:0;font-size:12px;line-height:1.5;color:#5f6b69;">
-              You're getting this because the weekly digest is on.
-              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn it off on your Account page</a>.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+        </tr>${footerRow(
+          `You're getting this because the weekly digest is on.
+              <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn it off on your Account page</a>.`,
+        )}`,
+  });
 
   return { subject, html, text };
 }
