@@ -135,7 +135,14 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     // The memorandum names the city, the address its county: in the box.
     expect(pipelineExportRow(deal({ extraction: wexley, address }), { ...ctx, box }).fit).toBe("fits");
     expect(pipelineExportRow(deal({ extraction: wexley }), { ...ctx, box }).fit).toBe("outside");
-    // Before the extraction lands the first signal stands in, as on the card.
-    expect(pipelineExportRow(deal({ extraction: null, first_signal: SIGNAL, address }), { ...ctx, box }).fit).toBe("fits");
+    // Before the extraction lands the first signal stands in, as on the card…
+    const early = pipelineExportRow(deal({ extraction: null, first_signal: SIGNAL, address }), { ...ctx, box });
+    expect(early.fit).toBe("fits");
+    // …and the row marks it the card's "First read", as the pipeline page
+    // does, so the sheet never passes it off as the screen's own fit.
+    expect(early.fitFirstRead).toBe(true);
+    expect(pipelineExportRow(deal({ extraction: wexley, first_signal: SIGNAL, address }), { ...ctx, box }).fitFirstRead).toBe(false);
+    // No buy box, no fit: nothing to mark.
+    expect(pipelineExportRow(deal({ extraction: null, first_signal: SIGNAL, address }), ctx).fitFirstRead).toBe(false);
   });
 });

@@ -105,6 +105,9 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     capWithheld: extraction && !plan && noteCapSlot(extraction) ? "note" : null,
     yieldOnCost: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
     fit,
+    // Judged on the first signal alone until the extraction lands, as the
+    // pipeline page marks it (the card's "First read").
+    fitFirstRead: fit != null && !extraction && signal != null,
     verdict: (d.verdict as { verdict?: string } | null)?.verdict ?? null,
     verdictBehind: verdictBehind(ctx.job),
     offersDue: ctx.offersDue,

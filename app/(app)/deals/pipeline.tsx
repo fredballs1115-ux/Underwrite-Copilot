@@ -35,6 +35,10 @@ import { OffersDueBit } from "./offers-due";
 import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
 import { compareSortValues, type SortDir } from "@/lib/pipeline-sort";
 import { PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
+// Why a fit wears "First read": it is judged on the first signal, before the
+// extraction lands — the deal page's buy-box panel says the same, and the
+// CSV and the meeting workbook mark the figure with the same words.
+import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
@@ -180,11 +184,6 @@ const MANDATE_META: Record<
   WATCH: { label: "Watch", cls: "text-caution" },
   PURSUE: { label: "Pursue", cls: "text-pass" },
 };
-
-/** Why a fit wears "First read": it is judged on the first signal, before
- *  the extraction lands — the deal page's buy-box panel says the same. */
-const FIRST_READ_TITLE =
-  "First read — judged on the first pass over the memorandum; the full screen refines it";
 
 function statusRank(d: DealCard): number {
   if (d.verdict) return (VERDICT_META[d.verdict]?.rank ?? 0) + 2;
@@ -675,9 +674,12 @@ export function Pipeline({
         // A note's cap is withheld, said so rather than left blank (#423).
         d.slots.cap ?? (d.slots.capWithheld === "note" ? "n/a — note" : ""),
         d.slots.yoc ?? "",
-        d.fit ? FIT_META[d.fit].label : "",
-        d.score != null ? String(d.score) : "",
-        d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "",
+        // A fit judged on the first signal, before the extraction lands, is
+        // marked on each of its figures as the card marks it — "Near (first
+        // read)" — since a CSV is read away from the page (lib/first-read).
+        markFirstRead(d.fit ? FIT_META[d.fit].label : "", d.fitFirstRead),
+        markFirstRead(d.score != null ? String(d.score) : "", d.fitFirstRead),
+        markFirstRead(d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "", d.fitFirstRead),
         d.jobStatus === "failed"
           ? "Failed"
           : d.jobStatus === "stalled"

@@ -4,6 +4,7 @@ import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding
 import { STAGES, STAGE_LABEL, normalizeStage, type Stage } from "@/lib/stages";
 import { assetClassLabel } from "@/lib/asset-class";
 import { parsePct, parsePrice, priceRange } from "@/lib/criteria";
+import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
@@ -100,6 +101,10 @@ export interface PipelineExportRow {
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
   yieldOnCost: string | null;
   fit: "fits" | "near" | "outside" | null;
+  /** the fit is judged on the screen's first signal, the extraction not
+   *  landed yet — the pipeline card's "First read" (lib/first-read); the
+   *  cell says so beside the fit it shows */
+  fitFirstRead?: boolean | null;
   verdict: string | null; // pass | caution | pass_on
   /** the call on file is the previous screen's: a re-screen is running, or
    *  the latest screen failed before its verdict (lib/screen-run
@@ -302,11 +307,18 @@ export async function buildPipelineWorkbook(
       yocCell.font = baseFont;
       yocCell.alignment = { horizontal: "right" };
 
+      // A fit judged on the first signal is the card's "First read": said on
+      // the cell, in italic as a call not yet the screen's own is, and
+      // explained in its note — never passed off as the full screen's fit.
       const fit = d.fit ? FIT_LABEL[d.fit] : null;
-      row.getCell(10).value = fit?.label ?? "—";
+      const firstRead = !!fit && !!d.fitFirstRead;
+      row.getCell(10).value = fit ? markFirstRead(fit.label, firstRead) : "—";
       row.getCell(10).font = fit
-        ? { size: 10, bold: true, color: { argb: fit.color } }
+        ? firstRead
+          ? { size: 10, italic: true, color: { argb: fit.color } }
+          : { size: 10, bold: true, color: { argb: fit.color } }
         : baseFont;
+      if (firstRead) row.getCell(10).note = FIRST_READ_TITLE;
 
       const v = d.verdict ? VERDICT_LABEL[d.verdict] : null;
       // A call the latest screen has not re-run is the previous screen's,
