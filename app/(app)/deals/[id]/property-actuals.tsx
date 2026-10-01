@@ -1,5 +1,5 @@
 import type { RentRollSummary, T12Summary, NoiComparison } from "@/lib/actuals/types";
-import { rentQuotedMonthly } from "@/lib/asset-words";
+import { assetWords, rentQuotedMonthly } from "@/lib/asset-words";
 
 const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
   in_line: { label: "In line", cls: "bg-pass/10 text-pass" },
@@ -21,14 +21,31 @@ const num = (n: number | null | undefined, digits = 1): string =>
   n == null || !Number.isFinite(n) ? "—" : n.toFixed(digits);
 
 /** "May 31, 2026" — the way the rest of the deal page writes a day, read in
- *  UTC so the server's render and the browser's agree; the text as it came
- *  where it is not a date. */
-function day(iso: string): string {
-  const t = Date.parse(`${iso.trim().slice(0, 10)}T00:00:00Z`);
-  return Number.isFinite(t)
-    ? new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
-    : iso;
+ *  UTC so the server's render and the browser's agree. A month alone is
+ *  "May 2026" and a year alone the year: read as a day, "2026-05" had
+ *  printed "May 1, 2026" and "2026" "Jan 1, 2026", a day nobody stated. A
+ *  day that does not exist ("2026-02-30", which the parser rolls to Mar 2)
+ *  and anything else is printed as it came. */
+export function statedDay(iso: string): string {
+  const m = iso.trim().match(/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?(?:T[\d:.]+(?:Z|[+-]\d{2}:?\d{2})?)?$/);
+  if (!m) return iso;
+  const [, y, mo, d] = m;
+  if (!mo) return y;
+  const year = Number(y);
+  const month = Number(mo);
+  if (month < 1 || month > 12) return iso;
+  if (!d) {
+    return new Date(Date.UTC(year, month - 1, 1)).toLocaleDateString("en-US", {
+      month: "short",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  }
+  const t = new Date(Date.UTC(year, month - 1, Number(d)));
+  if (t.getUTCFullYear() !== year || t.getUTCMonth() !== month - 1 || t.getUTCDate() !== Number(d)) return iso;
+  return t.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
+const day = statedDay;
 
 export interface ActualsData {
   rentRoll: { asOf: string | null; summary: RentRollSummary } | null;
@@ -67,16 +84,18 @@ export function PropertyActuals({ data }: { data: ActualsData }) {
   // office's is. A summary stored before the monthly figure was read keeps
   // its per-foot figure, said with its period.
   const monthly = rentQuotedMonthly(data.assetClass);
+  // What one is called in this class: a pad, a bed, a home, a space.
+  const noun = assetWords(data.assetClass).noun ?? { one: "unit", many: "units" };
   const avgRent =
     monthly && rr?.avgRentMonthly != null
-      ? `$${Math.round(rr.avgRentMonthly).toLocaleString("en-US")}/unit/mo`
+      ? `$${Math.round(rr.avgRentMonthly).toLocaleString("en-US")}/${noun.one}/mo`
       : rr?.weightedAvgRentPsf != null
         ? `$${num(rr.weightedAvgRentPsf, 2)}/SF${monthly ? "/yr" : ""}`
         : "—";
   // An average over fewer units than are occupied says so.
   const rentBasis =
     monthly && rr?.avgRentMonthly != null && rr.rentUnits != null && rr.rentUnits < rr.occupiedUnits
-      ? `over ${rr.rentUnits} of ${rr.occupiedUnits} occupied units`
+      ? `over ${rr.rentUnits} of ${rr.occupiedUnits} occupied ${noun.many}`
       : null;
 
   return (

@@ -6,7 +6,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { compareNoi } from "@/lib/actuals/analyze";
 import type { T12Summary } from "@/lib/actuals/types";
-import { PropertyActuals } from "@/app/(app)/deals/[id]/property-actuals";
+import { PropertyActuals, statedDay } from "@/app/(app)/deals/[id]/property-actuals";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -105,6 +105,29 @@ describe("PropertyActuals — the OM figure is named for what it is", () => {
     expect(visibleText(render({ ...apartments, rentRoll: { asOf: null, summary: undated } }))).toMatch(
       /measured at screen date Sep 8, 2026/,
     );
+  });
+
+  it("dates only what the document stated, and names a park's pads and a dorm's beds (the audit, 2026-10-01)", () => {
+    expect(statedDay("2026-05-31")).toBe("May 31, 2026");
+    expect(statedDay("2026-05-31T00:00:00Z")).toBe("May 31, 2026");
+    expect(statedDay("2026-05")).toBe("May 2026");
+    expect(statedDay("2026")).toBe("2026");
+    expect(statedDay("2026-02-30")).toBe("2026-02-30");
+    expect(statedDay("2026-13")).toBe("2026-13");
+    expect(statedDay("Q2 2026")).toBe("Q2 2026");
+    for (const [cls, one, many] of [
+      ["manufactured_housing", "pad", "pads"],
+      ["student_housing", "bed", "beds"],
+    ] as const) {
+      const partial = { ...SAMPLE_DEAL.rentRoll.summary, rentUnits: 200 };
+      const text = visibleText(
+        render({ rentRoll: { asOf: "2026-05", summary: partial }, t12: null, noiComparison: null, assetClass: cls }),
+      );
+      expect(text, cls).toMatch(new RegExp(`Avg rent\\s*\\$2,408/${one}/mo`));
+      expect(text, cls).toContain(`over 200 of 225 occupied ${many}`);
+      expect(text, cls).toContain("as of May 2026");
+      expect(text, cls).not.toContain("/unit/mo");
+    }
   });
 
   it("reads an office roll by the foot, with its expiry ladder", () => {
