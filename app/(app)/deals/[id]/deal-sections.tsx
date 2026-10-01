@@ -21,7 +21,7 @@ import { basisScale, fmtBasis, type BasisScale, type SubjectBasis } from "@/lib/
 import { gapScale, incomeGapShare, type GapUnit } from "@/lib/gap-detail";
 import { typicalRange as readTypicalRange } from "@/lib/typical-range";
 import { NOI_IN_LINE_BAND } from "@/lib/actuals/analyze";
-import type { DealFact } from "@/lib/facts";
+import { pageInDeck, type DealFact } from "@/lib/facts";
 import { FileDrop } from "../../file-drop";
 import { FileField } from "../../file-field";
 import { useToast } from "../../toaster";
@@ -688,9 +688,12 @@ export function TermsView({
 export function ChallengerView({
   result,
   dealName,
+  totalPages = null,
 }: {
   result: ChallengerResult;
   dealName?: string;
+  /** the memorandum's own length: a cited page past it is never sent */
+  totalPages?: number | null;
 }) {
   const ordered = [...(result.challenges ?? [])].sort(
     (a, b) => SEV[a.severity].rank - SEV[b.severity].rank,
@@ -703,7 +706,7 @@ export function ChallengerView({
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <SeverityTally challenges={ordered} />
             {ordered.some((c) => c.question) && (
-              <CopyAllQuestions challenges={ordered} dealName={dealName} />
+              <CopyAllQuestions challenges={ordered} dealName={dealName} totalPages={totalPages} />
             )}
           </div>
         }
@@ -779,7 +782,7 @@ function ChallengeCard({ c }: { c: Challenge }) {
 /** One click → a numbered, email-ready list of every broker question. */
 /** Assemble the challenges into a ready-to-send broker email: subject line,
  *  questions grouped by severity, OM page refs — paste and hit send. */
-function buildBrokerEmail(challenges: Challenge[], dealName?: string): string {
+export function buildBrokerEmail(challenges: Challenge[], dealName?: string, totalPages: number | null = null): string {
   const deal = dealName?.trim() || "the deal";
   const groups: [Challenge["severity"], string][] = [
     ["high", "Deal-critical"],
@@ -792,7 +795,11 @@ function buildBrokerEmail(challenges: Challenge[], dealName?: string): string {
       const qs = challenges.filter((c) => c.severity === sev && c.question);
       if (!qs.length) return null;
       const lines = qs.map((c) => {
-        const page = c.page?.trim() ? ` (OM ${c.page.trim()})` : "";
+        // Only a page the memorandum has: an email to its broker citing a
+        // page their deck does not hold is the one place a misread page
+        // leaves the site.
+        const cited = pageInDeck(c.page, totalPages);
+        const page = cited != null ? ` (OM p. ${cited})` : "";
         return `${++n}. ${c.question}${page}`;
       });
       return `${heading}:\n${lines.join("\n")}`;
@@ -817,9 +824,11 @@ function buildBrokerEmail(challenges: Challenge[], dealName?: string): string {
 function CopyAllQuestions({
   challenges,
   dealName,
+  totalPages,
 }: {
   challenges: Challenge[];
   dealName?: string;
+  totalPages: number | null;
 }) {
   const toast = useToast();
   return (
@@ -828,7 +837,7 @@ function CopyAllQuestions({
       onClick={async () => {
         try {
           await navigator.clipboard.writeText(
-            buildBrokerEmail(challenges, dealName),
+            buildBrokerEmail(challenges, dealName, totalPages),
           );
           toast("Broker email copied — subject line and all.", "success");
         } catch {
@@ -911,7 +920,7 @@ export function BrokerComps({
   /** rendered on the public /demo page — Pro gates point to signup, not billing */
   publicDemo?: boolean;
   /** subject location for the comps map (Feature 4); null hides the map */
-  mapContext?: { subjectLabel: string; market: string; omUrl: string | null } | null;
+  mapContext?: { subjectLabel: string; market: string; omUrl: string | null; totalPages?: number | null } | null;
   /** the subject's own basis (lib/comp-detail's subjectBasis), the tick the
    *  sale comps' bars are drawn against; null draws the bars with no tick */
   subject?: SubjectBasis | null;
@@ -935,7 +944,8 @@ export function BrokerComps({
       mapContext
         ? [
             ...saleComps.map((c, i): MapComp => {
-              const pageNum = c.page?.match(/\d+/)?.[0];
+              // A page the memorandum has, never the model's raw citation.
+              const pageNum = pageInDeck(c.page, mapContext.totalPages);
               return {
                 id: `om-${i}`,
                 kind: "om",

@@ -45,6 +45,15 @@ export function parsePageNumber(raw: string | undefined | null): number | null {
   return Number.isFinite(n) && n > 0 ? n : null;
 }
 
+/** A page the model cited, as a number, only where it parses AND falls
+ *  inside the document's own length; null where it does not, or where the
+ *  length is unknown — a citation the deck cannot hold is never shown,
+ *  linked or sent to a broker. */
+export function pageInDeck(raw: string | undefined | null, totalPages: number | null | undefined): number | null {
+  const n = parsePageNumber(raw);
+  return n != null && totalPages != null && n <= totalPages ? n : null;
+}
+
 /** Derive a display unit from the value string (pure, best-effort). */
 export function deriveUnit(value: string): string {
   const v = value.trim();

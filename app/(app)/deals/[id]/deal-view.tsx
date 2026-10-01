@@ -1437,7 +1437,11 @@ function AnalysesPanel({
       analysis === "verdict" ? (
         <VerdictView result={results.verdict!} stale={staleVerdict} staleWhy={staleWhy} />
       ) : analysis === "challenger" ? (
-        <ChallengerView result={results.challenges!} dealName={dealName} />
+        <ChallengerView
+          result={results.challenges!}
+          dealName={dealName}
+          totalPages={results.extraction?.totalPages ?? null}
+        />
       ) : analysis === "comps" ? (
         <BrokerComps
           result={results.comps!}
@@ -1452,6 +1456,7 @@ function AnalysesPanel({
               results.extraction?.address || results.extraction?.market || "",
             market: results.extraction?.market ?? "",
             omUrl,
+            totalPages: results.extraction?.totalPages ?? null,
           }}
         />
       ) : (
