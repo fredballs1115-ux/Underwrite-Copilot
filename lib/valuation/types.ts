@@ -68,8 +68,28 @@ export interface Valuation extends ValuationFacts {
   citations: Partial<Record<ValuationField, FieldCitation>>;
   /** fields the extractor COMPUTED rather than read off the page */
   derivedFields: ValuationField[];
+  /** fields the user corrected after the document was read: theirs, with
+   *  no page citation and no "derived" mark (lib/valuation/form) */
+  editedFields: ValuationField[];
   note: string | null;
   createdAt: string;
+}
+
+/**
+ * The citations column after a correction: each edited field's page
+ * citation replaced by an edited mark, `{ edited: true, at }` — the figure
+ * is the user's now, and its provenance says so — every other field's left
+ * exactly as stored. A re-read of the document writes the column afresh.
+ */
+export function citationsAfterEdit(
+  stored: unknown,
+  edited: readonly ValuationField[],
+  at: string,
+): Record<string, unknown> {
+  const out: Record<string, unknown> =
+    stored && typeof stored === "object" && !Array.isArray(stored) ? { ...(stored as Record<string, unknown>) } : {};
+  for (const f of edited) out[f] = { edited: true, at };
+  return out;
 }
 
 /** Postgres `numeric` can arrive as a JSON number or a string depending on the
@@ -88,10 +108,15 @@ const num = (v: unknown): number | null => {
 export function parseValuationRow(row: Record<string, unknown>): Valuation {
   const citationsRaw = (row.citations ?? {}) as Record<string, unknown>;
   const citations: Partial<Record<ValuationField, FieldCitation>> = {};
+  const editedFields: ValuationField[] = [];
   for (const f of VALUATION_FIELDS) {
     const c = citationsRaw[f];
     if (c && typeof c === "object") {
-      const { page, snippet } = c as { page?: unknown; snippet?: unknown };
+      const { page, snippet, edited } = c as { page?: unknown; snippet?: unknown; edited?: unknown };
+      if (edited === true) {
+        editedFields.push(f);
+        continue;
+      }
       if (typeof page === "string" && page.trim()) {
         citations[f] = { page: page.trim(), snippet: typeof snippet === "string" ? snippet : "" };
       }
@@ -110,9 +135,13 @@ export function parseValuationRow(row: Record<string, unknown>): Valuation {
     sourceDocumentId: row.source_document_id ? String(row.source_document_id) : null,
     extracted: row.extracted === true,
     citations,
-    derivedFields: derivedRaw.filter((f): f is ValuationField =>
-      (VALUATION_FIELDS as readonly string[]).includes(String(f)),
+    // An edited field is never "derived", whatever an older row's list says.
+    derivedFields: derivedRaw.filter(
+      (f): f is ValuationField =>
+        (VALUATION_FIELDS as readonly string[]).includes(String(f)) &&
+        !editedFields.includes(f as ValuationField),
     ),
+    editedFields,
     note: typeof row.note === "string" && row.note.trim() ? row.note : null,
     createdAt: String(row.created_at ?? ""),
     headlineValue: num(row.headline_value),

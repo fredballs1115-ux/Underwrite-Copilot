@@ -6,6 +6,13 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
 import { modelOpinion } from "@/lib/valuation/model-opinion";
 import {
+  FIELD_KIND,
+  fieldRefusalSentence,
+  fieldText,
+  isValuationField,
+  type FieldRefusal,
+} from "@/lib/valuation/form";
+import {
   bridgeSummaryLine,
   reconcileValuations,
   scoreAggressiveness,
@@ -36,10 +43,26 @@ const ERRORS: Record<string, string> = {
   size: "That file is over 32MB — the analysis service can't read it.",
   format: "That file's contents don't match its extension.",
   label: "Give the valuation a label so the comparison columns are readable.",
-  save: "Couldn't save that valuation.",
+  save: "Couldn't save that valuation. Nothing was added; try again.",
+  update: "Couldn't save those changes — the valuation is as it was. Try again.",
+  delete: "Couldn't delete that valuation. Try again.",
   nodoc: "There's no source document attached to that valuation to re-read.",
   extract: "Re-reading that BOV failed. Try again, or fill the fields in by hand.",
+  extractsave: "The BOV was re-read, but saving what it read failed — the valuation is as it was. Try again.",
 };
+
+const REFUSALS: readonly FieldRefusal[] = ["unreadable", "range", "whole_years"];
+
+/** The sentence an error code is answered with; a refused field's is built
+ *  from the field's own label (lib/valuation/form). */
+function errorSentence(code: string | undefined, field: string | undefined, why: string | undefined): string | null {
+  if (!code) return null;
+  if (code === "field") {
+    const refusal = REFUSALS.find((r) => r === why);
+    return isValuationField(field) && refusal ? fieldRefusalSentence(field, refusal) : null;
+  }
+  return ERRORS[code] ?? null;
+}
 
 /** How each field is typed on the manual form. */
 const FIELD_HINT: Record<ValuationField, string> = {
@@ -53,14 +76,6 @@ const FIELD_HINT: Record<ValuationField, string> = {
   capexDeduction: "$",
   discountRate: "%",
 };
-const PCT_FIELDS: ReadonlySet<ValuationField> = new Set([
-  "goingInCap",
-  "exitCap",
-  "rentGrowth",
-  "vacancyAssumption",
-  "discountRate",
-]);
-
 /** "$2.0M", "$450k" — a dollar figure for a sentence. */
 const usdShort = (n: number): string =>
   Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`;
@@ -83,10 +98,11 @@ export default async function ValuationsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ a?: string; b?: string; error?: string }>;
+  searchParams: Promise<{ a?: string; b?: string; error?: string; field?: string; why?: string }>;
 }) {
   const { id } = await params;
-  const { a: aParam, b: bParam, error: errorCode } = await searchParams;
+  const { a: aParam, b: bParam, error: errorCode, field: errorField, why } = await searchParams;
+  const errorText = errorSentence(errorCode, errorField, why);
 
   const supabase = await createSupabaseServerClient();
   const user = await getCurrentUser();
@@ -172,6 +188,15 @@ export default async function ValuationsPage({
         values: Object.fromEntries(VALUATION_FIELDS.map((f) => [f, named[f]])) as ColumnData["values"],
         citations: v.citations,
         derivedFields: v.derivedFields,
+        // A figure the user corrected on a document's column is theirs.
+        notes: v.extracted
+          ? Object.fromEntries(
+              v.editedFields.map((f) => [
+                f,
+                { chip: "edited", title: "You entered this figure; it replaces what the document stated." },
+              ]),
+            )
+          : {},
         implied: {
           ok: implied.ok,
           error: implied.error,
@@ -242,9 +267,9 @@ export default async function ValuationsPage({
         </p>
       </header>
 
-      {errorCode && ERRORS[errorCode] ? (
+      {errorText ? (
         <p className="rounded-lg border border-kill/30 bg-kill/5 px-4 py-3 text-sm text-kill">
-          {ERRORS[errorCode]}
+          {errorText}
         </p>
       ) : null}
 
@@ -375,8 +400,10 @@ export default async function ValuationsPage({
                 {FIELD_LABELS[f]} ({FIELD_HINT[f]})
                 <input
                   name={f}
-                  inputMode="decimal"
-                  placeholder={PCT_FIELDS.has(f) ? "e.g. 6.5" : ""}
+                  inputMode={FIELD_KIND[f] === "usd" ? undefined : "decimal"}
+                  placeholder={
+                    FIELD_KIND[f] === "pct" ? "e.g. 6.5" : FIELD_KIND[f] === "years" ? "e.g. 10" : "e.g. $65.8M"
+                  }
                   className="rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-sm text-ink"
                 />
               </label>
@@ -462,10 +489,8 @@ export default async function ValuationsPage({
                           {FIELD_LABELS[f]} ({FIELD_HINT[f]})
                           <input
                             name={f}
-                            inputMode="decimal"
-                            defaultValue={
-                              v[f] == null ? "" : PCT_FIELDS.has(f) ? (v[f]! * 100).toFixed(3).replace(/\.?0+$/, "") : String(v[f])
-                            }
+                            inputMode={FIELD_KIND[f] === "usd" ? undefined : "decimal"}
+                            defaultValue={fieldText(f, v[f])}
                             className="rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-sm text-ink"
                           />
                         </label>
