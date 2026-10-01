@@ -113,7 +113,8 @@ describe("a document's hold is kept only in whole years", () => {
     const out = extractedFields(read(5.5));
     expect(out.values.holdYears).toBeNull();
     expect(out.citations.holdYears).toBeUndefined();
-    expect(out.note).toContain("5.5-year hold");
+    expect(out.note).toContain("states a 5.5-year hold");
+    expect(extractedFields(read(8.5)).note).toContain("states an 8.5-year hold");
   });
 
   it("keeps a whole-year hold with its page", () => {

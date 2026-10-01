@@ -14,6 +14,7 @@
  * Pure.
  */
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { withArticle } from "@/lib/article";
 import { STRATEGY_LABEL, isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
 import { trailingYearBasis, unverifiedMark, type SubmarketMetrics } from "./metrics";
 import { RENT_BASIS_LABEL, type Dismissal, type Submarket } from "./types";
@@ -199,7 +200,7 @@ export function assumptionWarnings(
         ).toLocaleString("en-US")} SF/mo absorption (${trailingYearBasis(metrics.absorption)})${goingInBasis}`,
         metrics.unverified.supply,
       ),
-      figure: `${metrics.supply.months.toFixed(0)} months of supply vs a ${threshold}-month threshold; ${exitFigure}`,
+      figure: `${metrics.supply.months.toFixed(0)} months of supply vs ${withArticle(`${threshold}-month threshold`)}; ${exitFigure}`,
     });
   }
 
@@ -214,7 +215,7 @@ export function assumptionWarnings(
         submarket.name
       } has never been tighter than ${pct(trough.value)} in the data you've loaded.`,
       basis: marked(`trough was ${trough.period}`, metrics.unverified.trough),
-      figure: `${pct(inputs.vacancyPct, 2)} vs a ${pct(trough.value, 2)} trough, ${trough.period}`,
+      figure: `${pct(inputs.vacancyPct, 2)} vs ${withArticle(`${pct(trough.value, 2)} trough`)}, ${trough.period}`,
     });
   }
 

@@ -17,6 +17,7 @@
  *
  * Pure: no I/O.
  */
+import { withArticle } from "@/lib/article";
 import { readFigure } from "@/lib/money";
 import { FIELD_LABELS, VALUATION_FIELDS, type ValuationFacts, type ValuationField } from "./types";
 
@@ -109,7 +110,7 @@ export function extractedHold(value: number | null): { value: number | null; not
   if (value == null || (Number.isInteger(value) && value >= 1 && value <= 50)) return { value, note: null };
   return {
     value: null,
-    note: `The document states a ${value}-year hold; the hold is kept in whole years, so it is left blank for you to enter.`,
+    note: `The document states ${withArticle(`${value}-year hold`)}; the hold is kept in whole years, so it is left blank for you to enter.`,
   };
 }
 

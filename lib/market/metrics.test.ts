@@ -701,6 +701,19 @@ describe("assumptionWarnings", () => {
     expect(parseDismissals([{ code: "c", reason: "r", by: "b", at: "a" }])[0].figure).toBeNull();
   });
 
+  it("puts the article a figure takes before it: an 8.00% trough, an 8-month threshold", () => {
+    const eighty = submarketMetrics(
+      PERIODS.map((p) => ({ ...p, vacancyPct: 0.08, underConstructionSf: 4_000_000 })),
+      [],
+    );
+    const w = assumptionWarnings({ ...INPUTS, vacancyPct: 0.05 } as UnderwriteInputs, eighty, {
+      ...SUBMARKET,
+      supplyWarningMonths: 8,
+    });
+    expect(w.find((x) => x.code === "vacancy_below_trough")!.figure).toContain("vs an 8.00% trough");
+    expect(w.find((x) => x.code === "supply_vs_exit_cap")!.figure).toContain("vs an 8-month threshold");
+  });
+
   it("writes every figure in plain words a printed memo can set — no arrows", () => {
     const heavy = submarketMetrics(
       PERIODS.map((p) => ({ ...p, underConstructionSf: 4_000_000 })),
