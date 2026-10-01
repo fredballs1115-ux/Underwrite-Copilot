@@ -1242,7 +1242,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  Eighty-three are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Eighty-seven are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1261,13 +1261,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   and 36791223837; then, 2026-10-01, Ann Arbor, Lansing-East Lansing,
   Mobile, San Juan-Bayamón-Caguas and Shreveport-Bossier City — run
   36797923875, the card's name in the Census title's own letters, so the
-  table's test reads a name as Unicode letters), each judged through the
+  table's test reads a name as Unicode letters; then Fayetteville (North
+  Carolina), Naples-Marco Island, Spartanburg and Wilmington — run
+  36798176732, Fayetteville's credit the name inside the "Public domain,
+  City of Fayetteville" the runner printed), each judged through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
   `cbsa:` row never draws; San Jose, Fresno and Madison had nothing usable,
   Baton Rouge's best frames are PNGs (never served) with its one JPEG a
   steep aerial that reads as a map on a card, and Lincoln's one fine frame,
-  the Capitol, loses the Sower on its tower in the deal page's crops, so
-  each keeps the deal's drawn cover. A search result can
+  the Capitol, loses the Sower on its tower in the deal page's crops, and
+  Ocala's and Gainesville's sheets held a highway, a feed store's sign,
+  parked cars and a steep aerial, so each keeps the deal's drawn cover. A search result can
   be another city entirely (Los Angeles under Colorado Springs, Buffalo
   under Little Rock, 1963 Pittsburgh under Sarasota), and Birmingham's first
   search read Birmingham, England's categories (its entry names Alabama's

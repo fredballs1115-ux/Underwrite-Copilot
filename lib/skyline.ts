@@ -794,6 +794,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "El Paso, TX",
     size: [3159, 1751],
   },
+  // Fayetteville, NC: skyline-sheet run 36798176732 — downtown's church spires and tree-lined street from above in clear daylight, every spire whole in both crops, over the Market House down Hay Street on a grey winter day through a heavy phone filter. The runner printed the author as "Public domain, City of Fayetteville"; the credit is the name in it.
+  "cbsa:22180": {
+    file: "Fayetteville, NC Downtown Skyline.jpg",
+    place: "Downtown Fayetteville from above, its church spires over a tree-lined street",
+    credit: "City of Fayetteville",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Fayetteville, NC",
+    size: [4239, 1600],
+  },
   // Fayetteville, AR: skyline-sheet run 36786974652 — the hill and the town hold in both crops, where Old Main loses the top of its cupola in the wide frame and the article's lead is a hazy strip behind trees.
   "cbsa:22220": {
     file: "Mount Sequoyah and Fayetteville from University of Arkansas.jpg",
@@ -1024,6 +1034,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Myrtle Beach, SC",
     size: [6515, 2356],
   },
+  // Naples-Marco Island, FL: skyline-sheet run 36798176732 — the Naples Pier, the landmark the city is known by, whole in both crops at sunset, over a sunset at Clam Pass whose subject is a sailboat run aground (623px tall at 2400 wide), a canal-side villa whose roof the deal page's crops cut under a white sky, the Gulf over a railing, a dolphin and four press photographs of officials on the damaged pier.
+  "cbsa:34940": {
+    file: "Naples FL pier seen from 8th Avenue Beach at sunset.jpg",
+    place: "The Naples Pier from 8th Avenue Beach at sunset",
+    credit: "P,TO 19104",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Naples-Marco Island, FL",
+    size: [4032, 3024],
+  },
   // New Haven, CT: skyline-sheet run 36782733907 — the city article's lead, downtown over the autumn trees.
   "cbsa:35300": {
     file: "New Haven, Connecticut skyline (cropped).jpg",
@@ -1236,6 +1256,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Shreveport-Bossier City, LA",
     size: [3840, 2160],
   },
+  // Spartanburg, SC: skyline-sheet run 36798176732 — the city's skyline under a clear sky, every roof whole in both crops, over a Main Street corner whose cupola the wide crop cuts, a mural of words (the article's lead), a cultural centre's façade 522px tall at 2400 wide, a street of parked cars, a corporate tower and its logo, the airport's terminal sign and a postcard.
+  "cbsa:43900": {
+    file: "Spartanburg skyline - Sept. 2025.jpg",
+    place: "Downtown Spartanburg under a clear sky, a brick tower at its centre",
+    credit: "PegasusRacer28",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Spartanburg, SC",
+    size: [3954, 1572],
+  },
   // Spokane, WA: skyline-sheet run 36780772501 — the article's lead.
   "cbsa:44060": {
     file: "Spokane, Washington skyline (cropped).jpg",
@@ -1345,6 +1375,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Wichita, KS",
     size: [4654, 2792],
+  },
+  // Wilmington, NC: skyline-sheet run 36798176732 — the downtown riverfront on the Cape Fear River, sharp and whole in both crops under a clear sky, over Wrightsville Beach's strand (as fine, and the next town's), a drone's dusk view of its channel that is mostly water on the card, a highway past strip malls and an engraving.
+  "cbsa:48900": {
+    file: "BRIDGE 2024-05-07 Cape Fear Memorial Bridge Press Conf-831-155 (cropped).jpg",
+    place: "Downtown Wilmington's riverfront along the Cape Fear River",
+    credit: "NCDOTcommunications",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Wilmington, NC",
+    size: [1753, 1093],
   },
   // Winston-Salem, NC: skyline-sheet run 36782855933 — the city article's lead, over aerials of an interchange.
   "cbsa:49180": {
