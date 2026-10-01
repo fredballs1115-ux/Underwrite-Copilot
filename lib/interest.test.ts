@@ -398,6 +398,27 @@ describe("a note, underwritten as a note (#416)", () => {
     expect(interestNote(readInterest(mezz, askingPriceOf(mezz))!)).toContain(WITHHELD);
   });
 
+  it("a note named beside other debt with no order stated says so, and asserts no senior loan (the audit of 2026-10-01)", () => {
+    const unclear = ex(
+      interest({ kind: "note", summary: "Sale of a performing note", loan: "The property also carries $5M of mezzanine financing", page: "p. 5" }),
+      [row("Unpaid principal balance", "$15,000,000"), row("Note rate", "11.0%"), row("Maturity date", "March 31, 2028"), row("Whole-asset value", "$70,000,000"), row("Payment status", "Performing")],
+    );
+    const r = readInterest(unclear, 15_000_000, AS_OF)!;
+    expect(r.note!.ltvAtBalancePct).toBeNull();
+    const s = noteCollateralSentence(r.note);
+    expect(s).toContain("names other debt on the property without saying which loan comes first");
+    expect(s).not.toContain("sits behind a senior loan");
+    expect(r.headline).toContain(s);
+    // A first-lien note four months behind on its payments is still first.
+    const late = ex(
+      interest({ kind: "note", summary: "First-lien mortgage note", loan: "", page: "p. 5" }),
+      [row("Unpaid principal balance", "$15,000,000"), row("Note rate", "6.0%"), row("Maturity date", "March 31, 2028"), row("Whole-asset value", "$30,000,000"), row("Payment status", "Non-performing; borrower 4 months behind on payments")],
+    );
+    const l = readInterest(late, 12_000_000, AS_OF)!;
+    expect(l.note!.terms.subordinate).toBe(false);
+    expect(noteCollateralSentence(l.note)).toMatch(/puts the balance at 50% of its value and the price at 40%/);
+  });
+
   it("a first-lien note keeps its loan-to-value exactly as before", () => {
     const first = note("Performing", [...TERMS]);
     const withWords = { ...first, interest: { ...first.interest!, summary: "Sale of the first mortgage note", loan: "$24.4M first mortgage, 5.25% coupon" } };

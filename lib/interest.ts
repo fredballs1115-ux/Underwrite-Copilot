@@ -306,6 +306,12 @@ export function noteYieldSentence(n: NoteRead | null): string {
  *  report's note terms — prints this sentence. */
 export function noteCollateralSentence(n: NoteRead | null): string {
   if (!n || n.terms.collateralValue == null) return "";
+  // Named beside other debt with no order stated: said as that, never as a
+  // senior loan the words do not place ahead of it (the audit of
+  // 2026-10-01).
+  if (n.terms.position === "unclear") {
+    return `The collateral's stated ${money(n.terms.collateralValue)} is not set against this note alone: the memorandum names other debt on the property without saying which loan comes first, so a loan-to-value at this note's last dollar cannot be read from it.`;
+  }
   if (n.terms.subordinate) {
     return `The collateral's stated ${money(n.terms.collateralValue)} is not set against this note alone: it sits behind a senior loan, and its loan-to-value at its last dollar needs that loan's balance, which the memorandum does not state.`;
   }

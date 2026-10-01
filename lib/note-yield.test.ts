@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSubordinateNote, monthsBetween, parseMaturity, readNote, readNoteTerms, type NoteTerms } from "./note-yield";
+import { isSubordinateNote, monthsBetween, notePosition, parseMaturity, readNote, readNoteTerms, type NoteTerms } from "./note-yield";
 
 const row = (label: string, value: string) => ({ label, value });
 
@@ -14,6 +14,7 @@ const TERMS: NoteTerms = {
   status: "performing",
   collateralValue: 34_000_000,
   subordinate: false,
+  position: "first",
 };
 const AS_OF = new Date(Date.UTC(2025, 8, 30));
 
@@ -100,6 +101,7 @@ describe("readNoteTerms — each term from its own row, and only as stated", () 
       status: null,
       collateralValue: null,
       subordinate: false,
+      position: "first",
     });
   });
 });
@@ -132,6 +134,49 @@ describe("a note behind other debt — its loan-to-value needs a senior balance 
     ]) {
       expect(isSubordinateNote(words), words).toBe(false);
     }
+  });
+
+  it("never reads a first lien as behind from a payment status or a negated mention (the audit of 2026-10-01)", () => {
+    for (const words of [
+      // A payment status is no position.
+      "First-lien mortgage note. Non-performing; borrower 4 months behind on payments",
+      "Borrower is 90 days behind",
+      // A negated mention is no mention.
+      "First mortgage note; there is no mezzanine or junior debt",
+      "Senior first-lien loan, not subordinated to any other debt",
+      "No mezzanine, junior or subordinate financing encumbers the property",
+      "Performing loan without any subordinate financing",
+      "A non-subordinated first mortgage",
+      "Free and clear of any other liens; first mortgage note",
+      // A first-lien note beside other debt it names stays first.
+      "First mortgage note. The borrower also has a $5M mezzanine loan.",
+    ]) {
+      expect(notePosition(words), words).toBe("first");
+      expect(isSubordinateNote(words), words).toBe(false);
+    }
+    // A negation in one clause leaves the next clause's words read.
+    expect(notePosition("There is no mezzanine debt, but the note is subordinate to a $60M A-note")).toBe("behind");
+    // A junior piece of a first loan is junior.
+    expect(notePosition("Junior participation in a $50M first mortgage loan")).toBe("behind");
+  });
+
+  it("other debt named with nothing to place the note is unclear: the loan-to-value is withheld, and no senior loan is asserted", () => {
+    const words = "Performing note; the property also carries $5M of mezzanine financing";
+    expect(notePosition(words)).toBe("unclear");
+    expect(isSubordinateNote(words)).toBe(true);
+    const unclear = readNoteTerms({
+      metrics: [row("Unpaid principal balance", "$15,000,000"), row("Whole-asset value", "$70,000,000")],
+      interest: { summary: "Performing note", loan: "The property also carries $5M of mezzanine financing" },
+    });
+    expect(unclear.position).toBe("unclear");
+    expect(unclear.subordinate).toBe(true);
+    expect(readNote(unclear, 15_000_000, AS_OF)!.ltvAtBalancePct).toBeNull();
+    // The payment status row is never read for a position.
+    const status = readNoteTerms({
+      metrics: [row("Unpaid principal balance", "$15,000,000"), row("Payment status", "Non-performing; 4 months behind on payments")],
+      interest: { summary: "First-lien mortgage note", loan: "" },
+    });
+    expect(status.position).toBe("first");
   });
 
   it("reads the position from the interest's words and the note's rows, and withholds the loan-to-value", () => {
