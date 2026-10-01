@@ -145,6 +145,11 @@ way in this batch):
   never reaches the model. Feeding the confirmed import into the model, and
   a residential rent roll mode (loss to lease and unit mix, not WALT), are
   larger changes.
+- **Which regulatory alerts an account sees** (research pass 14): every
+  signed-in account sees every alert detected in the last 30 days, up to
+  three red banners, whatever its markets, so a brand-new account meets
+  banners about places it has no deal in. Showing an account only the
+  alerts for its own deals' jurisdictions is a product choice.
 - **Header slots on two deal types:** a value-add whose memorandum states
   no stabilized NOI shows "Yield on cost —" (a plan deal shows yield on
   cost, never a cap), and an auction shows "Price —" beside a stated
