@@ -353,7 +353,7 @@ function noteFor(x: {
   free: number;
 }): string {
   const usd = usdExact;
-  const mo =(n: number) => `${n} month${n === 1 ? "" : "s"}`;
+  const mo = (n: number) => `${n} month${n === 1 ? "" : "s"}`;
   if (x.monthsToStabilize === null) {
     return `It does not fill within ${mo(x.horizon)} at this pace — check the absorption.`;
   }
