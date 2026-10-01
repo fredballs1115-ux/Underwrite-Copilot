@@ -3,8 +3,9 @@ import { isPro } from "@/lib/billing";
 import { buildRentRollWorkbook } from "@/lib/export/workbook";
 import type { WorkbookInputs } from "@/lib/export/cashflow";
 import { getRentRollImport, latestRentRollImport, listProfiles } from "@/lib/rentroll/store";
-import { defaultProfileFor } from "@/lib/rentroll/profiles";
+import { openingProfile } from "@/lib/rentroll/profiles";
 import { analyzeRentRoll } from "@/lib/rentroll/analytics";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 import { currentDealAssumptions } from "@/lib/bridge/deal-assumptions";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
@@ -60,11 +61,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return Response.redirect(new URL(`/deals/${id}/rent-roll?error=notfound`, req.url), 302);
   }
 
-  const assetClass = String(deal.asset_class ?? "office");
+  // The deal's one class (the analyst's, else the deck's) and the profile the
+  // page opened on — the same rule, so the download prices what the page shows.
+  const assetClass = shownAssetClass(
+    (deal.asset_class as string | null) ?? null,
+    (deal.extraction as ExtractionResult | null) ?? null,
+  );
   const profiles = await listProfiles(supabase, user.id, assetClass);
-  const profileId = url.searchParams.get("profile");
-  const profile =
-    profiles.find((p) => p.id === profileId) ?? profiles[0] ?? defaultProfileFor(assetClass);
+  const profile = openingProfile(profiles, assetClass, url.searchParams.get("profile"));
 
   const asOf = record.asOfDate ?? new Date().toISOString().slice(0, 10);
   const analytics = analyzeRentRoll(record.leases, { asOf, nra: record.nra });

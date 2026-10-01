@@ -194,7 +194,9 @@ export async function saveLeasingProfile(formData: FormData) {
   const ctx = await requireDeal(dealId);
   if (!ctx) return;
 
-  const assetClass = String(formData.get("assetClass") ?? "office");
+  // The deal's class as the page read it; a profile is offered by default only
+  // to deals of the same family (lib/rentroll/profiles `openingProfile`).
+  const assetClass = String(formData.get("assetClass") ?? "").trim() || "office";
   const base = defaultProfileFor(assetClass);
   const pct = (key: string, fallback: number) => {
     const v = num(formData.get(key));

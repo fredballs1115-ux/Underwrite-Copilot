@@ -1,4 +1,4 @@
-import { assetWords } from "@/lib/asset-words";
+import { assetClassKey, assetWords, type ProfileFamily } from "@/lib/asset-words";
 /**
  * Market leasing assumptions (MLA) — the reusable profile that prices what
  * happens when a lease rolls: does the tenant renew, at what rent, with how
@@ -117,6 +117,45 @@ export const DEFAULT_PROFILE: ProfileDraft = PROFILE_DEFAULTS.office;
  *  a medical office starts from office, a net lease from retail. */
 export function defaultProfileFor(assetClass: string): ProfileDraft {
   return PROFILE_DEFAULTS[assetClass] ?? PROFILE_DEFAULTS[assetWords(assetClass).profile] ?? DEFAULT_PROFILE;
+}
+
+/** The profile family a deal's class leases like — the class read through
+ *  lib/pipeline-slots `shownAssetClass` (the analyst's, else the deck's), so a
+ *  deal filed "Auto-detect" whose memorandum is an apartment building leases
+ *  like one. A class nothing has read leases like an office, the generic row. */
+export function profileFamilyOf(assetClass: string | null | undefined): ProfileFamily {
+  return assetWords(assetClass).profile;
+}
+
+/** The profile id that asks for the class's market default by name, so a
+ *  reader with a saved profile can still pick the default. */
+export const MARKET_DEFAULT_ID = "default";
+
+/** The family a SAVED profile belongs to, by the class it was saved for —
+ *  null where that class was never known ("auto", from before the page read
+ *  the deal's class), so such a profile is listed but opens no deal. */
+export function savedProfileFamily(storedClass: string | null | undefined): ProfileFamily | null {
+  return assetClassKey(storedClass) ? assetWords(storedClass).profile : null;
+}
+
+/**
+ * The profile a deal's rent roll opens on, and its export prices with: the one
+ * asked for by id (`MARKET_DEFAULT_ID` asks for the market default); else the
+ * newest the user saved for a class of the same family (an apartment profile
+ * never opens an office deal, as the newest profile saved on ANY deal used
+ * to); else the family's market default. `profiles` come newest first, as
+ * lib/rentroll/store `listProfiles` reads them.
+ */
+export function openingProfile<P extends MarketLeasingProfile>(
+  profiles: readonly P[],
+  assetClass: string | null | undefined,
+  askedId?: string | null,
+): P | ProfileDraft {
+  if (askedId === MARKET_DEFAULT_ID) return defaultProfileFor(assetClass ?? "");
+  const asked = askedId ? profiles.find((p) => p.id === askedId) : undefined;
+  if (asked) return asked;
+  const family = profileFamilyOf(assetClass);
+  return profiles.find((p) => savedProfileFamily(p.assetClass) === family) ?? defaultProfileFor(assetClass ?? "");
 }
 
 /** Clamp a user-entered profile into physically sensible bounds without

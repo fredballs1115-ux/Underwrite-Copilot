@@ -10,8 +10,15 @@ import {
   rolloverCostForecast,
   rolloverSchedule,
 } from "@/lib/rentroll/analytics";
-import { defaultProfileFor, type ProfileDraft } from "@/lib/rentroll/profiles";
+import {
+  MARKET_DEFAULT_ID,
+  defaultProfileFor,
+  openingProfile,
+  profileFamilyOf,
+  type ProfileDraft,
+} from "@/lib/rentroll/profiles";
 import { getRentRollImport, latestRentRollImport, listProfiles } from "@/lib/rentroll/store";
+import { shownAssetClass } from "@/lib/pipeline-slots";
 import { RentRollDashboard } from "./dashboard";
 import { MappingForm } from "./mapping-form";
 import { deleteRentRollImport, saveLeasingProfile, uploadRentRoll } from "./actions";
@@ -51,15 +58,19 @@ export default async function RentRollPage({
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const { data: deal, error } = await supabase
+  const { data, error } = await supabase
     .from("deals")
-    .select("id, name, asset_class")
+    .select("id, name, asset_class, extracted_class:extraction->>assetClass")
     .eq("id", id)
     .maybeSingle();
   if (error) throw new Error(`Couldn't load the deal: ${error.message}`);
-  if (!deal) notFound();
+  if (!data) notFound();
+  const deal = data as { name: string | null; asset_class: string | null; extracted_class: string | null };
 
-  const assetClass = String(deal.asset_class ?? "office");
+  // The deal's one class, as every surface reads it: the analyst's where they
+  // filed one, the deck's where they left "Auto-detect" — so an apartment
+  // deal filed Auto leases like an apartment building, not like an office.
+  const assetClass = shownAssetClass(deal.asset_class, { assetClass: deal.extracted_class });
   const [record, profiles] = await Promise.all([
     importParam
       ? getRentRollImport(supabase, importParam)
@@ -67,8 +78,13 @@ export default async function RentRollPage({
     listProfiles(supabase, user.id, assetClass),
   ]);
 
-  const activeProfile: ProfileDraft =
-    profiles.find((p) => p.id === profileParam) ?? profiles[0] ?? defaultProfileFor(assetClass);
+  const activeProfile: ProfileDraft = openingProfile(profiles, assetClass, profileParam);
+  // A saved profile picked by hand is the one Save updates; the market default
+  // and a profile the page opened on by itself are saved as new.
+  const pickedProfileId =
+    profileParam && profileParam !== MARKET_DEFAULT_ID && profiles.some((p) => p.id === profileParam)
+      ? profileParam
+      : null;
 
   // The mapping UI needs the file's own header row and a couple of sample rows.
   // Read straight from storage — the file is the source of truth for what the
@@ -275,15 +291,16 @@ export default async function RentRollPage({
       <section className="rounded-lg border border-line bg-surface p-5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-base font-semibold text-ink">Market leasing assumptions</h2>
-          {profiles.length > 1 ? (
+          {profiles.length > 0 ? (
             <form method="get" className="flex items-center gap-2">
               {importParam ? <input type="hidden" name="import" value={importParam} /> : null}
               <select
                 name="profile"
                 aria-label="Market leasing profile"
-                defaultValue={profileParam ?? profiles[0]?.id}
+                defaultValue={"id" in activeProfile ? String(activeProfile.id) : MARKET_DEFAULT_ID}
                 className="rounded-md border border-line bg-surface px-2.5 py-1.5 text-sm text-ink"
               >
+                <option value={MARKET_DEFAULT_ID}>{defaultProfileFor(assetClass).name} (default)</option>
                 {profiles.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}
@@ -298,12 +315,14 @@ export default async function RentRollPage({
         </div>
         <p className="mt-1 max-w-2xl text-sm text-muted">
           How a lease rolls: renewal, rent, TI and LC, downtime and free rent. Profiles are yours
-          and reusable across deals; the defaults are market convention.
+          and reusable across deals of the same kind; the defaults are market convention.
         </p>
         <form action={saveLeasingProfile} className="mt-4 flex flex-col gap-4">
           <input type="hidden" name="dealId" value={id} />
-          <input type="hidden" name="assetClass" value={assetClass} />
-          {profileParam ? <input type="hidden" name="profileId" value={profileParam} /> : null}
+          {/* The class it is saved for decides which deals it opens: a class
+              nothing has read is saved as the family its defaults came from. */}
+          <input type="hidden" name="assetClass" value={assetClass || profileFamilyOf(assetClass)} />
+          {pickedProfileId ? <input type="hidden" name="profileId" value={pickedProfileId} /> : null}
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <label className="flex flex-col gap-1 text-xs text-muted">
               Profile name
@@ -329,7 +348,7 @@ export default async function RentRollPage({
             type="submit"
             className="w-fit rounded-md border border-brand px-4 py-2 text-sm font-medium text-brand transition hover:bg-brand hover:text-white"
           >
-            {profileParam ? "Update profile" : "Save profile"}
+            {pickedProfileId ? "Update profile" : "Save profile"}
           </button>
         </form>
       </section>

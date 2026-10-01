@@ -142,8 +142,10 @@ function parseProfile(row: Record<string, unknown>, fallback: ProfileDraft): Mar
   };
 }
 
-/** The user's saved profiles, newest first. Empty is normal — the asset-class
- *  default stands in until they save one. */
+/** The user's saved profiles, newest first, whatever class each was saved for
+ *  — the page lists them all to pick from, and opens a deal only on one of
+ *  its own family (lib/rentroll/profiles `openingProfile`). Empty is normal —
+ *  the asset-class default stands in until they save one. */
 export async function listProfiles(
   supabase: SupabaseClient,
   userId: string,
