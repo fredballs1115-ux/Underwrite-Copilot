@@ -27,21 +27,21 @@ const asWord = (symbol: string, word: string) => (s: string) =>
 /** The symbols outside WinAnsi that a sentence cannot lose, each with the
  *  text that says the same thing: a comparison, a direction, an arrow. */
 const STAND_INS: ((s: string) => string)[] = [
-  (s) => s.replace(/≥/g, ">="), // ≥
-  (s) => s.replace(/≤/g, "<="), // ≤
-  (s) => s.replace(/≈/g, "~"), // ≈
-  asWord("↑", "up"), // ↑
-  asWord("↓", "down"), // ↓
-  (s) => s.replace(/→/g, "->"), // →
-  (s) => s.replace(/←/g, "<-"), // ←
-  (s) => s.replace(/[‐‑]/g, "-"), // hyphen, non-breaking hyphen
-  (s) => s.replace(/[−–]/g, "-"), // minus sign / en dash
+  (s) => s.replace(/\u2265/g, ">="), // ≥
+  (s) => s.replace(/\u2264/g, "<="), // ≤
+  (s) => s.replace(/\u2248/g, "~"), // ≈
+  asWord("\u2191", "up"), // ↑
+  asWord("\u2193", "down"), // ↓
+  (s) => s.replace(/\u2192/g, "->"), // →
+  (s) => s.replace(/\u2190/g, "<-"), // ←
+  (s) => s.replace(/[\u2010\u2011]/g, "-"), // hyphen, non-breaking hyphen
+  (s) => s.replace(/[\u2212\u2013]/g, "-"), // minus sign / en dash
   // Typographic spaces (thin, narrow no-break, figure …) are a space, not
   // nothing: dropped, "12 months" would read "12months".
-  (s) => s.replace(/[ -   ]/g, " "),
+  (s) => s.replace(/[\u2002-\u200a\u202f\u205f]/g, " "),
 ];
 
 export const pdfSafe = (s: string): string =>
-  STAND_INS.reduce((t, f) => f(t), s).replace(/[^\n -~ -ÿ]/gu, (ch) =>
+  STAND_INS.reduce((t, f) => f(t), s).replace(/[^\n\u0020-\u007e\u00a0-\u00ff]/gu, (ch) =>
     WINANSI_EXTRA.has(ch.codePointAt(0)!) ? ch : "",
   );
