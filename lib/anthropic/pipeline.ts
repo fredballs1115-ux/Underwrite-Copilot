@@ -1174,8 +1174,9 @@ async function runAnalysisSteps(
     // never after the email, the picture lift or the cleanup below.
     finished = { doneAt: Date.now(), whole: resumedSteps === 0 };
 
-    // Heads-up email (key-ready; silently off without RESEND_API_KEY, and
-    // best-effort by design — the screen itself is already complete).
+    // Heads-up email (paused until RESEND_API_KEY and a sender a customer
+    // receives mail from are set, lib/email; best-effort by design — the
+    // screen itself is already complete).
     await notifyAnalysisReady(admin, dealId);
   } catch (err) {
     // One sentence the analyst can act on; the raw failure goes to the log.
