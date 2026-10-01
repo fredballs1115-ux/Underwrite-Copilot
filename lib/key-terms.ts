@@ -31,6 +31,17 @@ import { studentTermRows } from "./student-housing";
 import { mhTermRows } from "./manufactured-housing";
 import { storageTermRows } from "./self-storage";
 
+/** A cap rate on the property's income, whatever its qualifier: "Cap rate
+ *  (T-12)", "Stabilized cap rate", "Going-in cap", "Exit cap". Never an
+ *  interest rate cap ("Interest rate cap", "Rate cap strike"), which is a
+ *  term of a floating-rate loan. */
+const COLLATERAL_CAP =
+  /\bcap(?:italization)?\s+rates?\b|\b(?:going[- ]?in|entry|exit|terminal|reversion(?:ary)?|in[- ]place|stabili[sz]ed|pro ?forma|implied|trailing|current|market)\s+cap\b/i;
+
+function isCollateralCap(row: { label: string; value: string }): boolean {
+  return COLLATERAL_CAP.test(row.label) || findGoingInCap([row]) === row;
+}
+
 export interface KeyTermMetric {
   label: string;
   value: string;
@@ -113,9 +124,10 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A self-storage facility (#471): the economic occupancy, the street rate
   // and the in-place rent.
   for (const row of storageTermRows(rows)) lead(row);
-  // On a note the collateral's cap is not printed at all: among the rows a
-  // reader would take it for a cap on the note's price, which it is not.
-  const collateralCap = interest === "note" ? findGoingInCap(rows) : null;
-  const rest = rows.filter((m) => !head.includes(m) && m !== collateralCap);
+  // On a note no cap on the collateral's income is printed at all — the
+  // going-in, the in-place, the stabilized, the exit: among the rows a
+  // reader would take any of them for a cap on the note's price, which none
+  // is. An interest rate cap is a term of the loan and stays.
+  const rest = rows.filter((m) => !head.includes(m) && !(interest === "note" && isCollateralCap(m)));
   return [...head, ...rest.filter((m) => m.flagged), ...rest.filter((m) => !m.flagged)].slice(0, limit);
 }
