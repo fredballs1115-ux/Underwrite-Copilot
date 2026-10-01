@@ -199,6 +199,27 @@ describe("what it says with nothing to go on", () => {
   });
 });
 
+describe("the note says its dollars the way the card does", () => {
+  // It printed "Getting out PAYS 385213" under a tile that said -$385,213.
+  const RAW_FIGURE = /(?<![$\d,.])\d{4,}(?![\d,])/;
+
+  it("writes every dollar with its sign and its commas", () => {
+    const r = readPrepayment(SEED);
+    expect(r.note).toContain("Getting out PAYS $385,213 through defeasance");
+    expect(r.note).toContain("Yield maintenance would be $200,000");
+    expect(r.note).toContain(
+      "The Treasury portfolio costs $460,213 LESS than the balance it retires, so defeasance is a gain before its $75,000 of hard costs",
+    );
+    expect(r.note).toContain("makes it $1,238,275 below market");
+    const fallen = readPrepayment(FALLEN);
+    expect(fallen.note).toContain("Getting out costs $591,795 through yield maintenance.");
+    expect(fallen.note).toContain("Closing sooner is $24,658 a month of waiting bought back.");
+    const unpriced = readPrepayment({ ...SEED, treasuryRatePct: null });
+    expect(unpriced.note).toContain("The loan pays $92,623 a month and balloons at $19,054,138.");
+    for (const n of [r.note, fallen.note, unpriced.note]) expect(n).not.toMatch(RAW_FIGURE);
+  });
+});
+
 function round2(n: number): number {
   return Math.round(n * 100) / 100;
 }

@@ -3,6 +3,7 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { aOrAn, withArticle } from "@/lib/article";
 import { readFigure } from "@/lib/money";
+import { usd, usdExact } from "@/lib/tools/format";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
 import { readLease, readOpex } from "@/lib/tools/lease-math";
@@ -259,26 +260,10 @@ function CopyButton({
 
 // ── the output layer ───────────────────────────────────────────────────────
 
-// The sign goes OUTSIDE the dollar. Interpolating a negative straight in
-// gives "$-385,213", which is not how money is written anywhere, and it
-// shows up wherever a figure can legitimately go below zero — a stack
-// oversized against its basis, a residual that does not work at any
-// price, a defeasance that pays you. Ninety-odd call sites share these
-// two helpers, so it is fixed once here.
-const money = (n: number, body: (abs: number) => string) =>
-  `${n < 0 ? "-" : ""}$${body(Math.abs(n))}`;
-
-const usd = (n: number | null) =>
-  n === null
-    ? "—"
-    : money(n, (a) =>
-        a >= 1_000_000
-          ? `${(a / 1_000_000).toFixed(2)}M`
-          : Math.round(a).toLocaleString("en-US"),
-      );
-
-const usdExact = (n: number | null) =>
-  n === null ? "—" : money(n, (a) => Math.round(a).toLocaleString("en-US"));
+// The dollar writers — `usd`, `usdExact`, `usdCents`, the sign outside the
+// dollar — live in lib/tools/format, because the modules' own sentences
+// print their figures through them too: one figure, said one way, whether
+// it sits in a tile or in a note under it.
 
 const pct = (n: number | null, places = 2) =>
   n === null ? "—" : `${n.toFixed(places)}%`;

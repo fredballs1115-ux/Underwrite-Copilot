@@ -40,6 +40,8 @@
 //
 // The seeded building is deliberately ordinary. Nothing here is padding.
 
+import { usdExact } from "./format";
+
 export interface BelowLine {
   label: string;
   /** annual dollars */
@@ -190,7 +192,7 @@ export function readBelow(t: BelowInput): BelowResult {
   } else if (capGapBps !== null) {
     note = `The cover page's NOI is ${capGapBps}bp of cap rate above the one a lender would underwrite.`;
   } else {
-    note = `${round(totalAnnual).toLocaleString("en-US")} a year sits below the line. Enter a price to see what it is worth.`;
+    note = `${usdExact(totalAnnual)} a year sits below the line. Enter a price to see what it is worth.`;
   }
 
   return {

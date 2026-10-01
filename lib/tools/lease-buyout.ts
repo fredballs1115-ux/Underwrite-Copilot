@@ -75,6 +75,8 @@
  * Pure, no I/O.
  */
 
+import { usdCents, usdExact } from "./format";
+
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
 }
@@ -223,7 +225,8 @@ export function readBuyout(terms: BuyoutTerms): BuyoutRead {
       spreadPsf,
       spreadAnnual,
       note:
-        `The space is ${spreadPsf} a foot under market, worth ${spreadAnnual} a year. ` +
+        `The space is ${usdCents(Math.abs(spreadPsf))} a foot ${spreadPsf < 0 ? "over" : "under"} market, ` +
+        `${usdExact(Math.abs(spreadAnnual))} a year across it. ` +
         "Enter the years left and a discount rate to price ending it.",
     };
   }
@@ -322,19 +325,19 @@ export function readBuyout(terms: BuyoutTerms): BuyoutRead {
     notes.push(
       "The lease has nothing left to run, so ending it early is worth nothing — " +
         "the space turns over on the same day either way. " +
-        `The ${spreadPsf} a foot of spread is still there on the last day, which is ` +
+        `The ${usdCents(Math.abs(spreadPsf))} a foot of spread is still there on the last day, which is ` +
         "why starting from the spread gets this wrong.",
     );
   } else {
     notes.push(
-      `Ending the lease is worth ${buyoutValue} to the landlord: ` +
+      `Ending the lease is worth ${usdExact(buyoutValue)} to the landlord: ` +
         `${Math.round((yearsRemaining ?? 0) * 10) / 10} years of market rent instead of in-place, ` +
         "less the cost of turning the space over sooner than it had to be turned over.",
     );
     if (naiveSpreadPv > buyoutValue) {
       notes.push(
-        `Taking the spread alone would have said ${naiveSpreadPv} — ` +
-          `${round(naiveSpreadPv - buyoutValue)} too much, because it hands the landlord ` +
+        `Taking the spread alone would have said ${usdExact(naiveSpreadPv)} — ` +
+          `${usdExact(naiveSpreadPv - buyoutValue)} too much, because it hands the landlord ` +
           "market rent from tomorrow and there is a vacancy in between.",
       );
     }
@@ -342,13 +345,13 @@ export function readBuyout(terms: BuyoutTerms): BuyoutRead {
   if (zopa !== null) {
     if (zopa >= 0) {
       notes.push(
-        `There is a deal in it: the landlord can go to ${landlordCeiling} and the tenant ` +
-          `should take ${tenantFloor}, so ${zopa} is on the table.`,
+        `There is a deal in it: the landlord can go to ${usdExact(landlordCeiling)} and the tenant ` +
+          `should take ${usdExact(tenantFloor)}, so ${usdExact(zopa)} is on the table.`,
       );
     } else {
       notes.push(
-        `There is no deal on these terms — the landlord can pay ${landlordCeiling} and the ` +
-          `tenant needs ${tenantFloor}. The spread is a transfer and cancels between them; ` +
+        `There is no deal on these terms — the landlord can pay ${usdExact(landlordCeiling)} and the ` +
+          `tenant needs ${usdExact(tenantFloor)}. The spread is a transfer and cancels between them; ` +
           "what is left is the turnover and the move, which are a cost to both. A buyout " +
           "happens when vacant possession is worth something the rent does not contain, or " +
           "when the tenant discounts the future far harder than the landlord does.",

@@ -55,6 +55,7 @@
  */
 
 import { loanConstant } from "./deal-math";
+import { usdExact } from "./format";
 
 function real(n: number | null | undefined): n is number {
   return typeof n === "number" && Number.isFinite(n);
@@ -215,7 +216,7 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
       payment,
       balloon,
       note:
-        `The loan pays ${round(payment)} a month and balloons at ${balloon}. ` +
+        `The loan pays ${usdExact(payment)} a month and balloons at ${usdExact(balloon)}. ` +
         "Enter the Treasury rate for the remaining term to price getting out.",
     };
   }
@@ -266,11 +267,11 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
   } else {
     notes.push(
       cost > 0
-        ? `Getting out costs ${cost} through ${cheaper}. ` +
-            `Yield maintenance is ${yieldMaintenance}${atFloor ? " — all of it the floor" : ""}, ` +
-            `defeasance ${defeasance}.`
-        : `Getting out PAYS ${Math.abs(cost)} through ${cheaper}, rather than costing anything. ` +
-            `Yield maintenance would be ${yieldMaintenance}${atFloor ? " — all of it the floor" : ""}.`,
+        ? `Getting out costs ${usdExact(cost)} through ${cheaper}. ` +
+            `Yield maintenance is ${usdExact(yieldMaintenance)}${atFloor ? " — all of it the floor" : ""}, ` +
+            `defeasance ${usdExact(defeasance)}.`
+        : `Getting out PAYS ${usdExact(Math.abs(cost))} through ${cheaper}, rather than costing anything. ` +
+            `Yield maintenance would be ${usdExact(yieldMaintenance)}${atFloor ? " — all of it the floor" : ""}.`,
     );
     if (atFloor) {
       notes.push(
@@ -280,15 +281,15 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
     }
     if (defeasanceSpread < 0) {
       notes.push(
-        `The Treasury portfolio costs ${Math.abs(defeasanceSpread)} LESS than the balance it ` +
-          `retires, so defeasance is a gain before its ${round(hard)} of hard costs — ` +
+        `The Treasury portfolio costs ${usdExact(Math.abs(defeasanceSpread))} LESS than the balance it ` +
+          `retires, so defeasance is a gain before its ${usdExact(hard)} of hard costs — ` +
           "which is why it beats a penalty that can never go below its floor.",
       );
     }
     if (costOfNotWaiting !== null) {
       notes.push(
         `The loan goes open in ${open} months, where it would cost nothing. ` +
-          `Closing sooner is ${costOfNotWaiting} a month of waiting bought back.`,
+          `Closing sooner is ${usdExact(costOfNotWaiting)} a month of waiting bought back.`,
       );
     }
   }
@@ -298,10 +299,10 @@ export function readPrepayment(terms: PrepayTerms): PrepayRead {
   if (debtMarkToMarket !== null && debtMarkToMarket > 0) {
     notes.push(
       cost > 0
-        ? `The loan is ${debtMarkToMarket} below market, which is what a buyer assuming it ` +
-            `would be getting — ${debtMarkToMarket > cost ? "more" : "less"} than the ${cost} it ` +
+        ? `The loan is ${usdExact(debtMarkToMarket)} below market, which is what a buyer assuming it ` +
+            `would be getting — ${debtMarkToMarket > cost ? "more" : "less"} than the ${usdExact(cost)} it ` +
             `costs to retire, so ${debtMarkToMarket > cost ? "assumption is worth pricing into the bid" : "retiring it is the cleaner trade"}.`
-        : `The same rate move that makes this cheap to retire makes it ${debtMarkToMarket} below ` +
+        : `The same rate move that makes this cheap to retire makes it ${usdExact(debtMarkToMarket)} below ` +
             "market to a buyer who could assume it. Both are worth having; only one can be had.",
     );
   }

@@ -195,3 +195,15 @@ describe("what it refuses", () => {
     expect(Math.abs(shares - 100)).toBeLessThanOrEqual(0.2);
   });
 });
+
+describe("the note says its dollars the way the card does", () => {
+  it("puts the dollar sign on the figure it prints with no price to set it against", () => {
+    // It printed "308,800 a year sits below the line" — the one figure on
+    // the card without its sign. Nothing rolls here, so the figure is the
+    // reserve and the other line alone: $50,000 + $40,000.
+    const r = run({ priceUsd: null, annualRolloverPct: 0, otherAnnual: 40_000 });
+    expect(r.note).toBe(
+      "$90,000 a year sits below the line. Enter a price to see what it is worth.",
+    );
+  });
+});
