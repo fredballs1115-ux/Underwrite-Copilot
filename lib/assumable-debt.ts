@@ -38,7 +38,7 @@
 import { parsePageNumber } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
 import { parseUsd } from "@/lib/money";
-import { monthsBetween, parseMaturity } from "@/lib/note-yield";
+import { daysBetween, monthsBetween, parseMaturity } from "@/lib/note-yield";
 import { readAssumption, type AssumptionRead } from "@/lib/tools/loan-assumption";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
 import { assumableRows } from "@/lib/loan-rows";
@@ -99,9 +99,15 @@ export interface ModelForAssumption {
 
 export interface AssumableRead {
   terms: AssumableTerms;
-  /** whole months from the reading's day to the stated maturity */
+  /** whole months from the reading's day to the stated maturity — the
+   *  arithmetic's count */
   monthsLeft: number | null;
-  /** at or past its maturity on the reading's day */
+  /** days from the reading's day to the stated maturity, negative once it
+   *  has gone by */
+  daysLeft: number | null;
+  /** at or past its maturity on the reading's day: the day has come, by the
+   *  day, never by whole months (inside its last month a loan is due within
+   *  the month, not come due) */
   matured: boolean;
   /** the full years it runs at its coupon — the months left rounded DOWN,
    *  so a part-year is never run at the coupon (the reading that does not
@@ -279,7 +285,10 @@ export function readAssumable(
   if (!terms) return null;
   const today = asOf.toISOString().slice(0, 10);
   const monthsLeft = terms.maturity ? monthsBetween(today, terms.maturity) : null;
-  const matured = monthsLeft != null && monthsLeft < 1;
+  // At or past maturity by the day: whole months read a loan due next month
+  // as come due (the time audit of 2026-10-01).
+  const daysLeft = terms.maturity ? daysBetween(today, terms.maturity) : null;
+  const matured = daysLeft != null && daysLeft <= 0;
   const model = inputs ? modelForAssumption(inputs) : null;
   const schedule = scheduleOf(terms, model?.newLoanAmortYears ?? 30);
   const underMarketBps =
@@ -321,7 +330,7 @@ export function readAssumable(
     });
     read = r.assume && r.newLoan ? r : null;
   }
-  return { terms, monthsLeft, matured, couponYears, schedule, model, underMarketBps, read, missing };
+  return { terms, monthsLeft, daysLeft, matured, couponYears, schedule, model, underMarketBps, read, missing };
 }
 
 // ── Saying it ───────────────────────────────────────────────────────────

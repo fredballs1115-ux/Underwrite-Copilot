@@ -290,8 +290,11 @@ export function readRoster(ex: ExtractionResult | null | undefined, asOf: Date =
       : null;
 
   // The schedule: every listed tenant with an area and an end, bucketed by
-  // the first date it may leave.
-  const yearsFrom = (t: RosterTenant) => (t.monthToMonth ? 0 : t.ends ? t.ends.yearsLeft : null);
+  // the first date it may leave — counted to the DAY (lib/affordable
+  // `DatedEnd.yearsToTheDay`), so a lease ending 12 months and 17 days out
+  // rolls in year 2, where whole months rounded up put it in year 1, and a
+  // lease ending on an anniversary rolls in the year it closes.
+  const yearsFrom = (t: RosterTenant) => (t.monthToMonth ? 0 : t.ends ? t.ends.yearsToTheDay : null);
   const placed = tenants.filter((t) => t.sf != null && yearsFrom(t) != null);
   const unplaced = tenants.filter((t) => !placed.includes(t)).map((t) => t.name);
   const rows: LeaseRow[] = placed.map((t) => ({
@@ -299,7 +302,7 @@ export function readRoster(ex: ExtractionResult | null | undefined, asOf: Date =
     sf: t.sf!,
     rentPerSf: t.rentPsf,
     expiryYears: yearsFrom(t)!,
-    breakYears: t.early ? Math.max(0, t.early.yearsLeft) : null,
+    breakYears: t.early ? Math.max(0, t.early.yearsToTheDay) : null,
   }));
   const roll = rows.length >= 2 ? readRollover({ rows, holdYears: ROSTER_HOLD_YEARS, buildingSf }) : null;
   const byRent = !!roll && roll.totalRent > 0 && roll.rentedLeases === roll.leaseCount;

@@ -169,8 +169,11 @@ export function RosterPanel({ roster, modelLine = "" }: { roster: RosterRead | n
         </thead>
         <tbody>
           {r.tenants.map((t) => {
-            const endsYears = t.monthToMonth ? 0 : t.ends?.yearsLeft;
-            const leaveYears = t.early?.yearsLeft;
+            // Before the sale by the DAY: whole months put a lease ending a
+            // week after the sale before it (lib/ground-lease-term
+            // `DatedSpan`).
+            const endsYears = t.monthToMonth ? 0 : t.ends?.yearsToTheDay;
+            const leaveYears = t.early?.yearsToTheDay;
             const notes = [
               t.sf != null ? sfText(t.sf) : "",
               t.coTenancy ? "Co-tenancy" : "",

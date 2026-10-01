@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import { buildBrief } from "./verdict";
 import { dealContextFor } from "@/lib/deal-context";
 import type { ExtractedMetric, ExtractionResult, FirstSignal, MarketResult } from "./types";
@@ -151,6 +151,12 @@ describe("the verdict is told what is being sold and the building's own basis", 
   });
 
   it("a note: the context carries the note's own read, and there is no building basis", () => {
+    // Read on a pinned day: the note matures March 1, 2028, and from Feb 2
+    // of that year it is due within the month, with no yield to state.
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     const note = base({
       interest: { kind: "note", summary: "Sale of a performing first mortgage note.", share: "", groundLease: "", loan: "$15,000,000 UPB, 5.25% fixed, matures March 1, 2028, performing", page: "p. 3" },
       metrics: [

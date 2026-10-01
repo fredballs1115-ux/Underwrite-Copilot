@@ -53,7 +53,7 @@ import { countNoun } from "@/lib/asset-words";
 import { unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
 import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
-import { yearsText } from "@/lib/ground-lease-term";
+import { endHasPassed, endsByYear, fromToday, yearsText } from "@/lib/ground-lease-term";
 import { parseUsd } from "@/lib/money";
 
 export type { HotelEncumbrance };
@@ -303,8 +303,9 @@ function pipSentence(r: HotelFacts): string {
 function clockSentence(label: string, e: DatedEnd | null, passed: string): string {
   if (!e) return "";
   const end = endLabel(e);
-  if (e.yearsLeft <= 0) return `The ${label}'s stated end, ${end}, has passed — ${passed}.`;
-  return `The ${label} ends ${e.from === "year" ? `in ${end}` : end}, ${yearsText(e.yearsLeft)} from today.`;
+  // Passed, today and ahead by the day (lib/ground-lease-term `DatedSpan`).
+  if (endHasPassed(e)) return `The ${label}'s stated end, ${end}, has passed — ${passed}.`;
+  return `The ${label} ends ${e.from === "year" ? `in ${end}` : end}, ${fromToday(e)}.`;
 }
 
 /** The room revenue and the index against the competitive set, a sentence
@@ -373,12 +374,14 @@ export function hotelModelLine(r: HotelDealRead, m: HotelModel): string {
       );
     }
   }
+  // Inside the hold and past the sale by the DAY: whole months put an end a
+  // week after the sale inside it.
   const f = r.franchiseEnds;
-  if (f && f.yearsLeft > 0 && f.yearsLeft <= hold) {
+  if (f && !endHasPassed(f) && endsByYear(f, hold)) {
     out.push(`The franchise ends ${f.from === "year" ? `in ${endLabel(f)}` : endLabel(f)}, inside the model's ${holdWord} hold: a relicensing then brings its own PIP, or the hotel goes independent.`);
   }
   const g = r.managementEnds;
-  if (g && g.yearsLeft > hold && (r.encumbrance === "management" || r.encumbrance === "brand_and_management")) {
+  if (g && !endsByYear(g, hold) && (r.encumbrance === "management" || r.encumbrance === "brand_and_management")) {
     out.push(`The management agreement runs past the model's sale, to ${endLabel(g)}: the next buyer inherits the manager too.`);
   }
   return out.join(" ");
@@ -403,7 +406,7 @@ export function hotelShortLine(r: HotelDealRead): string {
   if (r.pipTotal != null) parts.push(`PIP ${money(r.pipTotal)}${r.pipPerKey != null ? ` (${money(r.pipPerKey)} ${withArticle(unit)})` : ""}`);
   else if (r.pipPerKey != null) parts.push(`PIP ${money(r.pipPerKey)} ${withArticle(unit)}`);
   else if (r.brand && !r.independent && !r.pip) parts.push("no PIP stated");
-  if (r.franchiseEnds && r.franchiseEnds.yearsLeft > 0) {
+  if (r.franchiseEnds && !endHasPassed(r.franchiseEnds)) {
     parts.push(`the franchise ends ${r.franchiseEnds.from === "year" ? `in ${endLabel(r.franchiseEnds)}` : endLabel(r.franchiseEnds)}`);
   }
   return parts.join("; ");
@@ -465,8 +468,8 @@ export function hotelNote(r: HotelDealRead): string {
           : "(b) THE ENCUMBRANCE — the memorandum does not say whether the sale is encumbered by management or the brand: ask, since it decides who runs the hotel",
   );
   traps.push(
-    r.franchiseEnds && r.franchiseEnds.yearsLeft > 0
-      ? `(c) THE FLAG'S TERM — the franchise ends ${endLabel(r.franchiseEnds)}, ${yearsText(r.franchiseEnds.yearsLeft)} from today: a relicensing brings a PIP of its own, and a flag that lapses takes its reservation system with it`
+    r.franchiseEnds && !endHasPassed(r.franchiseEnds)
+      ? `(c) THE FLAG'S TERM — the franchise ends ${endLabel(r.franchiseEnds)}, ${fromToday(r.franchiseEnds)}: a relicensing brings a PIP of its own, and a flag that lapses takes its reservation system with it`
       : r.franchiseEnds
         ? `(c) THE FLAG'S TERM — the franchise's stated end, ${endLabel(r.franchiseEnds)}, has passed: ask whether the hotel runs on an extension or month to month, and what the brand requires to relicense it`
         : r.independent

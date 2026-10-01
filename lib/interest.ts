@@ -43,7 +43,15 @@ import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { parsePageNumber } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
-import { groundLeaseTermLine, readGroundLeaseTerm, termEndLabel, yearsText, type GroundLeaseTerm } from "@/lib/ground-lease-term";
+import {
+  endHasPassed,
+  endIsAhead,
+  fromToday,
+  groundLeaseTermLine,
+  readGroundLeaseTerm,
+  termEndLabel,
+  type GroundLeaseTerm,
+} from "@/lib/ground-lease-term";
 import { readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
 
 export type { InterestKind };
@@ -146,8 +154,11 @@ export function interestOf(ex: ExtractionResult | null | undefined): { kind: Int
  *  not have), "Leased fee, reverts in 45 yrs". */
 export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const { kind, sharePct } = interestOf(ex);
-  const left = kind === "leasehold" || kind === "leased_fee" ? readGroundLeaseTerm(ex, asOf)?.yearsLeft ?? null : null;
-  const yrs = left != null && left > 0 ? (left < 1 ? "under 1 yr" : `${Math.floor(left)} ${Math.floor(left) === 1 ? "yr" : "yrs"}`) : null;
+  // Ahead by the DAY: inside its last month the whole months count none,
+  // and the tag had dropped the term as if it had ended.
+  const term = kind === "leasehold" || kind === "leased_fee" ? readGroundLeaseTerm(ex, asOf) : null;
+  const left = term && endIsAhead(term) ? term.yearsLeft : null;
+  const yrs = left != null ? (left < 1 ? "under 1 yr" : `${Math.floor(left)} ${Math.floor(left) === 1 ? "yr" : "yrs"}`) : null;
   switch (kind) {
     case "note":
       return "Note";
@@ -291,6 +302,11 @@ export function noteYieldSentence(n: NoteRead | null): string {
   if (n.matured && due) {
     return `It is past its ${due} maturity — a matured loan still outstanding is in default or extended, and there is no contract yield to state.`;
   }
+  // Due inside its last month, its day not yet gone by: no whole month of
+  // payments is left to solve a yield over, and the note is not past due.
+  if (n.monthsLeft === 0 && due) {
+    return `It comes due ${n.daysLeft === 0 ? "today" : "in under a month"}, at its ${due} maturity — too short a run for a yield to maturity to state.`;
+  }
   if (n.ytmPct != null && due) {
     if (n.terms.status === "non_performing") {
       return `If it paid to its ${due} maturity it would yield ${pctText(n.ytmPct)} (${n.paymentBasis}) — it is not paying, so what it earns turns on the time and cost of taking the property.`;
@@ -352,6 +368,11 @@ export function noteCaption(n: NoteRead | null): string {
   if (!n) return "";
   if (n.monthsLeft != null && n.terms.maturity && n.paymentBasis) {
     return `${n.monthsLeft} ${n.monthsLeft === 1 ? "month" : "months"} to its ${monthYear(n.terms.maturity)} maturity, ${n.paymentBasis}.`;
+  }
+  if (n.monthsLeft === 0 && n.terms.maturity) {
+    return n.daysLeft === 0
+      ? `Due today, at its ${monthYear(n.terms.maturity)} maturity.`
+      : `Under a month to its ${monthYear(n.terms.maturity)} maturity.`;
   }
   if (!n.terms.maturity && n.currentYieldPct != null) {
     return "The memorandum states no maturity, so there is no yield to maturity to give.";
@@ -569,8 +590,8 @@ const SHARED_TRAPS_READ: Partial<Record<InterestKind, string>> = {
  *  clause for the short line (#422), where the memorandum states it and it
  *  has not passed. */
 function termClause(t: GroundLeaseTerm | null, what: string): string {
-  if (!t || t.yearsLeft <= 0) return "";
-  return `; ${what} ${t.from === "year" ? "in " : t.from === "remaining" ? "about " : ""}${termEndLabel(t)}, ${yearsText(t.yearsLeft)} from today`;
+  if (!t || endHasPassed(t)) return "";
+  return `; ${what} ${t.from === "year" ? "in " : t.from === "remaining" ? "about " : ""}${termEndLabel(t)}, ${fromToday(t)}`;
 }
 
 /**
@@ -591,9 +612,11 @@ export function interestShortLine(r: InterestRead): string {
           ? ", past its maturity"
           : n.terms.status === "non_performing"
             ? ", and not paying"
-            : n.ytmPct != null && n.terms.maturity
-              ? `, ${pctText(n.ytmPct)} to its ${monthYear(n.terms.maturity)} maturity${n.terms.status === "performing" ? "" : " if paid as agreed"}`
-              : "";
+            : n.monthsLeft === 0
+              ? `, due ${n.daysLeft === 0 ? "today" : "in under a month"}`
+              : n.ytmPct != null && n.terms.maturity
+                ? `, ${pctText(n.ytmPct)} to its ${monthYear(n.terms.maturity)} maturity${n.terms.status === "performing" ? "" : " if paid as agreed"}`
+                : "";
       return `A loan secured by the property, not the property${
         r.discountPct != null && r.askingPrice != null && r.balance != null
           ? ` — the ${money(r.askingPrice)} price is ${discountPhrase(r.discountPct)} the ${money(r.balance)} balance${earns}`

@@ -1,5 +1,5 @@
 import { endLabel, type AffordableRead, type AffordableTier, type DatedEnd } from "@/lib/affordable";
-import { yearsText } from "@/lib/ground-lease-term";
+import { endHasPassed, leftText } from "@/lib/ground-lease-term";
 import { withArticle } from "@/lib/article";
 
 /**
@@ -174,6 +174,10 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
           <dl className="space-y-1.5" data-qa="affordable-clocks">
             {clocks.map((c) => {
               const left = c.end.yearsLeft;
+              // Passed by the DAY: inside its last month the whole months
+              // count none, and the clock had read "— passed" four weeks
+              // early (lib/ground-lease-term `DatedSpan`).
+              const passed = endHasPassed(c.end);
               return (
                 <div
                   key={c.key}
@@ -181,17 +185,17 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
                 >
                   <dt className="font-medium text-ink">{c.label}</dt>
                   <dd className="min-w-0">
-                    {left > 0 ? (
+                    {!passed ? (
                       <div className="flex flex-col gap-0.5 @md/clocks:flex-row @md/clocks:items-center @md/clocks:gap-2">
                         <div className="h-2 min-w-0 overflow-hidden rounded-full bg-faint @md/clocks:flex-1" aria-hidden>
                           <div
                             className={`h-full rounded-full ${c.key === "hap" ? "bg-caution/70" : c.key === "compliance" ? "bg-brand/40" : "bg-brand/70"}`}
                             data-bar="affordable-clock"
-                            style={{ width: pctOf(left, longest) }}
+                            style={{ width: pctOf(Math.max(0, left), longest) }}
                           />
                         </div>
                         <span className="font-mono tabular-nums text-muted @md/clocks:w-36 @md/clocks:shrink-0">
-                          {`${c.end.from === "year" ? "" : "to "}${endLabel(c.end)} · ${yearsText(left)}`}
+                          {`${c.end.from === "year" ? "" : "to "}${endLabel(c.end)} · ${leftText(c.end)}`}
                         </span>
                       </div>
                     ) : (

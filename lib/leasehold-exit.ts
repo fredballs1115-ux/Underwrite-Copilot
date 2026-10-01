@@ -40,7 +40,15 @@
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { interestOf } from "@/lib/interest";
-import { groundLeaseTermLine, readGroundLeaseTerm, termEndLabel, yearsText, type GroundLeaseTerm } from "@/lib/ground-lease-term";
+import {
+  endHasPassed,
+  endsByYear,
+  groundLeaseTermLine,
+  readGroundLeaseTerm,
+  termEndLabel,
+  yearsText,
+  type GroundLeaseTerm,
+} from "@/lib/ground-lease-term";
 import { TERM_MARGIN_YEARS } from "@/lib/tools/ground-lease";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
 
@@ -135,7 +143,11 @@ export function readLeaseholdExit(
   const rawGrowth = lastNoi > 0 && exitNoi > 0 ? (exitNoi / lastNoi - 1) * 100 : inputs.rentGrowthPct * 100;
   const growthPct = Math.max(rawGrowth, -exitCapPct / 2);
   const capitalised = run.residual.grossSaleProceeds;
-  const endsInHold = term.yearsLeft <= holdYears;
+  // Inside the hold by the DAY (lib/ground-lease-term `DatedSpan`): whole
+  // months put a lease ending a week after the sale inside it, and a lease
+  // ending 12 months and 17 days out in year 1. The term's value below runs
+  // on the whole months, the arithmetic's count.
+  const endsInHold = endsByYear(term, holdYears);
 
   const exitOn = (years: number): TermExit | null => {
     if (!(years > 0) || !(capitalised > 0)) return null;
@@ -160,7 +172,7 @@ export function readLeaseholdExit(
     term,
     holdYears,
     endsInHold,
-    endsInYear: endsInHold ? Math.max(0, Math.ceil(term.yearsLeft)) : null,
+    endsInYear: endsInHold ? Math.max(1, Math.ceil(term.yearsToTheDay)) : null,
     exitNoi,
     exitCapPct,
     capitalised,
@@ -169,7 +181,7 @@ export function readLeaseholdExit(
     leveredIrrPct: pctOf(run.returns.leveredIrrPct),
     unleveredIrrPct: pctOf(run.returns.unleveredIrrPct),
     onTerm: endsInHold ? null : exitOn(yearsAtSale),
-    withOptions: optionYears > 0 && term.yearsLeft > 0 ? exitOn(yearsAtSale + optionYears) : null,
+    withOptions: optionYears > 0 && !endHasPassed(term) ? exitOn(yearsAtSale + optionYears) : null,
     subordinated: subordinationOf(groundLease),
   };
 }
@@ -201,13 +213,18 @@ const shareText = (n: number) => `${Math.round(n)}%`;
 export function leaseholdExitSentence(r: LeaseholdExitRead): string {
   const hold = `${r.holdYears}-year hold`;
   const end = termEndLabel(r.term);
-  if (r.term.yearsLeft <= 0) {
+  if (endHasPassed(r.term)) {
     return `The ground lease's stated end, ${end}, has passed, so there is no term to value — check the lease and any extension already exercised before reading anything the model says.`;
   }
   if (r.endsInHold) {
     return `The ground lease ends ${r.term.from === "year" ? "in " : ""}${end}, in year ${r.endsInYear} of the model's ${hold}: the building reverts to the landowner before the model sells it, so the income after that and the sale proceeds are not this buyer's to collect.`;
   }
   const t = r.onTerm;
+  // Past the sale by under a whole month: the term's arithmetic counts
+  // none of it, and a buyer at the sale buys almost no lease.
+  if (!t && Math.round((r.term.yearsLeft - r.holdYears) * 12) < 1) {
+    return `The ground lease ends ${r.term.from === "year" ? "in " : ""}${end}, under a month after the model's sale in year ${r.holdYears}: a buyer then buys almost none of the term, so the model's capitalised exit is not a price anyone pays for it.`;
+  }
   if (!t) return "The model's exit could not be valued on the term.";
   if (t.sharePct >= 99.5) {
     return `With ${yearsText(t.yearsAtSale)} left at the model's sale in year ${r.holdYears}, the term bears the capitalised exit within 1% — the model's exit holds as it runs.`;

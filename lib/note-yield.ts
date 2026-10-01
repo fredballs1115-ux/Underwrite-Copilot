@@ -95,8 +95,12 @@ export interface NoteRead {
   cents: number | null;
   /** a year's interest on the balance over the price, percent */
   currentYieldPct: number | null;
-  /** whole months from the reading's date to maturity */
+  /** whole months from the reading's date to maturity — the arithmetic's
+   *  count, 0 inside the last month; null past maturity */
   monthsLeft: number | null;
+  /** days from the reading's date to maturity, negative once it has gone
+   *  by — what "past" and "due" are said from, never the whole months */
+  daysLeft: number | null;
   /** the monthly IRR × 12, percent — null without the terms to run it, or
    *  past maturity */
   ytmPct: number | null;
@@ -112,7 +116,8 @@ export interface NoteRead {
   /** the price over the collateral's stated value, percent — null on a
    *  subordinate note, as above */
   ltvAtPricePct: number | null;
-  /** past maturity on the reading's date */
+  /** past maturity on the reading's date: its day has gone by. On the day
+   *  itself the note is due, not past it */
   matured: boolean;
 }
 
@@ -349,11 +354,48 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
 
 /** Whole months from one day to another — a month is counted only once its
  *  day is reached, so a note maturing on the 1st, read on the 15th, has one
- *  month fewer than the calendar suggests. */
+ *  month fewer than the calendar suggests. The count the arithmetic runs on
+ *  (a month of interest is a whole month); never what says a day is past,
+ *  since every day of the last month counts none (`daysBetween`). */
 export function monthsBetween(fromIso: string, toIso: string): number {
   const [y1, m1, d1] = fromIso.split("-").map(Number);
   const [y2, m2, d2] = toIso.split("-").map(Number);
   return (y2 - y1) * 12 + (m2 - m1) - (d2 < d1 ? 1 : 0);
+}
+
+/** Whole days from one ISO day to another, in UTC — negative where the
+ *  second is earlier. What a sentence that says a date is past, due or
+ *  before another is decided by: whole months call a day four weeks off
+ *  "none left", and read a maturity next month as one gone by. */
+export function daysBetween(fromIso: string, toIso: string): number {
+  const at = (iso: string) => {
+    const [y, m, d] = iso.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((at(toIso) - at(fromIso)) / 86_400_000);
+}
+
+/**
+ * Years from one ISO day to another, to the day: the whole months, and the
+ * days past the last of them as a share of the month they fall in, over
+ * twelve. Equal to whole months ÷ 12 wherever the two days of the month
+ * are the same — the anniversaries a hold's years end on — so a date one
+ * day past an anniversary is in the year after it, where whole months put
+ * a lease ending 12 months and 17 days out "in year 1".
+ */
+export function yearsBetween(fromIso: string, toIso: string): number {
+  const months = monthsBetween(fromIso, toIso);
+  const [y, m, d] = fromIso.split("-").map(Number);
+  // The day the whole months reach, and the one a month on, each held to its
+  // month's last day (Jan 31 and a month is Feb 28).
+  const anchor = (k: number) => {
+    const last = new Date(Date.UTC(y, m - 1 + k + 1, 0)).getUTCDate();
+    const at = new Date(Date.UTC(y, m - 1 + k, Math.min(d, last)));
+    return at.toISOString().slice(0, 10);
+  };
+  const from = anchor(months);
+  const span = daysBetween(from, anchor(months + 1));
+  return (months + daysBetween(from, toIso) / span) / 12;
 }
 
 /**
@@ -364,13 +406,20 @@ export function readNote(terms: NoteTerms, price: number | null, asOf: Date): No
   if (price == null || !(price > 0) || terms.balance == null || !(terms.balance > 0)) return null;
   const balance = terms.balance;
   const today = iso(asOf.getUTCFullYear(), asOf.getUTCMonth() + 1, asOf.getUTCDate());
-  const months = terms.maturity ? monthsBetween(today, terms.maturity) : null;
-  const matured = months != null && months < 1;
+  // Past maturity by the DAY (the time audit of 2026-10-01): whole months
+  // called a note maturing in four weeks one gone by, "past its Mar 2028
+  // maturity" on Feb 2. The day itself is due, not past.
+  const daysLeft = terms.maturity ? daysBetween(today, terms.maturity) : null;
+  const matured = daysLeft != null && daysLeft < 0;
+  // The whole months the yield runs over — none inside the last month, so a
+  // note due within it has no yield to maturity to solve (a month's
+  // payments are the arithmetic's unit).
+  const months = terms.maturity && !matured ? monthsBetween(today, terms.maturity) : null;
   const r = terms.ratePct != null ? terms.ratePct / 100 : null;
 
   let ytmPct: number | null = null;
   let paymentBasis: string | null = null;
-  if (r != null && months != null && !matured) {
+  if (r != null && months != null && months >= 1) {
     const i = r / 12;
     const amortizing = terms.interestOnly === false && terms.amortYears != null;
     let payment: number;
@@ -404,7 +453,8 @@ export function readNote(terms: NoteTerms, price: number | null, asOf: Date): No
     price,
     cents: (price / balance) * 100,
     currentYieldPct: r != null ? ((balance * r) / price) * 100 : null,
-    monthsLeft: months != null && !matured ? months : null,
+    monthsLeft: months,
+    daysLeft,
     ytmPct,
     paymentBasis,
     // Behind a senior loan the note's last dollar sits on top of a balance

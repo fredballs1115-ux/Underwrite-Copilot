@@ -1,6 +1,6 @@
 import { LeaseTermBar } from "@/app/lease-term-bar";
-import { termEndLabel } from "@/lib/ground-lease-term";
-import { pct2, singleTenantModelLine, type LeaseModel, type SingleTenantRead } from "@/lib/single-tenant";
+import { endsByYear, termEndLabel } from "@/lib/ground-lease-term";
+import { effectiveSpan, pct2, singleTenantModelLine, type LeaseModel, type SingleTenantRead } from "@/lib/single-tenant";
 
 /**
  * One tenant leases the whole property (#454) — the pure panel for
@@ -39,8 +39,11 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
   const inc = r.increases;
   // The lease's growth against the model's, where the lease outlasts the
   // model's sale and its increases read as a rate.
+  // Past the sale by the DAY, as the model line reads it (lib/single-tenant
+  // `effectiveSpan`), so the picture and the sentence agree.
+  const span = effectiveSpan(r);
   const growth =
-    model && holdYears != null && eff && eff.yearsLeft > holdYears && inc && inc.kind !== "cpi"
+    model && holdYears != null && eff && span && !endsByYear(span, holdYears) && inc && inc.kind !== "cpi"
       ? { lease: inc.annualPct, model: model.rentGrowthPct * 100, how: inc.kind === "flat" ? "flat" : inc.how }
       : null;
   const scale = growth ? Math.max(growth.lease, growth.model, 1) : 1;

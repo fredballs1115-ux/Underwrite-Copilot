@@ -27,7 +27,7 @@
 // read as one.
 
 import { parsePageNumber } from "@/lib/facts";
-import { monthsBetween, parseStatedDate } from "@/lib/note-yield";
+import { monthsBetween, parseStatedDate, yearsBetween } from "@/lib/note-yield";
 
 export type MetricRow = { label: string; value: string; page?: string };
 type Rows = { metrics?: MetricRow[]; totalPages?: number } | null | undefined;
@@ -40,9 +40,16 @@ export interface GroundLeaseTerm {
   from: "date" | "year" | "remaining";
   /** the row's own words, as stated */
   stated: string;
-  /** years left on the reading's date — negative where the stated end has
-   *  passed */
+  /** years left on the reading's date, in whole months — the figure said
+   *  and the arithmetic's; negative where the stated end has passed */
   yearsLeft: number;
+  /** years left to the DAY (lib/note-yield `yearsBetween`): 0 on the end's
+   *  own day, negative only once it has gone by, and past an anniversary
+   *  the day after it. Every sentence that says the end has passed, comes
+   *  today or falls before a date reads this, never the whole months,
+   *  which count none in the last month and called a lease four weeks
+   *  from its end one that had ended. */
+  yearsToTheDay: number;
   /** the stated term already counts the extension options — a ceiling */
   includesOptions: boolean;
   /** the extension options as they parse: the years they add in all, and
@@ -192,6 +199,7 @@ export function readLeaseTerm(
   if (!read) return null;
 
   const yearsLeft = monthsBetween(today, read.ends) / 12;
+  const yearsToTheDay = yearsBetween(today, read.ends);
   // A purchase option in the same breath is not an extension.
   const words = `${read.row.label} ${read.row.value}`.replace(/[^.;]*\b(?:purchase|buy|first refusal|first offer)\b[^.;]*/gi, "");
   const includesOptions = INCLUDES_OPTIONS.test(words);
@@ -221,6 +229,7 @@ export function readLeaseTerm(
     from: read.from,
     stated: read.row.value.trim(),
     yearsLeft,
+    yearsToTheDay,
     includesOptions,
     options,
     optionsStated: optionsText,
@@ -243,6 +252,41 @@ export function yearsText(n: number): string {
   return `${Number.isInteger(v) ? String(v) : v.toFixed(1)} ${v === 1 ? "year" : "years"}`;
 }
 
+/** An end read on a day: its whole-month years and its years to the day
+ *  (the ground lease's term, a tenant's lease, an affordable or a hotel's
+ *  clock, a tax abatement). */
+export type DatedSpan = { yearsLeft: number; yearsToTheDay: number };
+
+/** Whether an end has gone by: the day AFTER it, never inside its last
+ *  month as whole months had it. Its own day is the term's last. */
+export const endHasPassed = (e: DatedSpan): boolean => e.yearsToTheDay < 0;
+
+/** Whether an end is still ahead, its own day not yet come. */
+export const endIsAhead = (e: DatedSpan): boolean => e.yearsToTheDay > 0;
+
+/** Whether an end falls at or before a sale `hold` years on — to the day,
+ *  so an end a week past the sale is never said to fall inside the hold. */
+export const endsByYear = (e: DatedSpan, hold: number): boolean => e.yearsToTheDay <= hold;
+
+/**
+ * How long is left, said beside an end's date: "45.3 years"; inside its
+ * last month, where whole months count none and the tenths would print
+ * "0 years", "under a month"; on its own day, "today". An end that has
+ * passed is said as passed, never through this.
+ */
+export function leftText(e: DatedSpan): string {
+  if (e.yearsToTheDay === 0) return "today";
+  if (e.yearsToTheDay > 0 && Math.round(e.yearsLeft * 12) < 1) return "under a month";
+  return yearsText(e.yearsLeft);
+}
+
+/** The same, after its date in a sentence: "45.3 years from today", "under
+ *  a month from today", "today". */
+export function fromToday(e: DatedSpan): string {
+  const left = leftText(e);
+  return left === "today" ? left : `${left} from today`;
+}
+
 /** The options, in a clause after the term: ", with extension options
  *  after it — four of 10 years, 40 years in all". */
 function optionsClause(t: GroundLeaseTerm): string {
@@ -261,15 +305,15 @@ function optionsClause(t: GroundLeaseTerm): string {
  */
 export function groundLeaseTermLine(t: GroundLeaseTerm): string {
   const end = termEndLabel(t);
-  if (t.yearsLeft <= 0) {
+  if (endHasPassed(t)) {
     return `The ground lease's stated end, ${end}, has passed — the term as read cannot be right: check the lease and any extension already exercised`;
   }
   const opts = optionsClause(t);
   switch (t.from) {
     case "date":
-      return `The ground lease ends ${end}, ${yearsText(t.yearsLeft)} from today${opts}`;
+      return `The ground lease ends ${end}, ${fromToday(t)}${opts}`;
     case "year":
-      return `The ground lease ends in ${end}, ${yearsText(t.yearsLeft)} from today — the memorandum states the year alone, read as its first day${opts}`;
+      return `The ground lease ends in ${end}, ${fromToday(t)} — the memorandum states the year alone, read as its first day${opts}`;
     case "remaining":
       return `The memorandum states ${t.stated.replace(/\.$/, "")} left on the ground lease; counted from today they run to about ${end}, and the memorandum's own date is earlier, so the term may be shorter${opts}`;
   }

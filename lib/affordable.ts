@@ -47,9 +47,9 @@ import type { AffordableProgram, AffordableTierStated, ExtractionResult } from "
 import { countNoun } from "@/lib/asset-words";
 import { parseCount, unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
-import { yearsText } from "@/lib/ground-lease-term";
+import { endHasPassed, fromToday } from "@/lib/ground-lease-term";
 import { parseUsd } from "@/lib/money";
-import { monthsBetween, parseStatedDate } from "@/lib/note-yield";
+import { monthsBetween, parseStatedDate, yearsBetween } from "@/lib/note-yield";
 
 export type { AffordableProgram };
 
@@ -143,8 +143,14 @@ export interface DatedEnd {
   from: "date" | "year";
   /** the row's words, as stated */
   stated: string;
-  /** years left today — negative where the stated end has passed */
+  /** years left today in whole months — the figure said; negative where
+   *  the stated end has passed */
   yearsLeft: number;
+  /** years left to the DAY (lib/ground-lease-term `DatedSpan`): what says
+   *  the end has passed, comes today or falls before the model's sale —
+   *  whole months called a contract four weeks from its end one that had
+   *  ended, and put a lease 12 months and 17 days out in year 1 */
+  yearsToTheDay: number;
   /** cited only where it parses and falls inside the memorandum */
   page: string;
 }
@@ -184,6 +190,7 @@ export function datedEnd(row: MetricRow | null, side: "first" | "last", asOf: Da
     from,
     stated: value,
     yearsLeft: monthsBetween(isoOf(asOf), ends) / 12,
+    yearsToTheDay: yearsBetween(isoOf(asOf), ends),
     page: n != null && pageCount != null && n <= pageCount ? (row.page ?? "").trim() : "",
   };
 }
@@ -338,10 +345,10 @@ function untilClause(e: DatedEnd | null, unread: string | null): string {
       ? `, for a term the memorandum states as "${unread.replace(/\.$/, "")}" rather than as a date it ends`
       : ", and the memorandum states no date it ends";
   }
-  if (e.yearsLeft <= 0) {
+  if (endHasPassed(e)) {
     return ` — its stated end, ${endLabel(e)}, has passed: check whether it was extended, or the building released`;
   }
-  return ` until ${e.from === "year" ? "the end of " : ""}${endLabel(e)}, ${yearsText(e.yearsLeft)} from today`;
+  return ` until ${e.from === "year" ? "the end of " : ""}${endLabel(e)}, ${fromToday(e)}`;
 }
 
 /** The programs that restrict rents (a HAP contract pays them, and is said
@@ -451,18 +458,18 @@ export function readAffordable(ex: ExtractionResult | null | undefined, asOf: Da
       ? rows.hapEndRow
         ? `, its term stated as "${rows.hapEndRow.value.trim().replace(/\.$/, "")}" rather than as a date it expires`
         : " whose expiry the memorandum does not state — ask for the contract, its rents and its renewal history"
-      : hapEnds.yearsLeft <= 0
+      : endHasPassed(hapEnds)
         ? ` whose stated expiry, ${endLabel(hapEnds)}, has passed — it has been renewed or is running on an extension; ask which`
-        : ` that expires ${hapEnds.from === "year" ? "in " : ""}${endLabel(hapEnds)}, ${yearsText(hapEnds.yearsLeft)} from today`;
+        : ` that expires ${hapEnds.from === "year" ? "in " : ""}${endLabel(hapEnds)}, ${fromToday(hapEnds)}`;
     const sentence = `${who}${when}`;
     lines.push(
       `${opener}${opener ? sentence : sentence.charAt(0).toUpperCase() + sentence.slice(1)}.`,
       `The contract sets the rent and HUD pays what the tenant's share of it does not; at renewal HUD brings contract rents above market down to market, and an owner who opts out gives a year's notice, the tenants take vouchers and the ${noun.many} rent at market.`,
     );
   }
-  if (complianceEnds && restrictionEnds && restrictionEnds.yearsLeft > 0) {
+  if (complianceEnds && restrictionEnds && !endHasPassed(restrictionEnds)) {
     lines.push(
-      complianceEnds.yearsLeft > 0
+      !endHasPassed(complianceEnds)
         ? `The credits' compliance period runs to ${endLabel(complianceEnds)}; the rent limits run past it, to ${endLabel(restrictionEnds)} — the fifteenth year ends the investor's recapture exposure, not the restriction.`
         : `The credits' compliance period ended in ${endLabel(complianceEnds)}; the rent limits did not — they run to ${endLabel(restrictionEnds)} under the extended-use agreement.`,
     );
@@ -502,13 +509,13 @@ export function readAffordable(ex: ExtractionResult | null | undefined, asOf: Da
   let gapLine: string | null = null;
   if (rAvg && mAvg && mAvg.rent > rAvg.rent) {
     const gap = mAvg.rent - rAvg.rent;
-    const held = restrictionEnds && restrictionEnds.yearsLeft > 0 ? ` until ${endLabel(restrictionEnds)}` : "";
+    const held = restrictionEnds && !endHasPassed(restrictionEnds) ? ` until ${endLabel(restrictionEnds)}` : "";
     gapLine = `The restricted ${noun.many} average ${money(rAvg.rent)} a month and the market-rate ${noun.many} ${money(mAvg.rent)}, on the memorandum's own averages, which blend unit types — ${money(gap)} a month apart, about ${money(gap * rAvg.units * 12)} a year across the ${count(rAvg.units)} restricted ${rAvg.units === 1 ? noun.one : noun.many} that the restriction holds back${held}.`;
   }
 
   // ── What the model is and is not ──
   const caveats: string[] = [];
-  const until = restrictionEnds && restrictionEnds.yearsLeft > 0 ? ` until ${endLabel(restrictionEnds)}` : "";
+  const until = restrictionEnds && !endHasPassed(restrictionEnds) ? ` until ${endLabel(restrictionEnds)}` : "";
   if (!hapOnly && everyUnit) {
     caveats.push(
       `The screening model grows every ${noun.one}'s rent at one rate, and here every ${noun.one}'s rent is capped by the restriction${until} — its rent growth is the limits' growth on this deal, not the market's.`,
@@ -595,7 +602,7 @@ export function affordableShortLine(r: AffordableRead): string {
   const restricted = r.programs.filter((p): p is Exclude<AffordableProgram, "section8"> => p !== "section8");
   const under = restricted.length ? ` under ${restricted.map((p) => PROGRAM_SHORT[p]).join(" and ")}` : "";
   const until =
-    r.restrictionEnds && r.restrictionEnds.yearsLeft > 0
+    r.restrictionEnds && !endHasPassed(r.restrictionEnds)
       ? ` until ${endLabel(r.restrictionEnds)}`
       : r.restrictionEnds
         ? " (its stated end has passed)"
@@ -610,7 +617,7 @@ export function affordableShortLine(r: AffordableRead): string {
     );
   }
   if (r.programs.includes("section8") || r.assistedUnits != null) {
-    const hap = r.hapEnds && r.hapEnds.yearsLeft > 0 ? ` to ${endLabel(r.hapEnds)}` : r.hapEnds ? " (its stated expiry has passed)" : "";
+    const hap = r.hapEnds && !endHasPassed(r.hapEnds) ? ` to ${endLabel(r.hapEnds)}` : r.hapEnds ? " (its stated expiry has passed)" : "";
     parts.push(
       r.assistedUnits != null && !r.countsDisagree
         ? `${count(r.assistedUnits)} ${r.hapOnly && r.totalUnits != null ? `of ${count(r.totalUnits)} ${r.noun.many} ` : ""}under a Section 8 HAP contract${hap}`

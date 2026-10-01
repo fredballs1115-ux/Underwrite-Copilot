@@ -1,6 +1,6 @@
 import { withArticle } from "@/lib/article";
 import { endLabel } from "@/lib/affordable";
-import { yearsText } from "@/lib/ground-lease-term";
+import { endHasPassed, leftText, yearsText } from "@/lib/ground-lease-term";
 import type { HotelDealRead } from "@/lib/hotel-deal";
 
 /**
@@ -120,6 +120,9 @@ export function HotelPanel({
           <dl className="space-y-1.5">
             {clocks.map((c) => {
               const left = c.end.yearsLeft;
+              // Passed by the DAY, never inside its last month (lib/ground-
+              // lease-term `DatedSpan`).
+              const passed = endHasPassed(c.end);
               return (
                 <div
                   key={c.key}
@@ -127,16 +130,16 @@ export function HotelPanel({
                 >
                   <dt className="font-medium text-ink">{c.label}</dt>
                   <dd className="min-w-0">
-                    {left > 0 ? (
+                    {!passed ? (
                       <div className="flex flex-col gap-0.5 @md/clocks:flex-row @md/clocks:items-center @md/clocks:gap-2">
                         <div className="relative h-2 min-w-0 overflow-hidden rounded-full bg-faint @md/clocks:flex-1" aria-hidden>
-                          <div className={`h-full rounded-full ${c.tone}`} data-bar="hotel-clock" style={{ width: pctOf(left, longest) }} />
+                          <div className={`h-full rounded-full ${c.tone}`} data-bar="hotel-clock" style={{ width: pctOf(Math.max(0, left), longest) }} />
                           {holdYears != null && (
                             <div className="absolute inset-y-0 w-0.5 bg-ink" data-bar="hotel-hold" style={{ left: pctOf(holdYears, longest) }} />
                           )}
                         </div>
                         <span className="font-mono tabular-nums text-muted @md/clocks:w-36 @md/clocks:shrink-0">
-                          {`${c.end.from === "year" ? "" : "to "}${endLabel(c.end)} · ${yearsText(left)}`}
+                          {`${c.end.from === "year" ? "" : "to "}${endLabel(c.end)} · ${leftText(c.end)}`}
                         </span>
                       </div>
                     ) : (
