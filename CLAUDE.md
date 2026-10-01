@@ -1932,9 +1932,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   function: `todayReads` (`lib/model-vs-market-read.ts`, `server-only`,
   the cached readers once) and `modelVsMarketFor` (pure, in
   `lib/model-vs-market.ts`: the class the deck turned out to be, whether
-  the deal is a plan, the page's own cap where it passes one and the
-  extraction's otherwise), so the page, the report and the workbook
-  cannot disagree about what was checked against what. **The research
+  the deal is a plan, and the going-in cap through `dealGoingInCap` — the
+  extraction's stated cap, else the first signal's, else the one their
+  NOI implies on their price, none on a plan deal or a note — the one
+  reader the submarket check's supply warning also reads), so the page,
+  the report and the workbook cannot disagree about what was checked
+  against what. **The research
   tracker rides beside the feeds** (#394, `lib/tracker-read.ts`, pure):
   `trackerFor` reads the metro's sector snapshot (`data/research/metros.json`,
   the blocks the market brief's "By asset type" panel and the vacancy
