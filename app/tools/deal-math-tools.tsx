@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 import { aOrAn, withArticle } from "@/lib/article";
 import { readFigure } from "@/lib/money";
-import { usd, usdExact } from "@/lib/tools/format";
+import { usd, usdCents, usdExact } from "@/lib/tools/format";
 import { blanks, fillIn } from "@/lib/tools/blanks";
 import { analyzeStrip, readStrip } from "@/lib/tools/cashflow-math";
 import { readDebt, testRefi } from "@/lib/tools/debt-math";
@@ -871,7 +871,7 @@ function CashFlowStrip() {
 
   return (
     <Card id="cash-flow-strip" eyebrow="Returns" title="Paste a cash flow">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -991,8 +991,11 @@ function CashFlowStrip() {
                 ))}
               </div>
               <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                {/* The running total is drawn from sm up, so the caption
+                    names it only there. */}
                 <p className="text-[11px] text-muted">
-                  Each year against the largest flow; the right column is the running total.
+                  Each year against the largest flow
+                  <span className="hidden sm:inline">; the right column is the running total</span>.
                 </p>
                 {/* Tab-delimited with headers, and the numbers RAW — no
                     dollar signs, no commas, no compacting to "$8.10M" — so
@@ -2394,7 +2397,7 @@ function PercentageRent() {
         <Field label="Cost ceiling" suffix="%" value={ceiling} onChange={setCeiling} placeholder="10" />
       </div>
 
-      <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,16rem)_minmax(0,1fr)]">
         <label className="block">
           <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
             Sales, month by month
@@ -2796,7 +2799,7 @@ function Leaseback() {
 
   return (
     <Card id="sale-leaseback" eyebrow="The structure" title="The sale-leaseback">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="180,000" />
@@ -4593,7 +4596,7 @@ function HoldOrSell() {
 
   return (
     <Card id="hold-or-sell" eyebrow="Returns" title="Hold it or sell it">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Worth today" value={value} onChange={setValue} placeholder="34M" />
           <Field label="Next year's NOI" value={noi} onChange={setNoi} placeholder="1,870,000" />
@@ -4771,7 +4774,7 @@ function MaxBid() {
 
   return (
     <Card id="max-bid" eyebrow="Returns" title="What you can pay">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Year 1 NOI" value={noi} onChange={setNoi} placeholder="1,650,000" />
           <Field label="NOI growth" suffix="%" value={growth} onChange={setGrowth} placeholder="3" />
@@ -4955,7 +4958,7 @@ function Insurance() {
 
   return (
     <Card id="insurance" eyebrow="The expense line" title="What insurance really costs">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Memorandum's premium" value={seller} onChange={setSeller} placeholder="420,000" />
@@ -5120,7 +5123,7 @@ function BelowTheLine() {
 
   return (
     <Card id="below-the-line" eyebrow="The statement" title="What sits below the NOI line">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="NOI as stated" value={noi} onChange={setNoi} placeholder="2,640,000" />
           <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="200,000" />
@@ -5173,9 +5176,15 @@ function BelowTheLine() {
               </p>
               <div className="mt-2 space-y-1.5">
                 {r.lines.map((l) => (
-                  <div key={l.label} className="flex items-center gap-3 text-xs">
-                    <span className="w-44 shrink-0 text-muted">{l.label}</span>
-                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                  // On a phone the label takes a line of its own above the
+                  // bar: beside it, its 11rem pushed the row 27px past the
+                  // card at 390px.
+                  <div
+                    key={l.label}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:flex-nowrap"
+                  >
+                    <span className="w-full text-muted sm:w-44 sm:shrink-0">{l.label}</span>
+                    <span className="relative h-2.5 min-w-0 flex-1 rounded-full bg-faint">
                       <span
                         data-bar="line"
                         className="absolute inset-y-0 left-0 rounded-full bg-caution"
@@ -5185,8 +5194,8 @@ function BelowTheLine() {
                     <span className="w-20 shrink-0 text-right tabular-nums">
                       {usdExact(l.amount)}
                     </span>
-                    <span className="w-14 shrink-0 text-right tabular-nums text-muted">
-                      ${l.perSf}/SF
+                    <span className="w-16 shrink-0 text-right tabular-nums text-muted">
+                      {`${usdCents(l.perSf)}/SF`}
                     </span>
                   </div>
                 ))}
@@ -5212,17 +5221,17 @@ function BelowTheLine() {
                 And the largest line is a guess
               </p>
               <div className="mt-2 flex items-center gap-3 text-xs">
-                <span className="w-28 shrink-0 text-right tabular-nums text-muted">
+                <span className="w-20 shrink-0 text-right tabular-nums text-muted sm:w-28">
                   {usdExact(r.leasingIfAllRenew)}
                 </span>
-                <span className="relative h-2.5 flex-1 rounded-full bg-brand/25">
+                <span className="relative h-2.5 min-w-0 flex-1 rounded-full bg-brand/25">
                   <span
                     data-bar="renew"
                     className="absolute inset-y-0 w-1 -translate-x-1/2 rounded-full bg-ink"
                     style={{ left: `${Math.max(0, Math.min(100, atBlend))}%` }}
                   />
                 </span>
-                <span className="w-28 shrink-0 tabular-nums text-muted">
+                <span className="w-20 shrink-0 tabular-nums text-muted sm:w-28">
                   {usdExact(r.leasingIfNoneRenew)}
                 </span>
               </div>
@@ -5297,7 +5306,7 @@ function EconomicOccupancy() {
 
   return (
     <Card id="economic-occupancy" eyebrow="The statement" title="The doors against the dollars">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Units" value={units} onChange={setUnits} placeholder="200" />
           <Field label="Market rent" suffix="/mo" value={market} onChange={setMarket} placeholder="1,850" />
@@ -5359,9 +5368,14 @@ function EconomicOccupancy() {
               </p>
               <div className="mt-2 space-y-1.5">
                 {r.lines.map((l) => (
-                  <div key={l.label} className="flex items-center gap-3 text-xs">
-                    <span className="w-32 shrink-0 text-muted">{l.label}</span>
-                    <span className="relative h-2.5 flex-1 rounded-full bg-faint">
+                  // The label over its bar on a phone, beside it from sm:
+                  // inline at 360px the row ran past the card.
+                  <div
+                    key={l.label}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:flex-nowrap"
+                  >
+                    <span className="w-full text-muted sm:w-32 sm:shrink-0">{l.label}</span>
+                    <span className="relative h-2.5 min-w-0 flex-1 rounded-full bg-faint">
                       <span
                         data-bar="egi"
                         className={`absolute inset-y-0 left-0 rounded-full ${tone(l.kind)}`}
@@ -5454,7 +5468,7 @@ function TrailingWindow() {
 
   return (
     <Card id="trailing-window" eyebrow="The statement" title="Which trailing window">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,19rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -5499,9 +5513,13 @@ function TrailingWindow() {
               {r.windows.map((w) => {
                 const lead = r.flattering?.months === w.months && r.windows.length > 1;
                 return (
-                  <div key={w.months} className="flex items-center gap-3 text-xs">
-                    <span className="w-24 shrink-0 text-muted">{w.label}</span>
-                    <span className="relative h-3 flex-1 rounded-full bg-faint">
+                  // The label over its bar on a phone, beside it from sm.
+                  <div
+                    key={w.months}
+                    className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs sm:flex-nowrap"
+                  >
+                    <span className="w-full text-muted sm:w-24 sm:shrink-0">{w.label}</span>
+                    <span className="relative h-3 min-w-0 flex-1 rounded-full bg-faint">
                       <span
                         data-bar="window"
                         className={`absolute inset-y-0 left-0 rounded-full ${
@@ -5626,7 +5644,7 @@ function LeaseUp() {
 
   return (
     <Card id="lease-up" eyebrow="The plan" title="Filling an empty building">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
         <div>
           <div className="grid grid-cols-2 gap-3">
             <Field label="Building" suffix="SF" value={sf} onChange={setSf} placeholder="120,000" />
@@ -5800,7 +5818,7 @@ function Rollover() {
 
   return (
     <Card id="rollover" eyebrow="The rent roll" title="When the income rolls">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,21rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -5864,21 +5882,26 @@ function Rollover() {
 
           {r.years.length > 0 && (
             <div className="mt-5 border-t border-line pt-4">
+              {/* Narrower columns on a phone, where the wide ones pushed the
+                  table 18px past the card at 390px and 48px at 360px. */}
               <div className="mb-2 flex items-center gap-3 text-[11px] uppercase tracking-wide text-muted">
-                <span className="w-20 shrink-0">Year</span>
-                <span className="flex-1">Share of income rolling</span>
-                <span className="w-20 shrink-0 text-right">SF</span>
-                <span className="w-24 shrink-0 text-right">TI + LC</span>
+                <span className="w-12 shrink-0 sm:w-20">Year</span>
+                <span className="min-w-0 flex-1">
+                  <span className="sm:hidden">Share rolling</span>
+                  <span className="hidden sm:inline">Share of income rolling</span>
+                </span>
+                <span className="w-14 shrink-0 text-right sm:w-20">SF</span>
+                <span className="w-20 shrink-0 text-right sm:w-24">TI + LC</span>
               </div>
               <div className="space-y-1.5">
                 {r.years.map((y) => {
                   const cliff = r.worstYear?.year === y.year && r.years.length > 1;
                   return (
                     <div key={y.year} className="flex items-center gap-3 text-xs">
-                      <span className="w-20 shrink-0 tabular-nums text-muted">
+                      <span className="w-12 shrink-0 tabular-nums text-muted sm:w-20">
                         Year {y.year}
                       </span>
-                      <span className="relative h-3 flex-1 rounded-full bg-faint">
+                      <span className="relative h-3 min-w-0 flex-1 rounded-full bg-faint">
                         <span
                           data-bar="roll"
                           className={`absolute inset-y-0 left-0 rounded-full ${
@@ -5895,11 +5918,11 @@ function Rollover() {
                           />
                         )}
                       </span>
-                      <span className="w-20 shrink-0 text-right tabular-nums">
+                      <span className="w-14 shrink-0 text-right tabular-nums sm:w-20">
                         {y.sfExpiring === 0 ? "—" : y.sfExpiring.toLocaleString("en-US")}
                       </span>
                       <span
-                        className={`w-24 shrink-0 text-right tabular-nums ${
+                        className={`w-20 shrink-0 text-right tabular-nums sm:w-24 ${
                           cliff ? "font-semibold text-caution" : "text-muted"
                         }`}
                       >
@@ -5991,7 +6014,7 @@ function UnitMix() {
 
   return (
     <Card id="unit-mix" eyebrow="Multifamily" title="Read the unit mix">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -6039,7 +6062,9 @@ function UnitMix() {
                   {read.rows.map((r) => (
                     <div key={`${r.label}|${r.units}`}>
                       <div className="flex items-baseline justify-between gap-3 text-sm">
-                        <span className="truncate">
+                        {/* Wraps on a phone, where a truncated line cut the
+                            count and the size off every row at 360px. */}
+                        <span className="min-w-0 sm:truncate">
                           <span className="font-medium">{r.label}</span>{" "}
                           <span className="text-muted">
                             · {r.units} {r.units === 1 ? "unit" : "units"}
@@ -6140,7 +6165,7 @@ function Waterfall() {
 
   return (
     <Card id="the-waterfall" eyebrow="Structure" title="Who actually gets the return">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -6301,7 +6326,7 @@ function FeasibilityRent() {
       eyebrow="New supply"
       title="The rent a new building needs"
     >
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Rentable area" suffix="SF" value={sf} onChange={setSf} placeholder="120,000" />
           <Field label="Land, all in" value={land} onChange={setLand} placeholder="9,000,000" />
@@ -6449,7 +6474,7 @@ function StorageEcri() {
 
   return (
     <Card id="storage-ecri" eyebrow="Self-storage" title="The rate increase, and the runway it spends">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Units let" value={units} onChange={setUnits} placeholder="585" />
           <Field label="In-place rent" suffix="/mo" value={inPlace} onChange={setInPlace} placeholder="135" />
@@ -6611,7 +6636,7 @@ function LoanAssumption() {
 
   return (
     <Card id="loan-assumption" eyebrow="Assumable debt" title="Taking over the seller's loan">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Asking price" value={price} onChange={setPrice} placeholder="20,000,000" />
           <Field label="Year-one NOI" value={noi} onChange={setNoi} placeholder="1,100,000" />
@@ -6789,7 +6814,7 @@ function Hotel() {
 
   return (
     <Card id="hotel-revpar" eyebrow="Hotels" title="What a hotel actually earns">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Keys" value={keys} onChange={setKeys} placeholder="150" />
           <Field label="ADR" value={adr} onChange={setAdr} placeholder="185" />
@@ -6979,7 +7004,7 @@ function Renovation() {
 
   return (
     <Card id="renovation-program" eyebrow="Value-add" title="The renovation program">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Doors to renovate" value={units} onChange={setUnits} placeholder="200" />
           <Field label="In-place rent" suffix="/mo" value={inPlace} onChange={setInPlace} placeholder="1,400" />
@@ -7171,7 +7196,7 @@ function Entitlement() {
 
   return (
     <Card id="entitlement" eyebrow="Before the shovel" title="The entitlement clock">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Land price" value={land} onChange={setLand} placeholder="6,000,000" />
           <Field label="Worth as it is" value={asIs} onChange={setAsIs} placeholder="4,200,000" />
@@ -7369,7 +7394,7 @@ function Swap() {
 
   return (
     <Card id="swap" eyebrow="Hedging" title="The swap, and getting out of one">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Loan" value={loan} onChange={setLoan} placeholder="20,000,000" />
           <Field label="Credit spread" suffix="%" value={spread} onChange={setSpread} placeholder="2.50" />
@@ -7561,7 +7586,7 @@ function CompGrid() {
 
   return (
     <Card id="comp-grid" eyebrow="Comparables" title="The comp adjustment grid">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,22rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
@@ -7613,11 +7638,17 @@ function CompGrid() {
           {drawn.length > 0 && (
             <div className="mt-5 space-y-1.5">
               {drawn.map((c) => (
-                <div key={c.name} className="flex items-center gap-3 text-xs">
+                // The gross adjustment and the weight are the comparability
+                // test, so a phone keeps them: under the bar there, beside it
+                // from sm.
+                <div
+                  key={c.name}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs sm:flex-nowrap"
+                >
                   <span className="w-28 shrink-0 truncate text-muted" title={c.name}>
                     {c.name}
                   </span>
-                  <div className="h-2.5 flex-1 overflow-hidden rounded-full bg-faint">
+                  <div className="h-2.5 min-w-0 flex-1 overflow-hidden rounded-full bg-faint">
                     <div
                       data-bar="grid"
                       className={`h-full ${c.flagged ? "bg-caution/60" : "bg-brand"}`}
@@ -7627,7 +7658,7 @@ function CompGrid() {
                   <span className="w-20 shrink-0 text-right font-mono tabular-nums text-ink">
                     {usd(c.basisAdjusted)}
                   </span>
-                  <span className="hidden w-28 shrink-0 text-right font-mono tabular-nums text-muted sm:inline">
+                  <span className="w-full pl-[7.75rem] font-mono tabular-nums text-muted sm:w-40 sm:shrink-0 sm:pl-0 sm:text-right">
                     {c.grossAdjustmentPct}% gross, {c.weightPct}% wt
                   </span>
                 </div>
@@ -7719,7 +7750,7 @@ function StraightLineRent() {
 
   return (
     <Card id="straight-line-rent" eyebrow="The statement" title="What the statement reports, and what the building collects">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Term" suffix="yrs" value={term} onChange={setTerm} placeholder="10" />
           <Field label="Area" suffix="SF" value={area} onChange={setArea} placeholder="20,000" />
@@ -7862,7 +7893,7 @@ function ZoningEnvelope() {
 
   return (
     <Card id="zoning-envelope" eyebrow="The envelope" title="What the site actually holds">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div className="grid grid-cols-2 gap-3">
           <Field label="Site" suffix="SF" value={site} onChange={setSite} placeholder="87,120" />
           <Field label="Density" suffix="/ac" value={upa} onChange={setUpa} placeholder="80" />
@@ -8055,7 +8086,7 @@ function FeeDrag() {
 
   return (
     <Card id="fee-drag" eyebrow="Structure" title="What the LP actually nets">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,18rem)_minmax(0,1fr)]">
         <div>
           <label className="block">
             <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-muted">
