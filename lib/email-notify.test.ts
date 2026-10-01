@@ -28,7 +28,10 @@ import {
   EMAIL_PICTURE_WAIT_MS,
   emailPicture,
   emailSetup,
+  notifyAnalysisFailed,
   notifyAnalysisReady,
+  occasionKey,
+  sendEmail,
   senderDomain,
   wantsAnalysisEmail,
 } from "./email";
@@ -147,6 +150,76 @@ describe("the screen-complete email's picture (#464)", () => {
     expect(sent[0].from).toBe("Underwrite Copilot <notify@underwrite.example>");
     expect(sent[0].subject).toBe("Go: The Maddox — screen complete");
     expect(sent[0].html).toMatch(/<img src="https:\/\/underwrite\.example\/api\/email\/picture\/[^"]+\?s=banner" width="520" height="260" alt="The Maddox — open the deal"/);
+  });
+});
+
+// A send that timed out may have been taken: the key names the email and
+// its occasion, and "Resend checks whether an email with the same
+// idempotency key has already been sent in the last 24 hours".
+describe("every send names its occasion in Resend's Idempotency-Key header", () => {
+  const requests: { headers: Record<string, string>; body: Record<string, unknown> }[] = [];
+  beforeEach(() => {
+    requests.length = 0;
+    process.env.RESEND_API_KEY = "re_test";
+    process.env.RESEND_FROM = "Underwrite Copilot <notify@underwrite.example>";
+    process.env.RESEND_BASE_URL = "https://resend.test";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { headers: Record<string, string>; body: string }) => {
+        requests.push({ headers: init.headers, body: JSON.parse(init.body) });
+        return new Response("{}", { status: 200 });
+      }),
+    );
+  });
+
+  it("sends the header with a key, and none without one", async () => {
+    expect(await sendEmail("a@example.com", "S", "<p>B</p>", "B", { idempotencyKey: "weekly-digest/u1/2026-10-05" })).toBe(true);
+    expect(await sendEmail(["a@example.com", "b@example.com"], "S", "<p>B</p>", "B")).toBe(true);
+    expect(requests[0].headers["Idempotency-Key"]).toBe("weekly-digest/u1/2026-10-05");
+    expect("Idempotency-Key" in requests[1].headers).toBe(false);
+    expect(requests[1].body.to).toEqual(["a@example.com", "b@example.com"]);
+  });
+
+  it("builds a key from the email's kind and its occasion, or none where a part is missing", () => {
+    expect(occasionKey("screen-complete", DEAL, "2026-10-05T13:02:03.004Z")).toBe(
+      `screen-complete/${DEAL}/2026-10-05T13:02:03.004Z`,
+    );
+    expect(occasionKey("screen-stopped", DEAL, null)).toBeNull();
+    expect(occasionKey("screen-stopped", DEAL, "  ")).toBeNull();
+    expect(occasionKey("x", "a b/c")).toBe("x/a-b-c");
+  });
+
+  it("keys the screen-complete email by its verdict, and the stopped one by its run", async () => {
+    const generatedAt = "2026-10-05T13:02:03.004Z";
+    const created = "2026-10-05T12:58:00.000Z";
+    const fake = (verdict: unknown) =>
+      ({
+        from: (table: string) => {
+          const q = {
+            select: () => q,
+            eq: () => q,
+            order: () => q,
+            limit: () => q,
+            maybeSingle: async () => ({
+              data:
+                table === "deals"
+                  ? { name: "The Maddox", user_id: "u1", team_id: null, verdict, is_sample: false, photo: null, om_storage_path: null }
+                  : table === "analysis_jobs"
+                    ? { status: "error", step: "comps", created_at: created }
+                    : { email_on_analysis: true },
+              error: null,
+            }),
+          };
+          return q;
+        },
+        auth: { admin: { getUserById: async () => ({ data: { user: { email: "buyer@example.com" } } }) } },
+      }) as unknown as SupabaseClient;
+    await notifyAnalysisReady(fake({ verdict: "pass", reason: "", generatedAt }), DEAL);
+    await notifyAnalysisFailed(fake(null), DEAL, "The analysis service is overloaded right now — try again in a few minutes.");
+    expect(requests.map((r) => r.headers["Idempotency-Key"])).toEqual([
+      `screen-complete/${DEAL}/${generatedAt}`,
+      `screen-stopped/${DEAL}/${created}`,
+    ]);
   });
 });
 

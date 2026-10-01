@@ -1,7 +1,7 @@
 import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { weeklyDigestEmail, type DigestInput } from "@/lib/email-template";
-import { sendEmail, emailEnabled } from "@/lib/email";
+import { sendEmail, emailEnabled, occasionKey } from "@/lib/email";
 import { STAGES, STAGE_LABEL, isOpenStage, normalizeStage } from "@/lib/stages";
 import { emailPictureUrl } from "@/lib/email-picture";
 import { appUrl } from "@/lib/app-url";
@@ -56,6 +56,13 @@ export interface DigestDealRow {
 export interface DigestJobRow extends JobLike {
   deal_id: string;
   created_at?: string | null;
+}
+
+/** The week a digest belongs to: the date of its Monday (UTC). */
+export function digestWeek(now: number): string {
+  const d = new Date(now);
+  const sinceMonday = (d.getUTCDay() + 6) % 7;
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() - sinceMonday)).toISOString().slice(0, 10);
 }
 
 /** What one person's digest says, before the links around it. */
@@ -279,7 +286,12 @@ export async function runWeeklyDigests(
         pipelineUrl: `${site}/deals`,
         settingsUrl: `${site}/account`,
       });
-      const ok = await sendEmail(to, subject, html, text);
+      // One digest a person a week: a send that timed out after Resend took
+      // it, and the retry the released claim brings, share this key, so the
+      // retry inside Resend's 24 hours is not a second email.
+      const ok = await sendEmail(to, subject, html, text, {
+        idempotencyKey: occasionKey("weekly-digest", profile.id, digestWeek(now)),
+      });
       if (!ok) {
         // Release the claim so the next tick retries instead of the guard
         // blocking a digest that never actually went out.

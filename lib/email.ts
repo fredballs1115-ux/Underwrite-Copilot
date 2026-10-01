@@ -101,11 +101,35 @@ export function emailEnabled(): boolean {
   return readySetup() !== null;
 }
 
+/** How long a send waits for Resend before giving up on the request. */
+export const SEND_TIMEOUT_MS = 8000;
+
+export interface SendOptions {
+  /**
+   * Resend's idempotency key, naming the email and its occasion
+   * (`occasionKey`): "Resend checks whether an email with the same
+   * idempotency key has already been sent in the last 24 hours", so a send
+   * retried after the request timed out — when Resend may well have taken
+   * the first — is not a second email. The digest retries exactly that way.
+   */
+  idempotencyKey?: string | null;
+}
+
+/** An idempotency key: the email's kind and its occasion's parts, joined
+ *  by "/", each part kept to the characters an id, a date or a timestamp
+ *  is written in. Null where a part is missing: no key is better than a
+ *  key two different emails could share. */
+export function occasionKey(kind: string, ...parts: (string | null | undefined)[]): string | null {
+  if (parts.some((p) => !p || !p.trim())) return null;
+  return [kind, ...(parts as string[])].map((p) => p.trim().replace(/[^A-Za-z0-9._:-]/g, "-")).join("/");
+}
+
 export async function sendEmail(
-  to: string,
+  to: string | string[],
   subject: string,
   html: string,
   text: string,
+  opts: SendOptions = {},
 ): Promise<boolean> {
   // The rule holds at the one place a request is made: while paused, no
   // send is attempted, whoever calls.
@@ -114,15 +138,17 @@ export async function sendEmail(
   const { key, from } = ready;
   const base = process.env.RESEND_BASE_URL ?? "https://api.resend.com";
   const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 8000);
+  const timer = setTimeout(() => ctrl.abort(), SEND_TIMEOUT_MS);
   try {
     const res = await fetch(`${base}/emails`, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
+        // "Send the key in the Idempotency-Key HTTP header" (Resend).
+        ...(opts.idempotencyKey ? { "Idempotency-Key": opts.idempotencyKey } : {}),
       },
-      body: JSON.stringify({ from, to: [to], subject, html, text }),
+      body: JSON.stringify({ from, to: Array.isArray(to) ? to : [to], subject, html, text }),
       signal: ctrl.signal,
     });
     if (!res.ok) {
@@ -246,7 +272,10 @@ export async function notifyAnalysisReady(
       settingsUrl: `${appUrl()}/account`,
       picture,
     });
-    await sendEmail(to, subject, html, text);
+    // The occasion is the verdict itself: each screen stamps its own.
+    await sendEmail(to, subject, html, text, {
+      idempotencyKey: occasionKey("screen-complete", dealId, verdict.generatedAt),
+    });
   } catch (err) {
     // Notification-only — the analysis itself already succeeded.
     console.error(
@@ -285,12 +314,44 @@ export async function notifyAnalysisFailed(
       dealUrl: `${appUrl()}/deals/${dealId}`,
       settingsUrl: `${appUrl()}/account`,
     });
-    await sendEmail(to, subject, html, text);
+    // The occasion is the run: its job row's created_at, restamped by every
+    // claim (lib/jobs), so a run's one failure is one email.
+    const job = await latestJob(admin, dealId);
+    await sendEmail(to, subject, html, text, {
+      idempotencyKey: occasionKey("screen-stopped", dealId, job?.created_at),
+    });
   } catch (err) {
     console.error(
       `[email] screen-stopped notification failed for ${dealId}:`,
       err instanceof Error ? err.message : err,
     );
+  }
+}
+
+/** The deal's latest job row as the screen emails read it — its status and
+ *  step (what a stopped run left behind) and when the run was asked for —
+ *  or null where it cannot be read. */
+async function latestJob(
+  admin: SupabaseClient,
+  dealId: string,
+): Promise<{ status: string | null; step: string | null; created_at: string | null } | null> {
+  try {
+    const { data, error } = await admin
+      .from("analysis_jobs")
+      .select("status, step, created_at")
+      .eq("deal_id", dealId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    const row = data as { status?: unknown; step?: unknown; created_at?: unknown };
+    return {
+      status: typeof row.status === "string" ? row.status : null,
+      step: typeof row.step === "string" ? row.step : null,
+      created_at: typeof row.created_at === "string" ? row.created_at : null,
+    };
+  } catch {
+    return null;
   }
 }
 

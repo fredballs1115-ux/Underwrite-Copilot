@@ -10,6 +10,7 @@ import {
   CALL_NOTE,
   OFFERS_WINDOW_DAYS,
   buildDigest,
+  digestWeek,
   newestJobs,
   runWeeklyDigests,
   type DigestDealRow,
@@ -214,7 +215,7 @@ function fakeAdmin(db: Db): SupabaseClient {
 }
 
 const env: Record<string, string | undefined> = {};
-let sent: { subject: string; html: string; text: string }[] = [];
+let sent: { subject: string; html: string; text: string; requestHeaders: Record<string, string> }[] = [];
 
 beforeEach(() => {
   for (const k of ["RESEND_API_KEY", "RESEND_FROM", "RESEND_BASE_URL", "NEXT_PUBLIC_APP_URL", "SUPABASE_SERVICE_ROLE_KEY"]) env[k] = process.env[k];
@@ -226,8 +227,8 @@ beforeEach(() => {
   sent = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (_url: string, init: { body: string }) => {
-      sent.push(JSON.parse(init.body));
+    vi.fn(async (_url: string, init: { body: string; headers: Record<string, string> }) => {
+      sent.push({ ...JSON.parse(init.body), requestHeaders: init.headers });
       return new Response("{}", { status: 200 });
     }),
   );
@@ -287,6 +288,37 @@ describe("runWeeklyDigests", () => {
     // …and no personal-only digest was built: the deals were never read.
     expect(db.calls.some((c) => c.table === "deals")).toBe(false);
     expect(String(err.mock.calls[0]?.[0])).toMatch(/team membership read failed for u1 — will retry next tick/);
+  });
+
+  it("keys each send by the person and the week, so the retry after a timed-out send is not a second email", async () => {
+    expect(digestWeek(NOW)).toBe("2026-10-05");
+    expect(digestWeek(Date.parse("2026-10-11T23:59:00Z"))).toBe("2026-10-05"); // the Sunday after
+    expect(digestWeek(Date.parse("2026-10-04T23:59:00Z"))).toBe("2026-09-28"); // the Sunday before
+
+    const db = dbWith();
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    // The first send times out — Resend may well have taken it.
+    const keys: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { headers: Record<string, string> }) => {
+        keys.push(init.headers["Idempotency-Key"]);
+        throw new DOMException("The operation was aborted.", "AbortError");
+      }),
+    );
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(0);
+    // The claim was released, so the next tick sends again — under the same key.
+    expect(db.profiles[0].last_digest_at).toBe(LAST_WEEK);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: string, init: { headers: Record<string, string> }) => {
+        keys.push(init.headers["Idempotency-Key"]);
+        return new Response("{}", { status: 200 });
+      }),
+    );
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW + 15 * 60_000, pauseMs: 0 })).toBe(1);
+    expect(keys).toEqual(["weekly-digest/u1/2026-10-05", "weekly-digest/u1/2026-10-05"]);
+    expect(err).toHaveBeenCalled();
   });
 
   it("sends nothing to someone whose deals are all closed or dead", async () => {
