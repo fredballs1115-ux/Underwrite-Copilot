@@ -17,6 +17,8 @@ import { statedModelRate } from "@/lib/model/stated-rate";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
+import { interestOf } from "@/lib/interest";
+import { assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -120,21 +122,49 @@ function amortPreview(
   return rows;
 }
 
-/** Loan terms the OM itself states — shown with their page references. */
-function omLoanTerms(extraction: ExtractionResult | null) {
+type OmTerm = { label: string; value: string; page?: string };
+
+/**
+ * Loan terms the OM itself states — shown with their page references, each
+ * under whose loan it is. The seller's loan offered for assumption (#417)
+ * and the note the seller offers to carry (#462) are read by their own
+ * finders and listed as theirs, never as the buyer's new financing. On a
+ * note the loan's terms are the asset being sold (#416), and on a leased
+ * fee the property's debt is the leaseholder's building's (`assumableApplies`)
+ * — neither is financing this buyer takes, so neither lists any.
+ */
+export function omLoanTerms(extraction: ExtractionResult | null): {
+  offered: OmTerm[];
+  assumable: OmTerm[];
+  seller: OmTerm[];
+} {
+  const none = { offered: [], assumable: [], seller: [] };
+  const { kind } = interestOf(extraction);
+  if (kind === "note" || kind === "leased_fee") return none;
   const metrics = extraction?.metrics ?? [];
-  const picks: { label: string; value: string; page?: string }[] = [];
+  const as = (term: string, m: { value: string; page?: string }): OmTerm => ({ label: term, value: m.value, page: m.page });
+  const assumableRows = assumableStatedRows(metrics);
+  const sellerRows = sellerNoteStatedRows(metrics);
+  const claimed = new Set<unknown>([...assumableRows, ...sellerRows].map((e) => e.row));
+  // The rest is what the OM states of a loan with no owner named: its own
+  // financing assumptions (the LTV it underwrites, the rate it quotes).
+  const rest = metrics.filter((m) => !claimed.has(m));
+  const offered: OmTerm[] = [];
   const take = (label: string, inc: RegExp, exc?: RegExp) => {
-    const m = findMetric(metrics, inc, exc);
-    if (m) picks.push({ label, value: m.value, page: (m as { page?: string }).page });
+    const m = findMetric(rest, inc, exc);
+    if (m) offered.push(as(label, m as { value: string; page?: string }));
   };
-  take("Loan amount", /loan amount|existing (debt|loan)|assumable (debt|loan)|first mortgage/i, /rate|ltv/i);
+  take("Loan amount", /loan amount|existing (debt|loan)|first mortgage/i, /rate|ltv/i);
   take("LTV", /loan[- ]to[- ]value|\bltv\b/i);
   take("Rate", /interest rate|\bloan rate\b|\bcoupon\b/i, /cap ?rate|growth|tax|vacancy/i);
   take("Amortization", /amortiz/i);
   take("Interest-only", /interest[- ]only|\bi\/?o\b period/i);
   take("Maturity", /maturity|loan term/i, /amortiz/i);
-  return picks;
+  return {
+    offered,
+    assumable: assumableRows.map((e) => as(e.term, e.row)),
+    seller: sellerRows.map((e) => as(e.term, e.row)),
+  };
 }
 
 interface Seed {
@@ -206,6 +236,21 @@ function deriveSeed(
     seededFrom: price != null || noi != null ? "extraction" : "defaults",
     rateNote: today ? today.note : null,
   };
+}
+
+/** A loan's stated terms as chips, each with its page. */
+function TermChips({ terms, qa }: { terms: OmTerm[]; qa: string }) {
+  return (
+    <ul className="mt-2 flex flex-wrap gap-1.5" data-qa={qa}>
+      {terms.map((t) => (
+        <li key={t.label} className="rounded-full border border-line bg-paper px-2.5 py-1 text-xs">
+          <span className="text-muted">{t.label}:</span>{" "}
+          <span className="font-mono font-medium tabular-nums">{t.value}</span>
+          {t.page && <span className="text-muted"> · {t.page}</span>}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 function SubHead({ children }: { children: React.ReactNode }) {
@@ -437,21 +482,29 @@ export function DebtSizer({
               : "The arithmetic here is code — enter the deal's figures."}
         </p>
 
-        {omTerms.length > 0 && (
+        {/* What the OM states of a loan, under whose loan it is: its own
+            financing assumptions, the seller's loan offered for assumption,
+            the note the seller offers to carry. A note's terms and a leased
+            fee's debt are never listed here (omLoanTerms). */}
+        {omTerms.offered.length > 0 && (
           <>
             <SubHead>Financing stated in the OM</SubHead>
-            <ul className="mt-2 flex flex-wrap gap-1.5">
-              {omTerms.map((t) => (
-                <li
-                  key={t.label}
-                  className="rounded-full border border-line bg-paper px-2.5 py-1 text-xs"
-                >
-                  <span className="text-muted">{t.label}:</span>{" "}
-                  <span className="font-mono font-medium tabular-nums">{t.value}</span>
-                  {t.page && <span className="text-muted"> · {t.page}</span>}
-                </li>
-              ))}
-            </ul>
+            <TermChips terms={omTerms.offered} qa="om-financing" />
+          </>
+        )}
+        {omTerms.assumable.length > 0 && (
+          <>
+            <SubHead>The loan in place, offered for assumption</SubHead>
+            <p className="mt-1 text-xs leading-relaxed text-muted">
+              {"The seller's loan, as the OM states it — not a quote for new financing."}
+            </p>
+            <TermChips terms={omTerms.assumable} qa="om-assumable" />
+          </>
+        )}
+        {omTerms.seller.length > 0 && (
+          <>
+            <SubHead>{"The seller's note, offered to carry the price"}</SubHead>
+            <TermChips terms={omTerms.seller} qa="om-seller-note" />
           </>
         )}
 

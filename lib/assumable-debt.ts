@@ -41,6 +41,7 @@ import { parseUsd } from "@/lib/money";
 import { monthsBetween, parseMaturity } from "@/lib/note-yield";
 import { readAssumption, type AssumptionRead } from "@/lib/tools/loan-assumption";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
+import { assumableRows } from "@/lib/loan-rows";
 
 export interface AssumableTerms {
   /** today's unpaid balance, as stated */
@@ -122,9 +123,8 @@ export interface AssumableRead {
 type MetricRows = { metrics?: Array<{ label: string; value: string; page?: string }>; totalPages?: number } | null | undefined;
 type Extraction = Parameters<typeof interestOf>[0];
 
-const LOAN = "assumable (?:loan|debt|mortgage|financing)";
-const rowOf = (ex: MetricRows, re: RegExp, not?: RegExp) =>
-  (ex?.metrics ?? []).find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
+// The loan's rows are found by lib/loan-rows, the one finder the deal
+// page's debt sizer reads too.
 
 const money = (text: string): number | null => {
   const n = parseUsd(text);
@@ -143,18 +143,9 @@ const percentOf = (text: string): number | null => {
  * assumption (no balance row), so a deal financed fresh reads nothing.
  */
 export function readAssumableTerms(ex: MetricRows): AssumableTerms | null {
-  const balanceRow = rowOf(
-    ex,
-    new RegExp(LOAN, "i"),
-    /rate|coupon|maturity|matures|amorti[sz]|\bterm\b|fee|debt service|payment|interest[- ]only|\bi\/?o\b|ltv|loan[- ]to[- ]value|dscr/i,
-  );
+  const { balanceRow, rateRow, maturityRow, amortRow, dsRow, feeRow } = assumableRows(ex?.metrics ?? []);
   const balance = balanceRow ? money(balanceRow.value) : null;
   if (!balanceRow || balance == null) return null;
-  const rateRow = rowOf(ex, new RegExp(`${LOAN} (?:interest )?(?:rate|coupon)`, "i"));
-  const maturityRow = rowOf(ex, new RegExp(`${LOAN} (?:maturity|matures)`, "i"), /extension|extended/i);
-  const amortRow = rowOf(ex, new RegExp(`${LOAN} (?:amorti[sz]ation|interest[- ]only)`, "i"));
-  const dsRow = rowOf(ex, new RegExp(`${LOAN} (?:annual )?(?:debt service|payment)`, "i"));
-  const feeRow = rowOf(ex, /assumption fee/i);
 
   const amortText = amortRow?.value ?? "";
   const statesIo = /interest[- ]only|\bi\/?o\b/i.test(amortText);

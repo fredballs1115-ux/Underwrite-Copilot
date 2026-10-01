@@ -32,6 +32,7 @@ import {
 } from "@/app/(app)/deals/[id]/sensitivity-playground";
 import { buyBoxRead } from "@/lib/buy-box-chip";
 import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
+import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -714,6 +715,88 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).toMatch(/Cap compression is not a plan/);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("the debt sizer lists a stated loan under whose loan it is (2026-09-30)", () => {
+  // The research pass: "Financing stated in the OM" listed a note's own
+  // amortization and maturity as if they were the buyer's financing, and the
+  // seller's assumable loan as a plain "Loan amount" and "Rate".
+  type Ex = NonNullable<Props["results"]["extraction"]>;
+  const row = (label: string, value: string, page = "p. 12") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const withRows = (rows: ReturnType<typeof row>[], interest?: Ex["interest"]): Ex =>
+    ({ ...SAMPLE_DEAL.extraction, totalPages: 60, metrics: [...SAMPLE_DEAL.extraction.metrics, ...rows], ...(interest ? { interest } : {}) }) as Ex;
+  const ASSUMABLE = [
+    row("Assumable loan balance", "$40,000,000"),
+    row("Assumable loan rate", "3.45%"),
+    row("Assumable loan maturity", "June 30, 2033"),
+    row("Assumable loan amortization", "Interest-only"),
+    row("Assumption fee", "1%"),
+  ];
+  const NOTE_ROWS = [
+    row("Unpaid principal balance", "$24,400,000", "p. 5"),
+    row("Note rate", "5.25%", "p. 5"),
+    row("Maturity date", "March 31, 2028", "p. 5"),
+    row("Amortization", "Interest-only", "p. 5"),
+  ];
+
+  it("keeps the memorandum's own financing assumptions as they were", () => {
+    const t = omLoanTerms(SAMPLE_DEAL.extraction as Ex);
+    expect(t.offered).toEqual([{ label: "LTV", value: "60%", page: "p. 44" }]);
+    expect(t.assumable).toEqual([]);
+    expect(t.seller).toEqual([]);
+  });
+
+  it("lists the seller's loan offered for assumption as that loan, never as a plain loan amount and rate", () => {
+    const t = omLoanTerms(withRows(ASSUMABLE));
+    expect(t.assumable.map((r) => `${r.label}: ${r.value}`)).toEqual([
+      "Balance: $40,000,000",
+      "Rate: 3.45%",
+      "Maturity: June 30, 2033",
+      "Amortization: Interest-only",
+      "Assumption fee: 1%",
+    ]);
+    expect(t.offered.map((r) => r.label)).toEqual(["LTV"]);
+  });
+
+  it("lists the note the seller offers to carry as the seller's note", () => {
+    const t = omLoanTerms(
+      withRows([
+        row("Seller financing amount", "70% of the purchase price"),
+        row("Seller financing rate", "5.00%"),
+        row("Seller financing term", "5 years"),
+        row("Seller financing amortization", "25 years"),
+      ]),
+    );
+    expect(t.seller.map((r) => r.label)).toEqual(["Amount", "Rate", "Term", "Amortization"]);
+    expect(t.offered.map((r) => r.label)).toEqual(["LTV"]);
+  });
+
+  it("lists nothing as financing on a note, whose terms are the asset, or on a leased fee", () => {
+    const note = omLoanTerms(withRows(NOTE_ROWS, { kind: "note", summary: "Sale of the first mortgage note", share: "", groundLease: "", loan: "", page: "p. 5" } as Ex["interest"]));
+    expect(note).toEqual({ offered: [], assumable: [], seller: [] });
+    const leasedFee = omLoanTerms(
+      withRows(ASSUMABLE, { kind: "leased_fee", summary: "The land under the tower, with its ground lease", share: "", groundLease: "", loan: "", page: "p. 4" } as Ex["interest"]),
+    );
+    expect(leasedFee).toEqual({ offered: [], assumable: [], seller: [] });
+  });
+
+  it("draws each group under its own heading on the Financials tab", () => {
+    const p = sampleProps("financials");
+    const assumable = textOf(render({ ...p, results: { ...p.results, extraction: withRows(ASSUMABLE) } }));
+    expect(assumable).toMatch(/Financing stated in the OM\s*LTV:\s*60%/);
+    expect(assumable).toMatch(/The loan in place, offered for assumption\s*The seller's loan, as the OM states it — not a quote for new financing\.\s*Balance:\s*\$40,000,000\s*· p\. 12/);
+    expect(assumable).not.toMatch(/Loan amount:/);
+    const note = render({
+      ...p,
+      results: {
+        ...p.results,
+        extraction: withRows(NOTE_ROWS, { kind: "note", summary: "Sale of the first mortgage note", share: "", groundLease: "", loan: "", page: "p. 5" } as Ex["interest"]),
+      },
+    });
+    expect(a11yIssues(note)).toEqual([]);
+    expect(textOf(note)).not.toMatch(/Financing stated in the OM/);
+    expect(textOf(note)).not.toMatch(/Amortization:\s*Interest-only/);
   });
 });
 

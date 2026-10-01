@@ -46,29 +46,23 @@ import {
 } from "@/lib/assumable-debt";
 import { readAssumption, type AssumptionRead } from "@/lib/tools/loan-assumption";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { sellerNoteRows } from "@/lib/loan-rows";
 
 type Extraction = Parameters<typeof assumableApplies>[0];
 type MetricRows = { metrics?: Array<{ label: string; value: string; page?: string }>; totalPages?: number } | null | undefined;
 
 // ── The rows ────────────────────────────────────────────────────────────
 
-const NOTE = String.raw`(?:seller(?:[- ]carry|[- ]carried|[- ]financed)?\s+(?:financing|carry(?:back)?|note|loan|mortgage|paper)|purchase[- ]money\s+(?:mortgage|note|loan))`;
-const AMOUNT = new RegExp(String.raw`^${NOTE}(?:\s+(?:amount|loan amount|principal|size))?$`, "i");
-const RATE = new RegExp(String.raw`${NOTE}.*\b(?:rate|coupon|interest)\b`, "i");
-const TERM = new RegExp(String.raw`${NOTE}.*\b(?:term|maturity|balloon|due)\b`, "i");
-const AMORT = new RegExp(String.raw`${NOTE}.*\b(?:amorti[sz]\w*|interest[- ]only)\b`, "i");
-const POSITION = new RegExp(String.raw`${NOTE}.*\b(?:position|lien|priority)\b`, "i");
+// The note's rows are found by lib/loan-rows, the one finder the key terms
+// and the deal page's debt sizer read too.
 const SECOND = /\bsecond\b|\bsubordinat\w*|\bbehind\b|\bjunior\b|\bmezz\w*/i;
 
 /** The rows a key-terms block leads with where the seller offers to carry
  *  financing: the note's size, its rate and its term. */
 export function sellerFinancingTermRows<M extends { label: string; value: string }>(metrics: ReadonlyArray<M>): M[] {
-  const pick = (re: RegExp, not?: RegExp) => metrics.find((m) => m && typeof m.label === "string" && re.test(m.label) && !(not && not.test(m.label)));
-  return [pick(AMOUNT), pick(RATE, /\bterm\b|amorti|position/i), pick(TERM, /amorti|rate|position/i)].filter((m): m is M => m != null);
+  const r = sellerNoteRows(metrics);
+  return [r.amountRow, r.rateRow, r.termRow].filter((m): m is M => m != null);
 }
-
-const rowOf = (ex: MetricRows, re: RegExp, not?: RegExp) =>
-  (ex?.metrics ?? []).find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
 
 const percentOf = (text: string, max: number): number | null => {
   const m = text.match(/(\d+(?:\.\d+)?)\s*(?:%|percent\b|per cent\b)/i);
@@ -111,11 +105,7 @@ export interface SellerFinancingTerms {
  * dollars — the model's price, which is the one both positions run on.
  */
 export function readSellerFinancingTerms(ex: MetricRows, price: number | null): SellerFinancingTerms | null {
-  const amountRow = rowOf(ex, AMOUNT);
-  const rateRow = rowOf(ex, RATE, /\bterm\b|amorti|position/i);
-  const termRow = rowOf(ex, TERM, /amorti|rate|position/i);
-  const amortRow = rowOf(ex, AMORT, /rate|position/i);
-  const positionRow = rowOf(ex, POSITION);
+  const { amountRow, rateRow, termRow, amortRow, positionRow } = sellerNoteRows(ex?.metrics ?? []);
   if (!amountRow && !rateRow && !termRow) return null;
 
   const amountText = amountRow?.value ?? "";
