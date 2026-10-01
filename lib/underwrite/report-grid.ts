@@ -5,8 +5,9 @@
 // the on-screen sliders can never disagree.
 
 import { withArticle } from "@/lib/article";
-import type { UnderwriteInputs } from "./engine";
-import type { DerivedModel } from "./inputs";
+import { computeUnderwrite, type UnderwriteInputs } from "./engine";
+import { costAssumptionsLine } from "./cost-note";
+import type { DerivedModel, InputSource } from "./inputs";
 import { leverValues, runScenario, sliderValues, type PlaygroundLevers } from "./playground";
 import { floorWords, floorsWords, fmtBid, solveMaxBid, type BidFloors, type BidMetrics } from "./solver";
 
@@ -286,6 +287,82 @@ export interface SensitivityData {
    *  an auction's floor, NOI over the going-in cap — as the derived model
    *  marks it; null where no sources were given */
   priceSource?: ModelSources["purchasePrice"] | null;
+  /** the model's base case the grids are struck around; null where no
+   *  sources were given, which cannot say what is a default */
+  baseCase?: BaseCase | null;
+}
+
+/**
+ * The base case the grids are struck around, as the workbook's Deal Summary
+ * holds it: the price, the loan, the equity, the hold and year 1's NOI, each
+ * input with where it came from (so a default never reads as the sponsor's
+ * case); the returns the ink-bordered cells show and year 1's coverage; and
+ * the sources and uses. Every figure is the engine's (`computeUnderwrite`),
+ * every source the derived model's own.
+ */
+export interface BaseCase {
+  price: number;
+  priceSource: InputSource | null;
+  loan: number;
+  /** loan to cost, decimal — the engine sizes the loan off the price plus
+   *  closing costs and the acquisition fee */
+  ltc: number;
+  ltcSource: InputSource | null;
+  equity: number;
+  holdYears: number;
+  holdSource: InputSource | null;
+  noiY1: number;
+  noiSource: InputSource | null;
+  /** the all-in rate, decimal, with its source — dated where today's
+   *  curve seeded it */
+  rate: number;
+  rateSource: InputSource | null;
+  amortYears: number;
+  /** months of interest-only; 999 is the whole term */
+  ioMonths: number;
+  leveredIrr: number | null;
+  equityMultiple: number | null;
+  cocY1: number | null;
+  dscrY1: number | null;
+  debtYieldY1: number | null;
+  closingCosts: number;
+  acqFee: number;
+  financingCosts: number;
+  totalUses: number;
+  /** what the returns carry for buying and selling (lib/underwrite/cost-note) */
+  costLine: string;
+}
+
+export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): BaseCase {
+  const uw = computeUnderwrite(inputs);
+  const su = uw.sourcesUses;
+  const y1 = uw.cashFlow[0];
+  return {
+    price: inputs.purchasePrice,
+    priceSource: sources.purchasePrice ?? null,
+    loan: su.loanAmount,
+    ltc: inputs.ltc,
+    ltcSource: sources.ltc ?? null,
+    equity: su.equity,
+    holdYears: uw.holdYears,
+    holdSource: sources.holdMonths ?? null,
+    noiY1: y1?.noi ?? 0,
+    noiSource: sources.inPlaceRentAnnual ?? null,
+    rate: inputs.allInRatePct,
+    rateSource: sources.allInRatePct ?? null,
+    amortYears: inputs.amortMonths / 12,
+    ioMonths: inputs.ioMonths,
+    leveredIrr: uw.returns.leveredIrrPct,
+    equityMultiple: uw.returns.leveredEquityMultiple,
+    cocY1: y1 && su.equity > 0 ? y1.leveredCashFlow / su.equity : null,
+    dscrY1: y1?.dscrNoi ?? null,
+    debtYieldY1: y1?.debtYield ?? null,
+    closingCosts: su.closingCosts,
+    acqFee: su.acqFee,
+    financingCosts: su.financingCosts,
+    totalUses: su.totalUses,
+    costLine: costAssumptionsLine(inputs),
+  };
 }
 
 /** What the caller knows beside the inputs. */
@@ -362,6 +439,7 @@ export function buildSensitivityData(
     maxBidFloors,
     withheld: placeholderReturnsLine(inputs, opts.sources),
     priceSource: opts.sources?.purchasePrice ?? null,
+    baseCase: opts.sources ? buildBaseCase(inputs, opts.sources) : null,
   };
 }
 

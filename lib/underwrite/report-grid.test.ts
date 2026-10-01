@@ -6,6 +6,7 @@ import { bidFloors, fmtBid, solveMaxBid } from "./solver";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import {
+  buildBaseCase,
   buildCapGrowthGrid,
   buildPriceCapGrid,
   buildSensitivityData,
@@ -303,6 +304,39 @@ describe("the report's max bid is the deal page's — the buy box's every floor,
     expect(maxBidSentence({ ...none, maxBid: null, maxBidFloors: { floors: { minCoc: 0.5 }, from: "buybox" } })).toBe(
       "No price inside the tested range clears your buy box's floors (50% cash-on-cash) under these assumptions: the deal's economics, not its price, are the blocker.",
     );
+  });
+});
+
+describe("buildBaseCase — the base case the grids are struck around, as the workbook's Deal Summary holds it", () => {
+  it("carries the engine's own figures and the derived model's own sources", () => {
+    const derived = sampleDerivedInputs();
+    const b = buildBaseCase(derived.inputs, derived.sources);
+    const uw = computeUnderwrite(derived.inputs);
+    const y1 = uw.cashFlow[0];
+    expect(b.price).toBe(derived.inputs.purchasePrice);
+    expect(b.loan).toBe(uw.sourcesUses.loanAmount);
+    expect(b.equity).toBe(uw.sourcesUses.equity);
+    expect(b.totalUses).toBe(uw.sourcesUses.totalUses);
+    expect(b.loan + b.equity).toBeCloseTo(b.totalUses, 6);
+    expect(b.price + b.closingCosts + b.acqFee + b.financingCosts).toBeCloseTo(b.totalUses, 6);
+    expect(b.noiY1).toBe(y1.noi);
+    expect(b.leveredIrr).toBe(uw.returns.leveredIrrPct);
+    expect(b.equityMultiple).toBe(uw.returns.leveredEquityMultiple);
+    expect(b.cocY1).toBeCloseTo(y1.leveredCashFlow / uw.sourcesUses.equity, 12);
+    expect(b.dscrY1).toBe(y1.dscrNoi);
+    expect(b.debtYieldY1).toBe(y1.debtYield);
+    expect(b.holdYears).toBe(5);
+    // Each input's own source: the ask the OM states, the defaults said as
+    // defaults, the NOI from the T-12 the sample carries.
+    expect(b.priceSource?.provenance).toBe("extracted");
+    expect(b.ltcSource?.provenance).toBe("assumption");
+    expect(b.holdSource?.provenance).toBe("assumption");
+    expect(b.rateSource?.provenance).toBe("assumption");
+    expect(b.noiSource?.note).toMatch(/^Grossed up from the T-12 actual NOI/);
+    expect(b.costLine).toMatch(/^These returns carry a 1\.0% closing hold and a 2\.0% cost of sale/);
+    // Only a caller that gives the sources gets one.
+    expect(buildSensitivityData(derived.inputs, 13).baseCase).toBeNull();
+    expect(buildSensitivityData(derived.inputs, 13, { sources: derived.sources }).baseCase).toEqual(b);
   });
 });
 

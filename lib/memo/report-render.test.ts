@@ -365,6 +365,56 @@ describe("ReportDocument (full report)", () => {
     expect(unstated).not.toMatch(/Max bid (clearing|holding)/);
   }, 60000);
 
+  it("prints the base case the grids are struck around, each input with its source, and the terms every cell runs on under the grid", async () => {
+    const extraction = { ...(SAMPLE_DEAL.extraction as ExtractionResult), totalPages: 40 };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const render = async (derived: ReturnType<typeof deriveUnderwriteInputs>) => {
+      const sensitivity = buildSensitivityData(derived.inputs, null, { sources: derived.sources });
+      const buf = await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(deal, "September 30, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      );
+      return { text: pdfTextOf(buf).replace(/\s+/g, " "), b: sensitivity.baseCase! };
+    };
+    const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+    const { text, b } = await render(deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name));
+    expect(text).toContain("The base case");
+    expect(text).toContain(`LEVERED IRR ${(b.leveredIrr! * 100).toFixed(1)}%`);
+    expect(text).toContain(`EQUITY MULTIPLE ${b.equityMultiple!.toFixed(2)}x`);
+    expect(text).toContain(`YEAR-1 DSCR ${b.dscrY1!.toFixed(2)}x`);
+    // The inputs, each with its provenance: the ask cited to its page, the
+    // defaults said as assumptions.
+    expect(text).toContain("Price $68,000,000 · OM p. 3");
+    expect(text).toContain(`Loan ${usd(b.loan)} · 60% of cost · assumption`);
+    expect(text).toContain(`Equity ${usd(b.equity)} · total uses less the loan`);
+    expect(text).toContain("Hold 5 years · assumption");
+    expect(text).toContain(`Year-1 NOI ${usd(b.noiY1)} · derived`);
+    expect(text).toContain(`Total uses ${usd(b.totalUses)}`);
+    expect(text).toContain(`Total sources ${usd(b.loan + b.equity)}`);
+    // The grid's terms: the rate a placeholder, said only as an assumption.
+    expect(text).toContain(
+      "The grids run on a 5-year hold (assumption); a loan of 60% of cost (assumption), amortizing over 30 years; and a 6.00% all-in rate (assumption). These returns carry a 1.0% closing hold and a 2.0% cost of sale, and no transfer or recordation tax: the model's default, not this jurisdiction's rate. Set each in the Excel model.",
+    );
+    // A rate seeded off today's curve prints its dated source note.
+    const seeded = await render(
+      deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name, undefined, {
+        debtIndex: { id: "DGS5", short: "5-yr", pct: 4.78, asOf: "2026-09-17", kind: "treasury" },
+      }),
+    );
+    expect(seeded.text).toContain(
+      "and a 6.78% all-in rate: 5-yr Treasury 4.78% (FRED, Sep 17, 2026) + 200 bps multifamily spread, a screening default — enter your quote (assumption).",
+    );
+  }, 60000);
+
   it("labels the retrade grid's base row the modeled price, never the ask, and says what the model priced it at", async () => {
     const render = async (extraction: ExtractionResult) => {
       const deal = {

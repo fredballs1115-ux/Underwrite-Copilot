@@ -37,9 +37,11 @@ import {
   heatLegend,
   maxBidSentence,
   HEAT_BG,
+  type BaseCase,
   type SensitivityData,
   type HeatCell,
 } from "@/lib/underwrite/report-grid";
+import { withArticle } from "@/lib/article";
 import {
   SPREAD_BG,
   SPREAD_LABEL,
@@ -1081,6 +1083,112 @@ export function sourceSays(src: InputSource | null | undefined, totalPages: numb
     src.provenance === "extracted" ? (page === "—" ? "" : page) : src.provenance === "derived" ? "derived" : "assumption";
   return tag ? `${note} (${tag})` : note;
 }
+/** Where one of the model's inputs came from, as a tag: "OM p. 3" (the page
+ *  only where it falls inside the memorandum), "derived", "assumption". */
+function provenanceOf(src: InputSource | null | undefined, totalPages: number | null): string {
+  if (!src) return "";
+  if (src.provenance === "extracted") {
+    const page = citedPage(src.page, totalPages);
+    return page === "—" ? "OM" : `OM ${page}`;
+  }
+  return src.provenance;
+}
+
+const pctOrDash = (d: number | null | undefined, dp = 1) => (d == null || !Number.isFinite(d) ? "—" : `${(d * 100).toFixed(dp)}%`);
+const xOrDash = (d: number | null | undefined, dp = 2) => (d == null || !Number.isFinite(d) || d <= 0 ? "—" : `${d.toFixed(dp)}x`);
+
+/**
+ * The terms the grids run on, said under them: the hold, the loan against
+ * cost and how it amortizes, the rate with its source note — dated where
+ * today's curve seeded it — each with its provenance, then what the returns
+ * carry for buying and selling (the deal page's playground's own line).
+ */
+export function gridTermsLine(b: BaseCase, totalPages: number | null): string {
+  const tag = (src: InputSource | null) => (src ? ` (${provenanceOf(src, totalPages)})` : "");
+  const amort =
+    b.ioMonths >= 999
+      ? "interest-only for the whole hold"
+      : b.ioMonths > 0
+        ? `interest-only for ${b.ioMonths} months, then amortizing over ${Number(b.amortYears.toFixed(1))} years`
+        : `amortizing over ${Number(b.amortYears.toFixed(1))} years`;
+  // The seeded rate's note names the index and its day ("5-yr Treasury
+  // 4.78% (FRED, Sep 17, 2026) + 200 bps …"); a placeholder's is only the
+  // instruction to enter one, which the provenance already says.
+  const rawNote = (b.rateSource?.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  const rateNote = /^enter\b/i.test(rawNote) ? "" : rawNote;
+  return [
+    `The grids run on ${withArticle(`${b.holdYears}-year hold`)}${tag(b.holdSource)}`,
+    `a loan of ${(b.ltc * 100).toFixed(0)}% of cost${tag(b.ltcSource)}, ${amort}`,
+    `and ${withArticle(`${(b.rate * 100).toFixed(2)}% all-in rate`)}${rateNote ? `: ${rateNote}` : ""}${tag(b.rateSource)}.`,
+  ].join("; ") + ` ${b.costLine}`;
+}
+
+/**
+ * The base case the grids are struck around (lib/underwrite/report-grid
+ * `buildBaseCase`): the returns the ink-bordered cells show and year 1's
+ * coverage as tiles; then the inputs with where each came from, beside the
+ * sources and uses. The workbook's Deal Summary on one strip of paper.
+ */
+function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | null }) {
+  const tiles: [string, string][] = [
+    ["Levered IRR", pctOrDash(b.leveredIrr)],
+    ["Equity multiple", xOrDash(b.equityMultiple)],
+    ["Year-1 cash-on-cash", pctOrDash(b.cocY1)],
+    ["Year-1 DSCR", xOrDash(b.dscrY1)],
+    ["Year-1 debt yield", pctOrDash(b.debtYieldY1)],
+  ];
+  const line = (label: string, value: string, note?: string, key?: string) => (
+    <View key={key ?? label} style={{ flexDirection: "row", marginBottom: 2 }} wrap={false}>
+      <Text style={{ width: 70, fontSize: 7.5, color: C.muted }}>{str(label)}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 8, color: C.ink, fontFamily: "Helvetica-Bold" }}>{str(value)}</Text>
+        {note ? <Text style={{ fontSize: 7, color: C.muted, marginTop: 0.5 }}>{str(note)}</Text> : null}
+      </View>
+    </View>
+  );
+  const money = (label: string, n: number, bold = false) => (
+    <View key={label} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 1.5 }}>
+      <Text style={{ fontSize: 7.5, color: bold ? C.ink : C.muted, fontFamily: bold ? "Helvetica-Bold" : "Helvetica" }}>{label}</Text>
+      <Text style={{ fontSize: 7.5, color: C.ink, fontFamily: bold ? "Helvetica-Bold" : "Helvetica" }}>{fmtUsd0(n)}</Text>
+    </View>
+  );
+  const noiNote = (b.noiSource?.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  return (
+    <View style={{ marginBottom: 10 }} wrap={false}>
+      <TitleRow title="The base case" count="the ink-bordered cells" marginTop={0} />
+      <View style={{ flexDirection: "row", borderTopWidth: 0.7, borderBottomWidth: 0.7, borderColor: C.line, paddingVertical: 5, marginBottom: 6 }}>
+        {tiles.map(([label, value]) => (
+          <View key={label} style={{ width: "20%" }}>
+            <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{label.toUpperCase()}</Text>
+            <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>{value}</Text>
+          </View>
+        ))}
+      </View>
+      <View style={{ flexDirection: "row" }}>
+        <View style={{ width: "58%", paddingRight: 14 }}>
+          {line("Price", `${fmtUsd0(b.price)} · ${provenanceOf(b.priceSource, totalPages)}`)}
+          {line("Loan", `${fmtUsd0(b.loan)} · ${(b.ltc * 100).toFixed(0)}% of cost · ${provenanceOf(b.ltcSource, totalPages)}`)}
+          {line("Equity", `${fmtUsd0(b.equity)} · total uses less the loan`)}
+          {line("Hold", `${b.holdYears} years · ${provenanceOf(b.holdSource, totalPages)}`)}
+          {line("Year-1 NOI", `${fmtUsd0(b.noiY1)} · ${provenanceOf(b.noiSource, totalPages)}`, noiNote)}
+        </View>
+        <View style={{ width: "42%" }}>
+          <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted, marginBottom: 2 }}>USES</Text>
+          {money("Purchase price", b.price)}
+          {money("Closing costs", b.closingCosts)}
+          {b.acqFee > 0 ? money("Acquisition fee", b.acqFee) : null}
+          {money("Financing costs", b.financingCosts)}
+          {money("Total uses", b.totalUses, true)}
+          <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted, marginTop: 4, marginBottom: 2 }}>SOURCES</Text>
+          {money("Loan", b.loan)}
+          {money("Equity", b.equity)}
+          {money("Total sources", b.loan + b.equity, true)}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 /**
  * The max bid, or why there is none, for what the price buys (lib/interest).
  * A note's model runs the collateral at the loan's price, so a bid solved on
@@ -1645,39 +1753,57 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <SingleTenantCaveat lease={mh} />
           <SingleTenantCaveat lease={storage} />
 
-          <HeatGrid
-            axisLabel="EXIT CAP"
-            spanLabel="RENT GROWTH (ANNUAL)"
-            colLabels={sensitivity.grid.growthCols.map((g) => `${(g * 100).toFixed(1)}%`)}
-            rowLabels={sensitivity.grid.capRows.map((cap) => `${(cap * 100).toFixed(2)}%`)}
-            cells={sensitivity.grid.cells}
-            baseRow={sensitivity.grid.baseRow}
-            baseCol={sensitivity.grid.baseCol}
-            hurdlePct={sensitivity.hurdlePct}
-          />
-          <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-            {str(sensitivity.takeaway)}
-          </Text>
+          {/* The base case the grids are struck around, each input with
+              where it came from — the workbook's Deal Summary. */}
+          {sensitivity.baseCase ? <BaseCaseBlock b={sensitivity.baseCase} totalPages={totalPages} /> : null}
 
-          {/* Legend — shared by both grids. */}
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 9 }}>
-            {heatLegend(sensitivity.hurdlePct).map((l) => (
-              <View key={l.bucket} style={{ flexDirection: "row", alignItems: "center", gap: 3.5 }}>
-                <View
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 2,
-                    backgroundColor: HEAT_BG[l.bucket],
-                    borderWidth: 0.5,
-                    borderColor: C.line,
-                  }}
-                />
-                <Text style={{ fontSize: 7.5, color: C.muted }}>{str(l.label)}</Text>
-              </View>
-            ))}
+          <View wrap={false}>
+            <HeatGrid
+              axisLabel="EXIT CAP"
+              spanLabel="RENT GROWTH (ANNUAL)"
+              colLabels={sensitivity.grid.growthCols.map((g) => `${(g * 100).toFixed(1)}%`)}
+              rowLabels={sensitivity.grid.capRows.map((cap) => `${(cap * 100).toFixed(2)}%`)}
+              cells={sensitivity.grid.cells}
+              baseRow={sensitivity.grid.baseRow}
+              baseCol={sensitivity.grid.baseCol}
+              hurdlePct={sensitivity.hurdlePct}
+            />
+            <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
+              {str(sensitivity.takeaway)}
+            </Text>
+
+            {/* Legend — shared by both grids. */}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10, marginTop: 9 }}>
+              {heatLegend(sensitivity.hurdlePct).map((l) => (
+                <View key={l.bucket} style={{ flexDirection: "row", alignItems: "center", gap: 3.5 }}>
+                  <View
+                    style={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: 2,
+                      backgroundColor: HEAT_BG[l.bucket],
+                      borderWidth: 0.5,
+                      borderColor: C.line,
+                    }}
+                  />
+                  <Text style={{ fontSize: 7.5, color: C.muted }}>{str(l.label)}</Text>
+                </View>
+              ))}
+            </View>
+
+            {/* The terms every cell runs on: the hold, the loan, the rate
+                with its source, and the costs of buying and selling. */}
+            {sensitivity.baseCase ? (
+              <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 6 }}>
+                {str(gridTermsLine(sensitivity.baseCase, totalPages))}
+              </Text>
+            ) : null}
           </View>
 
+          {/* The retrade grid moves to the next page whole, its title and
+              its max bid with it, rather than leave a heading or half a
+              grid at the foot of this one. */}
+          <View wrap={false}>
           <TitleRow title="The retrade grid" marginTop={16} />
           <Text style={s.sub}>
             The same model repriced: what paying less (or more) does to
@@ -1720,6 +1846,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
             {str(maxBidLineFor(sensitivity, interestOf(extraction)))}
           </Text>
+          </View>
 
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 10 }}>
             Computed from the deal&apos;s derived screening model — the same
