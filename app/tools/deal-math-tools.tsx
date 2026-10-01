@@ -2121,9 +2121,13 @@ function Recovery() {
   const [capType, setCapType] = useShared("rct", "cumulative");
   const [controllable, setControllable] = useShared("rctrl", "60");
   const [years, setYears] = useShared("ryr", "3");
+  // Last year's controllable expenses as charged — what a non-cumulative cap
+  // is measured against. Blank unless typed: the card does not invent it.
+  const [priorCtrl, setPriorCtrl] = useShared("rprior", "");
   const [paid, setPaid] = useShared("rpaid", "30,000");
 
   const stopBasis = basis === "expense stop";
+  const nonCumulative = capType === "non-cumulative";
 
   const r = useMemo(
     () =>
@@ -2140,11 +2144,12 @@ function Recovery() {
           capType === "none" ? "none" : capType === "non-cumulative" ? "non-cumulative" : "cumulative",
         controllablePct: num(controllable),
         yearsSinceBase: num(years),
+        priorControllable: num(priorCtrl),
         estimatedPaid: num(paid),
       }),
     [
       tenantSf, buildingSf, stopBasis, baseFixed, baseVar, baseOcc,
-      curFixed, curVar, curOcc, grossTo, capPct, capType, controllable, years, paid, stop,
+      curFixed, curVar, curOcc, grossTo, capPct, capType, controllable, years, priorCtrl, paid, stop,
     ],
   );
 
@@ -2232,9 +2237,19 @@ function Recovery() {
             />
             <Field label="Controllable" suffix="%" value={controllable} onChange={setControllable} placeholder="60" />
           </div>
-          {!stopBasis && (
+          {(!stopBasis || nonCumulative) && (
             <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Field label="Years since base" value={years} onChange={setYears} placeholder="3" />
+              {!stopBasis && (
+                <Field label="Years since base" value={years} onChange={setYears} placeholder="3" />
+              )}
+              {nonCumulative && (
+                <Field
+                  label="Last year's controllable"
+                  value={priorCtrl}
+                  onChange={setPriorCtrl}
+                  placeholder="1,140,000"
+                />
+              )}
             </div>
           )}
         </div>
@@ -2356,13 +2371,14 @@ function Recovery() {
                 back.
               </>
             )}
-            {(r.carvedOut ?? 0) > 0 && (
+            {(r.carvedOut ?? 0) > 0 && r.capSaved !== null && (
               <>
                 {" "}
                 {/* Lead with what the cap actually DID. Saying "$34,021 is
                     outside the cap" beside a stat reading "held back $0"
                     implies the cap bit and the carve-out blunted it, when
-                    in fact the cap never came near binding. */}
+                    in fact the cap never came near binding. A cap that
+                    could not be measured says so below instead. */}
                 <span className="font-normal text-muted">
                   {(r.capSaved ?? 0) > 0 ? (
                     <>
@@ -2382,6 +2398,7 @@ function Recovery() {
               </>
             )}
           </p>
+          {r.capNote && <p className="mt-2 text-sm text-caution">{r.capNote}</p>}
         </>
       )}
 
