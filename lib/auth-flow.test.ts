@@ -10,6 +10,7 @@ import {
   CONFIRM_LINK_FAILED,
   EMAIL_CONFIRMED,
   RESET_LINK_FAILED,
+  SIGNED_OUT,
   authErrorCopy,
   authLinkBanner,
   awaitingConfirmation,
@@ -83,6 +84,25 @@ describe("authErrorCopy — the auth service's codes become sentences", () => {
       .toMatch(/Confirm your email first/);
     expect(authErrorCopy({ code: "over_request_rate_limit", message: "Request rate limit reached" }, "signin"))
       .toMatch(/Too many attempts/);
+  });
+
+  it("a password change reads as a sentence, never the service's own text", () => {
+    expect(authErrorCopy({ code: "same_password", message: "New password should be different from the old password." }, "password"))
+      .toBe("That's already your password — choose a different one.");
+    expect(authErrorCopy({ message: "New password should be different from the old password." }, "password"))
+      .toBe("That's already your password — choose a different one.");
+    for (const code of ["reauthentication_needed", "reauthentication_not_valid", "reauth_nonce_missing"]) {
+      expect(authErrorCopy({ code, message: "Password update requires reauthentication" }, "password"), code)
+        .toBe("For your security, sign out and sign back in, then set your new password.");
+    }
+    for (const code of ["session_not_found", "session_expired"]) {
+      expect(authErrorCopy({ code, message: "Session from session_id claim in JWT does not exist" }, "password"), code)
+        .toBe(SIGNED_OUT);
+    }
+    expect(authErrorCopy({ code: "weak_password", message: "Password should contain at least one character of each: abc" }, "password"))
+      .toMatch(/too weak/);
+    expect(authErrorCopy({ code: "unexpected_failure", message: "Database error updating user" }, "password"))
+      .toBe("Something went wrong saving your new password — please try again.");
   });
 
   it("a validation failure reads from its message", () => {

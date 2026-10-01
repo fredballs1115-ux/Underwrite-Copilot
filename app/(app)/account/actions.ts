@@ -14,6 +14,7 @@ import {
   signatureMismatch,
 } from "@/lib/storage";
 import { getTeam } from "@/lib/teams";
+import { SIGNED_OUT, authErrorCopy } from "@/lib/auth-flow";
 import { getStripe } from "@/lib/stripe/client";
 import { syncTeamSeats } from "@/lib/stripe/seats";
 import { isPro } from "@/lib/billing";
@@ -174,10 +175,12 @@ export async function changePassword(
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "You're signed out — sign in again to continue." };
+  if (!user) return { error: SIGNED_OUT };
 
   const { error } = await supabase.auth.updateUser({ password });
-  if (error) return { error: error.message };
+  // One sentence by the error's code (lib/auth-flow), never the auth
+  // service's developer text.
+  if (error) return { error: authErrorCopy(error, "password") };
 
   return { ok: true };
 }

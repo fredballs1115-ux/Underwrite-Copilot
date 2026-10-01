@@ -18,8 +18,12 @@
  *  email a fresh confirmation link. */
 export type LoginMode = "signin" | "signup" | "reset" | "resend";
 
-/** What the person was doing when the auth service said no. */
-export type AuthIntent = LoginMode;
+/** What the person was doing when the auth service said no: one of the
+ *  sign-in page's forms, or setting a new password on the Account page. */
+export type AuthIntent = LoginMode | "password";
+
+/** A session-bound request with no session behind it. */
+export const SIGNED_OUT = "You're signed out — sign in again to continue.";
 
 const SUPPORT = "underwritecopilot.support@gmail.com";
 
@@ -45,6 +49,11 @@ const COPY = {
   linkExpired: "That link has expired — request a new one.",
   unreachable: "Couldn't reach the sign-in service — please try again in a moment.",
   emailOff: `Email sign-in is switched off — a setup problem on our side, not yours. Email ${SUPPORT}.`,
+  samePassword: "That's already your password — choose a different one.",
+  // The auth service asked for a recent sign-in before a password change (the
+  // project's secure-password-change setting); the page has no second-factor
+  // step, so a fresh session is the way through.
+  reauthenticate: "For your security, sign out and sign back in, then set your new password.",
 } as const;
 
 const GENERIC: Record<AuthIntent, string> = {
@@ -52,6 +61,7 @@ const GENERIC: Record<AuthIntent, string> = {
   signup: "Something went wrong creating your account — please try again.",
   reset: "Something went wrong sending the reset link — please try again.",
   resend: "Something went wrong sending the confirmation link — please try again.",
+  password: "Something went wrong saving your new password — please try again.",
 };
 
 /** What the page says once a fresh confirmation link is asked for. The auth
@@ -121,6 +131,15 @@ export function authErrorCopy(
       return COPY.tooMany;
     case "user_banned":
       return COPY.banned;
+    case "same_password":
+      return COPY.samePassword;
+    case "reauthentication_needed":
+    case "reauthentication_not_valid":
+    case "reauth_nonce_missing":
+      return COPY.reauthenticate;
+    case "session_not_found":
+    case "session_expired":
+      return SIGNED_OUT;
     case "otp_expired":
     case "flow_state_expired":
     case "flow_state_not_found":
@@ -141,6 +160,8 @@ export function authErrorCopy(
   if (m.includes("for security purposes")) return emailLimitCopy(m);
   if (m.includes("email rate limit")) return COPY.emailBusy;
   if (m.includes("rate limit")) return COPY.tooMany;
+  if (m.includes("should be different from the old password")) return COPY.samePassword;
+  if (m.includes("requires reauthentication")) return COPY.reauthenticate;
   if (m.includes("password should") || m.includes("password is too weak") || m.includes("weak password"))
     return COPY.weakPassword;
   if (m.includes("signups not allowed") || m.includes("signup is disabled")) return COPY.signupsClosed;
