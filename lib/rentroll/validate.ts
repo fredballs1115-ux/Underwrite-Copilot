@@ -7,9 +7,12 @@
  *
  * Pure.
  */
+import type { ParseResult } from "./parse";
 import type { Lease } from "./schema";
 
-export type IssueSeverity = "error" | "warning";
+/** "info" says what the import did on purpose (a totals line left out), so
+ *  the page shows it without calling it a problem. */
+export type IssueSeverity = "error" | "warning" | "info";
 
 export interface ValidationIssue {
   severity: IssueSeverity;
@@ -21,6 +24,7 @@ export interface ValidationIssue {
     | "missing_expiry"
     | "missing_sf"
     | "mixed_rent_basis"
+    | "skipped_totals"
     | "no_leases";
   message: string;
   /** source rows the issue points at */
@@ -32,7 +36,15 @@ export interface ValidateOptions {
   nra?: number | null;
   /** how far off the median rent PSF counts as an outlier (multiplicative) */
   outlierFactor?: number;
+  /** what the parser left out of the leases, so the stored issues say it */
+  parse?: Partial<Pick<ParseResult, "skippedTotals">>;
 }
+
+/** Up to three labels, quoted, for a message naming what it points at. */
+const quoted = (labels: string[]): string => {
+  const unique = [...new Set(labels)];
+  return `${unique.slice(0, 3).map((l) => `“${l}”`).join(", ")}${unique.length > 3 ? "…" : ""}`;
+};
 
 const median = (xs: number[]): number | null => {
   if (!xs.length) return null;
@@ -48,6 +60,20 @@ export function validateLeases(
   const issues: ValidationIssue[] = [];
   const outlierFactor = options.outlierFactor ?? 10;
 
+  // What the parser left out, said so the count is never a silent loss.
+  const parseIssues: ValidationIssue[] = [];
+  const skipped = options.parse?.skippedTotals ?? [];
+  if (skipped.length) {
+    parseIssues.push({
+      severity: "info",
+      code: "skipped_totals",
+      message: `Left out ${skipped.length} totals line${skipped.length === 1 ? "" : "s"} — the roll's own sums, not leases: ${quoted(
+        skipped.map((s) => s.label),
+      )}.`,
+      rows: skipped.map((s) => s.row),
+    });
+  }
+
   if (leases.length === 0) {
     return [
       {
@@ -57,6 +83,7 @@ export function validateLeases(
           "No lease rows were found. Check the header row and the column mapping — the file may have a title block above the real header.",
         rows: [],
       },
+      ...parseIssues,
     ];
   }
 
@@ -160,5 +187,5 @@ export function validateLeases(
     });
   }
 
-  return issues;
+  return [...issues, ...parseIssues];
 }

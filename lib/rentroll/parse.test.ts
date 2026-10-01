@@ -7,12 +7,19 @@ import {
   parsePercent,
   parseBasis,
   excelSerialToIso,
+  isTotalsLabel,
   suggestMapping,
   toLeases,
   normalizeHeader,
 } from "./parse";
 import { validateLeases } from "./validate";
-import { CLEAN_CSV, MESSY_CSV, MISSING_EXPIRIES_CSV, fortyTenantCsv } from "./__fixtures__";
+import {
+  CLEAN_CSV,
+  MESSY_CSV,
+  MISSING_EXPIRIES_CSV,
+  TOTAL_NAMED_TENANTS_CSV,
+  fortyTenantCsv,
+} from "./__fixtures__";
 
 const leasesFrom = (csv: string) => {
   const grid = parseCsv(csv);
@@ -156,6 +163,93 @@ describe("toLeases", () => {
   });
 });
 
+describe("totals lines are read by their shape, never by their first word", () => {
+  it("reads a whole totals label and refuses a name that only opens on the word", () => {
+    for (const label of [
+      "Total",
+      "TOTALS:",
+      "Grand Total",
+      "Sub-total",
+      "Weighted Average",
+      "Total Occupied SF",
+      "Vacant Total",
+      "Building A Total",
+      "Subtotal - Building A",
+      "Total for Phase 2",
+      "Totals (12 leases)",
+    ]) {
+      expect(isTotalsLabel(label), label).toBe(true);
+    }
+    for (const name of [
+      "Total Wine & More",
+      "Total Recall Media",
+      "Sum Kitchen",
+      "Average Joe's Coffee",
+      "Total-Tel Communications",
+      "Totally Kids",
+      "",
+    ]) {
+      expect(isTotalsLabel(name), name).toBe(false);
+    }
+    expect(isTotalsLabel(42)).toBe(false);
+  });
+
+  it("keeps a tenant named Total, drops the totals line, and keeps a lease whose note opens on Total", () => {
+    const { leases, skippedTotals, skippedTotalRows } = leasesFrom(TOTAL_NAMED_TENANTS_CSV);
+    expect(leases.map((l) => l.tenant)).toEqual([
+      "Acme Law LLP",
+      "Total Wine & More",
+      "Northside Dental",
+      "",
+      "Total Recall Media",
+    ]);
+    const wine = leases.find((l) => l.tenant === "Total Wine & More")!;
+    expect(wine.sf).toBe(18_000);
+    expect(wine.baseRentAnnual).toBe(522_000);
+    expect(skippedTotalRows).toBe(1);
+    expect(skippedTotals).toEqual([{ row: 7, label: "Total" }]);
+  });
+
+  it("keeps a Total-named tenant on a roll with no suite column, where its lease is dated", () => {
+    const { leases, skippedTotals } = leasesFrom(
+      "Tenant,SF,Expiration,Annual Rent\nAcme Co,5000,2030-12-31,150000\nTotal Wine & More,18000,2034-05-31,522000\nTotal,23000,,672000\n",
+    );
+    expect(leases.map((l) => l.tenant)).toEqual(["Acme Co", "Total Wine & More"]);
+    expect(skippedTotals.map((s) => s.label)).toEqual(["Total"]);
+  });
+
+  it("drops a totals line in the tenant column, a qualified one, and one in an unmapped column", () => {
+    const { leases, skippedTotals } = leasesFrom(
+      [
+        "Bldg,Suite,Tenant,SF,Expiration,Annual Rent",
+        "A,101,Acme Co,5000,2030-12-31,150000",
+        "A,102,Birch LLC,3000,2029-06-30,90000",
+        "A,,Subtotal - Building A,8000,,240000",
+        "B,201,Cobalt Inc,4000,2031-03-31,120000",
+        "B,,Total Occupied,12000,,360000",
+        "Total,,,12000,,360000",
+      ].join("\n"),
+    );
+    expect(leases.map((l) => l.tenant)).toEqual(["Acme Co", "Birch LLC", "Cobalt Inc"]);
+    expect(skippedTotals.map((s) => s.label)).toEqual(["Subtotal - Building A", "Total Occupied", "Total"]);
+  });
+
+  it("reads a label that only opens on Total by its figures: a sum of the rows above is a totals line, anything else a lease", () => {
+    const head = "Tenant,SF,Expiration,Annual Rent";
+    const sums = leasesFrom(
+      `${head}\nAcme Co,5000,2030-12-31,150000\nBirch LLC,3000,2029-06-30,90000\nTotal Northgate Commerce Center,8000,,240000\n`,
+    );
+    expect(sums.leases).toHaveLength(2);
+    expect(sums.skippedTotals.map((s) => s.label)).toEqual(["Total Northgate Commerce Center"]);
+
+    const tenant = leasesFrom(
+      `${head}\nAcme Co,5000,2030-12-31,150000\nBirch LLC,3000,2029-06-30,90000\nTotal Comfort HVAC,2500,,60000\n`,
+    );
+    expect(tenant.leases.map((l) => l.tenant)).toContain("Total Comfort HVAC");
+    expect(tenant.skippedTotals).toEqual([]);
+  });
+});
+
 describe("validateLeases", () => {
   it("flags SF summing past a stated NRA", () => {
     const { leases } = leasesFrom(CLEAN_CSV);
@@ -191,6 +285,17 @@ describe("validateLeases", () => {
   it("flags a roll that mixes lease bases", () => {
     const { leases } = leasesFrom(MESSY_CSV);
     expect(validateLeases(leases).map((i) => i.code)).toContain("mixed_rent_basis");
+  });
+
+  it("stores the totals lines it left out as a note naming each row and label", () => {
+    const parsed = leasesFrom(TOTAL_NAMED_TENANTS_CSV);
+    const note = validateLeases(parsed.leases, { parse: parsed }).find((i) => i.code === "skipped_totals");
+    expect(note?.severity).toBe("info");
+    expect(note?.rows).toEqual([7]);
+    expect(note?.message).toContain("Left out 1 totals line");
+    expect(note?.message).toContain("“Total”");
+    // Without the parse result there is nothing to say.
+    expect(validateLeases(parsed.leases).some((i) => i.code === "skipped_totals")).toBe(false);
   });
 
   it("says so plainly when nothing parsed", () => {

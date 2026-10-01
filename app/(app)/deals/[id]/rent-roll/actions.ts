@@ -75,7 +75,9 @@ export async function uploadRentRoll(formData: FormData) {
 
   const parsed = toLeases(grid, mapping);
   const nra = num(formData.get("nra"));
-  const issues = validateLeases(parsed.leases, { nra });
+  // The parse result rides along so the totals lines it left out are stored
+  // with the import's issues and shown on the page, never lost silently.
+  const issues = validateLeases(parsed.leases, { nra, parse: parsed });
 
   const docId = crypto.randomUUID();
   const path = documentPath(dealId, docId, file.name, "rent-roll");
@@ -157,7 +159,7 @@ export async function confirmMapping(formData: FormData) {
 
   const parsed = toLeases(grid, mapping);
   const nra = num(formData.get("nra")) ?? record.nra;
-  const issues = validateLeases(parsed.leases, { nra });
+  const issues = validateLeases(parsed.leases, { nra, parse: parsed });
   const asOf = String(formData.get("asOf") ?? "").trim();
 
   await ctx.supabase

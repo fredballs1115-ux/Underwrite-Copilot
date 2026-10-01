@@ -1501,7 +1501,7 @@ import { analyzeRentRoll, leaseUpCurve, markToMarket, rolloverCostForecast, roll
 import { parseCsv, suggestMapping, toLeases } from "@/lib/rentroll/parse";
 import { PROFILE_DEFAULTS } from "@/lib/rentroll/profiles";
 import { validateLeases } from "@/lib/rentroll/validate";
-import { CLEAN_CSV, MISSING_EXPIRIES_CSV } from "@/lib/rentroll/__fixtures__";
+import { CLEAN_CSV, MESSY_CSV, MISSING_EXPIRIES_CSV } from "@/lib/rentroll/__fixtures__";
 import { deriveAnalytics, type AnalyticsRow } from "@/lib/analytics";
 import { rentTrend } from "@/lib/market/metrics";
 import type { SubmarketPeriod } from "@/lib/market/types";
@@ -1509,7 +1509,8 @@ import type { SubmarketPeriod } from "@/lib/market/types";
 describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
   const renderRoll = (csv: string) => {
     const grid = parseCsv(csv);
-    const leases = toLeases(grid, suggestMapping(grid)).leases;
+    const parsed = toLeases(grid, suggestMapping(grid));
+    const leases = parsed.leases;
     const profile = PROFILE_DEFAULTS.office;
     const analytics = analyzeRentRoll(leases, { asOf: "2026-01-01", nra: null });
     const schedule = rolloverSchedule(leases, { nra: null });
@@ -1526,11 +1527,11 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
             nra: analytics.totalSf,
             absorptionSfPerMonth: 2_500,
           }),
-          issues: validateLeases(leases, { nra: null }),
+          issues: validateLeases(leases, { nra: null, parse: parsed }),
           filename: "rent-roll.csv",
         }),
       );
-    dumpView(`rent-roll-${csv === CLEAN_CSV ? "clean" : "issues"}`, html);
+    dumpView(`rent-roll-${csv === CLEAN_CSV ? "clean" : csv === MESSY_CSV ? "messy" : "issues"}`, html);
     expect(a11yIssues(html), "a11y rent roll").toEqual([]);
     return { text: visibleText(html), html, priced: Math.min(25, mtm.rows.length) };
   };
@@ -1554,6 +1555,13 @@ describe("RentRollDashboard — a parsed rent roll renders every panel", () => {
     const { text } = renderRoll(MISSING_EXPIRIES_CSV);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("What the import found in rent-roll.csv");
+  });
+
+  it("a roll with its own totals line says the line was left out, by row", () => {
+    const { text } = renderRoll(MESSY_CSV);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Left out 1 totals line");
+    expect(text).toContain("(row 11)");
   });
 });
 

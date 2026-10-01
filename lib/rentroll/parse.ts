@@ -22,7 +22,8 @@ import ExcelJS from "exceljs";
 import {
   CANONICAL_FIELDS,
   FIELD_BY_KEY,
-  TOTAL_MARKERS,
+  TOTAL_QUALIFIERS,
+  TOTAL_WORDS,
   VACANT_MARKERS,
   type CanonicalKey,
   type Lease,
@@ -414,9 +415,65 @@ const looksLike = (value: unknown, markers: string[]): boolean => {
   return markers.some((m) => s === m || s.startsWith(`${m} `) || s.startsWith(`${m}:`));
 };
 
+/** A label's words, lowercase, punctuation read as a space. */
+const labelWords = (raw: string): string[] =>
+  raw.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim().split(" ").filter(Boolean);
+
+/** A word a totals label may carry beside its totals word: one that names
+ *  what is totalled, a number, or a building's letter ("Building A"). */
+const qualifies = (w: string): boolean => TOTAL_QUALIFIERS.has(w) || /^\d+$/.test(w) || w.length <= 2;
+
+/** Where the label's totals word sits, when only qualifying words come
+ *  before it ("Grand Total", "Vacant Total"); -1 when it has none. */
+function totalsWordAt(words: string[]): number {
+  const at = words.findIndex((w) => TOTAL_WORDS.has(w));
+  return at >= 0 && words.slice(0, at).every(qualifies) ? at : -1;
+}
+
+/**
+ * Whether a cell's WHOLE text is a totals label: the word itself ("Total",
+ * "TOTALS:", "Grand Total", "Sub-total", "Weighted Average"), or the word with
+ * words that name what is totalled ("Total Occupied", "Vacant Total", "Total
+ * Rentable SF", "Building A Total"), or the word and then a separator or a
+ * "for" / "of" that hands the rest to what is totalled ("Subtotal - Building
+ * A", "Total: Retail", "Totals (12 leases)", "Total for Phase 2"). A name that
+ * only opens on the word is not one: "Total Wine & More", "Sum Kitchen" and
+ * "Average Joe's" are tenants.
+ */
+export function isTotalsLabel(raw: unknown): boolean {
+  if (typeof raw !== "string") return false;
+  const words = labelWords(raw);
+  const at = totalsWordAt(words);
+  if (at < 0) return false;
+  const rest = words.slice(at + 1);
+  if (rest.length === 0) return true;
+  // A dash separates only with a space after it: "Total - Retail" is a label,
+  // "Total-Tel Communications" a tenant.
+  const separated = new RegExp(`\\b${words[at]}\\b(?:\\s*[:(|/,]|\\s*[-–—]\\s)`, "i").test(raw);
+  if (separated) return true;
+  for (const w of rest) {
+    if (w === "for" || w === "of" || w === "by") return true;
+    if (!qualifies(w)) return false;
+  }
+  return true;
+}
+
+/** Whether a label opens on a totals word (after qualifiers only) — a
+ *  candidate the figures decide: "Total Northgate Center" sums the rows above
+ *  it, "Total Wine & More" does not. */
+const opensOnTotalsWord = (raw: unknown): boolean =>
+  typeof raw === "string" && totalsWordAt(labelWords(raw)) >= 0;
+
 // ---------------------------------------------------------------------------
 // Grid + mapping → leases
 // ---------------------------------------------------------------------------
+
+/** A row the parser left out of the leases, with the label that marked it. */
+export interface SkippedRow {
+  /** 1-based row in the source file */
+  row: number;
+  label: string;
+}
 
 export interface ParseResult {
   leases: Lease[];
@@ -426,17 +483,38 @@ export interface ParseResult {
   /** rows skipped as totals/subtotals, so the count is never a silent loss */
   skippedTotalRows: number;
   skippedBlankRows: number;
+  /** each totals line left out, by row and label — stored with the import's
+   *  issues (lib/rentroll/validate) and shown on the page */
+  skippedTotals: SkippedRow[];
 }
+
+/** Two figures that agree to a dollar (or a foot), or to half a percent. */
+const sameFigure = (a: number, b: number): boolean => Math.abs(a - b) <= Math.max(1, Math.abs(b) * 0.005);
 
 /**
  * Apply a mapping to the grid. Rows below the header are leases, except
  * total/subtotal lines (summing a file that carries its own totals doubles the
  * building) and fully-blank spacer rows.
+ *
+ * A TOTALS LINE IS READ BY ITS SHAPE, never by its first word, because a
+ * tenant can open on the same word ("Total Wine & More", 18,000 SF, was once
+ * dropped as a totals line). A row is the roll's own sums when:
+ *   1. its suite column holds a totals label (`isTotalsLabel` — the word
+ *      alone or with words naming what is totalled): a suite names a space,
+ *      never a tenant;
+ *   2. its tenant column holds one and it has no suite of its own;
+ *   3. it names no suite and no tenant, and a totals label sits in another
+ *      column ("Total" under a Building column);
+ *   4. a label that only OPENS on a totals word ("Total Northgate Center")
+ *      sits on a row with no suite of its own and no lease date, whose area
+ *      or rent adds up the rows above it — to half a percent, over two rows
+ *      or more, since the block it closes or the whole roll so far.
+ * Everything else is a lease, whatever its name opens on.
  */
 export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
   const headers = (grid[mapping.headerRow] ?? []).map((c) => String(c ?? "").trim());
   const leases: Lease[] = [];
-  let skippedTotalRows = 0;
+  const skippedTotals: SkippedRow[] = [];
   let skippedBlankRows = 0;
 
   const at = (row: Grid[number], key: CanonicalKey): unknown => {
@@ -444,6 +522,40 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
     return col === undefined ? null : (row[col] ?? null);
   };
   const isMonthly = (key: CanonicalKey) => mapping.monthly.includes(key);
+  const text = (v: unknown): string => (v == null ? "" : String(v).trim());
+  const rentOf = (row: Grid[number]): number | null => {
+    const raw = parseNumber(at(row, "baseRentAnnual"));
+    return raw == null ? null : isMonthly("baseRentAnnual") ? raw * 12 : raw;
+  };
+
+  // The leases since the last totals line, and since the top of the roll —
+  // what a rule-4 label's figures must add up.
+  let blockStart = 0;
+  const addsUp = (row: Grid[number]): boolean => {
+    const sf = parseNumber(at(row, "sf"));
+    const rent = rentOf(row);
+    if (sf == null && rent == null) return false;
+    const sets = [leases.slice(blockStart), leases].flatMap((set) => [set, set.filter((l) => !l.vacant)]);
+    return sets.some(
+      (set) =>
+        set.length >= 2 &&
+        (sf == null || sameFigure(sf, set.reduce((s, l) => s + (l.sf ?? 0), 0))) &&
+        (rent == null || sameFigure(rent, set.reduce((s, l) => s + (l.baseRentAnnual ?? 0), 0))),
+    );
+  };
+  const totalsLabelOf = (row: Grid[number]): string | null => {
+    const suite = text(at(row, "suite"));
+    const tenant = text(at(row, "tenant"));
+    if (isTotalsLabel(suite)) return suite;
+    if (!suite && isTotalsLabel(tenant)) return tenant;
+    const others = !suite && !tenant ? row.filter((c): c is string => typeof c === "string") : [];
+    const elsewhere = others.find((c) => isTotalsLabel(c));
+    if (elsewhere) return elsewhere.trim();
+    const opener = [suite, tenant, ...others].find(opensOnTotalsWord);
+    if (!opener || (suite && suite !== opener)) return null;
+    const dated = parseDate(at(row, "leaseExpiry")) != null || parseDate(at(row, "leaseStart")) != null;
+    return !dated && addsUp(row) ? opener.trim() : null;
+  };
 
   for (let r = mapping.headerRow + 1; r < grid.length; r++) {
     const row = grid[r];
@@ -452,23 +564,16 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
       skippedBlankRows++;
       continue;
     }
-    // A totals line usually announces itself in the tenant or suite column;
-    // check every mapped text column so a file that puts it elsewhere is still
-    // caught.
-    if (
-      looksLike(at(row, "tenant"), TOTAL_MARKERS) ||
-      looksLike(at(row, "suite"), TOTAL_MARKERS) ||
-      row.some((c) => typeof c === "string" && looksLike(c, TOTAL_MARKERS))
-    ) {
-      skippedTotalRows++;
+    const totalsLabel = totalsLabelOf(row);
+    if (totalsLabel != null) {
+      skippedTotals.push({ row: r + 1, label: totalsLabel });
+      blockStart = leases.length;
       continue;
     }
 
     const tenantRaw = String(at(row, "tenant") ?? "").trim();
     const sf = parseNumber(at(row, "sf"));
-    const rentRaw = parseNumber(at(row, "baseRentAnnual"));
-    const baseRentAnnual =
-      rentRaw == null ? null : isMonthly("baseRentAnnual") ? rentRaw * 12 : rentRaw;
+    const baseRentAnnual = rentOf(row);
     const psfRaw = parseNumber(at(row, "rentPsf"));
     const rentPsfStated = psfRaw == null ? null : isMonthly("rentPsf") ? psfRaw * 12 : psfRaw;
 
@@ -506,7 +611,14 @@ export function toLeases(grid: Grid, mapping: ColumnMapping): ParseResult {
     });
   }
 
-  return { leases, mapping, headers, skippedTotalRows, skippedBlankRows };
+  return {
+    leases,
+    mapping,
+    headers,
+    skippedTotalRows: skippedTotals.length,
+    skippedBlankRows,
+    skippedTotals,
+  };
 }
 
 /** One call: bytes → leases, using the auto-detected mapping. */

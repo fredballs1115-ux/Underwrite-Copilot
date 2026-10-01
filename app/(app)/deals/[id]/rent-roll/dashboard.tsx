@@ -128,6 +128,9 @@ export function RentRollDashboard({
 }) {
   const errors = issues.filter((i) => i.severity === "error");
   const warnings = issues.filter((i) => i.severity === "warning");
+  // What the import did on purpose (a totals line left out) — shown, in a
+  // neutral dot, after anything that needs fixing.
+  const notes = issues.filter((i) => i.severity === "info");
 
   // Mark to market, once for both layouts: each lease's gap as a share of
   // its market rent, scaled to the widest on the page. A market rent of
@@ -151,11 +154,11 @@ export function RentRollDashboard({
             What the import found in {filename}
           </h2>
           <ul className="mt-2 flex flex-col gap-2">
-            {[...errors, ...warnings].map((issue) => (
+            {[...errors, ...warnings, ...notes].map((issue) => (
               <li key={issue.code} className="flex gap-2 text-sm">
                 <span
                   className={`mt-0.5 h-2 w-2 shrink-0 rounded-full ${
-                    issue.severity === "error" ? "bg-kill" : "bg-caution"
+                    issue.severity === "error" ? "bg-kill" : issue.severity === "warning" ? "bg-caution" : "bg-muted/50"
                   }`}
                   aria-hidden
                 />

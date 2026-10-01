@@ -239,16 +239,39 @@ export const VACANT_MARKERS = [
   "n/a",
 ];
 
-/** Words that mark a row as a TOTAL / subtotal line rather than a lease —
- *  summing a file that includes its own totals doubles the building. */
-export const TOTAL_MARKERS = [
+/**
+ * The words a TOTAL / subtotal / average line is labelled with — summing a
+ * file that includes its own totals doubles the building. A word alone does
+ * not make a totals line: "Total Wine & More" and "Sum Kitchen" are tenants.
+ * lib/rentroll/parse `isTotalsLabel` reads a label as a totals line only where
+ * every other word in it names what is totalled (TOTAL_QUALIFIERS).
+ */
+export const TOTAL_WORDS: ReadonlySet<string> = new Set([
   "total",
   "totals",
   "subtotal",
-  "sub-total",
-  "grand total",
+  "subtotals",
   "sum",
-  "building total",
+  "sums",
   "average",
-  "weighted average",
-];
+  "averages",
+  "avg",
+  "mean",
+]);
+
+/** Words that say WHAT a totals line totals ("Grand Total", "Total Occupied
+ *  SF", "Vacant Total", "Total Rentable Area", "Building Total"). A label's
+ *  other words must all be these (or a number, or a building's letter) for it
+ *  to read as a totals line. */
+export const TOTAL_QUALIFIERS: ReadonlySet<string> = new Set([
+  "grand", "sub", "weighted", "wtd", "overall", "combined", "all", "the", "and",
+  "building", "buildings", "bldg", "property", "properties", "portfolio", "project",
+  "center", "centre", "park", "site", "phase", "campus", "roll",
+  "occupied", "vacant", "leased", "unleased", "available",
+  "net", "gross", "rentable", "usable", "current", "in", "place",
+  "sf", "rsf", "gla", "nra", "sq", "ft", "square", "feet", "footage", "area",
+  "rent", "rents", "rental", "income", "revenue", "base", "contract",
+  "annual", "annualized", "monthly", "psf", "per", "rate", "rates",
+  "units", "unit", "suites", "suite", "tenants", "tenant", "leases", "lease",
+  "spaces", "space", "expiring",
+]);
