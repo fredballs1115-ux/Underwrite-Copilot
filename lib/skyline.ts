@@ -944,6 +944,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Fort Wayne, IN",
     size: [2880, 1304],
   },
+  // Fresno, CA: skyline-sheet run 36816641545 — a one-market run's pick of ten: downtown's towers at dusk under a clear sky, the streets lit below them and the freeway's light trails along the foot, whole in both crops; over the Security Bank tower close up, its mast cut by every crop and a dark strip down the file's edge, a backlit roofline, a dusk panorama 544px tall at 2400 wide, two hazy views from an airliner, a car park under a water tower, a hotel's balconies, the courthouse's grille and a gas station's signs in Oakhurst.
+  "cbsa:23420": {
+    file: "Downtown Fresno Skyline.jpg",
+    place: "Downtown Fresno's towers at dusk, over the freeway's light trails",
+    credit: "JMora24",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Fresno, CA",
+    size: [4052, 1348],
+  },
   // Gainesville, FL: skyline-sheet run 36808459092 — a one-market run's pick of nineteen: Sweetwater Wetlands Park from above under a sky of cumulus, an oblique with a horizon, sharp and whole in both crops, over Century Tower, whose crown the wide crop cuts, the county's buildings behind signals and street signs, a museum at the card's foot, a camera's viewfinder and a coastal lab's sign; the six-market sheet had held parked cars under a crane, a steep aerial of Depot Park and a watermarked drone frame.
   "cbsa:23540": {
     file: "Sweetwater Wetlands Park.jpg",
@@ -1143,6 +1153,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Louisville, KY",
     size: [9640, 2304],
+  },
+  // Madison, WI: skyline-sheet run 36816573981 — a one-market run's pick of twenty-seven: the State Capitol's dome over downtown, across a frozen lake in low winter light under a clear sky, whole in both crops; over a drone's view of the Capitol whose crops cut its statue, the dome up the boulevard under a white sky with its statue cut at 21:9, Monona Terrace from the water, Bascom Hill in autumn with the dome small, Bascom Mall in black and white, power lines across the dome, the lake's open water, haze and algae, an 1855 lithograph and an old frame of a train. The runner printed the licence as "Public Domain" with a link to the Internet Archive's copy of Creative Commons' retired public-domain page; it is written here as the table's other public-domain rows are, with no link, since public domain asks for none.
+  "cbsa:31540": {
+    file: "Gfp-wisconsin-madison-city-skyline-in-the-winter.jpg",
+    place: "The State Capitol's dome over downtown Madison, across a frozen lake in winter light",
+    credit: "Yinan Chen",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Madison, WI",
+    size: [2500, 1667],
   },
   // Manchester-Nashua, NH: skyline-sheet run 36800324942 — the mills along the river and downtown's towers behind them under a clear sky in full leaf, from the city's article, every top well inside both crops, over the article's lead, a winter view from above of rowhouses over a flat roof, Nashua's millyard on the water, whose clock tower the wide crop takes, a night highway, a frame where the city is a strip under cloud and backlit towers over a parking lot.
   "cbsa:31700": {
@@ -1433,6 +1453,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Salem, OR",
     size: [3796, 2473],
+  },
+  // San Jose-Sunnyvale-Santa Clara, CA: skyline-sheet run 36816505479 — a one-market run's pick of twenty-eight: downtown's towers lit against a violet night sky, sharp and whole in both crops, the crane and every tower with sky above; over the same frame uncropped, downtown small across the valley floor from a height, a look up at the Hotel De Anza with parked cars and a one-way sign at its foot, a steep look down in hazy midday light, a hazy strip 501px tall at 2400 wide, suburbs under green hills, Santana Row's shopping street, a crowd at the Civic, storefronts and a theatre's marquee, two hazy views from airliners, San Francisco's Golden Gate and Alviso's fireworks. The card names the Census title's first city, as Oxnard's, Bakersfield's and Stockton's do: the whole title ran into the credit on a phone's card.
+  "cbsa:41940": {
+    file: "Downtown SJ at Night cropped1.jpg",
+    place: "Downtown San Jose's towers lit at night, over a field of yellow flowers",
+    credit: "Ben Loomis",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "San Jose, CA",
+    size: [3831, 2611],
   },
   // San Juan-Bayamón-Caguas, PR: skyline-sheet run 36797923875 — El Morro, the picture the city is known by, whole in both crops with a horizon, so it reads as a photograph, not a map; the fort's lawn panorama is 524px tall at 2400 wide, the plane's view of the islet reads as a map, and the rest are hazy views across the water and green hills with the city a strip on the horizon.
   "cbsa:41980": {

@@ -1234,6 +1234,12 @@
         "San Jose California skyline",
         "Downtown San Jose skyline night",
         "San Jose California downtown aerial"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown SJ at Night cropped1.jpg",
+          "note": "San Jose-Sunnyvale-Santa Clara, CA — Ben Loomis, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816505479)."
+        }
       ]
     },
     {
@@ -1648,6 +1654,12 @@
         "Fresno California skyline",
         "Fresno California downtown",
         "Fresno Tower Theatre"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Fresno Skyline.jpg",
+          "note": "Fresno, CA — JMora24, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816641545)."
+        }
       ]
     },
     {
@@ -1829,6 +1841,12 @@
         "Madison Wisconsin skyline Lake Monona",
         "Madison Wisconsin isthmus",
         "Wisconsin State Capitol Madison skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Gfp-wisconsin-madison-city-skyline-in-the-winter.jpg",
+          "note": "Madison, WI — Yinan Chen, Public Domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36816573981)."
+        }
       ]
     },
     {
