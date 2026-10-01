@@ -99,12 +99,14 @@ export async function askDeal(
 
   try {
     const pdf = await downloadOmPdf(deal.om_storage_path as string, { kind: "deal", dealId });
-    const result = await askDealQuestion(
-      pdf,
-      question,
-      dealContextFor((deal.extraction as ExtractionResult | null) ?? null),
-      { dealId },
-    );
+    const extraction = (deal.extraction as ExtractionResult | null) ?? null;
+    const result = await askDealQuestion(pdf, question, dealContextFor(extraction), {
+      dealId,
+      // How the screen read this memorandum, off the row already in hand:
+      // a question reads the figures the screen read, with no second read
+      // of the deal (null for a deal screened before the read was kept).
+      omRead: extraction?.omRead ?? null,
+    });
     const entry = {
       at: new Date().toISOString(),
       q: question,
