@@ -917,7 +917,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   entity); the fix is an explicit `{" "}`. A number followed only by a
   margin-spaced `<span>` is one word to a screen reader — spell the space.
   The public pages get the same lint after every deploy:
-  `scripts/lint-pages.mjs` over the HTML live-verify fetches.
+  `scripts/lint-pages.mjs` over the HTML live-verify fetches. CI runs it
+  first, over sixteen public pages as its own build serves them (the last
+  step of `test.yml`, with a placeholder Supabase URL on a closed port so
+  each page renders its no-data state): a render test draws a component,
+  and 32 glued words on /market's tables reached the branch through every
+  one of them.
   `lib/live-verify-markers.test.ts` holds every round marker that greps
   `/tools` to text that is really in the SERVED html: React's server
   renderer puts `<!-- -->` between adjacent text nodes, so a marker
