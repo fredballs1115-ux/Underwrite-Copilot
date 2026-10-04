@@ -1730,7 +1730,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   tables, which the Census Bureau publishes as .xlsx and nothing else
   (FRED carries only the four regions): `scripts/fetch-hvs.mjs` reads
   the current year's table and the eleven-year history with exceljs on a
-  quarterly cron (`hvs.yml`, the 6th of Feb / May / Aug / Nov), after
+  quarterly cron (`hvs.yml`, the 6th of Feb / May / Aug / Nov, and the
+  20th in case the 6th's run failed, since a metro's figure is stale three
+  weeks after it), after
   `probe-url.mjs` printed both workbooks' shape from the runner (run
   35794270430 — a header block naming each quarter with "Margin of Error"
   beside it, the area names padded with dot leaders and carrying footnote

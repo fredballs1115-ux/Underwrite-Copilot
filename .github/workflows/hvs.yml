@@ -7,7 +7,11 @@ name: hvs
 #
 # The survey releases a quarter's figures late in the month after it ends
 # (January, April, July, October); this runs early the month after that, so
-# the newest quarter is in the table within weeks of its release. Dispatch
+# the newest quarter is in the table within weeks of its release, and again
+# two weeks later: a metro's figure is stale 240 days after its quarter
+# began (data/fred-series.json), about three weeks after the 6th's run, so
+# one missed run alone would blank the survey board for a quarter. A
+# second run of the same figures rewrites the same rows. Dispatch
 # it with `dry_run` ticked to fetch, match and print without writing: the
 # log names the row each metro matched, which is how a name prefix is
 # verified before it is trusted (the sandbox cannot reach census.gov).
@@ -16,6 +20,7 @@ name: hvs
 on:
   schedule:
     - cron: "23 13 6 2,5,8,11 *" # the 6th of Feb / May / Aug / Nov, after the survey's release
+    - cron: "23 13 20 2,5,8,11 *" # the 20th, in case the 6th's run failed
   workflow_dispatch:
     inputs:
       dry_run:
