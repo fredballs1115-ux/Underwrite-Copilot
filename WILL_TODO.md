@@ -13,10 +13,15 @@ Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
      read owner names and mailing addresses;
    - a share link minted outside the app keeps whatever expiry and token its
      minter chose;
-   - an update can dodge the free-deal cap.
+   - an update can dodge the free-deal cap;
+   - an account can put its own screen back at the head of the worker's
+     queue, over and over, ahead of every other customer's;
+   - any signed-in account can write the alert banner's shared dismissal
+     columns, which nothing on the site uses any more.
 
-   The file's header says what each part closes and why the app's own
-   writes pass unchanged. In the same editor, delete the rows the rates
+   The last two were added on October 4. If you ran the file before then,
+   run the whole file again: it is idempotent. The file's header says what
+   each part closes and why the app's own writes pass unchanged. In the same editor, delete the rows the rates
    pull wrote for the four licensed series before it stopped asking for
    them. No page shows them, but migration 0023's read policy lets any
    signed-in account select them through the API:
@@ -72,6 +77,10 @@ way in this batch):
     (deleting one frees a slot), re-screens are unlimited and sign-up has no
     CAPTCHA, at about $3 a screen. The pages now say what is enforced; tell
     me the rule you want and I will make the code and the copy match it.
+    The security review of October 1 adds one fact to weigh: nothing caps
+    what one account spends. Once 0036 runs, a re-queued screen waits its
+    turn, but an account can still ask for screen after screen; a daily cap
+    per account is the guard, and its number is yours.
 
 **What changed without asking you, and why:**
 - The rates strip's **three ICE BofA credit spreads and Moody's Baa yield
@@ -118,7 +127,15 @@ way in this batch):
   - life science as its own class;
   - HUD's mortgage insurance premium in the assumable-loan card's rate;
   - data centers priced per megawatt;
-  - a bulk condo sell-out.
+  - a bulk condo sell-out;
+  - a Delaware Statutory Trust's master lease (research pass 23): the
+    investors' income is the master lease's rent, not the building's NOI;
+  - rent regulation in the model: a regulated building's rent growth is
+    capped by its board or statute, and the model grows every rent at one
+    market rate;
+  - reserves on a placeholder area: where the memorandum states no area,
+    the model's per-foot reserves are struck on the class's typical size
+    or the flat 100,000 SF, a figure the deal never stated.
 - **Wider coverage:**
   - rent rules for the 26 metro areas read without a brief, and for Oregon;
   - photographs for rural deals;

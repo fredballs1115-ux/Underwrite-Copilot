@@ -4725,6 +4725,31 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `name` is null and the name is in `name_translated.en`, as the runner
     printed in zori run 37231906743; "FY2026" and "FY2027" had both read
     20).
+- What a link or an account can make the server do (#491, research pass
+  22's security review, 2026-10-01; every finding reproduced first):
+  - **A public picture is drawn once, at its page's frame**: the shared
+    screen's aerial is drawn at its page's one frame (`SHARE_AERIAL`, any
+    other size snapped to it, lib/image-frames' `nearestFrame`), kept per
+    deal and frame with the point it was drawn around (lib/deal-aerial on
+    `HeldCopies`, lib/held-copies: bounded on count and bytes, a making
+    shared, a failure kept by nobody), and the link resolved again before
+    the copy is served. Every building's USGS export waits behind
+    `AERIAL_IN_FLIGHT` (4). The signed-in aerial and best-picture routes
+    snap to the frames their own pages ask for, too.
+  - **An email's picture is kept once and shown only to a reader of the
+    deal**: newly signed tokens carry the recipient, and the route checks
+    on each request, through the service role, that they can still read
+    the deal (its creator, or a member of its team) — a token signed
+    before carries none and keeps working until it expires; the resized
+    picture is kept per stored path and size (lib/email-picture-copy).
+  - **The health routes' costly half is the operator's**: /api/news/health's
+    light read stays public (live-verify reads it) and only `refresh=1`
+    refetches for an operator; /api/imagery/health's billed Static Maps call
+    and /api/comps/health's live probes run for `isSiteOperator` alone, a
+    signed-in account getting the free half and a stranger a 401.
+  - **No user-written value reaches a header raw**: a gallery photograph's
+    page is printed only as a whole page number in range, and a stored
+    path never goes into an etag a header cannot hold.
 - The front door: `lib/auth-flow.ts` is the pure layer — an auth failure's
   sentence by the service's stable `code` (`authErrorCopy`), the sign-in
   page's link banner, and where an email link's one-time code goes.
@@ -4758,7 +4783,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   names both; and 0036's write guards stay in place (the free-deal cap on
   insert and on the updates that could dodge it, a share link's token the
   database's and its expiry clamped, a job's `created_at` the database's
-  clock, `deals.qa` append-only). **A regulatory alert's dismissal is the
+  clock — and a run a user puts in the worker's queue, by turning its
+  status to queued or handing a queued row its payload, placed at the
+  database's now, so no re-queue jumps the line (#491) — `deals.qa`
+  append-only, and the alert banner's old shared dismissal write revoked).
+  **A regulatory alert's dismissal is the
   reader's own** (`lib/dismissed-alerts.ts`, a cookie of up to 50 ids for
   a year, alerts inside `ALERT_WINDOW_DAYS`, named for the account by
   `dismissedCookieName` so a second account on the same browser keeps its
@@ -4827,11 +4856,14 @@ whose move each item is. **As of 2026-09-16 every migration through 0035 is
 run and verified** (`supabase/CHECK_MIGRATIONS.sql` reported them all ✅), so
 the four LPC pages, the cost ledger and the site-flag card are live rather
 than inert — the long-standing "blocked on migrations" caveat is retired.
-**0036 (security hardening, 2026-09-30) is drafted and is the owner's to
-run**: until it runs, the public anon key can call the two public-record
-RPCs, a share link minted through PostgREST keeps the expiry and token its
-minter chose, and the free-deal cap can be dodged by an update; the app's
-own writes pass it unchanged, and `CHECK_MIGRATIONS.sql` checks it.
+**0036 (security hardening, 2026-09-30, amended 2026-10-04) is drafted and
+is the owner's to run**: until it runs, the public anon key can call the two
+public-record RPCs, a share link minted through PostgREST keeps the expiry
+and token its minter chose, the free-deal cap can be dodged by an update, a
+user can put their own run back at the head of the worker's queue, and any
+signed-in account can write the alert banner's shared dismissal columns; the
+app's own writes pass it unchanged, and `CHECK_MIGRATIONS.sql` checks it
+(the first draft of part 4 reads ❌ there).
 What remains is seeding and the operator's own accounts, not schema.
 
 ## Agents
