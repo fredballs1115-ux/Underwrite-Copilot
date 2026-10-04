@@ -3,11 +3,14 @@
 //
 // The portal's package_show (printed from the GitHub runner, zori run
 // 37231906743, 2026-10-04) lists 39 resources. Their `name` is null; the
-// name is in `name_translated.en` — "Property Assessment FY2026", "Property
-// Assessment FY2026 Data Key", "Property Assessment FY2025", … — newest
-// first. The first reader took `name` alone and read a year as "FY" or "20"
-// then two digits, so "FY2026" and "FY2027" both read 20, and with every
-// name null the newest roll was simply whichever the list put first.
+// name is in `name_translated.en` — "Property Assessment FY" and the year's
+// four digits, the same with "Data Key" after it, then the year before,
+// newest first. The first reader took `name` alone and read a year as "FY"
+// or "20" then two digits, so this year's roll and next year's both read
+// 20, and with every name null the newest roll was simply whichever the
+// list put first. No fiscal year is typed into this file (the rule
+// lib/fiscal-year-literal.test.ts holds every source to); the printed names
+// are in its test.
 
 export interface CkanResource {
   id: string;
@@ -23,10 +26,10 @@ export function resourceName(r: CkanResource): string {
 }
 
 /**
- * The fiscal year a resource's name states — "FY2026" is 2026, "FY26" is
- * 2026 — or null. A data key or a dictionary is documentation, not a roll,
- * and states no year here; a bare "2026" is not read, since only the roll's
- * own label says which fiscal year it is.
+ * The fiscal year a resource's name states — "FY" and four digits, or "FY"
+ * and two (read in the 2000s) — or null. A data key or a dictionary is
+ * documentation, not a roll, and states no year here; a bare "2026" is not
+ * read, since only the roll's own label says which fiscal year it is.
  */
 export function rollYear(name: string): number | null {
   if (/\bdata\s*key\b|\bdictionary\b/i.test(name)) return null;

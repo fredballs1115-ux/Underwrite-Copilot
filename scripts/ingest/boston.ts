@@ -48,7 +48,7 @@ async function resolveResource(): Promise<{ id: string; name: string }> {
     success?: boolean;
     result?: { resources?: CkanResource[] };
   };
-  // Per-year resources are named like "Property Assessment FY2026" (in
+  // Per-year resources are named "Property Assessment FY" and the year (in
   // `name_translated.en`; `name` is null) — the highest fiscal year the
   // portal can serve rows from is the current roll (lib/ingest/boston-roll).
   const roll = pickAssessmentRoll(body.result?.resources ?? []);
