@@ -283,8 +283,13 @@ export function analyzeStrip(values: number[], opts: StripOptions = {}): StripRe
       rate = engineRate ?? found.roots[0];
       rootNote = `The cash flows change sign ${changes} times, so the IRR may not be unique — ${ratePctWords(rate)} is the only rate found ${range}.`;
     } else {
+      // The search finds a rate where the NPV CROSSES zero; one that only
+      // touches it — [−100, 220, −121] is zero at 10% and below zero at
+      // every other rate — is a double root no sign change reveals. So the
+      // note says what the search found, never that no rate solves the
+      // strip: it had said so of that one.
       rate = null;
-      rootNote = `No rate ${range} solves this strip — its cash flows change sign ${changes} times. Read the NPV at your own rate instead.`;
+      rootNote = `The NPV does not change sign at any rate ${range}, so no IRR is shown — with cash flows that change sign ${changes} times, it can touch zero without crossing it. Read the NPV at your own rate instead.`;
     }
   }
   const irrPct = rate === null ? null : rate * 100;

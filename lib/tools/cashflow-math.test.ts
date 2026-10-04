@@ -180,6 +180,22 @@ describe("the strips that have no answer, said out loud", () => {
     expect(r.fromResidualPct).toBeNull();
   });
 
+  it("never says no rate solves a strip whose NPV only touches zero (audit c66)", () => {
+    // −100 + 220/(1+r) − 121/(1+r)² is −(11/(1+r) − 10)²: zero at exactly
+    // 10% and below zero everywhere else, so no sign change shows it. The
+    // note had said "No rate … solves this strip".
+    const touching = [-100, 220, -121];
+    expect(touching.reduce((acc, cf, t) => acc + cf / Math.pow(1.1, t), 0)).toBeCloseTo(0, 10);
+    const r = analyzeStrip(touching);
+    expect(r.irrPct).toBeNull();
+    expect(r.irrRoots).toEqual([]);
+    expect(r.note).toBe(
+      "The NPV does not change sign at any rate between -99.99% and 100,000%, so no IRR is shown — with cash flows " +
+        "that change sign 2 times, it can touch zero without crossing it. Read the NPV at your own rate instead.",
+    );
+    expect(r.note).not.toContain("solves this strip");
+  });
+
   it("finds a conventional strip's one rate past the engine's scan, and never calls it ambiguous", () => {
     // One sign change has exactly one rate. The engine scans −90% to 500%
     // and found neither of these, and the card said the strip "changes sign
