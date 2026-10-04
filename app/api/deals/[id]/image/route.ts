@@ -31,14 +31,7 @@ import { coverFor } from "@/lib/deal-cover";
 import { COVER_EDITION, coverSvg } from "@/lib/deal-cover-art";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import { dealPhotoPathOf } from "@/lib/storage-paths";
-
-const SIZE = { min: 48, max: 1280, defaultW: 800, defaultH: 450 };
-
-function clamp(raw: string | null, lo: number, hi: number, fallback: number): number {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(hi, Math.max(lo, Math.round(n)));
-}
+import { DEAL_IMAGE_FRAMES, nearestFrame } from "@/lib/image-frames";
 
 export async function GET(
   req: Request,
@@ -58,8 +51,10 @@ export async function GET(
   if (!deal) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const q = new URL(req.url).searchParams;
-  const width = clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW);
-  const height = clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH);
+  // The size is one its own callers ask for (`DEAL_IMAGE_FRAMES`,
+  // lib/image-frames; research pass 22): any other is the listed frame
+  // nearest it, where the route had drawn any size from 48 to 1280.
+  const { w: width, h: height } = nearestFrame(DEAL_IMAGE_FRAMES, q.get("w"), q.get("h"));
   const coverFallback = q.get("fallback") === "cover";
 
   // The deal's own photograph first — found in its memorandum on the first

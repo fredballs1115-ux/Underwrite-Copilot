@@ -10,6 +10,8 @@
 // a few at a time); a deal no geocoder could place, or with no address,
 // is counted and never guessed at.
 
+import { PIPELINE_MAP_PICTURE } from "@/lib/image-frames";
+
 export type LocationPrecision = "street" | "block" | "area";
 
 export interface MapPlace {
@@ -101,7 +103,8 @@ export function pinHtml(verdict: string | null, precision: LocationPrecision, se
 function cardBody(d: MapDeal): string {
   const call = d.verdict && PIN_LABEL[d.verdict] ? PIN_LABEL[d.verdict] : "Not screened";
   const figures = [d.price, d.figure].filter((x): x is string => !!x).map(escapeHtml).join(" · ");
-  const img = `/api/deals/${encodeURIComponent(d.id)}/image?w=96&amp;h=96&amp;fallback=cover`;
+  // The route's own frame for the card (lib/image-frames), twice its 48px.
+  const img = `/api/deals/${encodeURIComponent(d.id)}/image?w=${PIPELINE_MAP_PICTURE.w}&amp;h=${PIPELINE_MAP_PICTURE.h}&amp;fallback=cover`;
   return (
     `<img src="${img}" alt="" width="48" height="48" class="uc-maptip-img"/>` +
     `<div class="uc-maptip-body">` +

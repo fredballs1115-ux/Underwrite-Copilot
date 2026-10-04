@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DEAL_AVATAR } from "@/lib/image-frames";
 
 /**
  * A deal's building at avatar size (#435), wherever a list names deals: the
@@ -21,8 +22,10 @@ import { useState } from "react";
 export function DealAvatar({ dealId, dot, size = "sm" }: { dealId: string; dot?: string; size?: "sm" | "md" }) {
   const [gone, setGone] = useState(false);
   // "md" is a page's heading (#464: the deal's bridge, rent roll and
-  // valuations), a step up from a list's 32px.
-  const px = size === "md" ? 40 : 32;
+  // valuations), a step up from a list's 32px. The picture is asked at the
+  // route's own frame for the slot (lib/image-frames), twice its pixels.
+  const frame = DEAL_AVATAR[size];
+  const px = frame.w / 2;
   const box = size === "md" ? "h-10 w-10 rounded-lg" : "h-8 w-8 rounded-md";
   return (
     <span aria-hidden className={`relative shrink-0 ${size === "md" ? "h-10 w-10" : "h-8 w-8"}`}>
@@ -47,7 +50,7 @@ export function DealAvatar({ dealId, dot, size = "sm" }: { dealId: string; dot?:
         // eslint-disable-next-line @next/next/no-img-element -- the pipeline row's own proxied route, with its own cache headers
         <img
           data-deal-avatar="picture"
-          src={`/api/deals/${dealId}/image?w=${px * 2}&h=${px * 2}&fallback=cover`}
+          src={`/api/deals/${dealId}/image?w=${frame.w}&h=${frame.h}&fallback=cover`}
           alt=""
           width={px}
           height={px}

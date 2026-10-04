@@ -29,6 +29,7 @@
 // show one skyline twice, where their overheads tell the buildings apart.
 
 import { IMAGE_CREDIT } from "@/lib/imagery-plan";
+import { DEAL_BANNER, DEAL_CARD, DEAL_THUMB } from "@/lib/image-frames";
 import { isPreview } from "@/lib/photo-preview";
 import type { MarketPicture } from "@/lib/market-picture";
 
@@ -97,14 +98,15 @@ export interface BannerFrame {
 }
 
 /** The overhead's frame at card size: 16:9, twice a 320px column for a
- *  sharp picture on a dense screen. */
-export const BANNER: BannerFrame = { w: 640, h: 360 };
+ *  sharp picture on a dense screen. Each frame here is lib/image-frames' —
+ *  the aerial route draws those frames and no others. */
+export const BANNER: BannerFrame = DEAL_BANNER;
 
 /** The pipeline's cards (#428): 16:10, twice a 360px card. */
-export const CARD: BannerFrame = { w: 720, h: 450 };
+export const CARD: BannerFrame = DEAL_CARD;
 
 /** A list row's thumbnail (#442): square, three times a phone's 56px slot. */
-export const THUMB: BannerFrame = { w: 168, h: 168 };
+export const THUMB: BannerFrame = DEAL_THUMB;
 
 /** The market photograph a card leads with before anything has loaded: its
  *  first source, a pending memorandum photograph aside (that one is asked

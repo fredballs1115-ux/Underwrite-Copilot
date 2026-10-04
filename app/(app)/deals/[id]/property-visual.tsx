@@ -16,6 +16,7 @@ import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
 import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 import { previewStyle } from "@/lib/photo-preview";
+import { DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER } from "@/lib/image-frames";
 import {
   headerPhotoSizes,
   mosaicTileSizes,
@@ -114,12 +115,14 @@ import {
  *  as `g1`, `g2`… (#448). */
 type View = "photo" | "street" | "market" | "satellite" | "aerial" | "flood" | "map" | `g${number}`;
 
-const AERIAL = { w: 1280, h: 576 }; // the route's max width
+/** The overhead views' frame, and the overheads' in the full-screen viewer:
+ *  lib/image-frames' own, the frames the aerial route draws (research pass
+ *  22), so this page and its route cannot drift apart. */
+const AERIAL = DEAL_AERIAL_VIEW;
+const VIEWER = DEAL_AERIAL_VIEWER;
 /** The Flood view's crop of the deal's flood frame (#472): the view's own
  *  16:9, so nothing the key describes is cut away by the box. */
 const FLOOD_VIEW = { w: 1280, h: 720 };
-/** The overheads' frame in the full-screen viewer: the route's width, 4:3. */
-const VIEWER = { w: 1280, h: 960 };
 
 /** Every view's frame, read against the deal header it sits in (#433): 16:9
  *  on a phone, a wider band where the header stacks at a tablet's width (so

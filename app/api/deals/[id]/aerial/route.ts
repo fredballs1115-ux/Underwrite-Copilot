@@ -7,6 +7,11 @@
 // conditional on someone buying a Google key.
 //
 // For "whichever real picture we can get", use /image instead.
+//
+// The size is one its own pages ask for (`DEAL_AERIAL_FRAMES`,
+// lib/image-frames; research pass 22): any other width and height is the
+// listed frame nearest it. Each size was a USGS export and a sharp pass of
+// its own, and the route took any width and height from 48 to 1280.
 
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
@@ -18,8 +23,8 @@ import {
   fetchOneImage,
   type ImageSource,
 } from "@/lib/imagery";
+import { DEAL_AERIAL_FRAMES, nearestFrame } from "@/lib/image-frames";
 
-const SIZE = { min: 48, max: 1280, defaultW: 800, defaultH: 450 };
 /** z12 is a metro, z20 frames one building; outside that it is never useful. */
 const ZOOM = { min: 12, max: 20 };
 
@@ -54,9 +59,10 @@ export async function GET(
     q.get("src") ?? ""
   ] as ImageSource | undefined;
 
+  const frame = nearestFrame(DEAL_AERIAL_FRAMES, q.get("w"), q.get("h"));
   const size = {
-    width: clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW),
-    height: clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH),
+    width: frame.w,
+    height: frame.h,
     // Zoom defaults per source AND per the pixel width requested
     // (lib/imagery-plan frameZoom), so the frame covers the same ground
     // whether it is a 96px thumbnail or a 1280px hero.
