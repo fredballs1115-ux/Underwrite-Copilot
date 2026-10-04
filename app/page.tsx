@@ -55,8 +55,12 @@ const RULES = ruleCounts();
 const RULES_PHRASE =
   RULES.sourced === RULES.all ? `${RULES.all} source-linked` : `${RULES.all}, ${RULES.sourced} of them source-linked`;
 // The sample deal's legal read through the REAL rules engine — feeds the
-// walkthrough widget's Regulation block.
-const LEGAL = sampleLegal();
+// walkthrough widget's Regulation block. Read for the day the page renders
+// (the page is ISR), since a rule's date is marked stale past the research
+// rule's limit (lib/research-age) — never on the day the process started.
+function legalToday() {
+  return sampleLegal(new Date().toISOString().slice(0, 10));
+}
 // Deliberately FOCUSED coverage (per direction): FIFTEEN markets, full stop
 // — the DMV core (one market, four jurisdiction entries) + the rest of the
 // Mid-Atlantic + the biggest US markets. Research and website coverage stop
@@ -516,6 +520,7 @@ function PeopleStrip({ photos }: { photos: PhotoSlot[] }) {
 
 export default function Home() {
   const photos = photosOnDisk();
+  const legal = legalToday();
   return (
     <div className="flex flex-1 flex-col">
       <script
@@ -821,7 +826,7 @@ export default function Home() {
               </Link>
             </Reveal>
             <Reveal delay={120}>
-              <DemoTabs legal={LEGAL} />
+              <DemoTabs legal={legal} />
             </Reveal>
           </div>
         </section>

@@ -145,11 +145,17 @@ export function LeaderboardTable({
   rows,
   ranked,
   heldOpen,
+  stale = null,
 }: {
   sector: string;
   rows: readonly LeaderRow[];
   ranked: number;
   heldOpen: readonly string[];
+  /** past the research rule's limit (lib/research-age), the day the
+   *  research was read with its age and the stale mark — "research read Aug
+   *  25, 2026 (181 days old, stale)" — said under the heading; the figures
+   *  and their ranks still show. Null while the research is current. */
+  stale?: string | null;
 }) {
   if (rows.length === 0 && heldOpen.length === 0) return null;
   const label = LABEL[sector] ?? sector;
@@ -175,6 +181,11 @@ export function LeaderboardTable({
           {`${ranked} figures ranked tightest to loosest; each figure's own period beside it`}
         </span>
       </div>
+      {stale && (
+        <p className="mt-0.5 text-[11px] text-caution" data-qa="research-stale">
+          {stale}
+        </p>
+      )}
       <div className="mt-2 overflow-x-auto">
         <table className="w-full min-w-[440px] text-left text-sm">
           <thead>

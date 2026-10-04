@@ -971,6 +971,81 @@ describe("the tracker inside the model's checks", () => {
   });
 });
 
+// ── The tracker ages by the research rule (lib/research-age) ──────────────
+// The snapshot was read Aug 25, 2026: current through Feb 21, 2027, its
+// 180th day, and stale from Feb 22. Past it, its figures are still shown,
+// named stale with their age, and the model is held to none of them. The
+// feeds here stay the fixture's, read on their own day; only the check's
+// clock moves.
+describe("a stale tracker read is named stale and held to nothing", () => {
+  const LAST_CURRENT = new Date("2027-02-21T12:00:00Z");
+  const FIRST_STALE = new Date("2027-02-22T12:00:00Z");
+  const office = { ...base, assetClass: "office", inputs: { ...base.inputs, vacancyPct: 0.1 }, tracker: trackerFor("dc", "office") };
+
+  it("an office's vacancy is held to the tracker through Feb 21, and beside it, not held, from Feb 22", () => {
+    const before = check({ ...office, now: LAST_CURRENT }, "vacancy")!;
+    expect(before.tone).toBe("tighter");
+    expect(before.read).toContain("Q2 2026 (read Aug 25, 2026) — a research print, not a feed. The building would run 11.3 points tighter");
+    const after = check({ ...office, now: FIRST_STALE }, "vacancy")!;
+    expect(after.tone).toBe("stale");
+    expect(after.toneLabel).toBe("beside stale research");
+    expect(after.read).toBe(
+      "The model holds 10.0% vacancy. Office vacancy reads 21.3–22.2% on the research tracker: Colliers (21.3%) and CBRE (22.2%), the District, Q2 2026 (read Aug 25, 2026; 181 days old, stale) — a research print, not a feed. That research is 181 days old, past the 180 days the site holds research current, so the model is not held to it; its vacancy sits 11.3 points under its low end.",
+    );
+    expect(after.read).not.toContain("tighter than");
+    // The figures stay, each saying it is stale.
+    expect(after.published.map((p) => [p.value, p.text])).toEqual([
+      [21.3, "21.3% (Q2 2026; read Aug 25, 2026, 181 days old, stale)"],
+      [22.2, "22.2% (Q2 2026; read Aug 25, 2026, 181 days old, stale)"],
+    ]);
+  });
+
+  it("a narrower stock and a stale read say both reasons", () => {
+    const nova = { ...base, assetClass: "industrial", metro: { id: "nova", name: "Northern Virginia" }, tracker: trackerFor("nova", "industrial") };
+    const c = check({ ...nova, inputs: { ...base.inputs, vacancyPct: 0.06 }, now: FIRST_STALE }, "vacancy")!;
+    expect(c.tone).toBe("stale");
+    expect(c.read).toContain(
+      "That figure is for small-bay space, not the industrial market as a whole, and the research is 181 days old, past the 180 days the site holds research current, so the model is not held to it; its vacancy sits 1.0 point over its high end.",
+    );
+  });
+
+  it("an apartment deal's survey stays the anchor, and the tracker beside it is named stale", () => {
+    const apt = { ...base, tracker: trackerFor("dc", "multifamily") };
+    expect(check({ ...apt, now: LAST_CURRENT }, "vacancy")!.read).toContain("year-end 2025 (read Aug 25, 2026) — research, shown beside");
+    const c = check({ ...apt, now: FIRST_STALE }, "vacancy")!;
+    expect(c.tone).toBe("inside");
+    expect(c.read).toContain(
+      "The research tracker's apartment vacancy reads 5.2%: publisher not recorded, the Washington DC region, year-end 2025 (read Aug 25, 2026; 181 days old, stale) — research, shown beside the Census figure rather than in its place.",
+    );
+  });
+
+  it("the exit is set against the 10-year alone once the tracker's cap range is stale, the range still shown", () => {
+    const apt = { ...base, tracker: trackerFor("dc", "multifamily") };
+    const before = check({ ...apt, now: LAST_CURRENT }, "exit_cap")!;
+    expect(before.read).toContain("and the exit cap sits 50 bps over its high end — the conservative direction for an exit.");
+    const after = check({ ...apt, now: FIRST_STALE }, "exit_cap")!;
+    expect(after.tone).toBe(before.tone);
+    expect(after.read).toContain(
+      "The research tracker's apartment cap range is 4.75–5.50% (a band on a deal mix leaning Class B / value-add): publisher not recorded, the Washington DC region, undated (read Aug 25, 2026; 181 days old, stale). That research is 181 days old, past the 180 days the site holds research current, so the exit is not held to it; the exit cap sits 50 bps over its high end.",
+    );
+    expect(after.read).not.toContain("the conservative direction for an exit");
+    expect(after.published.slice(1).map((p) => p.value)).toEqual([4.75, 5.5]);
+    // A compression the tracker would have named is not named on stale research.
+    const tight = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.045 }, now: FIRST_STALE }, "exit_cap")!;
+    expect(tight.read).not.toContain("cap compression on top of the spread read");
+    expect(tight.read).toContain("the exit cap sits 25 bps under its low end.");
+  });
+
+  it("the card draws the stale chip and the sentence", () => {
+    const html = renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read: modelVsMarket({ ...office, now: FIRST_STALE }) }));
+    const text = visibleText(html);
+    expect(text).toContain("beside stale research");
+    expect(text).toContain("(read Aug 25, 2026; 181 days old, stale)");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
 // ── A deal outside the covered metros: the state's annual vacancy ───────────
 describe("a deal outside the covered metros anchors its vacancy check on the state's annual figure, and says so", () => {
   const paRates = readMetroRates("state:PA", [{ series_id: "PARVAC", obs_date: "2025-01-01", value: 6.6 }], FIXTURE_NOW);

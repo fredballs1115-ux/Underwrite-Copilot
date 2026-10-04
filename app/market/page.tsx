@@ -49,7 +49,8 @@ import {
   type SnapBlock,
   type Standing,
 } from "@/lib/sector-leaderboard";
-import { blockCitations, rentOf, rentText } from "@/lib/tracker-read";
+import { blockCitations, rentOf, rentText, snapshotAge, snapshotReadOn } from "@/lib/tracker-read";
+import { oldestDate, researchAge, staleMark } from "@/lib/research-age";
 import { SubmarketsPanel } from "./submarkets-panel";
 import { CoverageBoardCell, FigureCredits, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
 import { listSubmarkets } from "@/lib/market/store";
@@ -88,12 +89,16 @@ const SECTOR_LABEL: Record<string, string> = {
 const TRACKED_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
 function SectorSnapshotPanel({
   snapshot,
+  today,
   metroId,
   standings = {},
   national = [],
   metroRates = [],
 }: {
   snapshot: Record<string, unknown> | null;
+  /** the day the page is read (an ISO day): past the research rule's limit
+   *  the day the research was read is said with its age and marked stale */
+  today: string;
   metroId?: string;
   /** each tracked sector's standings (`sectorStandings`), read for the day */
   standings?: Record<string, Record<string, Standing>>;
@@ -110,9 +115,11 @@ function SectorSnapshotPanel({
     (e): e is [string, SnapBlock] => e[0] !== "as_of" && typeof e[1] === "object",
   );
   // The day the research sweep read the blocks — never the figures' own
-  // date, which each figure's credit line states.
-  const readOn =
-    typeof snapshot?.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(snapshot.as_of) ? snapshot.as_of : null;
+  // date, which each figure's credit line states — and, past the research
+  // rule's limit (lib/research-age), its age and the stale mark: the
+  // figures still show.
+  const readOn = snapshotReadOn(snapshot);
+  const stale = staleMark(snapshotAge(snapshot, today));
   return (
     <div>
       <p className="text-[11px] font-semibold uppercase tracking-wider text-muted">
@@ -120,6 +127,11 @@ function SectorSnapshotPanel({
         {readOn && (
           <span className="ml-1.5 font-normal normal-case tracking-normal">
             {`· research read ${datedLong(readOn)}`}
+            {stale && (
+              <span className="text-caution" data-qa="research-stale">
+                {` (${stale})`}
+              </span>
+            )}
           </span>
         )}
       </p>
@@ -414,6 +426,7 @@ async function MidAtlanticTable() {
     .filter((r) => r.price)
     .sort((a, b) => (a.price!.low ?? 0) - (b.price!.low ?? 0));
   if (priceRows.length === 0) return null;
+  const tableStale = staleMark(researchAge(priceRows[0].price!.as_of, todayIso()));
 
   const money = (n: number | null) => (n === null ? "—" : `$${Math.round(n / 1000)}k`);
   const range = (b: { low: number | null; high: number | null } | undefined) =>
@@ -430,7 +443,15 @@ async function MidAtlanticTable() {
           Mid-Atlantic 2–4 unit market
         </h2>
         <span className="text-[11px] text-muted">
-          {priceRows[0].price!.as_of} · Redfin public dataset
+          {`${priceRows[0].price!.as_of} · Redfin public dataset`}
+          {/* The month's figures are dated its last day; past the research
+              rule's limit (lib/research-age) the date says its age and that
+              it is stale — the deal page's rows say the same of these rows. */}
+          {tableStale && (
+            <span className="text-caution" data-qa="research-stale">
+              {` (${tableStale})`}
+            </span>
+          )}
         </span>
       </div>
       <div className="mt-3 overflow-x-auto">
@@ -695,6 +716,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
               sector_snapshot?: Record<string, unknown> | null;
             }).sector_snapshot ?? null
           }
+          today={todayIso()}
           metroId={active.id}
           standings={sectorStandings(TRACKED_SECTORS, todayIso())}
           national={national}
@@ -756,7 +778,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           Screen a deal in {active.name} →
         </Link>
 
-        <ExampleListings examples={examples} />
+        <ExampleListings examples={examples} today={todayIso()} />
       </div>
     </section>
   );
@@ -770,6 +792,33 @@ async function MetroExplorer({ selected }: { selected?: string }) {
 // the same news. Cells with no numeric read render as gaps and say why, so
 // the grid shows coverage honestly rather than implying completeness.
 const HEAT_SECTORS = TRACKED_SECTORS;
+
+/**
+ * The days the research sweep read the covered markets' snapshots, as the
+ * boards say them — "read Aug 25, 2026", or the span where they differ —
+ * never the figures' own date (each figure is a house's print of its own
+ * period, which the cell's title and the metro brief say); and, past the
+ * research rule's limit on `today` (lib/research-age), the oldest read's age
+ * and the stale mark. The coverage board and the sector leaderboard read
+ * this one helper.
+ */
+function snapshotsRead(today: string): { asOf: string; stale: string | null } {
+  const days = [
+    ...new Set(
+      (metrosSeed.metros ?? [])
+        .map((m) => snapshotReadOn((m as { sector_snapshot?: unknown }).sector_snapshot))
+        .filter((d): d is string => d !== null),
+    ),
+  ].sort();
+  const asOf =
+    days.length === 0
+      ? "undated"
+      : days.length === 1
+        ? `read ${datedLong(days[0])}`
+        : `read ${datedLong(days[0])} to ${datedLong(days[days.length - 1])}`;
+  const mark = staleMark(researchAge(oldestDate(days), today));
+  return { asOf, stale: mark ? (days.length > 1 ? `the oldest ${mark}` : mark) : null };
+}
 
 function SectorHeatGrid() {
   // Each market's standing per sector drives its cell: the figure and its own
@@ -794,22 +843,7 @@ function SectorHeatGrid() {
   const filled = cells.size;
   const rankedCells = [...cells.values()].filter((c) => c.t !== null).length;
   const total = metros.length * HEAT_SECTORS.length;
-  // The days the research sweep read the snapshots — one day, or the span
-  // where they differ. Never the figures' own date: each figure is a house's
-  // print of its own period, which the cell's title and the metro brief say.
-  const snapDates = [
-    ...new Set(
-      (metrosSeed.metros ?? [])
-        .map((m) => (m as { sector_snapshot?: { as_of?: unknown } | null }).sector_snapshot?.as_of)
-        .filter((d): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d)),
-    ),
-  ].sort();
-  const boardAsOf =
-    snapDates.length === 0
-      ? "undated"
-      : snapDates.length === 1
-        ? `read ${datedLong(snapDates[0])}`
-        : `read ${datedLong(snapDates[0])} to ${datedLong(snapDates[snapDates.length - 1])}`;
+  const { asOf: boardAsOf, stale: boardStale } = snapshotsRead(todayIso());
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -818,7 +852,13 @@ function SectorHeatGrid() {
           The whole board — vacancy by market and asset class
         </h2>
         <span className="text-[11px] text-muted">
-          {`Research ${boardAsOf} · ${filled} of ${total} cells carry a numeric read, ${rankedCells} of them ranked · shaded within each column, so office compares to office`}
+          {`Research ${boardAsOf}`}
+          {boardStale && (
+            <span className="text-caution" data-qa="research-stale">
+              {` (${boardStale})`}
+            </span>
+          )}
+          {` · ${filled} of ${total} cells carry a numeric read, ${rankedCells} of them ranked · shaded within each column, so office compares to office`}
         </span>
       </div>
       <div className="mt-3 overflow-x-auto">
@@ -963,6 +1003,9 @@ async function SectorLeaderboard({ sector }: { sector: string }) {
   // place it, read for today (lib/sector-leaderboard).
   const { rows, ranked, heldOpen } = sectorLeaderboard(sector, todayIso());
   if (rows.length === 0 && heldOpen.length === 0) return null;
+  // Past the research rule's limit the table still ranks and shows its
+  // figures, and says the day they were read, its age and that it is stale.
+  const research = snapshotsRead(todayIso());
   // The demand side, live: the same markets ranked by their payrolls in the
   // sector that fills this kind of building (all payrolls for apartments),
   // one cached read of that metric across the metros. A failed read leaves
@@ -978,7 +1021,13 @@ async function SectorLeaderboard({ sector }: { sector: string }) {
   }
   return (
     <div>
-      <LeaderboardTable sector={sector} rows={rows} ranked={ranked} heldOpen={heldOpen} />
+      <LeaderboardTable
+        sector={sector}
+        rows={rows}
+        ranked={ranked}
+        heldOpen={heldOpen}
+        stale={research.stale ? `research ${research.asOf} (${research.stale})` : null}
+      />
       {payrollMetric && payrolls.length > 0 && (
         <SectorJobsRank
           metric={payrollMetric}
@@ -1013,6 +1062,10 @@ function SectorExplorer({ selected }: { selected?: string }) {
     null;
   const verdict = doc.small_investor_verdict;
   const cycleStatus = doc.cycle_position?.status ?? "sourced";
+  // The day the sector's research was read, and past the research rule's
+  // limit (lib/research-age) its age and the stale mark beside it.
+  const docAsOf = typeof doc.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(doc.as_of) ? doc.as_of : null;
+  const docStale = staleMark(researchAge(docAsOf, todayIso()));
   const statusCls = (st: string | undefined) =>
     st === "verified"
       ? "bg-pass/10 text-pass"
@@ -1031,7 +1084,13 @@ function SectorExplorer({ selected }: { selected?: string }) {
             range or one figure. "Ranges, never single numbers" sat above
             6% and 6.2% (the research pass of 2026-10-01). */}
         <span className="text-[11px] text-muted">
-          {`${typeof doc.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(doc.as_of) ? `research read ${datedLong(doc.as_of)}` : asOfLabel(doc.as_of)} · each tier's cap as its source states it, a range or one figure`}
+          {docAsOf ? `research read ${datedLong(docAsOf)}` : asOfLabel(doc.as_of)}
+          {docStale && (
+            <span className="text-caution" data-qa="research-stale">
+              {` (${docStale})`}
+            </span>
+          )}
+          {" · each tier's cap as its source states it, a range or one figure"}
         </span>
       </div>
       <div className="mt-3 flex flex-wrap gap-1.5">

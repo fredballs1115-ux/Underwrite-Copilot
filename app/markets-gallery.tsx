@@ -1,13 +1,19 @@
 import Link from "next/link";
 import metrosSeed from "@/data/research/metros.json";
 import { metroView } from "@/lib/metro-imagery";
-import { MARKET_COUNT, metroFact } from "./markets-marquee";
+import { MARKET_COUNT, marketsResearch, metroFact } from "./markets-marquee";
 import { CityPhoto } from "./city-photo";
 import { OVERHEAD_GRID_CREDIT, galleryCredit, hasSkyline } from "@/lib/skyline";
 import { GalleryCreditText } from "./photo-credit";
 
 // Server-component module only: it pulls a research seed JSON, which must
 // never ride into a client bundle.
+
+/** Today as an ISO day, read outside the render — the homepage is ISR, so
+ *  the day is the render's, never the process's first. */
+function galleryToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
 
 /**
  * The covered markets, as real photographs of the actual places.
@@ -28,7 +34,7 @@ import { GalleryCreditText } from "./photo-credit";
  * content, the photograph is the context. That is also why the <img> sits
  * behind the text rather than above it.
  */
-export function MarketsGallery() {
+export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
   const items = (metrosSeed.metros ?? [])
     .map((m, i) => {
       const entry = m as { id: string; name: string; region?: string };
@@ -38,6 +44,7 @@ export function MarketsGallery() {
         name: entry.name,
         fact: fact?.text ?? entry.region ?? "covered market",
         cite: fact?.cite ?? null,
+        readOn: fact?.readOn ?? null,
         place: metroView(entry.id)?.place ?? null,
         dmv: entry.region === "DMV core",
       };
@@ -56,6 +63,14 @@ export function MarketsGallery() {
   // and Northern Virginia, itself several jurisdictions), so the line under
   // the heading says why there are more tiles than markets.
   const dmv = items.filter((m) => m.dmv).length;
+  // The tiles carry each figure's own period and never the day the research
+  // was read; past the research rule's limit (lib/research-age) that day is
+  // said once under the heading, with its age and the stale mark — the
+  // band's own reading (`marketsResearch`), so the two never disagree.
+  const research = marketsResearch(
+    items.map((m) => (m.cite ? { text: m.fact, cite: m.cite, readOn: m.readOn } : null)),
+    today,
+  );
 
   if (!items.length) return null;
 
@@ -73,6 +88,11 @@ export function MarketsGallery() {
           ? `${items.length} briefs, ${dmv} of them for the Washington area. Tap one to read it.`
           : "Tap one to read its brief."}
       </p>
+      {research.stale && research.span && (
+        <p className="mt-1 max-w-2xl text-xs text-caution" data-qa="research-stale">
+          {`Research ${research.span} (${research.stale}).`}
+        </p>
+      )}
 
       <ul className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
         {items.map((m) => (

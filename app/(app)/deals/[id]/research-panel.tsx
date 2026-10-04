@@ -12,11 +12,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import {
   asOfLabel,
   evaluateRules,
-  isStale,
   type Benchmark,
   type RegulatoryRule,
   type RuleEvaluation,
 } from "@/lib/research";
+import { researchAge, staleMark } from "@/lib/research-age";
 import {
   benchmarksForDeal,
   buildSubject,
@@ -190,29 +190,37 @@ const ANSWERABLE_IN_DEAL_FACTS = new Set([
   "owner_total_rental_units_in_state_lte",
 ]);
 
-function SourceLink({
+export function SourceLink({
   source,
   asOf,
   status,
+  today,
   yearEnded,
   readOn,
 }: {
   source: string | null;
   asOf: string;
   status: string;
+  /** the day the panel is read (an ISO day), for the research rule's age */
+  today: string;
   /** a figure that holds for a fiscal year (a fair market rent): its
    *  freshness is the year's — true once the year has ended — never the
-   *  180 days since it was read, which would call a year in force stale */
+   *  research rule's days since it was read, which would call a year in
+   *  force stale */
   yearEnded?: boolean;
   /** `asOf` is the day the research was read, not the figure's date (a
    *  research-tracker row, whose own period rides in its citation) */
   readOn?: boolean;
 }) {
   const meta = STATUS_META[status] ?? STATUS_META.sourced;
-  // A figure whose file states no date is undated — flagged in the stale
-  // tone, but never given a date it does not have.
-  const undated = !(typeof asOf === "string" && asOf.trim());
-  const stale = yearEnded === undefined ? undated || isStale(asOf) : yearEnded;
+  // The research rule (lib/research-age): past its limit the date is shown
+  // with its age and marked stale, never hidden. A figure whose file states
+  // no date is undated — flagged in the stale tone, but never given a date
+  // it does not have.
+  const age = researchAge(asOf, today);
+  const undated = age.asOf === null;
+  const stale = yearEnded === undefined ? undated || age.stale : yearEnded;
+  const dated = readOn ? `read ${asOf}` : asOfLabel(asOf);
   // Audit gate: a link the audit script has verified DEAD renders as plain
   // text — the user never gets handed a clickable 404. Unaudited links render
   // normally (never audited ≠ dead).
@@ -221,11 +229,11 @@ function SourceLink({
     <span className="inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
       <span className={`rounded px-1.5 py-px font-medium ${meta.cls}`}>{meta.label}</span>
       {stale && (
-        <span className="rounded bg-amber-500/10 px-1.5 py-px font-medium text-amber-600">
-          {yearEnded ? "year ended" : undated ? "undated" : `stale · ${asOf}`}
+        <span className="rounded bg-amber-500/10 px-1.5 py-px font-medium text-amber-600" data-qa="research-stale">
+          {yearEnded ? "year ended" : undated ? "undated" : `${dated} · ${staleMark(age)}`}
         </span>
       )}
-      {!stale && <span>{readOn ? `read ${asOf}` : asOfLabel(asOf)}</span>}
+      {!stale && <span>{dated}</span>}
       {source &&
         (audited === false ? (
           <span title={source}>source on file — link unavailable</span>
@@ -295,7 +303,8 @@ export async function ResearchPanel({
   /** the deal's asset class — same-sector benchmark rows sort first */
   assetClass?: string | null;
 }) {
-  // Today, for a fair market rent's year (ended or not) — read once here.
+  // Today, for a fair market rent's year (ended or not) and every research
+  // date's age (lib/research-age) — read once here.
   const today = fmrToday();
   const standings = sectorStandings(TRACKED_SECTORS, today);
   // The checked-in research layer, with the database's rows merged in — a
@@ -483,7 +492,7 @@ export async function ResearchPanel({
           </div>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             {leverage.label} — going-in cap {capPct}% vs {bench30.value}% (
-            {bench30.source}, {asOfLabel(bench30.asOf)}). The benchmark is an
+            {bench30.source}, {asOfLabel(bench30.asOf, bench30.live ? undefined : today)}). The benchmark is an
             owner-occupier rate; investor debt usually prices above it, so a
             thin spread here is thinner in practice.
           </p>
@@ -601,7 +610,7 @@ export async function ResearchPanel({
                   </p>
                 )}
                 <div className="mt-1.5">
-                  <SourceLink source={e.rule.source} asOf={e.rule.as_of} status={e.rule.status} />
+                  <SourceLink source={e.rule.source} asOf={e.rule.as_of} status={e.rule.status} today={today} />
                 </div>
               </li>
             );
@@ -627,7 +636,7 @@ export async function ResearchPanel({
                       {`${line.heading}: `}
                       <span className="font-mono tabular-nums">{line.figures}</span>
                     </span>
-                    <SourceLink source={line.head.source} asOf={line.head.as_of} status={line.head.status} yearEnded={line.ended} />
+                    <SourceLink source={line.head.source} asOf={line.head.as_of} status={line.head.status} today={today} yearEnded={line.ended} />
                   </li>
                 );
               }
@@ -666,7 +675,7 @@ export async function ResearchPanel({
                       </span>
                     )}
                   </span>
-                  <SourceLink source={b.source} asOf={b.as_of} status={b.status} readOn={!!b.cite} />
+                  <SourceLink source={b.source} asOf={b.as_of} status={b.status} today={today} readOn={!!b.cite} />
                 </li>
               );
             })}

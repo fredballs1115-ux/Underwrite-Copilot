@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   evaluateRules,
-  isStale,
   jurisdictionMatches,
   vsRange,
   type RegulatoryRule,
@@ -175,13 +174,8 @@ describe("evaluateRules — NY ETPA carve-out", () => {
   });
 });
 
-describe("staleness + ranges", () => {
-  it("flags >180 days", () => {
-    const today = new Date("2026-08-21");
-    expect(isStale("2026-07-16", today)).toBe(false);
-    expect(isStale("2025-12-01", today)).toBe(true);
-    expect(isStale("garbage", today)).toBe(true);
-  });
+describe("ranges", () => {
+  // A research date's age is lib/research-age's (research-age.test.ts).
   it("vsRange handles open-ended and null ranges", () => {
     expect(vsRange(500, 400, 600)).toBe("within");
     expect(vsRange(300, 400, 600)).toBe("below");

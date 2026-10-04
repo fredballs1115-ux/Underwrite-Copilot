@@ -12,6 +12,7 @@ import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import type { FirstSignal } from "@/lib/anthropic/types";
 import { capSpreadRead, leverageRead } from "@/lib/leverage";
 import { benchmark30 } from "@/lib/debt-index";
+import { fmrToday } from "@/lib/fmr";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { seedBenchmarks } from "@/lib/research-data";
@@ -324,7 +325,7 @@ export default async function ComparePage({
       {bench30 && cols.some((c) => c.leverage) && (
         <p className="text-xs leading-relaxed text-muted">
           Leverage row: each deal&apos;s going-in cap against the 30-yr fixed
-          ({bench30.value}%, {bench30.source}, {asOfLabel(bench30.asOf)}) — an
+          ({bench30.value}%, {bench30.source}, {asOfLabel(bench30.asOf, bench30.live ? undefined : fmrToday())}) — an
           owner-occupier benchmark; investor debt usually prices above it, so
           a thin spread here is thinner in practice.
         </p>

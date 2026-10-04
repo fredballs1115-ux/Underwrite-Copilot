@@ -5296,7 +5296,7 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
   // on Sep 17, the 10-year at 4.94% the same day; the sample's cap is 5.45%.
   const bench30 = { value: 6.95, asOf: "2026-09-17", source: "FRED · MORTGAGE30US", live: true };
   const tenYear = { id: "DGS10", short: "10-yr Treasury", pct: 4.94, asOf: "2026-09-17", kind: "treasury" as const };
-  const html = render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear }));
+  const html = render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear, today: "2026-09-21" }));
   const text = visibleText(html);
 
   it("reads the cap against the survey one-sided, dated and named as the series", () => {
@@ -5316,19 +5316,32 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
   it("the phrase the live-verify marker greps is in the markup a curl receives", () => {
     // The marker greps p_demo.html for "the 10-year Treasury (" — inside one
     // template literal, so React's <!-- --> separator never lands in it.
-    const served = renderToString(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear }));
+    const served = renderToString(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear, today: "2026-09-21" }));
     expect(served).toContain("the 10-year Treasury (");
   });
 
   it("the snapshot is named as the snapshot, and no 10-year means no second line", () => {
+    const snapshot = { value: 6.65, asOf: "2026-08-20", source: "FRED PMMS, the checked-in snapshot", live: false };
     const fallback = visibleText(render(React.createElement(SampleLeverageCard, {
       capPct: 5.45,
-      bench30: { value: 6.65, asOf: "2026-08-20", source: "FRED PMMS, the checked-in snapshot", live: false },
+      bench30: snapshot,
       tenYear: null,
+      today: "2026-09-21",
     })));
     expect(fallback).toContain("Negative leverage: going-in cap sits 120 bps below the 30-yr fixed");
     expect(fallback).toContain("30-yr fixed (FRED PMMS, the checked-in snapshot, as of 2026-08-20)");
     expect(fallback).not.toContain("10-year");
+    // The research rule (lib/research-age): the snapshot's week is current
+    // through its 180th day, Feb 16, 2027, and from Feb 17 it keeps its date
+    // with its age and the stale mark.
+    const card = (today: string) =>
+      visibleText(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30: snapshot, tenYear: null, today })));
+    expect(card("2027-02-16")).toContain("(FRED PMMS, the checked-in snapshot, as of 2026-08-20)");
+    expect(card("2027-02-17")).toContain("(FRED PMMS, the checked-in snapshot, as of 2026-08-20 (181 days old, stale))");
+    // A live survey keeps its own cadence's word, never the research rule's.
+    expect(visibleText(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear, today: "2027-06-01" })))).toContain(
+      "30-yr fixed (FRED · MORTGAGE30US, as of 2026-09-17)",
+    );
   });
 
   it("a stale survey says so beside its date, and the tone follows the spread", () => {
@@ -5336,6 +5349,7 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
       capPct: 7.9,
       bench30: { ...bench30, source: "FRED · MORTGAGE30US, stale" },
       tenYear,
+      today: "2026-09-21",
     })));
     expect(stale).toContain("Positive leverage at the benchmark: 95 bps above the 30-yr fixed");
     expect(stale).toContain("(FRED · MORTGAGE30US, stale, as of 2026-09-17)");
@@ -5344,8 +5358,8 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
   });
 
   it("renders nothing with no cap or no benchmark", () => {
-    expect(render(React.createElement(SampleLeverageCard, { capPct: null, bench30, tenYear }))).not.toContain("Leverage check");
-    expect(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30: null, tenYear }))).not.toContain("Leverage check");
+    expect(render(React.createElement(SampleLeverageCard, { capPct: null, bench30, tenYear, today: "2026-09-21" }))).not.toContain("Leverage check");
+    expect(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30: null, tenYear, today: "2026-09-21" }))).not.toContain("Leverage check");
   });
 
   it("reads clean and names everything", () => {

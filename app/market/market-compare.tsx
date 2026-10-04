@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { FMR_BEDS, fmrLabel, fmrWhen, type FmrBed } from "@/lib/fmr";
+import { researchAge, staleMark } from "@/lib/research-age";
 
 // Compact, serializable per-metro facts the server derives from the research
 // layer (metros.json) — this component only arranges them. Bars share ONE
@@ -49,6 +50,9 @@ export type CompareMetro = {
    *  never the figures' own date, which each cell's title states; null where
    *  the file states none */
   researchReadOn?: string | null;
+  /** the same day as an ISO day, for the research rule's age
+   *  (lib/research-age) — null where the file states none */
+  researchReadIso?: string | null;
 };
 
 const SECTOR_ROWS = ["office", "industrial", "multifamily", "retail"] as const;
@@ -78,10 +82,17 @@ function sectorCell(s: CompareSector | undefined): string {
 
 /** The days the research was read for the two metros, said once where they
  *  agree — the day read, never the figures' own period, which is each
- *  house's print's and rides in each cell's title. */
-function researchDates(a: CompareMetro, b: CompareMetro): string {
-  const da = a.researchReadOn ?? null;
-  const db = b.researchReadOn ?? null;
+ *  house's print's and rides in each cell's title — and, past the research
+ *  rule's limit on `today`, each day's age and the stale mark
+ *  (lib/research-age): the figures still show, said as stale. */
+function researchDates(a: CompareMetro, b: CompareMetro, today?: string): string {
+  const said = (m: CompareMetro): string | null => {
+    if (!m.researchReadOn) return null;
+    const mark = today ? staleMark(researchAge(m.researchReadIso ?? null, today)) : null;
+    return `${m.researchReadOn}${mark ? ` (${mark})` : ""}`;
+  };
+  const da = said(a);
+  const db = said(b);
   if (da && db && da !== db) return `research read ${da} (${a.name}) and ${db} (${b.name})`;
   const d = da ?? db;
   return d ? `research read ${d}` : "research undated";
@@ -236,7 +247,7 @@ export function MarketCompare({ metros, today }: { metros: CompareMetro[]; today
       {(a.sectors || b.sectors) && (
         <div className="mt-4 overflow-x-auto">
           <p className="text-[10px] uppercase tracking-wide text-muted">
-            {`Asset-type read · vacancy, asking rent, cap where sourced, each with its own period · ${researchDates(a, b)}`}
+            {`Asset-type read · vacancy, asking rent, cap where sourced, each with its own period · ${researchDates(a, b, today)}`}
           </p>
           <table className="mt-1.5 w-full min-w-[28rem] text-left text-[11px]">
             <thead>

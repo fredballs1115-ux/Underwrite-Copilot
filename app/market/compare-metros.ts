@@ -2,7 +2,7 @@ import metrosSeed from "@/data/research/metros.json";
 import { FMR_BEDS, fmrOf } from "@/lib/fmr";
 import { compsFeedState } from "@/lib/public-comps/core";
 import { datedLong } from "@/lib/debt-index";
-import { blockCitations, figuresTitle, rentOf, rentText } from "@/lib/tracker-read";
+import { blockCitations, figuresTitle, rentOf, rentText, snapshotReadOn } from "@/lib/tracker-read";
 import { sharedAreaFor } from "@/lib/sector-leaderboard";
 import type { CompareMetro, CompareSector } from "./market-compare";
 
@@ -27,8 +27,9 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
   // (lib/tracker-read), never the day the research was read.
   const snap = (m as { sector_snapshot?: Record<string, unknown> | null })
     .sector_snapshot;
-  // The day the research sweep read the snapshot, said as that.
-  const snapAsOf = typeof snap?.as_of === "string" && /^\d{4}-\d{2}-\d{2}$/.test(snap.as_of) ? snap.as_of : null;
+  // The day the research sweep read the snapshot, said as that — and kept
+  // as an ISO day for the research rule's age (lib/research-age).
+  const snapAsOf = snapshotReadOn(snap);
   let sectors: CompareMetro["sectors"];
   if (snap) {
     sectors = {};
@@ -90,6 +91,7 @@ export const COMPARE_METROS: CompareMetro[] = (metrosSeed.metros ?? []).map((m) 
     sectors,
     ruleCount: ((m as { rule_ids?: string[] }).rule_ids ?? []).length,
     researchReadOn: snapAsOf ? datedLong(snapAsOf) : null,
+    researchReadIso: snapAsOf,
     // Live only where the provider registry runs the feed, never merely
     // because the research file names one (Washington's is documented, not
     // wired); none where the file names no source at all.

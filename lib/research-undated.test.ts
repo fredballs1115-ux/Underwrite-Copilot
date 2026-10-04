@@ -66,7 +66,7 @@ describe("a research figure with no date in its file is undated, never given one
   it("the leverage check reads an undated snapshot as undated, not 'as of' nothing", () => {
     const pmms = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed")!;
     const bench30 = benchmark30(null, pmms)!;
-    const text = visibleText(renderToStaticMarkup(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear: null })));
+    const text = visibleText(renderToStaticMarkup(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear: null, today: "2026-09-21" })));
     expect(text).toContain("30-yr fixed (FRED PMMS, the checked-in snapshot, undated)");
     expect(text).not.toMatch(/as of\s*\)/);
   });

@@ -21,6 +21,8 @@ const TONE_CLASS: Record<CheckTone, string> = {
   level: "bg-faint text-muted",
   stated: "bg-faint text-muted",
   aside: "bg-faint text-muted",
+  // Research past its limit (lib/research-age): shown, named, held to nothing.
+  stale: "bg-caution/10 text-caution",
 };
 
 export function ModelVsMarketCard({ read }: { read: ModelVsMarket | null }) {

@@ -6,7 +6,8 @@
 //      research layer, HEAD/GET-checked; dead → data_issues, revived →
 //      resolved. (The weekly link-audit workflow covers the JSON layer.)
 //   2. FRESHNESS — every feed has a cadence: rates (weekdays), intel digest +
-//      news stories (weekdays), benchmarks (180-day research rule), each
+//      news stories (weekdays), benchmarks (the 180-day research rule,
+//      lib/research-age's RESEARCH_STALE_DAYS), each
 //      wired ingest market (monthly re-runs). Overdue → data_issues; back on
 //      schedule → resolved. A cron that silently stopped becomes a visible
 //      issue the next night.
@@ -46,6 +47,9 @@ import { isPeriodMetric, withoutPeriodRows } from "../lib/period-rows.ts";
 // Today's date, as every Claude step is told it (lib/anthropic/today): a
 // "confirmed" means true today, never true of a period that has ended.
 import { todayLine } from "../lib/anthropic/today.ts";
+// The research rule's one limit, the pages' own (lib/research-age): a row
+// past it is what every surface marks stale, so it is what this counts.
+import { RESEARCH_STALE_DAYS } from "../lib/research-age.ts";
 
 const LINKS_PER_NIGHT = 25;
 const RECHECK_CLAIMS = 5;
@@ -206,21 +210,22 @@ await freshness("rates", "obs_date", 5, "rates", "is the weekday FRED cron runni
 await freshness("market_intel_digests", "digest_date", 4, "market_intel_digests", "is the weekday intel cron running?");
 await freshness("market_intel_items", "created_at", 4, "news_stories", "is the weekday intel cron running?");
 
-// Benchmarks: the 180-day research rule — count, don't just check the newest.
-// The year-ago rows a pull dates a year back on purpose (Realtor.com's prior
-// hotness rank) are always past it, and would keep this tripped every night.
+// Benchmarks: the research rule (RESEARCH_STALE_DAYS) — count, don't just
+// check the newest. The year-ago rows a pull dates a year back on purpose
+// (Realtor.com's prior hotness rank) are always past it, and would keep
+// this tripped every night.
 try {
   checksRun += 1;
   const { count, error } = await withoutYearAgoRows(
     supabase
       .from("benchmarks")
       .select("id", { count: "exact", head: true })
-      .lt("as_of", daysAgo(180).toISOString().slice(0, 10))
+      .lt("as_of", daysAgo(RESEARCH_STALE_DAYS).toISOString().slice(0, 10))
   );
   // A query that failed is not a count of zero: it resolves nothing.
   if (error) throw new Error(error.message);
   if ((count ?? 0) > 0) {
-    await openIssue("stale", "benchmarks", `${count} rows older than 180 days — refresh pass due`);
+    await openIssue("stale", "benchmarks", `${count} rows older than ${RESEARCH_STALE_DAYS} days — refresh pass due`);
   } else {
     await resolveIssue("stale", "benchmarks");
   }

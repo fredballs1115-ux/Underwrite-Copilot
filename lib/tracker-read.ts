@@ -1,5 +1,6 @@
 import metrosSeed from "@/data/research/metros.json";
 import { assetClassKey } from "@/lib/asset-words";
+import { researchAge, type ResearchAge } from "@/lib/research-age";
 
 /**
  * The research tracker's read for a deal's kind of building in its metro —
@@ -22,6 +23,11 @@ import { assetClassKey } from "@/lib/asset-words";
  * number), a figure the tracker does not carry is null, and a sector no
  * tracker covers (a hotel, a clinic, storage, land) reads none rather than
  * the nearest neighbour's.
+ *
+ * The snapshot ages by the research rule (lib/research-age, `snapshotAge`,
+ * `trackerAge`): past its limit from the day it was read, every surface
+ * still shows its figures, with that day, its age and the stale mark, and
+ * the model's read against the market holds nothing to them.
  */
 export type TrackerSector = "office" | "industrial" | "retail" | "multifamily";
 
@@ -389,6 +395,26 @@ export function figureSources(figs: readonly CitedFigure[], ok: (href: string) =
   }));
 }
 
+/** The day the research sweep read a metro's sector snapshot — its `as_of`,
+ *  an ISO day — or null where the snapshot states none (said "undated",
+ *  never given a day). The one reader every surface takes the day from. */
+export function snapshotReadOn(snapshot: unknown): string | null {
+  const asOf = snapshot && typeof snapshot === "object" ? (snapshot as { as_of?: unknown }).as_of : null;
+  return typeof asOf === "string" && /^\d{4}-\d{2}-\d{2}$/.test(asOf.trim()) ? asOf.trim() : null;
+}
+
+/** A snapshot's age on `today` by the research rule (lib/research-age). */
+export function snapshotAge(snapshot: unknown, today: string | Date): ResearchAge {
+  return researchAge(snapshotReadOn(snapshot), today);
+}
+
+/** A tracker read's age on `today` by the research rule: past the limit
+ *  from the day the snapshot was read, its figures are shown, named stale,
+ *  and held to nothing. */
+export function trackerAge(t: Pick<TrackerRead, "asOf">, today: string | Date): ResearchAge {
+  return researchAge(t.asOf, today);
+}
+
 /** The tracker's read for a metro and a class — null where either has none,
  *  or where the class or the deck's own class words (`deckWords`) name a
  *  building the tracker does not describe. */
@@ -411,7 +437,7 @@ export function trackerFor(
   const capLow = num(block.cap_rate_low_pct);
   const capHigh = num(block.cap_rate_high_pct) ?? capLow;
   if (vacancyLow === null && capLow === null) return null;
-  const asOf = typeof snap?.as_of === "string" && snap.as_of.trim() ? snap.as_of : null;
+  const asOf = snapshotReadOn(snap);
   return {
     sector,
     sectorLabel: SECTOR_LABEL[sector],

@@ -7,20 +7,24 @@ import { asOfLabel } from "@/lib/research";
  * every real deal page runs, on the same benchmark read (lib/debt-index):
  * the week's 30-year survey off the rates table, dated and named, the
  * research layer's snapshot only where the table has nothing and named as
- * the snapshot, and the cap's spread over today's 10-year beside it — a
- * fact with a date, no verdict. Pure, so the render test draws it on a
- * fixture and checks the phrase the live-verify marker greps against the
- * markup a curl receives.
+ * the snapshot — with its age and the stale mark past the research rule's
+ * limit (lib/research-age), as the deal page says it — and the cap's spread
+ * over today's 10-year beside it — a fact with a date, no verdict. Pure, so
+ * the render test draws it on a fixture and checks the phrase the
+ * live-verify marker greps against the markup a curl receives.
  */
 export function SampleLeverageCard({
   capPct,
   bench30,
   tenYear,
+  today,
 }: {
   /** the sample's going-in cap, percent */
   capPct: number | null;
   bench30: Benchmark30 | null;
   tenYear: DebtIndex | null;
+  /** the day the card is read (an ISO day), for the snapshot's age */
+  today: string;
 }) {
   const leverage = capPct != null && bench30 ? leverageRead(capPct, bench30.value) : null;
   if (!leverage || !bench30 || capPct == null) return null;
@@ -52,7 +56,7 @@ export function SampleLeverageCard({
         <span className="font-mono font-semibold tabular-nums">
           {bench30.value}%
         </span>{" "}
-        30-yr fixed ({bench30.source}, {asOfLabel(bench30.asOf)}).
+        30-yr fixed ({bench30.source}, {asOfLabel(bench30.asOf, bench30.live ? undefined : today)}).
       </p>
       {capSpread && tenYear && (
         <p className="mt-1 text-sm leading-relaxed text-muted">

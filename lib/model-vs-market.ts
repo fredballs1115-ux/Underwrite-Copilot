@@ -23,10 +23,12 @@ import {
   bandText,
   figureCitation,
   figureRead,
+  trackerAge,
   trackerFor,
   type FigureRead,
   type TrackerRead,
 } from "@/lib/tracker-read";
+import { staleMark, staleReason, type ResearchAge } from "@/lib/research-age";
 
 /**
  * The model's assumptions against the published figures — pure, no model
@@ -60,6 +62,12 @@ import {
  * today's 10-year beside the going-in cap's, so the assumption is named as
  * a widening (the conservative direction) or a compression (a bet on the
  * market rather than the building), with the 10-year where it is today.
+ *
+ * The research tracker ages by the research rule (lib/research-age): past
+ * its limit from the day the snapshot was read, a tracker figure is still
+ * shown, named stale with its age, and the model is held to nothing in it —
+ * a commercial deal's vacancy reads "beside stale research", and the exit
+ * cap is set against the 10-year alone.
  */
 export type CheckKey = "rent_growth" | "expense_growth" | "vacancy" | "exit_cap";
 
@@ -73,7 +81,8 @@ export type CheckTone =
   | "compresses"
   | "level"
   | "stated"
-  | "aside";
+  | "aside"
+  | "stale";
 
 export const TONE_LABEL: Record<CheckTone, string> = {
   ahead: "ahead of the published figures",
@@ -89,6 +98,7 @@ export const TONE_LABEL: Record<CheckTone, string> = {
   level: "spread held at the exit",
   stated: "spread stated",
   aside: "beside a narrower stock",
+  stale: "beside stale research",
 };
 
 export interface PublishedFigure {
@@ -175,10 +185,26 @@ export interface ModelVsMarketInput {
  * a county split), Q1 2026 (read Aug 25, 2026)" — a tracker figure's own
  * house, area and period as the file states them (lib/tracker-read's
  * `figureCitation`, "undated" where it states no period), then the day the
- * research sweep read it, said as the day read and never as the figure's.
+ * research sweep read it, said as the day read and never as the figure's —
+ * and, past the research rule's limit, its age and the stale mark ("read
+ * Aug 25, 2026; 181 days old, stale").
  */
-function trackerCite(t: TrackerRead, f: FigureRead): string {
-  return `${figureCitation(f)}${t.asOf ? ` (read ${datedLong(t.asOf)})` : ""}`;
+function trackerCite(t: TrackerRead, f: FigureRead, age: ResearchAge): string {
+  const mark = staleMark(age);
+  return `${figureCitation(f)}${t.asOf ? ` (read ${datedLong(t.asOf)}${mark ? `; ${mark}` : ""})` : ""}`;
+}
+
+/**
+ * Why the model is not held to a tracker figure, where it is not, as the
+ * opening of a sentence: the figure is for a narrower stock than the class
+ * (`slice`), or the research is past the research rule's limit — or both.
+ * Null where the model is held to it.
+ */
+function notHeldBecause(t: TrackerRead, f: FigureRead, age: ResearchAge): string | null {
+  const narrower = f.slice ? `That figure is for ${f.slice}, not the ${t.sectorLabel} market as a whole` : null;
+  const old = staleReason(age);
+  if (!narrower && !old) return null;
+  return [narrower, old ? `${narrower ? "and the research is" : "That research is"} ${old}` : null].filter(Boolean).join(", ");
 }
 
 function trackerPublisher(f: FigureRead): string {
@@ -193,16 +219,27 @@ const UNNAMED: FigureRead = figureRead(null, []);
 /**
  * A tracker figure as published figures — one for a point, the low and the
  * high for a band — each labelled with the area it covers where the file
- * states one (never "metro" by default) and dated by its own period.
+ * states one (never "metro" by default) and dated by its own period; past
+ * the research rule's limit, with the day it was read, its age and the
+ * stale mark beside the period.
  */
-function trackerFigures(t: TrackerRead, f: FigureRead, what: "vacancy" | "cap", low: number, high: number): PublishedFigure[] {
+function trackerFigures(
+  t: TrackerRead,
+  f: FigureRead,
+  what: "vacancy" | "cap",
+  low: number,
+  high: number,
+  age: ResearchAge,
+): PublishedFigure[] {
   const dp = what === "cap" ? 2 : 1;
   const label = `${initialCap(t.sectorLabel)} ${what} (research tracker)${f.area ? `, ${f.area}` : ""}`;
   const when = f.period ?? "undated";
+  const mark = staleMark(age);
+  const dated = mark && t.asOf ? `${when}; read ${datedLong(t.asOf)}, ${mark}` : when;
   const publisher = trackerPublisher(f);
   const figure = (value: number, end?: string): PublishedFigure => ({
     label: end ? `${label}, ${end}` : label,
-    text: `${value.toFixed(dp)}% (${when})`,
+    text: `${value.toFixed(dp)}% (${dated})`,
     value,
     asOf: when,
     publisher,
@@ -225,14 +262,18 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
   if (!t || t.sector === "multifamily" || t.vacancyLow === null) return null;
   const hi = t.vacancyHigh ?? t.vacancyLow;
   const f = t.vacancy ?? UNNAMED;
-  const published = trackerFigures(t, f, "vacancy", t.vacancyLow, hi);
+  const age = trackerAge(t, input.now);
+  const published = trackerFigures(t, f, "vacancy", t.vacancyLow, hi, age);
   const band = bandText(t.vacancyLow, hi);
   // A figure the file says is for a narrower stock than the class (`slice`:
   // Northern Virginia's small-bay space) is shown and named, and the model
   // is not held to it — capBandTail's rule for a cap. A bulk warehouse read
   // against a small-bay band was called a point looser than "the industrial
-  // stock the figure covers" (the audit of 2026-10-01).
-  if (f.slice) {
+  // stock the figure covers" (the audit of 2026-10-01). Nor is the model
+  // held to research past the research rule's limit (lib/research-age): its
+  // figure is shown, named stale, and the chip says so.
+  const notHeld = notHeldBecause(t, f, age);
+  if (notHeld) {
     const point = Math.abs(hi - t.vacancyLow) < SAME;
     const where =
       v > hi + SAME
@@ -242,16 +283,17 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
           : point
             ? "at it"
             : "inside it";
+    const tone: CheckTone = age.stale ? "stale" : "aside";
     return {
       key: "vacancy",
       title: "Stabilized vacancy",
       model: `${v.toFixed(1)}%`,
       modelSource: sourceWords(input.sources?.vacancyPct),
       published,
-      tone: "aside",
-      toneLabel: TONE_LABEL.aside,
+      tone,
+      toneLabel: TONE_LABEL[tone],
       scope: "metro",
-      read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f)} — a research print, not a feed. That figure is for ${f.slice}, not the ${t.sectorLabel} market as a whole, so the model is not held to it; its vacancy sits ${where}.`,
+      read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f, age)} — a research print, not a feed. ${notHeld}, so the model is not held to it; its vacancy sits ${where}.`,
     };
   }
   const tone: CheckTone = v < t.vacancyLow - SAME ? "tighter" : v > hi + SAME ? "looser" : "inside";
@@ -274,7 +316,7 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
-    read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f)} — a research print, not a feed. ${clause}`,
+    read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f, age)} — a research print, not a feed. ${clause}`,
   };
 }
 
@@ -521,9 +563,13 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
   // the anchor.
   const t = input.tracker && input.tracker.sector === "multifamily" && input.tracker.vacancyLow !== null ? input.tracker : null;
   const tf = t?.vacancy ?? UNNAMED;
-  const trackerTail = t
-    ? ` The research tracker's apartment vacancy reads ${bandText(t.vacancyLow!, t.vacancyHigh)}: ${trackerCite(t, tf)} — research, shown beside the Census figure rather than in its place.`
-    : "";
+  // Never the anchor, so never held to; past the research rule's limit its
+  // citation says how old it is and that it is stale.
+  const tAge = t ? trackerAge(t, input.now) : null;
+  const trackerTail =
+    t && tAge
+      ? ` The research tracker's apartment vacancy reads ${bandText(t.vacancyLow!, t.vacancyHigh)}: ${trackerCite(t, tf, tAge)} — research, shown beside the Census figure rather than in its place.`
+      : "";
   if (metro) {
     const when = periodLabel(metro.obsDate, metro.meta.cadence);
     published.push({
@@ -568,7 +614,7 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
     title: "Stabilized vacancy",
     model: `${v.toFixed(1)}%`,
     modelSource: sourceWords(input.sources?.vacancyPct),
-    published: t ? [...published, ...trackerFigures(t, tf, "vacancy", t.vacancyLow!, t.vacancyHigh ?? t.vacancyLow!)] : published,
+    published: t && tAge ? [...published, ...trackerFigures(t, tf, "vacancy", t.vacancyLow!, t.vacancyHigh ?? t.vacancyLow!, tAge)] : published,
     tone,
     toneLabel: TONE_LABEL[tone],
     scope: "metro",
@@ -585,7 +631,9 @@ function vacancyCheck(input: ModelVsMarketInput): ModelCheck | null {
  * market's own figure. A figure the file says is for a narrower stock than
  * the class (`slice` — Chicago's average is its Class B/C small buildings')
  * is shown and named, and the exit is not held to it: a Class A exit read
- * against it would call a sound assumption cap compression.
+ * against it would call a sound assumption cap compression. Nor is it held
+ * to research past the research rule's limit (lib/research-age): the range
+ * is shown, named stale with its age.
  */
 function capBandTail(input: ModelVsMarketInput, x: number): { figures: PublishedFigure[]; sentence: string } {
   const t = input.tracker;
@@ -594,19 +642,21 @@ function capBandTail(input: ModelVsMarketInput, x: number): { figures: Published
   const hi = t.capHigh ?? lo;
   const point = Math.abs(hi - lo) < 0.005;
   const f = t.cap ?? UNNAMED;
-  const figures = trackerFigures(t, f, "cap", lo, hi);
+  const age = trackerAge(t, input.now);
+  const figures = trackerFigures(t, f, "cap", lo, hi, age);
   const bps = (n: number): string => `${Math.round(n * 100)} bps`;
   const head = ` The research tracker's ${t.sectorLabel} cap ${point ? "is" : "range is"} ${bandText(lo, hi, 2)}${
     f.construct ? ` (${f.construct})` : ""
-  }: ${trackerCite(t, f)}`;
+  }: ${trackerCite(t, f, age)}`;
   const over = point ? "it" : "its high end";
   const under = point ? "it" : "its low end";
-  if (f.slice) {
+  const notHeld = notHeldBecause(t, f, age);
+  if (notHeld) {
     const where =
       x > hi + SAME ? `${bps(x - hi)} over ${over}` : x < lo - SAME ? `${bps(lo - x)} under ${under}` : point ? "at it" : "inside it";
     return {
       figures,
-      sentence: `${head}. That figure is for ${f.slice}, not the ${t.sectorLabel} market as a whole, so the exit is not held to it; the exit cap sits ${where}.`,
+      sentence: `${head}. ${notHeld}, so the exit is not held to it; the exit cap sits ${where}.`,
     };
   }
   const position =

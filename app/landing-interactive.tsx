@@ -290,8 +290,14 @@ function LegalBlock({ legal }: { legal: SampleLegal }) {
             <span className="text-[9px] uppercase tracking-wide text-muted">
               {rule.typeLabel}
             </span>
-            <span className="ml-auto rounded bg-emerald-500/10 px-1.5 py-px text-[9px] font-medium text-emerald-600">
-              {rule.status} · {rule.asOf}
+            {/* Past the research rule's limit the date keeps its place, with
+                its age and the stale mark (lib/research-age via sampleLegal). */}
+            <span
+              className={`ml-auto rounded px-1.5 py-px text-[9px] font-medium ${
+                rule.stale ? "bg-amber-500/10 text-amber-600" : "bg-emerald-500/10 text-emerald-600"
+              }`}
+            >
+              {`${rule.status} · ${rule.asOf}${rule.stale ? ` · ${rule.stale}` : ""}`}
             </span>
           </div>
           <p className="mt-1 text-[10px] leading-relaxed text-muted">

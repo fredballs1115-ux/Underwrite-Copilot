@@ -36,11 +36,23 @@ describe("examplesFor — a market's example listings, each in the market, dated
       expect(e.asOf, e.address).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(e.source, e.address).not.toBe("");
     }
-    const html = renderToStaticMarkup(React.createElement(ExampleListings, { examples: examplesFor("nova") }));
+    const html = renderToStaticMarkup(React.createElement(ExampleListings, { examples: examplesFor("nova"), today: "2026-10-04" }));
     const text = visibleText(html);
     expect(text).toContain("Bright MLS #VAPW2118338");
     expect(text).toContain("listed as of Jul 15, 2026 · source: snippet-confirmed across independent queries (Bright MLS via portal snippets)");
-    expect(renderToStaticMarkup(React.createElement(ExampleListings, { examples: [] }))).toBe("");
+    expect(renderToStaticMarkup(React.createElement(ExampleListings, { examples: [], today: "2026-10-04" }))).toBe("");
     expect(examplesFor("chicago")).toEqual([]);
+  });
+
+  it("says a listing's day with its age and the stale mark past the research rule's limit, never hiding it", () => {
+    // Seen Jul 15, 2026: current through its 180th day, Jan 11, 2027.
+    // The mark is a span of its own (the caution tone), so the text is read
+    // with its line breaks folded.
+    const on = (today: string) =>
+      visibleText(renderToStaticMarkup(React.createElement(ExampleListings, { examples: examplesFor("nova"), today }))).replace(/\s+/g, " ");
+    expect(on("2027-01-11")).toContain("listed as of Jul 15, 2026 · source:");
+    expect(on("2027-01-11")).not.toContain("stale");
+    expect(on("2027-01-12")).toContain("listed as of Jul 15, 2026 (181 days old, stale) · source:");
+    expect(on("2027-01-12")).toContain("Bright MLS #VAPW2118338");
   });
 });

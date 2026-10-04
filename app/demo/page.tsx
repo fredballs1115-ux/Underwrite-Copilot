@@ -6,16 +6,18 @@ import { FREE_DEALS_LINE, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
 import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct, screenYearOf } from "@/lib/criteria";
-import { benchmark30 } from "@/lib/debt-index";
+import { benchmark30, datedLong } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { metroFmr, seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
 import { fmrLabel, fmrToday, fmrWhen } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
 import { sectorStandings } from "@/lib/sector-leaderboard";
-import { blockCitations } from "@/lib/tracker-read";
+import { blockCitations, snapshotAge } from "@/lib/tracker-read";
+import { researchAge, staleMark } from "@/lib/research-age";
 import metrosSeed from "@/data/research/metros.json";
 import { sampleLegal } from "@/lib/sample-legal";
+import { LegalPanel } from "./legal-panel";
 import { scoreMandateFit } from "@/lib/mandate";
 import { findPriceMetric, inferStrategy, unitCountRow } from "@/lib/deal-strategy";
 import { DemoSections, type DemoData } from "./sections";
@@ -55,83 +57,10 @@ export const metadata: Metadata = {
   },
 };
 
-/** The deal page's Regulation & benchmarks panel for the sample deal —
- *  derived by lib/sample-legal through the real rules engine. Full-width
- *  presentation with provenance (source link, verified chip, as-of), the
- *  covered-market chip, and the dormancy explainer for event-keyed rules. */
-function LegalPanel() {
-  const legal = sampleLegal();
-  return (
-    <section className="mt-8 rounded-2xl border border-line bg-surface p-5 shadow-card">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold tracking-tight">
-          Regulation &amp; benchmarks
-        </h2>
-        <span className="text-[11px] text-muted">
-          assumes a natural-person buyer with no other units here
-        </span>
-      </div>
-      {legal.metroName && (
-        <Link
-          href={legal.metroId ? `/market?metro=${legal.metroId}` : "/market"}
-          className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-brand/30 bg-brand/5 px-2.5 py-1 text-[11px] font-medium text-brand outline-none transition-colors hover:bg-brand/10 focus-visible:ring-2 focus-visible:ring-brand/40"
-        >
-          <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-brand" />
-          Covered market: {legal.metroName} — open the market brief →
-        </Link>
-      )}
-      <p className="mt-3 text-sm text-muted">
-        {legal.screenedCount} rule{legal.screenedCount === 1 ? "" : "s"} on file for {legal.jurisdiction} ·{" "}
-        {legal.triggeredCount === 0
-          ? "none triggered by this deal's facts"
-          : `${legal.triggeredCount} triggered by this deal's facts`}
-      </p>
-      <ul className="mt-3 space-y-3">
-        {legal.rules.map((r) => (
-          <li key={r.typeLabel} className="rounded-lg border border-line/70 p-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded bg-line/60 px-1.5 py-px text-[11px] font-semibold text-muted">
-                {r.outcomeLabel}
-              </span>
-              <span className="text-[11px] uppercase tracking-wide text-muted">
-                {r.typeLabel}
-              </span>
-              <span className="ml-auto inline-flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
-                <span className="rounded bg-emerald-500/10 px-1.5 py-px font-medium text-emerald-600">
-                  {r.status}
-                </span>
-                <span>as of {r.asOf}</span>
-                {r.source && (
-                  <a
-                    href={r.source}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="underline decoration-dotted underline-offset-2 hover:text-ink"
-                  >
-                    source
-                  </a>
-                )}
-              </span>
-            </div>
-            <p className="mt-1.5 text-sm leading-relaxed">{r.effect}</p>
-            {r.dormantNote && (
-              <p className="mt-1 text-[12px] font-medium text-caution">
-                {r.dormantNote}
-              </p>
-            )}
-          </li>
-        ))}
-      </ul>
-      {legal.stateFact && (
-        <p className="mt-3 text-[12px] text-muted">
-          Plain-state fact carried in the verified rule text: {legal.stateFact}
-        </p>
-      )}
-    </section>
-  );
-}
-
 export default async function DemoPage() {
+  // Today, read once outside the render: a fair market rent's year, the
+  // rankings' year-old rule and every research date's age (lib/research-age).
+  const today = fmrToday();
   // Everything below is computed by the SAME functions the logged-in app
   // runs — evaluateBuyBox, scoreMandateFit, deriveUnderwriteInputs — over
   // the sample fixture, so the demo can never drift from the product.
@@ -251,12 +180,15 @@ export default async function DemoPage() {
   // The 2–4 unit median with the month it is for and its change, read from
   // the research file (Redfin's single-month median) rather than typed here.
   const phillyMedian = twoToFourMedian("philadelphia_pa");
+  // Past the research rule's limit from its month's last day, the month
+  // keeps its place with its age and the stale mark (lib/research-age).
+  const phillyMedianStale = phillyMedian ? staleMark(researchAge(phillyMedian.asOf, today)) : null;
   // HUD's two-bedroom fair market rent with the fiscal year its research
   // block names (lib/fmr), never a figure or a year typed on the page.
   const phillyFmr = metroFmr("philadelphia");
   const phillyFmr2br = phillyFmr?.rents["2br"] ?? null;
   // Past the fiscal year's last day the figure says its year ended.
-  const phillyFmrWhen = phillyFmr ? fmrWhen(phillyFmr, fmrToday()) : null;
+  const phillyFmrWhen = phillyFmr ? fmrWhen(phillyFmr, today) : null;
   const band = (metric: string): string | null => {
     const r = phillyRows.find((b) => b.metric === metric);
     if (!r || typeof r.low !== "number") return null;
@@ -269,6 +201,10 @@ export default async function DemoPage() {
   const phillySnapshot = (metrosSeed.metros ?? []).find((m) => m.id === "philadelphia")?.sector_snapshot as
     | Record<string, unknown>
     | undefined;
+  // The tracker's figures still show past the research rule's limit; the
+  // line then says the day they were read, their age and that they are stale.
+  const phillyTrackerAge = snapshotAge(phillySnapshot, today);
+  const phillyTrackerStale = staleMark(phillyTrackerAge);
   const credit = (sector: string, label: "Vacancy" | "Rent") => {
     const fig = blockCitations(phillySnapshot?.[sector]).find((f) => f.label === label);
     // The narrower stock a figure covers rides with its period ("Class A
@@ -292,7 +228,7 @@ export default async function DemoPage() {
   // with them. A figure the ranking cannot place (a spread of two reads,
   // undated, over a year old) says why rather than taking a rank; a sector
   // with no numeric vacancy (retail's held-open level) gets nothing.
-  const standings = sectorStandings(["office", "industrial", "multifamily", "retail"], fmrToday());
+  const standings = sectorStandings(["office", "industrial", "multifamily", "retail"], today);
   const phillyRank = (sector: string): string | null => {
     const s = standings[sector]?.["philadelphia"];
     if (!s) return null;
@@ -401,7 +337,7 @@ export default async function DemoPage() {
               same engine on the sample's real Philadelphia jurisdiction. The
               sample's one rule happens to be dormant on a purchase, and the
               panel says so instead of hiding it — that honesty IS the demo. */}
-          <LegalPanel />
+          <LegalPanel legal={sampleLegal(today)} />
 
           {/* Interactive: the challenger's real broker questions, revealed on
               click — the reader plays analyst before seeing the drafted ask. */}
@@ -545,6 +481,9 @@ export default async function DemoPage() {
                   <div>
                     <dt className="text-[11px] text-muted">
                       {`2–4 unit median, ${monthOf(phillyMedian.asOf)}${phillyMedian.yoy ? ` · ${phillyMedian.yoy} YoY` : ""}`}
+                      {phillyMedianStale && (
+                        <span className="text-caution" data-qa="research-stale">{` (${phillyMedianStale})`}</span>
+                      )}
                     </dt>
                     <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
                       {`$${phillyMedian.price.toLocaleString("en-US")}`}
@@ -557,7 +496,13 @@ export default async function DemoPage() {
               </p>
               {(phillySectors.office || phillySectors.multifamily) && (
                 <p className="mt-2 border-t border-line/60 pt-2 text-[11px] leading-relaxed text-muted">
-                  Philadelphia by asset type:{" "}
+                  Philadelphia by asset type
+                  {phillyTrackerStale && phillyTrackerAge.asOf && (
+                    <span className="text-caution" data-qa="research-stale">
+                      {` (research read ${datedLong(phillyTrackerAge.asOf)}; ${phillyTrackerStale})`}
+                    </span>
+                  )}
+                  {": "}
                   {phillySectors.office && (
                     <>
                       office vacancy{" "}
@@ -615,7 +560,7 @@ export default async function DemoPage() {
               )}
             </div>
           </div>
-          <SampleLeverageCard capPct={sampleCapPct} bench30={bench30} tenYear={debt.tenYear} />
+          <SampleLeverageCard capPct={sampleCapPct} bench30={bench30} tenYear={debt.tenYear} today={today} />
           <SampleDemandCard demand={demand} />
         </div>
       </section>

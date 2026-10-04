@@ -8,6 +8,7 @@
 // "no rules on file" / "possibly applies" — never silently drop the rule.
 
 import { abbrevState } from "@/lib/address";
+import { researchAge, staleMark } from "@/lib/research-age";
 
 export type ResearchStatus = "verified" | "sourced" | "unverified_not_found";
 
@@ -388,17 +389,14 @@ export function hoursSince(iso: string, now = new Date()): number {
 
 /** A research figure's date as a page says it: "as of 2026-08-21", or
  *  "undated" where its file states none — never a date the file does not
- *  carry (hard-coded fallback dates once stood in for a missing one). */
-export function asOfLabel(asOf: string | null | undefined): string {
+ *  carry (hard-coded fallback dates once stood in for a missing one). Handed
+ *  `today`, a date past the research rule's limit carries its age and the
+ *  stale mark (lib/research-age): "as of 2026-08-20 (181 days old, stale)". */
+export function asOfLabel(asOf: string | null | undefined, today?: string | Date): string {
   const d = typeof asOf === "string" ? asOf.trim() : "";
-  return d ? `as of ${d}` : "undated";
-}
-
-/** >180 days old = stale, per the build spec. */
-export function isStale(asOf: string, today = new Date()): boolean {
-  const t = Date.parse(asOf);
-  if (!Number.isFinite(t)) return true;
-  return (today.getTime() - t) / 86_400_000 > 180;
+  if (!d) return "undated";
+  const mark = today === undefined ? null : staleMark(researchAge(d, today));
+  return `as of ${d}${mark ? ` (${mark})` : ""}`;
 }
 
 /** Compare a deal value to a benchmark range: below/within/above, null-safe. */
