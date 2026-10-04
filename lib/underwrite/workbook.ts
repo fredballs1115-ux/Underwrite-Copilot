@@ -59,6 +59,10 @@ const FMT = {
 
 function sourceText(s: InputSource | undefined): string {
   if (!s) return "";
+  // A figure read from a document other than the OM (a rent roll) is said
+  // as that document's: the writer had put "OM" before every extracted
+  // figure, so a rent roll's occupancy read "OM — Rent roll actual …".
+  if (s.provenance === "extracted" && s.doc) return s.note.startsWith(s.doc) ? s.note : `${s.doc} — ${s.note}`;
   const tag = s.provenance === "extracted" ? "OM" : s.provenance === "derived" ? "Derived" : "Assumption";
   const page = s.provenance === "extracted" && s.page ? ` ${s.page}` : "";
   return `${tag}${page} — ${s.note}`;

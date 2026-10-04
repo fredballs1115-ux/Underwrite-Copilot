@@ -797,9 +797,13 @@ describe("the workbook's labels and colours say what their cells are", () => {
       },
     });
     const rr = (await book(rolled)).getWorksheet("Assumptions")!;
-    expect(String(rr.getCell(findRow(rr, 1, "General Vacancy & Credit Loss %"), 3).value)).toMatch(
-      /Rent roll actual — 90\.0% SF-weighted occupancy as of 2026-05-01 — the vacancy is what it leaves and carries no credit or collection loss$/,
+    // …and is the rent roll's, never the OM's: the SOURCE writer had put
+    // "OM" before every extracted figure, the rent roll's included.
+    expect(String(rr.getCell(findRow(rr, 1, "General Vacancy & Credit Loss %"), 3).value)).toBe(
+      "Rent roll actual — 90.0% SF-weighted occupancy as of 2026-05-01 — the vacancy is what it leaves and carries no credit or collection loss",
     );
+    expect(rolled.sources.rsf?.doc).toBe("Rent roll");
+    expect(String(rr.getCell(findRow(rr, 1, "Rentable SF"), 3).value)).toBe("Rent roll total SF (as of 2026-05-01)");
     // A class default is an allowance, not a reading of the building: it
     // claims nothing about credit loss either way.
     const fallback = (await book(model)).getWorksheet("Assumptions")!;

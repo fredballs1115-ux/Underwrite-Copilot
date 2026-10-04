@@ -95,6 +95,9 @@ export interface InputSource {
   note: string;
   /** OM page, ONLY when the extraction metric actually carried one */
   page?: string;
+  /** the document an extracted figure was read from where it is not the
+   *  OM ("Rent roll"), so the SOURCE column never credits it to the OM */
+  doc?: string;
 }
 
 export interface WorkbookMeta {
@@ -476,8 +479,9 @@ export function deriveUnderwriteInputs(
     provenance: Provenance,
     note: string,
     page?: string,
+    doc?: string,
   ) => {
-    sources[key] = { provenance, note, page: page && page.trim() ? page : undefined };
+    sources[key] = { provenance, note, page: page && page.trim() ? page : undefined, ...(doc ? { doc } : {}) };
   };
 
   // ── Purchase price ─────────────────────────────────────────────────────
@@ -720,7 +724,7 @@ export function deriveUnderwriteInputs(
   const typicalSf = units != null && units > 0 && cd.sfPerUnit ? Math.round(units * cd.sfPerUnit) : null;
   const rsf = rrSf ?? (sfParsed && sfParsed > 100 ? Math.round(sfParsed) : (typicalSf ?? 100_000));
   if (rrSf != null) {
-    mark("rsf", "extracted", `Rent roll total SF${rrAsOf ? ` (as of ${rrAsOf})` : ""}`);
+    mark("rsf", "extracted", `Rent roll total SF${rrAsOf ? ` (as of ${rrAsOf})` : ""}`, undefined, "Rent roll");
   } else if (sfParsed && sfParsed > 100) {
     mark("rsf", "extracted", "OM building size", pageOf(sfMetric));
   } else if (typicalSf != null) {
@@ -825,6 +829,8 @@ export function deriveUnderwriteInputs(
       "vacancyPct",
       "extracted",
       `Rent roll actual — ${(rrOcc * 100).toFixed(1)}% SF-weighted occupancy${rrAsOf ? ` as of ${rrAsOf}` : ""} — ${noCreditLoss}`,
+      undefined,
+      "Rent roll",
     );
   } else if (occPct != null) {
     mark(
