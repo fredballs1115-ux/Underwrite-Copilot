@@ -6502,6 +6502,12 @@
         "Dover Delaware Green",
         "Dover Delaware downtown",
         "Dover Delaware Legislative Hall"
+      ],
+      "candidates": [
+        {
+          "file": "Dover Delaware.jpg",
+          "note": "Dover, DE — Tim Kiser ( w:User:Malepheasant ), CC BY-SA 2.5; credited \"Tim Kiser\", the name in the file page's Author field (zori probe_url run 37240141265). The chosen file, in lib/skyline.ts (skyline-sheet run 37237349944)."
+        }
       ]
     },
     {

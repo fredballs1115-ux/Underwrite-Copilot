@@ -924,6 +924,17 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Des Moines, IA",
     size: [2450, 1544],
   },
+  // Dover, DE: skyline-sheet run 37237349944 — an article's lead, a downtown street of brick and painted shop fronts with awnings in winter sun under a blue sky, the card keeping the whole frame and the 21:9 trimming only the edge building's cornice and the trees' crowns, the parked cars under the words; over a race-day crowd at the speedway, a highway from an overpass and a highway's direction sign.
+  // The runner printed the author as "Tim Kiser ( w:User:Malepheasant )", and the file page's own Author field is the same, a name and his Wikipedia user page, with no attribution template, and its description names the street, West Loockerman Street, on Dec 30, 2006 (zori probe_url run 37240141265); the credit is the name in it, as Duluth's is.
+  "cbsa:20100": {
+    file: "Dover Delaware.jpg",
+    place: "West Loockerman Street's shops in downtown Dover, in winter sun under a blue sky",
+    credit: "Tim Kiser",
+    license: "CC BY-SA 2.5",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.5",
+    name: "Dover, DE",
+    size: [2624, 1640],
+  },
   // Duluth, MN: skyline-sheet run 36818844258 — the lift bridge the city is known by, at dusk, its truss across the frame, sharp and whole at the top in both crops; over a drone frame of the canal's piers and the bridge under a flat grey overcast, downtown above the freeway's direction signs, two black-and-white plates, sled dogs and a rock cut. The runner printed the author as "Mfield , Matthew Field, http://www.photography.mattfield.com"; the file page's own Author field is the same, with no attribution template and an empty permission (zori probe_url run 37234876098); the credit is the name in it.
   "cbsa:20260": {
     file: "Aerial lift bridge duluth mn.jpg",
