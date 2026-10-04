@@ -263,6 +263,20 @@ export function siteFlagsStale(
   return !!was && was !== now;
 }
 
+/**
+ * A stored lookup that has answered for the address the deal has now — the
+ * one a step reading the deal's flood zone takes (the screen's steps, Ask):
+ * null while it is pending, and where it was made for an address the deal
+ * has since changed from (`siteFlagsStale`), whose zone is the old
+ * building's.
+ */
+export function answeredSiteFlags(
+  flags: SiteFlagsResult | null | undefined,
+  addressLabel: string | null | undefined,
+): SiteFlagsResult | null {
+  return flags && flags.status !== "pending" && !siteFlagsStale(flags, addressLabel) ? flags : null;
+}
+
 export const SITE_FLAGS_NOTE =
   "Screening flags from federal datasets at the geocoded point — parcel boundaries can differ; verify zone membership and flood status before closing.";
 

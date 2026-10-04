@@ -1,5 +1,5 @@
 import "server-only";
-import { siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { withArticle } from "@/lib/article";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
@@ -207,9 +207,10 @@ async function readStoredFlags(
 }
 
 /** Answered, and for the address the deal has now: flags looked up before
- *  an edit are the old address's. */
+ *  an edit are the old address's (lib/site-flags/core, the rule Ask reads
+ *  its flood zone by too). */
 const flagsAnswered = ({ label, flags }: { label: string; flags: SiteFlagsResult | null }) =>
-  !!flags && flags.status !== "pending" && !siteFlagsStale(flags, label);
+  answeredSiteFlags(flags, label) !== null;
 
 /**
  * The site flags as stored, with no lookup — for a step that runs after the

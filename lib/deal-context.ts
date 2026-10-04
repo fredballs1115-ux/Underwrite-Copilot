@@ -55,7 +55,10 @@ function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind)
  * the deal page and the market check's figures read it (lib/deal-strategy
  * `inferStrategy`): a deal only the first signal calls a conversion is a
  * conversion in every step's context, never "Stabilized" in one and a plan
- * in the next. A caller with no signal (Ask) reads as before.
+ * in the next. Ask passes the signal and the answered flood zone too, as the
+ * pipeline does; it had passed neither, so a deal the signal calls a
+ * conversion read "Stabilized" there. A caller with no signal reads as
+ * before.
  */
 export function dealContextFor(
   extraction: ExtractionResult | null,

@@ -6,10 +6,11 @@ import { isPro } from "@/lib/billing";
 import { downloadOmPdf } from "@/lib/storage";
 import { askDealQuestion, dealContextFor } from "@/lib/anthropic/ask";
 import { ScreenError } from "@/lib/anthropic/failure";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { parseDealQa } from "@/lib/deals";
 import { locatedPage } from "@/lib/facts";
 import { omFingerprint } from "@/lib/om-fingerprint";
+import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
 
 export type AskState =
   | { error?: string; ok?: boolean; question?: string }
@@ -68,7 +69,7 @@ export async function askDeal(
 
   const { data: deal, error: readErr } = await supabase
     .from("deals")
-    .select("id, om_storage_path, is_sample, qa, extraction")
+    .select("id, om_storage_path, is_sample, qa, extraction, first_signal, site_flags, address")
     .eq("id", dealId)
     .maybeSingle();
   if (readErr) {
@@ -106,7 +107,21 @@ export async function askDeal(
   try {
     const pdf = await downloadOmPdf(deal.om_storage_path as string, { kind: "deal", dealId });
     const extraction = (deal.extraction as ExtractionResult | null) ?? null;
-    const result = await askDealQuestion(pdf, question, dealContextFor(extraction), {
+    // What the screen's steps are told, read as the pipeline reads it: the
+    // deal's kind with its first signal beside the extraction, so a deal the
+    // signal calls a conversion is one here too (it read "Stabilized"), and
+    // FEMA's zone where the lookup has answered for the address the deal
+    // has now (lib/site-flags/core `answeredSiteFlags`).
+    const flags = answeredSiteFlags(
+      (deal.site_flags as SiteFlagsResult | null) ?? null,
+      (deal.address as { label?: string } | null)?.label,
+    );
+    const context = dealContextFor(
+      extraction,
+      flags ? { flood: flags.flood } : null,
+      (deal.first_signal as FirstSignal | null | undefined) ?? null,
+    );
+    const result = await askDealQuestion(pdf, question, context, {
       dealId,
       // How the screen read this memorandum, off the row already in hand:
       // a question reads the figures the screen read, with no second read

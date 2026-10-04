@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  answeredSiteFlags,
   isHighRiskZone,
   opportunityZoneFrom,
   opportunityZoneRead,
@@ -309,6 +310,28 @@ describe("siteFlagsStale — flags looked up for an address the deal no longer h
     expect(siteFlagsStale(flags, " 100 Elm St, Dallas, TX 75201 ")).toBe(false);
     expect(siteFlagsStale({}, "5000 Main St, Frisco, TX 75034")).toBe(false);
     expect(siteFlagsStale(null, "5000 Main St, Frisco, TX 75034")).toBe(false);
+  });
+});
+
+describe("answeredSiteFlags — the lookup a step reads the flood zone from (the screen's steps and Ask)", () => {
+  const lookup = (label: string, status: SiteFlagsResult["status"] = "ok"): SiteFlagsResult => ({
+    status,
+    subject: { lat: 32.8, lng: -96.8, label },
+    tractGeoid: null,
+    opportunityZone: null,
+    flood: { zone: "AE", subtype: null, isHighRisk: true },
+    retrievedAt: "2026-10-01T00:00:00.000Z",
+    note: "",
+  });
+  it("takes a lookup that answered for the address the deal has now", () => {
+    const flags = lookup("100 Elm St, Dallas, TX 75201");
+    expect(answeredSiteFlags(flags, "100 Elm St, Dallas, TX 75201")).toBe(flags);
+    expect(answeredSiteFlags(lookup("100 Elm St, Dallas, TX 75201", "lookup_failed"), "100 Elm St, Dallas, TX 75201")).not.toBeNull();
+  });
+  it("takes none that is pending, made for another address, or absent", () => {
+    expect(answeredSiteFlags(lookup("100 Elm St, Dallas, TX 75201", "pending"), "100 Elm St, Dallas, TX 75201")).toBeNull();
+    expect(answeredSiteFlags(lookup("100 Elm St, Dallas, TX 75201"), "5000 Main St, Frisco, TX 75034")).toBeNull();
+    expect(answeredSiteFlags(null, "100 Elm St, Dallas, TX 75201")).toBeNull();
   });
 });
 

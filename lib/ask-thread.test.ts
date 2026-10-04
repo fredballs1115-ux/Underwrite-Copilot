@@ -34,15 +34,27 @@ const db = vi.hoisted(() => ({
     cites: [] as { page: string; note: string }[],
     pages: null as number | null,
   },
+  /** what the model call was handed: the deal's context and the options */
+  context: undefined as string | null | undefined,
+  opts: undefined as Record<string, unknown> | undefined,
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 vi.mock("@/lib/billing", () => ({ isPro: async () => true }));
 vi.mock("@/lib/storage", () => ({ downloadOmPdf: async () => OM_BYTES }));
-vi.mock("@/lib/anthropic/ask", () => ({
-  askDealQuestion: async () => db.answer,
-  dealContextFor: () => null,
-}));
+vi.mock("@/lib/anthropic/ask", async () => {
+  // The model call is faked; the deal's context is the real reader's, so a
+  // test reads what Ask is told.
+  const { dealContextFor } = await import("@/lib/deal-context");
+  return {
+    askDealQuestion: async (_pdf: Buffer, _q: string, context?: string | null, opts?: Record<string, unknown>) => {
+      db.context = context;
+      db.opts = opts;
+      return db.answer;
+    },
+    dealContextFor,
+  };
+});
 vi.mock("@/lib/supabase/server", () => ({
   createSupabaseServerClient: async () => ({
     auth: { getUser: async () => ({ data: { user: { id: OWNER } } }) },
@@ -84,6 +96,8 @@ beforeEach(() => {
   db.appended.length = 0;
   db.updates.length = 0;
   db.rpcFails = false;
+  db.context = undefined;
+  db.opts = undefined;
   db.answer = {
     answer: "The OM states a 4.25% coupon on p. 12.",
     cites: [
@@ -161,6 +175,64 @@ describe("askDeal — what an answer keeps", () => {
     const state = await ask("And the roof?");
     expect(state?.error).toBe("This memorandum reached its 25-question cap — the thread above should have it covered.");
     expect(db.appended).toEqual([]);
+  });
+});
+
+describe("askDeal — what Ask is told about the deal, as the screen's steps are (audit c66)", () => {
+  // An office whose own words name no plan — read alone, stabilized — and a
+  // first signal that calls it a conversion: the deal page and every screen
+  // step read a conversion, and Ask had read "Stabilized".
+  const extraction = {
+    dealName: "1400 Market",
+    assetClass: "office",
+    market: "Center City, Philadelphia, PA",
+    metrics: [
+      { label: "Asking price", value: "$20,000,000", flagged: false, page: "p. 3" },
+      { label: "In-place NOI", value: "$1,100,000", flagged: false, page: "p. 9" },
+    ],
+  };
+  const signal = {
+    dealName: "1400 Market",
+    assetClass: "office",
+    market: "Center City, Philadelphia, PA",
+    askPrice: "$20,000,000",
+    size: "182,400 SF",
+    goingInCap: "",
+    perUnit: "",
+    take: "An office-to-residential conversion — check the construction budget before the price.",
+  };
+  const ADDRESS = "1400 Market St, Philadelphia, PA 19102";
+  const flags = (label: string, status = "ok") => ({
+    status,
+    subject: { lat: 39.95, lng: -75.16, label },
+    tractGeoid: null,
+    opportunityZone: null,
+    flood: { zone: "AE", subtype: null, isHighRisk: true },
+    retrievedAt: "2026-10-01T00:00:00.000Z",
+    note: "",
+  });
+
+  it("reads the deal's kind with its first signal", async () => {
+    db.deal = { ...db.deal, extraction, first_signal: signal };
+    await ask("What does the construction budget cover?");
+    expect(db.context).toContain("Deal type: Conversion");
+    // Without the signal the same extraction reads as it did.
+    db.deal = { ...db.deal, first_signal: null };
+    await ask("What does the construction budget cover?");
+    expect(db.context).toContain("Deal type: Stabilized");
+  });
+
+  it("carries FEMA's zone where the lookup answered for the address the deal has now", async () => {
+    db.deal = { ...db.deal, extraction, first_signal: null, site_flags: flags(ADDRESS), address: { label: ADDRESS } };
+    await ask("Is it in a flood zone?");
+    expect(db.context).toContain("FEMA's flood map puts the building in Zone AE, a Special Flood Hazard Area");
+    // A lookup made for the address before an edit is the old building's,
+    // and one still pending has said nothing: neither is read.
+    for (const stale of [flags("500 Elm St, Philadelphia, PA 19103"), flags(ADDRESS, "pending")]) {
+      db.deal = { ...db.deal, site_flags: stale };
+      await ask("Is it in a flood zone?");
+      expect(db.context ?? "").not.toContain("Zone AE");
+    }
   });
 });
 
