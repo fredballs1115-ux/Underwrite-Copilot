@@ -200,26 +200,54 @@ export interface EquipmentUse {
   gear: string;
 }
 
-// A tower is read only with a word that makes it one — an office tower is
-// a building — and "telecom" or "wireless" only beside what they put on a
-// site; a sign and a solar array by their own names.
+// What a ground lease is FOR, by the gear's own name. A tower only with a
+// word that makes it one — an office tower is a building — and an antenna,
+// a carrier or "wireless" only beside a site or a tower: a carrier's
+// antennas sit on rooftops as often as on a tower, and an antenna licence a
+// building's owner keeps is the building's (the reader took "rooftop
+// antenna licenses are retained by the ground lessee" for a tower). A sign
+// and a solar array by their own names, and panels only as an array's or a
+// ground-mounted system's: rooftop panels are the building's.
+const TOWER = String.raw`\b(?:cell(?:ular)?|wireless|telecom(?:munications?)?|communications?|radio|broadcast|transmission|antenna|monopole|self[- ]support(?:ing)?|guyed|lattice|stealth)[\s-]+towers?\b|\bmonopoles?\b|\b(?:cell|antenna)[\s-]+sites?\b|\b(?:telecom(?:munications?)?|wireless)[\s-]+(?:sites?|ground\s+leases?)\b`;
+const BILLBOARD = String.raw`\bbillboards?\b|\boutdoor[\s-]+advertising\b|\badvertising\s+(?:signs?|structures?|displays?)\b`;
+const SOLAR = String.raw`\bsolar[\s-]+(?:panel[\s-]+)?(?:arrays?|farms?|installations?|projects?|facilit(?:y|ies)|plants?|leases?|energy|power|generation)\b|\bground[\s-]+mounted[\s-]+(?:solar|photovoltaic|pv)(?:[\s-]+panels?)?\b|\bphotovoltaic\b|\bpv\s+(?:arrays?|systems?|facilit(?:y|ies)|projects?)\b`;
+
 const EQUIPMENT_USES: readonly (EquipmentUse & { re: RegExp })[] = [
-  {
-    re: /\b(?:cell(?:ular)?|wireless|telecom(?:munications?)?|communications?|radio|broadcast|transmission|monopole|self[- ]support(?:ing)?|guyed|lattice|stealth)[\s-]+towers?\b|\bmonopoles?\b|\bcell[\s-]+sites?\b|\bantenna(?:s|e)?\b|\b(?:telecom(?:munications?)?|wireless)[\s-]+(?:sites?|carriers?|equipment|leases?|ground\s+leases?)\b/i,
-    what: "a wireless tower",
-    gear: "the tower and its equipment",
-  },
-  {
-    re: /\bbillboards?\b|\boutdoor[\s-]+advertising\b|\badvertising\s+(?:signs?|structures?|displays?)\b/i,
-    what: "a billboard",
-    gear: "the sign and its structure",
-  },
-  {
-    re: /\bsolar[\s-]+(?:arrays?|farms?|panels?|installations?|projects?|facilit(?:y|ies)|plants?|leases?|energy|power|generation)\b|\bphotovoltaic\b|\bpv\s+(?:arrays?|systems?|facilit(?:y|ies)|projects?)\b/i,
-    what: "a solar array",
-    gear: "the panels and their equipment",
-  },
+  { re: new RegExp(TOWER, "i"), what: "a wireless tower", gear: "the tower and its equipment" },
+  { re: new RegExp(BILLBOARD, "i"), what: "a billboard", gear: "the sign and its structure" },
+  { re: new RegExp(SOLAR, "i"), what: "a solar array", gear: "the panels and their equipment" },
 ];
+
+// Any of the gear, and a list of it ("billboards, cell towers or solar
+// arrays").
+const GEAR = String.raw`(?:${TOWER}|${BILLBOARD}|${SOLAR})`;
+const GEAR_LIST = String.raw`${GEAR}(?:\s*(?:,|\band\b|\bor\b|\bnor\b|\/)\s*(?:(?:any|a|an|the|other|new)\s+)*${GEAR})*`;
+// A lease that forbids the gear is no lease for it — "the lease prohibits
+// billboards and cell towers on the site", "no billboards … may be
+// erected", "may not erect a cell tower", "billboards are prohibited" —
+// struck before anything is read, the way lib/site-reports strikes "no
+// RECs". Only the words of a denial and of putting the gear up stand
+// between the denial and the gear, so "may not sublet the cell tower" is
+// still a tower's lease.
+const DENIED_BEFORE = new RegExp(
+  String.raw`\b(?:no|not|never|nor|without|prohibit(?:s|ed|ing)?|forbid(?:s|den|ding)?|bars?|barred|barring|preclude(?:s|d)?|exclud(?:e|es|ed|ing))\b(?:\s+(?:any|a|an|the|all|other|new|further|additional|future|erection|construction|installation|placement|siting|use|of|to|erect|install|build|place|construct|permit|allow|be))*\s+${GEAR_LIST}`,
+  "gi",
+);
+const DENIED_AFTER = new RegExp(
+  String.raw`${GEAR_LIST}\s*,?\s*(?:(?:is|are|will\s+be|shall\s+be|may\s+be|be|being)\s+)?(?:not\s+(?:permitted|allowed)|prohibited|forbidden|barred|excluded|precluded|disallowed)\b`,
+  "gi",
+);
+// Gear on a building is the building's, never the ground lease's use:
+// "rooftop solar array", "roof-mounted cell sites", "a solar array on the
+// roof".
+const ON_A_BUILDING_BEFORE = new RegExp(
+  String.raw`\b(?:roof[\s-]?tops?|roofs?|roof[\s-]+mounted|rooftop[\s-]+mounted|building[\s-]+mounted|wall[\s-]+mounted|fa[cç]ade[\s-]+mounted|penthouse)(?:\s+[\w-]+){0,2}?\s+${GEAR}`,
+  "gi",
+);
+const ON_A_BUILDING_AFTER = new RegExp(
+  String.raw`${GEAR}(?:\s+[\w-]+){0,3}?\s+(?:on|atop|on\s+top\s+of|mounted\s+on|across)\s+(?:the\s+|its\s+|a\s+|each\s+)?(?:building'?s?\s+)?(?:roofs?|roof[\s-]?tops?|buildings?|structure|fa[cç]ade|penthouse|parking\s+(?:deck|garage|structure))\b`,
+  "gi",
+);
 
 /**
  * The equipment a ground lease's tenant puts on the land — a wireless
@@ -234,7 +262,13 @@ export function groundLeaseEquipment(ex: ExtractionResult | null | undefined): E
   if (!ex) return null;
   const words = [ex.interest?.summary, ex.interest?.groundLease, ex.assetClass]
     .filter((w): w is string => typeof w === "string" && w.trim() !== "")
-    .join(" \n ");
+    .join(" \n ")
+    // A denial of the gear and gear on a building are struck first: what is
+    // left names what the ground lease is for, or nothing.
+    .replace(DENIED_BEFORE, " ")
+    .replace(DENIED_AFTER, " ")
+    .replace(ON_A_BUILDING_BEFORE, " ")
+    .replace(ON_A_BUILDING_AFTER, " ");
   const hit = EQUIPMENT_USES.find((u) => u.re.test(words));
   return hit ? { what: hit.what, gear: hit.gear } : null;
 }

@@ -1299,6 +1299,25 @@ describe("the cover says what is being sold, and what the model is and is not on
       "fallback",
     );
     expect(await labels(tower)).toEqual(Array(3).fill("Stabilized (the lessee's wireless tower)"));
+    // The land under an office building whose lessee keeps its rooftop
+    // antenna licenses is a building's leased fee: the three cells had read
+    // the lessee's wireless tower.
+    const office = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+        interest: {
+          kind: "leased_fee",
+          summary: "Sale of the fee interest in the land beneath a 12-story office building",
+          share: "",
+          groundLease: "Ground lease through 2080; rooftop antenna licenses are retained by the ground lessee",
+          loan: "",
+          page: "",
+        },
+      },
+      "fallback",
+    );
+    expect(await labels(office)).toEqual(Array(3).fill("Stabilized (the leaseholder's building)"));
     // A price that buys the building keeps the label as it stands.
     expect(await labels(sold("fee_simple"))).toEqual(Array(3).fill("Stabilized"));
   });

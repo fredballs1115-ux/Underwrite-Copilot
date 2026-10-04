@@ -164,6 +164,19 @@ describe("readSale — how the property is sold", () => {
     expect(statesStalkingHorse(ex([row("Stalking horse bid", "Not disclosed")], { method: "unknown" }))).toBe(true);
     expect(statesStalkingHorse(null)).toBe(false);
   });
+
+  // A row reading "TBD" is a stalking-horse process whose bid is not yet set:
+  // still one — higher bids can reopen the sale, and the letter of intent
+  // is refused on it — never read as "none" (the pass of 2026-10-04 asked).
+  it("a stalking horse to be determined is still one, its bid unpriced", () => {
+    for (const tbd of ["TBD", "tbd", "To be determined", "TBD — pending court approval"]) {
+      const e = ex([row("Stalking horse bid", tbd)], { method: "bankruptcy" });
+      expect(statesStalkingHorse(e), tbd).toBe(true);
+      const r = readSale(e, TODAY)!;
+      expect(r.stalkingHorse, tbd).toBeNull();
+      expect(r.stalkingHorseStated, tbd).toBe(tbd);
+    }
+  });
 });
 
 describe("the sale on every summary", () => {

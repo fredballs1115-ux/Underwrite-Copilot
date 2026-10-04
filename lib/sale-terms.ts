@@ -60,7 +60,9 @@ const STALKING = /\bstalking[- ]horse\b/i;
 // A stalking-horse row that says there is none, or says nothing: "None",
 // "No stalking horse", "N/A", "Not applicable", "Not stated", "—". Any other
 // words state one, priced or not ("$12,500,000", "In place — terms in the
-// data room", "Not disclosed").
+// data room", "Not disclosed"). "TBD" is left out of this list on purpose:
+// a stalking-horse process whose bid is not yet set is still one — higher
+// bids can reopen the sale, so the letter of intent is refused on it.
 const NO_STALKING = /^(?:none|no|nil|n\/?a|not\s+(?:applicable|stated))\b|^[-–—]?\.?$/i;
 const NO_RESERVE = /\bno\s+reserve\b|\babsolute\b|\bwithout\s+reserve\b|\bnone\b/i;
 const UNDISCLOSED = /\bundisclosed\b|\bnot\s+disclosed\b|\bconfidential\b|\bunpublished\b/i;

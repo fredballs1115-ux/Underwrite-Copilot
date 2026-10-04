@@ -124,7 +124,12 @@ const KEYED_TRAPS: Record<KeyedTrapList, string> = {
   cold_storage: COLD_STORAGE_TRAPS,
 };
 
-const CANNABIS_WORDS = /\b(?:cannabis|marijuana|dispensar(?:y|ies)|cultivation)\b/i;
+// The plant's own words. "Dispensary" and "cultivation" alone are a
+// pharmacy's and a farm's as often as a cannabis business's, and keyed the
+// list on both: a cannabis dispensary or cultivation names the plant
+// somewhere in the memorandum's words ("cannabis dispensary", "marijuana
+// cultivation", "adult-use", a hemp or THC tenant).
+const CANNABIS_WORDS = /\b(?:cannabis|marijuana|marihuana|thc|hemp|adult[\s-]use)\b/i;
 // A building made for one use, by its own name — "Temple" before a
 // university's name and "theater" before "district" are a neighbourhood's.
 const SPECIAL_USE = String.raw`(?:church(?:es)?|chapels?|cathedrals?|synagogues?|temples?(?!\s+univ)|mosques?|(?:houses?|places?)\s+of\s+worship|parish\s+halls?|rector(?:y|ies)|convents?|monaster(?:y|ies)|school(?:house)?s?|theat(?:er|re)s?(?!\s+district)|cinemas?|auditori(?:um|ums|a)|librar(?:y|ies)|armor(?:y|ies)|fire\s?(?:house|station)s?|lodge\s+halls?)`;

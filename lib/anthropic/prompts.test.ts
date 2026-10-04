@@ -411,7 +411,7 @@ describe("trap lists keyed on the memorandum's own words", () => {
   const tenant = (name: string) => ({ tenant: name, guarantor: "", leaseType: "NNN", landlordObligations: "", tenantRights: "", page: "" });
 
   it("keys each list on the memorandum's words, and nothing on an ordinary deal", () => {
-    expect(keyedTrapsFor(ex({ singleTenant: tenant("Green Leaf Dispensary LLC") }))).toEqual(["cannabis"]);
+    expect(keyedTrapsFor(ex({ assetClass: "Retail (cannabis dispensary)", singleTenant: tenant("Green Leaf Dispensary LLC") }))).toEqual(["cannabis"]);
     expect(keyedTrapsFor(ex({ assetClass: "Industrial (cannabis cultivation)" }))).toEqual(["cannabis"]);
     expect(keyedTrapsFor(ex({ assetClass: "Life Science / Lab" }))).toEqual(["lab"]);
     expect(keyedTrapsFor(ex({ assetClass: "Laboratory" }))).toEqual(["lab"]);
@@ -428,6 +428,31 @@ describe("trap lists keyed on the memorandum's own words", () => {
     expect(keyedTrapsFor(ex({ assetClass: "Industrial Outdoor Storage" }))).toEqual([]);
     expect(keyedTrapsFor(ex({ assetClass: "Garden apartments" }))).toEqual([]);
     expect(keyedTrapsFor(null)).toEqual([]);
+  });
+
+  // "Dispensary" and "cultivation" alone keyed the cannabis list: a
+  // pharmacy's dispensary, a farm's row-crop cultivation and a medical
+  // building's tenant were asked about federal law and a cannabis license.
+  // The list keys on the plant's own words now.
+  it("keys the cannabis list on cannabis words, never on a dispensary or a cultivation alone", () => {
+    for (const words of [
+      { singleTenant: tenant("Main Street Dispensary") },
+      { singleTenant: tenant("Green Leaf Dispensary LLC") },
+      { assetClass: "Medical office", tenants: [{ name: "Walgreens Pharmacy & Dispensary", role: "anchor", inSale: "yes", sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "" }] },
+      { assetClass: "Agricultural land", strategy: { kind: "unknown", summary: "Row-crop cultivation on 400 acres", capitalBudget: "", timeline: "" } },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(words)), JSON.stringify(words)).toEqual([]);
+    }
+    for (const words of [
+      { singleTenant: tenant("Green Leaf Cannabis Dispensary") },
+      { assetClass: "Industrial (marijuana cultivation)" },
+      { assetClass: "Industrial (marihuana processing)" },
+      { singleTenant: tenant("Blue River Hemp Co.") },
+      { singleTenant: tenant("THC Labs LLC") },
+      { assetClass: "Retail", strategy: { kind: "stabilized", summary: "Leased to an adult-use dispensary", capitalBudget: "", timeline: "" } },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(words)), JSON.stringify(words)).toEqual(["cannabis"]);
+    }
   });
 
   it("each list rides after the class's own, and a deal keyed for none reads exactly as before", () => {

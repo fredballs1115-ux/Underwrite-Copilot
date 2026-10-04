@@ -751,6 +751,50 @@ describe("a leased fee under a tower, a billboard or a solar array: the land com
     expect(groundLeaseEquipment(site({ summary: "The land under a 200-unit apartment building" }, undefined, { dealName: "Solar Farm Lofts", assetClass: "multifamily" }))).toBeNull();
   });
 
+  // The reader matched gear anywhere in the lease's words, so the leased fee
+  // under an office building whose lessee keeps its rooftop antenna licenses
+  // read "Stabilized (the lessee's wireless tower)" on every surface, and a
+  // lease forbidding towers read as one. The gear counts only where it is
+  // what the ground lease is for: a denial is struck first (as lib/site-
+  // reports strikes "no RECs"), and gear on a building's roof is the
+  // building's.
+  it("reads no equipment from gear on a building's roof, a bare antenna or a lease that forbids it", async () => {
+    const { groundLeaseEquipment, dealTypeLabel, dealTypeLabelFor } = await import("./interest");
+    const office = (groundLease: string, summary = "Sale of the fee interest in the land beneath a 12-story office building") =>
+      site({ summary, groundLease }, undefined, { dealName: "One Harbor Plaza", assetClass: "office" });
+    const cases = [
+      office("Ground lease to the building's owner through 2080; rooftop antenna licenses are retained by the ground lessee"),
+      office("Ground lease through 2080, with the wireless carrier leases on the roof assigned to the ground lessee"),
+      office("Ground lease through 2080; the ground lessee installed rooftop solar panels in 2023"),
+      office("Ground lease through 2080; the lease prohibits billboards and cell towers on the site"),
+      office("Ground lease through 2080; no billboards, cell towers or solar arrays may be erected on the land"),
+      office("Ground lease through 2080; the ground lessee keeps the antenna licenses"),
+    ];
+    for (const e of cases) {
+      const what = e.interest?.groundLease;
+      expect(groundLeaseEquipment(e), what).toBeNull();
+      // The deal type on every surface, and the workbook's three cells.
+      expect(dealTypeLabel("Stabilized", e), what).toBe("Stabilized (the leaseholder's building)");
+      const meta = deriveUnderwriteInputs(e, "x").meta.interest;
+      expect(meta?.equipment ?? null, what).toBeNull();
+      expect(dealTypeLabelFor("Stabilized", meta?.kind, meta?.equipment), what).toBe("Stabilized (the leaseholder's building)");
+      // The tag and the panel: the building reverts.
+      expect(interestTag(e, ASOF), what).toBe("Leased fee, reverts in 22 yrs");
+      expect(readInterest(e, askingPriceOf(e), ASOF)!.headline, what).toContain("the building reverts to the buyer");
+    }
+    // The real ones read as before: a tower site, a billboard site, a
+    // ground-mounted solar array — and the land under a tower whose lease
+    // also bars billboards is still a tower's.
+    expect(groundLeaseEquipment(tower)?.what).toBe("a wireless tower");
+    expect(dealTypeLabel("Stabilized", tower)).toBe("Stabilized (the lessee's wireless tower)");
+    expect(groundLeaseEquipment(site({ summary: "Land leased to an outdoor advertising company for a billboard" }))?.what).toBe("a billboard");
+    expect(groundLeaseEquipment(site({ groundLease: "Ground lease to a solar developer for a 5 MW ground-mounted solar array" }))?.what).toBe("a solar array");
+    expect(
+      groundLeaseEquipment(site({ summary: "Sale of the fee interest in a cell tower site", groundLease: "Ground lease for a 150-foot monopole; billboards are prohibited" }))?.what,
+    ).toBe("a wireless tower");
+    expect(groundLeaseEquipment(site({ summary: "The land under an antenna tower" }))?.what).toBe("a wireless tower");
+  });
+
   it("the tag, the panel's sentences, the caveat, the short line and the traps say the land comes back", () => {
     expect(interestTag(tower, ASOF)).toBe("Leased fee, lease ends in 22 yrs");
     const r = readInterest(tower, askingPriceOf(tower), ASOF)!;
