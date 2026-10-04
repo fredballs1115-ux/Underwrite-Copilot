@@ -8096,6 +8096,17 @@ describe("the tracker's leaderboard, chips and coverage cells — one row a figu
     expect(spread).toContain('data-cell="unranked"');
     expect(spread).not.toContain("background-color");
     expect(spread).toContain("not ranked: a spread of two reads");
+    // A figure and its period are two words, as the page lint reads them
+    // (the coverage board printed "5.2year-end 2025" on every /market page).
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    expect(gluedWords(visibleText(spread))).toEqual([]);
+    const ind = sectorStandings(["industrial"], TODAY);
+    const undated = render(React.createElement(CoverageBoardCell, { sector: "industrial", cell: coverageCell(ind.industrial.nova, ind.industrial.nova.total) }));
+    expect(visibleText(undated)).toContain("undated");
+    expect(gluedWords(visibleText(undated))).toEqual([]);
+    for (const sector of ["office", "retail", "industrial", "multifamily"]) {
+      expect(gluedWords(visibleText(table(sector))), sector).toEqual([]);
+    }
   });
 });
 

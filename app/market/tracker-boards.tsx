@@ -169,7 +169,14 @@ export function LeaderboardTable({
   };
   const when = (r: LeaderRow, l: CitedFigure["label"]) => {
     const p = periodOf(r.figures, l);
-    return p ? <span className="block text-[10px] font-sans text-muted">{p}</span> : null;
+    // The space keeps the period a word of its own to a screen reader and the
+    // page lint: a block span alone puts nothing between "5.2" and "Q1".
+    return p ? (
+      <>
+        {" "}
+        <span className="block text-[10px] font-sans text-muted">{p}</span>
+      </>
+    ) : null;
   };
   return (
     <div>
@@ -302,7 +309,7 @@ export function CoverageBoardCell({ sector, cell }: { sector: string; cell: Cove
   }
   const body = (
     <>
-      {cell.label}
+      {cell.label}{" "}
       <span className="block font-sans text-[9px] leading-tight text-muted">{cell.period}</span>
     </>
   );
