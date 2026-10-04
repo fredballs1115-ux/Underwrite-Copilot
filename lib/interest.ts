@@ -198,7 +198,7 @@ const EQUIPMENT_USES: readonly (EquipmentUse & { re: RegExp })[] = [
     gear: "the sign and its structure",
   },
   {
-    re: /\bsolar[\s-]+(?:arrays?|farms?|panels?|installations?|projects?|facilit(?:y|ies)|fields?|gardens?|plants?|parks?|leases?|energy|power|generation|sites?)\b|\bphotovoltaic\b|\bpv\s+(?:arrays?|systems?|facilit(?:y|ies)|projects?)\b/i,
+    re: /\bsolar[\s-]+(?:arrays?|farms?|panels?|installations?|projects?|facilit(?:y|ies)|plants?|leases?|energy|power|generation)\b|\bphotovoltaic\b|\bpv\s+(?:arrays?|systems?|facilit(?:y|ies)|projects?)\b/i,
     what: "a solar array",
     gear: "the panels and their equipment",
   },
@@ -207,14 +207,15 @@ const EQUIPMENT_USES: readonly (EquipmentUse & { re: RegExp })[] = [
 /**
  * The equipment a ground lease's tenant puts on the land — a wireless
  * tower, a billboard, a solar array — where the memorandum's own words name
- * it: the interest's sentence, the ground lease as stated, the class and
- * the deal's name. Null where they name none, which is a building's ground
- * lease as before. Its equipment is the tenant's, so the land comes back
- * at the lease's end and no building reverts (research pass 23).
+ * it: the interest's sentence, the ground lease as stated and the class.
+ * Never the deal's name, which is a brand ("Solar Gardens Apartments" is a
+ * building). Null where they name none, which is a building's ground lease
+ * as before. Its equipment is the tenant's, so the land comes back at the
+ * lease's end and no building reverts (research pass 23).
  */
 export function groundLeaseEquipment(ex: ExtractionResult | null | undefined): EquipmentUse | null {
   if (!ex) return null;
-  const words = [ex.interest?.summary, ex.interest?.groundLease, ex.assetClass, ex.dealName]
+  const words = [ex.interest?.summary, ex.interest?.groundLease, ex.assetClass]
     .filter((w): w is string => typeof w === "string" && w.trim() !== "")
     .join(" \n ");
   const hit = EQUIPMENT_USES.find((u) => u.re.test(words));

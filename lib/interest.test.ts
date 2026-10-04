@@ -690,6 +690,8 @@ describe("a leased fee under a tower, a billboard or a solar array: the land com
     // The leased fee under an office tower is the land under a building.
     expect(groundLeaseEquipment(site({ summary: "Sale of the fee interest in the land beneath the tower" }, undefined, { dealName: "One Harbor Tower", assetClass: "office" }))).toBeNull();
     expect(groundLeaseEquipment(site({ summary: "The land under a 40-story office tower" }))).toBeNull();
+    // A deal's name is a brand, never the lease's use.
+    expect(groundLeaseEquipment(site({ summary: "The land under a 200-unit apartment building" }, undefined, { dealName: "Solar Farm Lofts", assetClass: "multifamily" }))).toBeNull();
   });
 
   it("the tag, the panel's sentences, the caveat, the short line and the traps say the land comes back", () => {
