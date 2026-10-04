@@ -3488,10 +3488,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `todaysRatesLine` in the pipeline) and appends the line to the
     challenger's notes, after the document so the cache never moves; the
     first-draft model's reconciliation gets it through `liveDebtSeeds`.
-  - **The Opportunity Zone answer names its round**: beside every answer
-    from the 2018 list, `OZ_NEXT_ROUND_NOTE` says the next round's zones
-    take effect January 1, 2027 and the 2018 zones run to December 31,
-    2028 (data/research/tax_law.json).
+  - **The Opportunity Zone answer names its round, as it stands on the day
+    the page is read** (`opportunityZoneRead(flags, today)` in
+    lib/site-flags/core, its dates held by a test to
+    data/research/tax_law.json's words): before 2027 the next round's
+    zones "take effect January 1, 2027"; through 2028 they took effect and
+    are not on this list, the 2018 zones running to December 31, 2028;
+    after that a listed tract's chip says "In a 2018 Opportunity Zone
+    tract; those designations ended Dec 31, 2028", never a zone in force.
 - Each building's own photograph: `lib/om-photo.ts` (pure) reads the JPEG
   image objects out of the deal's memorandum — a `/DCTDecode` stream IS the
   JPEG's bytes, verbatim, and `jpegInfo` reads its width, height and
@@ -4695,6 +4699,23 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     reads it (`endHasPassed`, `endIsAhead`, `endsByYear`, `leftText`,
     `fromToday` in lib/ground-lease-term). The month counts stay where the
     arithmetic runs on them.
+  - **A price label's year is the memorandum's, never the clock's**: the
+    extraction carries `screenedOn`, the day the screen read it (the
+    pipeline and the manual-deal path stamp it, `screenStamp`), and
+    `screenYearOf(ex)` is the year every price reader judges a label's
+    year against (`priceExclude(year)`, built per year, never at load;
+    the year is a required argument on every row-level reader, so the
+    compiler finds one that forgets it). "Asking price (2026)" on a 2026
+    screen stays the ask after January 1; an extraction stored before the
+    stamp reads as a 2026 screen (`UNSTAMPED_SCREEN_YEAR`), and a
+    re-screen of the same bytes keeps its first stamp (`screenStampFor`,
+    against the extraction's `omFingerprint`, lib/om-fingerprint's), so
+    only a reissued deck is a new reading.
+  - **A year in the page's own words is named, never "this year"**: the
+    intel job searches the run's year, the research files say "in 2026",
+    and a test keeps "this year" and "next year" out of data/research.
+    The cost card names its prices' month (`PRICES_AS_OF` in
+    lib/anthropic/models).
   - **A test about a date fakes that date** (the leasehold sentence in
     December, the roster's years, a fair market rent's year in force):
     a test that reads the real clock fails on a day that comes every year.
