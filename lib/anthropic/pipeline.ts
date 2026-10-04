@@ -151,8 +151,10 @@ const runGate = new RunGate(concurrencyFromEnv);
 // The provider reads a PDF of up to about 600 pages in one request
 // (MAX_OM_PAGES, lib/pdf); a longer deck came back as a raw 400. The upload
 // refuses one first (lib/pdf-open); this stop catches a deck uploaded before
-// that check. The byte counter only ever UNDER-counts, so a count past the
-// cap is certain, never a false alarm.
+// that check. The byte counter mostly under-counts, but an incrementally
+// saved file reads high by the pages it revised (lib/pdf), so a count just
+// past the cap could be such a file; the upload's own count is pdfjs's,
+// which reads the page tree.
 
 /** Keep the job row fresh while a run is alive; returns the stop function. */
 function startHeartbeat(dealId: string): () => void {

@@ -35,8 +35,9 @@ export interface AskResult {
    *  by the caller (lib/facts `locatedPage`) before any is kept */
   cites: { page: string; note: string }[];
   /** the memorandum's length in pages as this read established it (the
-   *  text layer's count, else the fail-safe byte counter); null where
-   *  neither could, and then no cited page can be validated */
+   *  text layer's count, else the screen's stored count held to the byte
+   *  counter — lib/pdf `citablePageCount`); null where none could, and then
+   *  no cited page can be validated */
   pages: number | null;
 }
 
@@ -109,6 +110,10 @@ export async function askDealQuestion(
     /** how the screen read the memorandum, where the caller holds it;
      *  otherwise it is read off the deal's stored extraction */
     omRead?: "pdf" | "text" | null;
+    /** the memorandum's length as the screen's extraction stored it
+     *  (`totalPages`): what a cited page is held to where the text layer
+     *  is not read, beside the byte counter */
+    totalPages?: number | null;
   },
 ): Promise<AskResult> {
   const client = getAnthropic();
@@ -119,7 +124,10 @@ export async function askDealQuestion(
   // read also says how many pages the deck has, which every cited page is
   // held to.
   const omRead = opts?.omRead !== undefined ? opts.omRead : await storedOmRead(opts?.dealId);
-  const { om, pages } = await omSourceWithPages(pdf, "om.pdf", { textFirst: askTextFirst(omRead) });
+  const { om, pages } = await omSourceWithPages(pdf, "om.pdf", {
+    textFirst: askTextFirst(omRead),
+    statedPages: opts?.totalPages ?? null,
+  });
   // A question is one read of the whole deck. Its spend is said in the log
   // the way a screen's is, so the operator's picture of what a deal costs
   // includes the questions asked of it.

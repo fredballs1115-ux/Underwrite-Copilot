@@ -121,6 +121,13 @@ describe("askDeal — what an answer keeps", () => {
     expect(entry.by).toBe(OWNER);
   });
 
+  it("hands the question the length the screen stored, which a PDF read holds its pages to (audit c66)", async () => {
+    db.deal = { ...db.deal, extraction: { dealName: "x", metrics: [], totalPages: 40, omRead: "pdf" } };
+    await ask("What is the coupon on the loan?");
+    expect(db.opts?.totalPages).toBe(40);
+    expect(db.opts?.omRead).toBe("pdf");
+  });
+
   it("keeps no page at all where the read could not say how long the deck is", async () => {
     db.answer.pages = null;
     await ask("What is the coupon on the loan?");

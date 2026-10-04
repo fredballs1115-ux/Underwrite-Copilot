@@ -88,11 +88,38 @@ describe("om-source — the deck goes text first", () => {
     const sparse = await omSourceWithPages(await deck(5, 1), "om.pdf", { textFirst: true });
     expect(sparse.om.kind).toBe("buffer");
     expect(sparse.pages).toBe(5);
-    // The layer not read: the byte counter, which only ever under-counts.
+    // The layer not read: the byte counter, where nothing else answers.
     process.env.OM_READ = "pdf";
     expect((await omSourceWithPages(await deck(3, 12), "om.pdf", { textFirst: true })).pages).toBe(3);
     // Nothing that reads as a page: no length, so no page can be held to it.
     expect((await omSourceWithPages(Buffer.from("%PDF-1.4 no pages"), "om.pdf", { textFirst: true })).pages).toBeNull();
+  });
+
+  it("holds a PDF read to the screen's stored length, where the byte counter re-counts a revised page (audit c66)", async () => {
+    // Two pages, page 2 revised by an incremental save: its object is written
+    // twice, and the byte counter reads three. Ask over a memorandum the
+    // screen read as a PDF had held its citations to that three.
+    const saved = Buffer.from(
+      [
+        "%PDF-1.7",
+        "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+        "2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >> endobj",
+        "3 0 obj << /Type /Page /Parent 2 0 R /Contents 5 0 R >> endobj",
+        "4 0 obj << /Type /Page /Parent 2 0 R /Contents 6 0 R >> endobj",
+        "trailer << /Root 1 0 R >>",
+        "%%EOF",
+        "4 0 obj << /Type /Page /Parent 2 0 R /Contents 7 0 R >> endobj",
+        "trailer << /Root 1 0 R /Prev 0 >>",
+        "%%EOF",
+      ].join("\n"),
+      "latin1",
+    );
+    expect((await omSourceWithPages(saved, "om.pdf", { textFirst: false })).pages).toBe(3);
+    expect((await omSourceWithPages(saved, "om.pdf", { textFirst: false, statedPages: 2 })).pages).toBe(2);
+    // A stored length from a deck since replaced cannot reach past this one.
+    expect((await omSourceWithPages(await deck(3, 12), "om.pdf", { textFirst: false, statedPages: 60 })).pages).toBe(3);
+    // The layer's own count, where it was read, is the length.
+    expect((await omSourceWithPages(await deck(6, 12), "om.pdf", { textFirst: true, statedPages: 60 })).pages).toBe(6);
   });
 });
 

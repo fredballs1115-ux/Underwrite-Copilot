@@ -62,7 +62,7 @@ describe("Ask reads the memorandum the way the screen did (research pass 18)", (
     storedExtraction({ dealName: "Oakwood Flats", omRead: "pdf" });
     const r = await askDealQuestion(pdf, "What is the in-place NOI?", null, { dealId: "d1" });
     expect(r.answer).toBe("It is stated.");
-    expect(vi.mocked(omSourceWithPages)).toHaveBeenCalledWith(pdf, "om.pdf", { textFirst: false });
+    expect(vi.mocked(omSourceWithPages)).toHaveBeenCalledWith(pdf, "om.pdf", { textFirst: false, statedPages: null });
   });
 
   it("a deal read from its text layer, one screened before the record, and a read that fails all decide as before", async () => {
@@ -70,15 +70,23 @@ describe("Ask reads the memorandum the way the screen did (research pass 18)", (
       vi.mocked(omSourceWithPages).mockClear();
       storedExtraction(row);
       await askDealQuestion(pdf, "What is the in-place NOI?", null, { dealId: "d1" });
-      expect(vi.mocked(omSourceWithPages), JSON.stringify(row)).toHaveBeenCalledWith(pdf, "om.pdf", { textFirst: true });
+      expect(vi.mocked(omSourceWithPages), JSON.stringify(row)).toHaveBeenCalledWith(pdf, "om.pdf", {
+        textFirst: true,
+        statedPages: null,
+      });
     }
   });
 
   it("a caller that holds the read hands it in, and nothing is read again", async () => {
     vi.mocked(createSupabaseAdminClient).mockClear();
     await askDealQuestion(pdf, "What is the in-place NOI?", null, { dealId: "d1", omRead: "pdf" });
-    expect(vi.mocked(omSourceWithPages)).toHaveBeenCalledWith(pdf, "om.pdf", { textFirst: false });
+    expect(vi.mocked(omSourceWithPages)).toHaveBeenCalledWith(pdf, "om.pdf", { textFirst: false, statedPages: null });
     expect(vi.mocked(createSupabaseAdminClient)).not.toHaveBeenCalled();
+  });
+
+  it("holds a PDF read's citations to the length the screen stored, beside the byte counter (audit c66)", async () => {
+    await askDealQuestion(pdf, "What is the in-place NOI?", null, { dealId: "d1", omRead: "pdf", totalPages: 40 });
+    expect(vi.mocked(omSourceWithPages)).toHaveBeenCalledWith(pdf, "om.pdf", { textFirst: false, statedPages: 40 });
   });
 });
 

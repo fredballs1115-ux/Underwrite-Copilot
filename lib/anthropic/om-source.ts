@@ -2,7 +2,7 @@ import "server-only";
 import Anthropic, { toFile } from "@anthropic-ai/sdk";
 import { getAnthropic } from "./client";
 import { isDenseLayer, pageTaggedText, pdfTextLayer, type PdfTextLayer } from "@/lib/pdf-text";
-import { countPdfPages } from "@/lib/pdf";
+import { citablePageCount, countPdfPages } from "@/lib/pdf";
 
 /**
  * How the OM rides along on an analysis request.
@@ -75,16 +75,20 @@ export async function omSourceFor(
  * The same transport, with the memorandum's length in pages where the read
  * can say it — what a cited page is held to (lib/facts `locatedPage`). The
  * text layer's own count when the layer was read (pdfjs walked every page,
- * dense or not), else the fail-safe byte counter (lib/pdf), which can only
- * under-count; null where neither finds a page.
+ * dense or not). Otherwise — the screen read the PDF itself, so Ask does
+ * too — the length the caller states (`statedPages`, the extraction's
+ * stored `totalPages`) held to the byte counter (lib/pdf
+ * `citablePageCount`): the counter alone over-counts an incrementally saved
+ * file, so its re-emitted pages validated pages the deck does not have.
+ * Null where nothing finds a page.
  */
 export async function omSourceWithPages(
   pdf: Buffer,
   filename = "om.pdf",
-  opts?: { textFirst?: boolean; title?: string },
+  opts?: { textFirst?: boolean; title?: string; statedPages?: number | null },
 ): Promise<{ om: OmSource; pages: number | null }> {
   const { om, layerPages } = await pickOmSource(pdf, filename, opts);
-  return { om, pages: layerPages ?? countPdfPages(pdf) };
+  return { om, pages: layerPages ?? citablePageCount(opts?.statedPages, countPdfPages(pdf)) };
 }
 
 async function pickOmSource(

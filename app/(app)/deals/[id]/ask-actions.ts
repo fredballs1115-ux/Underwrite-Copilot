@@ -127,6 +127,10 @@ export async function askDeal(
       // a question reads the figures the screen read, with no second read
       // of the deal (null for a deal screened before the read was kept).
       omRead: extraction?.omRead ?? null,
+      // …and how long it found it: where Ask reads the PDF itself, a cited
+      // page is held to this count, beside the byte counter, which
+      // over-counts an incrementally saved file (lib/pdf).
+      totalPages: extraction?.totalPages ?? null,
     });
     const entry = {
       at: new Date().toISOString(),

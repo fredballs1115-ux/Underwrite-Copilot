@@ -6,7 +6,25 @@ import {
   buildDealFacts,
   type FactMetric,
 } from "./facts";
-import { countPdfPages } from "./pdf";
+import { citablePageCount, countPdfPages } from "./pdf";
+
+/** A two-page deck whose page 2 was revised by an incremental save: the
+ *  revised page object is written again after the first trailer. */
+const INCREMENTALLY_SAVED_TWO_PAGES = Buffer.from(
+  [
+    "%PDF-1.7",
+    "1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj",
+    "2 0 obj << /Type /Pages /Kids [3 0 R 4 0 R] /Count 2 >> endobj",
+    "3 0 obj << /Type /Page /Parent 2 0 R /Contents 5 0 R >> endobj",
+    "4 0 obj << /Type /Page /Parent 2 0 R /Contents 6 0 R >> endobj",
+    "trailer << /Root 1 0 R >>",
+    "%%EOF",
+    "4 0 obj << /Type /Page /Parent 2 0 R /Contents 7 0 R >> endobj",
+    "trailer << /Root 1 0 R /Prev 0 >>",
+    "%%EOF",
+  ].join("\n"),
+  "latin1",
+);
 
 describe("parsePageNumber", () => {
   it("reads the common forms", () => {
@@ -114,6 +132,29 @@ describe("countPdfPages (fail-safe leaf counter)", () => {
     // counter finds none and returns null → citations mark 'source not
     // located' rather than validating against a wrong number.
     expect(countPdfPages(Buffer.from("%PDF-1.6\n1 0 obj<</Type /ObjStm>>stream ...", "latin1"))).toBeNull();
+  });
+  it("over-counts an incrementally saved file: each revised page is written again (audit c66)", () => {
+    // Its comment had said it "can only UNDER-count".
+    expect(countPdfPages(INCREMENTALLY_SAVED_TWO_PAGES)).toBe(3);
+  });
+});
+
+describe("citablePageCount — the length a cited page is held to without a read of the pages", () => {
+  it("takes the screen's stored count over the counter's re-counted pages", () => {
+    expect(citablePageCount(2, countPdfPages(INCREMENTALLY_SAVED_TWO_PAGES))).toBe(2);
+  });
+  it("takes the smaller where both answer, so a count stored for a replaced deck validates nothing past the new one", () => {
+    expect(citablePageCount(60, 40)).toBe(40);
+    expect(citablePageCount(40, 40)).toBe(40);
+  });
+  it("takes either alone where only one answers, and no count from neither", () => {
+    expect(citablePageCount(null, 12)).toBe(12);
+    expect(citablePageCount(undefined, 12)).toBe(12);
+    expect(citablePageCount(40, null)).toBe(40);
+    expect(citablePageCount(null, null)).toBeNull();
+    // A stored count that is no count is none.
+    expect(citablePageCount(0, 12)).toBe(12);
+    expect(citablePageCount(Number.NaN, null)).toBeNull();
   });
 });
 
