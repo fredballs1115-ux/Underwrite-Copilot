@@ -42,7 +42,7 @@ import { readSale, saleShortLine } from "@/lib/sale-terms";
 import { readRoster, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementShortLine } from "@/lib/tax-abatement";
-import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing";
+import { sellerFinancingDocLine } from "@/lib/seller-financing";
 import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
@@ -190,10 +190,10 @@ function valueAddLineFor(extraction: ExtractionResult | null): string {
 
 /** A note the seller offers to carry (lib/seller-financing, #462), in one
  *  line for the memo's header: the note as stated — the pricing needs the
- *  model, which the report carries. "" where none is offered. */
+ *  model, which the report carries; on a note, the financing of its
+ *  purchase, said as that. "" where none is offered. */
 function sellerNoteLineFor(extraction: ExtractionResult | null): string {
-  const s = extraction ? readSellerFinancing(extraction, null) : null;
-  return s ? sellerFinancingLine(s.terms) : "";
+  return extraction ? sellerFinancingDocLine(extraction) : "";
 }
 
 /** A property-tax abatement (lib/tax-abatement, #461), in one line for the

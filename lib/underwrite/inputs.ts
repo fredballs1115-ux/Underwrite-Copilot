@@ -25,7 +25,13 @@ import { saleCeilingRead } from "@/lib/sale-ceiling";
 import { readRoster, rosterModelLine, rosterShortLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddModelLine, valueAddShortLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementModelLine, taxAbatementShortLine } from "@/lib/tax-abatement";
-import { readSellerFinancing, sellerFinancingLine, sellerFinancingSentence } from "@/lib/seller-financing";
+import {
+  notePurchaseFinancing,
+  notePurchaseFinancingLine,
+  readSellerFinancing,
+  sellerFinancingLine,
+  sellerFinancingSentence,
+} from "@/lib/seller-financing";
 import {
   buildingSfRow,
   findGoingInCap,
@@ -282,7 +288,16 @@ function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["intere
  *  this model's new loan. Null where none is offered. */
 function sellerNoteMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["sellerNote"] {
   const s = extraction ? readSellerFinancing(extraction, inputs) : null;
-  return s ? { line: sellerFinancingLine(s.terms), read: sellerFinancingSentence(s) } : null;
+  if (s) return { line: sellerFinancingLine(s.terms), read: sellerFinancingSentence(s) };
+  // On a note the seller's financing is of the note's purchase: listed as
+  // that, and never run against this model's property loan.
+  const t = notePurchaseFinancing(extraction);
+  return t
+    ? {
+        line: notePurchaseFinancingLine(t),
+        read: "It finances the purchase of the loan, not the property, so this model — the collateral's, run with a property loan of its own — does not run it.",
+      }
+    : null;
 }
 
 function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["assumable"] {

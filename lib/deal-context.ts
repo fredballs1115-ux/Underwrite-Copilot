@@ -14,7 +14,12 @@ import { readSale, saleContextLine } from "@/lib/sale-terms";
 import { readRoster, rosterContextLine } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddContextLine } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementContextLine } from "@/lib/tax-abatement";
-import { readSellerFinancing, sellerFinancingContextLine } from "@/lib/seller-financing";
+import {
+  notePurchaseFinancing,
+  notePurchaseFinancingContextLine,
+  readSellerFinancing,
+  sellerFinancingContextLine,
+} from "@/lib/seller-financing";
 import { readSiteReports, siteReportsContextLine } from "@/lib/site-reports";
 import { readStudentHousing, studentContextLine } from "@/lib/student-housing";
 import { mhContextLine, readManufacturedHousing } from "@/lib/manufactured-housing";
@@ -102,6 +107,9 @@ export function dealContextFor(
   // A note the seller offers to carry (#462): its terms, and what its value
   // turns on — never its rate alone.
   const sellerNote = readSellerFinancing(extraction, null);
+  // On a note, the seller's financing is of the note's purchase: said as
+  // that, as stated, and never run against the model.
+  const noteFinancing = notePurchaseFinancing(extraction);
   // What the third-party reports found (#465): the Phase I, the immediate
   // repairs, the seismic PML and the zoning — each a lender's condition.
   const reports = readSiteReports(extraction);
@@ -126,6 +134,7 @@ export function dealContextFor(
     ...(range ? [range] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
     ...(sellerNote ? [sellerFinancingContextLine(sellerNote)] : []),
+    ...(noteFinancing ? [notePurchaseFinancingContextLine(noteFinancing)] : []),
     ...(affordable ? [affordableContextLine(affordable)] : []),
     ...(singleTenant ? [singleTenantContextLine(singleTenant)] : []),
     ...(roster ? [rosterContextLine(roster)] : []),

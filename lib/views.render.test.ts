@@ -6517,6 +6517,13 @@ describe("ShareView — a note the seller offers to carry, as stated (#462)", ()
     expect(visibleText(html)).toContain("The seller offers to carry financing: $40.0M at 5.00% for 5 years");
     expect(a11yIssues(html)).toEqual([]);
     expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SAMPLE_DEAL.extraction }))).not.toContain("share-seller-note");
+    // On a note the seller's financing is of the note's purchase, and says so.
+    const onNote = { ...extraction, interest: { kind: "note" as const, summary: "", share: "", groundLease: "", loan: "", page: "" } };
+    const noteText = visibleText(renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: onNote })));
+    expect(noteText).toContain(
+      "The seller offers to finance the note purchase: $40.0M at 5.00% for 5 years — financing of the buyer's purchase of the loan, not of the property, and not run against the model",
+    );
+    expect(noteText).toContain("Seller financing amount (for the note purchase; not run against the model)");
   });
 });
 

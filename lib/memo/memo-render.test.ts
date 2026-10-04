@@ -567,6 +567,20 @@ describe("MemoDocument (redesigned)", () => {
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain("The seller offers to carry financing: $40.0M at 5.00% for 5 years");
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).sellerNoteLine).toBe("");
+    // On a note the seller's financing is of the note's purchase: the memo
+    // says so, where it had printed nothing (research pass 23).
+    const onNote = buildMemoData(
+      { ...deal, extraction: { ...extraction, interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" } } } as unknown as DealRow,
+      "September 30, 2026",
+      [],
+    );
+    expect(onNote.sellerNoteLine).toBe(
+      "The seller offers to finance the note purchase: $40.0M at 5.00% for 5 years — financing of the buyer's purchase of the loan, not of the property, and not run against the model",
+    );
+    const noteText = (
+      await pdfTextOf(await renderToBuffer(React.createElement(MemoDocument, { data: onNote }) as unknown as Parameters<typeof renderToBuffer>[0]))
+    ).replace(/\s+/g, " ");
+    expect(noteText).toContain("The seller offers to finance the note purchase: $40.0M at 5.00% for 5 years");
   }, 30000);
 
   it("says how the property is sold under the title (#456), and nothing on the sample", async () => {

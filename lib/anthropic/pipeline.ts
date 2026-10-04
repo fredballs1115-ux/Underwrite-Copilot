@@ -45,7 +45,12 @@ import { readSale, saleNote } from "@/lib/sale-terms";
 import { readRoster, rosterNote } from "@/lib/tenant-roster";
 import { readValueAdd, valueAddNote } from "@/lib/value-add";
 import { readTaxAbatement, taxAbatementNote } from "@/lib/tax-abatement";
-import { readSellerFinancing, sellerFinancingNote } from "@/lib/seller-financing";
+import {
+  notePurchaseFinancing,
+  notePurchaseFinancingContextLine,
+  readSellerFinancing,
+  sellerFinancingNote,
+} from "@/lib/seller-financing";
 import { readSiteReports, siteReportsNote } from "@/lib/site-reports";
 import { readStudentHousing, studentNote } from "@/lib/student-housing";
 import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
@@ -1160,6 +1165,10 @@ async function runAnalysisSteps(
         // its rate, the balloon, the underlying loan, a second and the paper.
         const sellerNote = readSellerFinancing(ex, null);
         if (sellerNote) notes.push(sellerFinancingNote(sellerNote));
+        // On a note, financing the seller offers is of the note's purchase:
+        // said as that, never run against the model's property loan.
+        const noteFinancing = notePurchaseFinancing(ex);
+        if (noteFinancing) notes.push(notePurchaseFinancingContextLine(noteFinancing));
 
         // A covenant or a contract that sets the rents (#453): the
         // restriction's facts, then each program's traps by name — a

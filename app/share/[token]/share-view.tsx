@@ -18,7 +18,7 @@ import { screenYearOf } from "@/lib/criteria";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestOf, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
-import { readSellerFinancing, sellerFinancingLine } from "@/lib/seller-financing";
+import { sellerFinancingDocLine } from "@/lib/seller-financing";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { readAffordable } from "@/lib/affordable";
@@ -292,7 +292,9 @@ export function ShareView({
   // states it — the pricing against today's rate needs the model, which a
   // shared screen does not carry.
   const assumable = readAssumable(safeExtraction, null);
-  const sellerNote = readSellerFinancing(safeExtraction, null);
+  // A note the seller offers to carry, as stated (#462) — on a note, the
+  // financing of its purchase, said as that: the memo's one line.
+  const sellerNoteLine = sellerFinancingDocLine(safeExtraction);
   // Read in numeric order (lib/verdict-range): a verdict stored when the
   // conservative end came first can hold its larger figure as "low".
   const ranges = (screen?.ranges ?? []).slice(0, 6).map(rangeInOrder);
@@ -390,12 +392,12 @@ export function ShareView({
 
       {/* A note the seller offers to carry (#462), as stated — the pricing
           needs the model, which the sender's deal page carries. */}
-      {sellerNote && (
+      {sellerNoteLine && (
         <p
           data-qa="share-seller-note"
           className="mt-3 rounded-xl border border-line bg-surface px-4 py-2.5 text-sm leading-relaxed shadow-sm"
         >
-          {sellerFinancingLine(sellerNote.terms)}
+          {sellerNoteLine}
         </p>
       )}
 

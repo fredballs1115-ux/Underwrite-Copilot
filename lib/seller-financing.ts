@@ -33,8 +33,15 @@
 // A TERM THE OM DOES NOT STATE IS NOT INVENTED. No amount, no rate, no
 // term or no schedule: no comparison, and the card names what is missing.
 // A share of the price is struck on the model's price, and said.
+//
+// On a NOTE the seller's financing is of the note's purchase — the buyer
+// buys a loan, not the property — so it is never run against the model's
+// property loan; it is said, as stated and as what it is, wherever the
+// terms are listed (`notePurchaseFinancing`; research pass 23 found the
+// terms dropped silently).
 
 import { askingPriceOf } from "@/lib/deal-strategy";
+import { interestOf } from "@/lib/interest";
 import { parsePageNumber } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
 import {
@@ -325,4 +332,42 @@ export function sellerFinancingTag(ex: Extraction): string | null {
  *  page and the report carry; a line never claims more than the terms. */
 export function sellerFinancingLine(t: SellerFinancingTerms): string {
   return `The seller offers to carry financing: ${sellerFinancingTermsLine(t)}`;
+}
+
+// ── On a note ───────────────────────────────────────────────────────────
+
+/**
+ * The seller's financing of a NOTE purchase. On a note the buyer buys a
+ * loan, so a note the seller offers to carry finances the purchase of that
+ * loan — not the property — and the model, which runs the collateral as if
+ * bought outright with a property loan of its own, is no place to price it.
+ * `readSellerFinancing` stays null on a note, so nothing runs it; this
+ * reads the terms as stated so every surface that lists them says so. A
+ * share of the price is struck on the note's own price. Null on anything
+ * but a note, and where the memorandum offers none.
+ */
+export function notePurchaseFinancing(ex: Extraction): SellerFinancingTerms | null {
+  if (interestOf(ex).kind !== "note") return null;
+  return readSellerFinancingTerms(ex as MetricRows, askingPriceOf(ex as never));
+}
+
+/** The documents' line on a note: the terms as stated, said as the note
+ *  purchase's and not the model's. */
+export function notePurchaseFinancingLine(t: SellerFinancingTerms): string {
+  return `The seller offers to finance the note purchase: ${sellerFinancingTermsLine(t)} — financing of the buyer's purchase of the loan, not of the property, and not run against the model`;
+}
+
+/** The deal context's and the challenger's line on a note. */
+export function notePurchaseFinancingContextLine(t: SellerFinancingTerms): string {
+  return `The memorandum says the seller will finance the note purchase: ${sellerFinancingTermsLine(t)}. It finances the buyer's purchase of the loan, not the property, so it is read as stated and not run against the model, whose new loan is a property loan the note's buyer does not take.`;
+}
+
+/** The documents' one line for whatever the seller offers to carry — the
+ *  property's financing, or a note purchase's — or "" where nothing is
+ *  offered. The memo's header and the shared screen read this one function. */
+export function sellerFinancingDocLine(ex: Extraction): string {
+  const s = readSellerFinancing(ex, null);
+  if (s) return sellerFinancingLine(s.terms);
+  const t = notePurchaseFinancing(ex);
+  return t ? notePurchaseFinancingLine(t) : "";
 }
