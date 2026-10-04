@@ -218,6 +218,7 @@ describe("whether the cap reaches the breach", () => {
     expect(r.breachIndexPct).toBe(3.92);
     expect(SEED.capStrikePct).toBe(4.0);
     expect(r.capProtects).toBe(false);
+    expect(r.headline).toBe("The cap is on the wrong side of the covenant.");
     expect(r.note).toBe(
       "The cap is struck at 4.00% and the covenant breaks at 3.92% — the loan fails before the cap pays anything.",
     );
@@ -236,6 +237,7 @@ describe("whether the cap reaches the breach", () => {
     const r = readFloating({ ...SEED, noi: 2_000_000 });
     expect(r.breachIndexPct).toBe(5.33);
     expect(r.capProtects).toBe(true);
+    expect(r.headline).toBe("The cap engages before the covenant does.");
     expect(r.worstCaseDscr!).toBeGreaterThan(SEED.covenantDscr!);
     expect(r.note).toContain("engages before the covenant");
   });
@@ -244,10 +246,57 @@ describe("whether the cap reaches the breach", () => {
     const r = readFloating({ ...SEED, capStrikePct: null, capPremium: null });
     expect(r.capProtects).toBe(false);
     expect(r.note).toContain("No cap");
+    // The headline says there is none, as the note does, not that a cap the
+    // loan does not have sits on the wrong side.
+    expect(r.headline).toBe("No cap: the covenant is the only limit.");
   });
 
   it("cannot be judged without a breach point", () => {
     expect(readFloating({ ...SEED, noi: null }).capProtects).toBeNull();
+    expect(readFloating({ ...SEED, noi: null }).headline).toBeNull();
+  });
+});
+
+describe("a floor above the strike and the breach point (audit c66)", () => {
+  // The audit's loan: a 4.50% floor over a 4.00% strike on SOFR + 300, $20M
+  // interest-only, $1,760,000 of NOI against a 1.20× covenant — which breaks
+  // at an index of 4.33%. The strike is under the breach point, and the
+  // headline said the cap engages first, beside a note and a tile that said
+  // the loan was already through the covenant at the floor.
+  const FLOOR: FloatingTerms = { ...SEED, indexPct: 3.0, indexFloorPct: 4.5, capStrikePct: 4.0, noi: 1_760_000 };
+
+  it("is not protected by a cap struck under the breach point, and the headline says the floor", () => {
+    const r = readFloating(FLOOR);
+    expect(r.breachIndexPct).toBe(4.33);
+    expect(r.capProtects).toBe(false);
+    expect(r.headline).toBe("The floor is on the wrong side of the covenant.");
+    expect(r.note).toBe("Already through the covenant: 1.17× against a 1.20× test, at today's index.");
+    expect(r.worstCaseAt).toBe("floor");
+    expect(r.worstCaseDscr).toBe(1.17);
+  });
+
+  it("says where the floor breaks it while the index sits above the floor, never blaming the strike", () => {
+    const r = readFloating({ ...FLOOR, indexPct: 5.0 });
+    expect(r.dscr).toBe(1.26);
+    expect(r.capProtects).toBe(false);
+    expect(r.headline).toBe("The floor is on the wrong side of the covenant.");
+    expect(r.note).toBe(
+      "The 4.50% floor sits above the 4.33% index at which the covenant breaks: should the index fall under 4.17%, " +
+        "the note charges the floor, the cap pays back too little, and the loan fails the covenant — the cap cannot hold it.",
+    );
+    // The 4.17%: the floor less the run over the strike, against the debt
+    // service the covenant allows ($1,760,000 over 1.20).
+    const allowed = 1_760_000 / 1.2;
+    expect(readFloating({ ...FLOOR, indexPct: 4.16 }).debtServiceAnnual!).toBeGreaterThan(allowed);
+    expect(readFloating({ ...FLOOR, indexPct: 4.18 }).debtServiceAnnual!).toBeLessThan(allowed);
+  });
+
+  it("still protects where a floor over the strike sits under the breach point", () => {
+    // A 4.20% floor: the worst the loan pays is 7.20%, inside the covenant.
+    const r = readFloating({ ...FLOOR, indexFloorPct: 4.2 });
+    expect(r.capProtects).toBe(true);
+    expect(r.headline).toBe("The cap engages before the covenant does.");
+    expect(r.worstCaseDscr!).toBeGreaterThanOrEqual(1.2);
   });
 });
 

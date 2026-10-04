@@ -3529,11 +3529,10 @@ function FloatingRate({
 
       {r.breachIndexPct !== null && (
         <div className="mt-6 rounded-xl bg-faint p-4">
-          <p className="text-sm font-semibold">
-            {r.capProtects === false
-              ? "The cap is on the wrong side of the covenant."
-              : "The cap engages before the covenant does."}
-          </p>
+          {/* The module's own line, so it says what the note and the
+              worst-case tile say: a floor over the breach point is on the
+              wrong side of the covenant whatever the strike. */}
+          <p className="text-sm font-semibold">{r.headline}</p>
           <div className="relative mt-4 h-2 w-full rounded-full bg-white">
             <div
               data-bar="float"
