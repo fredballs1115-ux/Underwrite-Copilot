@@ -106,6 +106,7 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
             fromDelivery
             optionYears={r.term && !r.term.includesOptions ? r.term.options?.years ?? null : null}
             optionsWord="Renewal options"
+            ceiling={!!r.term?.includesOptions}
           />
         </div>
       ) : (
@@ -118,6 +119,7 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
               optionYears={!eff.early && r.term && !r.term.includesOptions ? r.term.options?.years ?? null : null}
               holdYears={holdYears}
               optionsWord="Renewal options"
+              ceiling={!eff.early && !!r.term?.includesOptions}
             />
           </div>
         )

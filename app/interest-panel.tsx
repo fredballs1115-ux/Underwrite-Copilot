@@ -157,7 +157,12 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
       )}
       {r.term && r.termLine && (
         <div className="mt-2.5">
-          <LeaseTermBar yearsLeft={r.term.yearsLeft} endLabel={termEndLabel(r.term)} optionYears={r.term.options?.years ?? null} />
+          <LeaseTermBar
+            yearsLeft={r.term.yearsLeft}
+            endLabel={termEndLabel(r.term)}
+            optionYears={r.term.options?.years ?? null}
+            ceiling={r.term.includesOptions}
+          />
           {termNeedsWords && <p className="mt-1 text-[11px] leading-snug text-muted">{`${r.termLine}.`}</p>}
         </div>
       )}

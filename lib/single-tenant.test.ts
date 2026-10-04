@@ -284,6 +284,40 @@ describe("readSingleTenant — the one lease the deal is", () => {
     );
   });
 
+  // The second pre-merge audit: a term counted from a delivery not yet
+  // dated has no end to set a stated early date against, so the date was
+  // compared with an end counted from today and dropped — 2042 said nowhere;
+  // the from-delivery read lost a comma; and a count "including options"
+  // was tagged and drawn as the lease, where it is the lease's ceiling.
+  it("on a building not yet delivered, keeps a stated early date, and says a count with its options as a ceiling", () => {
+    const bts = (count: string, more: Row[] = []) =>
+      ex([row("Lease term remaining", count), ...more], {
+        strategy: { kind: "development", summary: "A build-to-suit", capitalBudget: "", timeline: "" },
+      });
+    // The early date stands, and is the lease's end.
+    const early = readSingleTenant(bts("15 years", [row("Early termination date", "December 31, 2042")]), TODAY)!;
+    expect(early.early?.ends).toBe("2042-12-31");
+    expect(early.effective?.early).toBe(true);
+    expect(early.headline).toContain("The tenant may end the lease early from Dec 2042");
+    expect(singleTenantTag(bts("15 years", [row("Early termination date", "December 31, 2042")]), TODAY)).toBe(
+      "Single tenant, may leave in 16 yrs",
+    );
+    // The clause closes before its verb.
+    const opts = singleTenantModelLine(readSingleTenant(bts("15 years", [row("Renewal options", "Two 5-year options")]), TODAY)!, MODEL);
+    expect(opts).toContain("how much of it is left at the sale, before the tenant's renewal options, turns on that date");
+    // A count with its options in it is a ceiling, from delivery and from today.
+    expect(singleTenantTag(bts("35 years including options"), TODAY)).toBe("Single tenant, up to 35 yrs from delivery");
+    const ceiling = singleTenantModelLine(readSingleTenant(bts("35 years including options"), TODAY)!, MODEL);
+    expect(ceiling).toMatch(/^The lease runs up to 35 years from delivery, its renewal options counted in, not from today: a ceiling/);
+    expect(ceiling).not.toContain("outlasts the model's 5-year hold whenever");
+    const standing = ex([row("Lease term remaining", "35 years including options")]);
+    expect(singleTenantTag(standing, TODAY)).toBe("Single tenant, up to 35 yrs left");
+    expect(singleTenantModelLine(readSingleTenant(standing, TODAY)!, MODEL)).toMatch(
+      /^At the model's sale in 5 years the lease has up to 30 years left, its renewal options counted in:/,
+    );
+    for (const said of [early.headline, opts, ceiling]) expect(gluedWords(said)).toEqual([]);
+  });
+
   it("a passed end, and no end, are said as what they are", () => {
     const passed = readSingleTenant(ex([row("Lease expiration", "June 30, 2025")]), TODAY)!;
     expect(passed.headline).toContain("The lease's stated end, Jun 2025, has passed");

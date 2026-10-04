@@ -6907,6 +6907,27 @@ describe("SingleTenantPanel — the one lease a single-tenant property is, drawn
     expect(visibleText(html)).toContain("The lease runs 15 years from delivery, not from today");
     expect(html.match(/data-bar="lease-increase"/g)).toHaveLength(1);
   });
+
+  // The second pre-merge audit: a count with the renewal options in it drew
+  // "The term, 35 years from delivery" — the lease's ceiling drawn as the
+  // lease — while the sentence beside it called it a ceiling.
+  it("draws a term that counts its options as a ceiling, from delivery and from today", () => {
+    const withOptions = (kind: "development" | "stabilized") => {
+      const e = walgreens();
+      e.strategy = { kind, summary: "A build-to-suit store", capitalBudget: "", timeline: "" };
+      e.metrics = e.metrics.flatMap((m) =>
+        m.label === "Lease expiration" ? [{ ...m, label: "Lease term remaining", value: "35 years including options" }] : m.label === "Renewal options" ? [] : [m],
+      );
+      return e;
+    };
+    const delivery = visibleText(render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(withOptions("development"), AS_OF), model: null })));
+    expect(delivery).toContain("The term with its options, up to 35 years from delivery");
+    expect(delivery).not.toContain("The term, 35 years from delivery");
+    const today = render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(withOptions("stabilized"), AS_OF), model: MODEL }));
+    expect(visibleText(today)).toMatch(/Left at the sale with the options, up to \d/);
+    expect(gluedWords(visibleText(today))).toEqual([]);
+    expect(a11yIssues(today)).toEqual([]);
+  });
 });
 
 describe("ShareView — a single tenant's lease under the title (#454)", () => {
