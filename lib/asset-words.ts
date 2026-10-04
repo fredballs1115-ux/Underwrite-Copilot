@@ -237,6 +237,27 @@ const NAMES_LAND = /\b(?:land|parcels?|acreage|acres?|lots|entitled)\b/i;
 const housingWithCommercial = (s: string) =>
   HOUSING_WORDS.test(s) && COMMERCIAL_WORDS.test(s) && !CHANGE_OF_USE.test(s) && !NAMES_LAND.test(s);
 
+// "Resort" names lodging — "Boutique resort", "Golf resort and spa" —
+// until the phrase names a building of homes: "Resort-style apartments",
+// "Luxury resort-style multifamily", "Townhomes with resort-style
+// amenities" describe the pool and the clubhouse, not the lease, and the
+// hotel rule's bare "resort" had filed each as a hotel — a hotel's
+// defaults, keys and nightly rate, and no rent rules, on an apartment deck.
+// A hotel, a motel, lodging, hospitality or a short-term rental is lodging
+// whatever else the phrase names, and so is a resort counted in keys.
+const LODGING_WORDS = /\b(?:hotel|hospitality|lodging|motel|short[- ]term rental|str)\b/i;
+const RESORT_WORD = /\bresorts?\b/i;
+// The homes a phrase names, in the housing rules' own nouns: apartments,
+// units, multifamily, residential, housing, single-family rentals, and the
+// senior, student and manufactured classes.
+const NAMES_HOMES =
+  /\b(?:apartments?|multi[- ]?family|units?|residential|housing|town(?:homes?|houses?)|single[- ]family|build[- ]to[- ]rent|btr|sfr|senior|student|manufactured|mobile[- ]homes?)\b/i;
+// A count of keys ("150 keys", "a 120-key resort") — never a place called
+// the Keys.
+const COUNT_OF_KEYS = /\b\d[\d,]*[\s-]*keys?\b/i;
+const lodging = (s: string) =>
+  LODGING_WORDS.test(s) || (RESORT_WORD.test(s) && (!NAMES_HOMES.test(s) || COUNT_OF_KEYS.test(s)));
+
 /** Where a class the model phrased itself ("NNN retail", "boutique hotel")
  *  is filed — by the words it used, first match wins, longest tells first. */
 const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean), string])[] = [
@@ -246,7 +267,9 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   // area and a hotel's reserve — while "RV Park" filed as a park (research
   // pass 23). Read ahead of the hotel rule.
   [/\brv[\s-]+(?:parks?|resorts?)\b/i, "manufactured_housing"],
-  [/\b(hotel|hospitality|lodging|motel|resort|short[- ]term rental|str)\b/i, "hospitality_str"],
+  // Lodging by its own words; a resort only where the phrase names no
+  // homes, or counts its keys (`lodging`).
+  [lodging, "hospitality_str"],
   [/\b(self[- ]?storage|mini[- ]?storage)\b/i, "self_storage"],
   // Storage that is a warehouse or a yard — refrigerated buildings and
   // industrial outdoor storage — is industrial, and is read before the bare

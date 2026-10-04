@@ -277,6 +277,45 @@ describe("the asset-words table", () => {
     expect(assetClassKey("RV and boat storage")).toBe("self_storage");
   });
 
+  // The hotel rule's bare "resort" filed a building of apartments marketed
+  // for its "resort-style amenities" as a hotel: a hotel's defaults, keys and
+  // a nightly rate, and no rent rules, on an apartment deck.
+  it("files a building named as homes as housing, whatever resort words describe its amenities", () => {
+    for (const phrase of [
+      "Resort-style apartments",
+      "Luxury resort-style multifamily",
+      "Multifamily with resort-style amenities",
+      "Garden apartments with resort amenities",
+      "Resort-style multi-family community, 312 units",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("multifamily");
+      expect(isResidentialClass(phrase), phrase).toBe(true);
+    }
+    // Each housing class keeps its own rule.
+    expect(assetClassKey("Resort-style townhomes")).toBe("sfr_btr");
+    expect(assetClassKey("Build-to-rent community with resort-style amenities")).toBe("sfr_btr");
+    expect(assetClassKey("Resort-style senior living")).toBe("senior_housing");
+    expect(assetClassKey("Resort-style student housing")).toBe("student_housing");
+    expect(assetClassKey("Resort-style manufactured home community")).toBe("manufactured_housing");
+    expect(assetClassKey("Resort-style apartments over retail")).toBe("mixed_use");
+    // A resort that names no homes is lodging, as it was; so is one named
+    // with a hotel, lodging or a count of keys beside its homes.
+    for (const phrase of [
+      "Resort",
+      "Boutique resort",
+      "Resort hotel",
+      "Golf resort and spa",
+      "Resort hotel with residential condominiums",
+      "Resort lodging and apartments",
+      "Resort with 150 keys and 40 residential units",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("hospitality_str");
+      expect(isResidentialClass(phrase), phrase).toBe(false);
+    }
+    // A place called the Keys is no count of keys.
+    expect(assetClassKey("Resort-style apartments in the Florida Keys")).toBe("multifamily");
+  });
+
   it("files a laboratory with the life-science buildings, as an office", () => {
     for (const phrase of ["Laboratory", "Laboratory building", "Laboratories", "Labs", "Life Sciences Campus", "Life Science / Lab"]) {
       expect(assetClassKey(phrase), phrase).toBe("office");
