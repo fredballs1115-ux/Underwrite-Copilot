@@ -13,7 +13,7 @@
 // What is sold, and how, decides whether the letter is the document at all
 // (#414, #456, #411). The draft is a property purchase: the buyer acquires
 // the property from its owner for cash at closing and asks for the seller's
-// books, records and leases. Three rules.
+// books, records and leases. Four rules.
 //
 //   THE WRONG DOCUMENT IS REFUSED, WITH THE REASON. A note, a share of the
 //   owning entity and the leased fee are not the property; an auction and a
@@ -31,6 +31,14 @@
 //   memorandum's fact, marked in the draft for review beside its own words —
 //   no clause is added for it, since the legal terms are the buyer's
 //   counsel's to write.
+//
+//   A SHORT SALE CLOSES ON ITS LENDER'S APPROVAL. The owner sells for less
+//   than its loan's balance, so the sale closes only once its lender
+//   approves it and the payoff it will accept (research pass 23). That is
+//   the one condition the memorandum's own words add to the paper: the
+//   draft makes the closing conditional on it, as a conversion's draft
+//   carries an entitlements contingency — a condition, with no figure in
+//   it, marked for review beside the memorandum's words.
 //
 //   A BLANK IS NULL. An extraction saved before the interest or the sale was
 //   read is a fee simple sold the usual way, and drafts as before.
@@ -67,6 +75,10 @@ export interface LoiTerms {
   /** a seller that is not the owner: the draft names the court-appointed
    *  receiver or the lender that took the property back */
   seller: ({ method: "receivership" | "reo" } & LoiStated) | null;
+  /** a short sale: the draft makes the closing conditional on the seller's
+   *  lender approving the sale and the payoff it will accept — the sale's
+   *  terms as stated beside it */
+  shortSale: LoiStated | null;
   /** a portfolio's properties, in the memorandum's order: the draft lists
    *  them by name ("" for an address the memorandum does not print, or one
    *  that is the name itself) */
@@ -112,6 +124,7 @@ export function loiTermsFor(
       refusal: { kind: refused, sentence: LOI_REFUSAL[refused] },
       leasehold: null,
       seller: null,
+      shortSale: null,
       properties: [],
       notes: [],
     };
@@ -127,6 +140,9 @@ export function loiTermsFor(
     sale && (sale.method === "receivership" || sale.method === "reo")
       ? { method: sale.method, stated: sale.terms, page: sale.page }
       : null;
+  // The owner sells, but its lender decides: the closing waits on the
+  // lender's approval of the sale and the payoff it will accept.
+  const shortSale = sale?.method === "short_sale" ? { stated: sale.terms, page: sale.page } : null;
 
   const properties = (readPortfolio(extraction)?.assets ?? []).map((a) => ({
     name: a.name,
@@ -147,6 +163,11 @@ export function loiTermsFor(
   if (properties.length) {
     notes.push(`The draft lists the ${properties.length} properties by name, as the memorandum does.`);
   }
+  if (shortSale) {
+    notes.push(
+      "It is a short sale, so the draft makes the closing conditional on the seller's lender approving the sale and the payoff it will accept.",
+    );
+  }
 
-  return { plan, refusal: null, leasehold, seller, properties, notes };
+  return { plan, refusal: null, leasehold, seller, shortSale, properties, notes };
 }

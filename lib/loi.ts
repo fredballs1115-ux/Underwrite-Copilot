@@ -42,6 +42,11 @@ export interface LoiParams {
    *  letter names the court-appointed receiver or the lender that took the
    *  property back, marked for review. Null where the owner sells. */
   seller?: ({ method: "receivership" | "reo" } & StatedFact) | null;
+  /** a short sale, as the memorandum states it: the owner sells for less
+   *  than its loan's balance, so the letter makes the closing conditional on
+   *  its lender approving the sale and the payoff it will accept, marked for
+   *  review. Null on every other sale. */
+  shortSale?: StatedFact | null;
   /** a portfolio's properties, as the memorandum lists them: the letter
    *  lists them by name, marked for review. Empty for one property. */
   properties?: { name: string; address: string }[];
@@ -87,10 +92,13 @@ function para(
   });
 }
 
-function numbered(n: number, title: string, body: string): Paragraph[] {
+/** A numbered clause. One the memorandum decided (`review`, the note beside
+ *  it) is highlighted, with the note under it, as the opening's stretches
+ *  are; every other clause is plain. */
+function numbered(n: number, title: string, body: string, review?: string): Paragraph[] {
   return [
     para(`${n}. ${title}`, { bold: true, before: 200, after: 40 }),
-    para(body, { before: 0 }),
+    ...(review ? [sentence([{ review: body }], 0), reviewNote(review)] : [para(body, { before: 0 })]),
   ];
 }
 
@@ -98,9 +106,9 @@ function numbered(n: number, title: string, body: string): Paragraph[] {
  *  (highlighted) for the reviewer. */
 type Part = string | { review: string };
 
-function sentence(parts: Part[]): Paragraph {
+function sentence(parts: Part[], before = 120): Paragraph {
   return new Paragraph({
-    spacing: { before: 120, after: 120 },
+    spacing: { before, after: 120 },
     children: parts.map(
       (p) =>
         new TextRun({
@@ -153,8 +161,11 @@ function quoted(f: StatedFact): string {
  * bought and from whom comes from the memorandum where it says the sale is
  * not the property from its owner (lib/loi-terms) — a leasehold, a
  * receiver's or a lender's sale, a portfolio — each such line highlighted
- * beside a note for review, and no clause added for it. The deals this
- * skeleton is the wrong document for never reach it (lib/loi-refusal).
+ * beside a note for review, and no clause added for it. A short sale is
+ * the one the memorandum adds a clause for: it closes only on its lender's
+ * approval, so that condition is drafted, highlighted beside its note. The
+ * deals this skeleton is the wrong document for never reach it
+ * (lib/loi-refusal).
  */
 export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
   // XML 1.0 cannot carry these control characters; docx writes them verbatim
@@ -174,6 +185,7 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     firmName: p.firmName ? clean(p.firmName).trim() : null,
     leasehold: cleanFact(p.leasehold),
     seller: cleanFact(p.seller),
+    shortSale: cleanFact(p.shortSale),
     properties: (p.properties ?? []).map((x) => ({ name: clean(x.name).trim(), address: clean(x.address).trim() })),
   };
 
@@ -249,9 +261,21 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     work && p.plan && NEEDS_ENTITLEMENTS.has(p.plan.kind)
       ? `Buyer’s obligation to close shall be contingent upon Buyer obtaining, at Buyer’s cost and in form and substance satisfactory to Buyer, all zoning approvals, entitlements, permits and other governmental consents necessary for Buyer’s intended ${work}. Seller shall reasonably cooperate with Buyer’s applications, and the parties shall agree in the PSA on any extension of the Due Diligence Period or the Closing required to pursue them.`
       : null;
+  // A short sale closes only once the owner's lender approves the sale and
+  // the payoff it will accept (lib/loi-terms): a condition of closing, as
+  // the entitlements contingency is one, with no figure in it — highlighted
+  // beside the memorandum's own words, since the memorandum decided it.
+  const lenderApproval: [string, string, string] | null = p.shortSale
+    ? [
+        "Lender Approval",
+        "The Closing shall be conditioned upon Seller’s lender approving, in writing, the sale of the Property on the terms of the PSA and the payoff it will accept from the sale. Seller shall request that approval promptly after execution of the PSA, and the parties shall agree in the PSA on any extension of the Closing required to obtain it.",
+        `Review before sending: the memorandum says this is a short sale its lender must approve${quoted(p.shortSale)}.`,
+      ]
+    : null;
 
-  // Numbered in order, so an added clause renumbers the ones after it.
-  const sections: [string, string][] = [
+  // Numbered in order, so an added clause renumbers the ones after it. A
+  // third entry is the review note of a clause the memorandum decided.
+  const sections: ([string, string] | [string, string, string])[] = [
     [
       "Purchase Price",
       `${p.price}, payable in cash at closing, subject to customary prorations and adjustments.`,
@@ -263,6 +287,7 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     ["Due Diligence Period", diligence],
     ["Financing", financing],
     ...(entitlements ? [["Entitlements and Approvals", entitlements] as [string, string]] : []),
+    ...(lenderApproval ? [lenderApproval] : []),
     [
       "Closing",
       `Closing shall occur within ${p.closeDays} days after expiration of the Due Diligence Period, subject to customary closing conditions.`,
@@ -325,7 +350,7 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
       before: 200,
     }),
     ...opening,
-    ...sections.flatMap(([title, body], i) => numbered(i + 1, title, body)),
+    ...sections.flatMap(([title, body, review], i) => numbered(i + 1, title, body, review)),
     para(
       "NON-BINDING: This letter is an expression of mutual interest only. Except for this paragraph, no provision of this letter creates any legally binding obligation on either party, and no such obligation shall arise unless and until a definitive PSA is executed and delivered by both parties. Either party may discontinue discussions at any time for any reason.",
       { bold: true, before: 280 },

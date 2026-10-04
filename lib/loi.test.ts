@@ -108,3 +108,37 @@ describe("LOI draft — what the memorandum states the sale is (lib/loi-terms)",
     expect(t).toContain("(1) Bad Name");
   });
 });
+
+// Research pass 23 read a short sale as a sale method; the letter still
+// drafted it as the owner's ordinary sale, though it closes only once the
+// owner's lender approves the sale and the payoff it will take.
+describe("LOI draft — a short sale closes on its lender's approval", () => {
+  const CONDITION =
+    "The Closing shall be conditioned upon Seller’s lender approving, in writing, the sale of the Property on the terms of the PSA and the payoff it will accept from the sale.";
+
+  it("adds the lender's approval as a condition of closing, with no figure in it, marked for review", async () => {
+    const t = await letterText({ ...base, shortSale: { stated: "Offered as a short sale, subject to lender approval.", page: "p. 2" } });
+    expect(t).toContain("5. Lender Approval");
+    expect(t).toContain(CONDITION);
+    expect(t).toContain(
+      "[Review before sending: the memorandum says this is a short sale its lender must approve — “Offered as a short sale, subject to lender approval”, p. 2.]",
+    );
+    // The clauses after it renumber.
+    expect(t).toContain("6. Closing");
+    expect(t).toContain("7. Purchase and Sale Agreement");
+    // A condition, never a figure: no dollar amount or percentage in it.
+    const clause = t.slice(t.indexOf("5. Lender Approval"), t.indexOf("6. Closing"));
+    expect(clause).not.toMatch(/\$|\d\s*%/);
+    // The owner sells: the opening is the usual one.
+    expect(t).toContain("from its owner (“Seller”) on the principal terms set out below.");
+  });
+
+  it("follows a conversion's entitlements contingency, and the usual letter carries none", async () => {
+    const both = await letterText({ ...base, plan: { kind: "conversion", label: "Conversion" }, shortSale: { stated: "", page: "" } });
+    expect(both).toContain("5. Entitlements and Approvals");
+    expect(both).toContain("6. Lender Approval");
+    expect(both).toContain("[Review before sending: the memorandum says this is a short sale its lender must approve.]");
+    expect(both).toContain("7. Closing");
+    expect(await letterText(base)).not.toContain("Lender Approval");
+  });
+});

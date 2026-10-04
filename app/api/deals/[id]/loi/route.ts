@@ -150,9 +150,11 @@ export async function GET(
     const buffer = await buildLoiDocx({
       plan: terms.plan,
       // What the memorandum states the sale is, where it is not the
-      // property from its owner: each line marked in the letter for review.
+      // property from its owner: each line marked in the letter for review
+      // — and a short sale's closing conditioned on its lender's approval.
       leasehold: terms.leasehold,
       seller: terms.seller,
+      shortSale: terms.shortSale,
       properties: terms.properties,
       buyerName,
       firmName,

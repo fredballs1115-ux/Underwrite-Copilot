@@ -318,9 +318,44 @@ describe("the LOI drafts what the memorandum states, each such line marked for r
     expect(letter).toContain("[Review before sending: the memorandum says the lender that took the property back is selling it.]");
   });
 
+  // Research pass 23 read a short sale as a sale method; the letter drafted
+  // the owner's ordinary sale, though the owner's lender must approve it.
+  it("a short sale: the letter makes the closing conditional on the seller's lender approving the sale and its payoff", async () => {
+    const short: ExtractionResult = {
+      ...extraction,
+      totalPages: 40,
+      sale: sale("short_sale", { terms: "Offered as a short sale, subject to lender approval.", page: "p. 2" }),
+    };
+    const terms = loiTermsFor(short, null);
+    expect(terms.refusal).toBeNull();
+    expect(terms.shortSale).toEqual({ stated: "Offered as a short sale, subject to lender approval.", page: "p. 2" });
+    db.row = { ...db.row, extraction: short, first_signal: null };
+    const res = await download();
+    expect(res.status).toBe(200);
+    const letter = await letterText(res);
+    expect(letter).toContain("5. Lender Approval");
+    expect(letter).toContain(
+      "The Closing shall be conditioned upon Seller’s lender approving, in writing, the sale of the Property on the terms of the PSA and the payoff it will accept from the sale.",
+    );
+    expect(letter).toContain(
+      "[Review before sending: the memorandum says this is a short sale its lender must approve — “Offered as a short sale, subject to lender approval”, p. 2.]",
+    );
+    // The panel says what the download carries, in the same list.
+    const html = panelHtml(short, null);
+    expect(visibleText(html)).toMatch(
+      /It is a short sale, so the draft makes the closing conditional on the seller's lender approving the sale and the payoff it will accept\.\s*Each is highlighted in the draft for review\./,
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    // A sale the owner negotiates, or an extraction that read no sale,
+    // carries no such condition.
+    expect(loiTermsFor({ ...extraction, sale: sale("negotiated") }, null).shortSale).toBeNull();
+    expect(loiTermsFor(extraction, null).shortSale).toBeNull();
+  });
+
   it("a plain fee simple sold the usual way: the letter is the letter it always was", async () => {
     const plain = loiTermsFor(extraction, null);
-    expect(plain).toMatchObject({ refusal: null, leasehold: null, seller: null, properties: [], notes: [] });
+    expect(plain).toMatchObject({ refusal: null, leasehold: null, seller: null, shortSale: null, properties: [], notes: [] });
     db.row = { ...db.row, first_signal: null };
     const res = await download();
     expect(res.status).toBe(200);
@@ -345,7 +380,7 @@ describe("the LOI drafts what the memorandum states, each such line marked for r
       firmName: null,
     };
     const before = await letterXml(await buildLoiDocx(params));
-    const after = await letterXml(await buildLoiDocx({ ...params, plan: null, leasehold: null, seller: null, properties: [] }));
+    const after = await letterXml(await buildLoiDocx({ ...params, plan: null, leasehold: null, seller: null, shortSale: null, properties: [] }));
     expect(after).toBe(before);
     expect(panelHtml(extraction, null)).not.toMatch(/data-qa="loi-notes"/);
   });

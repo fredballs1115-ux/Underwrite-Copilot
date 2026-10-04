@@ -120,7 +120,8 @@ export function LoiPanel({
       )}
       {notes.length > 0 && (
         // The lines the memorandum decided — what is bought, who sells, the
-        // portfolio's properties — each marked in the draft for review.
+        // portfolio's properties, a short sale's lender approval — each
+        // marked in the draft for review.
         <ul data-qa="loi-notes" className="mt-2 max-w-lg list-disc space-y-1 pl-4 text-xs leading-relaxed text-brand">
           {notes.map((n) => (
             <li key={n}>{n}</li>
