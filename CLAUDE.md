@@ -148,7 +148,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the model gross the price up to the whole the building's figures
   describe — the model's price source is "derived", its note saying the
   share earns its slice before the promote and fees — while a share with
-  no stated percentage is compared to nothing. **A leasehold is a wasting
+  no stated percentage is compared to nothing. Where the memorandum states
+  the entity's own loan ("Entity loan balance", `entityLoanOf`), every
+  surface says the grossed-up figure is the equity's whole, not the
+  asset's, with the loan on top of it; the model neither adds the loan to
+  the price nor carries it (that arithmetic is the owner's call, in
+  WILL_TODO). **A leasehold is a wasting
   asset**, said, with the ground lease as stated and a link to the ground
   lease calculator. **A blank is null.** An extraction saved before the
   interest was read is fee simple, and a plain fee simple says nothing.
@@ -168,7 +173,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   filled, a share's implied whole with the share filled,
   `data-bar="interest"`), the memo under its title (`interestShortLine`),
   the report's sensitivity page (the model caveat above the grids) and the
-  workbook's cover (`meta.interest`). **The leased fee is its own kind**
+  workbook's cover (`meta.interest`). Under a tower, a billboard or a
+  solar array the leased fee says the land comes back, not a building
+  (read off the lease's own words, never the deal's name), and a stated
+  "Ground lease termination right" is shown as stated, never read as the
+  lease's end. **The leased fee is its own kind**
   (#415, `leased_fee`): the land under a building someone else owns, sold
   with its ground lease — read as fee simple with a ground lease, the same
   deal was told its income was an expense. The ground rent IS the
@@ -255,7 +264,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     end after 2100);
   - a year alone, read as its FIRST day, the earliest end the year allows;
   - a count of years, counted from today and said to be possibly short,
-    since the memorandum's own date is earlier.
+    since the memorandum's own date is earlier — except on a development or
+    a conversion, whose lease starts at delivery: there the count runs from
+    the lease's start, said so, with no "possibly short".
 
   The options are read apart from the term: "four 10-year options", "4 x
   10 years", "three successive 10-year", "to 2111". A separator is
@@ -446,7 +457,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   (`hotelShortLine`) and the compare table's Hotel row.
 - How the property is sold (#456): the extraction reads
   `ExtractionResult.sale` (`method` — `negotiated`, `auction`,
-  `receivership`, `bankruptcy`, `reo`, `unknown` — with the sale's terms
+  `receivership`, `bankruptcy`, `reo`, `short_sale`, `unknown`, the
+  extraction's enum read off the sale reader's own list — with the sale's terms
   and the condition it is sold in, each as stated) and labels the figures
   as rows: "Starting bid" (never filed under "Asking price"), "Buyer's
   premium", "Reserve price", "Bid deadline" and "Stalking horse bid".
@@ -637,7 +649,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   coverage is said: "Its year-one coverage is 1.16× against the model's
   loan's 1.31×"); a short term is a refinance (whole years at the note's
   rate, then today's); a second is not a first (read, never run against
-  the model's loan); a term not stated is named. The card is the
+  the model's loan); a term not stated is named; and on a note, the
+  seller's financing is of the note's purchase (`notePurchaseFinancing`):
+  listed as that in the deal context, the challenger's notes, the key
+  terms (labelled "for the note purchase; not run against the model"), the
+  memo, the shared screen and the workbook's cover, and never run against
+  the model's property loan. The card is the
   assumable card itself: `AssumableView.kind` ("assumption" | "seller")
   switches its words ("The seller's note, offered to carry the price",
   `data-qa="seller-note"`) and the report's `AssumableBlock`'s, and the
@@ -1085,7 +1102,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   storage yards as industrial, then the bare word "storage"; housing named
   by its program or tenants ("Affordable Housing (LIHTC)") as multifamily
   after every other rule (#479: the bare word had filed a cold-storage
-  warehouse as self-storage). **A deal has one class**: every reader goes
+  warehouse as self-storage). Apartments over shops ("Retail/Residential")
+  are mixed-use, an RV resort is a park, a lab or life-science building is
+  an office, and "Apartments" alone is multifamily (research pass 23); a
+  re-filed deal runs on its class's existing defaults. A lab, a yard or a
+  cold-storage building reads no lessor rent index (`ownMarketBuilding`,
+  the tracker's own predicate), and the challenger's class traps gain lists
+  for a cannabis tenant, a special-purpose conversion, a lab and cold
+  storage — questions only, after the class traps, so a deal that triggers
+  none is asked exactly as before. **A deal has one class**: every reader goes
   through `shownAssetClass` (the analyst's class where they filed one, the
   deck's where they left Auto) — the market check, the deal page's
   since-this-screen, demand and portfolio cards and the shared screen had
