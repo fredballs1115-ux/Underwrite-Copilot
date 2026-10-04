@@ -1883,8 +1883,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   two metro areas whose whiskers overlap are not ordered by the survey,
   whatever the order says. A metro's survey figure is stale after 240
   days (`freshDays`: a quarter dated its first day, published late in
-  the month after it ends, is at most about 210 days old while it is the
-  newest). The tracker figures on the sector pages
+  the month after it ends and pulled on the 6th of the month after that,
+  is at most about 220 days old while it is the newest). The tracker
+  figures on the sector pages
   are a different measure and the note says that too. One cached read
   (`liveMetricRates("rental_vacancy_msa")`) plus `liveRates()`; a
   suburb has no series of its own and is not a row; `data-bar="surveyvac"`.
