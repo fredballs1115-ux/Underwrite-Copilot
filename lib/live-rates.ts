@@ -71,6 +71,7 @@
 
 import { withArticle } from "@/lib/article";
 import { monthOf } from "@/lib/zori";
+import { HVS_RATES_URL } from "@/lib/hvs-tables";
 import table from "@/data/fred-series.json";
 
 /** How often a series publishes; `annual` is the Housing Vacancy Survey's
@@ -166,8 +167,10 @@ export type MetroMetric =
  */
 export type SeriesSource = "fred" | "bls" | "census";
 
-/** Where the Census Bureau publishes the Housing Vacancy Survey's rate tables. */
-export const HVS_RATES_URL = "https://www.census.gov/housing/hvs/data/rates.html";
+/** Where the Census Bureau publishes the Housing Vacancy Survey's rate tables
+ *  — the one address the tiles link and the pull reads the tables' names
+ *  from (lib/hvs-tables). */
+export { HVS_RATES_URL };
 
 export interface SeriesMeta {
   /** The key in the `rates` table. */
