@@ -124,6 +124,27 @@ describe("readRoster — the tenants a memorandum lists, against the model's sal
     expect(r.headline).toMatch(/Early termination rights take 0\.4 years off that: to the first date each tenant may leave, 4\.6 years\./);
   });
 
+  it("a break already open, or open today, rolls in year 1 in the list, the shares and the headline alike (the audit of 2026-10-04)", () => {
+    // The grocer may leave from January 1, 2026: read on October 4 that
+    // right is open. The list had put it in year 1 at 0% while the schedule
+    // counted its rent at the 2029 expiry, under nobody's name.
+    const day = new Date(Date.UTC(2026, 9, 4));
+    for (const earlyTermination of ["January 1, 2026", "October 4, 2026"]) {
+      const r = readRoster(
+        CENTER({}, [
+          tenant({ name: "Grocer", role: "anchor", sf: "40,000 SF", rent: "$600,000", leaseExpiration: "December 31, 2029", earlyTermination }),
+          tenant({ name: "Pharmacy", sf: "10,000 SF", rent: "$300,000", leaseExpiration: "March 31, 2035" }),
+        ]),
+        day,
+      )!;
+      const year1 = r.years.find((y) => y.year === 1)!;
+      expect(year1, earlyTermination).toEqual({ year: 1, sharePct: 66.7, tenants: ["Grocer"] });
+      for (const y of r.years) expect(y.sharePct > 0, `${earlyTermination} year ${y.year}`).toBe(y.tenants.length > 0);
+      expect(r.worst, earlyTermination).toEqual(year1);
+      expect(r.headline, earlyTermination).toContain("Of their rent, 67% expires before the model's sale in year 5 — the most in year 1, when Grocer rolls (67%).");
+    }
+  });
+
   it("reads by area where the list states no rents, and names the tenants it cannot place", () => {
     const r = readRoster(
       CENTER({}, [
