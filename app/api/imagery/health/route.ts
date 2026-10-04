@@ -11,9 +11,16 @@
 // It probes the live endpoints with a known-good address and reports what
 // each service actually said. Signed-in users only; the key itself is never
 // echoed, only whether it is present and what Google made of it.
+//
+// The two Google probes run for the site's operators alone (OPERATOR_EMAILS,
+// lib/operator-server; research pass 22): each is a call on the site's own
+// key, and the Static Maps one is billed, so any account asking on a loop
+// ran up the operator's bill. Everyone else signed in gets the free probes
+// (the geocoder, USGS, the basemap tiles) and whether a key is set.
 
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { isSiteOperator } from "@/lib/operator-server";
 import { BASEMAPS, usgsAerialUrl } from "@/lib/basemaps";
 import { imagePlan } from "@/lib/imagery-plan";
 import { googleConfigured } from "@/lib/imagery";
@@ -196,15 +203,22 @@ async function probeTiles(): Promise<Record<string, Probe>> {
   return out;
 }
 
+/** What a signed-in caller who is not an operator is told in place of the
+ *  Google probes. */
+const GOOGLE_PROBES_FOR_OPERATORS =
+  "Probed for the site's operators only: each Google probe is a call on the site's own key, and the Static Maps one is billed.";
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+  const operator = isSiteOperator(user);
 
   const key = process.env.GOOGLE_MAPS_API_KEY;
+  const notProbed = async (): Promise<Probe> => ({ ok: false, detail: GOOGLE_PROBES_FOR_OPERATORS });
   const [geocoder, streetView, satellite, aerial, tiles] = await Promise.all([
     probeGeocoder(),
-    probeStreetView(key),
-    probeSatellite(key),
+    operator ? probeStreetView(key) : notProbed(),
+    operator ? probeSatellite(key) : notProbed(),
     probeAerial(),
     probeTiles(),
   ]);
@@ -213,6 +227,8 @@ export async function GET() {
     {
       probeAddress: PROBE.label,
       googleConfigured: googleConfigured(),
+      // Whether the Google probes below ran (the site's operators only).
+      googleProbed: operator,
       // What a street-addressed deal will actually try, in order, right now.
       planForStreetAddressedDeal: imagePlan({
         hasStreetAddress: true,

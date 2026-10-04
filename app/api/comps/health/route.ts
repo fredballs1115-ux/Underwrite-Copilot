@@ -5,10 +5,16 @@
 // column name is discovered HERE (Socrata names the bad column; ArcGIS's
 // service root lists its layers) and fixed as a one-line config edit.
 // Signed-in users only; nothing here is secret, but there's no reason to
-// offer free probes to the world.
+// offer free probes to the world. The probes themselves are the site's
+// operators' (OPERATOR_EMAILS, lib/operator-server; research pass 22): each
+// ask sent every county and city portal a request from the site's own
+// address, and a portal that throttles that address throttles every deal's
+// comps pull with it. Everyone else signed in gets each provider's own
+// configuration and no request.
 
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/supabase/server";
+import { isSiteOperator } from "@/lib/operator-server";
 import { PROVIDERS } from "@/lib/public-comps/core";
 import { bareUrl, jsonShape, upstreamNote } from "@/lib/upstream-note";
 
@@ -16,6 +22,18 @@ export async function GET() {
   const user = await getCurrentUser();
   if (!user) {
     return NextResponse.json({ error: "unauthenticated" }, { status: 401 });
+  }
+  if (!isSiteOperator(user)) {
+    return NextResponse.json({
+      note: "The live probes of each provider are run for the site's operators only. This is each provider's configuration as the code holds it.",
+      probed: false,
+      results: PROVIDERS.map((p) => ({
+        provider: p.id,
+        name: p.name,
+        configured: p.configured,
+        needsFieldVerification: p.needsFieldVerification,
+      })),
+    });
   }
 
   const results = await Promise.all(
@@ -85,6 +103,7 @@ export async function GET() {
 
   return NextResponse.json({
     note: "ok:false or an error body here means that provider's config needs its endpoint/field names adjusted (lib/public-comps/core.ts). Philadelphia is reference-verified; DC and Maryland ship config-first.",
+    probed: true,
     results,
   });
 }
