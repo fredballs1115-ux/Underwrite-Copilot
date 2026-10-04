@@ -5953,6 +5953,12 @@
         "Bozeman Montana downtown",
         "Bozeman Montana Main Street",
         "Bozeman Montana Bridger Range"
+      ],
+      "candidates": [
+        {
+          "file": "Main St, Bozeman, Montana (1).JPG",
+          "note": "Bozeman, MT — Chris06, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236536465)."
+        }
       ]
     },
     {
@@ -5991,6 +5997,12 @@
         "Billings Montana skyline",
         "Billings Montana downtown",
         "Billings Montana Rimrocks"
+      ],
+      "candidates": [
+        {
+          "file": "Billings, Montana skyline in 2024.jpg",
+          "note": "Billings, MT — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236536465)."
+        }
       ]
     },
     {
@@ -6010,6 +6022,12 @@
         "Coeur d'Alene Idaho lake",
         "Coeur d'Alene Idaho downtown",
         "Coeur d'Alene Idaho waterfront"
+      ],
+      "candidates": [
+        {
+          "file": "Coeur d'Alene Resort (Main hotel; Facing southeast; 2023-02-16).jpg",
+          "note": "Coeur d'Alene, ID — Locke Cole, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236536465)."
+        }
       ]
     },
     {
@@ -6029,6 +6047,12 @@
         "Flagstaff Arizona downtown",
         "Flagstaff Arizona San Francisco Peaks",
         "Flagstaff Arizona Route 66"
+      ],
+      "candidates": [
+        {
+          "file": "San Francisco Peaks.jpg",
+          "note": "Flagstaff, AZ — Tyler finvold, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37236536465)."
+        }
       ]
     },
     {
@@ -6047,6 +6071,12 @@
         "Grand Junction Colorado downtown",
         "Grand Junction Colorado Book Cliffs",
         "Grand Junction Colorado Main Street"
+      ],
+      "candidates": [
+        {
+          "file": "Grand-junction-skyline.jpg",
+          "note": "Grand Junction, CO — Eleaf, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236536465)."
+        }
       ]
     },
     {
@@ -6105,6 +6135,12 @@
         "Auburn Alabama Samford Hall",
         "Auburn Alabama downtown",
         "Opelika Alabama downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Railroad Avenue Historic District Opelika Alabama.JPG",
+          "note": "Auburn-Opelika, AL — Rivers A. Langley; SaveRivers, CC BY-SA 3.0; credited \"Rivers A. Langley\", the name in the file page's Author field (zori probe_url run 37240971983). The chosen file, in lib/skyline.ts (skyline-sheet run 37236686331)."
+        }
       ]
     },
     {
@@ -6123,6 +6159,12 @@
         "Johnson City Tennessee downtown",
         "Johnson City Tennessee skyline",
         "Johnson City Tennessee mountains"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Johnson City Sunset.jpg",
+          "note": "Johnson City, TN — Lwowen18, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236686331)."
+        }
       ]
     },
     {
@@ -6178,6 +6220,12 @@
         "Iowa City downtown",
         "Iowa City Old Capitol",
         "Iowa City Iowa River"
+      ],
+      "candidates": [
+        {
+          "file": "Capitol Street, Iowa City, IA.jpg",
+          "note": "Iowa City, IA — w_lemay, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236836751)."
+        }
       ]
     },
     {
@@ -6197,6 +6245,12 @@
         "Columbia Missouri downtown",
         "Columbia Missouri skyline",
         "Francis Quadrangle columns"
+      ],
+      "candidates": [
+        {
+          "file": "Jesse Hall Aerial.jpg",
+          "note": "Columbia, MO — Lectrician2, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236836751)."
+        }
       ]
     },
     {
@@ -6216,6 +6270,12 @@
         "Lawrence Kansas downtown",
         "Lawrence Kansas Massachusetts Street",
         "Lawrence Kansas skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Lawrence, KS August 2025.jpg",
+          "note": "Lawrence, KS — Shannon Beat, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236836751)."
+        }
       ]
     },
     {
@@ -6235,6 +6295,12 @@
         "Bloomington Indiana downtown",
         "Bloomington Indiana courthouse square",
         "Bloomington Indiana skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Bloomington IN Kirkwood.jpg",
+          "note": "Bloomington, IN — Yahala, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236836751)."
+        }
       ]
     },
     {
@@ -6255,6 +6321,12 @@
         "Ithaca New York Cayuga Lake",
         "Ithaca New York downtown",
         "Ithaca New York gorge"
+      ],
+      "candidates": [
+        {
+          "file": "Cornell West Campus from McGraw Tower.jpg",
+          "note": "Ithaca, NY — Andrew Parmet, CC BY 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236836751)."
+        }
       ]
     },
     {
@@ -6274,6 +6346,12 @@
         "Traverse City Michigan bay",
         "Traverse City Michigan downtown",
         "Traverse City Front Street"
+      ],
+      "candidates": [
+        {
+          "file": "Traverse City Skyline.jpg",
+          "note": "Traverse City, MI — Phoenix-Five, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236836751)."
+        }
       ]
     },
     {

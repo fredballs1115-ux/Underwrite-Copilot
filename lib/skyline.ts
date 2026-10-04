@@ -624,6 +624,17 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Asheville, NC",
     size: [5679, 3838],
   },
+  // Auburn-Opelika, AL: skyline-sheet run 37236686331 — an article's lead, Railroad Avenue in Opelika, the title's second city: painted brick fronts, awnings and iron balconies in sun under a clear sky, sharp, whole on the card, the deal page's crops cutting one parapet's urn finial and, at 21:9, its scrolled pediment and the top of its painted name; over Auburn's city hall behind a lamppost and bare trees, and five frames of a football game's band and dancers.
+  // The runner printed the author as "Rivers A. Langley; SaveRivers", and the file page's own Author field is the same, a name and the photographer's Commons username, with no attribution template (zori probe_url run 37240971983); the credit is the name in it, as Duluth's and Dover's are.
+  "cbsa:12220": {
+    file: "Railroad Avenue Historic District Opelika Alabama.JPG",
+    place: "Railroad Avenue's painted storefronts in downtown Opelika under a clear blue sky",
+    credit: "Rivers A. Langley",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Auburn-Opelika, AL",
+    size: [3329, 2302],
+  },
   // Augusta, GA: skyline-sheet run 36782967654 — the city article's lead, the skyline in the evening light, over HDR street scenes.
   "cbsa:12260": {
     file: "Augusta, GA Downtown Skyline 2017.jpg",
@@ -674,6 +685,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Bend, OR",
     size: [4000, 3000],
   },
+  // Billings, MT: skyline-sheet run 37236536465 — an article's lead, downtown from the air on a clear winter day, its tallest tower whole at the left and the Rims along the horizon, an oblique with a horizon, sharp; over the railyard's coal trains toward downtown under an overcast, a printed postcard, a bank's lit sign, a bus terminal, a street corner under a signal's arm and two dark night frames.
+  "cbsa:13740": {
+    file: "Billings, Montana skyline in 2024.jpg",
+    place: "Downtown Billings on a clear winter day, the Rims along the horizon",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Billings, MT",
+    size: [7855, 5145],
+  },
   // Binghamton, NY: skyline-sheet run 36818942891 — downtown from the air on its river in warm summer light, wooded hills and a blue sky behind, an oblique with a horizon, sharp and whole in both crops; over a campus building behind streetlamps, the skyline small behind trees and power lines, and two hazy frames over pylons, wires and a wall.
   "cbsa:13780": {
     file: "Binghamton, New York skyline.jpg",
@@ -704,6 +725,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Bismarck, ND",
     size: [3648, 1831],
   },
+  // Bloomington, IN: skyline-sheet run 37236836751 — an article's lead, Kirkwood Avenue at sunset, its shops, lamps and trees running to the courthouse's dome under a lit sky, whole in both crops; over five portraits of the courthouse, each losing its dome's top at 21:9, two with cars along the foot, a portrait with a portable toilet and parked cars, and the dome's interior.
+  "cbsa:14020": {
+    file: "Bloomington IN Kirkwood.jpg",
+    place: "Kirkwood Avenue at sunset, the Monroe County Courthouse's dome at its end",
+    credit: "Yahala",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Bloomington, IN",
+    size: [3004, 1993],
+  },
   // Boise, ID: skyline-sheet run 36751130861 — the article's lead image, whole in every crop.
   "cbsa:14260": {
     file: "Boise, Idaho.jpg",
@@ -723,6 +754,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Boulder, CO",
     size: [5456, 3632],
+  },
+  // Bozeman, MT: skyline-sheet run 37236536465 — an article's lead, Main Street's brick and stone blocks in summer sun under a clear sky, the Hotel Baxter's rooftop sign down the street, whole in both crops but for a chimney's top the 21:9 cuts; over the Bridger Range behind a wheat field under a white sky, a lamppost's welcome banner over a car's roof, and three portraits of brick fronts behind parked cars.
+  "cbsa:14580": {
+    file: "Main St, Bozeman, Montana (1).JPG",
+    place: "Main Street in downtown Bozeman under a clear sky, the Hotel Baxter's rooftop sign down the street",
+    credit: "Chris06",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Bozeman, MT",
+    size: [2048, 1536],
   },
   // Bridgeport, CT: skyline-sheet run 36750858237 — the principal city's lead image, whole in every crop.
   "cbsa:14860": {
@@ -824,6 +865,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Chico, CA",
     size: [7298, 4277],
   },
+  // Coeur d'Alene, ID: skyline-sheet run 37236536465 — the lakefront resort and marina the city is known by, Tubbs Hill and the lake behind, from the air in low winter sun, an oblique whose horizon the card keeps, sharp; over the same waterfront from the air in a PNG (never served), the lake at sunset with no town in it, Wallace's I-90 viaduct — another county's town — twice, the resort's holiday lights at night and a 1970s archive plate gone magenta.
+  "cbsa:17660": {
+    file: "Coeur d'Alene Resort (Main hotel; Facing southeast; 2023-02-16).jpg",
+    place: "The Coeur d'Alene Resort and its marina on the lake, Tubbs Hill behind, from the air in winter sun",
+    credit: "Locke Cole",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Coeur d'Alene, ID",
+    size: [8064, 6048],
+  },
   // Colorado Springs, CO: skyline-sheet run 36779692322 — the article's lead, taken March 2026; the Pikes Peak frame was haze and one search result was Los Angeles.
   "cbsa:17820": {
     file: "Colorado Springs, Colorado (cropped).jpg",
@@ -833,6 +884,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Colorado Springs, CO",
     size: [6479, 4322],
+  },
+  // Columbia, MO: skyline-sheet run 37236836751 — an article's lead, Jesse Hall's dome over the Francis Quadrangle and its six columns from a low drone in summer, an oblique with a horizon under textured cloud, the spire whole in both crops; over downtown's roofs from a garage under a radio mast, a church at dusk, a museum's lawn, a church and an apartment block cut by the crops, and two dim streets of parked cars.
+  "cbsa:17860": {
+    file: "Jesse Hall Aerial.jpg",
+    place: "Jesse Hall's dome over the Francis Quadrangle and its six columns, from a low drone in summer",
+    credit: "Lectrician2",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Columbia, MO",
+    size: [4000, 2250],
   },
   // Columbia, SC: skyline-sheet run 36779692322 — the article's lead, over a night frame that goes dark under the card's shade.
   "cbsa:17900": {
@@ -1025,6 +1086,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Fayetteville, AR",
     size: [4000, 3000],
   },
+  // Flagstaff, AZ: skyline-sheet run 37236536465 — an article's lead, the San Francisco Peaks over the city under fresh snow, the pines below frosted white and a cloud bank over the summits in a clear blue sky, whole in both crops; over a stitched 360-degree panorama from the Humphreys Peak trail, its ridges bent by the projection.
+  "cbsa:22380": {
+    file: "San Francisco Peaks.jpg",
+    place: "The San Francisco Peaks under fresh snow over frosted pines, a cloud bank above",
+    credit: "Tyler finvold",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Flagstaff, AZ",
+    size: [1600, 930],
+  },
   // Flint, MI: skyline-sheet run 36816207134 — the city article's lead, downtown from above the river with the Vehicle City arch at its foot under cumulus, an oblique with a horizon, every tower whole in both crops. Over the tower with the globe and its neighbours, backlit over parked SUVs, downtown at dusk under heavy cloud across a plaza, the towers across the river 750px tall and soft, a dusk strip 375px tall with a seam in its sky, a road bridge with a van and a truck, and a White House photograph of President Obama sipping filtered water.
   "cbsa:22420": {
     file: "Flint, Michigan.jpg",
@@ -1064,6 +1135,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Gainesville, FL",
     size: [3992, 2242],
+  },
+  // Grand Junction, CO: skyline-sheet run 37236536465 — an article's lead, the city across its valley under the Book Cliffs and a storm-dark sky lit warm at the horizon, a bluff and junipers before it, whole in both crops; over the cliffs over downtown shot through tinted glass with a smudge in the sky, a city bus and the national monument's entrance sign.
+  "cbsa:24300": {
+    file: "Grand-junction-skyline.jpg",
+    place: "Grand Junction across its valley under the Book Cliffs, a stormy sky above",
+    credit: "Eleaf",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Grand Junction, CO",
+    size: [2900, 1642],
   },
   // Grand Rapids, MI: skyline-sheet run 36750858237 — blue hour with the lit bridge, sharp and whole.
   "cbsa:24340": {
@@ -1165,6 +1246,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Huntsville, AL",
     size: [2032, 1524],
   },
+  // Iowa City, IA: skyline-sheet run 37236836751 — Capitol Street toward the Old Capitol's gilded dome under a clear blue sky, the dome whole and central in both crops between a slatted grey building and a brick one; over the south skyline's roofs under a grey overcast and three frames of a block party's crowd.
+  "cbsa:26980": {
+    file: "Capitol Street, Iowa City, IA.jpg",
+    place: "Capitol Street toward the Old Capitol's gilded dome, under a clear blue sky",
+    credit: "w_lemay",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    name: "Iowa City, IA",
+    size: [3840, 2880],
+  },
+  // Ithaca, NY: skyline-sheet run 37236836751 — Cornell's West Campus and Cayuga Lake from McGraw Tower in spring under a clear sky, the town and its hills beyond, an oblique whose sky both crops keep; over the campus in autumn from the same tower, whose 21:9 keeps no sky and reads as roofs, the lake from a wooded hill with no town in it, and four street frames of the Commons behind a gateway's signs or in shade.
+  "cbsa:27060": {
+    file: "Cornell West Campus from McGraw Tower.jpg",
+    place: "Cornell's West Campus and Cayuga Lake from McGraw Tower, in spring",
+    credit: "Andrew Parmet",
+    license: "CC BY 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/3.0",
+    name: "Ithaca, NY",
+    size: [2944, 1281],
+  },
   // Jackson, MS: skyline-sheet run 36782967654 — the Capitol with downtown behind it, over a parking deck's view and a foggy parking lot.
   "cbsa:27140": {
     file: "JacksonMS Downtown Panorama.jpg",
@@ -1174,6 +1275,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     name: "Jackson, MS",
     size: [2247, 822],
+  },
+  // Johnson City, TN: skyline-sheet run 37236686331 — downtown at dusk, a lit church steeple and a brick tower against a sky fading from blue to orange, the mountains behind, a 2.64:1 strip whose full height both crops keep, served whole at its own width; over the same view by day under bare branches, a street of parked cars under a tree, another town's main street, and four frames of Virginia's Skyline Drive.
+  "cbsa:27740": {
+    file: "Downtown Johnson City Sunset.jpg",
+    place: "Downtown Johnson City at dusk, a lit church steeple and a brick tower against an orange sky, mountains behind",
+    credit: "Lwowen18",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Johnson City, TN",
+    size: [2353, 892],
   },
   // Kahului-Wailuku, HI: skyline-sheet run 36816430466 — Iao Valley's green ridges above Wailuku under a blue sky and cumulus, sharp, the summit whole with room in both crops; a crop of the photographer's own stitched panorama, without its black corners. Over that panorama and another whose unfilled black corners show in both crops, a tighter crop credited to a sentence naming a file, the Iao Needle under a mist that leaves half the card blank, a hazy view of West Maui from Haleakala's road, and two frames of Kahului Harbor's water and breakwater.
   "cbsa:27980": {
@@ -1284,6 +1395,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Las Cruces, NM",
     size: [5346, 2288],
+  },
+  // Lawrence, KS: skyline-sheet run 37236836751 — an article's lead, downtown's main street from above in late summer, a stone clock tower beside it and church spires beyond, wooded hills to a far horizon under a clear sky, an oblique whose every top both crops keep; over the same street with its tower from a rooftop, a winter street of parked cars and two highway bridges over the river.
+  "cbsa:29940": {
+    file: "Lawrence, KS August 2025.jpg",
+    place: "Downtown Lawrence's main street from above, a stone clock tower and church spires under a clear sky",
+    credit: "Shannon Beat",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Lawrence, KS",
+    size: [3000, 1688],
   },
   // Lexington, KY: skyline-sheet run 36780959488 — the landmark the city is known by, sharp at dusk; the downtown aerial was 1544px and dated.
   "cbsa:30460": {
@@ -1926,6 +2047,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Toledo, OH",
     size: [5184, 3456],
+  },
+  // Traverse City, MI: skyline-sheet run 37236836751 — downtown from above in summer under a clear blue sky, its tallest tower's green copper roof at the left and a red dome at the right, whole in both crops; over a hazy telephoto of the same tower in early spring behind a crane, the city as a thin strip across the bay, a crossroads in slush, a hazy marina and two shores in another county.
+  "cbsa:45900": {
+    file: "Traverse City Skyline.jpg",
+    place: "Downtown Traverse City from above under a clear summer sky",
+    credit: "Phoenix-Five",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Traverse City, MI",
+    size: [4032, 3024],
   },
   // Trenton-Princeton, NJ: skyline-sheet run 36800324942 — the State House, the picture a capital is known by, its dome whole in every crop under a clear sky, over the same building from the north with its dome cut by the wide crop behind a tree, City Hall under a grey sky, the falls of the Delaware with downtown a pale strip, the Trenton Makes bridge's lettering at night, the freeway and a canal under a billboard.
   "cbsa:45940": {
