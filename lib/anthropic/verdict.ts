@@ -139,7 +139,7 @@ const shareText = (pct: number): string => `${Number.isInteger(pct) ? pct : pct.
  * those says what the code computes, or that there is none and why.
  */
 function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedClass: string | null | undefined): string {
-  const { kind, sharePct } = interestOf(ex);
+  const { kind, sharePct, entityLoan } = interestOf(ex);
   if (kind === "note") {
     return "THE BUILDING'S BASIS: none — this sells a loan, and its price is a loan's. No price per unit or per SF, no cap and no property return is struck on it; the collateral's own figures belong to the collateral's owner.";
   }
@@ -169,7 +169,14 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
     if (plan?.totalCost != null) {
       return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, ${compact(plan.totalCost)} all-in as computed in code; the OM states no planned count to set it per ${noun.one}, and ${never} is never the basis.${priceAlone}`;
     }
+    // A share beside its entity's loan: the plan's own sentence on why.
+    if (plan?.costWithheld) return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost. ${plan.costWithheld}`;
     return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, which the code cannot compute from what the OM states; ${never} is never the basis.${priceAlone}`;
+  }
+  // A share beside the loan its entity carries: grossed up, its price is the
+  // equity's whole, which no basis is struck on.
+  if (kind === "partial_interest" && entityLoan != null) {
+    return `THE BUILDING'S BASIS: none — the share's price grossed up is the equity's whole, not the building's: the building's cost is that plus the entity's stated ${compact(entityLoan)} loan, which the model does not add, so no price per unit or per SF and no cap is struck on it.`;
   }
   if (tag) {
     const range = row ? priceRange(row.value) : null;

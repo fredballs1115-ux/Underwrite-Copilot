@@ -771,7 +771,9 @@ export interface MarketReads {
  * (`assessPlausibility`), through the same shared readers: `noiFigures`,
  * `askingPriceOf` (a range at its top) and `buildingPriceOf` (a share's
  * price grossed up to the whole, `whole`; none for a note, whose price is a
- * loan's, or a leased fee, whose price is the land's). Null where either
+ * loan's, a leased fee, whose price is the land's, or a share beside the
+ * loan its entity carries, whose grossed-up price is the equity's whole,
+ * not the building's). Null where either
  * figure is missing, and outside the band a cap can be — at or under 0.5%,
  * or at IMPLIED_CAP_CEILING and past it, where the NOI is no going-in
  * figure on this price. A plan deal has no going-in cap; the caller says

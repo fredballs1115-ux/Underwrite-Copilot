@@ -109,7 +109,8 @@ export interface PipelineSlots {
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
-   *  percentage, or where the count or the area is not stated */
+   *  percentage or beside the loan its entity carries (its grossed-up price
+   *  is the equity's whole), or where the count or the area is not stated */
   basis?: string | null;
 }
 
@@ -120,9 +121,10 @@ const compactUsd = (n: number) =>
  * The price by the class's own basis — "$274k/unit", "$200k/key", "$212/SF"
  * — read through the comps page's subject reader (lib/comp-detail
  * `subjectBasis`), so the card and the comps' tick agree on the figure: the
- * building's price (a share's grossed up, none for a note or the land)
- * over the count in the memorandum's own noun, or over the building's
- * area where the class is priced by the foot. None on a conversion or a
+ * building's price (a share's grossed up, none for a note, the land or a
+ * share beside the loan its entity carries, whose grossed-up price is the
+ * equity's whole) over the count in the memorandum's own noun, or over the
+ * building's area where the class is priced by the foot. None on a conversion or a
  * development, whose basis is the all-in cost, not the shell's price, and
  * none by the foot on an outdoor-storage yard, which trades by the acre
  * (the deck's own words, lib/deal-strategy `isOutdoorStorageYard`). The

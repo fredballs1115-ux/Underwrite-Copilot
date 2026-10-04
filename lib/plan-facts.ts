@@ -36,11 +36,12 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
     // note, the land under a ground lease, a share of no stated percentage
     // (#415) — says so rather than "not stated". A share's price grossed up
     // beside the loan its entity carries is the equity's whole: the label
-    // says so, and the loan is named beside the figure, never added to it.
+    // says so, and the loan is named beside the figure, never added to it —
+    // and no total cost is struck on it (`costWithheld`, under the facts).
     [
       plan.priceLabel,
-      plan.price != null
-        ? `${moneyCompact(plan.price)}${plan.entityLoan != null ? `, the entity's ${moneyCompact(plan.entityLoan)} loan on top` : ""}`
+      (plan.price ?? plan.equityWhole) != null
+        ? `${moneyCompact((plan.price ?? plan.equityWhole)!)}${plan.entityLoan != null ? `, the entity's ${moneyCompact(plan.entityLoan)} loan on top` : ""}`
         : (plan.priceWithheld ?? "not stated"),
     ],
     [

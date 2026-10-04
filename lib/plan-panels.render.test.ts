@@ -330,6 +330,12 @@ describe("SharePlan — the plan on the shared screen", () => {
       expect(text).toContain("Equity's whole, the share grossed up");
       expect(text).toContain("$40.0M, the entity's $56.5M loan on top");
       expect(text).not.toContain("Whole price");
+      // No total cost is struck on the equity's whole (it read $45.0M), and
+      // the panel says why in one sentence.
+      expect(text).not.toContain("$45.0M");
+      expect(text).toContain(
+        "No total cost or yield on cost is struck on the equity's whole: the building's cost is that plus the entity's $56.5M loan, which the model does not add.",
+      );
       expect(gluedWords(text)).toEqual([]);
     }
   });

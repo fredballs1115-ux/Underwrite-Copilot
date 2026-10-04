@@ -48,8 +48,9 @@ export function PlanStrip({
       <p className="mt-2 text-xs leading-relaxed text-muted">
         {plan.timeline ? `Timeline as stated: ${plan.timeline}. ` : "Timeline to stabilization: not stated. "}
         The stabilized NOI is the finished project&apos;s figure, judged on yield
-        on total cost — never on a cap rate against the acquisition price. The
-        challenger below tests whether it is as conservative as the OM presents it.
+        on total cost — never on a cap rate against the acquisition price.
+        {plan.costWithheld ? ` ${plan.costWithheld}` : ""}{" "}
+        The challenger below tests whether it is as conservative as the OM presents it.
       </p>
     </section>
   );

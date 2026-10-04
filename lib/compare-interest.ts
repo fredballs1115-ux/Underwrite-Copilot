@@ -19,7 +19,9 @@
 //   share's price implies (`buildingPriceOf`), the building's figure beside
 //   other buildings'. The returns stand only where the model already ran at
 //   that whole — within 2% of it; run at the share's price they set the
-//   whole building's cash flows against a fraction of its cost.
+//   whole building's cash flows against a fraction of its cost. Beside a
+//   loan its entity carries, the share grossed up is the equity's whole, no
+//   building's price: no cap is struck and the returns are withheld.
 //
 //   EVERYTHING ELSE STANDS. A leasehold's and a leased fee's model runs at
 //   what the price buys (the lease's building, the land's rent), and the
@@ -47,7 +49,8 @@ export interface CompareInterest {
    *  yrs left", "Leased fee" — null on a fee simple */
   tag: string | null;
   /** the going-in cap on the building's price, percent — null on a note,
-   *  which has none, and on a share with no stated percentage */
+   *  which has none, and on a share with no stated percentage or beside the
+   *  loan its entity carries (`buildingPriceOf` has no building's price) */
   cap: number | null;
   /** a note's yield to maturity at its price, percent, where it pays or
    *  may; null otherwise */
@@ -113,7 +116,9 @@ export function modelReturnsRead(
       : ci.withheld === "share"
         ? ci.cap != null
           ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
-          : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+          : interestOf(ex).entityLoan != null
+            ? "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+            : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
         : null;
   return { ...ci, share: !!ex && interestOf(ex).kind === "partial_interest", line };
 }

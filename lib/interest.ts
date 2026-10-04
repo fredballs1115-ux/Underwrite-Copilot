@@ -150,12 +150,25 @@ export function parseSharePct(text: string | null | undefined): number | null {
   return valid.length === 1 ? valid[0] : null;
 }
 
-/** The minimum the price readers need: the kind, and a partial interest's
- *  share where one percentage is stated as the share (`parseSharePct`). An
- *  extraction saved before the interest was read is fee simple. */
-export function interestOf(ex: ExtractionResult | null | undefined): { kind: InterestKind; sharePct: number | null } {
+/** The minimum the price readers need: the kind; a partial interest's share
+ *  where one percentage is stated as the share (`parseSharePct`); and the
+ *  loan its entity carries where the memorandum states one (`entityLoanOf`)
+ *  — beside it, the share's price grosses up to the equity's whole, not the
+ *  building's price, so no reader divides it as the building's
+ *  (lib/deal-strategy `buildingPriceOf`, lib/comp-detail `subjectBasis`).
+ *  An extraction saved before the interest was read is fee simple. */
+export function interestOf(ex: ExtractionResult | null | undefined): {
+  kind: InterestKind;
+  sharePct: number | null;
+  entityLoan: number | null;
+} {
   const kind = ex?.interest?.kind ?? "fee_simple";
-  return { kind, sharePct: kind === "partial_interest" ? parseSharePct(ex?.interest?.share) : null };
+  const share = kind === "partial_interest";
+  return {
+    kind,
+    sharePct: share ? parseSharePct(ex?.interest?.share) : null,
+    entityLoan: share ? statedEntityLoan(ex) : null,
+  };
 }
 
 // The loan the owning entity carries, from the row the extraction is asked
@@ -163,16 +176,20 @@ export function interestOf(ex: ExtractionResult | null | undefined): { kind: Int
 // for assumption or a share's slice of the balance.
 const ENTITY_LOAN_ROW = /^\s*entity(?:[- ]level)?\s+(?:loan|debt|mortgage)(?:\s+(?:balance|amount|outstanding))?\s*(?:\([^)]*\))?\s*$/i;
 
+/** The balance the entity-loan row states, whatever is being sold. */
+function statedEntityLoan(ex: ExtractionResult | null | undefined): number | null {
+  const row = (ex?.metrics ?? []).find((m) => m && typeof m.label === "string" && ENTITY_LOAN_ROW.test(m.label));
+  if (!row || typeof row.value !== "string" || /%|percent/i.test(row.value)) return null;
+  const n = parseUsd(row.value);
+  return n != null && n > 0 ? n : null;
+}
+
 /** The unpaid balance of the loan the owning entity carries, as the
  *  memorandum states it, on a partial interest — the debt that sits on top
  *  of the equity a share's price grosses up to. Null on every other
  *  interest, and where no such row is stated: a blank is null. */
 export function entityLoanOf(ex: ExtractionResult | null | undefined): number | null {
-  if (!ex || interestOf(ex).kind !== "partial_interest") return null;
-  const row = (ex.metrics ?? []).find((m) => m && typeof m.label === "string" && ENTITY_LOAN_ROW.test(m.label));
-  if (!row || /%|percent/i.test(row.value)) return null;
-  const n = parseUsd(row.value);
-  return n != null && n > 0 ? n : null;
+  return interestOf(ex).entityLoan;
 }
 
 /** What a ground lease's tenant puts on the land, where the memorandum's

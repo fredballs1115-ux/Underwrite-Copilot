@@ -110,17 +110,17 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
 
   it("a preferred-equity price is never grossed up on its return", () => {
     const pref = ex(interest({ kind: "partial_interest", share: "Preferred equity, 12% preferred return" }));
-    expect(interestOf(pref)).toEqual({ kind: "partial_interest", sharePct: null });
+    expect(interestOf(pref)).toEqual({ kind: "partial_interest", sharePct: null, entityLoan: null });
     const r = readInterest(pref, 15_000_000)!;
     expect(r.impliedWhole).toBeNull();
     expect(r.headline).toContain("states no single percentage for it");
   });
 
   it("interestOf reads an older extraction as fee simple, and a share only on a partial interest", () => {
-    expect(interestOf(ex(undefined))).toEqual({ kind: "fee_simple", sharePct: null });
-    expect(interestOf(null)).toEqual({ kind: "fee_simple", sharePct: null });
-    expect(interestOf(ex(interest({ kind: "partial_interest", share: "49% LP interest" })))).toEqual({ kind: "partial_interest", sharePct: 49 });
-    expect(interestOf(ex(interest({ kind: "note", share: "49%" })))).toEqual({ kind: "note", sharePct: null });
+    expect(interestOf(ex(undefined))).toEqual({ kind: "fee_simple", sharePct: null, entityLoan: null });
+    expect(interestOf(null)).toEqual({ kind: "fee_simple", sharePct: null, entityLoan: null });
+    expect(interestOf(ex(interest({ kind: "partial_interest", share: "49% LP interest" })))).toEqual({ kind: "partial_interest", sharePct: 49, entityLoan: null });
+    expect(interestOf(ex(interest({ kind: "note", share: "49%" })))).toEqual({ kind: "note", sharePct: null, entityLoan: null });
   });
 });
 
@@ -708,10 +708,12 @@ describe("a share beside the loan its entity carries: the grossed-up figure is t
     const plan = planSummary(e)!;
     expect(plan.priceLabel).toBe("Equity's whole, the share grossed up");
     expect(planFacts(plan)[1]).toEqual(["Equity's whole, the share grossed up", "$40.0M, the entity's $56.5M loan on top"]);
-    // The loan is named, never added: the total cost is the equity's whole
-    // and the budget, as before.
-    expect(plan.price).toBe(40_000_000);
-    expect(plan.totalCost).toBe(45_000_000);
+    // The loan is named, never added — and the equity's whole is no
+    // building's cost, so no total cost is struck on it (it read $45.0M: the
+    // equity's whole and the budget, as if the loan were not there).
+    expect(plan.price).toBeNull();
+    expect(plan.equityWhole).toBe(40_000_000);
+    expect(plan.totalCost).toBeNull();
   });
 });
 
@@ -971,5 +973,221 @@ describe("the price the building's figures describe, read by every reader that d
     expect(fee.price).toBe(20_000_000);
     expect(fee.priceLabel).toBe("Price");
     expect(fee.priceWithheld).toBeNull();
+  });
+});
+
+// The share beside its entity's loan, read by every reader that divides a
+// price (research pass 23's case, carried to the readers): a 4.5% share at
+// $1.8M beside a stated $56.5M loan on the entity, with 200 units and $5.0M
+// of NOI, printed "$200k/unit" and a 12.5% cap — the equity's whole, $40.0M,
+// divided as if it were the building's price, where the building's cost is
+// that plus the loan. Where the loan is stated, no building figure is struck
+// on the equity's whole, as none is on a note's price.
+describe("a share beside the loan its entity carries: no building figure is struck on the equity's whole", () => {
+  const share = interest({ kind: "partial_interest", share: "4.5% limited partnership interest" });
+  const m = (label: string, value: string, page = "p. 2") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const LOAN = m("Entity loan balance", "$56,500,000", "p. 9");
+  /** The recapitalization: the share, 200 units, $5.0M of NOI and the loan. */
+  const recap = (extra: ExtractionResult["metrics"] = [], over: Partial<ExtractionResult> = {}, loan = true): ExtractionResult => ({
+    dealName: "Harbor View Apartments",
+    assetClass: "multifamily",
+    market: "Baltimore, MD",
+    interest: share,
+    totalPages: 40,
+    metrics: [
+      m("Asking price", "$1,800,000"),
+      m("Units", "200"),
+      { label: "NOI (in-place)", value: "$5,000,000", flagged: false, page: "p. 9", basis: "in_place" },
+      ...(loan ? [LOAN] : []),
+      ...extra,
+    ],
+    ...over,
+  });
+
+  it("the building's price and the comps' subject basis answer nothing; without the loan the share grosses up as before", async () => {
+    const { buildingPriceOf } = await import("./deal-strategy");
+    const { subjectBasis } = await import("./comp-detail");
+    const { screenYearOf } = await import("./criteria");
+    expect(interestOf(recap()).entityLoan).toBe(56_500_000);
+    expect(buildingPriceOf(recap(), 1_800_000)).toBeNull();
+    const e = recap();
+    expect(subjectBasis(e.metrics, "stabilized", screenYearOf(e), interestOf(e))).toEqual({ perUnit: null, perSf: null });
+    // No loan stated: the whole the 4.5% implies, $40.0M, $200k a unit.
+    const plain = recap([], {}, false);
+    expect(interestOf(plain).entityLoan).toBeNull();
+    expect(buildingPriceOf(plain, 1_800_000)).toBeCloseTo(40_000_000, 2);
+    expect(subjectBasis(plain.metrics, "stabilized", screenYearOf(plain), interestOf(plain)).perUnit).toBe(200_000);
+  });
+
+  it("the pipeline card prints no basis, and the compare table and the Model tab withhold the cap, saying why", async () => {
+    const { pickSlots } = await import("./pipeline-slots");
+    const { compareInterest, modelReturnsRead } = await import("./compare-interest");
+    expect(pickSlots(recap(), null).basis).toBeNull();
+    expect(pickSlots(recap([], {}, false), null).basis).toBe("$200k/unit");
+    // The model runs at the equity's whole (the owner's call); the table's
+    // cap is struck on the building's price, which there is none of here.
+    const model = { purchasePrice: 40_000_000, year1Noi: 5_000_000, goingInCapPct: 12.5 };
+    expect(compareInterest(recap(), model)).toMatchObject({ cap: null, withheld: "share" });
+    expect(compareInterest(recap([], {}, false), model)).toMatchObject({ cap: 12.5, withheld: null });
+    expect(modelReturnsRead(recap(), model).line).toBe(
+      "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld.",
+    );
+  });
+
+  it("the exit check sets no implied going-in cap against the equity's whole", async () => {
+    const { impliedGoingInCap, dealGoingInCap } = await import("./model-vs-market");
+    expect(impliedGoingInCap(recap())).toBeNull();
+    expect(dealGoingInCap(recap())).toBeNull();
+    expect(impliedGoingInCap(recap([], {}, false))).toEqual({ pct: 12.5, whole: true });
+  });
+
+  it("the internal comps, the market memory and the analytics pool no basis and no cap off it", async () => {
+    const { deriveInternalComps } = await import("./internal-comps");
+    const { buildComps } = await import("./market-memory");
+    const { deriveAnalytics } = await import("./analytics");
+    const row = (id: string, extraction: ExtractionResult) => ({
+      id,
+      name: id,
+      asset_class: "multifamily",
+      created_at: "2026-09-01T00:00:00Z",
+      is_sample: false,
+      stage: "screening",
+      verdict: { verdict: "pass" },
+      extraction,
+    });
+    const withLoan = recap([m("Price per unit", "$9,000")]);
+    const without = recap([m("Price per unit", "$9,000")], {}, false);
+    const internal = Object.fromEntries(
+      deriveInternalComps("current", "multifamily", { assetClass: "multifamily" }, [row("loan", withLoan), row("plain", without)]).map((c) => [c.dealId, c]),
+    );
+    expect(internal.loan.priceLabel).toBe("$1.8M · 4.5% share");
+    expect(internal.loan.basisLabel).toBeNull();
+    expect(internal.plain.basisLabel).toBe("$200k/unit");
+    const memory = Object.fromEntries(buildComps([row("loan", withLoan), row("plain", without)]).map((c) => [c.dealId, c]));
+    expect(memory.loan?.perUnit ?? null).toBeNull();
+    expect(memory.plain.perUnit).toBe(200_000);
+    const charts = Object.fromEntries(deriveAnalytics([row("loan", withLoan), row("plain", without)]).map((d) => [d.id, d]));
+    expect(charts.loan.perUnit).toBeNull();
+    expect(charts.plain.perUnit).toBe(200_000);
+  });
+
+  it("a hotel's price a key, a student building's a bed and a park's a pad are blank", async () => {
+    const { readHotelDeal } = await import("./hotel-deal");
+    const { readStudentHousing } = await import("./student-housing");
+    const { readManufacturedHousing } = await import("./manufactured-housing");
+    const hotel = recap([m("Keys", "200"), m("PIP cost", "$4,200,000", "p. 6")], {
+      assetClass: "hospitality_str",
+      hotel: { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "unknown", pip: "", page: "p. 6" },
+    });
+    expect(readHotelDeal(hotel)!.pricePerKey).toBeNull();
+    expect(readHotelDeal({ ...hotel, metrics: hotel.metrics.filter((r) => r !== LOAN) })!.pricePerKey).toBe(200_000);
+    const student = recap([m("Beds", "400"), m("Pre-leased", "87% for Fall 2026")], { assetClass: "student_housing" });
+    expect(readStudentHousing(student)!.pricePerBed).toBeNull();
+    expect(readStudentHousing({ ...student, metrics: student.metrics.filter((r) => r !== LOAN) })!.pricePerBed).toBe(100_000);
+    const park = recap([m("Pads", "200"), m("Lot rent", "$430 per month")], { assetClass: "manufactured_housing" });
+    expect(readManufacturedHousing(park)!.pricePerPad).toBeNull();
+    expect(readManufacturedHousing({ ...park, metrics: park.metrics.filter((r) => r !== LOAN) })!.pricePerPad).toBe(200_000);
+  });
+
+  it("the debt sizer seeds no price off the equity's whole", async () => {
+    const { createElement } = await import("react");
+    const { renderToStaticMarkup } = await import("react-dom/server");
+    const { DebtSizer } = await import("@/app/(app)/deals/[id]/debt-sizer");
+    // The price field: its `value` renders after its label.
+    const priceField = (e: ExtractionResult) =>
+      /<input[^>]*aria-label="Purchase price"[^>]*value="([^"]*)"/.exec(renderToStaticMarkup(createElement(DebtSizer, { model: null, extraction: e })))?.[1];
+    expect(priceField(recap())).toBe("");
+    expect(priceField(recap([], {}, false))).toBe("$40,000,000");
+  });
+
+  it("the verdict's brief says there is no building basis, and why", async () => {
+    const { buildBrief } = await import("./anthropic/verdict");
+    const brief = (extraction: ExtractionResult) => buildBrief({ extraction, challenges: null, comps: null, reconciliation: null, market: null });
+    expect(brief(recap())).toContain(
+      "THE BUILDING'S BASIS: none — the share's price grossed up is the equity's whole, not the building's: the building's cost is that plus the entity's stated $56.5M loan, which the model does not add, so no price per unit or per SF and no cap is struck on it.",
+    );
+    expect(brief(recap([], {}, false))).toContain("THE BUILDING'S BASIS, computed in code: $200k/unit");
+  });
+
+  it("the plan shows the equity's whole with the loan beside it, and strikes no total cost or yield on cost, saying why", async () => {
+    const { planSummary } = await import("./deal-strategy");
+    const { planFacts } = await import("./plan-facts");
+    const planDeal = (loan: boolean) =>
+      recap(
+        [
+          m("Renovation budget", "$5,000,000", "p. 7"),
+          { label: "NOI (stabilized, pro forma)", value: "$6,000,000", flagged: false, page: "p. 8", basis: "pro_forma" },
+        ],
+        { strategy: { kind: "value_add", summary: "Renovate 200 units", capitalBudget: "", timeline: "" } },
+        loan,
+      );
+    const plan = (loan: boolean) => planSummary(planDeal(loan))!;
+    const p = plan(true);
+    // The price the plan builds on is the building's: none here. The figure
+    // shown is the equity's whole.
+    expect(p.price).toBeNull();
+    expect(p.equityWhole).toBeCloseTo(40_000_000, 2);
+    expect(p.priceLabel).toBe("Equity's whole, the share grossed up");
+    expect(p.entityLoan).toBe(56_500_000);
+    expect(p.budget?.budget).toBe(5_000_000);
+    expect(p.totalCost).toBeNull();
+    expect(p.yieldOnCost).toBeNull();
+    expect(p.costPerUnit).toBeNull();
+    expect(p.costWithheld).toBe(
+      "No total cost or yield on cost is struck on the equity's whole: the building's cost is that plus the entity's $56.5M loan, which the model does not add.",
+    );
+    const facts = Object.fromEntries(planFacts(p));
+    expect(facts["Equity's whole, the share grossed up"]).toBe("$40.0M, the entity's $56.5M loan on top");
+    expect(facts["Total cost"]).toBe("—");
+    expect(facts["Yield on cost"]).toBe("—");
+    // The steps that read the deal context are told the same sentence.
+    expect(dealContextFor(planDeal(true)) ?? "").toContain(p.costWithheld!);
+    // …and so are the challenger's plan line and the verdict's basis line.
+    const { plausibilityNote, inferStrategy: infer } = await import("./deal-strategy");
+    expect(plausibilityNote([], infer(planDeal(true)), p, planDeal(true))).toContain(
+      "; $5.0M (Renovation budget); no total cost or yield on cost is struck on the equity's whole: the building's cost is that plus the entity's $56.5M loan, which the model does not add; timeline",
+    );
+    const { buildBrief } = await import("./anthropic/verdict");
+    expect(buildBrief({ extraction: planDeal(true), challenges: null, comps: null, reconciliation: null, market: null })).toContain(
+      `THE BUILDING'S BASIS: on this value-add deal it is total cost. ${p.costWithheld}`,
+    );
+    // Without the loan the plan is exactly as before.
+    const plain = plan(false);
+    expect(plain.totalCost).toBeCloseTo(45_000_000, 2);
+    expect(plain.costWithheld).toBeNull();
+    expect(dealContextFor(planDeal(false)) ?? "").not.toContain("No total cost");
+  });
+
+  // A total the memorandum states all-in is its own figure, not one struck
+  // on the equity's whole: it stands as the total cost, and nothing is taken
+  // out of it — where the equity's whole had been subtracted from it as if
+  // it were the building's price inside the total.
+  it("a stated all-in total stands as the memorandum's own total cost, with nothing taken out of it", async () => {
+    const { planSummary, plausibilityNote, inferStrategy: infer } = await import("./deal-strategy");
+    const { planFacts } = await import("./plan-facts");
+    const e = recap(
+      [
+        m("Total project cost", "$100,000,000", "p. 7"),
+        { label: "NOI (stabilized, pro forma)", value: "$6,000,000", flagged: false, page: "p. 8", basis: "pro_forma" },
+      ],
+      { strategy: { kind: "value_add", summary: "Renovate 200 units", capitalBudget: "", timeline: "" } },
+    );
+    const p = planSummary(e)!;
+    expect(p.equityWhole).toBeCloseTo(40_000_000, 2);
+    expect(p.budget).toMatchObject({ budget: 100_000_000, allIn: false, isTotal: true });
+    expect(p.totalCost).toBe(100_000_000);
+    expect(p.yieldOnCost).toBeCloseTo(0.06, 10);
+    expect(p.costWithheld).toBeNull();
+    const facts = Object.fromEntries(planFacts(p));
+    expect(facts["Equity's whole, the share grossed up"]).toBe("$40.0M, the entity's $56.5M loan on top");
+    expect(facts.Budget).toBe("inside the stated total");
+    expect(facts["Total cost"]).toBe("$100.0M");
+    // The brief says why the acquisition inside the total is not separable,
+    // and never that the memorandum states no price: it states the share's.
+    const note = plausibilityNote([], infer(e), p, e);
+    expect(note).toContain(
+      "$100.0M all-in (Total project cost; the share's price grossed up is the equity's whole, not the building's, so the acquisition inside it is not separable)",
+    );
+    expect(note).not.toContain("the OM states no price");
   });
 });

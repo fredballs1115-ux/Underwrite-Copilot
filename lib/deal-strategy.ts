@@ -505,19 +505,22 @@ export function askingPriceOf(extraction: ExtractionResult | null | undefined): 
  * buildings' sales may divide: the asking price on a fee simple or a
  * leasehold; a share's grossed up to the whole where the OM states its
  * percentage; and null for a note (a loan's price), a leased fee (the
- * land's) and a share with no stated percentage — no building basis is
- * struck on those, and a memory that pools the account's past screens
- * never averages one in. The caller passes the price it read (the deal
- * page's includes the first signal's ask before the extraction lands).
+ * land's), a share with no stated percentage, and a share beside a loan its
+ * entity carries (lib/interest `entityLoanOf`): grossed up, that share's
+ * price is the equity's whole, and the building's cost is that plus the
+ * loan, which nothing adds — no building basis is struck on any of these,
+ * and a memory that pools the account's past screens never averages one
+ * in. The caller passes the price it read (the deal page's includes the
+ * first signal's ask before the extraction lands).
  */
 export function buildingPriceOf(
   extraction: ExtractionResult | null | undefined,
   price: number | null,
 ): number | null {
   if (price == null || !(price > 0)) return null;
-  const { kind, sharePct } = interestOf(extraction);
+  const { kind, sharePct, entityLoan } = interestOf(extraction);
   if (kind === "note" || kind === "leased_fee") return null;
-  if (kind === "partial_interest") return sharePct != null ? price / (sharePct / 100) : null;
+  if (kind === "partial_interest") return sharePct != null && entityLoan == null ? price / (sharePct / 100) : null;
   return price;
 }
 
@@ -756,7 +759,17 @@ export { isCountLabel, parseCount, unitCountRow, unitCountFromMetrics };
  *  plan is judged on, for the deal page and for the challenger's brief. */
 export interface PlanSummary {
   kind: StrategyKind;
+  /** the price the plan's cost is built on — the building's
+   *  (`buildingPriceOf`); null where the OM states none, and where what the
+   *  price buys is not the building (a note, the land, a share of no stated
+   *  percentage, a share beside its entity's loan, whose grossed-up figure
+   *  is `equityWhole`) */
   price: number | null;
+  /** a share's price grossed up beside the loan its entity carries: the
+   *  equity's whole, shown under its label with the loan beside it, and
+   *  never a cost anything is built on — the building's cost is that plus
+   *  the loan, which the model does not add; null otherwise */
+  equityWhole?: number | null;
   /** what the price figure is: the asking / purchase price, or on a ground-up
    *  development the land or site cost — or, where a share was bought, the
    *  whole the share's price implies (#415): the equity's whole where the
@@ -780,6 +793,11 @@ export interface PlanSummary {
   totalCost: number | null;
   /** stabilized NOI ÷ total cost, decimal, when both are known */
   yieldOnCost: number | null;
+  /** why no total cost or yield on cost is struck where the price is shown,
+   *  in one plain sentence: beside the equity's whole (`equityWhole`), the
+   *  building's cost is that plus the entity's loan, which the model does
+   *  not add; null otherwise */
+  costWithheld?: string | null;
   /** the finished product's unit count, when the OM states one */
   units: number | null;
   /** total cost over the planned units — the basis a comp or a per-unit
@@ -807,8 +825,16 @@ export function planSummary(
   // total cost — the plan says why rather than "not stated".
   const interest = interestOf(extraction);
   const price = buildingPriceOf(extraction, stated);
+  // Beside the loan its entity carries, a share's price grosses up to the
+  // equity's whole: shown, with the loan beside it, and never a cost the plan
+  // builds on — the building's cost is that plus the loan, which the model
+  // does not add.
+  const equityWhole =
+    price == null && stated != null && interest.sharePct != null && interest.entityLoan != null
+      ? stated / (interest.sharePct / 100)
+      : null;
   const priceWithheld =
-    stated == null || price != null
+    stated == null || price != null || equityWhole != null
       ? null
       : interest.kind === "note"
         ? `${money(stated)} for the note — a loan's price, not the project's`
@@ -825,7 +851,8 @@ export function planSummary(
   const wholeAsset = !priceRowIsLand(priceMetric);
   // A value-add stating its program a door at a time and no total (#460):
   // the doors times a door's cost, derived and said so — never added to a
-  // total the memorandum does state.
+  // total the memorandum does state. Read against the building's price
+  // alone: the equity's whole is no price to take out of an all-in total.
   const budget = landOnly
     ? null
     : (capitalBudgetFromMetrics(metrics, price, wholeAsset) ??
@@ -840,14 +867,17 @@ export function planSummary(
   const units = unitCountFromMetrics(metrics);
   // Beside the loan the entity carries, a share's price grosses up to the
   // equity's whole, not the asset's: the label says so on every surface
-  // that prints the plan's facts, as the others do (research pass 23).
-  const entityLoan = interest.sharePct != null && price != null ? entityLoanOf(extraction) : null;
+  // that prints the plan's facts, as the others do (research pass 23), and
+  // no total cost is struck on it (said in one sentence, `costWithheld`).
+  const entityLoan = equityWhole != null ? interest.entityLoan : null;
+  const shown = price ?? equityWhole;
   return {
     kind: strategy.kind,
     price,
+    equityWhole,
     priceLabel: priceRowIsLand(priceMetric)
       ? "Land cost"
-      : interest.kind === "partial_interest" && price != null
+      : interest.kind === "partial_interest" && shown != null
         ? entityLoan != null
           ? "Equity's whole, the share grossed up"
           : "Whole price, the share grossed up"
@@ -858,6 +888,10 @@ export function planSummary(
     budget,
     totalCost,
     yieldOnCost,
+    costWithheld:
+      entityLoan != null && totalCost == null
+        ? `No total cost or yield on cost is struck on the equity's whole: the building's cost is that plus the entity's ${money(entityLoan)} loan, which the model does not add.`
+        : null,
     units,
     costPerUnit: totalCost != null && units != null ? totalCost / units : null,
     // The strategy's own words first; else the metric rows the extraction
@@ -1077,9 +1111,10 @@ function planLine(plan: PlanSummary): string {
   // parenthesis below names the equity's whole beside the entity's loan.
   const shareWhole =
     plan.priceLabel === "Whole price, the share grossed up" || plan.priceLabel === "Equity's whole, the share grossed up";
+  const shown = plan.price ?? plan.equityWhole ?? null;
   parts.push(
-    plan.price != null
-      ? `${shareWhole ? "whole price, the share's grossed up," : "price"} ${money(plan.price)}${
+    shown != null
+      ? `${shareWhole ? "whole price, the share's grossed up," : "price"} ${money(shown)}${
           plan.entityLoan != null
             ? ` (the equity's whole, not the asset's: the entity's stated ${money(plan.entityLoan)} loan sits on top of it)`
             : ""
@@ -1091,7 +1126,13 @@ function planLine(plan: PlanSummary): string {
   parts.push(
     plan.budget
       ? plan.budget.isTotal
-        ? `${money(plan.budget.budget)} all-in (${plan.budget.label}; the OM states no price, so the acquisition inside it is not separable)`
+        ? // Beside the equity's whole the OM states a price — the share's —
+          // and no building's price to take out of the total.
+          `${money(plan.budget.budget)} all-in (${plan.budget.label}; ${
+            plan.equityWhole != null
+              ? "the share's price grossed up is the equity's whole, not the building's"
+              : "the OM states no price"
+          }, so the acquisition inside it is not separable)`
         : `${plan.budget.allIn ? "budget " : ""}${money(plan.budget.budget)}${plan.budget.allIn ? ` (${plan.budget.label} less the price)` : ` (${plan.budget.label})`}`
       : "construction / renovation budget not stated in the figures",
   );
@@ -1099,6 +1140,8 @@ function planLine(plan: PlanSummary): string {
   // As the deal page prints it, so a verdict that quotes it quotes the
   // page's own figure.
   if (plan.yieldOnCost != null) parts.push(`yield on total cost ${yieldOnCostText(plan.yieldOnCost)}`);
+  // …and where none is struck on the equity's whole, the page's sentence why.
+  if (plan.costWithheld) parts.push(plan.costWithheld.replace(/\.$/, "").replace(/^No /, "no "));
   parts.push(plan.timeline ? `timeline: ${plan.timeline}` : "timeline to stabilization not stated");
   if (plan.capitalBudgetText) parts.push(`budget as worded: ${plan.capitalBudgetText}`);
   return parts.join("; ");

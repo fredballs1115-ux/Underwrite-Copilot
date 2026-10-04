@@ -140,8 +140,10 @@ export function subjectBasis(
   /** what the price buys (lib/interest `interestOf`, #414): a note's price
    *  is nobody's basis, a leased fee's buys the land alone (#415), and a
    *  share's is grossed up to the whole the building's count and area
-   *  describe — or withheld with no stated share */
-  interest?: { kind: InterestKind; sharePct: number | null },
+   *  describe — or withheld with no stated share, and beside a loan its
+   *  entity carries (`entityLoan`), where the grossed-up figure is the
+   *  equity's whole and the building's cost is that plus the loan */
+  interest?: { kind: InterestKind; sharePct: number | null; entityLoan?: number | null },
   /** the deal's class in the deck's own words (`ExtractionResult.assetClass`),
    *  read for an outdoor-storage yard (lib/deal-strategy
    *  `isOutdoorStorageYard`) */
@@ -150,7 +152,7 @@ export function subjectBasis(
   const none = { perUnit: null, perSf: null };
   if (kind === "conversion" || kind === "development") return none;
   if (interest?.kind === "note" || interest?.kind === "leased_fee") return none;
-  if (interest?.kind === "partial_interest" && interest.sharePct == null) return none;
+  if (interest?.kind === "partial_interest" && (interest.sharePct == null || interest.entityLoan != null)) return none;
   const row = findPricedMetric(metrics, kind, screenYear);
   const stated = row ? parsePrice(row.value) : null;
   if (stated == null || stated < 10_000) return none;
