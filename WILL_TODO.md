@@ -118,7 +118,22 @@ way in this batch):
   - the exit cap's default: it is the going-in cap where the memorandum
     states one, and a flat 6% where it states none; the 6% could come from
     the cap the memorandum's NOI implies on its price, or the sector band;
-  - transfer and recording taxes could go into the model's closing costs;
+  - transfer and recording taxes could go into the model's closing costs,
+    and the seller's share into its cost of sale. They are zero today and
+    the largest input with a free source behind it (state and city
+    statutes): research pass 27 found rates from 0% (Texas) to about 4.6%
+    in Philadelphia and 5.5–6% on large sales in Los Angeles and San
+    Francisco. On the sample, a 4.578% Philadelphia rate split between
+    the purchase and the sale takes the levered return from 9.28% to
+    7.11%. Those rates are from search results until the runner prints
+    each statute, which is the first step either way;
+  - the model's loan has no coverage test: its 60% loan at 6.00% covers
+    its year-one debt service only 1.03 times on a deal bought at a 4.5%
+    cap, and 1.15 at 5.0%, below the 1.25 the page's own debt sizer
+    starts from, so a deal bought under about a 5.45% cap is given a
+    levered return on a loan a lender would size smaller (research pass
+    27, measured on the engine). Sizing the loan by coverage would change
+    those returns;
   - expense growth could come from the 5-year breakeven inflation rate;
   - plan deals could price on SOFR plus a construction spread;
   - a hotel's reserve could be 4% of revenue;
