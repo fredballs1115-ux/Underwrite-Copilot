@@ -7,6 +7,7 @@ import { COVER_EDITION, coverSvg } from "@/lib/deal-cover-art";
 import { EMAIL_PICTURE, type EmailPictureShape } from "@/lib/email-picture";
 import { HeldCopies } from "@/lib/held-copies";
 import { RunGate } from "@/lib/anthropic/run-gate";
+import { dealPhotoPathOf } from "@/lib/storage-paths";
 
 /**
  * The email's picture as the route serves it (research pass 22): the deal's
@@ -30,7 +31,10 @@ import { RunGate } from "@/lib/anthropic/run-gate";
  *     the cover in place of the photograph.
  *
  * The route checks the token and the recipient's access BEFORE it asks for
- * a copy, so a kept copy is never a way past either.
+ * a copy, so a kept copy is never a way past either — and a photograph is
+ * looked up only where its stored path is one of this deal's own
+ * (lib/storage-paths `dealPhotoPathOf`), so a copy kept for one deal is
+ * never a way into another's.
  */
 
 export interface EmailPictureCopy {
@@ -81,9 +85,15 @@ export async function heldEmailPicture(
   shape: EmailPictureShape,
 ): Promise<EmailPictureCopy | null> {
   const { w, h } = EMAIL_PICTURE[shape];
-  if (picture) {
-    const size = shape === "thumb" ? "thumb" : "hero";
-    const photo = await held.take(`photo:${picturePathFor(picture, size)}:${shape}`, () =>
+  const size = shape === "thumb" ? "thumb" : "hero";
+  // Only this deal's own photograph is looked up: the copy is kept by its
+  // stored path, and `deals.photo` is the deal's owner's to write, so a row
+  // pointing at another deal's path would be handed that deal's kept copy —
+  // the storage gate's scope check runs only when a copy is first made. A
+  // path that is not one of this deal's photograph files draws the cover.
+  const path = picture ? dealPhotoPathOf(dealId, picturePathFor(picture, size)) : null;
+  if (picture && path) {
+    const photo = await held.take(`photo:${path}:${shape}`, () =>
       inTurn(async () => {
         const bytes = await readPictureBytes(dealId, picture, size);
         const out = await sharp(bytes, { failOn: "none" })

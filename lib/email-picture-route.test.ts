@@ -211,6 +211,27 @@ describe("the email's picture route (#464)", () => {
     ]);
   });
 
+  // The kept copy is keyed by the stored path, and `deals.photo` is the
+  // deal's owner's to write: an owner who pointed their own deal at another
+  // deal's photograph was served that deal's kept copy, the storage gate's
+  // scope check running only when a copy is first made (LOW-2). A path that
+  // is not this deal's own photograph is never looked up.
+  it("never serves another deal's kept photograph to a deal whose row points at its path", async () => {
+    const OTHER_OWNER = "22222222-3333-4444-8555-666666666666";
+    route.deals = [dealRow(), dealRow({ id: OTHER_DEAL, user_id: OTHER_OWNER, photo: { picture: PICTURE } })];
+    const theirs = await ask(emailPictureToken(DEAL, OWNER)!, "banner");
+    expect(theirs.headers.get("x-image-source")).toBe("photo");
+    const kept = Buffer.from(await theirs.arrayBuffer());
+    // The other deal's owner asks for their own deal's picture, its row
+    // naming the first deal's stored path: its own cover, never the copy.
+    const pointed = await ask(emailPictureToken(OTHER_DEAL, OTHER_OWNER)!, "banner");
+    expect(pointed.status).toBe(200);
+    expect(pointed.headers.get("x-image-source")).toBe("cover");
+    expect(Buffer.from(await pointed.arrayBuffer()).equals(kept)).toBe(false);
+    // Nor is the path read for it: the first deal's one read is all there is.
+    expect(route.asked).toEqual([{ dealId: DEAL, size: "hero" }]);
+  });
+
   it("answers 404 to a member who has left the team, though the deal's picture is kept", async () => {
     route.deals = [dealRow({ team_id: TEAM })];
     route.members = [{ team_id: TEAM, user_id: MEMBER }];
