@@ -176,6 +176,24 @@ way in this batch):
   three red banners, whatever its markets, so a brand-new account meets
   banners about places it has no deal in. Showing an account only the
   alerts for its own deals' jurisdictions is a product choice.
+- **Four ideas from the outside view** (research pass 24, 2026-10-04: what
+  Dealpath, ARGUS, Crexi and others do that the site does not). The pass's
+  no-permission ideas go into the next batch; these four need you:
+  - **Critical dates for a deal under LOI or contract** (when the deposit
+    goes hard, diligence ends, closing): Dealpath tracks them with
+    reminders. The deal holds one date today, offers due. Storing the rest
+    is a migration you run, and a date read off our LOI would be marked as
+    ours until you confirm it against the signed PSA.
+  - **Ask over every document**, not only the memorandum: the rent roll,
+    the T-12, your own model and the supplements. Each question would cost
+    more, which ties to the Ask quota you have not set.
+  - **Memoranda over 32 MB**, which the upload refuses today although a
+    text-layer read has no such limit. Supabase's free plan caps a file at
+    50 MB; above that is a paid plan. A first step that needs nothing from
+    you: log the refusals, to see how often it happens.
+  - **Forward an OM to a deal inbox** (Dealpath's email intake): Resend,
+    already the sender, can receive mail by webhook, but it needs your
+    domain's DNS, and the sender must be a verified account address.
 - **Header slots on two deal types:** a value-add whose memorandum states
   no stabilized NOI shows "Yield on cost —" (a plan deal shows yield on
   cost, never a cap), and an auction shows "Price —" beside a stated
