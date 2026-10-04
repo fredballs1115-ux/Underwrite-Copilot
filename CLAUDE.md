@@ -2086,29 +2086,55 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   construction panel starts from SOFR + 350
   instead of a flat 8%. **A benchmark is not a quote** holds here as on
   `/tools`: only a `contractRate` series that is fresh and plausible seeds
-  (`seedRate`), a stale table seeds nothing and every surface keeps its old
-  flat default with the OLD note — never a sentence claiming the market
-  was consulted — land carries no permanent loan and says so, and the
-  sample deal is never seeded, since its figures are pinned in the demo's
-  tests. The hold is `HOLD_MONTHS` (60), one constant, because the caller
-  that reads the tenor must ask for the hold the model runs on. Before
-  this the model's rate was 6.00% on every deal on every day, the sizer's
-  6.50% and the construction panel's 8.00%. **The page says what its
-  returns carry for buying and selling** (#479, `costAssumptionsLine` in
-  `lib/underwrite/cost-note`, under the sensitivity playground's
-  figures): the transfer and recordation tax — none is said as the
-  model's default, never as the jurisdiction's rate — the closing hold
-  and the cost of sale, from the inputs themselves; only the workbook had
-  named them. **The leverage check reads
+  (`seedRate`), a stale table seeds nothing — the model keeps its flat
+  6.00% and the construction panel its flat 8.00%, each said as a
+  placeholder, never a sentence claiming the market was consulted — land
+  carries no permanent loan and says so, and the sample deal is never
+  seeded, since its figures are pinned in the demo's tests. The deal
+  page's sizer starts from the model's own rate on such a day
+  (`sizerStartingRate` in `lib/sizer-terms`, pure and import-free for the
+  client: a rate a loan's own paper states, then the seed, then the
+  derived model's rate said under the field as its placeholder, and a
+  flat 6.50%, labelled, only where there is no derived model), so the
+  sizer and the workbook never print two rates for one loan. The hold is
+  `HOLD_MONTHS` (60), one constant, because the caller that reads the
+  tenor must ask for the hold the model runs on. Before this the model's
+  rate was 6.00% on every deal on every day, the sizer's 6.50% and the
+  construction panel's 8.00%. **A default is said as one** (research pass
+  27): the sizer's opening sentence (`sizerSourceLine`) names only what
+  the first-draft model or the OM gave and calls its lender tests
+  (`SIZER_LENDER_TESTS`: 65% LTV, 1.25x, an 8% debt yield) and a
+  defaulted 30-year amortization screening defaults; the construction
+  panel names its fallbacks (`FLAT_CONSTRUCTION_RATE_PCT`,
+  `DEFAULT_MAX_LTC_PCT`, `DEFAULT_EXIT_CAP_PCT` and `DEFAULT_WORKS_YEARS`
+  beside `DEFAULT_DRAW_PROFILE` in lib/construction-debt);
+  `CONSTRUCTION_SPREAD_BPS` (350) is the site's screening default, not a
+  sourced figure; and where the playground's year-1 DSCR, at the tile's
+  two places, is under the sizer's coverage test, one line under the tile
+  says by how much and that the model sizes its loan by cost alone
+  (`modelLoanCoverageLine`, display only — sizing it by coverage is the
+  owner's call). **The page says what its returns carry for buying and
+  selling** (#479, `costAssumptionsLine` in `lib/underwrite/cost-note`,
+  under the sensitivity playground's figures): the transfer and
+  recordation tax — where none is modelled, none on the purchase and none
+  a seller may owe at the exit in the cost of sale, never implying a
+  jurisdiction levies one — the closing hold and the cost of sale, from
+  the inputs themselves; only the workbook had named them. In the
+  workbook every zero the model holds by default says so in its SOURCE
+  ("None modelled — enter it…"), recoveries and other revenue are said to
+  be folded into the rent line (added beside it, they count twice), and
+  the vacancy read off a stated occupancy says it carries no credit or
+  collection loss. **The leverage check reads
   the same curve** (#386): `DebtSeeds.tenYear` carries the 10-year beside
   the tenor, `capSpreadRead` in `lib/leverage.ts` says the cap's spread
   over it — a fact with a direction and a date, no verdict, because what
   a normal spread is depends on the class and the year and is not the
   module's to assert — and `leverageRead` takes the benchmark's NAME, so
   the deal page's research panel reads the cap against the 30-yr fixed as
-  before (one-sided, an owner-occupier rate) and then against today's
-  index plus the class spread, printing the seed's own note so the
-  assumption half is named; the compare table gets a signed "Cap over
+  before (one-sided, an owner-occupier rate) and then against the latest
+  index plus the class spread (`SEEDED_RATE_BENCHMARK`: a dated
+  observation is "the latest", never "today's"), printing the seed's own
+  note so the assumption half is named; the compare table gets a signed "Cap over
   10-yr Treasury" row beside its leverage row. **The survey rides with
   the seeds** (#387): `DebtSeeds.survey30` carries the 30-year mortgage
   survey off the same cached read — shown with its date whatever its age,
@@ -2121,7 +2147,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   without signing in. The demo's card is `app/demo/leverage-card.tsx`
   (`SampleLeverageCard`, pure, rendered in `lib/views.render.test.ts`
   with the marker's phrase checked against `renderToString`), and it
-  prints the cap over today's 10-year beside the survey read.
+  prints the cap over the latest 10-year, dated, beside the survey read.
 - The model's assumptions against the published figures:
   `lib/model-vs-market.ts` (pure, no model call — #388). The four
   numbers that decide the model's return (rent growth, expense growth,
@@ -2132,8 +2158,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   against CPI and core (with the 10-year breakeven beside them since
   2026-09-30: the bond market's own forecast, said as a ten-year horizon
   and never folded into the tone's range), vacancy against the survey's metro figure INSIDE
-  ITS MARGIN and then the region's, and the exit cap's spread over
-  today's 10-year beside the going-in cap's (a widening is the
+  ITS MARGIN and then the region's, and the exit cap's spread over the
+  latest 10-year, dated, beside the going-in cap's (a widening is the
   conservative direction; a compression "is not a plan"). Four rules:
   only a fresh figure is read and a check with nothing fresh is omitted;
   a figure is set against an assumption of its own kind (rental housing's
