@@ -72,6 +72,15 @@ const END_ROW = /expir|\bends?\b|terminat|maturity|end\s+date/i;
 const LEFT_ROW = /remaining|unexpired|\bleft\b/i;
 const OPTION_ROW = /option|extension|renewal/i;
 const PURCHASE = /purchase|\bbuy\b|acqui|first\s+refusal|first\s+offer|\brofr\b|\brofo\b/i;
+// A right to end the lease early — "Ground lease termination right" — is
+// no end of its term and no extension: read apart (`groundLeaseTerminationOf`)
+// and never as either, since the end row's "terminat" would otherwise take
+// it for the term's end and read a year in its words as the lease's.
+const TERMINATION_RIGHT =
+  /\bterminat\w*\s+(?:rights?|options?|clauses?|provisions?)\b|\bright\s+to\s+(?:terminate|cancel|end)\b|\bearly\s+terminat\w*|\bkick[- ]?outs?\b|\bcancell?ation\s+(?:rights?|options?)\b/i;
+const NOT_END = new RegExp(`${OPTION_ROW.source}|${TERMINATION_RIGHT.source}`, "i");
+const NOT_LEFT = TERMINATION_RIGHT;
+const NOT_OPTION = new RegExp(`${LEFT_ROW.source}|${TERMINATION_RIGHT.source}`, "i");
 
 // Where the options clause begins in a value that states the term and then
 // its options: "December 31, 2071, with four 10-year options".
@@ -165,10 +174,26 @@ export function readOptions(text: string): { years: number; how: string } | null
  */
 export function readGroundLeaseTerm(rows: Rows, asOf: Date = new Date()): GroundLeaseTerm | null {
   return readLeaseTerm(
-    { endRow: rowOf(rows, END_ROW, OPTION_ROW), leftRow: rowOf(rows, LEFT_ROW), optionRow: rowOf(rows, OPTION_ROW, LEFT_ROW) },
+    { endRow: rowOf(rows, END_ROW, NOT_END), leftRow: rowOf(rows, LEFT_ROW, NOT_LEFT), optionRow: rowOf(rows, OPTION_ROW, NOT_OPTION) },
     rows?.totalPages,
     asOf,
   );
+}
+
+// A row that states nothing: "None", "N/A", "Not stated", a dash.
+const STATES_NOTHING = /^\s*(?:none|n\/?a|no|not\s+(?:stated|applicable|disclosed)|[-–—])\s*\.?\s*$/i;
+
+/**
+ * A right to end the ground lease early, exactly as the memorandum states
+ * it — the row the extraction is asked to label "Ground lease termination
+ * right" (who holds it, from when, on what notice). Never read for a date
+ * or a term: it is said as stated and left to the lease. Null where no such
+ * row is stated, or the row states nothing.
+ */
+export function groundLeaseTerminationOf(rows: Rows): string | null {
+  const row = rowOf(rows, TERMINATION_RIGHT);
+  const v = (row?.value ?? "").trim().replace(/[.;,\s]+$/, "");
+  return v && !STATES_NOTHING.test(v) ? v : null;
 }
 
 /** A lease's term as its rows state it — the ground lease's above, a

@@ -10,6 +10,7 @@ import {
   interestNote,
   interestOf,
   interestShortLine,
+  interestTag,
   noteCaption,
   noteCollateralSentence,
   parseSharePct,
@@ -656,6 +657,102 @@ describe("a share beside the loan its entity carries: the grossed-up figure is t
     expect(plausibilityNote([], infer(e), plan, e)).toContain(
       "whole price, the share's grossed up, $40.0M (the equity's whole, not the asset's: the entity's stated $56.5M loan sits on top of it)",
     );
+  });
+});
+
+// Research pass 23: a cell tower's leased fee read "Leased fee, reverts in
+// 22 yrs" and "the building reverts to the buyer" — there is no building,
+// the equipment is the tenant's, and such tenants often hold a right to end
+// the lease early.
+describe("a leased fee under a tower, a billboard or a solar array: the land comes back, not a building", () => {
+  const ASOF = new Date(Date.UTC(2026, 8, 30));
+  const rent = { label: "Ground rent", value: "$26,000", flagged: false, page: "p. 3", basis: "in_place" as const };
+  const ends = { label: "Ground lease expiration", value: "December 31, 2048", flagged: false, page: "p. 3", basis: "na" as const };
+  const site = (over: Partial<ExtractedInterest>, metrics: ExtractionResult["metrics"] = [rent, ends], deck: Partial<ExtractionResult> = {}): ExtractionResult => ({
+    ...ex(interest({ kind: "leased_fee", page: "p. 3", ...over }), metrics),
+    dealName: "Route 9 Tower Site",
+    assetClass: "net_lease",
+    ...deck,
+  });
+  const tower = site({
+    summary: "Sale of the fee interest in a cell tower site",
+    groundLease: "Ground lease to a tower company for a 150-foot monopole; $26,000 a year with 3% annual escalations",
+  });
+
+  it("reads the use off the memorandum's own words, and an office tower is a building", async () => {
+    const { groundLeaseEquipment } = await import("./interest");
+    expect(groundLeaseEquipment(tower)).toEqual({ what: "a wireless tower", gear: "the tower and its equipment" });
+    expect(groundLeaseEquipment(site({ summary: "Land leased to an outdoor advertising company for a billboard" }))).toEqual({
+      what: "a billboard",
+      gear: "the sign and its structure",
+    });
+    expect(groundLeaseEquipment(site({ groundLease: "Ground lease to a solar developer for a 5 MW solar farm" }))?.what).toBe("a solar array");
+    // The leased fee under an office tower is the land under a building.
+    expect(groundLeaseEquipment(site({ summary: "Sale of the fee interest in the land beneath the tower" }, undefined, { dealName: "One Harbor Tower", assetClass: "office" }))).toBeNull();
+    expect(groundLeaseEquipment(site({ summary: "The land under a 40-story office tower" }))).toBeNull();
+  });
+
+  it("the tag, the panel's sentences, the caveat, the short line and the traps say the land comes back", () => {
+    expect(interestTag(tower, ASOF)).toBe("Leased fee, lease ends in 22 yrs");
+    const r = readInterest(tower, askingPriceOf(tower), ASOF)!;
+    expect(r.equipment?.what).toBe("a wireless tower");
+    expect(r.leadSentences[0]).toBe("This memorandum sells a LEASED FEE: the land under a wireless tower someone else owns, with its ground lease.");
+    expect(r.headline).toContain(
+      "when the lease ends the land comes back, not a building: the tower and its equipment are the tenant's own, as such leases usually provide, so read the lease for what the tenant must remove and restore at its end.",
+    );
+    expect(r.headline).toContain("Such tenants often hold a right to end the lease early: read the lease for one before trusting its term.");
+    expect(r.headline).not.toContain("the building reverts");
+    expect(r.modelCaveat).toContain("ends with the land coming back, not a building — the tenant's equipment is its own");
+    const short = interestShortLine(r);
+    expect(short.startsWith("The leased fee — the land under a wireless tower someone else owns, and its ground rent; the lease ends Dec 2048")).toBe(true);
+    expect(short).not.toContain("reverts");
+    const note = interestNote(r);
+    expect(note).toContain("(e) THE LAND COMES BACK, NOT A BUILDING — the tower and its equipment are the tenant's own, as such leases usually provide");
+    expect(note).toContain("(g) A TERMINATION RIGHT — such tenants often hold one, and the memorandum states none");
+    expect(note).not.toContain("the years until the building reverts");
+    expect(gluedWords(`${r.headline} ${r.modelCaveat} ${short} ${note}`)).toEqual([]);
+    // A building's leased fee reads as before.
+    const building = site({ summary: "Sale of the fee interest in the land beneath the tower" }, undefined, { dealName: "One Harbor Tower", assetClass: "office" });
+    expect(interestTag(building, ASOF)).toBe("Leased fee, reverts in 22 yrs");
+    expect(readInterest(building, askingPriceOf(building), ASOF)!.headline).toContain("the building reverts to the buyer");
+  });
+
+  it("a stated termination right is read as stated, said wherever the lease is, and never taken for the lease's end", () => {
+    const right = { label: "Ground lease termination right", value: "Tenant may terminate on 12 months' notice at any time after 2030", flagged: false, page: "p. 3", basis: "na" as const };
+    // The right is listed first, so the term reader would meet it first.
+    const e = site({ summary: "Sale of the fee interest in a cell tower site" }, [right, rent, ends]);
+    const r = readInterest(e, askingPriceOf(e), ASOF)!;
+    expect(r.term?.ends).toBe("2048-12-31");
+    expect(r.terminationRight).toBe("Tenant may terminate on 12 months' notice at any time after 2030");
+    expect(r.headline).toContain(
+      "The memorandum states a right to end the ground lease early: Tenant may terminate on 12 months' notice at any time after 2030 — read who holds it, from when and on what notice before trusting the term.",
+    );
+    expect(r.headline).not.toContain("Such tenants often hold");
+    expect(interestShortLine(r)).toContain("; the ground lease states a right to end it early");
+    expect(interestNote(r)).toContain("(g) A TERMINATION RIGHT — as stated: Tenant may terminate on 12 months' notice at any time after 2030");
+    // On a leasehold too, by its own words.
+    const lease = readInterest(ex(interest({ kind: "leasehold" }), [right, ends]), 20_000_000, ASOF)!;
+    expect(lease.headline).toContain("The memorandum states a right to end the ground lease early");
+    expect(interestNote(lease)).toContain(" A TERMINATION RIGHT — as stated: Tenant may terminate");
+    // A row that states nothing is no right.
+    const none = readInterest(site({}, [{ ...right, value: "None" }, rent, ends]), 20_000_000, ASOF)!;
+    expect(none.terminationRight).toBe("");
+  });
+
+  it("a fee simple letting part of its site to a tower collects a rent whose equipment is the tenant's", () => {
+    const fee = readInterest(
+      ex(interest({ kind: "fee_simple", groundLease: "A cell tower on the parking lot is let on a ground lease at $30,000 a year" })),
+      20_000_000,
+      ASOF,
+    )!;
+    expect(interestNote(fee)).toContain(
+      "collecting it (the ground tenant's credit, any right it holds to end the lease early, and what it must remove at the end — the tower and its equipment are its own, as such leases usually provide)",
+    );
+  });
+
+  it("the extraction asks for the right under its own label", async () => {
+    const { extractionInstruction } = await import("./anthropic/prompts");
+    expect(extractionInstruction("multifamily")).toContain('"Ground lease termination right"');
   });
 });
 

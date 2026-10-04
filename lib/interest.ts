@@ -40,7 +40,13 @@
 // NOI, which belongs to its owner — the building's own income over that
 // rent is the whole margin of safety, and when the lease ends the building
 // reverts to the buyer. Read as fee simple with a ground lease, the same
-// deal was told its income was an expense.
+// deal was told its income was an expense. Under a wireless tower, a
+// billboard or a solar array — named so in the memorandum's own words —
+// there is no building to revert: the land comes back, the tenant's
+// equipment is its own as such leases usually provide, and such tenants
+// often hold a right to end the lease early, which the extraction files as
+// "Ground lease termination right" and every surface says as stated
+// (research pass 23).
 //
 // A BLANK IS NULL. A share the OM does not state as a percentage is not
 // guessed at; a balance it does not state is not derived.
@@ -54,6 +60,7 @@ import {
   endIsAhead,
   fromToday,
   groundLeaseTermLine,
+  groundLeaseTerminationOf,
   readGroundLeaseTerm,
   termEndLabel,
   type GroundLeaseTerm,
@@ -168,13 +175,61 @@ export function entityLoanOf(ex: ExtractionResult | null | undefined): number | 
   return n != null && n > 0 ? n : null;
 }
 
+/** What a ground lease's tenant puts on the land, where the memorandum's
+ *  own words name it: in a sentence ("a wireless tower") and its gear as
+ *  the subject of one ("the tower and its equipment"). */
+export interface EquipmentUse {
+  what: string;
+  gear: string;
+}
+
+// A tower is read only with a word that makes it one — an office tower is
+// a building — and "telecom" or "wireless" only beside what they put on a
+// site; a sign and a solar array by their own names.
+const EQUIPMENT_USES: readonly (EquipmentUse & { re: RegExp })[] = [
+  {
+    re: /\b(?:cell(?:ular)?|wireless|telecom(?:munications?)?|communications?|radio|broadcast|transmission|monopole|self[- ]support(?:ing)?|guyed|lattice|stealth)[\s-]+towers?\b|\bmonopoles?\b|\bcell[\s-]+sites?\b|\bantenna(?:s|e)?\b|\b(?:telecom(?:munications?)?|wireless)[\s-]+(?:sites?|carriers?|equipment|leases?|ground\s+leases?)\b/i,
+    what: "a wireless tower",
+    gear: "the tower and its equipment",
+  },
+  {
+    re: /\bbillboards?\b|\boutdoor[\s-]+advertising\b|\badvertising\s+(?:signs?|structures?|displays?)\b/i,
+    what: "a billboard",
+    gear: "the sign and its structure",
+  },
+  {
+    re: /\bsolar[\s-]+(?:arrays?|farms?|panels?|installations?|projects?|facilit(?:y|ies)|fields?|gardens?|plants?|parks?|leases?|energy|power|generation|sites?)\b|\bphotovoltaic\b|\bpv\s+(?:arrays?|systems?|facilit(?:y|ies)|projects?)\b/i,
+    what: "a solar array",
+    gear: "the panels and their equipment",
+  },
+];
+
+/**
+ * The equipment a ground lease's tenant puts on the land — a wireless
+ * tower, a billboard, a solar array — where the memorandum's own words name
+ * it: the interest's sentence, the ground lease as stated, the class and
+ * the deal's name. Null where they name none, which is a building's ground
+ * lease as before. Its equipment is the tenant's, so the land comes back
+ * at the lease's end and no building reverts (research pass 23).
+ */
+export function groundLeaseEquipment(ex: ExtractionResult | null | undefined): EquipmentUse | null {
+  if (!ex) return null;
+  const words = [ex.interest?.summary, ex.interest?.groundLease, ex.assetClass, ex.dealName]
+    .filter((w): w is string => typeof w === "string" && w.trim() !== "")
+    .join(" \n ");
+  const hit = EQUIPMENT_USES.find((u) => u.re.test(words));
+  return hit ? { what: hit.what, gear: hit.gear } : null;
+}
+
 /** What the price buys, as the pipeline row's tag — "49% share", "Note",
  *  "Leased fee" — and null for a fee simple (or an extraction saved before
  *  the interest was read), where the price is the building's and the row
  *  says nothing more. Either side of a ground lease carries the years to
  *  its end where the memorandum states it (#422): "Leasehold, 45 yrs left"
  *  (whole years, down — a leasehold is never credited with a year it does
- *  not have), "Leased fee, reverts in 45 yrs". */
+ *  not have), "Leased fee, reverts in 45 yrs" — and under a tower, a
+ *  billboard or a solar array, where no building reverts, "Leased fee,
+ *  lease ends in 22 yrs". */
 export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const { kind, sharePct } = interestOf(ex);
   // Ahead by the DAY: inside its last month the whole months count none,
@@ -190,7 +245,7 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
     case "leasehold":
       return yrs ? `Leasehold, ${yrs} left` : "Leasehold";
     case "leased_fee":
-      return yrs ? `Leased fee, reverts in ${yrs}` : "Leased fee";
+      return yrs ? (groundLeaseEquipment(ex) ? `Leased fee, lease ends in ${yrs}` : `Leased fee, reverts in ${yrs}`) : "Leased fee";
     default:
       return null;
   }
@@ -286,6 +341,13 @@ export interface InterestRead {
   term: GroundLeaseTerm | null;
   /** that term in one sentence ("" where there is none) */
   termLine: string;
+  /** what the ground lease's tenant puts on the land where the memorandum
+   *  names it — a wireless tower, a billboard, a solar array — whose
+   *  equipment is the tenant's, so no building reverts (`groundLeaseEquipment`);
+   *  null on a building's ground lease and where no ground lease is involved */
+  equipment: EquipmentUse | null;
+  /** a right to end the ground lease early, exactly as stated ("" if none) */
+  terminationRight: string;
 }
 
 // Rounded on the tenths, never a float's toFixed.
@@ -474,6 +536,11 @@ export function readInterest(
   // simple with one under part of the site — only as the memorandum states.
   const term =
     kind === "leasehold" || kind === "leased_fee" || groundLease ? readGroundLeaseTerm(ex, asOf) : null;
+  // A ground lease's equipment and its termination right, wherever a ground
+  // lease is involved — only as the memorandum's own words state them.
+  const groundLeased = kind === "leasehold" || kind === "leased_fee" || !!groundLease || groundRent != null;
+  const equipment = groundLeased ? groundLeaseEquipment(ex) : null;
+  const terminationRight = groundLeased ? (groundLeaseTerminationOf(ex) ?? "") : "";
   // "the building's $6.0M of income covers the $1.2M ground rent 5.0×" —
   // two stated figures, one division.
   const coverageClause =
@@ -529,6 +596,20 @@ export function readInterest(
         "The screening model capitalises the exit like a fee-simple building. On a leasehold the value at exit is what the term left will bear — run the ground lease calculator on the stated term.";
       break;
     case "leased_fee":
+      if (equipment) {
+        // Under a tower, a sign or an array no building reverts: the land
+        // comes back, and the equipment is the tenant's. Said as what the
+        // memorandum names and what to read in the lease, never as law.
+        lead.push(
+          `This memorandum sells a LEASED FEE: the land under ${equipment.what} someone else owns, with its ground lease.`,
+          `The buyer collects the ground rent — the income here, not an expense — and when the lease ends the land comes back, not a building: ${equipment.gear} are the tenant's own, as such leases usually provide, so read the lease for what the tenant must remove and restore at its end.`,
+        );
+        // A stated right is said below, as stated; with none stated, ask.
+        if (!terminationRight) lead.push("Such tenants often hold a right to end the lease early: read the lease for one before trusting its term.");
+        modelCaveat =
+          "The screening model runs the ground rent as a building's NOI, with a building's growth, vacancy and expense assumptions. A ground rent grows by its lease's own schedule and resets, has no vacancy while the lease stands, and ends with the land coming back, not a building — the tenant's equipment is its own; run the ground lease calculator's leased-fee side on the stated terms.";
+        break;
+      }
       lead.push(
         "This memorandum sells a LEASED FEE: the land under a building someone else owns, with its ground lease.",
         "The buyer collects the ground rent — the income here, not an expense and never the building's NOI — and when the lease ends the building reverts to the buyer.",
@@ -546,6 +627,13 @@ export function readInterest(
         "Part of the site is under a ground lease.",
         "Whether this owner pays the ground rent (an expense ahead of the debt) or collects it (a pad let on a ground lease), the lease's term and resets decide what that part is worth — the lease as stated says which.",
       );
+  }
+  // A right to end the ground lease early, on either side of it — said as
+  // the memorandum states it, never read for a date or a term.
+  if (terminationRight) {
+    lead.push(
+      `The memorandum states a right to end the ground lease early: ${terminationRight} — read who holds it, from when and on what notice before trusting the term.`,
+    );
   }
   const headline = lead.join(" ");
   return {
@@ -573,6 +661,8 @@ export function readInterest(
     modelCaveat,
     term,
     termLine: term ? groundLeaseTermLine(term) : "",
+    equipment,
+    terminationRight,
   };
 }
 
@@ -612,8 +702,28 @@ export function interestNote(r: InterestRead): string {
     unknown:
       "GROUND-LEASE TRAP, checked by name: part of the site is under a ground lease — say which side this owner is on: paying the rent (an expense ahead of the debt, whose term and resets can reprice that part) or collecting it (the ground tenant's credit, and the reversion of its improvements at the lease's end).",
   };
+  // Under a wireless tower, a billboard or a solar array no building
+  // reverts (research pass 23): the land comes back, the equipment is the
+  // tenant's, and such tenants often hold a right to end the lease early.
+  // Each said as what to read in the lease, never as law.
+  const eq = r.equipment;
+  const termination = r.terminationRight
+    ? `as stated: ${r.terminationRight}`
+    : "such tenants often hold one, and the memorandum states none";
+  if (eq) {
+    traps.leased_fee = `LEASED-FEE TRAPS, checked by name where the OM gives the inputs: (a) THE RENT IS THE INCOME — the ground rent with its bumps and resets; (b) THE TENANT'S CREDIT — no building's income stands behind this rent, only the tenant's credit and its need for the site; (c) SUBORDINATION — a subordinated ground lease has pledged the land to the tenant's lender, so a default can cost the buyer the land itself, where an unsubordinated rent sits ahead of that loan; (d) THE RESETS — a rent reset to a share of then-current land value is where the growth lives, and a lease on fixed bumps alone has none; (e) THE LAND COMES BACK, NOT A BUILDING — ${eq.gear} are the tenant's own, as such leases usually provide: read what the lease makes it remove and restore at its end, and what the land is worth then; (f) PURCHASE OPTIONS — a tenant's option to buy the land caps what comes back; (g) A TERMINATION RIGHT — ${termination}: read who may end the lease early, from when and on what notice, before trusting the term.`;
+    const collecting = `collecting it (the ground tenant's credit, any right it holds to end the lease early, and what it must remove at the end — ${eq.gear} are its own, as such leases usually provide)`;
+    traps.fee_simple = traps.fee_simple.replace(/collecting it \([^)]*\)/, collecting);
+    traps.unknown = traps.unknown.replace(/collecting it \([^)]*\)/, collecting);
+  }
+  // A right to end the ground lease early, stated on any other ground
+  // lease, is named by its own words.
+  const terminationTrap =
+    r.terminationRight && !(eq && r.kind === "leased_fee")
+      ? ` A TERMINATION RIGHT — as stated: ${r.terminationRight}: read who may end the ground lease early, from when and on what notice, before trusting the term.`
+      : "";
   const shared = SHARED_TRAPS_READ[r.kind];
-  return `${interestContextLine(r)} ${traps[r.kind]}${shared ? ` ${shared}` : ""}`;
+  return `${interestContextLine(r)} ${traps[r.kind]}${terminationTrap}${shared ? ` ${shared}` : ""}`;
 }
 
 /**
@@ -681,12 +791,20 @@ export function interestShortLine(r: InterestRead): string {
           : `${withArticle(shareText(r.sharePct), true)} share of the owning entity — ${money(r.askingPrice)} for the share is ${money(r.impliedWhole)} for the whole`
         : "A share of the owning entity, its percentage not stated";
     case "leasehold":
-      return `A leasehold — the building and a lease on the land, not the land${termClause(r.term, "the lease ends")}`;
+      return `A leasehold — the building and a lease on the land, not the land${termClause(r.term, "the lease ends")}${terminationClause(r)}`;
     case "leased_fee":
-      return `The leased fee — the land under a building someone else owns, and its ground rent${
-        r.groundRentCoverage != null ? `, covered ${times(r.groundRentCoverage)} by the building's income` : ""
-      }${termClause(r.term, "the building reverts")}`;
+      // Under a tower, a sign or an array the land comes back, not a building.
+      return r.equipment
+        ? `The leased fee — the land under ${r.equipment.what} someone else owns, and its ground rent${termClause(r.term, "the lease ends")}${terminationClause(r)}`
+        : `The leased fee — the land under a building someone else owns, and its ground rent${
+            r.groundRentCoverage != null ? `, covered ${times(r.groundRentCoverage)} by the building's income` : ""
+          }${termClause(r.term, "the building reverts")}${terminationClause(r)}`;
     default:
-      return "Fee simple, with a ground lease on part of the site";
+      return `Fee simple, with a ground lease on part of the site${terminationClause(r)}`;
   }
+}
+
+/** "; the ground lease states a right to end it early" — where it does. */
+function terminationClause(r: InterestRead): string {
+  return r.terminationRight ? "; the ground lease states a right to end it early" : "";
 }

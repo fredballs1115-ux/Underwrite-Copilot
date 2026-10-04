@@ -1,11 +1,42 @@
 import { describe, expect, it } from "vitest";
-import { groundLeaseTermLine, readGroundLeaseTerm, readOptions, termEndLabel } from "@/lib/ground-lease-term";
+import { groundLeaseTermLine, groundLeaseTerminationOf, readGroundLeaseTerm, readOptions, termEndLabel } from "@/lib/ground-lease-term";
 
 // Every reading is on one pinned day, so a year left is a year left.
 const ASOF = new Date("2026-09-25T12:00:00Z");
 const rows = (metrics: Array<{ label: string; value: string; page?: string }>, totalPages = 40) => ({
   totalPages,
   metrics: metrics.map((m) => ({ page: "", ...m })),
+});
+
+// Research pass 23: the extraction files a right to end a ground lease
+// early as "Ground lease termination right" — a row the end reader's
+// "terminat" would otherwise take for the term's end, reading a year in its
+// words as the lease's.
+describe("groundLeaseTerminationOf — a right to end the lease early, read as stated and never as the term", () => {
+  const right = { label: "Ground lease termination right", value: "Tenant may terminate on 12 months' notice after 2030." };
+  it("is said as stated, and a row that states nothing is no right", () => {
+    expect(groundLeaseTerminationOf(rows([right]))).toBe("Tenant may terminate on 12 months' notice after 2030");
+    for (const value of ["None", "N/A", "Not stated", "—"]) expect(groundLeaseTerminationOf(rows([{ ...right, value }])), value).toBeNull();
+    expect(groundLeaseTerminationOf(rows([{ label: "Ground lease expiration", value: "December 31, 2071" }]))).toBeNull();
+  });
+
+  it("is never the term's end, nor its options, wherever it sits among the rows", () => {
+    const t = readGroundLeaseTerm(
+      rows([
+        right,
+        { label: "Ground lease termination option", value: "Tenant may cancel after 2030" },
+        { label: "Ground lease expiration", value: "December 31, 2071" },
+        { label: "Ground lease extension options", value: "Four 10-year options" },
+      ]),
+      ASOF,
+    )!;
+    expect(t.ends).toBe("2071-12-31");
+    expect(t.options?.years).toBe(40);
+    // A stated termination DATE is still a date the lease ends.
+    expect(readGroundLeaseTerm(rows([{ label: "Ground lease termination date", value: "December 31, 2071" }]), ASOF)?.ends).toBe("2071-12-31");
+    // A right alone states no term.
+    expect(readGroundLeaseTerm(rows([right]), ASOF)).toBeNull();
+  });
 });
 
 describe("readGroundLeaseTerm — when the ground lease ends, only as stated", () => {
