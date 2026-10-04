@@ -767,6 +767,45 @@ describe("the workbook's labels and colours say what their cells are", () => {
     expect(stated.getCell(findRow(stated, 1, "Rentable SF"), 2).value).toMatchObject({ formula: "RSF" });
   });
 
+  // The row is "General Vacancy & Credit Loss %", but read off a stated
+  // occupancy it holds 1 − that occupancy and nothing for credit loss; the
+  // SOURCE says so, the row and its name unchanged (research pass 27).
+  it("the vacancy read off a stated occupancy says it carries no credit or collection loss", async () => {
+    const assum = (await book(countedModel)).getWorksheet("Assumptions")!;
+    const row = findRow(assum, 1, "General Vacancy & Credit Loss %");
+    expect(assum.getCell(row, 2).name).toBe("VacancyPct");
+    expect(assum.getCell(row, 2).value).toBeCloseTo(0.07, 10);
+    expect(String(assum.getCell(row, 3).value)).toBe(
+      "OM p. 4 — OM in-place occupancy 93% — the vacancy is what it leaves and carries no credit or collection loss",
+    );
+    // The rent roll's occupancy is the same reading.
+    const rolled = deriveUnderwriteInputs(extraction, "fallback", {
+      rentRoll: {
+        summary: {
+          unitCount: 40,
+          occupiedUnits: 36,
+          totalSf: 300_000,
+          occupiedSf: 270_000,
+          sfWeightedOccupancy: 0.9,
+          waltYears: 3.2,
+          weightedAvgRentPsf: 14,
+          expiryBuckets: null,
+          expiryCoveredSf: 0,
+          truncated: false,
+        },
+        asOf: "2026-05-01",
+      },
+    });
+    const rr = (await book(rolled)).getWorksheet("Assumptions")!;
+    expect(String(rr.getCell(findRow(rr, 1, "General Vacancy & Credit Loss %"), 3).value)).toMatch(
+      /Rent roll actual — 90\.0% SF-weighted occupancy as of 2026-05-01 — the vacancy is what it leaves and carries no credit or collection loss$/,
+    );
+    // A class default is an allowance, not a reading of the building: it
+    // claims nothing about credit loss either way.
+    const fallback = (await book(model)).getWorksheet("Assumptions")!;
+    expect(String(fallback.getCell(findRow(fallback, 1, "General Vacancy & Credit Loss %"), 3).value)).not.toMatch(/credit/);
+  });
+
   it("the TI input says it is charged on the whole building's SF every year, never a per-lease allowance", async () => {
     const wb = await book(model);
     const assum = wb.getWorksheet("Assumptions")!;

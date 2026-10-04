@@ -816,17 +816,21 @@ export function deriveUnderwriteInputs(
 
   // Remaining provenance notes.
   mark("holdMonths", "assumption", "Underwrite Copilot default — 5-year hold");
+  // Read off a stated occupancy, the workbook's "General Vacancy & Credit
+  // Loss %" row holds 1 − that occupancy and nothing for credit or
+  // collection loss — the note says so, so the label is not read as both.
+  const noCreditLoss = "the vacancy is what it leaves and carries no credit or collection loss";
   if (rrOcc != null) {
     mark(
       "vacancyPct",
       "extracted",
-      `Rent roll actual — ${(rrOcc * 100).toFixed(1)}% SF-weighted occupancy${rrAsOf ? ` as of ${rrAsOf}` : ""}`,
+      `Rent roll actual — ${(rrOcc * 100).toFixed(1)}% SF-weighted occupancy${rrAsOf ? ` as of ${rrAsOf}` : ""} — ${noCreditLoss}`,
     );
   } else if (occPct != null) {
     mark(
       "vacancyPct",
       "extracted",
-      `OM in-place occupancy ${occPct}% — the vacancy is what it leaves`,
+      `OM in-place occupancy ${occPct}% — ${noCreditLoss}`,
       (occupancyRow(metrics) as { page?: string } | null)?.page,
     );
   } else {
