@@ -80,6 +80,13 @@ import {
 import { PREVIEW_PX, isPreview } from "./photo-preview";
 import sharp from "sharp";
 
+// These tests build real memoranda and read them through pdfjs and sharp: a
+// second or two each alone, but on a loaded machine (the full suite beside
+// other jobs, 2026-10-04) two ran past vitest's 5-second default and failed
+// on the timer, not on what they assert. The waits below already allow 10 to
+// 15 seconds, which that default had capped.
+vi.setConfig({ testTimeout: 30_000 });
+
 /** A deals table of one row's photo cache, read and written as the code does. */
 function fakeDb(photo: DealVisualCache | null) {
   const db = { photo };
