@@ -8060,14 +8060,16 @@ describe("the boards rank one period's rows, and list a fresh row of an older on
       { id: "dc", name: "Washington DC" },
       { id: "atlanta", name: "Atlanta" },
     ];
-    // Atlanta's Q1 figure is still fresh (the survey's 300 days) when
-    // Washington's Q2 is out: it is listed with its quarter, not placed.
+    // Read in August, after the survey's July release: Washington's Q2 is
+    // out, and Atlanta's Q1 figure is still fresh (the survey's 240 days, 221
+    // old) — listed with its quarter, not placed.
     const rows: RateRow[] = [
       { series_id: "HVS_RVR_47900", obs_date: "2026-04-01", value: 6.2 },
       { series_id: "HVS_RVR_47900_MOE", obs_date: "2026-04-01", value: 2.2 },
       { series_id: "HVS_RVR_12060", obs_date: "2026-01-01", value: 3.1 },
     ];
-    const html = render(React.createElement(SurveyVacancyBoard, { markets, rates: readMetricRates("rental_vacancy_msa", rows, FIXTURE_NOW), us: null }));
+    const august = new Date("2026-08-10T12:00:00Z");
+    const html = render(React.createElement(SurveyVacancyBoard, { markets, rates: readMetricRates("rental_vacancy_msa", rows, august), us: null }));
     const text = visibleText(html);
     expect(text).toContain("1 metro area in order, lowest first · Q2 2026");
     expect((html.match(/data-survey-row=/g) ?? []).length).toBe(1);
