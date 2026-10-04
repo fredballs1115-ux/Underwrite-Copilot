@@ -576,6 +576,89 @@ describe("what the price buys, read by the plausibility check, the deal context 
   });
 });
 
+// Research pass 23: a 4.5% share at $1.8M beside a stated $56.5M loan on the
+// entity read "$1.8M for the share is $40.0M for the whole" — the equity's
+// whole, with the entity's debt on top of it, said as the asset's.
+describe("a share beside the loan its entity carries: the grossed-up figure is the equity's whole", () => {
+  const noi = { label: "NOI (in-place)", value: "$4,900,000", flagged: false, page: "p. 9", basis: "in_place" as const };
+  const recap = (metrics: ExtractionResult["metrics"] = [], loan = "$56,500,000"): ExtractionResult => ({
+    ...ex(interest({ kind: "partial_interest", share: "4.5% limited partnership interest", summary: "A 4.5% LP interest in the owning partnership" })),
+    metrics: [
+      { label: "Asking price", value: "$1,800,000", flagged: false, page: "p. 2", basis: "na" },
+      { label: "Units", value: "240", flagged: false, page: "p. 2", basis: "na" },
+      { label: "Entity loan balance", value: loan, flagged: false, page: "p. 9", basis: "in_place" },
+      ...metrics,
+    ],
+  });
+
+  it("entityLoanOf reads the stated balance on a share alone, and a blank as null", async () => {
+    const { entityLoanOf } = await import("./interest");
+    expect(entityLoanOf(recap())).toBe(56_500_000);
+    // Only on a share: the same row beside a fee simple or a note is not read.
+    expect(entityLoanOf({ ...recap(), interest: interest({ kind: "fee_simple" }) })).toBeNull();
+    expect(entityLoanOf({ ...recap(), interest: interest({ kind: "note" }) })).toBeNull();
+    // A percentage is no balance, and no row is no loan.
+    expect(entityLoanOf(recap([], "65% LTV"))).toBeNull();
+    expect(entityLoanOf(ex(interest({ kind: "partial_interest", share: "4.5% LP interest" })))).toBeNull();
+    expect(entityLoanOf(null)).toBeNull();
+  });
+
+  it("the panel's sentence, the short line, the caveat and the traps name both figures", () => {
+    const e = recap();
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.impliedWhole).toBe(40_000_000);
+    expect(r.entityLoan).toBe(56_500_000);
+    expect(r.leadSentences[0]).toBe(
+      "This memorandum sells a 4.5% share of the owning entity, not the whole asset: $1.8M for the share is $40.0M grossed up — the equity's whole, not the asset's, since the entity's stated $56.5M loan sits on top of it, and the screen sets the whole building's income against the $40.0M alone.",
+    );
+    expect(r.leadSentences[1]).toBe("A minority share is worth less than its slice once control, the promote and the exit rights are priced.");
+    expect(interestShortLine(r)).toBe(
+      "A 4.5% share of the owning entity — $1.8M for the share is $40.0M for the equity's whole; the entity's stated $56.5M loan sits on top of it",
+    );
+    expect(r.modelCaveat).toContain("the equity's whole: the entity's stated $56.5M loan sits on top of it, and the model neither adds it to the price nor carries it");
+    expect(interestNote(r)).toContain("read that grossed-up figure as the equity's whole, not the asset's: the entity's stated $56.5M loan sits on top of it");
+    expect(dealContextFor(e)).toContain("the entity's stated $56.5M loan sits on top of it");
+    expect(gluedWords(`${r.headline} ${r.modelCaveat} ${interestShortLine(r)}`)).toEqual([]);
+    // No loan stated: the share reads exactly as before.
+    const plain = readInterest(ex(interest({ kind: "partial_interest", share: "49% limited partnership interest" })), 20_000_000)!;
+    expect(plain.entityLoan).toBeNull();
+    expect(interestShortLine(plain)).toBe("A 49% share of the owning entity — $20.0M for the share is $40.8M for the whole");
+  });
+
+  it("the model's price note and the plausibility check name both, and the model's price is unchanged", () => {
+    const e = recap([noi, { label: "Going-in cap rate", value: "5.1%", flagged: false, page: "p. 9", basis: "in_place" }]);
+    const d = deriveUnderwriteInputs(e, "x");
+    // The model still runs at the equity's whole: adding the loan is the owner's call.
+    expect(d.inputs.purchasePrice).toBe(40_000_000);
+    expect(d.sources.purchasePrice?.note).toContain(
+      "The OM's $1,800,000 for a 4.5% share, grossed up to $40,000,000 — the equity's whole, not the asset's: the entity's stated $56,500,000 loan sits on top of it, and the model neither adds it to the price nor carries it",
+    );
+    expect(d.meta.interest?.line).toContain("the entity's stated $56.5M loan sits on top of it");
+    const f = assessPlausibility(e);
+    expect(f.map((x) => x.code)).toEqual(["cap_mismatch"]);
+    expect(f[0].title).toBe("Stated 5.10% cap vs 12.25% from NOI (in-place) ÷ whole equity the share implies");
+    expect(f[0].detail).toContain(
+      "The $40.0M is the equity's whole, grossed up from the share's price — not the asset's: the entity's stated $56.5M loan sits on top of it.",
+    );
+  });
+
+  it("the plan line says it where a share's grossed-up price enters a plan", async () => {
+    const { planSummary, plausibilityNote, inferStrategy: infer } = await import("./deal-strategy");
+    const e: ExtractionResult = {
+      ...recap([
+        { label: "Renovation budget", value: "$5,000,000", flagged: false, page: "p. 7", basis: "pro_forma" },
+        { label: "NOI (stabilized, pro forma)", value: "$6,000,000", flagged: false, page: "p. 8", basis: "pro_forma" },
+      ]),
+      strategy: { kind: "value_add", summary: "Renovate 240 units", capitalBudget: "", timeline: "" },
+    };
+    const plan = planSummary(e)!;
+    expect(plan.entityLoan).toBe(56_500_000);
+    expect(plausibilityNote([], infer(e), plan, e)).toContain(
+      "whole price, the share's grossed up, $40.0M (the equity's whole, not the asset's: the entity's stated $56.5M loan sits on top of it)",
+    );
+  });
+});
+
 describe("the comps' subject basis reads what the price buys", () => {
   it("grosses a share up to the whole's per-unit basis, and draws no subject tick on a note", async () => {
     const { subjectBasis } = await import("./comp-detail");

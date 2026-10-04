@@ -14,7 +14,7 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
-import { interestOf, interestShortLine, readInterest } from "@/lib/interest";
+import { entityLoanOf, interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -517,10 +517,17 @@ export function deriveUnderwriteInputs(
     const share = interest.sharePct;
     const stated = price;
     price = stated / (share / 100);
+    // Beside the entity's stated loan the figure grossed up is the equity's
+    // whole, not the asset's (research pass 23). The note names both; the
+    // loan is not added to the price — that is the model's arithmetic, and
+    // the owner's call.
+    const entityLoan = entityLoanOf(extraction);
     mark(
       "purchasePrice",
       "derived",
-      `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to the whole asset — the model runs the whole building's cash flows; the share earns ${share}% of them before the promote and the sponsor's fees`,
+      entityLoan != null
+        ? `The OM's ${usd0(stated)}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to ${usd0(price)} — the equity's whole, not the asset's: the entity's stated ${usd0(entityLoan)} loan sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; the model runs the whole building's cash flows, and the share earns ${share}% of them before the promote and the sponsor's fees`
+        : `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to the whole asset — the model runs the whole building's cash flows; the share earns ${share}% of them before the promote and the sponsor's fees`,
       pageOf(priceMetric),
     );
   } else if (price != null) {

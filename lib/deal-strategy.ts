@@ -25,7 +25,7 @@
  */
 
 import { withArticle } from "@/lib/article";
-import { dealTypeLabel, groundRentOf, interestOf } from "@/lib/interest";
+import { dealTypeLabel, entityLoanOf, groundRentOf, interestOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
@@ -757,6 +757,11 @@ export interface PlanSummary {
    *  percentage (#415); null otherwise, and the price then reads "not
    *  stated" only where the OM states none */
   priceWithheld: string | null;
+  /** a share's price grossed up beside the loan its entity carries, as
+   *  stated (lib/interest `entityLoanOf`): the price is then the equity's
+   *  whole and the loan sits on top of it, said and never added in; null
+   *  or absent otherwise */
+  entityLoan?: number | null;
   /** the stabilized pro forma NOI, when the OM states one */
   stabilizedNoi: NoiFigure | null;
   budget: CapitalBudget | null;
@@ -831,6 +836,7 @@ export function planSummary(
         ? "Whole price, the share grossed up"
         : "Price",
     priceWithheld,
+    entityLoan: interest.sharePct != null && price != null ? entityLoanOf(extraction) : null,
     stabilizedNoi,
     budget,
     totalCost,
@@ -870,7 +876,17 @@ export function assessPlausibility(
   if (interest.kind === "note") return [];
   if (interest.kind === "partial_interest" && interest.sharePct == null) return [];
   const price = interest.sharePct != null ? stated / (interest.sharePct / 100) : stated;
-  const priceWord = interest.sharePct != null ? "whole-asset price the share implies" : "price";
+  // Beside the entity's stated loan, what a share's price grosses up to is
+  // the equity's whole, not the asset's: the loan sits on top of it, and
+  // every finding measured on the figure names both (research pass 23). The
+  // loan is never added to the price here.
+  const entityLoan = interest.sharePct != null ? entityLoanOf(extraction) : null;
+  const priceWord =
+    interest.sharePct != null ? (entityLoan != null ? "whole equity the share implies" : "whole-asset price the share implies") : "price";
+  const wholeNote =
+    entityLoan != null
+      ? ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it.`
+      : "";
 
   const findings: PlausibilityFinding[] = [];
   const planDeal = NON_STABILIZED.has(strategy.kind);
@@ -1021,9 +1037,12 @@ export function assessPlausibility(
     });
   }
 
-  // Dedupe by code, most severe first, stable within severity.
+  // Dedupe by code, most severe first, stable within severity. A finding
+  // measured on a share's grossed-up figure beside the entity's loan says
+  // what that figure is.
   const seen = new Set<string>();
   return findings
+    .map((f) => (wholeNote && f.code !== "no_income_in_place" ? { ...f, detail: `${f.detail}${wholeNote}` } : f))
     .filter((f) => (seen.has(f.code) ? false : (seen.add(f.code), true)))
     .sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "high" ? -1 : 1));
 }
@@ -1039,7 +1058,11 @@ function planLine(plan: PlanSummary): string {
   );
   parts.push(
     plan.price != null
-      ? `${plan.priceLabel === "Whole price, the share grossed up" ? "whole price, the share's grossed up," : "price"} ${money(plan.price)}`
+      ? `${plan.priceLabel === "Whole price, the share grossed up" ? "whole price, the share's grossed up," : "price"} ${money(plan.price)}${
+          plan.entityLoan != null
+            ? ` (the equity's whole, not the asset's: the entity's stated ${money(plan.entityLoan)} loan sits on top of it)`
+            : ""
+        }`
       : plan.priceWithheld
         ? `price ${plan.priceWithheld}`
         : "price not stated",

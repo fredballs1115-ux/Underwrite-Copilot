@@ -6254,6 +6254,16 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     );
     expect(share).toContain("The share $20.0M");
     expect(share).toContain("The whole, grossed up $40.8M");
+    // Beside the entity's stated loan the whole is the equity's, and the
+    // loan is named on top of it (research pass 23).
+    const recapEx = base({ ...blank, kind: "partial_interest", share: "4.5% LP interest" }, [
+      { label: "Entity loan balance", value: "$56,500,000", flagged: false, page: "p. 9" },
+    ]);
+    const recapHtml = render(React.createElement(InterestPanel, { interest: readInterestFor(recapEx, 1_800_000) }));
+    expect(visibleText(recapHtml)).toContain("The equity's whole, grossed up $40.0M · the entity's $56.5M loan on top");
+    expect(visibleText(recapHtml)).toContain("$1.8M for the share is $40.0M grossed up — the equity's whole, not the asset's");
+    expect(gluedWords(visibleText(recapHtml))).toEqual([]);
+    expect(a11yIssues(recapHtml), "share panel").toEqual([]);
     const leaseHtml = render(
       React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "leasehold", groundLease: "62 years remaining; $310,000 a year" }), 20_000_000) }),
     );

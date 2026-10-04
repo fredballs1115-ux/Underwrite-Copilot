@@ -104,7 +104,12 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         ? {
             fill: Math.min(1, r.sharePct / 100),
             left: `The share ${money(r.askingPrice)}`,
-            right: `The whole, grossed up ${money(r.impliedWhole)}`,
+            // Beside the entity's stated loan the whole is the equity's, and
+            // the loan sits on top of it (lib/interest).
+            right:
+              r.entityLoan != null
+                ? `The equity's whole, grossed up ${money(r.impliedWhole)} · the entity's ${money(r.entityLoan)} loan on top`
+                : `The whole, grossed up ${money(r.impliedWhole)}`,
           }
         : r.groundRent != null && r.incomeBeforeGroundRent != null && r.groundRentCoverage != null
           ? {
