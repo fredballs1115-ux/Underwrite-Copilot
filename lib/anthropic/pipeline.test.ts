@@ -567,6 +567,15 @@ describe("runAnalysis — the happy path", () => {
     expect(vi.mocked(challengeAssumptions).mock.calls[0][1]).toBe("office");
   });
 
+  it("hands the challenger the trap lists the memorandum's own words call for, and none on an ordinary deal (research pass 23)", async () => {
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][3]).toEqual([]);
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Cold Storage Warehouse" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][3]).toEqual(["cold_storage"]);
+  });
+
   it("hands the challenger no rates where the table holds nothing fresh — nothing is claimed as current", async () => {
     state.rates = [{ series_id: "DGS5", obs_date: "2026-01-02", value: 3.9 }];
     vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });

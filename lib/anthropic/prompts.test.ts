@@ -14,12 +14,14 @@ import {
   challengerInstruction,
   extractionInstruction,
   firstSignalInstruction,
+  keyedTrapsFor,
   liveMarketClause,
   marketCheckInstruction,
   reconcilerInstruction,
   reconciliationInstruction,
   verdictInstruction,
 } from "@/lib/anthropic/prompts";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 import { gapFigure } from "@/lib/gap-detail";
 import { compFigures } from "@/lib/comp-detail";
 import { priceRange } from "@/lib/criteria";
@@ -397,6 +399,59 @@ describe("sector-aware challenger traps", () => {
       expect(p).toContain(name);
       // Once each, however many classes share a list.
       expect(p.split(name).length - 1, name).toBe(1);
+    }
+  });
+});
+
+// Research pass 23: classes the challenger met with no list of their own —
+// a cannabis tenant, a special-purpose building sold to be converted, a lab
+// or a cold-storage building filed under office or industrial.
+describe("trap lists keyed on the memorandum's own words", () => {
+  const ex = (over: Partial<ExtractionResult>): ExtractionResult => ({ dealName: "Subject", assetClass: "retail", metrics: [], ...over });
+  const tenant = (name: string) => ({ tenant: name, guarantor: "", leaseType: "NNN", landlordObligations: "", tenantRights: "", page: "" });
+
+  it("keys each list on the memorandum's words, and nothing on an ordinary deal", () => {
+    expect(keyedTrapsFor(ex({ singleTenant: tenant("Green Leaf Dispensary LLC") }))).toEqual(["cannabis"]);
+    expect(keyedTrapsFor(ex({ assetClass: "Industrial (cannabis cultivation)" }))).toEqual(["cannabis"]);
+    expect(keyedTrapsFor(ex({ assetClass: "Life Science / Lab" }))).toEqual(["lab"]);
+    expect(keyedTrapsFor(ex({ assetClass: "Laboratory" }))).toEqual(["lab"]);
+    expect(keyedTrapsFor(ex({ assetClass: "Cold Storage Warehouse" }))).toEqual(["cold_storage"]);
+    // A special-purpose building where it is the building being converted…
+    expect(keyedTrapsFor(ex({ assetClass: "Church" }), "conversion")).toEqual(["special_purpose"]);
+    expect(keyedTrapsFor(ex({ assetClass: "Multifamily", strategy: { kind: "value_add", summary: "Convert the former church into 24 apartments", capitalBudget: "", timeline: "" } }))).toEqual(["special_purpose"]);
+    expect(keyedTrapsFor(ex({ dealName: "Lincoln School Lofts", strategy: { kind: "conversion", summary: "Adaptive reuse of the historic school into lofts", capitalBudget: "", timeline: "" } }))).toEqual(["special_purpose"]);
+    // …and never the neighbourhood's school or temple, or a church kept as one.
+    expect(keyedTrapsFor(ex({ assetClass: "Student housing", strategy: { kind: "development", summary: "Ground-up student housing serving Temple University", capitalBudget: "", timeline: "" } }), "development")).toEqual([]);
+    expect(keyedTrapsFor(ex({ assetClass: "Office", strategy: { kind: "conversion", summary: "Office-to-residential conversion near the school", capitalBudget: "", timeline: "" } }), "conversion")).toEqual([]);
+    expect(keyedTrapsFor(ex({ assetClass: "Church" }), "stabilized")).toEqual([]);
+    // An outdoor-storage yard has the industrial list's own trap; an ordinary deal none.
+    expect(keyedTrapsFor(ex({ assetClass: "Industrial Outdoor Storage" }))).toEqual([]);
+    expect(keyedTrapsFor(ex({ assetClass: "Garden apartments" }))).toEqual([]);
+    expect(keyedTrapsFor(null)).toEqual([]);
+  });
+
+  it("each list rides after the class's own, and a deal keyed for none reads exactly as before", () => {
+    expect(challengerInstruction("retail", [])).toBe(challengerInstruction("retail"));
+    const p = challengerInstruction("retail", ["cannabis"]);
+    expect(p.startsWith(challengerInstruction("retail"))).toBe(true);
+    expect(p).toContain("RETAIL-SPECIFIC TRAPS");
+    expect(p).toContain("CANNABIS-TENANT TRAPS");
+    for (const trap of ["(a) FEDERAL LAW AND THE FINANCING", "(b) THE LICENSE", "(c) THE RENT PREMIUM", "(d) THE BUILDING WITHOUT THE TENANT"]) {
+      expect(p, trap).toContain(trap);
+    }
+    const sp = challengerInstruction("auto", ["special_purpose"]);
+    for (const trap of ["(a) THE USE PERMIT AND THE ZONING", "(b) LANDMARK OR HISTORIC STATUS", "(c) DEED RESTRICTIONS", "(d) THE TAX EXEMPTION"]) {
+      expect(sp, trap).toContain(trap);
+    }
+    expect(sp.split("SPECIAL-PURPOSE TRAPS").length - 1).toBe(1);
+    expect(challengerInstruction("office", ["lab"])).toContain("(b) THE COST TO RE-TENANT");
+    const cold = challengerInstruction("industrial", ["cold_storage"]);
+    expect(cold).toContain("(a) THE REFRIGERATION");
+    expect(cold).toContain("(c) THE CAPITAL RESERVE — a cold-storage building's reserve runs above a dry warehouse's");
+    // Questions to check, never a statement of law or a figure.
+    for (const k of ["cannabis", "special_purpose", "lab", "cold_storage"] as const) {
+      const text = challengerInstruction("retail", [k]).slice(challengerInstruction("retail").length);
+      expect(text, k).not.toMatch(/\billegal\b|\bunlawful\b|\d/);
     }
   });
 });

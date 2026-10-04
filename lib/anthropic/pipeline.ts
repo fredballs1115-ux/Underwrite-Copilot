@@ -15,6 +15,7 @@ import {
 } from "@/lib/manual-deal";
 import { extractTerms } from "./extract";
 import { challengeAssumptions } from "./challenge";
+import { keyedTrapsFor } from "./prompts";
 import { scrutinizeComps } from "./comps";
 import { reconcileModel } from "./reconcile";
 import { checkMarket } from "./market";
@@ -34,6 +35,7 @@ import {
   noiFigures,
   planSummary,
   plausibilityNote,
+  type StrategyKind,
 } from "@/lib/deal-strategy";
 import { dealContextFor } from "@/lib/deal-context";
 import { interestNote, readInterest } from "@/lib/interest";
@@ -1062,8 +1064,10 @@ async function runAnalysisSteps(
       // OM-vs-rent-roll / OM-vs-T-12 discrepancies to the broker.
       let reconNote: string | undefined;
       // The extraction the notes below read, kept for the rates line's
-      // class spread after them.
+      // class spread after them — and with the deal's kind, for the trap
+      // lists the memorandum's own words call for.
       let challengeEx: ExtractionResult | null = null;
+      let challengeKind: StrategyKind | null = null;
       try {
         const { data: dr } = await admin
           .from("deals")
@@ -1087,6 +1091,7 @@ async function runAnalysisSteps(
         const ex = (dr?.extraction as ExtractionResult | null) ?? null;
         challengeEx = ex;
         const strategy = inferStrategy(ex, (dr?.first_signal as FirstSignal | null | undefined) ?? null);
+        challengeKind = strategy.kind;
 
         // Feature 1: the OM-assumed vs T-12-actual NOI gap is the skeptic's
         // first-order fact — a material (>5%) or red-flag (>10%) delta means
@@ -1257,7 +1262,11 @@ async function runAnalysisSteps(
       // apartment building). A phrase no class resolves keeps them all.
       const challengeClass =
         (assetClassKey(shownAssetClass(assetClass, challengeEx)) as AssetClass | null) ?? assetClass;
-      const challenges = await challengeAssumptions(om(), challengeClass, reconNote);
+      // The trap lists the memorandum's own words call for beside the
+      // class's (research pass 23): a cannabis tenant, a special-purpose
+      // building sold to be converted, a lab, a cold-storage building.
+      const keyed = keyedTrapsFor(challengeEx, challengeKind);
+      const challenges = await challengeAssumptions(om(), challengeClass, reconNote, keyed);
       await admin
         .from("deals")
         .update({ challenges, updated_at: new Date().toISOString() })

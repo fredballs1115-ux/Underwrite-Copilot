@@ -16,8 +16,10 @@
  * calls Claude lands in Phase 2 (the worker + the analysis functions).
  */
 
-import type { AssetClass } from "./types";
+import type { AssetClass, ExtractionResult } from "./types";
 import { assetWords } from "@/lib/asset-words";
+import type { StrategyKind } from "@/lib/deal-strategy";
+import { ownMarketBuilding } from "@/lib/tracker-read";
 
 /** Shared persona/guardrails prepended to every analysis call. The last two
  *  sentences are the guard on the seller's own pages: a memorandum's text
@@ -100,13 +102,94 @@ const TRAPS_BY_CLASS: Record<Exclude<AssetClass, "auto">, readonly string[]> = {
   land_infill: [LAND_TRAPS],
 };
 
-function sectorTrapsClause(assetClass: AssetClass): string {
+/** Trap lists keyed on the memorandum's own words rather than on its class
+ *  (research pass 23): a cannabis tenant, a building made for one use and
+ *  sold to be converted, and a lab or a cold-storage building the class
+ *  table files under office or industrial. Each is a set of questions to
+ *  check — never a claim of law and never a figure. */
+export type KeyedTrapList = "cannabis" | "special_purpose" | "lab" | "cold_storage";
+
+const CANNABIS_TRAPS = `CANNABIS-TENANT TRAPS, where the memorandum's tenant is a cannabis business — a dispensary, a cultivation or a processing facility — checked by name where the OM gives the inputs: (a) FEDERAL LAW AND THE FINANCING — ask how federal law treats the tenant's business today, and which lenders will lend on a building let to it and on what terms: many will not, so the loan a screening model assumes may not exist; (b) THE LICENSE — ask whether the tenant's license is tied to this site, and what a lapse, a revocation or a move does to the lease and its rent; (c) THE RENT PREMIUM — set the rent against what the space would let for to an ordinary tenant, and ask whether the premium survives a renewal or a re-let; (d) THE BUILDING WITHOUT THE TENANT — ask what it is worth if the tenant leaves: a fit-out for growing, processing or security may be worth nothing to the next tenant.`;
+
+const SPECIAL_PURPOSE_TRAPS = `SPECIAL-PURPOSE TRAPS, where the building was built for one use — a church, a school, a temple, a theatre and the like — and is sold to be converted, checked by name where the OM gives the inputs: (a) THE USE PERMIT AND THE ZONING — ask whether the new use is allowed as of right or needs a variance, a rezoning or a special permit, how long that takes, and whether the existing use rests on a permit that ends with it; (b) LANDMARK OR HISTORIC STATUS — check for a designation, a district or an eligibility that limits changes to the exterior, the interior or demolition; (c) DEED RESTRICTIONS — ask for the title commitment: a covenant or a restriction in the chain of title can limit the use or the sale; (d) THE TAX EXEMPTION — ask whether the seller's property-tax exemption ends at the sale, and price the full bill a taxable owner pays, which the seller's statement does not show.`;
+
+const LAB_TRAPS = `LABORATORY TRAPS, where the building is a lab or a life-science building, checked by name where the OM gives the inputs: (a) THE LAB INFRASTRUCTURE — air changes, exhaust, power and backup power, floor loading and vibration: what is in place, its age, and whose it is at the lease's end; (b) THE COST TO RE-TENANT — a lab's fit-out is costly and specific to its tenant: ask what the next tenant's allowance and downtime would be before believing a renewal at today's rent.`;
+
+const COLD_STORAGE_TRAPS = `COLD-STORAGE TRAPS, where the building is refrigerated or frozen storage, checked by name where the OM gives the inputs: (a) THE REFRIGERATION — the system, its refrigerant, its age and its replacement cost; (b) POWER — the service's capacity, the power bill and who pays it; (c) THE CAPITAL RESERVE — a cold-storage building's reserve runs above a dry warehouse's, its refrigeration plant, insulated envelope, slab and doors wearing out on their own clocks: ask for a condition report rather than holding it to a dry warehouse's reserve.`;
+
+const KEYED_TRAPS: Record<KeyedTrapList, string> = {
+  cannabis: CANNABIS_TRAPS,
+  special_purpose: SPECIAL_PURPOSE_TRAPS,
+  lab: LAB_TRAPS,
+  cold_storage: COLD_STORAGE_TRAPS,
+};
+
+const CANNABIS_WORDS = /\b(?:cannabis|marijuana|dispensar(?:y|ies)|cultivation)\b/i;
+// A building made for one use, by its own name — "Temple" before a
+// university's name and "theater" before "district" are a neighbourhood's.
+const SPECIAL_USE = String.raw`(?:church(?:es)?|chapels?|cathedrals?|synagogues?|temples?(?!\s+univ)|mosques?|(?:houses?|places?)\s+of\s+worship|parish\s+halls?|rector(?:y|ies)|convents?|monaster(?:y|ies)|school(?:house)?s?|theat(?:er|re)s?(?!\s+district)|cinemas?|auditori(?:um|ums|a)|librar(?:y|ies)|armor(?:y|ies)|fire\s?(?:house|station)s?|lodge\s+halls?)`;
+// …read only beside words that say it is the building being converted:
+// "a former church", "converting the school", "theatre to lofts", "church
+// conversion" — "near the school" is the neighbourhood's.
+const SPECIAL_PURPOSE_CONVERTED = new RegExp(
+  [
+    String.raw`\b(?:former|vacant|decommissioned|deconsecrated|closed)\s+${SPECIAL_USE}\b`,
+    String.raw`\b(?:convert(?:s|ed|ing)?|conversion\s+of|redevelop(?:s|ed|ing)?|redevelopment\s+of|repurpos(?:e|es|ed|ing)|adaptive[\s-]+re-?use\s+of)\s+(?:the\s+|a\s+|an\s+|this\s+)?(?:former\s+|vacant\s+|historic\s+|existing\s+)?${SPECIAL_USE}\b`,
+    String.raw`\b${SPECIAL_USE}[\s-]+(?:to|into)[\s-]+(?:residential|apartments?|multi[\s-]?family|condo(?:minium)?s?|lofts?|housing|offices?|retail|mixed[\s-]use|homes?|townhomes?)\b`,
+    String.raw`\b${SPECIAL_USE}\s+(?:conversion|redevelopment|adaptive[\s-]+re-?use)\b`,
+  ].join("|"),
+  "i",
+);
+// The class phrase names the special use itself ("Church", "Special
+// purpose (school)") — read with a plan to convert or build.
+const SPECIAL_PURPOSE_CLASS = new RegExp(String.raw`^\s*(?:special[\s-]+(?:purpose|use)|religious|institutional|${SPECIAL_USE})\b`, "i");
+
+/**
+ * The keyed trap lists the memorandum's own words call for — its class
+ * phrase, its name, the plan and the interest in its own terms, and its
+ * tenants' names. A lab and a cold-storage building by the research
+ * tracker's own test (lib/tracker-read `ownMarketBuilding`), so the traps
+ * and the figures agree on what the building is; a special-purpose
+ * building only where it is the building being converted. None where the
+ * words name none of them.
+ */
+export function keyedTrapsFor(ex: ExtractionResult | null | undefined, kind?: StrategyKind | null): KeyedTrapList[] {
+  if (!ex) return [];
+  const st = ex.singleTenant;
+  const words = [
+    ex.assetClass,
+    ex.dealName,
+    ex.strategy?.summary,
+    ex.interest?.summary,
+    st?.tenant,
+    st?.guarantor,
+    ...(Array.isArray(ex.tenants) ? ex.tenants.map((t) => t?.name) : []),
+  ]
+    .filter((w): w is string => typeof w === "string" && w.trim() !== "")
+    .join(" \n ");
+  const out: KeyedTrapList[] = [];
+  if (CANNABIS_WORDS.test(words)) out.push("cannabis");
+  const plan = kind === "conversion" || kind === "development";
+  if (SPECIAL_PURPOSE_CONVERTED.test(words) || (plan && SPECIAL_PURPOSE_CLASS.test(ex.assetClass ?? ""))) out.push("special_purpose");
+  const own = ownMarketBuilding(ex.assetClass);
+  if (own === "lab") out.push("lab");
+  if (own === "cold_storage") out.push("cold_storage");
+  return out;
+}
+
+function sectorTrapsClause(assetClass: AssetClass, keyed: readonly KeyedTrapList[] = []): string {
+  // The keyed lists ride after the class's own, where the class traps go —
+  // after the document — so the cached prefix never moves, and a deal the
+  // words key nothing for reads exactly as before.
+  const own = keyed.length
+    ? ` The memorandum's own words also name what the following lists are for — apply each beside the class's own: ${[...new Set(keyed)].map((k) => KEYED_TRAPS[k]).join(" ")}`
+    : "";
   if (assetClass === "auto") {
     const all = [...new Set(Object.values(TRAPS_BY_CLASS).flat())].join(" ");
-    return `\n\nApply the trap list of whichever asset class the document turns out to be — that class's list and no other's. ${all}`;
+    return `\n\nApply the trap list of whichever asset class the document turns out to be — that class's list and no other's. ${all}${own}`;
   }
   const lists = TRAPS_BY_CLASS[assetClass] ?? [];
-  return lists.length ? `\n\n${lists.join(" ")}` : "";
+  return lists.length ? `\n\n${lists.join(" ")}${own}` : own ? `\n\n${own.trim()}` : "";
 }
 
 /** Step 0 — First signal: the 30-second headline read, before the deep pass. */
@@ -175,8 +258,9 @@ Set \`totalPages\` to the offering memorandum's total number of pages (your best
 For \`locatorSnippet\`, give up to ten words of the actual surrounding text from that page — a short verbatim phrase a reader could search for to confirm the figure, e.g. "Going-In Cap Rate: 6.0%" or "Total Rentable Area: 300,142 SF". Use an empty string if you can't quote it. Never invent a snippet.`;
 }
 
-/** Step 2 — Assumption Challenger */
-export function challengerInstruction(assetClass: AssetClass): string {
+/** Step 2 — Assumption Challenger. `keyed` adds the trap lists the
+ *  memorandum's own words call for (`keyedTrapsFor`) after the class's. */
+export function challengerInstruction(assetClass: AssetClass, keyed: readonly KeyedTrapList[] = []): string {
   return `Challenge the optimistic assumptions in the attached offering memorandum the way a skeptical investment committee would grill a junior analyst. ${assetClassClause(
     assetClass,
   )}
@@ -189,6 +273,7 @@ IF THE OM DESCRIBES A PLAN — a conversion, a ground-up development, a lease-up
 
 Give 3–6 challenges, most severe first. For each, give a specific, numerate critique, the exact question to put to the broker, and \`page\` — the OM page where the challenged figure appears, as a short string like "p. 12" (empty string if unknown). Then give a one-paragraph stress test: what happens to returns if the one or two most aggressive assumptions revert to market.${sectorTrapsClause(
     assetClass,
+    keyed,
   )}`;
 }
 
