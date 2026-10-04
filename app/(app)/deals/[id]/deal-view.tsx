@@ -1206,7 +1206,9 @@ function MandateScoreHeader({
  *  linking to the full Market data page. Never a teammate's or another
  *  account's deals. The count is of the screens that left a going-in cap or a
  *  basis behind (lib/market-memory `buildComps` keeps no other), and the
- *  sentence says so. */
+ *  sentence says so — and says the figures are at the ask: each is struck on
+ *  a memorandum's asking price, never a price anyone paid, and read without
+ *  the words they read as trades. */
 function MarketMemoryStrip({ group }: { group: MarketGroup }) {
   const bits: string[] = [];
   if (group.cap) bits.push(`going-in cap ${fmtCapRange(group.cap)}`);
@@ -1231,7 +1233,7 @@ function MarketMemoryStrip({ group }: { group: MarketGroup }) {
         deal{group.count === 1 ? "" : "s"}{" "}with a cap or basis on file
         {bits.length ? (
           <>
-            : <span className="text-ink">{bits.join(" · ")}</span>
+            : <span className="text-ink">{bits.join(" · ")}</span>, at the ask
           </>
         ) : (
           ""

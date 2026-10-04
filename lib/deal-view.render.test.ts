@@ -660,8 +660,10 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(gluedWords(text)).toEqual([]);
     // The text tool breaks a line at each element's edge; the reader's
     // sentence runs straight through.
+    // The figures are at the ask — struck on the memoranda's asking prices,
+    // never trades — and the sentence says so.
     expect(text).toMatch(
-      /You've screened\s+3\s+other Philadelphia, PA Multifamily\s+deals with a cap or basis on file: going-in cap 5\.2–5\.6% · basis \$240–262k\/unit\s*\./,
+      /You've screened\s+3\s+other Philadelphia, PA Multifamily\s+deals with a cap or basis on file: going-in cap 5\.2–5\.6% · basis \$240–262k\/unit\s*, at the ask\s*\./,
     );
     // A hotel's basis is per key (lib/market-memory's group noun).
     const hotel = textOf(
@@ -679,8 +681,8 @@ describe("DealView — the sample deal renders every section without a runtime e
         },
       } as unknown as Props),
     );
-    const strip = hotel.match(/You've screened[\s\S]*?\/key/)?.[0] ?? "";
-    expect(strip).toMatch(/other Nashville, TN Hospitality \/ STR\s+deal with a cap or basis on file: basis \$225k\/key/);
+    const strip = hotel.match(/You've screened[\s\S]*?\/key[\s\S]*?\./)?.[0] ?? "";
+    expect(strip).toMatch(/other Nashville, TN Hospitality \/ STR\s+deal with a cap or basis on file: basis \$225k\/key\s*, at the ask\s*\./);
     expect(strip).not.toMatch(/\/unit/);
   });
 
