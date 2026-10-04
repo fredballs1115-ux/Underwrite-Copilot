@@ -5,6 +5,7 @@ import {
   assetClassKey,
   assetWords,
   countNoun,
+  dealClassKey,
   isResidentialClass,
   perSuffix,
   rentQuotedMonthly,
@@ -136,6 +137,20 @@ describe("the asset-words table", () => {
     }
     expect(rentQuotedMonthly(null)).toBe(false);
     expect(rentQuotedMonthly("Garden-style apartments")).toBe(true);
+  });
+
+  it("keys a deal by its one class: the analyst's, else the deck's, filed by its words", () => {
+    // The deck's phrase, where the analyst left it to the deck.
+    expect(dealClassKey("auto", { assetClass: "Garden-style multifamily" })).toBe("multifamily");
+    expect(dealClassKey(null, { assetClass: "Garden-style multifamily" })).toBe("multifamily");
+    // The analyst's class ahead of the deck's, whatever its case.
+    expect(dealClassKey("office", { assetClass: "Apartments" })).toBe("office");
+    expect(dealClassKey("MULTIFAMILY", null)).toBe("multifamily");
+    // A phrase no rule files keeps its own words, so two such deals still pool.
+    expect(dealClassKey("auto", { assetClass: "Cannabis Grow Facility" })).toBe("cannabis grow facility");
+    // Nothing named, nothing keyed.
+    expect(dealClassKey("auto", { assetClass: "" })).toBe("");
+    expect(dealClassKey(undefined, null)).toBe("");
   });
 
   it("files a class the model phrased itself by its words", () => {

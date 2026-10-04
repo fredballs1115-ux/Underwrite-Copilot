@@ -12,7 +12,7 @@
 // the noun only where nothing was read — a bare count, a form's label, a
 // prompt asking for the figure.
 
-import { ASSET_CLASS_LABEL, assetClassLabel } from "@/lib/asset-class";
+import { ASSET_CLASS_LABEL, assetClassLabel, shownAssetClass } from "@/lib/asset-class";
 
 /** The basis a price is quoted on. */
 export type Basis = "unit" | "sf" | "acre";
@@ -333,6 +333,25 @@ export function assetClassKey(key: string | null | undefined): string | null {
   if (WORDS[lower]) return lower;
   for (const [test, known] of PHRASE_TO_KEY) if (typeof test === "function" ? test(k) : test.test(k)) return known;
   return null;
+}
+
+/**
+ * A deal's one class, as the key two deals are compared by: the class the
+ * analyst filed, else the one the deck turned out to be (lib/asset-class
+ * `shownAssetClass`), filed by its words (`assetClassKey`). Wherever deals
+ * are pooled by class — the analytics' price per unit, the internal comps,
+ * the market memory — the raw words had been compared, so a deck's
+ * "Garden-style multifamily" matched nothing called multifamily, and the
+ * analytics read the deck's words ahead of the analyst's class. A phrase
+ * no rule files keeps its own words, lowercased, so two deals of the same
+ * unknown class still pool; "" where neither names a class.
+ */
+export function dealClassKey(
+  stored: string | null | undefined,
+  extraction: { assetClass?: string | null } | null | undefined,
+): string {
+  const shown = shownAssetClass(stored, extraction);
+  return assetClassKey(shown) ?? shown.trim().toLowerCase();
 }
 
 /** What a deal of no known class is spoken in: counted in units, priced

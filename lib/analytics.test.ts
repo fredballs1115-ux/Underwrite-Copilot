@@ -185,6 +185,21 @@ describe("deriveAnalytics — the $/unit series is multifamily's, never a pool o
   });
 });
 
+describe("deriveAnalytics — the deal's one class, filed by its words (lib/asset-words dealClassKey)", () => {
+  it("a deck's 'Garden-style multifamily' plots on the price-per-unit chart, the analyst's class read first", () => {
+    const deals = deriveAnalytics([
+      row("1", "Garden Court", { ...STABILIZED, assetClass: "Garden-style multifamily" }, { asset_class: "auto" }),
+      // Filed multifamily by the analyst; the deck called it something else.
+      row("2", "Filed", { ...STABILIZED, assetClass: "Mixed-use" }, { asset_class: "multifamily" }),
+      // Filed an office: no price per unit, whatever the deck says.
+      row("3", "Tysons", { ...STABILIZED, assetClass: "Apartments" }, { asset_class: "office" }),
+    ]);
+    expect(deals.find((d) => d.id === "1")?.perUnit).toBeCloseTo(50_000_000 / 248, 3);
+    expect(deals.find((d) => d.id === "2")?.perUnit).toBeCloseTo(50_000_000 / 248, 3);
+    expect(deals.find((d) => d.id === "3")?.perUnit).toBeNull();
+  });
+});
+
 describe("middleRead — a median needs three figures (the site's MEDIAN_FLOOR)", () => {
   const pct = (v: number) => `${v.toFixed(1)}%`;
 

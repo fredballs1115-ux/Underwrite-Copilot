@@ -217,6 +217,45 @@ describe("an outdoor-storage yard's shop building is never a market's per-SF bas
   });
 });
 
+describe("the memory files a deal by its one class, read by its words (lib/asset-words dealClassKey)", () => {
+  const screened = (id: string, assetClass: string, deckClass: string) => ({
+    id,
+    name: id,
+    asset_class: assetClass,
+    created_at: "2026-01-01T00:00:00.000Z",
+    is_sample: false,
+    verdict: null,
+    extraction: {
+      assetClass: deckClass,
+      market: "Dallas, TX",
+      metrics: [
+        { label: "Going-in cap rate", value: "5.0%" },
+        { label: "Purchase price", value: "$50,000,000" },
+        { label: "Units", value: "200" },
+      ],
+    },
+  });
+
+  it("groups a deck's 'Garden-style multifamily' with the account's multifamily screens", () => {
+    const comps = buildComps([screened("a", "multifamily", "Multifamily"), screened("g", "auto", "Garden-style multifamily")]);
+    expect(comps.map((c) => c.assetClass)).toEqual(["multifamily", "multifamily"]);
+    expect(summarizeMarkets(comps)).toHaveLength(1);
+    // The deal page asks in the deck's own words, and finds the other.
+    expect(marketMemoryFor(comps, "g", "Garden-style multifamily", "Dallas, TX")?.dealIds).toEqual(["a"]);
+    expect(marketMemoryFor(comps, "a", "multifamily", "Dallas, TX")?.dealIds).toEqual(["g"]);
+  });
+
+  it("finds the same deals read light", () => {
+    const keys: MemoryKeyRow[] = [
+      { id: "a", asset_class: "multifamily", is_sample: false, market: "Dallas, TX", ext_class: "Multifamily" },
+      { id: "g", asset_class: "auto", is_sample: false, market: "Dallas, TX", ext_class: "Garden-style multifamily" },
+      { id: "o", asset_class: "auto", is_sample: false, market: "Dallas, TX", ext_class: "Class A office" },
+    ];
+    expect(memoryCandidates(keys, "a", "multifamily", "Dallas, TX")).toEqual(["g"]);
+    expect(memoryCandidates(keys, "g", "Garden-style multifamily", "Dallas, TX")).toEqual(["a"]);
+  });
+});
+
 describe("memoryCandidates — the reader's own deals in this deal's group, read light", () => {
   const key = (id: string, over: Partial<MemoryKeyRow> = {}): MemoryKeyRow => ({
     id,

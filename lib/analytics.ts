@@ -9,6 +9,7 @@ import {
   type StrategyKind,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
+import { dealClassKey } from "@/lib/asset-words";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
@@ -87,8 +88,10 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     // per locker are not the same basis, and one of them pooled into the
     // "Price per unit" chart rescales it for every apartment deal on it.
     // (lib/market-memory and lib/internal-comps branch on class the same
-    // way; the other classes are $/SF there.)
-    const cls = (extraction.assetClass ?? r.asset_class ?? "").toLowerCase();
+    // way; the other classes are $/SF there.) The deal's one class, the
+    // analyst's first, filed by its words (lib/asset-words `dealClassKey`):
+    // a deck's "Garden-style multifamily" is multifamily.
+    const cls = dealClassKey(r.asset_class, extraction);
     let perUnit: number | null = null;
     if (cls !== "multifamily") {
       perUnit = null;

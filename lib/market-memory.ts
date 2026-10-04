@@ -29,7 +29,7 @@ import {
   unitCountRow,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
-import { assetWords, countNoun, perSuffix } from "@/lib/asset-words";
+import { assetWords, countNoun, dealClassKey, perSuffix } from "@/lib/asset-words";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 
 export interface MarketComp {
@@ -93,14 +93,10 @@ interface DealRowLike {
   extraction: unknown;
 }
 
-function effectiveClass(
-  assetClass: string | null | undefined,
-  extraction: { assetClass?: string } | null,
-): string {
-  const own = (assetClass ?? "").toLowerCase();
-  if (own && own !== "auto") return own;
-  return (extraction?.assetClass ?? "").toLowerCase();
-}
+/** A class handed in by a caller, as the key the comps are grouped under
+ *  (lib/asset-words `dealClassKey`): "MULTIFAMILY", "multifamily" and a
+ *  deck's "Garden-style multifamily" are one group. */
+const classKeyOf = (assetClass: string): string => dealClassKey(assetClass, null);
 
 /** Normalize a market string for grouping — lowercases, drops punctuation, and
  *  collapses whitespace, so "Dallas, TX" and "Dallas TX" group together.
@@ -177,7 +173,11 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     const metrics = extraction?.metrics;
     if (!Array.isArray(metrics) || metrics.length === 0) continue;
 
-    const assetClass = effectiveClass(row.asset_class, extraction);
+    // The deal's one class, filed by its words (lib/asset-words
+    // `dealClassKey`): a deck's "Garden-style multifamily" groups with the
+    // account's other multifamily screens, where the raw words had made a
+    // group of their own.
+    const assetClass = dealClassKey(row.asset_class, extraction);
     if (!assetClass) continue;
 
     // The deal's kind first, as the comp memory and the analytics read it.
@@ -371,7 +371,7 @@ export function memoryCandidates(
   assetClass: string,
   market: string,
 ): string[] {
-  const cls = assetClass.toLowerCase();
+  const cls = classKeyOf(assetClass);
   const key = normalizeMarketKey(market);
   if (!cls || !key) return [];
   return rows
@@ -379,7 +379,7 @@ export function memoryCandidates(
       (r) =>
         r.id !== dealId &&
         !r.is_sample &&
-        effectiveClass(r.asset_class, { assetClass: r.ext_class ?? undefined }) === cls &&
+        dealClassKey(r.asset_class, { assetClass: r.ext_class }) === cls &&
         normalizeMarketKey(r.market ?? "") === key,
     )
     .map((r) => r.id);
@@ -394,7 +394,7 @@ export function marketMemoryFor(
   assetClass: string,
   market: string,
 ): MarketGroup | null {
-  const cls = assetClass.toLowerCase();
+  const cls = classKeyOf(assetClass);
   const key = normalizeMarketKey(market);
   if (!cls || !key) return null;
   const members = comps.filter(

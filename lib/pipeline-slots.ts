@@ -5,7 +5,7 @@
 // carries, and what the price buys where it is not the building (#415).
 // Pure: no I/O, no LLM.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
-import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
+import { shownAssetClass } from "@/lib/asset-class";
 import { findGoingInCap, screenYearOf, unitCountRow } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
@@ -155,30 +155,12 @@ export function statedCapSlot(extraction: ExtractionResult, planDeal: boolean): 
   return findGoingInCap(extraction.metrics ?? [])?.value ?? null;
 }
 
-/**
- * The asset class a pipeline row shows. A deal created with "Auto-detect"
- * keeps "auto" in its column, and what the deck turned out to be lives in
- * the extraction — so the row shows that read, and shows nothing (no rail,
- * no dot, a dash) while nothing has read the deck yet. "Auto" was never an
- * asset class, and a row that said so read as one.
- *
- * A known class comes back as its key, whatever its case, so the filter
- * and the colour rail match it; a class the model phrased itself keeps
- * its case — "NNN retail" is not "Nnn retail" — and `assetClassLabel`
- * only raises its first letter.
- */
-export function shownAssetClass(
-  stored: string | null | undefined,
-  extraction: { assetClass?: string | null } | null | undefined,
-): string {
-  const norm = (v: string | null | undefined): string => {
-    const t = (v ?? "").trim();
-    const lower = t.toLowerCase();
-    if (!t || lower === "auto") return "";
-    return ASSET_CLASS_LABEL[lower] ? lower : t;
-  };
-  return norm(stored) || norm(extraction?.assetClass);
-}
+// The asset class a pipeline row shows — the deal's one class — is
+// `shownAssetClass` in lib/asset-class, beside the labels it reads, so the
+// modules the browser loads (lib/market-memory, through the deal page's
+// strip) can file a deal by it without loading every slot reader here.
+// Every surface still imports it from here.
+export { shownAssetClass };
 
 /**
  * Whether a card's empty slots are still being read rather than not stated:

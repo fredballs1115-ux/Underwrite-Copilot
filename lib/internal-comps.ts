@@ -19,7 +19,7 @@ import {
 } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { assetWords, perSuffix } from "@/lib/asset-words";
+import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
 
 /**
  * Internal comps memory: every deal the user screens leaves extracted figures
@@ -64,15 +64,6 @@ interface SiblingDealRow {
   is_sample: boolean | null;
   verdict: unknown;
   extraction: unknown;
-}
-
-function effectiveClass(
-  assetClass: string | null | undefined,
-  extraction: { assetClass?: string } | null,
-): string {
-  const own = (assetClass ?? "").toLowerCase();
-  if (own && own !== "auto") return own;
-  return (extraction?.assetClass ?? "").toLowerCase();
 }
 
 const fmtCompact = (dollars: number) =>
@@ -144,7 +135,10 @@ export function deriveInternalComps(
   siblings: SiblingDealRow[],
   limit = 8,
 ): InternalComp[] {
-  const wanted = effectiveClass(currentAssetClass, currentExtraction);
+  // The deal's one class, filed by its words (lib/asset-words
+  // `dealClassKey`): a sibling whose deck says "Garden-style multifamily" is
+  // a multifamily comp, where the raw words had matched nothing.
+  const wanted = dealClassKey(currentAssetClass, currentExtraction);
   if (!wanted) return [];
 
   const comps: InternalComp[] = [];
@@ -157,7 +151,7 @@ export function deriveInternalComps(
     } | null;
     const metrics = extraction?.metrics;
     if (!Array.isArray(metrics) || metrics.length === 0) continue;
-    if (effectiveClass(row.asset_class, extraction) !== wanted) continue;
+    if (dealClassKey(row.asset_class, extraction) !== wanted) continue;
 
     // The sibling's kind first. A plan deal (value-add, lease-up, conversion,
     // development) has no going-in cap — its stabilized cap or yield on cost
