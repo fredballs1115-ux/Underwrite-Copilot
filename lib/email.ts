@@ -106,18 +106,20 @@ export async function screenEmailRecipient(
   }
 }
 
-/** The recipient's address, under their own switch: the email they asked
- *  for, where they have not turned these emails off. */
+/** The recipient and their address, under their own switch: the email they
+ *  asked for, where they have not turned these emails off. The id signs the
+ *  email's picture link for them (lib/email-picture). */
 async function screenEmailAddress(
   admin: SupabaseClient,
   deal: { user_id: string | null; team_id: string | null },
   requestedBy?: string | null,
-): Promise<string | null> {
+): Promise<{ userId: string; email: string } | null> {
   const recipient = await screenEmailRecipient(admin, deal, requestedBy);
   if (!recipient) return null;
   if (!(await wantsAnalysisEmail(admin, recipient))) return null;
   const { data: userRes } = await admin.auth.admin.getUserById(recipient);
-  return userRes?.user?.email ?? null;
+  const email = userRes?.user?.email ?? null;
+  return email ? { userId: recipient, email } : null;
 }
 
 /**
@@ -191,10 +193,15 @@ export async function notifyAnalysisReady(
       color: "#114e54",
     };
     const dealName = (deal.name as string) ?? "Your deal";
-    const picture = await emailPicture(admin, dealId, {
-      cache: (deal.photo as DealVisualCache | null) ?? null,
-      omPath: (deal.om_storage_path as string | null) ?? null,
-    });
+    const picture = await emailPicture(
+      admin,
+      dealId,
+      {
+        cache: (deal.photo as DealVisualCache | null) ?? null,
+        omPath: (deal.om_storage_path as string | null) ?? null,
+      },
+      to.userId,
+    );
     const { subject, html, text } = analysisReadyEmail({
       dealName,
       verdictLabel: v.label,
@@ -206,7 +213,7 @@ export async function notifyAnalysisReady(
       picture,
     });
     // The occasion is the verdict itself: each screen stamps its own.
-    await sendEmail(to, subject, html, text, {
+    await sendEmail(to.email, subject, html, text, {
       idempotencyKey: occasionKey("screen-complete", dealId, verdict.generatedAt),
     });
   } catch (err) {
@@ -266,7 +273,7 @@ export async function notifyAnalysisFailed(
     });
     // The occasion is the run: its job row's created_at, restamped by every
     // claim (lib/jobs), so a run's one failure is one email.
-    await sendEmail(to, subject, html, text, {
+    await sendEmail(to.email, subject, html, text, {
       idempotencyKey: occasionKey("screen-stopped", dealId, job?.created_at),
     });
   } catch (err) {
@@ -363,13 +370,16 @@ export const EMAIL_PICTURE_WAIT_MS = 15_000;
  * which is why the banner's alt is the template's (`bannerAlt`: the deal
  * and the link, true of either picture) and is no longer decided here — a
  * "Photograph of …" written at send time could sit over the cover's drawing.
+ * The link is signed for `recipient`, the person the email goes to, and
+ * serves only while they can still read the deal.
  */
 export async function emailPicture(
   admin: SupabaseClient,
   dealId: string,
   deal: { cache: DealVisualCache | null; omPath: string | null },
+  recipient: string,
 ): Promise<{ url: string } | null> {
-  const url = emailPictureUrl(appUrl(), dealId, "banner");
+  const url = emailPictureUrl(appUrl(), dealId, "banner", recipient);
   if (!url) return null;
   if (pictureMayBeInMemorandum({ omPath: deal.omPath, isSample: false, cache: deal.cache })) {
     let timer: ReturnType<typeof setTimeout> | undefined;

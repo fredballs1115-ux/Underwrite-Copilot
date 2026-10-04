@@ -51,7 +51,7 @@ describe("the digest's one-click unsubscribe token — the only permission a mai
     expect(signedUnder(UNSUBSCRIBE_KEY_LABEL, `${USER}.digest`)).toBe(emailUnsubscribeToken(USER, "digest"));
     expect(readEmailUnsubscribeToken(signedUnder("underwrite-copilot/email-picture/v1", `${USER}.digest`))).toBeNull();
     // A picture token is never an unsubscribe, nor the other way round.
-    expect(readEmailUnsubscribeToken(emailPictureToken(USER)!)).toBeNull();
+    expect(readEmailUnsubscribeToken(emailPictureToken(USER, USER)!)).toBeNull();
     // Only the digest can be turned off by a link — the screen emails keep their switch.
     expect(readEmailUnsubscribeToken(signedUnder(UNSUBSCRIBE_KEY_LABEL, `${USER}.analysis`))).toBeNull();
     expect(emailUnsubscribeToken(USER, "analysis" as never)).toBeNull();

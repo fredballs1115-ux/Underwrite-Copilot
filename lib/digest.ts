@@ -117,13 +117,20 @@ export function newestJobs(rows: DigestJobRow[]): Map<string, DigestJobRow> {
 export function buildDigest(
   deals: DigestDealRow[],
   jobs: ReadonlyMap<string, JobLike>,
-  opts: { now: number; appUrl: string; pictureUrl?: (dealId: string) => string | null },
+  opts: {
+    now: number;
+    appUrl: string;
+    /** the person the digest goes to: each square's link is signed for
+     *  them, and serves only while they can still read its deal */
+    recipient: string;
+    pictureUrl?: (dealId: string) => string | null;
+  },
 ): DigestContent | null {
   const { now } = opts;
   const dealUrl = (id: string) => `${opts.appUrl}/deals/${id}`;
   // The deal's own square beside its name (#464): its photograph, else the
   // cover its card wears.
-  const pictureUrl = opts.pictureUrl ?? ((id: string) => emailPictureUrl(opts.appUrl, id, "thumb"));
+  const pictureUrl = opts.pictureUrl ?? ((id: string) => emailPictureUrl(opts.appUrl, id, "thumb", opts.recipient));
 
   const open = deals.filter((d) => isOpenStage(normalizeStage(d.stage ?? null)));
   // Grouped in ladder order, zero rows dropped.
@@ -275,7 +282,7 @@ export async function runWeeklyDigests(
         else jobs = newestJobs((jobRows ?? []) as DigestJobRow[]);
       }
 
-      const content = buildDigest(deals, jobs, { now, appUrl: site });
+      const content = buildDigest(deals, jobs, { now, appUrl: site, recipient: profile.id });
       if (!content) continue; // nothing open — nothing to say
 
       const { data: userRes } = await admin.auth.admin.getUserById(profile.id);

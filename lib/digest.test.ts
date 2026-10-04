@@ -18,6 +18,7 @@ import {
 } from "./digest";
 import { weeklyDigestEmail } from "./email-template";
 import { readEmailUnsubscribeToken } from "./email-unsubscribe";
+import { readEmailPictureToken } from "./email-picture";
 import { STALE_MS } from "./screen-run";
 
 // Monday, Oct 5, 2026, 13:00 UTC — the digest's hour.
@@ -43,7 +44,7 @@ const deal = (over: Partial<DigestDealRow> = {}): DigestDealRow => {
   };
 };
 const build = (deals: DigestDealRow[], jobs: DigestJobRow[] = []) =>
-  buildDigest(deals, newestJobs(jobs), { now: NOW, appUrl: SITE, pictureUrl: () => null });
+  buildDigest(deals, newestJobs(jobs), { now: NOW, appUrl: SITE, recipient: "u1", pictureUrl: () => null });
 
 describe("the digest counts open deals, never a closed one as live", () => {
   it("leaves Closed and Dead out of the count and the stages, and says \"open deals\"", () => {
@@ -335,6 +336,21 @@ describe("runWeeklyDigests", () => {
     // The same URI, visible in the footer and the plain text.
     expect(email.html).toContain(`<a href="${url![1]}" style="color:#114e54;">Unsubscribe in one click</a>`);
     expect(email.text).toContain(`Unsubscribe in one click: ${url![1]}`);
+  });
+
+  it("signs each deal's square for the person the digest goes to, a teammate's deal included", async () => {
+    const USER = "3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b";
+    process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
+    const db = dbWith({ profiles: [{ id: USER, email_weekly_digest: true, last_digest_at: LAST_WEEK }] });
+    // The team's deal, created by someone else: the reader sees it today.
+    db.deals[0] = { ...db.deals[0], user_id: "someone-else", team_id: "t1" };
+    expect(await runWeeklyDigests(fakeAdmin(db), { now: NOW, pauseMs: 0 })).toBe(1);
+    const tokens = [...sent[0].html.matchAll(/\/api\/email\/picture\/([^?"]+)\?s=thumb/g)].map((m) => m[1]);
+    expect(tokens.length).toBeGreaterThanOrEqual(2);
+    for (const t of tokens) expect(readEmailPictureToken(t, NOW)?.recipient).toBe(USER);
+    expect(new Set(tokens.map((t) => readEmailPictureToken(t, NOW)?.dealId))).toEqual(
+      new Set(db.deals.map((d) => d.id as string)),
+    );
   });
 
   it("without a key to sign with, carries no header and keeps the Account page's switch as the way out", async () => {
