@@ -44,6 +44,15 @@ export const SITE_CARD = {
   alt: "Underwrite Copilot: every CRE deal through the same disciplined screen",
 };
 
+/** The site's plain card (app/api/og/plain, lib/plain-card): the mark and
+ *  the name, no claim — the preview of a private page, never the advert. */
+export const PLAIN_CARD = {
+  url: "/api/og/plain",
+  width: 1200,
+  height: 630,
+  alt: "Underwrite Copilot",
+};
+
 /** A metro page's own card (app/api/og/market/[id]). */
 export function marketCardPath(id: string): string {
   return `/api/og/market/${encodeURIComponent(id)}`;

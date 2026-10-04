@@ -10,9 +10,13 @@ import { metadata as terms } from "@/app/terms/page";
 import { metadata as tools } from "@/app/tools/page";
 import { metadata as login } from "@/app/login/page";
 import { metadata as notFound } from "@/app/not-found";
+import * as sharePage from "@/app/share/[token]/page";
+import { metadata as shared } from "@/app/share/[token]/page";
+import { GET as plainCardRoute } from "@/app/api/og/plain/route";
+import sharp from "sharp";
 import sitemap from "@/app/sitemap";
 import { changelogSince, latestChange } from "./changelog";
-import { SITE_CARD, marketMeta, marketPageFor, marketPages, sectorPageFor } from "./public-pages";
+import { PLAIN_CARD, SITE_CARD, marketMeta, marketPageFor, marketPages, sectorPageFor } from "./public-pages";
 import { SITE_NAME, marketHeading, publicMetadata } from "./page-meta";
 
 const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8");
@@ -155,4 +159,43 @@ describe("each public page states its own canonical and link preview", () => {
     expect((office.twitter as Record<string, unknown>).images).toEqual([SITE_CARD]);
     expect(read("app/market/page.tsx")).toContain("publicMetadata(marketMeta(");
   });
+});
+
+describe("a shared deal screen previews as what it is, never the homepage's advert", () => {
+  // A page that states no openGraph or twitter inherits the root layout's
+  // whole: a shared screen went out in chat apps as "Stop underwriting like
+  // a coin flip", over the homepage's card.
+  it("states its own neutral title, description and plain card, and stays out of the index", () => {
+    expect(renderedTitle(shared)).toBe(`A deal screen shared with you · ${SITE_NAME}`);
+    expect(shared.robots).toEqual({ index: false, follow: false });
+    const og = shared.openGraph as Record<string, unknown>;
+    const tw = shared.twitter as Record<string, unknown>;
+    expect(og.title).toBe("A deal screen shared with you");
+    expect(tw.title).toBe("A deal screen shared with you");
+    expect(og.siteName).toBe(SITE_NAME);
+    expect(og.description).toBe(shared.description);
+    expect(tw.description).toBe(shared.description);
+    expect(tw.card).toBe("summary_large_image");
+    // The plain card, never the advert the public pages carry.
+    expect(og.images).toEqual([PLAIN_CARD]);
+    expect(tw.images).toEqual([PLAIN_CARD]);
+    expect(PLAIN_CARD.url).not.toBe(SITE_CARD.url);
+    for (const words of [og.title, og.description, tw.title, tw.description, PLAIN_CARD.alt]) {
+      expect(String(words)).not.toMatch(/coin flip|disciplined screen|bps apart/i);
+    }
+    // No url of its own: a preview never carries the link's token.
+    expect(og.url).toBeUndefined();
+  });
+
+  it("names nothing of the deal: the preview is one constant, never read from the share", () => {
+    expect("generateMetadata" in sharePage).toBe(false);
+  });
+
+  it("draws the plain card as a 1200 × 630 image a crawler can fetch", async () => {
+    const res = plainCardRoute();
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("image/png");
+    const meta = await sharp(Buffer.from(await res.arrayBuffer())).metadata();
+    expect([meta.width, meta.height]).toEqual([PLAIN_CARD.width, PLAIN_CARD.height]);
+  }, 30_000);
 });

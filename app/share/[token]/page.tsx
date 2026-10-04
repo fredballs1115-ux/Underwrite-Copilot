@@ -16,6 +16,8 @@ import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/cor
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { SHARE_AERIAL } from "@/lib/image-frames";
+import { SITE_NAME } from "@/lib/page-meta";
+import { PLAIN_CARD } from "@/lib/public-pages";
 import type { SharePictureSource } from "./share-picture";
 
 /** The aerial's credit on the public screen: The National Map is a US
@@ -26,9 +28,31 @@ const SHARE_AERIAL_CREDIT = "aerial imagery: USGS The National Map (public domai
 export const dynamic = "force-dynamic";
 
 // Shared screens are for the people holding the link, not search engines.
+// The link's preview says what it is and nothing of the deal: a page that
+// states no openGraph or twitter inherits the root layout's whole, so a
+// shared screen had gone out in chat apps as the homepage's advert ("Stop
+// underwriting like a coin flip…"). It never names the deal or draws its
+// figures or picture — a chat app caches a preview past the link's
+// revocation — so the picture is the site's plain card (lib/plain-card).
+const SHARED_TITLE = "A deal screen shared with you";
+const SHARED_DESCRIPTION = "A read-only deal screen, shared by its sender from Underwrite Copilot.";
 export const metadata: Metadata = {
-  title: "Shared deal screen",
+  title: SHARED_TITLE,
+  description: SHARED_DESCRIPTION,
   robots: { index: false, follow: false },
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: SHARED_TITLE,
+    description: SHARED_DESCRIPTION,
+    images: [PLAIN_CARD],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SHARED_TITLE,
+    description: SHARED_DESCRIPTION,
+    images: [PLAIN_CARD],
+  },
 };
 
 /**
