@@ -54,8 +54,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   basis-point or percent magnitude a row's gap line states (`gapFigure`) and
   puts every row on its own unit's track, signed by the row's stated
   direction (`gapScale`) — never across units, never inferring a sign from
-  the words. The deal page's Reconciliation table and the report's
-  reconciliation page both draw from it.
+  the words. A value's own sign is read before the two are subtracted
+  ("-1.0%", "−1.0%", "–1.0%" and "(1.0%)" are negative, so 3.0% against
+  -1.0% is 400 bps), and a dash set apart by a space is no figure. The deal
+  page's Reconciliation table and the report's reconciliation page both
+  draw from it.
 - A portfolio — one OM, several properties (#411): the extraction lists
   each property in `ExtractionResult.properties` (name, address, count,
   area, NOI, occupancy, year built, the allocated price and the page, each
@@ -459,7 +462,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   owner**: the headline says who is selling and what that means (as-is, no
   representations, the court). Auction figures make an auction whatever the
   method field says; a negotiated sale, and an unknown one with no bid, no
-  premium and no stalking horse, read null. **The model runs at the floor**:
+  premium and no stalking horse, read null. A letter of intent is refused on
+  any stalking-horse bid, priced or not and whatever the method (a row of
+  "None", "N/A" or "—" is no stalking horse; "Not disclosed" is one).
+  **The model runs at the floor**:
   where no asking price is stated, `deriveUnderwriteInputs` prices at the
   starting bid plus the premium (`floorAllIn`, "derived", the note saying
   every return is therefore a ceiling), after a stated price and a share's
@@ -505,7 +511,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   WALT against the listed leases' rent-weighted term); **a break is an
   expiry** (a stated early termination date is the lease's end, and a
   year alone is read as its FIRST day through the affordable reader's
-  `datedEnd`); **a shadow anchor is not bought** (named apart, never in the
+  `datedEnd`; a right already open, or opened, rolls in year one by one
+  rule, `rollYearOf` in lib/tools/rollover, in the list, the shares and
+  the headline alike, and so does an open break pasted into /tools'
+  rollover card); **a shadow anchor is not bought** (named apart, never in the
   roll); **co-tenancy rides on the anchor** (the rent under co-tenancy
   clauses as a share, and a tenant that may go dark named); **the list is
   not the building** (every figure is said as the listed tenants', with
@@ -1041,7 +1050,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   reference otherwise. Only the screen and Ask pass `textFirst`; a buyer's
   model, a BOV and a rent roll keep their pages. `OM_READ=pdf|text`
   overrides per call. The layer's page count is what the facts are
-  validated against. The pipeline holds the layer to the deck
+  validated against; where the screen read the PDF itself, Ask holds its
+  citations to the smaller of the extraction's stored `totalPages` and the
+  byte counter, which over-counts a file saved incrementally (each revised
+  page counted again). Ask counts its 25-question cap against the
+  memorandum the deal holds now, and is handed the deal's first signal and
+  the answered flood zone (`answeredSiteFlags`, the pipeline's own rule),
+  so it reads the deal's kind as every screen step does. The pipeline holds the layer to the deck
   (`textLayerMissed`): a read with no figures, or figures but no NOI, is
   re-read as pages, and the checkpoint payload's `omPages` makes a resumed
   attempt read the pages from the start.
@@ -1463,7 +1478,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   range gets its one rate from `stripRoots` (−99.99% to 100,000%); a
   strip with two or more rates prints none as the IRR (`irrRoots` lists
   them, and the note says to read the NPV); a single rate found on a strip
-  with several sign changes is said to be possibly not unique.
+  with several sign changes is said to be possibly not unique; and a
+  search that finds no sign change says that, never that no rate solves
+  the strip, since an NPV can touch zero without crossing it ([-100, 220,
+  -121] is zero at 10%).
   (`lib/model/compute` holds a second,
   coarser copy for the model tab; a third would be worse than either.)
   Every field on the page is on `useShared` (in the same client file): the
@@ -1891,7 +1909,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   whatever the order says. A metro's survey figure is stale after 240
   days (`freshDays`: a quarter dated its first day, published late in
   the month after it ends and pulled on the 6th of the month after that,
-  is at most about 220 days old while it is the newest). The tracker
+  is at most about 220 days old while it is the newest), and so are the
+  same survey's national and regional figures, so tiles from one survey
+  go stale at one age (a test gives the survey its own floor beside the
+  other quarterly series'). The tracker
   figures on the sector pages
   are a different measure and the note says that too. One cached read
   (`liveMetricRates("rental_vacancy_msa")`) plus `liveRates()`; a
@@ -2108,9 +2129,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   - **A tracker figure is ranked once, and only where it can be**
     (`sectorStandings` in `lib/sector-leaderboard`): one row a distinct
     figure, naming every market that shares it; ranked only when dated,
-    under a year old, for the whole stock and one read — else listed with
-    its reason ("undated", "small-bay space only", "a spread of two
-    reads"). A band is printed as a band and never ordered by its midpoint
+    under a year old, for the whole stock, one read and a named
+    publisher — else listed with its reason ("undated", "small-bay space
+    only", "a spread of two reads", "publisher not recorded"). Equal
+    figures share one place and one shade ("=4 of 11", `lib/rank.ts`,
+    the next figure taking its own position), on the leaderboard, the
+    chips, the coverage board, the rent board, the demo and the deal
+    page's research rows alike. A band is printed as a band and never ordered by its midpoint
     (`rentOf` / `rentText` in lib/tracker-read; Prince George's industrial
     rent is "$10–15", never the $12.50 the file once made). A figure the
     file names no house for is credited "publisher not recorded"
@@ -2121,7 +2146,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     and a stale one as not updating, carries no rank numbers (its
     margins overlap) and says "±4.3 pts"; the payroll board shades one
     month; rows are named for the area the series table names
-    ("Washington MSA"). All payrolls is checked for staleness like the
+    ("Washington MSA"), one spelling a metro area across its series (a
+    test holds it: the survey's Dallas and Norfolk rows had read "Dallas
+    MSA" and "Virginia Beach MSA", so the page called the whole metro
+    area's figure another area's). All payrolls is checked for staleness like the
     sectors, and a tile whose area is not the market's own names it
     (`lib/metro-own-area`: "Unemployment · Fairfax County").
   - **What a page claims is what it draws**: each market page's search
@@ -2130,8 +2158,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `lib/market-count`'s units ("DMV core · 4 briefs, one market",
     `regionCountLabel`); an example listing carries its own date and
     source and shows only on its own market (`lib/example-listings`);
-    the weekday intel is dated and called an AI's read for one
-    investor; Zillow's index is said as a smoothed index, and the HUD
+    the weekday intel is dated, in UTC and said so ("Bisnow, Oct 1, 2026
+    UTC"), and called an AI's read for one investor; Zillow's index is said as a smoothed index, and the HUD
     gap names both areas.
   - **A credit never covers the words**: a market band is a two-row grid,
     the picture and words in the first row and the credit in its own
@@ -2313,7 +2341,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   covenant — the seeded $20M is struck at 4.00% against a breach at 3.92%,
   so rates rise, the loan fails, the lender takes the building, and the
   cap starts paying afterwards. It was covering the lender's loss severity
-  the whole time. **A cap and a floor are not a collar and do not act on
+  the whole time. A floor set above both the strike and the breach point
+  is its own headline ("The floor is on the wrong side of the covenant",
+  with the index at which the loan fails), and a loan with no cap reads
+  "No cap: the covenant is the only limit". **A cap and a floor are not a collar and do not act on
   the same thing**: a floor is a term of the NOTE and lifts what is owed, a
   cap is a separate instrument on the INDEX and reimburses the excess, so
   the rate is `max(index, floor) + spread − max(0, index − strike)` and
@@ -2682,7 +2713,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   any long hold. And **depreciation is a TIMING benefit** — `netOfRecapture`
   is the shelter less what the sale took back, and a test pins it to exactly
   zero when the sheltering and recapture rates are equal, which is the claim
-  the module exists to make checkable. It follows that **cost segregation is
+  the module exists to make checkable. The card says the depreciation comes
+  back at a higher rate only where it does: higher, lower, the same or
+  mixed, since the recapture rate is capped at the owner's ordinary rate
+  and can sit under the capital-gains rate. It follows that **cost segregation is
   not a free lunch**: on the seeded deal it lifts year-one depreciation 4.5×
   and leaves the owner $130,909 WORSE off in raw dollars, winning only on
   the time value the module deliberately does not count.
@@ -2782,9 +2816,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   DIFFERENT rates and no single annuity factor covers it (a test pins it
   against a hand-built schedule for exactly that reason). Capitalising the
   leasehold's NOI at a fee-simple cap values a perpetuity that expires:
-  on the seeded lease that is $120M against $93.9M over 40 years (21.7% imaginary: 18.7% the
-  reversion, 3.0% the year-16 reset), and the same lease with 10 years left is 62.8% imaginary —
-  the error grows as the term shortens, which is why both figures are
+  on the seeded lease that is $120M against $93.9M over 40 years (21.7% imaginary: 12.1% the
+  reversion, 3.0% the year-16 reset, and 6.6% the 5% cap against the 8% discount rate —
+  `perpetualLeaseholdPv`, the same lease run forever at the discount rate, is $112,121,212,
+  and the reversion's share absorbs the rounding so the three parts add up), and the same
+  lease with 10 years left is 62.8% imaginary (56.2% the reversion, the same 6.6% the rates);
+  each part is said only where it exists, and one that runs the other way is said as giving
+  some back. The error grows as the term shortens, which is why both figures are
   drawn side by side. **Ground rent coverage is the lender's test**, not
   DSCR: on an unsubordinated lease the ground rent outranks the mortgage,
   and a default terminates the lease, the building and the mortgage
@@ -4705,7 +4743,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     sentence, tag and clock that says passed, today or before the sale
     reads it (`endHasPassed`, `endIsAhead`, `endsByYear`, `leftText`,
     `fromToday` in lib/ground-lease-term). The month counts stay where the
-    arithmetic runs on them.
+    arithmetic runs on them. **A date stated as a month alone** ("June
+    2027", "10/2031") is read on the side its rule takes
+    (`readStatedDate` in lib/note-yield, marked `month`): the first day
+    for a lease's end, a right to leave early, a HAP contract, a
+    franchise, an abatement and an assumable loan's maturity; the last for
+    a rent restriction, a management agreement and a note's maturity.
+    Inside the month an end is said "this month" (`thisMonth`), never
+    "today" or "under a month", and never passed until the month is out;
+    an abatement read early is gone from the month's first day; a bid
+    deadline stated as a month alone is no day and is not counted down
+    (the audit of 2026-10-04: every month was read as its last day, so a
+    lease "June 2027" ended "today" on June 30). A year alone is still
+    read as its first day.
   - **A price label's year is the memorandum's, never the clock's**: the
     extraction carries `screenedOn`, the day the screen read it (the
     pipeline and the manual-deal path stamp it, `screenStamp`), and
