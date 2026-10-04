@@ -4724,7 +4724,56 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     year (`lib/ingest/boston-roll`, `pickAssessmentRoll`: the portal's
     `name` is null and the name is in `name_translated.en`, as the runner
     printed in zori run 37231906743; "FY2026" and "FY2027" had both read
-    20).
+    20). The Census vacancy pull reads its tables' names off the survey's
+    rates page (`lib/hvs-tables`, `hvsTablesFrom`; `HVS_RATES_URL`, which
+    the tiles' link imports): the newest single-year metro table and the
+    history that runs on to it, never the 2005–2014 table in its place. A
+    page that answers and links neither fails the run; a page that cannot
+    be read falls back to the two names the pull knew, with a warning (dry
+    run 37235631634: both tables read off the page, 40 of 40 metros).
+  - **A research date ages by one rule** (`lib/research-age.ts`,
+    `RESEARCH_STALE_DAYS` 180, the rules panel's own figure): whole days,
+    stale only past the limit, an undated figure said as undated. A page
+    keeps the date and the figure and adds the age and the mark
+    (`staleMark`: "181 days old, stale"), never hides either. That holds on
+    the rules panel, the demo's legal list and the homepage's rule chip
+    (`sampleLegal`, read for the render's day), the leverage checks on the
+    mortgage-rate snapshot (`asOfLabel(asOf, today)`), /market's snapshot
+    panel, coverage board, sector leaderboard, compare card, sector
+    explorer, 2–4 unit table and example listings, and the homepage's band
+    and gallery (`snapshotReadOn`, `snapshotAge`, `trackerAge` in
+    lib/tracker-read). The model's read names a stale tracker figure and
+    holds nothing to it: an office's vacancy reads "beside stale
+    research", and the exit is set against the 10-year alone, the range
+    still shown. A fair market rent keeps its fiscal year's rule
+    (`fmrWhen`) and a feed its own cadence; the steward counts the
+    research rows alone by the same constant, and opens a fair market
+    rent's issue only once the newest fiscal year on file has ended
+    (`fyEnd`). As the files stand: the 2–4 unit rows read stale from Nov
+    28, 2026, the oldest rules from Jan 12, 2027, the mortgage-rate
+    snapshot from Feb 17, the sector files from Feb 18 and the tracker from
+    Feb 22.
+  - **A rule's stated window ends** (`lib/dated-window.ts`, pure):
+    `readDatedText` reads a window only where both of its ends are written
+    with their years — a month name, an ISO day or a month/day/year,
+    joined by a dash, "to", "through" or "between … and" — never a
+    building's vintage ("built between February 1, 1947 and January 1,
+    1974"), and an effective date only from "takes effect". A fiscal-year
+    label counts only where its dates are written beside it. `datedNotes`
+    says, the day after a window's last day, that the window ended and its
+    figure needs checking (never of a window a later one in the same text
+    follows, which is the text's own history), and on or after an
+    effective date that it has come. The text is never hidden or changed,
+    and no next figure is written in. The rules evaluation carries the
+    notes (`RuleEvaluation.dated`, on the subject's `today`), and
+    `app/dated-notes.tsx` draws them on the rules panel, /market's rule
+    and market notes, the demo's legal list and the homepage's rule. The
+    windows written today end June 30, 2027 (Los Angeles's 3% and Takoma
+    Park's 3.0%) and July 31, 2027 (California's 8.7% in the Los Angeles
+    area), and Virginia's amended section takes effect July 1, 2027.
+    Washington's "in 2027", Seattle's "for 2026" and Montgomery County's
+    fiscal-year label state a year alone, so they guard nothing until both
+    ends are written.
 - What a link or an account can make the server do (#491, research pass
   22's security review, 2026-10-01; every finding reproduced first):
   - **A public picture is drawn once, at its page's frame**: the shared
