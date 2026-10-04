@@ -134,7 +134,13 @@ export function readRoll(text: string, asOfYear: number): RollRead {
     const hasRent = nums.length >= 3;
     const rentRaw = hasRent ? nums[1] : null;
     const expiryRaw = hasRent ? nums[2] : nums[1];
-    const breakRaw = nums.length >= 4 ? nums[3] : null;
+    // In a calendar-year roll a 0 in the break column is no year: it is how
+    // a sheet says the lease has no break (a blank is dropped with the
+    // cell). Read as the year 0 it was a break two thousand years past, open,
+    // and it rolled the lease in year one. In a years-remaining roll a 0 is a
+    // break open today, and stays one.
+    const breakCell = nums.length >= 4 ? nums[3] : null;
+    const breakRaw = expiryWasCalendar && breakCell === 0 ? null : breakCell;
     const toYears = (v: number | null): number | null =>
       v === null ? null : expiryWasCalendar ? v - asOfYear : v;
 

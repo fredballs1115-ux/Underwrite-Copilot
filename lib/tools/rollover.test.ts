@@ -306,6 +306,24 @@ describe("what it refuses", () => {
     expect(rollYearOf({ expiryYears: 3.5, breakYears: null })).toBe(4);
   });
 
+  // In a calendar-year roll a break column's "0" is no year — it is how a
+  // sheet says the lease has no break. It was read as the year 0, two
+  // thousand years before the roll, an open break that rolled a 2033 lease in
+  // year one.
+  it("reads a 0 or a blank in a calendar-year roll's break column as no break", () => {
+    for (const roll of ["A\t10,000\t30\t2033\t0\nB\t10,000\t30\t2035", "A\t10,000\t30\t2033\t\nB\t10,000\t30\t2035\t"]) {
+      const read = readRoll(roll, 2026);
+      expect(read.expiryWasCalendar, roll).toBe(true);
+      expect(read.rows[0].breakYears, roll).toBeNull();
+      expect(rollYearOf(read.rows[0]), roll).toBe(7);
+      const r = readRollover({ rows: read.rows, holdYears: 5 });
+      expect(r.years.every((y) => y.sfExpiring === 0), roll).toBe(true);
+      expect(r.waltToBreak, roll).toBe(r.waltByRent);
+    }
+    // A break of 0 years in a years-remaining roll is still open today.
+    expect(readRoll("A\t10,000\t30\t7\t0", 2026).rows[0].breakYears).toBe(0);
+  });
+
   it("counts a lease past the horizon in the totals and not in the table", () => {
     const r = run();
     const inTable = r.years.reduce((a, y) => a + y.sfExpiring, 0);
