@@ -32,8 +32,8 @@ import { ASSET_CLASS_OPTIONS, assetClassLabel } from "@/lib/asset-class";
 import { rowMarketLabel } from "@/lib/placed-by";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
-import { parseMoney, parsePct, parsePrice, priceRange, priceRangeShort } from "@/lib/criteria";
-import { compareSortValues, type SortDir } from "@/lib/pipeline-sort";
+import { parseMoney, priceRange, priceRangeShort } from "@/lib/criteria";
+import { compareSortValues, pipelineSortValue, type PipelineSortKey, type SortDir } from "@/lib/pipeline-sort";
 import { PERSONAL_TAG, PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
 import { SHARING_OPTIONS, matchesSharing } from "@/lib/personal-deal";
 // Why a fit wears "First read": it is judged on the first signal, before the
@@ -158,8 +158,9 @@ function mapDealOf(d: DealCard): MapDeal {
 
 /** One row per deal: name · asset · price · cap · buy box · status · added.
  *  Every column is sortable from its header, and so is the call-for-offers
- *  date the deal's own cell carries. */
-type SortKey = "name" | "asset" | "price" | "cap" | "fit" | "status" | "added" | "due";
+ *  date the deal's own cell carries. What each deal sorts on under a
+ *  column is lib/pipeline-sort's `pipelineSortValue`. */
+type SortKey = PipelineSortKey;
 
 /** The price as a table wants it — "$68.0M", "$950k" — with the OM's own
  *  figure kept for the tooltip and the CSV. A column eighty pixels wide
@@ -175,10 +176,10 @@ function compactPrice(raw: string): string {
   return n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
 }
 
-const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string; cls: string; rank: number }> = {
-  outside: { label: "Outside", cls: "text-kill", rank: 0 },
-  near: { label: "Near", cls: "text-caution", rank: 1 },
-  fits: { label: "Fits", cls: "text-pass", rank: 2 },
+const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string; cls: string }> = {
+  outside: { label: "Outside", cls: "text-kill" },
+  near: { label: "Near", cls: "text-caution" },
+  fits: { label: "Fits", cls: "text-pass" },
 };
 
 const MANDATE_META: Record<
@@ -189,39 +190,6 @@ const MANDATE_META: Record<
   WATCH: { label: "Watch", cls: "text-caution" },
   PURSUE: { label: "Pursue", cls: "text-pass" },
 };
-
-function statusRank(d: DealCard): number {
-  if (d.verdict) return (VERDICT_META[d.verdict]?.rank ?? 0) + 2;
-  if (d.jobStatus === "running") return 1;
-  if (d.jobStatus === "stalled") return 0.75;
-  if (d.jobStatus === "failed") return 0.5;
-  return 0;
-}
-
-function sortValue(d: DealCard, key: SortKey): string | number | null {
-  switch (key) {
-    case "name":
-      return d.name.toLowerCase();
-    case "asset":
-      return d.assetClass;
-    case "price":
-      return d.slots.price ? (parsePrice(d.slots.price) ?? -1) : -1;
-    case "cap":
-      return d.slots.cap ? (parsePct(d.slots.cap) ?? -1) : -1;
-    case "fit":
-      // Sort by the numeric mandate score when present (the column shows it),
-      // falling back to the coarse fold rank for pre-score deals.
-      return d.score ?? (d.fit ? FIT_META[d.fit].rank : -1);
-    case "status":
-      return statusRank(d);
-    case "added":
-      return d.createdAt;
-    case "due":
-      // An ISO day, so the text sorts as the date; a deal with no deadline
-      // has nothing to sort on and goes after every deal that has one.
-      return d.offersDue;
-  }
-}
 
 /** First click on a header sorts the way people expect that column to lead:
  *  text A→Z, figures biggest-first, dates newest-first, best fits first, and
@@ -237,13 +205,10 @@ const DEFAULT_DIR: Record<SortKey, SortDir> = {
   due: "asc",
 };
 
-const VERDICT_META: Record<
-  string,
-  { label: string; cls: string; rank: number }
-> = {
-  pass_on: { label: "No-go", cls: "bg-kill/15 text-kill", rank: 0 },
-  caution: { label: "Caution", cls: "bg-caution/15 text-caution", rank: 1 },
-  pass: { label: "Go", cls: "bg-pass/15 text-pass", rank: 2 },
+const VERDICT_META: Record<string, { label: string; cls: string }> = {
+  pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
+  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
+  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
 };
 
 /** Each asset class reads as its own kind of thing at a glance: a colour dot
@@ -545,7 +510,7 @@ export function Pipeline({
       return true;
     });
     return list.sort((a, b) => {
-      const cmp = compareSortValues(sortValue(a, sortKey), sortValue(b, sortKey), sortDir);
+      const cmp = compareSortValues(pipelineSortValue(a, sortKey), pipelineSortValue(b, sortKey), sortDir);
       // Ties fall back to newest-first so the order stays stable and sane.
       const tie = sortKey === "added" ? 0 : b.createdAt.localeCompare(a.createdAt);
       return cmp || tie;
