@@ -1287,7 +1287,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  One hundred and thirty-four are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  One hundred and forty-two are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1342,7 +1342,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Fresno (at dusk, a 3:1 frame served at 2400) — one-market runs
   36816505479, 36816573981 and 36816641545; and Bellingham, Greeley,
   Kahului-Wailuku (the Iao Valley), Kennewick-Richland and Napa — run
-  36816430466), each judged
+  36816430466; then round 10: Rochester (Minnesota, the Mayo Clinic's
+  carved tower), Binghamton and Utica-Rome (Union Station) — runs
+  36818844258 and 36818942891 — Duluth (the Aerial Lift Bridge at dusk,
+  its credit the name inside the file page's Author field, zori run
+  37234876098), and Yakima, Chico (Upper Bidwell Park), Prescott Valley
+  (Watson Lake's granite boulders, named for the title's first city) and
+  Las Cruces (the Organ Mountains) — run 36819025201), each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
   `cbsa:` row never draws; Hagerstown, Burlington (Vermont), Kalamazoo,
@@ -1360,7 +1366,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   one lighthouse loses its lantern in the crops, and Olympia's Capitol its
   lantern at 21:9, so each keeps the deal's drawn cover (Ocala's one clear frame, spring water filed
   under Silver Springs, was left out: nothing but its category says where
-  it is). A two-state title is cut to
+  it is). Round 10 left Appleton, Champaign-Urbana, Charlottesville,
+  Kingston and State College with nothing usable, Vineland's pick under a
+  wire and shop signs, Lafayette-West Lafayette's one clean frame a PNG,
+  Topeka's Capitol with its statue cut at 21:9, and Bremerton's and
+  Merced's sheets an aerial that reads as a map, streets of signs and
+  wires and a hotel that loses its cornice, so each keeps the drawn cover
+  too. A two-state title is cut to
   its first city and state ("Memphis, TN", "Augusta, GA"), the table's
   own precedent, so a card's name passes the test's one-state pattern. A search result can
   be another city entirely (Los Angeles under Colorado Springs, Buffalo
