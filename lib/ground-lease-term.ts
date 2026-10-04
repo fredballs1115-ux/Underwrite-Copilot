@@ -10,7 +10,9 @@
 // Three readings, best first:
 //
 //   1. A STATED DATE ("December 31, 2071", "12/31/2071"), taken as written —
-//      the only reading that does not go stale as the memorandum ages.
+//      the only reading that does not go stale as the memorandum ages. A
+//      month alone ("June 2071", "06/2071") is read as its FIRST day, as a
+//      year is below, and said inside it as "this month", never "today".
 //   2. A STATED YEAR alone ("2071"), read as the year's FIRST day: the
 //      earliest end the year allows, so a leasehold is never credited with
 //      months the lease may not have.
@@ -27,7 +29,7 @@
 // read as one.
 
 import { parsePageNumber } from "@/lib/facts";
-import { monthsBetween, parseStatedDate, yearsBetween } from "@/lib/note-yield";
+import { monthsBetween, readStatedDate, sameMonth, yearsBetween } from "@/lib/note-yield";
 
 export type MetricRow = { label: string; value: string; page?: string };
 type Rows = { metrics?: MetricRow[]; totalPages?: number } | null | undefined;
@@ -35,9 +37,9 @@ type Rows = { metrics?: MetricRow[]; totalPages?: number } | null | undefined;
 export interface GroundLeaseTerm {
   /** the current term's end, an ISO date */
   ends: string;
-  /** how the end was read: a stated date, a stated year alone (its first
-   *  day), or years remaining counted from today */
-  from: "date" | "year" | "remaining";
+  /** how the end was read: a stated date, a stated month or year alone (its
+   *  first day), or years remaining counted from today */
+  from: "date" | "month" | "year" | "remaining";
   /** the row's own words, as stated */
   stated: string;
   /** years left on the reading's date, in whole months — the figure said
@@ -50,6 +52,9 @@ export interface GroundLeaseTerm {
    *  which count none in the last month and called a lease four weeks
    *  from its end one that had ended. */
   yearsToTheDay: number;
+  /** stated as a month alone, and the reading's date falls in that month
+   *  (`DatedSpan`) */
+  thisMonth: boolean;
   /** the stated term already counts the extension options — a ceiling */
   includesOptions: boolean;
   /** the extension options as they parse: the years they add in all, and
@@ -95,16 +100,16 @@ function addYears(asOf: Date, years: number): string {
   return isoOf(new Date(Date.UTC(asOf.getUTCFullYear(), asOf.getUTCMonth() + months, asOf.getUTCDate())));
 }
 
-/** A date a text states; a year alone as its first day. */
-function dateOf(text: string): { ends: string; from: "date" | "year" } | null {
-  const d = parseStatedDate(text, 1900, 2399);
-  if (d) return { ends: d, from: "date" };
+/** A date a text states; a month or a year alone as its first day. */
+function dateOf(text: string): { ends: string; from: "date" | "month" | "year" } | null {
+  const d = readStatedDate(text, 1900, 2399, "first");
+  if (d) return { ends: d.iso, from: d.month ? "month" : "date" };
   const y = text.match(/\b(19\d{2}|2[0-3]\d{2})\b/);
   return y ? { ends: `${y[1]}-01-01`, from: "year" } : null;
 }
 
 /** The date a value states before any options clause — else anywhere in it. */
-function endOf(value: string): { ends: string; from: "date" | "year" } | null {
+function endOf(value: string): { ends: string; from: "date" | "month" | "year" } | null {
   const cut = value.split(OPTIONS_CLAUSE)[0] ?? "";
   return (cut.trim() ? dateOf(cut) : null) ?? dateOf(value);
 }
@@ -230,6 +235,7 @@ export function readLeaseTerm(
     stated: read.row.value.trim(),
     yearsLeft,
     yearsToTheDay,
+    thisMonth: read.from === "month" && sameMonth(today, read.ends),
     includesOptions,
     options,
     optionsStated: optionsText,
@@ -254,15 +260,22 @@ export function yearsText(n: number): string {
 
 /** An end read on a day: its whole-month years and its years to the day
  *  (the ground lease's term, a tenant's lease, an affordable or a hotel's
- *  clock, a tax abatement). */
-export type DatedSpan = { yearsLeft: number; yearsToTheDay: number };
+ *  clock, a tax abatement). `thisMonth` marks an end the memorandum states
+ *  as a month alone ("June 2027"), read inside that month: the reader took
+ *  one of its days for the arithmetic, but the memorandum named none, so
+ *  the end is neither past nor due "today" until the month is out — it
+ *  comes "this month" (the audit of 2026-10-04: read as the month's last
+ *  day, a lease stated "June 2027" ended "today" on June 30). */
+export type DatedSpan = { yearsLeft: number; yearsToTheDay: number; thisMonth?: boolean };
 
 /** Whether an end has gone by: the day AFTER it, never inside its last
- *  month as whole months had it. Its own day is the term's last. */
-export const endHasPassed = (e: DatedSpan): boolean => e.yearsToTheDay < 0;
+ *  month as whole months had it. Its own day is the term's last; an end
+ *  stated as a month alone passes only once its month is out. */
+export const endHasPassed = (e: DatedSpan): boolean => !e.thisMonth && e.yearsToTheDay < 0;
 
-/** Whether an end is still ahead, its own day not yet come. */
-export const endIsAhead = (e: DatedSpan): boolean => e.yearsToTheDay > 0;
+/** Whether an end is still ahead, its own day not yet come — or, stated as
+ *  a month alone, its month not yet out. */
+export const endIsAhead = (e: DatedSpan): boolean => !!e.thisMonth || e.yearsToTheDay > 0;
 
 /** Whether an end falls at or before a sale `hold` years on — to the day,
  *  so an end a week past the sale is never said to fall inside the hold. */
@@ -271,20 +284,22 @@ export const endsByYear = (e: DatedSpan, hold: number): boolean => e.yearsToTheD
 /**
  * How long is left, said beside an end's date: "45.3 years"; inside its
  * last month, where whole months count none and the tenths would print
- * "0 years", "under a month"; on its own day, "today". An end that has
- * passed is said as passed, never through this.
+ * "0 years", "under a month"; on its own day, "today"; inside the month an
+ * end is stated as alone, "this month". An end that has passed is said as
+ * passed, never through this.
  */
 export function leftText(e: DatedSpan): string {
+  if (e.thisMonth) return "this month";
   if (e.yearsToTheDay === 0) return "today";
   if (e.yearsToTheDay > 0 && Math.round(e.yearsLeft * 12) < 1) return "under a month";
   return yearsText(e.yearsLeft);
 }
 
 /** The same, after its date in a sentence: "45.3 years from today", "under
- *  a month from today", "today". */
+ *  a month from today", "today", "this month". */
 export function fromToday(e: DatedSpan): string {
   const left = leftText(e);
-  return left === "today" ? left : `${left} from today`;
+  return left === "today" || left === "this month" ? left : `${left} from today`;
 }
 
 /** The options, in a clause after the term: ", with extension options
@@ -311,6 +326,7 @@ export function groundLeaseTermLine(t: GroundLeaseTerm): string {
   const opts = optionsClause(t);
   switch (t.from) {
     case "date":
+    case "month":
       return `The ground lease ends ${end}, ${fromToday(t)}${opts}`;
     case "year":
       return `The ground lease ends in ${end}, ${fromToday(t)} — the memorandum states the year alone, read as its first day${opts}`;

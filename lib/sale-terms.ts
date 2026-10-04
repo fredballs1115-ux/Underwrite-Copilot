@@ -37,7 +37,7 @@
 import type { ExtractionResult, SaleMethod } from "@/lib/anthropic/types";
 import { parsePageNumber } from "@/lib/facts";
 import { parseUsd } from "@/lib/money";
-import { parseStatedDate } from "@/lib/note-yield";
+import { readStatedDate } from "@/lib/note-yield";
 import { withArticle } from "@/lib/article";
 
 export type { SaleMethod };
@@ -187,7 +187,11 @@ export function readSale(ex: ExtractionResult | null | undefined, asOf: Date = n
           ? { kind: "amount", amount, stated: v }
           : { kind: "stated", amount: null, stated: v };
   }
-  const deadlineIso = deadlineRow ? parseStatedDate(deadlineRow.value, 2000, 2199) : null;
+  // A deadline is a day (lib/offering's rule): a month alone ("June 2027")
+  // stays in the key terms as stated and is never counted down to a day the
+  // memorandum did not name — it had read "Bids are due Jun 30, 2027".
+  const deadlineRead = deadlineRow ? readStatedDate(deadlineRow.value, 2000, 2199, "first") : null;
+  const deadlineIso = deadlineRead && !deadlineRead.month ? deadlineRead.iso : null;
   const read: SaleFacts = {
     method,
     label: METHOD_LABEL[method],

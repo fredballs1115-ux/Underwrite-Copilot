@@ -127,9 +127,11 @@ describe("readLeaseholdExit — the model's exit on the term left at its sale", 
       "Were every extension option exercised (four of 10 years, as stated), 80.3 years would be left at the sale and the term would bear 98% of the capitalised exit ($81.2M). An option adds years only if the leaseholder exercises it, and its rent usually resets to market when it does, so that is the ceiling.",
     );
     // Where the lease ends inside the hold, the options are the way past it.
+    // "March 2029" is read as its first day: 29 whole months from Sep 25,
+    // 2026, plus the 40 years of options, less the 5-year hold.
     const ends = read("March 2029", [row("Ground lease extension options", "Four 10-year options")]);
     expect(ends.onTerm).toBeNull();
-    expect(leaseholdOptionsLine(ends)).toContain("37.5 years would be left at the sale");
+    expect(leaseholdOptionsLine(ends)).toContain("37.4 years would be left at the sale");
   });
 
   it("asks whether the buyer at the sale can finance the term that is left", () => {

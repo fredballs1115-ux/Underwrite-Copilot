@@ -49,7 +49,7 @@ import { parseCount, unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
 import { endHasPassed, fromToday } from "@/lib/ground-lease-term";
 import { parseUsd } from "@/lib/money";
-import { monthsBetween, parseStatedDate, yearsBetween } from "@/lib/note-yield";
+import { monthsBetween, readStatedDate, sameMonth, yearsBetween } from "@/lib/note-yield";
 
 export type { AffordableProgram };
 
@@ -138,9 +138,9 @@ function affordableRowsOf(rows: Rows) {
 export interface DatedEnd {
   /** the end, an ISO date */
   ends: string;
-  /** a stated date, or a year alone — read on the side that does not
-   *  flatter the buyer (below) */
-  from: "date" | "year";
+  /** a stated date, or a month or a year alone — read on the side that
+   *  does not flatter the buyer (below) */
+  from: "date" | "month" | "year";
   /** the row's words, as stated */
   stated: string;
   /** years left today in whole months — the figure said; negative where
@@ -151,6 +151,10 @@ export interface DatedEnd {
    *  whole months called a contract four weeks from its end one that had
    *  ended, and put a lease 12 months and 17 days out in year 1 */
   yearsToTheDay: number;
+  /** stated as a month alone, and the reading's date falls in that month:
+   *  "this month", neither passed nor a day away (lib/ground-lease-term
+   *  `DatedSpan`) */
+  thisMonth: boolean;
   /** cited only where it parses and falls inside the memorandum */
   page: string;
 }
@@ -165,19 +169,23 @@ const isoOf = (d: Date) => d.toISOString().slice(0, 10);
 /**
  * A row's end, on a day — the affordable clocks' and, through
  * lib/hotel-deal, a hotel's franchise and management agreement's (#455).
- * A stated date is taken as written. A year alone is read on the side that
- * does not flatter the buyer: a rent restriction as
- * the year's LAST day (the market rents it holds back are never counted
- * early), a HAP contract as its FIRST (the subsidy is never counted for
- * months it may not run). Null where the row states no end — including a
+ * A stated date is taken as written. A month or a year alone is read on the
+ * side that does not flatter the buyer: a rent restriction as its LAST day
+ * (the market rents it holds back are never counted early), a HAP contract
+ * as its FIRST (the subsidy is never counted for months it may not run) —
+ * and a month alone, read inside that month, is said "this month" (the
+ * audit of 2026-10-04: every month had been read as its last day, a HAP
+ * contract's included). Null where the row states no end — including a
  * term counted from a start, which is kept as stated.
  */
 export function datedEnd(row: MetricRow | null, side: "first" | "last", asOf: Date, pageCount: number | null): DatedEnd | null {
   if (!row) return null;
   const value = row.value.trim();
   if (COUNT_OF_YEARS.test(value) && FROM_A_START.test(value)) return null;
-  let ends: string | null = parseStatedDate(value, 1950, 2199);
-  let from: DatedEnd["from"] = "date";
+  const today = isoOf(asOf);
+  const stated = readStatedDate(value, 1950, 2199, side);
+  let ends: string | null = stated?.iso ?? null;
+  let from: DatedEnd["from"] = stated?.month ? "month" : "date";
   if (!ends) {
     const y = value.match(/\b(19[5-9]\d|2[01]\d{2})\b/);
     if (!y) return null;
@@ -189,8 +197,9 @@ export function datedEnd(row: MetricRow | null, side: "first" | "last", asOf: Da
     ends,
     from,
     stated: value,
-    yearsLeft: monthsBetween(isoOf(asOf), ends) / 12,
-    yearsToTheDay: yearsBetween(isoOf(asOf), ends),
+    yearsLeft: monthsBetween(today, ends) / 12,
+    yearsToTheDay: yearsBetween(today, ends),
+    thisMonth: from === "month" && sameMonth(today, ends),
     page: n != null && pageCount != null && n <= pageCount ? (row.page ?? "").trim() : "",
   };
 }

@@ -63,6 +63,18 @@ describe("readSale — how the property is sold", () => {
     expect(r.page).toBe("p. 3");
   });
 
+  it("a deadline stated as a month alone is no day: never counted down, never printed as the month's last (the audit of 2026-10-04)", () => {
+    for (const stated of ["October 2026", "10/2026"]) {
+      const r = readSale(
+        ex([row("Starting bid", "$2,500,000"), row("Bid deadline", stated)], { method: "auction" }),
+        TODAY,
+      )!;
+      expect(r.deadline, stated).toBeNull();
+      expect(r.headline, stated).not.toMatch(/Bids are due|Oct 31/);
+      expect(saleShortLine(r), stated).not.toContain("bids due");
+    }
+  });
+
   it("says the starting bid is not the price, the premium on top, the reserve and the deadline", () => {
     const r = readSale(AUCTION, TODAY)!;
     expect(r.headline).toBe(

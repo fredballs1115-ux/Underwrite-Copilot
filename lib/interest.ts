@@ -286,6 +286,10 @@ const monthYear = (isoDate: string) => {
   const [y, m] = isoDate.split("-").map(Number);
   return `${MONTHS[m - 1]} ${y}`;
 };
+/** When a note inside its last month comes due: "this month" for a maturity
+ *  stated as a month alone, else "today" on its day, "in under a month"
+ *  before it. */
+const dueWhen = (n: NoteRead) => (n.thisMonth ? "this month" : n.daysLeft === 0 ? "today" : "in under a month");
 const pctText = (n: number) => `${one(n)}%`;
 
 /**
@@ -305,7 +309,7 @@ export function noteYieldSentence(n: NoteRead | null): string {
   // Due inside its last month, its day not yet gone by: no whole month of
   // payments is left to solve a yield over, and the note is not past due.
   if (n.monthsLeft === 0 && due) {
-    return `It comes due ${n.daysLeft === 0 ? "today" : "in under a month"}, at its ${due} maturity — too short a run for a yield to maturity to state.`;
+    return `It comes due ${dueWhen(n)}, at its ${due} maturity — too short a run for a yield to maturity to state.`;
   }
   if (n.ytmPct != null && due) {
     if (n.terms.status === "non_performing") {
@@ -370,9 +374,11 @@ export function noteCaption(n: NoteRead | null): string {
     return `${n.monthsLeft} ${n.monthsLeft === 1 ? "month" : "months"} to its ${monthYear(n.terms.maturity)} maturity, ${n.paymentBasis}.`;
   }
   if (n.monthsLeft === 0 && n.terms.maturity) {
-    return n.daysLeft === 0
-      ? `Due today, at its ${monthYear(n.terms.maturity)} maturity.`
-      : `Under a month to its ${monthYear(n.terms.maturity)} maturity.`;
+    return n.thisMonth
+      ? `Due this month, at its ${monthYear(n.terms.maturity)} maturity.`
+      : n.daysLeft === 0
+        ? `Due today, at its ${monthYear(n.terms.maturity)} maturity.`
+        : `Under a month to its ${monthYear(n.terms.maturity)} maturity.`;
   }
   if (!n.terms.maturity && n.currentYieldPct != null) {
     return "The memorandum states no maturity, so there is no yield to maturity to give.";
@@ -613,7 +619,7 @@ export function interestShortLine(r: InterestRead): string {
           : n.terms.status === "non_performing"
             ? ", and not paying"
             : n.monthsLeft === 0
-              ? `, due ${n.daysLeft === 0 ? "today" : "in under a month"}`
+              ? `, due ${dueWhen(n)}`
               : n.ytmPct != null && n.terms.maturity
                 ? `, ${pctText(n.ytmPct)} to its ${monthYear(n.terms.maturity)} maturity${n.terms.status === "performing" ? "" : " if paid as agreed"}`
                 : "";

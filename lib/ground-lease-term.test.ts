@@ -124,7 +124,9 @@ describe("readGroundLeaseTerm — when the ground lease ends, only as stated", (
       ]),
       ASOF,
     )!;
-    expect(t.ends).toBe("2066-03-31");
+    // A month alone is its first day, the earliest end it allows.
+    expect(t.ends).toBe("2066-03-01");
+    expect(t.from).toBe("month");
     expect(t.includesOptions).toBe(false);
     expect(t.options).toBeNull();
     expect(t.optionsStated).toBe("");

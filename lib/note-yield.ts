@@ -68,6 +68,10 @@ export interface NoteTerms {
   ratePct: number | null;
   /** the maturity as an ISO date; null where the OM states none, or only a year */
   maturity: string | null;
+  /** the OM states the maturity's month and no day ("Mar 2028"): read as
+   *  the month's last day, and said inside that month as due "this month"
+   *  (`NoteRead.thisMonth`); absent where it states the day */
+  maturityIsMonth?: boolean;
   /** true where the OM says interest-only; false where it states an
    *  amortization; null where it says neither — or both, an interest-only
    *  period beside an amortization (`amortYears` set) */
@@ -119,6 +123,10 @@ export interface NoteRead {
   /** past maturity on the reading's date: its day has gone by. On the day
    *  itself the note is due, not past it */
   matured: boolean;
+  /** the maturity is stated as a month alone and the reading's date falls
+   *  in it: due "this month", never "today" or "in under a month" on a day
+   *  the memorandum never named */
+  thisMonth: boolean;
 }
 
 // ── Reading the terms ───────────────────────────────────────────────────
@@ -145,27 +153,60 @@ export function parseMaturity(text: string | null | undefined): string | null {
 /**
  * A date as the OM writes it, in the formats `parseMaturity` reads, inside
  * the years the caller accepts — a loan's maturity falls this century, a
- * ninety-nine-year ground lease's end can fall in the next (#421).
+ * ninety-nine-year ground lease's end can fall in the next (#421). A month
+ * with no day is the month's end; a reader that must say which day it took
+ * reads `readStatedDate`.
  */
 export function parseStatedDate(text: string | null | undefined, minYear: number, maxYear: number): string | null {
+  return readStatedDate(text, minYear, maxYear, "last")?.iso ?? null;
+}
+
+/** A date the memorandum states, and whether it states the day. */
+export interface StatedDate {
+  /** the ISO day: for a month alone, the side the caller asked for */
+  iso: string;
+  /** the memorandum states a month and a year and no day ("June 2027",
+   *  "06/2027"): the day is the reader's choice, never the memorandum's, so
+   *  a sentence inside the month says "this month" — never "today", and
+   *  never "under a month" on the strength of a day nobody stated */
+  month: boolean;
+}
+
+/**
+ * A date as the OM writes it (the formats above), and whether it names the
+ * day. A month alone is read on the side the caller names (the audit of
+ * 2026-10-04: every month was read as its LAST day, so a lease stated "June
+ * 2027" ended "today" on June 30, and an abatement read early ran "under a
+ * month" all June): its FIRST day where an earlier end is the one that does
+ * not flatter the buyer — a lease, a contract, an abatement, a right to
+ * leave — its LAST where a later one is, a rent restriction.
+ */
+export function readStatedDate(
+  text: string | null | undefined,
+  minYear: number,
+  maxYear: number,
+  side: "first" | "last",
+): StatedDate | null {
   const validYear = (y: number) => y >= minYear && y <= maxYear;
+  const day = (y: number, mo: number, d: number): StatedDate => ({ iso: iso(y, mo, d), month: false });
+  const month = (y: number, mo: number): StatedDate => ({ iso: iso(y, mo, side === "first" ? 1 : lastDay(y, mo)), month: true });
   const s = (text ?? "").trim().replace(/\s+/g, " ");
   if (!s) return null;
   let m = s.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
   if (m) {
     const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
-    return validYear(y) && mo >= 1 && mo <= 12 && d >= 1 && d <= lastDay(y, mo) ? iso(y, mo, d) : null;
+    return validYear(y) && mo >= 1 && mo <= 12 && d >= 1 && d <= lastDay(y, mo) ? day(y, mo, d) : null;
   }
   m = s.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
   if (m) {
     const y = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
     const [mo, d] = [Number(m[1]), Number(m[2])];
-    return validYear(y) && mo >= 1 && mo <= 12 && d >= 1 && d <= lastDay(y, mo) ? iso(y, mo, d) : null;
+    return validYear(y) && mo >= 1 && mo <= 12 && d >= 1 && d <= lastDay(y, mo) ? day(y, mo, d) : null;
   }
   m = s.match(/\b(\d{1,2})\/(\d{4})\b/);
   if (m) {
     const [mo, y] = [Number(m[1]), Number(m[2])];
-    return validYear(y) && mo >= 1 && mo <= 12 ? iso(y, mo, lastDay(y, mo)) : null;
+    return validYear(y) && mo >= 1 && mo <= 12 ? month(y, mo) : null;
   }
   m = s.match(/\b([A-Za-z]{3,9})\.?\s+(?:(\d{1,2})(?:st|nd|rd|th)?,?\s+)?(\d{4})\b/);
   if (m) {
@@ -174,12 +215,16 @@ export function parseStatedDate(text: string | null | undefined, minYear: number
     if (!mo || !validYear(y)) return null;
     if (m[2]) {
       const d = Number(m[2]);
-      return d >= 1 && d <= lastDay(y, mo) ? iso(y, mo, d) : null;
+      return d >= 1 && d <= lastDay(y, mo) ? day(y, mo, d) : null;
     }
-    return iso(y, mo, lastDay(y, mo));
+    return month(y, mo);
   }
   return null;
 }
+
+/** Whether a reading's ISO day falls in the month of another ISO day — an
+ *  end stated as a month alone, read inside that month. */
+export const sameMonth = (todayIso: string, endIso: string): boolean => todayIso.slice(0, 7) === endIso.slice(0, 7);
 
 type MetricRows =
   | {
@@ -327,6 +372,9 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
   const monthsHit = amortText.match(/(\d{2,3})\s*(?:-month|months?|mos?\b)/i);
   const years = yearsHit ? Number(yearsHit[1]) : monthsHit && Number(monthsHit[1]) >= 60 ? Number(monthsHit[1]) / 12 : NaN;
   const amortYears = Number.isFinite(years) && years > 0 ? years : null;
+  // A month alone is its last day (`parseMaturity`'s rule), marked so its
+  // last month says "this month".
+  const maturity = maturityRow ? readStatedDate(maturityRow.value, 1990, 2100, "last") : null;
   const statusText = statusRow ? `${statusRow.label} ${statusRow.value}`.toLowerCase() : "";
   const status: NoteStatus | null = !statusRow
     ? null
@@ -339,7 +387,8 @@ export function readNoteTerms(ex: MetricRows): NoteTerms {
   return {
     balance: balanceRow ? money(balanceRow.value) : null,
     ratePct: rateRow ? pct(rateRow.value) : null,
-    maturity: maturityRow ? parseMaturity(maturityRow.value) : null,
+    maturity: maturity?.iso ?? null,
+    ...(maturity?.month ? { maturityIsMonth: true } : {}),
     // Both stated is neither: the OM does not say which applies from today.
     interestOnly: statesIo ? (amortYears != null ? null : true) : amortYears != null ? false : null,
     amortYears,
@@ -410,11 +459,14 @@ export function readNote(terms: NoteTerms, price: number | null, asOf: Date): No
   // called a note maturing in four weeks one gone by, "past its Mar 2028
   // maturity" on Feb 2. The day itself is due, not past.
   const daysLeft = terms.maturity ? daysBetween(today, terms.maturity) : null;
-  const matured = daysLeft != null && daysLeft < 0;
+  // A maturity stated as a month alone is due all that month, and past only
+  // once the month is out — whichever of its days the reading took.
+  const thisMonth = !!terms.maturityIsMonth && !!terms.maturity && sameMonth(today, terms.maturity);
+  const matured = !thisMonth && daysLeft != null && daysLeft < 0;
   // The whole months the yield runs over — none inside the last month, so a
   // note due within it has no yield to maturity to solve (a month's
   // payments are the arithmetic's unit).
-  const months = terms.maturity && !matured ? monthsBetween(today, terms.maturity) : null;
+  const months = terms.maturity && !matured ? Math.max(0, monthsBetween(today, terms.maturity)) : null;
   const r = terms.ratePct != null ? terms.ratePct / 100 : null;
 
   let ytmPct: number | null = null;
@@ -463,5 +515,6 @@ export function readNote(terms: NoteTerms, price: number | null, asOf: Date): No
     ltvAtBalancePct: terms.collateralValue != null && !terms.subordinate ? (balance / terms.collateralValue) * 100 : null,
     ltvAtPricePct: terms.collateralValue != null && !terms.subordinate ? (price / terms.collateralValue) * 100 : null,
     matured,
+    thisMonth,
   };
 }

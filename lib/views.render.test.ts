@@ -6544,7 +6544,8 @@ describe("LeaseholdExitCard — the term, the two exits, and the model's returns
   it("a lease that ends inside the hold draws the hold's years past its end in the warning tone and prices no sale", () => {
     const html = render(React.createElement(LeaseholdExitCard, { view: viewOf([row("Ground lease expiration", "March 2029")]) }));
     const text = visibleText(html);
-    expect(text).toContain("The model's hold, 5 years, 2.5 years of it after the lease ends");
+    // "March 2029" is read as its first day: 2.4 years left of the 5.
+    expect(text).toContain("The model's hold, 5 years, 2.6 years of it after the lease ends");
     expect(text).toContain("Past the lease's end");
     expect(text).toContain("in year 3 of the model's 5-year hold: the building reverts to the landowner before the model sells it");
     expect(html).toContain('data-bar="lease-past"');

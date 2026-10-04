@@ -59,7 +59,7 @@ import {
   type MetricRow,
 } from "@/lib/ground-lease-term";
 import { parseUsd } from "@/lib/money";
-import { monthsBetween, parseStatedDate, yearsBetween } from "@/lib/note-yield";
+import { monthsBetween, readStatedDate, sameMonth, yearsBetween } from "@/lib/note-yield";
 
 // ── The rows ────────────────────────────────────────────────────────────
 
@@ -235,13 +235,16 @@ const GRADE_WORDS: Record<NonNullable<RatingRead["grade"]>, string> = {
 /** A date the tenant may leave early, as stated. */
 export interface EarlyEnd {
   ends: string;
-  from: "date" | "year";
+  from: "date" | "month" | "year";
   stated: string;
   /** whole months ÷ 12, the figure said */
   yearsLeft: number;
   /** to the day (lib/ground-lease-term `DatedSpan`): what opened, ahead and
    *  before the sale are decided by */
   yearsToTheDay: number;
+  /** stated as a month alone, and the reading's date falls in that month:
+   *  the right opens "this month" (`DatedSpan`) */
+  thisMonth: boolean;
 }
 
 export interface SingleTenantRead {
@@ -258,7 +261,7 @@ export interface SingleTenantRead {
   early: EarlyEnd | null;
   /** when the lease can end: the early termination where it comes first,
    *  else the term — the date every "years left" is counted to */
-  effective: { ends: string; from: "date" | "year" | "remaining"; yearsLeft: number; early: boolean } | null;
+  effective: { ends: string; from: "date" | "month" | "year" | "remaining"; yearsLeft: number; early: boolean } | null;
   /** the rent's increases as read, and the row's own words */
   increases: Increases | null;
   increasesStated: string;
@@ -278,19 +281,21 @@ type LeaseFacts = Omit<SingleTenantRead, "headline" | "sentences">;
 const isoOf = (d: Date) => d.toISOString().slice(0, 10);
 const clean = (s: string | null | undefined) => (s ?? "").trim();
 
-/** A date the text states; a year alone as its first day — the earliest the
- *  tenant could leave in it. */
+/** A date the text states; a month or a year alone as its first day — the
+ *  earliest the tenant could leave in it. */
 function earlyOf(value: string, asOf: Date): EarlyEnd | null {
-  const d = parseStatedDate(value, 1990, 2199);
+  const d = readStatedDate(value, 1990, 2199, "first");
   const y = d ? null : value.match(/\b(19[89]\d|20\d{2}|21\d{2})\b/);
-  const ends = d ?? (y ? `${y[1]}-01-01` : null);
+  const ends = d?.iso ?? (y ? `${y[1]}-01-01` : null);
   if (!ends) return null;
+  const today = isoOf(asOf);
   return {
     ends,
-    from: d ? "date" : "year",
+    from: d ? (d.month ? "month" : "date") : "year",
     stated: value.trim(),
-    yearsLeft: monthsBetween(isoOf(asOf), ends) / 12,
-    yearsToTheDay: yearsBetween(isoOf(asOf), ends),
+    yearsLeft: monthsBetween(today, ends) / 12,
+    yearsToTheDay: yearsBetween(today, ends),
+    thisMonth: !!d?.month && sameMonth(today, ends),
   };
 }
 
@@ -364,9 +369,9 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
 // ── Saying it ───────────────────────────────────────────────────────────
 
 /** "Mar 2036"; a year alone as the year. */
-export const leaseEndLabel = (e: { ends: string; from: "date" | "year" | "remaining" }) => termEndLabel(e);
+export const leaseEndLabel = (e: { ends: string; from: "date" | "month" | "year" | "remaining" }) => termEndLabel(e);
 /** The end after a verb: "ends Mar 2036", "ends in 2036" for a year alone. */
-const endsWhen = (e: { ends: string; from: "date" | "year" | "remaining" }) => (e.from === "year" ? `in ${termEndLabel(e)}` : termEndLabel(e));
+const endsWhen = (e: { ends: string; from: "date" | "month" | "year" | "remaining" }) => (e.from === "year" ? `in ${termEndLabel(e)}` : termEndLabel(e));
 
 // A clause's words without their closing punctuation; a name keeps its
 // own abbreviation's period ("Walgreens Co.").
@@ -405,6 +410,7 @@ function termSentence(t: LeaseTerm | null): string {
   const opts = optionsClause(t);
   switch (t.from) {
     case "date":
+    case "month":
       return `The lease ends ${end}, ${fromToday(t)}${opts}.`;
     case "year":
       return `The lease ends in ${end}, ${fromToday(t)} — the memorandum states the year alone, read as its first day${opts}.`;

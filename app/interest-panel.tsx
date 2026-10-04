@@ -113,13 +113,14 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
               right: `The building's income before it ${money(r.incomeBeforeGroundRent)} · covered ${times(r.groundRentCoverage)}`,
             }
           : null;
-  // The bar's legend says a stated date's term and parsed options whole;
-  // the sentence is kept for what it cannot say — a year read as its first
-  // day, a count from today, a term that already counts its options,
-  // options that did not parse, an end that has passed.
+  // The bar's legend says a stated date's term (or a stated month's) and
+  // parsed options whole; the sentence is kept for what it cannot say — a
+  // year read as its first day, a count from today, a term that already
+  // counts its options, options that did not parse, an end that has passed
+  // or comes this month.
   const t = r.term;
   const termNeedsWords =
-    !!t && (t.from !== "date" || t.includesOptions || (!!t.optionsStated && !t.options) || t.yearsLeft <= 0);
+    !!t && ((t.from !== "date" && t.from !== "month") || t.includesOptions || (!!t.optionsStated && !t.options) || t.yearsLeft <= 0);
   // The ground lease calculator values either side of the lease: the
   // building on its term, or the land and its rent.
   const groundLeaseLink =

@@ -23,9 +23,11 @@
 // owner loses when the abatement ends; at the cap the price was set at it
 // is a sum of the price (the tax-reassessment card's rule on /tools).
 //
-// THE END IS READ EARLY. A year alone is the year's FIRST day, the side
-// that does not flatter the buyer, and a term counted from a stated start
-// is the start plus the term, said as counted.
+// THE END IS READ EARLY. A month or a year alone is its FIRST day, the side
+// that does not flatter the buyer — so an abatement stated to end "June
+// 2027" is gone from June 1, never carried to the month's last day — and a
+// term counted from a stated start is the start plus the term, said as
+// counted.
 //
 // THE SALE IS THE CLOCK. An abatement that ends inside the model's hold
 // leaves its exit struck on a NOI the building no longer earns; one that
@@ -91,9 +93,9 @@ const TERM_FROM_START = /\b(\d{1,2})[\s-]*(?:years?|yrs?)\b.*\b(?:from|commenc\w
 export interface AbatementEnd {
   /** the end, an ISO date */
   ends: string;
-  /** "date" as written, "year" a year alone (its first day), "term" a term
-   *  counted from a stated start */
-  from: "date" | "year" | "term";
+  /** "date" as written, "month" or "year" a month or a year alone (its
+   *  first day), "term" a term counted from a stated start */
+  from: "date" | "month" | "year" | "term";
   stated: string;
   /** years left today in whole months — the figure said; negative where
    *  the stated end has passed */
@@ -231,9 +233,9 @@ export function readTaxAbatement(ex: ExtractionResult | null | undefined, asOf: 
   return { ...read, sentences, headline: sentences.join(" ") };
 }
 
-/** "Jan 2031"; a year alone as the year. */
+/** "Jan 2031"; a year alone, or a term counted to a year, as the year. */
 export function abatementEndLabel(e: AbatementEnd): string {
-  return endLabel({ ends: e.ends, from: e.from === "date" ? "date" : "year" });
+  return endLabel({ ends: e.ends, from: e.from === "term" ? "year" : e.from });
 }
 
 function sentencesOf(r: Omit<TaxAbatementRead, "sentences" | "headline">): string[] {
