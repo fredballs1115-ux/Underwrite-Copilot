@@ -91,14 +91,24 @@ const MINUS_BEFORE = /(?:^|[^\p{L}\p{N}])[-−–]$/u;
 // ("NOI – $3,880,000")? The words do not say.
 const DASH_APART = /[-−–]\s+$/u;
 
+// What may stand before a bracketed figure for the brackets to be its sign:
+// nothing (the bracketed figure is the value), the start of a line, or what
+// sets a value down — a colon, an equals sign, "vs" / "versus" / "against",
+// a comma, a semicolon or a slash between values. Right after a label's own
+// word the brackets are an aside giving the figure: "Stabilized vacancy
+// (5.0%)" is 5.0%, where it had read as -5.0%.
+const VALUE_LEAD = /(?:^|\n|[:=,;/]|\b(?:vs\.?|versus|against))\s*$/iu;
+
 /** The sign a value's figure states: a minus directly before it, or
- *  accounting's brackets round it ("(1.0%)", "($30,000)"); null where a dash
- *  stands apart from it and could be either a sign or a separator. */
+ *  accounting's brackets round it where the bracketed figure stands as the
+ *  value ("(1.0%)", "Model: ($30,000)"); null where a dash stands apart from
+ *  it and could be either a sign or a separator. */
 function signOf(s: string, f: Located): 1 | -1 | null {
   const before = s.slice(0, f.start);
   const after = s.slice(f.end);
   if (MINUS_BEFORE.test(before)) return -1;
-  if (/\(\s*$/.test(before) && /^\s*\)/.test(after)) return -1;
+  const open = /\(\s*$/.exec(before);
+  if (open && /^\s*\)/.test(after)) return VALUE_LEAD.test(before.slice(0, open.index)) ? -1 : 1;
   if (DASH_APART.test(before)) return null;
   return 1;
 }
@@ -106,9 +116,11 @@ function signOf(s: string, f: Located): 1 | -1 | null {
 /**
  * A row's value as it states it: the figure `gapFigure` reads, with the sign
  * the text gives it — a minus in any of its forms ("-1.0%", "−1.0%",
- * "–1.0%") or accounting's brackets ("(1.0%)", "($30,000)"). Null where it
- * states no figure, or where a dash stands apart from the figure, a sign or
- * a separator, so the row's own line is read instead of a guess.
+ * "–1.0%") or accounting's brackets ("(1.0%)", "($30,000)") where the
+ * bracketed figure stands as the value, never after a label's own word
+ * ("Stabilized vacancy (5.0%)" is 5.0%). Null where it states no figure, or
+ * where a dash stands apart from the figure, a sign or a separator, so the
+ * row's own line is read instead of a guess.
  */
 export function valueFigure(text: string | null | undefined): ValueFigure | null {
   const s = (text ?? "").trim();

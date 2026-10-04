@@ -150,6 +150,28 @@ describe("a value below zero is read with its sign (audit c66)", () => {
     expect(valueFigure("Not modelled")).toBeNull();
   });
 
+  // Accounting's brackets are a sign only where the bracketed figure stands
+  // as the value; right after a label's own word they are an aside that
+  // gives the figure ("Stabilized vacancy (5.0%)" had read as -5.0%).
+  it("reads brackets as a sign only where the bracketed figure stands as the value", () => {
+    expect(valueFigure("Stabilized vacancy (5.0%)")).toEqual({ value: 5, unit: "pct" });
+    expect(valueFigure("In-place NOI ($3,880,000)")).toEqual({ value: 3_880_000, unit: "usd" });
+    expect(valueFigure("Rent growth (2.5%/yr)")).toEqual({ value: 2.5, unit: "pct" });
+    // The value itself, after a colon or an equals sign, set against another
+    // value, or opening a line of its own: the brackets are its sign.
+    expect(valueFigure("(1.0%)")).toEqual({ value: -1, unit: "pct" });
+    expect(valueFigure("Model: (1.0%)")).toEqual({ value: -1, unit: "pct" });
+    expect(valueFigure("Year 1 = ($30,000)")).toEqual({ value: -30_000, unit: "usd" });
+    expect(valueFigure("vs (1.0%)")).toEqual({ value: -1, unit: "pct" });
+    expect(valueFigure("against ($30,000)")).toEqual({ value: -30_000, unit: "usd" });
+    expect(valueFigure("Rent growth, model\n(1.0%)")).toEqual({ value: -1, unit: "pct" });
+    // 3.0% against a bracketed 1.0% is still 400 bps, wherever the bracket
+    // stands as the value.
+    expect(valueGap({ omValue: "3.0%", myValue: "(1.0%)" })).toEqual({ value: 400, unit: "bps" });
+    expect(valueGap({ omValue: "3.0%", myValue: "Model: (1.0%)" })).toEqual({ value: 400, unit: "bps" });
+    expect(valueGap({ omValue: "Stabilized vacancy (5.0%)", myValue: "8.0%" })).toEqual({ value: 300, unit: "bps" });
+  });
+
   it("subtracts 3.0% and -1.0% to 400 bps, and $120,000 and -$30,000 to $150,000", () => {
     // The audit's two: the page read 200 bps and $90,000, and said the
     // reconciler's correct lines were wrong.
