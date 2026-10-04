@@ -1,4 +1,5 @@
 import metrosSeed from "@/data/research/metros.json";
+import { competitionRanks } from "@/lib/rank";
 import {
   areaLabel,
   blockCitations,
@@ -66,8 +67,12 @@ export type LeaderRow = {
    *  link, which is another figure's as often as not */
   figures: CitedFigure[];
   /** the row's place, tightest first, among the ranked rows; null where the
-   *  figure is not ranked or there is no vacancy figure */
+   *  figure is not ranked or there is no vacancy figure. An equal figure
+   *  shares the place (lib/rank `competitionRanks`) */
   rank: number | null;
+  /** another ranked row carries an equal figure and shares this place,
+   *  printed "=5" (lib/rank `rankLabel`) — never ordered by name */
+  tied: boolean;
   /** why a vacancy figure is not ranked, in a few words ("undated",
    *  "2024, over a year old", "a spread of two reads"); null where ranked
    *  or where the row carries no vacancy figure */
@@ -83,13 +88,16 @@ function todayIso(): string {
 }
 
 /**
- * Why a vacancy figure is not ranked, or null where it is: a figure must be
- * dated, no more than a year old at the reader's date, for the whole stock
- * of its class, and one read — a point, or a band its publisher prints as
- * one range. A band of two houses, two inventories or two periods (DC's
- * Colliers 21.3% beside CBRE's 22.2%, Baltimore's all-inventory 10.0% beside
- * a competitive set's 20.9%) is two figures, and there is no one figure to
- * place: its midpoint is a number no source states.
+ * Why a vacancy figure is not ranked, or null where it is: a figure must
+ * name its publisher, be dated, no more than a year old at the reader's
+ * date, for the whole stock of its class, and one read — a point, or a band
+ * its publisher prints as one range. A figure whose publisher the file does
+ * not record is one a visitor cannot check, and its place would be claimed
+ * on nobody's word (Chicago's 4.7% industrial had been ranked #1). A band
+ * of two houses, two inventories or two periods (DC's Colliers 21.3% beside
+ * CBRE's 22.2%, Baltimore's all-inventory 10.0% beside a competitive set's
+ * 20.9%) is two figures, and there is no one figure to place: its midpoint
+ * is a number no source states.
  */
 export function unrankedReason(
   read: ReturnType<typeof figureRead>,
@@ -98,6 +106,7 @@ export function unrankedReason(
   today: string,
 ): string | null {
   const reasons: string[] = [];
+  if (!read.house) reasons.push("publisher not recorded");
   if (isUndated(read)) reasons.push("undated");
   else if (olderThanAYear(read, today)) reasons.push(`${read.period}, over a year old`);
   if (read.slice) reasons.push(`${read.slice} only`);
@@ -119,10 +128,13 @@ export function unrankedReason(
  * same figures under the same reads, and names them, with the area the
  * read names.
  *
- * RANKED ONLY WHERE THE SOURCES STATE A PLACE. A figure that is undated,
- * more than a year old at `today`, or for a narrower stock than the class
- * (NoVA's small-bay industrial) is listed after the ranked rows, unranked,
- * with the reason. A band is never ordered by its midpoint: a band of two
+ * RANKED ONLY WHERE THE SOURCES STATE A PLACE. A figure whose publisher is
+ * not recorded, undated, more than a year old at `today`, or for a narrower
+ * stock than the class (NoVA's small-bay industrial) is listed after the
+ * ranked rows, unranked, with the reason. Equal figures share one place,
+ * "=5", and are listed in name order under it (the audit of 2026-10-04:
+ * Miami's and New York's 7.7% industrial read #5 and #6, ordered by their
+ * names). A band is never ordered by its midpoint: a band of two
  * reads is listed unranked, as a band; a band its publisher prints as one
  * range (Hampton Roads retail, "4.4–4.6%") is one read and is ranked by
  * its LOOSEST end — the end that does not flatter the market, as a price
@@ -185,6 +197,7 @@ export function sectorLeaderboard(
       capHigh,
       figures,
       rank: null,
+      tied: false,
       reason: vLow === null ? null : unrankedReason(vacancyRead, vLow, vHigh, today),
       printedBand: vacancyRead.printedBand,
     };
@@ -204,8 +217,12 @@ export function sectorLeaderboard(
   const ranked = order
     .filter((r) => r.vLow !== null && r.reason === null)
     .sort((a, b) => loosest(a) - loosest(b) || Number(isPoint(b)) - Number(isPoint(a)) || a.name.localeCompare(b.name));
+  // One figure, one place: rows the sort keeps apart only by their names
+  // share the place, the next row taking its own position's.
+  const places = competitionRanks(ranked, (a, b) => Math.abs(loosest(a) - loosest(b)) < 0.005 && isPoint(a) === isPoint(b));
   ranked.forEach((r, i) => {
-    r.rank = i + 1;
+    r.rank = places[i].rank;
+    r.tied = places[i].tied;
   });
   const unranked = order
     .filter((r) => r.vLow !== null && r.reason !== null)
@@ -220,6 +237,8 @@ export function sectorLeaderboard(
 export interface Standing {
   row: LeaderRow;
   rank: number | null;
+  /** an equal figure shares the place ("=5") */
+  tied: boolean;
   total: number;
   reason: string | null;
 }
@@ -237,7 +256,7 @@ export function sectorStandings(
       const out: Record<string, Standing> = {};
       for (const row of board.rows) {
         if (row.vLow === null) continue;
-        for (const m of row.markets) out[m.id] = { row, rank: row.rank, total: board.ranked, reason: row.reason };
+        for (const m of row.markets) out[m.id] = { row, rank: row.rank, tied: row.tied, total: board.ranked, reason: row.reason };
       }
       return [sec, out];
     }),

@@ -46,15 +46,59 @@ describe("sectorLeaderboard — one row a figure, ranked only where the sources 
     const dmv = rowOf("multifamily", "montgomery_county");
     expect(dmv.markets.map((m) => m.id)).toEqual(["dc", "pg_county", "montgomery_county", "nova"]);
     expect(dmv.sharedArea).toBe("Washington DC region");
-    expect(dmv.rank).not.toBeNull();
+    // The region's figure names no publisher: one row, listed, not ranked.
+    expect(dmv).toMatchObject({ rank: null, reason: "publisher not recorded" });
     expect(sharedFigureWords(dmv)).toBe("Washington DC region — Washington DC, Prince George's County MD, Montgomery County MD, Northern Virginia");
     const suburban = rowOf("office", "pg_county");
     expect(suburban.markets.map((m) => m.id)).toEqual(["pg_county", "montgomery_county"]);
     expect(suburban.sharedArea).toBe("Suburban Maryland");
-    // One rank for the figure, never one a jurisdiction.
+    expect(suburban.rank).not.toBeNull();
+    // One rank for the figure, never one a jurisdiction: each place is its
+    // position among the ranked rows, and an equal figure — the same
+    // loosest end, a point beside a point — shares the place before it.
+    const loosest = (r: { vLow: number | null; vHigh: number | null }) => r.vHigh ?? r.vLow;
+    const point = (r: { vLow: number | null; vHigh: number | null }) => r.vHigh === null || r.vHigh === r.vLow;
     for (const sector of ["office", "industrial", "multifamily", "retail"]) {
-      const ranks = board(sector).rows.map((r) => r.rank).filter((r): r is number => r !== null);
-      expect(ranks, sector).toEqual(ranks.map((_, i) => i + 1));
+      const rows = board(sector).rows.filter((r) => r.rank !== null);
+      rows.forEach((r, i) => {
+        const prev = rows[i - 1];
+        const equal = !!prev && loosest(prev) === loosest(r) && point(prev) === point(r);
+        expect(r.rank, `${sector} ${r.id}`).toBe(equal ? prev.rank : i + 1);
+      });
+    }
+  });
+
+  it("gives equal figures one place, never an order by name (the audit of 2026-10-04)", () => {
+    // Miami's and New York's industrial vacancy are both 7.7% for Q2 2026:
+    // they had read #5 and #6, apart only by their names.
+    const miami = rowOf("industrial", "miami");
+    const nyc = rowOf("industrial", "nyc");
+    expect(miami.vLow).toBe(7.7);
+    expect(nyc.vLow).toBe(7.7);
+    expect(miami.rank).not.toBeNull();
+    expect(nyc.rank).toBe(miami.rank);
+    expect(miami.tied && nyc.tied).toBe(true);
+    // The next figure takes its own position's place, never the next number.
+    expect(rowOf("industrial", "norfolk_hampton_roads").rank).toBe(miami.rank! + 2);
+    const s = sectorStandings(["industrial"], TODAY).industrial;
+    expect(s.miami).toMatchObject({ rank: miami.rank, tied: true });
+    expect(s.nyc).toMatchObject({ rank: miami.rank, tied: true });
+    // A figure no other ranked row equals is not marked tied.
+    for (const sector of ["office", "industrial", "multifamily", "retail"]) {
+      const rows = board(sector).rows.filter((r) => r.rank !== null);
+      for (const r of rows) expect(r.tied, `${sector} ${r.id}`).toBe(rows.filter((x) => x.rank === r.rank).length > 1);
+    }
+  });
+
+  it("never ranks a figure whose publisher the file does not record", () => {
+    // Chicago's 4.7% industrial ("publisher not recorded, 2026") had been #1.
+    expect(rowOf("industrial", "chicago")).toMatchObject({ rank: null, reason: "publisher not recorded" });
+    expect(rowOf("office", "dallas")).toMatchObject({ rank: null, reason: "publisher not recorded" });
+    expect(rowOf("office", "chicago")).toMatchObject({ rank: null, reason: "publisher not recorded" });
+    for (const sector of ["office", "industrial", "multifamily", "retail"]) {
+      for (const r of board(sector).rows.filter((x) => x.rank !== null)) {
+        expect(r.figures.find((f) => f.label === "Vacancy")?.read.house, `${sector} ${r.id}`).toBeTruthy();
+      }
     }
   });
 
@@ -70,7 +114,7 @@ describe("sectorLeaderboard — one row a figure, ranked only where the sources 
   it("lists an undated, a year-old or a narrower-stock figure after the ranked rows, with the reason", () => {
     const nova = rowOf("industrial", "nova");
     expect(nova.rank).toBeNull();
-    expect(nova.reason).toBe("undated; small-bay space only; a spread of two reads");
+    expect(nova.reason).toBe("publisher not recorded; undated; small-bay space only; a spread of two reads");
     expect(rowOf("multifamily", "chicago").reason).toBe("undated; a spread of two reads");
     expect(rowOf("retail", "newark_jc")).toMatchObject({ rank: null, reason: "2024, over a year old" });
     expect(rowOf("retail", "richmond")).toMatchObject({ rank: null, reason: "undated" });
@@ -105,10 +149,12 @@ describe("sectorLeaderboard — one row a figure, ranked only where the sources 
   });
 
   it("reads the day it is given: a figure ages out of the ranking", () => {
-    // The DMV region's year-end 2025 figure is ranked on Oct 1, 2026 and not
-    // in the new year after.
-    expect(rowOf("multifamily", "dc").rank).not.toBeNull();
-    expect(rowOf("multifamily", "dc", "2027-01-15")).toMatchObject({ rank: null, reason: "year-end 2025, over a year old" });
+    // Philadelphia's Q2 2026 apartment figure is ranked on Oct 1, 2026 and
+    // not once a year has passed since its quarter ended.
+    expect(rowOf("multifamily", "philadelphia").rank).not.toBeNull();
+    expect(rowOf("multifamily", "philadelphia", "2027-07-15")).toMatchObject({ rank: null, reason: "Q2 2026, over a year old" });
+    // The DMV region's year-end 2025 figure names no publisher, and ages.
+    expect(rowOf("multifamily", "dc", "2027-01-15")).toMatchObject({ rank: null, reason: "publisher not recorded; year-end 2025, over a year old" });
   });
 
   it("gives each market its standing, shared or not", () => {

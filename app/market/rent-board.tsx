@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { competitionRanks, rankLabel } from "@/lib/rank";
 import { ZORI_CREDIT, ZORI_SOURCE_URL, monthOf, type ZoriRead } from "@/lib/zori";
 import { metroSeriesFor } from "@/lib/live-rates";
 import type { BoardMarket } from "./sector-jobs-board";
@@ -60,6 +61,11 @@ export function RentBoard({
   const widest = Math.max(0.5, ...ranked.map((x) => Math.abs(x.z.mfrYoyPct)));
   const half = (v: number) => `${Math.min(50, (Math.abs(v) / widest) * 50)}%`;
   const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : ""}${Math.abs(v).toFixed(1)}%`;
+  // The pull stores each change to one decimal, so two metro areas often
+  // print the same figure: they share one place, "=2" (lib/rank), never
+  // numbered apart by the order the sort happened to leave them in (the
+  // audit of 2026-10-04: Washington's +1.2% second, Atlanta's +1.2% third).
+  const places = competitionRanks(ranked, (a, b) => signed(a.z.mfrYoyPct) === signed(b.z.mfrYoyPct));
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5" data-qa="rent-board">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -69,7 +75,7 @@ export function RentBoard({
       <ol className="mt-3 space-y-1.5">
         {ranked.map(({ market, z }, i) => (
           <li key={market.id} className="grid grid-cols-[1.25rem_minmax(7rem,11rem)_1fr_auto_auto] items-center gap-2 text-xs">
-            <span className="font-mono text-[10px] tabular-nums text-muted">{i + 1}</span>
+            <span className="font-mono text-[10px] tabular-nums text-muted">{rankLabel(places[i], true)}</span>
             {market.briefed === false ? (
               <span className="truncate font-medium text-ink" title="Read without a brief — the same Zillow figure, no market page behind it">
                 {areaOf(market)}
@@ -114,7 +120,7 @@ export function RentBoard({
         </p>
       )}
       <p className="mt-3 text-[11px] leading-relaxed text-muted">
-        {`Zillow's Observed Rent Index over multifamily listings alone — a smoothed index of asking rents, dated by its month, each against the same month a year earlier — ranks the board; a suburb shares its metro area's row and is not listed twice. The years beside each bar are the typical home's price in years of the all-homes asking rent, and the sitting-tenant rent index on the metro tiles is a different measure: what leases already signed pay, where this is what landlords are asking for a vacant unit. ${ZORI_CREDIT}.`}{" "}
+        {`Zillow's Observed Rent Index over multifamily listings alone — a smoothed index of asking rents, dated by its month, each against the same month a year earlier — ranks the board; metro areas with the same change share a place ("=2"), and a suburb shares its metro area's row and is not listed twice. The years beside each bar are the typical home's price in years of the all-homes asking rent, and the sitting-tenant rent index on the metro tiles is a different measure: what leases already signed pay, where this is what landlords are asking for a vacant unit. ${ZORI_CREDIT}.`}{" "}
         <a href={ZORI_SOURCE_URL} target="_blank" rel="noreferrer" className="underline decoration-dotted underline-offset-2 hover:text-ink">
           Zillow Research
         </a>

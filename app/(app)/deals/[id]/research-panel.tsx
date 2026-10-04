@@ -32,6 +32,7 @@ import { withArticle } from "@/lib/article";
 import { FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrToday, fmrWhen, readFmrMetric, type FmrBed } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
 import { sectorStandings } from "@/lib/sector-leaderboard";
+import { rankLabel } from "@/lib/rank";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
@@ -653,7 +654,10 @@ export async function ResearchPanel({
               // cross-metro ranking — same builder as the market page.
               const vac = b.metric.match(/^(\w+?)_vacancy_pct$/);
               const standing = vac && metro ? standings[vac[1]]?.[metro.id] : undefined;
-              const rank = standing && standing.rank !== null ? { rank: standing.rank, total: standing.total } : undefined;
+              const rank =
+                standing && standing.rank !== null
+                  ? { label: rankLabel({ rank: standing.rank, tied: standing.tied }), total: standing.total }
+                  : undefined;
               return (
                 <li
                   key={`${b.metro}|${b.metric}`}
@@ -671,7 +675,7 @@ export async function ResearchPanel({
                         title={`rank across covered markets, tightest first${standing && standing.row.markets.length > 1 ? ` — one figure${standing.row.sharedArea ? ` for ${standing.row.sharedArea}` : ""}, read by ${standing.row.markets.map((m) => m.name).join(", ")}` : ""}`}
                         className="ml-2 rounded-full border border-line px-1.5 py-px text-[11px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
                       >
-                        #{rank.rank} of {rank.total}
+                        {`${rank.label} of ${rank.total}`}
                       </Link>
                     )}
                     {/* A research-tracker figure's own house, area and

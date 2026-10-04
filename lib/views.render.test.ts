@@ -6014,6 +6014,20 @@ describe("RentBoard — where apartment asking rents are moving, every metro are
   it("renders nothing until a row exists", () => {
     expect(render(React.createElement(RentBoard, { markets, reads: new Map() }))).not.toContain("Where apartment asking rents");
   });
+
+  it("gives metro areas with the same change one place, '=3', and the next its own (the audit of 2026-10-04)", () => {
+    // The pull stores the change to one decimal: Atlanta's −0.4% is
+    // Washington's, and the two had been numbered apart.
+    const tied = [
+      ...rows,
+      row("Atlanta", "zori_rent", 1890), row("Atlanta", "zori_mfr_rent", 1702), row("Atlanta", "zori_mfr_rent_yoy", -0.4),
+      row("Dallas-Fort Worth", "zori_rent", 1810), row("Dallas-Fort Worth", "zori_mfr_rent", 1590), row("Dallas-Fort Worth", "zori_mfr_rent_yoy", -1.6),
+    ];
+    const boardHtml = render(React.createElement(RentBoard, { markets, reads: new Map(markets.map((m) => [m.name, zoriFor(tied, m.name, read)])) }));
+    const places = [...boardHtml.matchAll(/<li[^>]*><span class="font-mono text-\[10px\] tabular-nums text-muted">([^<]+)<\/span>/g)].map((m) => m[1]);
+    expect(places).toEqual(["1", "2", "=3", "=3", "5"]);
+    expect(visibleText(boardHtml)).toContain('metro areas with the same change share a place ("=2")');
+  });
 });
 
 // ── A portfolio OM's properties on the deal page (#411) ────────────────────
@@ -8041,25 +8055,54 @@ describe("the tracker's leaderboard, chips and coverage cells — one row a figu
   };
 
   it("draws a shared figure as one row naming its area and every market, and lists the unranked after with the reason", () => {
+    const strip = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'");
+    // Suburban Maryland's office figure, ranked: one row, its area and both
+    // counties, its own period beside it.
+    const office = table("office");
+    const suburban = office.match(/<tr[^>]*data-row-rank="3"[\s\S]*?<\/tr>/)?.[0] ?? "";
+    expect(strip(suburban)).toContain("Suburban Maryland — Prince George's County MD, Montgomery County MD");
+    expect(strip(suburban)).toContain("Q1 2026");
+    expect((office.match(/data-row-rank="3"/g) ?? []).length).toBe(1);
     const html = table("multifamily");
     const text = visibleText(html);
     // The ranking's own words, which live-verify greps on the retail page.
     expect(text).toContain("figures ranked tightest to loosest");
-    const strip = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'");
-    const dmv = html.match(/<tr[^>]*data-row-rank="2"[\s\S]*?<\/tr>/)?.[0] ?? "";
+    // The DMV region's figure names no publisher: one row, listed after the
+    // ranked rows, every market it stands for named, with its reason.
+    const dmv = html.match(/<tr[^>]*data-row-rank="none"(?:(?!<\/tr>)[\s\S])*Washington DC region[\s\S]*?<\/tr>/)?.[0] ?? "";
     expect(strip(dmv)).toContain("Washington DC region — Washington DC, Prince George's County MD, Montgomery County MD, Northern Virginia");
-    // Each figure's own period beside it.
+    expect(strip(dmv)).toContain("publisher not recorded");
     expect(strip(dmv)).toContain("year-end 2025");
-    expect((html.match(/data-row-rank="2"/g) ?? []).length).toBe(1);
+    expect((html.match(/Washington DC region — /g) ?? []).length).toBe(1);
     // The unranked block, after the ranked rows, each with its reason.
     expect(text).toContain("Not ranked — the reason under each market");
-    expect(html.indexOf("Not ranked — the reason")).toBeGreaterThan(html.lastIndexOf('data-row-rank="5"'));
+    expect(html.indexOf("Not ranked — the reason")).toBeGreaterThan(html.lastIndexOf('data-row-rank="4"'));
     expect(text).toContain("undated; a spread of two reads");
     // A figure with no house says so, plainly, and never "on file".
     expect(text).toContain("vacancy: publisher not recorded");
     expect(text).not.toMatch(/\bon file\b/);
+    // The caption says the rule the table keeps.
+    expect(text).toContain("ranked only where its source names its publisher and dates it within the last year");
+    expect(text).toContain('Equal figures share one place ("=5") and one shade.');
     expect(a11yIssues(html), "multifamily leaderboard").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("prints equal figures at one place, '=4', and the next at its own (the audit of 2026-10-04)", () => {
+    const html = table("industrial");
+    const strip = (s: string) => s.replace(/<[^>]+>/g, "").replace(/&#x27;/g, "'");
+    const rowFor = (name: string) => html.match(new RegExp(`<tr[^>]*data-row-rank="(\\d+)"(?:(?!</tr>)[\\s\\S])*>${name}<[\\s\\S]*?</tr>`)) ?? null;
+    const miami = rowFor("Miami");
+    const nyc = rowFor("New York City");
+    expect(miami && nyc).toBeTruthy();
+    expect(miami![1]).toBe(nyc![1]);
+    expect(strip(miami![0])).toMatch(new RegExp(`^=${miami![1]}`));
+    expect(strip(nyc![0])).toMatch(new RegExp(`^=${miami![1]}`));
+    // The figure after them is numbered by its position.
+    expect(html).toContain(`data-row-rank="${Number(miami![1]) + 2}"`);
+    expect(html).not.toContain(`data-row-rank="${Number(miami![1]) + 1}"`);
+    // Chicago's figure names no publisher: listed, never #1.
+    expect(html).not.toMatch(/data-row-rank="1"(?:(?!<\/tr>)[\s\S])*>Chicago</);
   });
 
   it("prints a band as a band, ranks a printed range by its loosest end and keeps the held-open line", () => {
@@ -8072,7 +8115,7 @@ describe("the tracker's leaderboard, chips and coverage cells — one row a figu
     const industrial = visibleText(table("industrial"));
     expect(industrial).toContain("$10–15");
     expect(industrial).not.toContain("12.50");
-    expect(industrial).toContain("undated; small-bay space only; a spread of two reads");
+    expect(industrial).toContain("publisher not recorded; undated; small-bay space only; a spread of two reads");
   });
 
   it("chips a market by its figure's standing: a rank naming the shared figure, or why it is not ranked", () => {
@@ -8082,7 +8125,25 @@ describe("the tracker's leaderboard, chips and coverage cells — one row a figu
     expect(ranked).toContain("tightest first");
     expect(ranked).toContain("one figure for Suburban Maryland, read by Prince George&#x27;s County MD too");
     const unranked = visibleText(render(React.createElement(StandingChip, { sector: "industrial", metroId: "nova", standing: s.industrial.nova })));
-    expect(unranked).toContain("not ranked · undated; small-bay space only; a spread of two reads");
+    expect(unranked).toContain("not ranked · publisher not recorded; undated; small-bay space only; a spread of two reads");
+    // Two equal figures: one place, said "=", on both chips.
+    const chip = (id: string) => visibleText(render(React.createElement(StandingChip, { sector: "industrial", metroId: id, standing: s.industrial[id] }))).trim();
+    expect(chip("miami")).toMatch(/^=\d+ of \d+$/);
+    expect(chip("nyc")).toBe(chip("miami"));
+    expect(render(React.createElement(StandingChip, { sector: "industrial", metroId: "miami", standing: s.industrial.miami }))).toContain("shared with an equal figure");
+    // Chicago's industrial figure names no publisher.
+    expect(chip("chicago")).toBe("not ranked · publisher not recorded");
+  });
+
+  it("shades equal figures one shade on the coverage board", () => {
+    const s = sectorStandings(["industrial"], TODAY).industrial;
+    const miami = coverageCell(s.miami, s.miami.total);
+    const nyc = coverageCell(s.nyc, s.nyc.total);
+    expect(miami.t).not.toBeNull();
+    expect(nyc.t).toBe(miami.t);
+    expect(render(React.createElement(CoverageBoardCell, { sector: "industrial", cell: nyc }))).toBe(
+      render(React.createElement(CoverageBoardCell, { sector: "industrial", cell: { ...miami, credit: nyc.credit } })),
+    );
   });
 
   it("shades only a ranked coverage cell, prints every cell's period, and names the area of a shared one", () => {

@@ -12,6 +12,7 @@ import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
 import { metroFmr, seedBenchmarks, twoToFourMedian } from "@/lib/research-data";
 import { fmrLabel, fmrToday, fmrWhen } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
+import { rankLabel } from "@/lib/rank";
 import { sectorStandings } from "@/lib/sector-leaderboard";
 import { blockCitations, snapshotAge } from "@/lib/tracker-read";
 import { researchAge, staleMark } from "@/lib/research-age";
@@ -232,7 +233,7 @@ export default async function DemoPage() {
   const phillyRank = (sector: string): string | null => {
     const s = standings[sector]?.["philadelphia"];
     if (!s) return null;
-    return s.rank !== null ? `#${s.rank} of ${s.total}` : `not ranked: ${s.reason}`;
+    return s.rank !== null ? `${rankLabel({ rank: s.rank, tied: s.tied })} of ${s.total}` : `not ranked: ${s.reason}`;
   };
   const phillyRanks = {
     office: phillyRank("office"),

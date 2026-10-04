@@ -1,6 +1,7 @@
 import { Fragment } from "react";
 import Link from "next/link";
 import { linkOk } from "@/lib/link-audit";
+import { rankLabel } from "@/lib/rank";
 import { sharedFigureWords, type LeaderRow, type Standing } from "@/lib/sector-leaderboard";
 import { figureNote, figureSources, figuresTitle, rentText, type CitedFigure } from "@/lib/tracker-read";
 import { heatShade } from "./heat-shade";
@@ -13,9 +14,11 @@ import { heatShade } from "./heat-shade";
  *
  * What the rankings may claim is lib/sector-leaderboard's (the research pass
  * of 2026-10-01): one row per distinct figure, naming every market that
- * reads it; a rank only for a figure that is dated, no more than a year old,
- * for the whole stock and one read; everything else listed after, unranked,
- * with its reason; a band printed as a band, never as its midpoint.
+ * reads it; a rank only for a figure whose publisher is recorded, dated, no
+ * more than a year old, for the whole stock and one read; equal figures one
+ * place, "=5", and one shade (lib/rank); everything else listed after,
+ * unranked, with its reason; a band printed as a band, never as its
+ * midpoint.
  */
 
 const LABEL: Record<string, string> = {
@@ -53,10 +56,12 @@ export function StandingChip({ sector, metroId, standing }: { sector: string; me
       <Link
         href={`/market?sector=${sector}`}
         prefetch={false}
-        title={`rank among the covered markets' ${sectorWord(sector)} vacancy figures that can be ranked, tightest first${shared}`}
+        title={`rank among the covered markets' ${sectorWord(sector)} vacancy figures that can be ranked, tightest first${
+          standing.tied ? ", shared with an equal figure" : ""
+        }${shared}`}
         className="rounded-full border border-line px-1.5 py-px text-[10px] font-medium text-muted transition-colors hover:border-brand hover:text-brand"
       >
-        {`#${standing.rank} of ${standing.total}`}
+        {`${rankLabel({ rank: standing.rank, tied: standing.tied })} of ${standing.total}`}
       </Link>
     );
   }
@@ -216,7 +221,9 @@ export function LeaderboardTable({
                   </tr>
                 )}
                 <tr className="border-b border-line/60 align-top" data-row-rank={r.rank ?? "none"}>
-                  <td className="py-1.5 pr-2 font-mono text-[11px] tabular-nums text-muted">{r.rank ?? "—"}</td>
+                  <td className="py-1.5 pr-2 font-mono text-[11px] tabular-nums text-muted">
+                    {r.rank !== null ? rankLabel({ rank: r.rank, tied: r.tied }, true) : "—"}
+                  </td>
                   <td className="py-1.5 pr-3">
                     <RowMarkets row={r} />
                     {r.reason && (
@@ -251,7 +258,7 @@ export function LeaderboardTable({
         </table>
       </div>
       <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
-        {`A figure is ranked only where its source dates it within the last year, for the whole ${sectorWord(sector)} stock, as one read: a spread of two houses, two inventories or two periods is printed as the spread and never placed by its midpoint, and a range its publisher prints as one read is placed by its loosest end. Several markets that read one figure are one row.`}
+        {`A figure is ranked only where its source names its publisher and dates it within the last year, for the whole ${sectorWord(sector)} stock, as one read: a spread of two houses, two inventories or two periods is printed as the spread and never placed by its midpoint, and a range its publisher prints as one read is placed by its loosest end. Equal figures share one place ("=5") and one shade. Several markets that read one figure are one row.`}
       </p>
       {heldOpen.length > 0 && (
         <p className="mt-1.5 text-[11px] leading-relaxed text-muted">
