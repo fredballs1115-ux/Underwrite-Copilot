@@ -5100,6 +5100,12 @@
         "Greeley Colorado downtown",
         "Greeley Colorado skyline",
         "Greeley Colorado"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Greeley.JPG",
+          "note": "Greeley, CO — Peter Romero, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816430466)."
+        }
       ]
     },
     {
@@ -5121,6 +5127,12 @@
         "Tri-Cities Washington Columbia River",
         "Kennewick Washington Cable Bridge",
         "Richland Washington"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Richland.jpg",
+          "note": "Kennewick-Richland, WA — Corbin Harder, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816430466)."
+        }
       ]
     },
     {
@@ -5140,6 +5152,12 @@
         "Bellingham Washington skyline Mount Baker",
         "Bellingham Bay waterfront",
         "Bellingham Washington downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Bellingham, Washington (cropped).jpg",
+          "note": "Bellingham, WA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816430466)."
+        }
       ]
     },
     {
@@ -5159,6 +5177,12 @@
         "Napa Valley vineyards",
         "Napa California downtown riverfront",
         "Napa Valley landscape"
+      ],
+      "candidates": [
+        {
+          "file": "Napawineryvines.jpg",
+          "note": "Napa, CA — Fluous, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816430466)."
+        }
       ]
     },
     {
@@ -5180,6 +5204,12 @@
         "Maui coastline",
         "Iao Valley Maui",
         "Kahului Maui"
+      ],
+      "candidates": [
+        {
+          "file": "2011 Oct 02 Iao Valley Mountainside Panorama crop.jpg",
+          "note": "Kahului-Wailuku, HI — Mark Fickett, CC BY 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36816430466)."
+        }
       ]
     },
     {

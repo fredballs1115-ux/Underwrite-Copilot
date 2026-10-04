@@ -644,6 +644,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Barnstable Town, MA",
     size: [3888, 2592],
   },
+  // Bellingham, WA: skyline-sheet run 36816430466 — an article's lead, downtown from a low drone under cumulus, the red-brick Old City Hall's clock tower and the downtown blocks in sun, forested hills and a ridge behind, every top whole in both crops. Over an aerial over the harbour's industrial waterfront with Mount Baker on the horizon, a 1972 slide of the harbour full of logs, a 1908 postcard with its printed title and a barge leaving the port under grey cloud.
+  "cbsa:13380": {
+    file: "Bellingham, Washington (cropped).jpg",
+    place: "Downtown Bellingham and its red-brick Old City Hall from above, forested hills behind",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Bellingham, WA",
+    size: [6475, 3887],
+  },
   // Bend, OR: skyline-sheet run 36808230184 — the Deschutes beside Drake Park under a blue sky, its banks mirrored in the water, sharp and whole in both crops, over a downtown street at dawn under the Tower Theatre's sign with a bronze figure on a bench in its foreground, Mount Bachelor under a grey sky (the area's mountain, not the city), and two panoramas of the river 560 and 592px tall at their own width.
   "cbsa:13460": {
     file: "Drake Park, Bend (July 2012) - 1.JPG",
@@ -994,6 +1004,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Grand Rapids, MI",
     size: [4000, 1475],
   },
+  // Greeley, CO: skyline-sheet run 36816430466 — downtown's historic fronts in sun under a clear sky, a brick block with arched windows under a white cornice beside a cream one under a green cornice, a painted sign on the wall behind; the card clips the white cornice's corner and the 21:9 most of its length. Over pear trees in blossom before a storefront with bicycles and parked cars, a winter street corner of crossing signs under a white sky, the town's green sign with a sculpture and people (and again at a tilt), a shoe store's sign, two streets of parked cars and signs under a white sky, and Denver's skyline from Westminster behind a freight trailer.
+  "cbsa:24540": {
+    file: "Downtown Greeley.JPG",
+    place: "Downtown Greeley's historic brick and painted storefronts under a clear blue sky",
+    credit: "Peter Romero",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Greeley, CO",
+    size: [4000, 3000],
+  },
   // Green Bay, WI: skyline-sheet run 36800398141 — an article's lead, downtown and its riverfront crowd along the Fox River in low sun with the bridges and the horizon beyond, an oblique that reads as a photograph, over Lambeau Field's atrium and its brand logos, the bowl over a crowd's heads, an aerial view across its parking lots, an over-processed empty bowl, the atrium at night in fog, a distant grey view and a panorama 579px tall at 2400 wide.
   "cbsa:24580": {
     file: "Downtown Green Bay CityDeck along the Fox River.jpg",
@@ -1073,6 +1093,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     name: "Jackson, MS",
     size: [2247, 822],
+  },
+  // Kahului-Wailuku, HI: skyline-sheet run 36816430466 — Iao Valley's green ridges above Wailuku under a blue sky and cumulus, sharp, the summit whole with room in both crops; a crop of the photographer's own stitched panorama, without its black corners. Over that panorama and another whose unfilled black corners show in both crops, a tighter crop credited to a sentence naming a file, the Iao Needle under a mist that leaves half the card blank, a hazy view of West Maui from Haleakala's road, and two frames of Kahului Harbor's water and breakwater.
+  "cbsa:27980": {
+    file: "2011 Oct 02 Iao Valley Mountainside Panorama crop.jpg",
+    place: "The green ridges of Iao Valley in the West Maui Mountains, under a blue sky and cumulus",
+    credit: "Mark Fickett",
+    license: "CC BY 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/3.0",
+    name: "Kahului-Wailuku, HI",
+    size: [3901, 1684],
+  },
+  // Kennewick-Richland, WA: skyline-sheet run 36816430466 — from the Tri-Cities article, downtown Richland's blocks on the Columbia from a height in warm low sun, farmland and bluffs across the water, a hazy sky that the card keeps and the 21:9 does not. Over an aerial over Kennewick and the river in dim greenish light (an article's lead), Richland's flat suburbs from Badger Mountain in a strip 544px tall at 2400 wide, a brewery's storefront and sign, a view from the space station that reads as a map, a pergola at a road junction under wires, and a footbridge in a cave filed under the Cable Bridge.
+  "cbsa:28420": {
+    file: "Downtown Richland.jpg",
+    place: "Downtown Richland and the Columbia River from a height, in low sun",
+    credit: "Corbin Harder",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Kennewick-Richland, WA",
+    size: [3919, 2618],
   },
   // Killeen-Temple, TX: skyline-sheet run 36787138337 — a domed courthouse under a clear sky, whole in both crops and 926px tall, over a distant strip of Temple's towers behind trees and grey street corners; the card names the metro area, since the photograph is Belton's.
   "cbsa:28660": {
@@ -1293,6 +1333,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Myrtle Beach, SC",
     size: [6515, 2356],
+  },
+  // Napa, CA: skyline-sheet run 36816430466 — a vineyard in full summer leaf under a clear sky, red roses at the ends of its rows and wooded hills behind, from the category of Napa County's vineyards, the hills whole in both crops. Over the town's riverfront blocks behind a street lamp (an article's lead), a winter vineyard backlit and bare, a night harvest under floodlights that goes black on the card, a high aerial and an airliner's view that read as maps, and San Francisco and the Golden Gate Bridge.
+  "cbsa:34900": {
+    file: "Napawineryvines.jpg",
+    place: "A Napa County vineyard in summer leaf, red roses at the ends of its rows, below wooded hills",
+    credit: "Fluous",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Napa, CA",
+    size: [2592, 1944],
   },
   // Naples-Marco Island, FL: skyline-sheet run 36798176732 — the Naples Pier, the landmark the city is known by, whole in both crops at sunset, over a sunset at Clam Pass whose subject is a sailboat run aground (623px tall at 2400 wide), a canal-side villa whose roof the deal page's crops cut under a white sky, the Gulf over a railing, a dolphin and four press photographs of officials on the damaged pier.
   "cbsa:34940": {
