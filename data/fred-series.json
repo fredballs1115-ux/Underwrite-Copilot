@@ -60,7 +60,7 @@
     { "id": "PERMIT5", "short": "Permits, 5+ units", "label": "New Privately-Owned Housing Units Authorized: 5 Units or More (thousands, annual rate)", "group": "housing", "cadence": "monthly", "freshDays": 100, "unit": "count", "contractRate": false },
     { "id": "COMPU5MUSA", "short": "Completions, 5+ units", "label": "New Privately-Owned Housing Units Completed: 5 Units or More (thousands, annual rate)", "group": "housing", "cadence": "monthly", "freshDays": 100, "unit": "count", "contractRate": false },
     { "id": "HOUST", "short": "Starts, all", "label": "New Privately-Owned Housing Units Started: Total (thousands, annual rate)", "group": "housing", "cadence": "monthly", "freshDays": 100, "unit": "count", "contractRate": false },
-    { "id": "RRVRUSQ156N", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the United States (Housing Vacancy Survey)", "group": "housing", "cadence": "quarterly", "freshDays": 300, "unit": "pts", "contractRate": false }
+    { "id": "RRVRUSQ156N", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the United States (Housing Vacancy Survey)", "group": "housing", "cadence": "quarterly", "freshDays": 240, "unit": "pts", "contractRate": false }
   ],
   "metroSeries": [
     { "id": "WASH911URN", "metro": "dc", "metric": "unemployment", "area": "Washington MSA", "short": "Unemployment", "label": "Unemployment Rate in Washington-Arlington-Alexandria, DC-VA-MD-WV (MSA)", "cadence": "monthly", "freshDays": 110, "unit": "pts" },
@@ -523,10 +523,10 @@
     "newark_jc": "nyc"
   },
   "regionSeries": [
-    { "id": "RRVRNEQ156N", "metro": "northeast", "metric": "rental_vacancy", "area": "Northeast Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the Northeast Census Region", "cadence": "quarterly", "freshDays": 300, "unit": "pts" },
-    { "id": "RRVRMWQ156N", "metro": "midwest", "metric": "rental_vacancy", "area": "Midwest Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the Midwest Census Region", "cadence": "quarterly", "freshDays": 300, "unit": "pts" },
-    { "id": "RRVRSOQ156N", "metro": "south", "metric": "rental_vacancy", "area": "South Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the South Census Region", "cadence": "quarterly", "freshDays": 300, "unit": "pts" },
-    { "id": "RRVRWEQ156N", "metro": "west", "metric": "rental_vacancy", "area": "West Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the West Census Region", "cadence": "quarterly", "freshDays": 300, "unit": "pts" }
+    { "id": "RRVRNEQ156N", "metro": "northeast", "metric": "rental_vacancy", "area": "Northeast Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the Northeast Census Region", "cadence": "quarterly", "freshDays": 240, "unit": "pts" },
+    { "id": "RRVRMWQ156N", "metro": "midwest", "metric": "rental_vacancy", "area": "Midwest Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the Midwest Census Region", "cadence": "quarterly", "freshDays": 240, "unit": "pts" },
+    { "id": "RRVRSOQ156N", "metro": "south", "metric": "rental_vacancy", "area": "South Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the South Census Region", "cadence": "quarterly", "freshDays": 240, "unit": "pts" },
+    { "id": "RRVRWEQ156N", "metro": "west", "metric": "rental_vacancy", "area": "West Census region", "short": "Rental vacancy", "label": "Rental Vacancy Rate in the West Census Region", "cadence": "quarterly", "freshDays": 240, "unit": "pts" }
   ],
   "metroRegions": {
     "dc": "south",

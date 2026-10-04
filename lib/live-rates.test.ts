@@ -111,8 +111,13 @@ describe("the series table", () => {
     // year and published the March after the year ends, so it is fourteen
     // months old on arrival and twenty-six when the next one lands.
     const floor = { daily: 4, weekly: 8, monthly: 90, quarterly: 250, annual: 700 } as const;
+    // The Housing Vacancy Survey releases a quarter late in the month after
+    // it ends (.github/workflows/hvs.yml), a month sooner than the quarterly
+    // series the floor is set for, so its newest figure is at most about 220
+    // days old: the survey's one freshness, 240 days, clears it.
+    const survey = /^RRVR(?:US|NE|MW|SO|WE)Q156N$/;
     for (const s of SERIES) {
-      expect(s.freshDays, s.id).toBeGreaterThanOrEqual(floor[s.cadence]);
+      expect(s.freshDays, s.id).toBeGreaterThanOrEqual(survey.test(s.id) ? 240 : floor[s.cadence]);
     }
   });
 
@@ -652,6 +657,19 @@ describe("a covered metro's own series", () => {
       expect(m.contractRate).toBe(false);
       expect(m.area.length, m.id).toBeGreaterThan(3);
       expect([...COVERED, ...READ_ONLY], m.id).toContain(m.metro);
+    }
+  });
+
+  it("holds the Housing Vacancy Survey's quarterly figures to one freshness, the nation's, the regions' and the metros' alike (the audit of 2026-10-04)", () => {
+    // The nation's and the regions' went stale at 300 days and the metros'
+    // at 240, so tiles from one survey went stale at different ages.
+    const survey = [...SERIES, ...REGION_SERIES, ...METRO_SERIES].filter(
+      (s) => /^RRVR(?:US|NE|MW|SO|WE)Q156N$/.test(s.id) || /^HVS_RVR_\d+$/.test(s.id),
+    );
+    expect(survey.length).toBeGreaterThanOrEqual(5 + 40);
+    for (const s of survey) {
+      expect(s.cadence, s.id).toBe("quarterly");
+      expect(s.freshDays, s.id).toBe(240);
     }
   });
 
