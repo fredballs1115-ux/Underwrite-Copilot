@@ -664,6 +664,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Bend, OR",
     size: [4000, 3000],
   },
+  // Binghamton, NY: skyline-sheet run 36818942891 — downtown from the air on its river in warm summer light, wooded hills and a blue sky behind, an oblique with a horizon, sharp and whole in both crops; over a campus building behind streetlamps, the skyline small behind trees and power lines, and two hazy frames over pylons, wires and a wall.
+  "cbsa:13780": {
+    file: "Binghamton, New York skyline.jpg",
+    place: "Downtown Binghamton from above on its river, wooded hills behind, under a blue sky",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Binghamton, NY",
+    size: [8064, 5832],
+  },
   // Birmingham, AL: skyline-sheet run 36754192984 — the Alabama article's lead, sharp under a clear sky, every tower whole on the card and the deal page's crop; the first run searched Birmingham, England's categories.
   "cbsa:13820": {
     file: "Birmingham, Alabama.jpg",
@@ -1554,6 +1564,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Roanoke, VA",
     size: [2668, 1808],
   },
+  // Rochester, MN: skyline-sheet run 36818844258 — the Mayo Clinic the city is known by, its carved stone tower against a clear blue sky between the clinic's blocks, a strip whose full height both crops keep; over the same frame before its crop above a brick wall, three drone frames whose cards are flat roofs and parking lots, towers mirrored in a winter river whose white tower's crown the 21:9 cuts, and the clinic's blocks over houses' roofs.
+  "cbsa:40340": {
+    file: "Mayo Clinic skyline2 (cropped).jpg",
+    place: "The Mayo Clinic in downtown Rochester, its carved stone tower against a clear blue sky",
+    credit: "Michael Hicks from Saint Paul, MN, USA",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Rochester, MN",
+    size: [3236, 896],
+  },
   // Rochester, NY: skyline-sheet run 36781253352 — a one-market run's pick of twenty-four; the six-market sheet held an airport, a dated overhead and a washed-out sky.
   "cbsa:40380": {
     file: "Skyline Rochester, NY.jpg",
@@ -1825,6 +1845,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Honolulu, HI",
     size: [6000, 4000],
+  },
+  // Utica-Rome, NY: skyline-sheet run 36818942891 — an article's lead, Union Station's stone corner under a blue sky with white cloud, sharp, whole on the card and at 16:9, the near corner's top just past the 21:9's edge; over downtown from a drone in soft evening light, its card a lawn, rail tracks and parking lots, the harbor lock's gantry under poles, a stamp's first-day cover and highway signs.
+  "cbsa:46540": {
+    file: "Utica Union Station, New York.jpg",
+    place: "Utica's Union Station under a blue sky with white cloud",
+    credit: "Kenneth C. Zirkel",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Utica-Rome, NY",
+    size: [3600, 1904],
   },
   // Vallejo, CA: skyline-sheet run 36787230817 — the ferries and the old brick waterfront whole in both crops under a grey sky, over aerials, a theme park's coasters and San Francisco's Golden Gate.
   "cbsa:46700": {

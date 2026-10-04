@@ -5539,6 +5539,12 @@
         "Rochester Minnesota skyline",
         "Rochester Minnesota downtown",
         "Mayo Clinic Rochester"
+      ],
+      "candidates": [
+        {
+          "file": "Mayo Clinic skyline2 (cropped).jpg",
+          "note": "Rochester, MN — Michael Hicks from Saint Paul, MN, USA, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36818844258)."
+        }
       ]
     },
     {
@@ -5640,6 +5646,12 @@
         "Binghamton New York skyline",
         "Binghamton New York downtown",
         "Binghamton Susquehanna River"
+      ],
+      "candidates": [
+        {
+          "file": "Binghamton, New York skyline.jpg",
+          "note": "Binghamton, NY — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36818942891)."
+        }
       ]
     },
     {
@@ -5661,6 +5673,12 @@
         "Utica New York skyline",
         "Utica New York downtown",
         "Utica New York Genesee Street"
+      ],
+      "candidates": [
+        {
+          "file": "Utica Union Station, New York.jpg",
+          "note": "Utica-Rome, NY — Kenneth C. Zirkel, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36818942891)."
+        }
       ]
     },
     {
