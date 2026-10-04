@@ -319,6 +319,15 @@ const NON_STABILIZED: ReadonlySet<StrategyKind> = new Set([
 export const isPlanDeal = (kind: StrategyKind): boolean => NON_STABILIZED.has(kind);
 
 /**
+ * Whether the deal's kind says the building is not yet delivered — a
+ * ground-up development (a build-to-suit or a forward purchase is read as
+ * one), or a conversion whose new use comes with the works — so a lease
+ * signed for it begins at delivery, not today. A lease-up's building
+ * stands, and a value-add's or a stabilized one is delivered.
+ */
+export const notYetDelivered = (kind: StrategyKind): boolean => kind === "development" || kind === "conversion";
+
+/**
  * Whether the deal builds something, so what building costs speaks to it:
  * a development or a conversion, or a value-add that states its budget (in
  * total, or a door at a time). A lease-up's building is already built, and

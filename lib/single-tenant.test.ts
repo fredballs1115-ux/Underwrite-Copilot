@@ -192,9 +192,53 @@ describe("readSingleTenant — the one lease the deal is", () => {
   it("a count of years is counted from today and said to be possibly short", () => {
     const r = readSingleTenant(ex([row("Lease term remaining", "9.5 years")]), TODAY)!;
     expect(r.term?.from).toBe("remaining");
+    expect(r.startsAtDelivery).toBe(false);
     expect(r.headline).toContain(
       "The memorandum states 9.5 years left on the lease; counted from today they run to about Mar 2036, and its own date is earlier, so the term may be shorter.",
     );
+    expect(singleTenantShortLine(r)).toContain("the lease ends Mar 2036, 9.5 years from today");
+  });
+
+  // Research pass 23: a build-to-suit or a forward purchase read as a
+  // development leases a building that is not yet delivered — its term
+  // begins at delivery, so "counted from today … may be shorter" said it
+  // backwards.
+  it("on a building not yet delivered, a count of years runs from the lease's start, never from today", () => {
+    const bts = (kind: "development" | "conversion" | "stabilized" | "lease_up") =>
+      readSingleTenant(
+        ex([row("Lease term remaining", "15 years"), row("Rent increases", "1.5% annually")], {
+          dealName: "Amazon build-to-suit",
+          strategy: { kind, summary: "A build-to-suit distribution center leased to Amazon, delivered in 2027", capitalBudget: "", timeline: "" },
+        }),
+        TODAY,
+      )!;
+    const dev = bts("development");
+    expect(dev.startsAtDelivery).toBe(true);
+    expect(dev.headline).toContain(
+      "The memorandum states 15 years on the lease; the building is not yet delivered, so the term is counted from the lease's start, not from today.",
+    );
+    expect(dev.headline).not.toContain("may be shorter");
+    expect(dev.headline).not.toContain("counted from today");
+    expect(singleTenantShortLine(dev)).toContain("15 years on the lease, counted from its start — the building is not yet delivered");
+    expect(singleTenantShortLine(dev)).not.toContain("from today");
+    expect(singleTenantNote(dev)).toContain("(b) THE TERM AT THE EXIT — 15 years as stated, counted from the lease's start, not today, since the building is not yet delivered");
+    expect(singleTenantContextLine(dev)).not.toContain("may be shorter");
+    expect(gluedWords(`${dev.headline} ${singleTenantShortLine(dev)}`)).toEqual([]);
+    // A conversion's new use comes with the works too.
+    expect(bts("conversion").headline).toContain("counted from the lease's start, not from today");
+    // A building that stands — stabilized, or a lease-up — keeps today's count and its caution.
+    for (const kind of ["stabilized", "lease_up"] as const) {
+      const r = bts(kind);
+      expect(r.startsAtDelivery, kind).toBe(false);
+      expect(r.headline, kind).toContain("counted from today they run to about");
+      expect(r.headline, kind).toContain("so the term may be shorter");
+    }
+    // A stated date is a date, delivered or not.
+    const dated = readSingleTenant(
+      ex([row("Lease expiration", "March 31, 2042")], { strategy: { kind: "development", summary: "", capitalBudget: "", timeline: "" } }),
+      TODAY,
+    )!;
+    expect(dated.headline).toContain("The lease ends Mar 2042, 15.5 years from today.");
   });
 
   it("a passed end, and no end, are said as what they are", () => {
