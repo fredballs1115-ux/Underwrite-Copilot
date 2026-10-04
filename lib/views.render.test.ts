@@ -7070,6 +7070,17 @@ describe("SalePanel — how the property is sold, drawn", () => {
     const negotiated = auction({ method: "negotiated" }, [row("Asking price", "$4,000,000")]);
     expect(render(React.createElement(SalePanel, { sale: readSale(negotiated, AS_OF) }))).toBe(render(React.createElement(React.Fragment)));
   });
+
+  it("a short sale draws its chip and says the lender must approve it (research pass 23)", () => {
+    const short = auction({ method: "short_sale", terms: "Subject to lender approval", condition: "" }, [row("Asking price", "$4,000,000")]);
+    const html = render(React.createElement(SalePanel, { sale: readSale(short, AS_OF) }));
+    const text = visibleText(html);
+    expect(text).toContain("Short sale");
+    expect(text).toContain("It is a short sale: the owner is selling for less than its loan's balance, so its lender must approve the sale");
+    expect(html).not.toContain('data-bar="sale-bid"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
 });
 
 describe("ShareView — how the property is sold, under the title (#456)", () => {

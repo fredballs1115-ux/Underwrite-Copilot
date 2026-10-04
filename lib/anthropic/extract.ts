@@ -8,6 +8,7 @@ import { ANALYST_SYSTEM, extractionInstruction } from "./prompts";
 import { omDocument, omRequestOptions, type OmSource } from "./om-source";
 import { todayLine } from "./today";
 import type { AssetClass, ExtractionResult } from "./types";
+import { SALE_METHODS } from "@/lib/sale-terms";
 
 // The schema Claude must fill. `zodOutputFormat` turns this into a strict
 // JSON-schema the model is FORCED to match, so the result is always valid —
@@ -87,11 +88,12 @@ const ExtractionSchema = z.object({
     page: z.string(),
   }),
   // HOW THE PROPERTY IS SOLD (#456): negotiated, at auction, by a
-  // receiver, out of a bankruptcy or by a lender (REO) — with its terms and
-  // the condition it is sold in, as stated. The auction's figures are rows.
-  // Read by lib/sale-terms.
+  // receiver, out of a bankruptcy, by a lender (REO) or as a short sale its
+  // lender must approve — with its terms and the condition it is sold in,
+  // as stated. The auction's figures are rows. Read by lib/sale-terms, whose
+  // own list of methods (SALE_METHODS) is the enum, so the two cannot drift.
   sale: z.object({
-    method: z.enum(["negotiated", "auction", "receivership", "bankruptcy", "reo", "unknown"]),
+    method: z.enum(SALE_METHODS),
     terms: z.string(),
     condition: z.string(),
     page: z.string(),

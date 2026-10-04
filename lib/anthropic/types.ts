@@ -257,8 +257,9 @@ export interface ExtractedTenant {
   page: string;
 }
 
-/** How a property is sold (#456). */
-export type SaleMethod = "negotiated" | "auction" | "receivership" | "bankruptcy" | "reo" | "unknown";
+/** How a property is sold (#456) — a short sale is the owner's, for less
+ *  than its loan's balance, with its lender's consent. */
+export type SaleMethod = "negotiated" | "auction" | "receivership" | "bankruptcy" | "reo" | "short_sale" | "unknown";
 
 /** The sale as the OM states it — every field a string, "" where it
  *  states none. The auction's figures (the starting bid, the reserve, the

@@ -29,7 +29,9 @@
 // A RECEIVER, A TRUSTEE OR A LENDER IS NOT AN OWNER. The seller never ran
 // the building: it sells as-is, gives no representations, holds thin
 // records, and a court's approval or an overbid can follow the winning
-// bid.
+// bid. A short sale's seller IS the owner, but sells for less than its
+// loan's balance, so its lender's approval decides the price and whether it
+// closes at all.
 //
 // A BLANK IS NULL. A bid, a premium or a deadline the memorandum does not
 // state is not assumed, and a negotiated sale says nothing here.
@@ -63,16 +65,22 @@ const NO_STALKING = /^(?:none|no|nil|n\/?a|not\s+(?:applicable|stated))\b|^[-–
 const NO_RESERVE = /\bno\s+reserve\b|\babsolute\b|\bwithout\s+reserve\b|\bnone\b/i;
 const UNDISCLOSED = /\bundisclosed\b|\bnot\s+disclosed\b|\bconfidential\b|\bunpublished\b/i;
 
-const METHODS: SaleMethod[] = ["negotiated", "auction", "receivership", "bankruptcy", "reo", "unknown"];
-
 const METHOD_LABEL: Record<SaleMethod, string> = {
   negotiated: "A negotiated sale",
   auction: "An auction",
   receivership: "A receiver's sale",
   bankruptcy: "A bankruptcy sale",
   reo: "A lender's sale of a property it took back (REO)",
+  short_sale: "A short sale",
   unknown: "The sale",
 };
+
+/** Every way a property can be said to be sold, in one list: the label
+ *  record above holds every `SaleMethod` (the compiler sees to it), and the
+ *  extraction's enum reads this list (lib/anthropic/extract), so the schema,
+ *  the type and the reader cannot drift apart. */
+export const SALE_METHODS = Object.keys(METHOD_LABEL) as [SaleMethod, ...SaleMethod[]];
+const METHODS: readonly SaleMethod[] = SALE_METHODS;
 
 const clean = (s: string | null | undefined) => (s ?? "").trim();
 const pageIn = (page: string | undefined, pageCount: number | null) => {
@@ -284,6 +292,11 @@ const SELLER_SENTENCE: Partial<Record<SaleMethod, string>> = {
   bankruptcy:
     "It is sold out of a bankruptcy: the court approves the sale, a stalking-horse bid can set the floor, and higher bids can reopen it until the court rules.",
   reo: "The lender that took it back is selling it: it never ran the building either, sells as-is, and discloses only what it knows.",
+  // A short sale (research pass 23): the owner sells, for less than its
+  // loan's balance, so the lender must consent — said as what the sale is,
+  // with what to ask, and never a rule of law.
+  short_sale:
+    "It is a short sale: the owner is selling for less than its loan's balance, so its lender must approve the sale — the price the lender will take, and when it decides, are the lender's, and the seller cannot promise to close.",
 };
 
 function sentencesOf(r: SaleFacts): string[] {
@@ -329,7 +342,8 @@ export function ceilingBidLine(r: SaleRead, maxAllIn: number | null, hurdlePct: 
 }
 
 /** The pipeline row's tag: "Auction, 5% premium", "Auction",
- *  "Receivership sale", "Bankruptcy sale", "Bank-owned (REO)". */
+ *  "Receivership sale", "Bankruptcy sale", "Bank-owned (REO)", "Short
+ *  sale". */
 export function saleTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const r = readSale(ex, asOf);
   if (!r) return null;
@@ -342,6 +356,8 @@ export function saleTag(ex: ExtractionResult | null | undefined, asOf: Date = ne
       return "Bankruptcy sale";
     case "reo":
       return "Bank-owned (REO)";
+    case "short_sale":
+      return "Short sale";
     default:
       return null;
   }
@@ -357,6 +373,7 @@ export function saleShortLine(r: SaleRead): string {
     receivership: "Sold by a court-appointed receiver, as-is",
     bankruptcy: "Sold out of a bankruptcy, subject to the court",
     reo: "Sold by the lender that took it back (REO), as-is",
+    short_sale: "A short sale, subject to the lender's approval",
     negotiated: "",
     unknown: "Sold on the terms stated",
   };
@@ -399,6 +416,18 @@ export function saleNote(r: SaleRead): string {
         ? "(d) THE RESERVE — undisclosed: the seller can refuse any bid under it, so the starting bid is not an offer to sell at that figure"
         : "(d) THE RESERVE — ask whether one exists and whether the seller may bid against the buyers",
     );
+  } else if (r.method === "short_sale") {
+    // The owner sells, but its lender decides (research pass 23): each a
+    // question to put, never a rule of law.
+    traps.push(
+      "(a) THE LENDER'S CONSENT AND ITS TIMING — ask whether the lender has approved this sale in writing, and how long its review takes: a contract signed before it is an offer the seller cannot promise to honour",
+    );
+    traps.push(
+      "(b) THE PRICE THE LENDER APPROVES — the lender, not the seller, decides what it will take: ask what it has approved, and whether a reappraisal or a higher offer can move it after the contract is signed",
+    );
+    traps.push(
+      "(c) THE SELLER CANNOT PROMISE TO CLOSE — every date in the contract waits on the lender: weigh the deposit, the diligence spend and any rate lock against a sale that may not happen",
+    );
   } else {
     traps.push("(a) THE SELLER NEVER RAN IT — the figures are the receiver's, the trustee's or the lender's reconstruction: rebuild the rent roll and the T-12 from source, and price the deferred maintenance an absent owner leaves");
     traps.push("(b) AS-IS — no representations or warranties survive the closing: the diligence is the buyer's alone, before the bid");
@@ -409,6 +438,13 @@ export function saleNote(r: SaleRead): string {
           ? "(c) THE COURT — the receiver's sale can need the court's approval, and a higher offer can reopen it"
           : "(c) THE LENDER'S TERMS — a lender's contract is its own form: read its limits on disclosure, its deposit and its remedies",
     );
+    // How a lender came to own it decides what came with the title — asked,
+    // never assumed (research pass 23).
+    if (r.method === "reo") {
+      traps.push(
+        "(d) HOW THE LENDER TOOK TITLE — ask whether it came by a foreclosure or by a deed in lieu: a deed in lieu typically leaves junior liens in place, so check the title commitment for what survives",
+      );
+    }
   }
   return `${saleContextLine(r)}\n\nSALE TRAPS, checked by name against the facts above: ${traps.join("; ")}.`;
 }

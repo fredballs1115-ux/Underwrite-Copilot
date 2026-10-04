@@ -197,6 +197,56 @@ describe("the sale on every summary", () => {
     const receiver = saleNote(readSale(ex([], { method: "receivership" }), TODAY)!);
     expect(receiver).toContain("(a) THE SELLER NEVER RAN IT");
     expect(receiver).toContain("(c) THE COURT — the receiver's sale can need the court's approval");
+    expect(receiver).not.toContain("HOW THE LENDER TOOK TITLE");
     expect(gluedWords(note)).toEqual([]);
+  });
+});
+
+// Research pass 23: a short sale was no sale method, so the lender's
+// consent went unsaid; and the bank-owned traps never asked how the lender
+// came to own the building.
+describe("a short sale, and how a lender took title", () => {
+  it("a short sale says the lender must approve it, the price and the timing being the lender's", () => {
+    const r = readSale(ex([], { method: "short_sale", terms: "Subject to lender approval; 60-day close after approval" }), TODAY)!;
+    expect(r.method).toBe("short_sale");
+    expect(r.label).toBe("A short sale");
+    expect(r.headline).toBe(
+      "It is a short sale: the owner is selling for less than its loan's balance, so its lender must approve the sale — the price the lender will take, and when it decides, are the lender's, and the seller cannot promise to close.",
+    );
+    expect(saleTag(ex([], { method: "short_sale" }), TODAY)).toBe("Short sale");
+    expect(saleShortLine(r)).toBe("A short sale, subject to the lender's approval");
+    expect(saleContextLine(r)).toContain("The sale's terms as stated: Subject to lender approval; 60-day close after approval.");
+    const note = saleNote(r);
+    expect(note).toContain("(a) THE LENDER'S CONSENT AND ITS TIMING — ask whether the lender has approved this sale in writing");
+    expect(note).toContain("(b) THE PRICE THE LENDER APPROVES — the lender, not the seller, decides what it will take");
+    expect(note).toContain("(c) THE SELLER CANNOT PROMISE TO CLOSE");
+    // The owner ran the building: the receiver's and the lender's traps are not this sale's.
+    expect(note).not.toContain("THE SELLER NEVER RAN IT");
+    expect(gluedWords(`${r.headline} ${note}`)).toEqual([]);
+  });
+
+  it("a bank-owned sale asks how the lender took title, as a question to check", () => {
+    const note = saleNote(readSale(ex([], { method: "reo" }), TODAY)!);
+    expect(note).toContain(
+      "(d) HOW THE LENDER TOOK TITLE — ask whether it came by a foreclosure or by a deed in lieu: a deed in lieu typically leaves junior liens in place, so check the title commitment for what survives",
+    );
+    expect(note).toContain("(c) THE LENDER'S TERMS");
+  });
+
+  it("the extraction's enum, the type and the reader are one list, and the prompt names every method", async () => {
+    const { SALE_METHODS } = await import("./sale-terms");
+    const { extractionInstruction } = await import("./anthropic/prompts");
+    const { readFileSync } = await import("node:fs");
+    expect(SALE_METHODS).toEqual(["negotiated", "auction", "receivership", "bankruptcy", "reo", "short_sale", "unknown"]);
+    // The schema reads the reader's own list, never a copy of it.
+    expect(readFileSync("lib/anthropic/extract.ts", "utf8")).toContain("method: z.enum(SALE_METHODS)");
+    const prompt = extractionInstruction("multifamily" as never);
+    for (const m of SALE_METHODS) expect(prompt, m).toContain(`"${m}"`);
+    // Every method the extraction may write is read: none but a negotiated
+    // sale (and an unknown one with no auction figures) reads as nothing.
+    for (const m of SALE_METHODS) {
+      const read = readSale(ex([], { method: m }), TODAY);
+      expect(read === null, m).toBe(m === "negotiated" || m === "unknown");
+    }
   });
 });

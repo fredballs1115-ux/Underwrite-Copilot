@@ -25,6 +25,7 @@ const METHOD_CHIP: Record<SaleRead["method"], string> = {
   receivership: "Receiver's sale",
   bankruptcy: "Bankruptcy sale",
   reo: "Lender-owned (REO)",
+  short_sale: "Short sale",
   negotiated: "",
   unknown: "Sale terms",
 };
