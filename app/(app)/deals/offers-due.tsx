@@ -3,12 +3,15 @@
 import { useRef } from "react";
 import { setOffersDue } from "./actions";
 
-// "Today" for deadline math, captured once at module load (render must stay
-// pure). Pinned to UTC like the table dates; a page load refreshes it.
-const TODAY_UTC = (() => {
-  const now = new Date();
-  return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-})();
+// "Today" is the server page's, read once per request and handed in
+// (`today`), never read here: a module-level capture was read once per
+// server process, so every server render counted days from the day the
+// process started — four days in, a deal due in three read "Offers due in
+// 7d" in grey — and the browser kept the server's text. One prop means the
+// server's markup and the browser's first render are the same day. The
+// day is UTC's, as the table's dates, the tasks and the digest are: from
+// 8 pm Eastern a deal due tomorrow (UTC) reads "today" on every surface
+// alike, never one way on the badge and another on the page.
 
 function fmtDue(iso: string): string {
   return new Date(iso + "T00:00:00Z").toLocaleDateString("en-US", {
@@ -18,16 +21,18 @@ function fmtDue(iso: string): string {
   });
 }
 
-/** Days from today (UTC) to the call-for-offers date: negative = overdue. */
-export function daysUntil(isoDate: string): number {
+/** Days from `today` (a UTC day, yyyy-mm-dd) to the call-for-offers date:
+ *  negative = overdue. */
+export function daysUntil(isoDate: string, today: string): number {
   return Math.round(
-    (Date.parse(isoDate + "T00:00:00Z") - TODAY_UTC) / 86_400_000,
+    (Date.parse(isoDate + "T00:00:00Z") - Date.parse(today + "T00:00:00Z")) / 86_400_000,
   );
 }
 
-/** Colored "Offers due …" fragment — urgency at a glance. */
-export function OffersDueBit({ iso }: { iso: string }) {
-  const d = daysUntil(iso);
+/** Colored "Offers due …" fragment — urgency at a glance, counted from the
+ *  page's `today` (a UTC day, yyyy-mm-dd). */
+export function OffersDueBit({ iso, today }: { iso: string; today: string }) {
+  const d = daysUntil(iso, today);
   const cls = d < 0 ? "text-kill" : d <= 5 ? "text-caution" : "text-muted";
   const text =
     d < 0
@@ -39,13 +44,7 @@ export function OffersDueBit({ iso }: { iso: string }) {
           : d <= 14
             ? `Offers due in ${d}d`
             : `Offers due ${fmtDue(iso)}`;
-  // suppressHydrationWarning: server and client render across a midnight
-  // boundary can disagree by a day — cosmetic, never worth a hydration error.
-  return (
-    <span suppressHydrationWarning className={`font-medium ${cls}`}>
-      {text}
-    </span>
-  );
+  return <span className={`font-medium ${cls}`}>{text}</span>;
 }
 
 /** The broker's call-for-offers date — a small date control that saves on
@@ -55,11 +54,14 @@ export function OffersDueBit({ iso }: { iso: string }) {
 export function OffersDueControl({
   dealId,
   value,
+  today,
   fromMemorandum = null,
   calendarHref = null,
 }: {
   dealId: string;
   value: string | null;
+  /** the page's day (UTC, yyyy-mm-dd), read once per request */
+  today: string;
   /** where the date is the memorandum's own: its page, or "" where the
    *  page is not one the memorandum has; null where the date is not */
   fromMemorandum?: string | null;
@@ -67,7 +69,7 @@ export function OffersDueControl({
   calendarHref?: string | null;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
-  const d = value ? daysUntil(value) : null;
+  const d = value ? daysUntil(value, today) : null;
   const tone =
     d == null
       ? "border-line text-muted"
@@ -88,7 +90,7 @@ export function OffersDueControl({
       }
     >
       <input type="hidden" name="dealId" value={dealId} />
-      <span suppressHydrationWarning className="whitespace-nowrap">
+      <span className="whitespace-nowrap">
         {value
           ? d != null && d < 0
             ? "Offers were due"

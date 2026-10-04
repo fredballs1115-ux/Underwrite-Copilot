@@ -116,6 +116,10 @@ const CARDS: DealCard[] = [
 ];
 
 const BILLING = { isPro: false, canCreateDeal: true, allowance: dealAllowance({ plan: "free", dealCount: 1, team: null }) };
+// The page's day, read once per request by the pipeline page and handed to
+// the list: every offers-due countdown counts from it (the Maddox's offers
+// are due two days on).
+const TODAY = "2026-09-28";
 
 /**
  * The cards as the pipeline page hands them over (#442): each row's
@@ -194,7 +198,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         errorMessage: null,
         notice: null,
         onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
-        billing: BILLING,
+        billing: BILLING, todayIso: TODAY,
         initialView: "list",
       }),
     );
@@ -356,7 +360,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         errorMessage: null,
         notice: null,
         onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
-        billing: BILLING,
+        billing: BILLING, todayIso: TODAY,
       }),
     );
     expect(a11yIssues(html)).toEqual([]);
@@ -425,7 +429,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         errorMessage: null,
         notice: null,
         onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
-        billing: BILLING,
+        billing: BILLING, todayIso: TODAY,
       }),
     );
     dumpView("pipeline-cards", html);
@@ -564,7 +568,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         errorMessage: null,
         notice: null,
         onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
-        billing: BILLING,
+        billing: BILLING, todayIso: TODAY,
       }),
     );
     dumpView("pipeline-cards-market", html);
@@ -592,7 +596,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
       errorMessage: null,
       notice: null,
       onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
-      billing: BILLING,
+      billing: BILLING, todayIso: TODAY,
     };
     const cards = render(React.createElement(Pipeline, props));
     expect(cards).toContain('<option value="due:asc">Offers due, earliest</option>');
@@ -610,7 +614,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         notice: null,
         openNew: "1",
         onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
-        billing: BILLING,
+        billing: BILLING, todayIso: TODAY,
       }),
     );
     expect(a11yIssues(html), "a11y new-deal form").toEqual([]);
@@ -642,7 +646,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
         errorMessage: null,
         notice: null,
         onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
-        billing: BILLING,
+        billing: BILLING, todayIso: TODAY,
         initialView: "map",
       }),
     );
@@ -675,7 +679,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
           errorMessage: null,
           notice: null,
           onboarding: { hasBuyBox: false, sampleId: null, hasScreenedOm: false },
-          billing: BILLING,
+          billing: BILLING, todayIso: TODAY,
         }),
       );
     dumpView("pipeline-empty", emptyHtml);
@@ -696,6 +700,7 @@ describe("Pipeline — every card shape renders and reads clean", () => {
           notice: "Your deal was saved.",
           onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
           billing: { isPro: false, canCreateDeal: false, allowance: dealAllowance({ plan: "free", dealCount: 3, team: null }) },
+          todayIso: TODAY,
         }),
       );
     dumpView("pipeline-at-limit", atLimitHtml);
@@ -713,6 +718,7 @@ describe("Pipeline — the free-deal meter counts what the create action counts 
     errorMessage: null,
     notice: null,
     onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
+    todayIso: TODAY,
   };
   // The link to /billing that carries the count in its title.
   const meter = (html: string) => html.match(/<a\b(?=[^>]*\shref="\/billing")(?=[^>]*\stitle=")[^>]*>[\s\S]*?<\/a>/)?.[0] ?? "";
@@ -760,7 +766,7 @@ describe("Pipeline — a team reader's own deal says the team does not see it (l
     errorMessage: null,
     notice: null,
     onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
-    billing: BILLING,
+    billing: BILLING, todayIso: TODAY,
   };
   const mine = card({ id: "m", name: "Elm Street Lofts", personal: true, slots: { cap: "6.0%", price: "$14,000,000", yoc: null } });
   const shared = card({
@@ -817,7 +823,7 @@ describe("Pipeline — a deal screened again shows the run, never the call it is
     errorMessage: null,
     notice: null,
     onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
-    billing: BILLING,
+    billing: BILLING, todayIso: TODAY,
   };
 
   it("says Re-screening on the card and the row, with the previous call in the title", () => {
@@ -847,7 +853,7 @@ describe("Pipeline — a note's card withholds the collateral's cap (the audit o
     errorMessage: null,
     notice: null,
     onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
-    billing: BILLING,
+    billing: BILLING, todayIso: TODAY,
   };
   // The slots as lib/pipeline-slots reads a note: the collateral's cap is
   // withheld, and the note's yield to maturity stands in its place.
@@ -883,7 +889,7 @@ describe("Pipeline — a first screen's card reads the first signal, as the deal
     errorMessage: null,
     notice: null,
     onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
-    billing: BILLING,
+    billing: BILLING, todayIso: TODAY,
   };
   // The slots as lib/pipeline-slots reads a deal with a first signal and no
   // extraction yet (its ask, nothing else), and a fit judged on the signal;
@@ -979,7 +985,7 @@ describe("Pipeline — its loading state, and the reads that stream after it", (
         errorMessage: null,
         notice: null,
         onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true },
-        billing: BILLING,
+        billing: BILLING, todayIso: TODAY,
       }),
     );
     const grid = cards.match(/<ul class="stagger ([^"]*)" data-view="cards">/)?.[1];
@@ -7608,7 +7614,7 @@ describe("ShareView — the third-party reports (#465)", () => {
 });
 
 import { ListingTeam } from "@/app/(app)/deals/[id]/listing-team";
-import { OffersDueControl } from "@/app/(app)/deals/offers-due";
+import { OffersDueBit, OffersDueControl, daysUntil } from "@/app/(app)/deals/offers-due";
 import { listingTeamOf, offersDueOf } from "@/lib/offering";
 
 describe("The offering (#467) — the brokers to call and when offers are due", () => {
@@ -7646,7 +7652,7 @@ describe("The offering (#467) — the brokers to call and when offers are due", 
 
   it("marks the memorandum's own date in the header and offers it to a calendar", () => {
     const html = render(
-      React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-15", fromMemorandum: "p. 2", calendarHref: "/api/deals/d1/offers-due.ics" }),
+      React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-15", today: TODAY, fromMemorandum: "p. 2", calendarHref: "/api/deals/d1/offers-due.ics" }),
     );
     expect(a11yIssues(html), "a11y deadline control").toEqual([]);
     expect(html).toContain('data-qa="offers-due-om"');
@@ -7654,10 +7660,60 @@ describe("The offering (#467) — the brokers to call and when offers are due", 
     expect(html).toContain('href="/api/deals/d1/offers-due.ics"');
     expect(html).toContain('aria-label="Add the offers-due date to your calendar"');
     // A date the reader typed is theirs: no mark; no date, no calendar file.
-    const typed = render(React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-20", calendarHref: "/api/deals/d1/offers-due.ics" }));
+    const typed = render(React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-20", today: TODAY, calendarHref: "/api/deals/d1/offers-due.ics" }));
     expect(typed).not.toContain('data-qa="offers-due-om"');
-    const none = render(React.createElement(OffersDueControl, { dealId: "d1", value: null, calendarHref: null }));
+    const none = render(React.createElement(OffersDueControl, { dealId: "d1", value: null, today: TODAY, calendarHref: null }));
     expect(none).not.toContain("offers-due.ics");
+  });
+});
+
+describe("the offers-due countdown counts from the page's day, read once per request", () => {
+  // The badge had counted from a day captured when the module loaded — once
+  // a server process — so four days into a process a deal due in three read
+  // "Offers due in 7d" in grey, and the browser kept the server's text.
+  const bit = (iso: string, today: string) => renderToStaticMarkup(React.createElement(OffersDueBit, { iso, today }));
+  const words = (html: string) => visibleText(html).trim();
+
+  it("draws a deadline three days on as due in 3d, in the urgent tone", () => {
+    // A day well away from the clock this runs on: the badge is the page's
+    // day's, whatever the machine's.
+    const html = bit("2027-02-11", "2027-02-08");
+    expect(words(html)).toBe("Offers due in 3d");
+    expect(html).toContain("text-caution");
+    expect(html).not.toContain("text-muted");
+    // The header's control reads the same day, in the same tone.
+    const control = render(React.createElement(OffersDueControl, { dealId: "d1", value: "2027-02-11", today: "2027-02-08" }));
+    expect(control).toContain("border-caution/40 text-caution");
+  });
+
+  it("gives two days two answers from the same module", () => {
+    expect(daysUntil("2026-10-07", "2026-10-04")).toBe(3);
+    expect(daysUntil("2026-10-07", "2026-09-30")).toBe(7);
+    expect(words(bit("2026-10-07", "2026-09-30"))).toBe("Offers due in 7d");
+    expect(bit("2026-10-07", "2026-09-30")).toContain("text-muted");
+    expect(words(bit("2026-10-07", "2026-10-06"))).toBe("Offers due tomorrow");
+    expect(words(bit("2026-10-07", "2026-10-07"))).toBe("Offers due today");
+    expect(words(bit("2026-10-07", "2026-10-08"))).toBe("Offers were due Oct 7");
+    expect(bit("2026-10-07", "2026-10-08")).toContain("text-kill");
+    // The header's control says the deadline went by on the day after it.
+    expect(visibleText(render(React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-07", today: "2026-10-08" })))).toContain(
+      "Offers were due",
+    );
+    expect(visibleText(render(React.createElement(OffersDueControl, { dealId: "d1", value: "2026-10-07", today: "2026-10-07" })))).not.toContain(
+      "were due",
+    );
+  });
+
+  it("draws the list's and the cards' badges from the page's day", () => {
+    const due = card({ id: "z", name: "Harbor Point", offersDue: "2026-10-07" });
+    for (const initialView of ["list", "cards"] as const) {
+      const props = { deals: withThumbs([due]), errorMessage: null, notice: null, billing: BILLING, initialView };
+      const early = visibleText(render(React.createElement(Pipeline, { ...props, todayIso: "2026-09-30" })));
+      const late = visibleText(render(React.createElement(Pipeline, { ...props, todayIso: "2026-10-04" })));
+      expect(early, initialView).toContain("Offers due in 7d");
+      expect(late, initialView).toContain("Offers due in 3d");
+      expect(late, initialView).not.toContain("Offers due in 7d");
+    }
   });
 });
 
@@ -7846,7 +7902,7 @@ describe("Pipeline — a manufactured-housing park's tag (#470)", () => {
     market: "Lancaster, PA",
     coveredMarket: null,
   });
-  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING };
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
 
   it("says the lot rent against the market's on the row and the card, a private system in the warning tone", () => {
     for (const initialView of ["list", "cards"] as const) {
@@ -8032,7 +8088,7 @@ describe("Pipeline — a self-storage facility's tag (#471)", () => {
     market: "Lakewood, CO",
     coveredMarket: null,
   });
-  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING };
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
 
   it("says a lease-up in the warning tone on the row and the card", () => {
     for (const initialView of ["list", "cards"] as const) {

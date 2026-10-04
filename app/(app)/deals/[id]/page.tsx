@@ -1051,7 +1051,8 @@ export default async function DealPage({
     : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
   const noteCap = noteCapSlot(extraction);
   // Today as an ISO day (UTC), read once here and handed to what the page
-  // draws: the tasks' due dates and the Opportunity Zone round's line.
+  // draws: the offers-due countdown in the header, the tasks' due dates and
+  // the Opportunity Zone round's line.
   const todayIso = new Date().toISOString().slice(0, 10);
 
   return (
@@ -1340,6 +1341,7 @@ export default async function DealPage({
               key={`due-${offersDue ?? "unset"}`}
               dealId={id}
               value={offersDue}
+              today={todayIso}
               fromMemorandum={offersDue != null && offersDue === offeringDue?.iso ? offeringDue.page : null}
               calendarHref={offersDue ? `/api/deals/${id}/offers-due.ics` : null}
             />

@@ -452,6 +452,11 @@ export default async function DealsPage({
     ),
   };
 
+  // Today as an ISO day (UTC), read once per request and handed to the list:
+  // every offers-due countdown counts from it, on the server and in the
+  // browser alike (the deal page reads its own the same way).
+  const todayIso = new Date().toISOString().slice(0, 10);
+
   return (
     <>
       <Pipeline
@@ -475,6 +480,7 @@ export default async function DealsPage({
         initialView={initialView}
         viewerId={user?.id ?? null}
         onTeam={!!billing?.team}
+        todayIso={todayIso}
       />
       {/* The strip's own read streams after the pipeline rather than
           holding it back; nothing is drawn until it has stories. */}

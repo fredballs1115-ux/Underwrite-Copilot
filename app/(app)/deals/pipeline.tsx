@@ -321,6 +321,7 @@ export function Pipeline({
   initialView = "cards",
   viewerId = null,
   onTeam = false,
+  todayIso,
 }: {
   deals: DealCard[];
   errorMessage: string | null;
@@ -341,6 +342,10 @@ export function Pipeline({
   /** the reader is on a team: the pipeline holds the team's deals beside
    *  the reader's own, and a filter tells the two apart */
   onTeam?: boolean;
+  /** the page's day (UTC, yyyy-mm-dd), read once per request by the
+   *  server: every offers-due countdown on the list counts from it, so the
+   *  server's markup and the browser's are the same day */
+  todayIso: string;
 }) {
   const [query, setQuery] = useState("");
   const [view, setViewState] = useState<PipelineView>(initialView);
@@ -1211,6 +1216,7 @@ export function Pipeline({
                             checked={selected.has(d.id)}
                             onToggle={toggleSelected}
                             onMarket={reportMarket}
+                            todayIso={todayIso}
                           />
                         ))}
                       </ul>
@@ -1225,6 +1231,7 @@ export function Pipeline({
                             compareMode={compareMode}
                             checked={selected.has(d.id)}
                             onToggle={toggleSelected}
+                            todayIso={todayIso}
                           />
                         ))}
                       </ul>
@@ -1651,12 +1658,15 @@ const DealRow = memo(function DealRow({
   compareMode,
   checked,
   onToggle,
+  todayIso,
 }: {
   d: DealCard;
   i: number;
   compareMode: boolean;
   checked: boolean;
   onToggle: (id: string) => void;
+  /** the page's day, the offers-due countdown's (`Pipeline`'s `todayIso`) */
+  todayIso: string;
 }) {
   const v = d.verdict ? VERDICT_META[d.verdict] : null;
   const isDead = normalizeStage(d.stage) === "dead";
@@ -1789,7 +1799,7 @@ const DealRow = memo(function DealRow({
   const dateBit = (
     <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
   );
-  const dueBit = d.offersDue ? <OffersDueBit iso={d.offersDue} /> : null;
+  const dueBit = d.offersDue ? <OffersDueBit iso={d.offersDue} today={todayIso} /> : null;
   // A teammate's deal wears their initials; the name is the tooltip and
   // what a screen reader says.
   const addedByBit = d.addedBy ? (
@@ -2153,6 +2163,7 @@ const DealTile = memo(function DealTile({
   checked,
   onToggle,
   onMarket,
+  todayIso,
 }: {
   d: DealCard;
   i: number;
@@ -2161,6 +2172,8 @@ const DealTile = memo(function DealTile({
   onToggle: (id: string) => void;
   /** told which market photograph the card shows, for the page's credit */
   onMarket?: (dealId: string, marketId: string | null) => void;
+  /** the page's day, the offers-due countdown's (`Pipeline`'s `todayIso`) */
+  todayIso: string;
 }) {
   const dealId = d.id;
   const reportMarket = useCallback((marketId: string | null) => onMarket?.(dealId, marketId), [dealId, onMarket]);
@@ -2438,7 +2451,7 @@ const DealTile = memo(function DealTile({
               stage is changed here without leaving the pipeline. */}
           <div className="flex items-center gap-2 border-t border-line bg-faint/60 px-4 py-2 text-[11px] text-muted">
             {d.offersDue ? (
-              <OffersDueBit iso={d.offersDue} />
+              <OffersDueBit iso={d.offersDue} today={todayIso} />
             ) : (
               <span className="font-mono tabular-nums">{fmtDate(d.createdAt)}</span>
             )}
