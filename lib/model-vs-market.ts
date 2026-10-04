@@ -23,6 +23,7 @@ import {
   bandText,
   figureCitation,
   figureRead,
+  periodReason,
   trackerAge,
   trackerFor,
   type FigureRead,
@@ -67,7 +68,11 @@ import { staleMark, staleReason, type ResearchAge } from "@/lib/research-age";
  * its limit from the day the snapshot was read, a tracker figure is still
  * shown, named stale with its age, and the model is held to nothing in it —
  * a commercial deal's vacancy reads "beside stale research", and the exit
- * cap is set against the 10-year alone.
+ * cap is set against the 10-year alone. A figure the sector leaderboard
+ * would not rank for its own period — undated, or over a year old
+ * (lib/tracker-read `periodReason`, the leaderboard's own rule) — is shown
+ * and held to nothing the same way, and so is one for a narrower stock than
+ * the class.
  */
 export type CheckKey = "rent_growth" | "expense_growth" | "vacancy" | "exit_cap";
 
@@ -82,7 +87,9 @@ export type CheckTone =
   | "level"
   | "stated"
   | "aside"
-  | "stale";
+  | "stale"
+  | "undated"
+  | "old";
 
 export const TONE_LABEL: Record<CheckTone, string> = {
   ahead: "ahead of the published figures",
@@ -99,6 +106,10 @@ export const TONE_LABEL: Record<CheckTone, string> = {
   stated: "spread stated",
   aside: "beside a narrower stock",
   stale: "beside stale research",
+  // A tracker figure the sector leaderboard would not rank for its own
+  // period: shown, named, held to nothing.
+  undated: "beside an undated figure",
+  old: "beside a figure over a year old",
 };
 
 export interface PublishedFigure {
@@ -200,15 +211,38 @@ function trackerCite(t: TrackerRead, f: FigureRead, age: ResearchAge): string {
 
 /**
  * Why the model is not held to a tracker figure, where it is not, as the
- * opening of a sentence: the figure is for a narrower stock than the class
- * (`slice`), or the research is past the research rule's limit — or both.
- * Null where the model is held to it.
+ * opening of a sentence, and the chip that says so: the figure is for a
+ * narrower stock than the class (`slice`); it is undated, or over a year
+ * old by its own period — the rule the sector leaderboard ranks by
+ * (lib/tracker-read `periodReason`), so a figure it will not place is never
+ * one an assumption is held to (research pass 26 found a retail deal held to
+ * Newark's 2024 figure and Richmond's undated one); or the research is past
+ * the research rule's limit — or several. Null where the model is held to
+ * it.
  */
-function notHeldBecause(t: TrackerRead, f: FigureRead, age: ResearchAge): string | null {
-  const narrower = f.slice ? `That figure is for ${f.slice}, not the ${t.sectorLabel} market as a whole` : null;
+function notHeldBecause(
+  t: TrackerRead,
+  f: FigureRead,
+  age: ResearchAge,
+  today: string,
+): { because: string; tone: CheckTone } | null {
+  const period = periodReason(f, today);
+  const figure = [
+    f.slice ? `for ${f.slice}, not the ${t.sectorLabel} market as a whole` : null,
+    period === null ? null : period === "undated" ? "undated" : `from ${f.period}, over a year old`,
+  ].filter((x): x is string => x !== null);
   const old = staleReason(age);
-  if (!narrower && !old) return null;
-  return [narrower, old ? `${narrower ? "and the research is" : "That research is"} ${old}` : null].filter(Boolean).join(", ");
+  if (figure.length === 0 && !old) return null;
+  const because = [
+    figure.length > 0 ? `That figure is ${figure.join(", and ")}` : null,
+    old ? `${figure.length > 0 ? "and the research is" : "That research is"} ${old}` : null,
+  ]
+    .filter(Boolean)
+    .join(", ");
+  // The chip names the first reason of: stale research, a narrower stock, no
+  // date, an old one.
+  const tone: CheckTone = age.stale ? "stale" : f.slice ? "aside" : period === "undated" ? "undated" : "old";
+  return { because, tone };
 }
 
 function trackerPublisher(f: FigureRead): string {
@@ -275,8 +309,10 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
   // against a small-bay band was called a point looser than "the industrial
   // stock the figure covers" (the audit of 2026-10-01). Nor is the model
   // held to research past the research rule's limit (lib/research-age): its
-  // figure is shown, named stale, and the chip says so.
-  const notHeld = notHeldBecause(t, f, age);
+  // figure is shown, named stale, and the chip says so. Nor to a figure the
+  // sector leaderboard would not rank for its own period — undated, or over
+  // a year old (lib/tracker-read `periodReason`).
+  const notHeld = notHeldBecause(t, f, age, input.now.toISOString().slice(0, 10));
   if (notHeld) {
     const point = Math.abs(hi - t.vacancyLow) < SAME;
     const where =
@@ -287,7 +323,7 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
           : point
             ? "at it"
             : "inside it";
-    const tone: CheckTone = age.stale ? "stale" : "aside";
+    const tone = notHeld.tone;
     return {
       key: "vacancy",
       title: "Stabilized vacancy",
@@ -297,7 +333,7 @@ function trackerVacancyCheck(input: ModelVsMarketInput, v: number): ModelCheck |
       tone,
       toneLabel: TONE_LABEL[tone],
       scope: "metro",
-      read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f, age)} — a research print, not a feed. ${notHeld}, so the model is not held to it; its vacancy sits ${where}.`,
+      read: `The model holds ${v.toFixed(1)}% vacancy. ${initialCap(t.sectorLabel)} vacancy reads ${band} on the research tracker: ${trackerCite(t, f, age)} — a research print, not a feed. ${notHeld.because}, so the model is not held to it; its vacancy sits ${where}.`,
     };
   }
   const tone: CheckTone = v < t.vacancyLow - SAME ? "tighter" : v > hi + SAME ? "looser" : "inside";
@@ -655,13 +691,13 @@ function capBandTail(input: ModelVsMarketInput, x: number): { figures: Published
   }: ${trackerCite(t, f, age)}`;
   const over = point ? "it" : "its high end";
   const under = point ? "it" : "its low end";
-  const notHeld = notHeldBecause(t, f, age);
+  const notHeld = notHeldBecause(t, f, age, input.now.toISOString().slice(0, 10));
   if (notHeld) {
     const where =
       x > hi + SAME ? `${bps(x - hi)} over ${over}` : x < lo - SAME ? `${bps(lo - x)} under ${under}` : point ? "at it" : "inside it";
     return {
       figures,
-      sentence: `${head}. ${notHeld}, so the exit is not held to it; the exit cap sits ${where}.`,
+      sentence: `${head}. ${notHeld.because}, so the exit is not held to it; the exit cap sits ${where}.`,
     };
   }
   const position =

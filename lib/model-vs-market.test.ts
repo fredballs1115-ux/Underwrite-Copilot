@@ -608,6 +608,7 @@ describe("the going-in cap the documents imply where they state none", () => {
 
 // ── The research tracker's read, beside the feeds ───────────────────────────
 import { bandText, figureCitation, figureNote, figureRead, rentOf, trackerFor, trackerSectorFor } from "./tracker-read";
+import { sectorLeaderboard } from "./sector-leaderboard";
 import metrosSeed from "@/data/research/metros.json";
 
 describe("trackerFor — the sector snapshot's vacancy band and cap range for a deal's kind of building in its metro", () => {
@@ -896,8 +897,9 @@ describe("the tracker inside the model's checks", () => {
     expect(bulk.toneLabel).toBe("beside a narrower stock");
     // Northern Virginia's industrial band names no house and no period.
     expect(bulk.read).toContain("reads 3.9–5.0% on the research tracker: publisher not recorded, Northern Virginia, undated (read Aug 25, 2026)");
+    // It is undated too, and says so beside the stock.
     expect(bulk.read).toContain(
-      "That figure is for small-bay space, not the industrial market as a whole, so the model is not held to it; its vacancy sits 1.0 point over its high end.",
+      "That figure is for small-bay space, not the industrial market as a whole, and undated, so the model is not held to it; its vacancy sits 1.0 point over its high end.",
     );
     expect(bulk.read).not.toContain("looser than");
     expect(bulk.published.map((p) => [p.asOf, p.publisher])).toEqual([
@@ -905,6 +907,41 @@ describe("the tracker inside the model's checks", () => {
       ["undated", "research tracker"],
     ]);
     expect(check({ ...nova, inputs: { ...base.inputs, vacancyPct: 0.045 } }, "vacancy")!.read).toContain("its vacancy sits inside it.");
+  });
+
+  // Research pass 26 (C6): a retail deal's vacancy was held to Newark's
+  // 2024 figure and Richmond's undated one — figures the sector leaderboard
+  // refuses to rank. One rule now: a tracker figure the leaderboard would
+  // not rank for its own period (undated, or over a year old) is shown
+  // beside the check and never held against the assumption.
+  it("holds a retail deal to no tracker figure the leaderboard would not rank for its period", () => {
+    const retail = (id: string, name: string, vacancyPct = 0.08) => ({
+      ...base,
+      assetClass: "retail",
+      metro: { id, name },
+      tracker: trackerFor(id, "retail"),
+      inputs: { ...base.inputs, vacancyPct },
+    });
+    const today = FIXTURE_NOW.toISOString().slice(0, 10);
+    const reasonOf = (id: string) => sectorLeaderboard("retail", today).rows.find((r) => r.markets.some((m) => m.id === id))!.reason;
+    const old = check(retail("newark_jc", "Newark / Jersey City"), "vacancy")!;
+    expect(reasonOf("newark_jc")).toBe("2024, over a year old");
+    expect(old.tone).toBe("old");
+    expect(old.toneLabel).toBe("beside a figure over a year old");
+    expect(old.read).toContain("reads 3.4% on the research tracker: Marcus & Millichap");
+    expect(old.read).toContain("That figure is from 2024, over a year old, so the model is not held to it; its vacancy sits 4.6 points over it.");
+    expect(old.read).not.toContain("looser than");
+    expect(old.published.map((p) => p.asOf)).toEqual(["2024"]);
+    const undated = check(retail("richmond", "Richmond VA"), "vacancy")!;
+    expect(reasonOf("richmond")).toBe("undated");
+    expect(undated.tone).toBe("undated");
+    expect(undated.toneLabel).toBe("beside an undated figure");
+    expect(undated.read).toContain("That figure is undated, so the model is not held to it; its vacancy sits 3.6 points over it.");
+    // A figure dated within the year is held as before: Chicago's Q2 2026.
+    const dated = check(retail("chicago", "Chicago", 0.09), "vacancy")!;
+    expect(reasonOf("chicago")).toBeNull();
+    expect(dated.tone).toBe("looser");
+    expect(dated.read).toContain("The model runs 1.2 points looser than the retail stock the figure covers — conservative against the tracker.");
   });
 
   it("without a tracker read a commercial deal has no vacancy row, as before", () => {
@@ -929,26 +966,42 @@ describe("the tracker inside the model's checks", () => {
   });
 
   it("the tracker's cap range joins the exit-cap read: over its high end is the conservative direction, under its low end is compression on top of the spread", () => {
-    const apt = { ...base, tracker: trackerFor("dc", "multifamily") };
+    // Hampton Roads' range is Newmark's Q1 2026, dated within the year.
+    const apt = { ...base, metro: { id: "norfolk_hampton_roads", name: "Norfolk / Hampton Roads VA" }, tracker: trackerFor("norfolk_hampton_roads", "multifamily") };
     const c = check(apt, "exit_cap")!;
     expect(c.scope).toBe("metro");
     expect(c.published.map((p) => [p.label, p.value, p.asOf])).toEqual([
       ["10-year Treasury", 4.94, "2026-09-17"],
-      ["Apartment cap (research tracker), the Washington DC region, low end", 4.75, "undated"],
-      ["Apartment cap (research tracker), the Washington DC region, high end", 5.5, "undated"],
+      ["Apartment cap (research tracker), low end", 5.25, "Q1 2026"],
+      ["Apartment cap (research tracker), high end", 5.5, "Q1 2026"],
     ]);
     expect(c.read).toContain(
-      "The research tracker's apartment cap range is 4.75–5.50% (a band on a deal mix leaning Class B / value-add): publisher not recorded, the Washington DC region, undated (read Aug 25, 2026), and the exit cap sits 50 bps over its high end — the conservative direction for an exit.",
+      "The research tracker's apartment cap range is 5.25–5.50% (Class A near the low end, Class B/C toward 5.5%): Newmark (its Richmond & Hampton Roads report), Q1 2026 (read Aug 25, 2026), and the exit cap sits 50 bps over its high end — the conservative direction for an exit.",
     );
     const tight = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.045 } }, "exit_cap")!;
-    expect(tight.read).toContain("the exit cap sits 25 bps under its low end — an exit priced tighter than the market's own range, which is cap compression on top of the spread read.");
-    const within = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.05 } }, "exit_cap")!;
+    expect(tight.read).toContain("the exit cap sits 75 bps under its low end — an exit priced tighter than the market's own range, which is cap compression on top of the spread read.");
+    const within = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.054 } }, "exit_cap")!;
     expect(within.read).toContain("and the exit cap sits inside it.");
     // A plan deal states its spread and still reads the range.
     const plan = check({ ...apt, plan: true }, "exit_cap")!;
     expect(plan.tone).toBe("stated");
     expect(plan.read).toContain("A plan deal has no going-in cap to set it against");
-    expect(plan.read).toContain("apartment cap range is 4.75–5.50%");
+    expect(plan.read).toContain("apartment cap range is 5.25–5.50%");
+    // Washington's range is undated: the leaderboard would not rank it, so
+    // it is shown and the exit is not held to it — no compression named.
+    const dc = { ...base, tracker: trackerFor("dc", "multifamily") };
+    const undated = check(dc, "exit_cap")!;
+    expect(undated.scope).toBe("metro");
+    expect(undated.published.slice(1).map((p) => [p.value, p.asOf])).toEqual([
+      [4.75, "undated"],
+      [5.5, "undated"],
+    ]);
+    expect(undated.read).toContain(
+      "The research tracker's apartment cap range is 4.75–5.50% (a band on a deal mix leaning Class B / value-add): publisher not recorded, the Washington DC region, undated (read Aug 25, 2026). That figure is undated, so the exit is not held to it; the exit cap sits 50 bps over its high end.",
+    );
+    const dcTight = check({ ...dc, inputs: { ...base.inputs, exitCapPct: 0.045 } }, "exit_cap")!;
+    expect(dcTight.read).not.toContain("cap compression on top of the spread read");
+    expect(dcTight.read).toContain("the exit cap sits 25 bps under its low end.");
     // No range on the tracker: the check reads as it did, national.
     const office = check({ ...base, assetClass: "office", tracker: trackerFor("dc", "office") }, "exit_cap")!;
     expect(office.scope).toBe("national");
@@ -1024,12 +1077,12 @@ describe("a stale tracker read is named stale and held to nothing", () => {
     ]);
   });
 
-  it("a narrower stock and a stale read say both reasons", () => {
+  it("a narrower stock, no date and a stale read say every reason", () => {
     const nova = { ...base, assetClass: "industrial", metro: { id: "nova", name: "Northern Virginia" }, tracker: trackerFor("nova", "industrial") };
     const c = check({ ...nova, inputs: { ...base.inputs, vacancyPct: 0.06 }, now: FIRST_STALE }, "vacancy")!;
     expect(c.tone).toBe("stale");
     expect(c.read).toContain(
-      "That figure is for small-bay space, not the industrial market as a whole, and the research is 181 days old, past the 180 days the site holds research current, so the model is not held to it; its vacancy sits 1.0 point over its high end.",
+      "That figure is for small-bay space, not the industrial market as a whole, and undated, and the research is 181 days old, past the 180 days the site holds research current, so the model is not held to it; its vacancy sits 1.0 point over its high end.",
     );
   });
 
@@ -1044,20 +1097,22 @@ describe("a stale tracker read is named stale and held to nothing", () => {
   });
 
   it("the exit is set against the 10-year alone once the tracker's cap range is stale, the range still shown", () => {
-    const apt = { ...base, tracker: trackerFor("dc", "multifamily") };
+    // Hampton Roads' range is dated (Newmark's Q1 2026), so only the
+    // research rule's limit sets it aside.
+    const apt = { ...base, metro: { id: "norfolk_hampton_roads", name: "Norfolk / Hampton Roads VA" }, tracker: trackerFor("norfolk_hampton_roads", "multifamily") };
     const before = check({ ...apt, now: LAST_CURRENT }, "exit_cap")!;
     expect(before.read).toContain("and the exit cap sits 50 bps over its high end — the conservative direction for an exit.");
     const after = check({ ...apt, now: FIRST_STALE }, "exit_cap")!;
     expect(after.tone).toBe(before.tone);
     expect(after.read).toContain(
-      "The research tracker's apartment cap range is 4.75–5.50% (a band on a deal mix leaning Class B / value-add): publisher not recorded, the Washington DC region, undated (read Aug 25, 2026; 181 days old, stale). That research is 181 days old, past the 180 days the site holds research current, so the exit is not held to it; the exit cap sits 50 bps over its high end.",
+      "The research tracker's apartment cap range is 5.25–5.50% (Class A near the low end, Class B/C toward 5.5%): Newmark (its Richmond & Hampton Roads report), Q1 2026 (read Aug 25, 2026; 181 days old, stale). That research is 181 days old, past the 180 days the site holds research current, so the exit is not held to it; the exit cap sits 50 bps over its high end.",
     );
     expect(after.read).not.toContain("the conservative direction for an exit");
-    expect(after.published.slice(1).map((p) => p.value)).toEqual([4.75, 5.5]);
+    expect(after.published.slice(1).map((p) => p.value)).toEqual([5.25, 5.5]);
     // A compression the tracker would have named is not named on stale research.
     const tight = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.045 }, now: FIRST_STALE }, "exit_cap")!;
     expect(tight.read).not.toContain("cap compression on top of the spread read");
-    expect(tight.read).toContain("the exit cap sits 25 bps under its low end.");
+    expect(tight.read).toContain("the exit cap sits 75 bps under its low end.");
   });
 
   it("the card draws the stale chip and the sentence", () => {

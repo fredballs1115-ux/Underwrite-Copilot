@@ -23,6 +23,10 @@ const TONE_CLASS: Record<CheckTone, string> = {
   aside: "bg-faint text-muted",
   // Research past its limit (lib/research-age): shown, named, held to nothing.
   stale: "bg-caution/10 text-caution",
+  // A figure the sector leaderboard would not rank for its own period: the
+  // same.
+  undated: "bg-caution/10 text-caution",
+  old: "bg-caution/10 text-caution",
 };
 
 export function ModelVsMarketCard({ read }: { read: ModelVsMarket | null }) {

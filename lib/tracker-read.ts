@@ -246,6 +246,20 @@ export function olderThanAYear(read: Pick<FigureRead, "period">, today: string):
   return end < cutoff;
 }
 
+/**
+ * Why a figure's own period keeps it from being ranked or held to anything:
+ * "undated", or "2024, over a year old" at `today` (an ISO day); null where
+ * it is dated within the year. The one rule the sector leaderboard ranks by
+ * (lib/sector-leaderboard `unrankedReason`) and the model's read holds an
+ * assumption by (lib/model-vs-market), so a figure the leaderboard will not
+ * place is never one a deal's vacancy or exit is held to.
+ */
+export function periodReason(read: Pick<FigureRead, "period">, today: string): string | null {
+  if (isUndated(read)) return "undated";
+  if (olderThanAYear(read, today)) return `${read.period}, over a year old`;
+  return null;
+}
+
 /** "Suburban Maryland", "Washington DC region" — an area's words as a row
  *  names it: no leading "the", no parenthetical, the first letter capital. */
 export function areaLabel(area: string): string {

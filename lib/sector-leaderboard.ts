@@ -4,8 +4,7 @@ import {
   areaLabel,
   blockCitations,
   figureRead,
-  isUndated,
-  olderThanAYear,
+  periodReason,
   rentOf,
   type CitedFigure,
   type RentBand,
@@ -107,8 +106,10 @@ export function unrankedReason(
 ): string | null {
   const reasons: string[] = [];
   if (!read.house) reasons.push("publisher not recorded");
-  if (isUndated(read)) reasons.push("undated");
-  else if (olderThanAYear(read, today)) reasons.push(`${read.period}, over a year old`);
+  // Undated, or over a year old by its own period: the rule the model's
+  // read holds an assumption by too (lib/tracker-read `periodReason`).
+  const period = periodReason(read, today);
+  if (period) reasons.push(period);
   if (read.slice) reasons.push(`${read.slice} only`);
   const band = vHigh !== null && Math.abs(vHigh - vLow) >= 0.005;
   if (band && !read.printedBand) reasons.push("a spread of two reads");
