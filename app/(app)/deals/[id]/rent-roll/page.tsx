@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { notFound, redirect } from "next/navigation";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { downloadDealFile } from "@/lib/storage";
@@ -117,9 +119,11 @@ export default async function RentRollPage({
     }
   }
 
+  // A roll with no as-of date counts its years to expiry from today — the
+  // reader's own day (lib/reader-day), as the page says it.
   const analytics = record
     ? analyzeRentRoll(record.leases, {
-        asOf: record.asOfDate ?? new Date().toISOString().slice(0, 10),
+        asOf: record.asOfDate ?? readerToday((await cookies()).get(TZ_COOKIE)?.value),
         nra: record.nra,
         leasesShort: leasesShort(assetClass),
       })

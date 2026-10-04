@@ -81,8 +81,9 @@ describe("the outside services a user's data reaches, one list held to the code"
       expect(text).toContain(BROWSER_DIRECT_NOTE);
       expect(text).not.toMatch(/receives only the address text you type/i);
       // Each page dated by its own last change: the privacy page's cookie
-      // section was written out in full on October 1 (pass 14).
-      expect(text).toContain(name === "privacy" ? "Last updated: October 1, 2026" : "Last updated: September 30, 2026");
+      // section was written out in full on October 1 (pass 14), and named
+      // the time-zone cookie on October 4.
+      expect(text).toContain(name === "privacy" ? "Last updated: October 4, 2026" : "Last updated: September 30, 2026");
       expect(a11yIssues(html), name).toEqual([]);
       expect(gluedWords(text), name).toEqual([]);
     }

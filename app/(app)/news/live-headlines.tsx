@@ -1,17 +1,21 @@
 import type { LiveHeadlines, SourceStatus } from "@/lib/news/live";
 import { headlineSignals, searchHostsAnswering, timeAgo, type RankedHeadline } from "@/lib/news/feeds";
 import { headlineMarkets } from "@/lib/news/markets";
+import { DEFAULT_TIME_ZONE } from "@/lib/reader-day";
 
 /** The front page's shape: one lead, a grid of six, the rest as a list. */
 const GRID = 6;
 
-const fmtDate = (iso: string) =>
+/** The masthead's day — "Today's headlines", on the reader's own calendar
+ *  (lib/reader-day): the fetch's moment in the reader's zone. It had been
+ *  UTC's, so from 8 pm Eastern today's headlines wore tomorrow's date. */
+const fmtDate = (iso: string, timeZone: string) =>
   new Date(iso).toLocaleDateString("en-US", {
     weekday: "long",
     month: "long",
     day: "numeric",
     year: "numeric",
-    timeZone: "UTC",
+    timeZone,
   });
 
 /**
@@ -24,7 +28,15 @@ const fmtDate = (iso: string) =>
  * every source is unreachable. No I/O here: the page fetches and hands
  * the result in, and the render tests hand it a fixture.
  */
-export function LiveHeadlinesView({ live }: { live: LiveHeadlines }) {
+export function LiveHeadlinesView({
+  live,
+  timeZone = DEFAULT_TIME_ZONE,
+}: {
+  live: LiveHeadlines;
+  /** the reader's zone (lib/reader-day `readerTimeZone`), read by the page
+   *  from its cookie: the masthead's day is the reader's */
+  timeZone?: string;
+}) {
   const answered = live.sources.filter((s) => s.ok || s.stale);
   const searchHosts = searchHostsAnswering(live.sources);
   const now = Date.parse(live.fetchedAt);
@@ -38,7 +50,7 @@ export function LiveHeadlinesView({ live }: { live: LiveHeadlines }) {
         <h2 id="live-news" className="font-semibold text-ink">
           Today&apos;s headlines
         </h2>
-        <span>{fmtDate(live.fetchedAt)}</span>
+        <span>{fmtDate(live.fetchedAt, timeZone)}</span>
         <span>
           live from {answered.length} of {live.sources.length} sources · refreshed every 30 min
         </span>

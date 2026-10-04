@@ -1,5 +1,7 @@
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { buildRentRollWorkbook } from "@/lib/export/workbook";
 import type { WorkbookInputs, WorkbookNotes } from "@/lib/export/cashflow";
 import { getRentRollImport, latestRentRollImport, listProfiles } from "@/lib/rentroll/store";
@@ -86,7 +88,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const profiles = await listProfiles(supabase, user.id, assetClass);
   const profile = openingProfile(profiles, assetClass, url.searchParams.get("profile"));
 
-  const asOf = record.asOfDate ?? new Date().toISOString().slice(0, 10);
+  // With no as-of date on the roll, today — the reader's own day (lib/
+  // reader-day), the day the page counts from, so the two never differ.
+  const asOf = record.asOfDate ?? readerToday((await cookies()).get(TZ_COOKIE)?.value);
   const analytics = analyzeRentRoll(record.leases, { asOf, nra: record.nra });
   const nra = record.nra && record.nra > 0 ? record.nra : analytics.totalSf || 1;
 

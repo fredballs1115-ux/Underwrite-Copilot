@@ -40,9 +40,12 @@ describe("the pipeline's news strip", () => {
     const text = visibleText(html);
     expect(text).toContain("CRE news");
     expect(text).not.toMatch(/your markets/i);
-    expect(html).toContain('<time dateTime="2026-09-29T14:05:00.000Z">Sep 29, 2026</time>');
-    expect(html).toContain('<time dateTime="2026-09-28T09:00:00.000Z">Sep 28, 2026</time>');
-    expect(text).toContain("Example Wire · Sep 29, 2026");
+    // Each story's day is UTC's, and says so (lib/utc-day, the helper
+    // /market's intel prints through): a bare day read as the reader's was a
+    // day late for a story a feed dated in a US evening.
+    expect(html).toContain('<time dateTime="2026-09-29T14:05:00.000Z">Sep 29, 2026 UTC</time>');
+    expect(html).toContain('<time dateTime="2026-09-28T09:00:00.000Z">Sep 28, 2026 UTC</time>');
+    expect(text).toContain("Example Wire · Sep 29, 2026 UTC");
     // A story whose feed gave no date says none, rather than a made-up one.
     expect(text).toMatch(/Example Daily(?! ·)/);
     expect(html.match(/<time /g)).toHaveLength(2);
@@ -54,8 +57,10 @@ describe("the pipeline's news strip", () => {
     expect(renderToStaticMarkup(React.createElement(NewsStrip, { items: [] }))).toBe("");
   });
 
-  it("reads a date only where there is one", () => {
-    expect(storyDate("2026-09-29T14:05:00.000Z")).toBe("Sep 29, 2026");
+  it("reads a date only where there is one, said as the UTC day it is", () => {
+    expect(storyDate("2026-09-29T14:05:00.000Z")).toBe("Sep 29, 2026 UTC");
+    // 9 pm Eastern on Sep 29 is Sep 30 in UTC: the label says whose day.
+    expect(storyDate("2026-09-29T21:00:00-04:00")).toBe("Sep 30, 2026 UTC");
     expect(storyDate(null)).toBeNull();
     expect(storyDate("not a date")).toBeNull();
   });

@@ -2521,6 +2521,21 @@ describe("News live section", () => {
     dumpView("news-live", html);
   });
 
+  // "Today's headlines" wore the UTC day: from 8 pm Eastern, tomorrow's date.
+  // The masthead is the reader's day now, in the zone the page reads from
+  // the reader's cookie (lib/reader-day).
+  it("dates the masthead on the reader's own calendar", () => {
+    // 10 pm Eastern and 7 pm Pacific on Monday the 14th; Tuesday in UTC.
+    const evening: LiveHeadlines = { ...live, fetchedAt: "2026-09-15T02:00:00Z" };
+    const masthead = (timeZone?: string) =>
+      visibleText(render(React.createElement(LiveHeadlinesView, { live: evening, ...(timeZone ? { timeZone } : {}) })));
+    expect(masthead("America/New_York")).toContain("Monday, September 14, 2026");
+    expect(masthead("America/Los_Angeles")).toContain("Monday, September 14, 2026");
+    expect(masthead("UTC")).toContain("Tuesday, September 15, 2026");
+    // A page that hands no zone reads the site's US default, Eastern.
+    expect(masthead()).toContain("Monday, September 14, 2026");
+  });
+
   it("keeps the front page's shape at fourteen stories: one lead, six in the grid, the rest in the list", () => {
     const many: LiveHeadlines = {
       ...live,
@@ -2616,19 +2631,21 @@ describe("News scored feed", () => {
     expect(text).toContain("rule changes");
     expect(text).toContain("Maryland rent stabilization act signed");
     // The strip says when, as the day headings do (with the year, since it
-    // keeps the newest few whenever they came), and names the rule by the
-    // research file's words — never an ISO date or a raw rule id; an id the
-    // file does not hold says nothing.
+    // keeps the newest few whenever they came, and as the UTC day the sweep
+    // dates by, said so — lib/utc-day), and names the rule by the research
+    // file's words — never an ISO date or a raw rule id; an id the file does
+    // not hold says nothing.
     const flat = text.replace(/\s+/g, " ");
-    expect(flat).toContain("Montgomery County sets its 2027 rent stabilization cap Monday, Sep 14, 2026 · affects rent control (Montgomery County, MD)");
-    expect(flat).toContain("Maryland rent stabilization act signed Monday, Nov 3, 2025");
-    expect(flat).not.toMatch(/Nov 3, 2025 · affects/);
+    expect(flat).toContain("Montgomery County sets its 2027 rent stabilization cap Sep 14, 2026 UTC · affects rent control (Montgomery County, MD)");
+    expect(flat).toContain("Maryland rent stabilization act signed Nov 3, 2025 UTC");
+    expect(flat).not.toMatch(/Nov 3, 2025 UTC · affects/);
     expect(text).not.toMatch(/\d{4}-\d{2}-\d{2}/);
     expect(text).not.toContain("md-rent-cap");
     expect(text).not.toContain("md-moco-rent-stabilization");
     expect(html).toContain('<time dateTime="2026-09-14T10:00:00Z" class="whitespace-nowrap">');
-    expect(text).toContain("Monday, Sep 14");
-    expect(text).toContain("Sunday, Sep 13");
+    // The day headings are the sweep's UTC days, said so.
+    expect(html).toMatch(/>Sep 14, 2026 UTC<\/h2>/);
+    expect(html).toMatch(/>Sep 13, 2026 UTC<\/h2>/);
     expect(text).toContain("8/10");
     expect(text).toContain("MD regulation");
     expect(text).toContain("capital markets");
@@ -8442,7 +8459,17 @@ describe("a tracker figure's credit says what is missing, and a source links its
 });
 
 // ── The weekday intel items: dated, and the AI's read labelled as one investor's (the research pass of 2026-10-01) ──
-import { IntelItems, dayOf } from "@/app/market/intel-items";
+import { IntelItems, dayOf, digestLine } from "@/app/market/intel-items";
+
+// /market's "latest digest" printed the job's UTC day bare: the job dates a
+// digest by the UTC day it ran (scripts/daily-intel.mjs), so a run at 8 pm
+// Eastern read as tomorrow's to a reader on the East Coast.
+describe("the weekday intel's latest digest says its day is UTC's", () => {
+  it("reads 'latest digest Oct 1, 2026 UTC · 6 notable', and a stored text that is no ISO day as stored", () => {
+    expect(digestLine({ digest_date: "2026-10-01", item_count: 6 })).toBe("latest digest Oct 1, 2026 UTC · 6 notable");
+    expect(digestLine({ digest_date: "October 1", item_count: 2 })).toBe("latest digest October 1 · 2 notable");
+  });
+});
 
 describe("IntelItems — each item dated, its score and next step said as an AI's read for one investor, not advice", () => {
   const items = [

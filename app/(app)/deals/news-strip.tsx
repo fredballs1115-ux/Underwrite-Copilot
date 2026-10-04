@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { dayOf } from "@/lib/utc-day";
 
 /** One story the weekday intel sweep scored, as the pipeline's strip reads
  *  it (a row of market_intel_items, migration 0024). */
@@ -11,13 +12,11 @@ export interface NewsStripItem {
   published_at: string | null;
 }
 
-/** "Sep 29, 2026" — the day as the /news page reads days, in UTC; null for
- *  a value that is not a date. */
+/** "Sep 29, 2026 UTC" — the day as the /news page reads days, in UTC and
+ *  said so (lib/utc-day, the helper every feed's date prints through); null
+ *  for a value that is not a date. */
 export function storyDate(iso: string | null): string | null {
-  if (!iso) return null;
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return null;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+  return dayOf(iso);
 }
 
 /**

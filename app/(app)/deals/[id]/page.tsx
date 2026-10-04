@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { addressUpgrade } from "@/lib/address";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { FILED_PERSONAL, filedPersonalNotice } from "@/lib/personal-deal";
 import { notFound } from "next/navigation";
@@ -1050,10 +1052,11 @@ export default async function DealPage({
     ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
     : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
   const noteCap = noteCapSlot(extraction);
-  // Today as an ISO day (UTC), read once here and handed to what the page
+  // Today on the reader's own calendar (their browser's zone, from its
+  // cookie — lib/reader-day), read once here and handed to what the page
   // draws: the offers-due countdown in the header, the tasks' due dates and
   // the Opportunity Zone round's line.
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   return (
     <div className="flex flex-col gap-6">

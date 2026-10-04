@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/supabase/server";
 import { AppShell } from "./app-shell";
 import { coveredMarketNav } from "@/lib/market-match";
 import { RegulatoryAlertBanner } from "./regulatory-alert-banner";
+import { TimeZoneCookie } from "./time-zone-cookie";
 
 // Wraps every signed-in screen: real auth check (proxy.ts is the fast gate)
 // plus the app chrome (deep-teal sidebar / mobile top bar). getCurrentUser is
@@ -22,6 +23,9 @@ export default async function AppLayout({
 
   return (
     <AppShell userEmail={user.email ?? ""} markets={coveredMarketNav()}>
+      {/* The reader's time zone, written to the cookie every signed-in page
+          reads its day from (lib/reader-day): draws nothing. */}
+      <TimeZoneCookie />
       {/* The banner reads a cookie and a table. A layout's own data is out
           of loading.js's reach — a hard load waited on it before the page
           or its loading state could stream — so it streams in its own

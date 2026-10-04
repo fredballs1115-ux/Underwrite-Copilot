@@ -13,6 +13,7 @@ import { WhatsNewCard } from "./whats-new";
 import { NewsStrip, type NewsStripItem } from "./news-strip";
 import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
@@ -452,10 +453,11 @@ export default async function DealsPage({
     ),
   };
 
-  // Today as an ISO day (UTC), read once per request and handed to the list:
+  // Today on the reader's own calendar (their browser's zone, from its
+  // cookie — lib/reader-day), read once per request and handed to the list:
   // every offers-due countdown counts from it, on the server and in the
   // browser alike (the deal page reads its own the same way).
-  const todayIso = new Date().toISOString().slice(0, 10);
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   return (
     <>

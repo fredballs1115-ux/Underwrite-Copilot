@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ruleName } from "@/lib/research-data";
+import { dayOf } from "@/lib/utc-day";
 
 /** One story the weekday intel sweep gathered and scored for this buyer. */
 export interface ItemRow {
@@ -39,17 +40,12 @@ export const SECTOR_LABEL: Record<string, string> = {
   "construction-supply": "construction",
 };
 
-/** "Monday, Sep 14" — the day a story was picked up, as its group's
- *  heading says it; with its year ("Monday, Sep 14, 2026") for an alert,
- *  since the strip keeps the newest few whenever they came. */
-const fmtDay = (iso: string, withYear = false) =>
-  new Date(iso).toLocaleDateString("en-US", {
-    weekday: "long",
-    month: "short",
-    day: "numeric",
-    ...(withYear ? { year: "numeric" as const } : {}),
-    timeZone: "UTC",
-  });
+/** "Sep 14, 2026 UTC" — the day the sweep picked a story up, as its
+ *  group's heading says it, and the day an alert was detected: the sweep's
+ *  days are UTC's, said so (lib/utc-day, the helper every feed's date
+ *  prints through). A story picked up at 9 pm Eastern sits under the next
+ *  day's heading; the "UTC" says why. */
+const fmtDay = (iso: string): string => dayOf(iso) ?? iso;
 
 /**
  * The scored feed as a pure view of the sweep's rows: the law-and-rule
@@ -118,7 +114,7 @@ export function ScoredFeedView({
                   )}{" "}
                   <span className="ml-1 text-[11px] text-muted">
                     <time dateTime={a.detected_at} className="whitespace-nowrap">
-                      {fmtDay(a.detected_at, true)}
+                      {fmtDay(a.detected_at)}
                     </time>
                     {rule ? ` · affects ${rule}` : ""}
                   </span>

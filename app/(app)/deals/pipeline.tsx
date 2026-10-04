@@ -307,9 +307,10 @@ export function Pipeline({
   /** the reader is on a team: the pipeline holds the team's deals beside
    *  the reader's own, and a filter tells the two apart */
   onTeam?: boolean;
-  /** the page's day (UTC, yyyy-mm-dd), read once per request by the
-   *  server: every offers-due countdown on the list counts from it, so the
-   *  server's markup and the browser's are the same day */
+  /** the page's day (the reader's own, yyyy-mm-dd — lib/reader-day), read
+   *  once per request by the server: every offers-due countdown on the list
+   *  counts from it, so the server's markup and the browser's are the same
+   *  day */
   todayIso: string;
 }) {
   const [query, setQuery] = useState("");

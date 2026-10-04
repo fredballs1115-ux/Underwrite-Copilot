@@ -61,7 +61,7 @@ import { MarketCompare } from "./market-compare";
 import { COMPARE_METROS } from "./compare-metros";
 import { Fold } from "./fold";
 import { RuleItem } from "./rule-item";
-import { IntelItems, type IntelItem } from "./intel-items";
+import { IntelItems, digestLine, type IntelItem } from "./intel-items";
 import { SourceRef } from "./source-ref";
 import { ExampleListings } from "./example-listings";
 import { examplesFor } from "@/lib/example-listings";
@@ -1294,7 +1294,7 @@ async function IntelDigestCard() {
         <h2 className="text-sm font-semibold tracking-tight">Weekday intel</h2>
         {digest && (
           <span className="text-[11px] text-muted">
-            {`latest digest ${/^\d{4}-\d{2}-\d{2}$/.test(digest.digest_date) ? datedLong(digest.digest_date) : digest.digest_date} · ${digest.item_count} notable`}
+            {digestLine(digest)}
           </span>
         )}
       </div>

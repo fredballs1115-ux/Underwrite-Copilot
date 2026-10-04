@@ -1,4 +1,8 @@
-import { datedLong } from "@/lib/debt-index";
+import { dayOf } from "@/lib/utc-day";
+
+// The UTC day said as one ("Oct 1, 2026 UTC") — lib/utc-day, the one helper
+// every feed's date prints through; re-exported for the readers here.
+export { dayOf };
 
 /** One news item the weekday intel job kept, as the page reads it. */
 export interface IntelItem {
@@ -14,16 +18,14 @@ export interface IntelItem {
 }
 
 /**
- * "Oct 1, 2026 UTC" from a timestamp, or null: the day it falls on in UTC,
- * said so. The site states no time zone of its own, and a bare day read as
- * the reader's was a day late for anything published in a US evening — an
- * item a publisher dated 9pm Eastern on Sep 30 is Oct 1 in UTC (the audit
- * of 2026-10-04).
+ * The weekday intel's latest digest, as the /market card's corner says it:
+ * "latest digest Oct 1, 2026 UTC · 6 notable". The job dates a digest by the
+ * UTC day it ran (scripts/daily-intel.mjs), so the day is said as UTC's; a
+ * date that is not an ISO day is printed as stored.
  */
-export function dayOf(ts: string | null | undefined): string | null {
-  if (!ts) return null;
-  const at = Date.parse(ts);
-  return Number.isFinite(at) ? `${datedLong(new Date(at).toISOString().slice(0, 10))} UTC` : null;
+export function digestLine(digest: { digest_date: string; item_count: number }): string {
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(digest.digest_date) ? dayOf(digest.digest_date) : null;
+  return `latest digest ${day ?? digest.digest_date} · ${digest.item_count} notable`;
 }
 
 /**

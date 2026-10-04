@@ -432,7 +432,8 @@ export function DealView({
   /** null = deal_tasks table not migrated yet (card hidden) */
   tasks?: DealTask[] | null;
   taskAssignees?: TaskAssignee[];
-  /** yyyy-mm-dd (UTC) from the server, for stable overdue/date rendering */
+  /** yyyy-mm-dd, the reader's own day from the server (lib/reader-day), for
+   *  stable overdue/date rendering */
   todayIso?: string;
 }) {
   const router = useRouter();

@@ -21,8 +21,9 @@ export function SiteFlagsCard({
 }: {
   result: SiteFlagsResult | null;
   hasAddress: boolean;
-  /** today as an ISO day (UTC), read by the page: what an answer from the
-   *  2018 list means turns on where that round stands */
+  /** today as an ISO day (the reader's own, lib/reader-day), read by the
+   *  page: what an answer from the 2018 list means turns on where that
+   *  round stands */
   today: string;
 }) {
   if (!hasAddress) return null;
