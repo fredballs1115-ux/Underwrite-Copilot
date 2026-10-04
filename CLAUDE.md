@@ -1242,7 +1242,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  One hundred and eleven are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  One hundred and thirty-four are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1282,10 +1282,28 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   cross, as it does Mobile's), Santa Fe (the Palace of the Governors) and
   St. George (the city under its red bluffs) — run 36808230184 — and
   Gainesville, Sweetwater Wetlands Park from a drone, an oblique with a
-  horizon, from a one-market run (36808459092)), each judged
+  horizon, from a one-market run (36808459092); then round 9: Waterbury,
+  Norwich-New London and Erie (its credit the Corps of Engineers'
+  photographer, public domain) — run 36816098960 — and Cape Cod
+  (Barnstable Town) on the runner-up, the Old Harbor Life Saving Station
+  at sunset, since the first choice's photographer asks for his name
+  linked to his own user page, which the credit line cannot do (zori run
+  36817794786); Canton (the Hall of Fame), Flint, Sioux Falls, Fargo and
+  Cedar Rapids — run 36816207134; Roanoke, Hickory (the Morganton
+  depot), Lynchburg, Charleston WV, Kingsport-Bristol ("Kingsport, TN"
+  over Bristol's State Street) and Columbus GA — runs 36816286360 and
+  36816361727; San Jose (downtown at night, "San Jose, CA"), Madison
+  (written "Public domain", the runner printed "Public Domain") and
+  Fresno (at dusk, a 3:1 frame served at 2400) — one-market runs
+  36816505479, 36816573981 and 36816641545; and Bellingham, Greeley,
+  Kahului-Wailuku (the Iao Valley), Kennewick-Richland and Napa — run
+  36816430466), each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
-  `cbsa:` row never draws; San Jose, Fresno and Madison had nothing usable,
+  `cbsa:` row never draws; Hagerstown, Burlington (Vermont), Kalamazoo,
+  Beaumont, Huntington, Clarksville, Tuscaloosa and College Station had
+  nothing usable, Waco's pick was backlit and dull and Medford's a dry
+  hill over suburban roofs, soft at a phone's width,
   Baton Rouge's best frames are PNGs (never served) with its one JPEG a
   steep aerial that reads as a map on a card, and
   Ocala's sheet held a highway, a feed store's sign and parked cars,
@@ -1855,13 +1873,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   too** (#405, `app/market/survey-vacancy-board.tsx`,
   `SurveyVacancyBoard`, pure, under the payroll board): the survey's
   rental vacancy for all forty metro areas — briefed and read without a
-  brief alike — ranked tightest first, each bar carrying the survey's own
-  margin as a whisker (`LiveRate.moe`, the companion the read fetches
-  beside the figure), the national rate (`RRVRUSQ156N`, off the strip's
-  read) as a thin line, a stale row named after the ranked ones, and the
+  brief alike — the newest quarter's in order, lowest first, with no rank
+  numbers (#489: nearly every margin overlaps another), each bar carrying
+  the survey's own margin as a whisker (`LiveRate.moe`, the companion the
+  read fetches beside the figure), the national rate (`RRVRUSQ156N`, off
+  the strip's read) as a thin line, an older quarter's fresh row listed
+  after them with its quarter and a stale row as not updating, and the
   note saying the one thing the picture must not let a reader forget:
   two metro areas whose whiskers overlap are not ordered by the survey,
-  whatever the ranking says. The tracker figures on the sector pages
+  whatever the order says. A metro's survey figure is stale after 240
+  days (`freshDays`: a quarter dated its first day, published late in
+  the month after it ends, is at most about 210 days old while it is the
+  newest). The tracker figures on the sector pages
   are a different measure and the note says that too. One cached read
   (`liveMetricRates("rental_vacancy_msa")`) plus `liveRates()`; a
   suburb has no series of its own and is not a row; `data-bar="surveyvac"`.
@@ -2058,6 +2081,54 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `lib/model-vs-market-scope.ts` ("set against the published figures for
   the Washington DC market and the nation, read on …" — the nation named
   only where a national figure was read, a state called a state).
+- The public market pages, figure by figure (#489, research pass 19 of
+  2026-10-01). Each rule below is one reader, and every surface reads it:
+  - **A live figure is dated by its own cadence, the year always in it**:
+    `periodLabel` / `periodOf` in `lib/live-rates.ts` (a day "Sep 17,
+    2026", a month "Aug 2026", a quarter "Q2 2026", a year); the old
+    `shortDate` (a month and a day, no year) is gone. A count carries its
+    annual rate on the figure ("344k/yr", `formatValue`), and a tile's
+    link names a publisher the strip's FRED credit does not
+    (`publisherTag`: the BLS, the Census Bureau, Freddie Mac for its
+    mortgage survey). The curve's caption says "today's read of the
+    curve, as last posted <date>".
+  - **A rule is cut at its first whole sentence** (`lib/first-sentence`):
+    a period inside parentheses, after initials (D.C., O.C.G.A.) or a
+    known abbreviation (eff., Fla., Ch.) ends nothing; a rule's CAUTION
+    stays in view under it, never folded (`app/market/fold`, the shared
+    screen's fold). Its test reads every text in data/research.
+  - **A tracker figure is ranked once, and only where it can be**
+    (`sectorStandings` in `lib/sector-leaderboard`): one row a distinct
+    figure, naming every market that shares it; ranked only when dated,
+    under a year old, for the whole stock and one read — else listed with
+    its reason ("undated", "small-bay space only", "a spread of two
+    reads"). A band is printed as a band and never ordered by its midpoint
+    (`rentOf` / `rentText` in lib/tracker-read; Prince George's industrial
+    rent is "$10–15", never the $12.50 the file once made). A figure the
+    file names no house for is credited "publisher not recorded"
+    (`figureCitation`), a source with a note inside it is split
+    (`lib/source-parts`).
+  - **A board is one period's**: the survey board orders its newest
+    quarter, lists an older quarter's fresh row after it with its quarter
+    and a stale one as not updating, carries no rank numbers (its
+    margins overlap) and says "±4.3 pts"; the payroll board shades one
+    month; rows are named for the area the series table names
+    ("Washington MSA"). All payrolls is checked for staleness like the
+    sectors, and a tile whose area is not the market's own names it
+    (`lib/metro-own-area`: "Unemployment · Fairfax County").
+  - **What a page claims is what it draws**: each market page's search
+    description lists only the figures its series table holds
+    (`figuresDrawn` in lib/public-pages); the chip rows count in
+    `lib/market-count`'s units ("DMV core · 4 briefs, one market",
+    `regionCountLabel`); an example listing carries its own date and
+    source and shows only on its own market (`lib/example-listings`);
+    the weekday intel is dated and called an AI's read for one
+    investor; Zillow's index is said as a smoothed index, and the HUD
+    gap names both areas.
+  - **A credit never covers the words**: a market band is a two-row grid,
+    the picture and words in the first row and the credit in its own
+    (measured on all 45 bands at 390, 820 and 1280); a gallery's credit
+    line puts each photographer's licence beside them (`galleryCredit`).
 - HUD's fair market rents (#476): `lib/fmr.ts` (pure, no runtime
   imports, so the two scripts load it under plain Node) is the one reader.
   `fmrOf` reads a metros.json entry's `fmr` block — `fy`, `effective`,
@@ -4597,6 +4668,41 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   before any model call. `lib/anthropic/pipeline.test.ts` drives the real
   pipeline against a recording fake database — reproduce a failure there
   before fixing it.
+- Dates, read on the day they are read (#490, research pass 20's time
+  bombs, 2026-10-01: the whole suite was run at twelve future dates).
+  - **Every Claude step is told today's date** (`lib/anthropic/today.ts`,
+    `todayLine`): one line, ISO and words, in UTC, as the request's LAST
+    block — after the cached document, never in `ANALYST_SYSTEM` — so the
+    prompt cache's prefix stays byte-identical across steps and days. The
+    public-web comp search's "recent" is said to be as of that date; the
+    steward's "confirmed" means true today; the sector norms' era claims
+    are said as what to check, dated to when they were written.
+  - **A row dated by its period keeps its period** (`lib/period-rows.ts`,
+    `PERIOD_METRICS`): the 2–4 unit medians and the mortgage survey's
+    snapshot carry the month or week they are for in `as_of`, so the
+    steward leaves them out of its query and both its writes, beside the
+    feed rows (lib/feed-rows).
+  - **Past, today and before a date are read by the day**, never by whole
+    months ÷ 12, which counts none inside a date's last month:
+    `daysBetween` / `yearsBetween` in lib/note-yield (a date a day past an
+    anniversary is past it); a note is past its maturity the day after
+    it, due on the day, and under a month out says so with no yield; an
+    assumable loan is at or past its maturity from its day; the lease-end
+    readers (`readLeaseTerm`, `datedEnd`, a tax abatement) carry
+    `yearsToTheDay` beside their whole-month `yearsLeft`, and every
+    sentence, tag and clock that says passed, today or before the sale
+    reads it (`endHasPassed`, `endIsAhead`, `endsByYear`, `leftText`,
+    `fromToday` in lib/ground-lease-term). The month counts stay where the
+    arithmetic runs on them.
+  - **A test about a date fakes that date** (the leasehold sentence in
+    December, the roster's years, a fair market rent's year in force):
+    a test that reads the real clock fails on a day that comes every year.
+  - **A feed's file names are read, never typed by year**: Boston's
+    assessment roll is the resource whose name states the highest fiscal
+    year (`lib/ingest/boston-roll`, `pickAssessmentRoll`: the portal's
+    `name` is null and the name is in `name_translated.en`, as the runner
+    printed in zori run 37231906743; "FY2026" and "FY2027" had both read
+    20).
 - The front door: `lib/auth-flow.ts` is the pure layer — an auth failure's
   sentence by the service's stable `code` (`authErrorCopy`), the sign-in
   page's link banner, and where an email link's one-time code goes.
