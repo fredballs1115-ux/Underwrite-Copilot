@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
 import { costAssumptionsLine } from "@/lib/underwrite/cost-note";
 import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
+import { modelLoanCoverageLine } from "@/lib/sizer-terms";
 import {
   sliderValues,
   runScenario,
@@ -202,6 +203,9 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     setPriceOverride(null);
   };
 
+  // The DSCR the tile shows, against the coverage the debt sizer tests.
+  const coverageLine = modelLoanCoverageLine(current.dscrYr1, inputs.ltc);
+
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -255,6 +259,14 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         <Metric label="Year-1 CoC" value={fmtPct(current.cocYr1Pct)} cur={current.cocYr1Pct} was={base.cocYr1Pct} baseText={fmtPct(base.cocYr1Pct)} dirty={dirty} />
         <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={dirty} />
       </div>
+      {/* The model sizes its loan by cost alone, with no coverage test: where
+          the DSCR the tile shows is under the debt sizer's own test, one
+          line says so and by how much (lib/sizer-terms). Display only. */}
+      {coverageLine && (
+        <p className="mt-2 text-[11px] leading-relaxed text-caution" data-qa="playground-dscr-test">
+          {coverageLine}
+        </p>
+      )}
       {/* The costs these returns carry and the card cannot show: the
           model's defaults, said as defaults (lib/underwrite/cost-note). */}
       <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">

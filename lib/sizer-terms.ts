@@ -17,10 +17,39 @@
 
 import type { RateSeed } from "@/lib/debt-index";
 
+const toTwo = (n: number) => Math.round(n * 100) / 100;
+
 /** The sizer's own placeholder: only where the deal has no derived
  *  screening model to start from (no extraction yet) and nothing states a
  *  rate. */
 export const FLAT_SIZER_RATE_PCT = 6.5;
+
+/** The lender tests the sizer starts from: screening defaults, never a
+ *  lender's terms, and the card's opening sentence says so. The sensitivity
+ *  playground reads the coverage test too (`modelLoanCoverageLine`), so the
+ *  two never quote different tests — one figure, never retyped. */
+export const SIZER_LENDER_TESTS = { maxLtvPct: 65, minDscr: 1.25, minDebtYieldPct: 8 } as const;
+
+/**
+ * The screening model sizes its loan by cost alone — its loan-to-cost on the
+ * acquisition cost (lib/underwrite/engine), with no coverage test — so a
+ * deal bought on a thin enough cap carries a loan the sizer's own coverage
+ * test refuses (research pass 27: under about a 5.45% cap at 60% and 6.00%).
+ * Where the model's year-one DSCR is under that test, one line says so and
+ * by how much; display only, the model's loan is never resized. Read at the
+ * tile's own precision (two places): a DSCR that shows as 1.25x is at the
+ * test, never "0.00x under" it. Null with no debt service, or at or over
+ * the test.
+ */
+export function modelLoanCoverageLine(dscrYr1: number | null, ltc: number): string | null {
+  if (dscrYr1 == null || !Number.isFinite(dscrYr1)) return null;
+  const min = SIZER_LENDER_TESTS.minDscr;
+  const shown = toTwo(dscrYr1);
+  if (shown >= min) return null;
+  const gap = toTwo(min - shown);
+  const ltcPct = Number((ltc * 100).toFixed(1));
+  return `The model's loan is ${gap.toFixed(2)}x under the debt sizer's ${min.toFixed(2)}x coverage test: it sizes the loan by cost alone (${ltcPct}% of the acquisition cost).`;
+}
 
 /**
  * The card's opening sentence, true of every figure it starts from: the
@@ -68,8 +97,6 @@ export interface SizerRate {
    *  sentence names as the first-draft model's */
   note: string | null;
 }
-
-const toTwo = (n: number) => Math.round(n * 100) / 100;
 
 export function sizerStartingRate(o: {
   /** the first-draft model's rate where a loan's own paper states it, percent */

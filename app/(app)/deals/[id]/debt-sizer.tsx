@@ -20,7 +20,7 @@ import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
 import { interestOf } from "@/lib/interest";
 import { assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
 import { assetWords } from "@/lib/asset-words";
-import { sizerSourceLine, sizerStartingRate } from "@/lib/sizer-terms";
+import { SIZER_LENDER_TESTS, sizerSourceLine, sizerStartingRate } from "@/lib/sizer-terms";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -320,9 +320,11 @@ export function DebtSizer({
   const [ratePct, setRatePct] = useState(seed.ratePct);
   const [amortYears, setAmortYears] = useState(seed.amortYears);
   const [io, setIo] = useState(false);
-  const [maxLtvPct, setMaxLtvPct] = useState(65);
-  const [minDscr, setMinDscr] = useState(1.25);
-  const [minDebtYieldPct, setMinDebtYieldPct] = useState(8);
+  // The lender tests start at the screening defaults (lib/sizer-terms) the
+  // opening sentence names as defaults; the playground reads the same DSCR.
+  const [maxLtvPct, setMaxLtvPct] = useState<number>(SIZER_LENDER_TESTS.maxLtvPct);
+  const [minDscr, setMinDscr] = useState<number>(SIZER_LENDER_TESTS.minDscr);
+  const [minDebtYieldPct, setMinDebtYieldPct] = useState<number>(SIZER_LENDER_TESTS.minDebtYieldPct);
 
   const price = parseMoney(priceRaw) ?? null;
   const noi = parseMoney(noiRaw) ?? null;

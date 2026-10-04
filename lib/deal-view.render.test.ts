@@ -34,6 +34,7 @@ import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
 import { buyBoxRead } from "@/lib/buy-box-chip";
 import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
 import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";
+import { SIZER_LENDER_TESTS, modelLoanCoverageLine } from "@/lib/sizer-terms";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { readFileSync } from "node:fs";
@@ -978,6 +979,57 @@ describe("the sensitivity playground says whose figures it runs", () => {
       "mandate fit on the memorandum's figures",
     );
     expect(playgroundFitLine({ ...s, scored: ["IRR"] }, false)).toBe("with the model's IRR scored · Fit 63 on the memorandum's figures");
+  });
+
+  // Research pass 27: the model's loan is a share of cost with no coverage
+  // test, so a deal bought under about a 5.45% cap was given a levered
+  // return on a loan the page's own debt sizer refuses at 1.25x, and the
+  // page said nothing. Display only: the model's loan is never resized.
+  it("says where the model's loan falls under the coverage the debt sizer tests, and that it sizes by cost alone", () => {
+    const p = sampleProps(null) as unknown as { playground: PlaygroundData };
+    const draw = (price: number) =>
+      renderToStaticMarkup(
+        React.createElement(SensitivityPlayground, {
+          data: { ...p.playground, inputs: { ...p.playground.inputs, purchasePrice: price } },
+        }),
+      );
+    const dscrShown = (html: string) => Number(textOf(html).match(/Year-1 DSCR\s*(-?\d+\.\d\d)x/)![1]);
+    const ask = p.playground.inputs.purchasePrice;
+    // The sample's own ask: the tile reads 1.25x, at the sizer's test — no line.
+    const atTest = draw(ask);
+    expect(dscrShown(atTest)).toBe(SIZER_LENDER_TESTS.minDscr);
+    expect(atTest).not.toContain('data-qa="playground-dscr-test"');
+    // Cheaper, the loan is smaller on the same NOI: over the test — no line.
+    const over = draw(ask * 0.9);
+    expect(dscrShown(over)).toBeGreaterThan(SIZER_LENDER_TESTS.minDscr);
+    expect(over).not.toContain('data-qa="playground-dscr-test"');
+    // Dearer, the loan is larger on the same NOI: under the test, said by how much.
+    const under = draw(ask * 1.2);
+    const shown = dscrShown(under);
+    expect(shown).toBeLessThan(SIZER_LENDER_TESTS.minDscr);
+    const gap = (SIZER_LENDER_TESTS.minDscr - shown).toFixed(2);
+    const text = textOf(under);
+    expect(text).toContain(
+      `The model's loan is ${gap}x under the debt sizer's 1.25x coverage test: it sizes the loan by cost alone (60% of the acquisition cost).`,
+    );
+    // Under the tile, never above it.
+    expect(under.indexOf('data-qa="playground-dscr-test"')).toBeGreaterThan(under.indexOf("Year-1 DSCR"));
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(under)).toEqual([]);
+  });
+
+  it("reads the coverage at the tile's own precision, and says nothing where the model carries no debt", () => {
+    // 1.2496 shows as 1.25x: at the test, so no line that would read "0.00x under".
+    expect(modelLoanCoverageLine(1.2496, 0.6)).toBeNull();
+    expect(modelLoanCoverageLine(1.25, 0.6)).toBeNull();
+    expect(modelLoanCoverageLine(1.2449, 0.6)).toBe(
+      "The model's loan is 0.01x under the debt sizer's 1.25x coverage test: it sizes the loan by cost alone (60% of the acquisition cost).",
+    );
+    expect(modelLoanCoverageLine(1.03, 0.625)).toBe(
+      "The model's loan is 0.22x under the debt sizer's 1.25x coverage test: it sizes the loan by cost alone (62.5% of the acquisition cost).",
+    );
+    expect(modelLoanCoverageLine(null, 0.6)).toBeNull();
+    expect(modelLoanCoverageLine(Number.NaN, 0.6)).toBeNull();
   });
 
   it("says a plan deal's returns are the screening model's, not the plan's", () => {
