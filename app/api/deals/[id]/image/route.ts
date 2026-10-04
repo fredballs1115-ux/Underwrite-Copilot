@@ -30,6 +30,7 @@ import { IMAGE_CREDIT, fetchBestBuildingImage } from "@/lib/imagery";
 import { coverFor } from "@/lib/deal-cover";
 import { COVER_EDITION, coverSvg } from "@/lib/deal-cover-art";
 import { shownAssetClass } from "@/lib/pipeline-slots";
+import { dealPhotoPathOf } from "@/lib/storage-paths";
 
 const SIZE = { min: 48, max: 1280, defaultW: 800, defaultH: 450 };
 
@@ -64,14 +65,25 @@ export async function GET(
   // The deal's own photograph first — found in its memorandum on the first
   // ask and stored, so the plan below can serve it.
   const cache = (deal.photo as DealVisualCache | null) ?? null;
-  const picture = await ensureDealPicture(supabase, id, {
+  const found = await ensureDealPicture(supabase, id, {
     omPath: (deal.om_storage_path as string | null) ?? null,
     isSample: !!(deal as { is_sample?: boolean }).is_sample,
     cache,
     // A thumbnail's slot holds its plate meanwhile; this may wait its turn.
     waitMs: SEARCH_WAIT_MS,
   });
-  const withPicture: DealVisualCache | null = picture ? { ...(cache ?? {}), picture } : cache;
+  // deals.photo is the deal owner's to write, and the validator below puts
+  // its stored path and its geocode stamp in a header, where a line break
+  // had made the route answer 500 (research pass 22). A picture whose path
+  // is not this deal's photograph is none of its own (lib/storage would
+  // refuse to read it), and a stamp that is not a timestamp is no stamp.
+  const picture = found && dealPhotoPathOf(id, found[pictureSizeFor({ width, height })]) ? found : null;
+  const withPicture: DealVisualCache | null = picture
+    ? { ...(cache ?? {}), picture }
+    : cache
+      ? { ...cache, picture: undefined }
+      : null;
+  const geoAt = typeof cache?.geoAt === "string" && /^[0-9A-Za-z:.+-]{1,40}$/.test(cache.geoAt) ? cache.geoAt : "";
 
   // What the browser revalidates against, under a URL that never changes. A
   // stored photograph's identity is its path (the stamp of the upload that
@@ -82,7 +94,7 @@ export async function GET(
   // deals' pictures the next day rather than after a week of aerials.
   const etag = picture
     ? `W/"${picture[pictureSizeFor({ width, height })]}"`
-    : `W/"map:${cache?.geoAt ?? ""}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? `:cover${COVER_EDITION}` : ""}"`;
+    : `W/"map:${geoAt}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? `:cover${COVER_EDITION}` : ""}"`;
   const revalidate = { etag, "cache-control": "private, no-cache" };
   if (req.headers.get("if-none-match") === etag) {
     return new NextResponse(null, { status: 304, headers: revalidate });

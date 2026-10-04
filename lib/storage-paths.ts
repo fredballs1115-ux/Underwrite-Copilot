@@ -87,6 +87,18 @@ export function classifyDealPath(path: string, dealId: string): DealObjectKind |
   return null;
 }
 
+/**
+ * A photograph's stored path, read back off deals.photo, where it is one of
+ * this deal's photograph files; else null. The column is the deal's owner's
+ * to write, and the picture routes put the path in a header (the validator),
+ * where a line break had made them answer 500 (research pass 22). A path this
+ * returns is one the storage gate would read, and is header-safe: it holds
+ * only the characters the minting helpers produce.
+ */
+export function dealPhotoPathOf(dealId: string, path: unknown): string | null {
+  return typeof path === "string" && classifyDealPath(path, dealId) === "photo" ? path : null;
+}
+
 /** A drawn flood frame's file name (#472): a stamp. */
 const FLOOD_FILE = /^[a-z0-9]+\.jpg$/;
 

@@ -178,7 +178,11 @@ describe("the cover as a picture (#443)", () => {
 const route = vi.hoisted(() => ({
   row: null as Record<string, unknown> | null,
   planAsked: [] as { overhead?: boolean }[],
+  /** the cache each source is handed */
+  cacheHanded: [] as unknown[],
   photo: false,
+  /** the deal's own photograph, as the row stores it */
+  picture: null as Record<string, unknown> | null,
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -194,13 +198,14 @@ vi.mock("@/lib/supabase/server", () => ({
 vi.mock("@/lib/deal-picture", () => ({
   PICTURE_CREDIT: { om: "From the offering memorandum", upload: "Photograph added to the deal" },
   SEARCH_WAIT_MS: 0,
-  ensureDealPicture: async () => null,
+  ensureDealPicture: async () => route.picture,
   pictureSizeFor: () => "thumb",
 }));
 vi.mock("@/lib/imagery", () => ({
   IMAGE_CREDIT: { photo: "Photo", streetview: "Google Street View", aerial: "USGS The National Map (public domain)" },
-  fetchBestBuildingImage: async (_s: unknown, _id: string, _a: unknown, _c: unknown, _size: unknown, opts: { overhead?: boolean } = {}) => {
+  fetchBestBuildingImage: async (_s: unknown, _id: string, _a: unknown, cache: unknown, _size: unknown, opts: { overhead?: boolean } = {}) => {
     route.planAsked.push(opts);
+    route.cacheHanded.push(cache);
     if (!route.photo) return null;
     return {
       source: "streetview",
@@ -218,7 +223,9 @@ describe("the image route's cover (#443)", () => {
   beforeEach(() => {
     route.row = { id: "d1", address: { label: "Waco, TX", city: "Waco", state: "TX" }, photo: null, om_storage_path: null, is_sample: false, asset_class: "auto", extracted_class: "Self-storage facility" };
     route.planAsked = [];
+    route.cacheHanded = [];
     route.photo = false;
+    route.picture = null;
   });
 
   it("answers the deal's cover where no photograph of the building answers, never an overhead", async () => {
@@ -269,5 +276,25 @@ describe("the image route's cover (#443)", () => {
   it("answers a deal the caller cannot read with a 404, never a cover", async () => {
     route.row = null;
     expect((await ask("w=64&h=64&fallback=cover")).status).toBe(404);
+  });
+
+  it("puts nothing from the stored row in its validator that is not a stored path or a stamp (research pass 22)", async () => {
+    // deals.photo is the deal owner's to write: a line break in the stored
+    // path, or in the geocode stamp, had made the route answer 500.
+    const own = { hero: "photos/d1/1-hero.jpg", thumb: "photos/d1/1-thumb.jpg", source: "om" };
+    route.picture = { ...own, thumb: "photos/d1/1-thumb.jpg\r\nX: y" };
+    route.row = { ...route.row!, photo: { picture: route.picture, geoAt: "2026-10-01T00:00:00Z\nX: y" } };
+    const res = await ask("w=64&h=64&fallback=cover");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-image-source")).toBe("cover");
+    expect(res.headers.get("etag")).toMatch(/^W\/"map::\d{4}-\d{2}-\d{2}:64x64:cover\d+"$/);
+    // …and the picture whose path is not this deal's is no picture of it.
+    expect((route.cacheHanded[0] as { picture?: unknown }).picture).toBeUndefined();
+    // The deal's own photograph and stamp still make the validator.
+    route.picture = own;
+    route.row = { ...route.row!, photo: { picture: own, geoAt: "2026-10-01T00:00:00.000Z" } };
+    expect((await ask("w=64&h=64&fallback=cover")).headers.get("etag")).toBe(`W/"photos/d1/1-thumb.jpg"`);
+    route.picture = null;
+    expect((await ask("w=64&h=64&fallback=cover")).headers.get("etag")).toMatch(/^W\/"map:2026-10-01T00:00:00\.000Z:/);
   });
 });

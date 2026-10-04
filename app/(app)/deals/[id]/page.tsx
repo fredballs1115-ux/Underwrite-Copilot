@@ -47,7 +47,7 @@ import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing
 import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { readPortfolio } from "@/lib/portfolio";
 import { loiTermsFor } from "@/lib/loi-terms";
-import { PICTURE_CREDIT, ensureDealPicture, memorandumPhotoCredit } from "@/lib/deal-picture";
+import { PICTURE_CREDIT, ensureDealPicture, galleryPage, memorandumPhotoCredit } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/pipeline-slots";
@@ -452,7 +452,8 @@ export default async function DealPage({
   const gallery = (deal as { is_sample?: boolean }).is_sample
     ? []
     : (((deal.photo as DealVisualCache | null)?.gallery ?? []).map((g) => ({
-        page: g.page ?? null,
+        // A page the deal's owner wrote is printed only as a page number.
+        page: galleryPage(g.page),
         credit: memorandumPhotoCredit(g.page),
         // Its colours before its pixels (#463).
         preview: g.preview ?? null,

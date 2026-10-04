@@ -19,6 +19,7 @@
 import { NextResponse, after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { DealVisualCache } from "@/lib/deal-location";
+import { dealPhotoPathOf } from "@/lib/storage-paths";
 import {
   PICTURE_CREDIT,
   SEARCH_WAIT_MS,
@@ -73,11 +74,18 @@ export async function GET(
 
   const asked = url.searchParams.get("size");
   const size: PictureSize = asked === "thumb" ? "thumb" : asked === "full" ? "full" : "hero";
+  // The stored path is the deal's own to write (deals.photo), as the page
+  // in the credit above is (`memorandumPhotoCredit` prints only a page
+  // number). One that is not this deal's photograph is never read
+  // (lib/storage refuses it), and it never reaches a header either: a line
+  // break in it had made the route answer 500 (research pass 22).
+  const path = dealPhotoPathOf(id, picturePathFor(picture, size));
+  if (!path) return new NextResponse(null, { status: 404 });
   // The stored path carries the stamp of the upload that made it, so it is
   // the picture's identity: a replaced picture is a new path under the SAME
   // URL, and a browser told to revalidate rather than to trust a day's cache
   // sees it at once — while an unchanged one costs a 304 and no bytes.
-  const etag = `W/"${picturePathFor(picture, size)}"`;
+  const etag = `W/"${path}"`;
   const headers = {
     etag,
     "cache-control": "private, no-cache",

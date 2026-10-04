@@ -267,6 +267,21 @@ describe("GET /api/share/[token]/picture — the deal's own photograph, as long 
     expect(state.pictureReads).toEqual([]);
   });
 
+  it("a stored path that is not this deal's photograph is a 404 with no read, never a header (research pass 22)", async () => {
+    // deals.photo is the deal owner's to write: a line break in the path had
+    // made the route answer 500 building its validator.
+    for (const hero of ["photos/deal-1/1-hero.jpg\r\nSet-Cookie: a=b", "photos/deal-2/1700000000000-hero.jpg", 42]) {
+      state.client = fakeDb({
+        deal_shares: [share()],
+        deals: [deal({ team_id: null, photo: { picture: { ...PICTURE, hero } } })],
+      }).client;
+      const res = await get(TOKEN);
+      expect(res.status, String(hero)).toBe(404);
+      expect(res.headers.get("etag")).toBeNull();
+    }
+    expect(state.pictureReads).toEqual([]);
+  });
+
   it("no stored photograph is a 404 without a read — a share never lifts one out of the memorandum — and a missing file is a 404 too", async () => {
     state.client = fakeDb({ deal_shares: [share()], deals: [deal({ team_id: null, photo: null })] }).client;
     expect((await get(TOKEN)).status).toBe(404);

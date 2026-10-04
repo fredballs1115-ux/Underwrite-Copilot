@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeCache, type DealPicture, type DealVisualCache } from "@/lib/deal-location";
 import { RunGate } from "@/lib/anthropic/run-gate";
 import { PREVIEW_PX, isPreview } from "@/lib/photo-preview";
+import { MAX_OM_PAGES } from "@/lib/pdf";
 import { EARLY_SHARE, findOmImages, scanShaped, type OmImage } from "@/lib/om-photo";
 import {
   FLAT_SHARE,
@@ -194,9 +195,23 @@ export const PICTURE_CREDIT: Record<DealPicture["source"], string> = {
  */
 export const GALLERY_VERSION = 2;
 
-/** A memorandum photograph beside the cover, credited with its page. */
-export function memorandumPhotoCredit(page: number | null | undefined): string {
-  return page ? `${PICTURE_CREDIT.om}, page ${page}` : PICTURE_CREDIT.om;
+/**
+ * A gallery photograph's page as a credit may print it: a whole number from
+ * 1 to the longest memorandum the site reads (`MAX_OM_PAGES`), else none.
+ * The page is stored in deals.photo, which the deal's owner can write, and it
+ * goes into the picture route's `x-image-credit` header — where a line break
+ * made the route answer 500 (research pass 22) — and into every credit and
+ * alt text a gallery photograph wears. Every one of them reads it here.
+ */
+export function galleryPage(page: unknown): number | null {
+  return typeof page === "number" && Number.isInteger(page) && page >= 1 && page <= MAX_OM_PAGES ? page : null;
+}
+
+/** A memorandum photograph beside the cover, credited with its page where
+ *  it has one a credit may print (`galleryPage`). */
+export function memorandumPhotoCredit(page: unknown): string {
+  const n = galleryPage(page);
+  return n ? `${PICTURE_CREDIT.om}, page ${n}` : PICTURE_CREDIT.om;
 }
 
 /** A picture as decoded pixels: what a locked memorandum's cover comes out as. */

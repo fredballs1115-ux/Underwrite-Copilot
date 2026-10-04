@@ -17,7 +17,7 @@ import { cookies } from "next/headers";
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
-import { PICTURE_CREDIT, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
+import { PICTURE_CREDIT, galleryPage, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import { cacheFresh, type DealVisualCache } from "@/lib/deal-location";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
@@ -415,14 +415,18 @@ export default async function DealsPage({
           // credit, only where the card leads with the deal's own photograph.
           slides:
             picture && !d.is_sample
-              ? (cache?.gallery ?? []).map((g, k) => ({
-                  kind: "photo" as const,
-                  src: `/api/deals/${encodeURIComponent(d.id)}/picture?size=hero&g=${k + 1}`,
-                  credit: memorandumPhotoCredit(g.page),
-                  alt: g.page
-                    ? `Photograph from page ${g.page} of the memorandum for ${d.name}`
-                    : `Photograph from the memorandum for ${d.name}`,
-                }))
+              ? (cache?.gallery ?? []).map((g, k) => {
+                  // A page the deal's owner wrote is printed only as a page number.
+                  const page = galleryPage(g.page);
+                  return {
+                    kind: "photo" as const,
+                    src: `/api/deals/${encodeURIComponent(d.id)}/picture?size=hero&g=${k + 1}`,
+                    credit: memorandumPhotoCredit(page),
+                    alt: page
+                      ? `Photograph from page ${page} of the memorandum for ${d.name}`
+                      : `Photograph from the memorandum for ${d.name}`,
+                  };
+                })
               : [],
         };
       })(),

@@ -9,6 +9,7 @@ import {
   StoragePathError,
   brandingLogoPath,
   classifyDealPath,
+  dealPhotoPathOf,
   documentPath,
   isBrandingPath,
   isScopedPath,
@@ -68,6 +69,24 @@ describe("the minted shapes are their own deal's", () => {
     expect(safeFileName("../../etc/passwd")).toBe("etc_passwd");
     expect(safeFileName("", "bov.pdf")).toBe("bov.pdf");
     expect(safeFileName("x".repeat(200)).length).toBe(80);
+  });
+});
+
+describe("a photograph's stored path, read back off the deal's row", () => {
+  it("is the deal's own photograph file, or none — so it can go into a header (research pass 22)", () => {
+    expect(dealPhotoPathOf(DEAL, `photos/${DEAL}/k3x9-hero.jpg`)).toBe(`photos/${DEAL}/k3x9-hero.jpg`);
+    for (const bad of [
+      `photos/${DEAL}/k3x9-hero.jpg\r\nSet-Cookie: a=b`,
+      `photos/${DEAL}/k3x9-hero.jpg\n`,
+      `photos/${OTHER_DEAL}/k3x9-hero.jpg`,
+      omStoragePath(USER, DEAL),
+      `photos/${DEAL}/../k3x9-hero.jpg`,
+      42,
+      null,
+      { path: `photos/${DEAL}/k3x9-hero.jpg` },
+    ]) {
+      expect(dealPhotoPathOf(DEAL, bad), JSON.stringify(bad)).toBeNull();
+    }
   });
 });
 
