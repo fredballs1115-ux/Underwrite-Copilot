@@ -19,6 +19,8 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
 import { interestOf } from "@/lib/interest";
 import { assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
+import { assetWords } from "@/lib/asset-words";
+import { sizerStartingRate } from "@/lib/sizer-terms";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -173,22 +175,30 @@ interface Seed {
   ratePct: number;
   amortYears: number;
   seededFrom: "model" | "extraction" | "defaults";
-  /** the sentence behind a rate that came off today's curve — null where
-   *  the generated model's own loan set it, or nothing could seed one */
+  /** the sentence under the rate field saying where the rate came from
+   *  (lib/sizer-terms) — null where a loan's own paper states it */
   rateNote: string | null;
 }
 
-/** The rate a sizer starts from when the documents state none: today's
- *  index plus the class spread where the table could seed one (the same
- *  figure the screening model runs on, so the two agree), else the old
- *  flat placeholder. */
-const FLAT_RATE_PCT = 6.5;
-
+/** The rate a sizer starts from (lib/sizer-terms `sizerStartingRate`): a
+ *  rate a document states, then the day's seed, then the derived screening
+ *  model's own rate — so the sizer and the workbook print one rate for one
+ *  loan on a day the table seeds nothing — and a flat placeholder only where
+ *  there is no derived model at all, each said under the field. */
 function deriveSeed(
   model: UnderwritingModel | null,
   extraction: ExtractionResult | null,
   today: RateSeed | null,
+  underwrite: UnderwriteInputs | null,
 ): Seed {
+  const rate = (statedPct: number | null) =>
+    sizerStartingRate({
+      statedPct,
+      seed: today,
+      modelRateDec: underwrite?.allInRatePct ?? null,
+      // The model's own test for a class that carries a permanent loan.
+      operating: assetWords(extraction?.assetClass).operating,
+    });
   // An NOI at or above a quarter of the price is not the building's income —
   // it is a stabilized pro forma (the finished conversion) or a misread. A
   // lender sizes off in-place income; seeding the sizer with the pro forma
@@ -207,14 +217,14 @@ function deriveSeed(
     // rate is a quote, and a quote beats a benchmark. The first-draft model
     // carries a rate whether or not a document states one, so only a rate a
     // document states is taken as the quote (lib/model/stated-rate).
-    const stated = statedModelRate(model);
+    const r = rate(statedModelRate(model));
     return {
       price,
       noi: plausible(model.cashFlow?.[0]?.noi ?? null, price),
-      ratePct: stated ?? today?.pct ?? FLAT_RATE_PCT,
+      ratePct: r.pct,
       amortYears: model.inputs.loan?.amortYears ?? 30,
       seededFrom: "model",
-      rateNote: stated == null && today ? today.note : null,
+      rateNote: r.note,
     };
   }
   const metrics = extraction?.metrics ?? [];
@@ -228,13 +238,14 @@ function deriveSeed(
   const figs = noiFigures(metrics);
   const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1") ?? null;
   const noi = plausible(going?.value ?? null, price);
+  const r = rate(null);
   return {
     price,
     noi,
-    ratePct: today?.pct ?? FLAT_RATE_PCT,
+    ratePct: r.pct,
     amortYears: 30,
     seededFrom: price != null || noi != null ? "extraction" : "defaults",
-    rateNote: today ? today.note : null,
+    rateNote: r.note,
   };
 }
 
@@ -274,12 +285,14 @@ export function DebtSizer({
   underwrite?: UnderwriteInputs | null;
   /** today's starting rates off the rates table (lib/debt-index): the
    *  permanent loan's, which is the screening model's own seeded rate, and
-   *  the construction loan's; null keeps the flat placeholders */
+   *  the construction loan's; null starts the sizer from the derived
+   *  model's own rate (`underwrite`), and the construction panel from its
+   *  flat placeholder */
   rateSeeds?: DealRateSeeds | null;
 }) {
   const seed = useMemo(
-    () => deriveSeed(model, extraction, rateSeeds?.permanent ?? null),
-    [model, extraction, rateSeeds],
+    () => deriveSeed(model, extraction, rateSeeds?.permanent ?? null, underwrite),
+    [model, extraction, rateSeeds, underwrite],
   );
   const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
   // A plan deal's debt is construction or bridge debt sized to cost, paid off
@@ -574,7 +587,9 @@ export function DebtSizer({
           </label>
         </div>
         {seed.rateNote && (
-          <p className="mt-1.5 text-xs text-muted">Rate seeded from the live curve: {seed.rateNote}</p>
+          <p className="mt-1.5 text-xs text-muted" data-qa="sizer-rate-note">
+            {seed.rateNote}
+          </p>
         )}
 
         <ul className="mt-4 space-y-1.5">
