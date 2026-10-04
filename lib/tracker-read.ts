@@ -100,15 +100,28 @@ const SECTOR_LABEL: Record<TrackerSector, string> = {
  * as industrial) is a specialty building the warehouse market's figures do
  * not speak to. Each reads no tracker rather than its neighbour's.
  */
-const OWN_MARKET: readonly RegExp[] = [
-  /\b(life[- ]?sciences?|labs?|laborator(?:y|ies))\b/i,
-  /\b(industrial outdoor storage|outdoor storage|ios|truck (?:terminal|yard)|storage yard)\b/i,
-  /\b(cold[- ]storage|refrigerated|freezer)\b/i,
+export type OwnMarketBuilding = "lab" | "yard" | "cold_storage";
+
+const OWN_MARKET: readonly (readonly [OwnMarketBuilding, RegExp])[] = [
+  ["lab", /\b(life[- ]?sciences?|labs?|laborator(?:y|ies))\b/i],
+  ["yard", /\b(industrial outdoor storage|outdoor storage|ios|truck (?:terminal|yard)|storage yard)\b/i],
+  ["cold_storage", /\b(cold[- ]storage|refrigerated|freezer)\b/i],
 ];
 
-/** Whether any of the deal's own words name a building no tracker here describes. */
-function ownMarket(words: readonly (string | null | undefined)[]): boolean {
-  return words.some((w) => typeof w === "string" && OWN_MARKET.some((re) => re.test(w)));
+/**
+ * Which building no tracker here describes the deal's own words name — a
+ * lab, an outdoor-storage yard or a cold-storage warehouse — or null. The
+ * one test every reader of a neighbour's figure asks: the tracker
+ * (`trackerSectorFor`), the national lessor rent index (lib/live-market-
+ * brief `rentIndexFor`, which had handed a lab the office landlords' rents
+ * the tracker refuses it — research pass 23) and the challenger's traps
+ * for a lab or a cold-storage building, so none reads what another refuses.
+ */
+export function ownMarketBuilding(...words: readonly (string | null | undefined)[]): OwnMarketBuilding | null {
+  for (const [kind, re] of OWN_MARKET) {
+    if (words.some((w) => typeof w === "string" && re.test(w))) return kind;
+  }
+  return null;
 }
 
 /**
@@ -124,7 +137,7 @@ function ownMarket(words: readonly (string | null | undefined)[]): boolean {
  * null, so nothing is read against a neighbour's figure.
  */
 export function trackerSectorFor(assetClass: string | null | undefined, deckWords?: string | null): TrackerSector | null {
-  if (ownMarket([assetClass, deckWords])) return null;
+  if (ownMarketBuilding(assetClass, deckWords)) return null;
   switch (assetClassKey(assetClass)) {
     case "office":
       return "office";

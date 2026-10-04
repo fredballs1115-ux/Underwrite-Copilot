@@ -669,8 +669,31 @@ describe("trackerFor — the sector snapshot's vacancy band and cap range for a 
       metro: { id: "dc", name: "Washington DC" },
       reads: { rates, zori, national, now: FIXTURE_NOW },
     })!;
-    expect(r.checks.map((c) => c.key)).toEqual(["rent_growth", "expense_growth", "exit_cap"]);
+    // No rent row either: the industrial landlords' rent index is the
+    // neighbour's figure the tracker refuses it (research pass 23).
+    expect(r.checks.map((c) => c.key)).toEqual(["expense_growth", "exit_cap"]);
     expect(r.checks.map((c) => c.read).join(" ")).not.toContain("research tracker");
+    expect(r.checks.map((c) => c.read).join(" ")).not.toContain("lessors of manufacturing and industrial buildings");
+    // A lab the analyst filed as an office reads no office landlords' rents;
+    // a plain warehouse filed the same way still reads its own.
+    const lab = { ...cold, dealName: "Navy Yard Labs", assetClass: "Laboratory" };
+    const labRead = modelVsMarketFor({
+      derived: deriveUnderwriteInputs(lab, "lab"),
+      extraction: lab,
+      storedAssetClass: "office",
+      metro: { id: "dc", name: "Washington DC" },
+      reads: { rates, zori, national, now: FIXTURE_NOW },
+    })!;
+    expect(labRead.checks.map((c) => c.key)).not.toContain("rent_growth");
+    const warehouse = { ...cold, dealName: "Anacostia Distribution", assetClass: "Bulk distribution warehouse" };
+    const plain = modelVsMarketFor({
+      derived: deriveUnderwriteInputs(warehouse, "warehouse"),
+      extraction: warehouse,
+      storedAssetClass: "industrial",
+      metro: { id: "dc", name: "Washington DC" },
+      reads: { rates, zori, national, now: FIXTURE_NOW },
+    })!;
+    expect(plain.checks.find((c) => c.key === "rent_growth")?.read).toContain("lessors of manufacturing and industrial buildings");
   });
 
   it("reads a band as a band, a point as a point, the day the research was read, and each figure's own provenance", () => {

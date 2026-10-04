@@ -153,6 +153,10 @@ export interface ModelVsMarketInput {
   /** provenance of each assumption (deriveUnderwriteInputs' sources) — a default is named as one */
   sources?: Partial<Record<AssumptionKey, InputSource>>;
   assetClass?: string | null;
+  /** the deck's own class words (the extraction's phrase): a lab or a
+   *  cold-storage building filed as plain office or industrial reads no
+   *  lessor rent index, as it reads no tracker (lib/tracker-read) */
+  deckWords?: string | null;
   plan?: boolean;
   /** the going-in cap, percent, as the page shows it — null on a plan deal */
   goingInCapPct?: number | null;
@@ -387,10 +391,11 @@ function byPoints(model: number, published: readonly number[]): string {
  * of lessor charges (the BLS producer price index, `rentIndexFor`) — the
  * one figure of its own kind the feeds hold for an office, a shop, a
  * warehouse or a storage facility. Said as the nation's, never the
- * metro's. Lodging and licensed care have no lessor's rent and get no row.
+ * metro's. Lodging and licensed care have no lessor's rent and get no row,
+ * and neither does a lab or a cold-storage building (`rentIndexFor`).
  */
 function commercialRentCheck(input: ModelVsMarketInput, g: number): ModelCheck | null {
-  const idx = rentIndexFor(input.assetClass);
+  const idx = rentIndexFor(input.assetClass, input.deckWords);
   if (!idx) return null;
   const r = fresh(input.national, (x) => x.meta.id === idx.id);
   if (!r) return null;
@@ -863,6 +868,7 @@ export function modelVsMarketFor(args: {
     inputs: derived.inputs,
     sources: derived.sources,
     assetClass,
+    deckWords: extraction?.assetClass ?? null,
     plan: planDeal,
     goingInCapPct: goingIn?.pct ?? null,
     goingInCapSource: goingIn?.source,

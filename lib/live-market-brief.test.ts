@@ -5,6 +5,7 @@ import { CONSTRUCTION_COST_IDS, BRIEF_NATIONAL_IDS, CRE_PRICE_ID, DEBT_MARKET_ID
 import type { ZoriRead } from "./zori";
 import type { RealtorRead } from "./realtor";
 import { briefDelta } from "./brief-delta";
+import { trackerSectorFor } from "./tracker-read";
 
 const NOW = new Date("2026-09-23T12:00:00Z");
 
@@ -501,6 +502,30 @@ describe("the rents each kind of commercial lessor charges — national, said so
     }
     // A phrase the model wrote files by its words, like every other class read.
     expect(rentIndexFor("Class A office tower")?.id).toBe("PCU5311205311202_YOY");
+  });
+
+  // Research pass 23: a lab filed as an office was handed the office
+  // landlords' rents — the neighbour's figure the tracker refuses it.
+  it("a lab, an outdoor-storage yard or a cold-storage warehouse reads no neighbour's index, by the tracker's own test", () => {
+    for (const cls of ["Laboratory", "Life Sciences Campus", "Cold Storage Warehouse", "Refrigerated distribution", "Industrial Outdoor Storage (IOS)"]) {
+      expect(rentIndexFor(cls), cls).toBeNull();
+    }
+    // The analyst's plain class, with the deck's own words naming the building.
+    expect(rentIndexFor("office", "Life Science / Lab")).toBeNull();
+    expect(rentIndexFor("industrial", "Cold Storage Warehouse")).toBeNull();
+    expect(rentIndexFor("industrial", "IOS yard")).toBeNull();
+    // The two read one test, so they cannot disagree.
+    for (const [cls, words] of [["office", "Life Science / Lab"], ["industrial", "Cold Storage Warehouse"], ["industrial", "Bulk distribution warehouse"], ["office", "Class A office tower"]] as const) {
+      expect(rentIndexFor(cls, words) === null, `${cls} / ${words}`).toBe(trackerSectorFor(cls, words) === null);
+    }
+    // A plain warehouse or office filed the same way still reads its own.
+    expect(rentIndexFor("industrial", "Bulk distribution warehouse")?.id).toBe("PCU5311205311203_YOY");
+    // The brief carries no rents line for the lab, and the office line for an office.
+    const lab = liveMarketBrief({ ...base, assetClass: "office", deckWords: "Life Science / Lab" })!;
+    expect(lab.lines.some((l) => l.startsWith("Rents charged by"))).toBe(false);
+    expect(lab.figures.some((f) => f.key === "rent_index_yoy")).toBe(false);
+    const office = liveMarketBrief({ ...base, assetClass: "office", deckWords: "Class A office tower" })!;
+    expect(office.lines[0]).toContain("Rents charged by lessors of professional and office buildings");
   });
 
   it("an office deal's brief opens its national lines with the office rent index, dated and named as the nation's", () => {

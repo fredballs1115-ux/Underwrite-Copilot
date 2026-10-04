@@ -12,6 +12,7 @@ import { metroSupply, type MetroSupply } from "@/lib/metro-supply";
 import { HOTNESS_METROS, realtorFresh, type RealtorRead } from "@/lib/realtor";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { isDataMetro, isStateMarket } from "@/lib/market-match";
+import { ownMarketBuilding } from "@/lib/tracker-read";
 import { placedByClause, type CountyPlacedBy } from "@/lib/placed-by";
 import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
 
@@ -56,6 +57,10 @@ export interface LiveMarketInput {
   /** the deal's asset class, which picks the lending-standards series a
    *  bank reports for its kind of loan */
   assetClass?: string | null;
+  /** the deck's own class words (the extraction's phrase), read beside the
+   *  class so a lab or a cold-storage warehouse the analyst filed as plain
+   *  office or industrial reads no neighbour's rent index (`rentIndexFor`) */
+  deckWords?: string | null;
   /** a plan deal (development, conversion) also reads the construction
    *  lenders' standards */
   plan?: boolean;
@@ -145,6 +150,13 @@ export function lendingStandardsFor(assetClass: string | null | undefined, plan:
  * has no rent. Every id was printed by the runner (rates run 35917247236)
  * before it was trusted, and the figure is said as the nation's, never the
  * metro's — the one national figure on the income side of the brief.
+ *
+ * A lab, an outdoor-storage yard or a cold-storage warehouse — named so in
+ * the class or in the deck's own class words — reads none: it is filed
+ * under office or industrial, but its rents are a market of its own, and
+ * the research tracker already refuses it the neighbour's figure. Both ask
+ * the tracker's one test (lib/tracker-read `ownMarketBuilding`), so they
+ * cannot disagree (research pass 23).
  */
 export const RENT_INDEX_IDS = [
   "PCU531120531120_YOY",
@@ -201,9 +213,10 @@ export interface RentIndex {
   lessor: string;
 }
 
-export function rentIndexFor(assetClass: string | null | undefined): RentIndex | null {
+export function rentIndexFor(assetClass: string | null | undefined, deckWords?: string | null): RentIndex | null {
   const key = assetClassKey(assetClass);
   if (!key) return null;
+  if (ownMarketBuilding(assetClass, deckWords)) return null;
   const words = assetWords(key);
   if (words.residential || !words.operating) return null;
   switch (key) {
@@ -505,8 +518,12 @@ function realtorLine(m: RealtorRead | null, now: Date): Said | null {
 }
 
 /** The rents the deal's kind of lessor charges, nationally — one line, said as the nation's. */
-function rentIndexLine(national: readonly LiveRate[] | undefined, assetClass: string | null | undefined): Said | null {
-  const idx = rentIndexFor(assetClass);
+function rentIndexLine(
+  national: readonly LiveRate[] | undefined,
+  assetClass: string | null | undefined,
+  deckWords: string | null | undefined,
+): Said | null {
+  const idx = rentIndexFor(assetClass, deckWords);
   if (!idx || !national) return null;
   const r = national.find((x) => x.meta.id === idx.id && x.fresh && Number.isFinite(x.value));
   if (!r) return null;
@@ -675,7 +692,7 @@ export function liveMarketBrief(input: LiveMarketInput): LiveMarketBrief | null 
   const local = said.length;
   // A commercial deal's rents are national: the income side's one national
   // figure, ahead of the debt market's.
-  const ri = rentIndexLine(input.national, input.assetClass);
+  const ri = rentIndexLine(input.national, input.assetClass, input.deckWords);
   if (ri) said.push(ri);
   // And the one national figure on the expense side: what the policy a
   // building carries costs this year against last.

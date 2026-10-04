@@ -478,6 +478,9 @@ async function liveMarketFromDb(
         now,
         national: withNational ? national : undefined,
         assetClass,
+        // The deck's own class words, so a lab or a cold-storage building
+        // filed as plain office or industrial reads no neighbour's rents.
+        deckWords: ex?.assetClass ?? null,
         portfolio,
         plan,
         builds,

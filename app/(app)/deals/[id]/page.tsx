@@ -618,6 +618,7 @@ export default async function DealPage({
       now: reads.now,
       national: reads.national.filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id)),
       assetClass: readClass,
+      deckWords: extraction?.assetClass ?? null,
       plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
       builds: buildsSomething(extraction, inferStrategy(extraction, firstSignal).kind),
     });
