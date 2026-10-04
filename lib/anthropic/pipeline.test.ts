@@ -209,13 +209,15 @@ const EXTRACTION = {
     { label: "NOI (in place)", value: "$1,200,000", flagged: false, page: "p. 5", basis: "in_place", locatorSnippet: "" },
   ],
 } as unknown as ExtractionResult;
-/** EXTRACTION as the screen stores it: stamped with the day it read the
- *  memorandum, which a price label's year is judged against, and the
- *  fingerprint of the bytes it read, so a re-screen of the same deck keeps
- *  that day. */
+/** EXTRACTION as a re-screen of the deal below stores it: the fingerprint of
+ *  the bytes it read, so the next re-screen of the same deck keeps its
+ *  reading — and no stamp, since the extraction it replaces (`{ old: true }`,
+ *  stored before the stamp and with nothing saying the deck changed since)
+ *  read as UNSTAMPED_SCREEN_YEAR and the same deck keeps that reading
+ *  (lib/criteria `screenStampFor`). A first screen is stamped (the happy
+ *  path below). */
 const STORED_EXTRACTION = {
   ...EXTRACTION,
-  screenedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
   omFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
 };
 const SIGNAL = { dealName: "Oakwood Flats", assetClass: "multifamily", market: "Dallas, TX" } as unknown as FirstSignal;
@@ -465,7 +467,9 @@ describe("runAnalysis — the happy path", () => {
   it("runs the six steps in order, writes every result and finishes done", async () => {
     // The last evening of a year: the extraction is stamped with the day the
     // screen read the memorandum, so its labels are read against that year
-    // after the calendar turns (lib/criteria `screenYearOf`).
+    // after the calendar turns (lib/criteria `screenYearOf`). A first screen:
+    // no extraction on file.
+    state.deals.d1.extraction = null;
     vi.useFakeTimers({ now: new Date("2026-12-31T23:30:00Z"), toFake: ["Date"] });
     try {
       await runAnalysis("d1");
@@ -1565,6 +1569,81 @@ describe("runAnalysis — a re-screen of the same memorandum keeps the day it wa
       vi.useRealTimers();
     }
     expect(state.deals.d1.extraction).toMatchObject({ screenedOn: "2027-01-02", omFingerprint: same });
+  });
+});
+
+describe("runAnalysis — an extraction stored before the stamp keeps its reading when the same deck is screened again", () => {
+  // A deck priced "Asking price (2026)", screened in 2026 before the stamp
+  // shipped: no stamp and no fingerprint on file, so it reads as a 2026
+  // screen (UNSTAMPED_SCREEN_YEAR). Its last screen finished Oct 2, 2026.
+  const DECK_2026 = {
+    ...EXTRACTION,
+    metrics: [{ ...EXTRACTION.metrics[0], label: "Asking price (2026)" }, EXTRACTION.metrics[1]],
+  } as unknown as ExtractionResult;
+  const LAST_SCREEN = { ...VERDICT, generatedAt: "2026-10-02T12:00:00.000Z" };
+  const inJanuary2027 = async () => {
+    vi.useFakeTimers({ now: new Date("2027-01-02T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    return state.deals.d1.extraction as ExtractionResult;
+  };
+  const fingerprintOfTheDeck = async () => {
+    const { createHash } = await import("node:crypto");
+    return createHash("sha256").update(Buffer.from("%PDF-1.4\n")).digest("hex").slice(0, 16);
+  };
+
+  beforeEach(() => {
+    vi.mocked(extractTerms).mockResolvedValue(DECK_2026);
+    state.deals.d1.extraction = DECK_2026;
+    state.deals.d1.verdict = LAST_SCREEN;
+  });
+
+  it("the same bytes: no stamp written, the fingerprint now, and the ask still the ask — on this re-screen and the next", async () => {
+    const { screenYearOf } = await import("@/lib/criteria");
+    const { askingPriceOf } = await import("@/lib/deal-strategy");
+    const stored = await inJanuary2027();
+    expect(stored.omFingerprint).toBe(await fingerprintOfTheDeck());
+    expect(stored.screenedOn).toBeUndefined();
+    expect(screenYearOf(stored)).toBe(2026);
+    expect(askingPriceOf(stored)).toBe(20_000_000);
+    // The next re-screen of the same bytes compares fingerprints, and keeps it so.
+    expect((await inJanuary2027()).screenedOn).toBeUndefined();
+  });
+
+  it("a replacement older than the last screen is the deck that screen read: its reading is kept", async () => {
+    state.deals.d1.qa = [{ at: "2026-10-01T09:00:00.000Z", event: "om_replaced", om: await fingerprintOfTheDeck() }];
+    expect((await inJanuary2027()).screenedOn).toBeUndefined();
+  });
+
+  it("a deck replaced after the last screen (the Ask thread's marker, `replaceOm`) is a new reading, stamped today", async () => {
+    state.deals.d1.qa = [{ at: "2027-01-02T11:00:00.000Z", event: "om_replaced", om: await fingerprintOfTheDeck() }];
+    expect((await inJanuary2027()).screenedOn).toBe("2027-01-02");
+  });
+
+  it("a deal entered by hand, getting its first memorandum, is a new reading: the typed facts were no deck", async () => {
+    const { buildManualExtraction } = await import("@/lib/manual-deal");
+    const typed = buildManualExtraction({
+      name: "Oakwood Flats",
+      assetClass: "multifamily",
+      market: "Dallas, TX",
+      address: "100 Main St, Dallas, TX",
+      price: 20_000_000,
+      capPct: 6,
+      noiAnnual: null,
+      units: 100,
+      sf: null,
+      occupancyPct: null,
+      yearBuilt: null,
+      avgRentMo: null,
+      notes: "",
+    });
+    // Typed before the stamp shipped: no stamp on file either.
+    delete typed.screenedOn;
+    state.deals.d1.extraction = typed;
+    expect((await inJanuary2027()).screenedOn).toBe("2027-01-02");
   });
 });
 

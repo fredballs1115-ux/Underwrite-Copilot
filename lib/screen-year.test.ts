@@ -151,7 +151,43 @@ describe("a re-screen of the same memorandum keeps the day it was first read", (
     expect(screenStampFor({ screenedOn: "2026-11-20" }, "abc123def4567890", now)).toBe("2027-01-02");
     expect(screenStampFor(null, "abc123def4567890", now)).toBe("2027-01-02");
     expect(screenStampFor(prior, undefined, now)).toBe("2027-01-02");
-    // A malformed stamp on file is no stamp.
-    expect(screenStampFor({ screenedOn: "soon", omFingerprint: "abc123def4567890" }, "abc123def4567890", now)).toBe("2027-01-02");
+    // A malformed stamp on file is no stamp: the extraction of these bytes
+    // read as UNSTAMPED_SCREEN_YEAR, and the re-screen keeps that reading
+    // rather than moving it forward.
+    expect(screenStampFor({ screenedOn: "soon", omFingerprint: "abc123def4567890" }, "abc123def4567890", now)).toBeUndefined();
+  });
+});
+
+describe("an extraction stored before the stamp keeps its reading when the same deck is screened again", () => {
+  // Every extraction on file when the stamp shipped carries neither a stamp
+  // nor a fingerprint, and reads as UNSTAMPED_SCREEN_YEAR. Screening the same
+  // deck again on or after January 1, 2027 stamped 2027, so "Asking price
+  // (2026)" turned into a prior trade and the deal lost its price.
+  it("keeps no stamp (its 2026 reading) where the deal says the extraction on file was read from this deck", async () => {
+    const { screenStampFor, screenYearOf, UNSTAMPED_SCREEN_YEAR } = await import("./criteria");
+    const now = new Date(Date.UTC(2027, 0, 2));
+    const legacy = {};
+    const kept = screenStampFor(legacy, "abc123def4567890", now, { priorReadFromThisDeck: true });
+    expect(kept).toBeUndefined();
+    expect(screenYearOf({ screenedOn: kept })).toBe(UNSTAMPED_SCREEN_YEAR);
+    // A stamp written before the fingerprint, on the deck the deal says it
+    // was, is kept too.
+    expect(screenStampFor({ screenedOn: "2026-10-04" }, "abc123def4567890", now, { priorReadFromThisDeck: true })).toBe(
+      "2026-10-04",
+    );
+    // The deal says otherwise (the memorandum was replaced since, or the
+    // facts were typed by hand): a new reading.
+    expect(screenStampFor(legacy, "abc123def4567890", now, { priorReadFromThisDeck: false })).toBe("2027-01-02");
+    // An extraction of these bytes stored with no stamp keeps none.
+    expect(screenStampFor({ omFingerprint: "abc123def4567890" }, "abc123def4567890", now)).toBeUndefined();
+    // A fingerprint on file is the answer, whatever the deal row says.
+    expect(
+      screenStampFor({ screenedOn: "2026-11-20", omFingerprint: "0000000000000000" }, "abc123def4567890", now, {
+        priorReadFromThisDeck: true,
+      }),
+    ).toBe("2027-01-02");
+    // A first screen, and a run with no memorandum, read anew.
+    expect(screenStampFor(null, "abc123def4567890", now, { priorReadFromThisDeck: true })).toBe("2027-01-02");
+    expect(screenStampFor(legacy, undefined, now, { priorReadFromThisDeck: true })).toBe("2027-01-02");
   });
 });

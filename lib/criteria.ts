@@ -150,6 +150,9 @@ export function pastYearSource(screenYear: number): string {
  */
 export const UNSTAMPED_SCREEN_YEAR = 2026;
 
+/** A stamp as the screen writes one: an ISO day, read off its front. */
+const SCREEN_STAMP = /^(20\d\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/;
+
 /**
  * The year the screen read the memorandum, which a price label's year is
  * judged against: the extraction's `screenedOn` stamp (written by the
@@ -159,7 +162,7 @@ export const UNSTAMPED_SCREEN_YEAR = 2026;
  */
 export function screenYearOf(ex: { screenedOn?: string | null } | null | undefined): number {
   const stamp = typeof ex?.screenedOn === "string" ? ex.screenedOn.trim() : "";
-  const m = /^(20\d\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/.exec(stamp);
+  const m = SCREEN_STAMP.exec(stamp);
   return m ? Number(m[1]) : UNSTAMPED_SCREEN_YEAR;
 }
 
@@ -171,21 +174,43 @@ export function screenStamp(now: Date = new Date()): string {
 }
 
 /**
- * The stamp a re-screen writes: the day the SAME memorandum was first read,
- * where the extraction on file was read from these bytes (its
- * `omFingerprint`, lib/om-fingerprint) and carries a stamp; else today's.
- * A label's year is the memorandum's, so reading one deck again in a later
- * year never turns its "Asking price (2026)" into a prior trade; a reissued
- * deck (other bytes) is a new reading and stamped anew, as is an extraction
- * on file with no fingerprint, since nothing says it was this deck.
+ * The stamp a re-screen writes — or none (undefined), where the extraction
+ * it replaces was read from the same bytes and carried none. A re-screen
+ * never moves the screen's year forward for bytes the extraction on file
+ * read: a label's year is the memorandum's, so reading one deck again in a
+ * later year never turns its "Asking price (2026)" into a prior trade.
+ *
+ *   - The extraction on file carries a fingerprint (`omFingerprint`,
+ *     lib/om-fingerprint): these bytes' keeps its stamp, or its lack of one
+ *     (it reads as UNSTAMPED_SCREEN_YEAR, and keeps reading so); another
+ *     deck's is a new reading, stamped today.
+ *   - It carries none (stored before the fingerprint shipped): the deal row
+ *     says whether it was read from the memorandum being read now
+ *     (`priorReadFromThisDeck`, which the pipeline reads off the deal: not
+ *     typed by hand, lib/manual-deal `typedByHand`, and not replaced since
+ *     its last screen, lib/deals `memorandumReplacedSince`). Where it says
+ *     so, the stamp or its absence is kept; else today's.
+ *   - No extraction on file, or no memorandum: today's.
+ *
+ * Never an invented date: a reading kept without a stamp is written with
+ * none, never with a day nobody screened on.
  */
 export function screenStampFor(
   prior: { screenedOn?: string | null; omFingerprint?: string | null } | null | undefined,
   fingerprint: string | null | undefined,
   now: Date = new Date(),
-): string {
-  const kept = typeof prior?.screenedOn === "string" ? /^\d{4}-\d{2}-\d{2}/.exec(prior.screenedOn.trim()) : null;
-  if (fingerprint && prior?.omFingerprint === fingerprint && kept) return kept[0];
+  opts: { priorReadFromThisDeck?: boolean } = {},
+): string | undefined {
+  if (fingerprint && prior) {
+    const priorFingerprint = typeof prior.omFingerprint === "string" ? prior.omFingerprint.trim() : "";
+    const sameDeck = priorFingerprint ? priorFingerprint === fingerprint : opts.priorReadFromThisDeck === true;
+    if (sameDeck) {
+      // A malformed stamp is no stamp: it read as UNSTAMPED_SCREEN_YEAR
+      // (`screenYearOf`, the same pattern), and that reading is what is kept.
+      const kept = typeof prior.screenedOn === "string" ? SCREEN_STAMP.exec(prior.screenedOn.trim()) : null;
+      return kept ? kept[0] : undefined;
+    }
+  }
   return screenStamp(now);
 }
 

@@ -11,6 +11,7 @@ import {
   manualFactSheet,
   manualCompsStub,
   NOTES_MAX,
+  typedByHand,
   type ManualDealFacts,
 } from "./manual-deal";
 import { buildingSfRow, evaluateBuyBox, findMetric, METRIC_FIND, screenYearOf } from "./criteria";
@@ -257,6 +258,35 @@ describe("pipeline artifacts", () => {
     expect(stub.leaseComps).toEqual([]);
     expect(stub.redFlags).toEqual([]);
     expect(stub.summary).toMatch(/entered by hand/i);
+  });
+});
+
+describe("typedByHand — the facts typed in, told from a memorandum's read", () => {
+  it("knows what buildManualExtraction writes, stamped or stored before the stamp", () => {
+    const typed = buildManualExtraction(QUAD);
+    expect(typedByHand(typed)).toBe(true);
+    const unstamped = buildManualExtraction(QUAD);
+    delete unstamped.screenedOn;
+    expect(typedByHand(unstamped)).toBe(true);
+  });
+
+  it("a memorandum's read carries its page count, its pages, how it was read or its bytes' fingerprint", () => {
+    const read = { ...buildManualExtraction(QUAD), totalPages: 38 };
+    expect(typedByHand(read)).toBe(false);
+    // Stored before the page count was kept: no count at all, never 0.
+    const uncounted = buildManualExtraction(QUAD);
+    delete uncounted.totalPages;
+    expect(typedByHand(uncounted)).toBe(false);
+    const cited = buildManualExtraction(QUAD);
+    cited.metrics[0] = { ...cited.metrics[0], page: "p. 3" };
+    expect(typedByHand(cited)).toBe(false);
+    expect(typedByHand({ ...buildManualExtraction(QUAD), omRead: "text" })).toBe(false);
+    expect(typedByHand({ ...buildManualExtraction(QUAD), omFingerprint: "abc123def4567890" })).toBe(false);
+  });
+
+  it("nothing, or a shape with no figures, is no typed facts", () => {
+    expect(typedByHand(null)).toBe(false);
+    expect(typedByHand({ old: true } as never)).toBe(false);
   });
 });
 

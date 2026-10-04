@@ -152,6 +152,41 @@ export function parseDealQa(raw: unknown): AskEntry[] {
   });
 }
 
+/**
+ * Whether the deal's memorandum was replaced after `since` (the deal's last
+ * finished screen — its verdict's `generatedAt`), as far as the Ask thread
+ * says: `replaceOm` appends a marker naming the new deck's fingerprint to
+ * every deal that had a memorandum before. Replaced since, where:
+ *
+ *   - a marker is later than `since`, or its moment does not read (it
+ *     cannot be placed before the screen), or `since` is unknown and any
+ *     marker exists;
+ *   - the newest marker names other bytes than `fingerprint`, the deck
+ *     being read: the deck changed after it, when nothing says.
+ *
+ * No marker says nothing was replaced since the markers were first written
+ * — which is all the thread can say. The screen reads this to know whether
+ * an extraction stored before it fingerprinted its deck was read from the
+ * deck it is reading now (lib/criteria `screenStampFor`).
+ */
+export function memorandumReplacedSince(
+  rawQa: unknown,
+  since: string | null | undefined,
+  fingerprint: string | null | undefined,
+): boolean {
+  if (!Array.isArray(rawQa)) return false;
+  const markers = rawQa.filter(isOmReplaced);
+  if (markers.length === 0) return false;
+  const newest = markers[markers.length - 1];
+  if (fingerprint && typeof newest.om === "string" && newest.om && newest.om !== fingerprint) return true;
+  const screened = typeof since === "string" ? Date.parse(since) : NaN;
+  if (!Number.isFinite(screened)) return true;
+  return markers.some((m) => {
+    const at = typeof m.at === "string" ? Date.parse(m.at) : NaN;
+    return !Number.isFinite(at) || at > screened;
+  });
+}
+
 /** The six analysis steps, in order, keyed to the columns on `deals`. */
 export const DEAL_STEPS = [
   { key: "extraction", label: "Extract & flag" },

@@ -80,7 +80,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 import { askDeal } from "@/app/(app)/deals/[id]/ask-actions";
 import { AskPanel } from "@/app/(app)/deals/[id]/ask-panel";
-import { OM_REPLACED, parseDealQa, type AskEntry } from "./deals";
+import { OM_REPLACED, memorandumReplacedSince, parseDealQa, type AskEntry } from "./deals";
 import { omFingerprint } from "./om-fingerprint";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -268,6 +268,41 @@ describe("parseDealQa — which memorandum each answer was asked of", () => {
   it("the same deck uploaded again keeps its stamped answers current", () => {
     const qa = parseDealQa([entry("stamped", A), replaced(A)]);
     expect(qa[0].earlier).toBe(false);
+  });
+});
+
+describe("memorandumReplacedSince — whether the thread says the deck changed after a moment", () => {
+  const A = "aaaaaaaaaaaaaaaa";
+  const B = "bbbbbbbbbbbbbbbb";
+  const marker = (at: string, om: string) => ({ at, event: OM_REPLACED, om });
+  const question = { at: "2026-10-03T00:00:00.000Z", q: "?", answer: "…", cites: [], om: A };
+  // The deal's last screen finished on Oct 2, 2026 (its verdict's generatedAt).
+  const LAST_SCREEN = "2026-10-02T12:00:00.000Z";
+
+  it("no marker, or none newer than the last screen and naming these bytes: not replaced since", () => {
+    expect(memorandumReplacedSince(undefined, LAST_SCREEN, A)).toBe(false);
+    expect(memorandumReplacedSince([question], LAST_SCREEN, A)).toBe(false);
+    expect(memorandumReplacedSince([marker("2026-10-01T09:00:00.000Z", A), question], LAST_SCREEN, A)).toBe(false);
+    // …and with no screen ever finished, a thread with no marker says nothing either.
+    expect(memorandumReplacedSince([question], null, A)).toBe(false);
+  });
+
+  it("a marker newer than the last screen: replaced since", () => {
+    expect(memorandumReplacedSince([marker("2026-10-03T08:00:00.000Z", A)], LAST_SCREEN, A)).toBe(true);
+    // Any marker, where no screen is known to have finished since.
+    expect(memorandumReplacedSince([marker("2026-10-01T09:00:00.000Z", A)], null, A)).toBe(true);
+    expect(memorandumReplacedSince([marker("2026-10-01T09:00:00.000Z", A)], "not a date", A)).toBe(true);
+  });
+
+  it("the newest marker naming other bytes than the ones being read: changed after it, so since", () => {
+    expect(memorandumReplacedSince([marker("2026-10-01T09:00:00.000Z", B)], LAST_SCREEN, A)).toBe(true);
+    expect(
+      memorandumReplacedSince([marker("2026-09-01T09:00:00.000Z", B), marker("2026-10-01T09:00:00.000Z", A)], LAST_SCREEN, A),
+    ).toBe(false);
+  });
+
+  it("a marker whose moment does not read cannot be placed before the last screen", () => {
+    expect(memorandumReplacedSince([{ event: OM_REPLACED, om: A }], LAST_SCREEN, A)).toBe(true);
   });
 });
 

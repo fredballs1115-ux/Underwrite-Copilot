@@ -12,7 +12,9 @@ import {
   manualFactSheet,
   firstSignalFromExtraction,
   manualCompsStub,
+  typedByHand,
 } from "@/lib/manual-deal";
+import { memorandumReplacedSince } from "@/lib/deals";
 import { extractTerms } from "./extract";
 import { challengeAssumptions } from "./challenge";
 import { keyedTrapsFor } from "./prompts";
@@ -706,9 +708,11 @@ async function runAnalysisSteps(
   try {
     releaseSlot = await runGate.acquire();
     const admin = createSupabaseAdminClient();
+    // `qa` and `verdict` say whether the memorandum was replaced since the
+    // last screen (the stamp below, `screenStampFor`).
     const { data: deal, error } = await admin
       .from("deals")
-      .select("id, name, asset_class, om_storage_path, extraction")
+      .select("id, name, asset_class, om_storage_path, extraction, qa, verdict")
       .eq("id", dealId)
       .single();
 
@@ -959,14 +963,25 @@ async function runAnalysisSteps(
       // judged against its year (lib/criteria `screenYearOf`), so "Asking
       // price (2026)" read in 2026 is still the ask when the deal is opened
       // in 2027 — and when the same deck is screened again in 2027, since a
-      // re-screen of the same bytes keeps its first stamp (`screenStampFor`
-      // against the extraction this run replaces).
+      // re-screen of the same bytes keeps its first stamp, or the lack of
+      // one (`screenStampFor` against the extraction this run replaces). An
+      // extraction stored before the fingerprint is this deck's unless it
+      // was typed by hand (a deal entered by hand getting its first
+      // memorandum) or the deck was replaced after the deal's last screen
+      // (Ask's thread, which `replaceOm` marks) — "Replace OM" keeps the old
+      // deck's extraction on file until this run overwrites it.
       const fingerprint = pdf ? omFingerprint(pdf) : undefined;
-      extraction = {
-        ...extraction,
-        omFingerprint: fingerprint,
-        screenedOn: screenStampFor(deal.extraction as ExtractionResult | null, fingerprint),
-      };
+      const prior = (deal.extraction as ExtractionResult | null) ?? null;
+      const lastScreen = (deal.verdict as { generatedAt?: unknown } | null)?.generatedAt;
+      const stamp = screenStampFor(prior, fingerprint, new Date(), {
+        priorReadFromThisDeck:
+          prior != null &&
+          !typedByHand(prior) &&
+          !memorandumReplacedSince(deal.qa, typeof lastScreen === "string" ? lastScreen : null, fingerprint),
+      });
+      // A reading kept with no stamp is stored with none, never an invented day.
+      extraction = { ...extraction, omFingerprint: fingerprint, screenedOn: stamp };
+      if (!stamp) delete extraction.screenedOn;
       await admin
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })

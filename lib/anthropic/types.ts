@@ -147,8 +147,10 @@ export interface ExtractionResult {
    *  is judged against its year: "Asking price (2026)" is the ask on a 2026
    *  screen and stays the ask in 2027 (`screenYearOf`). Absent on an
    *  extraction stored before the stamp, which reads as a 2026 screen. A
-   *  re-screen of the same memorandum (the same `omFingerprint`) keeps its
-   *  first stamp (lib/criteria `screenStampFor`). */
+   *  re-screen of the same memorandum (the same `omFingerprint`, or, for an
+   *  extraction stored before the fingerprint, nothing on the deal saying the
+   *  deck changed since) keeps its first stamp — or its lack of one, and
+   *  with it the 2026 reading (lib/criteria `screenStampFor`). */
   screenedOn?: string;
   /** Which memorandum this extraction was read from: the fingerprint of its
    *  bytes (lib/om-fingerprint), stamped with `screenedOn`, so a re-screen

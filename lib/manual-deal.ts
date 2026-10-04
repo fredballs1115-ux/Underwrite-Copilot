@@ -181,6 +181,23 @@ export function buildManualExtraction(facts: ManualDealFacts, now: Date = new Da
   };
 }
 
+/**
+ * Whether an extraction is a deal's typed facts rather than a memorandum's
+ * read: what buildManualExtraction writes and has written since manual entry
+ * shipped — a page count of 0 and no figure citing a page. A memorandum's
+ * read carries its deck's page count (the text layer's, the model's or the
+ * byte counter's) or, stored before page counts were kept, none at all; and
+ * since they were recorded, how it was read (`omRead`) and its bytes'
+ * fingerprint. The screen reads it when a deal entered by hand gets its first
+ * memorandum: the facts on file were no deck, so the deck is a new reading
+ * (lib/criteria `screenStampFor`).
+ */
+export function typedByHand(ex: ExtractionResult | null | undefined): boolean {
+  if (!ex || !Array.isArray(ex.metrics)) return false;
+  if (ex.omRead || ex.omFingerprint) return false;
+  return ex.totalPages === 0 && ex.metrics.every((m) => !m?.page);
+}
+
 /** Parse a manual extraction back into form-editable facts — the edit panel
  *  round-trips through this, so labels here mirror buildManualExtraction. */
 export function factsFromExtraction(
