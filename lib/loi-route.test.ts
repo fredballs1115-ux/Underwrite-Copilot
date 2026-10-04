@@ -185,6 +185,24 @@ describe("the LOI is refused where the memorandum sells something else, or sells
     ["a receiver's auction", { ...extraction, sale: sale("receivership"), metrics: [...extraction.metrics, row("Buyer's premium", "5%")] }, "auction"],
     ["a bankruptcy sale", { ...extraction, sale: sale("bankruptcy") }, "bankruptcy"],
     ["a sale with a stalking-horse bid", { ...extraction, sale: sale("unknown"), metrics: [...extraction.metrics, row("Stalking horse bid", "$18,000,000")] }, "bids"],
+    // A stalking horse the memorandum does not price is a stalking horse
+    // (audit c66): both drafted a purchase from the owner, or the receiver.
+    [
+      "a stalking-horse bid the memorandum does not price",
+      { ...extraction, sale: sale("unknown"), metrics: [...extraction.metrics, row("Stalking horse bid", "In place — terms in the data room")] },
+      "bids",
+    ],
+    [
+      "a receiver's sale with a stalking horse in words",
+      {
+        ...extraction,
+        sale: sale("receivership"),
+        metrics: [...extraction.metrics, row("Stalking horse bid", "Under contract with a stalking horse; overbids due Nov 3")],
+      },
+      "bids",
+    ],
+    // Whatever method the extraction named.
+    ["a sale called negotiated with a stalking-horse bid", { ...extraction, sale: sale("negotiated"), metrics: [...extraction.metrics, row("Stalking horse bid", "$18,000,000")] }, "bids"],
   ];
 
   for (const [what, ex, kind] of cases) {
@@ -216,6 +234,15 @@ describe("the LOI is refused where the memorandum sells something else, or sells
   it("says why in each sentence: a note is bought under a loan sale agreement, an auction under its own terms", () => {
     expect(LOI_REFUSAL.note).toMatch(/loan sale agreement, not a property letter of intent/);
     expect(LOI_REFUSAL.auction).toMatch(/bid for under the auction's own terms/);
+    // True of a stalking horse whether or not the memorandum prices it.
+    expect(LOI_REFUSAL.bids).toMatch(/states a stalking-horse bid — the property is sold through bidding that higher bids can reopen/);
+  });
+
+  it("drafts as usual where the stalking-horse row says there is none", () => {
+    for (const none of ["None", "N/A", "Not applicable", "No stalking horse", "—"]) {
+      const ex = { ...extraction, sale: sale("unknown"), metrics: [...extraction.metrics, row("Stalking horse bid", none)] };
+      expect(loiTermsFor(ex, null).refusal, none).toBeNull();
+    }
   });
 });
 

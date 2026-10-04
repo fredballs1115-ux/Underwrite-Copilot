@@ -55,6 +55,11 @@ const RESERVE = /^(?:auction\s+|seller'?s?\s+)?reserve(?:\s+(?:price|bid|amount)
 const PREMIUM = /\bbuyer'?s\s+premium\b|\bbuyer\s+premium\b/i;
 const DEADLINE = /\bbid(?:s|ding)?\s+(?:deadline|due|date|ends?|closes?)\b|\bauction\s+(?:date|ends?|closes?)\b|\bcall\s+for\s+offers\b/i;
 const STALKING = /\bstalking[- ]horse\b/i;
+// A stalking-horse row that says there is none, or says nothing: "None",
+// "No stalking horse", "N/A", "Not applicable", "Not stated", "—". Any other
+// words state one, priced or not ("$12,500,000", "In place — terms in the
+// data room", "Not disclosed").
+const NO_STALKING = /^(?:none|no|nil|n\/?a|not\s+(?:applicable|stated))\b|^[-–—]?\.?$/i;
 const NO_RESERVE = /\bno\s+reserve\b|\babsolute\b|\bwithout\s+reserve\b|\bnone\b/i;
 const UNDISCLOSED = /\bundisclosed\b|\bnot\s+disclosed\b|\bconfidential\b|\bunpublished\b/i;
 
@@ -106,6 +111,21 @@ export function hammerFor(allIn: number, premium: { pct: number; min: number | n
   return (byPct * premium.pct) / 100 >= min ? byPct : allIn - min;
 }
 
+/** The memorandum's stalking-horse row where it states one, priced or not;
+ *  null where there is no row, or the row says there is none. */
+function stalkingRowOf(rows: MetricRow[]): MetricRow | null {
+  return rows.find((m) => STALKING.test(m.label) && !NO_STALKING.test(m.value.trim())) ?? null;
+}
+
+/** Whether the memorandum states a stalking-horse bid — priced or not, and
+ *  whatever sale method it names: a sale that higher bids can reopen. The
+ *  letter of intent is refused on it (lib/loi-terms); it had been refused
+ *  only where the bid parsed as dollars. */
+export function statesStalkingHorse(ex: ExtractionResult | null | undefined): boolean {
+  if (!ex) return false;
+  return stalkingRowOf((Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow)) != null;
+}
+
 /** An auction's own rows, for a key-terms block to lead with right after
  *  the price: the starting bid, the buyer's premium, the reserve, the bid
  *  deadline. */
@@ -133,6 +153,9 @@ export interface SaleRead {
   floorAllIn: number | null;
   deadline: { ends: string; stated: string; daysLeft: number } | null;
   stalkingHorse: number | null;
+  /** the stalking-horse row's words as stated, priced or not ("" where the
+   *  memorandum states none) */
+  stalkingHorseStated: string;
   /** who sells, the bid, the premium, the reserve and the deadline, in the
    *  reader's sentences, one a line — the panel leads with the first and
    *  folds the rest */
@@ -165,7 +188,7 @@ export function readSale(ex: ExtractionResult | null | undefined, asOf: Date = n
   const reserveRow = rows.find((m) => RESERVE.test(m.label.trim())) ?? null;
   const premiumRow = rows.find((m) => PREMIUM.test(m.label)) ?? null;
   const deadlineRow = rows.find((m) => DEADLINE.test(m.label)) ?? null;
-  const stalkingRow = rows.find((m) => STALKING.test(m.label)) ?? null;
+  const stalkingRow = stalkingRowOf(rows);
   const stated = METHODS.includes(s?.method as SaleMethod) ? (s!.method as SaleMethod) : "unknown";
   // An auction's figures say it is one, whatever the method field says.
   const method: SaleMethod = stated === "unknown" && (bidRow || premiumRow) ? "auction" : stated;
@@ -212,6 +235,7 @@ export function readSale(ex: ExtractionResult | null | undefined, asOf: Date = n
         }
       : null,
     stalkingHorse: stalkingRow ? parseUsd(stalkingRow.value) : null,
+    stalkingHorseStated: clean(stalkingRow?.value),
   };
   const sentences = sentencesOf(read);
   return { ...read, sentences, headline: sentences.join(" ") };
@@ -268,6 +292,9 @@ function sentencesOf(r: SaleFacts): string[] {
   else if (SELLER_SENTENCE[r.method]) parts.push(SELLER_SENTENCE[r.method]!);
   if (r.method !== "auction" && (r.startingBid != null || r.premium)) parts.push(...auctionSentences(r).slice(0, 2));
   if (r.stalkingHorse != null) parts.push(`A stalking-horse bid of ${money(r.stalkingHorse)} is stated: that is the floor every other bid starts over.`);
+  else if (r.stalkingHorseStated) {
+    parts.push(`A stalking-horse bid is stated (${r.stalkingHorseStated.replace(/[.;,\s]+$/, "")}): it sets the floor every other bid starts over.`);
+  }
   if (r.deadline) {
     parts.push(
       r.deadline.daysLeft > 0
@@ -342,6 +369,7 @@ export function saleShortLine(r: SaleRead): string {
   }
   if (r.reserve) parts.push(r.reserve.kind === "none" ? "no reserve" : r.reserve.kind === "undisclosed" ? "reserve undisclosed" : `reserve ${r.reserve.stated}`);
   if (r.stalkingHorse != null) parts.push(`${withArticle(money(r.stalkingHorse))} stalking-horse bid`);
+  else if (r.stalkingHorseStated) parts.push("a stalking-horse bid");
   if (r.deadline && r.deadline.daysLeft >= 0) parts.push(`bids due ${dayLabel(r.deadline.ends)}`);
   return parts.length ? `${head[r.method]}: ${parts.join("; ")}` : head[r.method];
 }

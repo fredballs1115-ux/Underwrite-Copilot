@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { allInFor, ceilingBidLine, hammerFor, readPremium, readSale, saleContextLine, saleNote, saleShortLine, saleTag } from "./sale-terms";
+import {
+  allInFor,
+  ceilingBidLine,
+  hammerFor,
+  readPremium,
+  readSale,
+  saleContextLine,
+  saleNote,
+  saleShortLine,
+  saleTag,
+  statesStalkingHorse,
+} from "./sale-terms";
 import { gluedWords } from "./render-lint";
 
 // Every read is on one day, so every "days from today" is fixed.
@@ -127,6 +138,31 @@ describe("readSale — how the property is sold", () => {
   it("a reserve for replacements is not an auction's reserve", () => {
     const r = readSale(ex([row("Starting bid", "$2,500,000"), row("Replacement reserve", "$250/unit")], { method: "auction" }), TODAY)!;
     expect(r.reserve).toBeNull();
+  });
+
+  it("a stalking horse the memorandum states without a price is still one (audit c66)", () => {
+    const unpriced = ex([row("Stalking horse bid", "In place — terms in the data room")], { method: "unknown" });
+    expect(statesStalkingHorse(unpriced)).toBe(true);
+    const r = readSale(unpriced, TODAY)!;
+    expect(r.stalkingHorse).toBeNull();
+    expect(r.stalkingHorseStated).toBe("In place — terms in the data room");
+    expect(r.headline).toContain("A stalking-horse bid is stated (In place — terms in the data room): it sets the floor every other bid starts over.");
+    expect(saleShortLine(r)).toBe("Sold on the terms stated: a stalking-horse bid");
+    // A priced one is said with its figure, as before.
+    expect(statesStalkingHorse(ex([row("Stalking horse bid", "$3,100,000")], { method: "bankruptcy" }))).toBe(true);
+    // Whatever method the extraction named.
+    expect(statesStalkingHorse(ex([row("Stalking horse bid", "$3,100,000")], { method: "negotiated" }))).toBe(true);
+  });
+
+  it("a stalking-horse row that says there is none is no stalking horse", () => {
+    for (const none of ["None", "None at this time", "N/A", "n/a", "Not applicable", "Not stated", "No stalking horse", "—", ""]) {
+      const e = ex([row("Stalking horse bid", none)], { method: "unknown" });
+      expect(statesStalkingHorse(e), none).toBe(false);
+      expect(readSale(e, TODAY), none).toBeNull();
+    }
+    // An amount withheld is a stalking horse whose price is not given.
+    expect(statesStalkingHorse(ex([row("Stalking horse bid", "Not disclosed")], { method: "unknown" }))).toBe(true);
+    expect(statesStalkingHorse(null)).toBe(false);
   });
 });
 

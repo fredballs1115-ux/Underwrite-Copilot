@@ -18,8 +18,11 @@
 //   THE WRONG DOCUMENT IS REFUSED, WITH THE REASON. A note, a share of the
 //   owning entity and the leased fee are not the property; an auction and a
 //   bankruptcy sale are bid for under their own terms, and so is a sale with
-//   a stalking-horse bid. No draft is made, and the panel and the route say
-//   the same one sentence (lib/loi-refusal).
+//   a stalking-horse bid — priced or not, and whatever method the
+//   memorandum names (it had been refused only where the bid parsed as
+//   dollars, so "In place — terms in the data room" drafted a purchase from
+//   the owner). No draft is made, and the panel and the route say the same
+//   one sentence (lib/loi-refusal).
 //
 //   WHAT THE MEMORANDUM STATES IS SAID, AND NOTHING IS INVENTED. A
 //   leasehold's draft names the leasehold interest under its ground lease as
@@ -38,7 +41,7 @@
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { inferStrategy, isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
 import { interestOf, readInterest } from "@/lib/interest";
-import { readSale } from "@/lib/sale-terms";
+import { readSale, statesStalkingHorse } from "@/lib/sale-terms";
 import { readPortfolio } from "@/lib/portfolio";
 import { LOI_REFUSAL, type LoiRefusalKind } from "@/lib/loi-refusal";
 
@@ -80,14 +83,17 @@ function refusalOf(ex: ExtractionResult | null | undefined): LoiRefusalKind | nu
   if (kind === "partial_interest") return "share";
   if (kind === "leased_fee") return "leased_fee";
   const sale = readSale(ex);
-  if (!sale) return null;
-  if (sale.method === "bankruptcy") return "bankruptcy";
-  // An auction's figures make an auction whoever runs it (lib/sale-terms):
-  // a receiver's or a lender's sale with a starting bid is bid for too.
-  if (sale.method === "auction" || sale.startingBid != null || sale.premium != null || sale.premiumStated) {
-    return "auction";
+  if (sale) {
+    if (sale.method === "bankruptcy") return "bankruptcy";
+    // An auction's figures make an auction whoever runs it (lib/sale-terms):
+    // a receiver's or a lender's sale with a starting bid is bid for too.
+    if (sale.method === "auction" || sale.startingBid != null || sale.premium != null || sale.premiumStated) {
+      return "auction";
+    }
   }
-  if (sale.stalkingHorse != null) return "bids";
+  // A stalking-horse bid the memorandum states, priced or not: higher bids
+  // can reopen the sale, whatever method the extraction named.
+  if (statesStalkingHorse(ex)) return "bids";
   return null;
 }
 
