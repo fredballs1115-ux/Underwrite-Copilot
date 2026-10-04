@@ -8297,7 +8297,7 @@ describe("a tracker figure's credit says what is missing, and a source links its
 });
 
 // ── The weekday intel items: dated, and the AI's read labelled as one investor's (the research pass of 2026-10-01) ──
-import { IntelItems } from "@/app/market/intel-items";
+import { IntelItems, dayOf } from "@/app/market/intel-items";
 
 describe("IntelItems — each item dated, its score and next step said as an AI's read for one investor, not advice", () => {
   const items = [
@@ -8308,8 +8308,23 @@ describe("IntelItems — each item dated, its score and next step said as an AI'
   const text = visibleText(html);
 
   it("dates each item by its publisher's date, or the day the job saw it", () => {
-    expect(text).toContain("(Example News, Sep 29, 2026)");
-    expect(text).toContain("(seen Sep 30, 2026)");
+    expect(text).toContain("(Example News, Sep 29, 2026 UTC)");
+    expect(text).toContain("(seen Sep 30, 2026 UTC)");
+  });
+
+  it("says the day is UTC's: 9pm Eastern on Sep 30 is Oct 1 there, never a bare day a reader takes for their own (the audit of 2026-10-04)", () => {
+    // What scripts/daily-intel.mjs stores for an RSS pubDate of 9pm Eastern.
+    const published_at = new Date("Tue, 30 Sep 2026 21:00:00 -0400").toISOString();
+    const evening = visibleText(
+      render(React.createElement(IntelItems, { items: [{ url: "https://example.com/c", title: "A headline", source: "Bisnow", relevance: 7, action: null, published_at, created_at: "2026-10-01T11:05:00+00:00" }] })),
+    );
+    expect(evening).toContain("(Bisnow, Oct 1, 2026 UTC)");
+    // An offset other than UTC's is read as the instant it names.
+    expect(dayOf("2026-09-30T21:00:00-04:00")).toBe("Oct 1, 2026 UTC");
+    expect(dayOf("2026-09-30T20:59:00-04:00")).toBe("Oct 1, 2026 UTC");
+    expect(dayOf("2026-09-30T19:59:00-04:00")).toBe("Sep 30, 2026 UTC");
+    expect(dayOf("not a date")).toBeNull();
+    expect(dayOf(null)).toBeNull();
   });
 
   it("labels the score and the next step as an AI's read against one investor's criteria", () => {

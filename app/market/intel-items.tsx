@@ -13,11 +13,17 @@ export interface IntelItem {
   created_at?: string | null;
 }
 
-/** "Sep 30, 2026" from a timestamp, or null. */
-function dayOf(ts: string | null | undefined): string | null {
+/**
+ * "Oct 1, 2026 UTC" from a timestamp, or null: the day it falls on in UTC,
+ * said so. The site states no time zone of its own, and a bare day read as
+ * the reader's was a day late for anything published in a US evening — an
+ * item a publisher dated 9pm Eastern on Sep 30 is Oct 1 in UTC (the audit
+ * of 2026-10-04).
+ */
+export function dayOf(ts: string | null | undefined): string | null {
   if (!ts) return null;
-  const day = ts.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(day) ? datedLong(day) : null;
+  const at = Date.parse(ts);
+  return Number.isFinite(at) ? `${datedLong(new Date(at).toISOString().slice(0, 10))} UTC` : null;
 }
 
 /**
