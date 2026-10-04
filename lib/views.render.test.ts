@@ -3304,6 +3304,10 @@ describe("the deal math tools", () => {
     expect(text).toContain("acquired by the due date of the return for 2026,");
     expect(text).toContain(", extensions included. An extension restores the full 180 days");
     expect(text).not.toContain("is filed");
+    // A partnership's or an S corporation's return is due a month sooner
+    // (research pass 28): said beside the individual's.
+    expect(text).toContain("Sold by a partnership or an S corporation, the window ends sooner: its calendar-year return for 2026 is due 2027-03-15");
+    expect(text).toContain(", so the replacement has to close by then unless that return is extended.");
     // Two segments of the window plus the part the due date takes off it.
     expect((html.match(/data-bar="clock"/g) ?? []).length).toBe(2);
     expect((html.match(/data-bar="clock-lost"/g) ?? []).length).toBe(1);

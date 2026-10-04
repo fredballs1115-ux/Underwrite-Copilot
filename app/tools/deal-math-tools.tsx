@@ -2088,6 +2088,14 @@ function Exchange1031() {
               which is why a fourth-quarter exchange files one first.
             </p>
           )}
+          {r.clock.entityCutShort && (
+            <p className="mt-2 text-sm text-caution" data-qa="entity-due">
+              Sold by a partnership or an S corporation, the window ends sooner:
+              its calendar-year return for {closing.slice(0, 4)} is due{" "}
+              <span className="font-mono tabular-nums">{r.clock.entityReturnDueBy}</span>,
+              so the replacement has to close by then unless that return is extended.
+            </p>
+          )}
         </div>
       )}
 

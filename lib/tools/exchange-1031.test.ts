@@ -232,6 +232,28 @@ describe("the clock", () => {
     expect(EXCHANGE_DAYS - c.closeDays).toBe(29);
   });
 
+  // Research pass 28: the cap was April 15 for every seller, but a
+  // partnership's or an S corporation's calendar-year return is due March
+  // 15 — an October sale's window ends then, unless that return is extended,
+  // while the card said "Close by" the 180th day with no word.
+  it("says when a partnership's or an S corporation's return cuts the window sooner", () => {
+    const oct = exchangeClock("2026-10-01")!;
+    expect(oct.closeBy).toBe("2027-03-30");
+    expect(oct.cutShort).toBe(false);
+    expect(oct.entityReturnDueBy).toBe("2027-03-15");
+    expect(oct.entityCutShort).toBe(true);
+    // A sale whose 180th day comes before March 15 is cut by neither.
+    const jun = exchangeClock("2026-06-01")!;
+    expect(jun.entityCutShort).toBe(false);
+    // Nor by an earlier March 15: the window is the year's own.
+    expect(exchangeClock("2026-03-02")!.entityCutShort).toBe(false);
+    // A November sale is cut by both, the entity's sooner.
+    const nov = exchangeClock("2026-11-15")!;
+    expect(nov.cutShort).toBe(true);
+    expect(nov.entityCutShort).toBe(true);
+    expect(nov.entityReturnDueBy).toBe("2027-03-15");
+  });
+
   it("counts the identification window as 45 days exactly", () => {
     const c = exchangeClock("2026-01-01")!;
     const start = Date.parse("2026-01-01T00:00:00Z");

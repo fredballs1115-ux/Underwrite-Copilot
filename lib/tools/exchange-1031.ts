@@ -150,6 +150,13 @@ export interface ExchangeRead {
     cutShort: boolean;
     /** days actually available to close */
     closeDays: number;
+    /** a partnership's or an S corporation's calendar-year return is due
+     *  March 15, a month before an individual's: that day, the year after
+     *  the transfer */
+    entityReturnDueBy: string;
+    /** true when that March 15 lands before the 180th day — the window a
+     *  partnership or an S corporation selling has, unless it extends */
+    entityCutShort: boolean;
   } | null;
   note: string | null;
 }
@@ -200,7 +207,10 @@ function iso(dayNumber: number): string {
  * date, extensions included (§1031(a)(3)(B); the card had said "before
  * that return is filed", which is not the rule). An extension restores the
  * full 180 days, which is why a Q4 exchange's first act is usually to file
- * one.
+ * one. A partnership or an S corporation on a calendar year files a month
+ * sooner, on March 15, so its window can end then where an individual's
+ * does not (`entityCutShort`, research pass 28) — said beside the
+ * individual's, since the card does not ask who sells.
  */
 export function exchangeClock(closing: string | null): ExchangeRead["clock"] {
   const start = day(closing);
@@ -209,6 +219,7 @@ export function exchangeClock(closing: string | null): ExchangeRead["clock"] {
   const full = start + EXCHANGE_DAYS;
   const year = Number(closing!.slice(0, 4));
   const due = Math.round(Date.UTC(year + 1, 3, 15) / 86_400_000);
+  const entityDue = Math.round(Date.UTC(year + 1, 2, 15) / 86_400_000);
   const close = Math.min(full, due);
   return {
     identifyBy: iso(identify),
@@ -217,6 +228,8 @@ export function exchangeClock(closing: string | null): ExchangeRead["clock"] {
     returnDueBy: iso(due),
     cutShort: due < full,
     closeDays: close - start,
+    entityReturnDueBy: iso(entityDue),
+    entityCutShort: entityDue < full,
   };
 }
 
