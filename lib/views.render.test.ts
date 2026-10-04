@@ -3236,13 +3236,18 @@ describe("the deal math tools", () => {
     // $8M NOI less $2M ground rent is $6M, which at a 5% fee-simple cap
     // looks like $120M. Over the 40 years the lease actually has, at 8%,
     // with the rent reset to 6% of the land in year 16, it is $93.9M —
-    // 18.7% of the perpetual figure a reversion the fee owner keeps and
-    // 3.0% the reset. (The card printed $97.53M, the value without the
-    // reset it announced, and 2.22× coverage on today's NOI.)
+    // 12.1% of the perpetual figure a reversion the fee owner keeps, 3.0%
+    // the reset, and 6.6% the 5% cap against the 8% discount rate, which a
+    // lease that never ended would show too. (The card printed $97.53M, the
+    // value without the reset it announced, and 2.22× coverage on today's
+    // NOI; then it called the rates' 6.6% a reversion too.)
     expect(text).toContain("A building on someone else's land");
     expect(text).toContain("$120.00M"); // capitalised as though forever
     expect(text).toContain("$93.90M"); // worth over the term, the reset in
     expect(text).not.toContain("$97.53M");
+    expect(text).toContain(
+      "12.1% of that figure is a reversion the fee owner keeps, 3.0% is the rent reset in year 16, and 6.6% would be there on a lease that never ended",
+    );
     expect(text).toContain("the year-16 reset in");
     expect(text).toContain("4.00×"); // ground rent coverage today
     expect(text).toContain("3.22×"); // after the reset, on year 16's NOI

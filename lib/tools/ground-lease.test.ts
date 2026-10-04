@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   TERM_MARGIN_YEARS,
   leaseholdPv,
+  perpetualLeaseholdPv,
   readGroundLease,
   type GroundLeaseTerms,
 } from "./ground-lease";
@@ -181,6 +182,110 @@ describe("a leasehold worth less than nothing", () => {
   });
 });
 
+describe("the gap is the reversion and the rates, said apart (audit c66)", () => {
+  // The capitalised figure is struck at the fee-simple cap and the term is
+  // discounted at another rate, so part of the gap would be there on a lease
+  // that never ended. The note had called all of it "a reversion the fee
+  // owner keeps" — 4ba4dda's error on the sale-leaseback card, here.
+
+  it("runs the lease that never ended as two growing perpetuities, the term's schedule with no end", () => {
+    // $8M growing 2.5% and $2M escalating 2%, at 8%: $145,454,545 less
+    // $33,333,333. The schedule run three thousand years lands on it.
+    expect(perpetualLeaseholdPv(8_000_000, 2_000_000, 2.5, 2, 8)).toBeCloseTo(112_121_212.12, 1);
+    expect(leaseholdPv(8_000_000, 2_000_000, 2.5, 2, 3_000, 8)).toBeCloseTo(
+      perpetualLeaseholdPv(8_000_000, 2_000_000, 2.5, 2, 8)!,
+      1,
+    );
+    // A rate at or under either growth has no finite value to give.
+    expect(perpetualLeaseholdPv(8_000_000, 2_000_000, 2.5, 2, 2.5)).toBeNull();
+    expect(perpetualLeaseholdPv(8_000_000, 2_000_000, 2.5, 9, 8)).toBeNull();
+    expect(readGroundLease(SEED).asIfNeverEnding).toBe(112_121_212);
+  });
+
+  it("splits the seed's 18.7% before the reset into 12.1% of reversion and 6.6% of the rates", () => {
+    const r = readGroundLease(SEED);
+    // $120M less $112.1M is the rates; $112.1M less the term's $97.5M is the
+    // cash flows after the term, the reversion.
+    expect(r.rateGapSharePct).toBe(6.6);
+    expect(r.reversionSharePct).toBe(12.1);
+    expect(r.reversionSharePct! + r.rateGapSharePct! + r.resetSharePct!).toBeCloseTo(r.overstatementPct!, 10);
+    expect(r.note).not.toContain("18.7% of that figure is a reversion");
+  });
+
+  it("calls almost none of a 12% discount rate's gap a reversion", () => {
+    // The audit's second: no growth, a 12% discount rate against a 5% cap.
+    // The note said "58.8% of that figure is a reversion"; the cash flows
+    // after forty years are worth 0.5% of it at 12%.
+    const r = readGroundLease({
+      ...SEED,
+      escalationPct: 0,
+      noiGrowthPct: 0,
+      discountRatePct: 12,
+      subordinated: true,
+      yearsToReset: null,
+      resetPctOfLand: null,
+      landValue: null,
+    });
+    expect(r.overstatementPct).toBe(58.8);
+    expect(r.asIfNeverEnding).toBe(50_000_000);
+    expect(r.note).toBe(
+      "Capitalising the leasehold's NOI as though it ran forever says $120,000,000; over 40 years it is worth " +
+        "$49,462,660 — 0.5% of that figure is a reversion the fee owner keeps, and 58.3% would be there on a lease " +
+        "that never ended: the 5% cap and the 12% discount rate disagree about the yield — the inputs, not the lease.",
+    );
+  });
+
+  it("says the reversion alone where the cap and the discount rate agree", () => {
+    // No growth and a discount rate at the cap: the lease that never ended
+    // IS the capitalised figure, so the whole gap is the reversion.
+    const r = readGroundLease({ ...SEED, escalationPct: 0, noiGrowthPct: 0, discountRatePct: 5, resetPctOfLand: null });
+    expect(r.rateGapSharePct).toBe(0);
+    expect(r.reversionSharePct).toBe(r.overstatementPct);
+    expect(r.note).toContain("— 14.2% of that figure is a reversion the fee owner keeps.");
+    expect(r.note).not.toContain("never ended");
+  });
+
+  it("says the rates giving some back where the discount rate values the lease above the cap", () => {
+    // At 7% with the growth entered, a lease that never ended is worth
+    // $137.8M, over the $120M the cap says: the reversion is more than the
+    // gap, and the parts said still add up to it.
+    const r = readGroundLease({ ...SEED, discountRatePct: 7 });
+    expect(r.rateGapSharePct).toBe(-14.8);
+    expect(r.note).toContain("21.6% of that figure is a reversion the fee owner keeps, and 3.9% is the rent reset in year 16.");
+    expect(r.note).toContain(
+      "The rates give 14.8% back: at 7%, with the growth entered, a lease that never ended would be worth $137,777,778, more than the 5% cap says.",
+    );
+    // A reversion past the whole figure is said as a size, not a slice.
+    const short = readGroundLease({ ...SEED, discountRatePct: 6, yearsRemaining: 10 });
+    expect(short.note).toContain("the reversion the fee owner keeps is worth 107.8% of that figure.");
+    expect(short.note).toContain("The rates give 48.8% back");
+  });
+
+  it("names neither part where a lease that never ended has no finite value", () => {
+    // A 2% discount rate under the NOI's 2.5% growth: run forever, the lease
+    // is worth more than any figure, so the reversion and the rates cannot
+    // be told apart and neither is named alone.
+    const r = readGroundLease({ ...SEED, discountRatePct: 2, yearsRemaining: 5 });
+    expect(r.asIfNeverEnding).toBeNull();
+    expect(r.reversionSharePct).toBeNull();
+    expect(r.rateGapSharePct).toBeNull();
+    expect(r.note).toContain(
+      "— 75.2% of that figure is the reversion and the rates together: at a discount rate no higher than the NOI's " +
+        "growth or the rent's escalation, a lease that never ended has no finite value, so the two cannot be told apart.",
+    );
+    expect(r.note).not.toContain("a reversion the fee owner keeps");
+  });
+
+  it("says a reset that lowers the rent as giving some back", () => {
+    // 5% of a $20M site is $1M from year 16, under the $2.69M the rent would
+    // have reached: the reset gives 5.6% back.
+    const r = readGroundLease({ ...SEED, landValue: 20_000_000, resetPctOfLand: 5 });
+    expect(r.resetSharePct).toBe(-5.6);
+    expect(r.note).toContain("12.1% of that figure is a reversion the fee owner keeps, and 6.6% would be there");
+    expect(r.note).toContain("The rent reset in year 16 gives 5.6% back.");
+  });
+});
+
 describe("coverage, which is the test the lender applies", () => {
   it("is NOI over the ground rent, not a DSCR", () => {
     expect(readGroundLease(SEED).coverage).toBe(4);
@@ -243,12 +348,16 @@ describe("the reset, which is an uncapped repricing", () => {
     const r = readGroundLease(SEED);
     expect(r.leaseholdValueBeforeReset).toBe(97_531_550);
     expect(r.leaseholdValue).toBe(93_902_689);
-    // The overstatement splits into the reversion and the reset, and the
-    // two add up to it.
+    // The overstatement splits into the reversion, the reset and the rates,
+    // and the three add up to it.
     expect(r.overstatementPct).toBe(21.7);
     expect(r.resetSharePct).toBe(3);
+    expect(r.reversionSharePct).toBe(12.1);
+    expect(r.rateGapSharePct).toBe(6.6);
     expect(r.note).toContain(
-      "18.7% of that figure is a reversion the fee owner keeps, and 3.0% is the rent reset in year 16",
+      "12.1% of that figure is a reversion the fee owner keeps, 3.0% is the rent reset in year 16, and 6.6% would be " +
+        "there on a lease that never ended: the 5% cap and the 8% discount rate, with the growth entered, disagree about " +
+        "the yield — the inputs, not the lease.",
     );
   });
 

@@ -17,6 +17,24 @@
  *      catastrophic at 25, and this module prints both numbers side by
  *      side because the gap is the whole point.
  *
+ *      Not all of that gap is the reversion. The capitalised figure is
+ *      struck at the fee-simple cap and the term is discounted at another
+ *      rate, so part of the gap would be there on a lease that NEVER ended:
+ *      the same cash flows run on forever at the discount rate
+ *      (`perpetualLeaseholdPv`) set against the cap's figure. That part is
+ *      the two inputs disagreeing about the yield, not a finding about the
+ *      lease, and the module reports it apart (`rateGapSharePct`) from the
+ *      reversion — the cash flows after the term, at the same rate
+ *      (`reversionSharePct`) — the way the sale-leaseback card splits its
+ *      overpayment (4ba4dda). On the seed, 12.1% of the capitalised figure
+ *      is the reversion and 6.6% the rates; the first version called all
+ *      18.7% "a reversion the fee owner keeps", and with no growth, a 12%
+ *      discount rate and a 5% cap it called 58.8% a reversion where the
+ *      reversion is 0.5%. A lease run forever has a value only where the
+ *      discount rate is above the NOI's growth and the rent's escalation;
+ *      where it is not, the two parts cannot be told apart and the card
+ *      says so rather than naming either.
+ *
  *   2. **Ground rent coverage is the test the lender actually applies.**
  *      On an unsubordinated lease the ground rent sits SENIOR to the
  *      mortgage: miss it and the fee owner can terminate the lease, which
@@ -119,8 +137,20 @@ export interface GroundLeaseRead {
   asIfPerpetual: number | null;
   /** how much of the perpetual figure is imaginary, as a % of it… */
   overstatementPct: number | null;
-  /** …and the share of that which is the reset rather than the reversion */
+  /** …the share of that which is the reset… */
   resetSharePct: number | null;
+  /** …the share that is the reversion: the cash flows after the term, at
+   *  the same discount rate, which the fee owner keeps… */
+  reversionSharePct: number | null;
+  /** …and the share that would be there on a lease that never ended: the
+   *  fee-simple cap against the discount rate, the inputs rather than the
+   *  lease. These two are null where a lease run forever has no finite
+   *  value at the discount rate. */
+  rateGapSharePct: number | null;
+  /** the leasehold's cash flows run on forever at the discount rate, the
+   *  reset left out — null where the rate is not above the NOI's growth and
+   *  the rent's escalation */
+  asIfNeverEnding: number | null;
   /** the ground rent after the reset, where one is coming */
   resetRent: number | null;
   /** the year the reset rent is first paid; null where the lease gives no
@@ -145,6 +175,9 @@ const EMPTY: GroundLeaseRead = {
   asIfPerpetual: null,
   overstatementPct: null,
   resetSharePct: null,
+  reversionSharePct: null,
+  rateGapSharePct: null,
+  asIfNeverEnding: null,
   resetRent: null,
   resetYear: null,
   resetCoverage: null,
@@ -199,6 +232,31 @@ export function leaseholdPv(
     pv += cash / Math.pow(1 + r, t);
   }
   return pv;
+}
+
+/**
+ * The same leasehold if it NEVER ended: its cash flows — the NOI growing at
+ * its rate, the rent escalating at its own — run on forever at the same
+ * discount rate. The counterfactual that tells the reversion apart from the
+ * rates: set against the capitalised figure it is what the cap and the
+ * discount rate disagree about, and set against the term's value it is the
+ * reversion, the cash flows after the term. Two growing perpetuities, so a
+ * closed form, `noi / (r − g) − rent / (r − e)`; null where the discount
+ * rate is not above both growth rates, since then a lease run forever has no
+ * finite value. A test pins it to `leaseholdPv` run thousands of years.
+ */
+export function perpetualLeaseholdPv(
+  noi: number,
+  groundRent: number,
+  noiGrowth: number,
+  escalation: number,
+  discount: number,
+): number | null {
+  const g = noiGrowth / 100;
+  const e = escalation / 100;
+  const r = discount / 100;
+  if (!(r > g) || !(r > e)) return null;
+  return noi / (r - g) - groundRent / (r - e);
 }
 
 /**
@@ -327,21 +385,34 @@ export function readGroundLease(input: GroundLeaseTerms): GroundLeaseRead {
     ? round(leaseholdNoi / (feeSimpleCapPct / 100))
     : null;
 
+  // The same cash flows with no end, at the same rate, the reset left out
+  // since its cost is said apart: what tells the reversion from the rates.
+  const neverEnding = perpetualLeaseholdPv(noi, groundRent, growth, esc, discountRatePct);
+  const asIfNeverEnding = neverEnding === null ? null : round(neverEnding);
+
   // Taken from the rounded pairs, so the figures on the card reconcile: the
-  // overstatement is the reversion's share and the reset's, and the two add
-  // up to it.
+  // overstatement is the reset's share, the reversion's and the rates', and
+  // the three add up to it. The gap before the reset is the reversion and
+  // the rates together; the rates' share is the capitalised figure against
+  // the lease that never ended, and the reversion is what is left.
   const overstatementPct =
     asIfPerpetual !== null && asIfPerpetual > 0
       ? round(((asIfPerpetual - leaseholdValue) / asIfPerpetual) * 100, 1)
       : null;
-  const reversionPct =
+  const beforeResetPct =
     asIfPerpetual !== null && asIfPerpetual > 0
       ? round(((asIfPerpetual - leaseholdValueBeforeReset) / asIfPerpetual) * 100, 1)
       : null;
   const resetSharePct =
-    reset === null || overstatementPct === null || reversionPct === null
+    reset === null || overstatementPct === null || beforeResetPct === null
       ? null
-      : round(overstatementPct - reversionPct, 1);
+      : round(overstatementPct - beforeResetPct, 1);
+  const rateGapSharePct =
+    asIfPerpetual !== null && asIfPerpetual > 0 && asIfNeverEnding !== null
+      ? round(((asIfPerpetual - asIfNeverEnding) / asIfPerpetual) * 100, 1)
+      : null;
+  const reversionSharePct =
+    rateGapSharePct === null || beforeResetPct === null ? null : round(beforeResetPct - rateGapSharePct, 1);
 
   // The leased fee is the mirror: the rent for the term — the same rent,
   // reset and all — then the land back. Discounted at the same rate, which
@@ -386,19 +457,22 @@ export function readGroundLease(input: GroundLeaseTerms): GroundLeaseRead {
       );
     }
   } else if (overstatementPct !== null && overstatementPct > 0) {
-    // Each share is said only where it is one: a reversion share at or
-    // below zero — the term worth more than the capitalised figure until the
-    // reset lands — leaves the whole gap to the reset, said as such.
-    const split =
-      resetSharePct !== null && resetSharePct > 0 && reversionPct !== null
-        ? reversionPct > 0
-          ? `${reversionPct.toFixed(1)}% of that figure is a reversion the fee owner keeps, and ${resetSharePct.toFixed(1)}% is the rent reset in year ${resetYear}.`
-          : `${overstatementPct.toFixed(1)}% under that figure, and the whole gap is the rent reset in year ${resetYear}: without it the term would be worth more than the capitalised figure.`
-        : `${overstatementPct}% of that figure is a reversion the fee owner keeps.`;
     notes.push(
       `Capitalising the leasehold's NOI as though it ran forever says ` +
         `${usd(asIfPerpetual!)}; over ${years} years it is worth ` +
-        `${usd(leaseholdValue)} — ${split}`,
+        `${usd(leaseholdValue)} — ` +
+        gapSplit({
+          overstatementPct,
+          beforeResetPct,
+          resetPct: resetYear === null ? null : resetSharePct,
+          resetYear,
+          reversionPct: reversionSharePct,
+          ratePct: rateGapSharePct,
+          neverEnding: asIfNeverEnding,
+          capPct: feeSimpleCapPct as number,
+          discountPct: discountRatePct,
+          growing: growth !== 0 || esc !== 0,
+        }),
     );
   }
   if (resetCoverage !== null && resetRent !== null) {
@@ -432,6 +506,9 @@ export function readGroundLease(input: GroundLeaseTerms): GroundLeaseRead {
     asIfPerpetual,
     overstatementPct,
     resetSharePct,
+    reversionSharePct,
+    rateGapSharePct,
+    asIfNeverEnding,
     resetRent,
     resetYear,
     resetCoverage,
@@ -439,6 +516,89 @@ export function readGroundLease(input: GroundLeaseTerms): GroundLeaseRead {
     financeable,
     note: notes.join(" "),
   };
+}
+
+/** Clauses joined as a sentence joins them: "A", "A, and B", "A, B, and C". */
+function joinClauses(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")}, and ${parts[parts.length - 1]}`;
+}
+
+/**
+ * What the gap between the capitalised figure and the term's value is made
+ * of, each part said only where it is there — 4ba4dda's rule on the
+ * sale-leaseback card: the reversion the fee owner keeps, the rent reset,
+ * and what a lease that never ended would show too, which is the cap and
+ * the discount rate disagreeing about the yield rather than anything about
+ * the lease. A part that runs the other way is said as giving some back, so
+ * the parts said add up to the gap.
+ */
+function gapSplit(x: {
+  overstatementPct: number;
+  beforeResetPct: number | null;
+  resetPct: number | null;
+  resetYear: number | null;
+  reversionPct: number | null;
+  ratePct: number | null;
+  neverEnding: number | null;
+  capPct: number;
+  discountPct: number;
+  growing: boolean;
+}): string {
+  const pct = (n: number) => `${n.toFixed(1)}%`;
+  const cap = `${trimmed(x.capPct)}%`;
+  const rate = `${trimmed(x.discountPct)}%`;
+  const growth = x.growing ? ", with the growth entered," : "";
+  const reset = x.resetPct;
+  // The term worth more than the capitalised figure until the reset lands:
+  // the whole gap is the reset, said as such.
+  if (reset !== null && reset > 0 && x.beforeResetPct !== null && x.beforeResetPct <= 0) {
+    return `${pct(x.overstatementPct)} under that figure, and the whole gap is the rent reset in year ${x.resetYear}: without it the term would be worth more than the capitalised figure.`;
+  }
+  const resetClause = reset !== null && reset > 0 ? `${pct(reset)} is the rent reset in year ${x.resetYear}` : null;
+  const resetBack = reset !== null && reset < 0 ? ` The rent reset in year ${x.resetYear} gives ${pct(-reset)} back.` : "";
+
+  // A lease run forever has no finite value at this rate, so the reversion
+  // and the rates cannot be told apart — and neither is named alone.
+  if (x.reversionPct === null || x.ratePct === null) {
+    const together = `${pct(x.beforeResetPct ?? x.overstatementPct)} of that figure is the reversion and the rates together`;
+    return (
+      `${joinClauses(resetClause ? [together, resetClause] : [together])}: at a discount rate no higher than the NOI's ` +
+      `growth or the rent's escalation, a lease that never ended has no finite value, so the two cannot be told apart.${resetBack}`
+    );
+  }
+
+  // A part past the whole figure is possible only beside one that gives
+  // some back, and is said as a size rather than as a slice of the figure.
+  const parts: string[] = [];
+  if (x.reversionPct > 0) {
+    parts.push(
+      x.reversionPct > 100
+        ? `the reversion the fee owner keeps is worth ${pct(x.reversionPct)} of that figure`
+        : `${pct(x.reversionPct)} of that figure is a reversion the fee owner keeps`,
+    );
+  }
+  if (resetClause) parts.push(resetClause);
+  if (x.ratePct > 0) {
+    parts.push(
+      x.ratePct > 100
+        ? `a lease that never ended would sit ${pct(x.ratePct)} under that figure`
+        : `${pct(x.ratePct)} would be there on a lease that never ended`,
+    );
+  }
+  if (parts.length === 0) return `${pct(x.overstatementPct)} under that figure.${resetBack}`;
+  let said = joinClauses(parts);
+  said +=
+    x.ratePct > 0
+      ? `: the ${cap} cap and the ${rate} discount rate${growth} disagree about the yield — the inputs, not the lease.`
+      : ".";
+  if (x.ratePct < 0 && x.neverEnding !== null) {
+    said += ` The rates give ${pct(-x.ratePct)} back: at ${rate}${growth} a lease that never ended would be worth ${usdExact(x.neverEnding)}, more than the ${cap} cap says.`;
+  }
+  if (x.reversionPct < 0) {
+    said += ` The lease's end gives ${pct(-x.reversionPct)} back: run on past it at ${rate}, the leasehold would lose money.`;
+  }
+  return said + resetBack;
 }
 
 /** A percent as typed, without a trailing ".0". */
