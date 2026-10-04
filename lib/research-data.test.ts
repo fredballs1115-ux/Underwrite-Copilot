@@ -481,6 +481,22 @@ describe("the research files' per-foot figures keep their dollar signs", () => {
     }
     expect(lost).toEqual([]);
   });
+
+  // "The oldest boomers turn 80 this year" was true when the senior housing
+  // file was read, and /market went on printing it in every year after. A
+  // research sentence names the year it means.
+  it("no sentence says 'this year' or 'next year' where it means a year it can name", () => {
+    const dir = join(process.cwd(), "data/research");
+    const undated: string[] = [];
+    for (const file of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
+      for (const s of strings(JSON.parse(readFileSync(join(dir, file), "utf8")))) {
+        for (const m of s.matchAll(/\b(?:this|next) year\b/gi)) {
+          undated.push(`${file}: …${s.slice(Math.max(0, (m.index ?? 0) - 60), (m.index ?? 0) + m[0].length)}`);
+        }
+      }
+    }
+    expect(undated).toEqual([]);
+  });
 });
 
 describe("the multifamily file's ACS stock counts", () => {

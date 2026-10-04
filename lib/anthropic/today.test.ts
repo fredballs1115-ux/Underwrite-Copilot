@@ -185,4 +185,14 @@ describe("the nightly steward and the intel job tell the model the day too", () 
     expect(intel).toContain('import { todayLine } from "../lib/anthropic/today.ts"');
     expect(intel).toMatch(/\n\$\{todayLine\(\)\}`;/);
   });
+
+  it("the intel job's searches name the run's own year, never a typed one", () => {
+    const intel = src("scripts/daily-intel.mjs");
+    const watches = intel.slice(intel.indexOf("const WATCHES = ["), intel.indexOf("];", intel.indexOf("const WATCHES = [")));
+    expect(watches).toContain('{ sector: "multifamily"');
+    // A year typed into a query asked for that year's market after it ended.
+    expect(watches.match(/\b(19|20)\d\d\b/g)).toBeNull();
+    expect(watches).toContain("investor market ${RUN_YEAR}`");
+    expect(intel).toContain("const RUN_YEAR = new Date().getUTCFullYear();");
+  });
 });

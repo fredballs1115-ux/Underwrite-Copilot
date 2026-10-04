@@ -23,6 +23,10 @@ import { missingSecrets, missingSecretsError } from "../lib/gh-annotate.ts";
 // "about to" change is judged against the day, never the model's training.
 import { todayLine } from "../lib/anthropic/today.ts";
 
+// The run's own year, for the watch that names one: a year typed into the
+// query went on asking for that year's market after it ended.
+const RUN_YEAR = new Date().getUTCFullYear();
+
 // One watch query per jurisdiction rule-set + per sector the buyer tracks.
 // Keep queries SPECIFIC — Google News RSS returns ~100 items per query and
 // relevance scoring costs tokens. The last three watches broaden the net to
@@ -33,7 +37,7 @@ const WATCHES = [
   { sector: "regulation-md", q: '"rent stabilization" Maryland "Prince George" OR Montgomery OR "Takoma Park"' },
   { sector: "regulation-va", q: 'Virginia "rent control" OR "rent stabilization" General Assembly landlord' },
   { sector: "regulation-east", q: '"rent control" ordinance New Jersey OR Connecticut OR "New York" landlord small' },
-  { sector: "multifamily", q: '"small multifamily" OR "duplex" OR "fourplex" investor market 2026' },
+  { sector: "multifamily", q: `"small multifamily" OR "duplex" OR "fourplex" investor market ${RUN_YEAR}` },
   { sector: "capital-markets", q: 'mortgage rates multifamily "cap rates" commercial real estate lending' },
   { sector: "tax", q: '"bonus depreciation" OR "opportunity zone" OR "1031 exchange" real estate investor' },
   { sector: "housing-policy", q: 'HUD "fair market rent" OR "FHA loan limit" OR "Section 8" payment standard' },
