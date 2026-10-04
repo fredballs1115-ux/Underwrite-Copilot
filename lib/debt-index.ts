@@ -100,9 +100,10 @@ export interface PermanentSpread {
   label: string;
 }
 
-/** The construction lender's spread over its floating index — a screening
- *  default (bank construction debt has priced at SOFR + 300 to 400 through
- *  the cycle), marked as an assumption wherever it is used. */
+/** The construction lender's spread over its floating index: the site's
+ *  screening default, not a figure read from any source, so every note
+ *  that uses it calls it a screening default — an assumption a lender's
+ *  quote replaces, never a quote. */
 export const CONSTRUCTION_SPREAD_BPS = 350;
 
 export function debtSeeds(rates: readonly LiveRate[], holdMonths: number): DebtSeeds {
