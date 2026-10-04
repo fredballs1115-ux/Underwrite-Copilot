@@ -584,6 +584,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Allentown, PA",
     size: [2048, 1151],
   },
+  // Amarillo, TX: skyline-sheet run 36818765688 — Palo Duro Canyon, the landmark the area is known by, its red-banded walls and mesas over juniper from the CCC overlook, sharp, the far rim whole at the 21:9's top; over downtown under a grey overcast behind a signal mast, the towers small under heavy cloud behind scrub and a fence, Cadillac Ranch tiny in a brown field from a drone, a street of signs, the canyon from high in the air, and a canyon strip too short for a phone's card.
+  "cbsa:11100": {
+    file: "Palo Duro Canyon from CCC Overlook 2024.jpg",
+    place: "Palo Duro Canyon from the CCC overlook, its red walls and mesas over juniper",
+    credit: "Larry D. Moore",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Amarillo, TX",
+    size: [2999, 2000],
+  },
   // Anchorage, AK: skyline-sheet run 36782967654 — the snow on the mountains behind downtown, over the city article's lead, a view from above whose card crop loses the mountains.
   "cbsa:11260": {
     file: "Anchorage eastward view from Hotel Captain Cook.jpg",
@@ -854,6 +864,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Crestview-Fort Walton Beach-Destin, FL",
     size: [3872, 2022],
   },
+  // Daphne-Fairhope-Foley, AL: skyline-sheet run 36818691850 — the resort coast the county is known by, a boat setting out from Orange Beach's docks with condominium towers across the water under a clear sky, bright, sharp and whole in both crops; over a hazy frame of Gulf Shores' crowded beach whose author field is a request to be credited, the county courthouse at Bay Minette between two oaks, and three PNG frames of a flyover video.
+  "cbsa:19300": {
+    file: "Alabama's Coastal Connection - Setting Out from Orange Beach - NARA - 7716828.jpg",
+    place: "A boat setting out from Orange Beach's docks, condominium towers across the water",
+    credit: "A. E. Crane, U.S. Department of Transportation",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Daphne-Fairhope-Foley, AL",
+    size: [2256, 1496],
+  },
   // Davenport, IA: skyline-sheet run 36800398141 — the riverfront across the Mississippi under a clear sky, the clock tower and a white-cabled skybridge whole in every crop, over the article's lead, whose casino boat is the centre of the card, a grey-sky panorama, two street-level frames over trees and a road, Rock Island's riverfront and Moline's clock tower, which the card cuts.
   "cbsa:19340": {
     file: "2018 Davenport skyline 02 (cropped).jpg",
@@ -1104,6 +1124,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Hickory-Lenoir-Morganton, NC",
     size: [3008, 2000],
   },
+  // Hilton Head Island-Bluffton-Port Royal, SC: skyline-sheet run 36818691850 — the lighthouse the island is known by, red and white over Harbour Town's marina, from the water under a clear sky, whole in both crops; over the island from high in the air, which reads as a map, Beaufort's Bay Street lined with parked cars, its waterfront's trees under a flat white sky, a swing bridge past the waterfront's pilings, a trawler before a highway bridge, and a 1972 street photograph that is a PNG.
+  "cbsa:25940": {
+    file: "Hilton Head Harbor (3926567515).jpg",
+    place: "Harbour Town Lighthouse and its marina on Hilton Head Island, from the water",
+    credit: "fw_gadget",
+    license: "CC BY-SA 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0",
+    name: "Hilton Head Island-Bluffton-Port Royal, SC",
+    size: [3072, 2304],
+  },
   // Huntsville, AL: skyline-sheet run 36782967654 — the downtown towers over the park's water, over two aerials of the interstate. The runner printed the author as "No machine-readable author provided. Anivron assumed (based on copyright claims)."; the credit is the name in it, without Commons' sentence around it.
   "cbsa:26620": {
     file: "Downtown Huntsville, Alabama.jpg",
@@ -1284,6 +1314,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Lynchburg, VA",
     size: [4032, 3024],
   },
+  // Macon-Bibb County, GA: skyline-sheet run 36818691850 — the city at dusk its article shows, the lights coming on under a pink and violet sky, a brick tower and a church's twin spires on the skyline, sharp, a strip whose full height both crops keep; over the city from high in the air, which reads as a map, a linen postcard, the towers small over trees and a field under a white sky, and three street corners under traffic signals.
+  "cbsa:31420": {
+    file: "Macon night skyline2.JPG",
+    place: "Macon at dusk from a rooftop, its lights coming on under a pink and violet sky",
+    credit: "Alexdi at English Wikipedia",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Macon-Bibb County, GA",
+    size: [4000, 1365],
+  },
   // Madison, WI: skyline-sheet run 36816573981 — a one-market run's pick of twenty-seven: the State Capitol's dome over downtown, across a frozen lake in low winter light under a clear sky, whole in both crops; over a drone's view of the Capitol whose crops cut its statue, the dome up the boulevard under a white sky with its statue cut at 21:9, Monona Terrace from the water, Bascom Hill in autumn with the dome small, Bascom Mall in black and white, power lines across the dome, the lake's open water, haze and algae, an 1855 lithograph and an old frame of a train. The runner printed the licence as "Public Domain" with a link to the Internet Archive's copy of Creative Commons' retired public-domain page; it is written here as the table's other public-domain rows are, with no link, since public domain asks for none.
   "cbsa:31540": {
     file: "Gfp-wisconsin-madison-city-skyline-in-the-winter.jpg",
@@ -1323,6 +1363,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Memphis, TN",
     size: [5979, 2988],
+  },
+  // Midland, TX: skyline-sheet run 36818765688 — the downtown towers the city is known by, in low sun from a drone, an oblique with the plain running out to a horizon, sharp, the towers whole in both crops; over the courthouse square through a window, a black mullion down the middle of both crops.
+  "cbsa:33260": {
+    file: "Midland, TX skyline (cropped).jpg",
+    place: "Downtown Midland's towers in low sun, the plain running out to the horizon",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Midland, TX",
+    size: [10974, 6173],
   },
   // Milwaukee, WI: skyline-sheet run 36750289515 — the one frame that keeps every tower whole; credited as Commons names the author (the filename names Isaac Rowlett).
   "cbsa:33340": {
@@ -1483,6 +1533,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     name: "Palm Bay-Melbourne-Titusville, FL",
     size: [4032, 3024],
+  },
+  // Panama City-Panama City Beach, FL: skyline-sheet run 36818691850 — the emerald water the coast is known by, from St. Andrews State Park toward the beach's condominium towers under a deep blue sky, sharp and whole in both crops; over a high panorama whose beach falls under the scrim, the beach from a pier whose tallest tower the 21:9 cuts, two people on a jet ski, a storm-dark sky over the Gulf, the park's beach and the bay under grey skies, and City Hall's lettered front.
+  "cbsa:37460": {
+    file: "Emerald Coast Waters from St Andrews State Park.jpg",
+    place: "The Gulf's emerald water from St. Andrews State Park, the beach and its condominium towers beyond",
+    credit: "Royalbroil",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Panama City-Panama City Beach, FL",
+    size: [5472, 3648],
   },
   // Pensacola, FL: skyline-sheet run 36783120462 — the white sand the area is known by (an article's lead), over an aerial of the bay.
   "cbsa:37860": {

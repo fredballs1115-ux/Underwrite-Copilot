@@ -5252,6 +5252,12 @@
         "Macon Georgia downtown",
         "Macon Georgia skyline",
         "Macon Georgia cherry blossoms"
+      ],
+      "candidates": [
+        {
+          "file": "Macon night skyline2.JPG",
+          "note": "Macon-Bibb County, GA — Alexdi at English Wikipedia, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36818691850)."
+        }
       ]
     },
     {
@@ -5294,6 +5300,12 @@
         "Harbour Town lighthouse Hilton Head",
         "Hilton Head Island beach",
         "Beaufort South Carolina waterfront"
+      ],
+      "candidates": [
+        {
+          "file": "Hilton Head Harbor (3926567515).jpg",
+          "note": "Hilton Head Island-Bluffton-Port Royal, SC — fw_gadget, CC BY-SA 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36818691850)."
+        }
       ]
     },
     {
@@ -5315,6 +5327,12 @@
         "Panama City Beach Florida beach",
         "Panama City Florida marina",
         "Panama City Beach pier"
+      ],
+      "candidates": [
+        {
+          "file": "Emerald Coast Waters from St Andrews State Park.jpg",
+          "note": "Panama City-Panama City Beach, FL — Royalbroil, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36818691850)."
+        }
       ]
     },
     {
@@ -5337,6 +5355,12 @@
         "Fairhope pier Mobile Bay",
         "Gulf Shores Alabama beach",
         "Orange Beach Alabama"
+      ],
+      "candidates": [
+        {
+          "file": "Alabama's Coastal Connection - Setting Out from Orange Beach - NARA - 7716828.jpg",
+          "note": "Daphne-Fairhope-Foley, AL — A. E. Crane, U.S. Department of Transportation, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 36818691850)."
+        }
       ]
     },
     {
@@ -5379,6 +5403,12 @@
         "Amarillo Texas skyline",
         "Amarillo Texas downtown",
         "Palo Duro Canyon"
+      ],
+      "candidates": [
+        {
+          "file": "Palo Duro Canyon from CCC Overlook 2024.jpg",
+          "note": "Amarillo, TX — Larry D. Moore, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36818765688)."
+        }
       ]
     },
     {
@@ -5434,6 +5464,12 @@
         "Midland Texas skyline",
         "Midland Texas downtown",
         "Midland Texas"
+      ],
+      "candidates": [
+        {
+          "file": "Midland, TX skyline (cropped).jpg",
+          "note": "Midland, TX — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36818765688)."
+        }
       ]
     },
     {
