@@ -679,7 +679,7 @@ export default function Home() {
                     </span>
                   </h1>
                   <p className="mt-6 max-w-xl text-lg leading-relaxed text-white/90">
-                    Upload the OM. Every figure labelled with where it came from, the three deal-killers stressed, a Go / Caution / No-go — in minutes.
+                    Upload the OM. Every figure labelled with where it came from, the three deal-killers stressed, a Go / Caution / No-go.
                   </p>
                   <div className="mt-8 flex flex-wrap items-center gap-3">
                     <Link

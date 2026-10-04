@@ -147,8 +147,8 @@ export default function WhyPage() {
               See it on a real deal
             </h2>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Start with a fully worked sample, or upload an OM and get a verdict
-              in a few minutes.
+              Start with a fully worked sample, or upload an OM and get a
+              verdict.
             </p>
             <div className="mt-4 flex flex-wrap gap-2.5">
               <Link

@@ -55,6 +55,21 @@ describe("the homepage claims no duration it has not measured either", () => {
     expect(Object.keys(marketing)).not.toContain("FIRST_READ_CLAIM");
     expect(Object.keys(marketing)).not.toContain("FULL_SCREEN_CLAIM");
   });
+
+  // The second pre-merge audit: the test above read "half a minute" alone,
+  // and the homepage's lead line still ended "— in minutes", the sign-in
+  // page said "Screen your first deal in minutes" and /why "get a verdict in
+  // a few minutes". No public page promises a screen's duration.
+  it("no public page promises how long a screen takes", () => {
+    const DURATION = /\bin (?:a few |just )?(?:minutes|seconds)\b|\bwithin minutes\b|\bin under a minute\b|\bminutes, not\b/i;
+    for (const p of ["app/page.tsx", "app/login/page.tsx", "app/why/page.tsx", "app/demo/page.tsx", "app/tools/page.tsx", "app/market/page.tsx"]) {
+      const said = read(p)
+        .split("\n")
+        .filter((line) => !/^\s*(?:\/\/|\*|\/\*)/.test(line))
+        .join("\n");
+      expect(said, p).not.toMatch(DURATION);
+    }
+  });
 });
 
 describe("isScreenJob — the six-step screen, not a job that runs on its own", () => {
