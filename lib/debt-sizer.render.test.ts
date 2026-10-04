@@ -112,6 +112,64 @@ describe("the debt sizer's starting rate is the model's, on a day the table seed
   });
 });
 
+describe("the debt sizer's opening sentence names where its starting figures come from", () => {
+  // It had said "its figures start from the OM's" (or "the first-draft
+  // model's") over a 65% LTV, a 1.25x DSCR and an 8% debt yield that are
+  // neither — and over a 30-year amortization the OM never stated.
+  const opening = (html: string) => html.match(/<p class="text-sm text-muted">([^<]*)<\/p>/)?.[1] ?? "";
+
+  it("from the OM: the price and NOI as the OM's, the amortization and the lender tests as screening defaults", () => {
+    const html = render({ model: null, extraction: OM, underwrite: deriveUnderwriteInputs(OM, "Harbor Point Apartments").inputs, rateSeeds: null });
+    clean(html);
+    expect(opening(html)).toBe(
+      "Price and NOI from the OM; the amortization and lender tests are screening defaults — replace them with a lender&#x27;s terms.",
+    );
+    expect(visibleText(html)).not.toContain("its figures start from");
+    // The defaults the sentence names are the ones the fields start at.
+    expect(inputValue(html, "Maximum loan to value percent")).toBe("65");
+    expect(inputValue(html, "Minimum debt service coverage ratio")).toBe("1.25");
+    expect(inputValue(html, "Minimum debt yield percent")).toBe("8");
+    expect(inputValue(html, "Amortization years")).toBe("30");
+  });
+
+  it("names only what the OM gave: a price with no NOI is the price alone", () => {
+    const priceOnly: ExtractionResult = { ...OM, metrics: OM.metrics.filter((m) => !/NOI/.test(m.label)) };
+    const html = render({ model: null, extraction: priceOnly, underwrite: null, rateSeeds: null });
+    expect(opening(html)).toBe(
+      "Price from the OM; the amortization and lender tests are screening defaults — replace them with a lender&#x27;s terms.",
+    );
+  });
+
+  it("from the first-draft model: its price, NOI, stated rate and amortization, and the lender tests as defaults", () => {
+    const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name);
+    const html = render({ model: SAMPLE_DEAL.model, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
+    clean(html);
+    expect(opening(html)).toBe(
+      "Price, NOI, rate and amortization from the first-draft model; the lender tests are screening defaults — replace them with a lender&#x27;s terms.",
+    );
+  });
+
+  it("a first-draft model whose rate no document states keeps the rate out of the model's list — its note says what it is", () => {
+    const assumed = {
+      ...SAMPLE_DEAL.model,
+      metrics: SAMPLE_DEAL.model.metrics.map((m) => (m.key === "rate" ? { ...m, authority: "Market", sources: [{ ...m.sources[0], doc: "Market" }] } : m)),
+    };
+    const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name);
+    const html = render({ model: assumed, extraction: SAMPLE_DEAL.extraction, underwrite: derived.inputs, rateSeeds: null });
+    expect(opening(html)).toBe(
+      "Price, NOI and amortization from the first-draft model; the lender tests are screening defaults — replace them with a lender&#x27;s terms.",
+    );
+    expect(visibleText(html)).toContain("Rate starts from the screening model's 6.00% placeholder");
+  });
+
+  it("with nothing to start from, asks for the deal's figures and still names the defaults", () => {
+    const html = render({ model: null, extraction: null, underwrite: null, rateSeeds: null });
+    expect(opening(html)).toBe(
+      "Enter the deal&#x27;s figures; the amortization and lender tests are screening defaults — replace them with a lender&#x27;s terms.",
+    );
+  });
+});
+
 describe("sizerStartingRate — the precedence, one rule", () => {
   const seed = { pct: 6.78, note: "5-yr Treasury 4.78% (FRED, Sep 17, 2026) + 200 bps multifamily spread, a screening default — enter your quote" };
   it("stated, then the seed, then the model's own rate, then the flat placeholder", () => {

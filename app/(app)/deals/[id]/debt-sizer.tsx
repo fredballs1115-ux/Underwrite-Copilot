@@ -20,7 +20,7 @@ import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
 import { interestOf } from "@/lib/interest";
 import { assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
 import { assetWords } from "@/lib/asset-words";
-import { sizerStartingRate } from "@/lib/sizer-terms";
+import { sizerSourceLine, sizerStartingRate } from "@/lib/sizer-terms";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -175,6 +175,10 @@ interface Seed {
   ratePct: number;
   amortYears: number;
   seededFrom: "model" | "extraction" | "defaults";
+  /** the rate is the first-draft model's, as a loan's own paper states it */
+  rateStated: boolean;
+  /** the amortization is the first-draft model's own, not the 30-year default */
+  amortFromModel: boolean;
   /** the sentence under the rate field saying where the rate came from
    *  (lib/sizer-terms) — null where a loan's own paper states it */
   rateNote: string | null;
@@ -218,12 +222,15 @@ function deriveSeed(
     // carries a rate whether or not a document states one, so only a rate a
     // document states is taken as the quote (lib/model/stated-rate).
     const r = rate(statedModelRate(model));
+    const modelAmort = model.inputs.loan?.amortYears ?? null;
     return {
       price,
       noi: plausible(model.cashFlow?.[0]?.noi ?? null, price),
       ratePct: r.pct,
-      amortYears: model.inputs.loan?.amortYears ?? 30,
+      amortYears: modelAmort ?? 30,
       seededFrom: "model",
+      rateStated: r.from === "stated",
+      amortFromModel: modelAmort != null,
       rateNote: r.note,
     };
   }
@@ -245,6 +252,8 @@ function deriveSeed(
     ratePct: r.pct,
     amortYears: 30,
     seededFrom: price != null || noi != null ? "extraction" : "defaults",
+    rateStated: false,
+    amortFromModel: false,
     rateNote: r.note,
   };
 }
@@ -487,12 +496,18 @@ export function DebtSizer({
         </span>
       </summary>
       <div className="border-t border-line p-5">
+        {/* What each starting figure is: the model's or the OM's, named as
+            theirs, and the lender tests named as screening defaults
+            (lib/sizer-terms). The summary line already says the math is
+            deterministic. */}
         <p className="text-sm text-muted">
-          {seed.seededFrom === "model"
-            ? "The arithmetic here is code; its figures start from the first-draft model's."
-            : seed.seededFrom === "extraction"
-              ? "The arithmetic here is code; its figures start from the OM's."
-              : "The arithmetic here is code — enter the deal's figures."}
+          {sizerSourceLine({
+            from: seed.seededFrom,
+            price: seed.price != null,
+            noi: seed.noi != null,
+            rate: seed.rateStated,
+            amortization: seed.amortFromModel,
+          })}
         </p>
 
         {/* What the OM states of a loan, under whose loan it is: its own

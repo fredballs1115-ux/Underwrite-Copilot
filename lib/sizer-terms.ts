@@ -22,6 +22,41 @@ import type { RateSeed } from "@/lib/debt-index";
  *  rate. */
 export const FLAT_SIZER_RATE_PCT = 6.5;
 
+/**
+ * The card's opening sentence, true of every figure it starts from: the
+ * ones the first-draft model or the OM gave, named as theirs, and the
+ * lender tests — with the amortization where neither gave one — named as
+ * the screening defaults they are, to replace with a lender's terms. A rate
+ * that is not the documents' says what it is under its own field
+ * (`sizerStartingRate`), so it is named here only where a loan's own paper
+ * states it. It had said "its figures start from the OM's" over a 65% LTV,
+ * a 1.25x DSCR, an 8% debt yield and a 30-year amortization that are not.
+ */
+export function sizerSourceLine(o: {
+  from: "model" | "extraction" | "defaults";
+  /** each figure the sizer took from that source */
+  price: boolean;
+  noi: boolean;
+  /** the first-draft model's rate, as a loan's own paper states it */
+  rate: boolean;
+  /** the first-draft model's own amortization (else the 30-year default) */
+  amortization: boolean;
+}): string {
+  const fromSource = o.from !== "defaults";
+  const named = [
+    fromSource && o.price ? "price" : null,
+    fromSource && o.noi ? "NOI" : null,
+    o.from === "model" && o.rate ? "rate" : null,
+    o.from === "model" && o.amortization ? "amortization" : null,
+  ].filter((w): w is string => w !== null);
+  const amortTaken = named.includes("amortization");
+  const defaults = `${amortTaken ? "the lender tests are" : "the amortization and lender tests are"} screening defaults — replace them with a lender's terms.`;
+  if (named.length === 0) return `Enter the deal's figures; ${defaults}`;
+  const list = named.length === 1 ? named[0] : `${named.slice(0, -1).join(", ")} and ${named[named.length - 1]}`;
+  const whose = o.from === "model" ? "the first-draft model" : "the OM";
+  return `${list[0].toUpperCase()}${list.slice(1)} from ${whose}; ${defaults}`;
+}
+
 export type SizerRateSource = "stated" | "seed" | "model" | "flat";
 
 export interface SizerRate {
