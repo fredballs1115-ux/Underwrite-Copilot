@@ -30,6 +30,7 @@ import { FIXTURE_NOW as NOW, REAL_ROWS as REAL } from "./live-rates.fixture";
 import table from "@/data/fred-series.json";
 import metrosSeed from "@/data/research/metros.json";
 import { DATA_METROS } from "@/lib/market-match";
+import { marketOwnArea, namesItsArea } from "@/lib/metro-own-area";
 import {
   HVS_RATES_URL,
   METRO_SERIES,
@@ -651,6 +652,33 @@ describe("a covered metro's own series", () => {
       expect(m.contractRate).toBe(false);
       expect(m.area.length, m.id).toBeGreaterThan(3);
       expect([...COVERED, ...READ_ONLY], m.id).toContain(m.metro);
+    }
+  });
+
+  it("names each metro area one way across every series filed under it (the audit of 2026-10-04)", () => {
+    // The survey's Dallas series said "Dallas MSA" and Norfolk's "Virginia
+    // Beach MSA" beside nine "Dallas–Fort Worth MSA" and "Virginia
+    // Beach–Norfolk MSA" tiles: the page took the survey tile for another
+    // area's and told the reader it was a county's or a division's. A
+    // division or a county is a different area and keeps its own name; the
+    // metro area is one name.
+    const msaNames = new Map<string, Set<string>>();
+    for (const m of METRO_SERIES) {
+      if (!/\bMSA$/.test(m.area)) continue;
+      msaNames.set(m.metro, (msaNames.get(m.metro) ?? new Set()).add(m.area));
+    }
+    expect(msaNames.size).toBeGreaterThan(30);
+    for (const [metro, names] of msaNames) expect([...names], metro).toHaveLength(1);
+    // The page then calls the survey tile the market's own.
+    for (const [id, name] of [
+      ["dallas", "Dallas-Fort Worth"],
+      ["norfolk_hampton_roads", "Norfolk / Hampton Roads VA"],
+    ] as const) {
+      const metas = metroSeriesFor(id).series;
+      const own = marketOwnArea(metas, id, name);
+      const survey = metas.find((s) => s.metro === id && s.metric === "rental_vacancy_msa")!;
+      expect(own, id).not.toBeNull();
+      expect(namesItsArea(survey, id, own), id).toBe(false);
     }
   });
 
