@@ -180,12 +180,17 @@ describe("the Monday digest pictures each deal it names (#464)", () => {
     expect(text).not.toContain("picture");
   });
 
-  it("offers the one-click unsubscribe in its footer where it has one, beside the Account page", () => {
+  it("offers the unsubscribe link in its footer where it has one, beside the Account page", () => {
     const url = "https://underwrite.example/api/email/unsubscribe/tok";
     const { html, text } = weeklyDigestEmail({ ...base, unsubscribeUrl: url });
-    expect(html).toContain(`<a href="${url}" style="color:#114e54;">Unsubscribe in one click</a>`);
+    // The link opens a page whose button turns the digest off, with no
+    // sign-in: it says that, and never "one click" — only the mail
+    // program's own button, from the List-Unsubscribe headers, is one
+    // click (audit c66).
+    expect(html).toContain(`<a href="${url}" style="color:#114e54;">Unsubscribe without signing in</a>`);
     expect(html).toContain(">manage both emails on your Account page</a>");
-    expect(text).toContain(`Unsubscribe in one click: ${url} — or manage both emails on your Account page: ${base.settingsUrl}`);
+    expect(text).toContain(`Unsubscribe without signing in: ${url} — or manage both emails on your Account page: ${base.settingsUrl}`);
+    expect(`${html} ${text}`).not.toMatch(/one click/i);
     expect(a11yIssues(html)).toEqual([]);
     // Without one, the footer is as it was.
     expect(weeklyDigestEmail(base).html).toContain(">Turn it off on your Account page</a>");

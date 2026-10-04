@@ -293,9 +293,12 @@ export interface DigestInput {
   }[];
   pipelineUrl: string;
   settingsUrl: string;
-  /** the one-click unsubscribe (lib/email-unsubscribe): drawn in the footer
-   *  beside the Account page's switch, which needs a sign-in; null where no
-   *  link could be minted */
+  /** the unsubscribe link (lib/email-unsubscribe): drawn in the footer
+   *  beside the Account page's switch, which needs a sign-in. It opens a
+   *  page that turns the digest off with one button and no sign-in — the
+   *  one-click unsubscribe itself is the mail program's own, through the
+   *  List-Unsubscribe headers, so the footer never calls the link one click.
+   *  Null where no link could be minted. */
   unsubscribeUrl?: string | null;
 }
 
@@ -342,7 +345,7 @@ export function weeklyDigestEmail(input: DigestInput): {
     `Open the pipeline: ${input.pipelineUrl}`,
     ``,
     input.unsubscribeUrl
-      ? `You're getting this because the weekly digest is on. Unsubscribe in one click: ${input.unsubscribeUrl} — or manage both emails on your Account page: ${input.settingsUrl}`
+      ? `You're getting this because the weekly digest is on. Unsubscribe without signing in: ${input.unsubscribeUrl} — or manage both emails on your Account page: ${input.settingsUrl}`
       : `You're getting this because the weekly digest is on. Turn it off on your Account page: ${input.settingsUrl}`,
   ]
     .filter((l): l is string => l !== null)
@@ -422,7 +425,7 @@ export function weeklyDigestEmail(input: DigestInput): {
         </tr>${footerRow(
           input.unsubscribeUrl
             ? `You're getting this because the weekly digest is on.
-              <a href="${esc(input.unsubscribeUrl)}" style="color:#114e54;">Unsubscribe in one click</a>, or
+              <a href="${esc(input.unsubscribeUrl)}" style="color:#114e54;">Unsubscribe without signing in</a>, or
               <a href="${esc(input.settingsUrl)}" style="color:#114e54;">manage both emails on your Account page</a>.`
             : `You're getting this because the weekly digest is on.
               <a href="${esc(input.settingsUrl)}" style="color:#114e54;">Turn it off on your Account page</a>.`,
