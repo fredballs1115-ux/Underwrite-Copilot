@@ -1191,6 +1191,24 @@ describe("the cover says what is being sold, and what the model is and is not on
     };
     expect(await labels(sold("note"))).toEqual(Array(3).fill("Stabilized (the collateral)"));
     expect(await labels(sold("leased_fee"))).toEqual(Array(3).fill("Stabilized (the leaseholder's building)"));
+    // Under a tower no building reverts: the lessee's equipment, as the
+    // deal header says it (research pass 23).
+    const tower = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        strategy: { kind: "stabilized", summary: "", capitalBudget: "", timeline: "" },
+        interest: {
+          kind: "leased_fee",
+          summary: "Sale of the fee interest in a cell tower site",
+          share: "",
+          groundLease: "Ground lease to a tower company for a 150-foot monopole",
+          loan: "",
+          page: "",
+        },
+      },
+      "fallback",
+    );
+    expect(await labels(tower)).toEqual(Array(3).fill("Stabilized (the lessee's wireless tower)"));
     // A price that buys the building keeps the label as it stands.
     expect(await labels(sold("fee_simple"))).toEqual(Array(3).fill("Stabilized"));
   });

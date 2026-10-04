@@ -255,19 +255,32 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
 /** The deal type as the header names it, said whose strategy it is where
  *  the price does not buy the building: a note's "Stabilized" describes the
  *  collateral that secures the loan, a leased fee's the building someone
- *  else owns on the land. Elsewhere the label as it stands. */
+ *  else owns on the land — or, under a wireless tower, a billboard or a
+ *  solar array, the lessee's equipment, read off the lease's own words
+ *  (`groundLeaseEquipment`, never the deal's name), since no building
+ *  stands there. Elsewhere the label as it stands. */
 export function dealTypeLabel(strategyLabel: string, ex: ExtractionResult | null | undefined): string {
-  return dealTypeLabelFor(strategyLabel, interestOf(ex).kind);
+  const { kind } = interestOf(ex);
+  return dealTypeLabelFor(strategyLabel, kind, kind === "leased_fee" ? groundLeaseEquipment(ex) : null);
 }
 
-/** The same label from the interest's kind alone, for a surface that holds
- *  the kind rather than the extraction (the workbook's cover). */
-export function dealTypeLabelFor(strategyLabel: string, kind: InterestKind | null | undefined): string {
+/** The same label from the interest's kind — and, on a leased fee, the
+ *  equipment the reader found — for a surface that holds those rather than
+ *  the extraction (the workbook's cover). */
+export function dealTypeLabelFor(
+  strategyLabel: string,
+  kind: InterestKind | null | undefined,
+  equipment: EquipmentUse | null = null,
+): string {
   switch (kind) {
     case "note":
       return `${strategyLabel} (the collateral)`;
     case "leased_fee":
-      return `${strategyLabel} (the leaseholder's building)`;
+      // "(the lessee's wireless tower)": the equipment without its article
+      // (research pass 23 left the header naming a building there).
+      return equipment
+        ? `${strategyLabel} (the lessee's ${equipment.what.replace(/^an?\s+/, "")})`
+        : `${strategyLabel} (the leaseholder's building)`;
     default:
       return strategyLabel;
   }

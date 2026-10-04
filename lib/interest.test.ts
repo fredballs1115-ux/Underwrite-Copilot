@@ -146,6 +146,39 @@ describe("dealTypeLabel — the header's deal type says whose strategy it is (20
     expect(dealTypeLabel("Stabilized", ex(undefined))).toBe("Stabilized");
     expect(dealTypeLabel("Stabilized", null)).toBe("Stabilized");
   });
+
+  // Research pass 23 said the land comes back under a tower, a billboard or
+  // a solar array, and left the header reading "(the leaseholder's
+  // building)" over one: there is no building, only the lessee's equipment.
+  it("names the lessee's tower, sign or array on a leased fee under one, off the lease's own words", () => {
+    const leasedFee = (over: Partial<ExtractedInterest>) => ex(interest({ kind: "leased_fee", ...over }));
+    expect(
+      dealTypeLabel(
+        "Stabilized",
+        leasedFee({ summary: "Sale of the fee interest in a cell tower site", groundLease: "Ground lease to a tower company for a 150-foot monopole" }),
+      ),
+    ).toBe("Stabilized (the lessee's wireless tower)");
+    expect(dealTypeLabel("Stabilized", leasedFee({ summary: "Land leased to an outdoor advertising company for a billboard" }))).toBe(
+      "Stabilized (the lessee's billboard)",
+    );
+    expect(dealTypeLabel("Stabilized", leasedFee({ groundLease: "Ground lease to a solar developer for a 5 MW solar farm" }))).toBe(
+      "Stabilized (the lessee's solar array)",
+    );
+    // From the kind and the equipment the reader found, for the workbook.
+    expect(dealTypeLabelFor("Stabilized", "leased_fee", { what: "a billboard", gear: "the sign and its structure" })).toBe(
+      "Stabilized (the lessee's billboard)",
+    );
+    // The deal's name is a brand, never the lease's use: a building's
+    // leased fee reads as before.
+    const lofts = { ...leasedFee({ summary: "The land under a 200-unit apartment building" }), dealName: "Solar Farm Lofts" };
+    expect(dealTypeLabel("Stabilized", lofts)).toBe("Stabilized (the leaseholder's building)");
+    // Only a leased fee: a fee simple letting part of its site to a tower
+    // owns its building, and its label is the building's.
+    expect(dealTypeLabel("Value-add", ex(interest({ kind: "fee_simple", groundLease: "A cell tower on the parking lot is let on a ground lease" })))).toBe(
+      "Value-add",
+    );
+    expect(dealTypeLabelFor("Value-add", "fee_simple", { what: "a wireless tower", gear: "the tower and its equipment" })).toBe("Value-add");
+  });
 });
 
 describe("readInterest — what the price buys, said", () => {

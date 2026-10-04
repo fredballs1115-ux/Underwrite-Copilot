@@ -12,7 +12,6 @@ import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { datedLong } from "@/lib/debt-index";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
-import type { InterestKind } from "@/lib/anthropic/types";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -185,7 +184,7 @@ export async function buildUnderwriteWorkbook(
   wsSens.properties.tabColor = { argb: "FFA05A1C" };
 
   buildCover(wsCover, model, branding, { portfolio: !!wsPortfolio, marketRead: !!wsRead }, builtAt);
-  buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy, model.meta.interest?.kind);
+  buildAssumptions(wsAssum, inputs, model.sources, model.meta.strategy, model.meta.interest);
   if (wsPortfolio && portfolio) buildPortfolio(wsPortfolio, portfolio, model.meta.unitNoun ?? { one: "unit", many: "units" });
   if (wsRead && marketRead) buildMarketRead(wsRead, marketRead);
   const cf = buildCashFlow(wsCf, inputs, holdYears);
@@ -289,9 +288,10 @@ function buildCover(
   const dealKind = meta.strategy ?? "unknown";
   if (dealKind !== "unknown") {
     // Whose strategy it is on a note or a leased fee, the deal header's own
-    // label (lib/interest): the type describes the collateral, or the
-    // leaseholder's building, never what the price buys.
-    fact("Deal type", dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind));
+    // label (lib/interest): the type describes the collateral, the
+    // leaseholder's building or the lessee's equipment, never what the
+    // price buys.
+    fact("Deal type", dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind, meta.interest?.equipment));
     const reading = ws.getCell(r, 3);
     reading.value = isPlanDeal(dealKind)
       ? `${STRATEGY_READING[dealKind]} This annual model books the capital budget in year 1 and anchors year-1 income on in-place or assumed figures — the Assumptions tab names each source.`
@@ -588,9 +588,10 @@ function buildAssumptions(
   inp: UnderwriteInputs,
   sources: DerivedModel["sources"],
   strategy: DerivedModel["meta"]["strategy"],
-  /** what the price buys (the cover's `meta.interest.kind`), which says
+  /** what the price buys (the cover's `meta.interest`): its kind, and on a
+   *  leased fee the lessee's equipment where the memorandum names one, say
    *  whose strategy the deal type is on a note or a leased fee */
-  interestKind?: InterestKind,
+  interest?: DerivedModel["meta"]["interest"],
 ) {
   ws.getColumn(1).width = 36;
   ws.getColumn(2).width = 16;
@@ -635,8 +636,9 @@ function buildAssumptions(
   if (dealKind !== "unknown") {
     label(ws.getCell(r, 1), "Deal Type", { indent: 1 });
     // Whose strategy it is on a note or a leased fee, as the cover says it
-    // (lib/interest): the collateral's, or the leaseholder's building's.
-    const kindLabel = dealTypeLabelFor(STRATEGY_LABEL[dealKind], interestKind);
+    // (lib/interest): the collateral's, the leaseholder's building's, or
+    // the lessee's tower's, sign's or array's.
+    const kindLabel = dealTypeLabelFor(STRATEGY_LABEL[dealKind], interest?.kind, interest?.equipment);
     label(ws.getCell(r, 2), kindLabel);
     const note = ws.getCell(r, 3);
     note.value = isPlanDeal(dealKind)
@@ -1212,7 +1214,7 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   if (dealKind !== "unknown") {
     r++;
     // Whose strategy it is on a note or a leased fee, as the cover says it.
-    label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind));
+    label(ws.getCell(r, 1), "Deal Type"); label(ws.getCell(r, 2), dealTypeLabelFor(STRATEGY_LABEL[dealKind], meta.interest?.kind, meta.interest?.equipment));
     if (planDeal) {
       label(ws.getCell(r, 4), "Capital Budget (yr 1)");
       ws.getCell(r, 5).value = { formula: "CapImprovements" } as ExcelJS.CellFormulaValue; styleLink(ws.getCell(r, 5), FMT.usd);

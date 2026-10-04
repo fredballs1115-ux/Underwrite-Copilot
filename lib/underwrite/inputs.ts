@@ -14,7 +14,7 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
-import { entityLoanOf, interestOf, interestShortLine, readInterest } from "@/lib/interest";
+import { entityLoanOf, interestOf, interestShortLine, readInterest, type EquipmentUse } from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -107,8 +107,10 @@ export interface WorkbookMeta {
   unitNoun?: { one: string; many: string };
   /** what is being sold (lib/interest, #414) — a note, a share, a
    *  leasehold: the cover says it in one line and what the model is and is
-   *  not; absent for a plain fee simple */
-  interest?: { line: string; modelCaveat: string | null; kind?: InterestKind } | null;
+   *  not; absent for a plain fee simple. `equipment` is a ground lease's
+   *  tower, billboard or solar array where the memorandum names one, which
+   *  the deal type names on a leased fee in place of a building */
+  interest?: { line: string; modelCaveat: string | null; kind?: InterestKind; equipment?: EquipmentUse | null } | null;
   /** the seller's loan offered for assumption (lib/assumable-debt, #419):
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
@@ -280,7 +282,7 @@ export function permanentLoanSpread(assetClass: string | null | undefined): Perm
  *  is not on it — null for a plain fee simple. */
 function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["interest"] {
   const r = readInterest(extraction, askingPriceOf(extraction));
-  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat, kind: r.kind } : null;
+  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat, kind: r.kind, equipment: r.equipment } : null;
 }
 
 /** The cover's lines about the seller's loan offered for assumption
