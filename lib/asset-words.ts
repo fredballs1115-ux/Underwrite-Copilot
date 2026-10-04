@@ -237,26 +237,61 @@ const NAMES_LAND = /\b(?:land|parcels?|acreage|acres?|lots|entitled)\b/i;
 const housingWithCommercial = (s: string) =>
   HOUSING_WORDS.test(s) && COMMERCIAL_WORDS.test(s) && !CHANGE_OF_USE.test(s) && !NAMES_LAND.test(s);
 
+// The housing classes' own words, each read by its rule below and by the
+// resort rule's test of whether a phrase names homes (`NAMES_HOMES`).
+// Senior housing is the care a resident buys with the home — assisted
+// living, memory care, independent living's meals and services, a
+// continuing-care community. An active-adult or 55+ community sells no care:
+// it is rental housing with an age restriction, read by the housing rules
+// (`AGE_RESTRICTED`), so the rent rules and an apartment's defaults reach
+// it — filed as senior housing, a 55+ apartment building in Prince George's
+// County lost its rent cap and ran on licensed care's defaults (research
+// pass 28).
+const SENIOR_WORDS = String.raw`senior|assisted living|memory care|independent living|skilled nursing|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?)`;
+const AGE_RESTRICTED = String.raw`active[\s-]+adult|age[\s-]+restricted|55[\s-]+and[\s-]+over`;
+// A mobile home in the plural too ("Mobile homes" ran past the word's end),
+// and a land-lease community, whose residents own their homes and rent the
+// land under them — a park, never a net lease or bare land.
+const MANUFACTURED_WORDS = String.raw`manufactured|mobile[- ]homes?|mhc|land[\s-]+lease\s+communit(?:y|ies)`;
+const SFR_WORDS = String.raw`sfr|single[- ]family|btr|build[- ]to[- ]rent|townhomes?|scattered|rental\s+homes?`;
+
 // "Resort" names lodging — "Boutique resort", "Golf resort and spa" —
 // until the phrase names a building of homes: "Resort-style apartments",
 // "Luxury resort-style multifamily", "Townhomes with resort-style
 // amenities" describe the pool and the clubhouse, not the lease, and the
 // hotel rule's bare "resort" had filed each as a hotel — a hotel's
 // defaults, keys and nightly rate, and no rent rules, on an apartment deck.
-// A hotel, a motel, lodging, hospitality or a short-term rental is lodging
-// whatever else the phrase names, and so is a resort counted in keys.
-const LODGING_WORDS = /\b(?:hotel|hospitality|lodging|motel|short[- ]term rental|str)\b/i;
+// A hotel, a motel, lodging, hospitality, a short-term or a vacation rental
+// is lodging whatever else the phrase names, and so is a resort counted in
+// keys, or named by its suites, its villas or its rental program.
+const LODGING_WORDS = /\b(?:hotel|hospitality|lodging|motel|short[- ]term rental|vacation[\s-]+rentals?|str)\b/i;
 const RESORT_WORD = /\bresorts?\b/i;
-// The homes a phrase names, in the housing rules' own nouns: apartments,
-// units, multifamily, residential, housing, single-family rentals, and the
-// senior, student and manufactured classes.
-const NAMES_HOMES =
-  /\b(?:apartments?|multi[- ]?family|units?|residential|housing|town(?:homes?|houses?)|single[- ]family|build[- ]to[- ]rent|btr|sfr|senior|student|manufactured|mobile[- ]homes?)\b/i;
+// The homes a phrase names, in every housing rule's own words — apartments,
+// units, residential, housing, and the single-family, senior, student and
+// manufactured classes' — or an age restriction. The first cut read only
+// the bare words senior, student and manufactured, so "Resort-style
+// assisted living", "Resort-style MHC" and "Resort-style rental homes"
+// still filed as hotels (the second pre-merge audit).
+const NAMES_HOMES = new RegExp(
+  String.raw`\b(?:apartments?|multi[- ]?family|units?|residential|housing|town(?:homes?|houses?)|student|${SFR_WORDS}|${SENIOR_WORDS}|${MANUFACTURED_WORDS}|${AGE_RESTRICTED})\b|\b55\s*\+`,
+  "i",
+);
+// A resort's own rooms, however they are described: its suites, its villas,
+// a condo-hotel's rental program.
+const RESORT_ROOMS = /\b(?:all[- ]suites?|suites?|villas?|rental\s+program|condo[- ]?hotels?)\b/i;
+// A word that describes rather than names: "resort-style" describes an
+// apartment building's pool, "apartment-style" a resort's suites.
+const STYLE_WORD = /\b[a-z0-9+]+[\s-]+style\b/gi;
 // A count of keys ("150 keys", "a 120-key resort") — never a place called
 // the Keys.
 const COUNT_OF_KEYS = /\b\d[\d,]*[\s-]*keys?\b/i;
-const lodging = (s: string) =>
-  LODGING_WORDS.test(s) || (RESORT_WORD.test(s) && (!NAMES_HOMES.test(s) || COUNT_OF_KEYS.test(s)));
+const lodging = (s: string) => {
+  if (LODGING_WORDS.test(s)) return true;
+  // What the phrase names, its "-style" words set aside.
+  const named = s.replace(STYLE_WORD, " ");
+  if (!RESORT_WORD.test(named)) return false;
+  return COUNT_OF_KEYS.test(s) || RESORT_ROOMS.test(named) || !NAMES_HOMES.test(named);
+};
 
 /** Where a class the model phrased itself ("NNN retail", "boutique hotel")
  *  is filed — by the words it used, first match wins, longest tells first. */
@@ -277,17 +312,18 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   // facility (the site-researcher's pass of 2026-09-30 ran "Cold Storage
   // Warehouse" and "Industrial Outdoor Storage" through this table and got
   // self-storage for both).
-  [/\b(cold[- ]storage|refrigerated|freezer|industrial outdoor storage|outdoor storage|ios)\b/i, "industrial"],
+  // A truck terminal, a truck yard and a storage yard are yards too — the
+  // plausibility check already read them as yards (lib/deal-strategy
+  // `isOutdoorStorageYard`) while the class table filed the first two as
+  // nothing and "Storage yard" as self-storage (research pass 28).
+  [/\b(cold[- ]storage|refrigerated|freezer|industrial outdoor storage|outdoor storage|ios|truck[\s-]+(?:terminals?|yards?)|storage[\s-]+yards?)\b/i, "industrial"],
   [/\b(storage)\b/i, "self_storage"],
-  [/\b(manufactured|mobile[- ]home|mhc)\b/i, "manufactured_housing"],
+  [new RegExp(String.raw`\b(?:${MANUFACTURED_WORDS})\b`, "i"), "manufactured_housing"],
   [/\b(student)\b/i, "student_housing"],
   // A continuing care retirement community (a CCRC, a "life plan
   // community") and an active adult community are senior housing by their
   // own names; a 55+ park is read by the manufactured-housing rule above.
-  [
-    /\b(senior|assisted living|memory care|independent living|skilled nursing|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|active[\s-]+adult|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?))\b/i,
-    "senior_housing",
-  ],
+  [new RegExp(String.raw`\b(?:${SENIOR_WORDS})\b`, "i"), "senior_housing"],
   // Housing beside shops or offices, read ahead of the office and retail
   // rules that had filed it as one of them (`housingWithCommercial`).
   [housingWithCommercial, "mixed_use"],
@@ -306,7 +342,7 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   // site (ground lease)"), and a site under lease to several is no land.
   [leasedSite, "net_lease"],
   [bareLand, "land_infill"],
-  [/\b(sfr|single[- ]family|btr|build[- ]to[- ]rent|townhomes?|scattered)\b/i, "sfr_btr"],
+  [new RegExp(String.raw`\b(?:${SFR_WORDS})\b`, "i"), "sfr_btr"],
   // A laboratory is filed with the life-science buildings, as an office
   // (research pass 23: "Laboratory" filed nowhere, "Life Sciences" nowhere
   // either — the plural ran past the word's end). The research tracker and
@@ -321,6 +357,9 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   // (LIHTC)", "Workforce Housing") — last, so a student, senior,
   // manufactured or single-family phrase is read by its own rule first.
   [/\b(affordable|workforce|lihtc|section 8|housing)\b/i, "multifamily"],
+  // An active-adult or 55+ community that names no other housing: rental
+  // housing with an age restriction (`AGE_RESTRICTED`).
+  [new RegExp(String.raw`\b(?:${AGE_RESTRICTED})\b|\b55\s*\+`, "i"), "multifamily"],
 ];
 
 /** The known key a stored class or a phrase of the model's resolves to;

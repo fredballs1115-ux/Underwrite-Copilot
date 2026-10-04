@@ -219,24 +219,45 @@ describe("the asset-words table", () => {
     expect(assetClassKey("Office tower")).toBe("office");
   });
 
-  it("files a continuing care, life plan or active adult community as senior housing, and a 55+ park as a park", () => {
+  it("files a continuing care or life plan community as senior housing, an active adult community as housing, and a 55+ park as a park", () => {
     // Each resolved to no class at all.
     for (const phrase of [
       "CCRC",
       "Continuing care retirement community",
       "Continuing-care community",
       "Life plan community",
-      "Active adult community",
-      "Active adult (55+) apartments",
       "Retirement community",
     ]) {
       expect(assetClassKey(phrase), phrase).toBe("senior_housing");
     }
+    // An active-adult or 55+ community sells no care: it is rental housing
+    // with an age restriction, which the rent rules reach (research pass 28 —
+    // filed as senior housing, it lost them and ran on licensed care's
+    // defaults).
+    for (const phrase of ["Active adult community", "Active adult (55+) apartments", "Age-restricted community", "55+ community"]) {
+      expect(assetClassKey(phrase), phrase).toBe("multifamily");
+      expect(isResidentialClass(phrase), phrase).toBe(true);
+    }
+    // Care is still care, whatever the age restriction beside it.
+    expect(assetClassKey("Active adult and assisted living community")).toBe("senior_housing");
     // An age-restricted park is a park: the manufactured-housing rule reads
     // it first.
     expect(assetClassKey("55+ manufactured home community")).toBe("manufactured_housing");
     expect(assetClassKey("55+ mobile home park")).toBe("manufactured_housing");
     expect(assetClassKey("Active adult manufactured housing community")).toBe("manufactured_housing");
+    // So is a land-lease community, whose residents own their homes and rent
+    // the land under them — never a net lease, never bare land.
+    expect(assetClassKey("Land-lease community")).toBe("manufactured_housing");
+    expect(assetClassKey("Land lease communities")).toBe("manufactured_housing");
+  });
+
+  it("files a truck terminal, a truck yard and a storage yard as the yards they are", () => {
+    for (const phrase of ["Truck terminal", "Truck yard", "Truck terminals", "Storage yard"]) {
+      expect(assetClassKey(phrase), phrase).toBe("industrial");
+    }
+    // Storage a person rents is still self-storage.
+    expect(assetClassKey("RV and boat storage")).toBe("self_storage");
+    expect(assetClassKey("Self-storage facility")).toBe("self_storage");
   });
 
   // Research pass 23: the retail rule ran before the housing one and only
@@ -329,6 +350,46 @@ describe("the asset-words table", () => {
     }
     // A place called the Keys is no count of keys.
     expect(assetClassKey("Resort-style apartments in the Florida Keys")).toBe("multifamily");
+  });
+
+  // The second pre-merge audit: "names no homes" read only the bare words
+  // senior, student and manufactured, so a senior community, a park or
+  // rental homes named in their own classes' words still filed as a hotel —
+  // a hotel's defaults, keys and nightly rate on a housing deck — and a
+  // resort's suites described as "apartment-style" filed as apartments.
+  it("reads a resort's homes in every housing rule's own words, and its -style words as description", () => {
+    for (const [phrase, key] of [
+      ["Resort-style independent living community", "senior_housing"],
+      ["Resort-style assisted living", "senior_housing"],
+      ["Resort-style retirement community", "senior_housing"],
+      ["Resort-style 55+ active adult community", "multifamily"],
+      ["Resort-style memory care", "senior_housing"],
+      ["Resort-style CCRC", "senior_housing"],
+      ["Resort-style life plan community", "senior_housing"],
+      ["Independent living resort", "senior_housing"],
+      ["Resort-style MHC", "manufactured_housing"],
+      ["MHC resort", "manufactured_housing"],
+      ["Resort-style rental homes", "sfr_btr"],
+    ] as const) {
+      expect(assetClassKey(phrase), phrase).toBe(key);
+    }
+    // An age-restricted resort community is housing, not a hotel.
+    expect(assetClassKey("55+ resort community")).toBe("multifamily");
+    // A resort's suites, villas or rental program are a resort's, however
+    // the deck describes their kitchens.
+    for (const phrase of [
+      "All-suite resort with apartment-style units",
+      "Apartment-style resort suites",
+      "Resort with apartment-style villas",
+      "Condo resort, 80 residential units in a rental program",
+      "Mediterranean-style resort",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("hospitality_str");
+    }
+    // A vacation rental is a short-term rental; a mobile home is one in the
+    // plural too.
+    expect(assetClassKey("Vacation rental homes")).toBe("hospitality_str");
+    expect(assetClassKey("Mobile homes")).toBe("manufactured_housing");
   });
 
   it("files a laboratory with the life-science buildings, as an office", () => {
