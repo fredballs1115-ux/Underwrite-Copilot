@@ -5766,6 +5766,12 @@
         "Yakima Washington downtown",
         "Yakima Valley vineyards",
         "Yakima Valley hop fields"
+      ],
+      "candidates": [
+        {
+          "file": "Yakima, Washington skyline.jpg",
+          "note": "Yakima, WA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36819025201)."
+        }
       ]
     },
     {
@@ -5807,6 +5813,12 @@
         "Chico California downtown",
         "Bidwell Park Chico",
         "Lake Oroville"
+      ],
+      "candidates": [
+        {
+          "file": "Upper Bidwell Park after the Park Fire.jpg",
+          "note": "Chico, CA — 9yz, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36819025201)."
+        }
       ]
     },
     {
@@ -5829,6 +5841,12 @@
         "Prescott Arizona courthouse square",
         "Watson Lake Granite Dells",
         "Prescott Arizona downtown"
+      ],
+      "candidates": [
+        {
+          "file": "Watson Lake 2.JPG",
+          "note": "Prescott Valley-Prescott, AZ — Benjamin Cody, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36819025201)."
+        }
       ]
     },
     {
@@ -5850,6 +5868,12 @@
         "Las Cruces Organ Mountains",
         "Las Cruces New Mexico downtown",
         "Mesilla plaza New Mexico"
+      ],
+      "candidates": [
+        {
+          "file": "Organ Mountains from Aguirre Spring Road.JPG",
+          "note": "Las Cruces, NM — Fredlyfish4, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36819025201)."
+        }
       ]
     }
   ]

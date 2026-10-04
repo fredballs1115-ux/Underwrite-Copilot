@@ -784,6 +784,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Chattanooga, TN",
     size: [4288, 1473],
   },
+  // Chico, CA: skyline-sheet run 36819025201 — an article's lead: Upper Bidwell Park's canyon under cumulus clouds after the Park Fire, golden meadows on its floor and its rim far inside both crops, the oaks below in shade under the words; over Kendall Hall's dome behind a sunlit arcade, which the 21:9 cuts, an airliner's hazy view of Lake Oroville, a sculpture of two hands before a car park and a street corner of signs and signals.
+  "cbsa:17020": {
+    file: "Upper Bidwell Park after the Park Fire.jpg",
+    place: "Upper Bidwell Park's canyon and rimrock under cumulus clouds after the Park Fire, oaks in shade below",
+    credit: "9yz",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Chico, CA",
+    size: [7298, 4277],
+  },
   // Colorado Springs, CO: skyline-sheet run 36779692322 — the article's lead, taken March 2026; the Pikes Peak frame was haze and one search result was Los Angeles.
   "cbsa:17820": {
     file: "Colorado Springs, Colorado (cropped).jpg",
@@ -1194,6 +1204,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Lansing-East Lansing, MI",
     size: [2618, 626],
   },
+  // Las Cruces, NM: skyline-sheet run 36819025201 — the Organ Mountains' needles in low sun from Aguirre Spring Road, the moon above, whole in both crops; over the range under snow and cloud, a strip of it 528px tall at its own 1400px width, two of the national monument's frames whose crests the 21:9 cuts, a ruin at Dripping Springs in shade and the university's library behind trees.
+  "cbsa:29740": {
+    file: "Organ Mountains from Aguirre Spring Road.JPG",
+    place: "The Organ Mountains' needles in low sun from Aguirre Spring Road, the moon above",
+    credit: "Fredlyfish4",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Las Cruces, NM",
+    size: [5346, 2288],
+  },
   // Lexington, KY: skyline-sheet run 36780959488 — the landmark the city is known by, sharp at dusk; the downtown aerial was 1544px and dated.
   "cbsa:30460": {
     file: "Rupp Arena view from Triangle Park.jpg",
@@ -1483,6 +1503,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Port St. Lucie, FL",
     size: [5318, 3542],
+  },
+  // Prescott Valley, AZ: skyline-sheet run 36819025201 — an article's lead: Watson Lake's boulders lit warm over deep blue water under a clear sky, whole in both crops, the card named for the title's first city; over Sedona's Cathedral Rock, another town's, whose cap the 21:9 cuts, the courthouse square's county sign on a lawn, the civic centre small under white cloud, the dells at dusk and behind a highway, and the courthouse's statue in shade.
+  "cbsa:39150": {
+    file: "Watson Lake 2.JPG",
+    place: "Watson Lake's weathered boulders over deep blue water, under a clear sky",
+    credit: "Benjamin Cody",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "http://creativecommons.org/licenses/by-sa/3.0/",
+    name: "Prescott Valley, AZ",
+    size: [2592, 1944],
   },
   // Providence, RI: skyline-sheet run 36750289515 — the article's lead image; the river, bridge and skyline stay whole in every crop.
   "cbsa:39300": {
@@ -1865,6 +1895,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Worcester, MA",
     size: [7154, 3974],
+  },
+  // Yakima, WA: skyline-sheet run 36819025201 — an article's lead: downtown from above under a soft overcast, its brick blocks and tower sharp, trees in blossom, the ridges behind whole with sky above them in both crops; over a farmers' market's apple-cut barrier, the library's corner, and four valley views (Red Mountain, the valley from it, a vineyard, and the river between Cle Elum and Thorp) that nothing in their files or category places in Yakima County.
+  "cbsa:49420": {
+    file: "Yakima, Washington skyline.jpg",
+    place: "Downtown Yakima from above, trees in blossom and the ridges behind",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Yakima, WA",
+    size: [6818, 4090],
   },
   // York-Hanover, PA: skyline-sheet run 36791223837 — the Hanover article's lead, whole in both crops in warm light; the search's only other result was New York City's skyline.
   "cbsa:49620": {
