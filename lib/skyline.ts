@@ -694,6 +694,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Birmingham, AL",
     size: [11551, 5574],
   },
+  // Bismarck, ND: skyline-sheet run 37236951448 — the State Capitol's tower the city is known by, under a blue sky and cumulus, its roof and masts inside the 21:9's top edge; over the same photograph before its crop and a drone frame of the Capitol, each losing the tower's top at 21:9, the Capitol behind a stone sign with a date stamp, downtown from a drone that reads as a map, and a cigarette card's lithograph.
+  "cbsa:13900": {
+    file: "2009-0521-ND-StateCapitol (cropped).jpg",
+    place: "The North Dakota State Capitol's tower in spring, under a blue sky and cumulus",
+    credit: "Bobak Ha'Eri",
+    license: "CC BY 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/3.0",
+    name: "Bismarck, ND",
+    size: [3648, 1831],
+  },
   // Boise, ID: skyline-sheet run 36751130861 — the article's lead image, whole in every crop.
   "cbsa:14260": {
     file: "Boise, Idaho.jpg",
@@ -1414,6 +1424,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Montgomery, AL",
     size: [4734, 3282],
   },
+  // Morgantown, WV: skyline-sheet run 37237349944 — the city on its hillside across the Monongahela from the west bank, the riverfront's brick blocks and the hill's buildings and trees under a pale sky, every top inside all three crops; over a drone frame whose horizon the 21:9 cuts, leaving a map, the riverfront under a clear sky behind a wall of painted advertisements and a car park, a steep aerial, and four street views of wires, signs and parked cars.
+  "cbsa:34060": {
+    file: "City of Morgantown from the west side of the Monongahela River, May 2012.jpg",
+    place: "Morgantown climbing its hillside above the Monongahela River, from the river's west bank",
+    credit: "Jae69376",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Morgantown, WV",
+    size: [2848, 1709],
+  },
   // Myrtle Beach, SC: skyline-sheet run 36787138337 — the towers and the beach whole in both crops in daylight, over a hazy high view up the strand to Cherry Grove Pier.
   "cbsa:34820": {
     file: "Panorama of the Myrtle Beach Beachfront 3 (cropped).jpg",
@@ -1564,6 +1584,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Peoria, IL",
     size: [2802, 1207],
   },
+  // Pittsfield, MA: skyline-sheet run 37237349944 — Park Square and downtown from above in clear autumn light, the stone church, the brick and stone blocks and the park's turning trees under hills on the horizon, every top inside all three crops; over the city article's lead, a drone frame toward the mountains whose summit sits on the card's top edge and which the 21:9 cuts with all its sky, and an 1886 print of the square.
+  "cbsa:38340": {
+    file: "Downtown and Park Square, Pittsfield, Massachusetts.jpg",
+    place: "Park Square and downtown Pittsfield in autumn colour, hills on the horizon",
+    credit: "Protophobic",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Pittsfield, MA",
+    size: [4000, 2000],
+  },
   // Portland, ME: skyline-sheet run 36782855933 — a picture from the city's own article, the marina in front of downtown, over an aerial and a grey view from the islands.
   "cbsa:38860": {
     file: "Skyline waterfront.jpg",
@@ -1613,6 +1643,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Provo, UT",
     size: [5248, 2952],
+  },
+  // Rapid City, SD: skyline-sheet run 37236951448 — downtown in warm low sun under the foothills of the Black Hills, the city and the ridge above it whole in both crops; over a drone frame of a highway, a gas station and car parks under a hazy sky, downtown from the hillside with treetops across half the card and flat ground behind, a sky of cloud over a sliver of plain, the Needles from Harney Peak, a street front behind a tree's trunk, office towers through blurred pine and a winter aerial that reads as a map.
+  "cbsa:39660": {
+    file: "Rapid City Skyline (2022).jpg",
+    place: "Downtown Rapid City in warm low sun, the foothills of the Black Hills behind it",
+    credit: "WeaponizingArchitecture",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Rapid City, SD",
+    size: [3353, 1885],
   },
   // Reno, NV: skyline-sheet run 36780959488 — the one clear frame; the rest were a freeway and airplane windows.
   "cbsa:39900": {
@@ -1975,6 +2015,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     name: "Wilmington, NC",
     size: [1753, 1093],
+  },
+  // Winchester, VA: skyline-sheet run 37237349944 — Old Town's walking mall, its brick and painted fronts with flags and awnings under a blue sky with cloud, the fronts whole in both crops and only the edge building's end wall and a bare tree's crown trimmed at 21:9; over the same mall in summer, whose yellow building's cornice every crop cuts, a church whose spire the deal page's crops cut, and one shop front behind a tree.
+  "cbsa:49020": {
+    file: "100 block of North Loudoun Street - 2.jpg",
+    place: "Old Town Winchester's Loudoun Street Mall, its brick and painted fronts hung with flags",
+    credit: "APK",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Winchester, VA",
+    size: [2094, 1502],
   },
   // Winston-Salem, NC: skyline-sheet run 36782855933 — the city article's lead, over aerials of an interchange.
   "cbsa:49180": {

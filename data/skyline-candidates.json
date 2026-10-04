@@ -6293,6 +6293,12 @@
         "Rapid City South Dakota downtown",
         "Rapid City South Dakota skyline",
         "Rapid City South Dakota Main Street"
+      ],
+      "candidates": [
+        {
+          "file": "Rapid City Skyline (2022).jpg",
+          "note": "Rapid City, SD — WeaponizingArchitecture, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236951448)."
+        }
       ]
     },
     {
@@ -6312,6 +6318,12 @@
         "Bismarck North Dakota capitol",
         "Bismarck North Dakota downtown",
         "Bismarck North Dakota skyline"
+      ],
+      "candidates": [
+        {
+          "file": "2009-0521-ND-StateCapitol (cropped).jpg",
+          "note": "Bismarck, ND — Bobak Ha'Eri, CC BY 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37236951448)."
+        }
       ]
     },
     {
@@ -6422,6 +6434,12 @@
         "Winchester Virginia Old Town",
         "Winchester Virginia downtown",
         "Winchester Virginia walking mall"
+      ],
+      "candidates": [
+        {
+          "file": "100 block of North Loudoun Street - 2.jpg",
+          "note": "Winchester, VA — APK, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37237349944)."
+        }
       ]
     },
     {
@@ -6459,6 +6477,12 @@
         "Morgantown West Virginia skyline",
         "Morgantown West Virginia downtown",
         "Morgantown West Virginia Monongahela River"
+      ],
+      "candidates": [
+        {
+          "file": "City of Morgantown from the west side of the Monongahela River, May 2012.jpg",
+          "note": "Morgantown, WV — Jae69376, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37237349944)."
+        }
       ]
     },
     {
@@ -6497,6 +6521,12 @@
         "Pittsfield Massachusetts downtown",
         "Pittsfield Massachusetts Park Square",
         "Pittsfield Massachusetts Berkshires"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown and Park Square, Pittsfield, Massachusetts.jpg",
+          "note": "Pittsfield, MA — Protophobic, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37237349944)."
+        }
       ]
     }
   ]
