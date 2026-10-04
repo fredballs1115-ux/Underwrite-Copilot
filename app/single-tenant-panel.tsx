@@ -1,6 +1,13 @@
 import { LeaseTermBar } from "@/app/lease-term-bar";
-import { endsByYear, termEndLabel } from "@/lib/ground-lease-term";
-import { effectiveSpan, pct2, singleTenantModelLine, type LeaseModel, type SingleTenantRead } from "@/lib/single-tenant";
+import { termEndLabel } from "@/lib/ground-lease-term";
+import {
+  pct2,
+  runsPastSale,
+  singleTenantModelLine,
+  termFromDelivery,
+  type LeaseModel,
+  type SingleTenantRead,
+} from "@/lib/single-tenant";
 
 /**
  * One tenant leases the whole property (#454) — the pure panel for
@@ -13,7 +20,9 @@ import { effectiveSpan, pct2, singleTenantModelLine, type LeaseModel, type Singl
  *     model's hold marked where the page has the model, the renewal options
  *     dashed after the term because they are the tenant's to exercise, and
  *     the hold's years past the lease's end in the warning tone. An early
- *     termination is drawn as the end, since the tenant decides.
+ *     termination is drawn as the end, since the tenant decides. A lease
+ *     on a building not yet delivered, its term a stated count, is drawn
+ *     from delivery, as the reader says it, with no hold over it.
  *   - THE INCREASES: the lease's own growth a year against the model's rent
  *     growth, on one scale — only where the lease runs past the model's
  *     sale, since after it ends the growth is a renewal's question.
@@ -37,13 +46,16 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
   const eff = r.effective;
   const holdYears = model && model.holdMonths > 0 ? model.holdMonths / 12 : null;
   const inc = r.increases;
+  // A lease that has not begun runs from delivery (lib/single-tenant
+  // `termFromDelivery`): drawn from then, never as years left today.
+  const fromDelivery = termFromDelivery(r);
   // The lease's growth against the model's, where the lease outlasts the
   // model's sale and its increases read as a rate.
-  // Past the sale by the DAY, as the model line reads it (lib/single-tenant
-  // `effectiveSpan`), so the picture and the sentence agree.
-  const span = effectiveSpan(r);
+  // Past the sale by the DAY, or whenever a lease from delivery begins, as
+  // the model line reads it (lib/single-tenant `runsPastSale`), so the
+  // picture and the sentence agree.
   const growth =
-    model && holdYears != null && eff && span && !endsByYear(span, holdYears) && inc && inc.kind !== "cpi"
+    model && holdYears != null && eff && runsPastSale(r, holdYears) && inc && inc.kind !== "cpi"
       ? { lease: inc.annualPct, model: model.rentGrowthPct * 100, how: inc.kind === "flat" ? "flat" : inc.how }
       : null;
   const scale = growth ? Math.max(growth.lease, growth.model, 1) : 1;
@@ -87,16 +99,28 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
         </details>
       )}
 
-      {eff && eff.yearsLeft > 0 && (
+      {fromDelivery != null ? (
         <div className="mt-2.5" data-qa="single-tenant-term">
           <LeaseTermBar
-            yearsLeft={eff.yearsLeft}
-            endLabel={eff.early ? `${termEndLabel(eff)}, the tenant's early termination` : termEndLabel(eff)}
-            optionYears={!eff.early && r.term && !r.term.includesOptions ? r.term.options?.years ?? null : null}
-            holdYears={holdYears}
+            yearsLeft={fromDelivery}
+            fromDelivery
+            optionYears={r.term && !r.term.includesOptions ? r.term.options?.years ?? null : null}
             optionsWord="Renewal options"
           />
         </div>
+      ) : (
+        eff &&
+        eff.yearsLeft > 0 && (
+          <div className="mt-2.5" data-qa="single-tenant-term">
+            <LeaseTermBar
+              yearsLeft={eff.yearsLeft}
+              endLabel={eff.early ? `${termEndLabel(eff)}, the tenant's early termination` : termEndLabel(eff)}
+              optionYears={!eff.early && r.term && !r.term.includesOptions ? r.term.options?.years ?? null : null}
+              holdYears={holdYears}
+              optionsWord="Renewal options"
+            />
+          </div>
+        )
       )}
 
       {growth && (

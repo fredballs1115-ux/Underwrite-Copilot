@@ -6874,6 +6874,33 @@ describe("SingleTenantPanel — the one lease a single-tenant property is, drawn
     const multi = walgreens({ tenant: "" });
     expect(render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(multi, AS_OF) }))).toBe(render(React.createElement(React.Fragment)));
   });
+
+  // A lease on a building not yet delivered begins at delivery (research
+  // pass 23): the reader said so, and the bar still drew "Left today, 15
+  // years (to Sep 2041)" with the model's hold laid over a term that shares
+  // no start with it.
+  it("draws a lease that begins at delivery from delivery, never as years left today", () => {
+    const bts = walgreens();
+    bts.strategy = { kind: "development", summary: "A build-to-suit store delivered in 2027", capitalBudget: "", timeline: "" };
+    bts.metrics = bts.metrics.map((m) => (m.label === "Lease expiration" ? { ...m, label: "Lease term remaining", value: "15 years" } : m));
+    for (const model of [MODEL, null]) {
+      const html = render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(bts, AS_OF), model }));
+      const text = visibleText(html);
+      expect(text).toContain("The term, 15 years from delivery");
+      expect(text).toContain("Renewal options, 40 years if exercised");
+      expect(text).not.toMatch(/Left today|Left at the sale|The model's hold/);
+      expect(html).not.toContain('data-bar="lease-hold"');
+      expect(html.match(/data-bar="lease-term"/g)).toHaveLength(1);
+      expect(html.match(/data-bar="lease-options"/g)).toHaveLength(1);
+      expect(a11yIssues(html)).toEqual([]);
+      expect(gluedWords(text)).toEqual([]);
+    }
+    // With the model: its read says the term runs from delivery, and the
+    // lease outlasts the sale whenever it begins, so the increases are drawn.
+    const html = render(React.createElement(SingleTenantPanel, { lease: readSingleTenant(bts, AS_OF), model: MODEL }));
+    expect(visibleText(html)).toContain("The lease runs 15 years from delivery, not from today");
+    expect(html.match(/data-bar="lease-increase"/g)).toHaveLength(1);
+  });
 });
 
 describe("ShareView — a single tenant's lease under the title (#454)", () => {

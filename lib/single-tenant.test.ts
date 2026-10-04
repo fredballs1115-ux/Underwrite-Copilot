@@ -241,6 +241,49 @@ describe("readSingleTenant — the one lease the deal is", () => {
     expect(dated.headline).toContain("The lease ends Mar 2042, 15.5 years from today.");
   });
 
+  // The reader's sentences counted that term from the lease's start; the
+  // pipeline's tag and the model's read (the panel, the workbook's cover,
+  // the report) still counted it from today: "Single tenant, 15 yrs left",
+  // and "the lease has 10 years left" at the sale of a lease not yet begun.
+  it("on a building not yet delivered, the tag and the model's read say the term runs from delivery, never years left today", () => {
+    const bts = (count: string, kind: "development" | "conversion" | "stabilized" = "development", more: Row[] = []) =>
+      ex([row("Lease term remaining", count), row("Rent increases", "1.5% annually"), ...more], {
+        dealName: "Amazon build-to-suit",
+        strategy: { kind, summary: "A build-to-suit distribution center leased to Amazon, delivered in 2027", capitalBudget: "", timeline: "" },
+      });
+    expect(singleTenantTag(bts("15 years"), TODAY)).toBe("Single tenant, 15 yrs from delivery");
+    const line = singleTenantModelLine(readSingleTenant(bts("15 years"), TODAY)!, MODEL);
+    expect(line).toBe(
+      "The lease runs 15 years from delivery, not from today, so it outlasts the model's 5-year hold whenever the building is delivered, and how much of it is left at the sale turns on that date: the next buyer prices those years of this tenant's rent and a renewal the tenant decides, and the model's 6.00% exit cap is one figure whatever the term left. " +
+        "The model grows the rent 3.0% a year; the lease's own increases are 1.5% a year, so the model's income runs ahead of the lease's — enter 1.5% as the rent growth to run the model on the lease.",
+    );
+    // A term shorter than the hold ends inside it only where the building
+    // is delivered soon enough — said so, with no growth line.
+    const short = singleTenantModelLine(readSingleTenant(bts("3 years"), TODAY)!, MODEL);
+    expect(short).toBe(
+      "The lease runs 3 years from delivery, not from today, so it ends inside the model's 5-year hold if the building is delivered within 2 years: the model's rent after that is this tenant staying — the tenant's choice, not the buyer's — and its 2.0% vacancy is a market's allowance, not a single tenant's all-or-nothing.",
+    );
+    expect(singleTenantTag(bts("3 years"), TODAY)).toBe("Single tenant, 3 yrs from delivery");
+    for (const said of [line, short]) {
+      expect(said).not.toMatch(/years? left|from today they/);
+      expect(gluedWords(said)).toEqual([]);
+    }
+    // A conversion's new use comes with the works too.
+    expect(singleTenantTag(bts("15 years", "conversion"), TODAY)).toBe("Single tenant, 15 yrs from delivery");
+    // A building that stands keeps today's count.
+    expect(singleTenantTag(bts("15 years", "stabilized"), TODAY)).toBe("Single tenant, 15 yrs left");
+    expect(singleTenantModelLine(readSingleTenant(bts("15 years", "stabilized"), TODAY)!, MODEL)).toMatch(
+      /^At the model's sale in 5 years the lease has 10 years left:/,
+    );
+    // A stated date is a date, and so is the tenant's right to leave early.
+    expect(singleTenantTag(ex([row("Lease expiration", "March 31, 2042")], { strategy: bts("1 year").strategy }), TODAY)).toBe(
+      "Single tenant, 15 yrs left",
+    );
+    expect(singleTenantTag(bts("15 years", "development", [row("Early termination date", "December 31, 2034")]), TODAY)).toBe(
+      "Single tenant, may leave in 8 yrs",
+    );
+  });
+
   it("a passed end, and no end, are said as what they are", () => {
     const passed = readSingleTenant(ex([row("Lease expiration", "June 30, 2025")]), TODAY)!;
     expect(passed.headline).toContain("The lease's stated end, Jun 2025, has passed");

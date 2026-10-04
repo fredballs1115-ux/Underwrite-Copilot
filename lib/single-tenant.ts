@@ -314,6 +314,34 @@ export function effectiveSpan(r: Pick<SingleTenantRead, "effective" | "early" | 
 }
 
 /**
+ * The term of a lease that has not begun: on a building not yet delivered
+ * (`startsAtDelivery`), a term stated as a count of years runs from the
+ * lease's start at delivery — a date the count does not give — so its
+ * length is all there is to say, and nothing is counted from today. Null on
+ * every other lease, on a stated date (a date is a date, delivered or not)
+ * and where the tenant may leave early on a stated date, which is then the
+ * lease's end.
+ */
+export function termFromDelivery(r: Pick<SingleTenantRead, "startsAtDelivery" | "term" | "effective">): number | null {
+  const t = r.term;
+  return r.startsAtDelivery && t?.from === "remaining" && !r.effective?.early ? t.yearsLeft : null;
+}
+
+/**
+ * Whether the lease runs past the model's sale `holdYears` on — to the day
+ * (`endsByYear`). A lease that begins at delivery runs past it whenever the
+ * building is delivered once its term is as long as the hold, since it
+ * begins after today; a shorter one may end inside the hold, which is not
+ * past. The panel's picture and the model's read ask this one question.
+ */
+export function runsPastSale(r: Pick<SingleTenantRead, "startsAtDelivery" | "term" | "effective" | "early">, holdYears: number): boolean {
+  const fromDelivery = termFromDelivery(r);
+  if (fromDelivery != null) return Math.round(fromDelivery * 12) >= Math.round(holdYears * 12);
+  const span = effectiveSpan(r);
+  return !!span && !endsByYear(span, holdYears);
+}
+
+/**
  * The one lease a single-tenant property is, on a day. Null where the
  * memorandum names no single tenant — a multi-tenant or vacant property —
  * and on a leased fee or a note, whose lease is the ground lease or the
@@ -499,7 +527,10 @@ function growthSentence(r: SingleTenantRead, m: LeaseModel): string {
 /**
  * What the lease means for the screening model: the years left at its sale,
  * or the lease ending inside its hold, then the rent's increases against
- * its growth. "" where no end is stated or the stated one has passed.
+ * its growth — and on a lease that begins at delivery (`termFromDelivery`),
+ * its term from then and what the delivery date decides, never years
+ * counted from today. "" where no end is stated or the stated one has
+ * passed.
  */
 export function singleTenantModelLine(r: SingleTenantRead, m: LeaseModel): string {
   const eff = r.effective;
@@ -510,6 +541,19 @@ export function singleTenantModelLine(r: SingleTenantRead, m: LeaseModel): strin
     m.vacancyPct > 0
       ? `its ${pct1(m.vacancyPct)} vacancy is a market's allowance, not a single tenant's all-or-nothing`
       : "it allows no vacancy for the tenant leaving";
+  const beforeOptions = !eff.early && r.term?.options ? ", before the tenant's renewal options" : "";
+  // A lease that has not begun runs from delivery (research pass 23): what
+  // it has left at the sale turns on a date its stated count does not give,
+  // so it is said so — never counted from today.
+  const fromDelivery = termFromDelivery(r);
+  if (fromDelivery != null) {
+    const runs = `The lease runs ${yearsText(fromDelivery)} from delivery, not from today`;
+    if (!runsPastSale(r, hold)) {
+      return `${runs}, so it ends inside the model's ${holdWord} hold if the building is delivered within ${yearsText(hold - fromDelivery)}: the model's rent after that is this tenant staying — the tenant's choice, not the buyer's — and ${vacancy}.`;
+    }
+    const whenever = `${runs}, so it outlasts the model's ${holdWord} hold whenever the building is delivered, and how much of it is left at the sale${beforeOptions} turns on that date: the next buyer prices those years of this tenant's rent and a renewal the tenant decides, and the model's ${capText(m.exitCapPct)} exit cap is one figure whatever the term left.`;
+    return [whenever, growthSentence(r, m)].filter(Boolean).join(" ");
+  }
   // Ahead, passed and before the sale by the DAY, never whole months
   // (lib/ground-lease-term `DatedSpan`).
   const span = effectiveSpan(r);
@@ -528,7 +572,6 @@ export function singleTenantModelLine(r: SingleTenantRead, m: LeaseModel): strin
   const left = eff.yearsLeft - hold;
   // Past the sale by under a whole month: the tenths would say "0 years".
   const leftText = Math.round(left * 12) < 1 ? "under a month" : yearsText(left);
-  const beforeOptions = !eff.early && r.term?.options ? ", before the tenant's renewal options" : "";
   const sale = `At the model's sale in ${yearsText(hold)} the lease has ${leftText} left${beforeOptions}: the next buyer prices those years of this tenant's rent and a renewal the tenant decides, and the model's ${capText(m.exitCapPct)} exit cap is one figure whatever the term left.`;
   return [sale, growthSentence(r, m)].filter(Boolean).join(" ");
 }
@@ -562,11 +605,20 @@ export function singleTenantShortLine(r: SingleTenantRead): string {
 /**
  * The pipeline row's tag: "Single tenant, 9 yrs left" (whole years down),
  * "Single tenant, may leave in 4 yrs" where an early termination comes
- * first, "Single tenant" where no end can be read. Null on anything else.
+ * first, "Single tenant, 15 yrs from delivery" on a lease that begins at
+ * delivery, "Single tenant" where no end can be read. Null on anything
+ * else.
  */
 export function singleTenantTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const r = readSingleTenant(ex, asOf);
   if (!r) return null;
+  // A lease that has not begun: its term from delivery, never years left
+  // today (research pass 23).
+  const fromDelivery = termFromDelivery(r);
+  if (fromDelivery != null) {
+    const whole = Math.floor(fromDelivery);
+    return `Single tenant, ${fromDelivery < 1 ? "under 1 yr" : `${whole} ${whole === 1 ? "yr" : "yrs"}`} from delivery`;
+  }
   const eff = r.effective;
   const span = effectiveSpan(r);
   if (!eff || !span || !endIsAhead(span)) return "Single tenant";
