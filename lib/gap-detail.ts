@@ -16,7 +16,7 @@
 // against -1.0% made 200 bps, and the page said the reconciler's correct
 // "400 bps" line was wrong.
 import type { ReconDirection } from "@/lib/anthropic/types";
-import { typicalRangeParts } from "@/lib/typical-range";
+import { looksLikeRange } from "@/lib/typical-range";
 
 export type GapUnit = "usd" | "bps" | "pct";
 
@@ -168,7 +168,9 @@ export interface GapRow {
   gap?: string | null;
 }
 
-const isRange = (text: string | null | undefined) => typicalRangeParts(text ?? "") != null;
+// A value written as a range is no single figure to subtract, whether or
+// not its ends make a range to draw against (lib/typical-range).
+const isRange = (text: string | null | undefined) => looksLikeRange(text);
 
 /**
  * The gap the row's two figures make, where both are stated on one footing.

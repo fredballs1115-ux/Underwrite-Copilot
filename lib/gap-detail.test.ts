@@ -93,6 +93,9 @@ describe("the gap is the two figures' own subtraction, not the reconciler's arit
     expect(valueGap(cap)).toEqual({ value: 0, unit: "bps" });
     // A range, a figure unstated or two footings make no gap of their own.
     expect(valueGap({ omValue: "5.25%–5.75%", myValue: "6.0%" })).toBeNull();
+    // A range the typical-range reader draws no track for is still a range,
+    // never its first figure.
+    expect(valueGap({ omValue: "$950–$1.2M", myValue: "$1,000,000" })).toBeNull();
     expect(valueGap({ omValue: "$3,880,000", myValue: "Not modelled" })).toBeNull();
     expect(valueGap({ omValue: "$2,400/mo", myValue: "$28,800/yr" })).toBeNull();
     expect(rowGap({ omValue: "$3,880,000", myValue: "Not modelled", gap: "$174k below" })).toEqual({ value: 174_000, unit: "usd" });
