@@ -388,6 +388,16 @@ function noteFor(s: {
     return `Already through the covenant: ${s.dscr.toFixed(2)}× against ${withArticle(s.covenantDscr.toFixed(2))}× test, at today's index.`;
   }
   if (s.floorBreaks && s.floorPct !== null && s.capStrikePct !== null && s.breachIndexPct !== null) {
+    // A strike over the breach point too leaves no index inside the
+    // covenant: below the strike the floor alone is charged, and above the
+    // floor the cap holds the index at the strike — both past it. (With
+    // every index through the covenant, the line above usually says so
+    // first; a strike a hundredth over the breach reads met at two decimals
+    // and reaches here.) The sentence below would name an index above which
+    // the loan held, and there is none.
+    if (s.capStrikePct > s.breachIndexPct) {
+      return `The ${s.floorPct.toFixed(2)}% floor and the ${s.capStrikePct.toFixed(2)}% strike both sit above the ${s.breachIndexPct.toFixed(2)}% index at which the covenant breaks, so the loan fails the covenant at every index: below the strike the floor alone puts the rate past it, between the two the cap pays back too little, and above the floor the cap holds the rate at the strike's, still past it.`;
+    }
     // Between the strike and the floor the note charges the floor and the
     // cap pays back the index's run over the strike, so the rate is the
     // floor's less that run: it crosses the covenant's rate where the run

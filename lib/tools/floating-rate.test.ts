@@ -291,6 +291,37 @@ describe("a floor above the strike and the breach point (audit c66)", () => {
     expect(readFloating({ ...FLOOR, indexPct: 4.18 }).debtServiceAnnual!).toBeLessThan(allowed);
   });
 
+  // With the strike over the breach point too, no index keeps the loan
+  // inside the covenant: below the strike the floor alone is charged, and
+  // above the floor the cap holds the index at the strike. The note said it
+  // failed "should the index fall under" the strike plus the floor less the
+  // breach — as if an index above that were safe. At 4.50% and 5.00% over a
+  // 4.33% breach every index is already through the covenant, and the note
+  // says that first; a strike a hundredth over the breach is the one that
+  // reached the sentence: the index sits over the floor, the covenant reads
+  // met at two decimals (1.1989× shows as 1.20×), and the note named 5.01%.
+  it("says the loan fails at every index where the strike sits over the breach point too", () => {
+    for (const indexPct of [3.0, 4.6, 5.0, 5.2, 6.0]) {
+      expect(readFloating({ ...FLOOR, indexPct, indexFloorPct: 5.0, capStrikePct: 4.5 }).note, String(indexPct)).toMatch(
+        /^Already through the covenant: 1\.1\d× against a 1\.20× test/,
+      );
+    }
+    const r = readFloating({ ...FLOOR, indexPct: 5.5, indexFloorPct: 5.0, capStrikePct: 4.34 });
+    expect(r.breachIndexPct).toBe(4.33);
+    expect(r.dscr).toBe(1.2);
+    expect(r.headline).toBe("The floor is on the wrong side of the covenant.");
+    expect(r.note).toBe(
+      "The 5.00% floor and the 4.34% strike both sit above the 4.33% index at which the covenant breaks, so the loan fails the covenant at every index: " +
+        "below the strike the floor alone puts the rate past it, between the two the cap pays back too little, and above the floor the cap holds the rate at the strike's, still past it.",
+    );
+    // Every index pays more than the covenant allows ($1,760,000 over 1.20).
+    const allowed = 1_760_000 / 1.2;
+    for (const indexPct of [2.0, 4.34, 4.8, 5.0, 5.01, 5.5, 9.0]) {
+      const ds = readFloating({ ...FLOOR, indexPct, indexFloorPct: 5.0, capStrikePct: 4.34 }).debtServiceAnnual!;
+      expect(ds, String(indexPct)).toBeGreaterThan(allowed);
+    }
+  });
+
   it("still protects where a floor over the strike sits under the breach point", () => {
     // A 4.20% floor: the worst the loan pays is 7.20%, inside the covenant.
     const r = readFloating({ ...FLOOR, indexFloorPct: 4.2 });
