@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CostCard, stepWord, type UsageRow } from "@/app/(app)/data-health/cost-card";
-import { PRICES } from "@/lib/anthropic/models";
+import { PRICES, PRICES_AS_OF } from "@/lib/anthropic/models";
 import type { CallUsage, UsageSummary } from "@/lib/anthropic/usage";
 import { a11yIssues, dumpView, gluedWords, visibleText } from "./render-lint";
 
@@ -60,7 +60,7 @@ describe("CostCard — what the last screens cost, drawn", () => {
     expect(gluedWords(text)).toEqual([]);
     // three ledgers, the row without one ignored
     expect(text).toContain("$3.02");
-    expect(text).toContain("median of the last 3 screens, at list price");
+    expect(text).toContain("median of the last 3 screens, at list prices as of Sep 2026");
     // one bar, six segments in pipeline order, the widest the cache write
     expect((html.match(/data-cost-bar/g) ?? []).length).toBe(1);
     const widths = [...html.matchAll(/class="bg-[a-z0-9/]+ h-full" style="width:([\d.]+)%"/g)].map((m) => Number(m[1]));
@@ -80,7 +80,7 @@ describe("CostCard — what the last screens cost, drawn", () => {
     const text = visibleText(html);
     expect(gluedWords(text)).toEqual([]);
     expect(text).toContain("$2.50");
-    expect(text).toContain("median of the 1 screen that priced, of the last 2, at list price");
+    expect(text).toContain("median of the 1 screen that priced, of the last 2, at list prices as of Sep 2026");
     expect(html).toMatch(/aria-label="Latest screen, unpriced: .*Verdict unpriced"/);
     expect(text).toContain("unpriced: mystery-model");
 
@@ -98,6 +98,16 @@ describe("CostCard — what the last screens cost, drawn", () => {
     const noColumn = render([], false);
     expect(visibleText(noColumn)).toContain("run migration 0035");
     expect(a11yIssues(none + noColumn)).toEqual([]);
+  });
+
+  it("says the month its list prices were read, from the price table's own constant", () => {
+    // The table is dated where it is written (lib/anthropic/models), and the
+    // card says that month beside every dollar figure: list prices move.
+    expect(PRICES_AS_OF).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
+    expect(PRICES_AS_OF).toBe("2026-09");
+    const text = visibleText(render([row("j1", summary(SCREEN, 3.02))]));
+    expect(text).toContain("list prices as of Sep 2026");
+    expect(text).not.toMatch(/at list price(?!s as of)/);
   });
 
   it("names a step as a legend word", () => {
