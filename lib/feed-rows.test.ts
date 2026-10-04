@@ -154,10 +154,17 @@ describe("the steward's filters leave every feed row out in the database", () =>
     const touching = statements.filter((s) => s.includes(".update(") || s.includes('.order("as_of"'));
     expect(touching.length).toBe(3);
     for (const s of touching) expect(s, s.trim().slice(0, 120)).toContain("withoutFeedRows(");
-    // …the count is taken without the year-ago rows…
+    // …the count is of the research rows alone: without the year-ago rows,
+    // and without the feeds', which keep their own cadence…
     const count = statements.filter((s) => s.includes('.lt("as_of"'));
     expect(count.length).toBe(1);
     expect(count[0]).toContain("withoutYearAgoRows(");
+    expect(count[0]).toContain("withoutFeedRows(");
+    // …a fair market rent is stale only once its fiscal year has ended…
+    const fmr = statements.filter((s) => s.includes("FMR_METRICS_LIKE"));
+    expect(fmr.length).toBe(1);
+    expect(fmr[0]).not.toContain('.lt("as_of"');
+    expect(steward).toMatch(/> fyEnd\(newest\.fy\)/);
     // …and what comes back is checked once more before anything is asked.
     expect(steward).toMatch(/\.filter\(\(b\) => !isFeedMetric\(b\.metric\)\)/);
   });

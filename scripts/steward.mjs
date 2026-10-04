@@ -40,7 +40,7 @@ import path from "node:path";
 import { createClient } from "@supabase/supabase-js";
 // What the feed pulls write, and the filters that leave those rows alone —
 // the one list the pulls and the reads use too (plain Node strips its types).
-import { isFeedMetric, withoutFeedRows, withoutYearAgoRows } from "../lib/feed-rows.ts";
+import { FMR_METRICS_LIKE, isFeedMetric, withoutFeedRows, withoutYearAgoRows } from "../lib/feed-rows.ts";
 // The research rows dated by the period their figure is for, which no
 // re-verification may re-date (lib/period-rows).
 import { isPeriodMetric, withoutPeriodRows } from "../lib/period-rows.ts";
@@ -50,6 +50,9 @@ import { todayLine } from "../lib/anthropic/today.ts";
 // The research rule's one limit, the pages' own (lib/research-age): a row
 // past it is what every surface marks stale, so it is what this counts.
 import { RESEARCH_STALE_DAYS } from "../lib/research-age.ts";
+// A fair market rent holds for its fiscal year (lib/fmr): it is stale once
+// that year has ended, never 180 days after it was read.
+import { fmrLabel, fyEnd, readFmrMetric } from "../lib/fmr.ts";
 
 const LINKS_PER_NIGHT = 25;
 const RECHECK_CLAIMS = 5;
@@ -213,14 +216,19 @@ await freshness("market_intel_items", "created_at", 4, "news_stories", "is the w
 // Benchmarks: the research rule (RESEARCH_STALE_DAYS) — count, don't just
 // check the newest. The year-ago rows a pull dates a year back on purpose
 // (Realtor.com's prior hotness rank) are always past it, and would keep
-// this tripped every night.
+// this tripped every night; the feeds' own rows keep their own cadence —
+// Zillow's and Realtor.com's are replaced each month, and a fair market
+// rent holds for its fiscal year (checked below) — so the count is of the
+// research rows alone.
 try {
   checksRun += 1;
-  const { count, error } = await withoutYearAgoRows(
-    supabase
-      .from("benchmarks")
-      .select("id", { count: "exact", head: true })
-      .lt("as_of", daysAgo(RESEARCH_STALE_DAYS).toISOString().slice(0, 10))
+  const { count, error } = await withoutFeedRows(
+    withoutYearAgoRows(
+      supabase
+        .from("benchmarks")
+        .select("id", { count: "exact", head: true })
+        .lt("as_of", daysAgo(RESEARCH_STALE_DAYS).toISOString().slice(0, 10))
+    )
   );
   // A query that failed is not a count of zero: it resolves nothing.
   if (error) throw new Error(error.message);
@@ -231,6 +239,35 @@ try {
   }
 } catch (err) {
   notes.push(`benchmarks freshness: table unreadable (${String(err).slice(0, 80)}) — skipped`);
+}
+
+// HUD's fair market rents: the newest fiscal year on file is current until
+// that year ends (lib/fmr's fyEnd), whenever it was read. The yearly pull
+// (fmr.yml) runs on the day a new year takes effect; past the end with no
+// newer year on file, it did not run or did not write.
+try {
+  checksRun += 1;
+  const { data, error } = await supabase
+    .from("benchmarks")
+    .select("metric")
+    .like("metric", FMR_METRICS_LIKE)
+    .order("metric", { ascending: false })
+    .limit(1);
+  if (error) throw new Error(error.message);
+  const newest = data?.[0] ? readFmrMetric(data[0].metric) : null;
+  if (!newest) {
+    await openIssue("stale", "fair market rents", "no fair market rent rows — run the fmr workflow or the research seed");
+  } else if (iso.slice(0, 10) > fyEnd(newest.fy)) {
+    await openIssue(
+      "stale",
+      "fair market rents",
+      `the newest on file are ${fmrLabel(newest.fy)}'s, a year that ended ${fyEnd(newest.fy)} — run the fmr workflow`
+    );
+  } else {
+    await resolveIssue("stale", "fair market rents");
+  }
+} catch (err) {
+  notes.push(`fair market rents: table unreadable (${String(err).slice(0, 80)}) — skipped`);
 }
 
 // Each WIRED ingest market (a pipeline file in scripts/ingest/) must have
