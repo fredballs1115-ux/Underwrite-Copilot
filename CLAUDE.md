@@ -1684,8 +1684,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   PMMS surveys, bank CRE loans y/y, delinquency, the three SLOOS
   standards series, and — #410 — commercial property prices against a
   year ago, `BOGZ1FL010000386Q`, the Fed's Financial Accounts, the one
-  free current CRE price figure: the BIS series FRED also carries stopped
-  at 2025 Q2 and the private indexes are licensed; the probe now prints a
+  free current CRE price figure: FRED's other national CRE price series
+  (`COMREPUSQ159N`) runs to 2026 Q1 but carries the IMF's copyright in its
+  notes (rates run 37243027958), and the private indexes are licensed;
+  the probe now prints a
   candidate's notes and a terms line, and caught Case-Shiller's
   copyright where this series names none. **It excludes apartments**
   (2026-10-01): the Fed builds the index, since 1996, on "the Costar U.S.

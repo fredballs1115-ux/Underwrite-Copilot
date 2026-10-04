@@ -100,8 +100,11 @@ export interface LiveMarketInput {
  * Financial Accounts price index for commercial real estate, against a
  * year ago (Z.1's Financial Soundness Indicators, quarterly, published
  * about ten weeks after the quarter). The one free, current figure for
- * the value side: the BIS's national series on FRED stopped at 2025 Q2,
- * and the private indexes (Green Street, RCA, CoStar's own) are licensed.
+ * the value side: FRED's "Commercial Real Estate Prices for United States"
+ * (COMREPUSQ159N) runs to 2026 Q1, but its notes carry the International
+ * Monetary Fund's copyright, "Reprinted with permission" (rates run
+ * 37243027958), so it is not republished here; and the private indexes
+ * (Green Street, RCA, CoStar's own) are licensed.
  * Printed by the runner with its notes (rates run 35945851126: no
  * copyright or permission named, where the same flag caught
  * Case-Shiller's) before it was trusted. A trailing year of prices, said
