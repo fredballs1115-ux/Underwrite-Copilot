@@ -7,6 +7,7 @@ import {
   gapShare,
   incomeGapShare,
   rowGap,
+  valueFigure,
   valueGap,
 } from "./gap-detail";
 import { SAMPLE_DEAL } from "./sample-deal";
@@ -118,6 +119,66 @@ describe("the gap is the two figures' own subtraction, not the reconciler's arit
     expect(scale.shares[0]).toBe(-1);
     expect(scale.shares[1]).toBeCloseTo(-100_000 / 173_500, 10);
     expect(scale.shares[2]).toBeNull();
+  });
+});
+
+describe("a value below zero is read with its sign (audit c66)", () => {
+  it("reads a minus in each of its forms, and accounting's brackets, as the value's own sign", () => {
+    expect(valueFigure("-1.0%")).toEqual({ value: -1, unit: "pct" });
+    expect(valueFigure("−1.0%")).toEqual({ value: -1, unit: "pct" });
+    expect(valueFigure("–1.0%")).toEqual({ value: -1, unit: "pct" });
+    expect(valueFigure("(1.0%)")).toEqual({ value: -1, unit: "pct" });
+    expect(valueFigure("-$30,000")).toEqual({ value: -30_000, unit: "usd" });
+    expect(valueFigure("−$1.2M")).toEqual({ value: -1_200_000, unit: "usd" });
+    expect(valueFigure("($30,000)")).toEqual({ value: -30_000, unit: "usd" });
+    expect(valueFigure("+$30,000")).toEqual({ value: 30_000, unit: "usd" });
+    expect(valueFigure("2.5%/yr")).toEqual({ value: 2.5, unit: "pct" });
+  });
+
+  it("never reads a hyphen inside a word, or a bracketed aside, as a minus", () => {
+    expect(valueFigure("T-12 $3,880,000")).toEqual({ value: 3_880_000, unit: "usd" });
+    expect(valueFigure("$3,880,000 (T-12)")).toEqual({ value: 3_880_000, unit: "usd" });
+    expect(valueFigure("(T-12) $3,880,000")).toEqual({ value: 3_880_000, unit: "usd" });
+    expect(valueFigure("(est. $30,000)")).toEqual({ value: 30_000, unit: "usd" });
+    // A dash set apart from the figure is a sign or a separator: neither is
+    // guessed, so the row's own line is read.
+    expect(valueFigure("NOI – $3,880,000")).toBeNull();
+    expect(valueFigure("− $30,000")).toBeNull();
+    expect(valueFigure("Not modelled")).toBeNull();
+  });
+
+  it("subtracts 3.0% and -1.0% to 400 bps, and $120,000 and -$30,000 to $150,000", () => {
+    // The audit's two: the page read 200 bps and $90,000, and said the
+    // reconciler's correct lines were wrong.
+    const rate = { omValue: "3.0%", myValue: "-1.0%", gap: "400 bps higher than the model", direction: "unfavorable" as const };
+    expect(valueGap(rate)).toEqual({ value: 400, unit: "bps" });
+    expect(gapDisagreementLine(rate)).toBeNull();
+    const income = { omValue: "$120,000", myValue: "-$30,000", gap: "$150k more income in the OM", direction: "unfavorable" as const };
+    expect(valueGap(income)).toEqual({ value: 150_000, unit: "usd" });
+    expect(gapDisagreementLine(income)).toBeNull();
+    // The other forms of the minus subtract the same way.
+    expect(valueGap({ omValue: "2.5%/yr", myValue: "−0.5%/yr" })).toEqual({ value: 300, unit: "bps" });
+    expect(valueGap({ omValue: "3.0%", myValue: "(1.0%)" })).toEqual({ value: 400, unit: "bps" });
+    expect(valueGap({ omValue: "-1.0%", myValue: "-3.0%" })).toEqual({ value: 200, unit: "bps" });
+  });
+
+  it("draws and grades the true gap, and still says a line that is wrong", () => {
+    const income = { omValue: "$120,000", myValue: "-$30,000", gap: "$150k more income in the OM", direction: "unfavorable" as const };
+    // (OM − model) ÷ |model|, the actuals card's delta: $150,000 over $30,000.
+    expect(gapShare(income)).toBeCloseTo(5, 10);
+    const scale = gapScale([income, { omValue: "$500,000", myValue: "$400,000", gap: "$100k", direction: "unfavorable" }]);
+    expect(scale.shares[0]).toBe(-1);
+    expect(scale.shares[1]).toBeCloseTo(-100_000 / 150_000, 10);
+    expect(gapDisagreementLine({ omValue: "3.0%", myValue: "-1.0%", gap: "200 bps higher" })).toBe(
+      "The two figures differ by 400 bps, where the line says 200 bps.",
+    );
+  });
+
+  it("leaves a value whose dash it cannot read to the row's own line", () => {
+    const row = { omValue: "$120,000", myValue: "– $30,000", gap: "$150k" };
+    expect(valueGap(row)).toBeNull();
+    expect(rowGap(row)).toEqual({ value: 150_000, unit: "usd" });
+    expect(gapDisagreement(row)).toBeNull();
   });
 });
 

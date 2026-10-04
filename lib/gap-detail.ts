@@ -8,6 +8,13 @@
 // words, and a row that states no figure ("In agreement", "Not modelled")
 // reads as nothing. Dollars, basis points and percentages are different
 // yardsticks: the scale puts each unit on its own track and never mixes them.
+//
+// The two VALUES a row compares are read with the sign they state
+// (`valueFigure`): a model's rent growth of "-1.0%" is a figure below zero,
+// not one point, and the gap the two values make is subtracted with their
+// signs. The first cut read "-1.0%", "−1.0%" and "(1.0%)" as +1.0, so 3.0%
+// against -1.0% made 200 bps, and the page said the reconciler's correct
+// "400 bps" line was wrong.
 import type { ReconDirection } from "@/lib/anthropic/types";
 import { typicalRangeParts } from "@/lib/typical-range";
 
@@ -15,6 +22,13 @@ export type GapUnit = "usd" | "bps" | "pct";
 
 export interface GapFigure {
   /** the magnitude as stated, always positive */
+  value: number;
+  unit: GapUnit;
+}
+
+/** A row's value as it states it — signed, so a model figure below zero is
+ *  read as one. */
+export interface ValueFigure {
   value: number;
   unit: GapUnit;
 }
@@ -28,33 +42,81 @@ const BPS = /(\d+(?:\.\d+)?)\s*(?:bps|bp|basis points?)\b/i;
 // "+4.2%", "3 percentage points", "3 pts", "2 pp", "4 per cent".
 const PCT = /(\d+(?:\.\d+)?)\s*(?:%|percent(?:age points?)?|per cent|pts?\b|pp\b)/i;
 
-/** The magnitude a gap line states, or null when it states none. Dollars
- *  win over basis points over percentages when a line carries more than one
- *  ("$174k, 4.5% below" is a dollar gap with its share beside it). */
-export function gapFigure(text: string | null | undefined): GapFigure | null {
-  const s = (text ?? "").trim();
-  if (!s) return null;
+/** A figure the text states, and where in the text it stands. */
+interface Located extends GapFigure {
+  start: number;
+  end: number;
+}
+
+/** The first figure a text states, by the precedence `gapFigure` names. */
+function locate(s: string): Located | null {
   const m = s.match(MONEY);
-  if (m) {
+  if (m && m.index != null) {
     const whole = m[1].replace(/,/g, "");
     let n = Number(`${whole}${m[2] ? `.${m[2]}` : ""}`);
     const suffix = (m[3] ?? "").toLowerCase();
     if (suffix === "k" || suffix === "thousand") n *= 1_000;
     else if (suffix === "m" || suffix === "mm" || suffix === "mn" || suffix === "million") n *= 1_000_000;
     else if (suffix === "b" || suffix === "bn" || suffix === "billion") n *= 1_000_000_000;
-    if (Number.isFinite(n) && n > 0) return { value: n, unit: "usd" };
+    if (Number.isFinite(n) && n > 0) return { value: n, unit: "usd", start: m.index, end: m.index + m[0].length };
   }
   const b = s.match(BPS);
-  if (b) {
+  if (b && b.index != null) {
     const n = Number(b[1]);
-    if (Number.isFinite(n) && n > 0) return { value: n, unit: "bps" };
+    if (Number.isFinite(n) && n > 0) return { value: n, unit: "bps", start: b.index, end: b.index + b[0].length };
   }
   const p = s.match(PCT);
-  if (p) {
+  if (p && p.index != null) {
     const n = Number(p[1]);
-    if (Number.isFinite(n) && n > 0) return { value: n, unit: "pct" };
+    if (Number.isFinite(n) && n > 0) return { value: n, unit: "pct", start: p.index, end: p.index + p[0].length };
   }
   return null;
+}
+
+/** The magnitude a gap line states, or null when it states none. Dollars
+ *  win over basis points over percentages when a line carries more than one
+ *  ("$174k, 4.5% below" is a dollar gap with its share beside it). */
+export function gapFigure(text: string | null | undefined): GapFigure | null {
+  const s = (text ?? "").trim();
+  if (!s) return null;
+  const f = locate(s);
+  return f ? { value: f.value, unit: f.unit } : null;
+}
+
+// A minus sign standing directly before a figure (or its dollar sign): the
+// hyphen-minus, the minus sign (U+2212), or the en dash a word processor sets
+// in its place — never one inside a word ("T-12", "Year-1").
+const MINUS_BEFORE = /(?:^|[^\p{L}\p{N}])[-−–]$/u;
+// A dash set apart from the figure by a space: a sign, or a separator
+// ("NOI – $3,880,000")? The words do not say.
+const DASH_APART = /[-−–]\s+$/u;
+
+/** The sign a value's figure states: a minus directly before it, or
+ *  accounting's brackets round it ("(1.0%)", "($30,000)"); null where a dash
+ *  stands apart from it and could be either a sign or a separator. */
+function signOf(s: string, f: Located): 1 | -1 | null {
+  const before = s.slice(0, f.start);
+  const after = s.slice(f.end);
+  if (MINUS_BEFORE.test(before)) return -1;
+  if (/\(\s*$/.test(before) && /^\s*\)/.test(after)) return -1;
+  if (DASH_APART.test(before)) return null;
+  return 1;
+}
+
+/**
+ * A row's value as it states it: the figure `gapFigure` reads, with the sign
+ * the text gives it — a minus in any of its forms ("-1.0%", "−1.0%",
+ * "–1.0%") or accounting's brackets ("(1.0%)", "($30,000)"). Null where it
+ * states no figure, or where a dash stands apart from the figure, a sign or
+ * a separator, so the row's own line is read instead of a guess.
+ */
+export function valueFigure(text: string | null | undefined): ValueFigure | null {
+  const s = (text ?? "").trim();
+  if (!s) return null;
+  const f = locate(s);
+  if (!f) return null;
+  const sign = signOf(s, f);
+  return sign === null ? null : { value: sign * f.value, unit: f.unit };
 }
 
 // A percentage gap stated in points of a rate ("3 pts", "2 pp", "3
@@ -113,15 +175,17 @@ const isRange = (text: string | null | undefined) => typicalRangeParts(text ?? "
  * The reconciler is asked for the difference and writes it as a line ("$174k
  * below the OM") — the model's arithmetic — beside two values that both
  * parse, so the code subtracts them: two dollar figures give dollars, two
- * rates give basis points. Null where either figure is unstated, a range,
- * or on another footing (a month beside a year, one unit beside the whole),
- * and the row's own line is read instead. The SIGN stays the row's stated
- * direction; this is the size alone.
+ * rates give basis points. Each value is read with its own sign
+ * (`valueFigure`), so 3.0% against -1.0% is 400 bps, never 200. Null where
+ * either figure is unstated, a range, on another footing (a month beside a
+ * year, one unit beside the whole) or carries a dash that may not be a sign,
+ * and the row's own line is read instead. The SIGN of the gap stays the
+ * row's stated direction; this is the size alone.
  */
 export function valueGap(row: GapRow): GapFigure | null {
   if (isRange(row.omValue) || isRange(row.myValue)) return null;
-  const om = gapFigure(row.omValue);
-  const mine = gapFigure(row.myValue);
+  const om = valueFigure(row.omValue);
+  const mine = valueFigure(row.myValue);
   if (!om || !mine || om.unit !== mine.unit) return null;
   if (om.unit === "usd") {
     if (!oneFooting(footingOf(row.omValue), footingOf(row.myValue))) return null;
