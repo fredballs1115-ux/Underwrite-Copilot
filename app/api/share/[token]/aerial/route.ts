@@ -11,21 +11,21 @@
 // Pinned to USGS on purpose: The National Map is a US federal work in the
 // public domain, so the public page owes no attribution beyond the credit
 // line it prints, and needs no key.
+//
+// One frame, the page's own (`SHARE_AERIAL`), whatever size the query names,
+// drawn once per deal per process and kept (lib/deal-aerial): anyone holding
+// the link can ask, so the link must not be a way to make this process draw
+// a picture per request (the security review of 2026-10-01). The link is
+// resolved again on every ask before the kept copy is served.
 
 import { NextResponse } from "next/server";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { StructuredAddress } from "@/lib/address";
 import type { DealVisualCache } from "@/lib/deal-location";
-import { IMAGE_CREDIT, fetchOneImage } from "@/lib/imagery";
+import { IMAGE_CREDIT } from "@/lib/imagery-plan";
+import { SHARE_AERIAL_FRAMES, nearestFrame } from "@/lib/image-frames";
+import { heldDealAerial } from "@/lib/deal-aerial";
 import { resolveShare } from "@/lib/share-resolve";
-
-const SIZE = { min: 48, max: 1280, defaultW: 960, defaultH: 400 };
-
-function clamp(raw: string | null, lo: number, hi: number, fallback: number): number {
-  const n = Number(raw);
-  if (!Number.isFinite(n)) return fallback;
-  return Math.min(hi, Math.max(lo, Math.round(n)));
-}
 
 export async function GET(
   req: Request,
@@ -43,22 +43,19 @@ export async function GET(
   if (!address?.label) return new NextResponse(null, { status: 404 });
 
   const q = new URL(req.url).searchParams;
-  const size = {
-    width: clamp(q.get("w"), SIZE.min, SIZE.max, SIZE.defaultW),
-    height: clamp(q.get("h"), SIZE.min, SIZE.max, SIZE.defaultH),
-  };
+  const frame = nearestFrame(SHARE_AERIAL_FRAMES, q.get("w"), q.get("h"));
   const cache = (deal.photo as DealVisualCache | null) ?? null;
-  const best = await fetchOneImage("aerial", admin, dealId, address, cache, size);
-  if (!best) return new NextResponse(null, { status: 404 });
+  const aerial = await heldDealAerial(admin, dealId, address, cache, frame);
+  if (!aerial) return new NextResponse(null, { status: 404 });
 
-  return new NextResponse(best.response.body, {
+  return new NextResponse(new Uint8Array(aerial.bytes), {
     headers: {
-      "content-type": best.response.headers.get("content-type") ?? "image/jpeg",
+      "content-type": aerial.type,
       // A day, like the deal page's own aerial. Private: the response is
       // scoped to a link, not to the world.
       "cache-control": "private, max-age=86400",
-      "x-image-source": best.source,
-      "x-image-credit": IMAGE_CREDIT[best.source],
+      "x-image-source": "aerial",
+      "x-image-credit": IMAGE_CREDIT.aerial,
     },
   });
 }

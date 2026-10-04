@@ -15,6 +15,7 @@ import { Expired, ShareView } from "./share-view";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
+import { SHARE_AERIAL } from "@/lib/image-frames";
 import type { SharePictureSource } from "./share-picture";
 
 /** The aerial's credit on the public screen: The National Map is a US
@@ -80,8 +81,15 @@ export default async function SharePage({
           },
         ]
       : []),
+    // The one frame the aerial route draws (lib/image-frames).
     ...(address?.label
-      ? [{ kind: "aerial" as const, src: `/api/share/${token}/aerial?w=960&h=400`, credit: SHARE_AERIAL_CREDIT }]
+      ? [
+          {
+            kind: "aerial" as const,
+            src: `/api/share/${token}/aerial?w=${SHARE_AERIAL.w}&h=${SHARE_AERIAL.h}`,
+            credit: SHARE_AERIAL_CREDIT,
+          },
+        ]
       : []),
   ];
   const picture = sources.length > 0 ? { sources, place: address?.label || deal.name } : null;

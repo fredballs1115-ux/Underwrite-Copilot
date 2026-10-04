@@ -19,6 +19,7 @@ import {
 } from "@/lib/imagery-plan";
 import { pictureSizeFor, readPictureBytes } from "@/lib/deal-picture";
 import { finishAerial } from "@/lib/aerial-finish";
+import { RunGate } from "@/lib/anthropic/run-gate";
 export { finishAerial };
 
 // The ordering rule and the credits are pure, so they live in a universal
@@ -211,12 +212,26 @@ export async function fetchGoogleSatelliteImage(
 }
 
 /**
+ * How many building aerials this process asks USGS for at once, and how long
+ * an ask waits for a turn (the security review of 2026-10-01): the market
+ * overheads' rule (lib/metro-overhead), here for every deal's aerial. The
+ * shared screen's aerial is public, and each frame is an export and a sharp
+ * pass, so a burst past four waits its turn. Four is the compare page's four
+ * columns in one round. An ask that finds no turn in time is a failure, and
+ * nothing keeps it.
+ */
+export const AERIAL_IN_FLIGHT = 4;
+const AERIAL_TURN_WAIT_MS = 30_000;
+const aerialTurns = new RunGate(() => AERIAL_IN_FLIGHT);
+
+/**
  * USGS aerial orthoimagery of the site. Needs no key, so this is what makes
  * "every deal has a real picture" true rather than aspirational — but at
  * 0.6-1.0 m/px it is the floor, not the good shot. Drawn no finer than the
  * photograph's own grain (`MAX_SOURCE_ZOOM.aerial`, z17 — an explicit zoom
  * is held to it too, so no caller can ask for the stretched frame) and
  * finished (`finishAerial`); a finish that fails serves the plain export.
+ * At most `AERIAL_IN_FLIGHT` at once in this process, the finish included.
  */
 export async function fetchAerialImage(
   loc: DealLocation,
@@ -232,6 +247,20 @@ export async function fetchAerialImage(
         source: "aerial",
       }),
   );
+  const release = await aerialTurns.acquireWithin(AERIAL_TURN_WAIT_MS);
+  if (!release) return null;
+  try {
+    return await exportAerial(loc, size, zoom);
+  } finally {
+    release();
+  }
+}
+
+async function exportAerial(
+  loc: DealLocation,
+  size: { width: number; height: number },
+  zoom: number,
+): Promise<Response | null> {
   try {
     const img = await fetch(
       usgsAerialUrl({
