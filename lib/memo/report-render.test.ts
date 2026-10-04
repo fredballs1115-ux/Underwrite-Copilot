@@ -404,7 +404,7 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain(`Total sources ${usd(b.loan + b.equity)}`);
     // The grid's terms: the rate a placeholder, said only as an assumption.
     expect(text).toContain(
-      "The grids run on a 5-year hold (assumption); a loan of 60% of cost (assumption), amortizing over 30 years; and a 6.00% all-in rate (assumption). These returns carry a 1.0% closing hold and a 2.0% cost of sale, and no transfer or recordation tax: the model's default, not this jurisdiction's rate. Set each in the Excel model.",
+      "The grids run on a 5-year hold (assumption); a loan of 60% of cost (assumption), amortizing over 30 years; and a 6.00% all-in rate (assumption). These returns carry a 1.0% closing hold and a 2.0% cost of sale, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.",
     );
     // A rate seeded off today's curve prints its dated source note.
     const seeded = await render(
