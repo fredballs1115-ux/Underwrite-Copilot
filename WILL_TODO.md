@@ -102,10 +102,13 @@ way in this batch):
   deal now runs on its own class's: retail to mixed-use moves the expense
   ratio from 32% to 40% and the reserve from $0.15 to $0.20 a foot; a hotel
   to a park, 65% to 35% expenses, 32% to 6% vacancy and a 325 to a 200 bps
-  spread; a lab, 7% to 10% vacancy and a 250 to a 300 bps spread; a hotel
-  to an apartment building, 65% to 42% expenses, 32% to 5% vacancy, the
-  reserve from $0.50 to $0.25 a foot, 550 to 850 SF a unit and a 325 to a
-  200 bps spread. A phrase that names a resort and units and nothing else
+  spread; a lab, 40% to 45% expenses, 7% to 10% vacancy and a 250 to a
+  300 bps spread; "Apartments" alone, 40% to 42% expenses, 7% to 5%
+  vacancy, the reserve from $0.20 to $0.25 a foot, 850 SF a unit where no
+  area is stated, and a 250 to a 200 bps spread; a hotel to an apartment
+  building, 65% to 42% expenses, 32% to 5% vacancy, the reserve from
+  $0.50 to $0.25 a foot, 550 to 850 SF a unit and a 325 to a 200 bps
+  spread. A phrase that names a resort and units and nothing else
   ("Resort with 200 units") is now filed as no class, on the generic
   defaults, since it may be either. Say if you would rather a re-filing
   waited for you.

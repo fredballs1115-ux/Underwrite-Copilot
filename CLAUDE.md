@@ -264,9 +264,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   - "Ground lease extension options".
 
   `lib/ground-lease-term.ts` (pure) reads them three ways, best first:
-  - a stated date, as written (`parseStatedDate` in lib/note-yield,
-    `parseMaturity`'s reader with a year range, since a 99-year lease can
-    end after 2100);
+  - a stated date, as written (`readStatedDate` in lib/note-yield, read
+    on its `first` side, with a year range, since a 99-year lease can end
+    after 2100);
   - a year alone, read as its FIRST day, the earliest end the year allows;
   - a count of years, counted from today and said to be possibly short,
     since the memorandum's own date is earlier. A ground lease is on the
@@ -798,6 +798,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   reports, the pipeline's CSV "Broker" column (`PipelineSlots.broker`,
   `brokerageOf`) and the compare table's Broker row. Never on the shared
   screen or in an email: the listing team is the reader's contact list.
+  **The countdown counts from the request's own day**: the pipeline page
+  and the deal page read today once per request and hand it down
+  (`todayIso`; `OffersDueBit` and `OffersDueControl` take `today`,
+  `daysUntil(iso, today)`), so the server's markup and the browser's
+  first render agree — the badge had counted from the day its module
+  loaded, once per process, and a deal due in three days read "in 7d"
+  four days into a process.
 - Student housing (#468): the extraction labels a student deal's leasing as
   rows of its own, each only as stated — "Pre-leased" (the share leased for
   the coming academic year, with its term and date as written), "Pre-leased
@@ -1138,7 +1145,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   through `shownAssetClass` (the analyst's class where they filed one, the
   deck's where they left Auto) — the market check, the deal page's
   since-this-screen, demand and portfolio cards and the shared screen had
-  read the deck's word first while the header read the analyst's;
+  read the deck's word first while the header read the analyst's — and
+  pools by it through `dealClassKey` (lib/asset-words: the shown class
+  filed by `assetClassKey`, a phrase no rule files kept as its own
+  lowercased words) in the analytics, the internal comps and the market
+  memory, which had compared the raw words; `shownAssetClass` lives in
+  lib/asset-class, re-exported from lib/pipeline-slots;
   `countNoun` reads a count row's OWN noun ahead of the class's, because
   the OM's word wins wherever the screen read one. The survey that
   bought the table (2026-09-22) found the deal header printing
@@ -1311,7 +1323,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  One hundred and forty-two are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  One hundred and sixty-seven are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1372,7 +1384,25 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   its credit the name inside the file page's Author field, zori run
   37234876098), and Yakima, Chico (Upper Bidwell Park), Prescott Valley
   (Watson Lake's granite boulders, named for the title's first city) and
-  Las Cruces (the Organ Mountains) — run 36819025201), each judged
+  Las Cruces (the Organ Mountains) — run 36819025201 — and
+  Daphne-Fairhope-Foley (a boat leaving Orange Beach, public domain, its
+  credit the photographer and the agency as printed), Hilton Head
+  Island-Bluffton-Port Royal (Harbour Town's lighthouse from the water,
+  soft at twice the sheet's size), Macon-Bibb County (at dusk) and Panama
+  City-Panama City Beach — run 36818691850 — and Amarillo (Palo Duro
+  Canyon, inside the metro area's counties) and Midland — run
+  36818765688; then round 11: Billings, Bozeman, Coeur d'Alene (the
+  table's first apostrophe in a name), Flagstaff (the San Francisco
+  Peaks) and Grand Junction — run 37236536465 — Auburn-Opelika (Opelika's
+  Railroad Avenue, the title kept whole since the photograph is the
+  second city's, its credit the name inside "Rivers A. Langley;
+  SaveRivers", zori run 37240971983) and Johnson City — run 37236686331 —
+  Bloomington (Kirkwood Avenue), Columbia MO (Jesse Hall), Iowa City,
+  Ithaca (Cornell over Cayuga Lake), Lawrence and Traverse City — run
+  37236836751 — Rapid City and Bismarck — run 37236951448 — and Dover
+  (West Loockerman Street, its credit the name inside "Tim Kiser (
+  w:User:Malepheasant )", zori run 37240141265), Morgantown, Pittsfield
+  and Winchester — run 37237349944), each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
   `cbsa:` row never draws; Hagerstown, Burlington (Vermont), Kalamazoo,
@@ -1395,8 +1425,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   wire and shop signs, Lafayette-West Lafayette's one clean frame a PNG,
   Topeka's Capitol with its statue cut at 21:9, and Bremerton's and
   Merced's sheets an aerial that reads as a map, streets of signs and
-  wires and a hotel that loses its cornice, so each keeps the drawn cover
-  too. A two-state title is cut to
+  wires and a hotel that loses its cornice, as did Athens-Clarke County
+  (City Hall loses its dome at 21:9), Punta Gorda, Lake Charles (a
+  refinery silhouette), Longview, Slidell-Mandeville-Covington and Tyler
+  (both tower frames lose a top at 21:9); round 11 left Missoula (its
+  clear frames lose a block's top at 21:9), Wildwood-The Villages,
+  Sebastian-Vero Beach-West Vero Corridor, Bowling Green (the fountain
+  statue's head lost at 21:9), Hattiesburg (an overcast drone frame that
+  reads as a map), Cheyenne (the file's own edge cuts the dome), Idaho
+  Falls, Logan (the 21:9 cuts the summit), Redding (the Sundial Bridge's
+  pylon lost at 21:9), Salisbury and Harrisonburg, so each keeps the
+  drawn cover too. A one-state title is mostly kept whole (the card
+  truncates a long one and the deal page shows it in full); a few were
+  cut to their first city. A two-state title is cut to
   its first city and state ("Memphis, TN", "Augusta, GA"), the table's
   own precedent, so a card's name passes the test's one-state pattern. A search result can
   be another city entirely (Los Angeles under Colorado Springs, Buffalo
@@ -4388,7 +4429,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   operator's (WILL_TODO's first section has the order of the move:
   Render's custom domain, `NEXT_PUBLIC_APP_URL` on web and worker,
   Supabase's URLs, then `CANONICAL_HOST` last). Live-verify fetches the
-  sitemap and the key and greps Pittsburgh's page title. **Each market
+  sitemap and the key and greps Pittsburgh's page title. **A shared deal
+  screen previews as one** (`app/share/[token]/page.tsx`): a neutral
+  title ("A deal screen shared with you"), noindex, no url, and the
+  site's plain card (`lib/plain-card`, served by `/api/og/plain`,
+  `PLAIN_CARD` in lib/public-pages: the mark and the name on the brand
+  teal) — never the deal's name, figures or picture, since a chat app
+  caches a preview after the link is revoked; it had inherited the
+  homepage's advert. **Each market
   page previews its own city** (#436): a shared `/market?metro=` link had
   gone out under the homepage's title and the site's one card, because a
   child's `openGraph` replaces the root's wholesale, so the page's
@@ -4759,7 +4807,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   says their median ("Your screens usually take about 3 minutes") from
   each ledger's `wallMs` — the run's own time, start to finish, which
   `runAnalysis` writes beside the ledger; never the ledger's `ms`, which
-  sums the model calls alone. While a first screen has not yet written the
+  sums the model calls alone; neither does the homepage, whose FAQ says
+  what a screen does and in what order, never how long
+  (lib/marketing-constants keeps no timing claim). While a first screen has not yet written the
   terms, an empty figure on the deal header, the pipeline card and the list
   row is a quiet shimmer named "Reading the memorandum"
   (`lib/screen-reading.ts` `readingMemorandum`), never the dash a finished
@@ -4771,6 +4821,16 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   "Screen your first OM" ticks only for a memorandum's screen that reached
   its verdict (`lib/onboarding.ts`), and a typed ⌘K query searches every
   deal by name on the server (`lib/palette-search.ts`, an escaped `ilike`).
+  A closed deal is counted as closed, never live (`isOpenStage` in
+  lib/stages): the analytics tile and the funnel's caption read "3 live ·
+  1 closed · 1 dead" (`stageCounts`, `stageCountLine` in lib/analytics),
+  and the meeting workbook's live block counts the deals still in play,
+  its asking value and plan count theirs. A blank or unparsed price, cap
+  or fit sorts last whichever way the list runs (`pipelineSortValue` in
+  lib/pipeline-sort), as a deal with no offers-due date does. The deal
+  page's "From your past screens" strip says its cap and basis ranges
+  are "at the ask": each is struck on a memorandum's asking price, never
+  a price anyone paid.
   In-process runs heartbeat
   the job row; a Files-API copy of an OM is released when its run ends
   (`releaseOmSource`); one web process runs at most `ANALYSIS_CONCURRENCY`
@@ -4815,8 +4875,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     an abatement read early is gone from the month's first day; a bid
     deadline stated as a month alone is no day and is not counted down
     (the audit of 2026-10-04: every month was read as its last day, so a
-    lease "June 2027" ended "today" on June 30). A year alone is still
-    read as its first day.
+    lease "June 2027" ended "today" on June 30). A year alone is read
+    the same way: on its rule's side (a lease's end its first day, a rent
+    restriction its last) and said "this year" inside that year
+    (`thisYear` on `GroundLeaseTerm`, `DatedEnd` and `EarlyEnd`,
+    `sameYear` in lib/note-yield), never "today" and never passed until
+    the year is out; an abatement, read early, is gone from the year's
+    first day.
   - **A price label's year is the memorandum's, never the clock's**: the
     extraction carries `screenedOn`, the day the screen read it (the
     pipeline and the manual-deal path stamp it, `screenStamp`), and
