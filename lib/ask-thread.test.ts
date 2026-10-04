@@ -141,6 +141,27 @@ describe("askDeal — what an answer keeps", () => {
     // 24 questions and a marker: the 25th question is still allowed.
     expect(await ask("One more question?")).toEqual({ ok: true });
   });
+
+  it("counts only the questions asked of the memorandum the deal holds now (audit c66)", async () => {
+    // Twenty-five answers asked of the earlier deck, then its replacement:
+    // the reissued deck has been asked nothing, and the refusal had told its
+    // reader "the thread above should have it covered".
+    const EARLIER = "aaaaaaaaaaaaaaaa";
+    const NOW = omFingerprint(OM_BYTES);
+    const answer = (i: number, om: string) => ({ at: `2026-09-01T00:00:${String(i).padStart(2, "0")}.000Z`, q: `Question ${i}?`, answer: "a", cites: [], om });
+    const replaced = { at: "2026-10-01T00:00:00.000Z", event: OM_REPLACED, om: NOW };
+    const earlier = Array.from({ length: 25 }, (_, i) => answer(i, EARLIER));
+    db.deal.qa = [...earlier, replaced];
+    expect(parseDealQa(db.deal.qa).filter((e) => e.earlier)).toHaveLength(25);
+    expect(await ask("What changed in the reissued deck?")).toEqual({ ok: true });
+
+    // Twenty-five of the current deck's own reach its cap, said of it.
+    db.appended.length = 0;
+    db.deal.qa = [...earlier, replaced, ...Array.from({ length: 25 }, (_, i) => answer(i, NOW))];
+    const state = await ask("And the roof?");
+    expect(state?.error).toBe("This memorandum reached its 25-question cap — the thread above should have it covered.");
+    expect(db.appended).toEqual([]);
+  });
 });
 
 describe("parseDealQa — which memorandum each answer was asked of", () => {

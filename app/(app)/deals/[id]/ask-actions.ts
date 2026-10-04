@@ -15,8 +15,10 @@ export type AskState =
   | { error?: string; ok?: boolean; question?: string }
   | null;
 
-// Each answer is a full OM read — cap the thread so one deal can't become an
-// unbounded Claude bill.
+// Each answer is a full OM read — cap the questions asked of each memorandum
+// so one deal can't become an unbounded Claude bill. A reissued deck is a new
+// document with its own pages, so its questions start again; the same bytes
+// uploaded again are the same memorandum, and keep their count.
 const MAX_QUESTIONS = 25;
 
 /**
@@ -87,11 +89,15 @@ export async function askDeal(
     };
   }
 
-  // The questions asked — a replaced OM's marker on the thread is none.
-  const qa = parseDealQa(deal.qa);
-  if (qa.length >= MAX_QUESTIONS) {
+  // The questions asked of the memorandum the deal holds now — a replaced
+  // OM's marker on the thread is none, and an answer asked of an earlier
+  // memorandum (lib/deals `parseDealQa`, the reading the thread is drawn
+  // with) counted toward that deck's cap. It had counted toward this one's,
+  // so a deal whose first deck used its 25 could ask nothing of the second.
+  const asked = parseDealQa(deal.qa).filter((e) => !e.earlier);
+  if (asked.length >= MAX_QUESTIONS) {
     return {
-      error: `This deal reached its ${MAX_QUESTIONS}-question cap — the thread above should have it covered.`,
+      error: `This memorandum reached its ${MAX_QUESTIONS}-question cap — the thread above should have it covered.`,
       // The typed question stays in the box, as on every other refusal.
       ...keep,
     };
