@@ -44,6 +44,20 @@ describe("a blank figure sorts last whichever way the list runs", () => {
     expect(order(priced, "cap", "desc")).toEqual(["Small", "Big", "Unpriced", "Call for offers"]);
   });
 
+  // The second pre-merge audit: the column draws a plan deal's yield on cost
+  // and a note's yield to maturity where there is no cap, and sorted both
+  // with the blanks, in no order among themselves.
+  it("by cap: the figure the column draws — a plan's yield on cost, a note's yield to maturity — sorts with the caps", () => {
+    const column = [
+      deal("Plan", { slots: { price: "$20,000,000", cap: null, yoc: "7.2%" } }),
+      deal("Note", { slots: { price: "$9,000,000", cap: null, noteYield: "13.8%" } }),
+      deal("Blank"),
+      ...priced.slice(1),
+    ];
+    expect(order(column, "cap", "asc")).toEqual(["Big", "Plan", "Small", "Note", "Blank", "Call for offers"]);
+    expect(order(column, "cap", "desc")).toEqual(["Note", "Small", "Plan", "Big", "Blank", "Call for offers"]);
+  });
+
   it("by fit: a score, then the fold before a score was read, then no fit at all", () => {
     const fits = [
       deal("No box"),

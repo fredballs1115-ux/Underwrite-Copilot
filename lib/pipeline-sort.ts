@@ -21,7 +21,10 @@ export interface SortableDeal {
   score: number | null;
   /** the call-for-offers date, an ISO day */
   offersDue: string | null;
-  slots: { price: string | null; cap: string | null };
+  /** the price; the cap — or, where there is none, the figure the Cap
+   *  column draws instead: a plan deal's yield on cost, a note's yield to
+   *  maturity (lib/pipeline-slots) */
+  slots: { price: string | null; cap: string | null; yoc?: string | null; noteYield?: string | null };
 }
 
 /** The call, worst to best — the status column's order. */
@@ -55,8 +58,13 @@ export function pipelineSortValue(d: SortableDeal, key: PipelineSortKey): string
       return d.assetClass;
     case "price":
       return d.slots.price ? parsePrice(d.slots.price) : null;
-    case "cap":
-      return d.slots.cap ? parsePct(d.slots.cap) : null;
+    case "cap": {
+      // The figure the column draws: the cap, else a plan deal's yield on
+      // cost, else a note's yield to maturity — each sorted beside the
+      // others, never with the blanks (the second pre-merge audit).
+      const shown = d.slots.cap ?? d.slots.yoc ?? d.slots.noteYield ?? null;
+      return shown ? parsePct(shown) : null;
+    }
     case "fit":
       // Sort by the numeric mandate score when present (the column shows it),
       // falling back to the coarse fold rank for pre-score deals.
