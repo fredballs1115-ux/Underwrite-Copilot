@@ -1149,9 +1149,12 @@ describe("the sixth review's per-unit, cap, price, size and occupancy cases", ()
     }
     expect(screenYearOf(null)).toBe(UNSTAMPED_SCREEN_YEAR);
     expect(screenYearOf(undefined)).toBe(UNSTAMPED_SCREEN_YEAR);
-    // The stamp a screen writes is the day as an ISO date, read back to its year.
-    expect(screenStamp(new Date(Date.UTC(2027, 0, 2, 9)))).toBe("2027-01-02");
-    expect(screenYearOf({ screenedOn: screenStamp(new Date(Date.UTC(2027, 0, 2, 9))) })).toBe(2027);
+    // The stamp a screen writes is the day as an ISO date — Honolulu's day
+    // (`SCREEN_STAMP_TIME_ZONE`), so 9 am UTC on Jan 2 is still Jan 1 —
+    // read back to its year.
+    expect(screenStamp(new Date(Date.UTC(2027, 0, 2, 9)))).toBe("2027-01-01");
+    expect(screenStamp(new Date(Date.UTC(2027, 0, 2, 22)))).toBe("2027-01-02");
+    expect(screenYearOf({ screenedOn: screenStamp(new Date(Date.UTC(2027, 0, 2, 22))) })).toBe(2027);
   });
 
   it("the buy box's source carries the stamp, so the band reads the label at the screen's year", () => {

@@ -137,10 +137,45 @@ describe("a price label dated the screen's year stays the ask after January 1", 
   });
 });
 
+// The stamp was the UTC day, so a screen run on New Year's Eve after 7 pm
+// Eastern (4 pm Pacific) was stamped with the next year — "Asking price
+// (2026)" on a deck its reader screened on December 31, 2026 read as a
+// prior trade. The stamp is the day in Honolulu now — no state's day begins
+// later — so its year never runs ahead of a US reader's.
+describe("the stamp's year never runs ahead of a US reader's own calendar", () => {
+  it("stamps 11:30 pm on Dec 31 in Los Angeles as Dec 31, and 3 am on Jan 1 in New York as Dec 31 too", async () => {
+    const { screenStamp, screenYearOf } = await import("./criteria");
+    const { dayIn } = await import("./reader-day");
+    // 11:30 pm Pacific on New Year's Eve: UTC is already in the new year.
+    const losAngeles = new Date("2027-01-01T07:30:00Z");
+    expect(dayIn("America/Los_Angeles", losAngeles)).toBe("2026-12-31");
+    expect(losAngeles.toISOString().slice(0, 10)).toBe("2027-01-01");
+    expect(screenStamp(losAngeles)).toBe("2026-12-31");
+    // 3 am Eastern on New Year's Day: the stamp is still Dec 31 — behind the
+    // reader's calendar, never ahead of it, which is the side a price label's
+    // year can bear (a label of the reader's new year is a later year, the ask).
+    const newYork = new Date("2027-01-01T08:00:00Z");
+    expect(dayIn("America/New_York", newYork)).toBe("2027-01-01");
+    expect(screenStamp(newYork)).toBe("2026-12-31");
+    const ex = { ...deal("Asking price (2026)"), screenedOn: screenStamp(losAngeles) };
+    expect(screenYearOf(ex)).toBe(2026);
+    // Midnight in Honolulu turns the stamp's year.
+    expect(screenStamp(new Date("2027-01-01T09:59:00Z"))).toBe("2026-12-31");
+    expect(screenStamp(new Date("2027-01-01T10:00:00Z"))).toBe("2027-01-01");
+  });
+
+  it("a deck screened on New Year's Eve keeps its price as the ask on every surface", async () => {
+    const { criteria, read } = await surfaces();
+    const ex = { ...deal("Asking price (2026)"), screenedOn: criteria.screenStamp(new Date("2027-01-01T07:30:00Z")) };
+    expect(read(ex)).toMatchObject({ year: 2026, asking: 42_000_000, pipeline: "$42,000,000", band: "pass", model: "extracted" });
+  });
+});
+
 describe("a re-screen of the same memorandum keeps the day it was first read", () => {
   it("keeps the stamp for the same bytes, and stamps a reissued deck or an unfingerprinted one anew", async () => {
     const { screenStampFor } = await import("./criteria");
-    const now = new Date(Date.UTC(2027, 0, 2));
+    // Noon on January 2 in Honolulu, the stamp's zone: "today" is Jan 2.
+    const now = new Date(Date.UTC(2027, 0, 2, 22));
     const prior = { screenedOn: "2026-11-20", omFingerprint: "abc123def4567890" };
     // The same deck screened again in 2027: still a 2026 reading.
     expect(screenStampFor(prior, "abc123def4567890", now)).toBe("2026-11-20");
@@ -165,7 +200,8 @@ describe("an extraction stored before the stamp keeps its reading when the same 
   // (2026)" turned into a prior trade and the deal lost its price.
   it("keeps no stamp (its 2026 reading) where the deal says the extraction on file was read from this deck", async () => {
     const { screenStampFor, screenYearOf, UNSTAMPED_SCREEN_YEAR } = await import("./criteria");
-    const now = new Date(Date.UTC(2027, 0, 2));
+    // Noon on January 2 in Honolulu, the stamp's zone: "today" is Jan 2.
+    const now = new Date(Date.UTC(2027, 0, 2, 22));
     const legacy = {};
     const kept = screenStampFor(legacy, "abc123def4567890", now, { priorReadFromThisDeck: true });
     expect(kept).toBeUndefined();

@@ -7,6 +7,7 @@
 
 import { withArticle } from "@/lib/article";
 import { assetWords, countNoun } from "@/lib/asset-words";
+import { dayIn } from "@/lib/reader-day";
 
 export interface GeoTarget {
   /** display label, e.g. "Dallas, TX" or "Tarrant County, TX" */
@@ -166,11 +167,24 @@ export function screenYearOf(ex: { screenedOn?: string | null } | null | undefin
   return m ? Number(m[1]) : UNSTAMPED_SCREEN_YEAR;
 }
 
+/** The zone the screen stamp's day is read in: Hawaii's — no state's day
+ *  begins later. The stamp exists to judge a price label's
+ *  year (`screenYearOf`), so its year must never run ahead of the calendar
+ *  of the analyst who screened the deck: the UTC day did from 7 pm Eastern
+ *  (4 pm Pacific) on December 31, and "Asking price (2026)" on a deck
+ *  screened that evening read as a prior trade. Read in Honolulu the stamp
+ *  can run behind a reader's day (3 am on January 1 in New York is still
+ *  December 31 there), never ahead of it in any state — and behind is the
+ *  side a label can bear: a label of the reader's new year is a later
+ *  year, the ask. (American Samoa's day begins an hour later still.) */
+export const SCREEN_STAMP_TIME_ZONE = "Pacific/Honolulu";
+
 /** The stamp a screen writes on the extraction it stores: the day it read
- *  the memorandum (or the typed facts), as an ISO date. One writer, so the
- *  pipeline and the manual-deal path stamp alike. */
+ *  the memorandum (or the typed facts), as an ISO date — the day in
+ *  `SCREEN_STAMP_TIME_ZONE`, never the UTC day. One writer, so the pipeline
+ *  and the manual-deal path stamp alike. */
 export function screenStamp(now: Date = new Date()): string {
-  return now.toISOString().slice(0, 10);
+  return dayIn(SCREEN_STAMP_TIME_ZONE, now);
 }
 
 /**
