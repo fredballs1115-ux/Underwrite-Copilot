@@ -4,7 +4,7 @@ import { daysBetween, monthsBetween, readNote, yearsBetween, type NoteTerms } fr
 import { interestShortLine, interestTag, noteCaption, noteYieldSentence, readInterest } from "./interest";
 import { assumableSentence, readAssumable } from "./assumable-debt";
 import { readRoster } from "./tenant-roster";
-import { readSingleTenant, singleTenantModelLine, singleTenantShortLine, singleTenantTag } from "./single-tenant";
+import { readSingleTenant, singleTenantModelLine, singleTenantNote, singleTenantShortLine, singleTenantTag } from "./single-tenant";
 import { hotelModelLine, readHotelDeal } from "./hotel-deal";
 import { readTaxAbatement, taxAbatementShortLine, taxAbatementTag } from "./tax-abatement";
 import { affordableShortLine, readAffordable } from "./affordable";
@@ -446,6 +446,8 @@ describe("a date stated as a month alone", () => {
             expect(r.headline, `${end} ${iso}`).not.toMatch(/today|has passed/);
             expect(singleTenantShortLine(r), `${end} ${iso}`).toContain(`the lease ends ${label}, this month`);
             expect(singleTenantTag(ex([row("Lease expiration", end)]), day(iso)), `${end} ${iso}`).toBe("Single tenant, under 1 yr left");
+            // The challenger's trap says it the same way, never "under a month left today".
+            expect(singleTenantNote(r), `${end} ${iso}`).toContain("(b) THE TERM AT THE EXIT — the lease ends this month, as stated:");
             expect(gluedWords(r.headline), `${end} ${iso}`).toEqual([]);
           }
           expect(at(m.after).headline, end).toContain(`The lease's stated end, ${label}, has passed`);
@@ -715,6 +717,213 @@ describe("a date stated as a month alone", () => {
           expect(after.matured, maturity).toBe(true);
           expect(assumableSentence(after), maturity).toMatch(new RegExp(`^It is at or past its ${label} maturity`));
         }
+      }
+    });
+  });
+});
+
+/**
+ * A date stated as a year alone ("2027"), the month's case a size up. The
+ * readers take the side their rule names, as before — the year's first day
+ * for a lease's end, a right to leave early, a HAP contract and a
+ * franchise; its last for a rent restriction and a management agreement —
+ * but the memorandum names no day, and a lease of "2027" read as January 1
+ * ended "today" on New Year's Day and "had passed" every other day of 2027.
+ * Inside the stated year an end is said "this year": never "today", never
+ * "under a month", never passed until the year is out. The abatement keeps
+ * its own rule, read early: gone from the year's first day, as from a
+ * month's. Each reader is read the day before the year, inside it (its
+ * first day, its middle, its last day) and the day after.
+ */
+describe("a date stated as a year alone", () => {
+  const Y = { before: "2026-12-31", inside: ["2027-01-01", "2027-06-15", "2027-12-31"], after: "2028-01-01" };
+  const YEAR_ALONE = " — the memorandum states the year alone, read as its first day";
+
+  describe("a ground lease", () => {
+    const ex = (end: string) =>
+      ({
+        ...SAMPLE_DEAL.extraction,
+        totalPages: 40,
+        interest: { kind: "leasehold", summary: "The leasehold interest", share: "", groundLease: "", loan: "", page: "" },
+        metrics: [...SAMPLE_DEAL.extraction.metrics, row("Ground lease expiration", end)],
+      }) as ExtractionResult;
+    const line = (iso: string) => groundLeaseTermLine(readGroundLeaseTerm(ex("2027"), day(iso))!);
+
+    it("is read from its first day, ends this year inside it, and has passed only once it is out", () => {
+      const t = readGroundLeaseTerm(ex("2027"), day(Y.before))!;
+      expect(t.ends).toBe("2027-01-01");
+      expect(t.from).toBe("year");
+      expect(t.thisYear).toBe(false);
+      expect(line(Y.before)).toBe(`The ground lease ends in 2027, under a month from today${YEAR_ALONE}`);
+      for (const iso of Y.inside) {
+        expect(readGroundLeaseTerm(ex("2027"), day(iso))!.thisYear, iso).toBe(true);
+        expect(line(iso), iso).toBe(`The ground lease ends in 2027, this year${YEAR_ALONE}`);
+        expect(interestTag(ex("2027"), day(iso)), iso).toBe("Leasehold, under 1 yr left");
+        expect(interestShortLine(readInterest(ex("2027"), 68_000_000, day(iso))!), iso).toContain("; the lease ends in 2027, this year");
+      }
+      expect(line(Y.after)).toMatch(/^The ground lease's stated end, 2027, has passed/);
+      expect(interestTag(ex("2027"), day(Y.after))).toBe("Leasehold");
+    });
+
+    it("the model's exit: a lease of 2027 read in mid-2027 ends in year 1 of the hold, never a term already gone", () => {
+      const e = ex("2027");
+      const r = readLeaseholdExit(e, deriveUnderwriteInputs(e, SAMPLE_DEAL.name).inputs, day("2027-06-15"))!;
+      expect(r.endsInHold).toBe(true);
+      expect(r.endsInYear).toBe(1);
+      expect(leaseholdExitSentence(r)).toMatch(/^The ground lease ends in 2027, in year 1 of the model's 5-year hold/);
+    });
+  });
+
+  describe("a single tenant's lease, and its right to leave early", () => {
+    const tenant: ExtractedSingleTenant = { tenant: "Walgreens Co.", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" };
+    const ex = (rows: Row[]) =>
+      ({
+        dealName: "Walgreens | Tulsa, OK",
+        assetClass: "net_lease",
+        totalPages: 30,
+        singleTenant: tenant,
+        metrics: [row("Asking price", "$6,500,000"), ...rows],
+      }) as unknown as ExtractionResult;
+    const model = { holdMonths: 60, rentGrowthPct: 0.02, vacancyPct: 0.05, exitCapPct: 0.065 };
+
+    it("the lease ends this year inside its year, and has passed only once it is out", () => {
+      const rows = [row("Lease expiration", "2027")];
+      const at = (iso: string) => readSingleTenant(ex(rows), day(iso))!;
+      expect(at(Y.before).term!.ends).toBe("2027-01-01");
+      expect(at(Y.before).headline).toContain(`The lease ends in 2027, under a month from today${YEAR_ALONE}.`);
+      for (const iso of Y.inside) {
+        const r = at(iso);
+        expect(r.headline, iso).toContain(`The lease ends in 2027, this year${YEAR_ALONE}.`);
+        expect(r.headline, iso).not.toMatch(/today|has passed/);
+        expect(singleTenantShortLine(r), iso).toContain("the lease ends in 2027, this year");
+        expect(singleTenantTag(ex(rows), day(iso)), iso).toBe("Single tenant, under 1 yr left");
+        expect(singleTenantModelLine(r, model), iso).toMatch(/^The lease ends in 2027, inside the model's 5-year hold/);
+        expect(singleTenantNote(r), iso).toContain("(b) THE TERM AT THE EXIT — the lease ends this year, as stated:");
+        expect(gluedWords(r.headline), iso).toEqual([]);
+      }
+      expect(at(Y.after).headline).toContain("The lease's stated end, 2027, has passed");
+    });
+
+    it("a right to leave early opens on its year's first day, comes this year inside it, and has opened after it", () => {
+      const rows = [row("Lease expiration", "December 31, 2035"), row("Early termination date", "2027")];
+      const at = (iso: string) => readSingleTenant(ex(rows), day(iso))!;
+      expect(at(Y.before).early!.ends).toBe("2027-01-01");
+      expect(at(Y.before).headline).toContain("The tenant may end the lease early from 2027, under a month from today, as stated");
+      for (const iso of Y.inside) {
+        const r = at(iso);
+        expect(r.early!.thisYear, iso).toBe(true);
+        expect(r.headline, iso).toContain("The tenant may end the lease early from 2027, this year, as stated");
+        expect(singleTenantShortLine(r), iso).toContain("the tenant may end it early from 2027");
+        expect(singleTenantModelLine(r, model), iso).toMatch(/^The lease may end in 2027, inside the model's 5-year hold/);
+        expect(singleTenantTag(ex(rows), day(iso)), iso).toBe("Single tenant, may leave in under 1 yr");
+        expect(singleTenantNote(r), iso).toContain("(b) THE TERM AT THE EXIT — the tenant may end the lease this year, as stated:");
+      }
+      expect(at(Y.after).headline).toContain("The tenant's right to end the lease early opened 2027, as stated");
+    });
+  });
+
+  describe("an affordable deal's clocks", () => {
+    const ex = (rows: Row[]) =>
+      ({
+        dealName: "Maple Court",
+        assetClass: "multifamily",
+        totalPages: 60,
+        affordable: { programs: ["lihtc", "section8"], summary: "", agreement: "", assistance: "", tiers: [], page: "" },
+        metrics: [row("Asking price", "$38,000,000"), row("Units", "240"), row("Restricted units", "180"), row("Units under HAP contract", "82"), ...rows],
+      }) as unknown as ExtractionResult;
+
+    it("a HAP contract is read from its year's first day, and expires this year inside it", () => {
+      const at = (iso: string) => readAffordable(ex([row("HAP contract expiration", "2027")]), day(iso))!;
+      expect(at(Y.before).hapEnds).toMatchObject({ ends: "2027-01-01", from: "year", thisYear: false });
+      expect(at(Y.before).headline).toContain("that expires in 2027, under a month from today");
+      for (const iso of Y.inside) {
+        const r = at(iso);
+        expect(r.hapEnds!.thisYear, iso).toBe(true);
+        expect(r.headline, iso).toContain("that expires in 2027, this year");
+        expect(affordableShortLine(r), iso).toContain("to 2027");
+      }
+      const after = at(Y.after);
+      expect(after.headline).toContain("whose stated expiry, 2027, has passed");
+      expect(affordableShortLine(after)).toContain("(its stated expiry has passed)");
+    });
+
+    it("a rent restriction is read to its year's last day, as its rule says, and runs this year inside it", () => {
+      const at = (iso: string) => readAffordable(ex([row("Affordability expiration", "2027")]), day(iso))!;
+      expect(at(Y.before).restrictionEnds).toMatchObject({ ends: "2027-12-31", from: "year" });
+      expect(at(Y.before).headline).toContain("until the end of 2027, 1 year from today");
+      for (const iso of Y.inside) {
+        const r = at(iso);
+        expect(r.headline, iso).toContain("until the end of 2027, this year");
+        expect(r.headline, iso).not.toMatch(/2027, today|has passed/);
+      }
+      expect(at(Y.after).headline).toContain("its stated end, 2027, has passed");
+    });
+  });
+
+  describe("a hotel's franchise and management agreement", () => {
+    const hotel: ExtractedHotel = { brand: "Courtyard by Marriott", franchise: "", management: "", encumbrance: "management", pip: "", page: "" };
+    const ex = (franchiseEnd: string, managementEnd = "2040") =>
+      ({
+        dealName: "Courtyard Nashville Downtown",
+        assetClass: "hospitality_str",
+        totalPages: 40,
+        hotel,
+        metrics: [
+          row("Asking price", "$26,000,000"),
+          row("Keys", "120"),
+          row("Franchise expiration", franchiseEnd),
+          row("Management agreement expiration", managementEnd),
+        ],
+      }) as unknown as ExtractionResult;
+    const model = { holdMonths: 60, capitalYr1: 0, capitalIsPip: false };
+
+    it("a franchise ends this year inside its year — inside the model's hold — and has passed only once it is out", () => {
+      expect(readHotelDeal(ex("2027"), day(Y.before))!.headline).toContain("The franchise ends in 2027, under a month from today.");
+      for (const iso of Y.inside) {
+        const r = readHotelDeal(ex("2027"), day(iso))!;
+        expect(r.franchiseEnds!.ends, iso).toBe("2027-01-01");
+        expect(r.headline, iso).toContain("The franchise ends in 2027, this year.");
+        expect(hotelModelLine(r, model), iso).toContain("The franchise ends in 2027, inside the model's 5-year hold");
+      }
+      expect(readHotelDeal(ex("2027"), day(Y.after))!.headline).toContain("The franchise's stated end, 2027, has passed");
+    });
+
+    it("a management agreement is read to its year's last day, and ends this year inside it", () => {
+      for (const iso of Y.inside) {
+        const r = readHotelDeal(ex("2040", "2027"), day(iso))!;
+        expect(r.managementEnds!.ends, iso).toBe("2027-12-31");
+        expect(r.headline, iso).toContain("The management agreement ends in 2027, this year.");
+      }
+      expect(readHotelDeal(ex("2040", "2027"), day(Y.after))!.headline).toContain("The management agreement's stated end, 2027, has passed");
+    });
+  });
+
+  describe("a tax abatement", () => {
+    const ex = (end: string) =>
+      ({
+        dealName: "The Fairmount",
+        assetClass: "multifamily",
+        totalPages: 40,
+        metrics: [
+          row("Asking price", "$55,000,000"),
+          row("NOI (in-place)", "$3,000,000"),
+          row("Tax abatement", "10-year Philadelphia tax abatement"),
+          row("Tax abatement expiration", end),
+          row("Abated real estate taxes", "$70,000"),
+          row("Unabated real estate taxes", "$520,000"),
+        ],
+      }) as unknown as ExtractionResult;
+
+    it("keeps its own rule, read early: abated the day before the year, gone from its first day — never 'this year'", () => {
+      const before = readTaxAbatement(ex("2027"), day(Y.before))!;
+      expect(before.end).toMatchObject({ ends: "2027-01-01", from: "year" });
+      expect(taxAbatementShortLine(before)).toContain("ends 2027, under a month from today");
+      expect(taxAbatementTag(ex("2027"), day(Y.before))).toMatch(/^Tax abated, under 1 yr left/);
+      for (const iso of [...Y.inside, Y.after]) {
+        const r = readTaxAbatement(ex("2027"), day(iso))!;
+        expect(taxAbatementTag(ex("2027"), day(iso)), iso).toBe("Abatement ended");
+        expect(r.headline, iso).toContain("ended 2027");
+        expect(r.headline, iso).not.toMatch(/this year|under a month/);
       }
     });
   });

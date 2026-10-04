@@ -49,7 +49,7 @@ import { parseCount, unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
 import { endHasPassed, fromToday } from "@/lib/ground-lease-term";
 import { parseUsd } from "@/lib/money";
-import { monthsBetween, readStatedDate, sameMonth, yearsBetween } from "@/lib/note-yield";
+import { monthsBetween, readStatedDate, sameMonth, sameYear, yearsBetween } from "@/lib/note-yield";
 
 export type { AffordableProgram };
 
@@ -155,6 +155,9 @@ export interface DatedEnd {
    *  "this month", neither passed nor a day away (lib/ground-lease-term
    *  `DatedSpan`) */
   thisMonth: boolean;
+  /** stated as a year alone, and the reading's date falls in that year:
+   *  "this year", on either side the year is read on */
+  thisYear: boolean;
   /** cited only where it parses and falls inside the memorandum */
   page: string;
 }
@@ -175,8 +178,10 @@ const isoOf = (d: Date) => d.toISOString().slice(0, 10);
  * as its FIRST (the subsidy is never counted for months it may not run) —
  * and a month alone, read inside that month, is said "this month" (the
  * audit of 2026-10-04: every month had been read as its last day, a HAP
- * contract's included). Null where the row states no end — including a
- * term counted from a start, which is kept as stated.
+ * contract's included), a year alone, read inside that year, "this year":
+ * the memorandum names no day in it, so the end neither comes "today" nor
+ * passes before the year is out. Null where the row states no end —
+ * including a term counted from a start, which is kept as stated.
  */
 export function datedEnd(row: MetricRow | null, side: "first" | "last", asOf: Date, pageCount: number | null): DatedEnd | null {
   if (!row) return null;
@@ -200,6 +205,7 @@ export function datedEnd(row: MetricRow | null, side: "first" | "last", asOf: Da
     yearsLeft: monthsBetween(today, ends) / 12,
     yearsToTheDay: yearsBetween(today, ends),
     thisMonth: from === "month" && sameMonth(today, ends),
+    thisYear: from === "year" && sameYear(today, ends),
     page: n != null && pageCount != null && n <= pageCount ? (row.page ?? "").trim() : "",
   };
 }

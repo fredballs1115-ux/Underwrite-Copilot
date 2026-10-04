@@ -25,7 +25,10 @@
 //
 // THE END IS READ EARLY. A month or a year alone is its FIRST day, the side
 // that does not flatter the buyer — so an abatement stated to end "June
-// 2027" is gone from June 1, never carried to the month's last day — and a
+// 2027" is gone from June 1, never carried to the month's last day, and one
+// stated to end "2027" is gone from January 1: where a lease stated as a
+// month or a year alone is said to end "this month" or "this year" inside
+// it (lib/ground-lease-term `DatedSpan`), an abatement has ended — and a
 // term counted from a stated start is the start plus the term, said as
 // counted.
 //

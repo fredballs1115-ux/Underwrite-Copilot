@@ -52,6 +52,7 @@ import {
   endIsAhead,
   endsByYear,
   fromToday,
+  leftText as spanLeftText,
   readLeaseTerm,
   termEndLabel,
   yearsText,
@@ -60,7 +61,7 @@ import {
   type MetricRow,
 } from "@/lib/ground-lease-term";
 import { parseUsd } from "@/lib/money";
-import { monthsBetween, readStatedDate, sameMonth, yearsBetween } from "@/lib/note-yield";
+import { monthsBetween, readStatedDate, sameMonth, sameYear, yearsBetween } from "@/lib/note-yield";
 
 // ── The rows ────────────────────────────────────────────────────────────
 
@@ -246,6 +247,9 @@ export interface EarlyEnd {
   /** stated as a month alone, and the reading's date falls in that month:
    *  the right opens "this month" (`DatedSpan`) */
   thisMonth: boolean;
+  /** stated as a year alone, and the reading's date falls in that year:
+   *  the right opens "this year" (`DatedSpan`) */
+  thisYear: boolean;
 }
 
 export interface SingleTenantRead {
@@ -302,6 +306,7 @@ function earlyOf(value: string, asOf: Date): EarlyEnd | null {
     yearsLeft: monthsBetween(today, ends) / 12,
     yearsToTheDay: yearsBetween(today, ends),
     thisMonth: !!d?.month && sameMonth(today, ends),
+    thisYear: !d && sameYear(today, ends),
   };
 }
 
@@ -660,6 +665,18 @@ const RIGHTS: Array<{ re: RegExp; trap: string }> = [
 export function singleTenantNote(r: SingleTenantRead): string {
   const eff = r.effective;
   const span = effectiveSpan(r);
+  // An end stated as a month or a year alone, read inside it, comes "this
+  // month" or "this year" — never "under a month left today", which a day
+  // nobody stated had said all through it.
+  const within = span && (span.thisMonth || span.thisYear) ? spanLeftText(span) : null;
+  const leftNow =
+    eff && span
+      ? within
+        ? eff.early
+          ? `the tenant may end the lease ${within}, as stated`
+          : `the lease ends ${within}, as stated`
+        : `${Math.round(span.yearsLeft * 12) < 1 ? "under a month" : yearsText(eff.yearsLeft)} left today${eff.early ? " to the tenant's early termination" : ""}`
+      : "";
   const traps: string[] = [];
   traps.push(
     r.guarantor
@@ -670,7 +687,7 @@ export function singleTenantNote(r: SingleTenantRead): string {
     eff && !eff.early && r.startsAtDelivery && r.term?.from === "remaining"
       ? `(b) THE TERM AT THE EXIT — ${statedCount(r.term)} as stated, counted from the lease's start, not today, since the building is not yet delivered: price the exit on the term a buyer will then be buying, and treat the renewal options as the tenant's, exercised only if the rent then suits it`
       : eff && span && endIsAhead(span)
-        ? `(b) THE TERM AT THE EXIT — ${Math.round(span.yearsLeft * 12) < 1 ? "under a month" : yearsText(eff.yearsLeft)} left today${eff.early ? " to the tenant's early termination" : ""}: price the exit on the term a buyer will then be buying, and treat the renewal options as the tenant's, exercised only if the rent then suits it`
+        ? `(b) THE TERM AT THE EXIT — ${leftNow}: price the exit on the term a buyer will then be buying, and treat the renewal options as the tenant's, exercised only if the rent then suits it`
         : "(b) THE TERM AT THE EXIT — the memorandum states no end the lease can be read to: ask for the lease's expiration, the options and any termination right before believing any exit",
   );
   traps.push("(c) DARK VALUE — what the building is worth empty, re-let at market rent after downtime, allowances and commissions: the downside a single tenant leaves, and rarely in the memorandum");

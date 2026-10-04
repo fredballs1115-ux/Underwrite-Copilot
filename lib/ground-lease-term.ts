@@ -15,7 +15,8 @@
 //      year is below, and said inside it as "this month", never "today".
 //   2. A STATED YEAR alone ("2071"), read as the year's FIRST day: the
 //      earliest end the year allows, so a leasehold is never credited with
-//      months the lease may not have.
+//      months the lease may not have — and said inside that year as "this
+//      year", never "today" on January 1 or passed before the year is out.
 //   3. YEARS REMAINING ("45 years"), counted from today — and said so, since
 //      the memorandum's own date is earlier than today and its count was
 //      true then.
@@ -29,7 +30,7 @@
 // read as one.
 
 import { parsePageNumber } from "@/lib/facts";
-import { monthsBetween, readStatedDate, sameMonth, yearsBetween } from "@/lib/note-yield";
+import { monthsBetween, readStatedDate, sameMonth, sameYear, yearsBetween } from "@/lib/note-yield";
 
 export type MetricRow = { label: string; value: string; page?: string };
 type Rows = { metrics?: MetricRow[]; totalPages?: number } | null | undefined;
@@ -55,6 +56,9 @@ export interface GroundLeaseTerm {
   /** stated as a month alone, and the reading's date falls in that month
    *  (`DatedSpan`) */
   thisMonth: boolean;
+  /** stated as a year alone, and the reading's date falls in that year
+   *  (`DatedSpan`) */
+  thisYear: boolean;
   /** the stated term already counts the extension options — a ceiling */
   includesOptions: boolean;
   /** the extension options as they parse: the years they add in all, and
@@ -261,6 +265,7 @@ export function readLeaseTerm(
     yearsLeft,
     yearsToTheDay,
     thisMonth: read.from === "month" && sameMonth(today, read.ends),
+    thisYear: read.from === "year" && sameYear(today, read.ends),
     includesOptions,
     options,
     optionsStated: optionsText,
@@ -290,17 +295,21 @@ export function yearsText(n: number): string {
  *  one of its days for the arithmetic, but the memorandum named none, so
  *  the end is neither past nor due "today" until the month is out — it
  *  comes "this month" (the audit of 2026-10-04: read as the month's last
- *  day, a lease stated "June 2027" ended "today" on June 30). */
-export type DatedSpan = { yearsLeft: number; yearsToTheDay: number; thisMonth?: boolean };
+ *  day, a lease stated "June 2027" ended "today" on June 30). `thisYear`
+ *  is the same for a year alone ("2071"), read inside that year: read as
+ *  its first day, a lease stated "2071" had ended "today" on January 1
+ *  and "passed" every other day of 2071 — it comes "this year". */
+export type DatedSpan = { yearsLeft: number; yearsToTheDay: number; thisMonth?: boolean; thisYear?: boolean };
 
 /** Whether an end has gone by: the day AFTER it, never inside its last
  *  month as whole months had it. Its own day is the term's last; an end
- *  stated as a month alone passes only once its month is out. */
-export const endHasPassed = (e: DatedSpan): boolean => !e.thisMonth && e.yearsToTheDay < 0;
+ *  stated as a month or a year alone passes only once that month or year
+ *  is out. */
+export const endHasPassed = (e: DatedSpan): boolean => !e.thisMonth && !e.thisYear && e.yearsToTheDay < 0;
 
 /** Whether an end is still ahead, its own day not yet come — or, stated as
- *  a month alone, its month not yet out. */
-export const endIsAhead = (e: DatedSpan): boolean => !!e.thisMonth || e.yearsToTheDay > 0;
+ *  a month or a year alone, that month or year not yet out. */
+export const endIsAhead = (e: DatedSpan): boolean => !!e.thisMonth || !!e.thisYear || e.yearsToTheDay > 0;
 
 /** Whether an end falls at or before a sale `hold` years on — to the day,
  *  so an end a week past the sale is never said to fall inside the hold. */
@@ -310,21 +319,23 @@ export const endsByYear = (e: DatedSpan, hold: number): boolean => e.yearsToTheD
  * How long is left, said beside an end's date: "45.3 years"; inside its
  * last month, where whole months count none and the tenths would print
  * "0 years", "under a month"; on its own day, "today"; inside the month an
- * end is stated as alone, "this month". An end that has passed is said as
- * passed, never through this.
+ * end is stated as alone, "this month", and inside the year an end is
+ * stated as alone, "this year". An end that has passed is said as passed,
+ * never through this.
  */
 export function leftText(e: DatedSpan): string {
   if (e.thisMonth) return "this month";
+  if (e.thisYear) return "this year";
   if (e.yearsToTheDay === 0) return "today";
   if (e.yearsToTheDay > 0 && Math.round(e.yearsLeft * 12) < 1) return "under a month";
   return yearsText(e.yearsLeft);
 }
 
 /** The same, after its date in a sentence: "45.3 years from today", "under
- *  a month from today", "today", "this month". */
+ *  a month from today", "today", "this month", "this year". */
 export function fromToday(e: DatedSpan): string {
   const left = leftText(e);
-  return left === "today" || left === "this month" ? left : `${left} from today`;
+  return left === "today" || left === "this month" || left === "this year" ? left : `${left} from today`;
 }
 
 /** The options, in a clause after the term: ", with extension options

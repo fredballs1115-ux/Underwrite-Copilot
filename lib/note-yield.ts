@@ -226,6 +226,10 @@ export function readStatedDate(
  *  end stated as a month alone, read inside that month. */
 export const sameMonth = (todayIso: string, endIso: string): boolean => todayIso.slice(0, 7) === endIso.slice(0, 7);
 
+/** Whether a reading's ISO day falls in the year of another ISO day — an
+ *  end stated as a year alone ("2071"), read inside that year. */
+export const sameYear = (todayIso: string, endIso: string): boolean => todayIso.slice(0, 4) === endIso.slice(0, 4);
+
 type MetricRows =
   | {
       metrics?: Array<{ label: string; value: string }>;
