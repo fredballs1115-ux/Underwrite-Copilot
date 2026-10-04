@@ -5899,6 +5899,569 @@
           "note": "Las Cruces, NM — Fredlyfish4, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 36819025201)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:14580",
+      "city": "Bozeman, Montana",
+      "area": "Bozeman, MT",
+      "wikipedia": [
+        "Bozeman, Montana",
+        "Bridger Range"
+      ],
+      "categories": [
+        "Views of Bozeman, Montana",
+        "Downtown Bozeman, Montana",
+        "Main Street (Bozeman, Montana)"
+      ],
+      "queries": [
+        "Bozeman Montana downtown",
+        "Bozeman Montana Main Street",
+        "Bozeman Montana Bridger Range"
+      ]
+    },
+    {
+      "metroId": "cbsa:33540",
+      "city": "Missoula, Montana",
+      "area": "Missoula, MT",
+      "wikipedia": [
+        "Missoula, Montana",
+        "Clark Fork River"
+      ],
+      "categories": [
+        "Views of Missoula, Montana",
+        "Downtown Missoula, Montana",
+        "Skylines of Missoula, Montana"
+      ],
+      "queries": [
+        "Missoula Montana downtown",
+        "Missoula Montana Clark Fork",
+        "Missoula Montana Mount Sentinel"
+      ]
+    },
+    {
+      "metroId": "cbsa:13740",
+      "city": "Billings, Montana",
+      "area": "Billings, MT",
+      "wikipedia": [
+        "Billings, Montana",
+        "Rimrocks (Billings, Montana)"
+      ],
+      "categories": [
+        "Views of Billings, Montana",
+        "Skylines of Billings, Montana",
+        "Downtown Billings, Montana"
+      ],
+      "queries": [
+        "Billings Montana skyline",
+        "Billings Montana downtown",
+        "Billings Montana Rimrocks"
+      ]
+    },
+    {
+      "metroId": "cbsa:17660",
+      "city": "Coeur d'Alene, Idaho",
+      "area": "Coeur d'Alene, ID",
+      "wikipedia": [
+        "Coeur d'Alene, Idaho",
+        "Lake Coeur d'Alene"
+      ],
+      "categories": [
+        "Views of Coeur d'Alene, Idaho",
+        "Lake Coeur d'Alene",
+        "Coeur d'Alene Resort"
+      ],
+      "queries": [
+        "Coeur d'Alene Idaho lake",
+        "Coeur d'Alene Idaho downtown",
+        "Coeur d'Alene Idaho waterfront"
+      ]
+    },
+    {
+      "metroId": "cbsa:22380",
+      "city": "Flagstaff, Arizona",
+      "area": "Flagstaff, AZ",
+      "wikipedia": [
+        "Flagstaff, Arizona",
+        "San Francisco Peaks"
+      ],
+      "categories": [
+        "Views of Flagstaff, Arizona",
+        "Downtown Flagstaff, Arizona",
+        "U.S. Route 66 in Flagstaff, Arizona"
+      ],
+      "queries": [
+        "Flagstaff Arizona downtown",
+        "Flagstaff Arizona San Francisco Peaks",
+        "Flagstaff Arizona Route 66"
+      ]
+    },
+    {
+      "metroId": "cbsa:24300",
+      "city": "Grand Junction, Colorado",
+      "area": "Grand Junction, CO",
+      "wikipedia": [
+        "Grand Junction, Colorado",
+        "Colorado National Monument"
+      ],
+      "categories": [
+        "Views of Grand Junction, Colorado",
+        "Downtown Grand Junction, Colorado"
+      ],
+      "queries": [
+        "Grand Junction Colorado downtown",
+        "Grand Junction Colorado Book Cliffs",
+        "Grand Junction Colorado Main Street"
+      ]
+    },
+    {
+      "metroId": "cbsa:48680",
+      "city": "The Villages, Florida",
+      "area": "Wildwood-The Villages, FL",
+      "wikipedia": [
+        "The Villages, Florida",
+        "Wildwood, Florida"
+      ],
+      "categories": [
+        "The Villages, Florida",
+        "Lake Sumter Landing"
+      ],
+      "queries": [
+        "The Villages Florida town square",
+        "The Villages Florida",
+        "Lake Sumter Landing"
+      ]
+    },
+    {
+      "metroId": "cbsa:42680",
+      "city": "Vero Beach, Florida",
+      "area": "Sebastian-Vero Beach-West Vero Corridor, FL",
+      "wikipedia": [
+        "Vero Beach, Florida",
+        "Sebastian, Florida",
+        "Indian River Lagoon"
+      ],
+      "categories": [
+        "Vero Beach, Florida",
+        "Beaches of Indian River County, Florida",
+        "Sebastian Inlet State Park"
+      ],
+      "queries": [
+        "Vero Beach Florida beach",
+        "Vero Beach Florida ocean",
+        "Sebastian Inlet Florida"
+      ]
+    },
+    {
+      "metroId": "cbsa:12220",
+      "city": "Auburn, Alabama",
+      "area": "Auburn-Opelika, AL",
+      "wikipedia": [
+        "Auburn, Alabama",
+        "Toomer's Corner",
+        "Opelika, Alabama"
+      ],
+      "categories": [
+        "Auburn, Alabama",
+        "Toomer's Corner",
+        "Samford Hall"
+      ],
+      "queries": [
+        "Auburn Alabama Samford Hall",
+        "Auburn Alabama downtown",
+        "Opelika Alabama downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:27740",
+      "city": "Johnson City, Tennessee",
+      "area": "Johnson City, TN",
+      "wikipedia": [
+        "Johnson City, Tennessee",
+        "Buffalo Mountain (Tennessee)"
+      ],
+      "categories": [
+        "Views of Johnson City, Tennessee",
+        "Downtown Johnson City, Tennessee"
+      ],
+      "queries": [
+        "Johnson City Tennessee downtown",
+        "Johnson City Tennessee skyline",
+        "Johnson City Tennessee mountains"
+      ]
+    },
+    {
+      "metroId": "cbsa:14540",
+      "city": "Bowling Green, Kentucky",
+      "area": "Bowling Green, KY",
+      "wikipedia": [
+        "Bowling Green, Kentucky",
+        "Fountain Square Park (Bowling Green, Kentucky)"
+      ],
+      "categories": [
+        "Views of Bowling Green, Kentucky",
+        "Downtown Bowling Green, Kentucky",
+        "Fountain Square Park (Bowling Green, Kentucky)"
+      ],
+      "queries": [
+        "Bowling Green Kentucky downtown",
+        "Bowling Green Kentucky Fountain Square",
+        "Bowling Green Kentucky skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:25620",
+      "city": "Hattiesburg, Mississippi",
+      "area": "Hattiesburg, MS",
+      "wikipedia": [
+        "Hattiesburg, Mississippi"
+      ],
+      "categories": [
+        "Views of Hattiesburg, Mississippi",
+        "Downtown Hattiesburg, Mississippi"
+      ],
+      "queries": [
+        "Hattiesburg Mississippi downtown",
+        "Hattiesburg Mississippi skyline",
+        "Hattiesburg Mississippi"
+      ]
+    },
+    {
+      "metroId": "cbsa:26980",
+      "city": "Iowa City, Iowa",
+      "area": "Iowa City, IA",
+      "wikipedia": [
+        "Iowa City, Iowa",
+        "Old Capitol (Iowa)"
+      ],
+      "categories": [
+        "Views of Iowa City, Iowa",
+        "Downtown Iowa City, Iowa",
+        "Old Capitol (Iowa)"
+      ],
+      "queries": [
+        "Iowa City downtown",
+        "Iowa City Old Capitol",
+        "Iowa City Iowa River"
+      ]
+    },
+    {
+      "metroId": "cbsa:17860",
+      "city": "Columbia, Missouri",
+      "area": "Columbia, MO",
+      "wikipedia": [
+        "Columbia, Missouri",
+        "Francis Quadrangle"
+      ],
+      "categories": [
+        "Views of Columbia, Missouri",
+        "Downtown Columbia, Missouri",
+        "Francis Quadrangle"
+      ],
+      "queries": [
+        "Columbia Missouri downtown",
+        "Columbia Missouri skyline",
+        "Francis Quadrangle columns"
+      ]
+    },
+    {
+      "metroId": "cbsa:29940",
+      "city": "Lawrence, Kansas",
+      "area": "Lawrence, KS",
+      "wikipedia": [
+        "Lawrence, Kansas",
+        "Massachusetts Street (Lawrence, Kansas)"
+      ],
+      "categories": [
+        "Views of Lawrence, Kansas",
+        "Downtown Lawrence, Kansas",
+        "Massachusetts Street (Lawrence, Kansas)"
+      ],
+      "queries": [
+        "Lawrence Kansas downtown",
+        "Lawrence Kansas Massachusetts Street",
+        "Lawrence Kansas skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:14020",
+      "city": "Bloomington, Indiana",
+      "area": "Bloomington, IN",
+      "wikipedia": [
+        "Bloomington, Indiana",
+        "Monroe County Courthouse (Indiana)"
+      ],
+      "categories": [
+        "Views of Bloomington, Indiana",
+        "Downtown Bloomington, Indiana",
+        "Monroe County Courthouse (Indiana)"
+      ],
+      "queries": [
+        "Bloomington Indiana downtown",
+        "Bloomington Indiana courthouse square",
+        "Bloomington Indiana skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:27060",
+      "city": "Ithaca, New York",
+      "area": "Ithaca, NY",
+      "wikipedia": [
+        "Ithaca, New York",
+        "Cayuga Lake",
+        "Ithaca Falls"
+      ],
+      "categories": [
+        "Views of Ithaca, New York",
+        "Ithaca Commons",
+        "Ithaca Falls"
+      ],
+      "queries": [
+        "Ithaca New York Cayuga Lake",
+        "Ithaca New York downtown",
+        "Ithaca New York gorge"
+      ]
+    },
+    {
+      "metroId": "cbsa:45900",
+      "city": "Traverse City, Michigan",
+      "area": "Traverse City, MI",
+      "wikipedia": [
+        "Traverse City, Michigan",
+        "Grand Traverse Bay"
+      ],
+      "categories": [
+        "Views of Traverse City, Michigan",
+        "Downtown Traverse City, Michigan",
+        "Grand Traverse Bay"
+      ],
+      "queries": [
+        "Traverse City Michigan bay",
+        "Traverse City Michigan downtown",
+        "Traverse City Front Street"
+      ]
+    },
+    {
+      "metroId": "cbsa:39660",
+      "city": "Rapid City, South Dakota",
+      "area": "Rapid City, SD",
+      "wikipedia": [
+        "Rapid City, South Dakota",
+        "Black Hills"
+      ],
+      "categories": [
+        "Views of Rapid City, South Dakota",
+        "Downtown Rapid City, South Dakota",
+        "Skylines of Rapid City, South Dakota"
+      ],
+      "queries": [
+        "Rapid City South Dakota downtown",
+        "Rapid City South Dakota skyline",
+        "Rapid City South Dakota Main Street"
+      ]
+    },
+    {
+      "metroId": "cbsa:13900",
+      "city": "Bismarck, North Dakota",
+      "area": "Bismarck, ND",
+      "wikipedia": [
+        "Bismarck, North Dakota",
+        "North Dakota State Capitol"
+      ],
+      "categories": [
+        "Views of Bismarck, North Dakota",
+        "North Dakota State Capitol",
+        "Downtown Bismarck, North Dakota"
+      ],
+      "queries": [
+        "Bismarck North Dakota capitol",
+        "Bismarck North Dakota downtown",
+        "Bismarck North Dakota skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:16940",
+      "city": "Cheyenne, Wyoming",
+      "area": "Cheyenne, WY",
+      "wikipedia": [
+        "Cheyenne, Wyoming",
+        "Wyoming State Capitol"
+      ],
+      "categories": [
+        "Views of Cheyenne, Wyoming",
+        "Wyoming State Capitol",
+        "Downtown Cheyenne, Wyoming"
+      ],
+      "queries": [
+        "Cheyenne Wyoming capitol",
+        "Cheyenne Wyoming downtown",
+        "Cheyenne Wyoming depot"
+      ]
+    },
+    {
+      "metroId": "cbsa:30860",
+      "city": "Logan, Utah",
+      "area": "Logan, UT-ID",
+      "wikipedia": [
+        "Logan, Utah",
+        "Cache Valley"
+      ],
+      "categories": [
+        "Views of Logan, Utah",
+        "Logan Utah Temple",
+        "Cache Valley"
+      ],
+      "queries": [
+        "Logan Utah Cache Valley",
+        "Logan Utah downtown",
+        "Logan Utah mountains"
+      ]
+    },
+    {
+      "metroId": "cbsa:39820",
+      "city": "Redding, California",
+      "area": "Redding, CA",
+      "wikipedia": [
+        "Redding, California",
+        "Sundial Bridge"
+      ],
+      "categories": [
+        "Sundial Bridge",
+        "Views of Redding, California"
+      ],
+      "queries": [
+        "Redding California Sundial Bridge",
+        "Redding California downtown",
+        "Redding California Sacramento River"
+      ]
+    },
+    {
+      "metroId": "cbsa:26820",
+      "city": "Idaho Falls, Idaho",
+      "area": "Idaho Falls, ID",
+      "wikipedia": [
+        "Idaho Falls, Idaho"
+      ],
+      "categories": [
+        "Views of Idaho Falls, Idaho",
+        "Snake River in Idaho Falls"
+      ],
+      "queries": [
+        "Idaho Falls Snake River falls",
+        "Idaho Falls downtown",
+        "Idaho Falls greenbelt"
+      ]
+    },
+    {
+      "metroId": "cbsa:41540",
+      "city": "Salisbury, Maryland",
+      "area": "Salisbury, MD",
+      "wikipedia": [
+        "Salisbury, Maryland",
+        "Wicomico River"
+      ],
+      "categories": [
+        "Views of Salisbury, Maryland",
+        "Downtown Salisbury, Maryland"
+      ],
+      "queries": [
+        "Salisbury Maryland downtown",
+        "Salisbury Maryland river",
+        "Salisbury Maryland"
+      ]
+    },
+    {
+      "metroId": "cbsa:49020",
+      "city": "Winchester, Virginia",
+      "area": "Winchester, VA-WV",
+      "wikipedia": [
+        "Winchester, Virginia",
+        "Old Town Winchester Historic District"
+      ],
+      "categories": [
+        "Views of Winchester, Virginia",
+        "Old Town Winchester Historic District",
+        "Loudoun Street Mall"
+      ],
+      "queries": [
+        "Winchester Virginia Old Town",
+        "Winchester Virginia downtown",
+        "Winchester Virginia walking mall"
+      ]
+    },
+    {
+      "metroId": "cbsa:25500",
+      "city": "Harrisonburg, Virginia",
+      "area": "Harrisonburg, VA",
+      "wikipedia": [
+        "Harrisonburg, Virginia",
+        "Shenandoah Valley"
+      ],
+      "categories": [
+        "Views of Harrisonburg, Virginia",
+        "Downtown Harrisonburg, Virginia"
+      ],
+      "queries": [
+        "Harrisonburg Virginia downtown",
+        "Harrisonburg Virginia skyline",
+        "Harrisonburg Virginia Shenandoah Valley"
+      ]
+    },
+    {
+      "metroId": "cbsa:34060",
+      "city": "Morgantown, West Virginia",
+      "area": "Morgantown, WV",
+      "wikipedia": [
+        "Morgantown, West Virginia",
+        "Monongahela River"
+      ],
+      "categories": [
+        "Views of Morgantown, West Virginia",
+        "Downtown Morgantown, West Virginia",
+        "Skylines of Morgantown, West Virginia"
+      ],
+      "queries": [
+        "Morgantown West Virginia skyline",
+        "Morgantown West Virginia downtown",
+        "Morgantown West Virginia Monongahela River"
+      ]
+    },
+    {
+      "metroId": "cbsa:20100",
+      "city": "Dover, Delaware",
+      "area": "Dover, DE",
+      "wikipedia": [
+        "Dover, Delaware",
+        "Legislative Hall (Delaware)"
+      ],
+      "categories": [
+        "Views of Dover, Delaware",
+        "Downtown Dover, Delaware",
+        "The Green (Dover, Delaware)"
+      ],
+      "queries": [
+        "Dover Delaware Green",
+        "Dover Delaware downtown",
+        "Dover Delaware Legislative Hall"
+      ]
+    },
+    {
+      "metroId": "cbsa:38340",
+      "city": "Pittsfield, Massachusetts",
+      "area": "Pittsfield, MA",
+      "wikipedia": [
+        "Pittsfield, Massachusetts",
+        "The Berkshires"
+      ],
+      "categories": [
+        "Views of Pittsfield, Massachusetts",
+        "Downtown Pittsfield, Massachusetts",
+        "Park Square (Pittsfield, Massachusetts)"
+      ],
+      "queries": [
+        "Pittsfield Massachusetts downtown",
+        "Pittsfield Massachusetts Park Square",
+        "Pittsfield Massachusetts Berkshires"
+      ]
     }
   ]
 }
