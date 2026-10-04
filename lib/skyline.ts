@@ -894,6 +894,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Des Moines, IA",
     size: [2450, 1544],
   },
+  // Duluth, MN: skyline-sheet run 36818844258 — the lift bridge the city is known by, at dusk, its truss across the frame, sharp and whole at the top in both crops; over a drone frame of the canal's piers and the bridge under a flat grey overcast, downtown above the freeway's direction signs, two black-and-white plates, sled dogs and a rock cut. The runner printed the author as "Mfield , Matthew Field, http://www.photography.mattfield.com"; the file page's own Author field is the same, with no attribution template and an empty permission (zori probe_url run 37234876098); the credit is the name in it.
+  "cbsa:20260": {
+    file: "Aerial lift bridge duluth mn.jpg",
+    place: "Duluth's Aerial Lift Bridge at dusk, its span lowered over the canal",
+    credit: "Matthew Field",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Duluth, MN",
+    size: [2000, 920],
+  },
   // Durham, NC: skyline-sheet run 36782967654 — the skyline panorama, over the transit station, a highway and a night view.
   "cbsa:20500": {
     file: "Skyline Panorama of Durham, North Carolina.jpg",
