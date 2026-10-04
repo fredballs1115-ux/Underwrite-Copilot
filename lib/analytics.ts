@@ -11,7 +11,7 @@ import {
 import { interestOf } from "@/lib/interest";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { normalizeStage, type Stage } from "@/lib/stages";
+import { isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
 
 /**
  * Portfolio analytics: every screened deal leaves extracted figures behind —
@@ -134,6 +134,31 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
   }
   // Oldest → newest, so time charts read left to right.
   return out.sort((a, b) => a.at.localeCompare(b.at));
+}
+
+/** Where the screened deals stand: live — still in play, on the ladder
+ *  short of Closed (lib/stages `isOpenStage`, the digest's and the meeting
+ *  workbook's rule) — closed, and dead. A closed deal is neither live nor
+ *  dead: the headline tile had counted it live. */
+export interface StageCounts {
+  live: number;
+  closed: number;
+  dead: number;
+}
+
+export function stageCounts(deals: readonly Pick<AnalyticsDeal, "stage">[]): StageCounts {
+  const out: StageCounts = { live: 0, closed: 0, dead: 0 };
+  for (const d of deals) {
+    if (isOpenStage(d.stage)) out.live++;
+    else if (d.stage === "closed") out.closed++;
+    else out.dead++;
+  }
+  return out;
+}
+
+/** "5 live · 2 closed · 3 dead" — the closed said only where a deal is. */
+export function stageCountLine(c: StageCounts): string {
+  return [`${c.live} live`, ...(c.closed > 0 ? [`${c.closed} closed`] : []), `${c.dead} dead`].join(" · ");
 }
 
 export function median(values: number[]): number | null {

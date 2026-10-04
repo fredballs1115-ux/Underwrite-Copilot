@@ -1,7 +1,7 @@
 import "server-only";
 import ExcelJS from "exceljs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
-import { STAGES, STAGE_LABEL, normalizeStage, type Stage } from "@/lib/stages";
+import { STAGES, STAGE_LABEL, isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
 import { assetClassLabel } from "@/lib/asset-class";
 import { parsePct, parsePrice, priceRange } from "@/lib/criteria";
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
@@ -427,14 +427,17 @@ export async function buildPipelineWorkbook(
   sum.getCell(`F${vr}`).value = rows.filter((d) => !d.verdict).length;
   sum.getCell(`F${vr}`).font = { size: 10, bold: true, color: { argb: INK } };
 
-  // Live-pipeline value: sum of parsed asking prices, dead excluded.
-  const live = rows.filter((d) => normalizeStage(d.stage) !== "dead");
+  // Live-pipeline value: sum of parsed asking prices over the deals still in
+  // play (lib/stages `isOpenStage`, the digest's rule). A closed deal is
+  // neither live nor dead — it had been counted live here and its price
+  // added to the asking value — and the By-stage table above counts it.
+  const live = rows.filter((d) => isOpenStage(normalizeStage(d.stage)));
   const prices = live
     .map((d) => (d.price ? parsePrice(d.price) : null))
     .filter((n): n is number => n != null && n > 0);
   const totalRow = r + 1;
   header(`B${totalRow}`, "Live pipeline");
-  sum.getCell(`B${totalRow + 1}`).value = "Deals (Dead excluded)";
+  sum.getCell(`B${totalRow + 1}`).value = "Deals (Closed and Dead excluded)";
   sum.getCell(`B${totalRow + 1}`).font = { size: 10, color: { argb: INK } };
   sum.getCell(`C${totalRow + 1}`).value = live.length;
   sum.getCell(`C${totalRow + 1}`).font = { size: 10, bold: true, color: { argb: INK } };

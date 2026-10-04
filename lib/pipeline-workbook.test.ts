@@ -181,6 +181,32 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(cfs).toEqual([]);
   });
 
+  it("the live pipeline is the deals still in play: a closed deal is neither live nor dead", async () => {
+    const sum = (
+      await load([
+        STABILIZED,
+        { ...STABILIZED, name: "Closed deal", stage: "closed", price: "$30,000,000" },
+        { ...CONVERSION, name: "Closed conversion", stage: "closed" },
+        { ...STABILIZED, name: "Dead deal", stage: "dead", price: "$10,000,000" },
+      ])
+    ).getWorksheet("Summary")!;
+    const byLabel = new Map<string, unknown>();
+    sum.eachRow((row) => {
+      const label = row.getCell(2).value;
+      if (typeof label === "string") byLabel.set(label, row.getCell(3).value);
+    });
+    expect(byLabel.get("Deals (Closed and Dead excluded)")).toBe(1);
+    // The asking value is the one open deal's, never the closed deals' too.
+    const asking = [...byLabel.keys()].filter((l) => l.startsWith("Asking value"));
+    expect(asking).toEqual(["Asking value (1 with a stated price)"]);
+    expect(byLabel.get(asking[0])).toBe(50_000_000);
+    // A closed plan deal is no live plan deal.
+    expect(byLabel.get("Plan deals (judged on yield on cost)")).toBe(0);
+    // The stage table still counts the closed, under their own name.
+    expect(byLabel.get("Closed")).toBe(2);
+    expect(byLabel.get("Dead")).toBe(1);
+  });
+
   it("the summary counts the live plan deals, dead ones excluded", async () => {
     const sum = (
       await load([STABILIZED, CONVERSION, { ...CONVERSION, name: "Dead conversion", stage: "dead" }])

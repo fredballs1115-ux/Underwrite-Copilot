@@ -7,9 +7,13 @@ import {
   middleRead,
   middleText,
   parsedPhrase,
+  stageCountLine,
+  stageCounts,
   type AnalyticsRow,
 } from "./analytics";
 import { MEDIAN_FLOOR } from "./public-comps/core";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const metric = (label: string, value: string): ExtractedMetric => ({
   label,
@@ -221,5 +225,30 @@ describe("middleRead — a median needs three figures (the site's MEDIAN_FLOOR)"
     expect(parsedPhrase(1)).toBe("the one deal that parsed");
     expect(parsedPhrase(2)).toBe("the two deals that parsed");
     expect(parsedPhrase(7)).toBe("7 deals parsed");
+  });
+});
+
+describe("stageCounts — a closed deal is neither live nor dead", () => {
+  it("counts the deals still in play as live, the closed as closed, the dead as dead", () => {
+    const deals = deriveAnalytics([
+      row("1", "Maddox", STABILIZED),
+      row("2", "Harbor View", STABILIZED, { stage: "under_contract" }),
+      row("3", "Elm Street Lofts", STABILIZED, { stage: "closed" }),
+      row("4", "Tysons Plaza", STABILIZED, { stage: "dead" }),
+      // A legacy stage folds onto the ladder (lib/stages) and is in play.
+      row("5", "Old row", STABILIZED, { stage: "pursuing" }),
+    ]);
+    expect(stageCounts(deals)).toEqual({ live: 3, closed: 1, dead: 1 });
+    expect(stageCountLine(stageCounts(deals))).toBe("3 live · 1 closed · 1 dead");
+    // No closed deal, no closed count.
+    expect(stageCountLine({ live: 4, closed: 0, dead: 2 })).toBe("4 live · 2 dead");
+    expect(stageCountLine(stageCounts([]))).toBe("0 live · 0 dead");
+  });
+
+  it("the analytics page prints its tile and its funnel's caption through them, never its own live filter", () => {
+    const page = readFileSync(join(__dirname, "..", "app/(app)/analytics/page.tsx"), "utf8");
+    expect(page).toContain("stageCountLine(counts)");
+    expect(page).toContain("stageCounts(deals)");
+    expect(page).not.toMatch(/stage\s*!==\s*"dead"/);
   });
 });

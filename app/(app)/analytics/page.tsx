@@ -8,6 +8,8 @@ import {
   middleRead,
   middleText,
   parsedPhrase,
+  stageCountLine,
+  stageCounts,
   type AnalyticsRow,
   type MiddleRead,
 } from "@/lib/analytics";
@@ -67,7 +69,9 @@ export default async function AnalyticsPage() {
     return `${counted}, ${yocValues.length} with a yield on cost${figure}`;
   })();
 
-  const live = deals.filter((d) => d.stage !== "dead");
+  // Live is still in play (lib/analytics `stageCounts`, through lib/stages
+  // `isOpenStage`): a closed deal is counted as closed, never live.
+  const counts = stageCounts(deals);
   const decided = deals.filter((d) => d.verdict !== null);
   const goRate =
     decided.length > 0
@@ -82,7 +86,6 @@ export default async function AnalyticsPage() {
       count: deals.filter((d) => normalizeStage(d.stage) === s).length,
     }))
     .filter((r) => r.count > 0);
-  const deadCount = deals.length - live.length;
 
   // Markets table — the durable "table view" behind the charts.
   const byMarket = new Map<string, typeof deals>();
@@ -134,7 +137,7 @@ export default async function AnalyticsPage() {
           {/* Headline tiles — numbers, not charts. */}
           <section className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             {[
-              { label: "Deals screened", value: String(deals.length), sub: `${live.length} live · ${deadCount} dead` },
+              { label: "Deals screened", value: String(deals.length), sub: stageCountLine(counts) },
               {
                 label: capRead.kind === "median" ? "Median going-in cap" : "Going-in cap",
                 value: middleText(capRead, pct) ?? "—",
@@ -216,7 +219,9 @@ export default async function AnalyticsPage() {
                   Pipeline by stage
                 </h2>
                 <p className="mb-3 mt-0.5 text-xs text-muted">
-                  Live deals in ladder order{deadCount > 0 ? ` — ${deadCount} dead not shown` : ""}.
+                  {`${counts.closed > 0 ? "Live deals in ladder order, then the closed" : "Live deals in ladder order"}${
+                    counts.dead > 0 ? ` — ${counts.dead} dead not shown` : ""
+                  }.`}
                 </p>
                 <StageFunnel rows={funnel} />
               </div>
