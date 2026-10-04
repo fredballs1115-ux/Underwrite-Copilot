@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import metrosSeed from "@/data/research/metros.json";
@@ -39,6 +39,13 @@ describe("the covered markets' research facts, each figure with its own period",
   });
 
   it("a figure whose period the file does not state is undated; an FMR says its year; no figure, no credit", () => {
+    // Read on a pinned day: a fair market rent is shown only while its year
+    // is in force (lib/fmr `fmrWhen`), and metroFact reads today off the
+    // clock — FY2027's ends Sep 30, 2027 and FY2028's a year later.
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 1)), toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
     expect(metroFact({ sector_snapshot: { office: { vacancy_pct: 12.5 } }, rule_ids: ["a"] }, 0)).toEqual({
       text: "Office 12.5% vac (undated) · 1 rule on file",
       cite: "Vacancy: publisher not recorded, undated",

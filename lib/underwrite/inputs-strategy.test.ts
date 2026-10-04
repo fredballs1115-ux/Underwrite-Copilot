@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
@@ -555,8 +555,15 @@ describe("deriveUnderwriteInputs — an auction's starting bid is where the pric
 });
 
 describe("deriveUnderwriteInputs — a multi-tenant property's listed tenants (#457)", () => {
-  // Years counted from the day the test runs, so the roll never moves with it.
-  const y = new Date().getUTCFullYear();
+  // Read on a pinned day: the model reads the roster off the clock, and a
+  // test counting years from the real one failed every December 2–31.
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const y = 2026;
   const t = (name: string, over: Record<string, string>) => ({
     name, role: "inline" as const, inSale: "yes" as const, sf: "", rent: "", leaseExpiration: "", options: "", earlyTermination: "", rights: "", page: "", ...over,
   });
