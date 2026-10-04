@@ -411,7 +411,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   read says the lease outlasts the hold whenever the building is
   delivered, or, for a term shorter than the hold, ends inside it only if
   the building is delivered within the difference (`runsPastSale`, the
-  one question the panel and the read ask). The model is NOT changed:
+  one question the panel and the read ask). A stated early-termination
+  date stands beside a term counted from delivery, which has no end to
+  set it against, and is then the lease's end; a count that includes the
+  renewal options is a ceiling, tagged and drawn "up to" (`LeaseTermBar`'s
+  `ceiling`, a ground lease's term too) and never said to outlast the hold
+  (the second pre-merge audit). The model is NOT changed:
   `singleTenantModelLine` says the years left at its sale (or the lease
   ending inside its hold, with its vacancy "a market's allowance, not a
   single tenant's all-or-nothing") and the lease's increases against its
@@ -1132,11 +1137,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   warehouse as self-storage). Apartments over shops ("Retail/Residential")
   are mixed-use, an RV resort is a park, a lab or life-science building is
   an office, and "Apartments" alone is multifamily (research pass 23); a
-  resort is lodging only where the phrase names no homes or counts its
-  keys, so "Resort-style apartments" is multifamily and "Resort with 200
-  units" is no class at all (a hotel, a motel, lodging, hospitality or a
-  short-term rental is lodging whatever else the phrase names); a
-  re-filed deal runs on its class's existing defaults. A lab, a yard or a
+  resort is lodging only where, its "-style" words set aside, the phrase
+  names no homes in any housing rule's own words, or names a resort's
+  suites, villas or rental program, or counts its keys — so
+  "Resort-style apartments" and "Resort-style assisted living" are
+  housing, "All-suite resort with apartment-style units" is a hotel and
+  "Resort with 200 units" is no class at all (a hotel, a motel, lodging,
+  hospitality or a short-term or vacation rental is lodging whatever else
+  the phrase names). An active-adult or 55+ community sells no care, so
+  it is rental housing the rent rules reach, never senior housing; a
+  land-lease community is a park; a truck terminal, a truck yard and a
+  storage yard are industrial yards (the second pre-merge audit and
+  research pass 28). A re-filed deal runs on its class's existing
+  defaults. A lab, a yard or a
   cold-storage building reads no lessor rent index (`ownMarketBuilding`,
   the tracker's own predicate), and the challenger's class traps gain lists
   for a cannabis tenant, a special-purpose conversion, a lab and cold
@@ -1436,8 +1449,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Falls, Logan (the 21:9 cuts the summit), Redding (the Sundial Bridge's
   pylon lost at 21:9), Salisbury and Harrisonburg, so each keeps the
   drawn cover too. A one-state title is mostly kept whole (the card
-  truncates a long one and the deal page shows it in full); a few were
-  cut to their first city. A two-state title is cut to
+  truncates a long one and the deal page shows it in full); 35 of the 152
+  are cut, most to their first city, three to the city the place is known
+  by (Fort Myers, Daytona Beach, Sarasota) and two to the city's everyday
+  name (Boise, Honolulu). A two-state title is cut to
   its first city and state ("Memphis, TN", "Augusta, GA"), the table's
   own precedent, so a card's name passes the test's one-state pattern. A search result can
   be another city entirely (Los Angeles under Colorado Springs, Buffalo
@@ -2839,7 +2854,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   are reported with the binding one named (`sizeLoan`'s convention), boot
   is taxed recapture-first at the higher rate, and `exchangeClock` draws
   the 45 and the 180 from the SAME day — capped by the return's due date,
-  which costs a Q4 closing real weeks unless an extension is filed.
+  which costs a Q4 closing real weeks unless an extension is filed. A
+  partnership's or an S corporation's calendar-year return is due March
+  15, a month before an individual's, so the card says that date wherever
+  it cuts the window (`entityCutShort`, research pass 28): the card does
+  not ask who sells.
 - What the tenant actually owes: `lib/tools/expense-recovery.ts` (pure —
   the operating-expense reconciliation). Three rules, and the first is the
   one that moves the most money. **Gross up BOTH years, or neither** —
@@ -4809,9 +4828,12 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   says their median ("Your screens usually take about 3 minutes") from
   each ledger's `wallMs` — the run's own time, start to finish, which
   `runAnalysis` writes beside the ledger; never the ledger's `ms`, which
-  sums the model calls alone; neither does the homepage, whose FAQ says
-  what a screen does and in what order, never how long
-  (lib/marketing-constants keeps no timing claim). While a first screen has not yet written the
+  sums the model calls alone; and no public page promises one: the
+  homepage's FAQ says what a screen does and in what order, never how
+  long, and the homepage's lead, the sign-in page and /why, which said "in
+  minutes", say what happens (lib/screen-duration.test.ts reads six public
+  pages for any promise of minutes or seconds; lib/marketing-constants
+  keeps no timing claim). While a first screen has not yet written the
   terms, an empty figure on the deal header, the pipeline card and the list
   row is a quiet shimmer named "Reading the memorandum"
   (`lib/screen-reading.ts` `readingMemorandum`), never the dash a finished
@@ -4824,12 +4846,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   its verdict (`lib/onboarding.ts`), and a typed ⌘K query searches every
   deal by name on the server (`lib/palette-search.ts`, an escaped `ilike`).
   A closed deal is counted as closed, never live (`isOpenStage` in
-  lib/stages): the analytics tile and the funnel's caption read "3 live ·
-  1 closed · 1 dead" (`stageCounts`, `stageCountLine` in lib/analytics),
-  and the meeting workbook's live block counts the deals still in play,
-  its asking value and plan count theirs. A blank or unparsed price, cap
-  or fit sorts last whichever way the list runs (`pipelineSortValue` in
-  lib/pipeline-sort), as a deal with no offers-due date does. The deal
+  lib/stages): the analytics tile reads "3 live · 1 closed · 1 dead"
+  (`stageCounts`, `stageCountLine` in lib/analytics), the funnel's caption
+  "Live deals in ladder order, then the closed — 1 dead not shown", and
+  the meeting workbook's live block counts the deals still in play, its
+  asking value and plan count theirs. A blank or unparsed price, cap or
+  fit sorts last whichever way the list runs (`pipelineSortValue` in
+  lib/pipeline-sort), as a deal with no offers-due date does, and the Cap
+  column sorts the figure it draws: the cap, else a plan deal's yield on
+  cost, else a note's yield to maturity. The deal
   page's "From your past screens" strip says its cap and basis ranges
   are "at the ask": each is struck on a memorandum's asking price, never
   a price anyone paid.

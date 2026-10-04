@@ -110,8 +110,28 @@ way in this batch):
   $0.50 to $0.25 a foot, 550 to 850 SF a unit and a 325 to a 200 bps
   spread. A phrase that names a resort and units and nothing else
   ("Resort with 200 units") is now filed as no class, on the generic
-  defaults, since it may be either. Say if you would rather a re-filing
-  waited for you.
+  defaults, since it may be either. Then the second pre-merge audit and
+  research pass 28 re-filed more:
+  - a resort named by a senior community's words ("Resort-style assisted
+    living", "… CCRC") moves from a hotel to senior housing: 65% to 68%
+    expenses, 32% to 12% vacancy, the reserve from $0.50 to $0.30 a foot,
+    550 to 600 SF a unit and a 325 to a 275 bps spread; a resort-style
+    park ("Resort-style MHC") from a hotel to a park, as the RV resort
+    above; "Resort-style rental homes" from a hotel to single-family
+    rentals, 65% to 38% expenses, 32% to 6% vacancy, $0.50 to $0.30, 550
+    to 1,600 SF a unit and 325 to 225 bps;
+  - an active-adult or 55+ community, which sells no care, files as
+    apartments (it had read as no class), with "Apartments" alone's deltas
+    above — and its rent rules now reach it;
+  - a land-lease community (residents own the homes, rent the land) moves
+    from land, which the model runs as non-operating, to a park: it now has
+    an NOI, a cap and a loan;
+  - a truck terminal or truck yard moves from no class to industrial, 40%
+    to 28% expenses, 7% to 5% vacancy, $0.20 to $0.15 and 250 to 225 bps;
+    a "Storage yard" from self-storage to industrial, 35% to 28%, 12% to
+    5% and 250 to 225 bps, with no unit size.
+
+  Say if you would rather a re-filing waited for you.
 
 **Your call — larger changes held for your permission:**
 - **Model math:**
@@ -132,8 +152,11 @@ way in this batch):
     cap, and 1.15 at 5.0%, below the 1.25 the page's own debt sizer
     starts from, so a deal bought under about a 5.45% cap is given a
     levered return on a loan a lender would size smaller (research pass
-    27, measured on the engine). Sizing the loan by coverage would change
-    those returns;
+    27, measured on the engine). The line moves with the rate: a live
+    deal's loan is seeded at the index plus its class's spread, and at
+    6.50% the 1.25 line is a 5.75% cap, at 6.78% (4.78% plus 200 bps) a
+    5.91% cap (the second pre-merge audit, on the engine). Sizing the loan
+    by coverage would change those returns;
   - expense growth could come from the 5-year breakeven inflation rate;
   - plan deals could price on SOFR plus a construction spread;
   - a hotel's reserve could be 4% of revenue;
