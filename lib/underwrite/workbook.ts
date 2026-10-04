@@ -669,26 +669,26 @@ function buildAssumptions(
     sc.value = `${said}Fixed: the Cash Flow tab's years and the sale year are built for this hold, so typing over it recalculates only part of the model.`;
     sc.font = { name: ARIAL, size: 9, color: provColor(sources.holdMonths?.provenance) };
   }
+  // A default of none says so in its SOURCE (lib/underwrite/inputs marks
+  // each zero), so no $0 here reads as a figure a document stated.
   input("Acquisition Fee %", inp.acqFeePct, "AcqFeePct", FMT.pct2, "acqFeePct");
-  input("Acquisition Fee Cap", inp.acqFeeCap, "AcqFeeCap", FMT.usd);
+  input("Acquisition Fee Cap", inp.acqFeeCap, "AcqFeeCap", FMT.usd, "acqFeeCap");
 
   header("Closing Cost Detail");
-  input("Transfer Tax % of price", inp.transferTaxPct, "TransferTaxPct", FMT.pct2);
-  label(ws.getCell(r - 1, 3), "Enter your jurisdiction's transfer-tax rate", { color: MUTED, size: 9 });
-  input("Recordation Tax % of price", inp.recordationTaxPct, "RecordationTaxPct", FMT.pct2);
-  label(ws.getCell(r - 1, 3), "Enter your jurisdiction's recordation-tax rate", { color: MUTED, size: 9 });
+  input("Transfer Tax % of price", inp.transferTaxPct, "TransferTaxPct", FMT.pct2, "transferTaxPct");
+  input("Recordation Tax % of price", inp.recordationTaxPct, "RecordationTaxPct", FMT.pct2, "recordationTaxPct");
   input("General Hold % of price", inp.generalHoldPct, "GeneralHoldPct", FMT.pct2, "generalHoldPct");
-  input("Buyer Legal", inp.buyerLegal, "BuyerLegal", FMT.usd);
-  input("Lender Legal", inp.lenderLegal, "LenderLegal", FMT.usd);
-  input("Appraisal / PCA / Phase I", inp.thirdPartyReports, "ThirdPartyReports", FMT.usd);
-  input("3rd Party / Misc.", inp.miscClosing, "MiscClosing", FMT.usd);
+  input("Buyer Legal", inp.buyerLegal, "BuyerLegal", FMT.usd, "buyerLegal");
+  input("Lender Legal", inp.lenderLegal, "LenderLegal", FMT.usd, "lenderLegal");
+  input("Appraisal / PCA / Phase I", inp.thirdPartyReports, "ThirdPartyReports", FMT.usd, "thirdPartyReports");
+  input("3rd Party / Misc.", inp.miscClosing, "MiscClosing", FMT.usd, "miscClosing");
   derived("Total Closing Costs", "PurchasePrice*(TransferTaxPct+RecordationTaxPct+GeneralHoldPct)+BuyerLegal+LenderLegal+ThirdPartyReports+MiscClosing", "ClosingCostsTotal", FMT.usd, true);
   derived("Closing Costs % of price", "ClosingCostsTotal/PurchasePrice", "ClosingCostPct_Buy", FMT.pct2);
 
   header("Income");
   input("In-Place Rental Revenue (annual)", inp.inPlaceRentAnnual, "InPlaceRent", FMT.usd, "inPlaceRentAnnual");
-  input("Expense Recoveries (annual)", inp.expenseRecoveriesAnnual, "Recoveries", FMT.usd);
-  input("Other Revenue (annual)", inp.otherRevenueAnnual, "OtherRev", FMT.usd);
+  input("Expense Recoveries (annual)", inp.expenseRecoveriesAnnual, "Recoveries", FMT.usd, "expenseRecoveriesAnnual");
+  input("Other Revenue (annual)", inp.otherRevenueAnnual, "OtherRev", FMT.usd, "otherRevenueAnnual");
   input("General Vacancy & Credit Loss %", inp.vacancyPct, "VacancyPct", FMT.pct1, "vacancyPct", true);
   input("Rent Growth %", inp.rentGrowthPct, "RentGrowth", FMT.pct1, "rentGrowthPct", true);
 

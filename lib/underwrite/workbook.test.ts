@@ -806,6 +806,53 @@ describe("the workbook's labels and colours say what their cells are", () => {
     expect(String(fallback.getCell(findRow(fallback, 1, "General Vacancy & Credit Loss %"), 3).value)).not.toMatch(/credit/);
   });
 
+  // A default of none is a claim: these rows printed $0 or 0.00% with an
+  // empty SOURCE (research pass 27), and the transfer taxes' "Enter your
+  // jurisdiction's transfer-tax rate" read as if every jurisdiction levied
+  // one. Each now says what its zero is; every value is unchanged.
+  it("every zero the model holds by default says what it is in its SOURCE", async () => {
+    const assum = (await book(model)).getWorksheet("Assumptions")!;
+    const row = (label: string) => {
+      const r = findRow(assum, 1, label);
+      return { value: assum.getCell(r, 2).value, source: String(assum.getCell(r, 3).value ?? "") };
+    };
+    const itemized = "Assumption — None itemized — the general hold stands in for it; enter it to itemize";
+    const folded = "Assumption — Folded into the in-place rental revenue — split it out of that line, never add it on top";
+    expect(row("Acquisition Fee %")).toEqual({
+      value: 0,
+      source: "Assumption — None modelled — enter it with its cap: the fee is the lesser of the two",
+    });
+    expect(row("Acquisition Fee Cap")).toEqual({
+      value: 0,
+      source: "Assumption — None modelled — the fee is the lesser of its % of the price and this cap, so enter both",
+    });
+    expect(row("Transfer Tax % of price")).toEqual({
+      value: 0,
+      source: "Assumption — None modelled — enter the jurisdiction's transfer-tax rate where it levies one",
+    });
+    expect(row("Recordation Tax % of price")).toEqual({
+      value: 0,
+      source: "Assumption — None modelled — enter the jurisdiction's recordation-tax rate where it levies one",
+    });
+    for (const label of ["Buyer Legal", "Lender Legal", "Appraisal / PCA / Phase I", "3rd Party / Misc."]) {
+      expect(row(label), label).toEqual({ value: 0, source: itemized });
+    }
+    for (const label of ["Expense Recoveries (annual)", "Other Revenue (annual)"]) {
+      expect(row(label), label).toEqual({ value: 0, source: folded });
+    }
+    // The named ranges the formulas read are where they were.
+    for (const [label, name] of [
+      ["Acquisition Fee %", "AcqFeePct"],
+      ["Acquisition Fee Cap", "AcqFeeCap"],
+      ["Transfer Tax % of price", "TransferTaxPct"],
+      ["Buyer Legal", "BuyerLegal"],
+      ["Expense Recoveries (annual)", "Recoveries"],
+      ["Other Revenue (annual)", "OtherRev"],
+    ]) {
+      expect(assum.getCell(findRow(assum, 1, label), 2).name, label).toBe(name);
+    }
+  });
+
   it("the TI input says it is charged on the whole building's SF every year, never a per-lease allowance", async () => {
     const wb = await book(model);
     const assum = wb.getWorksheet("Assumptions")!;

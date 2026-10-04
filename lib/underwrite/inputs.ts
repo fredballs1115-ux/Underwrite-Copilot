@@ -905,6 +905,20 @@ export function deriveUnderwriteInputs(
   mark("amortMonths", "assumption", "Default 30-year amortization");
   mark("financingCostPct", "assumption", "Default 1.0% of loan");
   mark("generalHoldPct", "assumption", "Placeholder DD/closing hold (1.0%) — enter itemized costs");
+  // A default of none is a claim, said as one in the SOURCE column: the
+  // costs the model holds at zero (none is ever read from a document), and
+  // the income its one rent line carries — that line is grossed up from the
+  // NOI, so a recovery or other income added beside it counts twice.
+  mark("acqFeePct", "assumption", "None modelled — enter it with its cap: the fee is the lesser of the two");
+  mark("acqFeeCap", "assumption", "None modelled — the fee is the lesser of its % of the price and this cap, so enter both");
+  mark("transferTaxPct", "assumption", "None modelled — enter the jurisdiction's transfer-tax rate where it levies one");
+  mark("recordationTaxPct", "assumption", "None modelled — enter the jurisdiction's recordation-tax rate where it levies one");
+  for (const key of ["buyerLegal", "lenderLegal", "thirdPartyReports", "miscClosing"] as const) {
+    mark(key, "assumption", "None itemized — the general hold stands in for it; enter it to itemize");
+  }
+  for (const key of ["expenseRecoveriesAnnual", "otherRevenueAnnual"] as const) {
+    mark(key, "assumption", "Folded into the in-place rental revenue — split it out of that line, never add it on top");
+  }
   mark("exitCapPct", capPct ? "derived" : "assumption",
     capPct ? "Defaulted to the going-in cap — set your exit view" : "Default 6.0% — set your exit view",
     capPct ? pageOf(capMetric) : undefined);
