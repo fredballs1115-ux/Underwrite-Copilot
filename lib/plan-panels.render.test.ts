@@ -12,7 +12,10 @@ import { ConstructionDebtPanel } from "@/app/(app)/deals/[id]/construction-debt-
 import { PlanStrip } from "@/app/(app)/deals/[id]/plausibility-panel";
 import { SharePlan } from "@/app/share/[token]/plan-facts";
 import { yieldOnCostText } from "@/lib/plan-facts";
+import { DEFAULT_DRAW_PROFILE } from "@/lib/construction-debt";
 import { gluedWords, visibleText } from "@/lib/render-lint";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const CONVERSION: ExtractionResult = {
   dealName: "1200 K Street — Office-to-Residential Conversion",
@@ -152,6 +155,49 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, { ...props, plan: noTimeline }));
     expect(html).toContain("states no timeline");
     expect(html).toMatch(/aria-label="Years to take-out"[^>]*value="2"/);
+  });
+
+  // The research pass: with no seed the 8% rate carried no sentence, and
+  // the 60% loan-to-cost and the 6% exit cap no word that they are
+  // defaults, though the model's own exit cap note says "Default 6.0% — set
+  // your exit view" (lib/underwrite/inputs).
+  it("says each fallback is a default where it is one: the flat rate, the loan-to-cost, the exit cap", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ConstructionDebtPanel, { ...props, exitCapPct: null, rateSeed: null }),
+    );
+    expect(html).toMatch(/aria-label="Construction loan rate percent"[^>]*value="8"/);
+    expect(html).toMatch(/aria-label="Maximum loan to cost percent"[^>]*value="60"/);
+    expect(html).toMatch(/aria-label="Exit cap rate percent"[^>]*value="6"/);
+    const text = visibleText(html);
+    expect(text).toContain("Construction rate: a flat 8.00% placeholder, not seeded from an index — enter your quote.");
+    expect(text).toContain("Default 60% loan-to-cost — enter your quote.");
+    expect(text).toContain("Default 6.0% exit cap — set your exit view.");
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("a seeded rate keeps its dated note, and an exit cap the model gave is no default", () => {
+    const rateSeed = {
+      pct: 7.81,
+      note: "30-day avg SOFR 4.31% (FRED, Sep 17, 2026) + 350 bps construction spread, a screening default — enter your quote",
+    };
+    const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, { ...props, exitCapPct: 5.5, rateSeed }));
+    expect(html).toMatch(/aria-label="Construction loan rate percent"[^>]*value="7.81"/);
+    expect(html).toMatch(/aria-label="Exit cap rate percent"[^>]*value="5.5"/);
+    const text = visibleText(html);
+    expect(text).toContain(`Construction rate seeded from the live index: ${rateSeed.note}.`);
+    expect(text).not.toContain("placeholder");
+    expect(text).toContain("Default 60% loan-to-cost — enter your quote.");
+    expect(text).not.toContain("exit cap — set your exit view");
+  });
+
+  it("states the draw's average from the module's own constant, never a second copy of it", () => {
+    const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, props));
+    expect(visibleText(html)).toContain(
+      `The draw is assumed to average ${Math.round(DEFAULT_DRAW_PROFILE * 100)}% outstanding across the works.`,
+    );
+    const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/construction-debt-panel.tsx"), "utf8");
+    expect(src).not.toMatch(/\b0\.55\b/);
+    expect(src).toContain("DEFAULT_DRAW_PROFILE");
   });
 });
 

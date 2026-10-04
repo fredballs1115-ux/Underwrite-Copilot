@@ -5,7 +5,15 @@ import { withArticle } from "@/lib/article";
 import { parseMoney } from "@/lib/criteria";
 import type { PlanSummary } from "@/lib/deal-strategy";
 import type { RateSeed } from "@/lib/debt-index";
-import { sizeConstructionDebt, worksYearsFromTimeline } from "@/lib/construction-debt";
+import {
+  DEFAULT_DRAW_PROFILE,
+  DEFAULT_EXIT_CAP_PCT,
+  DEFAULT_MAX_LTC_PCT,
+  DEFAULT_WORKS_YEARS,
+  FLAT_CONSTRUCTION_RATE_PCT,
+  sizeConstructionDebt,
+  worksYearsFromTimeline,
+} from "@/lib/construction-debt";
 import { yieldOnCostText } from "@/lib/plan-facts";
 
 const fmtUsd = (n: number) =>
@@ -53,18 +61,20 @@ export function ConstructionDebtPanel({
   maxLtvPct: number;
   numCls: string;
   /** today's floating index plus the construction spread (lib/debt-index),
-   *  with the sentence that says so; null keeps the flat 8% placeholder */
+   *  with the sentence that says so; null keeps the flat placeholder
+   *  (`FLAT_CONSTRUCTION_RATE_PCT`), said as one */
   rateSeed?: RateSeed | null;
 }) {
   const seededYears = worksYearsFromTimeline(plan.timeline);
   const [budgetRaw, setBudgetRaw] = useState(plan.budget ? fmtInput(plan.budget.budget) : "");
   const [noiRaw, setNoiRaw] = useState(plan.stabilizedNoi ? fmtInput(plan.stabilizedNoi.value) : "");
-  const [worksYears, setWorksYears] = useState(seededYears ?? 2);
+  const [worksYears, setWorksYears] = useState(seededYears ?? DEFAULT_WORKS_YEARS);
   // The construction rate starts from the day's index plus a spread, never
-  // from a flat figure, wherever the rates table could seed one.
-  const [ratePct, setRatePct] = useState(rateSeed?.pct ?? 8);
-  const [maxLtcPct, setMaxLtcPct] = useState(60);
-  const [exitCap, setExitCap] = useState(exitCapPct ?? 6);
+  // from a flat figure, wherever the rates table could seed one. Every
+  // starting term below that is a default is said as one under the fields.
+  const [ratePct, setRatePct] = useState(rateSeed?.pct ?? FLAT_CONSTRUCTION_RATE_PCT);
+  const [maxLtcPct, setMaxLtcPct] = useState(DEFAULT_MAX_LTC_PCT);
+  const [exitCap, setExitCap] = useState(exitCapPct ?? DEFAULT_EXIT_CAP_PCT);
 
   const budget = parseMoney(budgetRaw);
   const noi = parseMoney(noiRaw);
@@ -106,7 +116,7 @@ export function ConstructionDebtPanel({
           ? `${withArticle(planLabel.toLowerCase(), true)} is usually financed with bridge debt sized to total cost — price plus the works, carry included — and refinanced into permanent debt once the plan stabilizes. The take-out uses the lender terms in the sizer below.`
           : `${withArticle(planLabel.toLowerCase(), true)} borrows against what it costs, not against income it does not have yet: a construction or bridge loan sized to total cost — carry included — paid off at stabilization by permanent debt sized on the finished NOI. The take-out uses the lender terms in the sizer below.`}
         {seededYears == null && (
-          <span> The OM states no timeline, so the road to take-out defaults to 2 years — set it.</span>
+          <span>{` The OM states no timeline, so the road to take-out defaults to ${DEFAULT_WORKS_YEARS} years — set it.`}</span>
         )}
       </p>
       <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -135,9 +145,21 @@ export function ConstructionDebtPanel({
           <input type="number" step={0.05} min={0} max={25} value={exitCap} onChange={(e) => setExitCap(Number(e.target.value))} aria-label="Exit cap rate percent" className={numCls} />
         </label>
       </div>
-      {rateSeed && (
-        <p className="mt-1.5 text-xs text-muted">Construction rate seeded from the live index: {rateSeed.note}</p>
-      )}
+      {/* What each starting term is, in the model's own words for its
+          defaults ("Default 6.0% — set your exit view",
+          lib/underwrite/inputs): the rate's source, and every fallback
+          said as one. */}
+      <p className="mt-1.5 text-xs text-muted" data-qa="construction-defaults">
+        {[
+          rateSeed
+            ? `Construction rate seeded from the live index: ${rateSeed.note}.`
+            : `Construction rate: a flat ${FLAT_CONSTRUCTION_RATE_PCT.toFixed(2)}% placeholder, not seeded from an index — enter your quote.`,
+          `Default ${DEFAULT_MAX_LTC_PCT}% loan-to-cost — enter your quote.`,
+          exitCapPct == null ? `Default ${DEFAULT_EXIT_CAP_PCT.toFixed(1)}% exit cap — set your exit view.` : null,
+        ]
+          .filter((s): s is string => s !== null)
+          .join(" ")}
+      </p>
 
       {r ? (
         <>
@@ -195,7 +217,7 @@ export function ConstructionDebtPanel({
                   a real cost of the plan and the OM&apos;s figure leaves it out.
                 </>
               )}{" "}
-              The draw is assumed to average {Math.round(0.55 * 100)}% outstanding across the works.
+              The draw is assumed to average {Math.round(DEFAULT_DRAW_PROFILE * 100)}% outstanding across the works.
             </p>
           )}
         </>

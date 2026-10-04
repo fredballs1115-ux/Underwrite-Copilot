@@ -107,6 +107,18 @@ export function mortgageConstant(ratePct: number, amortYears: number): number {
 
 export const DEFAULT_DRAW_PROFILE = 0.55;
 
+/** The construction panel's starting terms where nothing better is to hand,
+ *  each said on the panel as the screening default it is: the construction
+ *  rate where the rates table seeds no floating index (else SOFR plus the
+ *  construction spread, lib/debt-index), the construction lender's
+ *  loan-to-cost cap, the exit cap where the screening model gives none (the
+ *  model's own exit-cap default is 6% too, lib/underwrite/inputs), and the
+ *  road to take-out where the OM states no timeline. */
+export const FLAT_CONSTRUCTION_RATE_PCT = 8;
+export const DEFAULT_MAX_LTC_PCT = 60;
+export const DEFAULT_EXIT_CAP_PCT = 6;
+export const DEFAULT_WORKS_YEARS = 2;
+
 const pos = (n: number | null | undefined): n is number => n != null && Number.isFinite(n) && n > 0;
 
 // What carries a construction loan's interest.
