@@ -69,7 +69,7 @@ import {
   buyBoxLines,
   evaluateBuyBox,
   hasNoDealbreakers,
-  screenStamp,
+  screenStampFor,
   type BuyBox,
   type BuyBoxCheck,
 } from "@/lib/criteria";
@@ -77,6 +77,7 @@ import { dealCheckSource } from "@/lib/buy-box-chip";
 import { evalDealbreakers } from "@/lib/mandate";
 import { notifyAnalysisFailed, notifyAnalysisReady } from "@/lib/email";
 import { requesterOf } from "@/lib/jobs";
+import { omFingerprint } from "@/lib/om-fingerprint";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { ensureDealPicture, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import type {
@@ -944,8 +945,15 @@ async function runAnalysisSteps(
       // The day this screen read the memorandum: a price label's year is
       // judged against its year (lib/criteria `screenYearOf`), so "Asking
       // price (2026)" read in 2026 is still the ask when the deal is opened
-      // in 2027.
-      extraction = { ...extraction, screenedOn: screenStamp() };
+      // in 2027 — and when the same deck is screened again in 2027, since a
+      // re-screen of the same bytes keeps its first stamp (`screenStampFor`
+      // against the extraction this run replaces).
+      const fingerprint = pdf ? omFingerprint(pdf) : undefined;
+      extraction = {
+        ...extraction,
+        omFingerprint: fingerprint,
+        screenedOn: screenStampFor(deal.extraction as ExtractionResult | null, fingerprint),
+      };
       await admin
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })

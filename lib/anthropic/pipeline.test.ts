@@ -210,8 +210,14 @@ const EXTRACTION = {
   ],
 } as unknown as ExtractionResult;
 /** EXTRACTION as the screen stores it: stamped with the day it read the
- *  memorandum, which a price label's year is judged against. */
-const STORED_EXTRACTION = { ...EXTRACTION, screenedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) };
+ *  memorandum, which a price label's year is judged against, and the
+ *  fingerprint of the bytes it read, so a re-screen of the same deck keeps
+ *  that day. */
+const STORED_EXTRACTION = {
+  ...EXTRACTION,
+  screenedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+  omFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+};
 const SIGNAL = { dealName: "Oakwood Flats", assetClass: "multifamily", market: "Dallas, TX" } as unknown as FirstSignal;
 const CHALLENGES = { challenges: [], summary: "" } as unknown as ChallengerResult;
 const COMPS = { saleComps: [], leaseComps: [], redFlags: [], summary: "" } as unknown as BrokerCompsResult;
@@ -470,7 +476,12 @@ describe("runAnalysis — the happy path", () => {
     expect(job().step).toBe("verdict");
     // Stored with how it was read: the PDF itself, here (omSourceFor's fake),
     // and the day it was read.
-    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf", screenedOn: "2026-12-31" });
+    expect(state.deals.d1.extraction).toEqual({
+      ...EXTRACTION,
+      omRead: "pdf",
+      screenedOn: "2026-12-31",
+      omFingerprint: expect.stringMatching(/^[0-9a-f]{16}$/),
+    });
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual(COMPS);
     // A deal with no address sits in no covered market: the check ran on
@@ -1518,6 +1529,33 @@ describe("runAnalysis — the building's photograph, lifted beside the screen", 
     await runAnalysis("d1");
     expect(job().status).toBe("done");
     expect(ensureDealPicture).not.toHaveBeenCalled();
+  });
+});
+
+describe("runAnalysis — a re-screen of the same memorandum keeps the day it was first read", () => {
+  it("keeps the stamp across the new year for the same bytes, and stamps a reissued deck anew", async () => {
+    const { createHash } = await import("node:crypto");
+    // The fake storage's deck (downloadOmPdf above), fingerprinted as
+    // lib/om-fingerprint does.
+    const same = createHash("sha256").update(Buffer.from("%PDF-1.4\n")).digest("hex").slice(0, 16);
+    state.deals.d1.extraction = { ...EXTRACTION, screenedOn: "2026-11-20", omFingerprint: same };
+    vi.useFakeTimers({ now: new Date("2027-01-02T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(state.deals.d1.extraction).toMatchObject({ screenedOn: "2026-11-20", omFingerprint: same });
+
+    // The extraction on file was read from other bytes: a new reading.
+    state.deals.d1.extraction = { ...EXTRACTION, screenedOn: "2026-11-20", omFingerprint: "0000000000000000" };
+    vi.useFakeTimers({ now: new Date("2027-01-02T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(state.deals.d1.extraction).toMatchObject({ screenedOn: "2027-01-02", omFingerprint: same });
   });
 });
 

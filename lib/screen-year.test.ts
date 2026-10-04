@@ -136,3 +136,22 @@ describe("a price label dated the screen's year stays the ask after January 1", 
     });
   });
 });
+
+describe("a re-screen of the same memorandum keeps the day it was first read", () => {
+  it("keeps the stamp for the same bytes, and stamps a reissued deck or an unfingerprinted one anew", async () => {
+    const { screenStampFor } = await import("./criteria");
+    const now = new Date(Date.UTC(2027, 0, 2));
+    const prior = { screenedOn: "2026-11-20", omFingerprint: "abc123def4567890" };
+    // The same deck screened again in 2027: still a 2026 reading.
+    expect(screenStampFor(prior, "abc123def4567890", now)).toBe("2026-11-20");
+    // A reissued deck is a new reading.
+    expect(screenStampFor(prior, "0000000000000000", now)).toBe("2027-01-02");
+    // Nothing on file says it was this deck: an extraction with no
+    // fingerprint, no extraction at all, or a deal with no memorandum.
+    expect(screenStampFor({ screenedOn: "2026-11-20" }, "abc123def4567890", now)).toBe("2027-01-02");
+    expect(screenStampFor(null, "abc123def4567890", now)).toBe("2027-01-02");
+    expect(screenStampFor(prior, undefined, now)).toBe("2027-01-02");
+    // A malformed stamp on file is no stamp.
+    expect(screenStampFor({ screenedOn: "soon", omFingerprint: "abc123def4567890" }, "abc123def4567890", now)).toBe("2027-01-02");
+  });
+});

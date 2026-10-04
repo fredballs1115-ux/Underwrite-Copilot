@@ -146,8 +146,15 @@ export interface ExtractionResult {
    *  `screenStamp`) — never a field the model writes. A price label's year
    *  is judged against its year: "Asking price (2026)" is the ask on a 2026
    *  screen and stays the ask in 2027 (`screenYearOf`). Absent on an
-   *  extraction stored before the stamp, which reads as a 2026 screen. */
+   *  extraction stored before the stamp, which reads as a 2026 screen. A
+   *  re-screen of the same memorandum (the same `omFingerprint`) keeps its
+   *  first stamp (lib/criteria `screenStampFor`). */
   screenedOn?: string;
+  /** Which memorandum this extraction was read from: the fingerprint of its
+   *  bytes (lib/om-fingerprint), stamped with `screenedOn`, so a re-screen
+   *  can tell the same deck from a reissued one. Absent on a deal entered by
+   *  hand and on an extraction stored before it was recorded. */
+  omFingerprint?: string;
   /** Free-text context typed by the buyer on MANUAL (no-OM) deals — condition,
    *  tenancy, the story. Never set by the OM extraction; rendered as prose,
    *  not a metric, and fed verbatim to the analysis fact sheet. */

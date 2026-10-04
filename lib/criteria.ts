@@ -170,6 +170,25 @@ export function screenStamp(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
+/**
+ * The stamp a re-screen writes: the day the SAME memorandum was first read,
+ * where the extraction on file was read from these bytes (its
+ * `omFingerprint`, lib/om-fingerprint) and carries a stamp; else today's.
+ * A label's year is the memorandum's, so reading one deck again in a later
+ * year never turns its "Asking price (2026)" into a prior trade; a reissued
+ * deck (other bytes) is a new reading and stamped anew, as is an extraction
+ * on file with no fingerprint, since nothing says it was this deck.
+ */
+export function screenStampFor(
+  prior: { screenedOn?: string | null; omFingerprint?: string | null } | null | undefined,
+  fingerprint: string | null | undefined,
+  now: Date = new Date(),
+): string {
+  const kept = typeof prior?.screenedOn === "string" ? /^\d{4}-\d{2}-\d{2}/.exec(prior.screenedOn.trim()) : null;
+  if (fingerprint && prior?.omFingerprint === fingerprint && kept) return kept[0];
+  return screenStamp(now);
+}
+
 // The price row's exclusions either side of the past-year fragment, which
 // depends on the screen's year (priceExclude, below).
 const PRICE_EXCLUDE_HEAD = String.raw`unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper\s+(?!(?:the|om|broker|seller|sponsor|offering|agent|marketing|guidance|psa|contract|loi)\b)|\/\s*(key|bed|room|pad|door|acre|lot|suite|stall|space|home|apartment|apt|bay|berth|slip|r?sf|nrsf|gsf|gla|nra|gba|nla)s?\b|\brent|yield|\bcap\b|\brate\b|spread|loan|debt|insurance|\bdate\b|exit|reversion|terminal|residual|disposition|projected|forward|pro ?forma|stabili[sz]|`;
