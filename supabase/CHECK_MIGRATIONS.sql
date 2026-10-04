@@ -61,12 +61,18 @@
 -- DELETE-only (it trims regulatory rules to the 15-market scope) — if the
 -- database was seeded before that cut, run 0029 again; it cannot double-delete.
 --
--- 0036 adds no table or column either, so it is read two other ways: by the
--- four triggers it creates, and by the grants it takes away. On its grants
--- row, "still_missing" names each public-record RPC a signed-out caller can
--- still run — the thing 0036 closes — or that does not exist yet, since a
--- grant on a function 0028 never made has not been taken away: run 0028 and
--- 0030_public_data_layer, then 0036 again (it is idempotent).
+-- 0036 adds no table or column either, so it is read three other ways: by the
+-- four triggers it creates, by the grants it takes away, and by what its
+-- worker's-queue guard says. On its grants row, "still_missing" names each
+-- public-record RPC a signed-out caller can still run — the thing 0036
+-- closes — or that does not exist yet, since a grant on a function 0028
+-- never made has not been taken away: run 0028 and 0030_public_data_layer,
+-- then 0036 again (it is idempotent). The queue guard's row reads the
+-- trigger's and the function's definitions, not just their names: the
+-- first draft of 0036 had both, fired only on a changed created_at, and let
+-- a re-queued screen keep its old place in line. A ❌ there means the draft
+-- is what ran — run 0036 again — or, with 0016's row ❌ too, that 0016 has
+-- not run (the guard needs its payload column): run 0016, then 0036.
 -- ============================================================================
 
 with
@@ -240,6 +246,37 @@ with
            or has_function_privilege('anon', to_regproc('public.' || x)::oid, 'execute')
       ) as missing
     from priv p
+  ),
+
+  -- A guard read by what it says: the worker's-queue trigger must fire on a
+  -- change of status or payload as well as created_at, and its function must
+  -- restamp a row a user's write puts back in the queue.
+  queue_res as (
+    select
+      362 as seq,
+      '0036_security_hardening.sql (the queue guard''s rules)' as migration,
+      'A re-queued screen goes to the back of the worker''s queue, never back to its old place in line. ❌ names the part still in its first draft: run 0036 again (and 0016 first, if its row above is ❌).' as unblocks,
+      array_remove(array[
+        case when not exists (
+          select 1
+          from pg_trigger g
+          join pg_class c on c.oid = g.tgrelid
+          join pg_namespace n on n.oid = c.relnamespace
+          where n.nspname = 'public' and c.relname = 'analysis_jobs'
+            and g.tgname = 'analysis_jobs_queue_guard' and not g.tgisinternal
+            and pg_get_triggerdef(g.oid) like '%BEFORE INSERT OR UPDATE OF created_at, status, payload ON %'
+        ) then 'trigger analysis_jobs_queue_guard on created_at, status, payload' end,
+        case when not exists (
+          select 1
+          from pg_proc p
+          join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.proname = 'analysis_jobs_queue_guard'
+            and regexp_replace(p.prosrc, '\s+', ' ', 'g')
+                like '%(new.status = ''queued'' and old.status is distinct from ''queued'')%'
+            and regexp_replace(p.prosrc, '\s+', ' ', 'g')
+                like '%(new.status = ''queued'' and new.payload is not null and old.payload is null)%'
+        ) then 'analysis_jobs_queue_guard() restamping a re-queued row' end
+      ], null) as missing
   )
 
 select
@@ -253,5 +290,6 @@ from (
   union all select * from fn_res
   union all select * from trg_res
   union all select * from priv_res
+  union all select * from queue_res
 ) r
 order by r.seq;

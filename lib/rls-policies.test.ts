@@ -204,6 +204,27 @@ export interface Trigger {
   file: string;
 }
 
+/**
+ * Each public function's body as the last migration to define it left it,
+ * keyed by name, its white space folded to single spaces. The body is read
+ * between the opening dollar quote and the same quote closing it, so a
+ * function created inside another block's `$fn$ … $fn$` is read whole.
+ */
+export function finalFunctionBodies(dir = DIR): Map<string, string> {
+  const bodies = new Map<string, string>();
+  for (const { sql } of migrations(dir)) {
+    for (const m of sql.matchAll(
+      /create\s+(?:or\s+replace\s+)?function\s+public\.([a-z_][a-z0-9_]*)\s*\([^)]*\)[\s\S]*?\bas\s+(\$[a-z_]*\$)/gi,
+    )) {
+      const open = (m.index ?? 0) + m[0].length;
+      const close = sql.indexOf(m[2], open);
+      if (close < 0) continue;
+      bodies.set(m[1].toLowerCase(), sql.slice(open, close).replace(/\s+/g, " ").trim());
+    }
+  }
+  return bodies;
+}
+
 /** The final trigger set after every migration has run, keyed table/name. */
 export function finalTriggers(dir = DIR): Map<string, Trigger> {
   const triggers = new Map<string, Trigger>();
@@ -349,6 +370,19 @@ describe("the readers can fail (synthetic migrations)", () => {
     expect(unknown).toEqual(["0001_a.sql: revoke on typo, which no earlier migration creates"]);
   });
 
+  it("a function's body is the last definition's, read whole inside another block's quotes", () => {
+    const dir = fixture({
+      "0001_a.sql": `create or replace function public.guard() returns trigger language plpgsql as $$
+        begin if new.a is distinct from old.a then new.a := now(); end if; return new; end; $$;`,
+      "0002_b.sql": `do $$ begin execute $fn$
+        create or replace function public.guard() returns trigger language plpgsql as $body$
+        begin
+          return new;
+        end; $body$; $fn$; end; $$;`,
+    });
+    expect(finalFunctionBodies(dir).get("guard")).toBe("begin return new; end;");
+  });
+
   it("a table left without row-level security, or given it only by a later file, is reported", () => {
     const dir = fixture({
       "0001_a.sql": `create table if not exists public.open_one (id int);
@@ -380,10 +414,26 @@ describe("the guards 0036 put on writes a user's session could otherwise shape",
   });
 
   it("a job's place in the worker's queue is the database's", () => {
+    // Not just a changed created_at: a deal's one job row keeps the time its
+    // last run was asked for, and an update that only turned its status back
+    // to 'queued' had put it in line at that old time, ahead of everyone
+    // queued since (the review of 2026-10-01). So the guard runs on a change
+    // of status or payload too…
     expect(on("analysis_jobs", "analysis_jobs_queue_guard")).toMatchObject({
       timing: "before",
-      events: "insert or update of created_at",
+      events: "insert or update of created_at, status, payload",
+      fn: "analysis_jobs_queue_guard",
     });
+    // …and restamps every way a user's write brings a row into the queue:
+    // the status turned to 'queued', or a payload handed to a queued row that
+    // had none (one inserted without it, which the worker passes over, and
+    // left to age).
+    const body = finalFunctionBodies().get("analysis_jobs_queue_guard")!;
+    expect(body).toContain("if auth.uid() is null then return new; end if;");
+    expect(body).toContain("if tg_op = 'INSERT' then new.created_at := now();");
+    expect(body).toContain("new.created_at is distinct from old.created_at");
+    expect(body).toContain("(new.status = 'queued' and old.status is distinct from 'queued')");
+    expect(body).toContain("(new.status = 'queued' and new.payload is not null and old.payload is null) then new.created_at := now();");
   });
 
   it("Ask's thread only grows", () => {

@@ -53,15 +53,31 @@
 --      trusted as before.
 --
 --   4. The worker's queue. analysis_jobs is writable by the deal's owner and
---      teammates (0007), and the worker takes the oldest queued row first
---      (worker/index.ts), so a backdated created_at jumped the queue. A
+--      teammates (0007), and the worker takes the oldest queued row that
+--      carries a payload first (worker/index.ts), so a backdated created_at
+--      jumped the queue. So did an old one kept: a deal has one job row, its
+--      created_at the moment its last run was asked for, and an update that
+--      set only {status: 'queued', attempts: 0, payload} put that row back
+--      in line at that old moment, ahead of every run asked for since — a
+--      free account could re-queue its screen in a loop and starve every
+--      customer (the review of 2026-10-01, reproduced on PostgreSQL 16). A
 --      signed-in user's insert, and any update of theirs that changes
---      created_at, now get the database's now(). The app's writes: every
---      enqueue (lib/jobs newJobRow) leaves created_at to its default, and
---      claimJob restamps it with the web server's now, which becomes the
---      database's now — the same instant give or take the clocks' skew, and
---      still "when this run was asked for". The worker and the pipeline write
---      with the service role and never set created_at.
+--      created_at or puts the row in the worker's queue — its status turned
+--      to 'queued', or a payload given to a queued row that had none (a row
+--      inserted queued without one, which the worker passes over, left to
+--      age and then handed one) — now get the database's now(). The app's
+--      writes: every enqueue (lib/jobs newJobRow) leaves created_at to its
+--      default, and claimJob restamps it with the web server's now, which
+--      becomes the database's now — the same instant give or take the
+--      clocks' skew, and still "when this run was asked for". A held row
+--      handed to the worker (a facts save, a replaced OM, a model upload:
+--      running to queued, deals/actions.ts) is placed at the hand-over,
+--      seconds after its claim — when it became the worker's to take, and
+--      the moment the deal page's clock now counts from. The worker and the
+--      pipeline write with the service role and never set created_at, so
+--      the worker's own requeue after a deploy keeps the row's place. The
+--      trigger needs 0016's payload column; without it there is no worker
+--      and no queue to jump, and the trigger is left off.
 --
 --   5. Ask's question cap. The 25-question cap (ask-actions.ts) counts
 --      deals.qa, which the deal's owner could rewrite: PATCH qa = [] and the
@@ -240,6 +256,12 @@ end;
 $$;
 
 -- 4. The worker's queue: a user's run is placed when it was asked for --------
+-- The worker's queue is `status = 'queued' and payload is not null`, oldest
+-- created_at first. A signed-in user's write that brings a row into it is
+-- placed at the database's now: the status turned to 'queued' (the review's
+-- loop), or a payload given to a queued row that had none (a row inserted
+-- queued without one and left to age). Any change they make to created_at
+-- is the database's now too.
 create or replace function public.analysis_jobs_queue_guard()
 returns trigger
 language plpgsql
@@ -250,19 +272,28 @@ begin
   end if;
   if tg_op = 'INSERT' then
     new.created_at := now();
-  elsif new.created_at is distinct from old.created_at then
+  elsif new.created_at is distinct from old.created_at
+     or (new.status = 'queued' and old.status is distinct from 'queued')
+     or (new.status = 'queued' and new.payload is not null and old.payload is null) then
     new.created_at := now();
   end if;
   return new;
 end;
 $$;
 
+-- "of created_at, status, payload": an update naming none of the three — a
+-- heartbeat, a step's progress — cannot move a row into the queue or along
+-- it, so the guard does not run for it. The payload column arrives with 0016.
 do $$
 begin
-  if to_regclass('public.analysis_jobs') is not null then
+  if to_regclass('public.analysis_jobs') is not null
+     and exists (
+       select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'analysis_jobs' and column_name = 'payload'
+     ) then
     execute 'drop trigger if exists analysis_jobs_queue_guard on public.analysis_jobs';
     execute 'create trigger analysis_jobs_queue_guard
-               before insert or update of created_at on public.analysis_jobs
+               before insert or update of created_at, status, payload on public.analysis_jobs
                for each row execute function public.analysis_jobs_queue_guard()';
   end if;
 end;
