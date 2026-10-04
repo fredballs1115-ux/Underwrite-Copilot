@@ -2918,9 +2918,12 @@ describe("the deal math tools", () => {
   });
 
   it("names the error it exists to prevent", () => {
-    // $11.45M at 20% says $2.29M. The bill is $2.56M.
+    // $11.45M at 20% says $2.29M. The bill is $2.56M — higher, since the
+    // seeded owner's depreciation comes back at 25%; an owner taxed under
+    // the capital gains rate is told "lower" (lib/tools/after-tax).
     expect(text).toContain("Running the whole gain at the capital gains rate would say $2.29M");
     expect(text).toContain("$2.56M");
+    expect(text).toContain("because what you depreciated comes back at a higher rate than what you made.");
   });
 
   it("says what the shelter was worth and what the sale took back", () => {

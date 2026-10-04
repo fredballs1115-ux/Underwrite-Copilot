@@ -120,6 +120,17 @@ export interface AfterTaxRead {
   recaptureRatePct: number | null;
   /** sale price less adjusted basis */
   totalGain: number | null;
+  /** the rate the capital gain is taxed at: the one entered, else 20% */
+  capGainsRatePct: number | null;
+  /** how the rates the depreciation comes back at stand against the capital
+   *  gains rate, over the parts of the gain that ARE depreciation: "higher"
+   *  where one is taxed above it and none below, "lower" where one is below
+   *  it and none above, "same" where each is at it, "mixed" where one is
+   *  above and one below; null with none in the gain.
+   *  Since the building's depreciation comes back at the ordinary rate,
+   *  capped at 25%, an owner taxed under the capital gains rate pays LESS on
+   *  it than on the gain, and the card said "a higher rate" regardless. */
+  recaptureVsGains: "higher" | "lower" | "same" | "mixed" | null;
   /** the three pieces of that gain, each with its own rate */
   sale: {
     ordinaryRecapture: number;
@@ -145,6 +156,8 @@ const EMPTY: AfterTaxRead = {
   adjustedBasis: null,
   recaptureRatePct: null,
   totalGain: null,
+  capGainsRatePct: null,
+  recaptureVsGains: null,
   sale: null,
   netOfRecapture: null,
   note: null,
@@ -277,6 +290,18 @@ export function readAfterTax(t: AfterTaxTerms): AfterTaxRead {
     pctOf(ordinaryRecapture, ordinary) + pctOf(unrecaptured1250, recapRate);
   const netOfRecapture = shelterValue - recaptureCost;
 
+  // Each part of the gain that is depreciation, by the rate it comes back
+  // at, against the capital gains rate — so the card says "higher" only
+  // where it is.
+  const recapturedAt = [
+    ...(round(ordinaryRecapture) > 0 ? [ordinary] : []),
+    ...(round(unrecaptured1250) > 0 ? [recapRate] : []),
+  ];
+  const above = recapturedAt.some((rate) => rate > capRate);
+  const below = recapturedAt.some((rate) => rate < capRate);
+  const recaptureVsGains: AfterTaxRead["recaptureVsGains"] =
+    recapturedAt.length === 0 ? null : above && below ? "mixed" : above ? "higher" : below ? "lower" : "same";
+
   return {
     depreciableBasis: round(depreciableBasis),
     buildingBasis: round(buildingBasis),
@@ -290,6 +315,8 @@ export function readAfterTax(t: AfterTaxTerms): AfterTaxRead {
     adjustedBasis: round(adjustedBasis),
     recaptureRatePct: recapRate,
     totalGain: round(totalGain),
+    capGainsRatePct: capRate,
+    recaptureVsGains,
     sale: {
       ordinaryRecapture: round(ordinaryRecapture),
       unrecaptured1250: round(unrecaptured1250),

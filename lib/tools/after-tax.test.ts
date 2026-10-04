@@ -248,3 +248,41 @@ describe("readAfterTax — what it asks for", () => {
     expect(r.netOfRecapture).toBeNull();
   });
 });
+
+describe("readAfterTax — whether the depreciation comes back dearer than the gain (audit c66)", () => {
+  it("says higher where the building's depreciation is taxed above the capital gains rate", () => {
+    // The seed: 25% on the building's depreciation, 20% on the rest.
+    const r = readAfterTax(SEED);
+    expect(r.capGainsRatePct).toBe(20);
+    expect(r.recaptureVsGains).toBe("higher");
+    expect(r.sale!.tax).toBeGreaterThan(Math.round(r.totalGain! * 0.2));
+  });
+
+  it("says lower for an owner taxed under the capital gains rate, whose 1250 gain comes back at the ordinary rate", () => {
+    // The audit's owner: 12% ordinary, 15% capital gains. The bill is
+    // $1,554,545 against $1,718,182 for the whole gain at 15% — and the card
+    // said the depreciation "comes back at a higher rate".
+    const r = readAfterTax({ ...SEED, ordinaryRatePct: 12, capGainsRatePct: 15 });
+    expect(r.recaptureRatePct).toBe(12);
+    expect(r.recaptureVsGains).toBe("lower");
+    expect(r.sale!.tax).toBe(1_554_545);
+    expect(Math.round(r.totalGain! * 0.15)).toBe(1_718_182);
+  });
+
+  it("says the same where they are one rate, and mixed only where one part is above and one below", () => {
+    expect(readAfterTax({ ...SEED, ordinaryRatePct: 20, capGainsRatePct: 20 }).recaptureVsGains).toBe("same");
+    // A carve-out at the 37% ordinary rate and the building at 25%, against
+    // a 28.8% capital gains rate: one part each way.
+    const split = readAfterTax({ ...SEED, costSegPct: 20, capGainsRatePct: 28.8 });
+    expect(split.sale!.ordinaryRecapture).toBeGreaterThan(0);
+    expect(split.recaptureVsGains).toBe("mixed");
+    // The carve-out above and the building's 25% at a 25% rate: none below.
+    expect(readAfterTax({ ...SEED, costSegPct: 20, capGainsRatePct: 25 }).recaptureVsGains).toBe("higher");
+  });
+
+  it("says nothing of a gain with no depreciation in it, or no sale", () => {
+    expect(readAfterTax({ ...SEED, salePrice: 5_000_000 }).recaptureVsGains).toBeNull();
+    expect(readAfterTax({ ...SEED, salePrice: null }).recaptureVsGains).toBeNull();
+    expect(readAfterTax(BLANK).capGainsRatePct).toBeNull();
+  });
+});

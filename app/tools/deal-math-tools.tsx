@@ -1712,9 +1712,10 @@ function AfterTax() {
           tone: "bg-caution",
         },
         {
+          // The rate the module taxed it at, a blank field's 20% included.
           label: "Capital gain",
           amount: r.sale.capitalGain,
-          rate: `${(num(capGains) ?? 0).toFixed(0)}%`,
+          rate: `${(r.capGainsRatePct ?? 0).toFixed(0)}%`,
           tone: "bg-brand",
         },
       ].filter((x) => x.amount > 0)
@@ -1791,15 +1792,33 @@ function AfterTax() {
               </span>
             ))}
           </div>
+          {/* "Higher" only where it is (lib/tools/after-tax
+              `recaptureVsGains`): the building's depreciation comes back
+              at the ordinary rate, capped at 25%, so an owner taxed under
+              the capital gains rate pays less on it, not more. The figure
+              beside it is at the rate the module taxed the gain at. */}
           <p className="mt-3 text-sm text-muted">
             Running the whole gain at the capital gains rate would say{" "}
             <span className="font-semibold tabular-nums text-ink">
-              {usd(gain * ((num(capGains) ?? 0) / 100))}
+              {usd(gain * ((r.capGainsRatePct ?? 0) / 100))}
             </span>
             . The bill is{" "}
-            <span className="font-semibold tabular-nums text-kill">{usd(r.sale!.tax)}</span>,
-            because what you depreciated comes back at a higher rate than what
-            you made.
+            <span
+              className={`font-semibold tabular-nums ${
+                r.recaptureVsGains === "higher" ? "text-kill" : r.recaptureVsGains === "lower" ? "text-brand" : "text-ink"
+              }`}
+            >
+              {usd(r.sale!.tax)}
+            </span>
+            {r.recaptureVsGains === "higher"
+              ? ", because what you depreciated comes back at a higher rate than what you made."
+              : r.recaptureVsGains === "lower"
+                ? ", because what you depreciated comes back at a lower rate than what you made."
+                : r.recaptureVsGains === "same"
+                  ? ", because what you depreciated comes back at the same rate as what you made."
+                  : r.recaptureVsGains === "mixed"
+                    ? ": part of what you depreciated comes back at a higher rate than what you made, and part at a lower one."
+                    : "."}
           </p>
         </div>
       )}
