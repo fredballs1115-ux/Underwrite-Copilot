@@ -20,10 +20,11 @@ export const SPREAD_HIGH_IRR_PCT = 14;
 export const SPREAD_BPS = (SPREAD_HIGH_IRR_PCT - SPREAD_LOW_IRR_PCT) * 100; // 400
 
 // ── Timing claims ───────────────────────────────────────────────────────────
-// Observed typical runs on mid-size OMs (subject to document size and model
-// latency) — phrased with "about" in copy for honesty.
-export const FIRST_READ_CLAIM = "about half a minute";
-export const FULL_SCREEN_CLAIM = "minutes";
+// None. A page claims no duration it has not measured: the first read's
+// "about half a minute" was labelled observed with no measurement behind
+// it, so the FAQ now says what happens and in what order, not how long. A
+// screen's own time is measured per reader (lib/screen-duration, the run's
+// wallMs) and said only from three of their own finished screens.
 
 // ── Product shape facts (countable in the codebase) ─────────────────────────
 // Six checkpointed analysis stages per OM: extract, challenge, comps,

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { isScreenJob, typicalScreenMs, typicalScreenPhrase } from "./screen-duration";
+import * as marketing from "./marketing-constants";
 
 describe("typicalScreenMs — the median of the account's measured runs, from three", () => {
   it("is nothing under three runs: the rail then claims no duration", () => {
@@ -37,6 +40,20 @@ describe("typicalScreenPhrase — rounded to what a person says", () => {
     expect(typicalScreenPhrase(null)).toBeNull();
     expect(typicalScreenPhrase(0)).toBeNull();
     expect(typicalScreenPhrase(Number.NaN)).toBeNull();
+  });
+});
+
+describe("the homepage claims no duration it has not measured either", () => {
+  const read = (p: string) => readFileSync(join(__dirname, "..", p), "utf8");
+
+  it("says what the screen does and in what order, not how long the first read takes", () => {
+    const home = read("app/page.tsx");
+    // "a first read … lands in about half a minute" was labelled observed
+    // in lib/marketing-constants, with nothing measured behind it.
+    expect(home).not.toMatch(/half a minute|FIRST_READ_CLAIM|FULL_SCREEN_CLAIM/);
+    expect(home).toContain("the screen runs on its own — the headline numbers first, then extraction, assumption challenges, comp scrutiny, market check, and a verdict.");
+    expect(Object.keys(marketing)).not.toContain("FIRST_READ_CLAIM");
+    expect(Object.keys(marketing)).not.toContain("FULL_SCREEN_CLAIM");
   });
 });
 

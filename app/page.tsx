@@ -9,7 +9,6 @@ import {
   SPREAD_LOW_IRR_PCT,
   SPREAD_HIGH_IRR_PCT,
   SPREAD_BPS,
-  FIRST_READ_CLAIM,
   ANALYSIS_STAGES,
   DEAL_KILLERS,
   COMPS_JURISDICTIONS,
@@ -284,7 +283,7 @@ const XLSX_PREVIEW_ROWS: [string, string, string][] = (() => {
 const FAQ: { q: string; a: string }[] = [
   {
     q: "What do I need to get started?",
-    a: `Just an offering memorandum as a PDF. Upload it and the screen runs on its own — a first read with the headline numbers lands in ${FIRST_READ_CLAIM}, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.`,
+    a: "Just an offering memorandum as a PDF. Upload it and the screen runs on its own — the headline numbers first, then extraction, assumption challenges, comp scrutiny, market check, and a verdict. Add a rent roll, T-12, or loan terms later to deepen the model. You can also explore a fully-worked sample deal before uploading anything.",
   },
   {
     q: "Where do the numbers come from?",
