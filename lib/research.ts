@@ -9,6 +9,7 @@
 
 import { abbrevState } from "@/lib/address";
 import { researchAge, staleMark } from "@/lib/research-age";
+import { datedNotes, type DatedNote } from "@/lib/dated-window";
 
 export type ResearchStatus = "verified" | "sourced" | "unverified_not_found";
 
@@ -62,6 +63,10 @@ export interface RuleSubject {
    *  WA caps' new-building exemptions) — injected so evaluation stays
    *  deterministic and testable */
   current_year?: number;
+  /** the day the rules are read, an ISO day — injected like `current_year`:
+   *  a rule whose text states a window or an effective date is read against
+   *  it (lib/dated-window), and its evaluation says what has ended */
+  today?: string;
   municipality_population?: number;
   /** CURRENT status ("vacant_registered", "non_owner_occupied_rental", …) —
    *  distinct from owner_occupied, which is the buyer's post-close intent */
@@ -97,6 +102,13 @@ export interface RuleEvaluation {
   outcome: "exempt" | "applies" | "possibly_applies" | "not_applicable";
   /** conditions that came back unknown — the UI lists them as open questions */
   unknowns: string[];
+  /** what the rule's own text says has ended or passed on the subject's day
+   *  (lib/dated-window `datedNotes`): a window its figure was stated for
+   *  that has ended, an effective date that has come — each one sentence,
+   *  printed under the text, which stays as written. The outcome is the
+   *  rule's and does not change: the rule still holds; its figure needs
+   *  checking. Empty while nothing has ended, or with no day given. */
+  dated: DatedNote[];
 }
 
 const and = (a: Tri, b: Tri): Tri =>
@@ -375,6 +387,7 @@ export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): Ru
       exempt: exemptTri,
       outcome,
       unknowns: [...(asks ? [WITHIN_CITY_LIMITS] : []), ...applies.unknowns, ...(hasExemption ? exempt.unknowns : [])],
+      dated: subject.today ? datedNotes(rule.effect, subject.today) : [],
     });
   }
   return out;

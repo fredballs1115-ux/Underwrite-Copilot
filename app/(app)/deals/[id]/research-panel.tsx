@@ -17,6 +17,7 @@ import {
   type RuleEvaluation,
 } from "@/lib/research";
 import { researchAge, staleMark } from "@/lib/research-age";
+import { DatedNotes } from "@/app/dated-notes";
 import {
   benchmarksForDeal,
   buildSubject,
@@ -338,6 +339,9 @@ export async function ResearchPanel({
     yearBuilt,
     sectorFields,
     residential: assetClassKey(assetClass) ? words.residential : undefined,
+    // A rule's own stated window or effective date is read on this day
+    // (lib/dated-window): each evaluation says what has ended.
+    today,
   });
   const evals = address?.state ? evaluateRules(rules, subject) : [];
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
@@ -596,6 +600,10 @@ export async function ResearchPanel({
                   </span>
                 </div>
                 <p className="mt-1.5 text-sm leading-relaxed">{e.rule.effect}</p>
+                {/* The rule's text as written, and — once a window it states
+                    its figure for has ended, or a date it gives has come —
+                    that sentence beneath it (lib/dated-window). */}
+                <DatedNotes notes={e.dated} className="mt-1" />
                 {open.length > 0 && (
                   <p className="mt-1 text-[12px] text-amber-600">
                     To settle this: provide {open.join(", ")}.{" "}

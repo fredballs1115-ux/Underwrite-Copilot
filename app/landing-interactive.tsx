@@ -305,6 +305,13 @@ function LegalBlock({ legal }: { legal: SampleLegal }) {
               ? rule.effect.slice(0, 149).trimEnd() + "…"
               : rule.effect}
           </p>
+          {/* A window the rule states its figure for, ended, or a date it
+              gives, come (lib/dated-window via sampleLegal) — never clamped. */}
+          {rule.dated.length > 0 && (
+            <p className="mt-1 text-[9px] font-medium text-caution" data-qa="window-ended">
+              {rule.dated.join(" ")}
+            </p>
+          )}
           {rule.dormantNote && (
             <p className="mt-1 text-[9px] font-medium text-caution">{rule.dormantNote}</p>
           )}

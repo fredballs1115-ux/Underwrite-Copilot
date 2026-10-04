@@ -1,5 +1,7 @@
 import type { RegulatoryRule } from "@/lib/research";
 import { foldParts } from "@/lib/first-sentence";
+import { datedNotes } from "@/lib/dated-window";
+import { DatedNotes } from "@/app/dated-notes";
 
 /**
  * One rule in force, as a market brief lists it: its status, its first
@@ -15,10 +17,16 @@ import { foldParts } from "@/lib/first-sentence";
  * often a county's page, a practitioner's note or a ballot record as the
  * code itself.
  *
+ * A rule whose text states a window its figure holds for, or a date a
+ * change takes effect, says on `today` once that window has ended or that
+ * date has come (lib/dated-window) — in view, like a caution, and never
+ * folded; the text stays as written.
+ *
  * Pure, so it renders on the rules file in lib/views.render.test.ts.
  */
-export function RuleItem({ rule }: { rule: Pick<RegulatoryRule, "id" | "status" | "effect" | "source"> }) {
+export function RuleItem({ rule, today }: { rule: Pick<RegulatoryRule, "id" | "status" | "effect" | "source">; today: string }) {
   const { first, cautions, rest } = foldParts(rule.effect);
+  const dated = datedNotes(rule.effect, today);
   return (
     <li className="text-sm leading-snug" data-rule={rule.id}>
       <span
@@ -51,6 +59,7 @@ export function RuleItem({ rule }: { rule: Pick<RegulatoryRule, "id" | "status" 
           {cautions.join(" ")}
         </p>
       )}
+      <DatedNotes notes={dated} className="mt-1" />
       {rest && (
         <details className="mt-0.5 text-xs leading-relaxed text-muted">
           <summary className="cursor-pointer list-none text-[11px] font-medium text-brand [&::-webkit-details-marker]:hidden">

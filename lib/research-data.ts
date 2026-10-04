@@ -462,8 +462,14 @@ export function buildSubject(input: {
   sizeText?: string | null;
   yearBuilt?: number | null;
   sectorFields?: Record<string, string | number | boolean> | null;
-  /** injected for deterministic tests; defaults to the wall-clock year */
+  /** injected for deterministic tests; defaults to `today`'s year, else the
+   *  wall-clock year */
   currentYear?: number;
+  /** the day the rules are read, an ISO day — a page reads it outside its
+   *  render and hands it in; defaults to the wall-clock day. A rule's text
+   *  that states a window or an effective date is read against it
+   *  (lib/dated-window), so the evaluation says what has ended. */
+  today?: string;
   /** the deal is rental housing (lib/asset-words); false files it as
    *  commercial property, which the rent-control, TOPA and just-cause rules
    *  are written not to reach; undefined (nothing read yet) keeps the
@@ -491,7 +497,8 @@ export function buildSubject(input: {
     // The deal-facts answer beats the OM/manual claim — the buyer may be
     // correcting a wrong listing figure.
     built_year: numField("year_built") ?? input.yearBuilt ?? undefined,
-    current_year: input.currentYear ?? new Date().getFullYear(),
+    current_year: input.currentYear ?? (input.today && /^\d{4}-/.test(input.today) ? Number(input.today.slice(0, 4)) : new Date().getFullYear()),
+    today: input.today ?? new Date().toISOString().slice(0, 10),
     // Post-close intent only — the occupancy STRING (current status) stays
     // unknown, so vacant-tax and rental-license questions stay honestly open.
     ...(willOccupy !== undefined ? { owner_occupied: willOccupy } : {}),

@@ -7976,7 +7976,7 @@ import { seedRules } from "@/lib/research-data";
 
 describe("RuleItem and Fold — a rule's first sentence whole, its caution in view (the research pass of 2026-10-01)", () => {
   const rules = seedRules();
-  const html = render(React.createElement("ul", null, ...rules.map((r) => React.createElement(RuleItem, { key: r.id, rule: r }))));
+  const html = render(React.createElement("ul", null, ...rules.map((r) => React.createElement(RuleItem, { key: r.id, rule: r, today: "2026-10-04" }))));
   const text = visibleText(html);
 
   it("prints no rule cut at an abbreviation", () => {

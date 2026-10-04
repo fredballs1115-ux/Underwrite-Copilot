@@ -26,6 +26,10 @@ export type SampleLegalRule = {
    *  date's age and the mark, "191 days old, stale" — shown beside the date,
    *  which stays; null while the date is current */
   stale: string | null;
+  /** what the rule's own text says has ended on the day read — a window its
+   *  figure was stated for, a date a change takes effect — each one sentence
+   *  (the evaluation's `dated`, lib/dated-window); empty while nothing has */
+  dated: string[];
   source: string | null;
 };
 
@@ -70,6 +74,7 @@ export function sampleLegal(today: string): SampleLegal {
     sizeText: "248 units",
     yearBuilt: null,
     sectorFields: null,
+    today,
   });
   const evals = evaluateRules(rules, subject);
   const shown = evals.filter((e) => e.outcome !== "not_applicable");
@@ -88,6 +93,7 @@ export function sampleLegal(today: string): SampleLegal {
     status: e.rule.status,
     asOf: e.rule.as_of,
     stale: staleMark(researchAge(e.rule.as_of, today)),
+    dated: e.dated.map((n) => n.text),
     source: e.rule.source,
   });
 

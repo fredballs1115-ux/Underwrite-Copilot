@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { SampleLegal } from "@/lib/sample-legal";
+import { DatedNotes } from "@/app/dated-notes";
 
 /** The deal page's Regulation & benchmarks panel for the sample deal —
  *  derived by lib/sample-legal through the real rules engine. Full-width
@@ -68,6 +69,9 @@ export function LegalPanel({ legal }: { legal: SampleLegal }) {
               </span>
             </div>
             <p className="mt-1.5 text-sm leading-relaxed">{r.effect}</p>
+            {/* A window the rule states its figure for, ended, or a date it
+                gives, come — under the text, which stays (lib/dated-window). */}
+            <DatedNotes notes={r.dated} className="mt-1" />
             {r.dormantNote && (
               <p className="mt-1 text-[12px] font-medium text-caution">
                 {r.dormantNote}

@@ -51,6 +51,8 @@ import {
 } from "@/lib/sector-leaderboard";
 import { blockCitations, rentOf, rentText, snapshotAge, snapshotReadOn } from "@/lib/tracker-read";
 import { oldestDate, researchAge, staleMark } from "@/lib/research-age";
+import { datedNotes } from "@/lib/dated-window";
+import { DatedNotes } from "@/app/dated-notes";
 import { SubmarketsPanel } from "./submarkets-panel";
 import { CoverageBoardCell, FigureCredits, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
 import { listSubmarkets } from "@/lib/market/store";
@@ -703,12 +705,21 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           name={active.name}
           eager
         />
-        <p className="text-sm leading-relaxed">
-          {(active.market_notes as { value?: string } | null)?.value}
-          <span className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${noteMeta}`}>
-            {noteStatus}
-          </span>
-        </p>
+        <div>
+          <p className="text-sm leading-relaxed">
+            {(active.market_notes as { value?: string } | null)?.value}
+            <span className={`ml-2 rounded px-1.5 py-px align-middle text-[10px] font-medium ${noteMeta}`}>
+              {noteStatus}
+            </span>
+          </p>
+          {/* A window the note states its figure for, ended — or a date it
+              gives, come — said under the note, which stays as written
+              (lib/dated-window). */}
+          <DatedNotes
+            notes={datedNotes((active.market_notes as { value?: string } | null)?.value, todayIso())}
+            className="mt-1"
+          />
+        </div>
 
         <SectorSnapshotPanel
           snapshot={
@@ -743,7 +754,7 @@ async function MetroExplorer({ selected }: { selected?: string }) {
           ) : (
             <ul className="mt-2 space-y-2">
               {rules.map((r) => (
-                <RuleItem key={r.id} rule={r} />
+                <RuleItem key={r.id} rule={r} today={todayIso()} />
               ))}
             </ul>
           )}
