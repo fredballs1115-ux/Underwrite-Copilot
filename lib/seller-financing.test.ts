@@ -15,6 +15,7 @@ import { gluedWords } from "./render-lint";
 import { extractionInstruction } from "@/lib/anthropic/prompts";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
+import { screenYearOf } from "@/lib/criteria";
 
 const row = (label: string, value: string, page = "p. 12") => ({ label, value, flagged: false, page, basis: "na" as const });
 // The sample's $68M apartment building, the seller offering to carry 70%
@@ -153,12 +154,12 @@ describe("the note on every summary", () => {
       "The memorandum says the seller will finance the note purchase: $40.8M (60% of the price) at 6.00% for 3 years, interest-only as stated. It finances the buyer's purchase of the loan, not the property, so it is read as stated and not run against the model",
     );
     // The key terms lead it beside the note's own terms, each labelled as the purchase's.
-    const labels = keyTermRows(onNote.metrics, "stabilized", 8, "note").map((m) => m.label);
+    const labels = keyTermRows(onNote.metrics, "stabilized", screenYearOf(onNote), 8, "note").map((m) => m.label);
     expect(labels).toContain("Seller financing amount (for the note purchase; not run against the model)");
     expect(labels).toContain("Seller financing rate (for the note purchase; not run against the model)");
     expect(labels).not.toContain("Seller financing amount");
     // On the property it reads as before.
-    expect(keyTermRows(sample().metrics, "stabilized", 12).map((m) => m.label)).toContain("Seller financing amount");
+    expect(keyTermRows(sample().metrics, "stabilized", screenYearOf(sample()), 12).map((m) => m.label)).toContain("Seller financing amount");
     // The workbook's cover lists it, and says the model does not run it.
     const meta = deriveUnderwriteInputs(onNote, "note").meta.sellerNote;
     expect(meta?.line).toBe(line);
