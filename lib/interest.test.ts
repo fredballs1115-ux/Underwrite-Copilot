@@ -691,6 +691,28 @@ describe("a share beside the loan its entity carries: the grossed-up figure is t
       "whole price, the share's grossed up, $40.0M (the equity's whole, not the asset's: the entity's stated $56.5M loan sits on top of it)",
     );
   });
+
+  // The plan's facts — the deal page's strip, the shared screen and the
+  // report's plan page — still labelled the figure "Whole price, the share
+  // grossed up" beside the entity's loan.
+  it("the plan's facts label the figure the equity's whole and name the loan beside it, never adding it in", async () => {
+    const { planSummary } = await import("./deal-strategy");
+    const { planFacts } = await import("./plan-facts");
+    const e: ExtractionResult = {
+      ...recap([
+        { label: "Renovation budget", value: "$5,000,000", flagged: false, page: "p. 7" },
+        { label: "NOI (stabilized, pro forma)", value: "$6,000,000", flagged: false, page: "p. 8" },
+      ]),
+      strategy: { kind: "value_add", summary: "Renovate 240 units", capitalBudget: "", timeline: "" },
+    };
+    const plan = planSummary(e)!;
+    expect(plan.priceLabel).toBe("Equity's whole, the share grossed up");
+    expect(planFacts(plan)[1]).toEqual(["Equity's whole, the share grossed up", "$40.0M, the entity's $56.5M loan on top"]);
+    // The loan is named, never added: the total cost is the equity's whole
+    // and the budget, as before.
+    expect(plan.price).toBe(40_000_000);
+    expect(plan.totalCost).toBe(45_000_000);
+  });
 });
 
 // Research pass 23: a cell tower's leased fee read "Leased fee, reverts in

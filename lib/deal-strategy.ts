@@ -759,8 +759,10 @@ export interface PlanSummary {
   price: number | null;
   /** what the price figure is: the asking / purchase price, or on a ground-up
    *  development the land or site cost — or, where a share was bought, the
-   *  whole the share's price implies (#415) */
-  priceLabel: "Price" | "Land cost" | "Whole price, the share grossed up";
+   *  whole the share's price implies (#415): the equity's whole where the
+   *  memorandum states the loan its entity carries (`entityLoan`), since
+   *  that loan sits on top of the figure */
+  priceLabel: "Price" | "Land cost" | "Whole price, the share grossed up" | "Equity's whole, the share grossed up";
   /** why a price the OM states is not the project's, where it is not — a
    *  note's, the land's under a ground lease, a share with no stated
    *  percentage (#415); null otherwise, and the price then reads "not
@@ -836,16 +838,22 @@ export function planSummary(
   const yieldOnCost =
     stabilizedNoi && totalCost != null && totalCost > 0 ? stabilizedNoi.value / totalCost : null;
   const units = unitCountFromMetrics(metrics);
+  // Beside the loan the entity carries, a share's price grosses up to the
+  // equity's whole, not the asset's: the label says so on every surface
+  // that prints the plan's facts, as the others do (research pass 23).
+  const entityLoan = interest.sharePct != null && price != null ? entityLoanOf(extraction) : null;
   return {
     kind: strategy.kind,
     price,
     priceLabel: priceRowIsLand(priceMetric)
       ? "Land cost"
       : interest.kind === "partial_interest" && price != null
-        ? "Whole price, the share grossed up"
+        ? entityLoan != null
+          ? "Equity's whole, the share grossed up"
+          : "Whole price, the share grossed up"
         : "Price",
     priceWithheld,
-    entityLoan: interest.sharePct != null && price != null ? entityLoanOf(extraction) : null,
+    entityLoan,
     stabilizedNoi,
     budget,
     totalCost,
@@ -1065,9 +1073,13 @@ function planLine(plan: PlanSummary): string {
       ? `stabilized NOI ${money(plan.stabilizedNoi.value)} (${plan.stabilizedNoi.label})`
       : "stabilized NOI not stated",
   );
+  // A share's grossed-up price, either label, reads as it did: the
+  // parenthesis below names the equity's whole beside the entity's loan.
+  const shareWhole =
+    plan.priceLabel === "Whole price, the share grossed up" || plan.priceLabel === "Equity's whole, the share grossed up";
   parts.push(
     plan.price != null
-      ? `${plan.priceLabel === "Whole price, the share grossed up" ? "whole price, the share's grossed up," : "price"} ${money(plan.price)}${
+      ? `${shareWhole ? "whole price, the share's grossed up," : "price"} ${money(plan.price)}${
           plan.entityLoan != null
             ? ` (the equity's whole, not the asset's: the entity's stated ${money(plan.entityLoan)} loan sits on top of it)`
             : ""

@@ -34,8 +34,15 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
     ],
     // A price the OM states for something other than the project — a
     // note, the land under a ground lease, a share of no stated percentage
-    // (#415) — says so rather than "not stated".
-    [plan.priceLabel, plan.price != null ? moneyCompact(plan.price) : (plan.priceWithheld ?? "not stated")],
+    // (#415) — says so rather than "not stated". A share's price grossed up
+    // beside the loan its entity carries is the equity's whole: the label
+    // says so, and the loan is named beside the figure, never added to it.
+    [
+      plan.priceLabel,
+      plan.price != null
+        ? `${moneyCompact(plan.price)}${plan.entityLoan != null ? `, the entity's ${moneyCompact(plan.entityLoan)} loan on top` : ""}`
+        : (plan.priceWithheld ?? "not stated"),
+    ],
     [
       // A value-add's program stated a door at a time (#460): the budget is
       // the doors times a door's cost, and the label says it was multiplied.

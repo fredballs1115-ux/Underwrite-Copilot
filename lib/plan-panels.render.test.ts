@@ -12,6 +12,7 @@ import { ConstructionDebtPanel } from "@/app/(app)/deals/[id]/construction-debt-
 import { PlanStrip } from "@/app/(app)/deals/[id]/plausibility-panel";
 import { SharePlan } from "@/app/share/[token]/plan-facts";
 import { yieldOnCostText } from "@/lib/plan-facts";
+import { gluedWords, visibleText } from "@/lib/render-lint";
 
 const CONVERSION: ExtractionResult = {
   dealName: "1200 K Street — Office-to-Residential Conversion",
@@ -245,6 +246,45 @@ describe("SharePlan — the plan on the shared screen", () => {
     for (const figure of ["$21.0M", "$20.0M", "$160.0M", "$180.0M", "11.67%"]) {
       expect(share).toContain(figure);
       expect(strip).toContain(figure);
+    }
+  });
+
+  // Research pass 23 said the grossed-up figure beside the entity's stated
+  // loan is the equity's whole on every other surface; the plan's facts
+  // still called it the whole price.
+  it("calls a share's grossed-up price the equity's whole beside the entity's loan, on both panels", () => {
+    const recap: ExtractionResult = {
+      dealName: "Harbor View Apartments",
+      assetClass: "multifamily",
+      totalPages: 40,
+      interest: {
+        kind: "partial_interest",
+        summary: "A 4.5% LP interest in the owning partnership",
+        share: "4.5% limited partnership interest",
+        groundLease: "",
+        loan: "",
+        page: "",
+      },
+      strategy: { kind: "value_add", summary: "Renovate 240 units", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Asking price", value: "$1,800,000", flagged: false, page: "p. 2" },
+        { label: "Units", value: "240", flagged: false, page: "p. 2" },
+        { label: "Entity loan balance", value: "$56,500,000", flagged: false, page: "p. 9" },
+        { label: "Renovation budget", value: "$5,000,000", flagged: false, page: "p. 7" },
+        { label: "NOI (stabilized, pro forma)", value: "$6,000,000", flagged: false, page: "p. 8" },
+      ],
+    };
+    const s = inferStrategy(recap);
+    const p = planSummary(recap, s)!;
+    for (const html of [
+      renderToStaticMarkup(React.createElement(SharePlan, { strategy: s, plan: p })),
+      renderToStaticMarkup(React.createElement(PlanStrip, { strategy: s, plan: p })),
+    ]) {
+      const text = visibleText(html);
+      expect(text).toContain("Equity's whole, the share grossed up");
+      expect(text).toContain("$40.0M, the entity's $56.5M loan on top");
+      expect(text).not.toContain("Whole price");
+      expect(gluedWords(text)).toEqual([]);
     }
   });
 });
