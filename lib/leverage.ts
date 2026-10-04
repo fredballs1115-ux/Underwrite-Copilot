@@ -23,12 +23,18 @@ export interface LeverageRead {
  *  above the benchmark likely erases them. */
 export const THIN_BPS = 75;
 
+/** What the leverage check calls the screening rate the model was seeded
+ *  with (lib/debt-index): the LATEST published index — a business day or
+ *  more old, printed with its date in the seed's note — plus the class
+ *  spread. Never "today's" (research pass 27, `ratesPromptLine`'s rule). */
+export const SEEDED_RATE_BENCHMARK = "the latest index plus the class spread";
+
 export function leverageRead(
   capPct: number,
   benchmarkPct: number,
   /** what the benchmark is called in the label — the 30-yr fixed by
-   *  default; "today's index plus the class spread" when the benchmark is
-   *  the screening rate the model was seeded with (lib/debt-index) */
+   *  default; `SEEDED_RATE_BENCHMARK` when the benchmark is the screening
+   *  rate the model was seeded with (lib/debt-index) */
   benchmarkName = "the 30-yr fixed",
 ): LeverageRead | null {
   if (

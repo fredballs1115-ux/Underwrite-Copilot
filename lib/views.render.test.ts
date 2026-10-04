@@ -5309,7 +5309,7 @@ describe("ShareView — a hotel development is spoken in keys", () => {
 import { renderToString } from "react-dom/server";
 import { SampleLeverageCard } from "@/app/demo/leverage-card";
 
-describe("SampleLeverageCard — the sample's cap against the week's survey and today's 10-year", () => {
+describe("SampleLeverageCard — the sample's cap against the week's survey and the latest 10-year", () => {
   // The runner's own table (lib/live-rates.fixture): the survey at 6.95%
   // on Sep 17, the 10-year at 4.94% the same day; the sample's cap is 5.45%.
   const bench30 = { value: 6.95, asOf: "2026-09-17", source: "FRED · MORTGAGE30US", live: true };
@@ -5328,7 +5328,8 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
   });
 
   it("says the cap's spread over the 10-year as a fact with its date, and no verdict", () => {
-    expect(text).toContain("curve: the cap is 51 bps over the 10-year Treasury (4.94% on Sep 17, 2026, FRED).");
+    expect(text).toContain("Against the latest curve: the cap is 51 bps over the 10-year Treasury (4.94% on Sep 17, 2026, FRED).");
+    expect(text).not.toContain("today's curve");
   });
 
   it("the phrase the live-verify marker greps is in the markup a curl receives", () => {

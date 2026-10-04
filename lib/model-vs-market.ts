@@ -668,7 +668,7 @@ function capBandTail(input: ModelVsMarketInput, x: number): { figures: Published
     x > hi + SAME
       ? `the exit cap sits ${bps(x - hi)} over ${over} — the conservative direction for an exit.`
       : x < lo - SAME
-        ? `the exit cap sits ${bps(lo - x)} under ${under} — an exit priced tighter than the market's own ${point ? "figure" : "range"} today, which is cap compression on top of the spread read.`
+        ? `the exit cap sits ${bps(lo - x)} under ${under} — an exit priced tighter than the market's own ${point ? "figure" : "range"}, which is cap compression on top of the spread read.`
         : point
           ? "the exit cap sits at it."
           : "the exit cap sits inside it.";
@@ -688,7 +688,10 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
     { label: "10-year Treasury", text: `${ten.value.toFixed(2)}% on ${when}`, value: ten.value, asOf: ten.obsDate, publisher: "FRED" },
   ];
   const g = input.goingInCapPct;
-  const head = `The exit cap ${x.toFixed(2)}% is ${Math.abs(exitSpread)} bps ${exitSpread >= 0 ? "over" : "under"} today's 10-year (${ten.value.toFixed(2)}%, ${when}; FRED).`;
+  // The latest published 10-year, printed with its own date — a business
+  // day or more old, so never "today's" (research pass 27, the rule
+  // lib/debt-index's `ratesPromptLine` follows).
+  const head = `The exit cap ${x.toFixed(2)}% is ${Math.abs(exitSpread)} bps ${exitSpread >= 0 ? "over" : "under"} the latest 10-year (${ten.value.toFixed(2)}%, ${when}; FRED).`;
   const band = capBandTail(input, x);
   published.push(...band.figures);
   // The tracker's range is the metro's figure; with it the check reads the
@@ -720,10 +723,10 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
         : `The going-in cap ${g.toFixed(2)}%`;
   const clause =
     tone === "widens"
-      ? `so the exit assumes the spread widens ${delta} bps with the 10-year where it is today — the conservative direction.`
+      ? `so the exit assumes the spread widens ${delta} bps with the 10-year unchanged — the conservative direction.`
       : tone === "compresses"
-        ? `so the exit assumes the spread narrows ${-delta} bps with the 10-year where it is today. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.`
-        : "so the exit holds the spread with the 10-year where it is today.";
+        ? `so the exit assumes the spread narrows ${-delta} bps with the 10-year unchanged. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.`
+        : "so the exit holds the spread with the 10-year unchanged.";
   return {
     key: "exit_cap",
     title: "Exit cap",

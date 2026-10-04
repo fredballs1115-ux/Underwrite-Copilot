@@ -157,7 +157,7 @@ describe("ReportDocument (full report)", () => {
               tone: "widens",
               toneLabel: "spread widens at the exit",
               scope: "national",
-              read: "The exit cap 6.00% is 106 bps over today's 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year where it is today - the conservative direction.",
+              read: "The exit cap 6.00% is 106 bps over the latest 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year unchanged - the conservative direction.",
             },
           ],
         }),
@@ -172,7 +172,7 @@ describe("ReportDocument (full report)", () => {
     expect(assumedText).toContain("Rent growth 3.0%/yr (a screening default)");
     expect(assumedText).toContain("ahead of the published figures");
     expect(assumedText).toContain("Exit cap 6.00% (derived from the documents)");
-    expect(assumedText).toContain("spread widens 55 bps with the 10-year where it is today");
+    expect(assumedText).toContain("spread widens 55 bps with the 10-year unchanged");
     expect(await pdfTextOf(buf)).not.toContain("Assumptions against the published figures");
 
     // The comp page draws each sale comp's stated basis on one track with

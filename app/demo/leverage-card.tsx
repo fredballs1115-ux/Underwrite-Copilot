@@ -60,7 +60,7 @@ export function SampleLeverageCard({
       </p>
       {capSpread && tenYear && (
         <p className="mt-1 text-sm leading-relaxed text-muted">
-          {`Against today's curve: the cap is ${capSpread.label} (${tenYear.pct.toFixed(2)}% on ${datedLong(tenYear.asOf)}, FRED).`}
+          {`Against the latest curve: the cap is ${capSpread.label} (${tenYear.pct.toFixed(2)}% on ${datedLong(tenYear.asOf)}, FRED).`}
         </p>
       )}
     </div>

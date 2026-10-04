@@ -36,7 +36,7 @@ import { rankLabel } from "@/lib/rank";
 import { linkOk } from "@/lib/link-audit";
 import { coveredState, dataMetroForAddress, isDataMetro, metroForAddress } from "@/lib/market-match";
 import { parsePct } from "@/lib/criteria";
-import { capSpreadRead, leverageRead } from "@/lib/leverage";
+import { capSpreadRead, leverageRead, SEEDED_RATE_BENCHMARK } from "@/lib/leverage";
 import {
   benchmark30,
   datedLong,
@@ -394,7 +394,7 @@ export async function ResearchPanel({
   // assumption, both named in the seed's own note.
   const capSpread = capPct != null && tenYear ? capSpreadRead(capPct, tenYear.pct) : null;
   const seededLeverage =
-    capPct != null && rateSeed ? leverageRead(capPct, rateSeed.pct, "today's index plus the class spread") : null;
+    capPct != null && rateSeed ? leverageRead(capPct, rateSeed.pct, SEEDED_RATE_BENCHMARK) : null;
 
   const hasRegulation = shown.length > 0;
   const hasBenchmarks = metroBench.length > 0;
@@ -505,7 +505,7 @@ export async function ResearchPanel({
             <div className="mt-2 border-t border-line/60 pt-2" data-qa="leverage-today">
               {capSpread && tenYear && (
                 <p className="text-xs leading-relaxed text-muted">
-                  {`Against today's curve: the cap is ${capSpread.label} (${tenYear.pct.toFixed(2)}% on ${datedLong(tenYear.asOf)}, FRED).`}
+                  {`Against the latest curve: the cap is ${capSpread.label} (${tenYear.pct.toFixed(2)}% on ${datedLong(tenYear.asOf)}, FRED).`}
                 </p>
               )}
               {seededLeverage && rateSeed && (

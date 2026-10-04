@@ -744,7 +744,7 @@ describe("the workbook's labels and colours say what their cells are", () => {
           tone: "widens" as const,
           toneLabel: "spread widens at the exit",
           scope: "national" as const,
-          read: "The exit cap 6.00% is 106 bps over today's 10-year.",
+          read: "The exit cap 6.00% is 106 bps over the latest 10-year.",
         },
       ],
     };
@@ -992,7 +992,7 @@ describe("the Market Read tab — the assumptions against the published figures,
         tone: "widens",
         toneLabel: "spread widens at the exit",
         scope: "national",
-        read: "The exit cap 6.00% is 106 bps over today's 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year where it is today — the conservative direction.",
+        read: "The exit cap 6.00% is 106 bps over the latest 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year unchanged — the conservative direction.",
       },
     ],
   };

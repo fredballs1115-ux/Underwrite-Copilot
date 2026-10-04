@@ -154,14 +154,14 @@ describe("modelVsMarket — the model's four assumptions against the published f
     );
   });
 
-  it("exit cap: the spread over today's 10-year beside the going-in cap's — a widening is named as the conservative direction", () => {
+  it("exit cap: the spread over the latest 10-year beside the going-in cap's — a widening is named as the conservative direction", () => {
     const c = check(base, "exit_cap")!;
     expect(c.model).toBe("6.00%");
     expect(c.modelSource).toBe("derived from the documents");
     expect(c.published[0]).toMatchObject({ label: "10-year Treasury", value: 4.94, asOf: "2026-09-17", publisher: "FRED" });
     expect(c.tone).toBe("widens");
     expect(c.read).toBe(
-      "The exit cap 6.00% is 106 bps over today's 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year where it is today — the conservative direction.",
+      "The exit cap 6.00% is 106 bps over the latest 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap 5.45% is 51 bps over it, so the exit assumes the spread widens 55 bps with the 10-year unchanged — the conservative direction.",
     );
   });
 
@@ -169,11 +169,11 @@ describe("modelVsMarket — the model's four assumptions against the published f
     const c = check({ ...base, inputs: { ...base.inputs, exitCapPct: 0.05 } }, "exit_cap")!;
     expect(c.tone).toBe("compresses");
     expect(c.toneLabel).toBe("assumes cap compression");
-    expect(c.read).toContain("The exit cap 5.00% is 6 bps over today's 10-year");
-    expect(c.read).toContain("so the exit assumes the spread narrows 45 bps with the 10-year where it is today. Cap compression is not a plan");
+    expect(c.read).toContain("The exit cap 5.00% is 6 bps over the latest 10-year");
+    expect(c.read).toContain("so the exit assumes the spread narrows 45 bps with the 10-year unchanged. Cap compression is not a plan");
     const level = check({ ...base, inputs: { ...base.inputs, exitCapPct: 0.0545 } }, "exit_cap")!;
     expect(level.tone).toBe("level");
-    expect(level.read).toContain("so the exit holds the spread with the 10-year where it is today.");
+    expect(level.read).toContain("so the exit holds the spread with the 10-year unchanged.");
   });
 
   it("a plan deal has no going-in cap: the exit's spread is stated, not set against an entry", () => {
@@ -278,7 +278,8 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
     expect(text).toContain("from the documents");
     expect(text).toContain("Exit cap");
     expect(text).toContain("spread widens at the exit");
-    expect(text).toContain("106 bps over today");
+    expect(text).toContain("106 bps over the latest 10-year");
+    expect(text).not.toContain("today's 10-year");
   });
 
   it("says the national scope where no metro figure was read, names the rows it has, and renders nothing with nothing to say", () => {
@@ -547,7 +548,7 @@ describe("the going-in cap the documents imply where they state none", () => {
       expect(exit?.modelSource).toBe("a screening default");
       expect(exit?.tone).toBe("compresses");
       expect(exit?.read).toContain(
-        "The exit cap 6.00% is 106 bps over today's 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap implied by the OM's NOI over its price, 7.50%, is 256 bps over it, so the exit assumes the spread narrows 150 bps with the 10-year where it is today. Cap compression is not a plan",
+        "The exit cap 6.00% is 106 bps over the latest 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap implied by the OM's NOI over its price, 7.50%, is 256 bps over it, so the exit assumes the spread narrows 150 bps with the 10-year unchanged. Cap compression is not a plan",
       );
       expect(exit?.read).not.toContain("No going-in cap");
     }
@@ -940,7 +941,7 @@ describe("the tracker inside the model's checks", () => {
       "The research tracker's apartment cap range is 4.75–5.50% (a band on a deal mix leaning Class B / value-add): publisher not recorded, the Washington DC region, undated (read Aug 25, 2026), and the exit cap sits 50 bps over its high end — the conservative direction for an exit.",
     );
     const tight = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.045 } }, "exit_cap")!;
-    expect(tight.read).toContain("the exit cap sits 25 bps under its low end — an exit priced tighter than the market's own range today, which is cap compression on top of the spread read.");
+    expect(tight.read).toContain("the exit cap sits 25 bps under its low end — an exit priced tighter than the market's own range, which is cap compression on top of the spread read.");
     const within = check({ ...apt, inputs: { ...base.inputs, exitCapPct: 0.05 } }, "exit_cap")!;
     expect(within.read).toContain("and the exit cap sits inside it.");
     // A plan deal states its spread and still reads the range.

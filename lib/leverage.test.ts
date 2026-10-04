@@ -1,15 +1,36 @@
 import { describe, expect, it } from "vitest";
-import { capSpreadRead, leverageRead, THIN_BPS } from "./leverage";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { capSpreadRead, leverageRead, SEEDED_RATE_BENCHMARK, THIN_BPS } from "./leverage";
 
 describe("leverageRead against a named benchmark", () => {
   it("names the 30-yr fixed by default and the seeded screening rate when told to", () => {
     expect(leverageRead(5.4, 6.78)?.label).toBe("Negative leverage: going-in cap sits 138 bps below the 30-yr fixed");
-    expect(leverageRead(5.4, 6.78, "today's index plus the class spread")?.label).toBe(
-      "Negative leverage: going-in cap sits 138 bps below today's index plus the class spread",
+    // The seed is the latest published index, a business day or more old and
+    // printed with its date — never "today's" (research pass 27).
+    expect(SEEDED_RATE_BENCHMARK).toBe("the latest index plus the class spread");
+    expect(leverageRead(5.4, 6.78, SEEDED_RATE_BENCHMARK)?.label).toBe(
+      "Negative leverage: going-in cap sits 138 bps below the latest index plus the class spread",
     );
-    expect(leverageRead(7.6, 6.78, "today's index plus the class spread")?.label).toBe(
-      "Positive leverage at the benchmark: 82 bps above today's index plus the class spread",
+    expect(leverageRead(7.6, 6.78, SEEDED_RATE_BENCHMARK)?.label).toBe(
+      "Positive leverage at the benchmark: 82 bps above the latest index plus the class spread",
     );
+  });
+
+  it("the deal page's research panel and the demo say the latest curve, never today's", () => {
+    // The panel reads the database, so no render test reaches it; its words
+    // are held here at the source, beside the demo card's — comments aside.
+    const code = (rel: string) =>
+      readFileSync(join(process.cwd(), rel), "utf8")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
+        .replace(/(^|[^:])\/\/.*$/gm, "$1");
+    const panel = code("app/(app)/deals/[id]/research-panel.tsx");
+    const demo = code("app/demo/leverage-card.tsx");
+    expect(panel).toContain("leverageRead(capPct, rateSeed.pct, SEEDED_RATE_BENCHMARK)");
+    for (const src of [panel, demo]) {
+      expect(src).toContain("`Against the latest curve: the cap is ${capSpread.label}");
+      expect(src).not.toMatch(/today(?:'|’|&apos;)s (?:curve|index|10-year|Treasury|SOFR)/);
+    }
   });
 });
 
