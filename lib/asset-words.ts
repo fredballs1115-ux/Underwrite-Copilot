@@ -214,9 +214,38 @@ const MANY_TENANTS = /\bmulti[- ]?tenant(?:ed)?\b|\btenants\b/i;
 const leasedSite = (s: string) => LAND_WORDS.test(s) && LEASE_WORDS.test(s) && !MANY_TENANTS.test(s);
 const bareLand = (s: string) => LAND_WORDS.test(s) && !LEASE_WORDS.test(s);
 
+// Housing over shops or offices is one building of two uses — "Apartments
+// over retail", "Retail/Residential", "Multifamily with ground-floor
+// retail". Only the words "mixed use" reached the mixed-use rule, so the
+// retail rule, which runs before the housing one, filed each as a store:
+// commercial to the rules panel, and a 1962, 36-unit Los Angeles building
+// filed "Apartments over retail" lost its rent ordinance (research pass 23).
+// Housing words beside commercial words are mixed-use. A change of use from
+// one to the other ("office-to-residential", "hotel-to-apartment", a
+// conversion, an adaptive reuse) is a conversion, filed by the rules below
+// as it was; a leasing or management office is part of an apartment
+// building; and land named for both uses is land.
+const HOUSING_WORDS = /\b(?:apartments?|residential|residences|multi[- ]?family|housing|dwelling\s+units?)\b/i;
+const COMMERCIAL_WORDS =
+  /\b(?:retail|commercial|shops?|storefronts?|restaurants?)\b|(?<!\b(?:leasing|management|rental|on[- ]site)\s)\boffices?\b/i;
+const USE_WORD = String.raw`(?:office|retail|hotel|motel|commercial|industrial|warehouse|church|school|apartment|residential|multi[- ]?family|housing|condo|resi)s?`;
+const CHANGE_OF_USE = new RegExp(
+  String.raw`\b${USE_WORD}[\s-]+(?:to|into)[\s-]+${USE_WORD}\b|\bconver(?:sions?|ts?|ted|ting)\b|\badaptive[\s-]+re-?use\b|\bchange[\s-]+of[\s-]+use\b`,
+  "i",
+);
+const NAMES_LAND = /\b(?:land|parcels?|acreage|acres?|lots|entitled)\b/i;
+const housingWithCommercial = (s: string) =>
+  HOUSING_WORDS.test(s) && COMMERCIAL_WORDS.test(s) && !CHANGE_OF_USE.test(s) && !NAMES_LAND.test(s);
+
 /** Where a class the model phrased itself ("NNN retail", "boutique hotel")
  *  is filed — by the words it used, first match wins, longest tells first. */
 const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean), string])[] = [
+  // An RV park or an RV resort lets its sites as a park lets its pads, and
+  // is filed as one: the hotel rule's "resort" ran first and filed "RV
+  // Resort & Campground" as a hotel — a hotel's defaults, invented floor
+  // area and a hotel's reserve — while "RV Park" filed as a park (research
+  // pass 23). Read ahead of the hotel rule.
+  [/\brv[\s-]+(?:parks?|resorts?)\b/i, "manufactured_housing"],
   [/\b(hotel|hospitality|lodging|motel|resort|short[- ]term rental|str)\b/i, "hospitality_str"],
   [/\b(self[- ]?storage|mini[- ]?storage)\b/i, "self_storage"],
   // Storage that is a warehouse or a yard — refrigerated buildings and
@@ -227,7 +256,7 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   // self-storage for both).
   [/\b(cold[- ]storage|refrigerated|freezer|industrial outdoor storage|outdoor storage|ios)\b/i, "industrial"],
   [/\b(storage)\b/i, "self_storage"],
-  [/\b(manufactured|mobile[- ]home|mhc|rv park|rv resort)\b/i, "manufactured_housing"],
+  [/\b(manufactured|mobile[- ]home|mhc)\b/i, "manufactured_housing"],
   [/\b(student)\b/i, "student_housing"],
   // A continuing care retirement community (a CCRC, a "life plan
   // community") and an active adult community are senior housing by their
@@ -236,6 +265,9 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
     /\b(senior|assisted living|memory care|independent living|skilled nursing|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|active[\s-]+adult|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?))\b/i,
     "senior_housing",
   ],
+  // Housing beside shops or offices, read ahead of the office and retail
+  // rules that had filed it as one of them (`housingWithCommercial`).
+  [housingWithCommercial, "mixed_use"],
   [/\b(medical office|mob\b|medical)\b/i, "medical_office"],
   [/\b(data ?cent(er|re)s?)\b/i, "data_center"],
   [/\b(parking|garage)\b/i, "parking"],
@@ -252,10 +284,16 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   [leasedSite, "net_lease"],
   [bareLand, "land_infill"],
   [/\b(sfr|single[- ]family|btr|build[- ]to[- ]rent|townhomes?|scattered)\b/i, "sfr_btr"],
-  [/\b(office|creative|life science|lab)\b/i, "office"],
+  // A laboratory is filed with the life-science buildings, as an office
+  // (research pass 23: "Laboratory" filed nowhere, "Life Sciences" nowhere
+  // either — the plural ran past the word's end). The research tracker and
+  // the lessor rent index read neither for it (lib/tracker-read).
+  [/\b(office|creative|life sciences?|labs?|laborator(?:y|ies))\b/i, "office"],
   [/\b(industrial|warehouse|logistics|distribution|flex|manufacturing|cold storage|ios|outdoor storage)\b/i, "industrial"],
   [/\b(retail|shopping|strip|grocery|restaurant|qsr)\b/i, "retail"],
-  [/\b(multifamily|multi[- ]family|apartment|residential|condo|garden|mid[- ]rise|high[- ]rise|walk[- ]up)\b/i, "multifamily"],
+  // "Apartments" in the plural too: the bare word ran past the rule's end
+  // and filed nowhere, a building of apartments read as no class at all.
+  [/\b(multifamily|multi[- ]family|apartments?|residential|condo|garden|mid[- ]rise|high[- ]rise|walk[- ]up)\b/i, "multifamily"],
   // Rental housing named by its program or its tenants ("Affordable Housing
   // (LIHTC)", "Workforce Housing") — last, so a student, senior,
   // manufactured or single-family phrase is read by its own rule first.

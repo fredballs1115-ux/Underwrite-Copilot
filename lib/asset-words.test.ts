@@ -224,6 +224,67 @@ describe("the asset-words table", () => {
     expect(assetClassKey("Active adult manufactured housing community")).toBe("manufactured_housing");
   });
 
+  // Research pass 23: the retail rule ran before the housing one and only
+  // the words "mixed use" reached the mixed-use rule, so a building of
+  // apartments over shops filed as a store — commercial to the rules panel,
+  // which dropped a 1962, 36-unit Los Angeles building's rent ordinance.
+  it("files housing beside shops or offices as mixed-use, rental housing to the rules", () => {
+    for (const phrase of [
+      "Apartments over retail",
+      "Retail/Residential",
+      "Multifamily with ground-floor retail",
+      "Residential over retail",
+      "Ground-floor retail with apartments above",
+      "Office/Residential",
+      "Residential and commercial",
+      "Apartments over shops",
+      "Residences over restaurants",
+      "Multi-family over storefronts",
+      "Affordable housing over retail (LIHTC)",
+      // The parking and medical rules no longer take a building of housing
+      // and shops before it is read as one.
+      "Apartments over retail with structured parking",
+      "Apartments over medical office",
+    ]) {
+      expect(assetClassKey(phrase), phrase).toBe("mixed_use");
+      expect(isResidentialClass(phrase), phrase).toBe(true);
+    }
+    // A change of use stays a conversion, filed by the building it is now.
+    expect(assetClassKey("Office-to-residential")).toBe("office");
+    expect(assetClassKey("Office-to-residential conversion")).toBe("office");
+    expect(assetClassKey("Adaptive reuse (office to residential)")).toBe("office");
+    expect(assetClassKey("Office building; residential conversion potential")).toBe("office");
+    expect(assetClassKey("Retail to residential conversion")).toBe("retail");
+    expect(assetClassKey("Hotel-to-apartment conversion")).toBe("hospitality_str");
+    // A student, senior or park phrase keeps its own class; land named for
+    // both uses is land; a commercial building with no housing is as it was.
+    expect(assetClassKey("Student housing with ground-floor retail")).toBe("student_housing");
+    expect(assetClassKey("Commercial and residential land")).toBe("land_infill");
+    expect(assetClassKey("Retail with office above")).toBe("office");
+    expect(assetClassKey("Retail condo")).toBe("retail");
+    // A building of apartments is rental housing in the plural too.
+    expect(assetClassKey("Apartments")).toBe("multifamily");
+    expect(isResidentialClass("Apartments")).toBe(true);
+  });
+
+  it("files an RV resort as an RV park is filed, never as a hotel", () => {
+    // The hotel rule's "resort" read first and filed it as lodging.
+    expect(assetClassKey("RV Resort & Campground")).toBe("manufactured_housing");
+    expect(assetClassKey("RV Resorts")).toBe("manufactured_housing");
+    expect(assetClassKey("RV Park")).toBe("manufactured_housing");
+    // A resort with no RV in it is still a hotel; RV storage is still storage.
+    expect(assetClassKey("Resort hotel")).toBe("hospitality_str");
+    expect(assetClassKey("RV and boat storage")).toBe("self_storage");
+  });
+
+  it("files a laboratory with the life-science buildings, as an office", () => {
+    for (const phrase of ["Laboratory", "Laboratory building", "Laboratories", "Labs", "Life Sciences Campus", "Life Science / Lab"]) {
+      expect(assetClassKey(phrase), phrase).toBe("office");
+    }
+    // A medical lab is still read by the medical rule first.
+    expect(assetClassKey("Medical laboratory")).toBe("medical_office");
+  });
+
   it("gives an unknown phrase the generic words under its own label", () => {
     const w = assetWords("Something else entirely");
     expect(w.label).toBe("Something else entirely");
