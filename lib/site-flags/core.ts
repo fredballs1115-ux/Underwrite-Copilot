@@ -137,46 +137,113 @@ const OZ_UNCHECKED_WHY: Record<OpportunityZoneUnchecked, string> = {
   lookup_failed: "the zone list could not be read",
 };
 
+/** When the next round's zones take effect and when the 2018 round's end,
+ *  as ISO days: data/research/tax_law.json (`opportunity_zones_2`, sourced)
+ *  says the next round's "zones take EFFECT January 1, 2027; old zones
+ *  overlap until December 31, 2028". The site holds only the 2018 list, so
+ *  what an answer from it means turns on these two days; a test holds both
+ *  to the file's words. */
+export const OZ_NEXT_ROUND_EFFECTIVE = "2027-01-01";
+export const OZ_2018_ROUND_LAST_DAY = "2028-12-31";
+
+/** Where the 2018 round stands on `today` (an ISO day, UTC, read by the page
+ *  and handed in, as the fair market rent's readers take it): the next round
+ *  not yet in effect, both rounds' zones in effect, or the 2018 designations
+ *  over. */
+export type OzRoundPhase = "ahead" | "overlap" | "ended";
+
+export function ozRoundPhase(today: string): OzRoundPhase {
+  if (today < OZ_NEXT_ROUND_EFFECTIVE) return "ahead";
+  if (today > OZ_2018_ROUND_LAST_DAY) return "ended";
+  return "overlap";
+}
+
+/** An ISO day in words, read in UTC: "January 1, 2027", or "Dec 31, 2028". */
+function ozDay(iso: string, month: "long" | "short"): string {
+  return new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month, day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+/** The line said beside every answer the 2018 list gives, as it stands on
+ *  `today`: before the next round takes effect, that it is coming; while
+ *  both rounds' zones are in effect, that it took effect and this checks
+ *  only the 2018 list; once the 2018 designations end, that they ended. */
+export function ozRoundNote(today: string): string {
+  const takesEffect = ozDay(OZ_NEXT_ROUND_EFFECTIVE, "long");
+  const lastDay = ozDay(OZ_2018_ROUND_LAST_DAY, "long");
+  switch (ozRoundPhase(today)) {
+    case "ahead":
+      return `This checks the 2018 round's zones. The next round's zones take effect ${takesEffect} and the 2018 zones run to ${lastDay}, so a deal closing from ${OZ_NEXT_ROUND_EFFECTIVE.slice(0, 4)} should be checked against the new round's maps too.`;
+    case "overlap":
+      return `This checks only the 2018 round's zones. The next round's zones took effect ${takesEffect} and are not on this list; the 2018 zones run to ${lastDay}, so check the new round's maps too.`;
+    case "ended":
+      return `The 2018 round's zones ended ${lastDay}, and this checks only that round's list — not the round that took effect ${takesEffect}. Check the current round's maps.`;
+  }
+}
+
 /** What the site-flags card says about the Opportunity Zone, from a stored
- *  lookup: the chip, and for a tract off the list the one caveat it owes. */
+ *  lookup on a given day: the chip, the caveat a tract off the list owes,
+ *  and the round's line. */
 export interface OpportunityZoneRead {
   kind: "listed" | "not_listed" | "unchecked";
   label: string;
   /** said under the chips where the tract's current number is off the list */
   caveat: string | null;
+  /** where the 2018 round stands on the day read: a tract on its list names
+   *  a zone in force only until the round ends, and is drawn as one only
+   *  until then */
+  phase: OzRoundPhase;
+  /** the round's line (`ozRoundNote`), beside every answer the list gave;
+   *  null where the check did not answer */
+  note: string | null;
 }
-
-/** The next round (data/research/tax_law.json, sourced): the program's new
- *  zones take effect January 1, 2027 and the 2018 zones run to December 31,
- *  2028, so an answer from the 2018 list is not the whole answer for a deal
- *  closing from 2027 — said beside every answer the list gives. */
-export const OZ_NEXT_ROUND_NOTE =
-  "This checks the 2018 round's zones. The next round's zones take effect January 1, 2027 and the 2018 zones run to December 31, 2028, so a deal closing from 2027 should be checked against the new round's maps too.";
 
 export const OZ_CURRENT_NUMBER_CAVEAT =
   "Opportunity Zones were checked by the tract's current number. The zones were designated on 2010 tract numbers, so a tract split or renumbered since can sit in a zone and still miss the list.";
 
+/** The same caveat once the 2018 designations have ended: no tract sits in
+ *  one of their zones any more. */
+export const OZ_CURRENT_NUMBER_CAVEAT_ENDED =
+  "Opportunity Zones were checked by the tract's current number. The 2018 zones were designated on 2010 tract numbers, so a tract split or renumbered since can have been in one and still miss the list.";
+
 /** The labels name the list's year: the zones on it are the 2018
  *  designations (the CDFI Fund's workbook: "the final Qualified Opportunity
  *  Zone designations for all States", updated December 14, 2018), and a
- *  label that says which list stays true whatever is designated later. */
+ *  label that says which list stays true whatever is designated later. A
+ *  tract on the list is in a zone only until the 2018 designations end;
+ *  after that its chip says they ended, never a zone in force. `today` is an
+ *  ISO day (UTC), read by the page and handed in. */
 export function opportunityZoneRead(
   flags: Pick<SiteFlagsResult, "opportunityZone" | "opportunityZoneUnchecked" | "v" | "ozTract">,
+  today: string,
 ): OpportunityZoneRead {
+  const phase = ozRoundPhase(today);
+  const note = ozRoundNote(today);
   const oz = flags.opportunityZone;
-  if (oz && typeof oz === "object") return { kind: "listed", label: "Opportunity Zone tract (2018 designations)", caveat: null };
+  if (oz && typeof oz === "object") {
+    const label =
+      phase === "ended"
+        ? `In a 2018 Opportunity Zone tract; those designations ended ${ozDay(OZ_2018_ROUND_LAST_DAY, "short")}`
+        : "Opportunity Zone tract (2018 designations)";
+    return { kind: "listed", label, caveat: null, phase, note };
+  }
   // A "not on the list" stored before the state rule may have been read
   // against another state's zones: not an answer.
   if (oz === null && (flags.v ?? 1) >= OZ_STATE_RULE_V) {
     // Read by the 2010 number the zones were designated on, a miss is the
     // answer; read by the current number, it owes the caveat.
     if (flags.ozTract?.vintage === "2010") {
-      return { kind: "not_listed", label: "Tract not on the 2018 Opportunity Zone list", caveat: null };
+      return { kind: "not_listed", label: "Tract not on the 2018 Opportunity Zone list", caveat: null, phase, note };
     }
-    return { kind: "not_listed", label: "Tract's current number not on the 2018 Opportunity Zone list", caveat: OZ_CURRENT_NUMBER_CAVEAT };
+    return {
+      kind: "not_listed",
+      label: "Tract's current number not on the 2018 Opportunity Zone list",
+      caveat: phase === "ended" ? OZ_CURRENT_NUMBER_CAVEAT_ENDED : OZ_CURRENT_NUMBER_CAVEAT,
+      phase,
+      note,
+    };
   }
   const why = oz === "unchecked" && flags.opportunityZoneUnchecked ? OZ_UNCHECKED_WHY[flags.opportunityZoneUnchecked] : null;
-  return { kind: "unchecked", label: `Opportunity Zone: not checked${why ? ` (${why})` : ""}`, caveat: null };
+  return { kind: "unchecked", label: `Opportunity Zone: not checked${why ? ` (${why})` : ""}`, caveat: null, phase, note: null };
 }
 
 /**

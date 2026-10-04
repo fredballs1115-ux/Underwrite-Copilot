@@ -1,10 +1,16 @@
+import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   isHighRiskZone,
   opportunityZoneFrom,
   opportunityZoneRead,
+  OZ_2018_ROUND_LAST_DAY,
   OZ_CURRENT_NUMBER_CAVEAT,
+  OZ_CURRENT_NUMBER_CAVEAT_ENDED,
+  OZ_NEXT_ROUND_EFFECTIVE,
   OZ_STATE_RULE_V,
+  ozRoundNote,
+  ozRoundPhase,
   parseCensusCounty,
   parseCensusPlace,
   parseCensusTract,
@@ -17,6 +23,9 @@ import {
   tractStateFips,
   type SiteFlagsResult,
 } from "./core";
+
+/** A day before the next round of Opportunity Zones takes effect. */
+const BEFORE_NEXT_ROUND = "2026-10-04";
 
 describe("isHighRiskZone", () => {
   it("flags A- and V-prefixed SFHA zones", () => {
@@ -413,7 +422,7 @@ describe("the Opportunity Zone check — not on the list only where the list hol
   });
 
   it("says a miss was checked by the tract's current number, and never that the site is outside a zone", () => {
-    const off = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V });
+    const off = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V }, BEFORE_NEXT_ROUND);
     expect(off.kind).toBe("not_listed");
     expect(off.label).toBe("Tract's current number not on the 2018 Opportunity Zone list");
     expect(off.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);
@@ -422,33 +431,109 @@ describe("the Opportunity Zone check — not on the list only where the list hol
       expect(text).not.toMatch(/not in an opportunity zone/i);
       expect(text).not.toMatch(/outside (an|the) opportunity zone/i);
     }
-    expect(opportunityZoneRead({ opportunityZone: { sourceDataset: "x" }, v: SITE_FLAGS_V })).toEqual({
+    expect(opportunityZoneRead({ opportunityZone: { sourceDataset: "x" }, v: SITE_FLAGS_V }, BEFORE_NEXT_ROUND)).toEqual({
       kind: "listed",
       label: "Opportunity Zone tract (2018 designations)",
       caveat: null,
+      phase: "ahead",
+      note: ozRoundNote(BEFORE_NEXT_ROUND),
     });
   });
 
   it("a miss read by the 2010 tract the zones were designated on owes no caveat (#473)", () => {
-    const off = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "2010" } });
-    expect(off).toEqual({ kind: "not_listed", label: "Tract not on the 2018 Opportunity Zone list", caveat: null });
+    const off = opportunityZoneRead(
+      { opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "2010" } },
+      BEFORE_NEXT_ROUND,
+    );
+    expect(off).toMatchObject({ kind: "not_listed", label: "Tract not on the 2018 Opportunity Zone list", caveat: null });
     // Read by the current number, it keeps the caveat.
-    const current = opportunityZoneRead({ opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "current" } });
+    const current = opportunityZoneRead(
+      { opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "current" } },
+      BEFORE_NEXT_ROUND,
+    );
     expect(current.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);
   });
 
   it("a 'not on the list' stored before the state rule is no answer, and a check that did not run says why", () => {
     // v2 and earlier read the miss against whatever state the registry held.
     expect(OZ_STATE_RULE_V).toBeLessThanOrEqual(SITE_FLAGS_V);
-    expect(opportunityZoneRead({ opportunityZone: null, v: 2 })).toEqual({ kind: "unchecked", label: "Opportunity Zone: not checked", caveat: null });
-    expect(opportunityZoneRead({ opportunityZone: null })).toEqual({ kind: "unchecked", label: "Opportunity Zone: not checked", caveat: null });
+    const unchecked = { kind: "unchecked", label: "Opportunity Zone: not checked", caveat: null, note: null };
+    expect(opportunityZoneRead({ opportunityZone: null, v: 2 }, BEFORE_NEXT_ROUND)).toMatchObject(unchecked);
+    expect(opportunityZoneRead({ opportunityZone: null }, BEFORE_NEXT_ROUND)).toMatchObject(unchecked);
     const why = (r: "no_tract" | "tract_failed" | "state_not_loaded" | "lookup_failed") =>
-      opportunityZoneRead({ opportunityZone: "unchecked", opportunityZoneUnchecked: r, v: SITE_FLAGS_V }).label;
+      opportunityZoneRead({ opportunityZone: "unchecked", opportunityZoneUnchecked: r, v: SITE_FLAGS_V }, BEFORE_NEXT_ROUND).label;
     expect(why("state_not_loaded")).toBe("Opportunity Zone: not checked (no zones on file for this state)");
     expect(why("no_tract")).toBe("Opportunity Zone: not checked (no census tract for this point)");
     expect(why("tract_failed")).toBe("Opportunity Zone: not checked (the census tract lookup failed)");
     expect(why("lookup_failed")).toBe("Opportunity Zone: not checked (the zone list could not be read)");
     // An older "unchecked" carries no reason: it names none rather than guess one.
-    expect(opportunityZoneRead({ opportunityZone: "unchecked", v: 2 }).label).toBe("Opportunity Zone: not checked");
+    expect(opportunityZoneRead({ opportunityZone: "unchecked", v: 2 }, BEFORE_NEXT_ROUND).label).toBe("Opportunity Zone: not checked");
+  });
+});
+
+// The site holds only the 2018 list, so what an answer from it means turns on
+// two days the research file states: the next round takes effect, then the
+// 2018 designations end. Each page hands the reader today's date.
+describe("opportunityZoneRead — the 2018 round's wording at three dates", () => {
+  const listed = { opportunityZone: { sourceDataset: "CDFI Fund QOZ list" }, v: SITE_FLAGS_V } as const;
+  const offByCurrent = { opportunityZone: null, v: SITE_FLAGS_V } as const;
+  const offBy2010 = { opportunityZone: null, v: SITE_FLAGS_V, ozTract: { geoid: "24005400100", vintage: "2010" as const } };
+
+  it("takes both days from data/research/tax_law.json, in its own words", () => {
+    const summary = (JSON.parse(readFileSync("data/research/tax_law.json", "utf8")) as { opportunity_zones_2: { summary: string } })
+      .opportunity_zones_2.summary;
+    const words = (iso: string) =>
+      new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+    // "…its zones take EFFECT January 1, 2027; old zones overlap until December 31, 2028."
+    expect(summary).toContain(`zones take EFFECT ${words(OZ_NEXT_ROUND_EFFECTIVE)}`);
+    expect(summary).toContain(`old zones overlap until ${words(OZ_2018_ROUND_LAST_DAY)}`);
+    expect(words(OZ_NEXT_ROUND_EFFECTIVE)).toBe("January 1, 2027");
+    expect(words(OZ_2018_ROUND_LAST_DAY)).toBe("December 31, 2028");
+  });
+
+  it("turns on the day the next round takes effect and the day after the 2018 round's last", () => {
+    expect(ozRoundPhase("2026-12-31")).toBe("ahead");
+    expect(ozRoundPhase("2027-01-01")).toBe("overlap");
+    expect(ozRoundPhase("2028-12-31")).toBe("overlap");
+    expect(ozRoundPhase("2029-01-01")).toBe("ended");
+  });
+
+  it("before 2027: as it read when the round was announced", () => {
+    const r = opportunityZoneRead(listed, BEFORE_NEXT_ROUND);
+    expect(r).toMatchObject({ kind: "listed", label: "Opportunity Zone tract (2018 designations)", phase: "ahead" });
+    expect(r.note).toBe(
+      "This checks the 2018 round's zones. The next round's zones take effect January 1, 2027 and the 2018 zones run to December 31, 2028, so a deal closing from 2027 should be checked against the new round's maps too.",
+    );
+    expect(opportunityZoneRead(offByCurrent, BEFORE_NEXT_ROUND).note).toBe(r.note);
+  });
+
+  it("from January 1, 2027: the next round took effect, and this checks only the 2018 list", () => {
+    const r = opportunityZoneRead(listed, "2027-06-30");
+    expect(r).toMatchObject({ kind: "listed", label: "Opportunity Zone tract (2018 designations)", phase: "overlap" });
+    expect(r.note).toBe(
+      "This checks only the 2018 round's zones. The next round's zones took effect January 1, 2027 and are not on this list; the 2018 zones run to December 31, 2028, so check the new round's maps too.",
+    );
+    expect(r.note).not.toMatch(/take effect/);
+    expect(opportunityZoneRead(offBy2010, "2027-06-30")).toMatchObject({ label: "Tract not on the 2018 Opportunity Zone list", note: r.note });
+    expect(opportunityZoneRead(offByCurrent, "2027-06-30").caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT);
+  });
+
+  it("after December 31, 2028: no chip or line reads as a zone in force", () => {
+    const r = opportunityZoneRead(listed, "2029-03-15");
+    expect(r).toMatchObject({
+      kind: "listed",
+      label: "In a 2018 Opportunity Zone tract; those designations ended Dec 31, 2028",
+      phase: "ended",
+    });
+    expect(r.note).toBe(
+      "The 2018 round's zones ended December 31, 2028, and this checks only that round's list — not the round that took effect January 1, 2027. Check the current round's maps.",
+    );
+    const off = opportunityZoneRead(offByCurrent, "2029-03-15");
+    expect(off.caveat).toBe(OZ_CURRENT_NUMBER_CAVEAT_ENDED);
+    for (const text of [r.label, r.note ?? "", off.label, off.caveat ?? "", off.note ?? ""]) {
+      expect(text).not.toMatch(/Opportunity Zone tract \(2018 designations\)/);
+      expect(text).not.toMatch(/\b(sit|sits) in a zone\b/);
+      expect(text).not.toMatch(/\b(run|runs) to\b|take effect/);
+    }
   });
 });

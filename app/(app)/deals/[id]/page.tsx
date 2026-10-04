@@ -1048,6 +1048,9 @@ export default async function DealPage({
     ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
     : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
   const noteCap = noteCapSlot(extraction);
+  // Today as an ISO day (UTC), read once here and handed to what the page
+  // draws: the tasks' due dates and the Opportunity Zone round's line.
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="flex flex-col gap-6">
@@ -1542,7 +1545,7 @@ export default async function DealPage({
         playground={playground}
         tasks={dealTasks}
         taskAssignees={taskAssignees}
-        todayIso={new Date().toISOString().slice(0, 10)}
+        todayIso={todayIso}
       />
 
       <div className="mt-6 space-y-4">
@@ -1552,7 +1555,7 @@ export default async function DealPage({
           hasAddress={!!dealAddress?.label}
           subjectPrice={subjectPriceNumber}
         />
-        <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} />
+        <SiteFlagsCard result={siteFlags} hasAddress={!!dealAddress?.label} today={todayIso} />
         <PublicRecordCard
           address={dealAddress}
           market={placement.briefed}

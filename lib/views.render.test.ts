@@ -5164,14 +5164,20 @@ describe("SiteFlagsCard — the flood chip says what FEMA's map says, and no mor
     retrievedAt: "2026-09-25T00:00:00Z",
     note: "Screening flags from federal datasets at the geocoded point.",
   });
+  // The day the page reads and hands the card; the fixture's lookup is from the week before.
+  const today = "2026-10-04";
   const chip = (flood: SiteFlagsResultForTest["flood"]) =>
-    visibleText(renderToStaticMarkup(React.createElement(SiteFlagsCard, { result: result(flood), hasAddress: true })));
+    visibleText(renderToStaticMarkup(React.createElement(SiteFlagsCard, { result: result(flood), hasAddress: true, today })));
 
   it("keeps a point off FEMA's digital map apart from minimal hazard, and minimal hazard out of the caution colour", () => {
     expect(chip(null)).toContain("Flood: no FEMA digital map at this point");
     expect(chip(null)).not.toMatch(/no mapped hazard/);
     const minimal = renderToStaticMarkup(
-      React.createElement(SiteFlagsCard, { result: result({ zone: "X", subtype: "AREA OF MINIMAL FLOOD HAZARD", isHighRisk: false }), hasAddress: true }),
+      React.createElement(SiteFlagsCard, {
+        result: result({ zone: "X", subtype: "AREA OF MINIMAL FLOOD HAZARD", isHighRisk: false }),
+        hasAddress: true,
+        today,
+      }),
     );
     expect(visibleText(minimal)).toContain("Flood zone X · minimal flood hazard");
     expect(minimal).not.toContain("bg-caution/10");
@@ -5181,7 +5187,7 @@ describe("SiteFlagsCard — the flood chip says what FEMA's map says, and no mor
 
   it("says a tract off the Opportunity Zone list was checked by its current number, and a check that did not run says why", () => {
     const card = (oz: Partial<SiteFlagsResultForTest>) =>
-      renderToStaticMarkup(React.createElement(SiteFlagsCard, { result: { ...result(null), ...oz }, hasAddress: true }));
+      renderToStaticMarkup(React.createElement(SiteFlagsCard, { result: { ...result(null), ...oz }, hasAddress: true, today }));
     const off = card({ opportunityZone: null, v: 3 });
     const offText = visibleText(off);
     expect(offText).toContain("Tract's current number not on the 2018 Opportunity Zone list");
@@ -5197,6 +5203,32 @@ describe("SiteFlagsCard — the flood chip says what FEMA's map says, and no mor
     expect(visibleText(card({ opportunityZone: null, v: 2 }))).toContain("Opportunity Zone: not checked");
     expect(visibleText(card({ opportunityZone: null, v: 2 }))).not.toContain("Opportunity Zone list");
     expect(visibleText(card({ opportunityZone: { sourceDataset: "Maryland Opportunity Zones" }, v: 3 }))).toContain("Opportunity Zone tract");
+  });
+
+  it("draws a tract on the 2018 list as a zone in force only while those designations are", () => {
+    const listed = (on: string) =>
+      renderToStaticMarkup(
+        React.createElement(SiteFlagsCard, {
+          result: { ...result(null), opportunityZone: { sourceDataset: "CDFI Fund QOZ list" }, v: 3 },
+          hasAddress: true,
+          today: on,
+        }),
+      );
+    const before = listed(today);
+    expect(visibleText(before)).toContain("Opportunity Zone tract (2018 designations)");
+    expect(visibleText(before)).toContain("The next round's zones take effect January 1, 2027");
+    expect(before).toContain("bg-pass/10");
+    const during = visibleText(listed("2027-06-30"));
+    expect(during).toContain("This checks only the 2018 round's zones. The next round's zones took effect January 1, 2027");
+    const after = listed("2029-01-02");
+    const afterText = visibleText(after);
+    expect(afterText).toContain("In a 2018 Opportunity Zone tract; those designations ended Dec 31, 2028");
+    expect(afterText).toContain("The 2018 round's zones ended December 31, 2028");
+    expect(afterText).not.toContain("Opportunity Zone tract (2018 designations)");
+    // No longer the colour of a benefit in force.
+    expect(after).not.toContain("bg-pass/10");
+    expect(a11yIssues(after), "site flags card, after the 2018 round").toEqual([]);
+    expect(gluedWords(afterText)).toEqual([]);
   });
 });
 
