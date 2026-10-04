@@ -92,17 +92,23 @@ way in this batch):
   The "Corporate credit" fold now reads the Treasury's own high-quality
   corporate bond curve (`HQMCB10YR`, monthly, public). If you ever license
   ICE or Moody's data, the four series can come back.
-- **Four kinds of deck are filed under their right class** (research pass
+- **Five kinds of deck are filed under their right class** (research pass
   23): apartments over shops as mixed-use (they had read as retail, so the
   rules panel treated the building as commercial), an RV resort as a park
   (it had read as a hotel), a lab or life-science building as an office
-  (it had read as no class), and "Apartments" alone as multifamily. Each
-  class's defaults are unchanged, but a re-filed deal now runs on its own
-  class's: retail to mixed-use moves the expense ratio from 32% to 40% and
-  the reserve from $0.15 to $0.20 a foot; a hotel to a park, 65% to 35%
-  expenses, 32% to 6% vacancy and a 325 to a 200 bps spread; a lab, 7% to
-  10% vacancy and a 250 to a 300 bps spread. Say if you would rather a
-  re-filing waited for you.
+  (it had read as no class), "Apartments" alone as multifamily, and
+  resort-style apartments as multifamily (the bare word "resort" had read
+  them as a hotel). Each class's defaults are unchanged, but a re-filed
+  deal now runs on its own class's: retail to mixed-use moves the expense
+  ratio from 32% to 40% and the reserve from $0.15 to $0.20 a foot; a hotel
+  to a park, 65% to 35% expenses, 32% to 6% vacancy and a 325 to a 200 bps
+  spread; a lab, 7% to 10% vacancy and a 250 to a 300 bps spread; a hotel
+  to an apartment building, 65% to 42% expenses, 32% to 5% vacancy, the
+  reserve from $0.50 to $0.25 a foot, 550 to 850 SF a unit and a 325 to a
+  200 bps spread. A phrase that names a resort and units and nothing else
+  ("Resort with 200 units") is now filed as no class, on the generic
+  defaults, since it may be either. Say if you would rather a re-filing
+  waited for you.
 
 **Your call — larger changes held for your permission:**
 - **Model math:**

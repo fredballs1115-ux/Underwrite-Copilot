@@ -151,7 +151,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   no stated percentage is compared to nothing. Where the memorandum states
   the entity's own loan ("Entity loan balance", `entityLoanOf`), every
   surface says the grossed-up figure is the equity's whole, not the
-  asset's, with the loan on top of it; the model neither adds the loan to
+  asset's, with the loan on top of it (the plan's price row reads
+  "Equity's whole, the share grossed up" and its figure "$40.0M, the
+  entity's $56.5M loan on top"); the model neither adds the loan to
   the price nor carries it (that arithmetic is the owner's call, in
   WILL_TODO). **A leasehold is a wasting
   asset**, said, with the ground lease as stated and a link to the ground
@@ -175,7 +177,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the report's sensitivity page (the model caveat above the grids) and the
   workbook's cover (`meta.interest`). Under a tower, a billboard or a
   solar array the leased fee says the land comes back, not a building
-  (read off the lease's own words, never the deal's name), and a stated
+  (read off the lease's own words, never the deal's name, by
+  `groundLeaseEquipment`, which the deal type reads too: "Stabilized (the
+  lessee's wireless tower)", on the page and the workbook's three Deal
+  Type cells), and a stated
   "Ground lease termination right" is shown as stated, never read as the
   lease's end. **The leased fee is its own kind**
   (#415, `leased_fee`): the land under a building someone else owns, sold
@@ -264,9 +269,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     end after 2100);
   - a year alone, read as its FIRST day, the earliest end the year allows;
   - a count of years, counted from today and said to be possibly short,
-    since the memorandum's own date is earlier — except on a development or
-    a conversion, whose lease starts at delivery: there the count runs from
-    the lease's start, said so, with no "possibly short".
+    since the memorandum's own date is earlier. A ground lease is on the
+    land and usually runs from its signing, so the count is today's on
+    every kind of deal; a single tenant's lease on a building not yet
+    delivered is the one counted from delivery (lib/single-tenant, below).
 
   The options are read apart from the term: "four 10-year options", "4 x
   10 years", "three successive 10-year", "to 2111". A separator is
@@ -395,7 +401,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   anything else stay as stated (`readIncreases`); the guarantor is the
   credit, and a stated rating is graded by its own letters (BBB- / Baa3
   and above investment grade, a disagreement across the line a split,
-  "N/A" unrated — `readRating`). The model is NOT changed:
+  "N/A" unrated — `readRating`); and a lease on a building not yet
+  delivered (`notYetDelivered` in lib/deal-strategy: a development, or a
+  conversion whose new use comes with the works) whose term is stated as
+  a count runs from delivery, never from today (`termFromDelivery`): the
+  sentence drops its "possibly short", the tag reads "Single tenant, 15
+  yrs from delivery", the bar draws "The term, 15 years from delivery"
+  with no hold over it (`LeaseTermBar`'s `fromDelivery`), and the model's
+  read says the lease outlasts the hold whenever the building is
+  delivered, or, for a term shorter than the hold, ends inside it only if
+  the building is delivered within the difference (`runsPastSale`, the
+  one question the panel and the read ask). The model is NOT changed:
   `singleTenantModelLine` says the years left at its sale (or the lease
   ending inside its hold, with its vacancy "a market's allowance, not a
   single tenant's all-or-nothing") and the lease's increases against its
@@ -476,7 +492,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   method field says; a negotiated sale, and an unknown one with no bid, no
   premium and no stalking horse, read null. A letter of intent is refused on
   any stalking-horse bid, priced or not and whatever the method (a row of
-  "None", "N/A" or "—" is no stalking horse; "Not disclosed" is one).
+  "None", "N/A" or "—" is no stalking horse; "Not disclosed" is one), and
+  a short sale's letter carries a "Lender Approval" clause before the
+  closing — the closing conditioned on the seller's lender approving the
+  sale and the payoff it will accept, no figure in it, highlighted beside
+  the memorandum's words for review (`LoiTerms.shortSale`).
   **The model runs at the floor**:
   where no asking price is stated, `deriveUnderwriteInputs` prices at the
   starting bid plus the premium (`floorAllIn`, "derived", the note saying
@@ -1105,6 +1125,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   warehouse as self-storage). Apartments over shops ("Retail/Residential")
   are mixed-use, an RV resort is a park, a lab or life-science building is
   an office, and "Apartments" alone is multifamily (research pass 23); a
+  resort is lodging only where the phrase names no homes or counts its
+  keys, so "Resort-style apartments" is multifamily and "Resort with 200
+  units" is no class at all (a hotel, a motel, lodging, hospitality or a
+  short-term rental is lodging whatever else the phrase names); a
   re-filed deal runs on its class's existing defaults. A lab, a yard or a
   cold-storage building reads no lessor rent index (`ownMarketBuilding`,
   the tracker's own predicate), and the challenger's class traps gain lists
