@@ -6,7 +6,7 @@
 // Pure: no I/O, no LLM.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { ASSET_CLASS_LABEL } from "@/lib/asset-class";
-import { findGoingInCap, unitCountRow } from "@/lib/criteria";
+import { findGoingInCap, screenYearOf, unitCountRow } from "@/lib/criteria";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
 import { noteCapSlot } from "@/lib/compare-interest";
@@ -132,7 +132,7 @@ const compactUsd = (n: number) =>
 export function basisTag(extraction: ExtractionResult, kind: StrategyKind, storedClass?: string | null): string | null {
   const metrics = extraction.metrics ?? [];
   const words = assetWords(shownAssetClass(storedClass, extraction));
-  const b = subjectBasis(metrics, kind, interestOf(extraction), extraction.assetClass);
+  const b = subjectBasis(metrics, kind, screenYearOf(extraction), interestOf(extraction), extraction.assetClass);
   if (words.basis === "sf") return b.perSf != null ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;
   if (words.basis === "unit" && b.perUnit != null) {
     const noun = countNoun(unitCountRow(metrics)?.label, words.key).replace(/s$/, "");
@@ -221,7 +221,7 @@ export function pickSlots(extraction: ExtractionResult | null, signal: FirstSign
     // land or site cost is what is being bought. The first signal's ask
     // fills the slot before the extraction lands, as on the deal page —
     // only when it is a figure, never an "unpriced" or "call for offers".
-    price: findPriceMetric(metrics, strategy.kind)?.value ?? signalAskPrice(signal),
+    price: findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? signalAskPrice(signal),
     yoc: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
     // A share's price, a note's or the land's under a ground lease is not
     // the building's, and the row says so beside the figure.

@@ -16,6 +16,7 @@ import {
   parsePct,
   parsePrice,
   METRIC_FIND,
+  screenYearOf,
 } from "@/lib/criteria";
 import {
   buildingPriceOf,
@@ -203,7 +204,7 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     // The shared price reader: on a development with no ask, the land cost —
     // and the price the building's figures describe (#415): a share's
     // grossed up to the whole, none for a note or a leased fee.
-    const priceMetric = findPriceMetric(metrics, strategy.kind);
+    const priceMetric = findPriceMetric(metrics, strategy.kind, screenYearOf(ext));
     const price = buildingPriceOf(ext, priceMetric ? parsePrice(priceMetric.value) : null);
     // An outdoor-storage yard trades by the acre: its price over the shop
     // building on it is never pooled as a market's per-SF basis.

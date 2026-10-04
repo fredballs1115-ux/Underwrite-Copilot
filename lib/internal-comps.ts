@@ -5,6 +5,7 @@ import {
   findMetric,
   parsePct,
   parsePrice,
+  screenYearOf,
 } from "@/lib/criteria";
 import {
   buildingPriceOf,
@@ -166,7 +167,7 @@ export function deriveInternalComps(
     const ext = { ...extraction, metrics } as ExtractionResult;
     const strategy = inferStrategy(ext);
     const plan = planSummary(ext, strategy);
-    const price = findPriceMetric(metrics, strategy.kind);
+    const price = findPriceMetric(metrics, strategy.kind, screenYearOf(ext));
     // A note's stated cap is the collateral's and a leased fee's a ground
     // rent's (#415): neither sits in a column of buildings' caps.
     const interestKind = interestOf(ext).kind;

@@ -17,7 +17,7 @@ import type { DealRow } from "@/lib/deals";
 Font.registerHyphenationCallback((word) =>
   word.length <= 24 ? [word] : (word.match(/.{1,12}/g) ?? [word]),
 );
-import type { BuyBoxCheck } from "@/lib/criteria";
+import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { pdfSafe } from "./pdf-text";
 import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
@@ -490,9 +490,12 @@ export function buildMemoData(
   // The price tile carries the basis under it, as a pipeline card does: the
   // building's price over its count in the memorandum's own noun, or its
   // area — none on a note, the land or a plan deal (lib/pipeline-slots).
-  const priceRow = findPriceMetric(metrics ?? [], strategy.kind);
+  // The price row's label is read against the year the screen read the
+  // memorandum, as every surface reads it.
+  const screenYear = screenYearOf(extraction);
+  const priceRow = findPriceMetric(metrics ?? [], strategy.kind, screenYear);
   const priceBasis = extraction && priceRow ? basisTag(extraction, strategy.kind, str(deal.asset_class)) : null;
-  const keyTerms = keyTermRows(metrics, strategy.kind, 8, interestOf(extraction ?? null).kind).map((m) => ({
+  const keyTerms = keyTermRows(metrics, strategy.kind, screenYear, 8, interestOf(extraction ?? null).kind).map((m) => ({
     label: str(m.label),
     value: str(m.value),
     flagged: !!m.flagged,

@@ -15,7 +15,7 @@ import {
   plausibilityNote,
   type DealStrategy,
 } from "@/lib/deal-strategy";
-import { foldBuyBoxChecks, parsePrice, priceRange, type BuyBoxCheck } from "@/lib/criteria";
+import { foldBuyBoxChecks, parsePrice, priceRange, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { interestOf } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
 import { assetWords } from "@/lib/asset-words";
@@ -152,8 +152,9 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
   const words = assetWords(shownAssetClass(storedClass, ex));
   const noun = words.noun ?? { one: "unit", many: "units" };
   const metrics = ex.metrics ?? [];
-  // The price row the basis divides — the same row the card's basis reads.
-  const row = findPricedMetric(metrics, strategy.kind);
+  // The price row the basis divides — the same row the card's basis reads,
+  // at the year the screen read the memorandum.
+  const row = findPricedMetric(metrics, strategy.kind, screenYearOf(ex));
   const tag = buildingBasisTag(ex, strategy.kind, storedClass);
   if (isPlanDeal(strategy.kind)) {
     // A plan deal's basis is its total cost; the shell's or the land's price

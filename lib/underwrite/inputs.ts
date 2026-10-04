@@ -35,6 +35,7 @@ import {
   parsePrice,
   parseSf,
   priceRange,
+  screenYearOf,
 } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
@@ -467,7 +468,9 @@ export function deriveUnderwriteInputs(
   // "oPERating" and silently disqualify "Net operating income" itself.
   // The shared price reader: the asking / purchase price, else — on a ground-up
   // development only — the land or site cost, which is what is being bought.
-  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind);
+  // A label's year is read against the year the screen read the memorandum,
+  // so a stored deal's model keeps its price in a later year.
+  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind, screenYearOf(extraction));
   const priceIsLand = priceMetric != null && /\b(land|site)\b/i.test(priceMetric.label);
   // The shared going-in cap reader — the same call the deal page, the buy
   // box and the mandate score make — so the workbook never backs a price

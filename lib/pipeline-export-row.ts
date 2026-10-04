@@ -4,7 +4,7 @@
 // teammate's name — come in, so a test reads a row as the route builds it.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
-import { buyBoxCheckSource, evaluateBuyBox, foldBuyBoxChecks, type BuyBox } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
 import { noteCapSlot } from "@/lib/compare-interest";
 import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
@@ -85,7 +85,7 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // says it (lib/interest `dealTypeLabel`).
     dealType: strategy.kind === "unknown" ? null : dealTypeLabel(strategy.label, extraction),
     planDeal: plan != null,
-    price: findPriceMetric(metrics, strategy.kind)?.value ?? null,
+    price: findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? null,
     interest: interestTag(extraction),
     debt: assumableTag(extraction),
     affordable: affordableTag(extraction),

@@ -2,7 +2,7 @@ import { floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type StrategyKind } from "@/lib/deal-strategy";
-import { priceRange, priceRangeShort } from "@/lib/criteria";
+import { priceRange, priceRangeShort, screenYearOf } from "@/lib/criteria";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { assetWords } from "@/lib/asset-words";
 import { dealTypeLabel, interestContextLine, readInterest } from "@/lib/interest";
@@ -32,7 +32,7 @@ const compact = (n: number): string =>
  * own cap or basis on either end. "" where the price row states one figure.
  */
 function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind): string {
-  const row = findPriceMetric(extraction?.metrics ?? [], kind);
+  const row = findPriceMetric(extraction?.metrics ?? [], kind, screenYearOf(extraction));
   const r = row ? priceRange(row.value) : null;
   if (!row || !r) return "";
   return `The ${row.label.trim().toLowerCase()} is stated as a range, ${priceRangeShort(r)}: every figure here is struck at its top, ${compact(r.high)}, the end that does not flatter a return.`;

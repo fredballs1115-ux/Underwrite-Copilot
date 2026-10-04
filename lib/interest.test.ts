@@ -579,15 +579,18 @@ describe("what the price buys, read by the plausibility check, the deal context 
 describe("the comps' subject basis reads what the price buys", () => {
   it("grosses a share up to the whole's per-unit basis, and draws no subject tick on a note", async () => {
     const { subjectBasis } = await import("./comp-detail");
-    const metrics = ex(undefined).metrics;
+    const { screenYearOf } = await import("./criteria");
+    const deal = ex(undefined);
+    const metrics = deal.metrics;
+    const year = screenYearOf(deal);
     // $20M over 240 units is $83,333 a unit on a fee simple…
-    expect(subjectBasis(metrics, "stabilized").perUnit).toBe(83_333);
+    expect(subjectBasis(metrics, "stabilized", year).perUnit).toBe(83_333);
     // …and $170,068 on the whole a 49% share implies.
-    expect(subjectBasis(metrics, "stabilized", { kind: "partial_interest", sharePct: 49 }).perUnit).toBe(170_068);
-    expect(subjectBasis(metrics, "stabilized", { kind: "partial_interest", sharePct: null }).perUnit).toBeNull();
-    expect(subjectBasis(metrics, "stabilized", { kind: "note", sharePct: null })).toEqual({ perUnit: null, perSf: null });
+    expect(subjectBasis(metrics, "stabilized", year, { kind: "partial_interest", sharePct: 49 }).perUnit).toBe(170_068);
+    expect(subjectBasis(metrics, "stabilized", year, { kind: "partial_interest", sharePct: null }).perUnit).toBeNull();
+    expect(subjectBasis(metrics, "stabilized", year, { kind: "note", sharePct: null })).toEqual({ perUnit: null, perSf: null });
     // A leased fee's price buys the land alone: no building basis to draw.
-    expect(subjectBasis(metrics, "stabilized", { kind: "leased_fee", sharePct: null })).toEqual({ perUnit: null, perSf: null });
+    expect(subjectBasis(metrics, "stabilized", year, { kind: "leased_fee", sharePct: null })).toEqual({ perUnit: null, perSf: null });
   });
 });
 

@@ -122,19 +122,73 @@ export const NEAR_IRR_PT = 1.0; // IRR / CoC: within 1pt of the target
  */
 export const LATER_YEAR = /\b(?:year|yr)\.?\s?(?!1\b)\d{1,2}\b|\by(?!1\b)\d{1,2}\b/i;
 
-/** Any calendar year before this one, as a label fragment. "Sale price
- *  (2019)", "Purchase price (2019)" and "Acquired 2019" are what the building
- *  last traded for; a label carrying THIS year or a later one — "Asking price
- *  (2026)", "Purchase price (2027 close)" — is the ask. Built once, from
- *  today's year, for years 1900 through last year. */
-export function pastYearSource(thisYear = new Date().getFullYear()): string {
-  const last = Math.min(Math.max(thisYear - 1, 2000), 2099) - 2000;
+/** Any calendar year before `screenYear`, as a label fragment: years 1900
+ *  through the year before it. "Sale price (2019)", "Purchase price (2019)"
+ *  and "Acquired 2019" are what the building last traded for; a label
+ *  carrying the screen's year or a later one — "Asking price (2026)",
+ *  "Purchase price (2027 close)" on a 2026 screen — is the ask. The year is
+ *  the caller's to give (`screenYearOf`), never the clock's. */
+export function pastYearSource(screenYear: number): string {
+  const last = Math.min(Math.max(screenYear - 1, 2000), 2099) - 2000;
   const tens = Math.floor(last / 10);
   const ones = last % 10;
   const parts = ["19\\d\\d"];
   if (tens > 0) parts.push(`20[0-${tens - 1}]\\d`);
   parts.push(`20${tens}[0-${ones}]`);
   return `\\b(?:${parts.join("|")})\\b`;
+}
+
+/**
+ * The year an extraction stored before `screenedOn` existed is read as.
+ * Until the stamp shipped, the price reader judged a label's year against
+ * the clock's year when the module loaded, and the stamp ships in 2026: so
+ * every extraction on file was last read as a 2026 screen, and reading the
+ * unstamped ones as 2026 keeps each one's price where it stands. The clock
+ * is no fallback — it is the bug: on January 1 it turned "Asking price
+ * (2026)" into a prior trade, and the deal lost its price on the pipeline,
+ * the model, the buy box and the memo.
+ */
+export const UNSTAMPED_SCREEN_YEAR = 2026;
+
+/**
+ * The year the screen read the memorandum, which a price label's year is
+ * judged against: the extraction's `screenedOn` stamp (written by the
+ * pipeline and the manual-deal path, `screenStamp`), else
+ * UNSTAMPED_SCREEN_YEAR. A label's "this year" is the year it was read, so a
+ * stored deal keeps its price whatever year it is opened in. Never the clock.
+ */
+export function screenYearOf(ex: { screenedOn?: string | null } | null | undefined): number {
+  const stamp = typeof ex?.screenedOn === "string" ? ex.screenedOn.trim() : "";
+  const m = /^(20\d\d)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])\b/.exec(stamp);
+  return m ? Number(m[1]) : UNSTAMPED_SCREEN_YEAR;
+}
+
+/** The stamp a screen writes on the extraction it stores: the day it read
+ *  the memorandum (or the typed facts), as an ISO date. One writer, so the
+ *  pipeline and the manual-deal path stamp alike. */
+export function screenStamp(now: Date = new Date()): string {
+  return now.toISOString().slice(0, 10);
+}
+
+// The price row's exclusions either side of the past-year fragment, which
+// depends on the screen's year (priceExclude, below).
+const PRICE_EXCLUDE_HEAD = String.raw`unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper\s+(?!(?:the|om|broker|seller|sponsor|offering|agent|marketing|guidance|psa|contract|loi)\b)|\/\s*(key|bed|room|pad|door|acre|lot|suite|stall|space|home|apartment|apt|bay|berth|slip|r?sf|nrsf|gsf|gla|nra|gba|nla)s?\b|\brent|yield|\bcap\b|\brate\b|spread|loan|debt|insurance|\bdate\b|exit|reversion|terminal|residual|disposition|projected|forward|pro ?forma|stabili[sz]|`;
+const PRICE_EXCLUDE_TAIL = String.raw`|\b(sale|sold|trade|traded)\b(?=[\s\S]*\b(19|20)\d\d\b)|\b(19|20)\d\d\b(?=[\s\S]*\b(sale|sold|trade|traded)\b)|\b(year|yr)\s?\d|\b(last|prior|previous|historical|original|land|site|reduction|reserve|bid|strike|target|underwritten|range)\b`;
+const priceExcludes = new Map<number, RegExp>();
+
+/**
+ * What is never the ask, on a screen of `screenYear` (METRIC_FIND.price.exc):
+ * a per-unit or per-SF figure, a rent, a rate, a projected or residual sale
+ * price, a prior trade — and a label dated before the screen's year. Built
+ * the first time a year is asked for and kept; never at module load.
+ */
+export function priceExclude(screenYear: number): RegExp {
+  let re = priceExcludes.get(screenYear);
+  if (!re) {
+    re = new RegExp(PRICE_EXCLUDE_HEAD + pastYearSource(screenYear) + PRICE_EXCLUDE_TAIL, "i");
+    priceExcludes.set(screenYear, re);
+  }
+  return re;
 }
 
 export const METRIC_FIND = {
@@ -161,16 +215,14 @@ export const METRIC_FIND = {
     // berth, parking space, whatever noun the OM picks — except "per the
     // PSA" / "per OM" / "per broker", which say where the ask came from.
     // A projected, residual, disposition or pro forma sale price and a
-    // prior trade — a past year in the label ("2019 sale price", "Purchase
-    // price (2019)"), or a sale / trade word beside any year, or "Year 5
-    // sale price" — are not the ask either. A label carrying this year or a
-    // later one ("Revised asking price (March 2026)") still is.
-    exc: new RegExp(
-      String.raw`unit|\bsf\b|\/ ?sf|per ?sf|per (square|sq)|psf|\bper\s+(?!(?:the|om|broker|seller|sponsor|offering|agent|marketing|guidance|psa|contract|loi)\b)|\/\s*(key|bed|room|pad|door|acre|lot|suite|stall|space|home|apartment|apt|bay|berth|slip|r?sf|nrsf|gsf|gla|nra|gba|nla)s?\b|\brent|yield|\bcap\b|\brate\b|spread|loan|debt|insurance|\bdate\b|exit|reversion|terminal|residual|disposition|projected|forward|pro ?forma|stabili[sz]|` +
-        pastYearSource() +
-        String.raw`|\b(sale|sold|trade|traded)\b(?=[\s\S]*\b(19|20)\d\d\b)|\b(19|20)\d\d\b(?=[\s\S]*\b(sale|sold|trade|traded)\b)|\b(year|yr)\s?\d|\b(last|prior|previous|historical|original|land|site|reduction|reserve|bid|strike|target|underwritten|range)\b`,
-      "i",
-    ),
+    // prior trade — a year before the screen's in the label ("2019 sale
+    // price", "Purchase price (2019)"), or a sale / trade word beside any
+    // year, or "Year 5 sale price" — are not the ask either. A label
+    // carrying the screen's year or a later one ("Revised asking price
+    // (March 2026)" on a 2026 screen) still is. So the exclusion is a
+    // function of the screen's year (`screenYearOf`), never a pattern built
+    // from the clock when the module loads.
+    exc: priceExclude,
   },
   // The price over the units, read by SHAPE: "Price per unit", "Price /
   // Unit", "$ / Unit", "Unit price", "Asking price per door", "Basis per
@@ -227,10 +279,17 @@ export const METRIC_FIND = {
  * deck prices. Null when the OM states neither. One implementation for the
  * buy-box price band, the mandate ceiling and every surface's price slot
  * (lib/deal-strategy's findPriceMetric delegates here), so the band judges
- * the same row the page prints.
+ * the same row the page prints. A label's year is read against
+ * `screenYear`, the year the screen read the memorandum — the caller's
+ * `screenYearOf(extraction)`, so no two surfaces read one deal's rows
+ * against two different years.
  */
-export function findPriceRow(metrics: MetricLike[], kind?: string | null): MetricLike | null {
-  const ask = findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc);
+export function findPriceRow(
+  metrics: MetricLike[],
+  kind: string | null | undefined,
+  screenYear: number,
+): MetricLike | null {
+  const ask = findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc(screenYear));
   if (ask && parseMoney(ask.value) != null) return ask;
   return kind === "development"
     ? (findMetric(metrics, METRIC_FIND.landPrice.inc, METRIC_FIND.landPrice.exc) ?? ask)
@@ -508,6 +567,9 @@ interface ExtractionLike {
   /** what the price buys (#414); a note's price is a loan's, so the
    *  collateral's cap is not the buyer's and no cap floor is checked on it */
   interest?: { kind?: string | null } | null;
+  /** the day the screen read the memorandum (ExtractionResult.screenedOn) —
+   *  the year a price label's year is judged against (`screenYearOf`) */
+  screenedOn?: string | null;
 }
 
 export function findMetric(
@@ -994,6 +1056,10 @@ export function buyBoxCheckSource(
     // cap is held to the box's cap floor and the mandate's dealbreaker on
     // every page, where the rule is that a note's price is a loan's.
     interest: extraction?.interest ?? null,
+    // So does the day the screen read the memorandum: the price band and
+    // the mandate's ceiling read a label's year against it, as the page's
+    // price slot does.
+    screenedOn: extraction?.screenedOn ?? null,
   };
 }
 
@@ -1183,9 +1249,9 @@ export function evaluateBuyBox(
   const band = priceBand(box);
   if (band.min != null || band.max != null) {
     // The shared price row — on a development the land cost, the same row
-    // the deal page and the pipeline print — so the band never says
-    // "no asking price" beside a printed one.
-    const metric = findPriceRow(metrics, extraction?.strategy?.kind);
+    // the deal page and the pipeline print, read against the screen's year
+    // — so the band never says "no asking price" beside a printed one.
+    const metric = findPriceRow(metrics, extraction?.strategy?.kind, screenYearOf(extraction));
     // A range (#466) is judged by the end that tests the band: its bottom
     // where it reaches under a floor, else its top — never the flattering
     // end against a ceiling — and said as the range it is.

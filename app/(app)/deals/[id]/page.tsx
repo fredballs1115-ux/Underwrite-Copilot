@@ -62,7 +62,7 @@ import { floodClassOfZone } from "@/lib/flood-style";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
-import { buildingSfRow, findGoingInCap, parsePrice } from "@/lib/criteria";
+import { buildingSfRow, findGoingInCap, parsePrice, screenYearOf } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { omLinkFor } from "@/lib/om-link";
@@ -888,7 +888,8 @@ export default async function DealPage({
   // or site cost is what is being bought. Before the extraction lands the
   // first signal's ask fills the slot — only when it is a figure, never an
   // "unpriced" or a "call for offers" printed where a price goes.
-  const summaryPrice = findPriceMetric(metrics, strategy.kind)?.value ?? signalAskPrice(firstSignal);
+  const summaryPrice =
+    findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? signalAskPrice(firstSignal);
   // The shared size reader: the building's row, never the land's or a
   // unit's.
   const sizeSf = buildingSfRow(metrics)?.value ?? null;

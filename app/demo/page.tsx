@@ -5,7 +5,7 @@ import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { FREE_DEALS_LINE, DEEP_TOOLS } from "@/lib/marketing-constants";
 import { compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import { sampleDerivedInputs } from "@/lib/sample-derive";
-import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct } from "@/lib/criteria";
+import { buildingSfRow, evaluateBuyBox, findGoingInCap, parsePct, screenYearOf } from "@/lib/criteria";
 import { benchmark30 } from "@/lib/debt-index";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { HOLD_MONTHS } from "@/lib/underwrite/inputs";
@@ -199,7 +199,7 @@ export default async function DemoPage() {
   };
   const metrics = data.extraction.metrics;
   // The shared price reader, as the deal page uses it.
-  const price = findPriceMetric(metrics, inferStrategy(data.extraction).kind)?.value ?? null;
+  const price = findPriceMetric(metrics, inferStrategy(data.extraction).kind, screenYearOf(data.extraction))?.value ?? null;
   const sfValue = buildingSfRow(metrics)?.value ?? null;
   const unitValue = unitCountRow(metrics)?.value ?? null;
   // A bare unit count ("248") reads wrong in a Size slot — say what it counts.

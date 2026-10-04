@@ -65,7 +65,14 @@ import { shownAssetClass } from "@/lib/pipeline-slots";
 import { assetClassKey } from "@/lib/asset-words";
 import { BRIEF_NATIONAL_IDS, liveMarketBrief, type LiveMarketBrief } from "@/lib/live-market-brief";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxLines, evaluateBuyBox, hasNoDealbreakers, type BuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import {
+  buyBoxLines,
+  evaluateBuyBox,
+  hasNoDealbreakers,
+  screenStamp,
+  type BuyBox,
+  type BuyBoxCheck,
+} from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
 import { evalDealbreakers } from "@/lib/mandate";
 import { notifyAnalysisFailed, notifyAnalysisReady } from "@/lib/email";
@@ -934,6 +941,11 @@ async function runAnalysisSteps(
       // never answers "the OM doesn't state" a figure the screen found in a
       // picture on a page.
       extraction = { ...extraction, omRead: omSource?.kind === "pages" ? "text" : "pdf" };
+      // The day this screen read the memorandum: a price label's year is
+      // judged against its year (lib/criteria `screenYearOf`), so "Asking
+      // price (2026)" read in 2026 is still the ask when the deal is opened
+      // in 2027.
+      extraction = { ...extraction, screenedOn: screenStamp() };
       await admin
         .from("deals")
         .update({ extraction, updated_at: new Date().toISOString() })

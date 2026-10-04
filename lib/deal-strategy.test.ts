@@ -19,7 +19,10 @@ import {
   renovationProgramBudget,
   timelineFromMetrics,
 } from "./deal-strategy";
-import { parseMoney } from "./criteria";
+import { parseMoney, screenYearOf } from "./criteria";
+
+/** The year the bare rows below were screened in; none carries a year. */
+const SCREEN_YEAR = 2026;
 
 const metric = (
   label: string,
@@ -770,7 +773,7 @@ describe("findPriceMetric — a development buys land", () => {
 
   it("reads the land cost as the price on a development, never the appraised land value", () => {
     expect(inferStrategy(DEVELOPMENT).kind).toBe("development");
-    expect(findPriceMetric(DEVELOPMENT.metrics, "development")?.value).toBe("$8,000,000");
+    expect(findPriceMetric(DEVELOPMENT.metrics, "development", screenYearOf(DEVELOPMENT))?.value).toBe("$8,000,000");
     const p = planSummary(DEVELOPMENT)!;
     expect(p.price).toBe(8_000_000);
     expect(p.budget).toMatchObject({ budget: 52_000_000, allIn: true });
@@ -780,11 +783,11 @@ describe("findPriceMetric — a development buys land", () => {
 
   it("the asking price still wins when both are stated, and other deals never read a land line as the price", () => {
     const both = [metric("Land cost", "$8,000,000"), metric("Asking price", "$50,000,000")];
-    expect(findPriceMetric(both, "development")?.value).toBe("$50,000,000");
-    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "stabilized")).toBeNull();
-    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "conversion")).toBeNull();
-    expect(findPriceMetric([metric("Land cost per acre", "$400,000")], "development")).toBeNull();
-    expect(findPriceMetric([metric("Land value", "$9,500,000")], "development")).toBeNull();
+    expect(findPriceMetric(both, "development", SCREEN_YEAR)?.value).toBe("$50,000,000");
+    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "stabilized", SCREEN_YEAR)).toBeNull();
+    expect(findPriceMetric([metric("Land cost", "$8,000,000")], "conversion", SCREEN_YEAR)).toBeNull();
+    expect(findPriceMetric([metric("Land cost per acre", "$400,000")], "development", SCREEN_YEAR)).toBeNull();
+    expect(findPriceMetric([metric("Land value", "$9,500,000")], "development", SCREEN_YEAR)).toBeNull();
   });
 });
 

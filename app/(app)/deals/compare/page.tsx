@@ -5,7 +5,7 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxCheckSource, evaluateBuyBox, type BuyBox } from "@/lib/criteria";
+import { buyBoxCheckSource, evaluateBuyBox, screenYearOf, type BuyBox } from "@/lib/criteria";
 import { CompareTable, MODEL_ROWS_NOTE, usd, type Col } from "./compare-table";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
@@ -91,9 +91,10 @@ function toCol(
   const cap = figs.cap;
   // The price and the year-1 NOI: the model's, else the memorandum's — the
   // shared price reader (never a per-unit price or a prior trade; a
-  // development's land cost is its price) and its in-place or year-1 NOI.
+  // development's land cost is its price), read against the year the screen
+  // read the memorandum, and its in-place or year-1 NOI.
   const modelPrice = usd(r?.purchasePrice);
-  const statedPrice = findPriceMetric(ex?.metrics ?? [], strat.kind)?.value ?? null;
+  const statedPrice = findPriceMetric(ex?.metrics ?? [], strat.kind, screenYearOf(ex))?.value ?? null;
   const modelNoi = usd(r?.year1Noi);
   const statedNoi = goingInNoiText(ex);
 

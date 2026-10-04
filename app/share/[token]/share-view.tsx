@@ -14,6 +14,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
+import { screenYearOf } from "@/lib/criteria";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestOf, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
@@ -285,7 +286,8 @@ export function ShareView({
   const strategy = inferStrategy(safeExtraction, firstSignal);
   const plan = planSummary(safeExtraction, strategy);
   // The deal-defining rows first, as the memo orders them (lib/key-terms.ts).
-  const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, 8, interestOf(safeExtraction).kind);
+  // Its price row is read against the year the screen read the memorandum.
+  const metrics = keyTermRows(safeExtraction?.metrics ?? [], strategy.kind, screenYearOf(safeExtraction), 8, interestOf(safeExtraction).kind);
   // The seller's loan offered for assumption (#419), as the memorandum
   // states it — the pricing against today's rate needs the model, which a
   // shared screen does not carry.

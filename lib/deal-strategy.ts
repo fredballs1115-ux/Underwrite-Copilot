@@ -42,6 +42,7 @@ import {
   parseMoney,
   parsePct,
   parsePrice,
+  screenYearOf,
   unitCountFromMetrics,
   unitCountRow,
 } from "@/lib/criteria";
@@ -190,7 +191,7 @@ export function inferStrategy(
     kind = "development";
   // A land sale — a land or site price and no income figure — is a
   // development, not an operating asset with no price.
-  else if (hasMetrics && isLandOnly(extraction?.metrics ?? [])) kind = "development";
+  else if (hasMetrics && isLandOnly(extraction?.metrics ?? [], screenYearOf(extraction))) kind = "development";
   else if (hasMetrics) kind = "stabilized";
   else return { kind: "unknown", label: STRATEGY_LABEL.unknown, summary: "", source: "none" };
 
@@ -302,9 +303,10 @@ const pct = (x: number, dp = 1): string => `${(x * 100).toFixed(dp)}%`;
 
 // The one price reader — shared with the buy-box check, the mandate score
 // and every summary slot through lib/criteria's METRIC_FIND, so no surface
-// reads a different row as "the price" than the next one.
+// reads a different row as "the price" than the next one. What it excludes
+// depends on the year the screen read the memorandum (a label dated before
+// it is a prior trade), so it is asked for per year: METRIC_FIND.price.exc.
 const PRICE_INCLUDE = METRIC_FIND.price.inc;
-const PRICE_EXCLUDE = METRIC_FIND.price.exc;
 
 const NON_STABILIZED: ReadonlySet<StrategyKind> = new Set([
   "value_add",
@@ -470,9 +472,11 @@ export function priceRowIsLand(priceMetric: MetricLike | null | undefined): bool
  *  the OM states neither: on an operating asset a land line is an
  *  allocation inside the basis, never the price. One reader with the buy
  *  box's price band and the mandate ceiling (lib/criteria's findPriceRow),
- *  so the band judges the row the page prints. */
-export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): MetricLike | null {
-  return findPriceRow(metrics, kind) as MetricLike | null;
+ *  so the band judges the row the page prints. `screenYear` is the year the
+ *  screen read the memorandum — `screenYearOf(extraction)` — against which a
+ *  label's own year is a prior trade or the ask. */
+export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind, screenYear: number): MetricLike | null {
+  return findPriceRow(metrics, kind, screenYear) as MetricLike | null;
 }
 
 /** The asking price as the plausibility check and the model read it — the
@@ -480,7 +484,7 @@ export function findPriceMetric(metrics: MetricLike[], kind: StrategyKind): Metr
  *  panel, the deal context and the challenger say the same figure. */
 export function askingPriceOf(extraction: ExtractionResult | null | undefined): number | null {
   if (!extraction) return null;
-  const row = findPriceMetric(extraction.metrics ?? [], inferStrategy(extraction).kind);
+  const row = findPriceMetric(extraction.metrics ?? [], inferStrategy(extraction).kind, screenYearOf(extraction));
   // A range's top (#466): the end that does not flatter the returns.
   const n = row ? parsePrice(row.value) : null;
   return n != null && n > 0 ? n : null;
@@ -540,15 +544,17 @@ export function isOutdoorStorageYard(assetClass: string | null | undefined): boo
  *  price rows the first whose value IS a figure ("Asking price: call for
  *  pricing" above "Purchase price: $42,000,000" gives the $42M), else the
  *  shared reader's row, so the letter and the deal page never name two
- *  different rows as the price. */
-export function findPricedMetric(metrics: MetricLike[], kind: StrategyKind): MetricLike | null {
+ *  different rows as the price. Read against the screen's year, as
+ *  findPriceMetric is. */
+export function findPricedMetric(metrics: MetricLike[], kind: StrategyKind, screenYear: number): MetricLike | null {
   const isFigure = (v: string) => {
     const n = parseMoney(v);
     return n != null && n >= 10_000;
   };
+  const exclude = METRIC_FIND.price.exc(screenYear);
   return (
-    metrics.find((x) => PRICE_INCLUDE.test(x.label) && !PRICE_EXCLUDE.test(x.label) && isFigure(x.value)) ??
-    findPriceMetric(metrics, kind)
+    metrics.find((x) => PRICE_INCLUDE.test(x.label) && !exclude.test(x.label) && isFigure(x.value)) ??
+    findPriceMetric(metrics, kind, screenYear)
   );
 }
 
@@ -568,9 +574,9 @@ export function signalAskPrice(signal: { askPrice?: string | null } | null | und
 const INCOME_ROW =
   /\bnoi\b|net operating income|cap rate|occupan|\brent|\begi\b|revenue|income|cash ?flow|\bncf\b|debt yield|dscr|expense|opex|\bleased\b|tenan|\bwalt\b|lease expir|vacan|reimburs|\bt-?12\b|\bttm\b|trailing|operating statement|\bcam\b/i;
 
-function isLandOnly(metrics: MetricLike[]): boolean {
+function isLandOnly(metrics: MetricLike[], screenYear: number): boolean {
   if (!metrics.length) return false;
-  if (findMetric(metrics, PRICE_INCLUDE, PRICE_EXCLUDE)) return false;
+  if (findMetric(metrics, PRICE_INCLUDE, METRIC_FIND.price.exc(screenYear))) return false;
   if (!findMetric(metrics, METRIC_FIND.landPrice.inc, METRIC_FIND.landPrice.exc)) return false;
   return !metrics.some((m) => INCOME_ROW.test(m.label));
 }
@@ -776,7 +782,7 @@ export function planSummary(
 ): PlanSummary | null {
   if (!extraction || !isPlanDeal(strategy.kind)) return null;
   const metrics = extraction.metrics ?? [];
-  const priceMetric = findPriceMetric(metrics, strategy.kind);
+  const priceMetric = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
   const priceRaw = priceMetric ? parsePrice(priceMetric.value) : null;
   const stated = priceRaw != null && priceRaw > 0 ? priceRaw : null;
   // What the price buys (#414, #415): a share's is grossed up to the whole
@@ -851,7 +857,7 @@ export function assessPlausibility(
 ): PlausibilityFinding[] {
   if (!extraction) return [];
   const metrics = extraction.metrics ?? [];
-  const priceMetric = findPriceMetric(metrics, strategy.kind);
+  const priceMetric = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
   const stated = priceMetric ? parsePrice(priceMetric.value) : null;
   if (stated == null || !(stated > 0)) return [];
   // What the price buys (lib/interest, #414). A note's price is a loan's:

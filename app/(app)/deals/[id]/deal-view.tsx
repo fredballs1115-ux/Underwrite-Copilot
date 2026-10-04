@@ -14,7 +14,7 @@ import type {
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
-import type { BuyBoxCheck } from "@/lib/criteria";
+import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import type { MandateScore, MandateVerdict } from "@/lib/mandate";
 import {
   fmtCapRange,
@@ -268,7 +268,10 @@ function askingPriceValue(extraction: ExtractionResult | null, signal: FirstSign
   // development with no asking price it is the land or site cost, the land
   // being bought. The kind is inferred with the first signal, exactly as the
   // page infers it, so the letter and the page never name two prices.
-  return findPricedMetric(extraction?.metrics ?? [], inferStrategy(extraction, signal).kind)?.value ?? "";
+  return (
+    findPricedMetric(extraction?.metrics ?? [], inferStrategy(extraction, signal).kind, screenYearOf(extraction))
+      ?.value ?? ""
+  );
 }
 
 function isActive(status: string | undefined): boolean {
@@ -948,6 +951,7 @@ export function DealView({
             compSubject={subjectBasis(
               results.extraction?.metrics ?? [],
               inferStrategy(results.extraction, firstSignal).kind,
+              screenYearOf(results.extraction),
               interestOf(results.extraction),
               results.extraction?.assetClass,
             )}

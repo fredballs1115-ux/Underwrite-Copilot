@@ -15,14 +15,23 @@ import {
   parseMoney,
   parsePct,
   pastYearSource,
+  priceExclude,
   resolveBuyBoxStore,
   sanitizeGeoTargets,
+  screenStamp,
+  screenYearOf,
   serializeBuyBoxStore,
   unitCountFromMetrics,
+  UNSTAMPED_SCREEN_YEAR,
   activeBox,
   type BuyBox,
   type BuyBoxStore,
 } from "./criteria";
+
+/** The year the bare rows in these cases were screened in. A label that
+ *  carries a year of its own is read against it; the cases that turn on
+ *  the year say which one they use. */
+const SCREEN_YEAR = 2026;
 
 function ex(
   metrics: Array<[string, string]>,
@@ -641,7 +650,7 @@ describe("occupancyPctFromMetrics — today's occupancy, never the sponsor's sta
 // square-footage noun in any spelling is a size.
 describe("METRIC_FIND.price — rents, rates, per-key figures and loan pricing are never the price", () => {
   const price = (label: string) =>
-    findMetric([{ label, value: "$2,150" }], METRIC_FIND.price.inc, METRIC_FIND.price.exc);
+    findMetric([{ label, value: "$2,150" }], METRIC_FIND.price.inc, METRIC_FIND.price.exc(SCREEN_YEAR));
 
   it("refuses an asking rent or rate, a price per key in either spelling, and loan / debt / insurance pricing", () => {
     for (const label of [
@@ -800,7 +809,7 @@ describe("the fourth review's occupancy, size and price cases", () => {
 
   it("a bare 'Asking:' or 'Ask —' and a total consideration read; an exit price or a prior year's sale never does", () => {
     const price = (label: string) =>
-      findMetric([{ label, value: "$42,000,000" }], METRIC_FIND.price.inc, METRIC_FIND.price.exc);
+      findMetric([{ label, value: "$42,000,000" }], METRIC_FIND.price.inc, METRIC_FIND.price.exc(SCREEN_YEAR));
     for (const label of ["Asking:", "Ask —", "Ask -", "Asking (unpriced)", "Total consideration", "Purchase Price:"]) {
       expect(price(label)?.label, label).toBe(label);
     }
@@ -863,7 +872,7 @@ describe("the fourth review's occupancy, size and price cases", () => {
 
 // The fifth review's cases — a whole-reader pass on the current code.
 describe("the fifth review's price, per-unit, cap, size, occupancy and money cases", () => {
-  const price = (label: string) => findPriceRow([{ label, value: "$42,000,000" }]);
+  const price = (label: string) => findPriceRow([{ label, value: "$42,000,000" }], null, SCREEN_YEAR);
 
   it("a price per anything is never the ask; a price per the PSA or per OM still is", () => {
     for (const label of [
@@ -900,10 +909,14 @@ describe("the fifth review's price, per-unit, cap, size, occupancy and money cas
       expect(price(label), label).toBeNull();
     }
     expect(
-      findPriceRow([
-        { label: "Projected sale price (Year 5)", value: "$58,000,000" },
-        { label: "Asking price", value: "$42,000,000" },
-      ])?.value,
+      findPriceRow(
+        [
+          { label: "Projected sale price (Year 5)", value: "$58,000,000" },
+          { label: "Asking price", value: "$42,000,000" },
+        ],
+        null,
+        SCREEN_YEAR,
+      )?.value,
     ).toBe("$42,000,000");
   });
 
@@ -913,9 +926,9 @@ describe("the fifth review's price, per-unit, cap, size, occupancy and money cas
       { label: "Acres", value: "12" },
       { label: "Zoning", value: "MF-2" },
     ];
-    expect(findPriceRow(land, "development")?.value).toBe("$4,000,000");
-    expect(findPriceRow(land, "stabilized")).toBeNull();
-    expect(findPriceRow(land)).toBeNull();
+    expect(findPriceRow(land, "development", SCREEN_YEAR)?.value).toBe("$4,000,000");
+    expect(findPriceRow(land, "stabilized", SCREEN_YEAR)).toBeNull();
+    expect(findPriceRow(land, null, SCREEN_YEAR)).toBeNull();
     const dev = { assetClass: "multifamily", market: "", address: "", metrics: land, strategy: { kind: "development" } };
     const inside = check(evaluateBuyBox("multifamily", dev, { priceMinM: 1, priceMaxM: 10 }), "Price")!;
     expect(inside.status).toBe("pass");
@@ -1076,8 +1089,9 @@ describe("the sixth review's per-unit, cap, price, size and occupancy cases", ()
     expect(buildingSfFromMetrics([{ label: "Size (SF)", value: "545,000 SF" }, { label: "Acres", value: "12.5" }])).toBeNull();
   });
 
-  it("an ask dated this year or later reads; a past year, or a sale word beside any year, is a prior trade", () => {
-    const y = new Date().getFullYear();
+  it("an ask dated the screen's year or later reads; an earlier year, or a sale word beside any year, is a prior trade", () => {
+    // A screen of 2026: its labels are read against 2026, whatever the clock says.
+    const y = 2026;
     for (const label of [
       `Revised asking price (March ${y})`,
       `Asking price (${y})`,
@@ -1085,7 +1099,7 @@ describe("the sixth review's per-unit, cap, price, size and occupancy cases", ()
       `Purchase price (${y + 1} close)`,
       `Price guidance (Q1 ${y})`,
     ]) {
-      expect(findPriceRow([{ label, value: "$42,000,000" }])?.value, label).toBe("$42,000,000");
+      expect(findPriceRow([{ label, value: "$42,000,000" }], null, y)?.value, label).toBe("$42,000,000");
     }
     for (const label of [
       "2019 sale price",
@@ -1101,8 +1115,12 @@ describe("the sixth review's per-unit, cap, price, size and occupancy cases", ()
       "Disposition price",
       "Pro forma sale price",
     ]) {
-      expect(findPriceRow([{ label, value: "$42,000,000" }]), label).toBeNull();
+      expect(findPriceRow([{ label, value: "$42,000,000" }], null, y), label).toBeNull();
     }
+    // A screen of 2027 reads its own year's labels as the ask and 2026's as
+    // a prior trade: the rule moves with the screen, not the clock.
+    expect(findPriceRow([{ label: "Asking price (2027)", value: "$42,000,000" }], null, 2027)?.value).toBe("$42,000,000");
+    expect(findPriceRow([{ label: "Purchase price (2026)", value: "$42,000,000" }], null, 2027)).toBeNull();
     // The past-year fragment, in its own right.
     expect(pastYearSource(2026)).toBe("\\b(?:19\\d\\d|20[0-1]\\d|202[0-5])\\b");
     expect(pastYearSource(2020)).toBe("\\b(?:19\\d\\d|20[0-0]\\d|201[0-9])\\b");
@@ -1110,6 +1128,43 @@ describe("the sixth review's per-unit, cap, price, size and occupancy cases", ()
     const past = new RegExp(pastYearSource(2026));
     for (const s of ["2025", "1998", "2000", "2019"]) expect(past.test(s), s).toBe(true);
     for (const s of ["2026", "2027", "20250", "12025"]) expect(past.test(s), s).toBe(false);
+  });
+
+  it("the price's exclusion is built per screen year and kept — the same pattern for the same year", () => {
+    expect(priceExclude(2026)).toBe(priceExclude(2026));
+    expect(METRIC_FIND.price.exc(2026)).toBe(priceExclude(2026));
+    expect(priceExclude(2027)).not.toBe(priceExclude(2026));
+    expect(priceExclude(2026).test("Purchase price (2025)")).toBe(true);
+    expect(priceExclude(2026).test("Asking price (2026)")).toBe(false);
+    expect(priceExclude(2027).test("Asking price (2026)")).toBe(true);
+  });
+
+  it("a screen's year is its stamp's; no stamp, or a stamp that is not a date, reads as a 2026 screen", () => {
+    expect(UNSTAMPED_SCREEN_YEAR).toBe(2026);
+    expect(screenYearOf({ screenedOn: "2027-01-02" })).toBe(2027);
+    expect(screenYearOf({ screenedOn: "2026-12-31" })).toBe(2026);
+    expect(screenYearOf({ screenedOn: " 2028-06-30 " })).toBe(2028);
+    for (const screenedOn of [undefined, null, "", "2027", "Jan 2, 2027", "0000-01-01", "2027-13-01", "2027-00-10"]) {
+      expect(screenYearOf({ screenedOn }), String(screenedOn)).toBe(UNSTAMPED_SCREEN_YEAR);
+    }
+    expect(screenYearOf(null)).toBe(UNSTAMPED_SCREEN_YEAR);
+    expect(screenYearOf(undefined)).toBe(UNSTAMPED_SCREEN_YEAR);
+    // The stamp a screen writes is the day as an ISO date, read back to its year.
+    expect(screenStamp(new Date(Date.UTC(2027, 0, 2, 9)))).toBe("2027-01-02");
+    expect(screenYearOf({ screenedOn: screenStamp(new Date(Date.UTC(2027, 0, 2, 9))) })).toBe(2027);
+  });
+
+  it("the buy box's source carries the stamp, so the band reads the label at the screen's year", () => {
+    const source = buyBoxCheckSource(
+      { ...ex([["Asking price (2026)", "$42,000,000"]]), screenedOn: "2026-12-15" },
+      null,
+      null,
+    );
+    expect(source?.screenedOn).toBe("2026-12-15");
+    expect(check(evaluateBuyBox("auto", source, { priceMaxM: 50 }), "Price")?.status).toBe("pass");
+    // Read as a screen of 2027, the same label is a prior trade and the band has no figure.
+    const later = buyBoxCheckSource({ ...ex([["Asking price (2026)", "$42,000,000"]]), screenedOn: "2027-01-02" }, null, null);
+    expect(check(evaluateBuyBox("auto", later, { priceMaxM: 50 }), "Price")?.status).toBe("unknown");
   });
 
   it("a second figure in the occupancy cell never blanks today's figure; a qualifier still does", () => {
@@ -1128,11 +1183,13 @@ describe("the sixth review's per-unit, cap, price, size and occupancy cases", ()
       { label: "Construction budget", value: "$36,000,000" },
       { label: "Units (proposed)", value: "240" },
     ];
-    expect(findPriceRow(metrics, "development")?.value).toBe("$4,000,000");
+    expect(findPriceRow(metrics, "development", SCREEN_YEAR)?.value).toBe("$4,000,000");
     // On an operating asset the unpriced ask row is still the price row.
-    expect(findPriceRow(metrics, "stabilized")?.value).toBe("Call for offers");
+    expect(findPriceRow(metrics, "stabilized", SCREEN_YEAR)?.value).toBe("Call for offers");
     // With no land cost the ask row comes back as it is.
-    expect(findPriceRow([{ label: "Asking price", value: "Call for offers" }], "development")?.value).toBe("Call for offers");
+    expect(
+      findPriceRow([{ label: "Asking price", value: "Call for offers" }], "development", SCREEN_YEAR)?.value,
+    ).toBe("Call for offers");
     const r = evaluateBuyBox("multifamily", { ...ex([]), metrics, strategy: { kind: "development" } }, { maxPriceM: 3 });
     expect(check(r, "Price")?.status).toBe("miss");
     expect(check(r, "Price")?.detail).toContain("land cost is $4.0M");

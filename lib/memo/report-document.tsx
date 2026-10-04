@@ -1,7 +1,7 @@
 import "server-only";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
-import type { BuyBoxCheck } from "@/lib/criteria";
+import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { siteFlagsStale, type FloodMapView, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
@@ -1563,6 +1563,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
     subjectBasis(
       metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
       inferStrategy(extraction, firstSignalOf(deal)).kind,
+      screenYearOf(extraction),
       interestOf(extraction),
       extraction?.assetClass,
     ),

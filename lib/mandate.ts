@@ -35,6 +35,7 @@ import {
   NEAR_REL,
   NEAR_CAP_PT,
   NEAR_IRR_PT,
+  screenYearOf,
   unitCountRow,
 } from "./criteria";
 
@@ -105,6 +106,9 @@ interface ExtractionLike {
   /** what the price buys (#414); on a note the stated cap is the
    *  collateral's, so no cap floor is scored on it */
   interest?: { kind?: string | null } | null;
+  /** the day the screen read the memorandum — a price label's year is read
+   *  against its year (lib/criteria `screenYearOf`) */
+  screenedOn?: string | null;
 }
 
 type Pattern = { readonly inc: RegExp; readonly exc?: RegExp };
@@ -241,9 +245,10 @@ export function evalDealbreakers(
   }
 
   // Hard purchase-price ceiling — the shared price row, so a development's
-  // land cost is judged, the same row the page prints.
+  // land cost is judged, the same row the page prints, read against the
+  // screen's year.
   if (db.maxPriceM != null) {
-    const priceRow = findPriceRow(metrics, extraction?.strategy?.kind);
+    const priceRow = findPriceRow(metrics, extraction?.strategy?.kind, screenYearOf(extraction));
     // A range's top (#466): a ceiling is tested by the end that can breach it.
     const price = priceRow ? parsePrice(priceRow.value) : null;
     const ceiling = db.maxPriceM * 1e6;

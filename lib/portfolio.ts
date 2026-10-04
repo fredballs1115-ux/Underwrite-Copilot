@@ -29,7 +29,7 @@
 // market check's header name the same places.
 
 import type { ExtractionResult, PortfolioProperty } from "@/lib/anthropic/types";
-import { parseCount, parsePct, parsePrice, parseSf } from "@/lib/criteria";
+import { parseCount, parsePct, parsePrice, parseSf, screenYearOf } from "@/lib/criteria";
 import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
 import { placeOf } from "@/lib/address";
 import { withArticle } from "@/lib/article";
@@ -189,7 +189,7 @@ export function readPortfolio(ex: ExtractionResult | null | undefined): Portfoli
     ? assets.reduce((s, a) => s + (a.allocated as number), 0)
     : null;
   const metrics = ex?.metrics ?? [];
-  const priceRow = findPricedMetric(metrics, inferStrategy(ex ?? null).kind);
+  const priceRow = findPricedMetric(metrics, inferStrategy(ex ?? null).kind, screenYearOf(ex));
   // A range's top (#466), as every reader of the ask takes it.
   const statedAsk = priceRow ? parsePrice(priceRow.value) : null;
   const askingPrice = statedAsk != null && statedAsk >= 10_000 ? statedAsk : null;

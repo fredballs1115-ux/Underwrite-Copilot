@@ -4,7 +4,7 @@
 // (Universal module: used by the deal page; snapshots are written by the
 // pipeline into deals.prior_screen — see migration 0010.)
 
-import { METRIC_FIND, parseMoney, parsePct, parsePrice } from "./criteria";
+import { METRIC_FIND, parseMoney, parsePct, parsePrice, screenYearOf } from "./criteria";
 
 interface MetricLike {
   label: string;
@@ -13,6 +13,8 @@ interface MetricLike {
 }
 interface ExtractionLike {
   metrics: MetricLike[];
+  /** the day that screen read the memorandum (ExtractionResult.screenedOn) */
+  screenedOn?: string | null;
 }
 interface VerdictLike {
   verdict?: string;
@@ -49,7 +51,9 @@ export interface ScreenDiff {
 interface Tracked {
   label: string;
   include: RegExp;
-  exclude?: RegExp;
+  /** a pattern, or — for the price, whose exclusion turns on the year the
+   *  screen read the memorandum — the pattern for a screen of a given year */
+  exclude?: RegExp | ((screenYear: number) => RegExp);
   kind: "money" | "pct";
   /** the asking price, read as every price is: a range at its top (#466) */
   price?: boolean;
@@ -64,7 +68,8 @@ const TRACKED: Tracked[] = [
   {
     label: "Asking price",
     // The shared price reader: every name an OM gives the ask, never a
-    // per-unit figure and never what the building last traded for.
+    // per-unit figure and never what the building last traded for — a
+    // label's year read against the year each screen read the memorandum.
     include: METRIC_FIND.price.inc,
     exclude: METRIC_FIND.price.exc,
     kind: "money",
@@ -165,16 +170,21 @@ const normLabel = (s: string) =>
  * manufacture a phantom retrade. So: an exact (normalized) label match wins;
  * otherwise only an unambiguous single candidate on each side with the SAME
  * tagged basis qualifies; otherwise the tracker is skipped for this deal.
+ * Each side's rows are read against its own screen's year: the previous
+ * screen may have read the memorandum in an earlier year than this one.
  */
 function pickPair(
   before: MetricLike[],
   after: MetricLike[],
   t: Tracked,
+  years: { before: number; after: number },
 ): [MetricLike, MetricLike] | null {
-  const match = (m: MetricLike) =>
-    t.include.test(m.label) && !(t.exclude && t.exclude.test(m.label));
-  const bs = before.filter(match);
-  const as_ = after.filter(match);
+  const excludeFor = (year: number): RegExp | undefined =>
+    typeof t.exclude === "function" ? t.exclude(year) : t.exclude;
+  const matcher = (exclude: RegExp | undefined) => (m: MetricLike) =>
+    t.include.test(m.label) && !(exclude && exclude.test(m.label));
+  const bs = before.filter(matcher(excludeFor(years.before)));
+  const as_ = after.filter(matcher(excludeFor(years.after)));
   if (!bs.length || !as_.length) return null;
 
   for (const b of bs) {
@@ -211,10 +221,11 @@ export function computeScreenDiff(
   const before = prior.extraction?.metrics ?? [];
   const after = currentExtraction.metrics ?? [];
   if (!before.length || !after.length) return null;
+  const years = { before: screenYearOf(prior.extraction), after: screenYearOf(currentExtraction) };
 
   const rows: DiffRow[] = [];
   for (const t of TRACKED) {
-    const pair = pickPair(before, after, t);
+    const pair = pickPair(before, after, t, years);
     if (!pair) continue;
     const [b, a] = pair;
 

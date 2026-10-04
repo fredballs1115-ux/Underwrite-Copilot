@@ -1,4 +1,4 @@
-import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct, parsePrice } from "@/lib/criteria";
+import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
 import {
   buildingPriceOf,
   findPriceMetric,
@@ -79,7 +79,7 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     const capPct = capMetric ? parsePct(capMetric.value) : null;
 
     // The asking / purchase price — or, on a development, the land cost.
-    const priceMetric = findPriceMetric(metrics, strategy.kind);
+    const priceMetric = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
     const price = priceMetric ? parsePrice(priceMetric.value) : null;
 
     // A $/unit only for multifamily — the class the series is named for.

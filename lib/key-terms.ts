@@ -59,11 +59,14 @@ export interface KeyTermMetric {
  * the loan's own terms follow the price — the balance, the coupon, the
  * maturity, whether it pays — and the collateral's cap is not led with,
  * since it is not the buyer's. Rows that are not objects (analysis output
- * can carry nulls) are dropped.
+ * can carry nulls) are dropped. `screenYear` is the year the screen read the
+ * memorandum (lib/criteria `screenYearOf`), which the price row's label is
+ * read against, as on every other surface.
  */
 export function keyTermRows<M extends KeyTermMetric>(
   metrics: ReadonlyArray<M | null | undefined>,
   kind: StrategyKind,
+  screenYear: number,
   limit = 8,
   interest?: InterestKind,
 ): M[] {
@@ -73,7 +76,7 @@ export function keyTermRows<M extends KeyTermMetric>(
     const hit = row ? rows.find((m) => m === row || (m.label === row.label && m.value === row.value)) : undefined;
     if (hit && !head.includes(hit)) head.push(hit);
   };
-  const price = findPriceMetric(rows, kind);
+  const price = findPriceMetric(rows, kind, screenYear);
   lead(price);
   // An auction has no asking price (#456): its starting bid, the buyer's
   // premium, the reserve and the deadline stand where the price would.

@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { basisScale, compFigures, fmtBasis, subjectBasis } from "./comp-detail";
+import { screenYearOf } from "./criteria";
 import { SAMPLE_DEAL } from "./sample-deal";
 
 const none = { perUnit: null, perSf: null, capPct: null };
+/** The year the sample's memorandum was screened in, read as every surface reads it. */
+const SAMPLE_YEAR = screenYearOf(SAMPLE_DEAL.extraction);
 
 describe("compFigures — reads a comp's stated basis and cap, nothing more", () => {
   it("reads a per-unit basis in its usual shapes", () => {
@@ -112,19 +115,19 @@ describe("compFigures — every shape a comp's detail line comes in (WILL_TODO's
 
 describe("subjectBasis — the deal's own basis from the shared readers", () => {
   it("divides the sample's asking price by its unit count", () => {
-    const b = subjectBasis(SAMPLE_DEAL.extraction.metrics, "stabilized");
+    const b = subjectBasis(SAMPLE_DEAL.extraction.metrics, "stabilized", SAMPLE_YEAR);
     expect(b.perUnit).toBe(Math.round(68_000_000 / 248));
     // The sample states no building size, so no per-SF basis is invented.
     expect(b.perSf).toBeNull();
   });
 
   it("gives a conversion or a development no price basis — they are judged on all-in cost", () => {
-    expect(subjectBasis(SAMPLE_DEAL.extraction.metrics, "conversion")).toEqual({ perUnit: null, perSf: null });
-    expect(subjectBasis(SAMPLE_DEAL.extraction.metrics, "development")).toEqual({ perUnit: null, perSf: null });
+    expect(subjectBasis(SAMPLE_DEAL.extraction.metrics, "conversion", SAMPLE_YEAR)).toEqual({ perUnit: null, perSf: null });
+    expect(subjectBasis(SAMPLE_DEAL.extraction.metrics, "development", SAMPLE_YEAR)).toEqual({ perUnit: null, perSf: null });
   });
 
   it("gives nothing when the OM states no price", () => {
-    expect(subjectBasis([{ label: "Units", value: "248" }], "stabilized")).toEqual({ perUnit: null, perSf: null });
+    expect(subjectBasis([{ label: "Units", value: "248" }], "stabilized", SAMPLE_YEAR)).toEqual({ perUnit: null, perSf: null });
   });
 
   it("gives an outdoor-storage yard no per-SF basis: it trades by the acre, not by its shop building", () => {
@@ -134,17 +137,17 @@ describe("subjectBasis — the deal's own basis from the shared readers", () => 
       { label: "Usable acres", value: "8.5" },
     ];
     // $12M over a 4,000 SF shop read $3,000/SF, and the comps drew it as a tick.
-    expect(subjectBasis(yard, "stabilized", undefined, "Industrial Outdoor Storage (IOS)")).toEqual({ perUnit: null, perSf: null });
-    expect(subjectBasis(yard, "stabilized", undefined, "Truck terminal").perSf).toBeNull();
+    expect(subjectBasis(yard, "stabilized", SAMPLE_YEAR, undefined, "Industrial Outdoor Storage (IOS)")).toEqual({ perUnit: null, perSf: null });
+    expect(subjectBasis(yard, "stabilized", SAMPLE_YEAR, undefined, "Truck terminal").perSf).toBeNull();
     // A warehouse on the same figures is priced by its feet, as before.
-    expect(subjectBasis(yard, "stabilized", undefined, "Industrial").perSf).toBe(3_000);
-    expect(subjectBasis(yard, "stabilized").perSf).toBe(3_000);
+    expect(subjectBasis(yard, "stabilized", SAMPLE_YEAR, undefined, "Industrial").perSf).toBe(3_000);
+    expect(subjectBasis(yard, "stabilized", SAMPLE_YEAR).perSf).toBe(3_000);
   });
 });
 
 describe("basisScale — every comp and the subject on one track", () => {
   it("scales the sample's three sale comps and the subject to the largest basis", () => {
-    const subject = subjectBasis(SAMPLE_DEAL.extraction.metrics, "stabilized");
+    const subject = subjectBasis(SAMPLE_DEAL.extraction.metrics, "stabilized", SAMPLE_YEAR);
     const scale = basisScale(SAMPLE_DEAL.comps.saleComps, subject)!;
     expect(scale.unit).toBe("unit");
     expect(scale.max).toBe(298_000);

@@ -141,6 +141,13 @@ export interface ExtractionResult {
    *  screen did (lib/anthropic/ask). Absent on an extraction saved before
    *  it was recorded, and on a deal entered by hand. */
   omRead?: "pdf" | "text";
+  /** The day the screen read the memorandum (or the typed facts), an ISO
+   *  date stamped when the extraction is stored (lib/criteria
+   *  `screenStamp`) — never a field the model writes. A price label's year
+   *  is judged against its year: "Asking price (2026)" is the ask on a 2026
+   *  screen and stays the ask in 2027 (`screenYearOf`). Absent on an
+   *  extraction stored before the stamp, which reads as a 2026 screen. */
+  screenedOn?: string;
   /** Free-text context typed by the buyer on MANUAL (no-OM) deals — condition,
    *  tenancy, the story. Never set by the OM extraction; rendered as prose,
    *  not a metric, and fed verbatim to the analysis fact sheet. */

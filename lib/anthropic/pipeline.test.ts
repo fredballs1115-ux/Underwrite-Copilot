@@ -209,6 +209,9 @@ const EXTRACTION = {
     { label: "NOI (in place)", value: "$1,200,000", flagged: false, page: "p. 5", basis: "in_place", locatorSnippet: "" },
   ],
 } as unknown as ExtractionResult;
+/** EXTRACTION as the screen stores it: stamped with the day it read the
+ *  memorandum, which a price label's year is judged against. */
+const STORED_EXTRACTION = { ...EXTRACTION, screenedOn: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) };
 const SIGNAL = { dealName: "Oakwood Flats", assetClass: "multifamily", market: "Dallas, TX" } as unknown as FirstSignal;
 const CHALLENGES = { challenges: [], summary: "" } as unknown as ChallengerResult;
 const COMPS = { saleComps: [], leaseComps: [], redFlags: [], summary: "" } as unknown as BrokerCompsResult;
@@ -454,11 +457,20 @@ describe("runAnalysis — what the run spent lands on its job row", () => {
 
 describe("runAnalysis — the happy path", () => {
   it("runs the six steps in order, writes every result and finishes done", async () => {
-    await runAnalysis("d1");
+    // The last evening of a year: the extraction is stamped with the day the
+    // screen read the memorandum, so its labels are read against that year
+    // after the calendar turns (lib/criteria `screenYearOf`).
+    vi.useFakeTimers({ now: new Date("2026-12-31T23:30:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
     expect(job().status).toBe("done");
     expect(job().step).toBe("verdict");
-    // Stored with how it was read: the PDF itself, here (omSourceFor's fake).
-    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
+    // Stored with how it was read: the PDF itself, here (omSourceFor's fake),
+    // and the day it was read.
+    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf", screenedOn: "2026-12-31" });
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual(COMPS);
     // A deal with no address sits in no covered market: the check ran on
@@ -1522,7 +1534,7 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
 
     // The mixed generation: this run's extraction and challenges beside the
     // previous screen's comps, market and verdict.
-    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
+    expect(state.deals.d1.extraction).toEqual({ ...STORED_EXTRACTION, omRead: "pdf" });
     expect(state.deals.d1.challenges).toEqual(CHALLENGES);
     expect(state.deals.d1.comps).toEqual({ old: true });
     expect(state.deals.d1.verdict).toEqual({ old: true });
@@ -1566,7 +1578,7 @@ describe("runAnalysis — what a failure leaves behind, and what it tells the an
     await runAnalysis("d1");
     expect(job().status).toBe("done");
     // The fall-back is recorded with the extraction, for Ask (research pass 18).
-    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
+    expect(state.deals.d1.extraction).toEqual({ ...STORED_EXTRACTION, omRead: "pdf" });
     expect(extractTerms).toHaveBeenCalledTimes(2);
     expect(vi.mocked(extractTerms).mock.calls[0][0]).toBe(pages);
     expect(vi.mocked(extractTerms).mock.calls[1][0]).toBe(buffer);
@@ -1728,7 +1740,7 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     expect(extractTerms).toHaveBeenCalledTimes(2);
     expect(vi.mocked(extractTerms).mock.calls[1][0]).toBe(buffer);
     // The fall-back to the pages is recorded with the extraction, for Ask.
-    expect(state.deals.d1.extraction).toEqual({ ...EXTRACTION, omRead: "pdf" });
+    expect(state.deals.d1.extraction).toEqual({ ...STORED_EXTRACTION, omRead: "pdf" });
     expect(vi.mocked(challengeAssumptions).mock.calls[0][0]).toBe(buffer);
 
     // A layer that read the NOI is the deck: one read, no fallback.

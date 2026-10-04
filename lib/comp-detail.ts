@@ -130,10 +130,13 @@ export interface SubjectBasis {
  *  judged on its all-in cost, not the shell's price, so it has no price
  *  basis to set against stabilized trades: both come back null. An
  *  outdoor-storage yard has no per-SF basis: it trades by the usable acre,
- *  and its price over the shop building on it is no figure to tick. */
+ *  and its price over the shop building on it is no figure to tick. The
+ *  price row is read against `screenYear`, the year the screen read the
+ *  memorandum (lib/criteria `screenYearOf`), as the deal page reads it. */
 export function subjectBasis(
   metrics: MetricLike[],
   kind: StrategyKind,
+  screenYear: number,
   /** what the price buys (lib/interest `interestOf`, #414): a note's price
    *  is nobody's basis, a leased fee's buys the land alone (#415), and a
    *  share's is grossed up to the whole the building's count and area
@@ -148,7 +151,7 @@ export function subjectBasis(
   if (kind === "conversion" || kind === "development") return none;
   if (interest?.kind === "note" || interest?.kind === "leased_fee") return none;
   if (interest?.kind === "partial_interest" && interest.sharePct == null) return none;
-  const row = findPricedMetric(metrics, kind);
+  const row = findPricedMetric(metrics, kind, screenYear);
   const stated = row ? parsePrice(row.value) : null;
   if (stated == null || stated < 10_000) return none;
   const price = interest?.sharePct != null ? stated / (interest.sharePct / 100) : stated;

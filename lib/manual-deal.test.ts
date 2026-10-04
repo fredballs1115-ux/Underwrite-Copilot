@@ -13,7 +13,7 @@ import {
   NOTES_MAX,
   type ManualDealFacts,
 } from "./manual-deal";
-import { buildingSfRow, evaluateBuyBox, findMetric, METRIC_FIND } from "./criteria";
+import { buildingSfRow, evaluateBuyBox, findMetric, METRIC_FIND, screenYearOf } from "./criteria";
 import { scoreMandateFit } from "./mandate";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import { computeUnderwrite } from "./underwrite/engine";
@@ -131,13 +131,20 @@ describe("buildManualExtraction", () => {
     expect(ex.totalPages).toBe(0);
   });
 
+  it("is stamped with the day the facts were read, which a price label's year is judged against", () => {
+    const ex = buildManualExtraction(QUAD, new Date(Date.UTC(2027, 2, 9, 15)));
+    expect(ex.screenedOn).toBe("2027-03-09");
+    expect(screenYearOf(ex)).toBe(2027);
+  });
+
   // THE load-bearing contract: the labels must keep matching the shared
   // metric matchers, or manual deals silently vanish from the buy box,
   // the pipeline columns, and the workbook.
   it("labels match METRIC_FIND (buy box + mandate score read them)", () => {
-    const { metrics } = buildManualExtraction(QUAD);
+    const ex = buildManualExtraction(QUAD);
+    const { metrics } = ex;
     expect(
-      findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc)?.value,
+      findMetric(metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc(screenYearOf(ex)))?.value,
     ).toBe("$1,250,000");
     expect(findMetric(metrics, METRIC_FIND.goingInCap.inc)?.value).toBe("6.2%");
     expect(findMetric(metrics, METRIC_FIND.perUnit.inc)?.value).toBe(
@@ -155,7 +162,7 @@ describe("buildManualExtraction", () => {
     expect(ex.metrics.some((m) => /context/i.test(m.label))).toBe(false);
     // Figures stay exactly where the matchers expect them.
     expect(
-      findMetric(ex.metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc)?.value,
+      findMetric(ex.metrics, METRIC_FIND.price.inc, METRIC_FIND.price.exc(screenYearOf(ex)))?.value,
     ).toBe("$1,250,000");
     expect(buildingSfRow(ex.metrics)?.value).toBe("3,600 SF");
   });
