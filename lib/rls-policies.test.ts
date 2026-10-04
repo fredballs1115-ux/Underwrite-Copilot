@@ -61,15 +61,62 @@ export function finalPolicies(dir = DIR): Map<string, Policy> {
   return policies;
 }
 
-/** Tables whose write verb is narrowed to named columns by a later grant. */
+/** A statement's role list, lower-cased. */
+const roleList = (raw: string) => raw.split(",").map((r) => r.trim().toLowerCase());
+
+/** The column names in a `(a, b)` list. */
+const columnList = (raw: string) => raw.split(",").map((c) => c.trim().toLowerCase()).filter(Boolean);
+
+/**
+ * Tables whose write verb a signed-in user still holds on named columns,
+ * after every grant and revoke has run in the order the statements do — as
+ * "<table>/<verb>". A revoke of the verb with a column list takes those
+ * columns back; one without takes them all, as Postgres revokes a table's
+ * column privileges with the table's (0036 took back the alert banner's
+ * two columns this way).
+ */
 export function columnGrantedWrites(dir = DIR): Set<string> {
-  const out = new Set<string>();
+  const held = new Map<string, Set<string>>();
   for (const { sql } of migrations(dir)) {
-    for (const m of sql.matchAll(/grant (update|insert) \([^)]*\) on public\.([a-z_]+) to authenticated/gi)) {
-      out.add(`${m[2]}/${m[1].toLowerCase()}`);
+    const events: { at: number; apply: () => void }[] = [];
+    for (const m of sql.matchAll(
+      /\bgrant\s+(update|insert)\s*\(([^)]*)\)\s*on\s+(?:table\s+)?public\.([a-z_][a-z0-9_]*)\s+to\s+([a-z_][a-z0-9_]*(?:\s*,\s*[a-z_][a-z0-9_]*)*)/gi,
+    )) {
+      if (!roleList(m[4]).includes("authenticated")) continue;
+      events.push({
+        at: m.index ?? 0,
+        apply: () => {
+          const key = `${m[3].toLowerCase()}/${m[1].toLowerCase()}`;
+          const cols = held.get(key) ?? new Set<string>();
+          for (const c of columnList(m[2])) cols.add(c);
+          held.set(key, cols);
+        },
+      });
     }
+    for (const m of sql.matchAll(
+      /\brevoke\s+([^;']*?)\s+on\s+(?:table\s+)?public\.([a-z_][a-z0-9_]*)\s+from\s+([a-z_][a-z0-9_]*(?:\s*,\s*[a-z_][a-z0-9_]*)*)/gi,
+    )) {
+      if (!roleList(m[3]).includes("authenticated")) continue;
+      const table = m[2].toLowerCase();
+      for (const p of m[1].matchAll(/\b(select|insert|update|delete|truncate|references|trigger|all)\b(?:\s+privileges)?\s*(?:\(([^)]*)\))?/gi)) {
+        const verb = p[1].toLowerCase();
+        const verbs = verb === "all" ? ["insert", "update"] : verb === "insert" || verb === "update" ? [verb] : [];
+        for (const v of verbs) {
+          events.push({
+            at: m.index ?? 0,
+            apply: () => {
+              const cols = held.get(`${table}/${v}`);
+              if (!cols) return;
+              if (p[2] === undefined) cols.clear();
+              else for (const c of columnList(p[2])) cols.delete(c);
+            },
+          });
+        }
+      }
+    }
+    for (const e of events.sort((a, b) => a.at - b.at)) e.apply();
   }
-  return out;
+  return new Set([...held].filter(([, cols]) => cols.size > 0).map(([key]) => key));
 }
 
 const bareTrue = (body: string) => /\b(using|with check)\s*\(\s*true\s*\)/i.test(body);
@@ -270,8 +317,18 @@ describe("row-level security policies", () => {
     }
   });
 
-  it("the alerts table lets users dismiss, not rewrite", () => {
-    expect(columnGrantedWrites().has("regulatory_alerts/update")).toBe(true);
+  it("the alert banner's shared rows take no write from a user's session", () => {
+    // A dismissal is the reader's own (lib/dismissed-alerts, a cookie), so
+    // 0036 took back the two columns 0034 left writable for the banner's old
+    // Dismiss, and dropped 0023's open update policy with them: one user's
+    // PATCH had been every user's banner.
+    expect(columnGrantedWrites().has("regulatory_alerts/update")).toBe(false);
+    const writes = [...finalPolicies().values()].filter((p) => p.table === "regulatory_alerts" && p.cmd !== "select");
+    expect(writes.map((p) => `${p.file}: "${p.name}" for ${p.cmd}`)).toEqual([]);
+  });
+
+  it("a column grant that stands is still read as one (sanity: profiles' own fields)", () => {
+    expect(columnGrantedWrites().has("profiles/update")).toBe(true);
   });
 
   it("every table turns row-level security on in the file that creates it", () => {
@@ -368,6 +425,34 @@ describe("the readers can fail (synthetic migrations)", () => {
     const { functions, unknown } = finalFunctions(dir);
     expect(functions.get("loose")!.searchPath).toBe(false);
     expect(unknown).toEqual(["0001_a.sql: revoke on typo, which no earlier migration creates"]);
+  });
+
+  it("a column grant is read until a later revoke takes it back, by column or whole", () => {
+    const dir = fixture({
+      "0001_a.sql": `revoke insert, update, delete on public.notes from anon, authenticated;
+        grant update (seen_at, seen_by) on public.notes to authenticated;
+        grant update (label) on public.tags to anon, authenticated;
+        grant update (body) on public.drafts to authenticated;
+        create policy "open" on public.notes for update to authenticated using (true) with check (true);`,
+      "0002_b.sql": `do $$ begin
+          execute 'revoke update (seen_at) on public.notes from anon, authenticated';
+          execute 'revoke update on public.tags from anon';
+          execute 'revoke all on public.drafts from anon, authenticated';
+        end; $$;`,
+    });
+    // One column of two taken back: the other is still a write.
+    expect([...columnGrantedWrites(dir)].sort()).toEqual(["notes/update", "tags/update"]);
+    const closed = fixture({
+      "0001_a.sql": `grant update (seen_at, seen_by) on public.notes to authenticated;
+        create policy "open" on public.notes for update to authenticated using (true) with check (true);`,
+      "0002_b.sql": `revoke update (seen_at, seen_by) on public.notes from anon, authenticated;`,
+    });
+    expect(columnGrantedWrites(closed).has("notes/update")).toBe(false);
+    // …and the open policy left behind is then a bare true with nothing narrowing it.
+    const open = [...finalPolicies(closed).values()].filter(
+      (p) => p.cmd !== "select" && bareTrue(p.body) && !columnGrantedWrites(closed).has(`${p.table}/${p.cmd}`),
+    );
+    expect(open.map((p) => p.name)).toEqual(["open"]);
   });
 
   it("a function's body is the last definition's, read whole inside another block's quotes", () => {

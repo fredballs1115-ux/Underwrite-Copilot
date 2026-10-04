@@ -6,7 +6,7 @@
 // detected in the last 30 days and not dismissed by this reader in this
 // browser — their account's cookie, read through the banner's own reader
 // (`dismissedFor`). The shared `dismissed_at` column is not read — every
-// signed-in user may write it.
+// signed-in user could write it until migration 0036 took the grant back.
 
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";

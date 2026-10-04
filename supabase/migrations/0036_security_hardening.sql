@@ -2,8 +2,9 @@
 -- 0036 — security hardening (the review of 2026-09-30)
 --
 -- Five places where the database trusted a value the caller chose, or checked
--- a rule on insert that an update could undo. Each part says what it closes
--- and why the app's own writes pass it unchanged.
+-- a rule on insert that an update could undo, and one write it still allowed
+-- that nothing uses. Each part says what it closes and why the app's own
+-- writes pass it unchanged.
 --
 -- Who is trusted. The web's server actions write with the signed-in user's
 -- session, so auth.uid() is that user. The worker, the in-process pipeline,
@@ -89,8 +90,19 @@
 --      as it was) plus the new entry. Nothing in the app edits or clears the
 --      thread.
 --
--- Rolling back: every part is one grant or one trigger — see the end of the
--- file for the statement that undoes each.
+--   6. The alert banner's shared write. 0034 narrowed regulatory_alerts'
+--      update to two columns, dismissed_at and dismissed_by, for the
+--      banner's Dismiss button. A dismissal is the reader's own now (a
+--      cookie, lib/dismissed-alerts), and nothing in the app reads or writes
+--      either column, so the grant only let any signed-in user write a row
+--      every other user sees. It is revoked, and 0023's update policy —
+--      `using (true) with check (true)` — is dropped with it, so a later run
+--      of 0034, which grants the two columns again, still reaches no row.
+--      The daily intel job inserts alerts with the service role, which
+--      neither touches; every reader selects named columns, never these two.
+--
+-- Rolling back: every part is a grant, a trigger or a policy — see the end of
+-- the file for the statements that undo each.
 --
 -- Idempotent. Run the WHOLE file in the Supabase SQL editor, after 0035. Each
 -- block checks that what it guards exists (as 0034 does), so the file is also
@@ -346,6 +358,17 @@ begin
 end;
 $$;
 
+-- 6. regulatory_alerts: no write from a user's session ------------------------
+-- 0034's column grant, taken back, and 0023's open update policy dropped.
+do $$
+begin
+  if to_regclass('public.regulatory_alerts') is not null then
+    execute 'revoke update (dismissed_at, dismissed_by) on public.regulatory_alerts from anon, authenticated';
+    execute 'drop policy if exists "dismiss regulatory alerts" on public.regulatory_alerts';
+  end if;
+end;
+$$;
+
 -- ── ROLLING BACK ─────────────────────────────────────────────────────────────
 -- Each statement undoes one part. Run only the one for the part that broke
 -- something, then tell whoever maintains the app which path it was.
@@ -357,5 +380,10 @@ $$;
 --   3. drop trigger if exists enforce_free_deal_cap_update on public.deals;
 --   4. drop trigger if exists analysis_jobs_queue_guard on public.analysis_jobs;
 --   5. drop trigger if exists deal_qa_append_only on public.deals;
+--   6. grant update (dismissed_at, dismissed_by) on public.regulatory_alerts to authenticated;
+--      create policy "dismiss regulatory alerts" on public.regulatory_alerts
+--        for update to authenticated using (true) with check (true);
+--      (this reopens the shared write part 6 closes; nothing in the app
+--      uses it)
 -- Part 2's id check lives in deal_shares_guard; running 0017's definition of
 -- that function again removes it.

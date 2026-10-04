@@ -5,9 +5,10 @@
 //
 // THE RULE: an alert shows where it was detected in the last
 // ALERT_WINDOW_DAYS (30) days and THIS READER has not dismissed it. The
-// shared row's `dismissed_at` is ignored: every signed-in user may write it
-// (migration 0034's column grant), so it was one reader's click — or anyone's
-// direct PATCH — hiding an alert from every customer. A dismissal is the
+// shared row's `dismissed_at` is ignored: every signed-in user could write it
+// (migration 0034's column grant, until 0036 took it back), so it was one
+// reader's click — or anyone's direct PATCH — hiding an alert from every
+// customer. A dismissal is the
 // alert's id in a cookie named for the reader's account (lib/dismissed-
 // alerts), so a second account on the same browser keeps its own; nothing
 // shared is written, and /news keeps every alert whatever a banner did.

@@ -3,9 +3,9 @@
  * the list's parsing and bounding are tested.
  *
  * The banner's Dismiss used to write the shared row's `dismissed_at`, and
- * every signed-in user may update that column (migration 0034's column
- * grant), so one reader's click — or anyone's direct PATCH — hid an alert
- * from every customer. A dismissal is the reader's own now: the alert's id in
+ * every signed-in user could update that column (migration 0034's column
+ * grant, until 0036 took it back), so one reader's click — or anyone's
+ * direct PATCH — hid an alert from every customer. A dismissal is the reader's own now: the alert's id in
  * a cookie on this site, newest first, at most `MAX_DISMISSED_ALERTS` of
  * them, for a year. The cookie is named for the account (`dismissedCookieName`),
  * so a second account signed in on the same browser keeps its own list: one

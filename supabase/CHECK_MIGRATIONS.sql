@@ -61,9 +61,11 @@
 -- DELETE-only (it trims regulatory rules to the 15-market scope) — if the
 -- database was seeded before that cut, run 0029 again; it cannot double-delete.
 --
--- 0036 adds no table or column either, so it is read three other ways: by the
--- four triggers it creates, by the grants it takes away, and by what its
--- worker's-queue guard says. On its grants row, "still_missing" names each
+-- 0036 adds no table or column either, so it is read four other ways: by the
+-- four triggers it creates, by the grants it takes away, by what its
+-- worker's-queue guard says, and by the alert banner's write it closes (any
+-- role that can still update the two dismissal columns, and any write policy
+-- left on the table, is named). On its grants row, "still_missing" names each
 -- public-record RPC a signed-out caller can still run — the thing 0036
 -- closes — or that does not exist yet, since a grant on a function 0028
 -- never made has not been taken away: run 0028 and 0030_public_data_layer,
@@ -277,6 +279,29 @@ with
                 like '%(new.status = ''queued'' and new.payload is not null and old.payload is null)%'
         ) then 'analysis_jobs_queue_guard() restamping a re-queued row' end
       ], null) as missing
+  ),
+
+  -- A write taken away: no signed-in session may update a regulatory alert,
+  -- a row every user's banner reads. Names each role that still can, and
+  -- each write policy still on the table.
+  alerts_res as (
+    select
+      363 as seq,
+      '0036_security_hardening.sql (the alert banner''s write)' as migration,
+      'No signed-in user can stamp a regulatory alert every other user sees: 0034''s two-column grant taken back, 0023''s open update policy dropped. ❌ names what is still open: run 0036 again (0023 first, if the table is named).' as unblocks,
+      case
+        when to_regclass('public.regulatory_alerts') is null then array['regulatory_alerts (0023)']
+        else array(
+          select format('update (%s) for %s', c.col, r.role)
+          from unnest(array['anon', 'authenticated']) as r(role)
+          cross join unnest(array['dismissed_at', 'dismissed_by']) as c(col)
+          where has_column_privilege(r.role, to_regclass('public.regulatory_alerts'), c.col, 'UPDATE')
+          union all
+          select format('policy "%s" for %s', p.policyname, lower(p.cmd))
+          from pg_policies p
+          where p.schemaname = 'public' and p.tablename = 'regulatory_alerts' and p.cmd <> 'SELECT'
+        )
+      end as missing
   )
 
 select
@@ -291,5 +316,6 @@ from (
   union all select * from trg_res
   union all select * from priv_res
   union all select * from queue_res
+  union all select * from alerts_res
 ) r
 order by r.seq;

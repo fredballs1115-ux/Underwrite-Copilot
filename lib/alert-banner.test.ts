@@ -3,7 +3,7 @@
  * request: only a real web URL ever becomes a link, and the headline is text.
  * Its Dismiss is the reader's alone — a cookie named for their account, in
  * this browser, never the shared row — and the shared `dismissed_at` column,
- * which any signed-in user may write, is not read.
+ * which any signed-in user could write until migration 0036, is not read.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { isValidElement, type ReactElement, type ReactNode } from "react";

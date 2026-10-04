@@ -93,7 +93,8 @@ export default async function NewsPage({
         // The archive: the newest alerts whether or not a banner was
         // dismissed. A dismissal is one browser's (regulatory-alert-banner),
         // and the shared `dismissed_at` column is not read — every signed-in
-        // user may write it, so it would let anyone hide an alert from all.
+        // user could write it until migration 0036 took the grant back, so
+        // it would have let anyone hide an alert from all.
         .order("detected_at", { ascending: false })
         .limit(5),
     ]);
