@@ -601,9 +601,11 @@ export function buildMemoData(
   branding?: MemoData["branding"],
   overrides?: string[] | null,
   cover?: MemoCover | null,
-  /** the day the memo is read on, an ISO day — the route's UTC day; it
-   *  decides the rent allowance in force. The clock's UTC day where a caller
-   *  passes none (the full report's first page, built on the same day). */
+  /** the day the memo is read on, an ISO day — the reader's own day
+   *  (lib/reader-day), which the memo and report routes date the document
+   *  and name its file for; it decides the rent allowance in force and the
+   *  other dated lines that take a day. The clock's UTC day where a caller
+   *  passes none. */
   today: string = new Date().toISOString().slice(0, 10),
   /** the reader's 1031 exchange (the buy box's) and the reader's own day,
    *  from the memo route; absent elsewhere — the report's first page and the

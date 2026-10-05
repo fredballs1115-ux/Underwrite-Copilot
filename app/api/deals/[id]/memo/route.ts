@@ -101,8 +101,13 @@ export async function GET(
     );
   }
   // The day the memo is dated: the reader's own (lib/reader-day), never the
-  // server's UTC day, which is tomorrow from 8 pm Eastern.
-  const dateStr = readerDateLong((await cookies()).get(TZ_COOKIE)?.value);
+  // server's UTC day, which is tomorrow from 8 pm Eastern — and the day its
+  // file is named for and its dated lines (the rent allowance in force, a
+  // delivery's clock) are read on, read once so the three cannot differ.
+  const tz = (await cookies()).get(TZ_COOKIE)?.value;
+  const now = new Date();
+  const dateStr = readerDateLong(tz, now);
+  const readerDay = readerToday(tz, now);
 
   // The buyer's standing criteria, so the forwarded page carries the fit call.
   // Best-effort: no box (or a pre-0008 schema) just means no buy-box row.
@@ -117,7 +122,7 @@ export async function GET(
       team_id: string | null;
     };
     const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
-    if (box?.exchange) exchange = { block: box.exchange, readerDay: readerToday((await cookies()).get(TZ_COOKIE)?.value) };
+    if (box?.exchange) exchange = { block: box.exchange, readerDay };
     if (box) {
       // The same source the deal page judges (lib/buy-box-chip
       // `dealCheckSource`): the extraction widened with the first signal and
@@ -183,9 +188,9 @@ export async function GET(
       (deal.address as StructuredAddress | null) ?? null,
       ((deal as unknown as { photo?: DealVisualCache | null }).photo ?? null),
     );
-    // The rent allowance in force is read on the route's UTC day — the day
-    // the file is named for (lib/rent-regulation).
-    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, new Date().toISOString().slice(0, 10), exchange);
+    // The rent allowance in force is read on the reader's day — the day the
+    // memo is dated and its file named for (lib/rent-regulation).
+    const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, readerDay, exchange);
     // MemoDocument renders a <Document>; cast to the element type renderToBuffer
     // expects (it's typed for a Document element, not a wrapping component).
     const element = React.createElement(MemoDocument, {
@@ -202,7 +207,7 @@ export async function GET(
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${safe}-screening-memo-${new Date().toISOString().slice(0, 10)}.pdf"`,
+        "Content-Disposition": `attachment; filename="${safe}-screening-memo-${readerDay}.pdf"`,
         "Cache-Control": "no-store",
       },
     });

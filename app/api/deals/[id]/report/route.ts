@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { TZ_COOKIE, readerDateLong } from "@/lib/reader-day";
+import { TZ_COOKIE, readerDateLong, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
 import { buildReportData, renderReportPdf } from "@/lib/memo/report-document";
 import type { MemoData } from "@/lib/memo/memo-document";
@@ -116,8 +116,13 @@ export async function GET(
   }
 
   // The day the report is dated: the reader's own (lib/reader-day), never
-  // the server's UTC day, which is tomorrow from 8 pm Eastern.
-  const dateStr = readerDateLong((await cookies()).get(TZ_COOKIE)?.value);
+  // the server's UTC day, which is tomorrow from 8 pm Eastern — and the day
+  // its file is named for and its rent rules are read on, read once so the
+  // three cannot differ.
+  const tz = (await cookies()).get(TZ_COOKIE)?.value;
+  const now = new Date();
+  const dateStr = readerDateLong(tz, now);
+  const readerDay = readerToday(tz, now);
 
   let buyBoxChecks: BuyBoxCheck[] = [];
   // The buy-box target IRR anchors the sensitivity page's color scale, so
@@ -188,9 +193,10 @@ export async function GET(
   // A sandwich position (lib/sandwich-lease).
   let sandwich: { line: string; read: string } | null = null;
   // The rent rules that reach the building (lib/rent-regulation), through the
-  // one call every surface makes, on the route's UTC day — the day the file
-  // is named for. Read apart from the model, so its line prints even where
-  // the model is not built; the model's read is added where it is.
+  // one call every surface makes, on the reader's day — the day the report
+  // is dated and its file named for. Read apart from the model, so its line
+  // prints even where the model is not built; the model's read is added
+  // where it is.
   const regulationRead = regulationForDeal(
     {
       extraction: (deal.extraction as ExtractionResult | null) ?? null,
@@ -198,7 +204,7 @@ export async function GET(
       siteFlags: (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null,
       assetClass: deal.asset_class as string | null,
     },
-    new Date().toISOString().slice(0, 10),
+    readerDay,
   );
   let regulation: { line: string; read: string } | null = regulationRead ? { line: regulationShortLine(regulationRead), read: "" } : null;
   try {
@@ -396,7 +402,7 @@ export async function GET(
       // a failed read is no page, never a failed report.
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich, readerDay);
     // The memo's target-return chip names the page the model's IRR is
     // graded on, which the helper checks against where it lands.
     const buffer = await renderReportPdf(input);
@@ -409,7 +415,7 @@ export async function GET(
     return new Response(new Uint8Array(buffer), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="${safe}-full-report-${new Date().toISOString().slice(0, 10)}.pdf"`,
+        "Content-Disposition": `attachment; filename="${safe}-full-report-${readerDay}.pdf"`,
         "Cache-Control": "no-store",
       },
     });

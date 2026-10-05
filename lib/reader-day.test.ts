@@ -171,9 +171,21 @@ describe("the signed-in pages count from the reader's day", () => {
   it("the letter of intent, the memo and the report are dated through readerDateLong, never the server's clock", () => {
     for (const rel of ["app/api/deals/[id]/loi/route.ts", "app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts"]) {
       const src = read(rel);
-      expect(src, rel).toMatch(/const dateStr = readerDateLong\(\s*\(await cookies\(\)\)\.get\(TZ_COOKIE\)\?\.value\s*\)/);
+      expect(src, rel).toMatch(/const dateStr = readerDateLong\(\s*(?:\(await cookies\(\)\)\.get\(TZ_COOKIE\)\?\.value|tz, now)\s*\)/);
       expect(src, rel).not.toMatch(/new Date\(\)\.toLocaleDateString\(/);
     }
+    // The memo's and the report's files are named for the day they are
+    // dated, and the rent rules they print are read on it: the filenames and
+    // the regulation read had kept the server's UTC day (the audit of
+    // 2026-10-05).
+    for (const rel of ["app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts"]) {
+      const src = read(rel);
+      expect(src, rel).toMatch(/const tz = \(await cookies\(\)\)\.get\(TZ_COOKIE\)\?\.value;/);
+      expect(src, rel).toMatch(/const readerDay = readerToday\(tz, now\);/);
+      expect(src, rel).toMatch(/filename="\$\{safe\}-[a-z-]+-\$\{readerDay\}\.pdf"/);
+      expect(src, rel).not.toContain("toISOString().slice(0, 10)");
+    }
+    expect(read("app/api/deals/[id]/report/route.ts")).toMatch(/assetClass: deal\.asset_class as string \| null,\s*\},\s*readerDay,\s*\)/);
   });
 
   it("the signed-in layout writes the cookie", () => {

@@ -706,7 +706,18 @@ export default async function DealPage({
   const strategy = inferStrategy(extraction, firstSignal);
   const plan = planSummary(extraction, strategy);
   const plausibility = assessPlausibility(extraction, strategy);
-  const interest = readInterest(extraction, askingPriceOf(extraction));
+  // Today on the reader's own calendar (their browser's zone, from its
+  // cookie — lib/reader-day), read once here and handed to what the page
+  // draws: what the price buys and its dates (a note's months to maturity, a
+  // position's to redemption, in the header's cap slot and price tag and on
+  // the Model tab, as the playground, the CSV and the workbook read them),
+  // the offers-due countdown in the header, the tasks' due dates, the
+  // Opportunity Zone round's line and the rent allowance in force. The
+  // server's UTC day had read a position due today as past in the header
+  // beside a playground reading it due (the audit of 2026-10-05).
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+  const readerNoon = new Date(`${todayIso}T12:00:00Z`);
+  const interest = readInterest(extraction, askingPriceOf(extraction), readerNoon);
   // A note's or a leased fee's deal type describes a building the price does
   // not buy, so the header says whose (lib/interest `dealTypeLabel`).
   const summaryStrategy = strategy.kind === "unknown" ? null : dealTypeLabel(strategy.label, extraction);
@@ -802,11 +813,6 @@ export default async function DealPage({
   // print a different rate for one deal on one day. Never on the sample,
   // whose figures are pinned (lib/model-market).
   const debt = await liveDebtSeeds(HOLD_MONTHS);
-  // Today on the reader's own calendar (their browser's zone, from its
-  // cookie — lib/reader-day), read once here and handed to what the page
-  // draws: the offers-due countdown in the header, the tasks' due dates, the
-  // Opportunity Zone round's line and the rent allowance in force.
-  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
   // The rent rules that reach the building (lib/rent-regulation), read once
   // through the one call every surface makes — at the address the page reads
   // the deal at, with the Census place and county only from flags answered
@@ -874,7 +880,7 @@ export default async function DealPage({
         // And where a leasehold's lease ends inside the model's hold, its
         // returns are withheld over the leasehold card's own sentence — the
         // report's read of the same model (research pass 38).
-        interest: modelReturnsRead(extraction, screeningCompareModel(derived.inputs), new Date(`${todayIso}T12:00:00Z`)),
+        interest: modelReturnsRead(extraction, screeningCompareModel(derived.inputs), readerNoon),
         // The occupancy the model read: a building it runs 90% vacant or
         // more has its returns, cap and bid withheld, the sentence naming
         // the occupancy stated (lib/underwrite/report-grid).
@@ -1066,7 +1072,9 @@ export default async function DealPage({
   // grossed up to the whole, none for a note or a leased fee — which the
   // public-record comps' median call divides (the research panel reads the
   // pipeline card's basis instead); the header still shows the price as asked.
-  const priceTag = interestTag(extraction);
+  // What the price buys beside it ("Price · Pref equity, 12% to Jun 2029"),
+  // on the reader's day, as the cap slot beside it reads its dates.
+  const priceTag = interestTag(extraction, readerNoon);
   const subjectPriceNumber = buildingPriceOf(extraction, summaryPrice ? parsePrice(summaryPrice) : null);
   // Also re-kick a lingering "pending" sentinel: a deploy can kill the
   // after() worker between claim and result, and claimRecordComps's
@@ -1159,7 +1167,7 @@ export default async function DealPage({
     ? plan.yieldWithheld && summaryYoc == null
       ? { label: "Yield on cost", value: "n/a", figure: true, title: plan.yieldWithheld }
       : { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
-    : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
+    : { ...goingInCapFigure(extraction, summaryCap ?? null, readerNoon), figure: true };
   const capWithheld = capSlotWithheld(extraction);
 
   return (
@@ -1706,7 +1714,7 @@ export default async function DealPage({
         // the model ran at that whole.
         // …and where a leasehold's lease ends inside the model's own hold,
         // its returns withheld over the leasehold card's sentence.
-        modelInterest={model ? modelReturnsRead(extraction, { ...model.returns, holdYears: model.holdYears }) : null}
+        modelInterest={model ? modelReturnsRead(extraction, { ...model.returns, holdYears: model.holdYears }, readerNoon) : null}
         metroDemand={
           reads && liveMarket
             ? metroDemand(reads.rates, readClass)

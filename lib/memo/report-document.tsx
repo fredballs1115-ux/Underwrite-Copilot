@@ -1232,6 +1232,11 @@ export function buildReportData(
   goingConcern?: { line: string; read: string } | null,
   condo?: { line: string; read: string } | null,
   sandwich?: { line: string; read: string } | null,
+  /** the day the report is read on, an ISO day — the reader's own, which the
+   *  route dates the report and names its file for: its first page's dated
+   *  lines (the rent allowance in force) read it, as the route's own
+   *  regulation read does. The clock's UTC day where a caller passes none. */
+  today?: string,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -1261,7 +1266,7 @@ export function buildReportData(
   // The grids the report prints, and the page they land on where the memo
   // and the call each take one: the memo's target-return chip names it.
   const graded = planDeal || withheld ? null : (sensitivity ?? null);
-  const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover);
+  const memo = buildMemoData(deal, dateStr, buyBoxChecks, branding, overrides, cover, today);
   const irr = graded ? gradedIrrOf(graded) : null;
   const chip = memo.buyBox.some((c) => c.label === TARGET_RETURN && c.status === "unknown");
   const targetReturnPage =

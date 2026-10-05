@@ -120,7 +120,13 @@ describe("a note's going-in cap slot, wherever the deal is summarized", () => {
     // The page is a loader over the Supabase row, so its wiring is held at
     // its source (as lib/memo/documents-review.test.ts holds the routes').
     const src = readFileSync("app/(app)/deals/[id]/page.tsx", "utf8");
-    expect(src).toMatch(/\{ \.\.\.goingInCapFigure\(extraction, summaryCap \?\? null\), figure: true \}/);
+    // On the reader's day (lib/reader-day), as the playground, the CSV and
+    // the workbook read a note's or a position's dates (the audit of
+    // 2026-10-05).
+    expect(src).toMatch(/\{ \.\.\.goingInCapFigure\(extraction, summaryCap \?\? null, readerNoon\), figure: true \}/);
+    expect(src).toMatch(/const readerNoon = new Date\(`\$\{todayIso\}T12:00:00Z`\);/);
+    expect(src).toMatch(/readInterest\(extraction, askingPriceOf\(extraction\), readerNoon\)/);
+    expect(src).toMatch(/modelReturnsRead\(extraction, model\.returns, readerNoon\)/);
     expect(src).not.toMatch(/\{ label: "Going-in cap", value: summaryCap \?\? null, figure: true \}/);
     // The slot's own kind, read by the one rule every surface reads
     // (`capSlotWithheld`): a note's, a preferred equity position's, or a
