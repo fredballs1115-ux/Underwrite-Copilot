@@ -330,7 +330,10 @@ export function deriveRisks(results: Results): RiskItem[] {
       const share = incomeGapShare(r);
       risks.push({
         severity: share != null && share <= NOI_IN_LINE_BAND ? "low" : "high",
-        title: `${r.metric}: model less favorable than the OM`,
+        // "Your model": the reader's own underwriting, which the reconciler
+        // reads — never the OM's pro forma nor the site's engine, which the
+        // same page also calls a model (research pass 32).
+        title: `${r.metric}: your model less favorable than the OM`,
         detail: r.gap,
         source: "Reconciler",
         tab: "reconciler",

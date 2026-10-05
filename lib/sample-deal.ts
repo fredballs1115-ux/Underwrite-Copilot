@@ -293,7 +293,7 @@ const challenges: ChallengerResult = {
       assumption: "Exit cap compression to 5.25%",
       severity: "high",
       challenge:
-        "The model exits 20 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
+        "The OM's pro forma exits 20 bps tighter than going-in with no stated thesis for compression in a flat-to-rising-rate environment.",
       question:
         "What thesis supports buying at a 5.45% cap and selling five years later at 5.25%?",
     },
