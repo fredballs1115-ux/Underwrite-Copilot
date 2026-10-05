@@ -405,6 +405,26 @@ yours:
 4. **Offers due before your relinquished property transfers** raise a
    reverse-exchange question the 1031 clock does not ask.
 
+**From the second pre-merge audit (2026-10-05):**
+1. **A leased fee's model.** Should it read the stated ground rent as its
+   NOI, and is a leased fee's cap a figure (as the deal header and the
+   playground show it) or "n/a" (as the workbook printed it)? The fix
+   round makes the workbook follow the header's rule for now.
+2. **The report's and the workbook's returns on a note, a position or a
+   share beside its entity's loan.** The deal page and the compare table
+   withhold them; the report and the workbook print them beside a caveat
+   saying they are not the buyer's. Say if they should be withheld there
+   too.
+3. **A position's accrued-to-date balance.** Where the redemption has gone
+   by or none is stated, the position's last dollar is placed without any
+   accrued return, said as "at least".
+4. **Puerto Rico deals.** The fix round lets a deal in Puerto Rico reach
+   its metro area's photograph (San Juan, Ponce, Mayagüez, Aguadilla). It
+   reads no market figures, since the site carries none for Puerto Rico.
+   Say if you would rather leave those deals on the drawn cover.
+5. **The research reseed** above also carries Chicago's corrected band to
+   signed-in pages.
+
 **Run the research seed after the merge** (`node scripts/seed-research.mjs`,
 the step that writes the FY2027 fair market rents). The runner read every
 source link the audit had marked dead. Two research figures changed:
