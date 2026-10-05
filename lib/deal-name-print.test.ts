@@ -39,6 +39,14 @@ describe("printableName", () => {
     expect(printableName("🏢🚀", [ADDRESS])).toBe("Deal");
     expect(printableName(null)).toBe("Deal");
   });
+
+  it("prints a name whose only symbols have stand-ins, the stand-in's letters no loss (audit C5, LOW-4)", () => {
+    expect(printableName("Tower ↑ Redevelopment", [ADDRESS])).toBe("Tower up Redevelopment");
+    expect(printableName("Main St → Annex", [ADDRESS])).toBe("Main St -> Annex");
+    expect(printableName("Rents ≥ $2k Portfolio", [ADDRESS])).toBe("Rents >= $2k Portfolio");
+    // A letter the font lacks is still a loss.
+    expect(printableName("Łódź Logistics Park ↑", [ADDRESS])).toBe(`${NAME_NOT_PRINTABLE} · ${ADDRESS}`);
+  });
 });
 
 /** The PDF's Title, decoded: pdfkit writes it as an indirect object holding

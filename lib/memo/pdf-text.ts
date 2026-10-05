@@ -71,16 +71,21 @@ export function nameBreaks(word: string): string[] {
   return pieces.flatMap((p, i) => (i === 0 ? [p] : [BREAK_HERE, p]));
 }
 
-export const pdfSafe = (s: string): string =>
-  STAND_INS.reduce((t, f) => f(t), s).replace(/[^\n\u0020-\u007e\u00a0-\u00ff]/gu, (ch) =>
-    WINANSI_EXTRA.has(ch.codePointAt(0)!) ? ch : "",
-  );
+/** Whether the font prints a character: WinAnsi, or a line break. */
+const prints = (ch: string): boolean => /[\n\u0020-\u007e\u00a0-\u00ff]/u.test(ch) || WINANSI_EXTRA.has(ch.codePointAt(0)!);
+
+const withStandIns = (s: string): string => STAND_INS.reduce((t, f) => f(t), s);
+
+export const pdfSafe = (s: string): string => withStandIns(s).replace(/[^\n\u0020-\u007e\u00a0-\u00ff]/gu, (ch) => (prints(ch) ? ch : ""));
 
 /** What the memo and the report call a deal whose name the font cannot
  *  print (research pass 42, M5). */
 export const NAME_NOT_PRINTABLE = "Deal (name not printable in this PDF's font)";
 
-const letterCount = (s: string): number => (s.match(/\p{L}/gu) ?? []).length;
+/** The letters `pdfSafe` would drop — never one a stand-in adds: "Tower ↑
+ *  Redevelopment" prints "Tower up Redevelopment" whole, where comparing the
+ *  two texts' letter counts had called it not printable (audit C5, LOW-4). */
+const lostLetters = (s: string): number => [...withStandIns(s)].filter((ch) => /\p{L}/u.test(ch) && !prints(ch)).length;
 
 /** A text as the PDF can print it: composed (a letter typed with a combining
  *  accent is the accented letter WinAnsi has: "Café", never "Cafe"), safe,
@@ -88,7 +93,7 @@ const letterCount = (s: string): number => (s.match(/\p{L}/gu) ?? []).length;
 function printableWhole(s: unknown): string | null {
   const raw = typeof s === "string" ? s.normalize("NFC").replace(/\s+/g, " ").trim() : "";
   const safe = pdfSafe(raw).replace(/\s+/g, " ").trim();
-  return letterCount(safe) === letterCount(raw) ? safe : null;
+  return lostLetters(raw) === 0 ? safe : null;
 }
 
 /**
