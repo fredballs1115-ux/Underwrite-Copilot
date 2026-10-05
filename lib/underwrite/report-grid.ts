@@ -5,6 +5,7 @@
 // the on-screen sliders can never disagree.
 
 import { withArticle } from "@/lib/article";
+import { moneyCompact } from "@/lib/plan-facts";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import { costAssumptionsLine } from "./cost-note";
 import type { DerivedModel, InputSource } from "./inputs";
@@ -276,6 +277,41 @@ export interface MaxBidFloors {
 }
 
 /**
+ * Where no price clears the buy box's floors together, which floor never
+ * clears and which clear on their own (research pass 35: the hotel's report
+ * listed three floors and named none, under a grid whose IRR cleared at 10%
+ * off). Each floor solved alone, over the same range and under the same
+ * levers as the bid; and the one reason the engine can prove for a
+ * cash-on-cash floor: year 1's cash flow before debt service negative
+ * whatever the price, since neither its NOI nor its capital spending moves
+ * with the price.
+ */
+export interface NoBidRead {
+  alone: { key: keyof BidFloors; price: number | null; unbounded: boolean }[];
+  /** year 1's NOI is under its capital spending and reserves, so its cash
+   *  flow is negative at every price */
+  yearOneNegative: boolean;
+  /** year 1's capital budget where it is what turns year 1 negative — the
+   *  year's NOI covers its other capital lines; null otherwise */
+  yearOneCapital: number | null;
+}
+
+const FLOOR_ORDER = ["minIrr", "minCoc", "minCap"] as const;
+
+export function noBidRead(inputs: UnderwriteInputs, floors: BidFloors, levers: Partial<PlaygroundLevers>): NoBidRead {
+  const set = FLOOR_ORDER.filter((k) => floors[k] != null);
+  const alone = set.map((key) => {
+    const one = set.length === 1 ? { price: null, unbounded: false } : solveMaxBid(inputs, { [key]: floors[key] }, levers);
+    return { key, price: one.price, unbounded: one.unbounded };
+  });
+  const y1 = computeUnderwrite({ ...inputs, expenseLines: inputs.expenseLines.map((l) => ({ ...l })), ...levers }).cashFlow[0];
+  const yearOneNegative = !!y1 && y1.noi - y1.totalCapEx < 0;
+  const yearOneCapital =
+    yearOneNegative && y1.capitalImprovements > 0 && y1.noi - (y1.totalCapEx - y1.capitalImprovements) >= 0 ? y1.capitalImprovements : null;
+  return { alone, yearOneNegative, yearOneCapital };
+}
+
+/**
  * The levers the deal page's max bid is solved under at rest: each
  * slider's base stop — the base clamped into the lever's range, which for
  * a route-derived model is the base itself — so the report's bid is the
@@ -302,6 +338,9 @@ export interface SensitivityData {
   /** what the max bid was solved on; absent on a bundle built before it
    *  was recorded, which solved the hurdle's IRR alone */
   maxBidFloors?: MaxBidFloors;
+  /** where the buy box's floors clear at no price together, each floor's
+   *  own solve (`noBidRead`); null where a bid solved or the box set none */
+  noBid?: NoBidRead | null;
   /** why the report leaves the model's returns out, or null where it may
    *  print them (`placeholderReturnsLine`); null where no sources were given */
   withheld?: string | null;
@@ -506,7 +545,8 @@ export function buildSensitivityData(
   // falls back to the screening hurdle's IRR the grids are graded on.
   const box = opts.floors && (opts.floors.minIrr != null || opts.floors.minCoc != null || opts.floors.minCap != null) ? opts.floors : null;
   const maxBidFloors: MaxBidFloors = box ? { floors: box, from: "buybox" } : { floors: { minIrr: hurdle / 100 }, from: "screening" };
-  const solved = solveMaxBid(inputs, maxBidFloors.floors, pageBaseLevers(inputs));
+  const levers = pageBaseLevers(inputs);
+  const solved = solveMaxBid(inputs, maxBidFloors.floors, levers);
   return {
     grid,
     priceGrid,
@@ -518,6 +558,9 @@ export function buildSensitivityData(
         ? { price: solved.price, deltaPct: solved.deltaPct, unbounded: solved.unbounded, binding: solved.binding, at: solved.at }
         : null,
     maxBidFloors,
+    // No price clears the box's floors together: which one never clears,
+    // and which clear on their own, so the sentence names them.
+    noBid: box && solved.price == null ? noBidRead(inputs, box, levers) : null,
     withheld: placeholderReturnsLine(inputs, opts.sources),
     priceSource: opts.sources?.purchasePrice ?? null,
     baseCase: opts.sources ? buildBaseCase(inputs, opts.sources) : null,
@@ -527,6 +570,45 @@ export function buildSensitivityData(
 const pct1 = (d: number | null | undefined, dp = 1) => (d == null || !Number.isFinite(d) ? "—" : `${(d * 100).toFixed(dp)}%`);
 
 /**
+ * Where no price clears the box's floors together, the sentence that names
+ * them from each floor's own solve (`noBidRead`): the floor that clears at
+ * no tested price, with the reason the engine proves for a cash-on-cash
+ * floor, then how far each other floor clears on its own. Null where there
+ * is nothing to name beyond the floors themselves — every floor fails even
+ * alone — and the caller's sentence stands.
+ */
+function noBidSentence(floors: BidFloors, nb: NoBidRead | null): string | null {
+  if (!nb || nb.alone.length === 0) return null;
+  const words = (k: keyof BidFloors) => floorWords(k, floors);
+  const never = nb.alone.filter((a) => a.price == null);
+  const alone = nb.alone.filter((a) => a.price != null);
+  const clearsAlone = alone.map(
+    (a, i) => `your ${words(a.key)} floor alone ${i === 0 ? "clears " : ""}${a.unbounded ? "at every tested price" : `up to ${fmtBid(a.price!)}`}`,
+  );
+  const aloneLine = clearsAlone.length > 0 ? `${clearsAlone.join(", and ").replace(/^y/, "Y")}.` : "";
+  if (never.length === 0) {
+    // Each floor clears on its own, never all of them at one price.
+    return `No price inside the tested range clears your buy box's floors together. ${aloneLine}`;
+  }
+  if (never.length > 1 && alone.length === 0) return null;
+  const because =
+    never.some((a) => a.key === "minCoc") && nb.yearOneNegative
+      ? nb.yearOneCapital != null
+        ? `year 1 carries ${moneyCompact(nb.yearOneCapital)} of capital, which leaves its cash flow negative at any price`
+        : "year 1's cash flow is negative at any price"
+      : "";
+  const list = never.map((a) => words(a.key));
+  const named = list.length === 1 ? list[0] : `${list.slice(0, -1).join(", ")} or ${list[list.length - 1]}`;
+  const head = `No price inside the tested range clears your ${named} floor`;
+  const why = because ? (never.length === 1 ? `: ${because}` : ` (the cash-on-cash because ${because})`) : "";
+  if (alone.length === 0) {
+    // The box's one floor: the reason where the engine proves one.
+    return because ? `${head}${why}.` : null;
+  }
+  return `${head}${why}. ${aloneLine}`;
+}
+
+/**
  * The max bid in the deal page's words (the playground's max-bid card): the
  * floors it clears and whose they are, the bid as the page prints it
  * (rounded down, `fmtBid`), its distance from the modeled price, the floor
@@ -534,7 +616,7 @@ const pct1 = (d: number | null | undefined, dp = 1) => (d == null || !Number.isF
  * that price. A bundle with no recorded floors reads as the screening
  * hurdle's IRR, which is what it was solved on.
  */
-export function maxBidSentence(s: Pick<SensitivityData, "maxBid" | "maxBidFloors" | "hurdlePct" | "hurdleSource">): string {
+export function maxBidSentence(s: Pick<SensitivityData, "maxBid" | "maxBidFloors" | "hurdlePct" | "hurdleSource" | "noBid">): string {
   const f = s.maxBidFloors ?? { floors: { minIrr: s.hurdlePct / 100 }, from: "screening" as const };
   const box = f.from === "buybox";
   const hurdle = `${Number(s.hurdlePct.toFixed(1))}%`;
@@ -545,9 +627,8 @@ export function maxBidSentence(s: Pick<SensitivityData, "maxBid" | "maxBidFloors
       : `the ${hurdle} screening hurdle`;
   const bid = s.maxBid;
   if (!bid) {
-    return box
-      ? `No price inside the tested range clears ${what} under these assumptions: the deal's economics, not its price, are the blocker.`
-      : `No price inside the tested range holds ${what} under these assumptions.`;
+    if (!box) return `No price inside the tested range holds ${what} under these assumptions.`;
+    return noBidSentence(f.floors, s.noBid ?? null) ?? `No price inside the tested range clears ${what} under these assumptions: the deal's economics, not its price, are the blocker.`;
   }
   if (bid.unbounded) {
     return box

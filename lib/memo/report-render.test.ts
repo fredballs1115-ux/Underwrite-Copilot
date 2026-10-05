@@ -946,6 +946,43 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("The model carries the $4.2M PIP as its first year's capital");
   }, 60000);
 
+  it("names the floor no price clears, and the IRR's own reach, where a hotel's PIP sinks year 1 (research pass 35)", async () => {
+    // The pass's hotel: $36M for 180 keys at 8.0% on a $2.88M T-12 NOI, and
+    // a $4.2M PIP the model carries as its first year's capital.
+    const hotel = {
+      dealName: "Hilton Garden Inn Midtown",
+      assetClass: "hospitality",
+      market: "Nashville, TN",
+      totalPages: 52,
+      hotel: { brand: "Hilton Garden Inn", franchise: "", management: "", encumbrance: "brand", pip: "", page: "p. 6" },
+      metrics: [
+        { label: "Asking price", value: "$36,000,000", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Keys", value: "180", flagged: false, page: "p. 3", basis: "na" },
+        { label: "Going-in cap", value: "8.0%", flagged: false, page: "p. 5", basis: "in_place" },
+        { label: "NOI (T-12)", value: "$2,880,000", flagged: false, page: "p. 5", basis: "in_place" },
+        { label: "PIP cost", value: "$4,200,000", flagged: false, page: "p. 6", basis: "na" },
+      ],
+    } as unknown as ExtractionResult;
+    const deal = { name: hotel.dealName, asset_class: "hospitality_str", extraction: hotel, challenges: null, comps: null, market: null, reconciliation: null, verdict: SAMPLE_DEAL.verdict, prior_screen: null } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(hotel, hotel.dealName!);
+    expect(derived.inputs.capitalImprovementsYr1).toBe(4_200_000);
+    const floors = bidFloors(SAMPLE_DEMO_BOX)!;
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors });
+    expect(sensitivity.maxBid).toBeNull();
+    const levers = pageBaseLevers(derived.inputs);
+    const irr = solveMaxBid(derived.inputs, { minIrr: floors.minIrr }, levers);
+    const cap = solveMaxBid(derived.inputs, { minCap: floors.minCap }, levers);
+    const text = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(deal, "October 5, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    expect(text).toContain(
+      `No price inside the tested range clears your 5% cash-on-cash floor: year 1 carries $4.2M of capital, which leaves its cash flow negative at any price. Your 13% IRR floor alone clears up to ${fmtBid(irr.price!)}, and your 5.75% going-in cap floor alone up to ${fmtBid(cap.price!)}.`,
+    );
+    expect(text).not.toContain("the deal's economics, not its price, are the blocker");
+  }, 60000);
+
   it("prints how the property is sold over the grids, and the ceiling bid (#456)", async () => {
     vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
     const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 3", basis: "na" as const });

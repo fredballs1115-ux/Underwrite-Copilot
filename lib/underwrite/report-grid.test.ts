@@ -17,6 +17,7 @@ import {
   heatCellEm,
   heatCellText,
   maxBidSentence,
+  pageBaseLevers,
   placeholderPageLine,
   placeholderReason,
   placeholderReturnsLine,
@@ -365,6 +366,51 @@ describe("the report's max bid is the deal page's — the buy box's every floor,
     expect(maxBidSentence({ ...none, maxBid: null, maxBidFloors: { floors: { minCoc: 0.5 }, from: "buybox" } })).toBe(
       "No price inside the tested range clears your buy box's floors (50% cash-on-cash) under these assumptions: the deal's economics, not its price, are the blocker.",
     );
+  });
+});
+
+describe("where no price clears the box's floors together, the sentence names which floor never clears and how far the others clear alone (research pass 35)", () => {
+  const floors = { minIrr: 0.1, minCoc: 0.05, minCap: 0.05 };
+
+  it("names the cash-on-cash floor year 1's capital puts out of reach, and solves each other floor alone", () => {
+    // $625k of year-1 NOI against $800k of first-year capital and $20k of
+    // reserves: year 1's cash flow is negative whatever the price.
+    const inputs = baseInputs({ capitalImprovementsYr1: 800_000 });
+    const s = buildSensitivityData(inputs, 10, { floors });
+    expect(s.maxBid).toBeNull();
+    // Each floor's own solve, under the bid's own levers — never asserted.
+    const levers = pageBaseLevers(inputs);
+    const irr = solveMaxBid(inputs, { minIrr: 0.1 }, levers);
+    const cap = solveMaxBid(inputs, { minCap: 0.05 }, levers);
+    expect(solveMaxBid(inputs, { minCoc: 0.05 }, levers).price).toBeNull();
+    expect(irr.price).not.toBeNull();
+    expect(cap.price).not.toBeNull();
+    expect(s.noBid).toEqual({
+      alone: [
+        { key: "minIrr", price: irr.price, unbounded: false },
+        { key: "minCoc", price: null, unbounded: false },
+        { key: "minCap", price: cap.price, unbounded: false },
+      ],
+      yearOneNegative: true,
+      yearOneCapital: 800_000,
+    });
+    expect(maxBidSentence(s)).toBe(
+      `No price inside the tested range clears your 5% cash-on-cash floor: year 1 carries $800k of capital, which leaves its cash flow negative at any price. Your 10% IRR floor alone clears up to ${fmtBid(irr.price!)}, and your 5% going-in cap floor alone up to ${fmtBid(cap.price!)}.`,
+    );
+    expect(maxBidSentence(s)).not.toContain("the deal's economics, not its price");
+  });
+
+  it("names no capital where the year's other capital lines already outrun its NOI", () => {
+    // $1M of reserves a year over $625k of NOI: negative with no budget at all.
+    const s = buildSensitivityData(baseInputs({ reservesPsf: 10 }), 10, { floors });
+    expect(s.noBid?.yearOneNegative).toBe(true);
+    expect(s.noBid?.yearOneCapital).toBeNull();
+    expect(maxBidSentence(s)).toMatch(/^No price inside the tested range clears your 5% cash-on-cash floor: year 1's cash flow is negative at any price\. /);
+  });
+
+  it("reads nothing where a bid solves, or the box sets no floor", () => {
+    expect(buildSensitivityData(baseInputs(), 10, { floors }).noBid).toBeNull();
+    expect(buildSensitivityData(baseInputs({ capitalImprovementsYr1: 800_000 }), 10).noBid).toBeNull();
   });
 });
 
