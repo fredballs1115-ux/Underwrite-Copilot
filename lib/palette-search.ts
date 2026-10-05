@@ -36,6 +36,34 @@ export function asksServer(typed: string, recentCount: number | null): boolean {
   return typed.trim() !== "" && !(recentCount != null && recentCount < PALETTE_LIMIT);
 }
 
+/** The call's dot on a deal's avatar, by the call on file. */
+const CALL_DOT: Record<string, string> = {
+  pass: "bg-pass",
+  caution: "bg-caution",
+  pass_on: "bg-kill",
+};
+
+/** A deal's latest run as the pipeline reads it (lib/screen-run
+ *  `listJobStatus`): a live screen, one that stopped writing progress, or a
+ *  failure that left the call behind. */
+export type PaletteRun = "running" | "stalled" | "failed" | null;
+
+/**
+ * A deal's call in the palette, drawn the way the pipeline card draws it: a
+ * failed or stalled run, or a screen still running, outranks the call on
+ * file, which is the previous screen's — its dot is the run's, and the
+ * row's hint says the run in the pipeline's own words (its CSV's: "Failed",
+ * "Stalled", "Re-screening", "Screening"). The palette had drawn the call
+ * on file whatever the run, the one list of calls that skipped
+ * lib/screen-run.
+ */
+export function paletteCall(call: string | null, run: PaletteRun | undefined): { dot: string; word: string | null } {
+  if (run === "failed") return { dot: "bg-kill", word: "Failed" };
+  if (run === "stalled") return { dot: "bg-caution", word: "Stalled" };
+  if (run === "running") return { dot: "pulse-bar bg-brand", word: call ? "Re-screening" : "Screening" };
+  return { dot: (call ? CALL_DOT[call] : null) ?? "bg-line", word: null };
+}
+
 /** The items of several lists, each id once, in the order first met — the
  *  recent deals, then what searches found beyond them. */
 export function uniqueById<T extends { id: string }>(...lists: T[][]): T[] {

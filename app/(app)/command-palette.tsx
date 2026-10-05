@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MarketNavEntry } from "@/lib/market-match";
-import { asksServer, uniqueById } from "@/lib/palette-search";
+import { asksServer, paletteCall, uniqueById, type PaletteRun } from "@/lib/palette-search";
 import { DealAvatar } from "./deal-avatar";
 
 /** How long typing rests before the server is asked for every deal whose
@@ -17,6 +17,8 @@ type PaletteDeal = {
   address: string;
   docs: string;
   call: string | null;
+  /** the latest run, as the pipeline reads it (lib/screen-run) */
+  run?: PaletteRun;
   stage: string;
 };
 
@@ -221,12 +223,6 @@ const ACTIONS: Item[] = [
   },
 ];
 
-const CALL_DOT: Record<string, string> = {
-  pass: "bg-pass",
-  caution: "bg-caution",
-  pass_on: "bg-kill",
-};
-
 /**
  * ⌘K / Ctrl+K jump-anywhere. Deals are fetched lazily on first open (and
  * refreshed on each open) from /api/palette — RLS keeps it to the caller's own.
@@ -337,16 +333,23 @@ export function CommandPalette({
     // An empty query lists the recent deals alone; a typed one filters them
     // with what the server found beyond them.
     const pool = q ? uniqueById(deals ?? [], found) : (deals ?? []);
-    const dealItems: Item[] = pool.map((d) => ({
-      key: d.id,
-      label: d.name,
-      hint: d.market || d.address || d.stage,
-      href: `/deals/${d.id}`,
-      // The building's picture with the call's dot on its corner (#435).
-      icon: <DealAvatar dealId={d.id} dot={d.call ? (CALL_DOT[d.call] ?? "bg-line") : "bg-line"} />,
-      group: "deals" as const,
-      search: `${d.name} ${d.market} ${d.address} ${d.docs}`,
-    }));
+    const dealItems: Item[] = pool.map((d) => {
+      // The call as the pipeline card draws it (lib/palette-search
+      // `paletteCall`): a failed, stalled or running screen outranks the
+      // call on file, its dot the run's and its word before the place.
+      const call = paletteCall(d.call, d.run);
+      const place = d.market || d.address || d.stage;
+      return {
+        key: d.id,
+        label: d.name,
+        hint: call.word ? `${call.word} · ${place}` : place,
+        href: `/deals/${d.id}`,
+        // The building's picture with the call's dot on its corner (#435).
+        icon: <DealAvatar dealId={d.id} dot={call.dot} />,
+        group: "deals" as const,
+        search: `${d.name} ${d.market} ${d.address} ${d.docs}`,
+      };
+    });
     // Market briefs come LAST so core actions stay above the fold on an
     // empty query; their alias search text makes "brooklyn" or "fort worth"
     // land on the right brief.

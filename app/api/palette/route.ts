@@ -1,5 +1,6 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { PALETTE_LIMIT, nameSearchPattern } from "@/lib/palette-search";
+import { listJobStatus, type JobLike } from "@/lib/screen-run";
 
 // Feeds the ⌘K command palette: the caller's deals (RLS-scoped — own +
 // team), newest first, trimmed to what the jump list renders. With no query
@@ -50,6 +51,23 @@ export async function GET(request: Request) {
     }
   }
 
+  // Each deal's latest run, as the pipeline page reads it (lib/screen-run):
+  // a call a re-screen is replacing, or one a stalled or failed run left
+  // behind, is drawn as the run, never as the current call. Best-effort: a
+  // failed read leaves the calls as they are on file.
+  const jobByDeal = new Map<string, JobLike>();
+  if (ids.length) {
+    const { data: jobs } = await supabase
+      .from("analysis_jobs")
+      .select("deal_id, status, step, updated_at, created_at")
+      .in("deal_id", ids)
+      .order("created_at", { ascending: false })
+      .limit(Math.max(100, ids.length * 3));
+    for (const j of (jobs ?? []) as ({ deal_id: string } & JobLike)[]) {
+      if (j?.deal_id && !jobByDeal.has(j.deal_id)) jobByDeal.set(j.deal_id, j);
+    }
+  }
+
   // Uploaded document filenames, so "rent roll" or a filename finds the deal.
   const docsById = new Map<string, string[]>();
   if (ids.length) {
@@ -64,15 +82,20 @@ export async function GET(request: Request) {
     }
   }
 
-  const deals = rows.map((d) => ({
-    id: d.id,
-    name: d.name,
-    market: typeof d.market === "string" ? d.market : "",
-    address: addressById.get(d.id) ?? "",
-    docs: (docsById.get(d.id) ?? []).join(" "),
-    call: (d.verdict as { verdict?: string } | null)?.verdict ?? null,
-    stage: d.stage ?? "screening",
-  }));
+  const deals = rows.map((d) => {
+    const call = (d.verdict as { verdict?: string } | null)?.verdict ?? null;
+    return {
+      id: d.id,
+      name: d.name,
+      market: typeof d.market === "string" ? d.market : "",
+      address: addressById.get(d.id) ?? "",
+      docs: (docsById.get(d.id) ?? []).join(" "),
+      call,
+      // The pipeline card's own read of the run (lib/screen-run).
+      run: listJobStatus(jobByDeal.get(d.id), !!call),
+      stage: d.stage ?? "screening",
+    };
+  });
 
   return Response.json({ deals });
 }

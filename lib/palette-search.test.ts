@@ -7,7 +7,7 @@
  * and matches a LIKE pattern the way PostgREST and Postgres would.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PALETTE_LIMIT, PALETTE_QUERY_MAX, asksServer, nameSearchPattern, uniqueById } from "./palette-search";
+import { PALETTE_LIMIT, PALETTE_QUERY_MAX, asksServer, nameSearchPattern, paletteCall, uniqueById } from "./palette-search";
 
 describe("nameSearchPattern — a typed query as an ILIKE pattern on the name", () => {
   it("wraps the text, trimmed, and answers null for nothing typed", () => {
@@ -48,6 +48,19 @@ describe("the palette's side — when it asks, and what it lists", () => {
     expect(uniqueById([d("a"), d("b")], [d("b"), d("z")], [d("a"), d("y")])).toEqual([d("a"), d("b"), d("z"), d("y")]);
     expect(uniqueById()).toEqual([]);
   });
+
+  it("draws a deal's call the way the pipeline card does: a run outranks the call on file (research pass 34)", () => {
+    // The call on file, where no run is replacing it.
+    expect(paletteCall("pass", null)).toEqual({ dot: "bg-pass", word: null });
+    expect(paletteCall("pass_on", null)).toEqual({ dot: "bg-kill", word: null });
+    expect(paletteCall(null, null)).toEqual({ dot: "bg-line", word: null });
+    // A re-screen running: the previous call is not drawn as the current one.
+    expect(paletteCall("pass", "running")).toEqual({ dot: "pulse-bar bg-brand", word: "Re-screening" });
+    expect(paletteCall(null, "running")).toEqual({ dot: "pulse-bar bg-brand", word: "Screening" });
+    // Stalled and failed, in the pipeline's words.
+    expect(paletteCall("pass", "stalled")).toEqual({ dot: "bg-caution", word: "Stalled" });
+    expect(paletteCall("caution", "failed")).toEqual({ dot: "bg-kill", word: "Failed" });
+  });
 });
 
 // ── The route, over a fake database ─────────────────────────────────────────
@@ -55,12 +68,15 @@ describe("the palette's side — when it asks, and what it lists", () => {
 const READER = "11111111-1111-4111-8111-111111111111";
 const STRANGER = "33333333-3333-4333-8333-333333333333";
 
-type Row = { id: string; name: string; user_id: string; updated_at: string; address: { label: string } | null };
+type Row = { id: string; name: string; user_id: string; updated_at: string; address: { label: string } | null; verdict?: { verdict: string } | null };
+type Job = { deal_id: string; status: string; step: string | null; updated_at: string; created_at: string };
 
 const db = vi.hoisted(() => ({
   user: null as { id: string } | null,
   deals: [] as Row[],
   documents: [] as { deal_id: string; filename: string }[],
+  /** each deal's runs, newest first as the route asks for them */
+  jobs: [] as Job[],
   /** each query's filters, in order */
   calls: [] as { table: string; ilike?: [string, string]; order?: string; limit?: number; in?: string }[],
 }));
@@ -114,12 +130,18 @@ vi.mock("@/lib/supabase/server", () => ({
             resolve({ data: db.documents.filter((doc) => ids!.includes(doc.deal_id)), error: null });
             return;
           }
+          if (table === "analysis_jobs") {
+            // Row-level security: runs of the reader's own deals.
+            const own = new Set(visible.map((d) => d.id));
+            resolve({ data: db.jobs.filter((j) => ids!.includes(j.deal_id) && own.has(j.deal_id)), error: null });
+            return;
+          }
           let rows = ids ? visible.filter((d) => ids!.includes(d.id)) : visible;
           if (call.ilike) rows = rows.filter((d) => likeMatches(call.ilike![1], d.name));
           if (call.order) rows = [...rows].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
           if (call.limit != null) rows = rows.slice(0, call.limit);
           resolve({
-            data: rows.map((d) => ({ id: d.id, name: d.name, market: "Baltimore, MD", verdict: null, stage: "screening", address: d.address })),
+            data: rows.map((d) => ({ id: d.id, name: d.name, market: "Baltimore, MD", verdict: d.verdict ?? null, stage: "screening", address: d.address })),
             error: null,
           });
         },
@@ -153,6 +175,7 @@ describe("GET /api/palette — the recent deals, or every deal a typed query nam
     // Another account's deal of the same name, which the reader must never get.
     db.deals.push({ id: "theirs", name: "Harbor View Apartments", user_id: STRANGER, updated_at: day(90), address: null });
     db.documents = [{ deal_id: "deal-0", filename: "Harbor View rent roll.xlsx" }];
+    db.jobs = [];
   });
 
   it("refuses a signed-out caller before reading anything, as before", async () => {
@@ -191,5 +214,38 @@ describe("GET /api/palette — the recent deals, or every deal a typed query nam
     expect((await ask("%")).body.deals.map((d) => d.name)).toEqual(["Tower at 50% occupancy"]);
     expect((await ask("_")).body.deals.map((d) => d.name)).toEqual(["Lot_7 Flex"]);
     for (const c of db.calls) if (c.ilike) expect(c.ilike[1]).not.toContain("*");
+  });
+
+  it("carries each deal's latest run, read as the pipeline reads it, so the palette never draws a call a run is replacing (research pass 34)", async () => {
+    const now = Date.now();
+    const at = (msAgo: number) => new Date(now - msAgo).toISOString();
+    const go = { verdict: "pass" };
+    db.deals = [
+      { id: "settled", name: "Settled", user_id: READER, updated_at: at(1_000), address: null, verdict: go },
+      { id: "rescreen", name: "Re-screened", user_id: READER, updated_at: at(2_000), address: null, verdict: go },
+      { id: "stalled", name: "Stalled", user_id: READER, updated_at: at(3_000), address: null, verdict: go },
+      { id: "failed", name: "Failed", user_id: READER, updated_at: at(4_000), address: null, verdict: go },
+      { id: "first", name: "First screen", user_id: READER, updated_at: at(5_000), address: null, verdict: null },
+    ];
+    db.jobs = [
+      { deal_id: "settled", status: "done", step: "verdict", updated_at: at(60_000), created_at: at(120_000) },
+      { deal_id: "rescreen", status: "running", step: "challenge", updated_at: at(30_000), created_at: at(90_000) },
+      { deal_id: "stalled", status: "running", step: "challenge", updated_at: at(11 * 60_000), created_at: at(20 * 60_000) },
+      { deal_id: "failed", status: "error", step: "comps", updated_at: at(60_000), created_at: at(120_000) },
+      { deal_id: "first", status: "running", step: "extract", updated_at: at(10_000), created_at: at(20_000) },
+    ];
+    const { body } = await ask();
+    const runs = Object.fromEntries((body.deals as unknown as { id: string; call: string | null; run: string | null }[]).map((d) => [d.id, [d.call, d.run]]));
+    expect(runs).toEqual({
+      settled: ["pass", null],
+      rescreen: ["pass", "running"],
+      stalled: ["pass", "stalled"],
+      failed: ["pass", "failed"],
+      first: [null, "running"],
+    });
+    // What the palette draws for each.
+    expect(paletteCall("pass", "running").word).toBe("Re-screening");
+    // The jobs are read for the listed deals only.
+    expect(db.calls.find((c) => c.table === "analysis_jobs")).toMatchObject({ in: "deal_id", order: "created_at desc" });
   });
 });
