@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
+import { ExchangeFields } from "./exchange-fields";
 import { getActiveBuyBox } from "@/lib/criteria-server";
 import { buyBoxLines, geoTargets, priceBand } from "@/lib/criteria";
 import {
@@ -53,6 +56,9 @@ export default async function CriteriaPage({
   const box = activeNamed?.box ?? {};
   const boxId = activeNamed?.id ?? "";
   const db = box.dealbreakers ?? {};
+  // The reader's own day (lib/reader-day), read once per request: the
+  // exchange's clock is said on it, as the deal header's chip says it.
+  const todayIso = readerToday((await cookies()).get(TZ_COOKIE)?.value);
 
   const banner = saved
     ? {
@@ -396,6 +402,11 @@ export default async function CriteriaPage({
                 </div>
               </div>
             </section>
+
+            {/* The buyer's 1031 exchange (lib/exchange-window): the day the
+                relinquished property transferred, who files the return and
+                whether it is extended — each deal's deadlines read off it. */}
+            <ExchangeFields exchange={box.exchange} today={todayIso} />
 
             <section className="rounded-2xl border border-line bg-surface p-6 shadow-card">
               <label htmlFor="notes" className="text-sm font-semibold tracking-tight">

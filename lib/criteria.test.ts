@@ -18,6 +18,7 @@ import {
   pastYearSource,
   priceExclude,
   resolveBuyBoxStore,
+  sanitizeExchange,
   sanitizeGeoTargets,
   screenStamp,
   screenYearOf,
@@ -422,6 +423,38 @@ describe("sanitizeGeoTargets — the save keeps what the picker builds", () => {
     expect(sanitizeGeoTargets("not json")).toBeUndefined();
     expect(sanitizeGeoTargets(JSON.stringify([{ city: "no label" }]))).toBeUndefined();
     expect(sanitizeGeoTargets(JSON.stringify({ label: "not an array" }))).toBeUndefined();
+  });
+});
+
+describe("the buy box's 1031 exchange (lib/exchange-window) — a blank is no exchange", () => {
+  it("keeps a real transfer day, a filer from the list and a ticked extension, and nothing else", () => {
+    expect(sanitizeExchange({ relinquishedTransferOn: "2026-09-15", filer: "partnership", returnExtended: true })).toEqual({
+      relinquishedTransferOn: "2026-09-15",
+      filer: "partnership",
+      returnExtended: true,
+    });
+    // A filer that is not one of the list's, or an extension not ticked, is not kept.
+    expect(sanitizeExchange({ relinquishedTransferOn: " 2026-09-15 ", filer: "llc", returnExtended: "on" })).toEqual({ relinquishedTransferOn: "2026-09-15" });
+    // No day, or no calendar day, is no exchange — whatever else the form sent.
+    for (const day of ["", "2026-02-31", "09/15/2026", "1999-12-31", "2101-01-01"]) {
+      expect(sanitizeExchange({ relinquishedTransferOn: day, filer: "partnership", returnExtended: true }), day).toBeUndefined();
+    }
+    expect(sanitizeExchange(null)).toBeUndefined();
+    expect(sanitizeExchange("2026-09-15")).toBeUndefined();
+  });
+
+  it("counts as the box's content, round-trips through the store, and is listed for the read-only view and the verdict", () => {
+    const box: BuyBox = { exchange: { relinquishedTransferOn: "2026-09-15", filer: "partnership" } };
+    expect(isEmptyBuyBox(box)).toBe(false);
+    expect(isEmptyBuyBox({ exchange: { relinquishedTransferOn: null } })).toBe(true);
+    const stored = serializeBuyBoxStore({ boxes: [{ id: "default", name: "Mandate", box }], activeId: "default" });
+    expect(activeBox(resolveBuyBoxStore(JSON.parse(JSON.stringify(stored))))?.exchange).toEqual(box.exchange);
+    expect(buyBoxLines(box)).toEqual([
+      "1031 exchange: the relinquished property transferred Sep 15, 2026; a partnership files the return (Form 1065)",
+    ]);
+    expect(buyBoxLines({ exchange: { relinquishedTransferOn: "2026-10-01", returnExtended: true } })).toEqual([
+      "1031 exchange: the relinquished property transferred Oct 1, 2026; who files the return is not set, so it is read as an individual's; the return is extended",
+    ]);
   });
 });
 

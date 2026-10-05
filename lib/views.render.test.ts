@@ -9537,6 +9537,37 @@ describe("Pipeline — a sandwich position's tag (lib/sandwich-lease)", () => {
   });
 });
 
+// ── The buy box's 1031 exchange (lib/exchange-window) ──────────────────────
+import { ExchangeFields } from "@/app/(app)/criteria/exchange-fields";
+
+describe("ExchangeFields (the buy box's 1031 exchange) — three optional fields, and the clock said on the reader's day", () => {
+  it("fills the stored day, filer and extension, and says the window under them", () => {
+    const html = render(
+      React.createElement(ExchangeFields, { exchange: { relinquishedTransferOn: "2026-09-15", filer: "partnership", returnExtended: true }, today: "2026-10-05" }),
+    );
+    dumpView("buy-box-exchange", html);
+    const text = visibleText(html);
+    expect(html).toContain('id="exchange"');
+    expect(html).toMatch(/<input id="exchangeTransferOn" type="date"[^>]*name="exchangeTransferOn" value="2026-09-15"\/>/);
+    expect(html).toMatch(/<option value="partnership" selected="">A partnership \(Form 1065\)<\/option>/);
+    expect(html).toMatch(/<input type="checkbox"[^>]*name="exchangeExtended" checked=""\/>/);
+    for (const label of ["An individual (Form 1040)", "An S corporation (Form 1120-S)", "A C corporation (Form 1120)", "A trust or an estate (Form 1041)"]) expect(text, label).toContain(label);
+    expect(text).toContain(
+      "Identify your replacement property by Oct 30, 2026 (in 25 days), the 45th day from the Sep 15, 2026 transfer; close by Mar 14, 2027 — the return is extended, so the full 180 days.",
+    );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("draws the blank fields and no clock where the box holds no exchange", () => {
+    const html = render(React.createElement(ExchangeFields, { exchange: undefined, today: "2026-10-05" }));
+    expect(html).toMatch(/<input id="exchangeTransferOn" type="date"[^>]*name="exchangeTransferOn" value=""\/>/);
+    expect(html).toMatch(/<option value="" selected="">Not set, read as an individual<\/option>/);
+    expect(html).not.toContain('data-qa="exchange-window"');
+    expect(a11yIssues(html)).toEqual([]);
+  });
+});
+
 // ── The rules in force, and a folded note, cut at a whole first sentence ──────
 import { RuleItem } from "@/app/market/rule-item";
 import { Fold } from "@/app/market/fold";

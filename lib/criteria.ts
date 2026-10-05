@@ -7,6 +7,7 @@
 
 import { withArticle } from "@/lib/article";
 import { assetWords, countNoun } from "@/lib/asset-words";
+import { EXCHANGE_FILERS, exchangeDay, type ExchangeBlock } from "@/lib/exchange-window";
 import { dayIn } from "@/lib/reader-day";
 
 export interface GeoTarget {
@@ -57,6 +58,12 @@ export interface BuyBox {
   dealbreakers?: Dealbreakers;
   /** free-text priorities, fed to the verdict synthesizer verbatim */
   notes?: string;
+  /** the buyer's 1031 exchange (lib/exchange-window): the day the
+   *  relinquished property was transferred (an ISO day), who files the
+   *  return and whether it is extended — read against each deal's
+   *  offers-due day and what its price buys. Absent, no exchange: a blank
+   *  is null. The box is the reader's, so never on the shared screen. */
+  exchange?: ExchangeBlock;
 }
 
 /**
@@ -399,8 +406,39 @@ export function isEmptyBuyBox(box: BuyBox | null | undefined): boolean {
     box.minCoCPct == null &&
     box.minIrrPct == null &&
     hasNoDealbreakers(box.dealbreakers) &&
-    !box.notes?.trim()
+    !box.notes?.trim() &&
+    !box.exchange?.relinquishedTransferOn
   );
+}
+
+/** A real calendar day, as an ISO date — "2026-09-15", never "2026-02-31" —
+ *  in a year an exchange can have run in. */
+function isExchangeDay(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const t = Date.parse(`${s}T00:00:00Z`);
+  if (!Number.isFinite(t) || new Date(t).toISOString().slice(0, 10) !== s) return false;
+  const year = Number(s.slice(0, 4));
+  return year >= 2000 && year <= 2100;
+}
+
+/**
+ * The buy box's 1031 exchange from what the form sends (or the stored
+ * jsonb), each part only as given: the relinquished property's transfer day
+ * as a real calendar day, else no exchange at all (a blank is null, and a
+ * filer or an extension with no day has nothing to run from); the filer
+ * only as one of `EXCHANGE_FILERS`; the extension only where ticked.
+ */
+export function sanitizeExchange(raw: unknown): ExchangeBlock | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const r = raw as Record<string, unknown>;
+  const day = typeof r.relinquishedTransferOn === "string" ? r.relinquishedTransferOn.trim() : "";
+  if (!isExchangeDay(day)) return undefined;
+  const filer = EXCHANGE_FILERS.find((f) => f.id === r.filer)?.id;
+  return {
+    relinquishedTransferOn: day,
+    ...(filer ? { filer } : {}),
+    ...(r.returnExtended === true ? { returnExtended: true } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -1530,5 +1568,16 @@ export function buyBoxLines(box: BuyBox): string[] {
     if (parts.length) lines.push(`Dealbreakers: ${parts.join("; ")}`);
   }
   if (box.notes?.trim()) lines.push(`Priorities: ${box.notes.trim()}`);
+  // The buyer's 1031 exchange (lib/exchange-window), as the box holds it;
+  // each deal's deadlines against it are the deal's own read.
+  const exchange = sanitizeExchange(box.exchange);
+  if (exchange) {
+    const filer = EXCHANGE_FILERS.find((f) => f.id === exchange.filer);
+    lines.push(
+      `1031 exchange: the relinquished property transferred ${exchangeDay(exchange.relinquishedTransferOn!)}; ${
+        filer ? `${filer.label.toLowerCase()} files the return (${filer.form})` : "who files the return is not set, so it is read as an individual's"
+      }${exchange.returnExtended ? "; the return is extended" : ""}`,
+    );
+  }
   return lines;
 }
