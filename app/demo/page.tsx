@@ -362,7 +362,7 @@ export default async function DemoPage() {
                 Take the deliverables with you
               </h2>
               <p className="mt-1 max-w-md text-sm text-muted">
-                The same files a signed-in analyst exports from this screen.
+                The same files a Pro analyst exports from this screen, free here for the sample.
               </p>
             </div>
             <div className="flex flex-wrap gap-2">

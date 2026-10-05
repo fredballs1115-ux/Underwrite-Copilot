@@ -913,7 +913,13 @@ export default function Home() {
                 {/* Excel model — the flagship tile */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card lg:col-span-2">
                   <div className="flex items-center justify-between gap-3">
-                    <h3 className="text-sm font-semibold">Excel model, live formulas</h3>
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                      Excel model, live formulas
+                      {/* On your own deals the exports are Pro, as the hero's
+                          card marks them; the samples download free
+                          (research pass 32). */}
+                      <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
+                    </h3>
                     <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
                       Sample
                     </span>
@@ -951,7 +957,10 @@ export default function Home() {
 
                 {/* Memo */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
-                  <h3 className="text-sm font-semibold">One-page IC memo</h3>
+                  <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+                    One-page IC memo
+                    <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
+                  </h3>
                   <div className="mt-4 flex-1">
                     <div className="rounded-lg border border-line bg-paper p-3">
                       <div className="flex items-center justify-between">

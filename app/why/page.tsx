@@ -46,7 +46,7 @@ const SECTIONS: { h: string; body: string[] }[] = [
     h: "What it does",
     body: [
       "Upload an OM. The app reads it and returns a screen: the key terms, a red-team of the assumptions, the comps inside the deck, a reconciliation across your documents, a market check, and a verdict.",
-      "It scores the deal against your buy box from zero to one hundred and gives a Pursue, Watch, or Pass call. It exports a working Excel model with live formulas. You get to a defensible read before you build anything by hand.",
+      "It scores the deal against your buy box from zero to one hundred and gives a Pursue, Watch, or Pass call. On Pro, it exports a working Excel model with live formulas. You get to a defensible read before you build anything by hand.",
     ],
   },
   {
