@@ -1234,6 +1234,15 @@ jobs:
           mark "#511 credits that follow the data" grep -q "Credits that follow the data, and messages that hold up" p_whats-new.html
           mark "#512 preferred equity, read as a position" grep -q "Preferred equity, read as a position" p_whats-new.html
           mark "#513 twenty-two more cities, pictured" grep -q "Twenty-two more cities, pictured" p_whats-new.html
+          mark "#514 thirteen more cities, pictured" grep -q "Thirteen more cities, pictured" p_whats-new.html
+          mark "#515 no figure a building could not earn" grep -q "No figure a building could not earn" p_whats-new.html
+          mark "#516 sign-in links that ask first" grep -q "Sign-in links that ask first, and screens that wait their turn" p_whats-new.html
+          mark "#517 co-owners and empty buildings" grep -q "Co-owners and empty buildings, read as what they are" p_whats-new.html
+          mark "#518 loans and deliveries, read as offered" grep -q "Loans and deliveries, read as offered" p_whats-new.html
+          mark "#519 the deal page, made for a phone" grep -q "The deal page, made for a phone" p_whats-new.html
+          mark "#520 a report that says what it ran on" grep -q "A report that says what it ran on" p_whats-new.html
+          mark "#521 a fit that says what it was judged on" grep -q "A fit that says what it was judged on" p_whats-new.html
+          mark "#522 one deal, one set of figures" grep -q "One deal, one set of figures" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"
