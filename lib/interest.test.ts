@@ -1658,8 +1658,11 @@ describe("an undivided interest held as a tenant in common is the real estate's,
     for (const share of ["a 49% tenant in common interest", "TIC interest (49%)", "an undivided 35% interest", "a 49% co-tenancy interest", "49% as tenants-in-common"]) {
       expect(isTenancyInCommon(tic({ share, summary: "" })), share).toBe(true);
     }
-    // A retail lease's co-tenancy clause is an anchor's, no co-ownership.
+    // A retail lease's co-tenancy clause is an anchor's, and a center's
+    // co-tenants are other tenants: no co-ownership.
     expect(shareHoldingOf(tic({ share: "49% LP interest", summary: "A JV interest in a center whose inline leases carry co-tenancy clauses" }))).toBeNull();
+    expect(shareHoldingOf(tic({ share: "49% LP interest", summary: "A JV interest in a center subject to co-tenancy; its co-tenants include a grocer" }))).toBeNull();
+    expect(isTenancyInCommon(tic({ share: "", summary: "Three co-owners holding title as co-tenants under a co-tenancy agreement" }))).toBe(true);
     // Only a partial interest: the same words on a fee simple say nothing.
     expect(shareHoldingOf(tic({ kind: "fee_simple" }))).toBeNull();
     // The share itself reads as before: the gross-up is a share's arithmetic.

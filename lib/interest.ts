@@ -249,10 +249,12 @@ function interestKindOf(ex: ExtractionResult | null | undefined): InterestKind {
 }
 
 // A tenancy in common by the interest's own words: tenant(s) in common, a
-// tenancy in common, TIC, an undivided interest, co-tenancy — never a retail
-// lease's co-tenancy clause, which is an anchor's and no co-ownership.
+// tenancy in common, TIC, an undivided interest, a co-tenancy interest or
+// agreement, co-owners "as co-tenants" — never a retail lease's co-tenancy
+// clause or a center's co-tenants, which are an anchor's and other tenants',
+// no co-ownership.
 const TIC_WORDS =
-  /\bten(?:ant|ants|ancy|ancies)[\s-]+in[\s-]+common\b|\btics?\b|\bundivided\b|\bco[\s-]?tenan(?:cy|cies|ts?)\b(?![\s-]+(?:clauses?|provisions?|requirements?|rights?|remed(?:y|ies)|rents?|failures?|violations?))/i;
+  /\bten(?:ant|ants|ancy|ancies)[\s-]+in[\s-]+common\b|\btics?\b|\bundivided\b|\bco[\s-]?tenancy[\s-]+(?:interests?|agreements?|ownership)\b|\bas\s+co[\s-]?tenants\b/i;
 // A Delaware statutory trust's beneficial interests, by their own words.
 const DST_WORDS = /\bdelaware\s+statutory\s+trusts?\b|\bdsts?\b|\bbeneficial\s+interests\b/i;
 
