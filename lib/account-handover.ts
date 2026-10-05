@@ -15,8 +15,10 @@
 // team sets its deals' team_id null, and such a deal goes with the account.
 //
 // Every list is read a page at a time and every write names its rows a chunk
-// of ids at a time: PostgREST answers a read with at most its max-rows, and a
-// filter of a few hundred ids makes a URL tens of KB long. The caller stops
+// of ids at a time: a Supabase project answers a read with at most its max
+// rows — 1,000 by Supabase's own default, where PostgREST's is no limit
+// (lib/read-all) — and a filter of a few hundred ids makes a URL tens of KB
+// long. The caller stops
 // the deletion on any failure (`ok: false`), with the counts of what had
 // already moved, so the page can say so.
 import "server-only";
