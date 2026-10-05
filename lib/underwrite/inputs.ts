@@ -14,7 +14,7 @@
  * and vacancy — the split is a labelled assumption, the NOI is real.
  */
 import { withArticle } from "@/lib/article";
-import { entityLoanOf, groundRentOf, interestOf, interestShortLine, isWholeShare, readInterest, type EquipmentUse } from "@/lib/interest";
+import { entityLoanOf, groundRentOf, interestOf, interestShortLine, isTenancyInCommon, isWholeShare, readInterest, type EquipmentUse } from "@/lib/interest";
 import { assumableLine, assumableSentence, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdBasisLine, leaseholdExitSentence, leaseholdLenderLine, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
@@ -395,6 +395,18 @@ export function basisWithheldOf(extraction: ExtractionResult | null): { word: st
     case "leased_fee":
       return { word: "leased fee", why: "the price buys the land under the building, not the building" };
     case "partial_interest":
+      // An undivided interest held as a tenant in common is the real
+      // estate's: a loan the memorandum states is the property's, never an
+      // entity's (research pass 37).
+      if (isTenancyInCommon(extraction)) {
+        return {
+          word: "share",
+          why:
+            entityLoan != null
+              ? "the interest's price grossed up is the equity's whole, with the loan on the property on top of it, not the building's price"
+              : "the price buys an undivided interest the memorandum states no percentage for, which cannot be grossed up to the building's price",
+        };
+      }
       return {
         word: "share",
         why:
@@ -761,13 +773,22 @@ export function deriveUnderwriteInputs(
     // the share's price implies, or beside the entity's loan the equity's
     // whole — never a "Purchase Price" the share does not cost.
     const shareWord = `${Math.round(share * 10) / 10}%`;
-    priceLabel = `${entityLoan != null ? "Equity's Whole" : "Whole Price"} (${shareWord} share grossed up)`;
+    // An undivided interest held as a tenant in common is title to the real
+    // estate beside its co-owners, never an entity's share: no promote, and a
+    // loan the memorandum states is the property's (research pass 37).
+    const tic = isTenancyInCommon(extraction);
+    priceLabel = `${entityLoan != null ? "Equity's Whole" : "Whole Price"} (${shareWord} ${tic ? "TIC interest" : "share"} grossed up)`;
+    const sold = tic ? `an undivided ${share}% interest held as a tenant in common` : `${withArticle(`${share}%`)} share`;
+    const earns = tic
+      ? `the interest earns ${share}% of them before any fee the co-owners' agreement pays its manager`
+      : `the share earns ${share}% of them before the promote and the sponsor's fees`;
+    const loanOnTop = tic ? `the stated ${usd0(entityLoan ?? 0)} loan on the property` : `the entity's stated ${usd0(entityLoan ?? 0)} loan`;
     mark(
       "purchasePrice",
       "derived",
       entityLoan != null
-        ? `The OM's ${usd0(stated)}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to ${usd0(price)} — the equity's whole, not the asset's: the entity's stated ${usd0(entityLoan)} loan sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; the model runs the whole building's cash flows, and the share earns ${share}% of them before the promote and the sponsor's fees`
-        : `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${withArticle(`${share}%`)} share, grossed up to the whole asset — the model runs the whole building's cash flows; the share earns ${share}% of them before the promote and the sponsor's fees`,
+        ? `The OM's ${usd0(stated)}${spanNote ? ` (${spanNote})` : ""} for ${sold}, grossed up to ${usd0(price)} — the equity's whole, not the asset's: ${loanOnTop} sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; the model runs the whole building's cash flows, and ${earns}`
+        : `The OM's $${Math.round(stated).toLocaleString("en-US")}${spanNote ? ` (${spanNote})` : ""} for ${sold}, grossed up to the whole asset — the model runs the whole building's cash flows; ${earns}`,
       pageOf(priceMetric),
     );
   } else if (price != null) {
@@ -778,7 +799,9 @@ export function deriveUnderwriteInputs(
         : interest.kind === "preferred_equity"
           ? "The OM's price for a PREFERRED EQUITY position in the owning entity — this model runs the whole building as if bought outright at that price, which is not the position's return: that is its rate and its redemption"
         : interest.kind === "partial_interest"
-          ? "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
+          ? isTenancyInCommon(extraction)
+            ? "The OM's price for an UNDIVIDED INTEREST held as a tenant in common that states no single percentage — the model cannot gross it up, so its returns are not the interest's"
+            : "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
           : interest.kind === "leased_fee"
             ? "The OM's price for the LEASED FEE — the land under a building someone else owns, with its ground lease"
             : "OM asking / purchase price";

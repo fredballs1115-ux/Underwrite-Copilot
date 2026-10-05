@@ -88,6 +88,20 @@ describe("the buyer's 1031 clock (pass 28, round 4)", () => {
     );
     expect(note.tag).toBe("1031: note — ask counsel");
     expect(exchangeFit(x, { offersDueIso: null, interestKind: "partial_interest" })!.tag).toBe("1031: share — ask counsel");
+    // An undivided interest held as a tenant in common is an interest in the
+    // real estate, never "a share of the owning entity" (research pass 37):
+    // what the co-ownership is for the exchange is counsel's question.
+    const tic = exchangeFit(x, { offersDueIso: null, interestKind: "partial_interest", holding: "tic" })!;
+    expect(tic.flags).toEqual([
+      {
+        kind: "tic",
+        text: "The price buys an undivided interest in the real estate, held as a tenant in common; whether the co-ownership counts as real property or as a partnership interest is a question for your exchange counsel.",
+      },
+    ]);
+    expect(tic.tag).toBe("1031: TIC — ask counsel");
+    expect(gluedWords(tic.flags[0].text)).toEqual([]);
+    // A trust's beneficial interests are asked about as a share is.
+    expect(exchangeFit(x, { offersDueIso: null, interestKind: "partial_interest", holding: "dst" })!.tag).toBe("1031: share — ask counsel");
     // A preferred equity position is an interest in the entity, as a share is.
     const position = exchangeFit(x, { offersDueIso: null, interestKind: "preferred_equity" })!;
     expect(position.flags).toEqual([

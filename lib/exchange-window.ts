@@ -43,12 +43,16 @@
 //
 // WHAT THE PRICE BUYS MUST BE REAL PROPERTY — a note, a share of the owning
 // entity, a preferred equity position in it and a short leasehold are each a
-// QUESTION for the buyer's exchange counsel, never a determination.
+// QUESTION for the buyer's exchange counsel, never a determination. So is an
+// undivided interest held as a tenant in common, which is an interest in the
+// real estate itself, not a share of an entity (research pass 37): whether
+// the co-ownership counts as real property is counsel's to say.
 //
 // A BLANK IS NULL — no exchange in the buy box, nothing said; an offers-due
 // date that is not a whole day is not compared.
 
 import type { InterestKind } from "@/lib/anthropic/types";
+import type { ShareHolding } from "@/lib/interest";
 import { EXCHANGE_DAYS, IDENTIFY_DAYS } from "@/lib/tools/exchange-1031";
 
 export type ExchangeFiler = "individual" | "partnership" | "s_corporation" | "c_corporation" | "trust";
@@ -184,7 +188,7 @@ function windowSentence(w: Omit<ExchangeWindow, "sentence">): string {
 /** One thing the deal and the exchange say together — a date fact or a
  *  question for exchange counsel, never a verdict. */
 export interface ExchangeFlag {
-  kind: "after_identify" | "id_period_over" | "after_close" | "note" | "entity_share" | "position" | "short_leasehold" | "lease_term";
+  kind: "after_identify" | "id_period_over" | "after_close" | "note" | "entity_share" | "tic" | "position" | "short_leasehold" | "lease_term";
   text: string;
 }
 
@@ -208,6 +212,10 @@ export function exchangeFit(
     /** the deal's offers-due day (lib/offering's `iso`), or null */
     offersDueIso: string | null;
     interestKind: InterestKind | null;
+    /** on a partial interest, what the share is a share of where it is not
+     *  the owning entity's (lib/interest `shareHoldingOf`) — an undivided
+     *  interest held as a tenant in common is the real estate's */
+    holding?: ShareHolding | null;
     /** the lease's years left today and its options' years, where the
      *  price buys a leasehold (lib/interest's term); null where no end is
      *  read */
@@ -243,6 +251,14 @@ export function exchangeFit(
   }
   if (deal.interestKind === "note") {
     flags.push({ kind: "note", text: `The price buys a loan secured by the building, not the building. ${REAL_PROPERTY}; whether a note counts is ${ASK}.` });
+  } else if (deal.interestKind === "partial_interest" && deal.holding === "tic") {
+    // Title to an undivided share of the real estate, not a share of an
+    // entity (research pass 37): what the co-ownership is for the exchange
+    // is counsel's question.
+    flags.push({
+      kind: "tic",
+      text: `The price buys an undivided interest in the real estate, held as a tenant in common; whether the co-ownership counts as real property or as a partnership interest is ${ASK}.`,
+    });
   } else if (deal.interestKind === "partial_interest") {
     flags.push({
       kind: "entity_share",
@@ -294,6 +310,7 @@ const TAG: Record<ExchangeFlag["kind"], string> = {
   after_close: "1031: offers due after close",
   note: "1031: note — ask counsel",
   entity_share: "1031: share — ask counsel",
+  tic: "1031: TIC — ask counsel",
   position: "1031: position — ask counsel",
   short_leasehold: "1031: lease under 30 yrs",
   // A term not read, or a ceiling of thirty years or more: the thirty years

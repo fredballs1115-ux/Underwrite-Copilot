@@ -57,6 +57,15 @@
 //
 // A BLANK IS NULL. A share the OM does not state as a percentage is not
 // guessed at; a balance it does not state is not derived.
+//
+// NOT EVERY SHARE IS AN ENTITY'S (research pass 37). A tenant in common holds
+// an undivided share of the property itself — title to real estate, beside
+// its co-owners, with no entity owning the property — so its sale, its loan
+// and its exit are the real estate's, never an entity's waterfall. Beneficial
+// interests in a Delaware statutory trust are a trust's: its trustee's
+// limits, its master tenant, its load and its conversion are asked beside the
+// share's own questions. Each is read off the interest's own words
+// (`shareHoldingOf`); the gross-up is the same arithmetic as any share's.
 
 import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
@@ -188,6 +197,53 @@ export function isWholeShare(sharePct: number | null | undefined): boolean {
 const IN_UNITS =
   /\b(?:offered|sold|issued|available|marketed)\s+in\s+(?:\$[\d.,]+\s*(?:[km]\b)?\s*)?(?:investment\s+)?units\b|\bunits\s+of\s+(?:beneficial\s+)?interests?\b|\bminimum\s+(?:investment|purchase|subscription)\b/i;
 
+/** The interest's kind as every reader takes it: a preferred equity position
+ *  is its own kind, and so is a share the extraction filed before that kind
+ *  was asked whose rows say a position (lib/position `isPreferredEquity`):
+ *  its price buys a rate and a redemption, never a slice of the building. An
+ *  extraction saved before the interest was read is fee simple. */
+function interestKindOf(ex: ExtractionResult | null | undefined): InterestKind {
+  return isPreferredEquity(ex) ? "preferred_equity" : (ex?.interest?.kind ?? "fee_simple");
+}
+
+// A tenancy in common by the interest's own words: tenant(s) in common, a
+// tenancy in common, TIC, an undivided interest, co-tenancy — never a retail
+// lease's co-tenancy clause, which is an anchor's and no co-ownership.
+const TIC_WORDS =
+  /\bten(?:ant|ants|ancy|ancies)[\s-]+in[\s-]+common\b|\btics?\b|\bundivided\b|\bco[\s-]?tenan(?:cy|cies|ts?)\b(?![\s-]+(?:clauses?|provisions?|requirements?|rights?|remed(?:y|ies)|rents?|failures?|violations?))/i;
+// A Delaware statutory trust's beneficial interests, by their own words.
+const DST_WORDS = /\bdelaware\s+statutory\s+trusts?\b|\bdsts?\b|\bbeneficial\s+interests\b/i;
+
+/** What a partial interest's share is a share OF where it is not the owning
+ *  entity's, by the interest's own words (its share as stated and its
+ *  sentence): an undivided interest in the property held as a tenant in
+ *  common ("tic") — title to real estate beside its co-owners, no entity's
+ *  share at all — or beneficial interests in a Delaware statutory trust
+ *  ("dst"), a trust's. */
+export type ShareHolding = "tic" | "dst";
+
+/** The share's holding (`ShareHolding`) on a partial interest; null for a
+ *  share of the owning entity as such, and on every other interest. A trust
+ *  named in the words is the trust's, whatever else they say. */
+export function shareHoldingOf(ex: ExtractionResult | null | undefined): ShareHolding | null {
+  if (interestKindOf(ex) !== "partial_interest") return null;
+  const words = [ex?.interest?.share, ex?.interest?.summary].filter((w): w is string => typeof w === "string").join(" \n ");
+  if (DST_WORDS.test(words)) return "dst";
+  if (TIC_WORDS.test(words)) return "tic";
+  return null;
+}
+
+/** An undivided interest in the property held as a tenant in common: title
+ *  to real estate beside its co-owners, never a share of an entity. */
+export function isTenancyInCommon(ex: ExtractionResult | null | undefined): boolean {
+  return shareHoldingOf(ex) === "tic";
+}
+
+/** Beneficial interests in a Delaware statutory trust. */
+export function isDst(ex: ExtractionResult | null | undefined): boolean {
+  return shareHoldingOf(ex) === "dst";
+}
+
 /** The minimum the price readers need: the kind; a partial interest's share
  *  where one percentage is stated as the share (`parseSharePct`); and the
  *  loan its entity carries where the memorandum states one (`entityLoanOf`)
@@ -200,11 +256,7 @@ export function interestOf(ex: ExtractionResult | null | undefined): {
   sharePct: number | null;
   entityLoan: number | null;
 } {
-  // A preferred equity position is its own kind, and so is a share the
-  // extraction filed before that kind was asked whose rows say a position
-  // (lib/position `isPreferredEquity`): its price buys a rate and a
-  // redemption, never a slice of the building.
-  const kind: InterestKind = isPreferredEquity(ex) ? "preferred_equity" : (ex?.interest?.kind ?? "fee_simple");
+  const kind = interestKindOf(ex);
   const share = kind === "partial_interest";
   return {
     kind,
@@ -375,6 +427,9 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
       // "Pref equity, 12% to Jun 2029" — its rate and its redemption.
       return positionTag(readPosition(ex, null, asOf)) ?? "Pref equity";
     case "partial_interest":
+      // An undivided interest held as a tenant in common is the real
+      // estate's, never an entity's share (research pass 37).
+      if (isTenancyInCommon(ex)) return sharePct != null ? `TIC ${shareText(sharePct)}` : "TIC";
       // A stated 100% buys all of the entity's interests, never "100% share".
       return sharePct != null ? (isWholeShare(sharePct) ? "All entity interests" : `${shareText(sharePct)} share`) : "Share";
     case "leasehold":
@@ -443,6 +498,11 @@ export const INTEREST_LABEL: Record<InterestKind, string> = {
  *  (the audit of 2026-10-05). */
 export const MASTER_LEASE_LABEL = "Master lease of the building, sublet";
 
+/** A tenancy in common's own words (`isTenancyInCommon`): title to an
+ *  undivided share of the property, never "a share of the owning entity",
+ *  which every surface had called it (research pass 37). */
+export const TIC_LABEL = "An undivided interest in the property, as a tenant in common";
+
 export interface InterestRead {
   kind: InterestKind;
   label: string;
@@ -456,6 +516,11 @@ export interface InterestRead {
   /** a partial interest whose own words say its interests are offered in
    *  units (a DST's "$100,000 units") */
   inUnits: boolean;
+  /** what a partial interest's share is a share OF where it is not the
+   *  owning entity's (`shareHoldingOf`): an undivided interest held as a
+   *  tenant in common, or a Delaware statutory trust's beneficial interests;
+   *  null otherwise */
+  holding: ShareHolding | null;
   /** the price the OM asks for what is being sold */
   askingPrice: number | null;
   /** a partial interest: the asking price over the share — the equity's
@@ -704,7 +769,8 @@ export function readInterest(
   const pageCount = typeof ex.totalPages === "number" && ex.totalPages > 0 ? ex.totalPages : null;
   const n = parsePageNumber(it.page);
   const page = n != null && pageCount != null && n <= pageCount ? it.page.trim() : "";
-  const sharePct = kind === "partial_interest" ? parseSharePct(it.share) : null;
+  const sharePct = interestOf(ex).sharePct;
+  const holding = shareHoldingOf(ex);
   const inUnits = kind === "partial_interest" && IN_UNITS.test(`${it.share ?? ""} \n ${it.summary ?? ""}`);
   const price = askingPrice != null && askingPrice > 0 ? askingPrice : null;
   const impliedWhole = sharePct != null && price != null ? price / (sharePct / 100) : null;
@@ -761,6 +827,44 @@ export function readInterest(
         "The property model runs the whole building at the position's price; that is not this position's return, which is its rate and its redemption.";
       break;
     case "partial_interest":
+      if (holding === "tic") {
+        // An undivided interest held as a tenant in common (research pass
+        // 37): title to a share of the property itself, beside its
+        // co-owners — no entity owns the property. The gross-up is a
+        // share's; a loan the memorandum states is the property's.
+        const pct = sharePct != null ? shareText(sharePct) : null;
+        const head = `This memorandum sells ${
+          pct ? `an undivided ${pct} of the property itself` : "an undivided interest in the property itself"
+        }, held as a tenant in common beside its co-owners — title to real estate, not a share of an entity`;
+        if (pct == null) {
+          lead.push(`${head} — and states no single percentage for it: the whole building's income cannot be set against the interest's price until its share is known.`);
+          if (entityLoan != null) lead.push(`The memorandum states ${withArticle(money(entityLoan))} loan on the property.`);
+          modelCaveat = "The screening model runs the whole asset at the interest's price, which it cannot gross up without a stated percentage — its returns are not the interest's.";
+          break;
+        }
+        if (price == null || impliedWhole == null) {
+          lead.push(`${head}.`);
+          modelCaveat = `The screening model runs the whole asset; the interest earns its ${pct} of the cash flows before any fee the co-owners' agreement pays its manager.`;
+          break;
+        }
+        if (isWholeShare(sharePct)) {
+          lead.push(`${head}: its ${money(price)} price is the whole's, nothing grossed up.`);
+        } else if (entityLoan != null) {
+          lead.push(
+            `${head}: ${money(price)} for the interest is ${money(impliedWhole)} grossed up — the equity's whole, not the asset's, since the stated ${money(entityLoan)} loan on the property sits on top of it, and the screen sets the whole building's income against the ${money(impliedWhole)} alone.`,
+          );
+        } else {
+          lead.push(
+            `${head}: ${money(price)} for the interest is ${money(impliedWhole)} for the whole, grossed up.`,
+            `The screen sets the whole building's income against the ${money(impliedWhole)}.`,
+          );
+        }
+        modelCaveat =
+          entityLoan != null
+            ? `The screening model runs the whole asset at the ${money(impliedWhole)} the interest's price implies — the equity's whole: the stated ${money(entityLoan)} loan on the property sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${money(impliedWhole)} instead. The interest earns its ${pct} of the cash flows before any fee the co-owners' agreement pays its manager.`
+            : `The screening model runs the whole asset at the ${money(impliedWhole)} the interest's price implies; the interest earns its ${pct} of those cash flows before any fee the co-owners' agreement pays its manager.`;
+        break;
+      }
       if (isWholeShare(sharePct)) {
         // All of the entity's interests (research pass 28): the price is the
         // whole's, with nothing to gross up — said so, never as a share or as
@@ -864,12 +968,21 @@ export function readInterest(
   return {
     kind,
     // All of the entity's interests is no share of it (research pass 28),
-    // and a master lease of the building is no ground lease.
-    label: isWholeShare(sharePct) ? "All of the owning entity's interests" : masterLease ? MASTER_LEASE_LABEL : INTEREST_LABEL[kind],
+    // a master lease of the building is no ground lease, and an undivided
+    // interest held as a tenant in common is no entity's (research pass 37).
+    label:
+      holding === "tic"
+        ? TIC_LABEL
+        : isWholeShare(sharePct)
+          ? "All of the owning entity's interests"
+          : masterLease
+            ? MASTER_LEASE_LABEL
+            : INTEREST_LABEL[kind],
     summary: (it.summary ?? "").trim(),
     page,
     sharePct,
     inUnits,
+    holding,
     askingPrice: price,
     impliedWhole,
     entityLoan,
@@ -971,9 +1084,49 @@ export function interestNote(r: InterestRead): string {
   // ground lease: its traps are the master lease's, in place of the ground
   // lease's resets on land value and a building reverting to the landowner.
   if (r.masterLease) traps.leasehold = MASTER_LEASE_TRAPS;
-  const shared = SHARED_TRAPS_READ[r.kind];
+  // An undivided interest held as a tenant in common is title to the real
+  // estate, never an entity's share: its traps are the co-owners', in place
+  // of a joint venture's waterfall and capital calls, and the two shared
+  // traps read for real property transferred (research pass 37). A Delaware
+  // statutory trust's beneficial interests are asked their own questions
+  // beside a share's.
+  if (r.holding === "tic") traps.partial_interest = ticTraps(r.entityLoan);
+  if (r.holding === "dst") traps.partial_interest = `${traps.partial_interest} ${DST_TRAPS}`;
+  const shared = r.holding === "tic" ? SHARED_TRAPS_TIC : SHARED_TRAPS_READ[r.kind];
   return `${interestContextLine(r)} ${traps[r.kind]}${terminationTrap}${shared ? ` ${shared}` : ""}`;
 }
+
+/**
+ * A tenancy in common's traps (research pass 37), asked as questions — what
+ * the co-owners' agreement, the loan and the exit say is the memorandum's and
+ * the documents' to answer, never a rule written here. The loan is named by
+ * its stated balance where the memorandum gives one.
+ */
+function ticTraps(loan: number | null): string {
+  const theLoan =
+    loan != null
+      ? `ask whether the co-owners are co-borrowers on the stated ${money(loan)} loan on the property, and whether its lender has consented to this transfer`
+      : "ask whether the property carries a loan, whether the co-owners are its co-borrowers, and whether its lender has consented to this transfer";
+  return `TENANCY-IN-COMMON TRAPS, asked by name where the OM gives the inputs: (a) UNANIMITY — ask what the TIC agreement makes every co-owner approve: a sale, a lease, a refinancing, the manager; (b) PARTITION — ask whether each co-owner keeps a right to partition the property, and whether it has been waived to the lender; (c) THE LOAN — ${theLoan}; (d) THE MANAGER AND ITS FEES — ask who manages the property under the TIC agreement, and what it is paid; (e) THE EXIT — ask whether the co-owners hold a right of first refusal on this interest, and whether the agreement carries a buy-sell.`;
+}
+
+/**
+ * A Delaware statutory trust's traps (research pass 37), beside a share's:
+ * questions, each answered by the trust agreement and the memorandum as
+ * stated — never a rule written here.
+ */
+const DST_TRAPS =
+  "DELAWARE STATUTORY TRUST TRAPS, asked by name where the OM gives the inputs: (a) WHAT THE TRUSTEE MAY NOT DO — ask for the trust agreement's limits on the trustee — on new capital, on refinancing, on new or renegotiated leases — as stated; (b) THE MASTER TENANT — ask whether the property is master leased and whether the master tenant is the sponsor's affiliate, and where it is master leased, read what the investors earn as the master lease rent, not the property's NOI, each as stated; (c) THE LOAD — ask for the offering costs and fees between the investor's cheque and the property, as stated; (d) THE SPRINGING LLC — ask whether the trust agreement provides for converting the trust to a limited liability company, and when that applies, as stated.";
+
+/**
+ * The two shared traps read for an undivided interest held as a tenant in
+ * common (research pass 37): the sale transfers real property, so whether
+ * it reassesses or carries a transfer tax on the share is the
+ * jurisdiction's rule to say, never assumed; and the policy is the
+ * co-owners'.
+ */
+const SHARED_TRAPS_TIC =
+  "THE TWO SHARED TRAPS, read for an undivided interest held as a tenant in common in place of the tax reset and the legacy insurance premium as the instruction above words them: the sale transfers real property — an undivided share of the title, not an interest in an entity — so whether it reassesses the property or this share of it, and whether it carries a transfer tax on the share, is the jurisdiction's rule to say, never assumed either way. The insurance is the co-owners' policy on the whole building, so the trap reads as that policy's next renewal and the share of its premium the TIC agreement puts on this interest, not a new owner's quote.";
 
 /**
  * A master leasehold's traps — the substance of lib/sandwich-lease's own
@@ -1056,6 +1209,20 @@ export function interestShortLine(r: InterestRead): string {
       return `A preferred equity position in the owning entity, not the property${earns}`;
     }
     case "partial_interest":
+      // An undivided interest held as a tenant in common: the real
+      // estate's, never an entity's share (research pass 37).
+      if (r.holding === "tic") {
+        const head =
+          r.sharePct != null
+            ? `An undivided ${shareText(r.sharePct)} interest in the property, held as a tenant in common`
+            : "An undivided interest in the property, held as a tenant in common";
+        if (r.sharePct == null) return `${head}, its percentage not stated`;
+        if (r.askingPrice == null || r.impliedWhole == null) return head;
+        if (isWholeShare(r.sharePct)) return `${head} — ${money(r.askingPrice)} for the whole, nothing grossed up`;
+        return r.entityLoan != null
+          ? `${head} — ${money(r.askingPrice)} for the interest is ${money(r.impliedWhole)} for the equity's whole; the stated ${money(r.entityLoan)} loan on the property sits on top of it`
+          : `${head} — ${money(r.askingPrice)} for the interest is ${money(r.impliedWhole)} for the whole`;
+      }
       // All of the entity's interests: the price is the whole's (research
       // pass 28).
       if (isWholeShare(r.sharePct)) {

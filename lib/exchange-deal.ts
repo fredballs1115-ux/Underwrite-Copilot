@@ -27,7 +27,7 @@ import {
   type ExchangeWindow,
 } from "@/lib/exchange-window";
 import { endIsAhead } from "@/lib/ground-lease-term";
-import { interestOf, leaseholdTermOf } from "@/lib/interest";
+import { interestOf, leaseholdTermOf, shareHoldingOf } from "@/lib/interest";
 import { offersDueUpgrade } from "@/lib/offering";
 
 export interface DealExchange {
@@ -76,6 +76,9 @@ export function exchangeForDeal(
   const fit = exchangeFit(window, {
     offersDueIso: offersDue || offersDueUpgrade(null, extraction),
     interestKind: kind,
+    // What a share is a share of: an undivided interest held as a tenant in
+    // common is the real estate's, not an entity's (research pass 37).
+    holding: shareHoldingOf(extraction),
     leaseYearsLeft: lease ? lease.yearsLeft : null,
     leaseOptionYears: lease?.options?.years ?? null,
     // A term that already counts its options is a ceiling: the thirty years

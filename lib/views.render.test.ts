@@ -7099,6 +7099,17 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(visibleText(recapHtml)).toContain("$1.8M for the share is $40.0M grossed up — the equity's whole, not the asset's");
     expect(gluedWords(visibleText(recapHtml))).toEqual([]);
     expect(a11yIssues(recapHtml), "share panel").toEqual([]);
+    // An undivided interest held as a tenant in common (research pass 37):
+    // the real estate's, its loan the property's — never an entity's.
+    const ticEx = base({ ...blank, kind: "partial_interest", share: "30% tenant-in-common interest", summary: "An undivided 30% tenant-in-common interest" }, [
+      { label: "Entity loan balance", value: "$9,000,000", flagged: false, page: "p. 9" },
+    ]);
+    const ticText = visibleText(render(React.createElement(InterestPanel, { interest: readInterestFor(ticEx, 4_200_000) })));
+    expect(ticText).toContain("An undivided interest in the property, as a tenant in common");
+    expect(ticText).toContain("The interest $4.2M");
+    expect(ticText).toContain("The equity's whole, grossed up $14.0M · the property's $9.0M loan on top");
+    expect(ticText).not.toMatch(/entity's|owning entity/);
+    expect(gluedWords(ticText)).toEqual([]);
     const leaseHtml = render(
       React.createElement(InterestPanel, { interest: readInterestFor(base({ ...blank, kind: "leasehold", groundLease: "62 years remaining; $310,000 a year" }), 20_000_000) }),
     );

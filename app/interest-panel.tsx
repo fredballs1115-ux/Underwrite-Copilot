@@ -183,12 +183,14 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         r.kind === "partial_interest" && r.impliedWhole != null && r.askingPrice != null && r.sharePct != null && !isWholeShare(r.sharePct)
         ? {
             fill: Math.min(1, r.sharePct / 100),
-            left: `The share ${money(r.askingPrice)}`,
+            // An undivided interest held as a tenant in common is the real
+            // estate's, and its loan the property's (lib/interest).
+            left: `${r.holding === "tic" ? "The interest" : "The share"} ${money(r.askingPrice)}`,
             // Beside the entity's stated loan the whole is the equity's, and
             // the loan sits on top of it (lib/interest).
             right:
               r.entityLoan != null
-                ? `The equity's whole, grossed up ${money(r.impliedWhole)} · the entity's ${money(r.entityLoan)} loan on top`
+                ? `The equity's whole, grossed up ${money(r.impliedWhole)} · ${r.holding === "tic" ? "the property's" : "the entity's"} ${money(r.entityLoan)} loan on top`
                 : `The whole, grossed up ${money(r.impliedWhole)}`,
           }
         : r.groundRent != null && r.incomeBeforeGroundRent != null && r.groundRentCoverage != null

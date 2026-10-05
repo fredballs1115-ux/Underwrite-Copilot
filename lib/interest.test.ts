@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ExtractedInterest, ExtractionResult } from "@/lib/anthropic/types";
 import {
   INTEREST_LABEL,
+  TIC_LABEL,
   dealTypeLabel,
   dealTypeLabelFor,
   groundRentOf,
@@ -11,12 +12,15 @@ import {
   interestOf,
   interestShortLine,
   interestTag,
+  isDst,
   isMasterLeasehold,
+  isTenancyInCommon,
   isWholeShare,
   noteCaption,
   noteCollateralSentence,
   parseSharePct,
   readInterest,
+  shareHoldingOf,
 } from "./interest";
 import { gluedWords } from "./render-lint";
 import { askingPriceOf, assessPlausibility, noiFigures } from "./deal-strategy";
@@ -1618,5 +1622,168 @@ describe("a preferred equity position, read as what its price buys", () => {
     expect(assessPlausibility(e)).toEqual([]);
     const derived = deriveUnderwriteInputs(e, "fallback");
     expect(derived.sources.purchasePrice?.note).toMatch(/^The OM's price for a PREFERRED EQUITY position in the owning entity/);
+  });
+});
+
+// Research pass 37: "30% tenant-in-common interest" read as "a 30% share of
+// the owning entity" — the shared traps said the entity keeps the property,
+// the traps named a waterfall and a promote, and the 1031 flag called it a
+// share of the entity. A tenant in common holds title to an undivided share
+// of the property itself, and no entity owns it.
+describe("an undivided interest held as a tenant in common is the real estate's, never an entity's share", () => {
+  const row = (label: string, value: string, basis: ExtractionResult["metrics"][number]["basis"] = "na") => ({ label, value, flagged: false, page: "p. 3", basis });
+  const tic = (over: Partial<ExtractedInterest> = {}, metrics: ExtractionResult["metrics"] = []): ExtractionResult => ({
+    dealName: "Summit MOB (TIC interest)",
+    assetClass: "Medical Office",
+    totalPages: 40,
+    interest: interest({
+      kind: "partial_interest",
+      summary: "An undivided 30% tenant-in-common interest in the fee simple of a medical office building, held under a TIC agreement",
+      share: "30% tenant-in-common interest",
+      page: "p. 2",
+      ...over,
+    }),
+    metrics: [
+      row("Asking price", "4,200,000"),
+      row("Total SF", "48,000 SF"),
+      row("NOI (in-place)", "980,000", "in_place"),
+      row("Going-in cap rate", "7.00%"),
+      ...metrics,
+    ],
+  });
+
+  it("reads the holding off the interest's own words, and only on a share", () => {
+    expect(shareHoldingOf(tic())).toBe("tic");
+    expect([isTenancyInCommon(tic()), isDst(tic())]).toEqual([true, false]);
+    for (const share of ["a 49% tenant in common interest", "TIC interest (49%)", "an undivided 35% interest", "a 49% co-tenancy interest", "49% as tenants-in-common"]) {
+      expect(isTenancyInCommon(tic({ share, summary: "" })), share).toBe(true);
+    }
+    // A retail lease's co-tenancy clause is an anchor's, no co-ownership.
+    expect(shareHoldingOf(tic({ share: "49% LP interest", summary: "A JV interest in a center whose inline leases carry co-tenancy clauses" }))).toBeNull();
+    // Only a partial interest: the same words on a fee simple say nothing.
+    expect(shareHoldingOf(tic({ kind: "fee_simple" }))).toBeNull();
+    // The share itself reads as before: the gross-up is a share's arithmetic.
+    expect(interestOf(tic())).toEqual({ kind: "partial_interest", sharePct: 30, entityLoan: null });
+  });
+
+  it("says title to real estate on every line — the lead, the label, the caveat, the short line and the tag", async () => {
+    const { buildingPriceOf } = await import("./deal-strategy");
+    const e = tic();
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.label).toBe(TIC_LABEL);
+    expect(r.label).toBe("An undivided interest in the property, as a tenant in common");
+    expect(r.holding).toBe("tic");
+    expect(r.leadSentences).toEqual([
+      "This memorandum sells an undivided 30% of the property itself, held as a tenant in common beside its co-owners — title to real estate, not a share of an entity: $4.2M for the interest is $14.0M for the whole, grossed up.",
+      "The screen sets the whole building's income against the $14.0M.",
+    ]);
+    expect(r.modelCaveat).toBe(
+      "The screening model runs the whole asset at the $14.0M the interest's price implies; the interest earns its 30% of those cash flows before any fee the co-owners' agreement pays its manager.",
+    );
+    expect(interestShortLine(r)).toBe("An undivided 30% interest in the property, held as a tenant in common — $4.2M for the interest is $14.0M for the whole");
+    expect(interestTag(e)).toBe("TIC 30%");
+    expect(interestTag(tic({ share: "", summary: "An undivided interest held as tenants in common" }))).toBe("TIC");
+    // The gross-up, the basis and the model stand: they were right.
+    expect(r.impliedWhole).toBe(14_000_000);
+    expect(buildingPriceOf(e, 4_200_000)).toBe(14_000_000);
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${dealContextFor(e)}`;
+    expect(said).toContain("What is being sold: an undivided interest in the property, as a tenant in common.");
+    expect(said).not.toMatch(/owning entity|share of the entity|promote|waterfall|sponsor's fees/);
+    expect(gluedWords(said)).toEqual([]);
+  });
+
+  it("asks the co-owners' questions in place of a joint venture's, and reads the shared two for real property — naming no rule", () => {
+    const note = interestNote(readInterest(tic(), 4_200_000)!);
+    expect(note).toContain(
+      "TENANCY-IN-COMMON TRAPS, asked by name where the OM gives the inputs: (a) UNANIMITY — ask what the TIC agreement makes every co-owner approve: a sale, a lease, a refinancing, the manager; (b) PARTITION — ask whether each co-owner keeps a right to partition the property, and whether it has been waived to the lender; (c) THE LOAN — ask whether the property carries a loan, whether the co-owners are its co-borrowers, and whether its lender has consented to this transfer; (d) THE MANAGER AND ITS FEES — ask who manages the property under the TIC agreement, and what it is paid; (e) THE EXIT — ask whether the co-owners hold a right of first refusal on this interest, and whether the agreement carries a buy-sell.",
+    );
+    expect(note).toContain(
+      "the sale transfers real property — an undivided share of the title, not an interest in an entity — so whether it reassesses the property or this share of it, and whether it carries a transfer tax on the share, is the jurisdiction's rule to say, never assumed either way.",
+    );
+    expect(note).toContain("The insurance is the co-owners' policy on the whole building");
+    expect(note).not.toMatch(/PARTIAL-INTEREST TRAPS|WATERFALL|CAPITAL CALLS|owning entity keeps the property|interest in the entity that owns it/);
+    // Questions, never a statute, a procedure or a ruling.
+    expect(note).not.toMatch(/Rev\.|Revenue Procedure|Revenue Ruling|U\.S\.C|§|\bSection\b|\bIRC\b|2002-22/);
+    expect(gluedWords(note)).toEqual([]);
+  });
+
+  it("names a loan the memorandum states as the property's, never an entity's", () => {
+    const e = tic({}, [row("Entity loan balance", "$9,000,000")]);
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.leadSentences[0]).toBe(
+      "This memorandum sells an undivided 30% of the property itself, held as a tenant in common beside its co-owners — title to real estate, not a share of an entity: $4.2M for the interest is $14.0M grossed up — the equity's whole, not the asset's, since the stated $9.0M loan on the property sits on top of it, and the screen sets the whole building's income against the $14.0M alone.",
+    );
+    expect(interestShortLine(r)).toBe(
+      "An undivided 30% interest in the property, held as a tenant in common — $4.2M for the interest is $14.0M for the equity's whole; the stated $9.0M loan on the property sits on top of it",
+    );
+    expect(r.modelCaveat).toContain("the stated $9.0M loan on the property sits on top of it, and the model neither adds it to the price nor carries it");
+    expect(interestNote(r)).toContain("(c) THE LOAN — ask whether the co-owners are co-borrowers on the stated $9.0M loan on the property, and whether its lender has consented to this transfer;");
+    const d = deriveUnderwriteInputs(e, "x");
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's $4,200,000 for an undivided 30% interest held as a tenant in common, grossed up to $14,000,000 — the equity's whole, not the asset's: the stated $9,000,000 loan on the property sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the $14,000,000 instead; the model runs the whole building's cash flows, and the interest earns 30% of them before any fee the co-owners' agreement pays its manager",
+    );
+    expect(d.meta.priceLabel).toBe("Equity's Whole (30% TIC interest grossed up)");
+    expect(d.meta.interest?.basisWithheld?.why).toBe(
+      "the interest's price grossed up is the equity's whole, with the loan on the property on top of it, not the building's price",
+    );
+    const said = `${r.headline} ${r.modelCaveat} ${interestShortLine(r)} ${d.sources.purchasePrice?.note}`;
+    expect(said).not.toMatch(/entity's|owning entity/);
+    expect(gluedWords(said)).toEqual([]);
+  });
+
+  it("says a percentage not stated as the interest's, never a share of an entity's", () => {
+    const e = tic({ share: "", summary: "An undivided interest held as tenants in common with three co-owners" });
+    const r = readInterest(e, askingPriceOf(e))!;
+    expect(r.sharePct).toBeNull();
+    expect(r.leadSentences[0]).toBe(
+      "This memorandum sells an undivided interest in the property itself, held as a tenant in common beside its co-owners — title to real estate, not a share of an entity — and states no single percentage for it: the whole building's income cannot be set against the interest's price until its share is known.",
+    );
+    expect(interestShortLine(r)).toBe("An undivided interest in the property, held as a tenant in common, its percentage not stated");
+    expect(deriveUnderwriteInputs(e, "x").sources.purchasePrice?.note).toBe(
+      "The OM's price for an UNDIVIDED INTEREST held as a tenant in common that states no single percentage — the model cannot gross it up, so its returns are not the interest's",
+    );
+  });
+
+  it("runs the model at the whole as before, its note saying what the price buys", () => {
+    const d = deriveUnderwriteInputs(tic(), "x");
+    expect(d.inputs.purchasePrice).toBe(14_000_000);
+    expect(d.sources.purchasePrice?.note).toBe(
+      "The OM's $4,200,000 for an undivided 30% interest held as a tenant in common, grossed up to the whole asset — the model runs the whole building's cash flows; the interest earns 30% of them before any fee the co-owners' agreement pays its manager",
+    );
+    expect(d.meta.priceLabel).toBe("Whole Price (30% TIC interest grossed up)");
+    expect(d.meta.interest?.line).toBe("An undivided 30% interest in the property, held as a tenant in common — $4.2M for the interest is $14.0M for the whole");
+  });
+});
+
+// Research pass 37: a Delaware statutory trust's sponsor-affiliate master
+// tenant, its load and its trustee's limits were asked nowhere.
+describe("a Delaware statutory trust's beneficial interests are asked their own questions beside a share's", () => {
+  const dst = (over: Partial<ExtractedInterest> = {}): ExtractionResult =>
+    ex(
+      interest({
+        kind: "partial_interest",
+        summary:
+          "Beneficial interests in a Delaware statutory trust that owns the property; 100% of the beneficial interests offered to accredited investors, minimum investment 100,000; property master leased to an affiliate of the sponsor",
+        share: "100% of the beneficial interests",
+        ...over,
+      }),
+    );
+
+  it("keeps the share's list and adds the trust's, as questions naming no ruling", () => {
+    const e = dst();
+    expect(shareHoldingOf(e)).toBe("dst");
+    const note = interestNote(readInterest(e, askingPriceOf(e))!);
+    expect(note).toContain("(a) THE PRICE IS FOR ALL OF THE ENTITY'S INTERESTS");
+    expect(note).toContain(
+      "DELAWARE STATUTORY TRUST TRAPS, asked by name where the OM gives the inputs: (a) WHAT THE TRUSTEE MAY NOT DO — ask for the trust agreement's limits on the trustee — on new capital, on refinancing, on new or renegotiated leases — as stated; (b) THE MASTER TENANT — ask whether the property is master leased and whether the master tenant is the sponsor's affiliate, and where it is master leased, read what the investors earn as the master lease rent, not the property's NOI, each as stated; (c) THE LOAD — ask for the offering costs and fees between the investor's cheque and the property, as stated; (d) THE SPRINGING LLC — ask whether the trust agreement provides for converting the trust to a limited liability company, and when that applies, as stated.",
+    );
+    expect(note).not.toMatch(/Rev\.|Revenue Ruling|Revenue Procedure|2004-86|§/);
+    expect(gluedWords(note)).toEqual([]);
+    // Named by "DST" or a trust's words alone, and never a tenancy in common.
+    expect(isDst(dst({ summary: "Interests in the Harbor View DST", share: "100%" }))).toBe(true);
+    expect(isTenancyInCommon(dst({ summary: "A DST or, at the investor's election, an undivided TIC interest" }))).toBe(false);
+    // A share of no trust asks the share's questions alone.
+    const lp = ex(interest({ kind: "partial_interest", share: "49% LP interest" }));
+    expect(interestNote(readInterest(lp, 20_000_000)!)).not.toContain("DELAWARE STATUTORY TRUST TRAPS");
   });
 });

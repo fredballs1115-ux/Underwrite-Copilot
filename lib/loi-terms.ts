@@ -55,7 +55,7 @@
 
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { inferStrategy, isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
-import { interestOf, readInterest } from "@/lib/interest";
+import { interestOf, isTenancyInCommon, readInterest } from "@/lib/interest";
 import { readSale, statesStalkingHorse } from "@/lib/sale-terms";
 import { readPortfolio } from "@/lib/portfolio";
 import { hotelSaleFacts, readHotelDeal } from "@/lib/hotel-deal";
@@ -105,7 +105,10 @@ export interface LoiTerms {
 function refusalOf(ex: ExtractionResult | null | undefined): LoiRefusalKind | null {
   const { kind } = interestOf(ex);
   if (kind === "note") return "note";
-  if (kind === "partial_interest") return "share";
+  // An undivided interest held as a tenant in common is the real estate's,
+  // never an entity's share (research pass 37) — still not the whole
+  // property this draft buys.
+  if (kind === "partial_interest") return isTenancyInCommon(ex) ? "tic" : "share";
   // A preferred equity position, its own kind or a share whose rows say one
   // (lib/interest `interestOf`).
   if (kind === "preferred_equity") return "position";

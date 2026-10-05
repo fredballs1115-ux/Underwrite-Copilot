@@ -38,6 +38,20 @@ describe("the buy box's 1031 exchange against a deal (lib/exchange-window)", () 
     expect(note).toMatchObject({ tag: "1031: note — ask counsel", tone: "muted" });
     const share = exchangeForDeal(BLOCK, deal([], { kind: "partial_interest", summary: "", share: "49% LP interest", groundLease: "", loan: "", page: "" }), null, TODAY)!;
     expect(share).toMatchObject({ tag: "1031: share — ask counsel", tone: "muted" });
+    // An undivided interest held as a tenant in common, read off the
+    // interest's own words (research pass 37): the real estate's, asked as
+    // such, never "a share of the owning entity".
+    const tic = exchangeForDeal(
+      BLOCK,
+      deal([], { kind: "partial_interest", summary: "An undivided 30% tenant-in-common interest in the fee simple", share: "30% tenant-in-common interest", groundLease: "", loan: "", page: "" }),
+      null,
+      TODAY,
+    )!;
+    expect(tic).toMatchObject({ tag: "1031: TIC — ask counsel", tone: "muted" });
+    expect(tic.line).toBe(
+      "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; the price buys an undivided interest in the real estate, held as a tenant in common; whether the co-ownership counts as real property or as a partnership interest is a question for your exchange counsel",
+    );
+    expect(tic.line).not.toContain("owning entity");
     // A preferred equity position, its own kind or a share filed before the
     // kind was asked whose rows say one (lib/interest `interestOf`).
     const position = exchangeForDeal(BLOCK, deal([], { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "" }), null, TODAY)!;
