@@ -6612,6 +6612,357 @@
           "note": "Pittsfield, MA — Protophobic, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37237349944)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:29420",
+      "city": "Lake Havasu City, Arizona",
+      "area": "Lake Havasu City-Kingman, AZ",
+      "wikipedia": [
+        "Lake Havasu City, Arizona",
+        "London Bridge (Lake Havasu City)",
+        "Kingman, Arizona"
+      ],
+      "categories": [
+        "London Bridge (Lake Havasu City)",
+        "Lake Havasu",
+        "Lake Havasu City, Arizona"
+      ],
+      "queries": [
+        "Lake Havasu City London Bridge",
+        "Lake Havasu City skyline",
+        "Lake Havasu aerial"
+      ]
+    },
+    {
+      "metroId": "cbsa:26300",
+      "city": "Hot Springs, Arkansas",
+      "area": "Hot Springs, AR",
+      "wikipedia": [
+        "Hot Springs, Arkansas",
+        "Bathhouse Row",
+        "Hot Springs National Park"
+      ],
+      "categories": [
+        "Bathhouse Row",
+        "Views of Hot Springs, Arkansas",
+        "Hot Springs, Arkansas"
+      ],
+      "queries": [
+        "Hot Springs Arkansas Bathhouse Row",
+        "Hot Springs Arkansas downtown",
+        "Hot Springs Arkansas skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:16180",
+      "city": "Carson City, Nevada",
+      "area": "Carson City, NV",
+      "wikipedia": [
+        "Carson City, Nevada",
+        "Nevada State Capitol"
+      ],
+      "categories": [
+        "Nevada State Capitol",
+        "Views of Carson City, Nevada",
+        "Carson City, Nevada"
+      ],
+      "queries": [
+        "Carson City Nevada downtown",
+        "Carson City Nevada skyline",
+        "Carson City Nevada capitol"
+      ]
+    },
+    {
+      "metroId": "cbsa:25740",
+      "city": "Helena, Montana",
+      "area": "Helena, MT",
+      "wikipedia": [
+        "Helena, Montana",
+        "Last Chance Gulch",
+        "Montana State Capitol"
+      ],
+      "categories": [
+        "Views of Helena, Montana",
+        "Last Chance Gulch",
+        "Helena, Montana"
+      ],
+      "queries": [
+        "Helena Montana skyline",
+        "Helena Montana downtown",
+        "Helena Montana cathedral"
+      ]
+    },
+    {
+      "metroId": "cbsa:24500",
+      "city": "Great Falls, Montana",
+      "area": "Great Falls, MT",
+      "wikipedia": [
+        "Great Falls, Montana",
+        "Great Falls of the Missouri River"
+      ],
+      "categories": [
+        "Views of Great Falls, Montana",
+        "Great Falls of the Missouri River",
+        "Great Falls, Montana"
+      ],
+      "queries": [
+        "Great Falls Montana skyline",
+        "Great Falls Montana downtown",
+        "Great Falls Montana Missouri River"
+      ]
+    },
+    {
+      "metroId": "cbsa:16220",
+      "city": "Casper, Wyoming",
+      "area": "Casper, WY",
+      "wikipedia": [
+        "Casper, Wyoming",
+        "Casper Mountain"
+      ],
+      "categories": [
+        "Views of Casper, Wyoming",
+        "Downtown Casper, Wyoming",
+        "Casper, Wyoming"
+      ],
+      "queries": [
+        "Casper Wyoming downtown",
+        "Casper Wyoming skyline",
+        "Casper Wyoming North Platte River"
+      ]
+    },
+    {
+      "metroId": "cbsa:12620",
+      "city": "Bangor, Maine",
+      "area": "Bangor, ME",
+      "wikipedia": [
+        "Bangor, Maine",
+        "Penobscot River"
+      ],
+      "categories": [
+        "Views of Bangor, Maine",
+        "Downtown Bangor, Maine",
+        "Bangor, Maine"
+      ],
+      "queries": [
+        "Bangor Maine downtown",
+        "Bangor Maine Penobscot River",
+        "Bangor Maine skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:24020",
+      "city": "Glens Falls, New York",
+      "area": "Glens Falls, NY",
+      "wikipedia": [
+        "Glens Falls, New York",
+        "Lake George (New York)",
+        "Lake George, New York"
+      ],
+      "categories": [
+        "Views of Glens Falls, New York",
+        "Lake George (New York)",
+        "Glens Falls, New York"
+      ],
+      "queries": [
+        "Glens Falls New York downtown",
+        "Lake George New York",
+        "Glens Falls Hudson River"
+      ]
+    },
+    {
+      "metroId": "cbsa:11200",
+      "city": "Northampton, Massachusetts",
+      "area": "Amherst Town-Northampton, MA",
+      "wikipedia": [
+        "Northampton, Massachusetts",
+        "Amherst, Massachusetts",
+        "Mount Holyoke Range"
+      ],
+      "categories": [
+        "Views of Northampton, Massachusetts",
+        "Northampton, Massachusetts",
+        "Amherst, Massachusetts"
+      ],
+      "queries": [
+        "Northampton Massachusetts downtown",
+        "Amherst Massachusetts downtown",
+        "Connecticut River Oxbow from Mount Holyoke"
+      ]
+    },
+    {
+      "metroId": "cbsa:23900",
+      "city": "Gettysburg, Pennsylvania",
+      "area": "Gettysburg, PA",
+      "wikipedia": [
+        "Gettysburg, Pennsylvania",
+        "Gettysburg Battlefield",
+        "Gettysburg National Military Park"
+      ],
+      "categories": [
+        "Gettysburg Battlefield",
+        "Little Round Top",
+        "Gettysburg, Pennsylvania"
+      ],
+      "queries": [
+        "Gettysburg battlefield panorama",
+        "Gettysburg Pennsylvania downtown",
+        "view from Little Round Top Gettysburg"
+      ]
+    },
+    {
+      "metroId": "cbsa:20220",
+      "city": "Dubuque, Iowa",
+      "area": "Dubuque, IA",
+      "wikipedia": [
+        "Dubuque, Iowa",
+        "Fenelon Place Elevator"
+      ],
+      "categories": [
+        "Views of Dubuque, Iowa",
+        "Fenelon Place Elevator",
+        "Dubuque, Iowa"
+      ],
+      "queries": [
+        "Dubuque Iowa skyline",
+        "Dubuque Iowa downtown",
+        "Dubuque Iowa Mississippi River"
+      ]
+    },
+    {
+      "metroId": "cbsa:29100",
+      "city": "La Crosse, Wisconsin",
+      "area": "La Crosse-Onalaska, WI-MN",
+      "wikipedia": [
+        "La Crosse, Wisconsin",
+        "Grandad Bluff",
+        "Onalaska, Wisconsin"
+      ],
+      "categories": [
+        "Grandad Bluff",
+        "Views of La Crosse, Wisconsin",
+        "La Crosse, Wisconsin"
+      ],
+      "queries": [
+        "La Crosse Wisconsin skyline",
+        "La Crosse from Grandad Bluff",
+        "La Crosse Wisconsin downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:15260",
+      "city": "Brunswick, Georgia",
+      "area": "Brunswick-St. Simons, GA",
+      "wikipedia": [
+        "Brunswick, Georgia",
+        "St. Simons, Georgia",
+        "Jekyll Island"
+      ],
+      "categories": [
+        "St. Simons Island",
+        "Sidney Lanier Bridge",
+        "Jekyll Island",
+        "Brunswick, Georgia"
+      ],
+      "queries": [
+        "St. Simons Island Georgia",
+        "Brunswick Georgia downtown",
+        "Jekyll Island Driftwood Beach"
+      ]
+    },
+    {
+      "metroId": "cbsa:27620",
+      "city": "Jefferson City, Missouri",
+      "area": "Jefferson City, MO",
+      "wikipedia": [
+        "Jefferson City, Missouri",
+        "Missouri State Capitol"
+      ],
+      "categories": [
+        "Missouri State Capitol",
+        "Views of Jefferson City, Missouri",
+        "Jefferson City, Missouri"
+      ],
+      "queries": [
+        "Jefferson City Missouri skyline",
+        "Jefferson City Missouri River capitol",
+        "Jefferson City Missouri downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:22900",
+      "city": "Fort Smith, Arkansas",
+      "area": "Fort Smith, AR-OK",
+      "wikipedia": [
+        "Fort Smith, Arkansas",
+        "Fort Smith National Historic Site"
+      ],
+      "categories": [
+        "Views of Fort Smith, Arkansas",
+        "Downtown Fort Smith, Arkansas",
+        "Fort Smith, Arkansas"
+      ],
+      "queries": [
+        "Fort Smith Arkansas skyline",
+        "Fort Smith Arkansas downtown",
+        "Fort Smith Arkansas River"
+      ]
+    },
+    {
+      "metroId": "cbsa:21820",
+      "city": "Fairbanks, Alaska",
+      "area": "Fairbanks-College, AK",
+      "wikipedia": [
+        "Fairbanks, Alaska",
+        "Chena River"
+      ],
+      "categories": [
+        "Views of Fairbanks, Alaska",
+        "Downtown Fairbanks, Alaska",
+        "Fairbanks, Alaska"
+      ],
+      "queries": [
+        "Fairbanks Alaska downtown",
+        "Fairbanks Alaska skyline",
+        "Fairbanks Alaska Chena River"
+      ]
+    },
+    {
+      "metroId": "cbsa:18700",
+      "city": "Corvallis, Oregon",
+      "area": "Corvallis, OR",
+      "wikipedia": [
+        "Corvallis, Oregon",
+        "Marys Peak"
+      ],
+      "categories": [
+        "Views of Corvallis, Oregon",
+        "Downtown Corvallis, Oregon",
+        "Corvallis, Oregon"
+      ],
+      "queries": [
+        "Corvallis Oregon downtown",
+        "Corvallis Oregon Willamette River",
+        "Corvallis Oregon skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:20740",
+      "city": "Eau Claire, Wisconsin",
+      "area": "Eau Claire, WI",
+      "wikipedia": [
+        "Eau Claire, Wisconsin",
+        "Chippewa River (Wisconsin)"
+      ],
+      "categories": [
+        "Views of Eau Claire, Wisconsin",
+        "Downtown Eau Claire, Wisconsin",
+        "Eau Claire, Wisconsin"
+      ],
+      "queries": [
+        "Eau Claire Wisconsin downtown",
+        "Eau Claire Wisconsin skyline",
+        "Eau Claire Wisconsin river"
+      ]
     }
   ]
 }
