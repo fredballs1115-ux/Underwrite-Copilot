@@ -136,6 +136,7 @@ export function DemoSections({ data, initialTab = "verdict" }: { data: DemoData;
             result={data.challenges}
             dealName="The Maddox at Brewerytown"
             totalPages={data.extraction.totalPages ?? null}
+            sample
           />
         )}
         {tab === "comps" && (

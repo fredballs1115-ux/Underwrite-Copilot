@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
 import { placedByClause } from "@/lib/placed-by";
+import { stressTestTitle } from "@/lib/stress-test-title";
 import { currentBriefLine } from "@/lib/permit-split";
 import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { liveReadFailedLine } from "@/lib/market-read-failed";
@@ -708,11 +709,15 @@ export function ChallengerView({
   result,
   dealName,
   totalPages = null,
+  sample = false,
 }: {
   result: ChallengerResult;
   dealName?: string;
   /** the memorandum's own length: a cited page past it is never sent */
   totalPages?: number | null;
+  /** the sample deal: its stress test's figures are the first-draft
+   *  model's, and the heading says so (lib/stress-test-title) */
+  sample?: boolean;
 }) {
   const ordered = [...(result.challenges ?? [])].sort(
     (a, b) => SEV[a.severity].rank - SEV[b.severity].rank,
@@ -743,7 +748,10 @@ export function ChallengerView({
         <div className="mt-3 rounded-xl border border-line bg-paper p-4">
           <div className="flex items-center gap-2 text-brand">
             <IconActivity className="h-4 w-4" />
-            <p className="text-sm font-medium text-ink">Stress test</p>
+            {/* Whose figures they are, as the full report heads them: the
+                challenger's estimate, or the sample's first-draft model's
+                (research pass 40, M8). */}
+            <p className="text-sm font-medium text-ink" data-qa="stress-test-title">{stressTestTitle(sample)}</p>
           </div>
           <p className="mt-1.5 text-sm leading-relaxed text-muted">
             {result.stressTest}

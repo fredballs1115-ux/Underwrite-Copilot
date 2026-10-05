@@ -1040,6 +1040,7 @@ export function DealView({
             omUrl={omUrl}
             marketSince={marketSince}
             metroDemand={metroDemand}
+            isSample={isSample}
             staleVerdict={staleResults.includes("verdict")}
             staleWhy={staleWhy}
             compSubject={subjectBasis(
@@ -1516,6 +1517,7 @@ function AnalysesPanel({
   compSubject = null,
   marketSince = null,
   metroDemand = null,
+  isSample = false,
 }: {
   analysis: AnalysisKey;
   onSelect: (key: AnalysisKey) => void;
@@ -1546,6 +1548,9 @@ function AnalysesPanel({
   marketSince?: BriefDelta | null;
   /** the metro area's payrolls by sector today (lib/metro-demand) */
   metroDemand?: MetroDemand | null;
+  /** the sample deal: its stress test is the first-draft model's run, and
+   *  the challenger's heading says so (lib/stress-test-title) */
+  isSample?: boolean;
 }) {
   const STEP_FOR: Record<AnalysisKey, string> = {
     verdict: "verdict",
@@ -1605,6 +1610,7 @@ function AnalysesPanel({
           result={results.challenges!}
           dealName={dealName}
           totalPages={results.extraction?.totalPages ?? null}
+          sample={isSample}
         />
       ) : analysis === "comps" ? (
         <BrokerComps

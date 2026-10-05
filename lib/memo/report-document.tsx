@@ -91,6 +91,7 @@ import { gapDisagreementLine, gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
 import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
 import { liveReadFailedLine } from "@/lib/market-read-failed";
+import { stressTestTitle } from "@/lib/stress-test-title";
 
 const C = {
   brand: "#114e54",
@@ -985,6 +986,11 @@ function CallInFullPage({
 export interface ReportInput {
   deal: DealRow;
   memo: MemoData;
+  /** the sample deal, where the row cannot say so (the public demo builds
+   *  its row by hand): its stress test is the first-draft model's run, and
+   *  the challenger page's heading says so (lib/stress-test-title). A row
+   *  marked `is_sample` says it too. */
+  sample?: boolean;
   /** the sensitivity page's data (Feature 5): both grids, the buyer-hurdle
    *  color scale, the takeaway, and the max bid; null when the deal has no
    *  extraction to derive a model from */
@@ -2548,10 +2554,12 @@ export function ReportDocument({
             </View>
           ))}
           {/* The challenger estimates what reverting an assumption does to
-              the returns without running the engine; the box says so. */}
+              the returns without running the engine; the box says so — and
+              on the sample, whose sentence is the first-draft model's run,
+              says that (research pass 40, M8; lib/stress-test-title). */}
           {str(challenges?.stressTest) ? (
             <View style={s.summaryBox} wrap={false}>
-              <Text style={[s.headText, { marginBottom: 3 }]}>Stress test — the screen&apos;s estimate, not the model&apos;s</Text>
+              <Text style={[s.headText, { marginBottom: 3 }]}>{stressTestTitle(input.sample === true || (deal as { is_sample?: boolean }).is_sample === true)}</Text>
               <Text style={s.summaryText}>{str(challenges?.stressTest)}</Text>
             </View>
           ) : null}

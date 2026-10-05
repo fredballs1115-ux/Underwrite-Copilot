@@ -60,7 +60,9 @@ function getSampleReport(dateStr: string): Promise<Buffer> {
     provenance: derived.sources.exitCapPct?.provenance ?? "assumption",
   });
 
-  const input = buildReportData(deal, dateStr, checks, sensitivity, undefined, plan);
+  // The sample: its stress test is the first-draft model's run, which the
+  // challenger page's heading says (lib/stress-test-title).
+  const input = { ...buildReportData(deal, dateStr, checks, sensitivity, undefined, plan), sample: true };
   const next = {
     dateStr,
     pdf: renderReportPdf(input).catch((err) => {
