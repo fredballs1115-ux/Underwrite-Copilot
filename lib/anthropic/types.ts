@@ -374,7 +374,7 @@ export interface ExtractedAffordability {
   page: string;
 }
 
-export type InterestKind = "fee_simple" | "leasehold" | "leased_fee" | "note" | "partial_interest" | "unknown";
+export type InterestKind = "fee_simple" | "leasehold" | "leased_fee" | "note" | "partial_interest" | "preferred_equity" | "unknown";
 
 export interface ExtractedInterest {
   kind: InterestKind;

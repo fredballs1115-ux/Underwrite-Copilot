@@ -117,9 +117,10 @@ export interface PipelineExportRow {
    *  on a note (`capWithheld`) */
   cap: string | null;
   /** "note" where the going-in cap is withheld because the price is a
-   *  loan's: the collateral's income over it is a cap nobody earns
-   *  (lib/compare-interest `noteCapSlot`) — the cell says "n/a — note" */
-  capWithheld?: "note" | null;
+   *  loan's: the collateral's income over it is a cap nobody earns; and
+   *  "position" where it is a preferred equity position's (lib/compare-
+   *  interest `noteCapSlot`) — the cell says "n/a — note" or "n/a — position" */
+  capWithheld?: "note" | "position" | null;
   /** a plan deal's stabilized NOI over total cost, e.g. "11.7%" */
   yieldOnCost: string | null;
   fit: "fits" | "near" | "outside" | null;
@@ -324,7 +325,7 @@ export async function buildPipelineWorkbook(
         capCell.value = capNum / 100;
         capCell.numFmt = PCT2;
       } else {
-        capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : d.capWithheld === "note" ? "n/a — note" : "—");
+        capCell.value = d.cap ?? (d.planDeal ? "n/a — plan" : d.capWithheld ? `n/a — ${d.capWithheld}` : "—");
       }
       capCell.font = baseFont;
       capCell.alignment = { horizontal: "right" };

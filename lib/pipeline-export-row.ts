@@ -144,7 +144,7 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // note (its collateral's cap is not the buyer's figure, and the cell
     // says the cap is withheld).
     cap: extraction ? statedCapSlot(extraction, plan != null) : null,
-    capWithheld: extraction && !plan && noteCapSlot(extraction) ? "note" : null,
+    capWithheld: extraction && !plan ? (noteCapSlot(extraction)?.of ?? null) : null,
     yieldOnCost: plan?.yieldOnCost != null ? `${(plan.yieldOnCost * 100).toFixed(1)}%` : null,
     fit,
     // Judged on the first signal alone until the extraction lands, as the

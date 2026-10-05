@@ -23,6 +23,12 @@
 //   loan its entity carries, the share grossed up is the equity's whole, no
 //   building's price: no cap is struck and the returns are withheld.
 //
+//   A PREFERRED EQUITY POSITION HAS NO CAP EITHER (lib/position). Its price
+//   buys a rate and a redemption, never a slice of the building: the cap row
+//   says its yield to redemption at its price — only where its redemption
+//   date has not gone by — and the model's returns are withheld as the
+//   building's, bought outright, not the position's.
+//
 //   EVERYTHING ELSE STANDS. A leasehold's and a leased fee's model runs at
 //   what the price buys (the lease's building, the land's rent), and the
 //   price row says which, with the years to the lease's end.
@@ -52,12 +58,24 @@ export interface CompareInterest {
    *  which has none, and on a share with no stated percentage or beside the
    *  loan its entity carries (`buildingPriceOf` has no building's price) */
   cap: number | null;
-  /** a note's yield to maturity at its price, percent, where it pays or
-   *  may; null otherwise */
+  /** the buyer's own yield at the price, percent: a note's to maturity
+   *  where it pays or may, a preferred equity position's to redemption
+   *  where the date has not gone by; null otherwise */
   noteYtmPct: number | null;
   /** why the model's returns are withheld; null where they stand */
-  withheld: "note" | "share" | null;
+  withheld: "note" | "share" | "position" | null;
 }
+
+/** What has a yield of its own in the cap slot, where the price buys no
+ *  building's cap: a note, a preferred equity position. */
+export type OwnYield = "note" | "position";
+
+/** The words each says in a cap slot: the yield's label, the end it runs
+ *  to, and the slot where no yield can be stated. */
+export const OWN_YIELD_WORDS: Record<OwnYield, { label: string; to: string; na: string }> = {
+  note: { label: "Yield to maturity", to: "to maturity", na: "n/a — note" },
+  position: { label: "Yield to redemption", to: "to redemption", na: "n/a — position" },
+};
 
 /** How near the model's price must be to the whole's for its returns to be
  *  the whole asset's rather than a share's price against a building. */
@@ -77,6 +95,11 @@ export function compareInterest(
     const n = readInterest(ex, askingPriceOf(ex), asOf)?.note ?? null;
     const pays = n != null && !n.matured && n.terms.status !== "non_performing";
     return { tag, cap: null, noteYtmPct: pays ? n.ytmPct : null, withheld: "note" };
+  }
+
+  if (kind === "preferred_equity") {
+    const p = readInterest(ex, askingPriceOf(ex), asOf)?.position ?? null;
+    return { tag, cap: null, noteYtmPct: p && !p.redeemedPast ? p.yieldPct : null, withheld: "position" };
   }
 
   if (kind === "partial_interest") {
@@ -113,16 +136,18 @@ export function modelReturnsRead(
   const line =
     ci.withheld === "note"
       ? "A note's price is a loan's: this model runs the collateral as if bought outright at it, so its cap and returns are the collateral's, not the note's, and are withheld."
-      : ci.withheld === "share"
-        ? ci.cap != null
-          ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
-          : interestOf(ex).entityLoan != null
-            ? isWholeShare(interestOf(ex).sharePct)
-              ? // All of the entity's interests (a stated 100%, research pass 28).
-                "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
-              : "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
-            : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
-        : null;
+      : ci.withheld === "position"
+        ? "A preferred equity position's price is a position's: this model runs the whole building as if bought outright at it, so its cap and returns are the building's, not the position's, and are withheld."
+        : ci.withheld === "share"
+          ? ci.cap != null
+            ? "A share's price is for the share: this model ran the whole building's cash flows at it rather than at the whole the price implies, so its returns are withheld, and the cap is struck on that whole."
+            : interestOf(ex).entityLoan != null
+              ? isWholeShare(interestOf(ex).sharePct)
+                ? // All of the entity's interests (a stated 100%, research pass 28).
+                  "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                : "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+              : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+          : null;
   return { ...ci, share: !!ex && interestOf(ex).kind === "partial_interest", line };
 }
 
@@ -137,9 +162,11 @@ export function modelReturnsRead(
 export function noteCapSlot(
   ex: ExtractionResult | null | undefined,
   asOf: Date = new Date(),
-): { ytmPct: number | null } | null {
-  if (!ex || interestOf(ex).kind !== "note") return null;
-  return { ytmPct: compareInterest(ex, null, asOf).noteYtmPct };
+): { ytmPct: number | null; of: OwnYield } | null {
+  if (!ex) return null;
+  const kind = interestOf(ex).kind;
+  if (kind !== "note" && kind !== "preferred_equity") return null;
+  return { ytmPct: compareInterest(ex, null, asOf).noteYtmPct, of: kind === "note" ? "note" : "position" };
 }
 
 /**
@@ -153,9 +180,10 @@ export function goingInCapFigure(
   statedCap: string | null,
   asOf: Date = new Date(),
 ): { label: string; value: string | null } {
-  const note = noteCapSlot(ex, asOf);
-  if (!note) return { label: "Going-in cap", value: statedCap };
-  return note.ytmPct != null
-    ? { label: "Yield to maturity", value: `${note.ytmPct.toFixed(1)}%` }
-    : { label: "Going-in cap", value: "n/a — note" };
+  const own = noteCapSlot(ex, asOf);
+  if (!own) return { label: "Going-in cap", value: statedCap };
+  const words = OWN_YIELD_WORDS[own.of];
+  return own.ytmPct != null
+    ? { label: words.label, value: `${own.ytmPct.toFixed(1)}%` }
+    : { label: "Going-in cap", value: words.na };
 }

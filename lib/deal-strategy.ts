@@ -622,7 +622,9 @@ export function buildingPriceOf(
 ): number | null {
   if (price == null || !(price > 0)) return null;
   const { kind, sharePct, entityLoan } = interestOf(extraction);
-  if (kind === "note" || kind === "leased_fee") return null;
+  // A preferred equity position's price buys a rate and a redemption, never
+  // a slice of the building (lib/position): no building basis is struck on it.
+  if (kind === "note" || kind === "leased_fee" || kind === "preferred_equity") return null;
   if (kind === "partial_interest") return sharePct != null && entityLoan == null ? price / (sharePct / 100) : null;
   return price;
 }
@@ -633,7 +635,7 @@ export function buildingPriceOf(
  *  (the collateral's, the land's, the whole's or the share's). */
 export function statedBasisIsBuildings(extraction: ExtractionResult | null | undefined): boolean {
   const { kind } = interestOf(extraction);
-  return kind !== "note" && kind !== "leased_fee" && kind !== "partial_interest";
+  return kind !== "note" && kind !== "leased_fee" && kind !== "partial_interest" && kind !== "preferred_equity";
 }
 
 // An outdoor-storage yard's words: industrial outdoor storage, a truck
@@ -961,9 +963,11 @@ export function planSummary(
       ? null
       : interest.kind === "note"
         ? `${money(stated)} for the note — a loan's price, not the project's`
-        : interest.kind === "leased_fee"
-          ? `${money(stated)} for the land under the ground lease — not the project's`
-          : `${money(stated)} for a share of no stated percentage — not the whole project's`;
+        : interest.kind === "preferred_equity"
+          ? `${money(stated)} for the preferred equity position — a position's price, not the project's`
+          : interest.kind === "leased_fee"
+            ? `${money(stated)} for the land under the ground lease — not the project's`
+            : `${money(stated)} for a share of no stated percentage — not the whole project's`;
   // A leased fee's buyer holds the land: the works and their cost are the
   // leaseholder's, so the plan has no cost or yield of the buyer's to state.
   const landOnly = interest.kind === "leased_fee";
@@ -1069,7 +1073,9 @@ export function assessPlausibility(
   // said so; a share the OM states no single percentage for is not
   // compared at all.
   const interest = interestOf(extraction);
-  if (interest.kind === "note") return [];
+  // A preferred equity position's price is a position's, as a note's is a
+  // loan's: no price finding (lib/position).
+  if (interest.kind === "note" || interest.kind === "preferred_equity") return [];
   if (interest.kind === "partial_interest" && interest.sharePct == null) return [];
   const price = interest.sharePct != null ? stated / (interest.sharePct / 100) : stated;
   // Beside the entity's stated loan, what a share's price grosses up to is

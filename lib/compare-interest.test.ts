@@ -100,7 +100,7 @@ describe("a note's going-in cap slot, wherever the deal is summarized", () => {
     const slot = noteCapSlot(note, AS_OF);
     expect(slot?.ytmPct).toBe(compareInterest(note, null, AS_OF).noteYtmPct);
     expect(slot?.ytmPct).not.toBeNull();
-    expect(noteCapSlot(npl, AS_OF)).toEqual({ ytmPct: null });
+    expect(noteCapSlot(npl, AS_OF)).toEqual({ ytmPct: null, of: "note" });
     // Anything but a note keeps its cap slot.
     expect(noteCapSlot(deal(undefined, terms), AS_OF)).toBeNull();
     expect(noteCapSlot(deal({ ...blank, kind: "leasehold" }, terms), AS_OF)).toBeNull();

@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import {
+  ACCRUAL_ROW,
+  CURRENT_PAY_ROW,
+  EXTENSION_ROW,
+  PREF_AMOUNT_ROW,
+  PREF_RETURN_ROW,
+  REDEMPTION_ROW,
+  REMEDIES_ROW,
+  SENIOR_BALANCE_ROW,
+  SENIOR_MATURITY_ROW,
+  VALUE_ROW,
   isPreferredEquity,
   positionModelLine,
   positionNote,
@@ -120,7 +130,12 @@ describe("a preferred equity position, read as a position (research pass 28, rou
   it("is a position only where the memorandum sells one", () => {
     expect(isPreferredEquity(PREF)).toBe(true);
     // Its rows beside a rate are enough before the interest is read.
-    expect(isPreferredEquity(ex(PREF.metrics))).toBe(true);
+    // A share filed before the kind was asked, whose rows say a position.
+    expect(isPreferredEquity(ex(PREF.metrics, "partial_interest"))).toBe(true);
+    // Never a fee simple's rows, nor an extraction that read no interest: a
+    // memorandum can describe a capital stack it does not sell.
+    expect(isPreferredEquity(ex(PREF.metrics, "fee_simple"))).toBe(false);
+    expect(isPreferredEquity(ex(PREF.metrics))).toBe(false);
     expect(isPreferredEquity(ex([metric("Asking price", "$40,000,000")], "partial_interest"))).toBe(false);
     expect(readPosition(ex([metric("Asking price", "$40,000,000")]), 40_000_000, ON)).toBeNull();
   });
@@ -142,5 +157,33 @@ describe("a preferred equity position, read as a position (research pass 28, rou
       "Senior loan balance",
       "Remedies",
     ]);
+  });
+});
+
+// The extraction asks for each row this reads, by the reader's own labels,
+// and files the position as its own kind (lib/interest reads it from there).
+describe("the extraction asks for the rows a position is read from", () => {
+  it("names every row by a label the reader takes, and the kind", async () => {
+    const { extractionInstruction } = await import("./anthropic/prompts");
+    const prompt = extractionInstruction("multifamily");
+    expect(prompt).toContain('"preferred_equity" (a PREFERRED EQUITY position in the owning entity');
+    const rows: [string, RegExp][] = [
+      ["Preferred equity amount", PREF_AMOUNT_ROW],
+      ["Preferred return", PREF_RETURN_ROW],
+      ["Current pay rate", CURRENT_PAY_ROW],
+      ["Accrual rate", ACCRUAL_ROW],
+      ["Mandatory redemption date", REDEMPTION_ROW],
+      ["Senior loan balance", SENIOR_BALANCE_ROW],
+      ["Senior loan maturity", SENIOR_MATURITY_ROW],
+      ["Whole-asset value", VALUE_ROW],
+      ["Extension options", EXTENSION_ROW],
+      ["Remedies", REMEDIES_ROW],
+    ];
+    for (const [label, re] of rows) {
+      expect(prompt, label).toContain(`"${label}"`);
+      expect(re.test(label), label).toBe(true);
+    }
+    // Each label is read by its own row and by no other's.
+    for (const [label, own] of rows) for (const [, re] of rows) if (re !== own) expect(re.test(label), `${label} vs ${re}`).toBe(false);
   });
 });

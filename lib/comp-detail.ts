@@ -151,7 +151,9 @@ export function subjectBasis(
 ): SubjectBasis {
   const none = { perUnit: null, perSf: null };
   if (kind === "conversion" || kind === "development") return none;
-  if (interest?.kind === "note" || interest?.kind === "leased_fee") return none;
+  // A preferred equity position's price buys a rate and a redemption,
+  // nobody's basis (lib/position).
+  if (interest?.kind === "note" || interest?.kind === "leased_fee" || interest?.kind === "preferred_equity") return none;
   if (interest?.kind === "partial_interest" && (interest.sharePct == null || interest.entityLoan != null)) return none;
   const row = findPricedMetric(metrics, kind, screenYear);
   const stated = row ? parsePrice(row.value) : null;

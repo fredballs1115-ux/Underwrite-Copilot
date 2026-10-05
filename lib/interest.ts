@@ -75,6 +75,7 @@ import {
   type LeaseName,
 } from "@/lib/ground-lease-term";
 import { readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
+import { isPreferredEquity, POSITION_TRAPS, positionModelLine, positionTag, readPosition, type PositionRead } from "@/lib/position";
 
 export type { InterestKind };
 
@@ -199,7 +200,11 @@ export function interestOf(ex: ExtractionResult | null | undefined): {
   sharePct: number | null;
   entityLoan: number | null;
 } {
-  const kind = ex?.interest?.kind ?? "fee_simple";
+  // A preferred equity position is its own kind, and so is a share the
+  // extraction filed before that kind was asked whose rows say a position
+  // (lib/position `isPreferredEquity`): its price buys a rate and a
+  // redemption, never a slice of the building.
+  const kind: InterestKind = isPreferredEquity(ex) ? "preferred_equity" : (ex?.interest?.kind ?? "fee_simple");
   const share = kind === "partial_interest";
   return {
     kind,
@@ -366,6 +371,9 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
   switch (kind) {
     case "note":
       return "Note";
+    case "preferred_equity":
+      // "Pref equity, 12% to Jun 2029" — its rate and its redemption.
+      return positionTag(readPosition(ex, null, asOf)) ?? "Pref equity";
     case "partial_interest":
       // A stated 100% buys all of the entity's interests, never "100% share".
       return sharePct != null ? (isWholeShare(sharePct) ? "All entity interests" : `${shareText(sharePct)} share`) : "Share";
@@ -404,6 +412,9 @@ export function dealTypeLabelFor(
   switch (kind) {
     case "note":
       return `${strategyLabel} (the collateral)`;
+    case "preferred_equity":
+      // The strategy is the property's the entity owns, not the position's.
+      return `${strategyLabel} (the entity's property)`;
     case "leased_fee":
       // "(the lessee's wireless tower)": the equipment without its article
       // (research pass 23 left the header naming a building there).
@@ -422,6 +433,7 @@ export const INTEREST_LABEL: Record<InterestKind, string> = {
   leased_fee: "The leased fee — the land under a ground lease",
   note: "A loan secured by the property",
   partial_interest: "A share of the owning entity",
+  preferred_equity: "A preferred equity position in the owning entity",
   unknown: "Not stated",
 };
 
@@ -462,6 +474,11 @@ export interface InterestRead {
    *  terms the OM states (lib/note-yield) — null on every other interest,
    *  or where the OM states no balance */
   note: NoteRead | null;
+  /** a preferred equity position, read as a position (lib/position): its
+   *  terms, its yield to redemption at the price, its cash and accrual, and
+   *  where its first and last dollar sit over the stated value — null on
+   *  every other interest */
+  position: PositionRead | null;
   /** the ground lease as stated ("" if none) — on a leasehold, or a
    *  fee-simple deal with a ground lease on part of the site; on a master
    *  leasehold (`masterLease`), the master lease as stated */
@@ -679,7 +696,7 @@ export function readInterest(
 ): InterestRead | null {
   const it = ex?.interest;
   if (!ex || !it) return null;
-  const kind = it.kind;
+  const kind = interestOf(ex).kind;
   const groundLease = (it.groundLease ?? "").trim();
   const groundRent = groundRentOf(ex);
   const incomeBeforeGroundRent = incomeBeforeGroundRentOf(ex);
@@ -693,6 +710,7 @@ export function readInterest(
   const impliedWhole = sharePct != null && price != null ? price / (sharePct / 100) : null;
   const entityLoan = kind === "partial_interest" ? entityLoanOf(ex) : null;
   const noteTerms = kind === "note" ? readNoteTerms(ex) : null;
+  const position = kind === "preferred_equity" ? readPosition(ex, price, asOf) : null;
   const balance = noteTerms?.balance ?? null;
   const note = noteTerms ? readNote(noteTerms, askingPrice != null && askingPrice > 0 ? askingPrice : null, asOf) : null;
   const discountPct = balance != null && balance > 0 && price != null ? ((balance - price) / balance) * 100 : null;
@@ -733,6 +751,14 @@ export function readInterest(
       }
       modelCaveat =
         "The screening model underwrites the collateral as if it were bought outright at the note's price. That is not the note's return, and its cap rate and IRR are not figures this buyer earns.";
+      break;
+    case "preferred_equity":
+      lead.push(
+        "This memorandum sells a PREFERRED EQUITY position in the owning entity, not the property: capital behind the mortgage and ahead of the common equity, paid a fixed preferred return until the sponsor redeems it — its return is its rate and its redemption, never a slice of the building's cash flows.",
+      );
+      modelCaveat =
+        positionModelLine(position) ??
+        "The property model runs the whole building at the position's price; that is not this position's return, which is its rate and its redemption.";
       break;
     case "partial_interest":
       if (isWholeShare(sharePct)) {
@@ -852,6 +878,7 @@ export function readInterest(
     balance,
     discountPct,
     note,
+    position,
     groundLease,
     masterLease,
     loan,
@@ -860,7 +887,9 @@ export function readInterest(
     groundRentCoverage,
     // A note's figures follow the lead (#416): what it earns, then its
     // cushion — the panel draws both and says the lead alone.
-    headline: [headline, noteYieldSentence(note), noteCollateralSentence(note)].filter(Boolean).join(" "),
+    // A position's read follows its lead the same way: its yield to
+    // redemption, its cash and accrual, its stack (lib/position).
+    headline: [headline, noteYieldSentence(note), noteCollateralSentence(note), ...(position?.sentences ?? [])].filter(Boolean).join(" "),
     lead: headline,
     leadSentences: lead,
     modelCaveat,
@@ -893,6 +922,7 @@ export function interestContextLine(r: InterestRead): string {
  */
 export function interestNote(r: InterestRead): string {
   const traps: Record<InterestKind, string> = {
+    preferred_equity: POSITION_TRAPS,
     note:
       "NOTE TRAPS, checked by name where the OM gives the inputs: (a) THE COLLATERAL IS NOT THE RETURN — the property's cap rate and IRR belong to its owner; underwrite the note's yield on the price paid; (b) THE DISCOUNT IS THE RETURN — on a performing note, the coupon on the price plus the discount accreting to maturity; ask for the payment history; (c) DEFAULT AND FORECLOSURE — a non-performing note is a bet on the time and cost to take the property, which runs by the state's process (judicial or not) and the borrower's resistance; (d) THE DOCUMENTS — guarantees, reserves, the loan agreement's defaults and any intercreditor or participation terms; (e) THE COLLATERAL'S VALUE — the loan-to-value on today's value, not the origination appraisal.",
     partial_interest: `PARTIAL-INTEREST TRAPS, checked by name where the OM gives the inputs: ${
@@ -968,6 +998,8 @@ const MASTER_LEASE_TRAPS =
  * notes. A fee simple and a leasehold keep the traps as written.
  */
 const SHARED_TRAPS_READ: Partial<Record<InterestKind, string>> = {
+  preferred_equity:
+    "THE TWO SHARED TRAPS, read for a preferred equity position in place of the tax reset and the legacy insurance premium as the instruction above words them: the owning entity keeps the property and its own policy, so this buyer takes neither line as a new owner would. Read both as the entity's: whether its taxes are paid and its insurance in force, which reach the position through the sponsor's capacity to pay and the property's value — and whether an investment in the entity resets the assessment is the jurisdiction's change-of-ownership rule to say, never assumed either way.",
   note:
     "THE TWO SHARED TRAPS, read for a note in place of the tax reset and the legacy insurance premium as the instruction above words them: a note's sale transfers no property — the borrower still owns the collateral — so neither the tax reset on a sale nor a new owner's insurance quote applies to this buyer. Read both as the borrower's: whether the collateral's taxes are paid and its insurance in force, which reach the note through the borrower's capacity to pay and the collateral's value. Should the buyer take the property in a foreclosure, its taxes and insurance become the buyer's from then, and whether that transfer resets the assessment is the jurisdiction's rule to say.",
   partial_interest:
@@ -1012,6 +1044,18 @@ export function interestShortLine(r: InterestRead): string {
           ? ` — the ${money(r.askingPrice)} price is ${discountPhrase(r.discountPct)} the ${money(r.balance)} balance${earns}`
           : earns
       }`;
+    }
+    case "preferred_equity": {
+      // Its yield to redemption in a clause, or that the date has gone by.
+      const p = r.position;
+      const earns = !p
+        ? ""
+        : p.redeemedPast
+          ? ", past its redemption date"
+          : p.yieldPct != null && p.terms.redemption && p.price != null
+            ? `, ${pctText(p.yieldPct)} to its ${monthYear(p.terms.redemption)} redemption at the ${money(p.price)} price`
+            : "";
+      return `A preferred equity position in the owning entity, not the property${earns}`;
     }
     case "partial_interest":
       // All of the entity's interests: the price is the whole's (research

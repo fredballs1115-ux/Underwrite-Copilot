@@ -1503,3 +1503,58 @@ describe("a share beside the loan its entity carries: no building figure is stru
     expect(note).not.toContain("the OM states no price");
   });
 });
+
+// Research pass 28, round 5: a preferred equity position is its own kind —
+// what its price buys is a rate and a redemption, never a slice of the
+// building — wherever "what the price buys" is read (lib/position).
+describe("a preferred equity position, read as what its price buys", () => {
+  const m = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 4", basis: "na" as const });
+  const rows = [
+    m("Preferred equity amount", "$15,000,000"),
+    m("Preferred return", "12% preferred return, 8% current pay"),
+    m("Current pay rate", "8.0%"),
+    m("Mandatory redemption date", "June 2029"),
+    m("Senior loan balance", "$52,000,000"),
+    m("Whole-asset value", "$80,000,000"),
+  ];
+  const ON = new Date("2026-10-05T12:00:00Z");
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("is its own kind, with its yield to redemption in the read, its tag and its short line", () => {
+    vi.useFakeTimers({ now: ON, toFake: ["Date"] });
+    const e = ex(interest({ kind: "preferred_equity", summary: "A $15M preferred equity investment in the owning entity" }), rows);
+    expect(interestOf(e).kind).toBe("preferred_equity");
+    const r = readInterest(e, askingPriceOf(e), ON)!;
+    expect(r.label).toBe(INTEREST_LABEL.preferred_equity);
+    expect(r.position?.terms.amount).toBe(15_000_000);
+    expect(r.lead).toMatch(/^This memorandum sells a PREFERRED EQUITY position in the owning entity, not the property/);
+    expect(r.headline).toContain("to redemption at its");
+    expect(r.modelCaveat).toMatch(/^The property model runs the whole building at the position's price; that is not this position's return/);
+    expect(interestTag(e, ON)).toBe("Pref equity, 12% to Jun 2029");
+    // Bought over its amount, the yield is what it is — negative here.
+    expect(interestShortLine(r)).toMatch(/^A preferred equity position in the owning entity, not the property, -\d+\.\d% to its Jun 2029 redemption at the \$20\.0M price$/);
+    expect(interestShortLine(readInterest(e, 14_000_000, ON)!)).toMatch(/, \d+\.\d% to its Jun 2029 redemption at the \$14\.0M price$/);
+    expect(dealTypeLabelFor("Stabilized", "preferred_equity")).toBe("Stabilized (the entity's property)");
+    // Its traps, by name; the shared two read for a position.
+    const note = interestNote(r);
+    expect(note).toContain("PREFERRED-EQUITY TRAPS, checked by name");
+    expect(note).toContain("THE TWO SHARED TRAPS, read for a preferred equity position");
+    for (const t of [r.headline, interestShortLine(r)]) expect(gluedWords(t)).toEqual([]);
+  });
+
+  it("reads a share filed before the kind was asked, whose rows say a position, as one; never a fee simple's rows", () => {
+    const share = ex(interest({ kind: "partial_interest", share: "" }), rows);
+    expect(interestOf(share).kind).toBe("preferred_equity");
+    const fee = ex(interest({ kind: "fee_simple" }), rows);
+    expect(interestOf(fee).kind).toBe("fee_simple");
+  });
+
+  it("strikes no building basis or price finding on the position's price, and runs the model saying so", () => {
+    const e = ex(interest({ kind: "preferred_equity" }), rows);
+    expect(assessPlausibility(e)).toEqual([]);
+    const derived = deriveUnderwriteInputs(e, "fallback");
+    expect(derived.sources.purchasePrice?.note).toMatch(/^The OM's price for a PREFERRED EQUITY position in the owning entity/);
+  });
+});

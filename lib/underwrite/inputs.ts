@@ -695,6 +695,8 @@ export function deriveUnderwriteInputs(
       ? "OM land / site cost — the development's acquisition basis; the build sits in the capital plan"
       : interest.kind === "note"
         ? "The OM's price for a NOTE secured by the property — this model runs the collateral as if bought outright at that price, which is not the note's return"
+        : interest.kind === "preferred_equity"
+          ? "The OM's price for a PREFERRED EQUITY position in the owning entity — this model runs the whole building as if bought outright at that price, which is not the position's return: that is its rate and its redemption"
         : interest.kind === "partial_interest"
           ? "The OM's price for a SHARE of the owning entity that states no single percentage — the model cannot gross it up, so its returns are not the share's"
           : interest.kind === "leased_fee"

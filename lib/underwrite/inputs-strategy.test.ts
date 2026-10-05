@@ -356,7 +356,8 @@ describe("the area a deal states none of", () => {
     );
     expect(snf.meta.units).toBe(120);
     expect(snf.meta.rsf).toBe(120 * 600);
-    expect(snf.sources.rsf?.note).toBe("120 units × 600 SF typical — enter the rentable SF");
+    // The count in the memorandum's own noun (audit A, L2).
+    expect(snf.sources.rsf?.note).toBe("120 beds × 600 SF typical — enter the rentable SF");
     const marina = deriveUnderwriteInputs(
       ex([metric("Asking price", "$14,000,000"), metric("NOI (in-place)", "$1,050,000"), metric("Wet slips", "250")], { assetClass: "Marina" }),
       "fallback",

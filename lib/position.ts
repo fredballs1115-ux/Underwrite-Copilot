@@ -208,10 +208,15 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
 }
 
 /** Whether the memorandum sells a preferred equity position: the interest's
- *  own kind, or a "Preferred equity amount" row beside a rate. */
+ *  own kind, or a share the extraction filed before that kind was asked
+ *  whose rows say a position — a "Preferred equity amount" beside a rate.
+ *  Never a fee simple's rows: a memorandum can describe a capital stack it
+ *  does not sell. */
 export function isPreferredEquity(ex: ExtractionResult | null | undefined): boolean {
   if (!ex) return false;
-  if ((ex.interest?.kind as string | undefined) === "preferred_equity") return true;
+  const kind = ex.interest?.kind as string | undefined;
+  if (kind === "preferred_equity") return true;
+  if (kind !== "partial_interest") return false;
   const t = readPositionTerms(ex);
   return t.amount != null && (t.currentPayPct != null || t.accrualPct != null);
 }
@@ -402,9 +407,14 @@ export function positionContextLine(r: PositionRead): string {
   return `What is being sold: ${withArticle("preferred equity position")} in the owning entity — ${r.sentences.slice(0, 3).join(" ")}`;
 }
 
+/** A position's traps by name — the interest note's (lib/interest) and this
+ *  module's own note read one list. */
+export const POSITION_TRAPS =
+  "PREFERRED-EQUITY TRAPS, checked by name where the OM gives the inputs: (a) THE STACK — the position's first and last dollar on today's value, not the sponsor's; (b) THE REDEMPTION — its date against the senior loan's maturity, and what a refinance at the last dollar needs; (c) CURRENT VS ACCRUED — the cash, the compounding, and the coverage left after the senior's debt service; (d) REMEDIES AND THE SENIOR LENDER — a recognition or intercreditor agreement, consent to a change of control, cure rights; (e) THE SPONSOR — guarantees, key-person terms, removal; (f) THE EXIT ORDER — what the position recovers on a sale at a lower value.";
+
 /** The challenger's notes: the facts, then the traps by name. */
 export function positionNote(r: PositionRead): string {
-  return `${positionContextLine(r)} PREFERRED-EQUITY TRAPS, checked by name where the OM gives the inputs: (a) THE STACK — the position's first and last dollar on today's value, not the sponsor's; (b) THE REDEMPTION — its date against the senior loan's maturity, and what a refinance at the last dollar needs; (c) CURRENT VS ACCRUED — the cash, the compounding, and the coverage left after the senior's debt service; (d) REMEDIES AND THE SENIOR LENDER — a recognition or intercreditor agreement, consent to a change of control, cure rights; (e) THE SPONSOR — guarantees, key-person terms, removal; (f) THE EXIT ORDER — what the position recovers on a sale at a lower value.`;
+  return `${positionContextLine(r)} ${POSITION_TRAPS}`;
 }
 
 /** The position's own rows, in the order a key-terms block leads with them. */

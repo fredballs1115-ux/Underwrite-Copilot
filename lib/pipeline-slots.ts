@@ -43,10 +43,12 @@ export interface PipelineSlots {
    *  and on a note, whose collateral's cap is not the buyer's (`capWithheld`) */
   cap: string | null;
   /** "note" where the going-in cap is withheld because the price is a
-   *  loan's (lib/compare-interest `noteCapSlot`); absent or null otherwise */
-  capWithheld?: "note" | null;
-  /** a note's yield to maturity at its price — "13.8%" — where the note pays
-   *  or may: its answer in the cap slot; absent or null otherwise */
+   *  loan's, "position" where it is a preferred equity position's
+   *  (lib/compare-interest `noteCapSlot`); absent or null otherwise */
+  capWithheld?: "note" | "position" | null;
+  /** the buyer's own yield at its price — "13.8%" — in the cap slot: a
+   *  note's to maturity where it pays or may, a position's to redemption
+   *  where the date has not gone by; absent or null otherwise */
   noteYield?: string | null;
   price: string | null;
   /** a plan deal's yield on total cost — its answer where a stabilized
@@ -198,7 +200,8 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind, store
  * the meeting workbook's row reads it too, so the three show one figure.
  */
 export function statedCapSlot(extraction: ExtractionResult, planDeal: boolean): string | null {
-  if (planDeal || interestOf(extraction).kind === "note") return null;
+  const { kind } = interestOf(extraction);
+  if (planDeal || kind === "note" || kind === "preferred_equity") return null;
   return findGoingInCap(extraction.metrics ?? [])?.value ?? null;
 }
 
@@ -278,7 +281,7 @@ export function pickSlots(
     // value-add's row shows its yield on cost where the export shows "n/a
     // — plan", never a cap on one and a yield on the other.
     cap: statedCapSlot(extraction, plan != null),
-    capWithheld: note ? "note" : null,
+    capWithheld: note ? note.of : null,
     noteYield: note?.ytmPct != null ? `${note.ytmPct.toFixed(1)}%` : null,
     // The shared price reader; on a development with no asking price the
     // land or site cost is what is being bought. The first signal's ask

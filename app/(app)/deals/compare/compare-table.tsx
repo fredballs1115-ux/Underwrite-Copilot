@@ -5,6 +5,7 @@ import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 import type { FigureSource } from "@/lib/compare-figures";
+import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "bg-pass/10 text-pass" },
@@ -107,7 +108,7 @@ export type Col = {
    *  outright; a share's, run at the share's price, set the whole
    *  building's cash flows against a fraction of its cost
    *  (lib/compare-interest, #423) */
-  withheld?: "note" | "share" | null;
+  withheld?: "note" | "share" | "position" | null;
   /** FEMA's flood zone at the building as a cell ("AE (SFHA)", "X
    *  (minimal)", "no FEMA digital map" — lib/site-flags `floodCell`, #426);
    *  blank before the lookup has answered */
@@ -456,17 +457,25 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       get: (c) =>
         c.planDeal
           ? "n/a — plan"
-          : c.withheld === "note"
+          : c.withheld === "note" || c.withheld === "position"
             ? c.noteYtm != null
-              ? `${pct(c.noteYtm)} to maturity`
-              : "n/a — note"
+              ? `${pct(c.noteYtm)} ${OWN_YIELD_WORDS[c.withheld].to}`
+              : OWN_YIELD_WORDS[c.withheld].na
             : pct(c.cap),
       mono: true,
       num: (c) => (c.planDeal ? null : c.cap),
       // The model's cap, else the memorandum's (lib/compare-figures); a
       // note's yield is read off the memorandum's own terms.
       src: (c) =>
-        c.planDeal ? null : c.withheld === "note" ? (c.noteYtm != null ? "om" : null) : c.cap != null ? c.capFrom : null,
+        c.planDeal
+          ? null
+          : c.withheld === "note" || c.withheld === "position"
+            ? c.noteYtm != null
+              ? "om"
+              : null
+            : c.cap != null
+              ? c.capFrom
+              : null,
     },
     // The plan's yardstick: stabilized NOI over everything it cost to get
     // there. Blank for a stabilized asset — its going-in cap is the answer.
@@ -487,8 +496,8 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       get: (c) =>
         c.planDeal
           ? "judged on yield on cost"
-          : c.withheld === "note"
-            ? "n/a — note"
+          : c.withheld === "note" || c.withheld === "position"
+            ? OWN_YIELD_WORDS[c.withheld].na
             : c.leverage
               ? `${c.leverage.spreadBps > 0 ? "+" : ""}${c.leverage.spreadBps} bps`
               : null,
@@ -506,7 +515,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       num: (c) => (c.planDeal || !c.leverage ? null : c.leverage.spreadBps),
       signed: true,
       // Struck on the cap one row up, so from where that cap came.
-      src: (c) => (c.planDeal || c.withheld === "note" || !c.leverage ? null : c.capFrom),
+      src: (c) => (c.planDeal || c.withheld === "note" || c.withheld === "position" || !c.leverage ? null : c.capFrom),
     },
     // The cap over today's 10-year — the spread a cap is quoted against, a
     // fact with no verdict, so the cell carries no tone; signed, like the
@@ -516,15 +525,15 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       get: (c) =>
         c.planDeal
           ? "judged on yield on cost"
-          : c.withheld === "note"
-            ? "n/a — note"
+          : c.withheld === "note" || c.withheld === "position"
+            ? OWN_YIELD_WORDS[c.withheld].na
             : c.capOverTenYear
               ? `${c.capOverTenYear.spreadBps > 0 ? "+" : ""}${c.capOverTenYear.spreadBps} bps`
               : null,
       mono: true,
       num: (c) => (c.planDeal || !c.capOverTenYear ? null : c.capOverTenYear.spreadBps),
       signed: true,
-      src: (c) => (c.planDeal || c.withheld === "note" || !c.capOverTenYear ? null : c.capFrom),
+      src: (c) => (c.planDeal || c.withheld === "note" || c.withheld === "position" || !c.capOverTenYear ? null : c.capFrom),
     },
     // What the price buys, beside it, where it is not the building
     // outright (#423) — the pipeline row's own tag.
