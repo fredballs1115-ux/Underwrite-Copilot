@@ -5,6 +5,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
 import { describeRunFailure, ScreenError } from "./failure";
+import { NO_FIGURES_FAILURE, NO_OM_FAILURE, pageCapFailure } from "./document-failures";
 import { RunGate, concurrencyFromEnv } from "./run-gate";
 import { newLedger, summarizeUsage, usageLogLine, withUsageLedger, type UsageLedger } from "./usage";
 import { omSourceFor, omFromText, releaseOmSource, type OmSource } from "./om-source";
@@ -762,9 +763,7 @@ async function runAnalysisSteps(
       : null;
     const manual = manualExtraction != null;
     if (!deal.om_storage_path && !manual) {
-      throw new Error(
-        "No OM file is attached to this deal — upload one, or enter the deal's facts by hand.",
-      );
+      throw new ScreenError(NO_OM_FAILURE);
     }
 
     const assetClass = (deal.asset_class as AssetClass) ?? "auto";
@@ -844,9 +843,7 @@ async function runAnalysisSteps(
     if (pdf) {
       const pages = countPdfPages(pdf);
       if (pages != null && pages > MAX_OM_PAGES) {
-        throw new ScreenError(
-          `This OM runs ${pages.toLocaleString("en-US")} pages — the analysis service reads up to about ${MAX_OM_PAGES} in one pass. Split off the financial sections and upload those.`,
-        );
+        throw new ScreenError(pageCapFailure(pages));
       }
     }
     // Inline for anything the request cap carries; one Files-API upload for
@@ -964,9 +961,7 @@ async function runAnalysisSteps(
       // never read — stop here. (A scan is read as pictures, and a file that
       // needs a password to open is refused at the upload, lib/pdf-open.)
       if (extraction.metrics.length === 0) {
-        throw new ScreenError(
-          "We couldn't read any figures out of this PDF, from its text or its pages — check it is the offering memorandum rather than a teaser or a cover letter, or upload a clearer copy with Replace OM.",
-        );
+        throw new ScreenError(NO_FIGURES_FAILURE);
       }
       // The memorandum's page count, as exact as this run can make it: the
       // text layer's own (pdfjs walked the pages); else the model's count of

@@ -85,6 +85,7 @@ import type { UnderwritingModel } from "@/lib/model/types";
 import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 import { MAX_OM_PAGES } from "@/lib/pdf";
 import { needsOperator } from "@/lib/anthropic/operator-failures";
+import { documentFailure } from "@/lib/anthropic/document-failures";
 import type { CompSearchResult } from "@/lib/anthropic/comps-search";
 
 type SupplementsMap = Partial<Record<string, TabSupplement>>;
@@ -459,6 +460,11 @@ export function DealView({
   const stalled = isStalled(job);
   const wasStalled = useRef(stalled);
   const operatorFailure = job?.status === "error" && needsOperator(job.error);
+  // A failure in the document itself (lib/anthropic/document-failures): a
+  // retry reads the same file the same way, so the banner offers another
+  // file — Replace OM — where it offered "Try again".
+  const remedy = job?.status === "error" && !operatorFailure ? documentFailure(job.error) : null;
+  const retryIsFutile = remedy === "replace" || remedy === "attach";
 
   // A row in flight — the poll keeps reading it, a stalled one included, so
   // a run the worker picks up again is seen.
@@ -781,7 +787,8 @@ export function DealView({
             {staleResults.length > 0
               ? "The results it did not reach still show below, marked as the previous screen's. "
               : "Nothing was lost. "}
-            {operatorFailure ? "Email" : "If it fails twice, email"}{" "}
+            {retryIsFutile ? "Trying again would read the same file the same way. " : ""}
+            {operatorFailure ? "Email" : retryIsFutile ? "If this is the right file, email" : "If it fails twice, email"}{" "}
             <a
               className="font-medium text-brand hover:text-brand-strong"
               href="mailto:underwritecopilot.support@gmail.com"
@@ -791,8 +798,20 @@ export function DealView({
             {operatorFailure ? "and we\u2019ll fix it on our side." : "and we\u2019ll dig in."}
           </p>
           {/* A failure on our side (lib/anthropic/operator-failures) says a
-              retry will not help; no button offers one beneath it. */}
-          {!operatorFailure && <RetryForm dealId={dealId} label="Try again" />}
+              retry will not help; no button offers one beneath it. A failure
+              in the document offers the Documents tab's own action — another
+              file in its place — and a retry only beside it, where the
+              failure may yet pass (lib/anthropic/document-failures). */}
+          {operatorFailure ? null : remedy ? (
+            <div className="mt-3 flex flex-wrap items-center gap-2" data-qa="document-failure">
+              <ReplaceOm dealId={dealId} disabled={false} attach={remedy === "attach" || !hasOm} prominent />
+              {remedy === "replace_or_retry" && (
+                <RetryForm dealId={dealId} label="Try again" className="" secondary />
+              )}
+            </div>
+          ) : (
+            <RetryForm dealId={dealId} label="Try again" />
+          )}
         </div>
       )}
 

@@ -40,6 +40,14 @@ import { regulationForDeal } from "./rent-regulation";
 import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { STALE_MS } from "./screen-run";
+import {
+  NO_FIGURES_FAILURE,
+  NO_OM_FAILURE,
+  REJECTED_FAILURE,
+  TOO_LARGE_FAILURE,
+  pageCapFailure,
+  refusalFailure,
+} from "./anthropic/document-failures";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -438,6 +446,43 @@ describe("DealView — the sample deal renders every section without a runtime e
     const never = textOf(render({ ...failedFirst("financials"), job: null }));
     expect(never).toMatch(/The screen hasn.t run for this deal yet\./);
     expect(never).toMatch(/Run the screen/);
+  });
+
+  it("a failure in the document offers Replace OM in its banner, never a 'Try again' that reads the same file the same way (research pass 30)", () => {
+    const failed = (error: string, hasOm = true): Props =>
+      ({
+        ...sampleProps("overview"),
+        isSample: false,
+        hasOm,
+        omUrl: hasOm ? "/api/deals/d1/om" : null,
+        job: { status: "error", step: "extract", progress: 10, error },
+        staleResults: [],
+      }) as unknown as Props;
+    const banner = (html: string) => html.slice(0, html.indexOf('aria-label="Deal sections"'));
+    for (const error of [NO_FIGURES_FAILURE, pageCapFailure(700), refusalFailure("Extraction"), TOO_LARGE_FAILURE]) {
+      const html = render(failed(error));
+      expect(a11yIssues(html), error).toEqual([]);
+      const top = banner(html);
+      const text = textOf(top);
+      expect(gluedWords(text), error).toEqual([]);
+      expect(text, error).not.toMatch(/Try again/);
+      expect(text, error).toContain("Trying again would read the same file the same way.");
+      expect(text, error).toContain("If this is the right file, email");
+      expect(top, error).toContain('data-qa="document-failure"');
+      expect(text, error).toMatch(/Replace OM/);
+    }
+    // The 400 that may yet pass: Replace OM, and the retry beside it.
+    const either = textOf(banner(render(failed(REJECTED_FAILURE))));
+    expect(either).toMatch(/Replace OM/);
+    expect((either.match(/Try again/g) ?? []).length).toBe(1);
+    expect(either).not.toContain("Trying again would read the same file");
+    // A deal with no OM is offered one.
+    expect(textOf(banner(render(failed(NO_OM_FAILURE, false))))).toMatch(/Attach OM/);
+    // A passing fault keeps its retry and nothing else.
+    const busy = banner(render(failed("The analysis service is overloaded right now — try again in a few minutes.")));
+    expect(busy).not.toContain('data-qa="document-failure"');
+    expect((textOf(busy).match(/Try again/g) ?? []).length).toBe(1);
+    expect(textOf(busy)).toContain("If it fails twice, email");
   });
 
   it("a run that stopped making progress reads as stopped on every view — never 'in progress' — and Replace OM works (research pass 30)", () => {

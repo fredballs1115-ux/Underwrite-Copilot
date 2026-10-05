@@ -2469,13 +2469,29 @@ export function AddData({ dealId, tab }: { dealId: string; tab: string }) {
   );
 }
 
-export function RetryForm({ dealId, label }: { dealId: string; label: string }) {
+export function RetryForm({
+  dealId,
+  label,
+  className = "mt-3",
+  secondary = false,
+}: {
+  dealId: string;
+  label: string;
+  /** the form's own spacing — none where it sits in a row of actions */
+  className?: string;
+  /** drawn as the second of two actions, beside a primary one */
+  secondary?: boolean;
+}) {
   return (
-    <form action={rerunAnalysis} className="mt-3">
+    <form action={rerunAnalysis} className={className}>
       <input type="hidden" name="dealId" value={dealId} />
       <PendingButton
         pendingLabel="Starting the screen…"
-        className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+        className={
+          secondary
+            ? "rounded-lg border border-line bg-surface px-4 py-2 text-sm font-medium transition-colors hover:bg-faint"
+            : "rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
+        }
       >
         {label}
       </PendingButton>

@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { escapeHtml, screenStoppedEmail, analysisReadyEmail } from "@/lib/email-template";
 import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE, needsOperator } from "@/lib/anthropic/operator-failures";
+import { documentFailure } from "@/lib/anthropic/document-failures";
 import { operatorEmails } from "@/lib/operator";
 import { screenedOn, verdictBehind } from "@/lib/screen-run";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
@@ -270,6 +271,9 @@ export async function notifyAnalysisFailed(
       dealUrl: `${appUrl()}/deals/${dealId}`,
       settingsUrl: `${appUrl()}/account`,
       previousCall: previous ? { ...previous, on: screenedOn(stored?.generatedAt) } : null,
+      // A failure in the document: the deal page offers Replace OM, not a
+      // retry that reads the same file the same way, and so does the email.
+      replaceOm: documentFailure(message) === "replace",
     });
     // The occasion is the run: its job row's created_at, restamped by every
     // claim (lib/jobs), so a run's one failure is one email.

@@ -198,7 +198,15 @@ export interface ScreenStoppedEmailInput {
    *  (lib/screen-run `verdictBehind` "failed") — and the day it was made
    *  (`screenedOn`, null for a call saved before the pipeline dated one) */
   previousCall?: { label: string; color: string; on: string | null } | null;
+  /** the failure is the document's (lib/anthropic/document-failures): a
+   *  retry reads the same file the same way, so the email says the way on
+   *  is replacing the OM on the deal page, as the page's banner offers */
+  replaceOm?: boolean;
 }
+
+/** What a document's failure asks of the reader, said once in the email. */
+export const REPLACE_OM_LINE =
+  "Trying again would read the same file the same way — replace the OM on the deal page to go on.";
 
 /** The sentence a stopped re-screen says about the call that stands. */
 export function previousCallLine(call: { label: string; on: string | null }): string {
@@ -223,6 +231,7 @@ export function screenStoppedEmail(input: ScreenStoppedEmailInput): {
     `${input.dealName} — the screen stopped before its verdict.`,
     ``,
     input.message,
+    input.replaceOm ? REPLACE_OM_LINE : null,
     stands ? `` : null,
     stands,
     ``,
@@ -247,13 +256,14 @@ export function screenStoppedEmail(input: ScreenStoppedEmailInput): {
   const html = emailDocument({
     title: subject,
     // Why it stopped, first; then the call that stands.
-    preheader: [input.message, stands].filter(Boolean).join(" "),
+    preheader: [input.message, input.replaceOm ? REPLACE_OM_LINE : null, stands].filter(Boolean).join(" "),
     rows: `
         <tr>
           <td style="padding:28px;">
             <p style="margin:0;font-size:13px;color:#a8432f;">The screen stopped</p>
             <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${esc(input.dealName)}</h1>
             <p style="margin:16px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(input.message)}</p>
+            ${input.replaceOm ? `<p style="margin:8px 0 0;font-size:14px;line-height:1.55;color:#18211f;">${esc(REPLACE_OM_LINE)}</p>` : ""}
             ${standing}
             ${button(input.dealUrl, "Open the deal")}
           </td>

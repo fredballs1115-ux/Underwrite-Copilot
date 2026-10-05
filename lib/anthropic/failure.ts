@@ -12,6 +12,7 @@
  */
 import { recordUsage, usageOfResponse } from "./usage";
 import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE } from "./operator-failures";
+import { REJECTED_FAILURE, TOO_LARGE_FAILURE, refusalFailure } from "./document-failures";
 
 /** An error whose message was written for the analyst and shows as it is. */
 export class ScreenError extends Error {
@@ -36,14 +37,14 @@ const RATE_LIMITED =
   "The analysis service is rate-limiting us right now — wait a minute and try again.";
 const OVERLOADED =
   "The analysis service is overloaded right now — try again in a few minutes.";
-const TOO_LARGE =
-  "The analysis service refused this document as too large — try a smaller PDF.";
+// The document's own failures: their sentences live in ./document-failures,
+// which the deal page reads to offer Replace OM instead of "Try again".
+const TOO_LARGE = TOO_LARGE_FAILURE;
 // A scanned deck reads fine (the service reads the pages as pictures), and a
 // file that needs a password to open or runs past the page limit is refused
 // at the upload (lib/pdf-open), so neither is the advice here: what is left
 // is a secured copy the service turned away, or a passing fault.
-const REJECTED =
-  "The analysis service could not accept this document — if it is a secured copy, save an unlocked one (print it to PDF) and upload it with Replace OM; otherwise try again.";
+const REJECTED = REJECTED_FAILURE;
 // The provider answers a spent credit balance or a workspace's usage limit
 // with a 400 like any malformed request; read as REJECTED, it blamed the
 // analyst's document for the operator's account.
@@ -169,9 +170,7 @@ export function structuredOutput<T>(response: StructuredResponse<T>, what: strin
     throw new ScreenError(`${what} was cut off before it finished — try again.`);
   }
   if (response.stop_reason === "refusal") {
-    throw new ScreenError(
-      `${what} was declined by the model — the document may hold content it will not analyze.`,
-    );
+    throw new ScreenError(refusalFailure(what));
   }
   if (response.parsed_output == null) {
     throw new ScreenError(`${what} did not return structured output.`);

@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import { replaceOm } from "../actions";
 import { tooLargeMessage } from "@/lib/upload-limit";
 
-function PickButton({ disabled, attach }: { disabled: boolean; attach: boolean }) {
+function PickButton({ disabled, attach, prominent }: { disabled: boolean; attach: boolean; prominent: boolean }) {
   const { pending } = useFormStatus();
   const inputRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
@@ -23,6 +23,7 @@ function PickButton({ disabled, attach }: { disabled: boolean; attach: boolean }
         className="sr-only"
         tabIndex={-1}
         aria-hidden
+        aria-label={attach ? "The OM to attach (PDF)" : "The OM to screen in place of the stored one (PDF)"}
         onChange={(e) => {
           const f = e.currentTarget.files?.[0];
           if (!f) return;
@@ -36,7 +37,11 @@ function PickButton({ disabled, attach }: { disabled: boolean; attach: boolean }
           const ok = window.confirm(
             attach
               ? `Attach "${f.name}" as this deal's OM and screen it?\n\nThe full analysis runs on the document, and the deal page will show what moved versus the screen built from your typed facts.`
-              : `Replace the stored OM with "${f.name}" and re-screen?\n\nThe full analysis runs again on the new document, and the deal page will show exactly what moved since this screen.`,
+              : prominent
+                ? // Offered under a screen that stopped on its document:
+                  // there may be no screen to compare against.
+                  `Screen "${f.name}" in place of the stored OM?\n\nThe full analysis runs on the new document.`
+                : `Replace the stored OM with "${f.name}" and re-screen?\n\nThe full analysis runs again on the new document, and the deal page will show exactly what moved since this screen.`,
           );
           if (ok) formRef.current?.requestSubmit();
           else e.currentTarget.value = "";
@@ -49,14 +54,20 @@ function PickButton({ disabled, attach }: { disabled: boolean; attach: boolean }
         title={
           attach
             ? "Got the OM? Attach it and the full document screen runs — page cites, comp scrutiny, everything."
-            : "Upload a reissued OM (price cut, updated deck) and re-run the screen — the deal page will show what moved."
+            : prominent
+              ? "Upload another copy of the memorandum, or the right document, and screen it."
+              : "Upload a reissued OM (price cut, updated deck) and re-run the screen — the deal page will show what moved."
         }
-        className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50"
+        className={
+          prominent
+            ? "inline-flex items-center gap-1.5 rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50"
+            : "inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-xs font-medium transition-colors hover:bg-faint disabled:cursor-not-allowed disabled:opacity-50"
+        }
       >
         {pending ? (
           <span
             aria-hidden
-            className="h-3 w-3 animate-spin rounded-full border-2 border-line border-t-brand"
+            className={`h-3 w-3 animate-spin rounded-full border-2 ${prominent ? "border-white/40 border-t-white" : "border-line border-t-brand"}`}
           />
         ) : (
           <svg
@@ -90,20 +101,25 @@ function PickButton({ disabled, attach }: { disabled: boolean; attach: boolean }
 
 /** "The broker sent a new deck" — swap the OM and re-screen in one step.
  *  With `attach`, the same flow reads as adding the FIRST OM to a deal that
- *  was typed in by hand (the action already handles the no-prior-OM case). */
+ *  was typed in by hand (the action already handles the no-prior-OM case).
+ *  `prominent` is the failure banner's own: the way on from a screen that
+ *  stopped on its document (lib/anthropic/document-failures), drawn as the
+ *  banner's primary button. */
 export function ReplaceOm({
   dealId,
   disabled,
   attach = false,
+  prominent = false,
 }: {
   dealId: string;
   disabled: boolean;
   attach?: boolean;
+  prominent?: boolean;
 }) {
   return (
     <form action={replaceOm}>
       <input type="hidden" name="dealId" value={dealId} />
-      <PickButton disabled={disabled} attach={attach} />
+      <PickButton disabled={disabled} attach={attach} prominent={prominent} />
     </form>
   );
 }
