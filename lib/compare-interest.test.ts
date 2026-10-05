@@ -139,7 +139,8 @@ describe("a note's going-in cap slot, wherever the deal is summarized", () => {
     expect(src).toMatch(/\{ \.\.\.goingInCapFigure\(extraction, summaryCap \?\? null, readerNoon\), figure: true \}/);
     expect(src).toMatch(/const readerNoon = new Date\(`\$\{todayIso\}T12:00:00Z`\);/);
     expect(src).toMatch(/readInterest\(extraction, askingPriceOf\(extraction\), readerNoon\)/);
-    expect(src).toMatch(/modelReturnsRead\(extraction, model\.returns, readerNoon\)/);
+    expect(src).toMatch(/modelReturnsRead\(extraction, \{ \.\.\.model\.returns, holdYears: model\.holdYears \}, readerNoon\)/);
+    expect(src).toMatch(/modelReturnsRead\(extraction, screeningCompareModel\(derived\.inputs\), readerNoon\)/);
     expect(src).not.toMatch(/\{ label: "Going-in cap", value: summaryCap \?\? null, figure: true \}/);
     // The slot's own kind, read by the one rule every surface reads
     // (`capSlotWithheld`): a note's, a preferred equity position's, or a
