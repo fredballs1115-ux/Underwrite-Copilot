@@ -956,6 +956,68 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   its title (`storageShortLine`), the workbook's cover ("The facility",
   `meta.storage`), the report's caveat (`buildReportData`'s
   twenty-fourth argument) and the compare table's row.
+- Rent regulation (research pass 28, round 1). The rules panel had long
+  said which rent regimes reach a building (`evaluateRules`), but nothing
+  the screen hands a reader did: a rent-stabilized Brooklyn walk-up read
+  as market-rate everywhere else. `lib/rent-regulation.ts` (pure) reads the
+  site's own rules for the deal, each regime's published allowance for a
+  dated period, and what the memorandum states. `data/research/
+  rent_allowances.json` holds `regimes` (each rent rule's name and short
+  word), `noRegime` (the rules that preempt or ban rent control) and
+  `allowances`, each filed ONLY as a primary source printed it from the
+  runner, with its period and the run in `read`: NYC's Order #58 (0% on one-
+  and two-year leases commencing Oct 1, 2026 to Sep 30, 2027), DC's Rent
+  Control Year 2026 (4.1%, 2.1% for a registered elderly or disabled
+  tenant), the LA RSO's 3%, Montgomery County's 5.2% (Jul 1, 2026 to Jun
+  30, 2027), Washington's 9.683% (2026) and 10% (2027), and Takoma Park's
+  3%; `lib/rent-regulation.test.ts` holds every rent rule to one of the two
+  lists. San Francisco's and Prince George's pages refuse the runner and
+  Jersey City's states no figure, so none is filed for them; AB 1482's cap
+  is regional (the LA area's 8.7% is in the rule's text, not the table).
+  Six rules: **the rule is the file's** (a regime is said only where a rule
+  applies or possibly applies, a "possibly" naming its open questions; a
+  regime only the memorandum names is said as its claim); **the allowance
+  is dated** (`allowanceOn`: read only inside its period; past its end said
+  to have ended, never carried forward; a period not yet begun said as
+  next); **the memorandum's count is the share** ("Rent-regulated units"
+  over the unit count; no count, no share, never derived from the
+  building's age); **loss to lease on a regulated unit is not upside**;
+  **the model's one growth rate is the market's** (set beside the
+  allowance, never changed — growing regulated units at the allowance is
+  the owner's model-math call); **a blank is null** (a regime row stating
+  "None", "No rent control", "Exempt", "Market rate" or a dash names no
+  regime, `STATES_NONE`). The extraction labels "Rent regulation", "Rent-
+  regulated units", "Legal regulated rent" and "Preferential rent", each
+  only as stated (a test holds the prompt's labels to the reader's
+  patterns). Every surface reads through ONE call, `regulationForDeal`
+  (the row's extraction, address, stored site flags and class, on the
+  reader's own day on a signed-in page and the UTC day in a route, a
+  document or a Claude step): the deal context (`regulationContextLine`,
+  every step after the site flags); the challenger (`regulationNote`,
+  REGULATION TRAPS by name, read from the address alone since it runs
+  before the flags, so a city regime it cannot place reads "possibly");
+  `app/regulation-panel.tsx` (`RegulationPanel`, pure: the regimes with
+  their outcome and source, `data-bar="reg-units"` the regulated share,
+  `reg-allowance` each figure in force against `reg-model-growth` the
+  model's rate on one scale — the shared screen, which has no model, draws
+  the allowance alone — `reg-period` with `reg-today`) on the deal page and
+  the shared screen; the key terms (`regulationTermRows` after the count);
+  the pipeline card, row, CSV "Rent regulation" column and the meeting
+  workbook's price note (`regulationTag`: "Rent-stabilized, 41 of 48", "LA
+  RSO, 3% cap", a regime that applies or the memorandum's claim in the
+  warning tone, "Rent rules: check" muted; `pickSlots`' fourth argument);
+  the memo under its title, the workbook cover ("The rent rules",
+  `meta.regulation`), the report's caveat (`buildReportData`'s last
+  argument) and the compare table's row (a dash, never "none"). **The
+  model's rent-growth check names a current allowance first**
+  (lib/model-vs-market), as the regime's for the units it regulates, shown
+  among the published figures and never folded into the market's range or
+  the tone: a NYC stabilized building at the model's 3% reads the 0%
+  allowance before the market figures it sits inside. An open "any of"
+  exemption is asked as the questions its open branches ask (MoCo's, AB
+  1482's and Washington's read "Open: any of" before), and every condition
+  key the rules file uses has an `OPEN_QUESTION_LABELS` entry, held by a
+  test that walks the file.
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
