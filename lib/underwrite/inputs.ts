@@ -1079,10 +1079,18 @@ export function deriveUnderwriteInputs(
     const onPlaceholder = statedPrice == null;
     // A cap stated as a range is named with the end taken (C27).
     const capWords = capRangeWords ?? `the stated ${(Math.round(capPct * 10_000) / 100).toFixed(2)}% going-in cap`;
+    // No price stated beside an NOI of zero or less: the price was backed
+    // out of that NOI over the cap (`noPrice`), so "price × the cap" is that
+    // NOI again — said as what the model runs, in the withheld sentence's
+    // own words, never as a figure set from a price no surface shows
+    // (research pass 40, item 16). Words only: the figure is the owner's.
+    const noPrice = sources.purchasePrice?.noPrice ?? null;
     mark(
       "inPlaceRentAnnual",
       noIncome || onPlaceholder ? "assumption" : "derived",
-      skipped
+      skipped && noPrice
+        ? `${implausible(skipped)}. No price was stated, so the model's price is that NOI over ${capRangeWords ?? "the stated going-in cap"} and its year-1 NOI is that same NOI: ${compactUsd(noPrice.value, { thousandsFrom: Infinity })} is not a year's income to price on — enter the purchase price`
+        : skipped
         ? `${implausible(skipped)}. Year-1 NOI set from ${onPlaceholder ? `the ${usd0(price)} placeholder × ${capWords}` : `price × ${capRangeWords ?? "the stated going-in cap"}`} instead`
         : onPlaceholder
           ? `The ${usd0(price)} placeholder × ${capWords}, at an assumed expense ratio — the memorandum states no price or NOI, so this NOI is the placeholder's; enter the price and the in-place NOI`

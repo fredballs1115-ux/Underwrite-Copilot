@@ -14,6 +14,7 @@ import ExcelJS from "exceljs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import { computeUnderwrite } from "@/lib/underwrite/engine";
 import {
   buildSensitivityData,
   placeholderPageLine,
@@ -137,5 +138,26 @@ describe("a price backed out of an NOI of zero or less is no price (research pas
     expect(zero.inputs.purchasePrice).toBe(0);
     expect(zero.sources.purchasePrice?.noPrice).toEqual({ label: "NOI (in-place)", value: 0 });
     expect(placeholderReason(zero.inputs, zero.sources)).toBe(REASON.replace("−$310,000", "$0"));
+  });
+
+  // Research pass 40, item 16: the NOI's note had said "Year-1 NOI set from
+  // price × the stated going-in cap instead" — circular, since the price was
+  // backed out of that NOI over the cap and is never shown. It says what the
+  // model runs, in the withheld sentence's own words; the figure is the
+  // owner's and unchanged.
+  it("says the year-1 NOI is the memorandum's own, never one set from a price no surface shows", () => {
+    for (const [noi, words] of [
+      ["-310,000", "−$310,000"],
+      ["0", "$0"],
+    ] as const) {
+      const run = deriveUnderwriteInputs(losing(noi), "x");
+      expect(run.sources.inPlaceRentAnnual?.note).toBe(
+        `The OM's NOI (in-place) is ${words} — no income in place to anchor year 1 on. No price was stated, so the model's price is that NOI over the stated going-in cap and its year-1 NOI is that same NOI: ${words} is not a year's income to price on — enter the purchase price`,
+      );
+      expect(run.sources.inPlaceRentAnnual?.note).not.toMatch(/set from price/);
+      expect(run.sources.inPlaceRentAnnual?.note).not.toMatch(NO_FIGURE);
+      // The figure the model runs is unchanged: that NOI, as before.
+      expect(computeUnderwrite(run.inputs).cashFlow[0].noi).toBeCloseTo(Number(noi.replace(/,/g, "")), 0);
+    }
   });
 });
