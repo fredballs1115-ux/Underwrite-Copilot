@@ -11,6 +11,7 @@ import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CompName, CompsMap, type MapComp } from "@/app/(app)/deals/[id]/comps-map";
 import { ScrollRegion } from "@/app/scroll-region";
+import { ToastProvider, toastLifetime } from "@/app/(app)/toaster";
 import { a11yIssues } from "./render-lint";
 
 const h = React.createElement;
@@ -135,5 +136,29 @@ describe("a placeholder that can be read (research pass 33, item 19)", () => {
     const src = readFileSync(file, "utf8");
     expect(src).toContain("placeholder:text-muted ");
     expect(src).not.toMatch(/placeholder:text-muted\/\d+/);
+  });
+});
+
+describe("a toast that waits for its reader (research pass 33, item 20)", () => {
+  it("keeps an error until it is dismissed, and gives any other toast 4.5 seconds", () => {
+    expect(toastLifetime("error")).toBeNull();
+    expect(toastLifetime("success")).toBe(4500);
+    expect(toastLifetime("info")).toBe(4500);
+  });
+
+  it("counts a toast's time on the card, paused while it is hovered or holds focus", () => {
+    // The timers run in a browser (checked in Chromium: hovered or focused,
+    // a toast stays; let go, it goes in what was left; an error stays).
+    const src = readFileSync("app/(app)/toaster.tsx", "utf8");
+    const push = src.slice(src.indexOf("const push = useCallback"), src.indexOf("return (", src.indexOf("const push = useCallback")));
+    expect(push).not.toContain("setTimeout");
+    expect(src).toContain("const paused = hovered || focused;");
+    expect(src).toMatch(/if \(ms == null \|\| paused\) return;/);
+    for (const handler of ["onMouseEnter", "onMouseLeave", "onFocus", "onBlur"]) expect(src).toContain(`${handler}=`);
+  });
+
+  it("keeps the toasts' live region as it was", () => {
+    const html = renderToStaticMarkup(h(ToastProvider, null, h("p", null, "page")));
+    expect(html).toMatch(/<div aria-live="polite" class="pointer-events-none fixed /);
   });
 });
