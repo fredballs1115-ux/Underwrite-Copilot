@@ -204,6 +204,9 @@ describe("an operating business on its real estate (pass 28, round 3)", () => {
     }
     // Utilities beside a store are no fuel.
     expect(operatingBusinessOf(deal({ assetClass: "Convenience store, tenant pays gas and electric" }, []))).toBe("convenience_store");
+    // A fuel word the words deny is no fuel (audit C5, LOW-3).
+    for (const words of ["Convenience Store (no fuel)", "C-store, no gas sales", "Convenience store, pumps removed", "Convenience store without fuel", "Convenience store, tanks and pumps have been removed"])
+      expect(operatingBusinessOf(deal({ assetClass: words }, [])), words).toBe("convenience_store");
     // And a single tenant's name names it where the class says nothing.
     const wash = deal({ assetClass: "Net lease", singleTenant: { ...WASH.singleTenant!, tenant: "Express Car Wash LLC" } }, [row("Annual base rent", "$276,000")]);
     expect(operatingBusinessOf(wash)).toBe("car_wash");

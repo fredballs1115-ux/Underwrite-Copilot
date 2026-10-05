@@ -218,15 +218,28 @@ function wordsOf(ex: ExtractionResult): string {
 const READ_OTHERWISE: ReadonlySet<string> = new Set(["multifamily", "office", "retail", "industrial", "hospitality_str", "data_center"]);
 const readOtherwise = (ex: ExtractionResult) => READ_OTHERWISE.has(assetClassKey(ex.assetClass ?? "") ?? "");
 
+// A fuel word the phrase denies — "no fuel", "no gas sales", "without
+// fuel", "non-fuel", "former gas station", "pumps removed" — is struck
+// before the fuel rules read, as lib/asset-words strikes a denied care word
+// (audit C5, LOW-3: "Convenience Store (no fuel)" had filed as a fuel
+// seller, and the challenger asked about tanks the store does not have).
+const FUEL_WORD = String.raw`(?:fuel(?:ing)?|gas(?:oline)?|diesel|pumps?|MPDs?|dispensers?|tanks?|USTs?)`;
+const DENIED_FUEL = new RegExp(
+  String.raw`\b(?:no|without|non|not|former(?:ly)?|ex)[\s-]+(?:[a-z]+[\s-]+){0,2}?${FUEL_WORD}\b(?:\s+(?:sales|service|positions|stations?))?` +
+    String.raw`|\b${FUEL_WORD}(?:\s+(?:and|&)\s+${FUEL_WORD})?(?:\s+(?:have\s+been|were|was|are|is))?\s+(?:removed|decommissioned|discontinued|closed|abandoned)\b`,
+  "gi",
+);
+
 function businessIn(words: string | null | undefined): OperatingBusiness | null {
   if (typeof words !== "string" || words.trim() === "") return null;
+  const said = words.replace(DENIED_FUEL, " ");
   for (const [kind, re] of BUSINESS_WORDS) {
-    if (!re.test(words)) continue;
+    if (!re.test(said)) continue;
     // Words the class table files as rental housing name no care business:
     // "Senior Living Apartments (LIHTC, 62+)" is an age-restricted
     // tax-credit building that sells no care (lib/asset-words), and the
     // two readers say one thing of it (the pre-merge audit).
-    if (kind === "senior_care" && assetClassKey(words) === "multifamily") continue;
+    if (kind === "senior_care" && assetClassKey(said) === "multifamily") continue;
     return kind;
   }
   return null;
