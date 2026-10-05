@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { setOffersDue } from "./actions";
+import { deadlineCommit } from "@/lib/deadline-day";
 
 // "Today" is the server page's, read once per request and handed in
 // (`today`), never read here: a module-level capture was read once per
@@ -48,8 +49,9 @@ export function OffersDueBit({ iso, today }: { iso: string; today: string }) {
   return <span className={`font-medium ${cls}`}>{text}</span>;
 }
 
-/** The broker's call-for-offers date — a small date control that saves on
- *  change (clearing the date clears the deadline). Lives in the deal header.
+/** The broker's call-for-offers date — a small date control that saves a
+ *  date picked from its calendar at once, and a typed one when the reader
+ *  leaves the field (clearing the date clears the deadline). Lives in the deal header.
  *  Where the date is the memorandum's own (#467) it says so, with its page,
  *  and any date on it can go to a calendar as one file. */
 export function OffersDueControl({
@@ -71,6 +73,24 @@ export function OffersDueControl({
   calendarHref?: string | null;
 }) {
   const formRef = useRef<HTMLFormElement>(null);
+  // A pick from the calendar saves at once. A date being TYPED saves when the
+  // reader leaves the field or presses Enter, and only as a real day between
+  // 2000 and 2100 (lib/deadline-day): the field reports a whole date at every
+  // digit of its year, so saving on each change stored year 0002 and
+  // remounted the field under the rest of the typing (research pass 33).
+  const typed = useRef(false);
+  const save = (input: HTMLInputElement, leaving: boolean) => {
+    typed.current = false;
+    // A field left holding no deadline shows the saved one again, so it never
+    // shows what is not kept.
+    const commit = deadlineCommit(input.value, input.validity.badInput, value);
+    if (commit === "refuse" && leaving) input.value = value ?? "";
+    if (commit !== "save") return;
+    const f = formRef.current;
+    if (!f) return;
+    if (typeof f.requestSubmit === "function") f.requestSubmit();
+    else f.submit();
+  };
   const d = value ? daysUntil(value, today) : null;
   const tone =
     d == null
@@ -104,11 +124,19 @@ export function OffersDueControl({
         name="offersDue"
         defaultValue={value ?? ""}
         aria-label="Call-for-offers date"
-        onChange={() => {
-          const f = formRef.current;
-          if (!f) return;
-          if (typeof f.requestSubmit === "function") f.requestSubmit();
-          else f.submit();
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            save(e.currentTarget, false);
+            return;
+          }
+          if (e.key !== "Tab" && e.key !== "Shift") typed.current = true;
+        }}
+        onChange={(e) => {
+          if (!typed.current) save(e.currentTarget, false);
+        }}
+        onBlur={(e) => {
+          if (typed.current) save(e.currentTarget, true);
         }}
         className="rounded border-0 bg-transparent p-0.5 font-mono text-xs tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-brand/40"
       />

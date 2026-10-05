@@ -45,6 +45,7 @@ import {
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { checkPdfOpens } from "@/lib/pdf-open";
 import { capRefusalOf } from "@/lib/deal-allowance";
+import { deadlineDay } from "@/lib/deadline-day";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -732,9 +733,10 @@ export async function setOffersDue(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
   const raw = String(formData.get("offersDue") ?? "").trim();
   if (!dealId) redirect("/deals");
-  // Empty clears the deadline; otherwise require a plain ISO date.
-  const offersDue =
-    raw === "" ? null : /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : undefined;
+  // Empty clears the deadline; otherwise a real day between 2000 and 2100
+  // (lib/deadline-day) — a date field reports 0002 on the way to 2027, and
+  // this had stored it.
+  const offersDue = raw === "" ? null : (deadlineDay(raw) ?? undefined);
   if (offersDue === undefined) redirect(`/deals/${dealId}?error=deadline`);
 
   const supabase = await createSupabaseServerClient();
