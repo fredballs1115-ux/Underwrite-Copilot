@@ -35,7 +35,7 @@ export const BATCH_ERROR_COPY: Record<string, string> = {
   pdf: "Not a valid PDF.",
   size: "Over the 32 MB limit.",
   locked: "Needs a password to open — upload an unlocked copy.",
-  pages: `Over ${MAX_OM_PAGES} pages — upload the financial sections.`,
+  pages: `Over ${MAX_OM_PAGES} pages — upload the sections with the deal's figures; the screen reads only those.`,
   save: "Couldn't save the deal — try again.",
   upload: "Upload failed — try again.",
 };

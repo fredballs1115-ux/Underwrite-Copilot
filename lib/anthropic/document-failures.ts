@@ -42,10 +42,19 @@ export const STORAGE_MISSING_FAILURE =
 export const NO_OM_FAILURE =
   "No OM file is attached to this deal — upload one, or enter the deal's facts by hand.";
 
-/** A deck past the pages the analysis service reads in one pass. */
+/** What a memorandum past the page cap is asked for, everywhere it is said. */
+export const PAGE_CAP_WAY_ON =
+  "Upload the sections that hold the deal's figures with Replace OM — the screen then reads those pages alone, not the whole memorandum.";
+
+/** A deck past the pages the analysis service reads in one pass. The way on
+ *  is the pages that hold the deal, said as what it is: a screen of those
+ *  pages alone, never of the whole memorandum (the batch-2 audit — a file
+ *  too large in bytes is never told to split, since a split memorandum is
+ *  screened on part of it; here part of it is the only read there is). */
 export function pageCapFailure(pages: number): string {
-  return `This OM runs ${pages.toLocaleString("en-US")} pages — the analysis service reads up to about ${MAX_OM_PAGES} in one pass. Split off the financial sections and upload those with Replace OM.`;
+  return `This OM runs ${pages.toLocaleString("en-US")} pages — the analysis service reads up to about ${MAX_OM_PAGES} in one pass. ${PAGE_CAP_WAY_ON}`;
 }
+
 
 /** The model declined to read the document at the step named. A refusal is
  *  not the file's fixed property — a second read may go through — so the

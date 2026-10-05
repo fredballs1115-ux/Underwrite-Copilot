@@ -200,7 +200,7 @@ const MODEL_ERRORS: Record<string, string> = {
   omsize: "That PDF is larger than 32 MB — please try a smaller file.",
   omlocked:
     "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password and upload that. The stored OM is unchanged.",
-  ompages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the financial sections on their own. The stored OM is unchanged.`,
+  ompages: `That PDF runs past ${MAX_OM_PAGES} pages, more than the analysis reads in one pass — upload the sections that hold the deal's figures, and the screen will read those pages alone, not the whole memorandum. The stored OM is unchanged.`,
   omupload:
     "The upload didn’t complete — the stored OM is unchanged. Please try again.",
   ompermission:

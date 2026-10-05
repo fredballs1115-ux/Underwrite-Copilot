@@ -55,6 +55,15 @@ describe("documentFailure — the failures a retry of the same file cannot fix",
     // Each names Replace OM as the way on, but the refusal, whose remedy the
     // banner itself offers.
     for (const m of [NO_FIGURES_FAILURE, pageCapFailure(700), TOO_LARGE_FAILURE]) expect(m).toContain("Replace OM");
+    // Past the page cap the way on is part of the memorandum, said as that
+    // wherever it is said (the batch-2 audit): never "split it" as if the
+    // screen still read the whole.
+    expect(pageCapFailure(700)).toContain("the screen then reads those pages alone, not the whole memorandum");
+    for (const f of ["lib/batch-run.ts", "app/(app)/deals/page.tsx", "app/(app)/deals/[id]/deal-view.tsx"]) {
+      const src = readFileSync(join(process.cwd(), f), "utf8");
+      expect(src, f).not.toMatch(/upload the financial sections|Split off/);
+      expect(src, f).toMatch(/pages alone, not the whole memorandum|the screen reads only those/);
+    }
   });
 
   it("the provider's 400 for a PDF it will not read offers Replace OM beside the retry — its words are not read yet", () => {
