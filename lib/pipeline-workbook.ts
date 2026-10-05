@@ -109,6 +109,10 @@ export interface PipelineExportRow {
   /** condominium units bought in bulk — "Bulk 42 of 120 (35%)", "Condo
    *  units" (lib/condo `condoTag`); carried in the price cell's note */
   condo?: string | null;
+  /** a sandwich position's spread — "Spread $720k, 1.65× cover", "Subleases
+   *  under the master rent" (lib/sandwich-lease `sandwichTag`); carried in
+   *  the price cell's note */
+  sandwich?: string | null;
   /** the going-in cap on today's income — always null on a plan deal, and
    *  on a note (`capWithheld`) */
   cap: string | null;
@@ -307,6 +311,7 @@ export async function buildPipelineWorkbook(
         d.mixedUse ? `${d.mixedUse}: a mixed-use building's commercial share — the deal page reads the two incomes, the commercial space and what one exit cap does to both.` : null,
         d.goingConcern ? `${d.goingConcern}: an operating business on its real estate — the deal page reads whose earnings these are, the rent's coverage and the split.` : null,
         d.condo ? `${d.condo}: condominium units in an association its declaration governs — the deal page reads the buyer's share of the votes, a year of the dues and a lender's limit on a single owner.` : null,
+        d.sandwich ? `${d.sandwich}: a master lease of the building, sublet — the master rent is owed whatever the subtenants pay; the deal page reads the spread, its cover and the master lease's term.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 

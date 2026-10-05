@@ -1542,6 +1542,41 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The condominium units")).toThrow();
   });
 
+  it("a sandwich position (lib/sandwich-lease): the two rents and the master lease's end, then the model's perpetuity against the lease", async () => {
+    const position = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        dealName: "Founders Plaza",
+        assetClass: "Office",
+        interest: {
+          kind: "leasehold",
+          summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+          share: "",
+          groundLease: "Master lease of the building from its owner",
+          loan: "",
+          page: "",
+        },
+        metrics: [
+          { label: "Asking price", value: "$6,500,000", flagged: false, page: "p. 2" },
+          { label: "Master lease rent", value: "$1,100,000 a year", flagged: false, page: "p. 6" },
+          { label: "Sublease income", value: "$1,820,000", flagged: false, page: "p. 6" },
+          { label: "NOI (T-12)", value: "$720,000", flagged: false, page: "p. 9" },
+          { label: "Master lease expiration", value: "December 31, 2091", flagged: false, page: "p. 6" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(position));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The sandwich position");
+    expect(String(cover.getCell(r, 3).value)).toBe("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2091");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(
+      /^The model capitalises the position's income at its sale as if it ran forever; the master lease ends Dec 2091, [\d.]+ years after the model's sale/,
+    );
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The sandwich position")).toThrow();
+  });
+
   it("a self-storage facility (#471): its occupancies and rates, then what the model does with the premium over street", async () => {
     const storage = deriveUnderwriteInputs(
       {

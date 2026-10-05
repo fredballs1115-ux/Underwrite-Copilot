@@ -1588,7 +1588,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const bare = (label: string) => label.replace(/ · model$/, "");
     const tableRows = (html: string) => [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => bare(m[1]));
     const cardRows = (html: string) => [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => bare(m[1]));
-    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Forward purchase", "Operating business", "Mixed-use", "Condominium", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
+    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Forward purchase", "Operating business", "Mixed-use", "Condominium", "Sandwich position", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
     // Four deals none of which states a hotel, a sale, a restriction or any
     // of the other deal-type facts: no column of dashes for any of them.
     const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: COLS }));
@@ -1669,6 +1669,19 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(row).not.toBe("");
     const cells = visibleText(row);
     expect(cells).toContain("Bulk 42 of 120 (35%)");
+    expect(cells.match(/—/g)).toHaveLength(2);
+    expect(cells).not.toMatch(/\bnone\b/i);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("sets a sandwich position side by side (lib/sandwich-lease): the spread, a dash beside every other deal", () => {
+    const cols: Col[] = [COLS[0], { ...COLS[1], sandwich: "Spread $720k, 1.65× cover" }, COLS[2]];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    const row = html.match(/<tr\b(?:(?!<\/tr>)[\s\S])*?>Sandwich position<\/td>[\s\S]*?<\/tr>/)?.[0] ?? "";
+    expect(row).not.toBe("");
+    const cells = visibleText(row);
+    expect(cells).toContain("Spread $720k, 1.65× cover");
     expect(cells.match(/—/g)).toHaveLength(2);
     expect(cells).not.toMatch(/\bnone\b/i);
     expect(a11yIssues(html)).toEqual([]);
@@ -9364,6 +9377,159 @@ describe("Pipeline — condominium units' tag (lib/condo)", () => {
       const text = visibleText(html);
       expect(text, initialView).toContain("Bulk 42 of 120 (35%)");
       const chip = html.match(/<span[^>]*title="Bulk 42 of 120 \(35%\):[^"]*"[^>]*>/)?.[0] ?? "";
+      expect(chip, initialView).toContain("text-brand");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+  });
+});
+
+// ── A sandwich position (lib/sandwich-lease) ────────────────────────────────
+import { SandwichPanel } from "@/app/sandwich-panel";
+import { readSandwichLease, sandwichModelLine, sandwichTag } from "@/lib/sandwich-lease";
+
+const SANDWICH_TODAY = new Date("2026-10-05T12:00:00Z");
+const MASTER_INTEREST = {
+  kind: "leasehold",
+  summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+  share: "",
+  groundLease: "Master lease of the building from its owner; master rent $1,100,000 a year",
+  loan: "",
+  page: "p. 4",
+};
+const sandwichDeck = (metrics: { label: string; value: string }[], interest: Record<string, string> = MASTER_INTEREST) =>
+  ({
+    dealName: "Founders Plaza",
+    assetClass: "Office",
+    totalPages: 40,
+    interest,
+    metrics: metrics.map((m) => ({ ...m, flagged: false, page: "p. 6", basis: "na" as const })),
+  }) as unknown as ExtractionResult;
+const SANDWICH_DECK = sandwichDeck([
+  { label: "Asking price", value: "$6,500,000" },
+  { label: "Master lease rent", value: "$1,100,000 a year, increasing 2% annually" },
+  { label: "Sublease income", value: "$1,820,000" },
+  { label: "NOI (T-12)", value: "$720,000" },
+  { label: "Master lease expiration", value: "December 31, 2041" },
+  { label: "Master lease options", value: "Two 5-year options" },
+]);
+
+describe("SandwichPanel (lib/sandwich-lease) — the subleases against the master rent, the spread filled, and the master lease's term", () => {
+  it("draws the spread on the sublease income, the cover, and the term against the model's hold, then the model's read", () => {
+    const r = readSandwichLease(SANDWICH_DECK, SANDWICH_TODAY)!;
+    const html = render(React.createElement(SandwichPanel, { sandwich: r, holdYears: 5, modelLine: sandwichModelLine(r, { holdYears: 5 })! }));
+    dumpView("sandwich-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="sandwich-panel"');
+    expect(html).toContain("border-l-brand");
+    expect(text).toContain("Spread $720k a year, 1.65× cover");
+    for (const bar of ["sandwich-master", "sandwich-spread", "lease-hold", "lease-term", "lease-options"]) {
+      expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    }
+    expect(html).not.toContain('data-bar="sandwich-shortfall"');
+    expect(text).toContain("Master rent $1.10M, owed whatever the subtenants pay");
+    expect(text).toContain("Spread $720k, the position's income before its own costs");
+    expect(text).toContain("The whole bar: the subleases' $1.82M a year");
+    // The master lease's term against the model's sale: the position ends with it.
+    expect(text).toContain("The model's hold, 5 years");
+    expect(text).toContain("Left at the sale, 10.2 years (to Dec 2041)");
+    expect(text).toContain("Extension options, 10 years if exercised");
+    for (const key of ["cover", "cushion"]) expect(html).toContain(`data-sandwich="${key}"`);
+    expect(text).toContain("1.65×");
+    expect(text).toContain("40%");
+    // The read's first sentence in the open, the rest one click away.
+    expect(text).toContain("The subleases bring in $1.82M a year against the $1.10M master rent");
+    expect(html).toContain("Read the rest (2 more)");
+    expect(text).toContain("The model capitalises the position's income at its sale as if it ran forever; the master lease ends Dec 2041, 10.2 years after the model's sale");
+    expect(a11yIssues(html), "sandwich panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("warns where the subleases bring in less than the master rent and the lease ends inside the hold, says one rent alone, and nothing on anything else", () => {
+    const under = readSandwichLease(
+      sandwichDeck([
+        { label: "Master lease rent", value: "$1,100,000" },
+        { label: "Sublease income", value: "$950,000" },
+        { label: "Master lease expiration", value: "June 30, 2029" },
+      ]),
+      SANDWICH_TODAY,
+    )!;
+    const html = render(React.createElement(SandwichPanel, { sandwich: under, holdYears: 5 }));
+    const text = visibleText(html);
+    expect(html).toContain("border-l-caution");
+    expect(text).toContain("The subleases bring in $150k a year less than the master rent");
+    for (const bar of ["sandwich-sublease", "sandwich-shortfall", "lease-past"]) expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    expect(text).toContain("Shortfall $150k a year, which the position pays");
+    expect(text).toContain("The whole bar: the $1.10M master rent, owed whatever the subtenants pay");
+    expect(html).not.toContain('data-sandwich="cushion"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    // One rent alone: a tile, no spread drawn.
+    const one = render(React.createElement(SandwichPanel, { sandwich: readSandwichLease(sandwichDeck([{ label: "Master lease rent", value: "$1,100,000" }]), SANDWICH_TODAY) }));
+    expect(one).toContain('data-sandwich="master-rent"');
+    expect(one).not.toContain('data-qa="sandwich-spread"');
+    expect(visibleText(one)).toContain("Master rent $1.10M a year");
+    expect(renderToStaticMarkup(React.createElement(SandwichPanel, { sandwich: null }))).toBe("");
+    const plain = { ...MASTER_INTEREST, summary: "Leasehold under a 99-year ground lease", groundLease: "Ground lease to 2090" };
+    expect(readSandwichLease(sandwichDeck([{ label: "Master lease rent", value: "$1,100,000" }, { label: "Sublease income", value: "$1,820,000" }], plain), SANDWICH_TODAY)).toBeNull();
+  });
+});
+
+describe("ShareView — a sandwich position (lib/sandwich-lease)", () => {
+  it("draws the spread and the master lease's term without the model's hold or read, the two rents lead the key terms, and nothing on the sample", () => {
+    const props = {
+      dealName: "Founders Plaza",
+      assetClass: "auto",
+      expiresAt: "2026-10-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      today: "2026-10-05",
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: SANDWICH_DECK }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="sandwich-panel"');
+    const panel = html.match(/<section aria-label="Sandwich position"[\s\S]*?<\/section>/)?.[0] ?? "";
+    expect(panel.match(/data-bar="sandwich-spread"/g)).toHaveLength(1);
+    expect(panel.match(/data-bar="lease-term"/g)).toHaveLength(1);
+    expect(panel).not.toContain('data-bar="lease-hold"');
+    expect(text).not.toContain("The model capitalises");
+    // The key terms lead with the two rents and the master lease's end,
+    // ahead of the memorandum's own NOI.
+    const term = (label: string) => html.indexOf(`<span class="line-clamp-2">${label}</span>`);
+    expect(term("Master lease rent")).toBeGreaterThan(-1);
+    expect(term("Master lease rent")).toBeLessThan(term("NOI (T-12)"));
+    expect(term("Sublease income")).toBeLessThan(term("NOI (T-12)"));
+    expect(term("Master lease expiration")).toBeLessThan(term("NOI (T-12)"));
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain("sandwich-panel");
+  });
+});
+
+describe("Pipeline — a sandwich position's tag (lib/sandwich-lease)", () => {
+  const tag = sandwichTag(SANDWICH_DECK, SANDWICH_TODAY)!;
+  const position = card({
+    id: "sw",
+    name: "Founders Plaza",
+    assetClass: "office",
+    verdict: "caution",
+    slots: { cap: null, price: "$6,500,000", yoc: null, interest: "Master lease, 15 yrs left", sandwich: tag },
+    market: "Baltimore, MD",
+    coveredMarket: null,
+  });
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
+
+  it("says the spread and its cover in the brand's tone on the row and the card, beside what the price buys", () => {
+    expect(tag).toBe("Spread $720k, 1.65× cover");
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([position]), initialView }));
+      const text = visibleText(html);
+      expect(text, initialView).toContain("Spread $720k, 1.65× cover");
+      expect(text, initialView).toContain("Master lease, 15 yrs left");
+      const chip = html.match(/<span[^>]*title="Spread \$720k, 1\.65× cover:[^"]*"[^>]*>/)?.[0] ?? "";
       expect(chip, initialView).toContain("text-brand");
       expect(gluedWords(text), initialView).toEqual([]);
       expect(a11yIssues(html), initialView).toEqual([]);

@@ -664,6 +664,50 @@ describe("deriveUnderwriteInputs — condominium units sold as one building (lib
   });
 });
 
+describe("deriveUnderwriteInputs — a sandwich position capitalised as if it ran forever (lib/sandwich-lease)", () => {
+  // Read on a pinned day: the model reads the master lease's term off the
+  // clock, and the years after its sale move with it.
+  beforeEach(() => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 5, 12)), toFake: ["Date"] });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const interest = {
+    kind: "leasehold" as const,
+    summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+    share: "",
+    groundLease: "Master lease of the building from its owner",
+    loan: "",
+    page: "",
+  };
+  const rows = [
+    metric("Asking price", "$6,500,000"),
+    metric("Master lease rent", "$1,100,000 a year, increasing 2% annually"),
+    metric("Sublease income", "$1,820,000"),
+    metric("NOI (T-12)", "$720,000"),
+    metric("Master lease expiration", "December 31, 2041"),
+  ];
+
+  it("says the two rents and the master lease's end in a line, and where the lease ends against the model's sale", () => {
+    const m = deriveUnderwriteInputs(ex(rows, { assetClass: "office", interest }), "fallback");
+    expect(m.inputs.holdMonths).toBe(60);
+    expect(m.meta.sandwich?.line).toBe("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2041");
+    expect(m.meta.sandwich?.read).toBe(
+      "The model capitalises the position's income at its sale as if it ran forever; the master lease ends Dec 2041, 10.2 years after the model's sale, and the position with it — the exit on that term is the one to read.",
+    );
+    // A master lease ending inside the hold: the sale the model prices cannot happen.
+    const short = deriveUnderwriteInputs(ex([...rows.slice(0, 4), metric("Master lease expiration", "June 30, 2029")], { assetClass: "office", interest }), "fallback");
+    expect(short.meta.sandwich?.read).toContain("the master lease ends Jun 2029, inside the model's 5-year hold, so the sale the model prices cannot happen.");
+  });
+
+  it("nothing on a plain leasehold or a building bought outright", () => {
+    const plain = { ...interest, summary: "Leasehold under a 99-year ground lease", groundLease: "Ground lease to 2090" };
+    expect(deriveUnderwriteInputs(ex(rows, { assetClass: "office", interest: plain }), "fallback").meta.sandwich).toBeNull();
+    expect(deriveUnderwriteInputs(ex(rows, { assetClass: "office" }), "fallback").meta.sandwich).toBeNull();
+  });
+});
+
 describe("deriveUnderwriteInputs — the PCA's immediate repairs are capital at closing (#465)", () => {
   const base = [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,520,000"), metric("Units", "240")];
 

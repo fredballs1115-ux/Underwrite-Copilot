@@ -142,6 +142,33 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(pipelineExportRow(deal(), ctx).condo).toBeNull();
   });
 
+  it("says a sandwich position's spread, as the pipeline card says it, and carries it in the price cell's note (lib/sandwich-lease)", async () => {
+    const position = {
+      dealName: "Founders Plaza",
+      assetClass: "Office",
+      market: "Baltimore, MD",
+      address: "",
+      interest: {
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner",
+        loan: "",
+        page: "",
+      },
+      metrics: [m("Asking price", "$6,500,000"), m("Master lease rent", "$1,100,000"), m("Sublease income", "$1,820,000"), m("Master lease expiration", "December 31, 2041")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: position }), { ...ctx, today: "2026-10-05" });
+    expect(row.sandwich).toBe("Spread $720k, 1.65× cover");
+    expect(row.sandwich).toBe(pickSlots(position, null, "auto", { address: null, siteFlags: null, today: "2026-10-05" }).sandwich);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    const note = JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note);
+    expect(note).toContain("Spread $720k, 1.65× cover: a master lease of the building, sublet — the master rent is owed whatever the subtenants pay");
+    expect(pipelineExportRow(deal(), ctx).sandwich).toBeNull();
+  });
+
   it("prints the deal's one class: the deck's on a deal filed Auto, the analyst's where they filed one", async () => {
     expect(pipelineExportRow(deal(), ctx).assetClass).toBe("multifamily");
     expect(pipelineExportRow(deal({ asset_class: "office" }), ctx).assetClass).toBe("office");

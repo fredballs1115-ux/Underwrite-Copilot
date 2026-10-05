@@ -34,6 +34,8 @@ import { GoingConcernPanel } from "@/app/going-concern-panel";
 import { readGoingConcern } from "@/lib/going-concern";
 import { CondoPanel } from "@/app/condo-panel";
 import { readCondo } from "@/lib/condo";
+import { SandwichPanel } from "@/app/sandwich-panel";
+import { readSandwichLease } from "@/lib/sandwich-lease";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
@@ -1459,6 +1461,15 @@ export default async function DealPage({
             before any figure is believed, since it changes what the price
             buys (lib/interest). Nothing for a plain fee simple. */}
         <InterestPanel interest={interest} />
+        {/* A sandwich position (lib/sandwich-lease): the sublease income
+            against the master rent with the spread filled, its cover, the
+            master lease's term against the model's hold, and what the model
+            does with a position that ends. Read on the reader's day. */}
+        <SandwichPanel
+          sandwich={readSandwichLease(extraction, new Date(`${todayIso}T12:00:00Z`))}
+          holdYears={derived ? derived.inputs.holdMonths / 12 : null}
+          modelLine={derived?.meta.sandwich?.read ?? ""}
+        />
         {/* How it is sold (#456): an auction's starting bid is where the
             price starts — the bid, the premium on top, the model's ceiling
             at the buyer's hurdle; a court's or a lender's sale says who is

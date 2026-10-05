@@ -450,6 +450,41 @@ describe("dealContextFor — condominium units bought in bulk (lib/condo)", () =
   });
 });
 
+describe("dealContextFor — a sandwich position (lib/sandwich-lease)", () => {
+  const SANDWICH = {
+    dealName: "Founders Plaza",
+    assetClass: "Office",
+    totalPages: 40,
+    interest: {
+      kind: "leasehold",
+      summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+      share: "",
+      groundLease: "Master lease of the building from its owner; master rent $1,100,000 a year",
+      loan: "",
+      page: "p. 4",
+    },
+    metrics: [
+      m("Asking price", "$6,500,000"),
+      m("Master lease rent", "$1,100,000 a year, increasing 2% annually"),
+      m("Sublease income", "$1,820,000"),
+      m("NOI (T-12)", "$720,000"),
+      m("Master lease expiration", "December 31, 2041"),
+    ],
+  } as unknown as ExtractionResult;
+
+  it("says the spread, its cover and the master lease's end right after what is being sold, and nothing on a plain leasehold", () => {
+    const ctx = dealContextFor(SANDWICH)!;
+    expect(ctx).toContain(
+      "Sandwich position (a master lease of the building, sublet): The subleases bring in $1.82M a year against the $1.10M master rent: a spread of $720k, the position's income before its own costs, the sublease income covering the master rent 1.65×.",
+    );
+    expect(ctx).toContain("When it ends the position ends with it: no building and no land come to the buyer.");
+    expect(ctx.indexOf("What is being sold")).toBeGreaterThan(-1);
+    expect(ctx.indexOf("What is being sold")).toBeLessThan(ctx.indexOf("Sandwich position"));
+    const plain = { ...SANDWICH, interest: { ...SANDWICH.interest!, summary: "Leasehold under a 99-year ground lease", groundLease: "Ground lease to 2090" } };
+    expect(dealContextFor(plain) ?? "").not.toContain("Sandwich position");
+  });
+});
+
 describe("dealContextFor — the rent rules that reach the building (lib/rent-regulation)", () => {
   const walkUp: ExtractionResult = {
     dealName: "The Walk-up",

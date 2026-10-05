@@ -363,6 +363,32 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(btr, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Homes", "Occupancy"]);
   });
 
+  it("a sandwich position's two rents and the master lease's end lead after the price, on a leasehold only (lib/sandwich-lease)", () => {
+    const sandwich = [
+      { label: "Occupancy", value: "91%", flagged: true },
+      { label: "Master lease expiration", value: "December 31, 2041", flagged: false },
+      { label: "Master lease options", value: "Two 5-year options", flagged: false },
+      { label: "NOI (T-12)", value: "$720,000", flagged: false },
+      { label: "Sublease income", value: "$1,820,000", flagged: false },
+      { label: "Master lease rent", value: "$1,100,000 a year", flagged: false },
+      { label: "Asking price", value: "$6,500,000", flagged: false },
+    ];
+    expect(keyTermRows(sandwich, "stabilized", SCREEN_YEAR, 6, "leasehold").map((m) => m.label)).toEqual([
+      "Asking price",
+      "Master lease rent",
+      "Sublease income",
+      "Master lease expiration",
+      "Master lease options",
+      "Occupancy",
+    ]);
+    // A seller's master lease of vacant suites on a building sold outright
+    // is a rent guarantee: its rents are never led as the position's, and
+    // fall after the flagged rows in the memorandum's order.
+    const fee = keyTermRows(sandwich, "stabilized", SCREEN_YEAR, 8, "fee_simple").map((m) => m.label);
+    expect(fee.indexOf("Master lease rent")).toBeGreaterThan(fee.indexOf("Occupancy"));
+    expect(fee.indexOf("Sublease income")).toBeGreaterThan(fee.indexOf("Occupancy"));
+  });
+
   it("a student building's pre-leasing and walk lead after the price (#468)", () => {
     const student = [
       { label: "Occupancy", value: "96%", flagged: false },

@@ -31,6 +31,7 @@ import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseTag } from "@/lib/mixed-use";
 import { goingConcernTag } from "@/lib/going-concern";
 import { condoTag } from "@/lib/condo";
+import { sandwichTag } from "@/lib/sandwich-lease";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ListJobStatus } from "@/lib/screen-run";
 
@@ -136,6 +137,12 @@ export interface PipelineSlots {
    *  units" (lib/condo `condoTag`); absent or null where the deal's own words
    *  name no condominium or the memorandum states none of its figures */
   condo?: string | null;
+  /** a sandwich position's spread — "Spread $720k, 1.65× cover", "Subleases
+   *  under the master rent" (lib/sandwich-lease `sandwichTag`); absent or
+   *  null on anything but a master lease of the building whose memorandum
+   *  states both rents. Its term is the interest's tag ("Master lease, 15
+   *  yrs left") */
+  sandwich?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
@@ -317,6 +324,9 @@ export function pickSlots(
     // Condominium units bought in bulk (lib/condo): the units offered of the
     // condominium's, where both are stated.
     condo: condoTag(extraction, asOf),
+    // A sandwich position (lib/sandwich-lease): the sublease income less the
+    // master rent, and its cover, where both rents are stated.
+    sandwich: sandwichTag(extraction, asOf),
     // The price by the unit or the foot, as a listing card shows it (#469),
     // in the deal's one class.
     basis: basisTag(extraction, strategy.kind, storedClass),

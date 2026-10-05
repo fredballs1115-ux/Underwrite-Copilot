@@ -486,3 +486,24 @@ describe("the lease on every summary", () => {
     expect(readSingleTenant(ex([row("Lease term remaining", "7 years")]), TODAY)?.term?.from).toBe("remaining");
   });
 });
+
+describe("a sandwich position's master lease is never its subtenant's lease (research pass 28)", () => {
+  it("reads the subtenant's own lease on a master leasehold, and a net lease's master lease as the tenant's", () => {
+    const master = {
+      kind: "leasehold" as const,
+      summary: "Leasehold interest under a master lease of the building, sublet to one tenant",
+      share: "",
+      groundLease: "Master lease of the building from its owner",
+      loan: "",
+      page: "",
+    };
+    // The master lease's end and its remaining term listed first: the
+    // subtenant's lease is read from its own row.
+    const rows = [row("Master lease expiration", "December 31, 2041"), row("Master lease term remaining", "15 years"), row("Lease expiration", "March 31, 2036")];
+    expect(readSingleTenant(ex(rows, { interest: master }), TODAY)!.term?.ends).toBe("2036-03-31");
+    // Only the master lease's end stated: nothing is read for the subtenant.
+    expect(readSingleTenant(ex([row("Master lease expiration", "December 31, 2041")], { interest: master }), TODAY)!.term).toBeNull();
+    // A net lease's master lease, on a building sold outright, is the tenant's.
+    expect(readSingleTenant(ex([row("Master lease expiration", "December 31, 2041")]), TODAY)!.term?.ends).toBe("2041-12-31");
+  });
+});

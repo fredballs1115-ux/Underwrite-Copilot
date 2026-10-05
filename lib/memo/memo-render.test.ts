@@ -606,6 +606,51 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").condoLine).toBe("");
   }, 30000);
 
+  it("says a sandwich position under the title, on the day it is given (lib/sandwich-lease), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Founders Plaza",
+      assetClass: "Office",
+      interest: {
+        kind: "leasehold" as const,
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner",
+        loan: "",
+        page: "",
+      },
+      metrics: [
+        { label: "Asking price", value: "$6,500,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Master lease rent", value: "$1,100,000 a year", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Sublease income", value: "$1,820,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "NOI (T-12)", value: "$720,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Master lease expiration", value: "December 31, 2041", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const deal = {
+      name: "Founders Plaza",
+      asset_class: "auto",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.sandwichLine).toBe("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2041");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2041");
+    // Past its end the master lease's date is not said as the position's end.
+    expect(buildMemoData(deal, "October 5, 2042", [], null, null, null, "2042-10-05").sandwichLine).toBe(
+      "Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×)",
+    );
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").sandwichLine).toBe("");
+  }, 30000);
+
   it("says the rent rules that reach the building under the title, on the day it is given (lib/rent-regulation), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

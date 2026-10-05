@@ -42,6 +42,8 @@ import { GoingConcernPanel } from "@/app/going-concern-panel";
 import { readGoingConcern } from "@/lib/going-concern";
 import { CondoPanel } from "@/app/condo-panel";
 import { readCondo } from "@/lib/condo";
+import { SandwichPanel } from "@/app/sandwich-panel";
+import { readSandwichLease } from "@/lib/sandwich-lease";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -360,6 +362,12 @@ export function ShareView({
       {/* What is being sold (#414) — a note, a share, a leasehold changes
           what every figure below means; nothing for a plain fee simple. */}
       <InterestPanel interest={readInterest(safeExtraction, askingPriceOf(safeExtraction))} />
+
+      {/* A sandwich position (lib/sandwich-lease): the sublease income
+          against the master rent, its cover and the master lease's term —
+          the model's hold and read need the model, which the sender's deal
+          page carries. Read on the loader's day. */}
+      <SandwichPanel sandwich={readSandwichLease(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined)} />
 
       {/* How it is sold (#456): the starting bid, the premium on top, the
           reserve and the deadline — or who is selling, and as-is. */}

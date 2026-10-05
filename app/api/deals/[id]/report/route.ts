@@ -189,6 +189,8 @@ export async function GET(
   let goingConcern: { line: string; read: string } | null = null;
   // Condominium units bought in bulk (lib/condo).
   let condo: { line: string; read: string } | null = null;
+  // A sandwich position (lib/sandwich-lease).
+  let sandwich: { line: string; read: string } | null = null;
   // The rent rules that reach the building (lib/rent-regulation), through the
   // one call every surface makes, on the route's UTC day — the day the file
   // is named for. Read apart from the model, so its line prints even where
@@ -291,6 +293,7 @@ export async function GET(
       mixedUse = derived.meta.mixedUse ?? null;
       goingConcern = derived.meta.goingConcern ?? null;
       condo = derived.meta.condo ?? null;
+      sandwich = derived.meta.sandwich ?? null;
       // The rent rules, with this model's one growth rate set beside the
       // allowance in force (the workbook cover's own two lines).
       regulation = derived.meta.regulation ?? regulation;
@@ -384,7 +387,7 @@ export async function GET(
       // a failed read is no page, never a failed report.
       galleryPhotosFor(id, visualCache).catch(() => []),
     ]);
-    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo);
+    const input = buildReportData(deal, dateStr, buyBoxChecks, sensitivity, branding, plan, overrides, cover, assumptions, assumable, leasehold, floodMap, singleTenant, hotel, sale, roster, photos, valueAdd, taxAbatement, sellerNote, siteReports, student, mh, storage, regulation, forward, mixedUse, goingConcern, condo, sandwich);
     const element = React.createElement(ReportDocument, {
       input,
     }) as unknown as Parameters<typeof renderToBuffer>[0];

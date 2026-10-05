@@ -1300,6 +1300,49 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("Condominium units: 42 of 120 units; dues $328k a year. The model sells the 42 units as one building");
   }, 60000);
 
+  it("prints a sandwich position over the grids, and the model's perpetuity against its master lease (lib/sandwich-lease)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Founders Plaza",
+      assetClass: "Office",
+      interest: {
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner",
+        loan: "",
+        page: "",
+      },
+      metrics: [
+        { label: "Asking price", value: "$6,500,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Master lease rent", value: "$1,100,000 a year", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Sublease income", value: "$1,820,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "NOI (T-12)", value: "$720,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Master lease expiration", value: "December 31, 2091", flagged: false, page: "", basis: "na" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: "Founders Plaza",
+      asset_class: "auto",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, "Founders Plaza");
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.sandwich ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.sandwich).toEqual(derived.meta.sandwich);
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends Dec 2091. The model capitalises the position's income at its sale as if it ran forever; the master lease ends Dec 2091",
+    );
+  }, 60000);
+
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

@@ -29,6 +29,7 @@ import { forwardContextLine, readForwardPurchase } from "@/lib/forward-purchase"
 import { mixedUseContextLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernContextLine, readGoingConcern } from "@/lib/going-concern";
 import { condoContextLine, readCondo } from "@/lib/condo";
+import { readSandwichLease, sandwichContextLine } from "@/lib/sandwich-lease";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -89,6 +90,11 @@ export function dealContextFor(
   // What is being sold is said FIRST whatever the strategy (#414): a note's
   // price or a share's changes what every figure after it means.
   const interest = readInterest(extraction, askingPriceOf(extraction));
+  // A sandwich position (lib/sandwich-lease): a master lease of the
+  // building, sublet — the sublease income against the master rent, the
+  // spread and its cover, and the master lease's end, right after what is
+  // being sold, since the position is the income between the two rents.
+  const sandwich = readSandwichLease(extraction);
   // The seller's loan, where it is offered for assumption (#417): its terms
   // as stated and what its value turns on, right after what is being sold.
   const assumable = readAssumable(extraction, null);
@@ -158,6 +164,7 @@ export function dealContextFor(
   const range = priceRangeLine(extraction, strategy.kind);
   const head = [
     ...(interest ? [interestContextLine(interest)] : []),
+    ...(sandwich ? [sandwichContextLine(sandwich)] : []),
     ...(sale ? [saleContextLine(sale)] : []),
     ...(range ? [range] : []),
     ...(forward ? [forwardContextLine(forward)] : []),

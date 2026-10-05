@@ -52,6 +52,7 @@ import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
 import { condoShortLine, readCondo } from "@/lib/condo";
+import { readSandwichLease, sandwichShortLine } from "@/lib/sandwich-lease";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
@@ -293,6 +294,15 @@ function condoLineFor(extraction: ExtractionResult | null, today: string): strin
   return r ? condoShortLine(r) : "";
 }
 
+/** A sandwich position (lib/sandwich-lease) in one line for the memo's
+ *  header: the sublease income against the master rent and its cover, and
+ *  when the master lease ends. "" on anything but a master lease of the
+ *  building. */
+function sandwichLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readSandwichLease(extraction, new Date(`${today}T12:00:00Z`));
+  return r ? sandwichShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -400,6 +410,10 @@ export type MemoData = {
    *  condominium's, a year of their dues and a special assessment
    *  (lib/condo), in one line; "" on anything else */
   condoLine?: string;
+  /** a sandwich position — the sublease income against the master rent,
+   *  its cover and the master lease's end (lib/sandwich-lease), in one
+   *  line; "" on anything but a master lease of the building */
+  sandwichLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -712,6 +726,7 @@ export function buildMemoData(
     mixedUseLine: pdfSafe(mixedUseLineFor(extraction ?? null, today)),
     goingConcernLine: pdfSafe(goingConcernLineFor(extraction ?? null, today)),
     condoLine: pdfSafe(condoLineFor(extraction ?? null, today)),
+    sandwichLine: pdfSafe(sandwichLineFor(extraction ?? null, today)),
     singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
     hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
     saleLine: pdfSafe(saleLineFor(extraction ?? null)),
@@ -1196,6 +1211,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {data.interestLine && (
               <Text style={[s.sub, { color: "#114e54", fontFamily: "Helvetica-Bold" }]}>{data.interestLine}</Text>
             )}
+            {/* A sandwich position (lib/sandwich-lease): the subleases
+                against the master rent, and when the master lease ends. */}
+            {data.sandwichLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.sandwichLine}</Text>}
             {/* How it is sold (#456): an auction's starting bid is where the
                 price starts, and a court's or a lender's sale is as-is. */}
             {data.saleLine && <Text style={[s.sub, { color: "#8a5a00", fontFamily: "Helvetica-Bold" }]}>{data.saleLine}</Text>}

@@ -1450,6 +1450,41 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a sandwich position: the challenger reads the spread, its cover and the sandwich-lease traps, and the deal context says them (lib/sandwich-lease)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "Office",
+      dealName: "Founders Plaza",
+      interest: {
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner; master rent $1,100,000 a year",
+        loan: "",
+        page: "",
+      },
+      metrics: [
+        { label: "Asking price", value: "$6,500,000", flagged: false, page: "", basis: "na" },
+        { label: "Master lease rent", value: "$1,100,000 a year, increasing 2% annually", flagged: false, page: "", basis: "in_place" },
+        { label: "Sublease income", value: "$1,820,000", flagged: false, page: "", basis: "in_place" },
+        { label: "NOI (T-12)", value: "$720,000", flagged: false, page: "", basis: "in_place" },
+        { label: "Master lease expiration", value: "December 31, 2041", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain(
+      "SANDWICH POSITION AS STATED: The subleases bring in $1.82M a year against the $1.10M master rent: a spread of $720k, the position's income before its own costs, the sublease income covering the master rent 1.65×.",
+    );
+    expect(note).toContain("SANDWICH-LEASE TRAPS, checked by name");
+    for (const trap of ["(a) THE TERM AND THE OPTIONS", "(c) THE FEE OWNER'S LENDER", "(d) CONSENT TO ASSIGN AND SUBLET"]) expect(note, trap).toContain(trap);
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Sandwich position (a master lease of the building, sublet): The subleases bring in $1.82M a year");
+    expect(context).not.toContain("SANDWICH-LEASE TRAPS");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a rent-regulated building: the challenger and the deal context read the rules that reach it, the allowance in force and the regulation traps (lib/rent-regulation)", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     vi.mocked(extractTerms).mockResolvedValue({

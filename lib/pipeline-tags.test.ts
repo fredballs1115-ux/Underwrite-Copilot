@@ -44,6 +44,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
         price: "$12,500,000",
         sale: "Auction, 5% premium",
         interest: "49% share",
+        sandwich: "Spread $720k, 1.65× cover",
         forward: "Build-to-suit, 6.00% at delivery",
         goingConcern: "Operator lease, 2.61x coverage",
         debt: "Assumable 3.45%",
@@ -67,7 +68,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
       { tag: "Flood AE" },
     );
     expect(tags.map((t) => t.key)).toEqual([
-      "flood", "sale", "interest", "forward", "goingConcern", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse", "condo",
+      "flood", "sale", "interest", "sandwich", "forward", "goingConcern", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse", "condo",
     ]);
     // The broker and the basis are no tag: one is a CSV column, the other
     // the price's own second line.
@@ -87,6 +88,13 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     expect(tone("mixedUse")).toBe("brand");
     // Condominium units are the brand's: the deal page reads the share.
     expect(tone("condo")).toBe("brand");
+    // A sandwich position's spread is the brand's; subleases that bring in
+    // less than the master rent warn.
+    expect(tone("sandwich")).toBe("brand");
+    expect(dealTags(slots({ sandwich: "Subleases under the master rent" }))[0]).toMatchObject({ key: "sandwich", tone: "caution" });
+    expect(tags.find((t) => t.key === "sandwich")?.title).toBe(
+      "Spread $720k, 1.65× cover: a master lease of the building, sublet — the master rent is owed whatever the subtenants pay; the deal page reads the spread, its cover and the master lease's term",
+    );
     // A lease the operator's earnings cover is the brand's; a business sold
     // with its real estate, one not settled, or a coverage under 1.00x warns.
     expect(tone("goingConcern")).toBe("brand");

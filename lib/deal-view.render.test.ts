@@ -45,6 +45,8 @@ import { readGoingConcern } from "./going-concern";
 import { GoingConcernPanel } from "@/app/going-concern-panel";
 import { readCondo } from "./condo";
 import { CondoPanel } from "@/app/condo-panel";
+import { readSandwichLease } from "./sandwich-lease";
+import { SandwichPanel } from "@/app/sandwich-panel";
 import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { STALE_MS } from "./screen-run";
@@ -1196,6 +1198,48 @@ describe("the deal page's condominium panel reads the derived model (lib/condo)"
     expect(html).toContain('data-qa="condo-panel"');
     expect(html.match(/data-bar="condo-limit"/g)).toHaveLength(1);
     expect(text).toContain(`The model sells the 42 units as one building at its ${(derived.inputs.exitCapPct * 100).toFixed(2)}% exit cap`);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("the deal page's sandwich panel reads the derived model (lib/sandwich-lease)", () => {
+  it("draws the master lease's term against the model's hold, and the model's own read", () => {
+    // As app/(app)/deals/[id]/page.tsx draws it: the read on the page's day,
+    // the hold and `meta.sandwich.read` from the derived model.
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Founders Plaza",
+      assetClass: "Office",
+      interest: {
+        kind: "leasehold" as const,
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner",
+        loan: "",
+        page: "",
+      },
+      metrics: [
+        { label: "Asking price", value: "$6,500,000", flagged: false, page: "", basis: "na" as const },
+        { label: "Master lease rent", value: "$1,100,000 a year", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Sublease income", value: "$1,820,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "NOI (T-12)", value: "$720,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Master lease expiration", value: "December 31, 2091", flagged: false, page: "", basis: "na" as const },
+      ],
+    };
+    const derived = deriveUnderwriteInputs(extraction, "Founders Plaza");
+    const html = renderToStaticMarkup(
+      React.createElement(SandwichPanel, {
+        sandwich: readSandwichLease(extraction, new Date("2026-10-05T12:00:00Z")),
+        holdYears: derived.inputs.holdMonths / 12,
+        modelLine: derived.meta.sandwich?.read ?? "",
+      }),
+    );
+    const text = textOf(html);
+    expect(html).toContain('data-qa="sandwich-panel"');
+    for (const bar of ["sandwich-master", "sandwich-spread", "lease-hold", "lease-term"]) expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    expect(text).toContain(`The model's hold, ${derived.inputs.holdMonths / 12} years`);
+    expect(text).toContain("The model capitalises the position's income at its sale as if it ran forever; the master lease ends Dec 2091");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });

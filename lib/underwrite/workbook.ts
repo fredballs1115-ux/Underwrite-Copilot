@@ -550,6 +550,23 @@ function buildCover(
       r++;
     }
   }
+  // A sandwich position (lib/sandwich-lease): the sublease income against
+  // the master rent and the master lease's end, then what this model does
+  // with the position — its income capitalised at the sale as if it ran
+  // forever, while the master lease ends.
+  if (meta.sandwich) {
+    fact("The sandwich position", meta.sandwich.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.sandwich.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.sandwich.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
   // What the third-party reports found (#465): the Phase I, the immediate
   // repairs, the seismic PML and the zoning, then what this model does with
   // the repairs.

@@ -70,6 +70,7 @@ import { forwardModelLine, forwardShortLine, readForwardPurchase } from "@/lib/f
 import { mixedUseModelLine, mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernModelLine, goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
 import { condoModelLine, condoShortLine, readCondo } from "@/lib/condo";
+import { readSandwichLease, sandwichModelLine, sandwichShortLine } from "@/lib/sandwich-lease";
 import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -224,6 +225,13 @@ export interface WorkbookMeta {
    *  then what this model does with them — it sells them as one building at
    *  its exit cap and runs no retail exit. Absent on anything else. */
   condo?: { line: string; read: string } | null;
+  /** a sandwich position (lib/sandwich-lease): the sublease income against
+   *  the master rent, its cover and the master lease's end in a line, then
+   *  what this model does with the position — it capitalises the income at
+   *  its sale as if it ran forever, while the master lease ends ("" where
+   *  the stated end has passed). Absent on anything but a master lease of
+   *  the building. */
+  sandwich?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -464,6 +472,17 @@ function condoMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs
   const r = readCondo(extraction);
   if (!r) return null;
   return { line: condoShortLine(r), read: condoModelLine(r, { exitCapPct: inputs.exitCapPct }) ?? "" };
+}
+
+/** The cover's lines about a sandwich position (lib/sandwich-lease): the
+ *  two rents and the master lease's end in a line, then what this model
+ *  does with the position — it capitalises the income at its sale as if it
+ *  ran forever, and the master lease ends against its hold. Null on
+ *  anything but a master lease of the building. */
+function sandwichMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["sandwich"] {
+  const r = readSandwichLease(extraction);
+  if (!r) return null;
+  return { line: sandwichShortLine(r), read: sandwichModelLine(r, { holdYears: inputs.holdMonths / 12 }) ?? "" };
 }
 
 /** The cover's lines about a multi-tenant property's listed tenants
@@ -1106,6 +1125,7 @@ export function deriveUnderwriteInputs(
       mixedUse: mixedUseMeta(extraction, inputs),
       goingConcern: goingConcernMeta(extraction, inputs, noi),
       condo: condoMeta(extraction, inputs),
+      sandwich: sandwichMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

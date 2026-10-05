@@ -22,6 +22,7 @@ import { forwardTermRows } from "./forward-purchase";
 import { COMMERCIAL_INCOME_ROW, RESIDENTIAL_INCOME_ROW, mixedUseTermRows } from "./mixed-use";
 import { goingConcernTermRows } from "./going-concern";
 import { HOA_DUES_ROW, condoTermRows } from "./condo";
+import { sandwichTermRows } from "./sandwich-lease";
 import { noteTermRows } from "./note-yield";
 import { affordableTermRows } from "./affordable";
 import { singleTenantTermRows } from "./single-tenant";
@@ -119,6 +120,12 @@ export function keyTermRows<M extends KeyTermMetric>(
     lead(findGoingInCap(rows));
   }
   lead(unitCountRow(rows));
+  // A sandwich position (lib/sandwich-lease): the master rent and the
+  // sublease income the position lives between, then the master lease's
+  // end and its options — what the price buys, after the count. Only on a
+  // leasehold, so a seller's master lease of vacant suites on a building
+  // sold outright (a rent guarantee) never leads as one.
+  if (interest === "leasehold") for (const row of sandwichTermRows(rows)) lead(row);
   // A covenant or a contract that sets the rents (#453): how many units it
   // binds and until when, right after the count it is a share of.
   for (const row of affordableTermRows(rows)) lead(row);

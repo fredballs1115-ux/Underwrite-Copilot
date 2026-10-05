@@ -49,6 +49,7 @@
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { inferStrategy, notYetDelivered } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
+import { isMasterLeasehold } from "@/lib/interest";
 import {
   endHasPassed,
   endIsAhead,
@@ -97,8 +98,18 @@ const RATING_ROW = /\bcredit\s+rating\b|\brating\b/i;
 const EARLY_ROW =
   /\bearly\s+terminat\w*|\bterminat\w*\s+(?:option|right)s?\b|\bkick[- ]?out\b|\bfirm\s+term\b.*\b(?:expir\w*|ends?|end\s+date)\b|\b(?:expir\w*|end)\b.*\bfirm\s+term\b/i;
 
+// On a sandwich position (lib/interest `isMasterLeasehold`, research pass
+// 28) a master lease's rows — "Master lease expiration", "… term remaining"
+// — are the position's own lease from the building's owner, never the
+// subtenant's. A net lease's "master lease" on a building bought outright
+// is the tenant's own, and is read as before.
+const MASTER_LEASE_ROW = /\bmaster[\s-]*lease/i;
+
 function rowsOf(ex: ExtractionResult): MetricRow[] {
-  return (Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow).filter((m) => !NOT_TENANT_LEASE.test(m.label));
+  const master = isMasterLeasehold(ex);
+  return (Array.isArray(ex.metrics) ? ex.metrics : [])
+    .filter(isRow)
+    .filter((m) => !NOT_TENANT_LEASE.test(m.label) && !(master && MASTER_LEASE_ROW.test(m.label)));
 }
 
 const find = (rows: MetricRow[], re: RegExp, not?: RegExp) =>

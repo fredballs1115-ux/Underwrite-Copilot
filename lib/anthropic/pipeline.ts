@@ -66,6 +66,7 @@ import { forwardNote, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseNote, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernNote, readGoingConcern } from "@/lib/going-concern";
 import { condoNote, readCondo } from "@/lib/condo";
+import { readSandwichLease, sandwichNote } from "@/lib/sandwich-lease";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -1406,6 +1407,11 @@ async function runAnalysisSteps(
         // stated, then the condo traps by name.
         const condo = readCondo(ex);
         if (condo) notes.push(condoNote(condo));
+        // A sandwich position (lib/sandwich-lease): the sublease income
+        // against the master rent, the spread, its cover and the master
+        // lease's end as stated, then the sandwich-lease traps by name.
+        const sandwich = readSandwichLease(ex);
+        if (sandwich) notes.push(sandwichNote(sandwich));
 
         if (flagged.length) {
           notes.push(

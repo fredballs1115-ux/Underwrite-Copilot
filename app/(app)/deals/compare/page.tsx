@@ -41,6 +41,7 @@ import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseTag } from "@/lib/mixed-use";
 import { goingConcernTag } from "@/lib/going-concern";
 import { condoTag } from "@/lib/condo";
+import { sandwichTag } from "@/lib/sandwich-lease";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
 import { compareReturns } from "@/lib/compare-figures";
@@ -215,6 +216,8 @@ function toCol(
     goingConcern: goingConcernTag(ex, new Date(`${today}T12:00:00Z`)),
     // Condominium units bought in bulk (lib/condo).
     condo: condoTag(ex, new Date(`${today}T12:00:00Z`)),
+    // A sandwich position's spread (lib/sandwich-lease).
+    sandwich: sandwichTag(ex, new Date(`${today}T12:00:00Z`)),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
     noteYtm: figs.noteYtmPct,

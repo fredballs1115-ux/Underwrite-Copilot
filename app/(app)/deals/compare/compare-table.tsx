@@ -170,6 +170,9 @@ export type Col = {
   /** condominium units bought in bulk ("Bulk 42 of 120 (35%)", "Condo
    *  units" — lib/condo `condoTag`); absent otherwise */
   condo?: string | null;
+  /** a sandwich position's spread ("Spread $720k, 1.65× cover" —
+   *  lib/sandwich-lease `sandwichTag`); absent otherwise */
+  sandwich?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -410,6 +413,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // Condominium units bought in bulk (lib/condo): the buyer's share of the
     // association, a dash beside a deal with no read.
     { label: "Condominium", get: (c) => c.condo || "—" },
+    // A sandwich position (lib/sandwich-lease): the subleases less the
+    // master rent and its cover, a dash beside a deal with no read.
+    { label: "Sandwich position", get: (c) => c.sandwich || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },
