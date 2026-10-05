@@ -242,7 +242,7 @@
         "note": "The Washington HUD area's metro-wide figures, shared by every jurisdiction in it. ZIP-level Small Area FMRs govern vouchers; per-ZIP values are not on file. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
-        "value": "County rent stabilization (CPI+3% capped 6%) with building-age and small-owner exemptions; Takoma Park layers its OWN stricter regime (all 2+ unit rentals, no small-owner exemption, FY2027 allowance 3.0%).",
+        "value": "County rent stabilization (CPI+3% capped 6%) with building-age and small-owner exemptions; Takoma Park layers its OWN stricter regime (all 2+ unit rentals, no small-owner exemption, an allowance of 3% for increases between July 1, 2026 and June 30, 2027).",
         "status": "sourced"
       },
       "rule_ids": [
@@ -1685,7 +1685,7 @@
         "note": "Mandatory Small Area FMR area: ZIP-level rents govern vouchers; per-ZIP values are not on file. Read from HUD's FY2027 file (the Internet Archive's capture of 2026-09-22)."
       },
       "market_notes": {
-        "value": "Washington's 2025 HB 1217 now caps increases statewide (lesser of 7%+CPI or 10%; 9.683% for 2026) with a 12-year new-construction exemption - Seattle adds landlord regulations (JumpStart-era rules) but no separate city rent cap. King County publishes a dedicated real-property SALES file: the easiest comps win in the West.",
+        "value": "Washington's 2025 HB 1217 now caps increases statewide (lesser of 7%+CPI or 10%; 9.683% for increases taking effect between January 1, 2026 and December 31, 2026, and 10% between January 1, 2027 and December 31, 2027) with a 12-year new-construction exemption - Seattle adds landlord regulations (JumpStart-era rules) but no separate city rent cap. King County publishes a dedicated real-property SALES file: the easiest comps win in the West.",
         "status": "verified"
       },
       "rule_ids": [

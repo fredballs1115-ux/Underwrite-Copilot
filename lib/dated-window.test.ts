@@ -10,6 +10,8 @@ import { sampleLegal } from "./sample-legal";
 import { RuleItem } from "@/app/market/rule-item";
 import { DatedNotes } from "@/app/dated-notes";
 import { LegalPanel } from "@/app/demo/legal-panel";
+import { MarketNote } from "@/app/market/market-note";
+import { snapshotReadOn } from "./tracker-read";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 const rules = rulesSeed.rules as RegulatoryRule[];
@@ -37,9 +39,29 @@ describe("readDatedText — a window or an effective date, only as written", () 
       start: "2026-07-01",
       end: "2027-06-30",
     });
+    // Washington's: the 2027 cap read on 2026-09-30, then Commerce's page
+    // read again on 2026-10-04 — the 2026 window and the 2027 one. The read's
+    // own day and the page's "through 12/31/2026" are single days, not windows.
     expect(readDatedText(rule("wa-rent-cap-hb1217").verification).windows).toEqual([
       { text: "1/1/2027 and 12/31/2027", start: "2027-01-01", end: "2027-12-31" },
+      { text: "1/1/2026 and 12/31/2026", start: "2026-01-01", end: "2026-12-31" },
+      { text: "1/1/2027 and 12/31/2027", start: "2027-01-01", end: "2027-12-31" },
     ]);
+    // The rule's effect and Seattle's note state both windows with their
+    // days, as Commerce's page does (they had said "for 2026", a year alone).
+    for (const t of [rule("wa-rent-cap-hb1217").effect, note("seattle")]) {
+      expect(readDatedText(t).windows).toEqual([
+        { text: "January 1, 2026 and December 31, 2026", start: "2026-01-01", end: "2026-12-31" },
+        { text: "January 1, 2027 and December 31, 2027", start: "2027-01-01", end: "2027-12-31" },
+      ]);
+    }
+    // Montgomery County's note states Takoma Park's allowance for its window
+    // (it had said "FY2027 allowance 3.0%", a label no file gives days for).
+    expect(readDatedText(note("montgomery_county"))).toEqual({
+      windows: [{ text: "July 1, 2026 and June 30, 2027", start: "2026-07-01", end: "2027-06-30" }],
+      takesEffect: [],
+      fiscalYears: [],
+    });
   });
 
   it("reads Virginia's effective date and its request for a review", () => {
@@ -61,12 +83,13 @@ describe("readDatedText — a window or an effective date, only as written", () 
   });
 
   it("counts a fiscal-year label only where its dates are written beside it", () => {
-    // Montgomery County's note says "FY2027 allowance 3.0%" for Takoma Park,
-    // and no file states which days that fiscal year covers: it guards
-    // nothing, and is listed so a reader can see why.
-    const moco = readDatedText(note("montgomery_county"));
-    expect(moco).toEqual({ windows: [], takesEffect: [], fiscalYears: ["FY2027"] });
-    expect(datedNotes(note("montgomery_county"), "2030-01-01")).toEqual([]);
+    // A label with no days beside it — as Montgomery County's note once wrote
+    // Takoma Park's "FY2027 allowance 3.0%", before it stated the window — is
+    // given no days from another text or from memory: it guards nothing, and
+    // is listed so a reader can see why.
+    const bare = "Takoma Park's FY2027 allowance 3.0%.";
+    expect(readDatedText(bare)).toEqual({ windows: [], takesEffect: [], fiscalYears: ["FY2027"] });
+    expect(datedNotes(bare, "2030-01-01")).toEqual([]);
     // A label with its window beside it is that window.
     const stated = readDatedText("Allowance for FY2027 (July 1, 2026 - June 30, 2027): 3.0%.");
     expect(stated.fiscalYears).toEqual([]);
@@ -100,6 +123,38 @@ describe("datedNotes — what a page says on the day before, of and after each e
     expect(datedNotes(la, "2027-06-30")).toEqual([]);
     const after = datedNotes(la, "2027-07-01");
     expect(after.map((n) => n.date)).toEqual(["2027-06-30"]);
+  });
+
+  it("Washington's 2026 window is history once the 2027 one it states follows it; the 2027 one ends with its year", () => {
+    for (const [id, t] of [
+      ["wa-rent-cap-hb1217", rule("wa-rent-cap-hb1217").effect],
+      ["note:seattle", note("seattle")],
+    ] as const) {
+      expect(datedNotes(t, "2026-12-31"), id).toEqual([]);
+      // The 2026 window has ended, and the same text states the window that
+      // follows it: its own history, no note.
+      expect(datedNotes(t, "2027-01-01"), id).toEqual([]);
+      expect(datedNotes(t, "2027-12-31"), id).toEqual([]);
+      expect(datedNotes(t, "2028-01-01"), id).toEqual([
+        {
+          kind: "window_ended",
+          date: "2027-12-31",
+          text: "This states its figure for January 1, 2027 and December 31, 2027, a window that ended on Dec 31, 2027: the figure needs checking.",
+        },
+      ]);
+    }
+  });
+
+  it("Takoma Park's allowance in Montgomery County's note ends with its window, June 30, 2027", () => {
+    const moco = note("montgomery_county");
+    expect(datedNotes(moco, "2027-06-30")).toEqual([]);
+    expect(datedNotes(moco, "2027-07-01")).toEqual([
+      {
+        kind: "window_ended",
+        date: "2027-06-30",
+        text: "This states its figure for July 1, 2026 and June 30, 2027, a window that ended on Jun 30, 2027: the figure needs checking.",
+      },
+    ]);
   });
 
   it("an effective date: nothing before it, today on it, passed after it", () => {
@@ -142,9 +197,14 @@ describe("what the files state, and when it ends", () => {
     expect(ending).toEqual([
       { id: "ca-la-rso-coverage", last: "2027-06-30" },
       { id: "md-takoma-park-rent-stabilization", last: "2027-06-30" },
+      { id: "note:montgomery_county", last: "2027-06-30" },
       { id: "va-no-local-rent-control", last: "2027-07-01" },
       { id: "ca-ab1482-rent-cap", last: "2027-07-31" },
     ]);
+    // Washington's 2027 window, in the rule and in Seattle's note, ends with
+    // its year, past the twelve months.
+    expect(lastStatedDay(rule("wa-rent-cap-hb1217").effect)).toBe("2027-12-31");
+    expect(lastStatedDay(note("seattle"))).toBe("2027-12-31");
   });
 
   it("no printed text says anything on 2026-10-04", () => {
@@ -176,6 +236,30 @@ describe("every surface that prints such a text reads it", () => {
     expect(html.match(/<details[\s\S]*?<\/details>/)?.[0] ?? "").not.toContain("window-ended");
     // The rule's text stays as written.
     expect(text(html)).toContain("Takoma Park runs its OWN rent stabilization");
+    expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("the market brief's Washington rule says its 2027 window ended only once 2027 is out", () => {
+    const item = (today: string) =>
+      renderToStaticMarkup(React.createElement("ul", null, React.createElement(RuleItem, { rule: rule("wa-rent-cap-hb1217"), today })));
+    expect(item("2027-01-01")).not.toContain('data-qa="window-ended"');
+    expect(text(item("2028-01-01"))).toContain("a window that ended on Dec 31, 2027: the figure needs checking.");
+  });
+
+  it("the market brief's note says it under the note, which stays as written", () => {
+    const moco = (metrosSeed.metros ?? []).find((m) => m.id === "montgomery_county")!;
+    const at = (today: string) =>
+      renderToStaticMarkup(
+        React.createElement(MarketNote, {
+          note: moco.market_notes as { value: string; status?: string },
+          readOn: snapshotReadOn(moco.sector_snapshot),
+          today,
+        }),
+      );
+    expect(at("2027-06-30")).not.toContain('data-qa="window-ended"');
+    const html = at("2027-07-01");
+    expect(text(html)).toContain("a window that ended on Jun 30, 2027: the figure needs checking.");
+    expect(text(html)).toContain(note("montgomery_county"));
     expect(a11yIssues(html)).toEqual([]);
   });
 

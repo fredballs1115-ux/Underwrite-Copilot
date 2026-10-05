@@ -367,12 +367,12 @@
      }
     ]
    },
-   "effect": "Washington HB 1217 (signed May 2025, effective immediately) caps annual rent increases statewide at the lesser of 7% + CPI or 10% - 10% for 2025, 9.683% for increases taking effect in 2026, 10% for increases taking effect in 2027 (7% + 4.53% CPI = 11.53%, capped at 10%) - with NO increase allowed in a tenancy's first 12 months. EXEMPT from the cap: buildings within 12 YEARS of first certificate of occupancy (a rolling window, read here as the building's age in whole years from its year built) and owner-occupied single-family homes renting out no more than 2 units/bedrooms (incl. ADU). Exempt properties still owe the notice/parity requirements (RCW 59.18.710).",
+   "effect": "Washington HB 1217 (signed May 2025, effective immediately) caps annual rent increases statewide at the lesser of 7% + CPI or 10% - 10% for 2025, 9.683% for increases taking effect between January 1, 2026 and December 31, 2026, 10% for increases taking effect between January 1, 2027 and December 31, 2027 (7% + 4.53% CPI = 11.53%, capped at 10%) - with NO increase allowed in a tenancy's first 12 months. EXEMPT from the cap: buildings within 12 YEARS of first certificate of occupancy (a rolling window, read here as the building's age in whole years from its year built) and owner-occupied single-family homes renting out no more than 2 units/bedrooms (incl. ADU). Exempt properties still owe the notice/parity requirements (RCW 59.18.710).",
    "quote": "up to 7% plus the Consumer Price Index, or 10 percent, whichever is less",
    "source": "https://www.commerce.wa.gov/housing-policy/hb1217-landlord-resource-center/",
    "as_of": "2026-09-30",
    "status": "verified",
-   "verification": "snippet-confirmed across WA Dept of Commerce, WA Realtors, Stoel Rives, Multifamily NW (4 independent, 1 primary); 2026 cap 9.683% cross-confirmed; 2026-09-30: the 2027 cap read from Commerce's HB 1217 Landlord Resource Center page (the rule's source) - 'The maximum annual rent increase percentage allowed ... between 1/1/2027 and 12/31/2027 is 10%', computed there as 7% + 4.53% CPI = 11.53%, capped at 10%"
+   "verification": "snippet-confirmed across WA Dept of Commerce, WA Realtors, Stoel Rives, Multifamily NW (4 independent, 1 primary); 2026 cap 9.683% cross-confirmed; 2026-09-30: the 2027 cap read from Commerce's HB 1217 Landlord Resource Center page (the rule's source) - 'The maximum annual rent increase percentage allowed ... between 1/1/2027 and 12/31/2027 is 10%', computed there as 7% + 4.53% CPI = 11.53%, capped at 10%; 2026-10-04: Commerce's page read again from the runner (zori probe_url run 37240367657): 'between 1/1/2026 and 12/31/2026 is' and 'Maximum annual rent increase percent through 12/31/2026: 9.683%', and 'between 1/1/2027 and 12/31/2027 is 10%.'"
   },
   {
    "id": "il-rent-control-preemption",
