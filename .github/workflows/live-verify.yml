@@ -59,7 +59,10 @@ jobs:
           grep -c "irr-gauge" body.html && echo "IRR GAUGE: present" || echo "IRR GAUGE: missing"
           grep -c "stamp-in" body.html && echo "VERDICT STAMP: present" || echo "VERDICT STAMP: missing"
           grep -c "scroll-progress" body.html && echo "SCROLL PROGRESS: present" || echo "SCROLL PROGRESS: missing"
-          grep -c "Aerial view of" body.html && echo "MARKETS GALLERY (aerials): present" || echo "MARKETS GALLERY: missing"
+          # The gallery's tiles (each carries its fact, data-qa="fact") and its
+          # one credit line. It had grepped "Aerial view of", the tiles' alt when
+          # every tile was an overhead; a tile's alt now says what it shows.
+          grep -c 'data-qa="fact"' body.html && grep -q "Photographs by" body.html && echo "MARKETS GALLERY: present" || echo "MARKETS GALLERY: missing"
           grep -c "The ground layer" body.html && echo "GROUND LAYER TEXT: STILL PRESENT (pre-#240 build)" || echo "GROUND LAYER TEXT: gone (correct after #240)"
           grep -c "pulse-tile" body.html && echo "MARKET PULSE BOARD: STILL PRESENT (pre-#240 build)" || echo "MARKET PULSE BOARD: gone (correct after #240)"
           grep -o 'name="uc-build" content="[0-9a-f]*"' body.html | head -1 && echo "SELF-HEAL SENTINEL: armed (stale browser copies reload themselves)" || echo "SELF-HEAL SENTINEL: not yet deployed"
