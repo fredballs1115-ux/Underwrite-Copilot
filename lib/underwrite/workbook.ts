@@ -1951,6 +1951,16 @@ function buildOperatingMetrics(
   bottomBorder(ws, r, 1, lastCol);
   r++;
 
+  // A building the model runs 90% vacant or more: its potential gross
+  // revenue is a sliver of income grossed up, so a breakeven occupancy
+  // struck against it is no figure (research pass 38 — 0.8% on a vacant
+  // building): the row is left out with a sentence. Elsewhere a breakeven
+  // over 100% is said rather than printed — the year's expenses and debt
+  // service are more than the building collects full — and the formula
+  // stays live.
+  const vacancyPct = Math.round(model.inputs.vacancyPct * 100);
+  const breakevenLeftOut = model.inputs.vacancyPct >= 0.9;
+  const breakeven = (y: number) => `(-${at("opex", y)}-${at("debt", y)})/${at("pgr", y)}`;
   const ratioRows: [string, (y: number) => string, string][] = [
     [
       "Expense Ratio (OpEx / EGR)",
@@ -1964,12 +1974,16 @@ function buildOperatingMetrics(
     ],
     ["DSCR (NOI)", (y) => `${at("dscr", y)}`, FMT.ratio],
     ["Debt Yield", (y) => `${at("debtyield", y)}`, FMT.pct1],
-    [
-      "Breakeven Occupancy",
-      (y) =>
-        `IF(${at("pgr", y)}=0,"n/a",(-${at("opex", y)}-${at("debt", y)})/${at("pgr", y)})`,
-      FMT.pct1,
-    ],
+    ...(breakevenLeftOut
+      ? []
+      : ([
+          [
+            "Breakeven Occupancy",
+            (y: number) =>
+              `IF(${at("pgr", y)}=0,"n/a",IF(${breakeven(y)}>1,"not reached at full occupancy",${breakeven(y)}))`,
+            FMT.pct1,
+          ],
+        ] as [string, (y: number) => string, string][])),
     [
       "Cash-on-Cash (levered)",
       (y) => `IF(Equity=0,"n/a",${at("levcf", y)}/Equity)`,
@@ -1991,7 +2005,9 @@ function buildOperatingMetrics(
       const cell = ws.getCell(r, firstCol + y);
       cell.value = { formula: f(y) } as ExcelJS.CellFormulaValue;
       styleFormula(cell, fmt);
-      cell.alignment = { horizontal: "right" };
+      // A breakeven past full occupancy is said in words, which wrap inside
+      // the year's column rather than run under the next year's figure.
+      cell.alignment = lab === "Breakeven Occupancy" ? { horizontal: "right", wrapText: true } : { horizontal: "right" };
     }
     r++;
   });
@@ -1999,9 +2015,13 @@ function buildOperatingMetrics(
   r++;
   label(
     ws.getCell(r, 1),
-    // What the formula covers, said: the row leaves reserves, capital and
-    // the asset management fee out, so it is not where cash flow crosses zero.
-    "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
+    breakevenLeftOut
+      ? `Breakeven Occupancy left out: the model runs the building ${vacancyPct}% vacant, so its Potential Gross Revenue is its year-1 income grossed up from ${100 - vacancyPct}% occupancy, and a breakeven occupancy struck against it is no figure to screen on.`
+      : // What the formula covers, said: the row leaves reserves, capital and
+        // the asset management fee out, so it is not where cash flow crosses
+        // zero — and where they are more than the building collects full,
+        // the row says so.
+        "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
     { color: MUTED, size: 9 },
   );
   r += 2;
