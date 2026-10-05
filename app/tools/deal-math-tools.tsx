@@ -2083,7 +2083,7 @@ function Exchange1031() {
                 {EXCHANGE_DAYS - r.clock.closeDays} days
               </span>{" "}
               off the back of the window: the replacement has to be acquired by
-              the due date of the return for {closing.slice(0, 4)},{" "}
+              the due date of the return for {closing.slice(0, 4)}, read here as{" "}
               <span className="font-mono tabular-nums">{r.clock.returnDueBy}</span>,
               extensions included. An extension restores the full {EXCHANGE_DAYS} days,
               which is why a fourth-quarter exchange files one first.
@@ -2092,7 +2092,8 @@ function Exchange1031() {
           {r.clock.entityCutShort && (
             <p className="mt-2 text-sm text-caution" data-qa="entity-due">
               Sold by a partnership or an S corporation, the window ends sooner:
-              its calendar-year return for {closing.slice(0, 4)} is due{" "}
+              the due date of its calendar-year return for {closing.slice(0, 4)} ends
+              it, read here as{" "}
               <span className="font-mono tabular-nums">{r.clock.entityReturnDueBy}</span>,
               so the replacement has to close by then unless that return is extended.
             </p>

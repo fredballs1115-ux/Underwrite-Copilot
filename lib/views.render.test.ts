@@ -3902,12 +3902,16 @@ describe("the deal math tools", () => {
     expect(text).toContain("An extension restores the full 180 days");
     // The window ends at the return's DUE DATE, extensions included
     // (§1031(a)(3)(B)) — the card had said "before the return … is filed".
-    expect(text).toContain("acquired by the due date of the return for 2026,");
+    expect(text).toContain("acquired by the due date of the return for 2026, read here as 2027-04-15");
     expect(text).toContain(", extensions included. An extension restores the full 180 days");
     expect(text).not.toContain("is filed");
     // A partnership's or an S corporation's return is due a month sooner
-    // (research pass 28): said beside the individual's.
-    expect(text).toContain("Sold by a partnership or an S corporation, the window ends sooner: its calendar-year return for 2026 is due 2027-03-15");
+    // (research pass 28): said beside the individual's. A due date on a
+    // weekend or a holiday can move, so the 15th is said as the day the
+    // window is read to, never as the day the return "is due" (the audit's
+    // L6, the buyer's 1031 clock's own wording).
+    expect(text).toContain("Sold by a partnership or an S corporation, the window ends sooner: the due date of its calendar-year return for 2026 ends it, read here as 2027-03-15");
+    expect(text).not.toContain("is due 2027");
     expect(text).toContain(", so the replacement has to close by then unless that return is extended.");
     // Two segments of the window plus the part the due date takes off it.
     expect((html.match(/data-bar="clock"/g) ?? []).length).toBe(2);
