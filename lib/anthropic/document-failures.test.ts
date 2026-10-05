@@ -37,7 +37,7 @@ const thrown = (fn: () => unknown): unknown => {
 };
 
 describe("documentFailure — the failures a retry of the same file cannot fix", () => {
-  it("no figures, the page cap, a refusal and a 413 offer Replace OM alone", () => {
+  it("no figures, the page cap and a 413 offer Replace OM alone; a refusal offers the retry beside it", () => {
     expect(documentFailure(NO_FIGURES_FAILURE)).toBe("replace");
     expect(documentFailure(pageCapFailure(700))).toBe("replace");
     expect(documentFailure(pageCapFailure(1_204))).toBe("replace");
@@ -47,7 +47,8 @@ describe("documentFailure — the failures a retry of the same file cannot fix",
       const err = thrown(() => structuredOutput({ parsed_output: null, stop_reason: "refusal" }, what));
       expect(err).toBeInstanceOf(ScreenError);
       expect((err as Error).message).toBe(refusalFailure(what));
-      expect(documentFailure(describeRunFailure(err).message), what).toBe("replace");
+      // A refusal may not recur on a second read (the batch-2 audit).
+      expect(documentFailure(describeRunFailure(err).message), what).toBe("replace_or_retry");
     }
     // A failure stored under the 413's earlier remedy reads the same way.
     expect(documentFailure("The analysis service refused this document as too large — try a smaller PDF.")).toBe("replace");

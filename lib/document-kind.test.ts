@@ -33,6 +33,10 @@ describe("documentKindWarning — what the deal page says of a document that is 
       "This reads as a lease, not an offering memorandum — the screen reads it as one all the same, so its call may judge a document that is no deal. Upload the OM with Replace OM; the lease can be kept with the deal under Documents.",
     );
     expect(documentKindWarning("rent_roll")).toContain("add the rent roll on the Overview, where it re-bases the model");
+    // A BOV has a page of its own on the deal (the batch-2 audit).
+    expect(documentKindWarning("bov")).toBe(
+      "This reads as a broker's opinion of value, not an offering memorandum — the screen reads it as one all the same, so its call may judge a document that is no deal. Upload the OM with Replace OM; a BOV is read on the deal's Valuations page, where it is set against your own model.",
+    );
     expect(documentKindWarning("operating_statement")).toMatch(/^This reads as an operating statement, /);
     expect(documentKindWarning("flyer_or_teaser")).toMatch(/^This reads as a flyer or a teaser, not a full offering memorandum/);
     expect(documentKindWarning("other")).toMatch(/^This doesn't read as an offering memorandum/);

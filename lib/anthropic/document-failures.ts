@@ -1,6 +1,8 @@
 /**
  * The failures that are the DOCUMENT's: a retry reads the same file the same
- * way, so the way on is another file — Replace OM. The deal page offered "Try
+ * way, so the way on is another file — Replace OM — with a retry beside it
+ * only where the failure may yet pass (a 400 whose words are not read yet, a
+ * model's refusal). The deal page offered "Try
  * again" under every one of them, beneath a sentence naming Replace OM, and
  * each retry paid the first signal's cache write (the largest single item of
  * a screen) for the same answer (research pass 30; Material's rule: never
@@ -45,7 +47,9 @@ export function pageCapFailure(pages: number): string {
   return `This OM runs ${pages.toLocaleString("en-US")} pages — the analysis service reads up to about ${MAX_OM_PAGES} in one pass. Split off the financial sections and upload those with Replace OM.`;
 }
 
-/** The model declined to read the document at the step named. */
+/** The model declined to read the document at the step named. A refusal is
+ *  not the file's fixed property — a second read may go through — so the
+ *  banner offers the retry beside Replace OM (the batch-2 audit). */
 export function refusalFailure(what: string): string {
   return `${what} was declined by the model — the document may hold content it will not analyze.`;
 }
@@ -68,8 +72,8 @@ export function documentFailure(message: string | null | undefined): DocumentRem
   const m = (message ?? "").trim();
   if (!m) return null;
   if (m === NO_OM_FAILURE) return "attach";
-  if (m === REJECTED_FAILURE) return "replace_or_retry";
-  if (m === NO_FIGURES_FAILURE || m === STORAGE_MISSING_FAILURE || TOO_LARGE.test(m) || PAGE_CAP.test(m) || REFUSAL.test(m)) {
+  if (m === REJECTED_FAILURE || REFUSAL.test(m)) return "replace_or_retry";
+  if (m === NO_FIGURES_FAILURE || m === STORAGE_MISSING_FAILURE || TOO_LARGE.test(m) || PAGE_CAP.test(m)) {
     return "replace";
   }
   return null;

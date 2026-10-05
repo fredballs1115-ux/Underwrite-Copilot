@@ -556,7 +556,7 @@ describe("DealView — the sample deal renders every section without a runtime e
         staleResults: [],
       }) as unknown as Props;
     const banner = (html: string) => html.slice(0, html.indexOf('aria-label="Deal sections"'));
-    for (const error of [NO_FIGURES_FAILURE, pageCapFailure(700), refusalFailure("Extraction"), TOO_LARGE_FAILURE]) {
+    for (const error of [NO_FIGURES_FAILURE, pageCapFailure(700), TOO_LARGE_FAILURE]) {
       const html = render(failed(error));
       expect(a11yIssues(html), error).toEqual([]);
       const top = banner(html);
@@ -568,11 +568,14 @@ describe("DealView — the sample deal renders every section without a runtime e
       expect(top, error).toContain('data-qa="document-failure"');
       expect(text, error).toMatch(/Replace OM/);
     }
-    // The 400 that may yet pass: Replace OM, and the retry beside it.
-    const either = textOf(banner(render(failed(REJECTED_FAILURE))));
-    expect(either).toMatch(/Replace OM/);
-    expect((either.match(/Try again/g) ?? []).length).toBe(1);
-    expect(either).not.toContain("Trying again would read the same file");
+    // The 400 that may yet pass, and a model's refusal, which a second read
+    // may get past: Replace OM, and the retry beside it.
+    for (const error of [REJECTED_FAILURE, refusalFailure("Extraction")]) {
+      const either = textOf(banner(render(failed(error))));
+      expect(either, error).toMatch(/Replace OM/);
+      expect((either.match(/Try again/g) ?? []).length, error).toBe(1);
+      expect(either, error).not.toContain("Trying again would read the same file");
+    }
     // A deal with no OM is offered one, and never told a retry "would read
     // the same file" it does not have (the batch-2 audit).
     const noFile = textOf(banner(render(failed(NO_OM_FAILURE, false))));

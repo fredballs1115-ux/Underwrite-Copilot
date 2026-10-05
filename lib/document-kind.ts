@@ -31,7 +31,10 @@ export function documentKindOf(raw: unknown): DocumentKind | null {
 
 /** What each kind is called, and where it belongs on the deal instead. */
 const SAID: Record<Exclude<DocumentKind, "offering_memorandum" | "flyer_or_teaser" | "other">, { what: string; instead?: string }> = {
-  bov: { what: "a broker's opinion of value" },
+  bov: {
+    what: "a broker's opinion of value",
+    instead: "a BOV is read on the deal's Valuations page, where it is set against your own model",
+  },
   lease: { what: "a lease", instead: "the lease can be kept with the deal under Documents" },
   rent_roll: {
     what: "a rent roll",
