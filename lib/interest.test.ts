@@ -2021,3 +2021,25 @@ describe("a development joint venture's grossed-up equity is the equity's whole,
     }
   });
 });
+
+// A term the memorandum states as a count of years is counted from today,
+// though the memorandum's own date is earlier: the sentence says the term
+// may be shorter, and the tag had said "Leasehold, 45 yrs left" as if it
+// were a date. At most that long, it says "up to"; the land comes back
+// "within" it. A term that already counts its options is a ceiling too.
+describe("interestTag — a counted or ceiling term is at most that long", () => {
+  const AS_OF = new Date(Date.UTC(2026, 9, 5, 12));
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 4", basis: "na" as const });
+  const held = (kind: "leasehold" | "leased_fee", rows: ReturnType<typeof row>[]) =>
+    ex(interest({ kind, summary: kind === "leasehold" ? "The leasehold interest in the building" : "The leased fee", groundLease: "Ground lease to the building's owner" }), rows);
+
+  it("says up to on a count of years and within on the land's return", () => {
+    expect(interestTag(held("leasehold", [row("Ground lease term remaining", "45 years")]), AS_OF)).toBe("Leasehold, up to 45 yrs left");
+    expect(interestTag(held("leased_fee", [row("Ground lease term remaining", "45 years")]), AS_OF)).toBe("Leased fee, reverts within 45 yrs");
+  });
+
+  it("reads a stated date as before", () => {
+    expect(interestTag(held("leasehold", [row("Ground lease expiration", "December 31, 2071")]), AS_OF)).toBe("Leasehold, 45 yrs left");
+    expect(interestTag(held("leased_fee", [row("Ground lease expiration", "December 31, 2071")]), AS_OF)).toBe("Leased fee, reverts in 45 yrs");
+  });
+});

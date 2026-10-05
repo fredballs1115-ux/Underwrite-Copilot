@@ -314,8 +314,9 @@ describe("readSingleTenant — the one lease the deal is", () => {
     }
     // A conversion's new use comes with the works too.
     expect(singleTenantTag(bts("15 years", "conversion"), TODAY)).toBe("Single tenant, 15 yrs from delivery");
-    // A building that stands keeps today's count.
-    expect(singleTenantTag(bts("15 years", "stabilized"), TODAY)).toBe("Single tenant, 15 yrs left");
+    // A building that stands keeps today's count, at most that long: the
+    // memorandum's own date is earlier, so the term may be shorter.
+    expect(singleTenantTag(bts("15 years", "stabilized"), TODAY)).toBe("Single tenant, up to 15 yrs left");
     expect(singleTenantModelLine(readSingleTenant(bts("15 years", "stabilized"), TODAY)!, MODEL)).toMatch(
       /^At the model's sale in 5 years the lease has 10 years left:/,
     );

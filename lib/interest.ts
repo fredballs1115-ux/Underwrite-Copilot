@@ -569,6 +569,13 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
   const term = kind === "leasehold" || kind === "leased_fee" ? leaseholdTermOf(ex, asOf).term : null;
   const left = term && endIsAhead(term) ? term.yearsLeft : null;
   const yrs = left != null ? (left < 1 ? "under 1 yr" : `${Math.floor(left)} ${Math.floor(left) === 1 ? "yr" : "yrs"}`) : null;
+  // A term the memorandum states as a count of years, counted here from
+  // today though its own date is earlier, or one that already counts its
+  // extension options, is at most that long: "up to", as the sentence says
+  // the term may be shorter (lib/ground-lease-term) and as the single
+  // tenant's tag says a ceiling.
+  const atMost = !!term && left != null && left >= 1 && (term.from === "remaining" || term.includesOptions);
+  const span = yrs ? `${atMost ? "up to " : ""}${yrs}` : null;
   switch (kind) {
     case "note":
       return "Note";
@@ -590,10 +597,15 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
     case "leasehold":
       // A master lease of the building, sublet (research pass 28): the
       // position is the lease, and its years are the master lease's.
-      if (isMasterLeasehold(ex)) return yrs ? `Master lease, ${yrs} left` : "Master lease";
-      return yrs ? `Leasehold, ${yrs} left` : "Leasehold";
+      if (isMasterLeasehold(ex)) return span ? `Master lease, ${span} left` : "Master lease";
+      return span ? `Leasehold, ${span} left` : "Leasehold";
     case "leased_fee":
-      return yrs ? (groundLeaseEquipment(ex) ? `Leased fee, lease ends in ${yrs}` : `Leased fee, reverts in ${yrs}`) : "Leased fee";
+      // At most that long, the land comes back WITHIN it.
+      return yrs
+        ? groundLeaseEquipment(ex)
+          ? `Leased fee, lease ends ${atMost ? "within" : "in"} ${yrs}`
+          : `Leased fee, reverts ${atMost ? "within" : "in"} ${yrs}`
+        : "Leased fee";
     default:
       return null;
   }

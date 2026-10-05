@@ -653,6 +653,10 @@ export function singleTenantTag(ex: ExtractionResult | null | undefined, asOf: D
   if (!r) return null;
   // A count with the renewal options in it is the lease's ceiling: "up to".
   const upTo = (years: number) => (r.term?.includesOptions && years >= 1 ? "up to " : "");
+  // So is a term stated as a count of years and counted from today, since
+  // the memorandum's own date is earlier (the sentence says it may be
+  // shorter) — never one counted from delivery, which runs from that day.
+  const upToToday = (years: number) => (r.term?.from === "remaining" && years >= 1 ? "up to " : upTo(years));
   // A lease that has not begun: its term from delivery, never years left
   // today (research pass 23).
   const fromDelivery = termFromDelivery(r);
@@ -665,7 +669,7 @@ export function singleTenantTag(ex: ExtractionResult | null | undefined, asOf: D
   if (!eff || !span || !endIsAhead(span)) return "Single tenant";
   const whole = Math.floor(eff.yearsLeft);
   const yrs = eff.yearsLeft < 1 ? "under 1 yr" : `${whole} ${whole === 1 ? "yr" : "yrs"}`;
-  return eff.early ? `Single tenant, may leave in ${yrs}` : `Single tenant, ${upTo(eff.yearsLeft)}${yrs} left`;
+  return eff.early ? `Single tenant, may leave in ${yrs}` : `Single tenant, ${upToToday(eff.yearsLeft)}${yrs} left`;
 }
 
 /** The lease as the steps that read the memorandum after the extraction
