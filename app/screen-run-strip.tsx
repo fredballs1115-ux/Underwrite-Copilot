@@ -1,12 +1,22 @@
 import Link from "next/link";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { DEAL_KILLERS } from "@/lib/marketing-constants";
+import { PausableTicker } from "./pausable-ticker";
+
+/** The trace's animation-play-state: running until its pause button says. */
+const PLAY = "var(--screenrun-play, running)";
 
 /** The screen, running — a looping six-stage trace band. Every line is
  *  DERIVED from the same sample fixture the demo renders — counts and the
  *  verdict word, not copywriting — so this strip can never claim an output
  *  shape the sample screen doesn't show. The animated block is aria-hidden;
- *  screen readers get one static sentence. Shared by the homepage and /why. */
+ *  screen readers get one static sentence. Shared by the homepage and /why.
+ *
+ *  It replays forever, so it carries the tickers' pause button (WCAG 2.2.2,
+ *  app/pausable-ticker). The button marks its wrapper `data-ticker-paused`,
+ *  which sets `--screenrun-play` there; each line and the caret read it as
+ *  their own animation-play-state, inline, because the lines' animation is
+ *  an unlayered rule in globals.css that no utility can reach. */
 export function ScreenRunStrip() {
   const metricCount = SAMPLE_DEAL.extraction.metrics.length;
   // The gaps the sample's own reconciliation calls — a row in agreement is
@@ -50,27 +60,31 @@ export function ScreenRunStrip() {
           reconciliation against your model, the market check, and a verdict
           with its reasons.
         </p>
-        <div
-          aria-hidden
-          className="mt-4 rounded-xl border border-white/10 bg-black/25 p-4 font-mono text-[12px] leading-relaxed sm:text-[13px]"
-        >
-          {LINES.map(([stage, detail], i) => (
-            <p
-              key={stage}
-              style={{ "--i": i } as React.CSSProperties}
-              className="screenrun-line flex flex-wrap gap-x-2 py-0.5"
-            >
-              <span className="text-white/55">▸</span>
-              <span className="w-20 shrink-0 text-accent">{stage}</span>
-              <span className="text-white/75">
-                {detail}
-                {i === LINES.length - 1 && (
-                  <span className="screenrun-caret ml-1 text-accent">▍</span>
-                )}
-              </span>
-            </p>
-          ))}
-        </div>
+        <PausableTicker what="trace" className="mt-4 data-[ticker-paused]:[--screenrun-play:paused]">
+          <div
+            aria-hidden
+            className="rounded-xl border border-white/10 bg-black/25 p-4 pr-10 font-mono text-[12px] leading-relaxed sm:text-[13px]"
+          >
+            {LINES.map(([stage, detail], i) => (
+              <p
+                key={stage}
+                style={{ "--i": i, animationPlayState: PLAY } as React.CSSProperties}
+                className="screenrun-line flex flex-wrap gap-x-2 py-0.5"
+              >
+                <span className="text-white/55">▸</span>
+                <span className="w-20 shrink-0 text-accent">{stage}</span>
+                <span className="text-white/75">
+                  {detail}
+                  {i === LINES.length - 1 && (
+                    <span className="screenrun-caret ml-1 text-accent" style={{ animationPlayState: PLAY }}>
+                      ▍
+                    </span>
+                  )}
+                </span>
+              </p>
+            ))}
+          </div>
+        </PausableTicker>
       </div>
     </section>
   );

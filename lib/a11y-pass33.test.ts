@@ -12,6 +12,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { CompName, CompsMap, type MapComp } from "@/app/(app)/deals/[id]/comps-map";
 import { ScrollRegion } from "@/app/scroll-region";
 import { ToastProvider, toastLifetime } from "@/app/(app)/toaster";
+import { ScreenRunStrip } from "@/app/screen-run-strip";
 import { a11yIssues } from "./render-lint";
 
 const h = React.createElement;
@@ -160,5 +161,22 @@ describe("a toast that waits for its reader (research pass 33, item 20)", () => 
   it("keeps the toasts' live region as it was", () => {
     const html = renderToStaticMarkup(h(ToastProvider, null, h("p", null, "page")));
     expect(html).toMatch(/<div aria-live="polite" class="pointer-events-none fixed /);
+  });
+});
+
+describe("the homepage's running trace can be stopped (research pass 33, item 21)", () => {
+  it("carries the tickers' pause button, outside the hidden trace, and every moving part reads its state", () => {
+    const html = renderToStaticMarkup(h(ScreenRunStrip));
+    // The shared button (app/pausable-ticker), named for what it stops.
+    expect(html).toContain('aria-label="Pause the trace"');
+    const wrapper = html.match(/<div class="relative mt-4 ([^"]*)">/);
+    expect(wrapper?.[1]).toBe("data-[ticker-paused]:[--screenrun-play:paused]");
+    // The button is the wrapper's first child, before the aria-hidden block.
+    expect(html.indexOf('aria-label="Pause the trace"')).toBeLessThan(html.indexOf('aria-hidden="true"', html.indexOf("relative mt-4")));
+    // Six lines and the caret, each following the button's state inline.
+    const lines = html.match(/class="screenrun-line[^"]*"/g) ?? [];
+    expect(lines).toHaveLength(6);
+    expect(html.match(/animation-play-state:var\(--screenrun-play, running\)/g)).toHaveLength(7);
+    expect(a11yIssues(html)).toEqual([]);
   });
 });
