@@ -52,6 +52,9 @@ export interface InternalComp {
   /** a plan deal's stabilized NOI over total cost, e.g. "11.67%" — its
    *  answer where a stabilized asset shows a cap */
   yieldOnCostLabel: string | null;
+  /** a teammate's screen, not the reader's own — set where the caller says
+   *  who is reading (`viewerId`), so the block says whose screens it shows */
+  teammate?: boolean;
 }
 
 interface MetricLike {
@@ -71,6 +74,49 @@ interface SiblingDealRow {
    *  its kind, as its own page reads it; absent on a row the caller did not
    *  select it for */
   first_signal?: unknown;
+  /** who added the sibling, for whose screens the block says they are */
+  user_id?: string | null;
+}
+
+/** How many of the deal's own class the block reads in full, newest first:
+ *  more than it shows, since a screen whose figures do not parse is no comp. */
+export const INTERNAL_COMP_CANDIDATES = 40;
+
+/** A screened deal as the light read finds it: its class keys alone. */
+export interface CompKeyRow {
+  id: string;
+  asset_class: string | null;
+  is_sample: boolean | null;
+  created_at: string;
+  /** `extraction->>assetClass` */
+  ext_class: string | null;
+}
+
+/**
+ * The ids of the reader's other screened deals of this deal's class, newest
+ * first, at most `max` — whose full rows the "From your pipeline" block then
+ * reads. The class is matched in the read, before any cut, as the market
+ * memory's light read matches it (lib/market-memory `memoryCandidates`): the
+ * page had read the forty newest screens of every class and kept those of the
+ * deal's, so a team that screened forty offices since its last apartment deal
+ * showed an apartment deal no comps at all (research pass 42).
+ */
+export function internalCompCandidates(
+  rows: readonly CompKeyRow[],
+  currentDealId: string,
+  currentAssetClass: string,
+  currentExtraction: { assetClass?: string } | null,
+  max = INTERNAL_COMP_CANDIDATES,
+): string[] {
+  const wanted = dealClassKey(currentAssetClass, currentExtraction);
+  if (!wanted) return [];
+  return rows
+    .filter(
+      (r) => r.id !== currentDealId && !r.is_sample && dealClassKey(r.asset_class, { assetClass: r.ext_class ?? undefined }) === wanted,
+    )
+    .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""))
+    .slice(0, max)
+    .map((r) => r.id);
 }
 
 const fmtCompact = (dollars: number) => compactUsd(dollars);
@@ -155,6 +201,8 @@ export function deriveInternalComps(
   currentExtraction: { assetClass?: string } | null,
   siblings: SiblingDealRow[],
   limit = 8,
+  /** who is reading: each comp says whether it is a teammate's screen */
+  viewerId?: string | null,
 ): InternalComp[] {
   // The deal's one class, filed by its words (lib/asset-words
   // `dealClassKey`): a sibling whose deck says "Garden-style multifamily" is
@@ -233,6 +281,7 @@ export function deriveInternalComps(
       kindLabel: plan ? strategy.label : null,
       // To two decimals, as the sibling's own header and card print it.
       yieldOnCostLabel: yoc != null ? yieldOnCostText(yoc) : null,
+      ...(viewerId !== undefined ? { teammate: row.user_id != null && row.user_id !== viewerId } : {}),
     });
     if (comps.length >= limit) break;
   }

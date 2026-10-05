@@ -27,6 +27,7 @@ import { ActualsPrompt, type ActualsSlotState } from "./actuals-prompt";
 import { SensitivityPlayground, type PlaygroundData } from "./sensitivity-playground";
 import { type StageChange } from "@/lib/stages";
 import type { InternalComp } from "@/lib/internal-comps";
+import { internalCompsLead } from "@/lib/internal-comps-lead";
 import { DealAvatar } from "@/app/(app)/deal-avatar";
 import { DebtSizer } from "./debt-sizer";
 import { ModelVsMarketCard } from "./model-vs-market-card";
@@ -1978,9 +1979,8 @@ function InternalCompsBlock({ comps }: { comps: InternalComp[] }) {
       <h2 className="text-sm font-semibold tracking-tight">
         From your pipeline
       </h2>
-      <p className="mt-1 text-sm text-muted">
-        Same asset class, as extracted from each OM you&rsquo;ve screened —
-        your own frame of reference, not third-party comp data.
+      <p className="mt-1 text-sm text-muted" data-qa="internal-comps-lead">
+        {internalCompsLead(comps.length, comps.some((c) => c.teammate))}
       </p>
       <div className="scroll-shadows-x mt-3 overflow-x-auto">
         <table className="w-full min-w-105 text-sm">

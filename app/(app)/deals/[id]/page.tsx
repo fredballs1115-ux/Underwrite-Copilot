@@ -123,7 +123,7 @@ import { OffersDueControl } from "../offers-due";
 import { ShareControl, type ShareRow } from "./share-control";
 import { parseStageHistory } from "@/lib/stages";
 import { parseDealNotes, parseDealQa } from "@/lib/deals";
-import { deriveInternalComps } from "@/lib/internal-comps";
+import { deriveInternalComps, internalCompCandidates, type CompKeyRow, type InternalComp } from "@/lib/internal-comps";
 import {
   buildComps,
   marketMemoryFor,
@@ -168,7 +168,7 @@ import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { versionBadge } from "@/lib/bridge/version-rules";
-import { readAll } from "@/lib/read-all";
+import { readAll, readByIds } from "@/lib/read-all";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
 import { SubmarketCard } from "./submarket-card";
@@ -263,15 +263,22 @@ export default async function DealPage({
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
-      // Internal comps memory: the user's other screened deals (RLS scopes to
-      // own + shared team deals). Derivation filters to this asset class.
-      supabase
-        .from("deals")
-        .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id, first_signal")
-        .neq("id", id)
-        .not("extraction", "is", null)
-        .order("created_at", { ascending: false })
-        .limit(40),
+      // Internal comps memory: the reader's other screened deals (RLS scopes
+      // to own + shared team deals), their class keys alone, every one a
+      // page at a time — the class is matched before any cut, then the
+      // newest of it are read in full below (research pass 42: the forty
+      // newest of every class had left an apartment deal no comps where
+      // forty offices came after it).
+      readAll<CompKeyRow>((from, to) =>
+        supabase
+          .from("deals")
+          .select("id, asset_class, is_sample, created_at, ext_class:extraction->>assetClass")
+          .neq("id", id)
+          .not("extraction", "is", null)
+          .order("created_at", { ascending: false })
+          .order("id")
+          .range(from, to),
+      ).then((data) => ({ data })),
       // Every live share link (pre-0017 schema: the query errors and data
       // reads null — the Share button simply shows an empty list). All of
       // them, newest first, a page at a time: the panel says a link is
@@ -373,13 +380,32 @@ export default async function DealPage({
     (deal as { stage_history?: unknown }).stage_history,
   );
 
-  // What the user's own past screens said about deals like this one.
-  const internalComps = deriveInternalComps(
+  // What the reader's past screens — theirs and their team's — said about
+  // deals like this one: the newest of this deal's class, found in the light
+  // read above and read in full here (a hundred ids a request), newest first.
+  // Started now and awaited where the view is built.
+  const compIds = internalCompCandidates(
+    (siblings.data ?? []) as CompKeyRow[],
     deal.id,
     (deal.asset_class as string | null) ?? "auto",
     extraction,
-    (siblings.data ?? []) as Parameters<typeof deriveInternalComps>[3],
   );
+  const internalCompsRead: Promise<InternalComp[]> = compIds.length
+    ? readByIds(compIds, (ids) =>
+        supabase
+          .from("deals")
+          .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id, first_signal")
+          .in("id", ids),
+      )
+        .then((rows) => {
+          const order = new Map(compIds.map((x, i) => [x, i]));
+          const sorted = ((rows ?? []) as Parameters<typeof deriveInternalComps>[3]).sort(
+            (a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0),
+          );
+          return deriveInternalComps(deal.id, (deal.asset_class as string | null) ?? "auto", extraction, sorted, 8, user?.id ?? null);
+        })
+        .catch(() => [])
+    : Promise.resolve([]);
 
   // Deal memory (Feature 6): the account's OWN prior screens of this exact
   // market + asset class, aggregated — found in the reader's own deals
@@ -1179,6 +1205,7 @@ export default async function DealPage({
 
   const floodLegendEntries = await floodLegendRead;
   const marketMemory = await memoryRead;
+  const internalComps = await internalCompsRead;
   const typicalScreen = await typicalScreenRead;
   const sameFile = await twinRead;
 
