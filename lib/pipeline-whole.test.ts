@@ -49,6 +49,9 @@ const db = {
   reads: [] as string[],
   inSizes: [] as number[],
   failRead: null as string | null,
+  /** a deal that lands, newest first, the first time the count is asked —
+   *  a slow count, answered once the rows' pages are read */
+  landOnCount: null as Record<string, unknown> | null,
 };
 function fakeClient() {
   return {
@@ -77,6 +80,14 @@ function fakeClient() {
         },
         then<T>(resolve: (v: { data: unknown; count: number | null; error: unknown }) => T) {
           db.reads.push(table);
+          if (counted && head && db.landOnCount) {
+            const landing = db.landOnCount;
+            db.landOnCount = null;
+            return new Promise<void>((done) => setTimeout(done, 5)).then(() => {
+              db.deals.unshift(landing);
+              return resolve({ data: null, count: db.deals.length + db.countExtra, error: null });
+            });
+          }
           const label = table === "deals" && ids ? "deals:ids" : table;
           if (db.failRead === label) return Promise.resolve({ data: null, count: null, error: { message: "timeout" } }).then(resolve);
           const source = table === "deals" ? db.deals : table === "analysis_jobs" ? db.jobs : [];
@@ -147,6 +158,23 @@ describe("the meeting workbook is the whole pipeline", () => {
     expect(res.status).toBe(302);
     expect(res.headers.get("location")).toContain("/deals?error=exportfail");
     db.countExtra = 0;
+  });
+
+  it("reads again once where a deal lands while it reads, and builds the workbook (audit C5, LOW-11)", async () => {
+    db.deals = Array.from({ length: 7 }, (_, i) => deal(i));
+    db.landOnCount = deal(8);
+    const res = await GET(new Request("https://underwrite.example/api/pipeline/export"));
+    expect(res.status).toBe(200);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await res.arrayBuffer()) as ArrayBuffer);
+    const ws = wb.getWorksheet("Pipeline")!;
+    expect(String(ws.getCell("D2").value)).toMatch(/^8 deals · exported /);
+    const names: string[] = [];
+    ws.eachRow((row) => {
+      const v = row.getCell(2).value;
+      if (typeof v === "string" && /^Deal \d$/.test(v)) names.push(v);
+    });
+    expect(names.sort()).toEqual([...Array.from({ length: 7 }, (_, i) => `Deal ${i}`), "Deal 8"]);
   });
 
   it("reads every deal's deadline and latest screen a hundred ids a request", async () => {

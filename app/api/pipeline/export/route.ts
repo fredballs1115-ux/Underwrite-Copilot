@@ -48,12 +48,15 @@ export async function GET(req: Request) {
     is_sample: boolean | null;
   };
   // Every deal, a page at a time, newest first (lib/read-all), with the
-  // exact count beside it: "the whole pipeline" had been the newest 1,000 —
+  // exact count after it: "the whole pipeline" had been the newest 1,000 —
   // one read's most — and the meeting's totals short with no sign (research
   // pass 42). A read that fails, or reads fewer deals than the count says
   // there are, builds no workbook: the page says so and the reader asks again.
-  const [data, { count, error: countError }, team] = await Promise.all([
-    readAll<Row>((from, to) =>
+  // The count is taken once the rows are read, and a deal that lands between
+  // the two (a batch upload while the meeting exports) is read again once
+  // before the export fails (audit C5, LOW-11).
+  const readPipeline = async (): Promise<Row[] | null> => {
+    const rows = await readAll<Row>((from, to) =>
       supabase
         .from("deals")
         // The first signal and the address too: the row reads the deal's kind
@@ -64,11 +67,17 @@ export async function GET(req: Request) {
         .order("created_at", { ascending: false })
         .order("id")
         .range(from, to),
-    ),
-    supabase.from("deals").select("id", { count: "exact", head: true }),
+    );
+    if (!rows) return null;
+    const { count, error } = await supabase.from("deals").select("id", { count: "exact", head: true });
+    if (error || (count != null && count > rows.length)) return null;
+    return rows;
+  };
+  const [data, team] = await Promise.all([
+    readPipeline().then((rows) => rows ?? readPipeline()),
     getTeam(supabase, user.id).catch(() => null),
   ]);
-  if (!data || countError || (count != null && count > data.length)) {
+  if (!data) {
     return Response.redirect(new URL("/deals?error=exportfail", req.url), 302);
   }
   const rows = data.filter((d) => !d.is_sample);
