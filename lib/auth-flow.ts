@@ -339,6 +339,56 @@ export function landingAfterFailedExchange(next: string | null, hadCode: boolean
   return "/login?link=expired";
 }
 
+/**
+ * The email links a click-through page verifies by their token hash
+ * (supabase-js's `EmailOtpType`): `/auth/confirm` shows one button and
+ * verifies only when it is pressed. A link a corporate scanner fetches to
+ * check it (Outlook's Safe Links and its kind) then uses nothing up, and a
+ * reset asked for on a laptop opens on a phone, since the hash needs no code
+ * verifier in the browser that asked (research pass 32; the email templates
+ * pointing here are the owner's to set).
+ */
+export const EMAIL_LINK_TYPES = ["signup", "invite", "magiclink", "recovery", "email_change", "email"] as const;
+export type EmailLinkType = (typeof EMAIL_LINK_TYPES)[number];
+
+/** A link's `type`, or null for one the page does not verify. */
+export function emailLinkTypeOf(raw: string | null | undefined): EmailLinkType | null {
+  return (EMAIL_LINK_TYPES as readonly string[]).includes(raw ?? "") ? (raw as EmailLinkType) : null;
+}
+
+/** A token hash as a link carries it: letters, digits, `-` and `_`, of a
+ *  sane length — anything else is refused before the auth service is asked. */
+export function isTokenHash(raw: string | null | undefined): raw is string {
+  return typeof raw === "string" && /^[A-Za-z0-9_-]{16,512}$/.test(raw);
+}
+
+/** What `/auth/confirm` says, and its one button, by the link's kind. */
+export function confirmPageCopy(type: EmailLinkType): { heading: string; body: string; button: string } {
+  if (type === "recovery") {
+    return {
+      heading: "Set a new password",
+      body: "Continue to sign in and choose a new password on your Account page.",
+      button: "Continue",
+    };
+  }
+  if (type === "email_change") {
+    return { heading: "Confirm your new email", body: "Confirm the change to your account's email address.", button: "Confirm the change" };
+  }
+  if (type === "magiclink") return { heading: "Sign in", body: "Continue to sign in to Underwrite Copilot.", button: "Sign in" };
+  return { heading: "Confirm your email", body: "Confirm your email address to finish setting up your account.", button: "Confirm my email" };
+}
+
+/** Where `/auth/confirm` sends the person: on a verified link, where a
+ *  code's exchange would (`landingAfterExchange`); on a refused one, to the
+ *  sign-in page's banner for that kind of link, the page it carried riding
+ *  along. */
+export function landingAfterConfirm(type: EmailLinkType, next: string | null, ok: boolean): string {
+  if (ok) return landingAfterExchange(next, type === "recovery" ? "recovery" : null);
+  if (type === "recovery" || type === "magiclink") return "/login?link=expired";
+  const onward = onwardPath(next);
+  return `/login?confirmed=1&link=expired${onward ? `&next=${encodeURIComponent(onward)}` : ""}`;
+}
+
 export type LinkBanner = { tone: "ok" | "warn"; text: string };
 
 export const CONFIRM_LINK_FAILED =
