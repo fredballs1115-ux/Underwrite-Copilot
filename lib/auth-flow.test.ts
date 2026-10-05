@@ -52,6 +52,23 @@ describe("a weak password is said by the service's own reasons (research pass 32
     expect(weakPasswordCopy({ message: msg, reasons: ["characters"] })).toBe(
       "That password is too weak — include at least a lower-case letter, an upper-case letter and a number.",
     );
+    // The "Letters and digits" setting is ONE set of both alphabets beside
+    // the digits: a letter of either case, never both (the second pre-merge
+    // audit of batch 2).
+    expect(
+      weakPasswordCopy({
+        message:
+          "Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789",
+        reasons: ["characters"],
+      }),
+    ).toBe("That password is too weak — include at least a letter and a number.");
+    expect(
+      weakPasswordCopy({
+        message:
+          "Password should contain at least one character of each: abcdefghijklmnopqrstuvwxyz, ABCDEFGHIJKLMNOPQRSTUVWXYZ, 0123456789, !@#$%^&*()_+-=[]{};':\"|<>?,./`~",
+        reasons: ["characters"],
+      }),
+    ).toBe("That password is too weak — include at least a lower-case letter, an upper-case letter, a number and a symbol.");
     expect(weakPasswordCopy({ message: "Password is known to be weak and easy to guess", reasons: ["pwned"] })).toBe(
       "That password is too weak — choose one that hasn't appeared in a known data breach.",
     );

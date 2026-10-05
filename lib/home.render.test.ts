@@ -32,6 +32,16 @@ describe("the homepage, as a screen reader hears it", () => {
     expect(a11yIssues(html)).toEqual([]);
   }, 60_000);
 
+  it("keeps each export tile's Pro mark a word of its own (the batch-2 audit)", async () => {
+    // The text read "Excel model, live formulasPro": the flex gap spaced
+    // the chip on screen and nothing spaced it for a screen reader.
+    const html = await renderHome();
+    const text = html.replace(/<!-- -->/g, "").replace(/<[^>]+>/g, "");
+    expect(text).toContain("Excel model, live formulas Pro");
+    expect(text).toContain("One-page IC memo Pro");
+    expect(text).not.toMatch(/formulasPro|memoPro/);
+  }, 60_000);
+
   it("names the hero card's two chips: the call, and the buy-box fit", async () => {
     const html = await renderHome();
     const card = html.slice(html.indexOf("The Maddox at Brewerytown"));

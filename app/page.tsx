@@ -917,7 +917,9 @@ export default function Home() {
                       Excel model, live formulas
                       {/* On your own deals the exports are Pro, as the hero's
                           card marks them; the samples download free
-                          (research pass 32). */}
+                          (research pass 32). The space keeps "Pro" a word of
+                          its own to a screen reader; the flex gap spaces it
+                          on screen. */}{" "}
                       <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
                     </h3>
                     <span className="rounded-full bg-faint px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted">
@@ -958,7 +960,7 @@ export default function Home() {
                 {/* Memo */}
                 <div className="hover-lift flex flex-col rounded-2xl border border-line bg-surface p-5 shadow-card">
                   <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-                    One-page IC memo
+                    One-page IC memo{" "}
                     <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">Pro</span>
                   </h3>
                   <div className="mt-4 flex-1">
@@ -1430,7 +1432,7 @@ function DealPreview() {
               key={a}
               className="flex items-center gap-1 rounded-lg border border-line bg-surface px-2.5 py-1 text-[11px] font-medium shadow-sm"
             >
-              {a}
+              {a}{" "}
               <span className="rounded-full bg-brand/10 px-1.5 py-px text-[9px] font-semibold text-brand">
                 Pro
               </span>

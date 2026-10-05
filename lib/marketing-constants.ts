@@ -124,8 +124,11 @@ export const FREE_PLAN: readonly string[] = [
   // Each said where it holds: the card had promised recorded-sales comps and
   // a local rule check by every address, where the comps run only where a
   // county publishes its sales to the registry and local rules only in the
-  // covered markets (research pass 32).
-  "Rent-rule check by address: local in the covered markets, statewide elsewhere",
+  // covered markets (research pass 32). The statewide rules are on file for
+  // ten states and no others — Oregon's statewide cap among the missing — so
+  // the line counts them; lib/plan-features.test.ts holds the count to the
+  // rules file (the batch-2 audit: it had said "statewide elsewhere").
+  "Rent-rule check by address: local in the covered markets, and the statewide rules on file for 10 states",
   `Recorded-sales comps in ${COVERAGE_SUMMARY}`,
   "Risk digest and side-by-side deal comparison",
   "Reconcile your own underwriting model",

@@ -118,6 +118,36 @@ const CHARACTER_CLASSES: [RegExp, string][] = [
   [/[!@#$%^&*][!@#$%^&*()_+\-=[\]{};':"|<>?,./`~]{3,}/, "a symbol"],
 ];
 
+/** One required set of the service's list, said as the characters it lets
+ *  through: a set holding both alphabets is "a letter", never a demand for
+ *  both cases (its "Letters and digits" setting is one set of both, beside
+ *  the digits), and a set mixing kinds is any one of them. Null where the set
+ *  is none the copy can name. */
+function requiredSetWords(set: string): string | null {
+  const lower = set.includes("abcdefghijklmnopqrstuvwxyz");
+  const upper = set.includes("ABCDEFGHIJKLMNOPQRSTUVWXYZ");
+  const words: string[] = [];
+  if (lower && upper) words.push("a letter");
+  else if (lower) words.push("a lower-case letter");
+  else if (upper) words.push("an upper-case letter");
+  if (set.includes("0123456789")) words.push("a number");
+  if (/[!@#$%^&*]/.test(set)) words.push("a symbol");
+  return words.length > 0 ? words.join(" or ") : null;
+}
+
+/** The kinds of characters the message's list asks for, a set at a time
+ *  ("…at least one character of each: <set>, <set>"); null where the message
+ *  carries no list, or a set the copy cannot name. A symbol set holds a comma
+ *  but never a comma before a space, so the list splits on ", ". */
+function requiredKinds(message: string): string[] | null {
+  const at = /\beach:\s*/i.exec(message);
+  if (!at) return null;
+  const sets = message.slice(at.index + at[0].length).trim().split(", ").filter((x) => x.length > 0);
+  if (sets.length === 0) return null;
+  const words = sets.map(requiredSetWords);
+  return words.every((w): w is string => w != null) ? words : null;
+}
+
 /**
  * A weak password, said by the reasons the auth service gives
  * (`AuthWeakPasswordError.reasons`: length, characters, pwned) and the
@@ -135,7 +165,8 @@ export function weakPasswordCopy(err: { message?: string | null; reasons?: reado
     parts.push(n ? `use at least ${n} characters` : "make it longer");
   }
   if (reasons.includes("characters")) {
-    const kinds = CHARACTER_CLASSES.filter(([re]) => re.test(message)).map(([, words]) => words);
+    const kinds =
+      requiredKinds(message) ?? CHARACTER_CLASSES.filter(([re]) => re.test(message)).map(([, words]) => words);
     parts.push(
       kinds.length === 0
         ? "include the kinds of characters the sign-in service asks for"
