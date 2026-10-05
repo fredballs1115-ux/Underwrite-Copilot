@@ -273,7 +273,7 @@ export default async function DealPage({
       // own + shared team deals). Derivation filters to this asset class.
       supabase
         .from("deals")
-        .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id")
+        .select("id, name, asset_class, created_at, is_sample, verdict, extraction, user_id, first_signal")
         .neq("id", id)
         .not("extraction", "is", null)
         .order("created_at", { ascending: false })
@@ -402,7 +402,7 @@ export default async function DealPage({
           batches.map((ids) =>
             supabase
               .from("deals")
-              .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
+              .select("id, name, asset_class, created_at, is_sample, verdict, extraction, first_signal")
               .in("id", ids),
           ),
         );
