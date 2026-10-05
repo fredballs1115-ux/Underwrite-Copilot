@@ -339,6 +339,17 @@ describe("the verdict is told what is being sold and the building's own basis", 
     );
   });
 
+  // Research pass 41 (L4): a deal filed as an office over a deck that calls
+  // itself multifamily read "Harbor View Apartments — Multifamily" beside a
+  // basis per foot and "Asset class — fits: … this is office".
+  it("names the deal's one class: the analyst's where filed, the deck's where left to Auto", () => {
+    const deck = base({ metrics: [m("Asking price", "$80,000,000"), m("Total SF", "300,000 SF")] });
+    const dealLine = (brief: string) => brief.split("\n")[2];
+    expect(dealLine(briefOf(deck, "office"))).toBe("Harbor View Apartments — Office — Dallas, TX");
+    expect(dealLine(briefOf(deck, "auto"))).toBe("Harbor View Apartments — Multifamily — Dallas, TX");
+    expect(dealLine(briefOf(base({ assetClass: "Garden-style apartments" }), "auto"))).toBe("Harbor View Apartments — Garden-style apartments — Dallas, TX");
+  });
+
   it("a forward purchase's basis is its price, the buyer's whole cost at delivery, never the price plus the developer's budget (research pass 41)", () => {
     const forward = base({
       assetClass: "Industrial",

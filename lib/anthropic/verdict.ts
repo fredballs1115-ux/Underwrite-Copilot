@@ -26,6 +26,7 @@ import type { MandateScore } from "@/lib/mandate";
 import { entityLoanWords, interestOf, isGpStake, isMasterLeasehold, isTenancyInCommon, isWholeShare } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
 import { assetWords } from "@/lib/asset-words";
+import { assetClassLabel } from "@/lib/asset-class";
 import { basisTag as buildingBasisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
@@ -295,13 +296,17 @@ export function buildBrief(input: VerdictInputs): string {
   const sections: string[] = [];
 
   // Deal identity first — the ranges must be grounded in the actual asset,
-  // asset class, and submarket, not synthesized in a vacuum.
+  // asset class, and submarket, not synthesized in a vacuum. The class is the
+  // one every page shows (shownAssetClass: the analyst's where they filed
+  // one, the deck's where they left it to Auto), so the line never names a
+  // class the basis and the box's checks below are not in (research pass 41).
   const ex = input.extraction;
+  const shownClass = ex ? assetClassLabel(shownAssetClass(input.assetClass, ex)) || ex.assetClass : "";
   sections.push(
     "## Deal",
     ex
       ? [
-          `${ex.dealName ?? "(unnamed)"} — ${ex.assetClass}${ex.market ? ` — ${ex.market}` : ""}`,
+          `${ex.dealName ?? "(unnamed)"} — ${shownClass}${ex.market ? ` — ${ex.market}` : ""}`,
           ex.address ? `Address: ${ex.address}` : "",
         ]
           .filter(Boolean)
