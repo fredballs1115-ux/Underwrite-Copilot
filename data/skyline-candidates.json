@@ -7075,6 +7075,12 @@
         "Ponce Puerto Rico skyline",
         "Ponce Puerto Rico aerial view",
         "Ponce from Cruceta del Vigia"
+      ],
+      "candidates": [
+        {
+          "file": "Ponce Puerto Rico port aerial view.jpg",
+          "note": "Ponce, PR — Tony Santana, U.S. Army Corps of Engineers, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37288646346, a one-market run)."
+        }
       ]
     },
     {
@@ -7098,6 +7104,12 @@
         "Aguadilla Puerto Rico aerial view",
         "Aguadilla Puerto Rico panorama",
         "Rincon Puerto Rico aerial view"
+      ],
+      "candidates": [
+        {
+          "file": "Aguadilla Pueblo.jpg",
+          "note": "Aguadilla, PR — U.S. Corps of Engineers, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37287443715)."
+        }
       ]
     },
     {
@@ -7165,6 +7177,12 @@
         "Solomons Maryland aerial view",
         "Calvert Cliffs Chesapeake Bay",
         "Patuxent River Solomons"
+      ],
+      "candidates": [
+        {
+          "file": "2016-07-20 10 10 04 Cliffs to the north of Grays Creek in Calvert Cliffs State Park, Calvert County, Maryland.jpg",
+          "note": "Lexington Park, MD — Famartin, CC BY-SA 4.0; Calvert Cliffs, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37288974243, a one-market run)."
+        }
       ]
     },
     {
@@ -7211,6 +7229,12 @@
         "Mayaguez Puerto Rico aerial view",
         "Mayaguez Puerto Rico panorama",
         "Cabo Rojo Puerto Rico aerial view"
+      ],
+      "candidates": [
+        {
+          "file": "Faro de Los Morrillos, Cabo Rojo.jpg",
+          "note": "Mayagüez, PR — Jerjes Medina Albino, CC BY-SA 3.0; Cabo Rojo, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37288750601, a one-market run)."
+        }
       ]
     },
     {
@@ -7405,6 +7429,12 @@
         "Racine Wisconsin skyline",
         "Racine Wisconsin harbor",
         "Racine Wisconsin lakefront"
+      ],
+      "candidates": [
+        {
+          "file": "Aerial view of Wind Point Lighthouse, Wisconsin, US julesvernex2.jpg",
+          "note": "Racine-Mount Pleasant, WI — Jules Verne Times Two, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37287680216)."
+        }
       ]
     },
     {
@@ -7426,6 +7456,12 @@
         "Saginaw Michigan downtown",
         "Saginaw Michigan skyline",
         "Saginaw Michigan aerial view"
+      ],
+      "candidates": [
+        {
+          "file": "Saginaw, Michigan Skyline (2022).jpg",
+          "note": "Saginaw, MI — WeaponizingArchitecture, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37287680216)."
+        }
       ]
     },
     {
@@ -7448,6 +7484,12 @@
         "Kenosha Wisconsin skyline",
         "Kenosha Wisconsin harbor",
         "Kenosha Wisconsin lakefront"
+      ],
+      "candidates": [
+        {
+          "file": "Kenosha North Pier Lighthouse.jpg",
+          "note": "Kenosha, WI — Wrongdave at English Wikipedia, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37287680216)."
+        }
       ]
     }
   ]

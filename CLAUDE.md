@@ -1578,7 +1578,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  One hundred and eighty-two are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  One hundred and eighty-nine are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1669,7 +1669,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   Gettysburg (cannons on Seminary Ridge), Jefferson City (the Capitol from
   the air, its credit "KTrimble at English Wikipedia" as printed) and
   Great Falls (the falls on the Missouri) from a one-market run each
-  (37279345706, 37279496897 and 37279768946)), each judged
+  (37279345706, 37279496897 and 37279768946); then round 13: Aguadilla
+  (the town on its bay) — run 37287443715 — Racine-Mount Pleasant (Wind
+  Point Lighthouse from a drone), Saginaw (downtown across the river) and
+  Kenosha (the red North Pier lighthouse, its credit "Wrongdave at English
+  Wikipedia" as printed) — run 37287680216 — with Ponce (its port under the
+  mountains, from the search door), Mayagüez (Los Morrillos lighthouse at
+  Cabo Rojo, named for the metro area) and Lexington Park (Calvert Cliffs,
+  named for the metro area: the 2023 delineation puts Calvert County in
+  it) from a one-market run each (37288646346, 37288750601 and
+  37288974243); Ponce's and Aguadilla's are U.S. Army Corps of Engineers
+  film scans about 1500px wide, served at their own width as Erie's is),
+  each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
   `cbsa:` row never draws; Hagerstown, Burlington (Vermont), Kalamazoo,
@@ -1707,9 +1718,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   hillside of new houses, one-market run 37279647195), Fort Smith (streets
   under wires and signs, a flood plate and a postcard) and Corvallis (buses
   under wires, an archive aerial that reads as a map, and the courthouse,
-  whose clock and cupola the 21:9 cuts) on the drawn cover. A one-state
+  whose clock and cupola the 21:9 cuts) on the drawn cover. Round 13 left
+  Houma-Bayou Cane-Thibodaux (its one usable frame a hazy film-scan aerial
+  of Larose, run 37287680216), Monroe (its one frame a PNG), Gainesville
+  (Georgia; a cupola the 21:9 cuts and streets of parked cars),
+  Jacksonville (North Carolina), Yuma, Elkhart-Goshen (the courthouse's
+  author printed "unknown", its lantern trimmed at 21:9), Springfield
+  (Illinois; every Capitol frame behind cars and wires or cut at 21:9,
+  one-market run 37289191720), St. Cloud, Joplin (its sheet the 2011
+  tornado's cleanup), Warner Robins and Florence (South Carolina; a
+  big-box centre's parking) on the drawn cover. A one-state
   title is mostly kept whole (the card
-  truncates a long one and the deal page shows it in full); 35 of the 166
+  truncates a long one and the deal page shows it in full); 35 of the 173
   are cut, most to their first city, three to the city the place is known
   by (Fort Myers, Daytona Beach, Sarasota) and two to the city's everyday
   name (Boise, Honolulu). A two-state title is cut to

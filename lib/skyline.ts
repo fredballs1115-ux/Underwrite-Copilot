@@ -596,6 +596,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.0",
     size: [2512, 1844],
   },  // ── Metro areas the site reads no figures for (#472) ──────────────────────
+  // Aguadilla, PR: skyline-sheet run 37287443715 — an article's lead, the town on its bay from the air in summer sun, a beach and a breakwater on turquoise water below houses climbing to green hills, a white block by the pier; no horizon, but the houses stand side-on in perspective over the sea, so it reads as a town, not a map (Hot Springs' case); a 1519px film scan, served at its own width as Erie's is. Over Rincón from a drone as a 2.8:1 panorama whose card is grey cloud with the town under the words, Crash Boat Beach's pier of bathers' backs under a flag, the beach under palms, palm fronds over a sunset beach and a bar's view of umbrellas and parked cars.
+  "cbsa:10380": {
+    file: "Aguadilla Pueblo.jpg",
+    place: "Aguadilla on its bay from the air, a beach and a breakwater below houses climbing green hills",
+    credit: "U.S. Corps of Engineers",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Aguadilla, PR",
+    size: [1519, 961],
+  },
   // Akron, OH: skyline-sheet run 36782855933 — the skyline at a card's full height, over a warmer panorama too short for the deal page's frame.
   "cbsa:10420": {
     file: "AkronPanorama.jpg",
@@ -1493,6 +1503,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Kennewick-Richland, WA",
     size: [3919, 2618],
   },
+  // Kenosha, WI: skyline-sheet run 37287680216 — an article's lead, the red North Pier lighthouse at the end of its pier on blue water under a blue sky with cumulus, the tower standing above the card's words, whole in both crops; the credit "Wrongdave at English Wikipedia" as printed (Bangor's form). Over the harbour and its far shore as a 3.4:1 panorama whose walkers stand under the words, a street with a motorcycle and parked cars, a grey street of snowbanks and SUVs, an empty street under a gym's sign and a survey plate of the harbour.
+  "cbsa:28450": {
+    file: "Kenosha North Pier Lighthouse.jpg",
+    place: "Kenosha's red North Pier lighthouse at the end of its pier under a blue sky with cumulus",
+    credit: "Wrongdave at English Wikipedia",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Kenosha, WI",
+    size: [2016, 1512],
+  },
   // Killeen-Temple, TX: skyline-sheet run 36787138337 — a domed courthouse under a clear sky, whole in both crops and 926px tall, over a distant strip of Temple's towers behind trees and grey street corners; the card names the metro area, since the photograph is Belton's.
   "cbsa:28660": {
     file: "Downtown belton.jpg",
@@ -1623,6 +1643,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Lexington, KY",
     size: [6088, 4059],
   },
+  // Lexington Park, MD: skyline-sheet run 37288974243 — a one-market run's find of thirty-one, from Calvert Cliffs State Park's category: the sandstone cliffs in morning sun with trees on their top, driftwood on the beach and the bay with a further headland under a deep blue sky, whole in both crops; a phone's frame, a little smoothed at 1:1 and clean at card size; the park is in Calvert County, inside the metro area, so the picture is named for the metro area and its place says it is the cliffs (Belton's rule), the round's weakest with Houma's. Over the park's own lead, the headland under a flat white sky, cliff faces under haze, a pond and a trail marker, Point Lookout's riprap and open water, the Patuxent at sunset from a bridge and Solomons' roads under wires and signs. The six-market sheet (run 37287443715) held only the Patuxent and Point Lookout frames.
+  "cbsa:30500": {
+    file: "2016-07-20 10 10 04 Cliffs to the north of Grays Creek in Calvert Cliffs State Park, Calvert County, Maryland.jpg",
+    place: "The cliffs of Calvert Cliffs State Park over the beach and the bay in morning sun",
+    credit: "Famartin",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Lexington Park, MD",
+    size: [3200, 2380],
+  },
   // Lincoln, NE: skyline-sheet run 36800019700 — the State Capitol's tower over downtown under a clear sky, the Sower whole in every crop; the Capitol's own portraits lose the Sower in the deal page's crops, the same skyline's other frames are smaller, paler or put a crane against the tower, the night frames are blown by floodlights, and the rest are rooftops, street corners, a theatre, a hotel's canopy and two congressmen.
   "cbsa:30700": {
     file: "Skyline of Downtown Lincoln, Nebraska, U.S. (2021 photograph).jpg",
@@ -1692,6 +1722,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Manchester-Nashua, NH",
     size: [8064, 5376],
+  },
+  // Mayagüez, PR: skyline-sheet run 37288750601 — a one-market run's find of twenty-three, from the lighthouse's category: Los Morrillos lighthouse at Cabo Rojo from above in warm late light, on its limestone cliffs over the sea, the lagoons and the hills beyond under a soft blue sky, the lighthouse above the card's words and whole in both crops (the 21:9 keeps the lagoons' far shore and loses the hills); Cabo Rojo is in the metro area, so the picture is named for the metro area and its place says it is Cabo Rojo (Belton's rule). Over the same lighthouse under a dramatic sky and two more frames whose 21:9 cuts its lantern, one with a photographer's watermark, the lighthouse small across grey water, seven frames of the cliffs and surf with no sky, the plaza's fountain and statue (the 21:9 cuts its head), the theatre's front (the 21:9 cuts its dome), a drone frame centred on a brewery's painted advertisement, mid-rise blocks under overcast and seven 1898 plates. The six-market sheet (run 37287552719) held the brewery, the overcast blocks and four of the plates.
+  "cbsa:32420": {
+    file: "Faro de Los Morrillos, Cabo Rojo.jpg",
+    place: "Los Morrillos lighthouse on its cliffs at Cabo Rojo from above, lagoons and hills beyond",
+    credit: "Jerjes Medina Albino",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Mayagüez, PR",
+    size: [4000, 3000],
   },
   // McAllen, TX: skyline-sheet run 36782733907 — the city article's lead, over a cityscape led by a parking lot.
   "cbsa:32580": {
@@ -1933,6 +1973,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Pittsfield, MA",
     size: [4000, 2000],
   },
+  // Ponce, PR: skyline-sheet run 37288646346 — a one-market run's find of fifteen, from search: the port of Ponce and its marina point from the air, sailboats in the harbour and a container ship at the quay, the city along the far shore and the mountains on the horizon under a pale sky; the card keeps the mountains, the 21:9 loses them and keeps the far shore, so it still reads as a harbour in perspective, not a map; a 1511px film scan, served at its own width as Erie's is. Over a 1977 survey plate of the firehouse and the cathedral, the city hall behind trees and a lamppost, Castillo Serrallés on its hill under a white sky (the 21:9 cuts its tower), a 1960s aerial of a hotel, a lettered university postcard, a dam's construction site, a carnival float and a crafts fair at night, a painted lion, a grackle, an iguana, an 1898 landing painted and a tug from a warship's deck. The six-market sheet (run 37287443715) held the plate, the city hall, Castillo Serrallés, the grackle and a book's plate of the plaza.
+  "cbsa:38660": {
+    file: "Ponce Puerto Rico port aerial view.jpg",
+    place: "The port of Ponce from the air, its marina and harbour, the mountains beyond",
+    credit: "Tony Santana, U.S. Army Corps of Engineers",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Ponce, PR",
+    size: [1511, 998],
+  },
   // Portland, ME: skyline-sheet run 36782855933 — a picture from the city's own article, the marina in front of downtown, over an aerial and a grey view from the islands.
   "cbsa:38860": {
     file: "Skyline waterfront.jpg",
@@ -1982,6 +2032,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Provo, UT",
     size: [5248, 2952],
+  },
+  // Racine-Mount Pleasant, WI: skyline-sheet run 37287680216 — an article's photograph, Wind Point Lighthouse from a drone, the white tower and its red lantern over the keeper's red-roofed house among trees, the lake beyond under mist and a grey sky; an oblique with a horizon, the lantern whole in both crops (the 21:9 with a small margin), crisp. Over the article's lead, the Research Tower over the brick Administration Building under a blue sky (a company's headquarters), the lighthouse from the ground (the 21:9 cuts its lantern), twice behind pines across a lawn, and a coloured postcard of a square.
+  "cbsa:39540": {
+    file: "Aerial view of Wind Point Lighthouse, Wisconsin, US julesvernex2.jpg",
+    place: "Wind Point Lighthouse and the keeper's house from the air, the lake beyond under mist",
+    credit: "Jules Verne Times Two",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Racine-Mount Pleasant, WI",
+    size: [8052, 5871],
   },
   // Rapid City, SD: skyline-sheet run 37236951448 — downtown in warm low sun under the foothills of the Black Hills, the city and the ridge above it whole in both crops; over a drone frame of a highway, a gas station and car parks under a hazy sky, downtown from the hillside with treetops across half the card and flat ground behind, a sky of cloud over a sliver of plain, the Needles from Harney Peak, a street front behind a tree's trunk, office towers through blurred pine and a winter aerial that reads as a map.
   "cbsa:39660": {
@@ -2042,6 +2102,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/2.5",
     name: "Rockford, IL",
     size: [3456, 2304],
+  },
+  // Saginaw, MI: skyline-sheet run 37287680216 — an article's lead, downtown across the river in the evening under a blue sky, a tall old block and an Art Deco tower over the riverbank's buildings, a bridge and a boat's wake at the right, whole in both crops; a little smoothed at 1:1, clean at card and header size, a windowless white wall at the left edge. Over the Castle Museum (the 21:9 cuts a tower's lantern), a speedboat's wake under two bridges at 1600px, a concert on a lawn from above and three archive plates of 1888, 1912 and 1915.
+  "cbsa:40980": {
+    file: "Saginaw, Michigan Skyline (2022).jpg",
+    place: "Downtown Saginaw across the river in the evening, a bridge at the right",
+    credit: "WeaponizingArchitecture",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Saginaw, MI",
+    size: [3706, 2084],
   },
   // St. George, UT: skyline-sheet run 36808230184 — the city below its red sandstone bluffs, snow-capped mountains under cloud beyond, an article's lead, whole in both crops, over four views of Snow Canyon State Park — red and white sandstone and sage, the park rather than the city, one with a dark shadow across a third of the card.
   "cbsa:41100": {

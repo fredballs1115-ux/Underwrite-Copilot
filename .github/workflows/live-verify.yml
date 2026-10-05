@@ -1233,7 +1233,7 @@ jobs:
           mark "#510 your 1031 clock, beside every deal" grep -q "Your 1031 clock, beside every deal" p_whats-new.html
           mark "#511 credits that follow the data" grep -q "Credits that follow the data, and messages that hold up" p_whats-new.html
           mark "#512 preferred equity, read as a position" grep -q "Preferred equity, read as a position" p_whats-new.html
-          mark "#513 fifteen more cities, pictured" grep -q "Fifteen more cities, pictured" p_whats-new.html
+          mark "#513 twenty-two more cities, pictured" grep -q "Twenty-two more cities, pictured" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"

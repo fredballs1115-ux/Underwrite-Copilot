@@ -350,6 +350,21 @@ overrule (each alternative is the drawn cover unless said):
 6. **"Amherst Town-Northampton, MA"** keeps the Census title whole; Boise's
    precedent would shorten it to the town's everyday name.
 
+**Photographs, round 13.** Seven more: Ponce, Aguadilla, Mayagüez (Los
+Morrillos lighthouse at Cabo Rojo), Lexington Park (Calvert Cliffs),
+Racine-Mount Pleasant, Saginaw and Kenosha. I left Houma's one usable frame
+(a hazy film-scan aerial of Larose) on the drawn cover, with ten others.
+Four choices are yours to overrule:
+1. **Ponce** and **Aguadilla** are Corps of Engineers film scans about
+   1500px wide, served at their own width as Erie's is: sharp on a phone's
+   card, softer than the other picks on a 2x deal header.
+2. **Aguadilla** has no sky in either crop: the town climbing from its
+   beach, half rooftops at 21:9 (Hot Springs' case).
+3. **Lexington Park** is the round's weakest, a sandy cliff face under a
+   tree line.
+4. **Kenosha**'s credit reads "Wrongdave at English Wikipedia" as printed,
+   like Bangor's.
+
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
 **Do these (each is yours alone):**
