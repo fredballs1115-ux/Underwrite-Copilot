@@ -60,7 +60,7 @@ import { planFacts, yieldOnCostText } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
-import { askingPriceOf, inferStrategy, isPlanDeal } from "@/lib/deal-strategy";
+import { askingPriceOf, inferStrategy, isPlanDeal, notYetDelivered } from "@/lib/deal-strategy";
 import { interestOf, isWholeShare, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
@@ -1986,7 +1986,9 @@ export function ReportDocument({
                   : "Timeline to stabilization: not stated."
               }${
                 plan.plan.costPerUnit != null && plan.plan.units != null
-                  ? ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} planned ${planCount.many}.`
+                  ? // "planned" only where the building is still to be
+                    // delivered: a value-add's or a lease-up's units stand.
+                    ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} ${notYetDelivered(plan.kind) ? "planned " : ""}${planCount.many}.`
                   : ""
               }`,
             )}

@@ -2229,6 +2229,38 @@ describe("ReportDocument (full report)", () => {
     const keys = await render(hotel("Keys (proposed)"));
     expect(keys).toContain("BASIS PER KEY (ALL-IN)");
     expect(keys).toContain("The all-in basis is total cost over the 160 planned keys.");
+    // The memo page under the title says the same noun (research pass 35).
+    expect(rooms).toContain("$300,000 per planned room all-in");
+  }, 60000);
+
+  it("costs a value-add's standing units without calling them planned, on the plan page and the memo (research pass 35)", async () => {
+    const row = (label: string, value: string, page = "p. 3") => ({ label, value, flagged: false, page, basis: "na" as const });
+    const ex = {
+      dealName: "Riverside Commons — Value-Add",
+      assetClass: "multifamily",
+      market: "Richmond, VA",
+      totalPages: 40,
+      strategy: { kind: "value_add", summary: "Renovate 192 of 240 classic units over 30 months.", capitalBudget: "$4,800,000", timeline: "30 months" },
+      metrics: [
+        row("Asking price", "$42,000,000"),
+        row("Units", "240"),
+        { label: "NOI (in-place)", value: "$2,310,000", flagged: false, page: "p. 8", basis: "in_place" },
+        { label: "NOI (stabilized, pro forma)", value: "$2,950,000", flagged: true, page: "p. 9", basis: "pro_forma" },
+        row("Renovation budget", "$4,800,000", "p. 10"),
+      ],
+    } as unknown as ExtractionResult;
+    const deal = { name: ex.dealName, asset_class: "multifamily", extraction: ex, challenges: null, comps: null, market: null, reconciliation: null, verdict: SAMPLE_DEAL.verdict, prior_screen: null } as unknown as DealRow;
+    const plan = buildPlanReport(ex, { pct: 0.06, provenance: "assumption" });
+    expect(plan?.kind).toBe("value_add");
+    const input = buildReportData(deal, "October 5, 2026", [], null, undefined, plan);
+    const text = pdfTextOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    ).replace(/\s+/g, " ");
+    // They read "over the 240 planned units" and "$195,000 per planned unit
+    // all-in" on 240 apartments that stand today.
+    expect(text).toContain("The all-in basis is total cost over the 240 units.");
+    expect(text).toContain("$195,000 per unit all-in");
+    expect(text).not.toContain("planned unit");
   }, 60000);
 
   it("gives the site a page of its own: FEMA's flood map as one picture, the ring on the building, the key with the building's zone marked, and the zone's sentence (#427, #472)", async () => {

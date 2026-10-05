@@ -18,7 +18,7 @@ import type { DealRow } from "@/lib/deals";
 Font.registerHyphenationCallback((word) =>
   word.length <= 24 ? [word] : (word.match(/.{1,12}/g) ?? [word]),
 );
-import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { pdfSafe } from "./pdf-text";
 import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
@@ -31,7 +31,7 @@ import type {
   MarketResult,
   VerdictResult,
 } from "@/lib/anthropic/types";
-import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, type DealStrategy } from "@/lib/deal-strategy";
+import { askingPriceOf, findPriceMetric, inferStrategy, notYetDelivered, planSummary, type DealStrategy } from "@/lib/deal-strategy";
 import { marketsPhrase, portfolioFacts, readPortfolio } from "@/lib/portfolio";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { dealTypeLabel, interestOf, interestShortLine, isWholeShare, readInterest } from "@/lib/interest";
@@ -120,7 +120,7 @@ export const STATUS_CHIP: Record<
  * The strategy is the deal page's own read (the extraction and the first
  * signal).
  */
-function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStrategy): string {
+function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStrategy, cls: string): string {
   if (strategy.kind === "unknown" || strategy.kind === "stabilized") return "";
   const plan = planSummary(extraction, strategy);
   // Whose strategy it is on a note or a leased fee, as the deal header says
@@ -131,9 +131,16 @@ function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStra
   // A forward purchase's NOI is the one stated at delivery (lib/deal-strategy
   // `forwardDeliveryNoi`), over the price the buyer pays then.
   const noiWord = plan?.forward ? "NOI at delivery" : "stabilized NOI";
+  // The basis in the counting row's own noun — a hotel's rooms or keys, a
+  // park's pads — as the report's plan page says it, and "planned" only
+  // where the building is still to be delivered: a value-add's units stand
+  // (research pass 35: "$195,000 per planned unit all-in" on 240 existing
+  // units).
+  const noun = countNounOf(extraction?.metrics ?? [], cls).one;
+  const per = `per ${notYetDelivered(strategy.kind) ? "planned " : ""}${noun}`;
   if (plan?.stabilizedNoi && plan.totalCost != null && plan.yieldOnCost != null) {
     return `${kind} · ${noiWord} ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
-      plan.costPerUnit != null ? `; ${m(plan.costPerUnit)} per planned unit all-in` : ""
+      plan.costPerUnit != null ? `; ${m(plan.costPerUnit)} ${per} all-in` : ""
     })`;
   }
   if (plan?.stabilizedNoi) return `${kind} · ${noiWord} ${m(plan.stabilizedNoi.value)}`;
@@ -737,9 +744,12 @@ export function buildMemoData(
         for (const r of diff.rows.filter((x) => x.direction !== "flat").slice(0, 3)) {
           parts.push(`${r.label} ${r.delta}`);
         }
+        // With its year: a re-screen across a new year read "(Aug 2)"
+        // with nothing to say which August (research pass 35).
         const when = new Date(diff.at).toLocaleDateString("en-US", {
           month: "short",
           day: "numeric",
+          year: "numeric",
           timeZone: "UTC",
         });
         sinceLast = pdfSafe(
@@ -756,7 +766,7 @@ export function buildMemoData(
     market: str(extraction?.market),
     // On a deal filed "Auto-detect", what the deck turned out to be.
     assetClass: shownAssetClass(str(deal.asset_class), extraction ?? null),
-    strategyLine: pdfSafe(strategyLineFor(extraction ?? null, strategy)),
+    strategyLine: pdfSafe(strategyLineFor(extraction ?? null, strategy, shownAssetClass(str(deal.asset_class), extraction ?? null))),
     portfolioLine: pdfSafe(portfolioLineFor(extraction ?? null)),
     interestLine: pdfSafe(interestLineFor(extraction ?? null)),
     assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),

@@ -1332,3 +1332,84 @@ describe("MemoDocument (redesigned)", () => {
     expect(text).toContain("a rule of thumb, not a live comps feed");
   }, 30000);
 });
+
+// Research pass 35, F18: the memo's smaller wording.
+describe("the memo's wording (research pass 35)", () => {
+  const row = (label: string, value: string, page = "p. 3") => ({ label, value, flagged: false, page, basis: "na" as const });
+  const dealOf = (extraction: unknown, asset_class: string, prior_screen: unknown = null) =>
+    ({
+      name: (extraction as { dealName?: string }).dealName ?? SAMPLE_DEAL.name,
+      asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen,
+    }) as unknown as DealRow;
+
+  it("dates the since-last line with its year", async () => {
+    const prior = {
+      at: "2026-08-02T15:00:00.000Z",
+      extraction: {
+        metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$70,000,000" } : m)),
+      },
+      verdict: { verdict: "pass" },
+    };
+    const data = buildMemoData(dealOf(SAMPLE_DEAL.extraction, SAMPLE_DEAL.asset_class, prior), "October 5, 2026");
+    // It read "Since last screen (Aug 2): …", which says nothing of which
+    // August once a re-screen crosses a new year.
+    expect(data.sinceLast).toBe("Since last screen (Aug 2, 2026): Go › Caution  ·  Asking price -$2.0M (-2.9%)");
+    const text = (await pdfTextOf(
+      await renderToBuffer(React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    )).replace(/\s+/g, " ");
+    expect(text).toContain("Since last screen (Aug 2, 2026):");
+  }, 30000);
+
+  it("costs a value-add per unit, not per planned unit, and a development per planned unit in the memorandum's own noun", () => {
+    // 240 apartments that stand today, renovated: none is planned.
+    const valueAdd = {
+      dealName: "Riverside Commons — Value-Add",
+      assetClass: "multifamily",
+      market: "Richmond, VA",
+      totalPages: 40,
+      strategy: { kind: "value_add", summary: "Renovate 192 of 240 classic units over 30 months.", capitalBudget: "$4,800,000", timeline: "30 months" },
+      metrics: [
+        row("Asking price", "$42,000,000"),
+        row("Units", "240"),
+        { label: "NOI (in-place)", value: "$2,310,000", flagged: false, page: "p. 8", basis: "in_place" },
+        { label: "NOI (stabilized, pro forma)", value: "$2,950,000", flagged: true, page: "p. 9", basis: "pro_forma" },
+        row("Renovation budget", "$4,800,000", "p. 10"),
+      ],
+    };
+    // It read "…; $195,000 per planned unit all-in)".
+    expect(buildMemoData(dealOf(valueAdd, "multifamily"), "October 5, 2026").strategyLine).toBe(
+      "Value-add · stabilized NOI $3.0M on $46.8M total cost (6.30% yield on cost; $195,000 per unit all-in)",
+    );
+    // A hotel still to be built: planned, and in the count's own noun.
+    const hotel = (countLabel: string) => ({
+      dealName: "Harbor Point Hotel — Ground-up Select Service",
+      assetClass: "hospitality_str",
+      market: "Norfolk, VA",
+      strategy: {
+        kind: "development",
+        summary: "Build a 160-room select-service hotel on the waterfront site.",
+        capitalBudget: "$42M hard and soft costs",
+        timeline: "20 months of construction, 18 months of ramp",
+      },
+      metrics: [
+        row("Land cost", "$6,000,000"),
+        row("NOI (stabilized, pro forma)", "$4,200,000", "p. 12"),
+        row("Total project cost", "$48,000,000", "p. 14"),
+        row(countLabel, "160", "p. 4"),
+      ],
+    });
+    expect(buildMemoData(dealOf(hotel("Rooms (proposed)"), "hospitality_str"), "October 5, 2026").strategyLine).toBe(
+      "Development · stabilized NOI $4.2M on $48.0M total cost (8.75% yield on cost; $300,000 per planned room all-in)",
+    );
+    expect(buildMemoData(dealOf(hotel("Keys (proposed)"), "hospitality_str"), "October 5, 2026").strategyLine).toMatch(
+      /; \$300,000 per planned key all-in\)$/,
+    );
+  });
+});
