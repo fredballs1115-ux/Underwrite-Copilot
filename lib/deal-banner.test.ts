@@ -1,7 +1,12 @@
+import React from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BANNER, CARD, THUMB, bannerSources, leadMarketId, pictureVersion, shownMarketIds } from "./deal-banner";
+import { BANNER, CARD, THUMB, bannerSources, leadMarketId, pictureVersion, shownMarketIds, type BannerSource } from "./deal-banner";
 import { IMAGE_CREDIT, imagePlan } from "./imagery-plan";
 import { marketPictureFor } from "./market-picture";
+import { coverFor } from "./deal-cover";
+import { a11yIssues, visibleText } from "./render-lint";
+import { BannerFace, DealBanner } from "@/app/(app)/deals/deal-banner";
 
 const base = { dealId: "d1", pictureCredit: null, googleEnabled: false, hasStreetAddress: true, hasAddress: true };
 
@@ -151,5 +156,87 @@ describe("the pipeline's one credit line names the market photographs on screen,
     expect(shownMarketIds(cards, new Map<string, string | null>([["a", null], ["b", null], ["c", null]]))).toEqual([]);
     // A card not on screen is not passed in at all.
     expect(shownMarketIds([], new Map())).toEqual([]);
+  });
+});
+
+describe("a card says nothing about a picture until the picture has loaded (research pass 29)", () => {
+  // Research pass 29 caught, on a phone with the photographs slow to come,
+  // a drawn office tower captioned "MARKET PHOTO Philadelphia PA" and
+  // credited to its photographer, a drawn storefront credited "From the
+  // offering memorandum", and a drawn apartment block counting "5"
+  // photographs under both flip arrows: the frame held the deal's cover
+  // while each card already wore its picture's words.
+  const cover = coverFor({ seed: "d1", assetClass: "multifamily", place: "Philadelphia, PA" });
+  const pitt = marketPictureFor({ city: "Pittsburgh", state: "PA" })!;
+  const own = bannerSources({ ...base, pictureCredit: "From the offering memorandum", aerial: false }, CARD);
+  const slides: BannerSource[] = [3, 5].map((page, k) => ({
+    kind: "photo",
+    src: `/api/deals/d1/picture?size=hero&g=${k + 1}`,
+    credit: `From the offering memorandum, page ${page}`,
+  }));
+  const draw = (sources: BannerSource[], extra: Partial<React.ComponentProps<typeof DealBanner>> = {}) =>
+    renderToStaticMarkup(
+      React.createElement(DealBanner, { sources, label: "The Fairmount", aspect: "16/10", flush: true, shade: true, cover, ...extra }),
+    );
+  const face = (props: React.ComponentProps<typeof BannerFace>) => renderToStaticMarkup(React.createElement(BannerFace, props));
+
+  it("draws no credit, no count, no caption and no ring before the picture loads, and keeps the cover's own words off", () => {
+    // The deal's own photograph, five of them on its page.
+    const photo = draw(own, { photos: 5, slides });
+    expect(photo).toContain('data-deal-banner="photo"');
+    expect(photo).toMatch(/<img[^>]*src="\/api\/deals\/d1\/picture\?size=hero"[^>]*class="[^"]*\bopacity-0\b/);
+    expect(photo).not.toContain('data-picture="face"');
+    expect(photo).not.toContain('data-picture="photo-count"');
+    expect(photo).not.toContain('data-slide=');
+    // The cover holds the frame without its words, as it always has: it is
+    // no photograph, and no photograph's caption either.
+    expect(photo).toMatch(/<span aria-hidden="true" data-deal-cover="housing"/);
+    expect(photo).not.toContain('role="img"');
+    expect(visibleText(photo).trim()).toBe("");
+    // A market's photograph: no caption, no photographer, no licence.
+    const market = draw(bannerSources({ ...base, market: pitt, aerial: false }, CARD));
+    expect(market).toContain('data-deal-banner="market"');
+    expect(market).not.toContain('data-picture="market"');
+    expect(visibleText(market).trim()).toBe("");
+    // A memorandum's photograph asked for over the market's: neither speaks.
+    const lifting = draw(bannerSources({ ...base, memorandumUnread: true, market: pitt, aerial: false }, CARD));
+    expect(lifting).toContain('data-lift="photo"');
+    expect(visibleText(lifting).trim()).toBe("");
+    // A street address's overhead, the compare page's: no ring, no credit.
+    const overhead = draw(bannerSources(base, BANNER), { cover: null, shade: false });
+    expect(overhead).toContain('data-deal-banner="aerial"');
+    expect(overhead).not.toContain('data-picture="banner-pin"');
+    expect(visibleText(overhead)).not.toContain(IMAGE_CREDIT.aerial);
+    for (const html of [photo, market, lifting, overhead]) expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("draws them once the picture is whole, fading in with it: the count and credit, the flipped-to page, the market's caption, the ring", () => {
+    const [photo] = own;
+    expect(face({ source: photo, loaded: false, photos: 5, credit: photo.credit })).toBe("");
+    const whole = face({ source: photo, loaded: true, photos: 5, credit: photo.credit });
+    expect(whole).toMatch(/^<span data-picture="face" class="[^"]*\btransition-opacity\b[^"]*\bstarting:opacity-0\b/);
+    expect(whole).toMatch(/data-picture="photo-count"[^>]*>[\s\S]*?<span>5<\/span><span class="sr-only"> photographs<\/span>/);
+    expect(visibleText(whole)).toContain("From the offering memorandum");
+    // Flipped to another photograph, once that one is whole: its place in
+    // the count and its own page's credit.
+    const flipped = face({ source: photo, loaded: true, photos: 5, position: 2, credit: slides[0].credit });
+    expect(visibleText(flipped)).toContain("2 / 5");
+    expect(visibleText(flipped)).toContain("From the offering memorandum, page 3");
+    // One photograph is not counted.
+    expect(face({ source: photo, loaded: true, photos: 1, credit: photo.credit })).not.toContain("photo-count");
+    // A market's photograph: named on its face as the market's, credited to
+    // its photographer, and counted as nothing.
+    const [mkt] = bannerSources({ ...base, market: pitt, aerial: false }, CARD);
+    const caption = face({ source: mkt, loaded: true, photos: 5, credit: mkt.credit });
+    expect(caption).toContain('data-picture="market"');
+    expect(visibleText(caption).replace(/\s+/g, " ")).toContain(`Market photo ${pitt.name}`);
+    expect(visibleText(caption).replace(/\s+/g, " ")).toContain(pitt.credit);
+    expect(caption).not.toContain("photo-count");
+    // A street address's overhead: the ring at its centre, and USGS credited.
+    const [overhead] = bannerSources(base, BANNER);
+    const ringed = face({ source: overhead, loaded: true, credit: overhead.credit });
+    expect(ringed).toContain('data-picture="banner-pin"');
+    expect(visibleText(ringed)).toContain(IMAGE_CREDIT.aerial);
+    for (const html of [whole, flipped, caption, ringed]) expect(a11yIssues(html)).toEqual([]);
   });
 });

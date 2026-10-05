@@ -2155,7 +2155,10 @@ const DealTile = memo(function DealTile({
   const [dead, setDead] = useState<ReadonlySet<string>>(new Set());
   const slides = useMemo(() => (d.slides ?? []).filter((s) => !dead.has(s.src)), [d.slides, dead]);
   const [slideAsked, setSlide] = useState(0);
-  const [photoOn, setPhotoOn] = useState(d.pictures?.[0]?.kind === "photo" && !d.pictures[0].pending);
+  // Told by the banner once the deal's own photograph is whole on screen:
+  // the arrows and the dots wait for it, as its count and credit do, so
+  // nothing points at photographs over the cover that holds the frame.
+  const [photoOn, setPhotoOn] = useState(false);
   const canFlip = !compareMode && photoOn && slides.length > 0;
   const count = slides.length + 1;
   const slide = slideAsked < count ? slideAsked : 0;
@@ -2383,39 +2386,10 @@ const DealTile = memo(function DealTile({
             {inner}
           </Link>
           {/* The deal's other photographs (#450), flipped through where a
-              listing's card lets you: arrows on the picture, shown on hover
-              or focus and always on a touch screen, a swipe, and a dot a
-              photograph. Outside the link, over the picture: a button inside
-              an anchor is invalid, and the card's click still opens the deal. */}
-          {canFlip ? (
-            <div data-flip="photos" className="pointer-events-none absolute inset-x-0 top-0 flex aspect-[16/10] items-center justify-between px-2">
-              {[-1, 1].map((step) => (
-                <button
-                  key={step}
-                  type="button"
-                  onClick={() => go(step)}
-                  aria-label={`${step < 0 ? "Previous" : "Next"} photo of ${d.name}`}
-                  data-flip-step={step}
-                  className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-ink shadow-md opacity-0 transition hover:bg-white focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand group-hover:opacity-100 pointer-coarse:opacity-90"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
-                    <path d={step < 0 ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
-                  </svg>
-                </button>
-              ))}
-              <span aria-hidden className="absolute bottom-7 left-1/2 flex -translate-x-1/2 gap-1">
-                {Array.from({ length: Math.min(count, 5) }, (_, k) => {
-                  const first = Math.min(Math.max(0, slide - 2), Math.max(0, count - 5));
-                  return (
-                    <span
-                      key={first + k}
-                      className={`h-1.5 w-1.5 rounded-full shadow-sm ${first + k === slide ? "bg-white" : "bg-white/55"}`}
-                    />
-                  );
-                })}
-              </span>
-            </div>
-          ) : null}
+              listing's card lets you, once its own photograph is whole on
+              screen. Outside the link, over the picture: a button inside an
+              anchor is invalid, and the card's click still opens the deal. */}
+          {canFlip ? <PhotoFlip name={d.name} count={count} slide={slide} onStep={go} /> : null}
           {/* Outside the link: a select inside an anchor is invalid, and the
               stage is changed here without leaving the pipeline. */}
           <div className="flex items-center gap-2 border-t border-line bg-faint/60 px-4 py-2 text-[11px] text-muted">
@@ -2441,6 +2415,59 @@ const DealTile = memo(function DealTile({
     </li>
   );
 });
+
+/**
+ * A card's way through its deal's photographs (#450), over the picture: an
+ * arrow each side, shown on hover or focus and always on a touch screen,
+ * named for the deal, and a dot a photograph — five at most, a window round
+ * the one on screen. The card draws it only once its own photograph is
+ * whole on screen, and it fades in with it. Pure, so a test draws it.
+ */
+export function PhotoFlip({
+  name,
+  count,
+  slide,
+  onStep,
+}: {
+  /** the deal's name, for the arrows' accessible names */
+  name: string;
+  /** how many photographs there are to flip through, the lead one included */
+  count: number;
+  /** the one on screen, from 0 */
+  slide: number;
+  onStep: (step: number) => void;
+}) {
+  const first = Math.min(Math.max(0, slide - 2), Math.max(0, count - 5));
+  return (
+    <div
+      data-flip="photos"
+      className="pointer-events-none absolute inset-x-0 top-0 flex aspect-[16/10] items-center justify-between px-2 transition-opacity duration-500 ease-out starting:opacity-0"
+    >
+      {[-1, 1].map((step) => (
+        <button
+          key={step}
+          type="button"
+          onClick={() => onStep(step)}
+          aria-label={`${step < 0 ? "Previous" : "Next"} photo of ${name}`}
+          data-flip-step={step}
+          className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-ink shadow-md opacity-0 transition hover:bg-white focus-visible:opacity-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand group-hover:opacity-100 pointer-coarse:opacity-90"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="h-4 w-4">
+            <path d={step < 0 ? "m15 18-6-6 6-6" : "m9 18 6-6-6-6"} />
+          </svg>
+        </button>
+      ))}
+      <span aria-hidden className="absolute bottom-7 left-1/2 flex -translate-x-1/2 gap-1">
+        {Array.from({ length: Math.min(count, 5) }, (_, k) => (
+          <span
+            key={first + k}
+            className={`h-1.5 w-1.5 rounded-full shadow-sm ${first + k === slide ? "bg-white" : "bg-white/55"}`}
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
 
 const ONBOARD_KEY = "uc-onboard-dismissed";
 

@@ -43,7 +43,7 @@ vi.mock("../app/(app)/deals/actions", () => {
   };
 });
 
-import { Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
+import { PhotoFlip, Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { modelReturnsRead } from "@/lib/compare-interest";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
@@ -468,18 +468,15 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((html.match(/data-deal-cover=/g) ?? []).length).toBe(live.length);
     expect(positionConflicts(html)).toEqual([]);
     // Over the deal's own photograph, the card counts the photographs its
-    // deal page holds (#448), and a reader hears the word; nowhere else.
-    expect((html.match(/data-picture="photo-count"/g) ?? []).length).toBe(1);
-    expect(html).toMatch(/data-picture="photo-count"[^>]*>[\s\S]*?<span>5<\/span><span class="sr-only"> photographs<\/span>/);
-    // …and flips through them there (#450): two arrows over the picture,
-    // outside the card's link, named for the deal, and a dot a photograph.
-    const flip = html.match(/<div data-flip="photos"[\s\S]*?<\/div>/)?.[0] ?? "";
-    expect(flip).not.toBe("");
-    expect((html.match(/data-flip="photos"/g) ?? []).length).toBe(1);
-    expect(flip).toContain('aria-label="Previous photo of 1400 Market — office to residential"');
-    expect(flip).toContain('aria-label="Next photo of 1400 Market — office to residential"');
-    expect((flip.match(/rounded-full shadow-sm bg-white/g) ?? []).length).toBe(5);
-    expect(html).toMatch(/<\/a><div data-flip="photos"/);
+    // deal page holds (#448) and flips through them (#450) — once that
+    // photograph is whole on screen (research pass 29). Until it is, the
+    // frame is the deal's cover without its words, and nothing on it points
+    // at photographs nobody can see: no count, no arrows, no dots.
+    // lib/deal-banner.test.ts draws the count once the photograph is whole,
+    // and the arrows and dots are drawn below (PhotoFlip).
+    expect(html).not.toContain('data-picture="photo-count"');
+    expect(html).not.toContain('data-flip="photos"');
+    expect(html).not.toContain('data-picture="face"');
     // Nothing is asked for before it is wanted: the other photographs load
     // on a flip, never with the page.
     expect(html).not.toContain("picture?size=hero&amp;g=");
@@ -493,9 +490,11 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(lifted[0]).toContain('alt=""');
     expect(lifted[0]).toContain('aria-hidden="true"');
     expect(lifted[0]).toContain("opacity-0");
-    // The credit follows the picture on screen.
+    // The credit follows the picture on screen, and only once it is on
+    // screen: the photograph added to the deal is still loading here, so
+    // its credit is not over the cover that holds its frame.
     expect(text).not.toContain("From the offering memorandum");
-    expect(text).toContain("Photograph added to the deal");
+    expect(text).not.toContain("Photograph added to the deal");
     expect(text).not.toContain("Imagery: USGS The National Map");
     // The call rides on the picture, once a card: the failed re-screen and
     // the failed run each say Failed, the stalled one Stalled.
@@ -546,6 +545,22 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(html).not.toContain('class="hidden items-center gap-3 px-5 pb-1.5 md:flex"');
   });
 
+  it("flips through a deal's photographs once its own is whole: two arrows named for the deal, and a dot a photograph (#450)", () => {
+    const html = render(React.createElement(PhotoFlip, { name: "1400 Market — office to residential", count: 5, slide: 0, onStep: () => {} }));
+    expect(a11yIssues(html)).toEqual([]);
+    expect(html).toMatch(/^<div data-flip="photos"/);
+    expect(html).toContain('aria-label="Previous photo of 1400 Market — office to residential"');
+    expect(html).toContain('aria-label="Next photo of 1400 Market — office to residential"');
+    // A dot a photograph, the one on screen solid.
+    expect((html.match(/rounded-full shadow-sm bg-white(?:\/55)?"/g) ?? []).length).toBe(5);
+    expect((html.match(/rounded-full shadow-sm bg-white"/g) ?? []).length).toBe(1);
+    // Five at most: a window round the one on screen.
+    const many = render(React.createElement(PhotoFlip, { name: "The Maddox", count: 9, slide: 6, onStep: () => {} }));
+    expect((many.match(/rounded-full shadow-sm bg-white(?:\/55)?"/g) ?? []).length).toBe(5);
+    // It fades in with the photograph it flips through.
+    expect(html).toMatch(/^<div data-flip="photos" class="[^"]*\bstarting:opacity-0\b/);
+  });
+
   it("shows a card whose building has no photograph its market's photograph, named as the market's — pictures, not maps (#438)", () => {
     const market = marketPictureFor({ city: "Pittsburgh", state: "PA" })!;
     const withMarket = CARDS.map((c) => ({
@@ -579,12 +594,16 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect((html.match(/data-deal-banner="market"/g) ?? []).length).toBe(1);
     expect(html).toContain(`src="${market.src.replace(/&/g, "&amp;")}"`);
     expect(html).not.toContain(`src="/api/deals/c/aerial?src=usgs&amp;w=${CARD.w}&amp;h=${CARD.h}"`);
-    // Named on its face as the market's, never passed for the building, and
-    // credited to its photographer.
-    expect((html.match(/data-picture="market"/g) ?? []).length).toBe(1);
+    // Named as the market's in its alt text at once, never passed for the
+    // building. Its caption — the market named on its face, credited to its
+    // photographer — waits for the photograph to load (research pass 29):
+    // over the cover that holds the frame meanwhile it would credit a
+    // photograph nobody can see. lib/deal-banner.test.ts draws the caption
+    // once the photograph is whole.
+    expect(html).not.toContain('data-picture="market"');
     const flat = text.replace(/\s+/g, " ");
-    expect(flat).toContain(`Market photo ${market.name}`);
-    expect(flat).toContain(market.credit);
+    expect(flat).not.toContain("Market photo");
+    expect(flat).not.toContain(market.credit);
     expect(html).toContain("No photograph of the building yet.");
     // A building's own photograph is untouched.
     expect(html).toContain('src="/api/deals/b/picture?size=hero"');
@@ -1373,9 +1392,12 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(html).toContain('src="/api/deals/a/picture?size=hero"');
     expect(html).toContain('alt="Photograph of The Maddox at Brewerytown"');
     expect(html).toContain('alt="Aerial photograph of 1400 Market — office to residential"');
+    // Each credit waits for its picture to load (research pass 29), as on
+    // the pipeline's cards: the server's markup draws no picture yet, so it
+    // names none. lib/deal-banner.test.ts draws the credits once whole.
     const text = visibleText(html);
-    expect(text).toContain("From the offering memorandum");
-    expect(text).toContain("Imagery: USGS The National Map");
+    expect(text).not.toContain("From the offering memorandum");
+    expect(text).not.toContain("Imagery: USGS The National Map");
     expect(a11yIssues(html), "a11y compare pictured").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
     expect((html.match(/<li /g) ?? []).length).toBe(pictured.length);
