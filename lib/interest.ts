@@ -1087,9 +1087,14 @@ export function readInterest(
         // co-owners — no entity owns the property. The gross-up is a
         // share's; a loan the memorandum states is the property's.
         const pct = sharePct != null ? shareText(sharePct) : null;
-        const head = `This memorandum sells ${
-          pct ? `an undivided ${pct} of the property itself` : "an undivided interest in the property itself"
-        }, held as a tenant in common beside its co-owners — title to real estate, not a share of an entity`;
+        // All the tenant-in-common interests are together the whole property:
+        // no co-owner is left beside them (the audit C3b LOW-1).
+        const all = isWholeShare(sharePct);
+        const head = all
+          ? "This memorandum sells all the tenant-in-common interests in the property, together the whole property — title to real estate, not a share of an entity"
+          : `This memorandum sells ${
+              pct ? `an undivided ${pct} of the property itself` : "an undivided interest in the property itself"
+            }, held as a tenant in common beside its co-owners — title to real estate, not a share of an entity`;
         if (pct == null) {
           lead.push(`${head} — and states no single percentage for it: the whole building's income cannot be set against the interest's price until its share is known.`);
           if (entityLoan != null) lead.push(`The memorandum states ${withArticle(money(entityLoan))} loan on the property.`);
@@ -1098,11 +1103,22 @@ export function readInterest(
         }
         if (price == null || impliedWhole == null) {
           lead.push(`${head}.`);
-          modelCaveat = `The screening model runs the whole asset; the interest earns its ${pct} of the cash flows before any fee the co-owners' agreement pays its manager.`;
+          modelCaveat = all
+            ? "The screening model runs the whole asset, which all the tenant-in-common interests are together."
+            : `The screening model runs the whole asset; the interest earns its ${pct} of the cash flows before any fee the co-owners' agreement pays its manager.`;
           break;
         }
-        if (isWholeShare(sharePct)) {
-          lead.push(`${head}: its ${money(price)} price is the whole's, nothing grossed up.`);
+        if (all) {
+          lead.push(
+            entityLoan != null
+              ? `${head}: its ${money(price)} price is the equity's whole, nothing grossed up, not the asset's, since the stated ${money(entityLoan)} loan on the property sits on top of it.`
+              : `${head}: its ${money(price)} price is the whole's, nothing grossed up.`,
+          );
+          modelCaveat =
+            entityLoan != null
+              ? `The screening model runs the whole asset at the ${money(price)} price for all the tenant-in-common interests — the equity's whole: the stated ${money(entityLoan)} loan on the property sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on it instead.`
+              : `The screening model runs the whole asset at the ${money(price)} price for all the tenant-in-common interests, nothing grossed up.`;
+          break;
         } else if (entityLoan != null) {
           lead.push(
             `${head}: ${money(price)} for the interest is ${money(impliedWhole)} grossed up — the equity's whole, not the asset's, since the stated ${money(entityLoan)} loan on the property sits on top of it, and the screen sets the whole building's income against the ${money(impliedWhole)} alone.`,

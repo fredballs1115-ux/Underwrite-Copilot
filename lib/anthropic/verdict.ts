@@ -220,9 +220,12 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
   // All of the entity's interests (a stated 100%, research pass 28): the
   // price is the whole's, nothing grossed up.
   const allInterests = isWholeShare(sharePct);
+  // All the tenant-in-common interests are together the whole property, held
+  // by no entity (the audit C3b LOW-1).
+  const allWhat = isTenancyInCommon(ex) ? "all the tenant-in-common interests" : "all of the entity's interests";
   if (kind === "partial_interest" && entityLoan != null) {
     return allInterests
-      ? `THE BUILDING'S BASIS: none — the price for all of the entity's interests is the equity's whole, not the building's: the building's cost is that plus the entity's stated ${compact(entityLoan)} loan, which the model does not add, so no price per unit or per SF and no cap is struck on it.`
+      ? `THE BUILDING'S BASIS: none — the price for ${allWhat} is the equity's whole, not the building's: the building's cost is that plus ${entityLoanWords(ex, compact(entityLoan))}, which the model does not add, so no price per unit or per SF and no cap is struck on it.`
       : `THE BUILDING'S BASIS: none — the ${isTenancyInCommon(ex) ? "interest's" : "share's"} price grossed up is the equity's whole, not the building's: the building's cost is that plus ${entityLoanWords(ex, compact(entityLoan))}, which the model does not add, so no price per unit or per SF and no cap is struck on it.`;
   }
   if (tag) {
@@ -231,7 +234,9 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
     // entity: its percentage is an undivided interest's (research pass 41).
     const share = isTenancyInCommon(ex) ? "interest" : "share";
     const what = allInterests
-      ? "the price for all of the owning entity's interests, nothing grossed up"
+      ? isTenancyInCommon(ex)
+        ? "the price for all the tenant-in-common interests, together the whole property, nothing grossed up"
+        : "the price for all of the owning entity's interests, nothing grossed up"
       : sharePct != null
         ? `the whole the ${shareText(sharePct)} ${share}'s price implies`
         : range

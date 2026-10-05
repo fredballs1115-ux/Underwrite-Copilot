@@ -224,6 +224,19 @@ describe("the LOI is refused where the memorandum sells something else, or sells
       { ...extraction, interest: interest("partial_interest", { share: "30% tenant-in-common interest", summary: "An undivided 30% tenant-in-common interest in the fee simple" }) },
       "tic",
     ],
+    // All the tenant-in-common interests are together the whole property,
+    // bought from each co-owner (audit C3b LOW-1).
+    [
+      "all the tenant-in-common interests",
+      {
+        ...extraction,
+        interest: interest("partial_interest", {
+          share: "100% of the tenant-in-common interests",
+          summary: "100% of the tenant-in-common interests in the property, sold together by the co-owners",
+        }),
+      },
+      "tic_all",
+    ],
     // A share of the general partner's interest is a share of a share.
     ["a share of the general partner's interest", { ...extraction, interest: interest("partial_interest", { share: "50% of the general partner interest" }) }, "gp_stake"],
     // A preferred equity position (lib/position): its own kind, and a share
@@ -304,6 +317,9 @@ describe("the LOI is refused where the memorandum sells something else, or sells
     // A tenancy in common is never called a share of an entity (research pass 37).
     expect(LOI_REFUSAL.tic).toMatch(/sells an undivided interest in the property, held as a tenant in common beside its co-owners/);
     expect(LOI_REFUSAL.tic).not.toMatch(/entity/);
+    // All of them are the whole property, bought from several owners.
+    expect(LOI_REFUSAL.tic_all).toMatch(/sells all the tenant-in-common interests in the property, together the whole property/);
+    expect(LOI_REFUSAL.tic_all).not.toMatch(/entity|beside its co-owners/);
     expect(LOI_REFUSAL.gp_stake).toMatch(/sells a share of the general partner's interest, not the property — a share of a share/);
     expect(LOI_REFUSAL.auction).toMatch(/bid for under the auction's own terms/);
     // True of a stalking horse whether or not the memorandum prices it.

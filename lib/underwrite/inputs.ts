@@ -17,6 +17,7 @@ import { withArticle } from "@/lib/article";
 import { compactUsd } from "@/lib/money";
 import {
   entityLoanOf,
+  entityLoanWords,
   groundRentOf,
   interestOf,
   interestShortLine,
@@ -850,14 +851,21 @@ export function deriveUnderwriteInputs(
     // a share with no stated percentage. Beside the entity's stated loan it
     // is the equity's whole, and the loan sits on top of it, as below.
     const entityLoan = entityLoanOf(extraction);
-    if (entityLoan != null) priceLabel = "Equity's Whole (all the entity's interests)";
-    const of = `The OM's ${usd0(price)}${spanNote ? ` (${spanNote})` : ""} for all of the owning entity's interests`;
+    // All the tenant-in-common interests are together the whole property,
+    // held by no entity: its loan is the property's, and no entity's costs
+    // stand between the building and the buyer (the audit C3b LOW-1).
+    const tic = isTenancyInCommon(extraction);
+    if (entityLoan != null) priceLabel = tic ? "Equity's Whole (all the TIC interests)" : "Equity's Whole (all the entity's interests)";
+    const of = tic
+      ? `The OM's ${usd0(price)}${spanNote ? ` (${spanNote})` : ""} for all the tenant-in-common interests in the property, together the whole property`
+      : `The OM's ${usd0(price)}${spanNote ? ` (${spanNote})` : ""} for all of the owning entity's interests`;
+    const runs = tic ? "the model runs the whole building's cash flows" : "the model runs the whole building's cash flows, before the entity's own costs and fees";
     mark(
       "purchasePrice",
       "extracted",
       entityLoan != null
-        ? `${of} — the equity's whole, nothing grossed up, not the asset's: the entity's stated ${usd0(entityLoan)} loan sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; the model runs the whole building's cash flows, before the entity's own costs and fees`
-        : `${of} — the whole, nothing grossed up; the model runs the whole building's cash flows, before the entity's own costs and fees`,
+        ? `${of} — the equity's whole, nothing grossed up, not the asset's: ${entityLoanWords(extraction, usd0(entityLoan))} sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on the ${usd0(price)} instead; ${runs}`
+        : `${of} — the whole, nothing grossed up; ${runs}`,
       pageOf(priceMetric),
     );
   } else if (price != null && interest.kind === "partial_interest" && interest.sharePct != null) {

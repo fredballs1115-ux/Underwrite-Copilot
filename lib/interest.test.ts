@@ -26,6 +26,7 @@ import { gluedWords } from "./render-lint";
 import { askingPriceOf, assessPlausibility, noiFigures } from "./deal-strategy";
 import { dealContextFor } from "./deal-context";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
+import { buildBrief } from "./anthropic/verdict";
 
 const interest = (over: Partial<ExtractedInterest>): ExtractedInterest => ({
   kind: "fee_simple",
@@ -2050,5 +2051,59 @@ describe("interestTag — a counted or ceiling term is at most that long", () =>
   it("reads a stated date as before", () => {
     expect(interestTag(held("leasehold", [row("Ground lease expiration", "December 31, 2071")]), AS_OF)).toBe("Leasehold, 45 yrs left");
     expect(interestTag(held("leased_fee", [row("Ground lease expiration", "December 31, 2071")]), AS_OF)).toBe("Leased fee, reverts in 45 yrs");
+  });
+});
+
+describe("all the tenant-in-common interests are the whole property, never an entity's (audit C3b LOW-1)", () => {
+  // "100% of the tenant-in-common interests" read as an undivided interest
+  // "beside its co-owners" in the lead, and as "all of the owning entity's
+  // interests" in the model's price note and the verdict.
+  const tic = (loan?: string): ExtractionResult => ({
+    ...ex(
+      interest({
+        kind: "partial_interest",
+        share: "100% of the tenant-in-common interests",
+        summary: "100% of the tenant-in-common interests in the property, sold together by the co-owners",
+      }),
+    ),
+    metrics: [
+      { label: "Asking price", value: "$30,000,000", flagged: false, page: "p. 2", basis: "na" },
+      { label: "Units", value: "200", flagged: false, page: "p. 2", basis: "na" },
+      { label: "NOI (in-place)", value: "1,650,000", flagged: false, page: "p. 2", basis: "in_place" },
+      ...(loan ? [{ label: "Entity loan balance", value: loan, flagged: false, page: "p. 2", basis: "na" as const }] : []),
+    ],
+  });
+
+  it("says it in the lead and the model caveat", () => {
+    const r = readInterest(tic(), 30_000_000)!;
+    expect(r.lead).toBe(
+      "This memorandum sells all the tenant-in-common interests in the property, together the whole property — title to real estate, not a share of an entity: its $30.0M price is the whole's, nothing grossed up.",
+    );
+    expect(r.modelCaveat).toBe("The screening model runs the whole asset at the $30.0M price for all the tenant-in-common interests, nothing grossed up.");
+    const withLoan = readInterest(tic("$14,000,000"), 30_000_000)!;
+    expect(withLoan.lead).toBe(
+      "This memorandum sells all the tenant-in-common interests in the property, together the whole property — title to real estate, not a share of an entity: its $30.0M price is the equity's whole, nothing grossed up, not the asset's, since the stated $14.0M loan on the property sits on top of it.",
+    );
+    expect(withLoan.modelCaveat).toBe(
+      "The screening model runs the whole asset at the $30.0M price for all the tenant-in-common interests — the equity's whole: the stated $14.0M loan on the property sits on top of it, and the model neither adds it to the price nor carries it, sizing a new loan of its own on it instead.",
+    );
+    for (const s of [r.lead, withLoan.lead, r.modelCaveat ?? "", withLoan.modelCaveat ?? ""]) {
+      expect(s).not.toContain("beside its co-owners");
+      expect(s).not.toContain("entity's interests");
+    }
+  });
+
+  it("says it in the model's price note and the verdict's basis line", () => {
+    const note = deriveUnderwriteInputs(tic(), "x").sources.purchasePrice?.note ?? "";
+    expect(note).toContain("The OM's $30,000,000 for all the tenant-in-common interests in the property, together the whole property");
+    expect(note).not.toContain("entity");
+    const loanNote = deriveUnderwriteInputs(tic("$14,000,000"), "x").sources.purchasePrice?.note ?? "";
+    expect(loanNote).toContain("the stated $14,000,000 loan on the property sits on top of it");
+    expect(loanNote).not.toContain("entity");
+    const brief = buildBrief({ extraction: tic("$14,000,000"), assetClass: "auto" } as never);
+    const line = brief.slice(brief.indexOf("THE BUILDING'S BASIS")).split("\n")[0];
+    expect(line).toBe(
+      "THE BUILDING'S BASIS: none — the price for all the tenant-in-common interests is the equity's whole, not the building's: the building's cost is that plus the stated $14.0M loan on the property, which the model does not add, so no price per unit or per SF and no cap is struck on it.",
+    );
   });
 });

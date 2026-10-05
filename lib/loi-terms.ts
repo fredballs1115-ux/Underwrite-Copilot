@@ -55,7 +55,7 @@
 
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { inferStrategy, isPlanDeal, type StrategyKind } from "@/lib/deal-strategy";
-import { interestOf, isGpStake, isTenancyInCommon, readInterest } from "@/lib/interest";
+import { interestOf, isGpStake, isTenancyInCommon, isWholeShare, readInterest } from "@/lib/interest";
 import { readSale, statesStalkingHorse } from "@/lib/sale-terms";
 import { readPortfolio } from "@/lib/portfolio";
 import { hotelSaleFacts, readHotelDeal } from "@/lib/hotel-deal";
@@ -110,7 +110,12 @@ function refusalOf(ex: ExtractionResult | null | undefined): LoiRefusalKind | nu
   // property this draft buys.
   // A share of the general partner's interest is a share of a share, said as
   // one (research pass 37).
-  if (kind === "partial_interest") return isTenancyInCommon(ex) ? "tic" : isGpStake(ex) ? "gp_stake" : "share";
+  // All the tenant-in-common interests are the whole property, conveyed by
+  // each co-owner (the audit C3b LOW-1).
+  if (kind === "partial_interest") {
+    if (isTenancyInCommon(ex)) return isWholeShare(interestOf(ex).sharePct) ? "tic_all" : "tic";
+    return isGpStake(ex) ? "gp_stake" : "share";
+  }
   // A preferred equity position, its own kind or a share whose rows say one
   // (lib/interest `interestOf`).
   if (kind === "preferred_equity") return "position";
