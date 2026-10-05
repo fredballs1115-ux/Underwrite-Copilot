@@ -993,6 +993,7 @@ describe("the per-unit rows in the class's own noun (lib/asset-words)", () => {
 
 // ── The Market Read tab ─────────────────────────────────────────────────────
 import type { ModelVsMarket } from "@/lib/model-vs-market";
+import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 
 describe("the Market Read tab — the assumptions against the published figures, as built", () => {
   const read: ModelVsMarket = {
@@ -1071,6 +1072,11 @@ describe("the Market Read tab — the assumptions against the published figures,
     expect(ws.getCell(8, 5).value).toBe(4.94);
     expect(ws.getCell(8, 5).numFmt).toBe('0.00"%"');
     expect(ws.getCell(8, 8).value).toBe("spread widens at the exit");
+    // The providers' own notices under the figures (the batch-2 audit,
+    // LOW-7): FRED's for the 10-year, the BLS's for the rent index its own
+    // API answered — a row apart from the last check.
+    expect(ws.getCell(10, 1).value).toBe(FRED_NOTICE);
+    expect(ws.getCell(11, 1).value).toBe(BLS_NOTICE);
     // A data tab: nothing on it is a formula.
     ws.eachRow((row) => {
       row.eachCell((cell) => {

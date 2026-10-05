@@ -38,6 +38,22 @@ export const BLS_NOTICE =
   "BLS.gov cannot vouch for the data or analyses derived from these data after the data have been retrieved from BLS.gov.";
 
 /**
+ * The notices a document prints under the published figures it carries (the
+ * batch-2 audit, LOW-7): an export travels with no page around it, so the
+ * report's market page and the workbook's Market Read tab say them where the
+ * figures are. From the figures' own credits — a brief line's closing
+ * "(…; FRED)" or "(…; the BLS)", a read's publisher ("FRED", "BLS via FRED",
+ * "BLS"): FRED's wherever a figure came through FRED, the BLS's only where
+ * one came from the BLS's own API, never a BLS series FRED carries.
+ */
+export function documentNotices(credits: readonly string[]): string[] {
+  const out: string[] = [];
+  if (credits.some((c) => /\bFRED\b/.test(c))) out.push(FRED_NOTICE);
+  if (credits.some((c) => /(?:^|; )(?:the )?BLS(?:\)|$)/.test(c))) out.push(BLS_NOTICE);
+  return out;
+}
+
+/**
  * The New York Fed's Terms of Use (newyorkfed.org/privacy/termsofuse,
  * printed by zori probe runs 37262564561 and 37262665824): "If you use or
  * distribute reference rate data or related information posted to the

@@ -88,7 +88,10 @@ them.
   every SOFR figure the site draws with the DTCC sentence, as is the BLS's
   "cannot vouch" sentence. The Claude steps judge a floating loan against
   SOFR and are told never to write its level, since their words reach the
-  deal page and the shared screen with no notice under them. Pass 31's summary that FRED forbids storing or databases was
+  deal page and the shared screen with no notice under them. The exports
+  carry the notices too: the report's market page and assumptions read,
+  and the workbook's Market Read tab, print FRED's under its figures and
+  the BLS's where its own API answered one. Pass 31's summary that FRED forbids storing or databases was
   wrong: no line of the printed terms says so.
   - **The BLS asks for the retrieval date** of what its API returned. The
     pull never stamps the day it fetched an observation it already had,

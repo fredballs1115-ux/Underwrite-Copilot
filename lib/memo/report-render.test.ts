@@ -6,6 +6,7 @@
 // fails in CI, not at a user's download click.
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
 import { afterEach, describe, it, expect, vi } from "vitest";
+import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, rangeRead, readDay, ReportDocument } from "./report-document";
@@ -128,6 +129,11 @@ describe("ReportDocument (full report)", () => {
     expect(briefedText).toContain("Unemployment 4.1% (Jul 2026, Philadelphia MSA; FRED)");
     expect(briefedText).toContain("10-year Treasury 4.94%");
     expect(await pdfTextOf(buf)).not.toContain("Figures the check read");
+    // FRED's own notice under its figures (the batch-2 audit, LOW-7); the
+    // BLS's only where its own API answered one, which neither line did.
+    expect(briefedText.replace(/\s+/g, " ")).toContain(FRED_NOTICE);
+    expect(briefedText.replace(/\s+/g, " ")).not.toContain(BLS_NOTICE);
+    expect((await pdfTextOf(buf)).replace(/\s+/g, " ")).not.toContain(FRED_NOTICE);
 
     // A covered market whose figures could not be read that day says so
     // under the checks (lib/market-read-failed, research pass 30).

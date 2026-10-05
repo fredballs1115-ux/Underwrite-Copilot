@@ -10,6 +10,7 @@ import { STRATEGY_LABEL, STRATEGY_READING, isPlanDeal } from "@/lib/deal-strateg
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { datedLong } from "@/lib/debt-index";
+import { documentNotices } from "@/lib/data-notices";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 
@@ -1074,6 +1075,13 @@ function buildMarketRead(ws: ExcelJS.Worksheet, read: ModelVsMarket) {
       r++;
     });
     bottomBorder(ws, r - 1, 1, headers.length);
+  }
+  // The providers' own notices under their figures (lib/data-notices): an
+  // export travels with no page around it.
+  r++;
+  for (const n of documentNotices(read.checks.flatMap((c) => c.published.map((p) => p.publisher)))) {
+    label(ws.getCell(r, 1), n, { color: MUTED, size: 9 });
+    r++;
   }
 }
 

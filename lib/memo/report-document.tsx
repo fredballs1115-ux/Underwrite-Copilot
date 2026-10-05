@@ -6,6 +6,7 @@ import { siteFlagsStale, type FloodMapView, type SiteFlagsResult } from "@/lib/s
 import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import { OSM_LOCATION_WORDS, REPORT_FLOOD_SIZE } from "@/lib/basemaps";
+import { documentNotices } from "@/lib/data-notices";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -320,6 +321,11 @@ function AssumptionsBlock({ read }: { read: ModelVsMarket | null | undefined }) 
           </Text>
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 1 }}>{str(c.read)}</Text>
         </View>
+      ))}
+      {documentNotices(read.checks.flatMap((c) => c.published.map((p) => p.publisher))).map((n) => (
+        <Text key={n} style={{ fontSize: 6.5, color: C.muted, marginTop: 4 }}>
+          {str(n)}
+        </Text>
       ))}
     </View>
   );
@@ -2375,6 +2381,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                 </Text>
               ))}
             </View>
+          ))}
+          {/* The providers' own notices under their figures (lib/data-notices). */}
+          {documentNotices(briefBlocks.flatMap((b) => b.lines)).map((n) => (
+            <Text key={n} style={{ fontSize: 6.5, color: C.muted, marginTop: 4 }}>
+              {str(n)}
+            </Text>
           ))}
         </PageChrome>
       )}

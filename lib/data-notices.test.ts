@@ -9,6 +9,7 @@ import {
   NY_FED_SOFR_NOTICE,
   NY_FED_SOFR_NOTICES,
   carriesNyFedNotice,
+  documentNotices,
   nyFedNotice,
 } from "./data-notices";
 
@@ -69,5 +70,26 @@ describe("the providers' notices, in their printed words", () => {
     for (const notice of [FRED_NOTICE, BLS_NOTICE, NY_FED_SOFR_NOTICE, DTCC_SOFR_SENTENCE]) {
       expect(notice).toMatch(winAnsi);
     }
+  });
+});
+
+// The batch-2 audit, LOW-7: the report's market page and the workbook's
+// Market Read tab print FRED's and the BLS's figures with no page around them.
+describe("documentNotices — the notices an export prints under its figures", () => {
+  it("says FRED's wherever a figure came through FRED, the BLS's only for its own API", () => {
+    expect(documentNotices(["Unemployment 3.4% (Jul 2026, Washington MSA; FRED)"])).toEqual([FRED_NOTICE]);
+    expect(
+      documentNotices([
+        "Unemployment 3.4% (Jul 2026, Washington MSA; FRED)",
+        "Rent paid by sitting tenants (CPI rent of primary residence) +5.0% from a year ago (Jul 2026, Washington-Arlington-Alexandria; the BLS)",
+      ]),
+    ).toEqual([FRED_NOTICE, BLS_NOTICE]);
+    // A BLS series FRED carries is FRED's to notice, however its label reads.
+    expect(documentNotices(["Rents charged by lessors, national (BLS producer price index): +2.1% from a year ago (Aug 2026; BLS via FRED)"])).toEqual([FRED_NOTICE]);
+    // A read's publishers.
+    expect(documentNotices(["Zillow Research", "BLS", "FRED"])).toEqual([FRED_NOTICE, BLS_NOTICE]);
+    expect(documentNotices(["BLS via FRED"])).toEqual([FRED_NOTICE]);
+    expect(documentNotices(["Zillow Research", "Census Bureau"])).toEqual([]);
+    expect(documentNotices([])).toEqual([]);
   });
 });
