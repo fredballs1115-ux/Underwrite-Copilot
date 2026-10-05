@@ -4,6 +4,7 @@ import { FIXTURE_NOW, REAL_ROWS } from "./live-rates.fixture";
 import {
   CONSTRUCTION_SPREAD_BPS,
   NO_DEBT_SEEDS,
+  SURVEY_SOURCE,
   allInPct,
   benchmark30,
   constructionSeed,
@@ -108,8 +109,10 @@ describe("the all-in rate and its note", () => {
     const c = constructionSeed(debtSeeds(rates, 60));
     expect(c?.pct).toBe(Math.round((3.67623 + CONSTRUCTION_SPREAD_BPS / 100) * 100) / 100);
     expect(c?.pct).toBe(7.18);
+    // SOFR's figure is the New York Fed's, through FRED, as the strip's
+    // tile credits it; a Treasury tenor's note still says FRED.
     expect(c?.note).toBe(
-      "30-day avg SOFR 3.68% (FRED, Sep 21, 2026) + 350 bps construction spread, a screening default — enter your quote",
+      "30-day avg SOFR 3.68% (New York Fed via FRED, Sep 21, 2026) + 350 bps construction spread, a screening default — enter your quote",
     );
     // The index it was built on, so the panel that prints it owes and draws
     // the New York Fed's notice (lib/data-notices).
@@ -129,11 +132,14 @@ describe("benchmark30 — the leverage check's 30-yr fixed, and which one it is"
   // as the seed reads it: its source is the file's first.
   const snapshot = seedBenchmarks().find((b) => b.metric === "pmms_30y_fixed")!;
 
-  it("the week's survey first, named as FRED's series", () => {
+  it("the week's survey first, credited to Freddie Mac's survey through FRED's series", () => {
+    // FRED is the channel; the survey is Freddie Mac's, by the name its own
+    // page gives it (research pass 31, C3).
+    expect(SURVEY_SOURCE).toBe("Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US");
     expect(benchmark30(live, snapshot)).toEqual({
       value: 6.95,
       asOf: "2026-09-17",
-      source: "FRED · MORTGAGE30US",
+      source: "Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US",
       live: true,
     });
   });
@@ -142,7 +148,7 @@ describe("benchmark30 — the leverage check's 30-yr fixed, and which one it is"
     const b = benchmark30({ ...live, fresh: false }, snapshot);
     expect(b?.value).toBe(6.95);
     expect(b?.asOf).toBe("2026-09-17");
-    expect(b?.source).toBe("FRED · MORTGAGE30US, stale");
+    expect(b?.source).toBe("Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, stale");
   });
 
   it("the checked-in snapshot only where the table has no survey, named as the snapshot by the publisher its source states", () => {

@@ -1,4 +1,5 @@
 import {
+  publisherTag,
   rateSeeds,
   seedRate,
   treasuryForTerm,
@@ -139,14 +140,26 @@ export interface Benchmark30 {
   value: number;
   /** ISO date of the figure — the survey week, or the snapshot's own as-of */
   asOf: string;
-  /** "FRED · MORTGAGE30US" for the live survey (", stale" appended where
-   *  the table has not been written for the survey's cadence); for the
-   *  research layer's row, its publisher as the row's own source names it
-   *  ("Freddie Mac PMMS, the checked-in snapshot"), or "publisher not
-   *  recorded, the checked-in snapshot" where the source names none */
+  /** `SURVEY_SOURCE` for the live survey — Freddie Mac's, through FRED (",
+   *  stale" appended where the table has not been written for the survey's
+   *  cadence); for the research layer's row, its publisher as the row's own
+   *  source names it ("Freddie Mac PMMS, the checked-in snapshot"), or
+   *  "publisher not recorded, the checked-in snapshot" where the source
+   *  names none */
   source: string;
   live: boolean;
 }
+
+/**
+ * The live survey's source as the leverage check prints it: the publisher
+ * and its survey by the name Freddie Mac's own page gives it ("Primary
+ * Mortgage Market Survey®", as the runner printed it), through FRED, with
+ * FRED's series id. FRED is the channel: the survey is Freddie Mac's, and
+ * FRED's notes on the series say "Copyright, 2016, Freddie Mac. Reprinted
+ * with permission." (zori probe run 37262488972). It had read "FRED ·
+ * MORTGAGE30US" (research pass 31, C3).
+ */
+export const SURVEY_SOURCE = "Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US";
 
 /**
  * The publisher a snapshot's source names, as the research file writes it:
@@ -174,7 +187,7 @@ export function benchmark30(
     return {
       value: survey.pct,
       asOf: survey.asOf,
-      source: survey.fresh ? "FRED · MORTGAGE30US" : "FRED · MORTGAGE30US, stale",
+      source: survey.fresh ? SURVEY_SOURCE : `${SURVEY_SOURCE}, stale`,
       live: true,
     };
   }
@@ -289,9 +302,13 @@ export function indexName(index: DebtIndex): string {
  * same sentence: "5-yr Treasury 4.78% (FRED, Sep 17, 2026) + 200 bps
  * multifamily spread, a screening default — enter your quote". The index
  * half is the fact and the spread half is named as the assumption it is.
+ * An index FRED carries for another publisher is credited to that publisher
+ * through FRED, as the strip's tile credits it (`publisherTag`): "30-day avg
+ * SOFR 3.68% (New York Fed via FRED, Sep 21, 2026)".
  */
 export function debtRateNote(index: DebtIndex, spreadBps: number, spreadLabel: string): string {
-  return `${indexName(index)} ${index.pct.toFixed(2)}% (FRED, ${datedLong(index.asOf)}) + ${spreadBps} bps ${spreadLabel}, a screening default — enter your quote`;
+  const credit = publisherTag({ id: index.id, source: "fred", label: index.short }) ?? "FRED";
+  return `${indexName(index)} ${index.pct.toFixed(2)}% (${credit}, ${datedLong(index.asOf)}) + ${spreadBps} bps ${spreadLabel}, a screening default — enter your quote`;
 }
 
 /** A rate a surface starts from, with the sentence that says where it came from. */

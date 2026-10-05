@@ -82,7 +82,9 @@ export function RatesStrip({
           Rates today
         </h2>
         <p className="text-[11px] text-muted">
-          {`The latest figure each series has posted, dated by its own day, month or quarter · FRED, pulled every weekday · ${rates.length} series · each figure links to its source`}
+          {/* FRED is the channel: a figure FRED carries for another
+              publisher names that publisher on its tile (publisherTag). */}
+          {`The latest figure each series has posted, dated by its own day, month or quarter · pulled through FRED every weekday · ${rates.length} series · each figure links to its source`}
         </p>
       </div>
 

@@ -15,6 +15,7 @@
  */
 
 import { HVS_RATES_URL } from "@/lib/hvs-tables";
+import { NY_FED_SERIES } from "@/lib/data-notices";
 
 /** How often a series publishes; `annual` is the Housing Vacancy Survey's
  *  state figure, dated the first of its year and published the March after
@@ -599,16 +600,33 @@ export function periodOf(r: { obsDate: string; meta: Pick<SeriesMeta, "cadence">
 }
 
 /**
- * Who publishes a figure, where a tile names it beside its link: the BLS or
- * the Census Bureau for a series pulled from them, and Freddie Mac for its
- * mortgage survey — FRED carries the survey, and the table's own label says
- * whose it is. Null for everything else, which the strip's heading and the
- * link itself credit to FRED.
+ * The series FRED carries for a publisher that is not FRED, by id, with
+ * the publisher a tile credits (research pass 31, C8: the strip had said
+ * "· FRED" over figures FRED only carries). SOFR and its 30-day average are
+ * the New York Fed's reference-rate data — FRED's own page tags SOFR
+ * "Copyrighted: Citation Required" (zori probe run 37262488972) — and the
+ * HQM corporate curve is the U.S. Treasury's.
  */
-export function publisherTag(meta: Pick<SeriesMeta, "source" | "label">): string | null {
+const CARRIED_FOR: Readonly<Record<string, string>> = {
+  ...Object.fromEntries(NY_FED_SERIES.map((id) => [id, "New York Fed"])),
+  HQMCB10YR: "U.S. Treasury",
+};
+
+/**
+ * Who publishes a figure, where a tile names it beside its link: the BLS or
+ * the Census Bureau for a series pulled from them; for a series FRED
+ * carries for someone else, that publisher with FRED as the channel — "New
+ * York Fed via FRED" over SOFR, "U.S. Treasury via FRED" over the HQM
+ * curve, "Freddie Mac via FRED" over its mortgage survey, whose own label
+ * says whose it is. Null for everything else, which the strip's heading and
+ * the link itself credit to FRED.
+ */
+export function publisherTag(meta: Pick<SeriesMeta, "source" | "label"> & { id?: string }): string | null {
   if (meta.source === "bls") return "BLS";
   if (meta.source === "census") return "Census";
-  if (/^Freddie Mac\b/.test(meta.label)) return "Freddie Mac";
+  const carried = meta.id ? CARRIED_FOR[meta.id] : undefined;
+  if (carried) return `${carried} via FRED`;
+  if (/^Freddie Mac\b/.test(meta.label)) return "Freddie Mac via FRED";
   return null;
 }
 

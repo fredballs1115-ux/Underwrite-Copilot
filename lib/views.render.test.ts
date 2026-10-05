@@ -5819,7 +5819,9 @@ import { seedBenchmarks } from "@/lib/research-data";
 describe("SampleLeverageCard — the sample's cap against the week's survey and the latest 10-year", () => {
   // The runner's own table (lib/live-rates.fixture): the survey at 6.95%
   // on Sep 17, the 10-year at 4.94% the same day; the sample's cap is 5.45%.
-  const bench30 = { value: 6.95, asOf: "2026-09-17", source: "FRED · MORTGAGE30US", live: true };
+  // Built by the read itself, so the source is the one the card is handed:
+  // Freddie Mac's survey, through FRED (research pass 31, C3).
+  const bench30 = benchmark30({ id: "MORTGAGE30US", pct: 6.95, asOf: "2026-09-17", fresh: true }, null)!;
   const tenYear = { id: "DGS10", short: "10-yr Treasury", pct: 4.94, asOf: "2026-09-17", kind: "treasury" as const };
   const html = render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear, today: "2026-09-21" }));
   const text = visibleText(html);
@@ -5829,7 +5831,7 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
     expect(text).toContain("going-in cap 5.45% vs");
     // The figure is its own styled span, so the visible text splits there.
     expect(text).toContain("6.95%");
-    expect(text).toContain("30-yr fixed (FRED · MORTGAGE30US, as of 2026-09-17)");
+    expect(text).toContain("30-yr fixed (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of 2026-09-17)");
     expect(text).toContain("negative leverage");
     expect(text).toContain("Leverage check — computed, not opined");
   });
@@ -5870,19 +5872,19 @@ describe("SampleLeverageCard — the sample's cap against the week's survey and 
     expect(card("2027-02-17")).toContain("(Freddie Mac PMMS, the checked-in snapshot, as of 2026-08-20 (181 days old, stale))");
     // A live survey keeps its own cadence's word, never the research rule's.
     expect(visibleText(render(React.createElement(SampleLeverageCard, { capPct: 5.45, bench30, tenYear, today: "2027-06-01" })))).toContain(
-      "30-yr fixed (FRED · MORTGAGE30US, as of 2026-09-17)",
+      "30-yr fixed (Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, as of 2026-09-17)",
     );
   });
 
   it("a stale survey says so beside its date, and the tone follows the spread", () => {
     const stale = visibleText(render(React.createElement(SampleLeverageCard, {
       capPct: 7.9,
-      bench30: { ...bench30, source: "FRED · MORTGAGE30US, stale" },
+      bench30: benchmark30({ id: "MORTGAGE30US", pct: 6.95, asOf: "2026-09-17", fresh: false }, null)!,
       tenYear,
       today: "2026-09-21",
     })));
     expect(stale).toContain("Positive leverage at the benchmark: 95 bps above the 30-yr fixed");
-    expect(stale).toContain("(FRED · MORTGAGE30US, stale, as of 2026-09-17)");
+    expect(stale).toContain("(Freddie Mac's Primary Mortgage Market Survey® via FRED · MORTGAGE30US, stale, as of 2026-09-17)");
     expect(stale).toContain("positive at benchmark");
     expect(stale).toContain("296 bps over the 10-year Treasury");
   });

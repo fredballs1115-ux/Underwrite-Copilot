@@ -386,8 +386,14 @@ describe("how a figure is said", () => {
   });
 
   it("names the publisher a tile credits beside its link", () => {
-    expect(publisherTag(of("MORTGAGE30US").meta)).toBe("Freddie Mac");
+    // A series FRED carries for another publisher credits that publisher,
+    // FRED named as the channel (research pass 31, C3 and C8).
+    expect(publisherTag(of("MORTGAGE30US").meta)).toBe("Freddie Mac via FRED");
+    expect(publisherTag(of("SOFR").meta)).toBe("New York Fed via FRED");
+    expect(publisherTag(of("SOFR30DAYAVG").meta)).toBe("New York Fed via FRED");
+    expect(publisherTag(of("HQMCB10YR").meta)).toBe("U.S. Treasury via FRED");
     expect(publisherTag(of("DGS10").meta)).toBeNull();
+    expect(publisherTag(of("DFF").meta)).toBeNull();
     expect(publisherTag({ source: "bls", label: "Rent of primary residence" })).toBe("BLS");
     expect(publisherTag({ source: "census", label: "Rental vacancy" })).toBe("Census");
   });

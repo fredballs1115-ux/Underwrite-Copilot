@@ -181,7 +181,7 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
   it("a seeded rate keeps its dated note, and an exit cap the model gave is no default", () => {
     const rateSeed = {
       pct: 7.81,
-      note: "30-day avg SOFR 4.31% (FRED, Sep 17, 2026) + 350 bps construction spread, a screening default — enter your quote",
+      note: "30-day avg SOFR 4.31% (New York Fed via FRED, Sep 17, 2026) + 350 bps construction spread, a screening default — enter your quote",
       index: "SOFR30DAYAVG",
     };
     const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, { ...props, exitCapPct: 5.5, rateSeed }));

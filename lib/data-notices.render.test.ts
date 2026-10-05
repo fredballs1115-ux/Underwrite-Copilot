@@ -93,6 +93,25 @@ describe("the New York Fed's notice beside SOFR on the strip", () => {
   });
 });
 
+describe("the strip credits the publisher, FRED as the channel", () => {
+  const text = visibleText(render(React.createElement(RatesStrip, { rates: readRates(REAL_ROWS, FIXTURE_NOW) })));
+
+  it("names the New York Fed over SOFR, the Treasury over the HQM curve and Freddie Mac over its survey", () => {
+    expect(text).toContain("SOFR as of Sep 21, 2026 · New York Fed via FRED");
+    expect(text).toContain("30-day avg SOFR as of Sep 21, 2026 · New York Fed via FRED");
+    expect(text).toMatch(/HQM corporate 10-yr as of [A-Z][a-z]{2} \d{4} · U\.S\. Treasury via FRED/);
+    expect(text).toContain("30-yr fixed as of Sep 17, 2026 · Freddie Mac via FRED");
+    // A Treasury tenor FRED publishes from the Board's release carries no tag.
+    expect(text).toContain("10-yr Treasury as of Sep 17, 2026");
+    expect(text).not.toContain("10-yr Treasury as of Sep 17, 2026 ·");
+  });
+
+  it("says the figures came through FRED, never that FRED published them all", () => {
+    expect(text).toContain("pulled through FRED every weekday");
+    expect(text).not.toContain("FRED, pulled every weekday");
+  });
+});
+
 describe("the BLS's sentence under a figure read from the BLS's own API", () => {
   // Washington's rent index comes from the BLS directly (source "bls" in
   // data/fred-series.json), as the level; the page derives the change.
