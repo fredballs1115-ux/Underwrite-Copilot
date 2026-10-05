@@ -2,7 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import table from "@/data/cbsa-counties.json";
 import { US_STATE_ABBREV } from "@/lib/address";
-import { DATA_METROS, marketForAddress } from "@/lib/market-match";
+import { DATA_METROS, dataMetroForAddress, marketForAddress, metroForAddress, stateForAddress } from "@/lib/market-match";
+import { SKYLINES } from "@/lib/skyline";
+import { marketPictureFor } from "@/lib/market-picture";
+import { CARD, bannerSources } from "@/lib/deal-banner";
 import { BRIEFED_CBSA, cbsaOfMarket, countyLine, countyOf, placeDeal } from "./market-county";
 
 // A tract in the county: the county's five digits and any six.
@@ -22,6 +25,21 @@ describe("the delineation the placement reads (#447)", () => {
   it("holds every market the site reads to a metro area the delineation files", () => {
     for (const [id, cbsa] of Object.entries(BRIEFED_CBSA)) expect(titles[cbsa], id).toBeTruthy();
     for (const m of DATA_METROS) expect(titles[m.cbsa], m.id).toBeTruthy();
+  });
+
+  it("places every metro area the skyline table has a photograph for in a county countyOf can return (the audit of 2026-10-05)", () => {
+    // A row no county reaches is a photograph no deal is ever shown:
+    // Puerto Rico's four were, until its code was read here.
+    const rows = Object.keys(SKYLINES)
+      .map((id) => /^cbsa:(\d{5})$/.exec(id)?.[1])
+      .filter((code): code is string => !!code);
+    expect(rows.length).toBeGreaterThan(100);
+    for (const code of rows) {
+      const fips = Object.keys(counties).find((f) => counties[f].cbsa === code);
+      expect(fips, `cbsa:${code} names a metro area the delineation files`).toBeTruthy();
+      expect(countyOf(line("x"), tract(fips!))?.cbsa, `cbsa:${code}`).toBe(code);
+    }
+    expect(rows).toEqual(expect.arrayContaining(["10380", "32420", "38660", "41980"]));
   });
 
   it("holds the briefed markets' metro areas to the ones their Realtor.com rows are keyed on", () => {
@@ -177,5 +195,62 @@ describe("where the deal is, with its county", () => {
   it("reads the state where the county's metro area is one the site does not read", () => {
     const bremerton = line("100 Pacific Ave, Bremerton, WA 98337");
     expect(placeDeal(bremerton, countyOf(bremerton, tract("53035"))).live).toEqual({ id: "state:WA", name: "Washington" });
+  });
+});
+
+// The audit of 2026-10-05 (MED-6): no deal could reach a Puerto Rico metro
+// area's photograph, since the county reader knew the states alone. Its
+// county is read now, here only: it places the deal in no market and no
+// state's series — the site reads no Puerto Rico figures — so the one thing
+// any surface shows for it is the photograph.
+describe("a deal in Puerto Rico", () => {
+  const ponce = { label: "100 Calle Comercio, Ponce, PR 00716", street: "100 Calle Comercio", city: "Ponce", state: "PR", zip: "00716" };
+  const flags = tract("72113");
+
+  it("finds its county and metro area, whether its state is written PR, Puerto Rico or only on its line", () => {
+    const want = { fips: "72113", name: "Ponce Municipio", state: "PR", cbsa: "38660", area: "Ponce, PR", from: "tract" };
+    expect(countyOf(ponce, flags)).toEqual(want);
+    expect(countyOf({ ...ponce, state: "Puerto Rico" }, flags)).toEqual(want);
+    expect(countyOf(line(ponce.label), flags)).toEqual(want);
+    // A tract in another state than the address names is not the building.
+    expect(countyOf(ponce, tract("48085"))).toBeNull();
+    expect(countyOf(line(ponce.label), tract("48085"))).toBeNull();
+    // A municipio the address names whole, as a county is.
+    expect(countyOf({ label: "x", city: "Mayagüez", state: "PR", county: "Mayagüez Municipio" }, null)).toMatchObject({
+      fips: "72097",
+      cbsa: "32420",
+      from: "address",
+    });
+  });
+
+  it("reads no figures and makes no claim about them: no brief, no market read, no county placement, no state's series", () => {
+    const placement = placeDeal(ponce, countyOf(ponce, flags));
+    expect(placement).toEqual({ briefed: null, read: null, placedBy: null, live: null, county: countyOf(ponce, flags) });
+    // The readers every market surface shares know nothing of it either.
+    for (const a of [ponce, line(ponce.label)]) {
+      expect(marketForAddress(a)).toBeNull();
+      expect(metroForAddress(a)).toBeNull();
+      expect(dataMetroForAddress(a)).toBeNull();
+      expect(stateForAddress(a)).toBeNull();
+    }
+  });
+
+  it("wears its metro area's photograph on the deal page and the pipeline card", () => {
+    const placement = placeDeal(ponce, countyOf(ponce, flags));
+    // The deal page's and the pipeline page's own call.
+    const picture = marketPictureFor(ponce, "Ponce, Puerto Rico", placement.briefed ?? placement.read, placement.county);
+    expect(picture).toMatchObject({ id: "cbsa:38660", name: SKYLINES["cbsa:38660"].name ?? "Ponce, PR" });
+    // The card's picture sources lead with it where the building has none.
+    const sources = bannerSources(
+      { dealId: "d1", pictureCredit: null, googleEnabled: false, hasStreetAddress: true, hasAddress: true, aerial: false, market: picture },
+      CARD,
+    );
+    expect(sources.map((s) => s.kind)).toEqual(["market"]);
+    expect(sources[0]).toMatchObject({ marketId: "cbsa:38660" });
+    // San Juan's, Mayagüez's and Aguadilla's the same way.
+    for (const [fips, code] of [["72127", "41980"], ["72097", "32420"], ["72005", "10380"]]) {
+      const c = countyOf(line("x"), tract(fips));
+      expect(marketPictureFor(line("x"), null, null, c)?.id, fips).toBe(`cbsa:${code}`);
+    }
   });
 });
