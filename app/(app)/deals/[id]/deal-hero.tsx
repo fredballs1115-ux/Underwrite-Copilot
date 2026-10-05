@@ -154,7 +154,10 @@ export function DealHero({
           </div>
         ) : null}
 
-        <div className="px-6 pb-5 [grid-area:panels] empty:hidden">{children}</div>
+        {/* The panels' well: 12px inside the card on a phone, where 24px of
+            it, the card's border and each panel's own edge and padding left
+            a 263px column of text on a 390px screen (research pass 36). */}
+        <div className="px-3 pb-5 sm:px-6 [grid-area:panels] empty:hidden">{children}</div>
       </div>
     </header>
   );

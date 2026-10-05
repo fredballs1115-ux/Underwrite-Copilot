@@ -74,6 +74,21 @@ describe("the bar that keeps the deal in view (research pass 36, F1)", () => {
   });
 });
 
+describe("the panels' well inside the header (research pass 36, F7)", () => {
+  it("insets the panels 12px on a phone and 24px from sm", () => {
+    // 24px of well, the card's border and each panel's own edge and padding
+    // left a 263px column of text on a 390px phone.
+    const html = renderToStaticMarkup(
+      h(DealHero, { title: "The Maddox", subtitle: "Philadelphia, PA · Multifamily", figures: FIGURES }, h("section", { "aria-label": "The plan" }, "The plan")),
+    );
+    const well = (/<div class="([^"]*\[grid-area:panels\][^"]*)">/.exec(html)?.[1] ?? "").split(" ");
+    expect(well).toContain("px-3");
+    expect(well).toContain("sm:px-6");
+    expect(well).not.toContain("px-6");
+    expect(well).toContain("empty:hidden");
+  });
+});
+
 describe("what does not tie, right after the plan (research pass 36, F4)", () => {
   it("draws the plausibility panel after the plan and what is being sold, before every deal-kind panel", () => {
     // The page's comment and DealHero's doc put "what does not tie" right
