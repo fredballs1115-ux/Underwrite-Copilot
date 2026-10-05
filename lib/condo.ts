@@ -153,6 +153,18 @@ export function monthlyDuesOf(stated: string): number | null {
   if (n == null || !(n > 0)) return null;
   const yearly = /\/\s*(?:yr|year)\b|\bper\s+(?:year|annum)\b|\bannual(?:ly)?\b|\ba\s+year\b/i.test(v);
   const monthly = /\/\s*mo(?:nth)?\b|\bper\s+month\b|\bmonthly\b|\ba\s+month\b/i.test(v);
+  if (yearly && monthly) {
+    // Both periods stated ("$650/mo ($7,800/yr)"): the month's figure, only
+    // where the two figures agree — a month's is a twelfth of the year's —
+    // else none, and the row is shown as stated. The year's word had won
+    // and divided the month's figure by twelve (the audit of 2026-10-05:
+    // $54.17 a unit, a twelfth of the truth).
+    const figures = [...v.matchAll(/\$\s*\d[\d,]*(?:\.\d+)?\s*(?:mm|m|k)?\b/gi)].map((m) => parseMoney(m[0])).filter((x): x is number => x != null && x > 0);
+    if (figures.length !== 2) return null;
+    const month = Math.min(...figures);
+    const year = Math.max(...figures);
+    return Math.abs(year - month * 12) <= month * 12 * 0.01 && month <= UNIT_DUES_CEILING ? month : null;
+  }
   const perMonth = yearly ? n / 12 : monthly ? n : null;
   return perMonth != null && perMonth <= UNIT_DUES_CEILING ? perMonth : null;
 }
@@ -312,6 +324,10 @@ export function condoShortLine(r: CondoRead): string {
           : "",
     r.specialAssessment ? `special assessment ${r.specialAssessment}` : "",
   ].filter(Boolean);
+  // A read of the declaration's terms alone says its first one, never an
+  // empty line (the audit of 2026-10-05: "Condominium units: ").
+  const first = r.stated[0];
+  if (parts.length === 0 && first) parts.push(`${first.label.toLowerCase()} as stated (${first.value.replace(/\.$/, "")})`);
   return `Condominium units: ${parts.join("; ")}`;
 }
 

@@ -86,6 +86,28 @@ describe("condominium units bought in bulk (pass 28, round 8)", () => {
     expect(monthlyDuesOf("$600 - $700")).toBeNull();
   });
 
+  // The audit of 2026-10-05: a row stating both periods was read as a
+  // twelfth of its monthly figure — $54.17, a year of 42 units' dues $27,300
+  // against the true $327,600.
+  it("reads a row stating both periods at its month's figure where the two agree, and as stated where they do not", () => {
+    expect(monthlyDuesOf("$650/mo ($7,800/yr)")).toBe(650);
+    expect(monthlyDuesOf("$7,800 per year ($650 per month)")).toBe(650);
+    expect(monthlyDuesOf("$650/mo ($7,900/yr)")).toBeNull();
+    const both = readCondo(deal("Condominium units", [row("Units offered", "42"), row("HOA dues", "$650/mo ($7,800/yr)")]), TODAY)!;
+    expect(both).toMatchObject({ monthlyDues: 650, annualDues: 327_600 });
+    expect(both.headline).toContain("the dues on 42 units are $328k a year");
+    const disagree = readCondo(deal("Condominium units", [row("Units offered", "42"), row("HOA dues", "$650/mo ($7,900/yr)")]), TODAY)!;
+    expect(disagree).toMatchObject({ monthlyDues: null, annualDues: null, duesStated: "$650/mo ($7,900/yr)" });
+  });
+
+  // The audit of 2026-10-05: a read of the declaration's terms alone wrote
+  // "Condominium units: " on the memo and the workbook's cover.
+  it("writes a short line of the declaration's first term where nothing else is stated, never an empty one", () => {
+    const r = readCondo(deal("Condominium", [row("Rental restrictions", "No more than 25% of units may be leased.")]), TODAY)!;
+    expect(r.headline).toBe("Rental restrictions, as stated: No more than 25% of units may be leased.");
+    expect(condoShortLine(r)).toBe("Condominium units: rental restrictions as stated (No more than 25% of units may be leased)");
+  });
+
   it("says a dues row it cannot read as stated, and a unit's dues to the dollar", () => {
     const bare = readCondo(deal("Condominium units", [row("Units offered", "42"), row("HOA dues", "$650")]), TODAY)!;
     expect(bare).toMatchObject({ monthlyDues: null, duesStated: "$650", annualDues: null });
