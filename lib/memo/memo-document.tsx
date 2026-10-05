@@ -112,6 +112,17 @@ export const STATUS_CHIP: Record<
   unknown: { color: C.muted, bg: C.faint, mark: "—" },
 };
 
+/** The chips' key under the row's "Buy box": each mark in a word or two,
+ *  as the deal page's buy-box card has it (inside the mandate, a near
+ *  miss, outside it, not determinable yet). */
+const STATUS_ORDER = ["pass", "near", "miss", "unknown"] as const;
+export const STATUS_WORD: Record<(typeof STATUS_ORDER)[number], string> = {
+  pass: "inside",
+  near: "near miss",
+  miss: "outside",
+  unknown: "not read yet",
+};
+
 /**
  * The deal type for the memo's subtitle — and, on a plan deal, the plan's
  * headline in one clause: the stabilized NOI over the total cost it takes to
@@ -970,6 +981,7 @@ const s = StyleSheet.create({
   },
   buyBoxMark: { fontSize: 8, fontFamily: "Helvetica-Bold", marginRight: 3 },
   buyBoxLabel: { fontSize: 8, color: C.ink },
+  buyBoxKey: { fontSize: 6.5, color: C.muted, marginBottom: 3, marginLeft: 2 },
 
   // The sections sit 9pt apart (research pass 35: 11 left the risks and
   // the next steps a few points short of page one under a wrapped title).
@@ -1419,6 +1431,13 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
                 </View>
               );
             })}
+            {/* The marks' key, the ones the row uses (research pass 35:
+                the chips printed "+, × and — with no legend"). */}
+            <Text style={s.buyBoxKey}>
+              {STATUS_ORDER.filter((st) => data.buyBox.some((c) => c.status === st))
+                .map((st) => `${STATUS_CHIP[st].mark} ${STATUS_WORD[st]}`)
+                .join("  ·  ")}
+            </Text>
           </View>
         )}
 
