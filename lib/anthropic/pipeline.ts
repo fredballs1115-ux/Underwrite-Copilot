@@ -585,10 +585,11 @@ async function liveMarketFromDb(
     if (!metro && !others) return { primary: null, others: [], failed: null };
     const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)), failedRead);
     const national = readRates(nationalRows, now);
-    // Whether every read of the market's OWN figures failed — its series and
-    // its benchmarks — apart from the national lines: a brief left holding
-    // only the nation's lines is no read of the market, and its header
-    // would say it read the metro's figures (the batch-2 audit).
+    // Whether the reads of the market's OWN figures failed — its series and
+    // its benchmarks — apart from the national lines, every one of them or
+    // enough to leave no line of its own: a brief left holding only the
+    // nation's lines is no read of the market (the batch-2 audit, and the
+    // pre-merge audit's case of a read that answered empty).
     let ownReadFailed = false;
     const readMarket = async (
       market: { id: string; name: string; placedBy?: { county: string; area: string } },
@@ -606,9 +607,7 @@ async function liveMarketFromDb(
         fetchSeriesRows(admin, metas, ownFailed),
         fetchBenchRows(admin, market.name, [...ZILLOW_METRICS, ...REALTOR_METRICS], ownFailed),
       ]);
-      ownReadFailed = own > 0 && own >= attempts;
-      if (ownReadFailed) return null;
-      return liveMarketBrief({
+      const brief = liveMarketBrief({
         metro: market,
         rates: readMetroRates(market.id, rateRows, now),
         zori: zoriFor(bench, market.name, now),
@@ -623,6 +622,14 @@ async function liveMarketFromDb(
         plan,
         builds,
       });
+      // Reads of the market's own figures failed and left no line of its
+      // own: the reads that answered held nothing for this deal (a state
+      // has no Zillow or Realtor.com rows, and their read "succeeds" empty;
+      // a commercial deal reads no housing line), so a block of the
+      // nation's lines alone is a failed read of the market, never a read
+      // of it (the pre-merge audit).
+      ownReadFailed = own > 0 && (own >= attempts || brief == null || brief.national >= brief.lines.length);
+      return ownReadFailed ? null : brief;
     };
     const whole = portfolioFor(ex, metro?.id ?? "");
     // The other markets are read FIRST, so the address's header names only

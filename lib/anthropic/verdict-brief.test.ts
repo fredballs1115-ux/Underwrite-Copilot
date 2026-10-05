@@ -32,8 +32,41 @@ describe("the verdict's brief carries the figures the market check read", () => 
     const counted = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: { ...market, liveBrief: { ...market.liveBrief!, national: 1 } } });
     expect(counted).toContain("The last line is the nation's figure, not the market's — it says so.");
     expect(brief).not.toContain("the nation's figure");
-    const two = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: { ...market, liveBrief: { ...market.liveBrief!, national: 2 } } });
+    // Two of three: every line the nation's is a block of its own (below).
+    const two = buildBrief({
+      extraction: null,
+      challenges: null,
+      comps: null,
+      reconciliation: null,
+      market: {
+        ...market,
+        liveBrief: { ...market.liveBrief!, lines: [...market.liveBrief!.lines, "Debt market — CRE loan delinquency at commercial banks 1.40% (Q2 2026; FRED)"], national: 2 },
+      },
+    });
     expect(two).toContain("The last 2 lines are the nation's figures, not the market's — each says so.");
+  });
+
+  // The pre-merge audit (C1, M3): a block of the nation's lines alone was
+  // headed as the state's figures and said "each is dated and is the state's".
+  it("heads a block of the nation's lines alone as the nation's, saying none of the market's own was current", () => {
+    const nationOnly = {
+      metro: "Pennsylvania",
+      grain: "state" as const,
+      readOn: "2026-09-23",
+      lines: ["Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED), -3 bps on the day before"],
+      figures: [],
+      national: 1,
+    };
+    const brief = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: { ...market, liveBrief: nationOnly } });
+    expect(brief).toContain(
+      "## The nation's published figures the market check read on 2026-09-23 — none of the state of Pennsylvania's own was current, and the deal lies outside the metros the site tracks",
+    );
+    expect(brief).toContain("Each is dated and is the nation's, not the state's, any metro's, the submarket's or the building's.");
+    expect(brief).not.toContain("is the state's, not any metro's");
+    expect(brief).not.toContain("## The state of Pennsylvania's published figures");
+    const metro = buildBrief({ extraction: null, challenges: null, comps: null, reconciliation: null, market: { ...market, liveBrief: { ...nationOnly, metro: "Washington DC", grain: "metro" as const } } });
+    expect(metro).toContain("## The nation's published figures the market check read on 2026-09-23 — none of the Washington DC market's own was current\n");
+    expect(metro).not.toContain("is the metro's, not the submarket's");
   });
 
   it("a check that read no figures adds no section, and the brief is the old one", () => {

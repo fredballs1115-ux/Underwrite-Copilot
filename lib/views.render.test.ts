@@ -6961,6 +6961,41 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 
+  // The pre-merge audit (C1, M3): a block of the nation's lines alone read
+  // "Checked beside 1 published figure for the state of Pennsylvania … 0 the
+  // state's and 1 the nation's".
+  it("the shared screen's market read says none of the market's own figures was current where every line is the nation's", () => {
+    const verdict: VerdictResult = {
+      verdict: "caution",
+      reason: "One market.",
+      topRisks: [],
+      nextSteps: [],
+      screen: { ranges: [], dealKillers: [], sensitivity: [] },
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: extraction.dealName,
+        assetClass: "office",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: false,
+        picture: null,
+        extraction: { ...extraction, properties: [] } as unknown as ExtractionResult,
+        comps: null,
+        market: {
+          checks: [],
+          summary: "Rents are ahead of the nation's lessor rents.",
+          liveBrief: { metro: "Pennsylvania", grain: "state", readOn: "2026-09-23", lines: ["Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)"], national: 1 },
+        },
+        verdict,
+      }),
+    );
+    const text = visibleText(html);
+    expect(text).toContain("Checked beside 1 published figure, read on 2026-09-23 — each the nation's: none of the state of Pennsylvania's own was current.");
+    expect(text).not.toContain("for the state of Pennsylvania");
+    expect(text).not.toContain("0 the state's");
+    expect(gluedWords(text)).toEqual([]);
+  });
+
   it("the shared screen's market read says how a county-placed deal reached its market (#447)", () => {
     const verdict: VerdictResult = {
       verdict: "caution",

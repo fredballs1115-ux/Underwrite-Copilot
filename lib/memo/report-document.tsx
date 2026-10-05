@@ -735,6 +735,16 @@ function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean)
   const nationSays = nat > 0 ? (nat === 1 ? " The last is the nation's, and says so." : ` The last ${countWord(nat)} are the nation's, each said so.`) : "";
   const localCount = b.lines.length - nat;
   const first_ = localCount === 1 ? "The first is" : `The first ${countWord(localCount)} are`;
+  // Every line the nation's: none of the market's own figures was current,
+  // said in place of "the first none are the metro's" (the pre-merge audit).
+  if (localCount === 0 && nat > 0) {
+    const each = ` Each is the nation's, and says so.`;
+    return first
+      ? `Figures the check read beside the rules of thumb: the nation's, as published, read on ${readDay(b.readOn)} — none of ${whose} own was current${
+          state ? ", and the address lies outside the metros the site tracks" : ""
+        }.${state ? "" : placedBySentence(b.placedBy)}${each}`
+      : `And the nation's, where ${sit}, read on ${readDay(b.readOn)}: none of ${whose} own was current.${each}`;
+  }
   if (!first) {
     return `And ${whose} own, where ${sit}, read on ${readDay(b.readOn)}. Each is ${state ? "the state's" : "the metro's"} — not those properties' own, and never the portfolio's.${nationSays}`;
   }

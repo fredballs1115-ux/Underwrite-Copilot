@@ -2158,6 +2158,44 @@ describe("ReportDocument (full report)", () => {
     );
   }, 60000);
 
+  // The pre-merge audit (C1, M3): a block of the nation's lines alone was
+  // headed as the state's figures, "The first 0 are the state's".
+  it("heads a block of the nation's lines alone as the nation's, saying none of the market's own was current", async () => {
+    const deal = {
+      name: "Harrisburg Office",
+      asset_class: "office",
+      extraction: { dealName: "Harrisburg Office", assetClass: "office", metrics: [{ label: "Asking price", value: "$12,000,000", flagged: false, page: "p. 3" }] },
+      challenges: null,
+      comps: null,
+      market: {
+        checks: [{ assumption: "Rent growth", omSays: "4.0%", typicalRange: "2.5%–3.5%", assessment: "aggressive", note: "Above the index.", page: "" }],
+        summary: "One aggressive assumption.",
+        liveBrief: {
+          metro: "Pennsylvania",
+          grain: "state" as const,
+          readOn: "2026-09-23",
+          lines: ["Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)", "Debt market — CRE delinquency 1.4% (Q2 2026; FRED)"],
+          national: 2,
+        },
+      },
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const text = (
+      await pdfTextOf(
+        await renderToBuffer(
+          React.createElement(ReportDocument, { input: buildReportData(deal, "September 24, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+        ),
+      )
+    ).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "Figures the check read beside the rules of thumb: the nation's, as published, read on Sep 23, 2026 — none of the state of Pennsylvania's own was current, and the address lies outside the metros the site tracks. Each is the nation's, and says so.",
+    );
+    expect(text).not.toContain("The first 0");
+    expect(text).not.toContain("the state of Pennsylvania's, as published");
+  }, 60000);
+
   it("says how a county-placed deal reached its market's figures (#447)", async () => {
     const market = {
       checks: [{ assumption: "Rent growth", omSays: "4.0%", typicalRange: "2.5%–3.5%", assessment: "aggressive", note: "Above the index.", page: "" }],

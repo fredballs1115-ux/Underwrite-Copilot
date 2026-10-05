@@ -231,6 +231,10 @@ function nationalNote(b: { lines: string[]; national?: number }): string {
     : "";
 }
 
+/** Every line of a stored block the nation's: none of the market's own
+ *  figures was current that day. */
+const noneOwn = (b: { lines: string[]; national?: number }): boolean => b.lines.length > 0 && (b.national ?? 0) >= b.lines.length;
+
 export function buildBrief(input: VerdictInputs): string {
   const sections: string[] = [];
 
@@ -396,7 +400,23 @@ export function buildBrief(input: VerdictInputs): string {
   // screen range or a next step that turns on one of them can name the
   // figure and its date as its source rather than a rule of thumb.
   const live = input.market?.liveBrief;
-  if (live && live.lines.length > 0) {
+  if (live && live.lines.length > 0 && noneOwn(live)) {
+    // Every line the nation's: none of the market's own figures was
+    // current, and the section says so rather than "each is the state's"
+    // (the pre-merge audit).
+    const whose = live.grain === "state" ? `the state of ${live.metro}'s` : `the ${live.metro} market's`;
+    sections.push(
+      `## The nation's published figures the market check read on ${live.readOn} — none of ${whose} own was current${
+        live.grain === "state" ? ", and the deal lies outside the metros the site tracks" : ""
+      }`,
+      [
+        ...live.lines.map((l) => `- ${currentBriefLine(l)}`),
+        `Each is dated and is the nation's, not ${live.grain === "state" ? "the state's, any metro's" : "the metro's"}, the submarket's or the building's. Where a screen range, a risk or a next step turns on one of these, name the figure and its date as its source, and say it is the nation's.${
+          live.grain === "state" ? "" : placedBySentence(live.placedBy)
+        }`,
+      ].join("\n"),
+    );
+  } else if (live && live.lines.length > 0) {
     sections.push(
       live.grain === "state"
         ? `## The state of ${live.metro}'s published figures the market check read on ${live.readOn} — the deal lies outside the metros the site tracks`
@@ -417,6 +437,16 @@ export function buildBrief(input: VerdictInputs): string {
     if (o.lines.length === 0) continue;
     const pf = o.portfolio;
     const where = pf ? `, where ${pf.here} of the portfolio's ${pf.of} properties ${pf.here === 1 ? "sits" : "sit"}` : "";
+    if (noneOwn(o)) {
+      sections.push(
+        `## The nation's published figures, read on ${o.readOn} — none of ${o.grain === "state" ? `the state of ${o.metro}'s` : `the ${o.metro} market's`} own was current${where}`,
+        [
+          ...o.lines.map((l) => `- ${currentBriefLine(l)}`),
+          "Each is dated and is the nation's, not that market's, never the portfolio's. Where a range, a risk or a next step turns on one, name the figure and its date, and say it is the nation's.",
+        ].join("\n"),
+      );
+      continue;
+    }
     sections.push(
       o.grain === "state"
         ? `## The state of ${o.metro}'s published figures${where}, read on ${o.readOn}`

@@ -37,6 +37,9 @@ interface State {
   /** reads of every series but these, and of `benchmarks`, answer with an
    *  error: the market's own figures fail while the nation's answer */
   onlySeries?: string[];
+  /** with `onlySeries`, the `benchmarks` read still answers (empty, as a
+   *  state's does: it has no Zillow or Realtor.com rows) */
+  benchmarksAnswer?: boolean;
 }
 
 /** A chainable, thenable query like supabase-js's, over an in-memory store. */
@@ -152,7 +155,10 @@ class FakeQuery {
     if ((table === "rates" || table === "benchmarks") && state.failFigureReads) {
       return { data: null, error: { message: "TypeError: fetch failed" } };
     }
-    if (state.onlySeries && (table === "benchmarks" || (table === "rates" && !state.onlySeries.includes(String(this.where("series_id")))))) {
+    if (
+      state.onlySeries &&
+      ((table === "benchmarks" && !state.benchmarksAnswer) || (table === "rates" && !state.onlySeries.includes(String(this.where("series_id")))))
+    ) {
       return { data: null, error: { message: "TypeError: fetch failed" } };
     }
     if (table === "rates") {
@@ -1700,6 +1706,61 @@ describe("runAnalysis — the happy path", () => {
     expect(stored.liveBrief?.metro).toBe("Pennsylvania");
     expect(stored.liveBrief?.grain).toBe("state");
     expect(stored.liveBrief?.lines).toHaveLength(3);
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  // The pre-merge audit (C1, M3): a state has no Zillow or Realtor.com rows,
+  // so its benchmarks read "succeeded" empty while every series read failed,
+  // and the check was handed the nation's lines under "so these are the
+  // state's own figures".
+  it("a state whose every series read failed while its empty benchmarks answered stores a failed read, never a brief of the nation's lines", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    state.deals.d1.address = { city: "Harrisburg", state: "PA" };
+    state.rates = [
+      { series_id: "PAUR", obs_date: "2026-08-01", value: 3.7 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
+    state.benchmarks = [];
+    state.onlySeries = ["DGS10"];
+    state.benchmarksAnswer = true;
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    expect(vi.mocked(checkMarket).mock.calls[0][3]).toBeNull();
+    const stored = state.deals.d1.market as MarketResult;
+    expect(stored.liveBrief).toBeNull();
+    expect(stored.liveReadFailed).toEqual({ market: "Pennsylvania", grain: "state" });
+    warn.mockRestore();
+  });
+
+  it("a state none of whose own figures is current is handed the nation's lines under a header that says so, and no failed read", async () => {
+    state.deals.d1.address = { city: "Harrisburg", state: "PA" };
+    state.rates = [
+      { series_id: "PAUR", obs_date: "2025-01-01", value: 3.7 },
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+    ];
+    state.benchmarks = [];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3];
+    expect(handed).toContain(
+      "Published figures for the state of Pennsylvania the deal sits in — the address lies outside the metros the site tracks — read on 2026-09-23 from FRED. No figure of the state's own was current; the one line below is the nation's figure, dated and said as such, and never this state's.",
+    );
+    expect(handed).not.toContain("own figures");
+    expect(handed).not.toContain("each is the state's");
+    const stored = state.deals.d1.market as MarketResult;
+    expect(stored.liveBrief?.national).toBe(1);
+    expect(stored.liveBrief?.lines).toHaveLength(1);
+    expect(stored.liveReadFailed).toBeUndefined();
     expect(errSpy).not.toHaveBeenCalled();
   });
 });

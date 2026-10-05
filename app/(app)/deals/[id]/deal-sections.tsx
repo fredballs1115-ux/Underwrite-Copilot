@@ -1617,7 +1617,9 @@ export function MarketCheck({
             {others.length > 0
               ? `rules of thumb, read beside each market's published figures`
               : brief
-                ? `rules of thumb, read beside ${brief.grain === "state" ? "the state's" : "the metro's"} published figures`
+                ? `rules of thumb, read beside ${
+                    brief.lines.length > 0 && (brief.national ?? 0) >= brief.lines.length ? "the nation's" : brief.grain === "state" ? "the state's" : "the metro's"
+                  } published figures`
                 : readFailed
                   ? "rules of thumb — the published figures were not read"
                   : "rules-of-thumb, not pulled comps"}
@@ -1726,7 +1728,8 @@ function briefCount(brief: NonNullable<MarketResult["liveBrief"]>): string {
   const n = brief.lines.length;
   const nat = Math.min(Math.max(brief.national ?? 0, 0), n);
   const whose = brief.grain === "state" ? "the state’s rather than any metro’s" : "the metro’s rather than the submarket’s";
-  const split = nat > 0 ? `each dated: ${n - nat} ${whose} and ${nat} the nation’s` : `each dated, each ${whose}`;
+  // Every line the nation's: no figure of the market's own was current.
+  const split = nat >= n ? "each dated, each the nation’s" : nat > 0 ? `each dated: ${n - nat} ${whose} and ${nat} the nation’s` : `each dated, each ${whose}`;
   const tail = brief.portfolio
     ? ", and never the portfolio’s"
     : brief.grain === "state"
@@ -1744,13 +1747,20 @@ function LiveBriefRead({ brief }: { brief: NonNullable<MarketResult["liveBrief"]
       ? ` — where ${pf.here} of the ${pf.of} properties ${pf.here === 1 ? "sits" : "sit"}`
       : ` — the address on file, where none of the ${pf.of} properties sits`
     : "";
+  // A block of the nation's lines alone: none of the market's own figures
+  // was current, and the heading says so rather than "own figures".
+  const noneOwn = (brief.national ?? 0) >= brief.lines.length;
   return (
     <details className="rounded-xl border border-line bg-paper px-4 py-3 text-sm">
       <summary className="cursor-pointer list-none text-muted [&::-webkit-details-marker]:hidden">
         <span className="font-medium text-ink">
-          {brief.grain === "state"
-            ? `Read beside the state of ${brief.metro}’s own figures${where}`
-            : `Read beside the ${brief.metro} market’s own figures${where}${placedByClause(brief.placedBy)}`}
+          {noneOwn
+            ? brief.grain === "state"
+              ? `Read beside the nation’s figures — none of the state of ${brief.metro}’s own was current${where}`
+              : `Read beside the nation’s figures — none of the ${brief.metro} market’s own was current${where}${placedByClause(brief.placedBy)}`
+            : brief.grain === "state"
+              ? `Read beside the state of ${brief.metro}’s own figures${where}`
+              : `Read beside the ${brief.metro} market’s own figures${where}${placedByClause(brief.placedBy)}`}
         </span>
         <span>{briefCount(brief)}</span>
       </summary>

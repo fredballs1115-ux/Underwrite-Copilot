@@ -316,6 +316,30 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(stateText).toMatch(/each the state’s rather than any metro’s — the address lies outside the metros the site tracks/);
     expect(stateText).toMatch(/rules of thumb, read beside the state's published figures/);
     expect(stateText).not.toMatch(/market’s own figures/);
+    // The pre-merge audit (C1, M3): a block of the nation's lines alone —
+    // none of the state's own figures current — is never called the
+    // state's own figures, nor counted "0 the state's".
+    const nationOnly: Props = {
+      ...withBrief,
+      results: {
+        ...withBrief.results,
+        market: {
+          ...withBrief.results.market!,
+          liveBrief: {
+            metro: "Pennsylvania",
+            grain: "state",
+            readOn: "2026-09-23",
+            lines: ["Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED), -3 bps on the day before"],
+            national: 1,
+          },
+        },
+      },
+    };
+    const nationText = textOf(render(nationOnly));
+    expect(nationText).toMatch(/Read beside the nation’s figures — none of the state of Pennsylvania’s own was current/);
+    expect(nationText).toMatch(/1 published figure as of Sep 23, 2026, each dated, each the nation’s — the address lies outside the metros the site tracks/);
+    expect(nationText).toMatch(/rules of thumb, read beside the nation's published figures/);
+    expect(nationText).not.toMatch(/Pennsylvania’s own figures|0 the state’s/);
     expect(text).toMatch(/Unemployment 4\.1% \(Jul 2026, Philadelphia MSA; FRED\)/);
     expect(text).toMatch(/read beside the metro's published figures/);
     // Nothing read today → no "since" block at all.

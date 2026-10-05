@@ -663,6 +663,37 @@ describe("a deal outside the covered metros reads its state's figures, said as t
     expect(dc.grain).toBe("metro");
     expect(dc.text).toContain("each is the metro area's");
   });
+
+  // The pre-merge audit (C1, M3): a block holding the nation's lines alone
+  // opened "so these are the state's own figures … each is the state's".
+  it("says no figure of the state's or the market's own was current where every line is the nation's", () => {
+    const national = readRates(REAL_ROWS, FIXTURE_NOW).filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id));
+    const state = liveMarketBrief({ metro: { id: "state:PA", name: "Pennsylvania" }, assetClass: "office", rates: [], zori: null, realtor: null, national, now: NOW })!;
+    expect(state.national).toBe(state.lines.length);
+    expect(state.national).toBeGreaterThan(1);
+    const head = state.text.split("\n")[0];
+    expect(head).toBe(
+      `Published figures for the state of Pennsylvania the deal sits in — the address lies outside the metros the site tracks — read on 2026-09-23 from FRED. No figure of the state's own was current; the ${state.national} lines below are the nation's figures, each dated and said as such, and never this state's.`,
+    );
+    // Stale figures of its own are no figures of its own.
+    const stale = liveMarketBrief({
+      metro: { id: "state:PA", name: "Pennsylvania" },
+      assetClass: "multifamily",
+      rates: readMetroRates("state:PA", [{ series_id: "PAUR", obs_date: "2025-01-01", value: 3.7 }], NOW),
+      zori: null,
+      realtor: null,
+      national: national.filter((r) => r.meta.id === "DGS10"),
+      now: NOW,
+    })!;
+    expect(stale.text.split("\n")[0]).toBe(
+      "Published figures for the state of Pennsylvania the deal sits in — the address lies outside the metros the site tracks — read on 2026-09-23 from FRED. No figure of the state's own was current; the one line below is the nation's figure, dated and said as such, and never this state's.",
+    );
+    const dc = liveMarketBrief({ metro: { id: "dc", name: "Washington DC" }, assetClass: "multifamily", rates: [], zori: null, realtor: null, national, now: NOW })!;
+    expect(dc.text.split("\n")[0]).toBe(
+      `Published figures for the Washington DC market the deal sits in, read on 2026-09-23 from FRED. No figure of the metro area's own was current; the ${dc.national} lines below are the nation's figures, each dated and said as such, and never this market's.`,
+    );
+    for (const b of [state, stale, dc]) expect(b.text).not.toMatch(/each is the (?:state|metro area)'s|own figures/);
+  });
 });
 
 // ── A metro area the site reads without a brief ─────────────────────────────

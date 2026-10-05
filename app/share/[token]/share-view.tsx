@@ -275,6 +275,10 @@ function splitOf(b: { lines: string[]; national?: number }, local: string, each:
   return nat > 0 ? `${b.lines.length - nat} ${local} and ${nat} the nation's, ${none}` : each;
 }
 
+/** Every line the nation's: none of the market's own figures was current,
+ *  said so rather than "for the state of …" over the nation's lines. */
+const noneOwnOf = (b: { lines: string[]; national?: number }): boolean => b.lines.length > 0 && (b.national ?? 0) >= b.lines.length;
+
 /** Why the call on file is the previous completed screen's — one sentence
  *  for each way the sender's latest run did not reach it, said by the
  *  verdict below and carried by the call's chip beside the title. */
@@ -728,9 +732,13 @@ export function ShareView({
               )}
               {market.liveBrief && market.liveBrief.lines.length > 0 && (
                 <p className="mt-2 text-xs text-muted">
-                  {market.liveBrief.grain === "state"
-                    ? `Checked beside ${figureCount(market.liveBrief.lines.length)} for the state of ${market.liveBrief.metro}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the state's", "each the state's, not any metro's and not the building's", "none any metro's or the building's")}.`
-                    : `Checked beside ${figureCount(market.liveBrief.lines.length)} for the ${market.liveBrief.metro} market${placedByClause(market.liveBrief.placedBy)}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the metro's", "each the metro's, not the building's", "none the building's")}.`}
+                  {noneOwnOf(market.liveBrief)
+                    ? market.liveBrief.grain === "state"
+                      ? `Checked beside ${figureCount(market.liveBrief.lines.length)}, read on ${market.liveBrief.readOn} — each the nation's: none of the state of ${market.liveBrief.metro}'s own was current.`
+                      : `Checked beside ${figureCount(market.liveBrief.lines.length)}, read on ${market.liveBrief.readOn} — each the nation's: none of the ${market.liveBrief.metro} market's own was current${placedByClause(market.liveBrief.placedBy)}.`
+                    : market.liveBrief.grain === "state"
+                      ? `Checked beside ${figureCount(market.liveBrief.lines.length)} for the state of ${market.liveBrief.metro}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the state's", "each the state's, not any metro's and not the building's", "none any metro's or the building's")}.`
+                      : `Checked beside ${figureCount(market.liveBrief.lines.length)} for the ${market.liveBrief.metro} market${placedByClause(market.liveBrief.placedBy)}, read on ${market.liveBrief.readOn} — ${splitOf(market.liveBrief, "the metro's", "each the metro's, not the building's", "none the building's")}.`}
                 </p>
               )}
               {/* A portfolio across markets (#413): each other market's own
@@ -744,9 +752,11 @@ export function ShareView({
                     : "";
                   return (
                     <p key={b.metro} className="mt-1 text-xs text-muted">
-                      {b.grain === "state"
-                        ? `${lead} ${b.lines.length} for the state of ${b.metro}${where}, read on ${b.readOn} — the state's, never the portfolio's.`
-                        : `${lead} ${b.lines.length} for the ${b.metro} market${where}, read on ${b.readOn} — the metro's, never the portfolio's.`}
+                      {noneOwnOf(b)
+                        ? `${lead} ${b.lines.length} of the nation's, read on ${b.readOn} — none of ${b.grain === "state" ? `the state of ${b.metro}'s` : `the ${b.metro} market's`} own was current${where}.`
+                        : b.grain === "state"
+                          ? `${lead} ${b.lines.length} for the state of ${b.metro}${where}, read on ${b.readOn} — the state's, never the portfolio's.`
+                          : `${lead} ${b.lines.length} for the ${b.metro} market${where}, read on ${b.readOn} — the metro's, never the portfolio's.`}
                     </p>
                   );
                 })}
