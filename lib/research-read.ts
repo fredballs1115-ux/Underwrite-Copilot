@@ -27,6 +27,17 @@ import { readAll } from "@/lib/read-all";
  * already keeps its checked-in files when a read fails. The tags are the
  * pulls' own (`benchmarks`), so a revalidation of the feed rows reaches this
  * read too.
+ *
+ * Each table is its own cache entry, and Next keeps one only under 2 MB
+ * (past it, production warns and keeps nothing, so every view would read the
+ * table page by page). Neither can reach it as the tables are shaped: one
+ * `benchmarks` row a (sector, metro, metric) — the research rows, the two
+ * monthly pulls' sixteen metrics for each of their 44 metros, HUD's rents a
+ * fiscal year — measures 756,709 characters on 2026-10-05 with every note
+ * longer than the pulls write and two old fiscal years kept (1,113 rows);
+ * the rules 36,250. A metro adds about 10 KB, a fiscal year about 60 KB.
+ * lib/research-read-paged.test.ts holds the estimate under half the cap
+ * (audit C5, LOW-10).
  */
 function admin() {
   return createSupabaseAdminClient();

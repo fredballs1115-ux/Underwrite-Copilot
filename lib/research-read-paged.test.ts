@@ -63,3 +63,52 @@ describe("the steward's link-health sweep", () => {
     expect(steward).not.toContain('await supabase.from(table).select("source")');
   });
 });
+
+// Next keeps an unstable_cache entry only under 2 MB, measured as the JSON of
+// the entry, whose body is the JSON of the rows (node_modules/next/dist/
+// server/lib/incremental-cache: past it, production warns and keeps nothing,
+// so every signed-in view would read both tables page by page). The cached
+// `benchmarks` read is bounded: one row a (sector, metro, metric), the
+// research rows, the two monthly pulls' metrics for each metro they read, and
+// HUD's rents a fiscal year (audit C5, LOW-10).
+describe("what the signed-in research read hands the cache", () => {
+  it("fits the 2 MB entry with room to spare, on the checked-in files and both pulls' rows, generously", async () => {
+    const { seedBenchmarks, seedRules } = await import("./research-data");
+    const { REALTOR_METRICS, ZILLOW_METRICS } = await import("./feed-rows");
+    const dataMetros = JSON.parse(readFileSync("data/data-metros.json", "utf8")) as { metros: unknown[] };
+    const briefed = (file: string) => (readFileSync(file, "utf8").match(/^\s*\{ id: "/gm) ?? []).length;
+    const asStored = (r: object) => ({ id: "00000000-0000-0000-0000-000000000000", ...r, created_at: "2026-10-05T00:00:00.000000+00:00" });
+    const entry = (rows: unknown[]) => JSON.stringify({ body: JSON.stringify(rows) }).length;
+    const seeds = seedBenchmarks().map(asStored);
+    // Each pull's metros — its briefed list and the metro areas read without
+    // a brief — each metric with a note longer than any the pulls write.
+    const pullRows = (metros: number, metrics: readonly string[]) =>
+      Array.from({ length: metros }, (_, i) =>
+        metrics.map((metric) =>
+          asStored({
+            sector: "multifamily",
+            metro: `Metro ${i} with a long name`,
+            metric,
+            low: 1_234_567,
+            high: 1_234_567,
+            unit: "usd_month",
+            source: "https://www.realtor.com/research/data/",
+            as_of: "2026-09-01",
+            status: "verified",
+            note: "x".repeat(300),
+          }),
+        ),
+      ).flat();
+    const zillowMetros = briefed("scripts/fetch-zori.mjs") + dataMetros.metros.length;
+    const realtorMetros = briefed("scripts/fetch-realtor.mjs") + dataMetros.metros.length;
+    expect(zillowMetros).toBeGreaterThan(40);
+    const feed = [...pullRows(zillowMetros, ZILLOW_METRICS), ...pullRows(realtorMetros, REALTOR_METRICS)];
+    // HUD's rents for two fiscal years before the one on file, never deleted.
+    const fmr = seeds.filter((r) => /^hud_fmr_fy/.test((r as unknown as { metric: string }).metric));
+    const benchmarks = entry([...seeds, ...feed, ...fmr, ...fmr]);
+    // 756,709 characters on 2026-10-05, 1,113 rows. Half the cap is the line,
+    // so the table's growth fails here long before the cache stops keeping it.
+    expect(benchmarks).toBeLessThan(1024 * 1024);
+    expect(entry(seedRules().map(asStored))).toBeLessThan(256 * 1024);
+  });
+});
