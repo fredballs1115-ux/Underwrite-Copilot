@@ -1894,6 +1894,7 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
 // ── A submarket, opened on its metro's photograph (#424) ────────────────────
 import { SubmarketCards } from "@/app/market/submarket-cards";
 import { MARKET_BAND_PICTURE, MarketBand } from "@/app/place-band";
+import { CityPhoto } from "@/app/city-photo";
 import { EMPTY_RULES, type Submarket } from "@/lib/market/types";
 import { SKYLINES, commonsPage, galleryCredit, skylineSrcSet } from "@/lib/skyline";
 
@@ -1981,6 +1982,23 @@ describe("SubmarketCards and the submarket's band — the metro its owner typed,
     expect(visibleText(html).replace(/\n/g, "")).toContain(`${SKYLINES.st_louis.place} · `);
     expect(html).toContain(`href="${commonsPage(SKYLINES.st_louis.file)}"`);
     expect(a11yIssues(html), "a11y market band").toEqual([]);
+  });
+
+  it("crops a band at its photograph's own focus where one was judged, and a tile never (research pass 29)", () => {
+    // At the band's 42% a laptop's band cut Atlanta's towers off at the top;
+    // its photograph carries the focus judged through the band's crops.
+    const img = (markup: string) => /<img\b[^>]*>/.exec(markup)?.[0] ?? "";
+    const atlanta = img(render(React.createElement(MarketBand, { metro: "atlanta", eyebrow: "Southeast", name: "Atlanta GA" })));
+    expect(SKYLINES.atlanta.bandFocusY).toBeDefined();
+    expect(atlanta).toContain(`style="object-position:50% ${SKYLINES.atlanta.bandFocusY}%"`);
+    // The band's class still says 42% for every photograph without one.
+    expect(atlanta).toContain("object-[50%_42%]");
+    expect(SKYLINES.richmond.bandFocusY).toBeUndefined();
+    expect(img(render(React.createElement(MarketBand, { metro: "richmond", eyebrow: "Mid-Atlantic", name: "Richmond VA" })))).not.toContain("object-position");
+    // A tile of the same photograph is another shape, and keeps its own crop.
+    const tile = img(render(React.createElement(CityPhoto, { metro: "atlanta", width: 480, height: 360, className: "h-full w-full object-cover" })));
+    expect(tile).toContain("/api/imagery/skyline/atlanta");
+    expect(tile).not.toContain("object-position");
   });
 });
 

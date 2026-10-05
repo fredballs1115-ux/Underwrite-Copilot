@@ -229,13 +229,17 @@ export function PlaceBackdrop({
   // of Commons' weight, so a phone takes 1600 and a dense laptop 2400 where
   // one 1400px file was stretched twice over; 1400 stays the file a browser
   // without srcset gets. Above centre, because a skyline's subject is its
-  // tower line and the bottom of the frame is usually road or water.
+  // tower line and the bottom of the frame is usually road or water — and
+  // where that cut a photograph wrong (a tower's crown off the top, a
+  // skyline sunk under the words), at its own focus (`bandFocus`, the
+  // table's `bandFocusY`, judged by eye through the bands' crops).
   return (
     <CityPhoto
       metro={metro}
       width={1400}
       height={height}
       sizes={sizes}
+      bandFocus
       eager={eager}
       className="h-full w-full object-cover object-[50%_42%]"
       layer={layer ?? (scrim === "hero" ? HERO_STRIP : "absolute inset-0")}

@@ -14,6 +14,10 @@ export interface CityPicture<Credit> {
   /** what the picture on screen shows, for an alt text that describes it */
   alt: string;
   credit: Credit;
+  /** where this picture is cropped (a CSS object-position), where its
+   *  surface asks for the photograph's own: a band's `bandFocusY`
+   *  (lib/skyline). Unset, the surface's class decides. */
+  position?: string;
 }
 
 /**
@@ -121,6 +125,10 @@ export function CityPhotoView({
       decoding="async"
       onError={() => setMode(mode === "skyline" && hasAerial ? "aerial" : "none")}
       className={className}
+      // The photograph's own crop, over the class's: the picture on screen
+      // carries it, so the overhead that replaces a failed photograph is
+      // cropped as its surface crops it, never at the photograph's focus.
+      style={shown.position ? { objectPosition: shown.position } : undefined}
     />
   );
   const caption = showCredit && credit ? <p className={creditClassName}>{credit}</p> : null;

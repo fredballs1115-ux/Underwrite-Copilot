@@ -56,6 +56,17 @@ export interface SkylineShot {
    *  panorama cut to the card by its height stays sharp
    *  (lib/market-picture's `marketPhotoWidth`) */
   size?: readonly [number, number];
+  /** where a band crops the photograph from top to bottom, a percent of
+   *  its height (drawn as `object-position: 50% <bandFocusY>%`), for a
+   *  photograph the band's own 42% cut wrong: a tall subject's top lost,
+   *  or the subject sunk under the words' scrim (research pass 29). Judged
+   *  by eye through the bands' own crops — the laptop band at 1104×336,
+   *  /market's at 1062×336, the tablet's at 730×336 and the phone's strip
+   *  at 300×224 — with the scrim and the words painted on, so the
+   *  subject's top clears the frame and the scrim does not bury it. For a
+   *  band (`PlaceBackdrop`) only, never a card or a tile, whose frames are
+   *  other shapes. Unset, the band's own 42%. */
+  bandFocusY?: number;
 }
 
 /** The table's key for a metro area the site reads no figures for (#472):
@@ -121,6 +132,11 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [3008, 2000],
+    // The wheel is taller than a laptop's band: at 42% its crown of
+    // gondolas went off the top, at 0% the whole upper arc stands clear
+    // and the hub sits in the words' scrim (research pass 29's
+    // band-laptop-0 sheet, and the focus sheets cut 2026-10-05).
+    bandFocusY: 0,
   },
   // Northern Virginia is the one suburban market that gets a skyline, and
   // Rosslyn is the reason. PG County and Montgomery County still keep their
@@ -223,6 +239,11 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [4000, 1668],
+    // At 42% the skyline sat under the words' scrim below empty sky; at 80%
+    // it stands above the scrim, the Willis Tower's antennas clear of the
+    // top on /market's band and on /tools' shorter one, which 100% cut
+    // (band-laptop-1; focus sheets 2026-10-05).
+    bandFocusY: 80,
   },
   // Third sheet (skyline-sheet run 35661336976): the 6000px file it
   // replaces was a tight cluster of downtown towers under a blue sky —
@@ -261,6 +282,9 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [8330, 3456],
+    // Both tall towers' tops clear the laptop band at 16%; at 42% both were
+    // cut (band-laptop-1; focus sheets 2026-10-05).
+    bandFocusY: 16,
   },
   atlanta: {
     file: "Atlanta, Georgia Skyline.jpg",
@@ -269,6 +293,10 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [1920, 1280],
+    // At 42% the laptop band kept the freeway and lost the towers' tops; at
+    // 6% the skyline stands whole above the words' scrim, Bank of America
+    // Plaza's spire clear (band-laptop-1; focus sheets 2026-10-05).
+    bandFocusY: 6,
   },
   // Fourth sheet (skyline-sheet run 35752500514, the first one-market run,
   // thirty-six files deep): the hazy plane-window aerial gives way to the
@@ -335,6 +363,9 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     size: [4320, 2160],
+    // The tallest tower's top clears the laptop band at 22%; at 42% it was
+    // cut (band-laptop-2; focus sheets 2026-10-05).
+    bandFocusY: 22,
   },
   // minneapolis: chosen by eye from contact sheet 8 (skyline-sheet run
   // 35943350787, 2026-09-24) — the article's lead, the skyline over the river at 4828px — over St. Anthony Falls at dusk, which is the falls rather than the city, and a 5168×1528 strip.
@@ -365,6 +396,9 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY-SA 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     size: [4810, 2762],
+    // The tallest tower's pointed crown is whole in the laptop band at 8%;
+    // at 42% it was cut off (band-laptop-2; focus sheets 2026-10-05).
+    bandFocusY: 8,
   },
   // raleigh: chosen by eye from contact sheet 9 (skyline-sheet run
   // 35943520435, 2026-09-24) — the article's lead, the tower cluster and the amphitheatre lit low from the west at 4000px — over two panoramio street views, a Fayetteville Street frame and, from the search, a photograph of Kyiv by a Raleigh photographer.
@@ -456,6 +490,10 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     size: [7823, 5035],
+    // The tallest tower's pyramid top is whole in the laptop band at 23%; at
+    // 42% the band kept its shaft and cut the top (band-laptop-4; focus
+    // sheets 2026-10-05).
+    bandFocusY: 23,
   },
   // detroit: chosen by eye from contact sheet 10 (skyline-sheet run
   // 35943694349, 2026-09-24), through the market band's own crop — the article's lead at 4773px — over a night frame from 2021 whose Renaissance Center falls out of the phone's crop, a Gordie Howe Bridge aerial and a 1929 panorama (a PNG).
@@ -486,6 +524,9 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     size: [8199, 4340],
+    // Key Tower's pyramid and spire are whole in the laptop band at 4%; at
+    // 42% the pyramid was cut (band-laptop-4; focus sheets 2026-10-05).
+    bandFocusY: 4,
   },
   // phoenix: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35944782635, 2026-09-24), through the market band's own crop — the article's lead, an oblique aerial of the towers with the mountains beyond them — over a street corner and the airport's control tower, which are what the six-market sheet held, a hazy dusk from South Mountain and two night frames the band turns black.
@@ -526,6 +567,10 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC0",
     licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
     size: [4032, 2454],
+    // The towers are whole in the laptop band at 16%, the fountain at the
+    // scrim's edge; at 42% the band was half lake and the towers' tops cut
+    // (band-laptop-4; focus sheets 2026-10-05).
+    bandFocusY: 16,
   },
   // indianapolis: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35945058692, 2026-09-24), through the market band's own crop — the monument at the city's centre against a sunset — over two midday panoramas where the city is a strip under the words and the stadium and reservoir aerials the six-market sheet held; the credit is the name the runner printed, without the permission link printed after it.
@@ -536,6 +581,10 @@ export const SKYLINES: Record<string, SkylineShot> = {
     license: "CC BY 4.0",
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     size: [4382, 2230],
+    // The tallest tower and the flag on its neighbour are whole in the
+    // laptop band at 22%, the monument above the scrim; at 42% the tower's
+    // top was cut (band-laptop-5; focus sheets 2026-10-05).
+    bandFocusY: 22,
   },
   // riverside: chosen by eye from its own one-market sheet (skyline-sheet run
   // 35945179705, 2026-09-24), through the market band's own crop — a real view of the place from the mountain over the campus — there is no skyline to photograph, and the convention-centre aerial and the San Bernardino station and airport frames were the alternatives.

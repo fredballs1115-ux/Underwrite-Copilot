@@ -71,6 +71,25 @@ describe("the market photograph table", () => {
     }
   });
 
+  it("crops a band at a photograph's own focus only inside the photograph, and only where one was judged (research pass 29)", () => {
+    // `bandFocusY` is an object-position's vertical percent, judged by eye
+    // through the bands' crops: 0 is the photograph's top edge at the
+    // band's top, 100 its bottom edge at the band's bottom. Anything outside
+    // that is no crop of the photograph at all.
+    const focused = Object.entries(SKYLINES).filter(([, shot]) => shot.bandFocusY !== undefined);
+    expect(focused.length, "the photographs a band's 42% cut wrong").toBeGreaterThanOrEqual(10);
+    for (const [id, shot] of focused) {
+      const y = shot.bandFocusY!;
+      expect(Number.isFinite(y), id).toBe(true);
+      expect(y, id).toBeGreaterThanOrEqual(0);
+      expect(y, id).toBeLessThanOrEqual(100);
+      // A judged value is a whole percent; 42 is the band's own and is
+      // left unset rather than restated.
+      expect(Number.isInteger(y), id).toBe(true);
+      expect(y, id).not.toBe(42);
+    }
+  });
+
   it("reads a market's photograph by id, and nothing for one without", () => {
     expect(skylineFor("definitely-not-a-metro")).toBeNull();
     expect(hasSkyline("definitely-not-a-metro")).toBe(false);

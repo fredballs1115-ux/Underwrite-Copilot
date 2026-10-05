@@ -70,6 +70,7 @@ export function CityPhoto({
   eager = false,
   showCredit = true,
   sizes,
+  bandFocus = false,
   layer,
   creditLayer,
   overlay,
@@ -94,6 +95,11 @@ export function CityPhoto({
   /** how wide the slot draws, for the browser to pick a file by; unset,
    *  the one file at `width`, as before */
   sizes?: string;
+  /** a band's picture (`PlaceBackdrop`): the photograph is cropped at its
+   *  own `bandFocusY` where the table records one (lib/skyline), judged
+   *  through a band's crops — never a card's or a tile's, whose frames are
+   *  other shapes */
+  bandFocus?: boolean;
   /** a band's picture layer: the box the picture fills behind the band's
    *  words ("absolute inset-0", or the hero's strip), and the shape of the
    *  box its credit is drawn in after them. Unset, the picture and its
@@ -124,6 +130,7 @@ export function CityPhoto({
         // The photographer linked to the file's page and the licence to its
         // text, and "cropped to fit": what a Creative Commons credit carries.
         credit: skylineCreditParts(shot),
+        ...(bandFocus && shot.bandFocusY !== undefined ? { position: `50% ${shot.bandFocusY}%` } : {}),
       }
     : null;
   // The overhead is drawn at the size asked for, so twice the size is the
