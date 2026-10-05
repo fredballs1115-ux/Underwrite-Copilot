@@ -27,8 +27,8 @@ interface Item {
 /** Buy-box triage chip states worth showing (anything else stays hidden).
  *  Keys are the pipeline table's fit vocabulary — one vocabulary everywhere. */
 const TRIAGE_CHIP: Record<string, { label: string; cls: string }> = {
-  fits: { label: "Fits box", cls: "bg-pass/15 text-pass" },
-  near: { label: "Near box", cls: "bg-caution/15 text-caution" },
+  fits: { label: "Fits box", cls: "bg-pass/10 text-pass" },
+  near: { label: "Near box", cls: "bg-caution/10 text-caution" },
   outside: { label: "Outside box", cls: "bg-kill/15 text-kill" },
 };
 

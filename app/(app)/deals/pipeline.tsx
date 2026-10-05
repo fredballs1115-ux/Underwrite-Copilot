@@ -207,8 +207,8 @@ const DEFAULT_DIR: Record<SortKey, SortDir> = {
 
 const VERDICT_META: Record<string, { label: string; cls: string }> = {
   pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
-  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
-  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
+  caution: { label: "Caution", cls: "bg-caution/10 text-caution" },
+  pass: { label: "Go", cls: "bg-pass/10 text-pass" },
 };
 
 /** Each asset class reads as its own kind of thing at a glance: a colour dot
@@ -2702,7 +2702,7 @@ function GettingStarted({
               aria-hidden
               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                 s.done
-                  ? "bg-pass/15 text-pass"
+                  ? "bg-pass/10 text-pass"
                   : "bg-faint text-muted ring-1 ring-inset ring-line"
               }`}
             >

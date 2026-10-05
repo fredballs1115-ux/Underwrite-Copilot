@@ -1210,8 +1210,8 @@ const MANDATE_META: Record<
   MandateVerdict,
   { label: string; text: string; bar: string; chip: string }
 > = {
-  PURSUE: { label: "Pursue", text: "text-pass", bar: "bg-pass", chip: "bg-pass/15 text-pass" },
-  WATCH: { label: "Watch", text: "text-caution", bar: "bg-caution", chip: "bg-caution/15 text-caution" },
+  PURSUE: { label: "Pursue", text: "text-pass", bar: "bg-pass", chip: "bg-pass/10 text-pass" },
+  WATCH: { label: "Watch", text: "text-caution", bar: "bg-caution", chip: "bg-caution/10 text-caution" },
   PASS: { label: "Pass", text: "text-kill", bar: "bg-kill", chip: "bg-kill/15 text-kill" },
 };
 
@@ -1893,8 +1893,8 @@ function useElapsed(startedAt: string | null | undefined): { label: string; ms: 
  *  Simple by design — a paper trail, not a timeline visualization. */
 
 const COMP_CALL: Record<string, { label: string; cls: string }> = {
-  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
-  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
+  pass: { label: "Go", cls: "bg-pass/10 text-pass" },
+  caution: { label: "Caution", cls: "bg-caution/10 text-caution" },
   pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
 };
 

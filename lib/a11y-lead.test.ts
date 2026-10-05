@@ -1,5 +1,5 @@
 import React from "react";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it, vi } from "vitest";
@@ -79,5 +79,29 @@ describe("the sample deal's guide at 320px (research pass 33, item 12)", () => {
   it("lets each card shrink, so the hint truncates rather than spill past the column", () => {
     const guide = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/sample-guide.tsx"), "utf8");
     expect(guide).toMatch(/<li key=\{s\.title\} className="min-w-0">/);
+  });
+});
+
+describe("the call chips and a range's base read at 4.5:1 (research pass 33, item 6)", () => {
+  const walk = (dir: string): string[] =>
+    readdirSync(dir).flatMap((n) => {
+      const p = join(dir, n);
+      return statSync(p).isDirectory() ? walk(p) : /\.tsx$/.test(n) ? [p] : [];
+    });
+  it("never sets a call's words on its own colour at 15% (4.3:1), only at 10% (4.6:1)", () => {
+    const offenders = walk(join(process.cwd(), "app")).flatMap((f) =>
+      readFileSync(f, "utf8")
+        .split("\n")
+        .filter((l) => (/bg-pass\/15/.test(l) && /text-pass/.test(l)) || (/bg-caution\/15/.test(l) && /text-caution/.test(l)))
+        .map((l) => `${f}: ${l.trim()}`),
+    );
+    expect(offenders).toEqual([]);
+  });
+
+  it("draws a range's base on an opaque tint, so the grid's line colour never shows through", () => {
+    const opaque = /bg-\[color-mix\(in_oklab,var\(--color-brand\)_(?:5|10)%,var\(--color-surface\)\)\]/;
+    expect(readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-sections.tsx"), "utf8")).toMatch(opaque);
+    expect(readFileSync(join(process.cwd(), "app/share/[token]/share-view.tsx"), "utf8")).toMatch(opaque);
+    expect(readFileSync(join(process.cwd(), "app/landing-interactive.tsx"), "utf8")).toMatch(opaque);
   });
 });

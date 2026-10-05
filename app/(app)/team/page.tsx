@@ -203,7 +203,7 @@ export default async function TeamPage({
               <span
                 className={`rounded-full px-3 py-1 text-xs font-semibold ${
                   team.planActive
-                    ? "bg-pass/15 text-pass"
+                    ? "bg-pass/10 text-pass"
                     : "bg-faint text-muted"
                 }`}
               >

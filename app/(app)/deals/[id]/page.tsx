@@ -168,8 +168,8 @@ import { SubmarketCard } from "./submarket-card";
 import type { PlaygroundData } from "./sensitivity-playground";
 
 const VERDICT_PILL = {
-  pass: { label: "Go", cls: "bg-pass/15 text-pass" },
-  caution: { label: "Caution", cls: "bg-caution/15 text-caution" },
+  pass: { label: "Go", cls: "bg-pass/10 text-pass" },
+  caution: { label: "Caution", cls: "bg-caution/10 text-caution" },
   pass_on: { label: "No-go", cls: "bg-kill/15 text-kill" },
 } as const;
 

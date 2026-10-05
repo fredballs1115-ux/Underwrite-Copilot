@@ -248,7 +248,7 @@ export function ValuationsView({
                       ) : null}
                       {derived ? (
                         <span
-                          className="ml-1 rounded bg-caution/15 px-1 text-[10px] font-sans font-medium text-caution"
+                          className="ml-1 rounded bg-caution/10 px-1 text-[10px] font-sans font-medium text-caution"
                           title="Computed from a stated value and NOI — not stated on the page"
                         >
                           der

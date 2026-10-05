@@ -1892,7 +1892,7 @@ const VERDICT = {
     word: "Go",
     sub: "Worth deeper work",
     tint: "from-pass/10",
-    iconBg: "bg-pass/15 text-pass",
+    iconBg: "bg-pass/10 text-pass",
     wordCls: "text-pass",
     rail: "border-l-pass",
     Icon: IconCheck,
@@ -1901,7 +1901,7 @@ const VERDICT = {
     word: "Caution",
     sub: "Proceed only with named conditions",
     tint: "from-caution/10",
-    iconBg: "bg-caution/15 text-caution",
+    iconBg: "bg-caution/10 text-caution",
     wordCls: "text-caution",
     rail: "border-l-caution",
     Icon: IconAlert,
@@ -2298,6 +2298,9 @@ function RangeCard({ r: stored }: { r: ScreenRange }) {
   );
 }
 
+/** A screen range's base cell: the brand's tint on white, opaque. */
+export const BASE_CELL = "bg-[color-mix(in_oklab,var(--color-brand)_10%,var(--color-surface))]";
+
 function RangeCell({
   label,
   value,
@@ -2308,7 +2311,10 @@ function RangeCell({
   emphasized?: boolean;
 }) {
   return (
-    <div className={`px-3 py-2 ${emphasized ? "bg-brand/10" : "bg-surface"}`}>
+    // The base's tint is mixed with white rather than laid over the grid's
+    // line colour, which showed through a 10% tint and took the label to
+    // 3.7:1 (research pass 33).
+    <div className={`px-3 py-2 ${emphasized ? BASE_CELL : "bg-surface"}`}>
       <p className="text-[10px] uppercase tracking-wide text-muted">{label}</p>
       <p
         className={`mt-0.5 font-mono tabular-nums ${

@@ -124,12 +124,12 @@ const VERDICT_META: Record<
   VerdictCall,
   { label: string; cls: string; border: string; disc: string; dot: string }
 > = {
-  pass: { label: "Go", cls: "text-pass", border: "border-pass", disc: "bg-pass/15 text-pass", dot: "bg-pass" },
+  pass: { label: "Go", cls: "text-pass", border: "border-pass", disc: "bg-pass/10 text-pass", dot: "bg-pass" },
   caution: {
     label: "Caution",
     cls: "text-caution",
     border: "border-caution",
-    disc: "bg-caution/15 text-caution",
+    disc: "bg-caution/10 text-caution",
     dot: "bg-caution",
   },
   pass_on: { label: "No-go", cls: "text-kill", border: "border-kill", disc: "bg-kill/15 text-kill", dot: "bg-kill" },
@@ -557,7 +557,9 @@ export function ShareView({
                       <p className="text-[10px] uppercase tracking-wide text-muted">Low</p>
                       <p className="mt-0.5 text-sm tabular-nums">{r.low}</p>
                     </div>
-                    <div className="bg-brand/10 px-2 py-1.5">
+                    {/* Opaque, so the grid's line colour never shows through
+                        the tint (research pass 33). */}
+                    <div className="bg-[color-mix(in_oklab,var(--color-brand)_10%,var(--color-surface))] px-2 py-1.5">
                       <p className="text-[10px] uppercase tracking-wide text-muted">Base</p>
                       <p className="mt-0.5 text-sm font-semibold tabular-nums text-brand">{r.base}</p>
                     </div>

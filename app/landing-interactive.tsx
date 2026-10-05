@@ -138,7 +138,9 @@ function RangeRow({
         ].map(([k, v, e]) => (
           <div
             key={k as string}
-            className={`px-2.5 py-1.5 ${e ? "bg-brand/5" : "bg-surface"}`}
+            // Opaque, so the grid's line colour never shows through the
+            // base's tint (research pass 33).
+            className={`px-2.5 py-1.5 ${e ? "bg-[color-mix(in_oklab,var(--color-brand)_5%,var(--color-surface))]" : "bg-surface"}`}
           >
             <p className="text-[9px] uppercase tracking-wide text-muted">
               {k as string}

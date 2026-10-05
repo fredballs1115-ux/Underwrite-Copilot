@@ -305,7 +305,7 @@ export default async function DemoPage() {
               <h2 className="text-xl font-semibold tracking-tight">
                 The Maddox at Brewerytown
               </h2>
-              <span className="rounded-full bg-caution/15 px-2.5 py-1 text-[11px] font-medium text-caution">
+              <span className="rounded-full bg-caution/10 px-2.5 py-1 text-[11px] font-medium text-caution">
                 Caution
               </span>
               {/* The deal's kind, read from the sample's own extraction the way

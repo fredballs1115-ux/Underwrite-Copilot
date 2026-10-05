@@ -5624,7 +5624,7 @@ describe("DealStickyBar — the deal kept in view past its header", () => {
     React.createElement(DealStickyBar, {
       dealId: "d1",
       name: "The Maddox",
-      chip: { label: "Go", cls: "bg-pass/15 text-pass" },
+      chip: { label: "Go", cls: "bg-pass/10 text-pass" },
       // The header's own labels, word for word: the price with what it buys.
       figures: [
         { label: "Price · 49% share", value: "$23,765,000" },
