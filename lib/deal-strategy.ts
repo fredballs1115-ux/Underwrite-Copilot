@@ -386,11 +386,15 @@ export function buildsSomething(extraction: ExtractionResult | null | undefined,
 // this module, and `planSummary` must know a forward purchase to say the
 // developer funds the works.
 
-/** The words that name a purchase at completion. A build-to-suit counts
- *  only beside a price for the whole asset (`isForwardPurchase`): a site
- *  sold for a build-to-suit is the buyer's own development. */
+/** The words that name a purchase at completion. A lender's forward
+ *  commitment or take-out commitment is a loan's, never a purchase: a
+ *  development financed with one had been read as bought at delivery, its
+ *  plan's cost struck at the land price (the audit of 2026-10-05). Every
+ *  path holds only beside a price that is not the land's
+ *  (`isForwardPurchase`): a site sold for a build-to-suit, or priced at
+ *  its land, is the buyer's own development. */
 const FORWARD_WORDS =
-  /\bforward[- ](?:purchase|sale|commitment|takeout|take[- ]out)\b|\bpurchased?\s+(?:at|upon|on)\s+(?:the\s+)?(?:completion|delivery|substantial completion|certificate of occupancy|issuance of (?:the\s+)?(?:certificate of occupancy|c\.?\s?o\.?))\b|\btake[- ]?out (?:commitment|purchase|buyer)\b/i;
+  /\bforward[- ](?:purchase|sale)\b|\bpurchased?\s+(?:at|upon|on)\s+(?:the\s+)?(?:completion|delivery|substantial completion|certificate of occupancy|issuance of (?:the\s+)?(?:certificate of occupancy|c\.?\s?o\.?))\b|\btake[- ]?out (?:purchase|buyer)\b/i;
 /** A single tenant's build-to-suit, by its own words. */
 export const BUILD_TO_SUIT_WORDS = /\bbuild[- ]to[- ]suit\b|\bbts\b/i;
 
@@ -423,10 +427,13 @@ function forwardOfKind(ex: ExtractionResult | null | undefined, kind: StrategyKi
   if (!ex) return false;
   if (kind !== "development" && kind !== "conversion") return false;
   const words = forwardWordsOf(ex);
-  if (FORWARD_WORDS.test(words)) return true;
-  if (!BUILD_TO_SUIT_WORDS.test(words)) return false;
+  const forward = FORWARD_WORDS.test(words);
+  if (!forward && !BUILD_TO_SUIT_WORDS.test(words)) return false;
+  // A price that is the land's is the buyer's own development whatever the
+  // words say; a build-to-suit needs a price for the whole asset.
   const priceRow = findPriceMetric(ex.metrics ?? [], kind, screenYearOf(ex));
-  return priceRow != null && !priceRowIsLand(priceRow);
+  if (priceRowIsLand(priceRow)) return false;
+  return forward || priceRow != null;
 }
 
 /** The NOI a forward purchase's memorandum states at delivery: the

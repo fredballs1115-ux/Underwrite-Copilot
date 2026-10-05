@@ -8,6 +8,7 @@ import {
   classifyNoi,
   findPriceMetric,
   inferStrategy,
+  isForwardPurchase,
   isOutdoorStorageYard,
   isPlanDeal,
   buildsSomething,
@@ -741,6 +742,59 @@ describe("planSummary / plausibilityNote — a forward purchase", () => {
       ["Yield on cost", "6.00%"],
     ]);
     expect(planFacts(planSummary(btr, inferStrategy(btr))!)[2]).toEqual(["Budget", "the developer's"]);
+  });
+
+  // The audit of 2026-10-05: a lender's forward or take-out commitment was
+  // read as a purchase at delivery, so a LIHTC development financed with one
+  // struck its plan's cost at the land price — a 57.8% yield on cost where
+  // the stated total makes it 4.2%.
+  it("reads a lender's forward or take-out commitment as a loan, and never strikes a plan's cost at a land price", () => {
+    const lihtc = ex(
+      [
+        metric("Land cost", "$4,500,000"),
+        metric("Total development cost", "$62,000,000"),
+        metric("NOI (stabilized, pro forma)", "$2,600,000"),
+        metric("Units (proposed)", "180"),
+      ],
+      {
+        assetClass: "Affordable Housing (LIHTC)",
+        strategy: { ...dev, summary: "New construction of 180 LIHTC units, financed with tax-exempt bonds and a Freddie Mac forward commitment.", timeline: "24-month construction" },
+      },
+    );
+    const lifeCo = ex(
+      [
+        metric("Land price", "$6,000,000"),
+        metric("Total development cost", "$48,000,000"),
+        metric("NOI (stabilized, pro forma)", "$3,100,000"),
+        metric("Units (proposed)", "240"),
+      ],
+      {
+        assetClass: "Multifamily",
+        strategy: { ...dev, summary: "Entitled site for a 240-unit ground-up development; the sponsor has a construction loan with a take-out commitment from a life company." },
+      },
+    );
+    for (const [what, deal, total] of [
+      ["a forward commitment", lihtc, 62_000_000],
+      ["a take-out commitment", lifeCo, 48_000_000],
+    ] as const) {
+      const s = inferStrategy(deal);
+      expect(isForwardPurchase(deal, s), what).toBe(false);
+      expect(buildsSomething(deal, s.kind), what).toBe(true);
+      const plan = planSummary(deal, s)!;
+      expect(plan.forward, what).toBeUndefined();
+      expect(plan.totalCost, what).toBe(total);
+      expect(plan.yieldOnCost!, what).toBeLessThan(0.07);
+    }
+    expect(planSummary(lihtc, inferStrategy(lihtc))!.yieldOnCost).toBeCloseTo(2.6 / 62, 6);
+    // A purchase at completion priced at the land is the buyer's own build.
+    const atLand = ex([metric("Land cost", "$6,000,000"), metric("Total development cost", "$48,000,000")], {
+      assetClass: "industrial",
+      strategy: { ...dev, summary: "Forward purchase of a distribution center at completion" },
+    });
+    expect(isForwardPurchase(atLand, inferStrategy(atLand))).toBe(false);
+    // The words of a purchase still read one beside the whole asset's price.
+    expect(isForwardPurchase(bts, inferStrategy(bts))).toBe(true);
+    expect(isForwardPurchase(btr, inferStrategy(btr))).toBe(true);
   });
 
   it("hands the challenger the purchase's plan text in place of the construction paragraph", () => {
