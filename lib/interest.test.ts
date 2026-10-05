@@ -1929,7 +1929,7 @@ describe("a share of the general partner's interest is a share of a share, never
     expect(d.meta.priceLabel).toBeNull();
     // The building's stated income is not wrong: the price is not the building's.
     expect(d.sources.inPlaceRentAnnual?.note).toBe(
-      "The OM's NOI (in-place) of $4,400,000 is 138% of price — the whole building's income against the price of a share of the general partner's interest, which is not the building's price, so it does not anchor year 1 here. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI",
+      "The OM's NOI (in-place) of $4,400,000 is 138% of price — the whole building's income against the price of a share of the general partner's interest, which is not the building's price, so it does not anchor year 1 here. No going-in cap in the OM either — assumed 6% going-in; enter the year-1 NOI you would run",
     );
     expect(d.meta.interest?.basisWithheld).toEqual({
       word: "share",

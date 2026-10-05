@@ -57,7 +57,9 @@ describe("the deal page's sensitivity sliders (research pass 33, item 10)", () =
     };
     const html = renderToStaticMarkup(React.createElement(SensitivityPlayground, { data }));
     const status = /<p role="status" class="sr-only">([^<]*)<\/p>/.exec(html)?.[1] ?? "";
-    expect(status).toBe("No levered IRR solves at these levers");
+    // With its reason (lib/underwrite/no-irr): no rent, so the sale repays
+    // nothing of the loan.
+    expect(status).toBe("No levered IRR solves at these levers: the sale does not repay the loan");
     expect(status).not.toContain("—");
   });
 
