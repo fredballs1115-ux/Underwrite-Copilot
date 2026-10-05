@@ -10,6 +10,12 @@
  */
 import { MAX_OM_PAGES } from "@/lib/pdf";
 
+/** The most memoranda one batch uploads at once — a call-for-offers day's
+ *  handful, each a deal with a screen queued behind it. The most screens
+ *  the app itself ever queues for one person in one go, so the worker's
+ *  queue reads it as each account's fair share (lib/worker-queue). */
+export const BATCH_MAX_FILES = 4;
+
 /** The create action's answer, as the batch reads it (actions.ts
  *  `CreateDealResult`). */
 export type BatchResult =

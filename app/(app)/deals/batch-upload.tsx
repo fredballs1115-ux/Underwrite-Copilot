@@ -13,11 +13,11 @@ import { nameFromFile } from "@/lib/deal-name";
 import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
 // The run itself, pure (lib/batch-run): each answer's status, what the
 // button sends again, and the plan's limit said once with a link.
-import { capNotice, runBatch, runLabel, type BatchStatus } from "@/lib/batch-run";
+import { BATCH_MAX_FILES, capNotice, runBatch, runLabel, type BatchStatus } from "@/lib/batch-run";
 import type { BuyBoxCoverage } from "@/lib/criteria";
 import { checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 
-const MAX_FILES = 4;
+const MAX_FILES = BATCH_MAX_FILES;
 const MAX_BYTES = 32 * 1024 * 1024;
 
 interface Item {
