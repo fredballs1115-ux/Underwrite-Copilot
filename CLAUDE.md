@@ -56,7 +56,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   direction (`gapScale`) — never across units, never inferring a sign from
   the words. A value's own sign is read before the two are subtracted
   ("-1.0%", "−1.0%", "–1.0%" and "(1.0%)" are negative, so 3.0% against
-  -1.0% is 400 bps), and a dash set apart by a space is no figure. The deal
+  -1.0% is 400 bps — brackets are a minus only where the bracketed figure
+  is the value, `VALUE_LEAD`, so "Stabilized vacancy (5.0%)" is 5.0%), and
+  a dash set apart by a space is no figure. The deal
   page's Reconciliation table and the report's reconciliation page both
   draw from it.
 - A portfolio — one OM, several properties (#411): the extraction lists
@@ -155,7 +157,13 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   "Equity's whole, the share grossed up" and its figure "$40.0M, the
   entity's $56.5M loan on top"); the model neither adds the loan to
   the price nor carries it (that arithmetic is the owner's call, in
-  WILL_TODO). **A leasehold is a wasting
+  WILL_TODO). And no building figure is struck on that whole (the audit of
+  2026-10-04): `interestOf` carries `entityLoan`, `buildingPriceOf` and
+  `subjectBasis` answer null beside it, so no basis tag, comps tick,
+  compare-table cap, implied going-in cap, pooled memory or per-key, -bed
+  or -pad price divides it, and `planSummary` shows it as `equityWhole`
+  with no total cost or yield on cost, saying why (`costWithheld`).
+  **A leasehold is a wasting
   asset**, said, with the ground lease as stated and a link to the ground
   lease calculator. **A blank is null.** An extraction saved before the
   interest was read is fee simple, and a plain fee simple says nothing.
@@ -551,7 +559,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `datedEnd`; a right already open, or opened, rolls in year one by one
   rule, `rollYearOf` in lib/tools/rollover, in the list, the shares and
   the headline alike, and so does an open break pasted into /tools'
-  rollover card); **a shadow anchor is not bought** (named apart, never in the
+  rollover card, where a 0 in a calendar-year roll's break column is no
+  break); **a shadow anchor is not bought** (named apart, never in the
   roll); **co-tenancy rides on the anchor** (the rent under co-tenancy
   clauses as a share, and a tenant that may go dark named); **the list is
   not the building** (every figure is said as the listed tenants', with
@@ -751,7 +760,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   one, where that makes a range at all; a second no larger than the first,
   or more than twice it, is no range: "$42,000,000 – $500,000 credit",
   "– 5.25% cap"), `parsePrice` is the range's top or else `parseMoney`, and
-  `priceRangeShort` writes "$40–42M" for a slot that shows one price.
+  `priceRangeShort` writes "$40–42M" for a slot that shows one price. A
+  market check's typical range (lib/typical-range) carries a scale by the
+  same rule, refusing a second end more than twice the first where the
+  two are on different scales, so "$950–$1.2M" is no range while "3–8%"
+  still is (`looksLikeRange`, which lib/gap-detail reads too).
   **Every reader of an asking price goes through `parsePrice`**:
   `askingPriceOf`, the plan (`planSummary`) and its capital budget (a cost
   read as a price is), the plausibility check, the model
@@ -1154,7 +1167,11 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   the tracker's own predicate), and the challenger's class traps gain lists
   for a cannabis tenant, a special-purpose conversion, a lab and cold
   storage — questions only, after the class traps, so a deal that triggers
-  none is asked exactly as before. **A deal has one class**: every reader goes
+  none is asked exactly as before. The cannabis list keys on cannabis,
+  marijuana, THC, hemp or adult-use, never "dispensary" or "cultivation"
+  alone; and `groundLeaseEquipment` strikes denials ("prohibits billboards
+  and cell towers") and gear on a building ("rooftop antenna licenses",
+  rooftop solar panels) before it reads a tower, a sign or an array. **A deal has one class**: every reader goes
   through `shownAssetClass` (the analyst's class where they filed one, the
   deck's where they left Auto) — the market check, the deal page's
   since-this-screen, demand and portfolio cards and the shared screen had
@@ -2140,7 +2157,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   survey off the same cached read — shown with its date whatever its age,
   flagged when the table is stale, never a seed — and `benchmark30` picks
   it over the research layer's checked-in snapshot with the SOURCE saying
-  which ("FRED · MORTGAGE30US" / "FRED PMMS, the checked-in snapshot"),
+  which ("FRED · MORTGAGE30US" / "Freddie Mac PMMS, the checked-in
+  snapshot" — the snapshot named by the publisher its row's source cites,
+  or "publisher not recorded", never FRED),
   so the deal page's research panel, the compare table and the demo read
   one table through one read; each had queried the row for itself, and
   the demo read the August snapshot on the one page a visitor sees
@@ -2244,7 +2263,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   becomes the metro's — unless the file says the range is for a narrower
   stock than the class (`slice`: Chicago's Class B/C small buildings,
   Miami's and Boston's core), which is named and shown but never held
-  against the exit. `modelVsMarketFor` reads it, so the page, the
+  against the exit — nor is a figure the sector leaderboard would not
+  rank for its period, undated or over a year old by its own period
+  (`periodReason`, the leaderboard's own predicate: "beside an undated
+  figure", "beside a figure over a year old"). `modelVsMarketFor` reads it, so the page, the
   report and the workbook agree; `modelVsMarket` takes it as `tracker`,
   and a read without one is exactly as before. **Where the documents
   state no cap**, the exit is set against the going-in cap their NOI over
@@ -2488,8 +2510,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   cap starts paying afterwards. It was covering the lender's loss severity
   the whole time. A floor set above both the strike and the breach point
   is its own headline ("The floor is on the wrong side of the covenant",
-  with the index at which the loan fails), and a loan with no cap reads
-  "No cap: the covenant is the only limit". **A cap and a floor are not a collar and do not act on
+  with the index at which the loan fails) — and with the strike over the
+  breach too, the note says the loan fails at every index — and a loan
+  with no cap reads "No cap: the covenant is the only limit". **A cap and a floor are not a collar and do not act on
   the same thing**: a floor is a term of the NOTE and lifts what is owed, a
   cap is a separate instrument on the INDEX and reimburses the excess, so
   the rate is `max(index, floor) + spread − max(0, index − strike)` and
@@ -4936,7 +4959,9 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     the year is out; an abatement, read early, is gone from the year's
     first day.
   - **A price label's year is the memorandum's, never the clock's**: the
-    extraction carries `screenedOn`, the day the screen read it (the
+    extraction carries `screenedOn`, the day the screen read it, in
+    Honolulu (`SCREEN_STAMP_TIME_ZONE`, the westernmost US zone, so the
+    stamp's year never runs ahead of a US analyst's calendar; the
     pipeline and the manual-deal path stamp it, `screenStamp`), and
     `screenYearOf(ex)` is the year every price reader judges a label's
     year against (`priceExclude(year)`, built per year, never at load;
@@ -4944,9 +4969,24 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     compiler finds one that forgets it). "Asking price (2026)" on a 2026
     screen stays the ask after January 1; an extraction stored before the
     stamp reads as a 2026 screen (`UNSTAMPED_SCREEN_YEAR`), and a
-    re-screen of the same bytes keeps its first stamp (`screenStampFor`,
-    against the extraction's `omFingerprint`, lib/om-fingerprint's), so
-    only a reissued deck is a new reading.
+    re-screen of the same bytes keeps its first stamp, or its lack of one
+    (`screenStampFor`, against the extraction's `omFingerprint`,
+    lib/om-fingerprint's), so only a reissued deck is a new reading. An
+    extraction stored before the fingerprint counts as this deck's unless
+    it was typed by hand (`typedByHand`) or the deck was replaced since
+    its last screen (`memorandumReplacedSince`, Ask's thread markers); a
+    kept reading is stored with no stamp, never an invented day.
+  - **A signed-in page's "today" is the reader's own day**
+    (`readerToday` in lib/reader-day): `TimeZoneCookie` in the signed-in
+    layout writes the browser's zone to the `uc_tz` cookie (validated
+    against `Intl.supportedValuesOf`, else America/New_York) and asks for
+    the page again only where the day moves; the pipeline, the deal page
+    (offers due, tasks, the Opportunity Zone line) and the rent roll read
+    it once per request and hand it down. A feed's or a job's bare day
+    says "UTC" (`dayOf`, lib/utc-day). The digest and the worker keep the
+    UTC day; a deal's own event timestamps still print the UTC day, for
+    the next batch. Every cookie the code writes is on the privacy page,
+    and lib/own-cookies.test.ts fails on one that is not.
   - **A year in the page's own words is named, never "this year"**: the
     intel job searches the run's year, the research files say "in 2026",
     and a test keeps "this year" and "next year" out of data/research.
@@ -5007,9 +5047,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     windows written today end June 30, 2027 (Los Angeles's 3% and Takoma
     Park's 3.0%) and July 31, 2027 (California's 8.7% in the Los Angeles
     area), and Virginia's amended section takes effect July 1, 2027.
-    Washington's "in 2027", Seattle's "for 2026" and Montgomery County's
-    fiscal-year label state a year alone, so they guard nothing until both
-    ends are written.
+    Washington's HB 1217 rule and Seattle's note state the 2026 and 2027
+    caps with both ends of each window, and Montgomery County's note
+    Takoma Park's 3% for July 1, 2026 to June 30, 2027, as the runner
+    read the pages (zori run 37240367657): the 2026 window passes as
+    history, the 2027 one reads as ended from Jan 1, 2028, and Takoma's
+    from Jul 1, 2027 ("This states its figure from July 1, 2026 to June
+    30, 2027, a window that ended …"). /market prints each covered
+    market's note as written with its research's read day beside it
+    (`MarketNote`, "· research read Aug 25, 2026"), stale by the research
+    rule; a note refreshed later than that day is dated the older day,
+    the side that goes stale sooner.
 - What a link or an account can make the server do (#491, research pass
   22's security review, 2026-10-01; every finding reproduced first):
   - **A public picture is drawn once, at its page's frame**: the shared
@@ -5026,7 +5074,10 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     on each request, through the service role, that they can still read
     the deal (its creator, or a member of its team) — a token signed
     before carries none and keeps working until it expires; the resized
-    picture is kept per stored path and size (lib/email-picture-copy).
+    picture is kept per stored path and size (lib/email-picture-copy),
+    and looked up only under this deal's own photo path
+    (`dealPhotoPathOf`) — a row pointed at another deal's path draws its
+    own cover.
   - **The health routes' costly half is the operator's**: /api/news/health's
     light read stays public (live-verify reads it) and only `refresh=1`
     refetches for an operator; /api/imagery/health's billed Static Maps call
