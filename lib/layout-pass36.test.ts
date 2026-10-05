@@ -21,6 +21,8 @@ import { StageSelect } from "@/app/(app)/deals/[id]/stage-select";
 import { OffersDueControl } from "@/app/(app)/deals/offers-due";
 import { ShareView } from "@/app/share/[token]/share-view";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
+import { ListingTeam } from "@/app/(app)/deals/[id]/listing-team";
+import { listingTeamOf, offersDueOf } from "./offering";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -308,6 +310,58 @@ describe("the compare page decides cards or table by its own column (research pa
     // The scroll's own shadows (globals.css), the site's affordance for a
     // wide table: one at whichever edge has more, none with nothing to scroll.
     expect(src("app/globals.css")).toMatch(/\.scroll-shadows-x \{[\s\S]*?background-attachment: local, local, scroll, scroll;/);
+  });
+});
+
+describe("the offering card's broker links and call for offers (research pass 36, F11 and F16)", () => {
+  const card = (due: string) =>
+    renderToStaticMarkup(
+      h(
+        ListingTeam,
+        (() => {
+          const ex = {
+            dealName: "The Maddox",
+            assetClass: "multifamily",
+            totalPages: 60,
+            metrics: [{ label: "Offers due", value: due, page: "p. 2" }],
+            listingTeam: [
+              { name: "Jane Q. Doe", title: "Executive Vice President", firm: "CBRE", phone: "(215) 555-0100", email: "jane.doe@cbre.com", page: "p. 2" },
+              { name: "John Roe", title: "Senior Associate", firm: "CBRE", phone: "+44 20 7946 0958", email: "", page: "p. 2" },
+            ],
+          } as never;
+          return { team: listingTeamOf(ex), offersDue: offersDueOf(ex) };
+        })(),
+      ),
+    );
+
+  it("gives the phone and the email room for a finger: 10px apart, 32px tall on a touch screen", () => {
+    // 87x16 and 107x16, 2px apart where the email wrapped under the phone,
+    // failed WCAG 2.5.8 at 820 and 320: 16px tall and 10px apart, their 24px
+    // circles' centres are 26px apart whatever their widths.
+    const html = card("Thursday, October 15, 2026 at 5:00 PM ET");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(html).toMatch(/<span class="mt-0\.5 flex flex-wrap gap-x-3 gap-y-2\.5 text-xs"><a href="tel:\+12155550100"/);
+    for (const link of [/<a href="tel:\+12155550100" class="([^"]*)"/, /<a href="mailto:jane\.doe@cbre\.com" class="([^"]*)"/]) {
+      expect(link.exec(html)?.[1].split(" ")).toContain("pointer-coarse:py-2");
+    }
+  });
+
+  it("keeps a time and its zone on one line, the words as written", () => {
+    // "… at 5:00 PM / ET": the zone had stood alone on a line at 390.
+    const kept = (due: string) => /<span class="whitespace-nowrap">([^<]*)<\/span>/.exec(card(due))?.[1] ?? null;
+    expect(kept("Thursday, October 15, 2026 at 5:00 PM ET")).toBe("5:00 PM ET");
+    expect(kept("October 15, 2026 by 3 p.m. Eastern Time")).toBe("3 p.m. Eastern Time");
+    expect(kept("10/15/2026, 17:00 CET")).toBe("17:00 CET");
+    expect(kept("October 15, 2026 at 12:00 noon (EST)")).toBe("12:00 noon (EST)");
+    expect(kept("5PM ET on Thursday, October 15, 2026")).toBe("5PM ET");
+    // A day's name after the time is not a zone, and a date alone is no time.
+    expect(kept("October 15, 2026 at 5:00 PM Thursday")).toBe("5:00 PM");
+    expect(kept("October 15, 2026")).toBeNull();
+    expect(kept("Offers reviewed as received")).toBeNull();
+    // The words are the memorandum's, untouched.
+    const html = card("Thursday, October 15, 2026 at 5:00 PM ET");
+    expect(visibleText(html)).toContain("Thursday, October 15, 2026 at 5:00 PM ET");
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 });
 

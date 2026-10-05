@@ -1,4 +1,28 @@
+import type { ReactNode } from "react";
 import { initialsOf, type ListingBroker, type OffersDueRead } from "@/lib/offering";
+
+/** A clock time and the zone written after it — "5:00 PM ET", "3 p.m.
+ *  Eastern Time", "17:00 CET", "12:00 noon (EST)" — read only where the
+ *  words carry a colon, an a.m. / p.m. or a noon, so a date's figures are
+ *  never one, and a zone only as a whole word ("5:00 PM Thursday" keeps
+ *  its day apart). */
+const TIME_AND_ZONE =
+  /\b(?:\d{1,2}(?::\d{2})?\s?(?:[AaPp]\.?\s?[Mm]\b\.?|[Nn]oon\b)|\d{1,2}:\d{2}\b)(?:\s+\(?(?:[A-Z]{1,5}|(?:Eastern|Central|Mountain|Pacific)(?:\s+(?:Standard|Daylight))?(?:\s+Time)?)\b\)?)?/;
+
+/** The call for offers as written, its time and zone kept on one line: "at
+ *  5:00 PM / ET" had left the zone alone on a line of its own at 390
+ *  (research pass 36). The words are the memorandum's, untouched. */
+function asWritten(stated: string): ReactNode {
+  const m = TIME_AND_ZONE.exec(stated);
+  if (!m) return stated;
+  return (
+    <>
+      {stated.slice(0, m.index)}
+      <span className="whitespace-nowrap">{m[0]}</span>
+      {stated.slice(m.index + m[0].length)}
+    </>
+  );
+}
 
 /**
  * Who is selling it and when offers are due (#467) — the pure card for
@@ -27,7 +51,7 @@ export function ListingTeam({ team, offersDue }: { team: ListingBroker[]; offers
       {offersDue && (
         <p className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm" data-qa="offers-due-stated">
           <span className="text-muted">{offersDue.asReceived ? "Offers:" : "Offers due:"}</span>{" "}
-          <span className="font-medium">{offersDue.stated}</span>
+          <span className="font-medium">{asWritten(offersDue.stated)}</span>
         </p>
       )}
 
@@ -43,18 +67,23 @@ export function ListingTeam({ team, offersDue }: { team: ListingBroker[]; offers
                 {(b.title || b.firm) && (
                   <span className="block text-xs leading-snug text-muted">{[b.title, b.firm].filter(Boolean).join(", ")}</span>
                 )}
+                {/* What the card is for: a tap to call or write. 2px apart,
+                    16px tall, the two failed WCAG 2.5.8 wherever the email
+                    wrapped under the phone (820, 320 — research pass 36):
+                    10px apart now, so their 24px circles never meet, and
+                    32px tall to a finger. */}
                 {(b.phone || b.email) && (
-                  <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs">
+                  <span className="mt-0.5 flex flex-wrap gap-x-3 gap-y-2.5 text-xs">
                     {b.phone &&
                       (b.tel ? (
-                        <a href={b.tel} className="font-mono tabular-nums text-brand hover:underline">
+                        <a href={b.tel} className="font-mono tabular-nums text-brand hover:underline pointer-coarse:py-2">
                           {b.phone}
                         </a>
                       ) : (
                         <span className="font-mono tabular-nums">{b.phone}</span>
                       ))}
                     {b.email && (
-                      <a href={`mailto:${b.email}`} className="break-all text-brand hover:underline">
+                      <a href={`mailto:${b.email}`} className="break-all text-brand hover:underline pointer-coarse:py-2">
                         {b.email}
                       </a>
                     )}
