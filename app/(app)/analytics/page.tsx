@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import {
+  analyticsScope,
   deriveAnalytics,
   fmtUsdCompact,
   middleRead,
@@ -17,6 +18,7 @@ import { STAGES, STAGE_LABEL, normalizeStage } from "@/lib/stages";
 import { isPlanDeal } from "@/lib/deal-strategy";
 import { pctText } from "@/lib/plan-facts";
 import { DotTimeline, VerdictMix, StageFunnel } from "./charts";
+import { readAllResult } from "@/lib/read-all";
 
 export const metadata: Metadata = { title: "Analytics" };
 
@@ -35,18 +37,32 @@ export default async function AnalyticsPage() {
   if (!user) redirect("/login?next=/analytics");
 
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase
-    .from("deals")
-    // The first signal too: the deal's kind is read with it, as on its page.
-    .select("id, name, asset_class, created_at, is_sample, stage, verdict, extraction, first_signal")
-    .not("extraction", "is", null)
-    .order("created_at", { ascending: true })
-    .limit(300);
-  if (error) {
-    throw new Error(`Couldn't load your portfolio: ${error.message}`);
+  // Every screened deal the reader can see — their own and their team's, as
+  // row-level security hands them over — newest first, a page at a time
+  // (lib/read-all). The read had been the OLDEST 300: past them every newer
+  // screen, the ones a reader looks for, was missing from every figure, and
+  // nothing said so (research pass 42).
+  const { data, error } = await readAllResult<AnalyticsRow & { user_id?: string | null }>((from, to) =>
+    supabase
+      .from("deals")
+      // The first signal too: the deal's kind is read with it, as on its page.
+      .select("id, name, asset_class, created_at, is_sample, stage, verdict, user_id, extraction, first_signal")
+      .not("extraction", "is", null)
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(from, to),
+  );
+  if (error || !data) {
+    throw new Error(`Couldn't load your portfolio: ${(error as { message?: string } | null)?.message ?? "the read failed"}`);
   }
 
-  const deals = deriveAnalytics((data ?? []) as AnalyticsRow[]);
+  const deals = deriveAnalytics(data);
+  // Whose screens the figures are, as the read finds them: the page says
+  // the team's where any is among them, never "an OM you ran" over a
+  // teammate's deal. Counted as deriveAnalytics counts: screened, not the
+  // sample.
+  const pooled = data.filter((r) => !r.is_sample && r.extraction != null);
+  const own = pooled.filter((r) => r.user_id === user.id).length;
   const capPoints = deals
     .filter((d) => d.capPct != null)
     .map((d) => ({ at: d.at, value: d.capPct!, name: d.name }));
@@ -115,9 +131,8 @@ export default async function AnalyticsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight">Analytics</h1>
-        <p className="mt-1 text-sm text-muted">
-          What your own screens add up to — every figure below was extracted
-          from an OM you ran, never restated.
+        <p className="mt-1 text-sm text-muted" data-qa="analytics-scope">
+          {analyticsScope(own, pooled.length - own)}
         </p>
       </div>
 

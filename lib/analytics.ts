@@ -64,6 +64,19 @@ export interface AnalyticsRow {
   first_signal?: unknown;
 }
 
+/**
+ * What the analytics page's figures are of, as its read finds them (research
+ * pass 42, H3): every screened deal the reader can see, which row-level
+ * security makes their own and their team's. Said as the reader's own only
+ * where no teammate's screen is among them — never "an OM you ran" over a
+ * teammate's deal. Whose deals the page pools is the owner's call; these
+ * words follow the read.
+ */
+export function analyticsScope(own: number, team: number): string {
+  if (team <= 0) return "What your own screens add up to — every figure below was extracted from an OM you screened, never restated.";
+  return `What the screens in your pipeline add up to — ${own} of yours and ${team} of your team's — every figure below was extracted from a screened OM, never restated.`;
+}
+
 export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
   const out: AnalyticsDeal[] = [];
   for (const r of rows) {
