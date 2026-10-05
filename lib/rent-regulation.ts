@@ -122,6 +122,11 @@ export function allowanceOn(ruleId: string, today: string): AllowanceRead | null
 
 type MetricRow = { label: string; value: string; page?: string };
 
+/** A row with a label and a value to read — analysis output can carry nulls
+ *  and odd shapes, which every other reader drops the same way. */
+const isRow = (m: unknown): m is MetricRow =>
+  !!m && typeof m === "object" && typeof (m as MetricRow).label === "string" && typeof (m as MetricRow).value === "string";
+
 const rowOf = (metrics: readonly MetricRow[], re: RegExp, not?: RegExp) =>
   metrics.find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
 
@@ -140,9 +145,19 @@ export const PREFERENTIAL_RENT_ROW = /^\s*(?:average\s+)?preferential\s+rents?\b
 
 const NOT_A_COUNT = /%|percent|\bshare\b|\$|expir|\bdate\b/i;
 
+/** A regime row whose words state none — "None", "No rent control", "N/A",
+ *  "Not subject to rent control", "Exempt", "Market rate", a dash — names no
+ *  regime: a park memorandum's "Rent control: None" (the row lib/manufactured-
+ *  housing reads as not regulated) is a stated none, never the memorandum's
+ *  claim of a regime. Read only from the start of the words, so "Rent
+ *  stabilization (12 units exempt)" still names one. */
+const STATES_NONE =
+  /^\s*(?:none|no|n\/?a|nil|unknown|tbd|[-–—]|exempt|unregulated|free[- ]market|market[- ]rate|not\s+(?:applicable|stated|provided|available|disclosed|subject|regulated|covered|rent[- ](?:controlled|stabili[sz]ed|regulated)))(?![\w-])/i;
+
 /** The regulation's rows, in the order a key-terms block leads with them
  *  after the unit count — each only where the memorandum states it. */
-export function regulationTermRows<M extends MetricRow>(metrics: ReadonlyArray<M>): M[] {
+export function regulationTermRows<M extends MetricRow>(rows: ReadonlyArray<M>): M[] {
+  const metrics = rows.filter((m): m is M => isRow(m));
   return [
     rowOf(metrics, REGIME_ROW),
     rowOf(metrics, UNITS_ROW, NOT_A_COUNT),
@@ -263,12 +278,13 @@ export function readRegulation(
   today: string,
 ): RegulationRead | null {
   if (!ex) return null;
-  const metrics = (ex.metrics ?? []) as MetricRow[];
+  const metrics = (Array.isArray(ex.metrics) ? (ex.metrics as unknown[]) : []).filter(isRow);
   const statedRow = rowOf(metrics, REGIME_ROW);
   const unitsRow = rowOf(metrics, UNITS_ROW, NOT_A_COUNT);
   const legalRow = rowOf(metrics, LEGAL_RENT_ROW);
   const preferentialRow = rowOf(metrics, PREFERENTIAL_RENT_ROW);
-  const stated = statedRow?.value.trim() || null;
+  const statedWords = statedRow?.value.trim() ?? "";
+  const stated = statedWords && !STATES_NONE.test(statedWords) ? statedWords : null;
   const regulatedUnits = unitsRow ? parseCount(unitsRow.value) : null;
   const totalUnits = unitCountFromMetrics(metrics);
   const memoSays = stated != null || regulatedUnits != null || legalRow != null || preferentialRow != null;

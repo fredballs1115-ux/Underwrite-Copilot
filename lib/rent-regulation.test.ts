@@ -3,8 +3,12 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import rulesFile from "@/data/research/regulatory_rules.json";
 import {
   ALLOWANCES,
+  LEGAL_RENT_ROW,
   NO_REGIME,
+  PREFERENTIAL_RENT_ROW,
+  REGIME_ROW,
   REGIMES,
+  UNITS_ROW,
   allowanceOn,
   allowanceSentence,
   readRegulation,
@@ -19,6 +23,7 @@ import {
 import { readAffordable } from "./affordable";
 import { unitCountFromMetrics } from "./criteria";
 import { gluedWords } from "./render-lint";
+import { extractionInstruction } from "./anthropic/prompts";
 
 type Row = ExtractionResult["metrics"][number];
 const row = (label: string, value: string, page = ""): Row => ({ label, value, flagged: false, page, basis: "na" });
@@ -174,9 +179,82 @@ describe("the rules decide; a blank stays null", () => {
     expect(regulationModelLine(r, 3)).toBeNull();
   });
 
+  it("reads past rows analysis output can carry — a null, a row with no value, metrics that are no list — and never throws", () => {
+    const odd = {
+      ...walkUp([row("Rent-regulated units", "41")]),
+      metrics: [null, { label: "Rent regulation" }, row("Units", "48"), row("Year built", "1931"), row("Rent-regulated units", "41")],
+    } as unknown as ExtractionResult;
+    const r = readRegulation(odd, BROOKLYN, "2026-10-05")!;
+    expect(r.regulatedUnits).toBe(41);
+    expect(r.stated).toBeNull();
+    expect(regulationTermRows(odd.metrics).map((m) => m.label)).toEqual(["Rent-regulated units"]);
+    expect(readRegulation({ ...walkUp(), metrics: { not: "a list" } } as unknown as ExtractionResult, BROOKLYN, "2026-10-05")!.totalUnits).toBeNull();
+  });
+
   it("no address, no rule read", () => {
     expect(readRegulation(walkUp(), { address: null, classKey: "multifamily" }, "2026-10-05")).toBeNull();
     expect(readRegulation(null, BROOKLYN, "2026-10-05")).toBeNull();
+  });
+});
+
+describe("a stated none is no claim", () => {
+  const park = (control: string) =>
+    ex([row("Pads", "150"), row("Lot rent", "$430"), row("Rent control", control)], "manufactured_housing");
+  const lancaster = { address: { state: "PA", city: "Lancaster" }, classKey: "manufactured_housing" };
+
+  it("reads a park's 'Rent control: None' — the row lib/manufactured-housing reads as not regulated — as no regime", () => {
+    for (const none of ["None", "No rent control", "N/A", "Not subject to rent control", "Not rent-controlled", "Exempt", "Market rate", "—"]) {
+      expect(readRegulation(park(none), lancaster, "2026-10-05"), none).toBeNull();
+    }
+    // Words that name a regime are still the memorandum's claim, even with
+    // an exemption inside them.
+    const claim = readRegulation(park("Subject to the county's manufactured-home rent ordinance"), lancaster, "2026-10-05")!;
+    expect(claim.claimOnly).toBe(true);
+    expect(regulationTag(claim)).toBe("Rent-regulated (OM)");
+    const austin = { address: { state: "TX", city: "Austin" }, classKey: "multifamily" };
+    expect(readRegulation(ex([row("Units", "120"), row("Rent regulation", "Rent stabilization (12 units exempt)")]), austin, "2026-10-05")!.stated).toBe(
+      "Rent stabilization (12 units exempt)",
+    );
+  });
+
+  it("keeps the rules' read where the memorandum states none, and never says it names the regime as none", () => {
+    const none = readRegulation(walkUp([row("Rent regulation", "None")]), BROOKLYN, "2026-10-05")!;
+    expect(none.regimes[0].outcome).toBe("applies");
+    expect(none.stated).toBeNull();
+    expect(none.headline).not.toContain("It names the regime as None");
+    // A regulated count of 0 is no count (lib/criteria `parseCount`), so it
+    // is no claim either.
+    const austin = { address: { state: "TX", city: "Austin" }, classKey: "multifamily" };
+    expect(readRegulation(ex([row("Units", "120"), row("Rent-regulated units", "0")]), austin, "2026-10-05")).toBeNull();
+  });
+});
+
+describe("the prompt asks for what the reader reads", () => {
+  it("names each regulation row by a label the reader's own pattern takes", () => {
+    const prompt = extractionInstruction("multifamily");
+    const labels: [string, RegExp][] = [
+      ["Rent regulation", REGIME_ROW],
+      ["Rent-regulated units", UNITS_ROW],
+      ["Legal regulated rent", LEGAL_RENT_ROW],
+      ["Preferential rent", PREFERENTIAL_RENT_ROW],
+    ];
+    for (const [label, re] of labels) {
+      expect(prompt).toContain(`"${label}"`);
+      expect(re.test(label), label).toBe(true);
+    }
+    // An affordable program's restricted units stay its own: the prompt names
+    // them beside the regulated count, and the regulated count's pattern
+    // never takes them.
+    expect(prompt).toContain('never an affordable program\'s restricted units, which stay under "Restricted units"');
+    expect(UNITS_ROW.test("Restricted units")).toBe(false);
+    // Each label, as the extraction writes it, is read: the regime, the count
+    // as the share of the building's, and both rents as stated.
+    const r = readRegulation(
+      walkUp([row("Rent regulation", "Rent stabilization"), row("Rent-regulated units", "41"), row("Legal regulated rent", "$1,650"), row("Preferential rent", "$1,480")]),
+      BROOKLYN,
+      "2026-10-05",
+    )!;
+    expect([r.stated, r.regulatedUnits, r.legalRent, r.preferentialRent]).toEqual(["Rent stabilization", 41, "$1,650", "$1,480"]);
   });
 });
 
