@@ -3,6 +3,72 @@
   "entries": [
     {
       "date": "2026-10-05",
+      "title": "Rent rules that reach the building, in every screen",
+      "href": "/deals",
+      "blurb": "Where a building's rents are regulated, the screen now says so wherever the deal is read: the regime, the allowance in force today as its agency publishes it, and that the model grows every rent at one rate. Each allowance is filed only as its source printed it, and a memorandum that states the building is unregulated is read as saying so."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Forward purchases and build-to-suits, read at delivery",
+      "href": "/deals",
+      "blurb": "A forward purchase or a build-to-suit is read as a purchase at delivery rather than a development: the price is all-in at delivery, a stated construction budget is the developer's, the yield is struck at delivery, and the panel draws the delivery date against the outside date and what the deposit has at risk."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Mixed-use buildings, read as two incomes",
+      "href": "/deals",
+      "blurb": "Apartments over shops or offices are read as two incomes: the commercial share of the income and of the area where the memorandum states both halves, and a note that the model capitalises both at one exit cap."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Gas stations, car washes and other operating businesses",
+      "href": "/deals",
+      "blurb": "A memorandum that sells an operating business with its real estate, or the real estate leased to its operator, is read as the operator's: an EBITDA is never taken for rent, a coverage is read as stated, and the fuel contracts, licences and the ground under the tanks are asked about by name."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Condominium units bought in bulk",
+      "href": "/deals",
+      "blurb": "A block of units inside someone else's condominium is read as one: the share of the units the buyer would own, the dues, assessments and reserves as stated, and Fannie Mae's single-entity limit, said as the lender's rule from its Selling Guide with the version it was read from."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "When a screen stops, it says so",
+      "href": "/deals",
+      "blurb": "A screen whose process stopped now reads as stalled on every page instead of running for ever, a document the screen cannot read offers Replace OM instead of Try again, a result that could not be saved fails the run instead of standing on the old one, and an upload that is not an offering memorandum, or the same file as an earlier deal, is pointed out."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Every data source credited as its terms ask",
+      "href": "/market",
+      "blurb": "FRED's and the BLS's notices are in every footer, SOFR carries the New York Fed's notice, each rate tile names its publisher, research figures name their house in words a phone shows, Redfin and OpenStreetMap are credited where their data appears, and a public-web comp links only to a page the search actually returned."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Sharper card photos, and a scene of its own for every deal",
+      "href": "/deals",
+      "blurb": "Pipeline cards load an 800px copy of each photograph, about a third of the bytes, and a deal with no photograph gets a drawn scene of its own, with its own hour, light and street, under one of twelve skies. Market photos show the city on a phone instead of a tinted wash, and the shared screen's photo fills a phone's width."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "The market page, quicker",
+      "href": "/market",
+      "blurb": "The market page draws its figures before its slowest read answers, the tables it reads stay on the server instead of riding into your browser, and the homepage no longer repaints on every frame."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Flood insurance, as the law reaches it",
+      "href": "/deals",
+      "blurb": "A building in a Special Flood Hazard Area now reads as federal law reaches it: where the community takes part in the flood insurance program, insurance is required on a loan from a federally regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys, and the lender's own flood determination decides."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "A first hour without surprises",
+      "href": "/login",
+      "blurb": "The sign-in form keeps your email after a refusal, the sign-up notice names the address the link went to, an invite opens on Create account, the free plan says where comps and local rent rules run, the exports are marked Pro, and the FAQ says plainly that Anthropic's Claude reads a memorandum to screen it and may not train on it."
+    },
+    {
+      "date": "2026-10-05",
       "title": "Emails sent once, to the person who asked",
       "href": "/account",
       "blurb": "A screen's emails now go to whoever asked for the screen, and only while they can still see the deal, and a send retried after a timeout is never a second email. The Monday digest counts your open deals and the offers due in the week ahead, marks a call whose re-screen is running or did not finish, and carries a one-click unsubscribe."
