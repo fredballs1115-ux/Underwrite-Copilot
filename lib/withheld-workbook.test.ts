@@ -130,7 +130,7 @@ describe("the workbook's Deal Summary says withheld over its live formulas (rese
       expect(c.numFmt, `tile ${col}`).toBe(WITHHELD_FMT);
     }
     expect(ws.getCell(tileRow + 1, 1).numFmt).not.toBe(WITHHELD_FMT);
-    for (const lab of ["Unlevered IRR", "Levered IRR", "Unlevered Equity Multiple", "Levered Equity Multiple"]) {
+    for (const lab of ["Unlevered IRR (before AM fee)", "Levered IRR", "Unlevered Equity Multiple (before AM fee)", "Levered Equity Multiple"]) {
       const c = ws.getCell(rowOf(ws, 4, lab), 5);
       expect(formulaOf(c), lab).toMatch(/IRR\(|SUM\(/);
       expect(c.numFmt, lab).toBe(WITHHELD_FMT);

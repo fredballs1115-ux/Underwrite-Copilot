@@ -1978,6 +1978,9 @@ describe("BridgeView — an IRR move attributed to its drivers renders and reads
     expect(text).toContain("$12.4M");
     expect(text).toMatch(/8\.00?%/);
     expect(text).not.toMatch(/13700000/);
+    // The unlevered column's IRR is before the asset management fee, which
+    // only the levered IRR carries (research pass 40, L3).
+    expect(text).toContain("Unlevered: the IRR before debt and before the asset management fee, which only the levered IRR carries.");
     const same = visibleText(
       render(
         React.createElement(BridgeView, {

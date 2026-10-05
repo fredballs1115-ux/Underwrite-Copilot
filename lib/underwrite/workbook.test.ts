@@ -1565,13 +1565,27 @@ describe("the workbook reads on paper", () => {
     expect(() => findRow(stab, 4, "Stabilized Yield (on cost)")).toThrow();
   });
 
+  // Research pass 40, L3: the unlevered IRR and multiple run on the
+  // property's flows before debt, and the asset management fee rides only in
+  // the levered flows — the rows said "Unlevered IRR" and nothing more, so a
+  // reader set 7.16% against a levered return that carries the fee.
+  it("says the unlevered pair is before the asset management fee, and prints the engine's figure", async () => {
+    const wb = await load(model);
+    const summary = wb.getWorksheet("Deal Summary")!;
+    expect(model.inputs.amFeePctEquity).toBeGreaterThan(0);
+    expect(() => findRow(summary, 4, "Unlevered IRR")).toThrow();
+    const irr = findRow(summary, 4, "Unlevered IRR (before AM fee)");
+    expect(summary.getCell(irr, 5).value).toMatchObject({ formula: expect.stringContaining("IRR(") });
+    expect(findRow(summary, 4, "Unlevered Equity Multiple (before AM fee)")).toBeGreaterThan(irr);
+  });
+
   it("prints a multiple to two places, as the report does, on the tiles, the return block and the sensitivity grids", async () => {
     const wb = await load(model);
     const summary = wb.getWorksheet("Deal Summary")!;
     const tiles = findRow(summary, 1, "PURCHASE PRICE");
     expect(summary.getCell(tiles, 3).value).toBe("EQUITY MULTIPLE");
     expect(summary.getCell(tiles + 1, 3).numFmt).toBe('0.00"x"');
-    for (const lab of ["Unlevered Equity Multiple", "Levered Equity Multiple"]) {
+    for (const lab of ["Unlevered Equity Multiple (before AM fee)", "Levered Equity Multiple"]) {
       expect(summary.getCell(findRow(summary, 4, lab), 5).numFmt, lab).toBe('0.00"x"');
     }
     const sens = wb.getWorksheet("Sensitivity")!;

@@ -307,7 +307,11 @@ export function BridgeView({
               bridge.steps.length === 1 ? "" : "s"
             } (${bridge.scenariosEvaluated} model runs); contributions sum to the move.`
           : `Sampled Shapley attribution over ${bridge.steps.length} changed assumptions, averaged across 2,000 orderings (${bridge.scenariosEvaluated} model runs); ± is one standard error.`}{" "}
-        Residual {Math.abs(bridge.unexplainedBps).toFixed(2)} bps.
+        Residual {Math.abs(bridge.unexplainedBps).toFixed(2)} bps.{" "}
+        {/* The engine's unlevered IRR runs on the property's flows before
+            debt; the asset management fee rides only in the levered ones
+            (research pass 40, L3). */}
+        Unlevered: the IRR before debt and before the asset management fee, which only the levered IRR carries.
         {bridge.flooredScenarios > 0
           ? ` ${bridge.flooredScenarios} intermediate scenario${
               bridge.flooredScenarios === 1 ? "" : "s"

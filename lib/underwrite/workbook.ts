@@ -84,6 +84,13 @@ const YEAR1_YIELD_LABEL = "Year-1 Yield on Total Cost";
  *  10 pt: a market name past it wraps. */
 const MARKET_LINE = 20;
 
+/** The Return Summary's unlevered pair, said as what they leave out: the
+ *  engine's unlevered flows are the property's before debt, and the asset
+ *  management fee, a fee on the equity, rides only in the levered ones
+ *  (research pass 40, L3). */
+export const UNLEVERED_IRR_LABEL = "Unlevered IRR (before AM fee)";
+export const UNLEVERED_EM_LABEL = "Unlevered Equity Multiple (before AM fee)";
+
 /** The Assumptions tab's rent line, as it is: the year-1 NOI grossed up
  *  through the expense ratio and the vacancy, other income folded in — the
  *  building's potential gross revenue, never a rent roll's rents (research
@@ -1773,8 +1780,11 @@ function buildDealSummary(
     ret(onLand ? `${YEAR1_YIELD_LABEL} (the Land's)` : YEAR1_YIELD_LABEL, `IF(TotalUses<=0,"n/a",${noiY1}/TotalUses)`, capFmt(FMT.pct2));
   }
   // The returns the tiles show, marked as the tiles are where the page
-  // withholds them (research pass 40, H1).
-  ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, retFmt(FMT.pct1));
+  // withholds them (research pass 40, H1). The unlevered pair runs on the
+  // property's cash flow before debt, and the asset management fee — charged
+  // on the equity — rides only in the levered flows: the labels say so
+  // (research pass 40, L3).
+  ret(UNLEVERED_IRR_LABEL, `IFERROR(IRR(${unlevRange}),"check inputs")`, retFmt(FMT.pct1));
   ret("Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, retFmt(FMT.pct1), "LeveredIRR");
   // Its words wrap in their column, the row tall enough for them, where no
   // IRR solves on the model as built.
@@ -1783,7 +1793,7 @@ function buildDealSummary(
     c.alignment = { ...c.alignment, wrapText: true, vertical: "top" };
     ws.getRow(rr - 1).height = 38;
   }
-  ret("Unlevered Equity Multiple", `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, retFmt(FMT.mult));
+  ret(UNLEVERED_EM_LABEL, `IF((PurchasePrice+ClosingCostsTotal+AcqFee)=0,"n/a",(SUM(${unlevOps}))/(PurchasePrice+ClosingCostsTotal+AcqFee))`, retFmt(FMT.mult));
   ret("Levered Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, retFmt(FMT.mult), "LeveredEM");
   r = Math.max(r, rr) + 1;
 
