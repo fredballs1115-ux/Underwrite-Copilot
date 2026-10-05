@@ -179,7 +179,7 @@ describe("modelVsMarket — the model's four assumptions against the published f
   it("a plan deal has no going-in cap: the exit's spread is stated, not set against an entry", () => {
     const c = check({ ...base, plan: true, goingInCapPct: null }, "exit_cap")!;
     expect(c.tone).toBe("stated");
-    expect(c.read).toContain("A plan deal has no going-in cap to set it against; the spread is the claim");
+    expect(c.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it; the spread is the claim");
     const noCap = check({ ...base, goingInCapPct: null }, "exit_cap")!;
     expect(noCap.tone).toBe("stated");
     expect(noCap.read).toContain("No going-in cap to set it against; the spread is the claim.");
@@ -463,11 +463,11 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     const r = modelVsMarketFor({ derived: deriveUnderwriteInputs(plan, "plan"), extraction: plan, storedAssetClass: "auto", metro: { id: "dc", name: "Washington DC" }, reads });
     const exit = r?.checks.find((c) => c.key === "exit_cap");
     expect(exit?.tone).toBe("stated");
-    expect(exit?.read).toContain("A plan deal has no going-in cap to set it against");
+    expect(exit?.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it");
     // Not the first signal's either, nor the one its figures would imply: a
     // plan's NOI belongs over total cost, and the page shows none.
     const shown = modelVsMarketFor({ derived: deriveUnderwriteInputs(plan, "plan"), extraction: plan, firstSignal: signalWithCap("5.0%"), storedAssetClass: "auto", metro: null, reads });
-    expect(shown?.checks.find((c) => c.key === "exit_cap")?.read).toContain("A plan deal has no going-in cap to set it against");
+    expect(shown?.checks.find((c) => c.key === "exit_cap")?.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it");
   });
 
   it("reads the plan the first signal names, as the page does (the audit of 2026-09-30)", () => {
@@ -486,7 +486,7 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     const exitOf = (r: ReturnType<typeof modelVsMarketFor>) => r?.checks.find((c) => c.key === "exit_cap");
     const withSignal = modelVsMarketFor({ derived, extraction, firstSignal: signal, storedAssetClass: "industrial", metro: null, reads });
     expect(exitOf(withSignal)?.tone).toBe("stated");
-    expect(exitOf(withSignal)?.read).toContain("A plan deal has no going-in cap to set it against");
+    expect(exitOf(withSignal)?.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it");
     const without = modelVsMarketFor({ derived, extraction, storedAssetClass: "industrial", metro: null, reads });
     expect(exitOf(without)?.read).toContain("The going-in cap 6.00%");
   });
@@ -528,6 +528,26 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
       interest: { kind: "note", summary: "The first mortgage note", share: "", groundLease: "", loan: "", page: "p. 2" },
     };
     expect(dealGoingInCap(note, signalWithCap("6.0%"))).toBeNull();
+    // Wherever the header withholds the cap (lib/compare-interest
+    // `capSlotWithheld`): a preferred equity position's price buys a
+    // position, and a stated cap is the building's on a value it never paid.
+    const position: ExtractionResult = {
+      ...extraction,
+      interest: { kind: "preferred_equity", summary: "Preferred equity in the owning entity", share: "", groundLease: "", loan: "", page: "p. 2" },
+    };
+    expect(dealGoingInCap(position)).toBeNull();
+    // A share keeps the memorandum's cap; beside its entity's own loan, the
+    // grossed-up price is the equity's whole and no cap is set against it.
+    const share: ExtractionResult = {
+      ...extraction,
+      interest: { kind: "partial_interest", summary: "A 49% interest in the owning entity", share: "49%", groundLease: "", loan: "", page: "p. 2" },
+    };
+    expect(dealGoingInCap(share)).toEqual({ pct: 6, source: "stated" });
+    const shareBesideLoan: ExtractionResult = {
+      ...share,
+      metrics: [...share.metrics, { label: "Entity loan balance", value: "$56,500,000", page: "4", flagged: false }],
+    };
+    expect(dealGoingInCap(shareBesideLoan)).toBeNull();
     const conversion: FirstSignal = { ...signalWithCap("6.0%"), take: "A conversion of a vacant plant to last-mile logistics." };
     expect(dealGoingInCap(extraction, conversion)).toBeNull();
   });
@@ -1106,7 +1126,7 @@ describe("the tracker inside the model's checks", () => {
     // A plan deal states its spread and still reads the range.
     const plan = check({ ...apt, plan: true }, "exit_cap")!;
     expect(plan.tone).toBe("stated");
-    expect(plan.read).toContain("A plan deal has no going-in cap to set it against");
+    expect(plan.read).toContain("A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it");
     expect(plan.read).toContain("apartment cap range is 5.25–5.50%");
     // Washington's range is undated: the leaderboard would not rank it, so
     // it is shown and the exit is not held to it — no compression named.

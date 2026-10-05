@@ -17,7 +17,7 @@ import {
   signalGoingInCap,
 } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
-import { interestOf } from "@/lib/interest";
+import { capSlotWithheld } from "@/lib/compare-interest";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import {
   bandText,
@@ -824,7 +824,7 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
       tone: "stated",
       toneLabel: TONE_LABEL.stated,
       scope,
-      read: `${head} ${input.plan ? "A plan deal has no going-in cap to set it against; the spread is the claim, and the finished building's yield on cost is what it is bought at." : "No going-in cap to set it against; the spread is the claim."}${band.sentence}`,
+      read: `${head} ${input.plan ? "A plan deal is judged on its yield on total cost, not on an in-place cap, so no going-in cap is set against it; the spread is the claim, and the finished building's yield on cost is what it is bought at." : "No going-in cap to set it against; the spread is the claim."}${band.sentence}`,
     };
   }
   const inSpread = Math.round((g - ten.value) * 100);
@@ -971,7 +971,10 @@ export function dealGoingInCap(
   firstSignal?: FirstSignal | null,
 ): DealGoingInCap | null {
   const planDeal = isPlanDeal(inferStrategy(extraction, firstSignal ?? null).kind);
-  if (planDeal || interestOf(extraction).kind === "note") return null;
+  // No cap where the header withholds one (`capSlotWithheld`): a note's or
+  // a preferred equity position's price buys a loan or a position, and a
+  // share's beside its entity's loan is the equity's whole.
+  if (planDeal || capSlotWithheld(extraction) != null) return null;
   const capText = findGoingInCap(extraction?.metrics ?? [])?.value ?? null;
   const parsed = capText ? parsePct(capText) : null;
   const stated =
@@ -999,7 +1002,8 @@ export function dealGoingInCap(
  * stated one, else the first signal's where it can be a cap on the price
  * (`signalGoingInCap`, the page's summary bar's own fallback); where
  * neither states one, the cap the documents' NOI implies on their price;
- * and none on a plan deal or a note. The rule lives here and nowhere else:
+ * and none on a plan deal, a note, a preferred equity position or a share
+ * beside the loan its entity carries. The rule lives here and nowhere else:
  * the page once handed in its summary bar's figure while the report and
  * the workbook read the implied cap, and one deal's exit read 60 bps of
  * widening on the page and 20 in the documents.
