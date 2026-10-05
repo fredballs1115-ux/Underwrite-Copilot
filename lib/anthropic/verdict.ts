@@ -184,7 +184,8 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
   // The price row the basis divides — the same row the card's basis reads,
   // at the year the screen read the memorandum.
   const row = findPricedMetric(metrics, strategy.kind, screenYearOf(ex));
-  const tag = buildingBasisTag(ex, strategy.kind, storedClass);
+  // The figure alone: the line below says whose it is.
+  const tag = buildingBasisTag(ex, strategy.kind, storedClass, { bare: true });
   if (isPlanDeal(strategy.kind)) {
     // A plan deal's basis is its total cost; the shell's or the land's price
     // over units that do not exist yet is no basis at all.

@@ -204,7 +204,14 @@ export interface PipelineSlots {
  * strategy `basisOutsideBand`): the card had read "$2k/unit" beside the
  * panel's finding that the price or the count was misread (research pass 38).
  */
-export function basisTag(extraction: ExtractionResult, kind: StrategyKind, storedClass?: string | null): string | null {
+export function basisTag(
+  extraction: ExtractionResult,
+  kind: StrategyKind,
+  storedClass?: string | null,
+  /** the figure alone, for a caller that says whose it is in its own words
+   *  (the verdict's brief: "the whole the 49% share's price implies") */
+  opts: { bare?: boolean } = {},
+): string | null {
   if (isMasterLeasehold(extraction)) return null;
   const metrics = extraction.metrics ?? [];
   const words = assetWords(shownAssetClass(storedClass, extraction));
@@ -218,7 +225,7 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind, store
   // says whose it is, the deal header's "Price · 49% share" rule: the card,
   // the list and the CSV had printed "$274k/unit" bare under $33.3M while
   // the memo said "the whole" (research pass 35, audit C3a LOW-10).
-  const whole = sold.kind === "partial_interest" && sold.sharePct != null && !isWholeShare(sold.sharePct) ? ", the whole" : "";
+  const whole = !opts.bare && sold.kind === "partial_interest" && sold.sharePct != null && !isWholeShare(sold.sharePct) ? ", the whole" : "";
   if (words.basis === "sf") {
     return b.perSf != null && !basisOutsideBand(b.perSf, "sf", cls) ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF${whole}` : null;
   }
