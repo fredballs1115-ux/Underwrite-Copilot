@@ -57,6 +57,7 @@ import { MarketNote } from "./market-note";
 import { SubmarketsPanel } from "./submarkets-panel";
 import { CoverageBoardCell, FigureCredits, LeaderboardTable, StandingChip, coverageCell, type CoverageCell } from "./tracker-boards";
 import { listSubmarkets } from "@/lib/market/store";
+import { readMarketMemory } from "@/lib/market-memory-read";
 import type { Submarket } from "@/lib/market/types";
 import { MarketCompare } from "./market-compare";
 import { COMPARE_METROS } from "./compare-metros";
@@ -250,17 +251,13 @@ export default async function MarketDataPage({
   // explicit user_id filter is what keeps this memory private to the buyer.
   // The reader's own submarkets are read beside it: the page puts the
   // covered markets first for a reader with neither.
+  // Every one of them, a page at a time (lib/market-memory-read, the one read
+  // the deal page's "From your past screens" strip counts from too): the
+  // newest 500 had stopped every count and range here, and stated another
+  // count than the strip's for the same market (research pass 42).
   const [{ data, error }, submarkets] = user
     ? await Promise.all([
-        supabase
-          .from("deals")
-          // The first signal too: each deal's kind is read with it, as on
-          // its own page (lib/market-memory).
-          .select("id, name, asset_class, created_at, is_sample, verdict, extraction, first_signal")
-          .eq("user_id", user.id)
-          .not("extraction", "is", null)
-          .order("created_at", { ascending: false })
-          .limit(500),
+        readMarketMemory(supabase, user.id),
         // Migration 0033 not applied yet: the table is missing, the list
         // is empty, and a create attempt says so itself.
         listSubmarkets(supabase, user.id).catch((): Submarket[] => []),

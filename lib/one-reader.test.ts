@@ -457,10 +457,14 @@ describe("analytics, the market memory and the internal comps read a deal's kind
   });
 
   it("the analytics page and the market page select the first signal for it", () => {
-    for (const file of ["app/(app)/analytics/page.tsx", "app/market/page.tsx"]) {
-      const src = readFileSync(join(process.cwd(), file), "utf8");
-      expect(src, file).toMatch(/\.select\("id, name, asset_class, created_at, is_sample,[^"]*extraction, first_signal"\)/);
-    }
+    const analytics = readFileSync(join(process.cwd(), "app/(app)/analytics/page.tsx"), "utf8");
+    expect(analytics).toMatch(/\.select\("id, name, asset_class, created_at, is_sample,[^"]*extraction, first_signal"\)/);
+    // The market page reads its memory through the one read the deal page's
+    // strip shares (lib/market-memory-read, research pass 42).
+    expect(readFileSync(join(process.cwd(), "app/market/page.tsx"), "utf8")).toContain("readMarketMemory(supabase, user.id)");
+    expect(readFileSync(join(process.cwd(), "lib/market-memory-read.ts"), "utf8")).toMatch(
+      /const MEMORY_COLUMNS = "id, name, asset_class, created_at, is_sample,[^"]*extraction, first_signal";/,
+    );
   });
 });
 

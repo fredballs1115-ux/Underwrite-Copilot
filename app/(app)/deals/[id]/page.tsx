@@ -169,6 +169,7 @@ import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { snapshotVersion } from "@/lib/bridge/versions";
 import { versionBadge } from "@/lib/bridge/version-rules";
 import { readAll, readByIds } from "@/lib/read-all";
+import { readMemoryGroup, readMemoryKeys } from "@/lib/market-memory-read";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
 import { SubmarketCard } from "./submarket-card";
@@ -304,19 +305,13 @@ export default async function DealPage({
         .eq("deal_id", id)
         .order("id", { ascending: true }),
       // Deal memory's own read: every deal the READER screened, never a
-      // teammate's — the forty newest above are the whole team's, so a
-      // busy team pushed the reader's own screens out of the count. Light:
-      // the class and the market only, the rows the strip needs in full
-      // are read once this deal's own class and market are known.
-      user
-        ? supabase
-            .from("deals")
-            .select("id, asset_class, is_sample, market:extraction->>market, ext_class:extraction->>assetClass")
-            .eq("user_id", user.id)
-            .neq("id", id)
-            .not("extraction", "is", null)
-            .limit(1000)
-        : Promise.resolve({ data: null }),
+      // teammate's — the comps above are the whole team's, so a busy team
+      // pushed the reader's own screens out of the count. Light: the class
+      // and the market only, every one a page at a time (lib/market-memory-
+      // read, the one read /market's "Your market data" counts from too, so
+      // the two state one count for one market); the rows the strip needs
+      // in full are read once this deal's own class and market are known.
+      user ? readMemoryKeys(supabase, user.id).then((data) => ({ data })) : Promise.resolve({ data: null }),
     ]);
 
   if (error) {
@@ -421,21 +416,9 @@ export default async function DealPage({
       ? memoryCandidates(ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction.market)
       : [];
   const memoryRead: Promise<MarketGroup | null> = memoryIds.length
-    ? (async () => {
-        // A hundred ids a request keeps each URL well inside a proxy's limit.
-        const batches: string[][] = [];
-        for (let i = 0; i < memoryIds.length; i += 100) batches.push(memoryIds.slice(i, i + 100));
-        const reads = await Promise.all(
-          batches.map((ids) =>
-            supabase
-              .from("deals")
-              .select("id, name, asset_class, created_at, is_sample, verdict, extraction, first_signal")
-              .in("id", ids),
-          ),
-        );
-        const rows = reads.flatMap((r) => (r.data ?? []) as Parameters<typeof buildComps>[0]);
-        return marketMemoryFor(buildComps(rows), deal.id, currentClass, extraction!.market!);
-      })().catch(() => null)
+    ? readMemoryGroup(supabase, ownKeys.data as MemoryKeyRow[], deal.id, currentClass, extraction!.market!)
+        .then((rows) => (rows ? marketMemoryFor(buildComps(rows), deal.id, currentClass, extraction!.market!) : null))
+        .catch(() => null)
     : Promise.resolve(null);
 
   const documents = (docsData ?? []) as DealDocument[];
