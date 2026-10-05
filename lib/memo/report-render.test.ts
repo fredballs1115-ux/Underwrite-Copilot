@@ -249,6 +249,39 @@ describe("ReportDocument (full report)", () => {
     vi.useRealTimers();
   });
 
+  it("prints the demo report's pages, and its debt sentence says what its model runs (research pass 35)", async () => {
+    // The demo report route's own chain (app/api/demo/report).
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = sampleDerivedInputs();
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors: bidFloors(SAMPLE_DEMO_BOX) });
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity);
+    // The fictional memorandum runs to its last cited page and past it.
+    expect(input.totalPages).toBe(48);
+    const text = pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]));
+    // The terms' page column: each row's own page, no longer a dash.
+    expect(text).toMatch(/Asking price\n\$68,000,000\n—\np\. 3\n/);
+    expect(text).toMatch(/Loan-to-value\n60%\n—\np\. 44\n/);
+    // The base case cites the ask's page; the comps carry theirs.
+    expect(text.replace(/\s+/g, " ")).toContain("Price $68,000,000 · OM p. 3");
+    expect(text).toMatch(/Parkside — 1\.4 mi[\s\S]*?\np\. 14\n/);
+    // The debt killer says what the model runs: no interest-only year.
+    expect(derived.inputs.ioMonths).toBe(0);
+    const flat = text.replace(/\s+/g, " ");
+    expect(flat).toContain("60% LTV at 6.0%, amortizing over 30 years.");
+    expect(flat).toContain("amortizing over 30 years; and a 6.00% all-in rate");
+    expect(flat).not.toMatch(/year of IO/);
+  }, 60000);
+
   it("says the challenges run most severe first, the order the challenger is asked for, never the order deals die", async () => {
     // The prompt's own order, so the subtitle cannot drift from it again.
     expect(challengerInstruction("multifamily")).toContain("Give 3–6 challenges, most severe first.");

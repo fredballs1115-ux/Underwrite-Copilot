@@ -286,6 +286,11 @@ const extraction: ExtractionResult = {
     { label: "Vacancy (pro forma)", value: "6.0%", flagged: true, page: "p. 8", basis: "pro_forma" },
     { label: "Loan-to-value", value: "60%", flagged: false, page: "p. 44", basis: "na" },
   ],
+  // The fictional memorandum's length, at or past its last cited page
+  // (p. 44): a citation prints only inside the page count (lib/facts), and
+  // without one the demo report's page column was dashes on every row
+  // beside the "(p. 14)" its own memo page cites (research pass 35).
+  totalPages: 48,
 };
 
 const challenges: ChallengerResult = {
@@ -321,6 +326,8 @@ const challenges: ChallengerResult = {
   stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same ${compactUsd(inputs.year1Opex)} of year-one expenses.`,
 };
 
+// The memorandum's three sale comps sit on its p. 14, the page the
+// verdict's basis range cites for the $252k and $261k trades.
 const comps: BrokerCompsResult = {
   saleComps: [
     {
@@ -328,18 +335,21 @@ const comps: BrokerCompsResult = {
       detail: "$252k/unit · 5.6% cap · Q3'25",
       support: "supports",
       note: "Comparable vintage and submarket; supports a sub-$260k basis.",
+      page: "p. 14",
     },
     {
       name: "Vue at Girard — 4.0 mi",
       detail: "$298k/unit · 4.9% cap · Q1'25",
       support: "stretched",
       note: "Newer, amenitized asset in a stronger submarket — not a clean comp.",
+      page: "p. 14",
     },
     {
       name: "Parkside — 1.4 mi",
       detail: "$261k/unit · 5.4% cap · Q4'25",
       support: "favorable",
       note: "Closest comp; lands near the subject's implied basis.",
+      page: "p. 14",
     },
   ],
   leaseComps: [
@@ -478,7 +488,10 @@ const verdict: VerdictResult = {
       },
       {
         lever: "debt",
-        read: "60% LTV at 6.0% with one year of IO.",
+        // What the documents' model runs (lib/sample-derive): it amortizes
+        // over 30 years from the first month, so no interest-only year
+        // (research pass 35: the read said "with one year of IO").
+        read: "60% LTV at 6.0%, amortizing over 30 years.",
         risk: "A soft refi window or higher rate pressures the takeout.",
       },
     ],
