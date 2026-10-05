@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { BROWSER_DIRECT_NOTE, DATA_PROCESSORS, supportInboxProvider } from "./data-processors";
 import { censusUrl, photonUrl } from "./geocode";
@@ -97,25 +97,84 @@ describe("the outside services a user's data reaches, one list held to the code"
 // page and pictures, the email pictures and the background screens read
 // with the server's own key, behind the site's own checks (research pass
 // 39). The page names them, and this holds the names to the code.
-describe("the security page names the reads that go round row-level security", () => {
-  it("names each reader that uses the server's key, and no longer says every page reads through the database's rules", () => {
-    for (const file of [
-      "app/share/[token]/page.tsx",
-      "app/api/share/[token]/picture/route.ts",
-      "app/api/share/[token]/aerial/route.ts",
-      "app/api/email/picture/[token]/route.ts",
-      "worker/index.ts",
-      "lib/anthropic/pipeline.ts",
-    ]) {
-      expect(src(file), file).toContain("createSupabaseAdminClient");
+//
+// It then named three such readers as the only ones, while the account page,
+// every document's buy box and branding, Ask, the deal page's location work,
+// billing, the public market figures and every stored file read with the
+// same key (audit C3b MED-5). Every file that makes the server's client is
+// held here to the words the page names it by: a new one fails until the
+// page names what it reads.
+const SERVER_KEY_READERS: Record<string, string> = {
+  "app/share/[token]/page.tsx": "a shared link's page and its pictures",
+  "app/api/share/[token]/picture/route.ts": "a shared link's page and its pictures",
+  "app/api/share/[token]/aerial/route.ts": "a shared link's page and its pictures",
+  "app/api/email/picture/[token]/route.ts": "the pictures in our emails",
+  "app/api/email/unsubscribe/[token]/route.ts": "their one-click unsubscribe",
+  "worker/index.ts": "the background work that runs your screens",
+  "lib/anthropic/pipeline.ts": "the background work that runs your screens",
+  "lib/anthropic/actuals-ingest.ts": "the analyses beside them",
+  "lib/anthropic/comps-search.ts": "the analyses beside them",
+  "lib/anthropic/reconcile-facts.ts": "the analyses beside them",
+  "lib/model/build-model.ts": "the analyses beside them",
+  "lib/public-comps/run.ts": "the analyses beside them",
+  "lib/site-flags/run.ts": "the analyses beside them",
+  // The deal page's location and flood work, after it renders.
+  "app/(app)/deals/[id]/page.tsx": "the analyses beside them",
+  // The sample deal's actuals, seeded when it is created.
+  "app/(app)/deals/actions.ts": "the analyses beside them",
+  "lib/anthropic/ask.ts": "the questions you ask about a deal",
+  "lib/storage.ts": "every stored file",
+  "lib/criteria-server.ts": "the buy box and branding a memo, report or export reads",
+  "lib/branding-server.ts": "the buy box and branding a memo, report or export reads",
+  "app/(app)/account/page.tsx": "your account's settings",
+  "app/(app)/account/actions.ts": "your account's settings",
+  "app/(app)/billing/actions.ts": "billing",
+  "app/(app)/team/actions.ts": "billing",
+  "lib/billing.ts": "billing",
+  "lib/stripe/seats.ts": "billing",
+  "app/api/stripe/webhook/route.ts": "billing",
+  "app/page.tsx": "the public market figures every visitor sees",
+  "lib/live-rates-read.ts": "the public market figures every visitor sees",
+  "lib/research-read.ts": "the public market figures every visitor sees",
+  "lib/realtor-read.ts": "the public market figures every visitor sees",
+  "lib/zori-read.ts": "the public market figures every visitor sees",
+};
+
+/** Every source file under app/, lib/ and worker/ that makes the server's
+ *  client, the client's own module and the tests aside. */
+function serverKeyFiles(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const name of readdirSync(join(root, dir))) {
+      const rel = `${dir}/${name}`;
+      if (statSync(join(root, rel)).isDirectory()) {
+        if (name !== "node_modules") walk(rel);
+      } else if (/\.tsx?$/.test(name) && !/\.test\.tsx?$|\.fixture\.ts$/.test(name) && rel !== "lib/supabase/admin.ts") {
+        if (src(rel).includes("createSupabaseAdminClient")) out.push(rel);
+      }
     }
+  };
+  for (const dir of ["app", "lib", "worker"]) walk(dir);
+  return out.sort();
+}
+
+describe("the security page names the reads that go round row-level security", () => {
+  it("names what every reader that uses the server's key reads, and claims no count", () => {
     const text = visibleText(renderToStaticMarkup(React.createElement(SecurityPage))).replace(/\s+/g, " ");
-    expect(text).toContain(
-      "Three things read with the server's own key instead, behind the site's own checks rather than the database's: a shared link's page and its pictures, the pictures in our emails, and the background work that runs your screens.",
-    );
+    const files = serverKeyFiles();
+    expect(files.length).toBeGreaterThan(10);
+    for (const file of files) {
+      const words = SERVER_KEY_READERS[file];
+      expect(words, `${file} makes the server's client: name what it reads on the security page`).toBeDefined();
+      expect(text, file).toContain(words);
+    }
+    // Every file the list names still makes the client.
+    for (const file of Object.keys(SERVER_KEY_READERS)) expect(files, file).toContain(file);
+    expect(text).not.toContain("Three things read with the server's own key");
+    expect(text).not.toContain("the few reads that go round it");
     expect(text).toContain("so a bug in one of those pages can't leak another firm's pipeline");
     expect(text).not.toContain("A bug in a page can't leak another firm's pipeline, because the database itself won't serve it.");
-    expect(text).toContain("Isolation is enforced in the database itself (the few reads that go round it are named below)");
+    expect(text).toContain("Isolation is enforced in the database itself (the reads that go round it are named below)");
   });
 });
 
