@@ -115,6 +115,13 @@ export interface MarketForModel {
  *  says nothing of rent rules — the sample, a test, the bridge's read. */
 export interface DealForModel {
   regulation?: RegulationRead | null;
+  /** the day the model's dated readers read on — a lease's end, a note's
+   *  maturity, an abatement's burn-off, a bid deadline: the caller's own,
+   *  so each `meta.X.read` says what the page's panel beside it says (the
+   *  deal page its `readerNoon`, lib/reader-day; a route the reader's day
+   *  where it reads the time-zone cookie, else the UTC day's noon; research
+   *  pass 40). Absent, the readers read the clock, as before. */
+  asOf?: Date | null;
 }
 
 /** The model's hold, months — one constant, because the tenor the rate is
@@ -421,8 +428,8 @@ export function permanentLoanSpread(assetClass: string | null | undefined): Perm
 
 /** The cover's line about what is being sold, and what the model is and
  *  is not on it — null for a plain fee simple. */
-function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["interest"] {
-  const r = readInterest(extraction, askingPriceOf(extraction));
+function interestMeta(extraction: ExtractionResult | null, asOf: Date): WorkbookMeta["interest"] {
+  const r = readInterest(extraction, askingPriceOf(extraction), asOf);
   return r
     ? {
         line: interestShortLine(r),
@@ -503,24 +510,24 @@ function sellerNoteMeta(extraction: ExtractionResult | null, inputs: UnderwriteI
     : null;
 }
 
-function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["assumable"] {
-  const a = readAssumable(extraction, inputs);
+function assumableMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["assumable"] {
+  const a = readAssumable(extraction, inputs, asOf);
   return a ? { line: assumableLine(a), read: assumableSentence(a) } : null;
 }
 
 /** The cover's lines about a covenant or a contract that sets the rents
  *  (#453): the restriction, and what the model's one growth rate is not on
  *  it. Null on a market-rate deal. */
-function affordableMeta(extraction: ExtractionResult | null): WorkbookMeta["affordable"] {
-  const r = readAffordable(extraction);
+function affordableMeta(extraction: ExtractionResult | null, asOf: Date): WorkbookMeta["affordable"] {
+  const r = readAffordable(extraction, asOf);
   return r ? { line: affordableShortLine(r), modelCaveat: r.modelCaveat } : null;
 }
 
 /** The cover's lines about the one lease a single-tenant property is
  *  (#454): the lease, then the deal page's own read of it against this
  *  model. Null on anything else. */
-function singleTenantMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["singleTenant"] {
-  const r = readSingleTenant(extraction);
+function singleTenantMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["singleTenant"] {
+  const r = readSingleTenant(extraction, asOf);
   if (!r) return null;
   return {
     line: singleTenantShortLine(r),
@@ -578,8 +585,9 @@ function forwardMeta(
   inputs: UnderwriteInputs,
   noi1: number,
   noiAssumed: boolean,
+  asOf: Date,
 ): WorkbookMeta["forward"] {
-  const r = readForwardPurchase(extraction);
+  const r = readForwardPurchase(extraction, asOf);
   if (!r) return null;
   return {
     line: forwardShortLine(r),
@@ -590,8 +598,8 @@ function forwardMeta(
 /** The cover's lines about a mixed-use building (lib/mixed-use): the two
  *  incomes in a line, then what this model does with them — one exit cap
  *  and one growth rate for both. Null on anything else. */
-function mixedUseMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["mixedUse"] {
-  const r = readMixedUse(extraction);
+function mixedUseMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["mixedUse"] {
+  const r = readMixedUse(extraction, asOf);
   if (!r) return null;
   return {
     line: mixedUseShortLine(r),
@@ -603,8 +611,8 @@ function mixedUseMeta(extraction: ExtractionResult | null, inputs: UnderwriteInp
  *  (lib/going-concern): the read in a line, then what this model does with
  *  the income — it capitalises its year-one income as rent and allocates
  *  nothing to the business. Null on anything else. */
-function goingConcernMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, noi1: number, noiAssumed = false): WorkbookMeta["goingConcern"] {
-  const r = readGoingConcern(extraction);
+function goingConcernMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, noi1: number, noiAssumed: boolean, asOf: Date): WorkbookMeta["goingConcern"] {
+  const r = readGoingConcern(extraction, asOf);
   if (!r) return null;
   return { line: goingConcernShortLine(r), read: goingConcernModelLine(r, { noi1, exitCapPct: inputs.exitCapPct, noiAssumed }) ?? "" };
 }
@@ -613,8 +621,8 @@ function goingConcernMeta(extraction: ExtractionResult | null, inputs: Underwrit
  *  the read in a line, then what this model does with them — it sells the
  *  units as one building at its exit cap, and runs no retail exit. Null on
  *  anything else. */
-function condoMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["condo"] {
-  const r = readCondo(extraction);
+function condoMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["condo"] {
+  const r = readCondo(extraction, asOf);
   if (!r) return null;
   return { line: condoShortLine(r), read: condoModelLine(r, { exitCapPct: inputs.exitCapPct }) ?? "" };
 }
@@ -624,8 +632,8 @@ function condoMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs
  *  does with the position — it capitalises the income at its sale as if it
  *  ran forever, and the master lease ends against its hold. Null on
  *  anything but a master lease of the building. */
-function sandwichMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["sandwich"] {
-  const r = readSandwichLease(extraction);
+function sandwichMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["sandwich"] {
+  const r = readSandwichLease(extraction, asOf);
   if (!r) return null;
   return { line: sandwichShortLine(r), read: sandwichModelLine(r, { holdYears: inputs.holdMonths / 12 }) ?? "" };
 }
@@ -633,8 +641,8 @@ function sandwichMeta(extraction: ExtractionResult | null, inputs: UnderwriteInp
 /** The cover's lines about a multi-tenant property's listed tenants
  *  (#457): the roster, then what this model does not carry for its roll.
  *  Null where the memorandum lists fewer than two tenants. */
-function rosterMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["roster"] {
-  const r = readRoster(extraction);
+function rosterMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["roster"] {
+  const r = readRoster(extraction, asOf);
   if (!r) return null;
   return {
     line: rosterShortLine(r),
@@ -667,8 +675,8 @@ function valueAddMeta(extraction: ExtractionResult | null, inputs: UnderwriteInp
 /** The cover's lines about a property-tax abatement (#461): the
  *  abatement, then where it ends against this model's sale and what the
  *  step-up is worth at its exit cap. Null where the memorandum states none. */
-function taxAbatementMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["taxAbatement"] {
-  const r = readTaxAbatement(extraction);
+function taxAbatementMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["taxAbatement"] {
+  const r = readTaxAbatement(extraction, asOf);
   if (!r) return null;
   return {
     line: taxAbatementShortLine(r),
@@ -685,8 +693,8 @@ function taxAbatementMeta(extraction: ExtractionResult | null, inputs: Underwrit
  *  exit cap that runs this workbook on the term — the Exit Cap input stays
  *  the model's, the reader decides — then the financing and the basis.
  *  Null unless a leasehold states when its lease ends. */
-function leaseholdMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["leasehold"] {
-  const r = readLeaseholdExit(extraction, inputs);
+function leaseholdMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, asOf: Date): WorkbookMeta["leasehold"] {
+  const r = readLeaseholdExit(extraction, inputs, asOf);
   if (!r) return null;
   const t = r.onTerm;
   const run =
@@ -707,6 +715,9 @@ export function deriveUnderwriteInputs(
   const metrics = extraction?.metrics ?? [];
   const assetClass = normalizeClass(extraction?.assetClass ?? "auto");
   const cd = CLASS_DEFAULTS[assetClass];
+  // The day every dated reader below reads on: the caller's, so the model's
+  // lines say what the page's panels say on the same day (research pass 40).
+  const asOf = deal?.asOf ?? new Date();
   // The class as a page says it, for the notes and the workbook's cover —
   // "Self-storage default", never "self_storage default", and "generic"
   // where nothing has read the deck.
@@ -821,7 +832,7 @@ export function deriveUnderwriteInputs(
   const interest = interestOf(extraction);
   // How it is sold (#456): an auction's starting bid is where the price
   // starts, read only where no asking price is stated.
-  const saleFloor = readSale(extraction);
+  const saleFloor = readSale(extraction, asOf);
 
   // A leased fee's price note says what the model runs as its income, which
   // only the NOI's derivation below knows: it is written there.
@@ -1206,13 +1217,13 @@ export function deriveUnderwriteInputs(
   // capital. Where the memorandum states a PIP and no other capital budget
   // the model carries it; where it states both, the budget is read as
   // including it — never the two added.
-  const hotelRead = readHotelDeal(extraction);
+  const hotelRead = readHotelDeal(extraction, asOf);
   const pipCapital = !budgetRead && hotelRead?.pipTotal != null && hotelRead.pipTotal > 0 ? hotelRead.pipTotal : null;
   // The property condition report's immediate repairs (#465): work the
   // building needs now, capital at closing. Carried where the memorandum
   // states no other budget and no PIP; a stated budget or PIP is read as
   // including them — never the two added.
-  const reportsRead = readSiteReports(extraction);
+  const reportsRead = readSiteReports(extraction, asOf);
   const repairsCapital =
     !budgetRead && pipCapital == null && reportsRead?.pca?.immediate != null && reportsRead.pca.immediate > 0
       ? reportsRead.pca.immediate
@@ -1533,21 +1544,21 @@ export function deriveUnderwriteInputs(
       // The workbook's cover prints this: the label, never a key or "auto".
       assetClass: assetClassLabel(extraction?.assetClass) || "—",
       unitNoun,
-      interest: interestMeta(extraction),
+      interest: interestMeta(extraction, asOf),
       priceLabel,
       ...(grossedUpSharePct != null ? { grossedUpSharePct } : {}),
       // A development priced at its land, and a bulk condominium purchase's
       // units offered: what the workbook's per-unit yardsticks are of.
       ...(priceIsLand && statedPrice != null ? { priceIsLand: true } : {}),
       ...(condoUnitsOffered(extraction) != null ? { unitsOffered: condoUnitsOffered(extraction) } : {}),
-      assumable: assumableMeta(extraction, inputs),
+      assumable: assumableMeta(extraction, inputs, asOf),
       sellerNote: sellerNoteMeta(extraction, inputs),
-      leasehold: leaseholdMeta(extraction, inputs),
-      affordable: affordableMeta(extraction),
-      singleTenant: singleTenantMeta(extraction, inputs),
-      roster: rosterMeta(extraction, inputs),
+      leasehold: leaseholdMeta(extraction, inputs, asOf),
+      affordable: affordableMeta(extraction, asOf),
+      singleTenant: singleTenantMeta(extraction, inputs, asOf),
+      roster: rosterMeta(extraction, inputs, asOf),
       valueAdd: valueAddMeta(extraction, inputs),
-      taxAbatement: taxAbatementMeta(extraction, inputs),
+      taxAbatement: taxAbatementMeta(extraction, inputs, asOf),
       siteReports: reportsRead
         ? {
             line: siteReportsShortLine(reportsRead),
@@ -1558,12 +1569,12 @@ export function deriveUnderwriteInputs(
       mh: mhMeta(extraction, inputs),
       storage: storageMeta(extraction, inputs),
       regulation: regulationMeta(deal?.regulation, inputs),
-      forward: forwardMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption"),
-      mixedUse: mixedUseMeta(extraction, inputs),
-      goingConcern: goingConcernMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption"),
-      condo: condoMeta(extraction, inputs),
-      sandwich: sandwichMeta(extraction, inputs),
-      sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
+      forward: forwardMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption", asOf),
+      mixedUse: mixedUseMeta(extraction, inputs, asOf),
+      goingConcern: goingConcernMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption", asOf),
+      condo: condoMeta(extraction, inputs, asOf),
+      sandwich: sandwichMeta(extraction, inputs, asOf),
+      sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs, undefined, asOf) } : null,
       hotel: hotelRead
         ? {
             line: hotelShortLine(hotelRead),

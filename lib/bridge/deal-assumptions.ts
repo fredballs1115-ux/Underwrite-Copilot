@@ -38,6 +38,10 @@ export async function currentDealModel(
   dealName: string,
   extraction: ExtractionResult | null,
   holdMonths: number = HOLD_MONTHS,
+  /** the day the model's dated readers read on: the reader's where the
+   *  caller reads the time-zone cookie (the rent-roll workbook), else the
+   *  UTC day's noon (research pass 40) */
+  asOf: Date = new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00Z`),
 ): Promise<DerivedModel | null> {
   if (!extraction) return null;
 
@@ -82,5 +86,6 @@ export async function currentDealModel(
         : null,
     },
     modelMarketFor(isSample, debt),
+    { asOf },
   );
 }

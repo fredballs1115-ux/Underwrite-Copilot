@@ -127,12 +127,17 @@ export async function GET(
     // the one call every surface makes, on the route's UTC day — the day the
     // cover says the workbook was built: the cover's "The rent rules" and the
     // Market Read's rent-growth row read the same regulation.
+    const utcDay = new Date().toISOString().slice(0, 10);
     const regulation = regulationForDeal(
       { extraction, address, siteFlags, assetClass: deal.asset_class as string | null },
-      new Date().toISOString().slice(0, 10),
+      utcDay,
     );
+    // The model's dated readers read the same day, at its noon (the route
+    // reads no time-zone cookie; research pass 40).
+    const asOf = new Date(`${utcDay}T12:00:00Z`);
     const model = deriveUnderwriteInputs(extraction, deal.name, actuals, modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt), {
       regulation,
+      asOf,
     });
     // An auction's ceiling bid (#456) is said at the buyer's own hurdle, the
     // buy box's IRR floor, as the deal page and the report say it; the
@@ -142,7 +147,7 @@ export async function GET(
       try {
         const ownership = deal as unknown as { user_id: string; team_id: string | null };
         const hurdle = (await getBuyBoxForDeal(ownership.user_id, ownership.team_id))?.minIrrPct ?? null;
-        if (hurdle != null) model.meta.sale = { ...model.meta.sale, read: saleCeilingRead(extraction, model.inputs, hurdle) };
+        if (hurdle != null) model.meta.sale = { ...model.meta.sale, read: saleCeilingRead(extraction, model.inputs, hurdle, asOf) };
       } catch (err) {
         console.warn(`workbook buy box read failed for ${id}:`, err instanceof Error ? err.message : err);
       }

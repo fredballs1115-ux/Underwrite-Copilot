@@ -187,6 +187,24 @@ describe("the signed-in pages count from the reader's day", () => {
       expect(deal, call).toContain(call);
     }
     expect(deal.match(/new Date\(`\$\{todayIso\}T12:00:00Z`\)/g) ?? [], "the reader's noon is built once").toHaveLength(1);
+    // The model's lines read the same day as the panels beside them: the
+    // derivation's dated readers (DealForModel.asOf) and the sale panel's
+    // ceiling (research pass 40, item 14).
+    expect(deal).toMatch(/deriveUnderwriteInputs\([\s\S]*?\{ regulation, asOf: readerNoon \},?\s*\)/);
+    expect(deal).toContain("saleCeiling(extraction, shown.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT, readerNoon)");
+    // The report reads its model on the day it is dated, at its noon.
+    const report = read("app/api/deals/[id]/report/route.ts");
+    expect(report).toContain("const readerNoon = new Date(`${readerDay}T12:00:00Z`);");
+    expect(report).toContain("{ regulation: regulationRead, asOf: readerNoon }");
+    for (const call of [
+      "readAssumable(extraction, derived.inputs, readerNoon)",
+      "readLeaseholdExit(extraction, derived.inputs, readerNoon)",
+      "saleCeilingRead(extraction, derived.inputs, hurdlePct ?? SALE_HURDLE_PCT, readerNoon)",
+    ]) {
+      expect(report, call).toContain(call);
+    }
+    // The rent-roll workbook's model reads the reader's day it counts from.
+    expect(read("app/api/deals/[id]/rent-roll.xlsx/route.ts")).toContain("new Date(`${readerDay}T12:00:00Z`)");
   });
 
   // The documents' own date, read once per request from the cookie the

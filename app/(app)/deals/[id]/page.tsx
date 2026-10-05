@@ -840,7 +840,9 @@ export default async function DealPage({
             : null,
         },
         modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
-        { regulation },
+        // The model's lines read the reader's day, as the panels beside
+        // them do (research pass 40; lib/reader-day).
+        { regulation, asOf: readerNoon },
       )
     : null;
   // The full report's gate (lib/underwrite/report-grid `modelReadsWithheld`):
@@ -1565,7 +1567,7 @@ export default async function DealPage({
             selling (lib/sale-terms). */}
         <SalePanel
           sale={readSale(extraction, readerNoon)}
-          ceiling={shown ? saleCeiling(extraction, shown.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT) : null}
+          ceiling={shown ? saleCeiling(extraction, shown.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT, readerNoon) : null}
         />
         {/* A forward purchase or a build-to-suit bought at delivery
             (lib/forward-purchase): the clock from today to the delivery and

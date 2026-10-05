@@ -90,7 +90,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
   // With no as-of date on the roll, today — the reader's own day (lib/
   // reader-day), the day the page counts from, so the two never differ.
-  const asOf = record.asOfDate ?? readerToday((await cookies()).get(TZ_COOKIE)?.value);
+  const readerDay = readerToday((await cookies()).get(TZ_COOKIE)?.value);
+  const asOf = record.asOfDate ?? readerDay;
   const analytics = analyzeRentRoll(record.leases, { asOf, nra: record.nra });
   const nra = record.nra && record.nra > 0 ? record.nra : analytics.totalSf || 1;
 
@@ -98,12 +99,15 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   // defaults when it hasn't. Either way they land as editable blue inputs.
   // The deal's own model, derived as every other surface derives it
   // (lib/bridge/deal-assumptions), but seeded for this workbook's hold.
+  // Its dated readers read the reader's day, as the deal page's do
+  // (research pass 40).
   const model = await currentDealModel(
     supabase,
     id,
     deal.name as string,
     (deal.extraction as ExtractionResult | null) ?? null,
     EXPORT_HOLD_YEARS * 12,
+    new Date(`${readerDay}T12:00:00Z`),
   );
   const base = model?.inputs ?? null;
 

@@ -124,6 +124,9 @@ export async function GET(
   const now = new Date();
   const dateStr = readerDateLong(tz, now);
   const readerDay = readerToday(tz, now);
+  // Its noon, the day every dated reader of the model reads on, as the deal
+  // page reads on its reader's (research pass 40).
+  const readerNoon = new Date(`${readerDay}T12:00:00Z`);
 
   let buyBoxChecks: BuyBoxCheck[] = [];
   // The buy-box target IRR anchors the sensitivity page's color scale, so
@@ -248,7 +251,7 @@ export async function GET(
             : null,
         },
         modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt),
-        { regulation: regulationRead },
+        { regulation: regulationRead, asOf: readerNoon },
       );
       // The sources say whether the price and the year-1 NOI are the
       // documents' or placeholders; on a placeholder's model the report
@@ -284,7 +287,7 @@ export async function GET(
         },
         (deal.first_signal as FirstSignal | null) ?? null,
       );
-      const assumableRead = readAssumable(extraction, derived.inputs);
+      const assumableRead = readAssumable(extraction, derived.inputs, readerNoon);
       // A note the seller offers to carry (#462), priced against this
       // model's own new loan the way the deal page prices it.
       const sellerRead = readSellerFinancing(extraction, derived.inputs);
@@ -292,7 +295,7 @@ export async function GET(
       assumable = assumableRead
         ? assumableView(assumableRead, derived.sources.allInRatePct?.note ?? null, !!derived.meta.rateSeed)
         : null;
-      const leaseholdRead = readLeaseholdExit(extraction, derived.inputs);
+      const leaseholdRead = readLeaseholdExit(extraction, derived.inputs, readerNoon);
       leasehold = leaseholdRead ? leaseholdExitView(leaseholdRead) : null;
       // The one lease a single-tenant property is (#454), read against this
       // model — the workbook cover's own two lines.
@@ -322,7 +325,7 @@ export async function GET(
       // How it is sold (#456): the ceiling bid at this report's own hurdle,
       // the buy box's where set — the same one its grids are coloured by.
       sale = derived.meta.sale
-        ? { line: derived.meta.sale.line, read: saleCeilingRead(extraction, derived.inputs, hurdlePct ?? SALE_HURDLE_PCT) }
+        ? { line: derived.meta.sale.line, read: saleCeilingRead(extraction, derived.inputs, hurdlePct ?? SALE_HURDLE_PCT, readerNoon) }
         : null;
 
       // The model's assumptions against the published figures — the same

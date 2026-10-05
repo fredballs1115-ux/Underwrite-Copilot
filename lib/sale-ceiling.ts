@@ -38,8 +38,11 @@ export function saleCeiling(
   extraction: ExtractionResult | null | undefined,
   inputs: UnderwriteInputs,
   hurdlePct: number = SALE_HURDLE_PCT,
+  /** the day the sale is read on (a bid deadline's countdown): the
+   *  caller's, as the page's sale panel reads it; absent, the clock's */
+  asOf: Date = new Date(),
 ): SaleCeiling | null {
-  const sale = readSale(extraction);
+  const sale = readSale(extraction, asOf);
   if (!sale) return null;
   const solved = solveMaxBid(inputs, { minIrr: hurdlePct / 100 });
   const maxAllIn = solved.price != null && solved.price > 0 ? solved.price : null;
@@ -57,6 +60,7 @@ export function saleCeilingRead(
   extraction: ExtractionResult | null | undefined,
   inputs: UnderwriteInputs,
   hurdlePct: number = SALE_HURDLE_PCT,
+  asOf: Date = new Date(),
 ): string {
-  return saleCeiling(extraction, inputs, hurdlePct)?.line ?? "";
+  return saleCeiling(extraction, inputs, hurdlePct, asOf)?.line ?? "";
 }
