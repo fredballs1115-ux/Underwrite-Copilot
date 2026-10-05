@@ -1178,6 +1178,16 @@ jobs:
           mark "#487 a team's deals stay with the team" grep -q "s deals stay with the team" p_whats-new.html
           mark "#487 the letter of intent, ask and the model" grep -q "The letter of intent, Ask and the model, held to the deal" p_whats-new.html
           mark "#487 reconciliation gaps from their own figures" grep -q "Reconciliation gaps drawn from their own figures" p_whats-new.html
+          mark "#488 emails sent once, to the person who asked" grep -q "Emails sent once, to the person who asked" p_whats-new.html
+          mark "#489 every market figure dated with its year" grep -q "Every market figure dated with its year" p_whats-new.html
+          mark "#490 dates read on the day they are read" grep -q "Dates read on the day they are read" p_whats-new.html
+          mark "#490 research dates that say when they are stale" grep -q "Research dates that say when they are stale" p_whats-new.html
+          mark "#491 links and pictures that show only what they should" grep -q "Links and pictures that show only what they should" p_whats-new.html
+          mark "#492 calculator dollars, written one way" grep -q "Calculator dollars, written one way" p_whats-new.html
+          mark "#493 fifty-six more cities, pictured" grep -q "Fifty-six more cities, pictured" p_whats-new.html
+          mark "#494 mixed-use, labs and short sales, read as what they are" grep -q "Mixed-use, labs and short sales, read as what they are" p_whats-new.html
+          mark "#496 defaults said as defaults" grep -q "Defaults said as defaults" p_whats-new.html
+          mark "#495 counts that hold from one day to the next" grep -q "Counts that hold from one day to the next" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"

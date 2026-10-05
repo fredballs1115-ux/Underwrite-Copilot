@@ -2,6 +2,66 @@
   "$schema_note": "User-visible product improvements, newest first. Feeds the pipeline's What's-new card and the homepage footer's latest-improvement stamp — one source, both surfaces (the homepage must match the real site). Keep entries honest, dated, and user-phrased; trim to ~12.",
   "entries": [
     {
+      "date": "2026-10-05",
+      "title": "Emails sent once, to the person who asked",
+      "href": "/account",
+      "blurb": "A screen's emails now go to whoever asked for the screen, and only while they can still see the deal, and a send retried after a timeout is never a second email. The Monday digest counts your open deals and the offers due in the week ahead, marks a call whose re-screen is running or did not finish, and carries a one-click unsubscribe."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Every market figure dated with its year",
+      "href": "/market",
+      "blurb": "Each live figure on the market pages is dated by its own cadence, a day, a month or a quarter, with the year always in it, and a count carries its annual rate. A rule is cut at its first whole sentence with its caution kept in view. A research figure is ranked only where it can be, a band is printed as a band, and the survey board drops its rank numbers because its margins overlap. A feed's date says UTC wherever it is printed, each market page claims only the figures it draws, and a photo credit never covers a market's name."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Dates read on the day they are read",
+      "href": "/deals",
+      "blurb": "Every analysis step is told today's date. A price labelled with a year is read against the year the memorandum was screened, so a 2026 asking price stays the ask after New Year, and screening the same deck again keeps the day it was first read. The Opportunity Zone answer says where the 2018 round stands on the day you read it, and maturities, lease ends and abatements are counted to the day."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Research dates that say when they are stale",
+      "href": "/market",
+      "blurb": "Once a research figure is more than 180 days old, every page that shows it says so beside its date, and the model's checks stop holding an assumption to it. A rule that states its figure for a window, such as a rent cap for July 2026 to June 2027, says once that window has ended that its figure needs checking. Each market's note on /market carries the day its research was read. Nothing is hidden; the date and the figure stay."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Links and pictures that show only what they should",
+      "href": "/security",
+      "blurb": "A shared screen's aerial and a deal's pictures are drawn only at the sizes their pages ask for, and an email's photograph is served only to someone who can read the deal. The health checks' costly probes run for the site's operators alone, and a screen run again waits its turn in the queue."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Calculator dollars, written one way",
+      "href": "/tools",
+      "blurb": "Every calculator writes its dollars through one writer, so a negative figure reads with its minus sign outside the dollar. Five more cards name a blank required field instead of reading it as zero, four more say when a figure ran to the longest the card runs, a ground lease worth less than nothing says so, and the 1031 card says when a partnership's or an S corporation's March 15 return date ends the window sooner."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Fifty-six more cities, pictured",
+      "href": "/deals",
+      "blurb": "Deals in fifty-six more metro areas now open on a photograph of their market, from Waterbury, Cape Cod and San Jose to Duluth's lift bridge, Flagstaff's peaks and Coeur d'Alene's lake. Each was chosen by eye through the card's and the deal page's own crops and is credited to its photographer; a city whose photographs held nothing worth showing keeps the deal's drawn cover."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Mixed-use, labs and short sales, read as what they are",
+      "href": "/deals",
+      "blurb": "Apartments over shops now file as mixed-use, an RV resort or a land-lease community as a park, a lab as an office, a truck terminal or storage yard as an industrial yard, an active-adult community as apartments, and a resort-style apartment building, senior community or home as housing, each on its own class's defaults. A share whose entity carries its own loan says its price is the equity's whole and strikes no price a unit or cap on it, seller financing on a note is said to be the note purchase's, a single tenant's lease on a building not yet built counts from delivery, a lease term that counts its options is said as a ceiling, the land under a tower, billboard or solar array is said to come back, and a short sale's letter of intent waits on its lender's approval."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Defaults said as defaults",
+      "href": "/deals",
+      "blurb": "On a day with no fresh rate, the debt sizer starts from the model's own rate, so the page and the workbook quote one rate for one loan. The sizer's lender tests, the construction panel's terms and the workbook's zero rows say they are defaults, a rent roll's figures are credited to the rent roll, the cost line never implies a jurisdiction levies a transfer tax, a rate is said as the latest with its date, and where the model's loan falls under the sizer's coverage test, the year-1 coverage says by how much."
+    },
+    {
+      "date": "2026-10-05",
+      "title": "Counts that hold from one day to the next",
+      "href": "/deals",
+      "blurb": "The offers-due countdown, your tasks and the rent roll count from your own calendar day, in your time zone, a closed deal counts as closed rather than live on the analytics page and in the meeting workbook, a deal with no price, cap or fit sorts last whichever way the list runs, the Cap column sorts a plan's yield on cost and a note's yield with the caps, and a shared deal screen previews as a plain card rather than the homepage's advert. A lease or contract that ends in a year stated alone is said to end this year, never today. No page promises how long a screen takes."
+    },
+    {
       "date": "2026-10-01",
       "title": "Every step of the screen reads the same deal",
       "href": "/deals",
