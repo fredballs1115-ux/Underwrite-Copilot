@@ -215,7 +215,10 @@ export interface NoiFigure {
 }
 
 const NOI_INCLUDE = /net operating income|\bnoi\b/i;
-// Per-unit / per-SF figures, margins and growth rates are not the NOI.
+// Per-unit / per-SF figures, margins and growth rates are not the NOI. An
+// operating business's earnings are filed under "EBITDA" or "EBITDAR", which
+// name no NOI, so no reader here takes them (`ebitdaFigure` reads them to be
+// said, never used — research pass 28).
 const NOI_EXCLUDE = /\bper\b|psf|unit|margin|growth|debt|yield|multiple/i;
 // A slash is a denominator — "NOI / SF", "NOI / RSF", "NOI / key", "NOI /
 // EGI", "Price / NOI", "NOI / quarter" — and the figure a rate or a ratio,
@@ -270,6 +273,37 @@ export function noiFigures(metrics: MetricLike[]): NoiFigure[] {
     out.push({ kind, label: m.label, value, page: m.page });
   }
   return out;
+}
+
+// An operating business's earnings, by the labels the extraction files them
+// under ("EBITDA", "EBITDAR (T-12)", "EBITDARM") — never a margin, a
+// multiple, a coverage or a figure per unit.
+const EBITDA_ROW = /\bebitda(?:r|rm)?\b/i;
+const NOT_EBITDA_SUM = /margin|multiple|coverage|ratio|\bper\b|psf|\/|growth|yield/i;
+
+export interface EbitdaFigure {
+  label: string;
+  value: number;
+  page?: string;
+}
+
+/**
+ * The first EBITDA, EBITDAR or EBITDARM the memorandum states, as a sum —
+ * an operating business's earnings (a skilled-nursing operator's, a car
+ * wash's), filed under labels no NOI reader takes (`NOI_INCLUDE` names no
+ * EBITDA): read only so that a note can say the memorandum states it and
+ * that it is not used (research pass 28). Null where none is stated, and on
+ * a percentage or a ratio.
+ */
+export function ebitdaFigure(metrics: MetricLike[]): EbitdaFigure | null {
+  for (const m of metrics) {
+    if (!EBITDA_ROW.test(m.label) || NOT_EBITDA_SUM.test(m.label)) continue;
+    if (/%|percent|\d\s*[x×](?![a-z])/i.test(m.value)) continue;
+    const value = parseMoney(m.value);
+    if (value == null || !Number.isFinite(value) || !(value > 0)) continue;
+    return { label: m.label.trim(), value, page: m.page };
+  }
+  return null;
 }
 
 // ── Plausibility ─────────────────────────────────────────────────────────

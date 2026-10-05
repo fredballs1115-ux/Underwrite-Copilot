@@ -48,6 +48,7 @@ import {
   budgetFromText,
   capitalBudgetFromMetrics,
   askingPriceOf,
+  ebitdaFigure,
   findPriceMetric,
   inferStrategy,
   isPlanDeal,
@@ -676,12 +677,23 @@ export function deriveUnderwriteInputs(
   } else {
     noi = price * 0.06;
     const skipped = goingFig ?? stabilizedFig;
+    // An operating business's earnings stated where no NOI anchors year 1
+    // (research pass 28): said, so the note never reads as if the memorandum
+    // stated no earnings, and never used — EBITDA is the business's, before
+    // rent, a management fee and reserves, never the real estate's NOI. The
+    // model's NOI stays the assumed 6%.
+    const ebitda = ebitdaFigure(metrics);
+    const earnings = ebitda
+      ? `The OM states the business's ${ebitda.label} of $${Math.round(ebitda.value).toLocaleString("en-US")}, which is not the real estate's NOI and is not used`
+      : "";
     mark(
       "inPlaceRentAnnual",
       "assumption",
       skipped
-        ? `${implausible(skipped)}. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI`
-        : "No NOI or cap in the OM — assumed 6% going-in",
+        ? `${implausible(skipped)}. No going-in cap in the OM either — assumed 6% going-in; enter the in-place NOI${earnings ? `. ${earnings}` : ""}`
+        : earnings
+          ? `${earnings}; with no NOI or cap in the OM, the model assumed 6% going-in`
+          : "No NOI or cap in the OM — assumed 6% going-in",
     );
   }
 
