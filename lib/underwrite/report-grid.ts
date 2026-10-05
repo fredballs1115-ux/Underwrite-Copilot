@@ -5,6 +5,7 @@
 // the on-screen sliders can never disagree.
 
 import { withArticle } from "@/lib/article";
+import { findingWithholdsReturns, type PlausibilityFinding } from "@/lib/deal-strategy";
 import { moneyCompact } from "@/lib/plan-facts";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
 import { costAssumptionsLine } from "./cost-note";
@@ -627,6 +628,28 @@ export function nearlyVacantPageLine(
   if (!reason) return null;
   const what = o.maxBid ? "The returns, the cap on year-1 NOI and the max bid" : "The returns and the cap on year-1 NOI";
   return `${what} are withheld: ${reason}`;
+}
+
+/** What a withheld tile says after "n/a — " while a finding stands against
+ *  the returns (`misreadPageLine`). */
+export const MISREAD_WORD = "figures don't tie";
+
+/**
+ * The deal page's playground, over its tiles, while the plausibility check
+ * finds the figures the returns run on do not tie (lib/deal-strategy
+ * `findingWithholdsReturns`: a high finding, or an implied cap under the
+ * floor — an NOI stated a month at a time had printed "Equity multiple
+ * −1.53x" and "DSCR 0.16x" bare, research pass 38): the returns, and the max
+ * bid where a buy box floor would solve one, withheld with the finding's own
+ * claim, as a placeholder's are. Null where no such finding stands.
+ */
+export function misreadPageLine(
+  findings: readonly Pick<PlausibilityFinding, "code" | "severity" | "title">[] | null | undefined,
+  o: { maxBid: boolean },
+): string | null {
+  const f = (findings ?? []).find(findingWithholdsReturns);
+  if (!f) return null;
+  return `The returns${o.maxBid ? " and the max bid" : ""} are withheld: ${f.title}, and returns built on figures that do not tie would be a misread's.`;
 }
 
 /** Everything the report's sensitivity page renders, in one pure build. */

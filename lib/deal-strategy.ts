@@ -91,6 +91,14 @@ export const STRATEGY_READING: Record<StrategyKind, string> = {
  *  misread. */
 export const IMPLIED_CAP_CEILING = 0.25;
 
+/** How far under the price an NOI can sit and still be a stabilized
+ *  building's going-in figure — a rule of thumb, not a market figure, and
+ *  said as one (research pass 38). Under it the NOI is, most often, a price
+ *  for land or a redevelopment, a figure stated a month at a time or in
+ *  thousands, or a misread: an NOI stated per month ran as a year's NOI and
+ *  printed "Equity multiple −1.53x" and "DSCR 0.16x" with no finding. */
+export const IMPLIED_CAP_FLOOR = 0.02;
+
 /**
  * The first signal's going-in cap, where it can be a cap on the price at
  * all: the signal is a fast read with no label to check, so a figure at or
@@ -312,6 +320,7 @@ export function ebitdaFigure(metrics: MetricLike[]): EbitdaFigure | null {
 export type FindingCode =
   | "noi_exceeds_price"
   | "implied_cap_impossible"
+  | "implied_cap_low"
   | "label_mismatch"
   | "strategy_unsettled"
   | "cap_mismatch"
@@ -326,6 +335,17 @@ export interface PlausibilityFinding {
   title: string;
   /** what it means and what to do */
   detail: string;
+}
+
+/**
+ * Whether a finding stands against the model's returns (research pass 38):
+ * a high one — figures that cannot all be true at once — or an implied cap
+ * under the floor. While one stands, the deal page's sensitivity playground
+ * withholds its tiles and its max bid and says why, as it does for a
+ * placeholder's (lib/underwrite/report-grid `misreadPageLine`).
+ */
+export function findingWithholdsReturns(f: Pick<PlausibilityFinding, "code" | "severity">): boolean {
+  return f.severity === "high" || f.code === "implied_cap_low";
 }
 
 const money = (n: number): string => compactUsd(n);
@@ -1047,6 +1067,25 @@ export function planSummary(
   };
 }
 
+// The words on an NOI row that say its figure is not a year's whole dollars:
+// a month at a time ("NOI (monthly)", "45,000 per month", "$/mo"), or in
+// thousands ("2,450 ($000s)", "in thousands").
+const PER_MONTH_WORDS = /\bper\s+month\b|\bmonthly\b|\ba\s+month\b|\/\s*mo(?:nth)?\b/i;
+const IN_THOUSANDS_WORDS = /\(\s*\$?\s*0{3}'?s?\s*\)|\$\s*0{3}'?s?(?![\d,])|\bin\s+thousands\b/i;
+
+/** Where an NOI row's own words say its figure is a month's or in thousands,
+ *  the sentence that quotes them — the row is the one the figure was read
+ *  from, label and value as stated; "" where they say neither. */
+function noiRowWords(metrics: MetricLike[], f: NoiFigure): string {
+  const row = metrics.find((m) => m.label === f.label && parseMoney(m.value) === f.value);
+  if (!row) return "";
+  const words = `${row.label} ${row.value}`;
+  const quoted = `“${row.label.trim()}: ${row.value.trim()}”`;
+  if (PER_MONTH_WORDS.test(words)) return ` The row reads ${quoted} — a month's figure, which every return here runs as a year's.`;
+  if (IN_THOUSANDS_WORDS.test(words)) return ` The row reads ${quoted} — a figure in thousands of dollars, which every return here runs as dollars.`;
+  return "";
+}
+
 /**
  * Check the extraction's headline figures against each other. Returns the
  * findings, most severe first, deduplicated by code. Empty when the figures
@@ -1142,6 +1181,32 @@ export function assessPlausibility(
     });
   }
 
+  // The NOI the building earns as bought: the in-place figure, else Year 1.
+  const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1");
+
+  // 1b. An NOI far UNDER what a stabilized building yields on this price
+  //     (research pass 38). Under the floor is, as a rule of thumb, a price
+  //     for land or a redevelopment, a figure stated a month at a time or in
+  //     thousands, or a misread — said as the rule of thumb it is, with the
+  //     row's own words where they say which. The figure tested is the one
+  //     the model runs year 1 on: the NOI as bought, else, on a stabilized
+  //     deal that states no other, its stabilized figure. None at or under
+  //     zero, which is no income at all (rule 5), and none at or over the
+  //     ceiling, which rule 1 has said.
+  const anchor = going ?? figs.find((f) => f.kind === "stabilized") ?? null;
+  if (strategy.kind === "stabilized" && anchor && anchor.value > 0 && anchor.value / price < IMPLIED_CAP_FLOOR) {
+    const implied = anchor.value / price;
+    findings.push({
+      code: "implied_cap_low",
+      severity: "medium",
+      title: `${anchor.label} of ${money(anchor.value)} implies ${withArticle(pct(implied, 2))} cap rate on the ${money(price)} ${priceWord}`,
+      detail: `Under ${pct(IMPLIED_CAP_FLOOR, 0)} of the price is under the going-in cap a stabilized building trades at — a rule of thumb, not a market figure: an NOI that low is, most often, a price for land or a redevelopment, a figure stated a month at a time or in thousands, or a misread.${noiRowWords(
+        metrics,
+        anchor,
+      )} Check the source page before relying on any return built from these two figures.`,
+    });
+  }
+
   // 2. A stated going-in cap that disagrees with NOI ÷ price — read through
   //    the one cap reader every other surface uses, so a residual, Year-3 or
   //    on-cost cap that no surface shows can't manufacture a finding here.
@@ -1151,7 +1216,6 @@ export function assessPlausibility(
     capPctRaw != null && capPctRaw / 100 > 0.005 && capPctRaw / 100 <= IMPLIED_CAP_CEILING
       ? capPctRaw / 100
       : null;
-  const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1");
   if (statedCap != null && going) {
     const implied = going.value / price;
     if (implied < IMPLIED_CAP_CEILING && Math.abs(implied - statedCap) > 0.015) {

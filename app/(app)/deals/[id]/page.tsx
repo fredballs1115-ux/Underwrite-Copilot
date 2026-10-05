@@ -888,6 +888,9 @@ export default async function DealPage({
         // more has its returns, cap and bid withheld, the sentence naming
         // the occupancy stated (lib/underwrite/report-grid).
         occupancyPct: derived.meta.occupancyPct ?? null,
+        // The panel's findings under the header: while figures that do not
+        // tie stand, the tiles and the bid are withheld with the claim.
+        findings: plausibility,
       }
     : null;
   // The cap the plan's yield on cost is measured against: the model's own

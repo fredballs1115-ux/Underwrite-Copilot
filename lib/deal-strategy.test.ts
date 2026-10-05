@@ -1038,3 +1038,57 @@ describe("the seventh review's budget and plausibility cases", () => {
     expect(assessPlausibility(noCost).map((f) => f.code)).not.toContain("basis_out_of_band");
   });
 });
+
+describe("an implied going-in cap under the floor is a finding, said as the rule of thumb it is (research pass 38)", () => {
+  // The pass's fixtures, row for row.
+  const rows = (assetClass: string, list: [string, string, string?][]) =>
+    ex(
+      list.map(([label, value, basis]) => metric(label, value, { page: "p. 3", ...(basis ? { basis: basis as ExtractedMetric["basis"] } : {}) })),
+      { assetClass, address: "", market: "" },
+    );
+  const RULE =
+    "Under 2% of the price is under the going-in cap a stabilized building trades at — a rule of thumb, not a market figure: an NOI that low is, most often, a price for land or a redevelopment, a figure stated a month at a time or in thousands, or a misread.";
+
+  it("names an NOI stated a month at a time, which every return ran as a year's", () => {
+    const monthly = rows("Retail", [["Asking price", "6,500,000"], ["NOI (monthly)", "45,000", "in_place"], ["Total SF", "28,000 SF"]]);
+    const [f] = assessPlausibility(monthly);
+    expect(f).toEqual({
+      code: "implied_cap_low",
+      severity: "medium",
+      title: "NOI (monthly) of $45k implies a 0.69% cap rate on the $6.5M price",
+      detail: `${RULE} The row reads “NOI (monthly): 45,000” — a month's figure, which every return here runs as a year's. Check the source page before relying on any return built from these two figures.`,
+    });
+    // The value's own words count too, beside a stated cap that disagrees.
+    const perMonth = rows("Retail", [["Asking price", "6,500,000"], ["NOI (in-place)", "45,000 per month", "in_place"], ["Going-in cap rate", "8.30%"], ["Total SF", "28,000 SF"]]);
+    const codes = assessPlausibility(perMonth);
+    expect(codes.map((x) => x.code).sort()).toEqual(["cap_mismatch", "implied_cap_low"]);
+    expect(codes.find((x) => x.code === "implied_cap_low")!.detail).toContain("The row reads “NOI (in-place): 45,000 per month” — a month's figure");
+  });
+
+  it("names an NOI stated in thousands, which every return ran as dollars", () => {
+    const thousands = rows("Office", [["Asking price", "45,000,000"], ["NOI (in-place)", "2,450 ($000s)", "in_place"], ["Total SF", "310,000 SF"]]);
+    const [f] = assessPlausibility(thousands);
+    expect(f.code).toBe("implied_cap_low");
+    expect(f.title).toBe("NOI (in-place) of $2k implies a 0.01% cap rate on the $45.0M price");
+    expect(f.detail).toContain("The row reads “NOI (in-place): 2,450 ($000s)” — a figure in thousands of dollars, which every return here runs as dollars.");
+  });
+
+  it("says the rule alone where the row's words say neither, and only on a deal read as stabilized", () => {
+    const low = rows("Multifamily", [["Asking price", "50,000,000"], ["NOI (in-place)", "600,000", "in_place"], ["Units", "100"]]);
+    const [f] = assessPlausibility(low);
+    expect(f.code).toBe("implied_cap_low");
+    expect(f.title).toBe("NOI (in-place) of $600k implies a 1.20% cap rate on the $50.0M price");
+    expect(f.detail).toBe(`${RULE} Check the source page before relying on any return built from these two figures.`);
+    // A 3%-occupied office earning $45k on $8.5M.
+    const occ3 = rows("Office", [["Asking price", "8,500,000"], ["Total SF", "42,000 SF"], ["Occupancy", "3%", "in_place"], ["NOI (in-place)", "45,000", "in_place"]]);
+    expect(assessPlausibility(occ3).map((x) => x.code)).toEqual(["implied_cap_low"]);
+    // At the floor and over it, nothing; a plan deal's in-place income is the plan's to judge.
+    const atFloor = rows("Multifamily", [["Asking price", "50,000,000"], ["NOI (in-place)", "1,000,000", "in_place"], ["Units", "100"]]);
+    expect(assessPlausibility(atFloor).map((x) => x.code)).not.toContain("implied_cap_low");
+    const plan = { ...low, strategy: { kind: "value_add" as const, summary: "", capitalBudget: "", timeline: "" } };
+    expect(assessPlausibility(plan).map((x) => x.code)).not.toContain("implied_cap_low");
+    // No income at all is rule 5's, never a cap under the floor.
+    const negative = rows("Office", [["Asking price", "8,500,000"], ["NOI (in-place)", "(310,000)", "in_place"]]);
+    expect(assessPlausibility(negative).map((x) => x.code)).toEqual(["no_income_in_place"]);
+  });
+});

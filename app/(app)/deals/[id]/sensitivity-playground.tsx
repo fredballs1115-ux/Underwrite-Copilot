@@ -20,6 +20,8 @@ import { scoreMandateFit } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
 import { solveMaxBid, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
 import {
+  MISREAD_WORD,
+  misreadPageLine,
   nearlyVacantPageLine,
   nearlyVacantWord,
   placeholderPageLine,
@@ -27,6 +29,7 @@ import {
   type ModelSources,
 } from "@/lib/underwrite/report-grid";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
+import type { PlausibilityFinding } from "@/lib/deal-strategy";
 
 /** Everything the playground needs, computed server-side once. */
 export interface PlaygroundData {
@@ -61,6 +64,12 @@ export interface PlaygroundData {
    *  naming the occupancy stated (lib/underwrite/report-grid
    *  `nearlyVacantReason`) */
   occupancyPct?: number | null;
+  /** the plausibility check's findings on the memorandum's figures (lib/
+   *  deal-strategy `assessPlausibility`, the panel under the deal's header):
+   *  while a high one or an implied cap under the floor stands, the tiles
+   *  and the max bid are withheld with its claim (lib/underwrite/report-grid
+   *  `misreadPageLine`); absent, they stand */
+  findings?: PlausibilityFinding[] | null;
 }
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
@@ -151,14 +160,24 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // vacancy, so a step of the lever moves the NOI by a multiple, and no
   // return, cap or bid is struck on it.
   const vacantWord = nearlyVacantWord(inputs);
+  // And figures the plausibility check finds do not tie (lib/deal-strategy
+  // `findingWithholdsReturns`: a high finding, or an implied cap under the
+  // floor — an NOI stated a month at a time): returns built on them would
+  // be a misread's, whatever price is typed.
+  const misread = misreadPageLine(data.findings, { maxBid: false }) != null;
   const placeholder = placeholderReason(inputs, sources, { priceEntered }) != null;
-  const withheld = own != null || placeholder || vacantWord != null;
+  const withheld = own != null || placeholder || vacantWord != null || misread;
   // The base case, at the modelled price, is a placeholder's wherever the
   // model assumed either figure: a moved lever is then set against nothing.
-  const baseWithheld = own != null || placeholderReason(inputs, sources) != null || vacantWord != null;
+  const baseWithheld = own != null || placeholderReason(inputs, sources) != null || vacantWord != null || misread;
   const compare = dirty && !baseWithheld;
   const naWord =
-    own ?? (placeholder ? (pricePlaceholder && !priceEntered ? "no price" : "assumed NOI") : (vacantWord ?? ""));
+    own ??
+    (placeholder
+      ? pricePlaceholder && !priceEntered
+        ? "no price"
+        : "assumed NOI"
+      : (vacantWord ?? (misread ? MISREAD_WORD : "")));
   // No cap is struck on year-1 NOI where the price did not buy the
   // building, where the NOI is the model's assumption (an assumed 6% of the
   // price printed "6.00%" on every such deal), or where the building runs
@@ -281,10 +300,12 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       ? `${data.interest.line}${floorsSet ? " The max bid, solved on them, is withheld too." : ""}`
       : null;
   // A placeholder's reason first; else, on a building the model runs nearly
-  // vacant, that reason (lib/underwrite/report-grid).
+  // vacant, that reason; else the finding that stands against the returns
+  // (lib/underwrite/report-grid) — one sentence over the tiles.
   const withheldLine =
     placeholderPageLine(inputs, sources, { priceEntered, maxBid: floorsSet && own == null }) ??
-    nearlyVacantPageLine(inputs, data.occupancyPct, { maxBid: floorsSet && own == null });
+    nearlyVacantPageLine(inputs, data.occupancyPct, { maxBid: floorsSet && own == null }) ??
+    misreadPageLine(data.findings, { maxBid: floorsSet && own == null });
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">

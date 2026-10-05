@@ -11,6 +11,7 @@ import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { computeUnderwrite } from "@/lib/underwrite/engine";
 import { buildSensitivityData, maxBidSentence, nearlyVacantReason } from "@/lib/underwrite/report-grid";
 import { SensitivityPlayground, type PlaygroundData } from "@/app/(app)/deals/[id]/sensitivity-playground";
+import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { a11yIssues, gluedWords, visibleText as textOf } from "./render-lint";
 
@@ -71,6 +72,37 @@ describe("a building the model runs nearly vacant (research pass 38, item 1)", (
     const { text } = drawn(deal("Office", [["Asking price", "8,500,000"], ["Total SF", "42,000 SF"], ["Occupancy", "3%", "in_place"], ["NOI (in-place)", "45,000", "in_place"]]));
     expect(text).toContain("stated 3% occupied, the model's rent line is that space's revenue grossed up through 97% vacancy");
     expect(text.match(/n\/a — 97% vacant/g)?.length).toBe(4);
+  });
+});
+
+describe("figures the plausibility check finds do not tie withhold the tiles (research pass 38, item 4)", () => {
+  // A retail strip whose NOI the memorandum states a month at a time: the
+  // model ran it as a year's, and the page printed "Equity multiple −1.53x"
+  // and "Year-1 DSCR 0.16x" with no finding.
+  const MONTHLY = deal("Retail", [["Asking price", "6,500,000"], ["NOI (monthly)", "45,000", "in_place"], ["Total SF", "28,000 SF"]]);
+
+  it("withholds the tiles and the max bid with the finding's own claim, as a placeholder's are", () => {
+    const findings = assessPlausibility(MONTHLY, inferStrategy(MONTHLY));
+    expect(findings.map((f) => f.code)).toEqual(["implied_cap_low"]);
+    const { d, html, text } = drawn(MONTHLY, { findings });
+    expect(text).toContain(
+      "The returns and the max bid are withheld: NOI (monthly) of $45k implies a 0.69% cap rate on the $6.5M price, and returns built on figures that do not tie would be a misread's.",
+    );
+    expect(text.match(/n\/a — figures don't tie/g)?.length).toBe(4);
+    const r = computeUnderwrite(d.inputs);
+    expect(r.returns.leveredEquityMultiple!).toBeLessThan(0);
+    for (const figure of ["−1.53x", "-1.53x", "0.16x", "−9.6%", "-9.6%"]) expect(text).not.toContain(figure);
+    expect(html).not.toContain("Max bid");
+    expect(html).not.toContain('data-qa="playground-dscr-test"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("leaves a building whose figures tie exactly as before", () => {
+    const priced = deal("Retail", [["Asking price", "6,500,000"], ["NOI (in-place)", "520,000", "in_place"], ["Total SF", "28,000 SF"]]);
+    const findings = assessPlausibility(priced, inferStrategy(priced));
+    expect(findings).toEqual([]);
+    expect(drawn(priced, { findings }).html).toBe(drawn(priced).html);
   });
 });
 
