@@ -7491,6 +7491,389 @@
           "note": "Kenosha, WI — Wrongdave at English Wikipedia, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37287680216)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:13220",
+      "city": "Beckley, West Virginia",
+      "area": "Beckley, WV",
+      "wikipedia": [
+        "Beckley, West Virginia",
+        "New River Gorge Bridge",
+        "New River Gorge National Park and Preserve",
+        "Fayetteville, West Virginia"
+      ],
+      "categories": [
+        "New River Gorge Bridge",
+        "New River Gorge National Park and Preserve",
+        "Views of Beckley, West Virginia",
+        "Beckley, West Virginia"
+      ],
+      "queries": [
+        "New River Gorge Bridge autumn",
+        "New River Gorge Bridge view",
+        "Beckley West Virginia downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:46300",
+      "city": "Twin Falls, Idaho",
+      "area": "Twin Falls, ID",
+      "wikipedia": [
+        "Twin Falls, Idaho",
+        "Shoshone Falls",
+        "Perrine Bridge",
+        "Snake River Canyon (Idaho)"
+      ],
+      "categories": [
+        "Shoshone Falls",
+        "Perrine Bridge",
+        "Snake River Canyon (Idaho)",
+        "Twin Falls, Idaho"
+      ],
+      "queries": [
+        "Shoshone Falls Idaho",
+        "Perrine Bridge Snake River Canyon",
+        "Twin Falls Idaho aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:18020",
+      "city": "Columbus, Indiana",
+      "area": "Columbus, IN",
+      "wikipedia": [
+        "Columbus, Indiana",
+        "First Christian Church (Columbus, Indiana)",
+        "Bartholomew County Courthouse",
+        "Miller House (Columbus, Indiana)"
+      ],
+      "categories": [
+        "Architecture of Columbus, Indiana",
+        "Downtown Columbus, Indiana",
+        "First Christian Church (Columbus, Indiana)",
+        "Columbus, Indiana"
+      ],
+      "queries": [
+        "Columbus Indiana architecture",
+        "Columbus Indiana downtown",
+        "Columbus Indiana skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:11020",
+      "city": "Altoona, Pennsylvania",
+      "area": "Altoona, PA",
+      "wikipedia": [
+        "Altoona, Pennsylvania",
+        "Horseshoe Curve (Pennsylvania)",
+        "Cathedral of the Blessed Sacrament (Altoona, Pennsylvania)"
+      ],
+      "categories": [
+        "Horseshoe Curve (Pennsylvania)",
+        "Views of Altoona, Pennsylvania",
+        "Altoona, Pennsylvania"
+      ],
+      "queries": [
+        "Horseshoe Curve Altoona train",
+        "Altoona Pennsylvania skyline",
+        "Altoona Pennsylvania aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:48540",
+      "city": "Wheeling, West Virginia",
+      "area": "Wheeling, WV",
+      "wikipedia": [
+        "Wheeling, West Virginia",
+        "Wheeling Suspension Bridge",
+        "Wheeling Island"
+      ],
+      "categories": [
+        "Wheeling Suspension Bridge",
+        "Views of Wheeling, West Virginia",
+        "Downtown Wheeling, West Virginia",
+        "Wheeling, West Virginia"
+      ],
+      "queries": [
+        "Wheeling Suspension Bridge Ohio River",
+        "Wheeling West Virginia skyline",
+        "Wheeling West Virginia downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:41780",
+      "city": "Sandusky, Ohio",
+      "area": "Sandusky, OH",
+      "wikipedia": [
+        "Sandusky, Ohio",
+        "Cedar Point",
+        "Marblehead Lighthouse (Ohio)",
+        "Kelleys Island, Ohio"
+      ],
+      "categories": [
+        "Cedar Point",
+        "Marblehead Lighthouse (Ohio)",
+        "Views of Sandusky, Ohio",
+        "Sandusky, Ohio"
+      ],
+      "queries": [
+        "Cedar Point skyline Lake Erie",
+        "Marblehead Lighthouse Lake Erie",
+        "Sandusky Ohio waterfront"
+      ]
+    },
+    {
+      "metroId": "cbsa:24260",
+      "city": "Grand Island, Nebraska",
+      "area": "Grand Island, NE",
+      "wikipedia": [
+        "Grand Island, Nebraska",
+        "Stuhr Museum of the Prairie Pioneer",
+        "Platte River"
+      ],
+      "categories": [
+        "Grand Island, Nebraska",
+        "Downtown Grand Island, Nebraska",
+        "Stuhr Museum of the Prairie Pioneer",
+        "Platte River"
+      ],
+      "queries": [
+        "Grand Island Nebraska downtown",
+        "Platte River sandhill cranes Grand Island",
+        "Grand Island Nebraska aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:34580",
+      "city": "Mount Vernon, Washington",
+      "area": "Mount Vernon-Anacortes, WA",
+      "wikipedia": [
+        "Mount Vernon, Washington",
+        "Anacortes, Washington",
+        "Skagit Valley Tulip Festival",
+        "Deception Pass"
+      ],
+      "categories": [
+        "Skagit Valley Tulip Festival",
+        "Anacortes, Washington",
+        "Mount Vernon, Washington",
+        "Deception Pass"
+      ],
+      "queries": [
+        "Skagit Valley tulip fields",
+        "Anacortes Washington harbor",
+        "Deception Pass bridge"
+      ]
+    },
+    {
+      "metroId": "cbsa:48300",
+      "city": "Wenatchee, Washington",
+      "area": "Wenatchee-East Wenatchee, WA",
+      "wikipedia": [
+        "Wenatchee, Washington",
+        "Ohme Gardens",
+        "Lake Chelan"
+      ],
+      "categories": [
+        "Wenatchee, Washington",
+        "Views of Wenatchee, Washington",
+        "Ohme Gardens",
+        "Lake Chelan"
+      ],
+      "queries": [
+        "Wenatchee Washington Columbia River",
+        "Wenatchee Washington aerial view",
+        "Lake Chelan view"
+      ]
+    },
+    {
+      "metroId": "cbsa:22140",
+      "city": "Farmington, New Mexico",
+      "area": "Farmington, NM",
+      "wikipedia": [
+        "Farmington, New Mexico",
+        "Shiprock",
+        "Bisti/De-Na-Zin Wilderness",
+        "Aztec Ruins National Monument"
+      ],
+      "categories": [
+        "Shiprock (rock formation)",
+        "Bisti/De-Na-Zin Wilderness",
+        "Farmington, New Mexico",
+        "Aztec Ruins National Monument"
+      ],
+      "queries": [
+        "Shiprock New Mexico",
+        "Bisti Badlands New Mexico",
+        "Farmington New Mexico Animas River"
+      ]
+    },
+    {
+      "metroId": "cbsa:30020",
+      "city": "Lawton, Oklahoma",
+      "area": "Lawton, OK",
+      "wikipedia": [
+        "Lawton, Oklahoma",
+        "Wichita Mountains",
+        "Mount Scott (Oklahoma)",
+        "Wichita Mountains Wildlife Refuge"
+      ],
+      "categories": [
+        "Wichita Mountains",
+        "Wichita Mountains Wildlife Refuge",
+        "Mount Scott (Oklahoma)",
+        "Lawton, Oklahoma"
+      ],
+      "queries": [
+        "Wichita Mountains Oklahoma",
+        "Mount Scott Oklahoma view",
+        "Lawton Oklahoma skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:26140",
+      "city": "Homosassa Springs, Florida",
+      "area": "Homosassa Springs, FL",
+      "wikipedia": [
+        "Homosassa Springs, Florida",
+        "Ellie Schiller Homosassa Springs Wildlife State Park",
+        "Crystal River, Florida",
+        "Three Sisters Springs"
+      ],
+      "categories": [
+        "Homosassa Springs Wildlife State Park",
+        "Crystal River, Florida",
+        "Three Sisters Springs",
+        "Homosassa River"
+      ],
+      "queries": [
+        "Homosassa Springs manatee",
+        "Crystal River Florida springs",
+        "Homosassa River Florida"
+      ]
+    },
+    {
+      "metroId": "cbsa:33140",
+      "city": "Michigan City, Indiana",
+      "area": "Michigan City-La Porte, IN",
+      "wikipedia": [
+        "Michigan City, Indiana",
+        "Michigan City East Pierhead Light",
+        "Old Michigan City Light"
+      ],
+      "categories": [
+        "Michigan City East Pierhead Light",
+        "Old Michigan City Light",
+        "Michigan City, Indiana",
+        "Washington Park (Michigan City, Indiana)"
+      ],
+      "queries": [
+        "Michigan City lighthouse Lake Michigan",
+        "Michigan City Indiana pier",
+        "Michigan City Indiana beach"
+      ]
+    },
+    {
+      "metroId": "cbsa:34740",
+      "city": "Muskegon, Michigan",
+      "area": "Muskegon-Norton Shores, MI",
+      "wikipedia": [
+        "Muskegon, Michigan",
+        "Muskegon South Pierhead Light",
+        "Muskegon Lake"
+      ],
+      "categories": [
+        "Muskegon South Pierhead Light",
+        "Muskegon, Michigan",
+        "Muskegon Lake",
+        "Pere Marquette Park (Muskegon)"
+      ],
+      "queries": [
+        "Muskegon lighthouse Lake Michigan",
+        "Muskegon Michigan waterfront",
+        "Muskegon Lake sunset"
+      ]
+    },
+    {
+      "metroId": "cbsa:27780",
+      "city": "Johnstown, Pennsylvania",
+      "area": "Johnstown, PA",
+      "wikipedia": [
+        "Johnstown, Pennsylvania",
+        "Johnstown Inclined Plane",
+        "Stone Bridge (Johnstown, Pennsylvania)"
+      ],
+      "categories": [
+        "Johnstown Inclined Plane",
+        "Views of Johnstown, Pennsylvania",
+        "Johnstown, Pennsylvania"
+      ],
+      "queries": [
+        "Johnstown Inclined Plane view",
+        "Johnstown Pennsylvania skyline",
+        "Johnstown Pennsylvania aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:47460",
+      "city": "Walla Walla, Washington",
+      "area": "Walla Walla, WA",
+      "wikipedia": [
+        "Walla Walla, Washington",
+        "Whitman College",
+        "Walla Walla Valley AVA"
+      ],
+      "categories": [
+        "Walla Walla, Washington",
+        "Downtown Walla Walla, Washington",
+        "Walla Walla Valley AVA",
+        "Whitman College"
+      ],
+      "queries": [
+        "Walla Walla vineyards",
+        "Walla Walla Washington downtown",
+        "Walla Walla wheat fields"
+      ]
+    },
+    {
+      "metroId": "cbsa:43580",
+      "city": "Sioux City, Iowa",
+      "area": "Sioux City, IA",
+      "wikipedia": [
+        "Sioux City, Iowa",
+        "Sergeant Floyd Monument",
+        "Stone State Park"
+      ],
+      "categories": [
+        "Views of Sioux City, Iowa",
+        "Downtown Sioux City, Iowa",
+        "Sioux City, Iowa",
+        "Sergeant Floyd Monument"
+      ],
+      "queries": [
+        "Sioux City Iowa skyline",
+        "Sioux City Missouri River",
+        "Sioux City Iowa aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:30300",
+      "city": "Lewiston, Idaho",
+      "area": "Lewiston, ID",
+      "wikipedia": [
+        "Lewiston, Idaho",
+        "Clarkston, Washington",
+        "Snake River"
+      ],
+      "categories": [
+        "Lewiston, Idaho",
+        "Clarkston, Washington",
+        "Snake River in Idaho"
+      ],
+      "queries": [
+        "Lewiston Idaho Snake River",
+        "Lewiston Clarkston confluence",
+        "Lewiston Idaho aerial view"
+      ]
     }
   ]
 }
