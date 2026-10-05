@@ -45,7 +45,7 @@ import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
 import { PLAN_YOC_TITLE, YOC_WITHHELD } from "@/lib/plan-facts";
 import { FOLD_WORD, checkedOf, checkedSentence, fitCellText, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
-import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
+import { DEAL_NAME_MAX, nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
   STAGES,
   STAGE_LABEL,
@@ -3177,6 +3177,7 @@ function NewDealForm({
             <input
               name="name"
               required
+              maxLength={DEAL_NAME_MAX}
               value={name}
               onChange={(e) => {
                 setName(e.target.value);

@@ -43,6 +43,7 @@ import {
   buildManualExtraction,
   firstSignalFromExtraction,
 } from "@/lib/manual-deal";
+import { dealNameOf } from "@/lib/deal-name";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { checkPdfOpens } from "@/lib/pdf-open";
 import { capRefusalOf } from "@/lib/deal-allowance";
@@ -87,7 +88,9 @@ export type CreateDealResult =
  * can surface failures its own way.
  */
 async function createDealCore(formData: FormData): Promise<CreateDealResult> {
-  const name = String(formData.get("name") ?? "").trim();
+  // The one cap every name is stored under (lib/deal-name): the upload had
+  // stored a name of any length (research pass 42).
+  const name = dealNameOf(formData.get("name"));
   const assetClass = String(formData.get("assetClass") ?? "auto");
   const file = formData.get("om");
 
@@ -776,7 +779,7 @@ export async function setOffersDue(formData: FormData) {
  *  offers it no Rename; this refuses one sent anyway. */
 export async function renameDeal(formData: FormData) {
   const dealId = String(formData.get("dealId") ?? "");
-  const name = String(formData.get("name") ?? "").trim();
+  const name = dealNameOf(formData.get("name"));
   if (!dealId || !name) redirect(`/deals/${dealId}`);
 
   const supabase = await createSupabaseServerClient();
@@ -794,7 +797,7 @@ export async function renameDeal(formData: FormData) {
 
   await supabase
     .from("deals")
-    .update({ name: name.slice(0, 120), updated_at: new Date().toISOString() })
+    .update({ name, updated_at: new Date().toISOString() })
     .eq("id", dealId);
   revalidatePath(`/deals/${dealId}`);
   revalidatePath("/deals");

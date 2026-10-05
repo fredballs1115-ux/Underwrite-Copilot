@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { nameFromFile, nameIsFromFile, prefillName, restoredFileName } from "./deal-name";
+import { DEAL_NAME_MAX, dealNameOf, nameFromFile, nameIsFromFile, prefillName, restoredFileName } from "./deal-name";
 
 describe("a deal's name from its memorandum's file name", () => {
   it("reads the file's name as words, the way the batch upload always has", () => {
     expect(nameFromFile("the-maddox_OM_v2.pdf")).toBe("The maddox OM v2");
     expect(nameFromFile("Harbor View Apartments.PDF")).toBe("Harbor View Apartments");
     expect(nameFromFile("__--.pdf")).toBe("Untitled OM");
-    expect(nameFromFile(`${"a".repeat(120)}.pdf`)).toHaveLength(80);
+    // The one cap every name is stored under (research pass 42): the batch's
+    // name is the deal's, so its cut is the stored name's 120, not 80.
+    expect(nameFromFile(`${"a".repeat(200)}.pdf`)).toHaveLength(DEAL_NAME_MAX);
   });
 
   it("fills an empty name field from the chosen PDF, and a newer PDF replaces the name the last one gave", () => {

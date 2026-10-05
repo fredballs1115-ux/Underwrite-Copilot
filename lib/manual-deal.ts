@@ -16,6 +16,7 @@
 import { parseMoney, parsePct, screenStamp } from "@/lib/criteria";
 import { assetWords } from "@/lib/asset-words";
 import { READER_ROUND } from "@/lib/reader-round";
+import { dealNameOf } from "@/lib/deal-name";
 import type {
   ExtractionResult,
   ExtractedMetric,
@@ -86,7 +87,8 @@ export function factsFromForm(form: {
       .trim()
       .slice(0, cap);
   return {
-    name: s("name", 120),
+    // The one cap every name is stored under (lib/deal-name).
+    name: dealNameOf(form.get("name")),
     assetClass: s("assetClass", 40) || "multifamily",
     market: s("market"),
     address: s("addressText"),

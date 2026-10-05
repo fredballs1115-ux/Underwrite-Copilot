@@ -41,6 +41,36 @@ const STAND_INS: ((s: string) => string)[] = [
   (s) => s.replace(/[\u2002-\u200a\u202f\u205f]/g, " "),
 ];
 
+/** A word longer than this wraps by `nameBreaks`; shorter, it wraps whole. */
+const NAME_WORD_WHOLE = 24;
+/** The pieces a run with no separator is cut into, as the memo's own
+ *  hyphenation cuts a long word. */
+const NAME_PIECE = 12;
+/** An empty part react-pdf reads as a break with nothing drawn: textkit
+ *  removes a soft hyphen from a part, and an empty part is zero-width glue,
+ *  where a break draws no hyphen (a break between two parts of a word is a
+ *  penalty, and react-pdf draws "-" at every one). */
+const BREAK_HERE = "­";
+
+/**
+ * Where a deal's name may break on paper (research pass 42, L1): react-pdf's
+ * hyphenation callback for the Text that prints it. A word of the name that
+ * fits any column wraps whole. A longer one — a URL pasted as the name —
+ * breaks after its slashes (never inside "//") and after each hyphen, dot or
+ * underscore it already has, and a run still longer than a column is cut in
+ * twelve-letter pieces; every break draws nothing, so the printed name is
+ * the name: "…/1400-Market-St-P- hiladelphia-…" had been drawn by the
+ * memo's own hyphenation, which puts a hyphen at every break.
+ */
+export function nameBreaks(word: string): string[] {
+  if (word.length <= NAME_WORD_WHOLE) return [word];
+  const pieces = word
+    .split(/(?<=[-_.])|(?<=\/)(?!\/)/)
+    .filter(Boolean)
+    .flatMap((p) => (p.length > NAME_WORD_WHOLE ? (p.match(new RegExp(`.{1,${NAME_PIECE}}`, "gu")) ?? [p]) : [p]));
+  return pieces.flatMap((p, i) => (i === 0 ? [p] : [BREAK_HERE, p]));
+}
+
 export const pdfSafe = (s: string): string =>
   STAND_INS.reduce((t, f) => f(t), s).replace(/[^\n\u0020-\u007e\u00a0-\u00ff]/gu, (ch) =>
     WINANSI_EXTRA.has(ch.codePointAt(0)!) ? ch : "",

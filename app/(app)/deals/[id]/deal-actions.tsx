@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { renameDeal, deleteDeal } from "../actions";
+import { DEAL_NAME_MAX } from "@/lib/deal-name";
 
 const itemCls =
   "flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm font-medium transition-colors";
@@ -111,7 +112,7 @@ export function DealActions({
                   defaultValue={dealName}
                   required
                   autoFocus
-                  maxLength={120}
+                  maxLength={DEAL_NAME_MAX}
                   className="w-full rounded-lg border border-line bg-paper px-3 py-2 text-sm outline-none transition-shadow focus:border-brand focus-visible:ring-2 focus-visible:ring-brand/40"
                 />
                 <div className="flex gap-2">

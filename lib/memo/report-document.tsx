@@ -18,6 +18,7 @@ import type {
   VerdictResult,
 } from "@/lib/anthropic/types";
 import { basePosition, buildMemoData, MemoPage, pdfSafe, type MemoCover, type MemoData } from "./memo-document";
+import { nameBreaks } from "./pdf-text";
 import { rangeInOrder } from "@/lib/verdict-range";
 import { typicalRangeParts } from "@/lib/typical-range";
 
@@ -826,7 +827,9 @@ function PageChrome({
             <Text style={s.pageHeadBrand}>Underwrite Copilot</Text>
           ) : null}
         </View>
-        <Text style={s.pageHeadMeta}>{dealName} — full screening report</Text>
+        <Text style={s.pageHeadMeta} hyphenationCallback={nameBreaks}>
+          {dealName} — full screening report
+        </Text>
       </View>
       <TitleRow title={title} count={count} />
       {children}

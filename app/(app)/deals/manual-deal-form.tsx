@@ -12,6 +12,7 @@ import type { StructuredAddress } from "@/lib/address";
 import { ASSET_CLASS_OPTIONS } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
 import { NOTES_MAX, type ManualDealFacts } from "@/lib/manual-deal";
+import { DEAL_NAME_MAX } from "@/lib/deal-name";
 
 /**
  * Type a deal in — no OM. One component serves both flows: creating a deal
@@ -92,6 +93,7 @@ export function ManualDealForm({
         <input
           name="name"
           required
+          maxLength={DEAL_NAME_MAX}
           value={name}
           onChange={(e) => setName(e.target.value)}
           aria-label="Deal name"

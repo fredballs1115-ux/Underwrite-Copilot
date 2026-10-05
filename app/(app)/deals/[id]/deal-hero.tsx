@@ -47,6 +47,11 @@ export function priceFigureOf(label: string, stated: string | null): HeroFigure 
     : { label, value: stated, figure: true };
 }
 
+/** The deal's name: wraps anywhere it must (`overflow-wrap: anywhere`, which
+ *  also lets the flex row shrink it) and stops at three lines, the whole name
+ *  in its title. */
+export const HERO_TITLE = "line-clamp-3 min-w-0 text-xl font-semibold tracking-tight [overflow-wrap:anywhere] @3xl:text-2xl";
+
 // One column by default: the picture, the facts, the tools, the panels.
 // Split at the header's own 48rem, and only while a picture is there.
 const GRID = [
@@ -100,8 +105,11 @@ export function DealHero({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               {/* Focusable from script only: "Back to the top" lands here,
-                  out of the sticky bar that hides as it goes. */}
-              <h1 id="deal-title" tabIndex={-1} className="text-xl font-semibold tracking-tight @3xl:text-2xl">
+                  out of the sticky bar that hides as it goes. A name wraps
+                  anywhere it must — a URL pasted as the name had widened a
+                  phone's page to 711px — and a long one stops at three
+                  lines, the whole name in its title (research pass 42). */}
+              <h1 id="deal-title" tabIndex={-1} title={title} className={HERO_TITLE}>
                 {title}
               </h1>
               {chips}

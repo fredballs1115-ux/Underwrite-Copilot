@@ -19,7 +19,7 @@ Font.registerHyphenationCallback((word) =>
   word.length <= 24 ? [word] : (word.match(/.{1,12}/g) ?? [word]),
 );
 import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
-import { pdfSafe } from "./pdf-text";
+import { nameBreaks, pdfSafe } from "./pdf-text";
 import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { screenedOn } from "@/lib/screen-run";
@@ -1253,6 +1253,7 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
         <Text
           fixed
           style={s.continued}
+          hyphenationCallback={nameBreaks}
           render={({ pageNumber }) => (pageNumber > 1 ? `${data.name} — screening memo, continued` : "")}
         />
         <View style={s.body}>
@@ -1290,7 +1291,11 @@ export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNu
         <View style={s.divider} />
 
         <View style={s.titleRow}>
-          <Text style={[s.title, { flex: 1 }]}>{data.name}</Text>
+          {/* A name breaks where it can break with nothing drawn — after a
+              URL's slashes — never with a hyphen inside it (`nameBreaks`). */}
+          <Text style={[s.title, { flex: 1 }]} hyphenationCallback={nameBreaks}>
+            {data.name}
+          </Text>
           {data.verdictWord ? (
             <View
               style={[s.titleChipBox, { backgroundColor: data.verdictColor }]}

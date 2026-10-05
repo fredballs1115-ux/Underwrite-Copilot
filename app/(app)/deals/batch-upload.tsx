@@ -9,7 +9,7 @@ import {
 } from "./actions";
 // Each file's deal is named from its file name — a starting point the user
 // can edit before the batch runs; the single upload pre-fills the same way.
-import { nameFromFile } from "@/lib/deal-name";
+import { DEAL_NAME_MAX, nameFromFile } from "@/lib/deal-name";
 import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
 // The run itself, pure (lib/batch-run): each answer's status, what the
 // button sends again, and the plan's limit said once with a link.
@@ -282,6 +282,7 @@ export function BatchUpload({
               >
                 <input
                   value={item.name}
+                  maxLength={DEAL_NAME_MAX}
                   disabled={running || item.status.kind === "queued"}
                   aria-label={`Deal name for ${item.file.name}`}
                   onChange={(e) =>
