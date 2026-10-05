@@ -809,8 +809,9 @@ export function buildingSfFromMetrics(metrics: MetricLike[]): number | null {
 // A row COUNTS the units only when its label, read whole, has the shape of
 // a count label: an optional "total" / "number of" / "#" prefix, an
 // optional physical qualifier (residential, apartment, rental, guest,
-// storage, student …), the noun (units, doors, keys, rooms, beds, pads,
-// sites, suites, apartments, homes, lots, spaces) and nothing after it but
+// storage, student, licensed, certified, wet …), the noun (units, doors,
+// keys, rooms, beds, pads, sites, campsites, suites, apartments, homes,
+// lots, spaces, slips) and nothing after it but
 // "count" / "total" / "proposed" / "planned". Everything that merely
 // mentions units — "Unit mix", "Unit sizes", "Units per acre", a price per
 // unit — and every PARTIAL count — "Vacant units", "Affordable units",
@@ -818,8 +819,12 @@ export function buildingSfFromMetrics(metrics: MetricLike[]): number | null {
 // count, and reading one as the count puts a wrong basis on every per-unit
 // surface. Whitelisting the shape beats blacklisting adjectives: the next
 // OM's "Units delivered" needs no new word.
+// A care facility's licensed or certified beds, a marina's (wet) slips and a
+// campground's campsites are each the whole count in the deck's own noun
+// (research pass 28): an SNF's per-bed and a marina's per-slip basis had
+// never been struck.
 const COUNT_LABEL =
-  /^(?:(?:total|net rentable|rentable|gross|overall)\s+)?(?:(?:number|no\.?|count|#)\s+(?:of\s+)?)?(?:total\s+)?(?:(?:proposed|planned|existing|current|as[- ]built|approved|entitled|zoned|permitted)\s+)?(?:(?:residential|apartment|apt\.?|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|mobile[- ]home|manufactured[- ]home|mh|rv|senior(?: living)?)\s+)?(?:units?|doors?|keys?|rooms?|guest ?rooms?|beds?|pads?|sites?|home ?sites?|suites?|apartments?|apartment homes?|homes?|lots?|spaces?)(?:\s+(?:count|total|proposed|planned))?$/i;
+  /^(?:(?:total|net rentable|rentable|gross|overall)\s+)?(?:(?:number|no\.?|count|#)\s+(?:of\s+)?)?(?:total\s+)?(?:(?:proposed|planned|existing|current|as[- ]built|approved|entitled|zoned|permitted)\s+)?(?:(?:residential|apartment|apt\.?|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|mobile[- ]home|manufactured[- ]home|mh|rv|senior(?: living)?|licensed|certified|wet)\s+)?(?:units?|doors?|keys?|rooms?|guest ?rooms?|beds?|pads?|sites?|home ?sites?|camp ?sites?|suites?|apartments?|apartment homes?|homes?|lots?|spaces?|slips?)(?:\s+(?:count|total|proposed|planned))?$/i;
 // A parenthetical naming a subset — "(Phase I)", "(Building A)", "(of 312)"
 // — keeps the row from being the count; any other ("(proposed)", "(per
 // OM)", "(IL/AL/MC)") is dropped before the shape is read.
@@ -855,7 +860,7 @@ export function isCountLabel(label: string): boolean {
 // "150 guest rooms", "240 rental units" — so the qualifiers COUNT_LABEL
 // admits are stripped here too.
 const COUNT_WORD =
-  /\b(units?|keys?|doors?|apartments?|apts?\.?|homes?|residences?|beds?|pads?|rooms?|sites?|lots?|spaces?|suites?|total|residential|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|senior|manufactured|mobile[- ]home|mh|rv)\b/gi;
+  /\b(units?|keys?|doors?|apartments?|apts?\.?|homes?|residences?|beds?|pads?|rooms?|sites?|camp ?sites?|lots?|spaces?|suites?|slips?|total|residential|rental|multi[- ]?family|dwelling|leasable|rentable|living|guest|hotel|storage|self[- ]storage|student|senior|manufactured|mobile[- ]home|mh|rv|licensed|certified|wet)\b/gi;
 // A footnote marker on a label or a value — "Units*", "312¹", "Units (1)"
 // — is not part of the count.
 const FOOTNOTE_MARK = /[*†‡¹²³⁴]+/g;

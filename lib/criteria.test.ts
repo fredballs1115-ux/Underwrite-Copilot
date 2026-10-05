@@ -10,6 +10,7 @@ import {
   findPriceRow,
   METRIC_FIND,
   foldBuyBoxChecks,
+  isCountLabel,
   isEmptyBuyBox,
   buyBoxLines,
   parseMoney,
@@ -27,6 +28,8 @@ import {
   type BuyBox,
   type BuyBoxStore,
 } from "./criteria";
+import { countNoun } from "./asset-words";
+import { basisTag } from "./pipeline-slots";
 
 /** The year the bare rows in these cases were screened in. A label that
  *  carries a year of its own is read against it; the cases that turn on
@@ -232,6 +235,34 @@ describe("the count band — units, keys, pads, in the deal's own noun", () => {
     expect(unitCountFromMetrics([{ label: "RV sites", value: "40" }, { label: "Pads", value: "150" }])).toBe(150);
     // An RV resort's sites are its count where nothing else is.
     expect(unitCountFromMetrics([{ label: "RV sites", value: "220" }])).toBe(220);
+  });
+
+  // Research pass 28: a skilled-nursing facility's licensed beds, a marina's
+  // slips and a campground's campsites were no count, so no per-bed or
+  // per-slip basis was ever struck.
+  it("a care facility's licensed beds, a marina's slips and a campground's campsites are each the count, in its own noun", () => {
+    for (const [label, value, n, noun] of [
+      ["Licensed beds", "120", 120, "beds"],
+      ["Certified beds", "120 certified beds", 120, "beds"],
+      ["Wet slips", "250", 250, "slips"],
+      ["Slips", "180 slips", 180, "slips"],
+      ["Campsites", "180", 180, "campsites"],
+      ["Camp sites", "180 campsites", 180, "campsites"],
+    ] as const) {
+      expect(isCountLabel(label), label).toBe(true);
+      expect(unitCountFromMetrics([{ label, value }]), label).toBe(n);
+      expect(countNoun(label, null), label).toBe(noun);
+    }
+    expect(check(evaluateBuyBox("auto", ex([["Wet slips", "250"]]), box), "Slips")?.detail).toContain("this is 250 slips");
+    // A row about the beds or the slips is still no count.
+    for (const label of ["Licensed beds per unit", "Slip rent", "Slips (Phase I)", "Campsite rent", "Bed mix"]) {
+      expect(isCountLabel(label), label).toBe(false);
+    }
+    // The deal's basis in its own noun: the price over the beds, the slips.
+    const snf = { dealName: "Lakeside SNF", assetClass: "Skilled Nursing Facility", metrics: [{ label: "Asking price", value: "$18,000,000", flagged: false, page: "p. 2" }, { label: "Licensed beds", value: "120", flagged: false, page: "p. 2" }] };
+    expect(basisTag(snf, "stabilized")).toBe("$150k/bed");
+    const marina = { dealName: "Harbor Marina", assetClass: "Marina", metrics: [{ label: "Asking price", value: "$14,000,000", flagged: false, page: "p. 2" }, { label: "Wet slips", value: "250", flagged: false, page: "p. 2" }] };
+    expect(basisTag(marina, "stabilized")).toBe("$56k/slip");
   });
 
   it("the class's noun stands in where the OM stated no count, and the check is unknown", () => {

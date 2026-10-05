@@ -449,7 +449,9 @@ export function perSuffix(words: Pick<AssetWords, "basis" | "noun">): string {
  *  hotel and "212 units" on an apartment building. */
 export function countNoun(label: string | null | undefined, cls: string | null | undefined): string {
   const l = (label ?? "").toLowerCase();
-  const m = l.match(/\b(home ?sites?|keys?|beds?|pads?|rooms?|homes?|lots?|sites?|spaces?|suites?|apartments?|doors?|units?|acres?)\b/g);
+  // A marina's slips and a campground's campsites in their own words
+  // (research pass 28), beside a care facility's licensed beds.
+  const m = l.match(/\b(home ?sites?|camp ?sites?|keys?|beds?|pads?|rooms?|homes?|lots?|sites?|spaces?|suites?|slips?|apartments?|doors?|units?|acres?)\b/g);
   if (m?.length) {
     const last = m[m.length - 1].replace(/\s+/g, "");
     const base = last.replace(/s$/, "");

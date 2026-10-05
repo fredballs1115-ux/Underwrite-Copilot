@@ -342,6 +342,28 @@ describe("the area a deal states none of", () => {
     expect(m.sources.rsf?.note).toBe("248 units × 850 SF typical — enter the rentable SF");
   });
 
+  // Research pass 28: licensed beds are a count now, so a care facility
+  // that states no area runs on its beds × the class's 600 SF where it ran
+  // on the 100,000 SF placeholder; a marina's slips change no figure, its
+  // class (none) carrying no typical size.
+  it("runs a care facility on its licensed beds, and a marina's slips on the placeholder still", () => {
+    const snf = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$18,000,000"), metric("NOI (in-place)", "$1,350,000"), metric("Licensed beds", "120")], {
+        assetClass: "Skilled Nursing Facility",
+      }),
+      "fallback",
+    );
+    expect(snf.meta.units).toBe(120);
+    expect(snf.meta.rsf).toBe(120 * 600);
+    expect(snf.sources.rsf?.note).toBe("120 units × 600 SF typical — enter the rentable SF");
+    const marina = deriveUnderwriteInputs(
+      ex([metric("Asking price", "$14,000,000"), metric("NOI (in-place)", "$1,050,000"), metric("Wet slips", "250")], { assetClass: "Marina" }),
+      "fallback",
+    );
+    expect(marina.meta.units).toBe(250);
+    expect(marina.meta.rsf).toBe(100_000);
+  });
+
   it("speaks a hotel's count in keys", () => {
     const m = deriveUnderwriteInputs(
       ex([metric("Asking price", "$24,000,000"), metric("NOI (in-place)", "$2,000,000"), metric("Keys", "120")], {
