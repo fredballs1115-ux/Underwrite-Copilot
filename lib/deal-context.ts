@@ -41,8 +41,10 @@ const compact = (n: number): string => compactUsd(n);
  * top (lib/criteria `parsePrice`), the end that does not flatter a return,
  * and a step that reads the memorandum's "$40–42M" would otherwise strike its
  * own cap or basis on either end. "" where the price row states one figure.
+ * The challenger's notes carry it too (lib/anthropic/pipeline, research pass
+ * 41): its BASIS test reads the same "$40–42M".
  */
-function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind): string {
+export function priceRangeLine(extraction: ExtractionResult | null, kind: StrategyKind): string {
   const row = findPriceMetric(extraction?.metrics ?? [], kind, screenYearOf(extraction));
   const r = row ? priceRange(row.value) : null;
   if (!row || !r) return "";

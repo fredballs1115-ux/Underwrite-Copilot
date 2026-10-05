@@ -1,5 +1,5 @@
 import "server-only";
-import { answeredSiteFlags, type SiteFlagsResult } from "@/lib/site-flags/core";
+import { answeredSiteFlags, floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { withArticle } from "@/lib/article";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
@@ -41,7 +41,7 @@ import {
   plausibilityNote,
   type StrategyKind,
 } from "@/lib/deal-strategy";
-import { dealContextFor } from "@/lib/deal-context";
+import { dealContextFor, priceRangeLine } from "@/lib/deal-context";
 import { interestNote, readInterest } from "@/lib/interest";
 import { assumableNote, readAssumable } from "@/lib/assumable-debt";
 import { affordableNote, readAffordable } from "@/lib/affordable";
@@ -1262,7 +1262,7 @@ async function runAnalysisSteps(
       try {
         const { data: dr } = await admin
           .from("deals")
-          .select("discrepancies, extraction, first_signal, address")
+          .select("discrepancies, extraction, first_signal, address, site_flags")
           .eq("id", dealId)
           .single();
         const disc = (dr?.discrepancies as {
@@ -1283,6 +1283,13 @@ async function runAnalysisSteps(
         challengeEx = ex;
         const strategy = inferStrategy(ex, (dr?.first_signal as FirstSignal | null | undefined) ?? null);
         challengeKind = strategy.kind;
+
+        // A price stated as a range (#466): which end every figure is struck
+        // at, as the deal context tells every step after this one — the
+        // instruction's BASIS test reads the same "$40–42M" in the
+        // memorandum (research pass 41).
+        const range = priceRangeLine(ex, strategy.kind);
+        if (range) notes.push(range);
 
         // Feature 1: the OM-assumed vs T-12-actual NOI gap is the skeptic's
         // first-order fact — a material (>5%) or red-flag (>10%) delta means
@@ -1431,6 +1438,17 @@ async function runAnalysisSteps(
         // seismic PML and the zoning — the site-report traps by name.
         const reports = readSiteReports(ex);
         if (reports) notes.push(siteReportsNote(reports));
+        // FEMA's flood zone, where the site lookup has already answered by
+        // now — a re-screen, or a deal whose page was viewed first. Nothing
+        // waits for it here: the lookup a new deal needs runs before the
+        // comps, as it did (research pass 41: the challenger tests the
+        // insurance line and had never been told the zone).
+        const challengeFlags = answeredSiteFlags(
+          (dr?.site_flags as SiteFlagsResult | null | undefined) ?? null,
+          (dr?.address as { label?: string } | null | undefined)?.label?.trim() ?? "",
+        );
+        const flood = challengeFlags ? floodContextLine(challengeFlags.flood, challengeFlags.pointIsBuilding === true) : null;
+        if (flood) notes.push(flood);
 
         // A student building (#468): the pre-lease pace, the beds still to
         // sign against the model's vacancy, the rent per bed, the walk.

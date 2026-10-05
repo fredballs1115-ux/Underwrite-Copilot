@@ -1034,6 +1034,65 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  // Research pass 41 (M3): the comps, the market check, the verdict and Ask
+  // read which end of a price range every figure is struck at and the flood
+  // zone; the challenger, whose BASIS test and insurance trap read both,
+  // was told neither.
+  it("hands the challenger the price range's end, and the flood zone where the lookup has already answered — never waiting for one", async () => {
+    const label = "5000 Main St, Frisco, TX 75034";
+    state.deals.d1.address = { label, street: "5000 Main St", city: "Frisco", state: "TX", zip: "75034", county: "", submarket: "" };
+    // The deal page's lookup has answered: the building sits in Zone AE.
+    state.deals.d1.site_flags = {
+      status: "ok",
+      subject: { lat: 33.15, lng: -96.82, label },
+      tractGeoid: "48085030100",
+      opportunityZone: null,
+      flood: { zone: "AE", subtype: null, isHighRisk: true },
+      pointIsBuilding: true,
+      retrievedAt: "2026-09-23T11:00:00Z",
+      note: "",
+    };
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      metrics: [{ ...EXTRACTION.metrics[0], value: "$40,000,000 – $42,000,000" }, EXTRACTION.metrics[1]],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("The asking price is stated as a range, $40–42M: every figure here is struck at its top, $42.0M, the end that does not flatter a return.");
+    expect(note).toContain("FEMA's flood map puts the building's point in Zone AE, a Special Flood Hazard Area");
+    // The comps are told the same two sentences, as before.
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("The asking price is stated as a range, $40–42M");
+    expect(context).toContain("in Zone AE, a Special Flood Hazard Area");
+    expect(vi.mocked(claimSiteFlags)).not.toHaveBeenCalled();
+
+    // A lookup that has not answered by the challenger's turn: no flood line
+    // there and no wait for one — the lookup runs before the comps, as it did.
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(scrutinizeComps).mockClear();
+    state.deals.d1.site_flags = { status: "pending", retrievedAt: "2026-09-23T11:59:00Z", note: "" };
+    vi.mocked(runSiteFlags).mockImplementationOnce(async () => {
+      state.deals.d1.site_flags = {
+        status: "ok",
+        subject: { lat: 33.15, lng: -96.82, label },
+        tractGeoid: "48085030100",
+        opportunityZone: null,
+        flood: { zone: "AE", subtype: null, isHighRisk: true },
+        pointIsBuilding: true,
+        retrievedAt: "2026-09-23T12:00:00Z",
+        note: "",
+      };
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const later = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(later).toContain("The asking price is stated as a range, $40–42M");
+    expect(later).not.toContain("Zone AE");
+    expect(vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "").toContain("in Zone AE, a Special Flood Hazard Area");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a portfolio across two markets: the challenger gets the portfolio traps, and the market check's header says whose figures it read", async () => {
     const prop = (name: string, address: string, count: string) => ({
       name, address, count, area: "", noi: "", occupancy: "", yearBuilt: "", allocatedPrice: "", page: "",
