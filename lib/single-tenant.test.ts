@@ -494,6 +494,57 @@ describe("the lease on every summary", () => {
   });
 });
 
+// Research pass 41 (M7): two labels of other families read as the lease's.
+describe("another family's label is never the lease's (research pass 41)", () => {
+  it("reads no star rating as the tenant's credit", () => {
+    const snf = ex(
+      [
+        row("Annual base rent", "$1,450,000", "p. 5"),
+        row("Lease expiration", "December 31, 2038", "p. 5"),
+        row("CMS star rating", "3 stars (August 2026)", "p. 7"),
+      ],
+      { assetClass: "Skilled Nursing Facility", singleTenant: tenant({ tenant: "Buckeye Care Operations, LLC", guarantor: "Buckeye Care Holdings" }) },
+    );
+    const r = readSingleTenant(snf, TODAY)!;
+    expect(r.rating).toBeNull();
+    expect(r.headline).not.toContain("3 stars");
+    // The tenant's own rating, by an agency's name or bare, still reads.
+    for (const label of ["Tenant credit rating", "Guarantor credit rating", "S&P rating", "Rating"]) {
+      expect(readSingleTenant(ex([row(label, "BBB- (S&P)")]), TODAY)!.rating?.grade, label).toBe("investment");
+    }
+  });
+
+  it("reads no preferred equity position's extension options as the tenant's renewal options", () => {
+    const position = {
+      kind: "preferred_equity" as const,
+      summary: "Preferred equity in the entity owning a Walgreens",
+      share: "",
+      groundLease: "",
+      loan: "",
+      page: "p. 4",
+    };
+    const pref = ex(
+      [
+        row("Preferred equity amount", "$2,000,000"),
+        row("Extension options", "One 12-month extension of the redemption at a 50 bp fee"),
+        row("Lease expiration", "March 31, 2034"),
+      ],
+      { interest: position },
+    );
+    const r = readSingleTenant(pref, TODAY)!;
+    expect(r.term?.ends).toBe("2034-03-31");
+    expect(r.term?.options).toBeNull();
+    expect(r.headline).not.toContain("redemption");
+    // The tenant's options under the lease's own words still read.
+    for (const label of ["Renewal options", "Lease extension options", "Renewal and extension options"]) {
+      expect(readSingleTenant(ex([row("Lease expiration", "March 31, 2034"), row(label, "Four 5-year options")]), TODAY)!.term?.options, label).toEqual({
+        years: 20,
+        how: "four of 5 years",
+      });
+    }
+  });
+});
+
 describe("a sandwich position's master lease is never its subtenant's lease (research pass 28)", () => {
   it("reads the subtenant's own lease on a master leasehold, and a net lease's master lease as the tenant's", () => {
     const master = {

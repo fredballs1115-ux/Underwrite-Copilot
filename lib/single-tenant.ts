@@ -79,7 +79,13 @@ const END_ROW = /\blease\b.*\b(?:expir\w*|ends?|end\s+date|termination\s+date)\b
 const NOT_END = /option|renewal|extension|early|remaining|unexpired|\bleft\b|kick|\bfirm\b/i;
 const LEFT_ROW = /\bterm\s+remaining\b|\bremaining\s+(?:lease\s+|primary\s+|base\s+|initial\s+)?term\b|\bunexpired\s+(?:lease\s+)?term\b|\blease\b.*\b(?:remaining|left)\b/i;
 const NOT_LEFT = /option|renewal|extension/i;
-const OPTION_ROW = /\b(?:renewal|extension)\s+options?\b|\boptions?\s+to\s+(?:renew|extend)\b|^(?:lease\s+)?options?$/i;
+// The tenant's renewal options, as the extraction labels them ("Renewal
+// options"), or a lease's extension options named as the lease's — never a
+// bare "Extension options", the label a preferred equity position's
+// extension of its redemption is filed under (lib/position, research pass
+// 41: a position in a single-tenant building had read it as the tenant's).
+const OPTION_ROW =
+  /\brenewal\s+options?\b|\brenewal\s+(?:and|or|\/)\s+extension\s+options?\b|\b(?:lease|tenant'?s?)\s+extension\s+options?\b|\boptions?\s+to\s+(?:renew|extend)\b|^(?:lease\s+)?options?$/i;
 const NOT_OPTION = /purchase|\bbuy\b|first\s+refusal|first\s+offer|\brofr\b|\brofo\b|terminat|kick/i;
 const INCREASE_ROW =
   /\brent(?:al)?\s+(?:increases?|escalations?|escalators?|bumps|steps|adjustments?)\b|^(?:annual\s+|scheduled\s+)?(?:increases|escalations?|escalators?|bumps)$/i;
@@ -89,7 +95,12 @@ const NOT_RENT = /per\s*(?:sf|square|foot)|psf|\/\s*(?:sf|ft)\b|\bmarket\b|pro\s
 // A monthly figure is not the year's rent; a per-foot one falls under the
 // reader's floor (a year's rent under $1,000 is not a building's).
 const RENT_VALUE_NOT_ANNUAL = /\/\s*mo(?:nth)?\b|per\s+month|monthly/i;
-const RATING_ROW = /\bcredit\s+rating\b|\brating\b/i;
+// The tenant's or its guarantor's credit rating, as the extraction labels it
+// ("Tenant credit rating"), by an agency's name, or a bare "Rating" — never
+// another kind of rating: a nursing home's "CMS star rating" had been read
+// as the operator's credit (research pass 41).
+const RATING_ROW =
+  /\bcredit\s+ratings?\b|^\s*(?:tenant|guarantor|lessee|corporate)(?:'s)?\s+ratings?\b|^\s*(?:s&p|moody'?s|fitch)(?:\s+credit)?\s+ratings?\b|^\s*ratings?\s*$/i;
 // The first date the tenant may leave: an early termination, a termination
 // option or a kick-out — and a firm term's end ("Firm term expiration",
 // "End of firm term"), since after its firm term a tenant such as the
@@ -112,8 +123,35 @@ function rowsOf(ex: ExtractionResult): MetricRow[] {
     .filter((m) => !NOT_TENANT_LEASE.test(m.label) && !(master && MASTER_LEASE_ROW.test(m.label)));
 }
 
-const find = (rows: MetricRow[], re: RegExp, not?: RegExp) =>
+const find = <M extends MetricRow>(rows: ReadonlyArray<M>, re: RegExp, not?: RegExp) =>
   rows.find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
+
+/** The rows the read takes, each by what it is read for — one finder for
+ *  the read and for `singleTenantRowsRead`. */
+function rowsRead<M extends MetricRow>(rows: ReadonlyArray<M>) {
+  return {
+    endRow: find(rows, END_ROW, NOT_END),
+    leftRow: find(rows, LEFT_ROW, NOT_LEFT),
+    optionRow: find(rows, OPTION_ROW, NOT_OPTION),
+    earlyRow: find(rows, EARLY_ROW),
+    incRow: find(rows, INCREASE_ROW, NOT_INCREASE),
+    rentRow: rows.find((m) => RENT_ROW.test(m.label) && !NOT_RENT.test(m.label) && !RENT_VALUE_NOT_ANNUAL.test(m.value)) ?? null,
+    ratingRow: find(rows, RATING_ROW),
+  };
+}
+
+/**
+ * Every row the read takes from a list — the lease's end or years left, its
+ * options, its first date to leave, its increases, its rent and its rating —
+ * through the read's own finder, never a ground lease's, a loan's or a
+ * note's row. For the test that holds the extraction's labels to their
+ * readers (lib/prompt-row-readers.test.ts, research pass 41).
+ */
+export function singleTenantRowsRead<M extends { label: string; value: string }>(metrics: ReadonlyArray<M>): M[] {
+  const rows = metrics.filter((m) => isRow(m) && !NOT_TENANT_LEASE.test(m.label));
+  const r = rowsRead(rows);
+  return [...new Set([r.endRow, r.leftRow, r.optionRow, r.earlyRow, r.incRow, r.rentRow, r.ratingRow])].filter((m): m is M => m != null);
+}
 
 /** The lease's own rows, for a key-terms block to lead with after the count
  *  (lib/key-terms): its end (or the years left where no end is stated), its
@@ -380,13 +418,9 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
   const kind = ex.interest?.kind;
   if (kind === "leased_fee" || kind === "note") return null;
   const rows = rowsOf(ex);
+  const { endRow, leftRow, optionRow, earlyRow, incRow, rentRow, ratingRow } = rowsRead(rows);
 
-  const term = readLeaseTerm(
-    { endRow: find(rows, END_ROW, NOT_END), leftRow: find(rows, LEFT_ROW, NOT_LEFT), optionRow: find(rows, OPTION_ROW, NOT_OPTION) },
-    ex.totalPages,
-    asOf,
-  );
-  const earlyRow = find(rows, EARLY_ROW);
+  const term = readLeaseTerm({ endRow, leftRow, optionRow }, ex.totalPages, asOf);
   const earlyRead = earlyRow ? earlyOf(earlyRow.value, asOf) : null;
   const startsAtDelivery = notYetDelivered(inferStrategy(ex).kind);
   // Early only where it comes before the term's end; a date at or after it
@@ -403,11 +437,8 @@ export function readSingleTenant(ex: ExtractionResult | null | undefined, asOf: 
       ? { ends: term.ends, from: term.from, yearsLeft: term.yearsLeft, early: false }
       : null;
 
-  const incRow = find(rows, INCREASE_ROW, NOT_INCREASE);
   const increasesStated = clean(incRow?.value);
-  const rentRow = rows.find((m) => RENT_ROW.test(m.label) && !NOT_RENT.test(m.label) && !RENT_VALUE_NOT_ANNUAL.test(m.value)) ?? null;
   const rent = rentRow ? parseUsd(rentRow.value, 1_000) : null;
-  const ratingRow = find(rows, RATING_ROW);
 
   const pageCount = typeof ex.totalPages === "number" && ex.totalPages > 0 ? ex.totalPages : null;
   const n = parsePageNumber(st.page);
