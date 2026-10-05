@@ -44,6 +44,22 @@ describe("the deal page's sensitivity sliders (research pass 33, item 10)", () =
     expect(a11yIssues(html)).toEqual([]);
   });
 
+  // The pre-merge audit (C1, L11): a levered IRR that does not solve was
+  // read aloud as "Levered IRR —".
+  it("say a levered IRR that does not solve in words, never a dash", () => {
+    const ex = SAMPLE_DEAL.extraction;
+    const data: PlaygroundData = {
+      inputs: { ...sampleDerivedInputs().inputs, inPlaceRentAnnual: 0, expenseRecoveriesAnnual: 0, otherRevenueAnnual: 0 },
+      dealAssetClass: SAMPLE_DEAL.asset_class,
+      checkSource: { assetClass: ex.assetClass, market: ex.market, metrics: ex.metrics },
+      box: SAMPLE_DEMO_BOX,
+    };
+    const html = renderToStaticMarkup(React.createElement(SensitivityPlayground, { data }));
+    const status = /<p role="status" class="sr-only">([^<]*)<\/p>/.exec(html)?.[1] ?? "";
+    expect(status).toBe("No levered IRR solves at these levers");
+    expect(status).not.toContain("—");
+  });
+
   it("keep a word apart from the figure before it", () => {
     // "5.45%base 5.45%" was one word to a screen reader: the margin spaced
     // it on screen only.

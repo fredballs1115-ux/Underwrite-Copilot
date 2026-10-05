@@ -373,13 +373,17 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           tiles stay out of the live region, which would read all four at
           every step (research pass 33). */}
       <p role="status" className="sr-only">
+        {/* A return that does not solve is said in words, never read aloud
+            as "Levered IRR —" (the pre-merge audit). */}
         {withheld
           ? "Levered IRR withheld"
-          : compare
-            ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${fmtPct(base.leveredIrrPct)}`
-            : baseWithheld
-              ? `Levered IRR ${fmtPct(current.leveredIrrPct)} at your price`
-              : `Levered IRR ${fmtPct(current.leveredIrrPct)}, the base case`}
+          : !finite(current.leveredIrrPct)
+            ? "No levered IRR solves at these levers"
+            : compare
+              ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${finite(base.leveredIrrPct) ? fmtPct(base.leveredIrrPct) : "none solves"}`
+              : baseWithheld
+                ? `Levered IRR ${fmtPct(current.leveredIrrPct)} at your price`
+                : `Levered IRR ${fmtPct(current.leveredIrrPct)}, the base case`}
       </p>
       {interestLine && (
         <p className="mt-4 text-[11px] leading-relaxed text-caution" data-qa="playground-interest">
