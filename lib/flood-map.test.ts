@@ -240,8 +240,12 @@ describe("floodCrop — the frame cut to a surface's shape", { timeout: 60_000 }
     const record = (await ensureFloodFrame(client, "deal-6", LOC, db.photo, { fetchers: fetchers() }))!;
     const page = await floodCrop("deal-6", record, 1280, 720);
     expect(await sharp(page).metadata()).toMatchObject({ format: "jpeg", width: 1280, height: 720 });
+    const dense = await floodCrop("deal-6", record, 2560, 1440);
+    expect(await sharp(dense).metadata()).toMatchObject({ width: OW, height: Math.round((OW * 9) / 16) });
+    // A size no page asks for is the listed crop nearest it (research pass
+    // 39) — never more pixels than the frame holds.
     const huge = await floodCrop("deal-6", record, 5120, 2880);
-    expect(await sharp(huge).metadata()).toMatchObject({ width: OW, height: Math.round((OW * 9) / 16) });
+    expect(await sharp(huge).metadata()).toMatchObject({ width: OW, height: OH });
     const whole = await floodCrop("deal-6", record, OW, OH);
     expect(await sharp(whole).metadata()).toMatchObject({ width: OW, height: OH });
   });

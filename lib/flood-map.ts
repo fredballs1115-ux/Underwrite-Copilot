@@ -2,7 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import vendoredLegend from "@/data/nfhl-legend.json";
-import { NFHL_ROOT, REPORT_FLOOD_SIZE, nfhlRestyledForm, usgsAerialUrl } from "@/lib/basemaps";
+import { NFHL_ROOT, nfhlRestyledForm, usgsAerialUrl } from "@/lib/basemaps";
 export { FLOOD_MIN_ZOOM, FLOOD_ZOOM, REPORT_FLOOD_SIZE } from "@/lib/basemaps";
 import { finishAerial } from "@/lib/aerial-finish";
 import {
@@ -44,6 +44,8 @@ import { pointIsBuilding, resolveDealLocation, writeCache, type DealLocation, ty
 import type { StructuredAddress } from "@/lib/address";
 import { RunGate } from "@/lib/anthropic/run-gate";
 import { intactImage } from "@/lib/memo/cover-aerial";
+import { HeldCopies } from "@/lib/held-copies";
+import { FLOOD_FRAMES, FLOOD_REPORT, FLOOD_VIEW, nearestFrame } from "@/lib/image-frames";
 
 // FEMA's flood map over the deal's aerial (#425), drawn once a deal (#472).
 //
@@ -310,26 +312,75 @@ export async function ensureFloodFrame(
   return within(run, opts.waitMs, null);
 }
 
+/** The cuts this process has made, by the stored frame's path and the size
+ *  (research pass 39): a frame is drawn once a deal, and each of its few
+ *  crops is cut once a process. The viewer's whole frame is the largest, a
+ *  megabyte or so; the bounds keep a few deals' worth. */
+export const MAX_HELD_FLOOD_CROPS = 48;
+export const MAX_HELD_FLOOD_CROP_BYTES = 24_000_000;
+/** Cuts made at once in this process, and how long one waits for a turn
+ *  before the route answers "ask again". */
+export const FLOOD_CROP_IN_FLIGHT = 2;
+const FLOOD_CROP_TURN_MS = 20_000;
+
+const crops = new HeldCopies<{ bytes: Buffer }>(MAX_HELD_FLOOD_CROPS, MAX_HELD_FLOOD_CROP_BYTES);
+const cropTurns = new RunGate(() => FLOOD_CROP_IN_FLIGHT);
+/** The cuts this process has made, and the most made at once. */
+const cutsMade = { count: 0, cutting: 0, mostAtOnce: 0 };
+
+/** How many cuts this process has made, and the most at once (tests). */
+export function floodCropsMade(): { count: number; mostAtOnce: number } {
+  return { count: cutsMade.count, mostAtOnce: cutsMade.mostAtOnce };
+}
+
+/** Forget every held cut, and the count of them (tests). */
+export function forgetFloodCrops(): void {
+  crops.forget();
+  cutsMade.count = 0;
+  cutsMade.mostAtOnce = 0;
+}
+
 /**
- * The frame cut to `w`×`h` from its centre, as a JPEG — never larger than
- * the stored frame gives in that shape, so nothing is stretched.
+ * The frame cut to the listed crop nearest `w`×`h` (lib/image-frames
+ * `FLOOD_FRAMES`: the page's, the viewer's and the report's) from its
+ * centre, as a JPEG — never larger than the stored frame gives in that
+ * shape, so nothing is stretched. Each cut is made once a process and held
+ * by the frame's path and its size; asks that arrive while one is being made
+ * share it; and no more than `FLOOD_CROP_IN_FLIGHT` are made at once — one
+ * that finds no turn in time throws, and nothing keeps the failure.
  *
  * The record's path comes off the deal's photo cache, a column the row's
  * owner can write, so it is held to this deal's own flood shape BEFORE any
- * byte is served — the held copy included: a record naming another deal's
+ * byte is served — the held copies included: a record naming another deal's
  * frame must not be answered from this process's memory of it.
  */
 export async function floodCrop(dealId: string, record: FloodFrameRecord, w: number, h: number): Promise<Buffer> {
   const path = scopedPath(record.path, { kind: "deal", dealId, only: ["flood"] });
-  const sharp = (await import("sharp")).default;
-  const bytes = held.get(path) ?? hold(path, await downloadDealFile(path, { kind: "deal", dealId, only: ["flood"] }));
-  const box = cropBox(record.width, record.height, w, h);
-  const out = servedSize(w, h, record.width, record.height);
-  return sharp(bytes)
-    .extract(box)
-    .resize(out.width, out.height, { fit: "fill", kernel: "lanczos3" })
-    .jpeg({ quality: 82, mozjpeg: true })
-    .toBuffer();
+  const frame = nearestFrame(FLOOD_FRAMES, w, h, FLOOD_VIEW);
+  const cut = await crops.take(`${path}:${frame.w}x${frame.h}`, async () => {
+    const release = await cropTurns.acquireWithin(FLOOD_CROP_TURN_MS);
+    if (!release) return null;
+    cutsMade.count++;
+    cutsMade.cutting++;
+    cutsMade.mostAtOnce = Math.max(cutsMade.mostAtOnce, cutsMade.cutting);
+    try {
+      const sharp = (await import("sharp")).default;
+      const bytes = held.get(path) ?? hold(path, await downloadDealFile(path, { kind: "deal", dealId, only: ["flood"] }));
+      const box = cropBox(record.width, record.height, frame.w, frame.h);
+      const out = servedSize(frame.w, frame.h, record.width, record.height);
+      const jpeg = await sharp(bytes)
+        .extract(box)
+        .resize(out.width, out.height, { fit: "fill", kernel: "lanczos3" })
+        .jpeg({ quality: 82, mozjpeg: true })
+        .toBuffer();
+      return { bytes: jpeg };
+    } finally {
+      cutsMade.cutting--;
+      release();
+    }
+  });
+  if (!cut) throw new Error("no turn came free to cut the flood frame");
+  return cut.bytes;
 }
 
 async function within<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
@@ -414,7 +465,7 @@ export async function floodMapFor(
       if (!loc || loc.precision === "area") return null;
       const record = await ensureFloodFrame(supabase, dealId, loc, cache);
       if (!record) return null;
-      const jpeg = await floodCrop(dealId, record, REPORT_FLOOD_SIZE.width * 2, REPORT_FLOOD_SIZE.height * 2);
+      const jpeg = await floodCrop(dealId, record, FLOOD_REPORT.w, FLOOD_REPORT.h);
       if (!intactImage(jpeg, "image/jpeg")) return null;
       return {
         image: `data:image/jpeg;base64,${jpeg.toString("base64")}`,

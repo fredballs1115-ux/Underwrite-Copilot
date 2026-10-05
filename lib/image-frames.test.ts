@@ -64,6 +64,12 @@ import {
   DEAL_AERIAL_VIEW,
   DEAL_AERIAL_VIEWER,
   DEAL_IMAGE_FRAMES,
+  FLOOD_FRAMES,
+  FLOOD_REPORT,
+  FLOOD_STRIP,
+  FLOOD_VIEW,
+  FLOOD_VIEWER,
+  FLOOD_VIEW_2X,
   nearestFrame,
   type PixelFrame,
 } from "./image-frames";
@@ -114,13 +120,26 @@ describe("the URLs the pages build ask for listed frames, the same as before", (
   it("the deal page's overheads: lib/image-frames' own constants, at the sizes they always were", () => {
     expect([DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER].map(key)).toEqual(["1280x576", "1280x960"]);
     const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/property-visual.tsx"), "utf8");
-    expect(src).toMatch(/import \{ DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER \} from "@\/lib\/image-frames";/);
+    expect(src).toMatch(/import \{ DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER[^}]*\} from "@\/lib\/image-frames";/);
     expect(src).toContain("const AERIAL = DEAL_AERIAL_VIEW;");
     expect(src).toContain("const VIEWER = DEAL_AERIAL_VIEWER;");
     for (const m of src.matchAll(/\/aerial\?src=[a-z]+&w=\$\{([A-Z_]+)\.w\}&h=\$\{([A-Z_]+)\.h\}/g)) {
       expect(["AERIAL", "VIEWER"]).toContain(m[1]);
       expect(m[2]).toBe(m[1]);
     }
+  });
+
+  it("the deal page's flood crops: lib/image-frames' own, every one a size the flood route cuts (research pass 39)", () => {
+    const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/property-visual.tsx"), "utf8");
+    const asked = [...src.matchAll(/\$\{flood\.src\}&w=\$\{([A-Z_0-9]+)\.w\}&h=\$\{([A-Z_0-9]+)\.h\}/g)];
+    expect(asked.map((m) => m[1]).sort()).toEqual(["FLOOD_STRIP", "FLOOD_VIEW", "FLOOD_VIEWER", "FLOOD_VIEW_2X"]);
+    for (const m of asked) expect(m[2]).toBe(m[1]);
+    // No flood size typed as a number.
+    expect(src).not.toMatch(/\$\{flood\.src\}&w=\d/);
+    const frames = listed(FLOOD_FRAMES);
+    for (const f of [FLOOD_VIEW, FLOOD_VIEW_2X, FLOOD_STRIP, FLOOD_VIEWER, FLOOD_REPORT]) expect(frames.has(key(f))).toBe(true);
+    // The report cuts its band through the same list.
+    expect(readFileSync(join(process.cwd(), "lib/flood-map.ts"), "utf8")).toContain("floodCrop(dealId, record, FLOOD_REPORT.w, FLOOD_REPORT.h)");
   });
 
   it("a deal's avatar and the pipeline map's card", () => {

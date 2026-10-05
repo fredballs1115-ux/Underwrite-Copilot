@@ -18,7 +18,7 @@ import { PropertyMap } from "./property-map";
 import { ReplacePicture } from "./replace-picture";
 import { previewStyle } from "@/lib/photo-preview";
 import { mosaicRepeats, photoControlOn } from "@/lib/property-views";
-import { DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER } from "@/lib/image-frames";
+import { DEAL_AERIAL_VIEW, DEAL_AERIAL_VIEWER, FLOOD_STRIP, FLOOD_VIEW, FLOOD_VIEW_2X, FLOOD_VIEWER } from "@/lib/image-frames";
 import {
   headerPhotoSizes,
   mosaicTileSizes,
@@ -124,9 +124,10 @@ type View = "photo" | "street" | "market" | "satellite" | "aerial" | "flood" | "
  *  22), so this page and its route cannot drift apart. */
 const AERIAL = DEAL_AERIAL_VIEW;
 const VIEWER = DEAL_AERIAL_VIEWER;
-/** The Flood view's crop of the deal's flood frame (#472): the view's own
- *  16:9, so nothing the key describes is cut away by the box. */
-const FLOOD_VIEW = { w: 1280, h: 720 };
+// The Flood view's crops of the deal's flood frame (#472) — the view's own
+// 16:9 at 1x and 2x, the filmstrip's and the viewer's whole frame — are
+// lib/image-frames' own, the only sizes the flood route cuts (research pass
+// 39), so this page and its route cannot drift apart.
 
 /** Every view's frame, read against the deal header it sits in (#433): 16:9
  *  on a phone, a wider band where the header stacks at a tablet's width (so
@@ -340,14 +341,14 @@ export function PropertyVisual({
   // filmstrip's, and the viewer's whole frame — each retry a new URL.
   const floodR = floodTry ? `&r=${floodTry}` : "";
   const floodView = flood ? `${flood.src}&w=${FLOOD_VIEW.w}&h=${FLOOD_VIEW.h}${floodR}` : "";
-  const floodView2x = flood ? `${flood.src}&w=${FLOOD_VIEW.w * 2}&h=${FLOOD_VIEW.h * 2}${floodR}` : "";
+  const floodView2x = flood ? `${flood.src}&w=${FLOOD_VIEW_2X.w}&h=${FLOOD_VIEW_2X.h}${floodR}` : "";
   const thumbs: Record<string, { src: string | null; fail: () => void }> = {
     photo: { src: `/api/deals/${dealId}/picture?size=hero`, fail: () => setPhotoGone(true) },
     street: { src: `/api/deals/${dealId}/photo`, fail: () => setStreetGone(true) },
     market: { src: market?.src ?? null, fail: () => setMarketGone(true) },
     satellite: { src: `/api/deals/${dealId}/aerial?src=satellite&w=${AERIAL.w}&h=${AERIAL.h}`, fail: () => setSatelliteGone(true) },
     aerial: { src: aerialSrc, fail: () => setAerialGone(true) },
-    flood: { src: flood && floodState !== "failed" ? `${flood.src}&w=192&h=108${floodR}` : null, fail: onFloodError },
+    flood: { src: flood && floodState !== "failed" ? `${flood.src}&w=${FLOOD_STRIP.w}&h=${FLOOD_STRIP.h}${floodR}` : null, fail: onFloodError },
     map: { src: null, fail: () => {} },
     // A gallery photograph's place in the filmstrip is its stored 240px
     // crop: its full-size picture waits for its view to be opened.
@@ -456,7 +457,7 @@ export function PropertyVisual({
                 id: v.id,
                 label: v.label,
                 // The whole frame, at the pixels it is drawn at.
-                src: `${flood.src}&w=${VIEWER.w * 2}&h=${VIEWER.h * 2}${floodR}`,
+                src: `${flood.src}&w=${FLOOD_VIEWER.w}&h=${FLOOD_VIEWER.h}${floodR}`,
                 alt: `Aerial photograph of the blocks around ${label}, with FEMA's flood hazard zones drawn over it`,
                 credit: ["FEMA flood zones · USGS imagery", ...osmCredit],
                 thumb,
@@ -739,7 +740,7 @@ export function PropertyVisual({
                     key={floodTry}
                     ref={floodImg}
                     src={floodView}
-                    srcSet={`${floodView} ${FLOOD_VIEW.w}w, ${floodView2x} ${FLOOD_VIEW.w * 2}w`}
+                    srcSet={`${floodView} ${FLOOD_VIEW.w}w, ${floodView2x} ${FLOOD_VIEW_2X.w}w`}
                     sizes="(min-width: 64rem) 50vw, 100vw"
                     alt={`Aerial photograph of the blocks around ${label}, with FEMA's flood hazard zones drawn over it`}
                     width={FLOOD_VIEW.w}
