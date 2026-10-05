@@ -142,6 +142,45 @@ async function patchJob(dealId: string, patch: JobPatch): Promise<void> {
   }
 }
 
+/** The five results a screen writes, and the reconciler's, as the deal page
+ *  names them in a failure's sentence. */
+const RESULT_NAME = {
+  extraction: "terms",
+  challenges: "challenger's questions",
+  comps: "comp read",
+  market: "market check",
+  verdict: "verdict",
+  reconciliation: "reconciliation",
+} as const;
+
+/**
+ * Write one of the run's results to the deal, or fail the run there. The
+ * writes' errors were never read: a statement timeout on the verdict's write
+ * left the previous screen's call on the deal, undashed and unmarked, under
+ * a job that ended "done" and a toast saying the verdict was ready; a failed
+ * write of the terms sent every later step to read the old ones (research
+ * pass 30). Thrown, the job ends "error" at the step that wrote, and every
+ * surface's previous-screen rule (lib/screen-run) marks what is the last
+ * screen's.
+ */
+async function writeResult(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  dealId: string,
+  column: keyof typeof RESULT_NAME,
+  value: unknown,
+): Promise<void> {
+  const { error } = await admin
+    .from("deals")
+    .update({ [column]: value, updated_at: new Date().toISOString() })
+    .eq("id", dealId);
+  if (error) {
+    throw new ScreenError(
+      `We couldn't save the ${RESULT_NAME[column]} to the deal — our database didn't take the write. Try again in a minute.`,
+      error.message,
+    );
+  }
+}
+
 // In-process runs wrote the job row only at step boundaries. A slow step —
 // the SDK retries a 529 twice with backoff inside one call, so one step can
 // run past ten minutes — let the row go stale with the run still alive, and
@@ -580,11 +619,20 @@ async function regenerateVerdict(
   dealId: string,
   dealContext: string | null,
 ): Promise<void> {
-  const { data } = await admin
+  const { data, error: readErr } = await admin
     .from("deals")
     .select("asset_class, address, extraction, first_signal, challenges, comps, reconciliation, market, user_id, team_id")
     .eq("id", dealId)
     .single();
+  // A verdict synthesized over a read that failed would judge a deal with
+  // no terms, no challenger and no market check — and be written as this
+  // run's call (research pass 30).
+  if (readErr || !data) {
+    throw new ScreenError(
+      "We couldn't read this deal's results back from our database just now — try again in a minute.",
+      readErr?.message ?? "no row",
+    );
+  }
   const extraction = (data?.extraction as ExtractionResult | null | undefined) ?? null;
   const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
 
@@ -646,15 +694,9 @@ async function regenerateVerdict(
     ratesLine: await todaysRatesLine(admin, extraction),
   });
 
-  await admin
-    .from("deals")
-    .update({
-      // generatedAt lets consumers (the weekly digest) know when THIS verdict
-      // landed — deals.updated_at bumps on any edit and can't be trusted.
-      verdict: { ...verdict, generatedAt: new Date().toISOString() },
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", dealId);
+  // generatedAt lets consumers (the weekly digest) know when THIS verdict
+  // landed — deals.updated_at bumps on any edit and can't be trusted.
+  await writeResult(admin, dealId, "verdict", { ...verdict, generatedAt: new Date().toISOString() });
 }
 
 /**
@@ -1022,10 +1064,7 @@ async function runAnalysisSteps(
       // A reading kept with no stamp is stored with none, never an invented day.
       extraction = { ...extraction, omFingerprint: fingerprint, screenedOn: stamp };
       if (!stamp) delete extraction.screenedOn;
-      await admin
-        .from("deals")
-        .update({ extraction, updated_at: new Date().toISOString() })
-        .eq("id", dealId);
+      await writeResult(admin, dealId, "extraction", extraction);
       // Place the deal by its address (#441): a deal uploaded with the
       // address box empty takes the one the memorandum states, and a typed
       // line gets the street, city and state it names — so the market check
@@ -1333,10 +1372,7 @@ async function runAnalysisSteps(
       // building sold to be converted, a lab, a cold-storage building.
       const keyed = keyedTrapsFor(challengeEx, challengeKind);
       const challenges = await challengeAssumptions(om(), challengeClass, reconNote, keyed);
-      await admin
-        .from("deals")
-        .update({ challenges, updated_at: new Date().toISOString() })
-        .eq("id", dealId);
+      await writeResult(admin, dealId, "challenges", challenges);
       await markDone("challenge");
     }
 
@@ -1359,10 +1395,7 @@ async function runAnalysisSteps(
     if (!completed.has("comps")) {
       await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
       const comps = manual ? manualCompsStub() : await scrutinizeComps(om(), dealContext);
-      await admin
-        .from("deals")
-        .update({ comps, updated_at: new Date().toISOString() })
-        .eq("id", dealId);
+      await writeResult(admin, dealId, "comps", comps);
       await markDone("comps");
     }
 
@@ -1392,10 +1425,7 @@ async function runAnalysisSteps(
         liveBrief: primary ? record(primary) : null,
         ...(others.length > 0 ? { otherBriefs: others.map(record) } : {}),
       };
-      await admin
-        .from("deals")
-        .update({ market, updated_at: new Date().toISOString() })
-        .eq("id", dealId);
+      await writeResult(admin, dealId, "market", market);
       await markDone("market");
     }
 
@@ -1506,10 +1536,7 @@ async function runReconciliationSteps(
     );
     const reconciliation = await reconcileModel(omSource, parsed, dealContext);
 
-    await admin
-      .from("deals")
-      .update({ reconciliation, updated_at: new Date().toISOString() })
-      .eq("id", dealId);
+    await writeResult(admin, dealId, "reconciliation", reconciliation);
 
     // Fold the reconciliation into the verdict so the headline reflects it.
     await patchJob(dealId, { status: "running", step: "verdict", progress: 80 });

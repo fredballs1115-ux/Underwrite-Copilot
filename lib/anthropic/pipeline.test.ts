@@ -14,7 +14,7 @@ import type {
   MarketResult,
   VerdictResult,
 } from "./types";
-import { staleAfterFailure, type JobLike } from "@/lib/screen-run";
+import { previousScreenResults, staleAfterFailure, verdictBehind, type JobLike } from "@/lib/screen-run";
 
 type Row = Record<string, unknown>;
 interface State {
@@ -27,6 +27,11 @@ interface State {
   rates?: Row[];
   /** the `benchmarks` table, likewise */
   benchmarks?: Row[];
+  /** a deals update whose patch writes this column answers with an error,
+   *  as a statement timeout does */
+  failUpdateOf?: string;
+  /** the next N reads of a deal answer with an error, as a network blip does */
+  failDealReads?: number;
 }
 
 /** A chainable, thenable query like supabase-js's, over an in-memory store. */
@@ -107,12 +112,19 @@ class FakeQuery {
       const id = String(this.where("id"));
       const row = state.deals[id];
       if (this.op === "select") {
+        if (state.failDealReads && state.failDealReads > 0) {
+          state.failDealReads--;
+          return { data: null, error: { message: "TypeError: fetch failed" } };
+        }
         if (!row) {
           return this.wantsSingle
             ? { data: null, error: { message: "Row not found" } }
             : { data: null, error: null };
         }
         return { data: row, error: null };
+      }
+      if (this.op === "update" && state.failUpdateOf && state.failUpdateOf in this.patch) {
+        return { data: null, error: { message: "canceling statement due to statement timeout" } };
       }
       if (this.op === "update" && row && this.nulls.every((c) => row[c] == null)) Object.assign(row, this.patch);
       return { data: this.wantsRows ? (row ? [row] : []) : null, error: null };
@@ -1869,6 +1881,61 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     await Promise.all(["d1", "d2"].map((id) => runAnalysis(id)));
     expect(peak).toBe(1);
     expect(state.jobs.map((j) => j.status).sort()).toEqual(["done", "error"]);
+  });
+
+  it("a result whose write fails fails the run at its step — never 'done' over the previous screen's result (research pass 30)", async () => {
+    // The verdict's write times out: the previous call stays on the deal,
+    // and the job says the run failed at the verdict, so every surface marks
+    // that call as the previous screen's (lib/screen-run).
+    state.failUpdateOf = "verdict";
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().step).toBe("verdict");
+    expect(job().error).toBe("We couldn't save the verdict to the deal — our database didn't take the write. Try again in a minute.");
+    expect(state.deals.d1.verdict).toEqual({ old: true });
+    expect(verdictBehind(job())).toBe("failed");
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("statement timeout"));
+
+    // The terms' write fails: nothing after it reads the previous terms.
+    state = freshState();
+    state.failUpdateOf = "extraction";
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(synthesizeVerdict).mockClear();
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().step).toBe("extract");
+    expect(job().error).toMatch(/^We couldn't save the terms to the deal/);
+    expect(challengeAssumptions).not.toHaveBeenCalled();
+    expect(synthesizeVerdict).not.toHaveBeenCalled();
+    expect(previousScreenResults(job()).has("extraction")).toBe(true);
+
+    // The challenger's, the comps' and the market check's alike.
+    for (const [column, step] of [["challenges", "challenge"], ["comps", "comps"], ["market", "market"]] as const) {
+      state = freshState();
+      state.failUpdateOf = column;
+      await runAnalysis("d1");
+      expect(job().status, column).toBe("error");
+      expect(job().step, column).toBe(step);
+      expect(state.deals.d1[column], column).toEqual({ old: true });
+    }
+  });
+
+  it("a verdict is never synthesized over a read of the deal's results that failed", async () => {
+    // Every read up to the verdict answers; the verdict's own read blips.
+    const reads = vi.fn();
+    vi.mocked(synthesizeVerdict).mockImplementation(async () => {
+      reads();
+      return VERDICT;
+    });
+    vi.mocked(checkMarket).mockImplementation(async () => {
+      state.failDealReads = 1;
+      return MARKET;
+    });
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().step).toBe("verdict");
+    expect(reads).not.toHaveBeenCalled();
+    expect(state.deals.d1.verdict).toEqual({ old: true });
   });
 
   it("an OM past the provider's page cap by pdfjs's own count stops before any model call, with the count in the message", async () => {
