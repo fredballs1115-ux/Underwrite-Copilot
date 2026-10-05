@@ -247,7 +247,20 @@ const housingWithCommercial = (s: string) =>
 // it — filed as senior housing, a 55+ apartment building in Prince George's
 // County lost its rent cap and ran on licensed care's defaults (research
 // pass 28).
-const SENIOR_WORDS = String.raw`senior|assisted living|memory care|independent living|skilled nursing|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?)`;
+const SENIOR_WORDS = String.raw`senior|assisted living|memory care|independent living|skilled nursing|snf|nursing\s+(?:homes?|facilit(?:y|ies)|cent(?:er|re)s?)|post[\s-]+acute|rehabilitation\s+(?:cent(?:er|re)s?|facilit(?:y|ies)|hospitals?)|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?)`;
+// Senior APARTMENTS — "Senior Apartments (LIHTC, 62+)", "Affordable Senior
+// Housing", "62+ apartments" — rent an age-restricted home and sell no care:
+// rental housing the rent rules reach, as an active-adult community is
+// (research pass 28's amendment; filed as senior housing they lost the rent
+// rules and ran on licensed care's defaults). A care or service word keeps
+// a phrase senior housing: independent living's meals and services are care
+// a resident buys.
+const CARE_OR_SERVICE =
+  /\b(?:assisted|memory|skilled|nursing|snf|care|independent[\s-]+living|ccrcs?|continuing|life[\s-]+plan|licensed|services?|meals?|post[\s-]+acute|rehabilitation)\b/i;
+const seniorApartments = (s: string) =>
+  /\bseniors?\b/i.test(s) &&
+  (/\b(?:apartments?|affordable|lihtc|tax[\s-]+credit|section\s+8|age[\s-]+restricted|rental\s+housing)\b/i.test(s) || /\b(?:55|62)\s*\+/.test(s)) &&
+  !CARE_OR_SERVICE.test(s);
 const AGE_RESTRICTED = String.raw`active[\s-]+adult|age[\s-]+restricted|55[\s-]+and[\s-]+over`;
 // A mobile home in the plural too ("Mobile homes" ran past the word's end),
 // and a land-lease community, whose residents own their homes and rent the
@@ -320,9 +333,14 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   [/\b(storage)\b/i, "self_storage"],
   [new RegExp(String.raw`\b(?:${MANUFACTURED_WORDS})\b`, "i"), "manufactured_housing"],
   [/\b(student)\b/i, "student_housing"],
+  // Senior apartments are rental housing (`seniorApartments`), read ahead
+  // of the senior rule their word would otherwise file them under.
+  [seniorApartments, "multifamily"],
   // A continuing care retirement community (a CCRC, a "life plan
-  // community") and an active adult community are senior housing by their
-  // own names; a 55+ park is read by the manufactured-housing rule above.
+  // community"), a skilled nursing facility by any of its names (an SNF, a
+  // nursing home, post-acute care, a rehabilitation center) and an active
+  // adult community are senior housing by their own names; a 55+ park is
+  // read by the manufactured-housing rule above.
   [new RegExp(String.raw`\b(?:${SENIOR_WORDS})\b`, "i"), "senior_housing"],
   // Housing beside shops or offices, read ahead of the office and retail
   // rules that had filed it as one of them (`housingWithCommercial`).
@@ -370,7 +388,7 @@ const PHRASE_TO_KEY: readonly (readonly [RegExp | ((phrase: string) => boolean),
   [/\b(affordable|workforce|lihtc|section 8|housing)\b/i, "multifamily"],
   // An active-adult or 55+ community that names no other housing: rental
   // housing with an age restriction (`AGE_RESTRICTED`).
-  [new RegExp(String.raw`\b(?:${AGE_RESTRICTED})\b|\b55\s*\+`, "i"), "multifamily"],
+  [new RegExp(String.raw`\b(?:${AGE_RESTRICTED})\b|\b(?:55|62)\s*\+`, "i"), "multifamily"],
 ];
 
 /** The known key a stored class or a phrase of the model's resolves to;
