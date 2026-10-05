@@ -1616,6 +1616,9 @@ describe("the sensitivity playground says whose figures it runs", () => {
     const at = html.indexOf('data-qa="playground-fit"');
     expect(textOf(html.slice(html.indexOf(">", at) + 1))).toMatch(/mandate fit on the memorandum's figures/);
     expect(html).toMatch(/<p role="status" class="sr-only">Levered IRR withheld<\/p>/);
+    // "These returns carry …" would name figures the card does not show.
+    expect(html).not.toContain('data-qa="playground-costs"');
+    expect(text).not.toContain("These returns carry");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });
@@ -1712,6 +1715,9 @@ describe("the sensitivity playground says whose figures it runs", () => {
     expect(withSources).toBe(without);
     expect(withSources).not.toContain('data-qa="playground-withheld"');
     expect(textOf(withSources)).toContain("Max bid");
+    // The returns it shows carry the costs the card names under them.
+    expect(withSources).toContain('data-qa="playground-costs"');
+    expect(textOf(withSources)).toContain("These returns carry");
   });
 });
 

@@ -361,10 +361,14 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         </p>
       )}
       {/* The costs these returns carry and the card cannot show: the
-          model's defaults, said as defaults (lib/underwrite/cost-note). */}
-      <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">
-        {costAssumptionsLine(inputs)}
-      </p>
+          model's defaults, said as defaults (lib/underwrite/cost-note).
+          Not under withheld tiles, where "these returns" would name
+          figures the card does not show. */}
+      {!withheld && (
+        <p className="mt-2 text-[11px] leading-relaxed text-muted" data-qa="playground-costs">
+          {costAssumptionsLine(inputs)}
+        </p>
+      )}
       {planDeal && (
         // The full report leaves these out on a plan deal for this reason
         // (lib/memo/report-document); the page says it beside them.
