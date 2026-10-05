@@ -40,7 +40,7 @@ import {
 } from "@/lib/site-flags/core";
 import { floodFramePath, scopedPath } from "@/lib/storage-paths";
 import { downloadDealFile, removeStorageFiles, uploadDealPhoto } from "@/lib/storage";
-import { resolveDealLocation, writeCache, type DealLocation, type DealVisualCache } from "@/lib/deal-location";
+import { pointIsBuilding, resolveDealLocation, writeCache, type DealLocation, type DealVisualCache } from "@/lib/deal-location";
 import type { StructuredAddress } from "@/lib/address";
 import { RunGate } from "@/lib/anthropic/run-gate";
 import { intactImage } from "@/lib/memo/cover-aerial";
@@ -429,7 +429,10 @@ export async function floodMapFor(
     20_000,
     null,
   );
-  const line = floodZoneLine(flood, legend);
+  // The sentence names the point as the key does: the building's only where
+  // the frame's centre is ringed as the building — the drawn frame's own
+  // placement, else the cached one's (lib/deal-location `pointIsBuilding`).
+  const line = floodZoneLine(flood, legend, picture ? picture.ring : pointIsBuilding(cache, address));
   if (!picture && !line) return null;
   const key = picture
     ? await Promise.all(

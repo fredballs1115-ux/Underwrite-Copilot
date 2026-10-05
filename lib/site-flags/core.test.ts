@@ -254,6 +254,27 @@ describe("legendEntryFor and floodZoneLine — what the map says at the building
     const ao = parseNfhlFlood({ features: [{ attributes: { FLD_ZONE: "AO", STATIC_BFE: -9999, DEPTH: 2, LEN_UNIT: "Feet" } }] })!;
     expect(floodZoneLine(ao, legend)).toContain("FEMA maps the flood there at 2 feet deep.");
   });
+
+  // The pre-merge audit (C1, L10): beside a key that says "at the frame's
+  // centre" (a point placed at the street's centreline, a block or a town),
+  // the sentence still said "the building's point".
+  it("names the point the address was placed at, never the building's, where the frame's centre is not the building", () => {
+    const off = floodZoneLine(flag("AE", null), legend, false)!;
+    expect(off).toMatch(/^FEMA's map puts the point the address was placed at in Zone AE \(1% annual chance flood hazard\), a Special Flood Hazard Area:/);
+    for (const line of [
+      off,
+      floodZoneLine(null, legend, false)!,
+      floodZoneLine(flag("X", "AREA OF MINIMAL FLOOD HAZARD"), legend, false)!,
+      floodZoneLine(flag("OPEN WATER", null), legend, false)!,
+      floodZoneLine(flag("AREA NOT INCLUDED", null), legend, false)!,
+      floodZoneLine(flag("D", null), legend, false)!,
+    ]) {
+      expect(line).toContain("the point the address was placed at");
+      expect(line).not.toContain("the building's point");
+    }
+    // At the house itself, as before.
+    expect(floodZoneLine(flag("AE", null), legend, true)).toMatch(/^FEMA's map puts the building's point in Zone AE/);
+  });
 });
 
 import { floodCell, floodShortLine, floodTag } from "./core";

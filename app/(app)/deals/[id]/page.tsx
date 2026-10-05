@@ -1292,7 +1292,9 @@ export default async function DealPage({
                           ? floodClassOfZone(floodLegendEntries, siteFlags.flood.zone, siteFlags.flood.subtype)
                           : null,
                       zone: siteFlags?.flood && siteFlags.flood !== "unavailable" ? `Zone ${siteFlags.flood.zone}` : null,
-                      line: floodZoneLine(siteFlags?.flood, floodLegendEntries),
+                      // The sentence names the point as the key beside it
+                      // does: the building's only where the ring is drawn.
+                      line: floodZoneLine(siteFlags?.flood, floodLegendEntries, pointIsBuilding(visualCache, dealAddress)),
                     }
                   : null
               }

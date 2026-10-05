@@ -508,45 +508,53 @@ const NOT_REQUIRED = "federal law does not require flood insurance there, though
  * point in the river is a point off the building. Zone D is a hazard FEMA
  * has not studied, never a mapped one. Where FEMA states the base flood
  * elevation, or an AO zone's depth, it is said too.
+ *
+ * `pointIsBuilding` is lib/deal-location's rule for ringing the frame's
+ * centre: false where the address was placed at its street's centreline, a
+ * block or a town, or not yet placed for this address — and then the point
+ * is "the point the address was placed at", never "the building's point",
+ * beside a key that says "at the frame's centre" (the pre-merge audit).
  */
 export function floodZoneLine(
   flood: SiteFlagsResult["flood"] | undefined,
   legend: readonly NfhlLegendEntry[] = [],
+  pointIsBuilding = true,
 ): string | null {
   if (flood === undefined || flood === "unavailable") return null;
+  const point = pointIsBuilding ? "the building's point" : "the point the address was placed at";
   if (flood === null) {
-    return "FEMA's digital flood map has no zone at the building's point — the area may not be mapped digitally; check the effective paper map with FEMA's Map Service Center.";
+    return `FEMA's digital flood map has no zone at ${point} — the area may not be mapped digitally; check the effective paper map with FEMA's Map Service Center.`;
   }
   const z = flood.zone.trim().toUpperCase();
   if (z === "OPEN WATER") {
-    return "FEMA's map puts the building's point in open water, so the point is likely off the building: read the zone on FEMA's map at the building itself.";
+    return `FEMA's map puts ${point} in open water, so the point is likely off the building: read the zone on FEMA's map at the building itself.`;
   }
   if (z === "AREA NOT INCLUDED") {
-    return "FEMA's map marks the building's point as an area this flood map does not include: another community's map, or one not yet digital, covers it — check FEMA's Map Service Center.";
+    return `FEMA's map marks ${point} as an area this flood map does not include: another community's map, or one not yet digital, covers it — check FEMA's Map Service Center.`;
   }
   const zone = `Zone ${flood.zone}`;
   // The building's POINT: the zone is FEMA's map at the geocoded point the
   // ring marks, never a determination for the building (research pass 31).
   if (isMinimalHazard(flood)) {
-    return `FEMA's map puts the building's point in ${zone}, an area of minimal flood hazard, which FEMA maps and leaves undrawn — the shading, where there is any, is the hazard nearby.`;
+    return `FEMA's map puts ${point} in ${zone}, an area of minimal flood hazard, which FEMA maps and leaves undrawn — the shading, where there is any, is the hazard nearby.`;
   }
   const entry = legendEntryFor(legend, flood);
   if (flood.isHighRisk) {
     if (entry && /^regulatory floodway/i.test(entry.label)) {
-      return `FEMA's map puts the building's point in ${zone} in the regulatory floodway, a Special Flood Hazard Area where new building and fill are restricted to keep the channel clear: ${SFHA_INSURANCE}${elevationWords(flood)}`;
+      return `FEMA's map puts ${point} in ${zone} in the regulatory floodway, a Special Flood Hazard Area where new building and fill are restricted to keep the channel clear: ${SFHA_INSURANCE}${elevationWords(flood)}`;
     }
     const called = entry ? ` (${entry.label.toLowerCase()})` : "";
     const coastal = z.startsWith("V") ? ", a coastal high-hazard area where storm waves add to the flood," : ",";
-    return `FEMA's map puts the building's point in ${zone}${called}${coastal} a Special Flood Hazard Area: ${SFHA_INSURANCE}${elevationWords(flood)}`;
+    return `FEMA's map puts ${point} in ${zone}${called}${coastal} a Special Flood Hazard Area: ${SFHA_INSURANCE}${elevationWords(flood)}`;
   }
   const called = entry ? ` (${entry.label.toLowerCase()})` : "";
   if (z === "D") {
-    return `FEMA's map puts the building's point in ${zone}${called}, where FEMA has not determined the flood hazard: the map neither shows one nor rules one out, and outside a Special Flood Hazard Area ${NOT_REQUIRED}.`;
+    return `FEMA's map puts ${point} in ${zone}${called}, where FEMA has not determined the flood hazard: the map neither shows one nor rules one out, and outside a Special Flood Hazard Area ${NOT_REQUIRED}.`;
   }
   if (!flood.subtype || !entry) {
-    return `FEMA's map puts the building's point in ${zone}${called}, outside the Special Flood Hazard Area: ${NOT_REQUIRED}.`;
+    return `FEMA's map puts ${point} in ${zone}${called}, outside the Special Flood Hazard Area: ${NOT_REQUIRED}.`;
   }
-  return `FEMA's map puts the building's point in ${zone}${called}, outside the Special Flood Hazard Area, in a hazard FEMA still maps: ${NOT_REQUIRED}.`;
+  return `FEMA's map puts ${point} in ${zone}${called}, outside the Special Flood Hazard Area, in a hazard FEMA still maps: ${NOT_REQUIRED}.`;
 }
 
 // ── The flood zone wherever the deal is summarized (#426) ───────────────────

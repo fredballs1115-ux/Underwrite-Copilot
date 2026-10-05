@@ -299,6 +299,10 @@ describe("floodMapFor — the report's flood page reads the zone looked up for t
     const view = await floodMapFor(fakeDb(null).client, "deal-elm", address, null, lookedUpFor(ELM));
     expect(view?.image).toBeNull();
     expect(view?.line).toMatch(/Zone AE/);
+    // No point placed at the house for this address: the zone is said at
+    // the point the address was placed at, never the building's (the
+    // pre-merge audit, C1 L10).
+    expect(view?.line).toMatch(/^FEMA's map puts the point the address was placed at in Zone AE/);
   });
 
   it("says nothing where the lookup was made for an address the deal has since changed from, as for a pending one", async () => {
