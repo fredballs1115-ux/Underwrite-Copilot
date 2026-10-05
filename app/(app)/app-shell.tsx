@@ -129,6 +129,9 @@ export function AppShell({
   const inTeam = pathname.startsWith("/team");
   const inBilling = pathname.startsWith("/billing");
   const inAccount = pathname.startsWith("/account");
+  // A deal's own page keeps its bar at a phone's foot once the header
+  // scrolls away (#437), so the footer below the page clears it too.
+  const onDealPage = /^\/deals\/[^/]+$/.test(pathname) && pathname !== "/deals/compare";
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   return (
@@ -319,6 +322,24 @@ export function AppShell({
             {children}
           </div>
         </main>
+        {/* The terms, the privacy policy and the security page on every
+            signed-in page: what a customer may need to read, and the footer
+            links Google's Street View policies ask of a web app that shows
+            its imagery ("web apps should include these links in their
+            footer", as the runner printed the policies on Oct 5, 2026). */}
+        <footer className={`border-t border-line px-5 py-4 sm:px-8 print:hidden ${onDealPage ? "max-md:pb-20" : ""}`}>
+          <nav aria-label="Terms and policies" className="mx-auto flex max-w-7xl gap-4 text-xs text-muted">
+            <Link href="/terms" className="hover:text-ink">
+              Terms
+            </Link>
+            <Link href="/privacy" className="hover:text-ink">
+              Privacy
+            </Link>
+            <Link href="/security" className="hover:text-ink">
+              Security
+            </Link>
+          </nav>
+        </footer>
       </div>
     </div>
     </ToastProvider>
