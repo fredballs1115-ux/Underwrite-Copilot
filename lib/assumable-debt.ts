@@ -43,8 +43,15 @@
 // the loan costs, so the coupon priced is the note rate plus it, said; and
 // a lockout, or a sale subject to the loan, makes the model's new loan one
 // this buyer may not be able to take, which the card says.
+//
+// And a balance at or over the price is said, never priced (research pass
+// 38): it leaves no equity cheque, so neither position's return solves, and
+// a balance stated as the loan as first made, or as the whole debt on the
+// property, is the usual misread — "$30.0M — more than the $25.0M price:
+// check the balance".
 
 import { withArticle } from "@/lib/article";
+import { askingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
 import { compactUsd, parseUsd } from "@/lib/money";
@@ -185,10 +192,53 @@ export interface AssumableRead {
   /** today's rate less the coupon priced, basis points — positive where the
    *  loan is under the market */
   underMarketBps: number | null;
-  /** the two positions, run whole — null where a term is missing */
+  /** the two positions, run whole — null where a term is missing, and where
+   *  the balance is at or over the price (`overPrice`) */
   read: AssumptionRead | null;
   /** the terms the comparison needed and the memorandum did not state */
   missing: string[];
+  /** the balance at or over the price it is set against — said, and nothing
+   *  priced on it; null where it is under (research pass 38) */
+  overPrice: OverPrice | null;
+}
+
+/** A loan's balance, or a seller's note's amount, at or over the price it
+ *  is set against (research pass 38). */
+export interface OverPrice {
+  /** the balance or the note's amount, as stated */
+  amount: number;
+  /** the price it is set against: the memorandum's ask where it states one,
+   *  else the price the model runs on */
+  price: number;
+  /** the price is the memorandum's own ask. The documents' lines say so
+   *  only then: the model's price may be its placeholder, which only the
+   *  surfaces that gate the model's reads may set anything against */
+  stated: boolean;
+}
+
+/** The balance or the note's amount against the memorandum's ask where it
+ *  states one, else the model's price; null where it is under, or where
+ *  there is no price to set it against. */
+export function overPriceOf(amount: number | null, statedPrice: number | null, modelPrice: number | null): OverPrice | null {
+  const price = statedPrice != null && statedPrice > 0 ? statedPrice : modelPrice;
+  if (amount == null || !(amount > 0) || price == null || !(price > 0) || amount < price) return null;
+  return { amount, price, stated: statedPrice != null && statedPrice > 0 };
+}
+
+/** What the figure is against the price: "more than the $25.0M price:
+ *  check the balance". Two figures that read alike are "as much as" each
+ *  other, never "more than". */
+export function overPriceClause(o: OverPrice, what: string): string {
+  const amount = assumableMoney(o.amount);
+  const price = assumableMoney(o.price);
+  const the = o.stated ? `the ${price} price` : `the ${price} price the model runs on`;
+  return `${o.amount > o.price && amount !== price ? "more than" : "as much as"} ${the}: check the ${what}`;
+}
+
+/** The figure and the clause: "$30.0M — more than the $25.0M price: check
+ *  the balance". */
+export function overPriceWords(o: OverPrice, what: string): string {
+  return `${assumableMoney(o.amount)} — ${overPriceClause(o, what)}`;
 }
 
 // ── Reading the terms ───────────────────────────────────────────────────
@@ -522,9 +572,15 @@ export function readAssumable(
   // coupon, and a loan with under a year to run is a refinance, not an
   // assumption.
   const couponYears = monthsLeft != null && !matured ? Math.floor(Math.max(0, monthsLeft) / 12) : null;
+  // A balance at or over the price leaves no equity cheque, so neither
+  // position's return solves: it is said, and nothing is priced on it. A
+  // first loan's row that states two loans gives no balance of the first's.
+  const overPrice = terms.supplemental?.balanceStated
+    ? null
+    : overPriceOf(terms.balance, askingPriceOf(ex as never), model?.price ?? null);
 
   let read: AssumptionRead | null = null;
-  if (model && pricedRatePct != null && couponYears != null && couponYears >= 1 && schedule) {
+  if (!overPrice && model && pricedRatePct != null && couponYears != null && couponYears >= 1 && schedule) {
     const remainingYears = couponYears;
     const r = readAssumption({
       price: model.price,
@@ -549,7 +605,7 @@ export function readAssumable(
     });
     read = r.assume && r.newLoan ? r : null;
   }
-  return { terms, monthsLeft, daysLeft, matured, couponYears, schedule, model, pricedRatePct, underMarketBps, read, missing };
+  return { terms, monthsLeft, daysLeft, matured, couponYears, schedule, model, pricedRatePct, underMarketBps, read, missing, overPrice };
 }
 
 // ── Saying it ───────────────────────────────────────────────────────────
@@ -636,6 +692,9 @@ export function assumableContextLine(a: AssumableRead): string {
   const t = a.terms;
   const prepay = prepaymentWords(t);
   const tail = prepay ? ` ${prepay}` : "";
+  if (a.overPrice?.stated) {
+    return `The memorandum offers the seller's loan for assumption: ${assumableTermsLine(a)}; its ${assumableMoney(a.overPrice.amount)} balance is ${overPriceClause(a.overPrice, "balance")}. A balance at or over the price leaves no equity cheque, so the loan is priced against nothing until the balance is checked.${tail}`;
+  }
   if (t.supplemental) {
     return `The memorandum offers the seller's loans for assumption together: ${assumableTermsLine(a)}. The two are assumed together, so what they are worth is the two loans' position — their rates over the years of them the hold uses, against the equity cheque their balances take — never the first loan's rate alone.${tail}`;
   }
@@ -657,7 +716,8 @@ const yearsText = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
 
 /**
  * The card's one sentence under the pictures: what is missing, or that the
- * loan has matured, or the answer the two positions give — and, where its
+ * loan has matured, or that its balance is at or over the price (said, and
+ * priced against nothing), or the answer the two positions give — and, where its
  * prepayment terms lock the loan in, that the model's new loan may not be
  * this buyer's to take. `withheld` is why the model's reads are left out
  * (lib/underwrite/report-grid `modelReadsWithheld`): the loan is then read
@@ -672,6 +732,9 @@ export function assumableSentence(a: AssumableRead, withheld: string | null = nu
   }
   const t = a.terms;
   const lockIn = t.prepayment?.locksIn ? ` ${prepaymentWords(t)}` : "";
+  if (a.overPrice) {
+    return `${overPriceWords(a.overPrice, "balance")}. A loan at or over the price leaves no equity cheque, so nothing is priced against a new loan.${lockIn}`;
+  }
   if (t.supplemental || t.floating) {
     const said: string[] = [];
     if (t.supplemental) said.push("A second loan is offered with it: the two are assumed together, so the first is not priced against a new loan alone.");
@@ -720,7 +783,11 @@ function pricedSentence(a: AssumableRead, r: AssumptionRead, model: ModelForAssu
       (r.annualDebtServiceSaved ?? 0) >= 0 ? "saves" : "costs"
     } in debt service does not pay for the ${assumableMoney(Math.abs(r.extraEquity ?? 0))} ${(r.extraEquity ?? 0) >= 0 ? "larger" : "smaller"} cheque.${overlap}`;
   }
-  return `Assuming it returns ${oneDp(r.irrGapPts ?? 0)} points more than the model's new loan.${overlap}`;
+  // A gap that did not solve is no gap, never "0 points" (research pass 38).
+  if (r.irrGapPts == null) {
+    return `No return gap is stated: the levered return of assuming it, or of the model's new loan, does not solve on the model's figures.${overlap}`;
+  }
+  return `Assuming it returns ${oneDp(r.irrGapPts)} points more than the model's new loan.${overlap}`;
 }
 
 // ── What the card draws ─────────────────────────────────────────────────
@@ -795,8 +862,11 @@ export function assumableView(a: AssumableRead, rateNote: string | null, seeded:
     irrGapPts: r?.irrGapPts ?? null,
     pricePremium: r && r.pricePremium != null && r.pricePremium > 0 ? r.pricePremium : null,
     pricePremiumPct: r && r.pricePremium != null && r.pricePremium > 0 ? r.pricePremiumPctOfPrice : null,
-    feeLine:
-      a.terms.feePct != null
+    // Nothing is priced on a balance at or over the price, so no cheque
+    // carries a fee.
+    feeLine: a.overPrice
+      ? null
+      : a.terms.feePct != null
         ? a.terms.supplemental
           ? // Two loans: the fee is not struck on the first one's balance alone.
             `The ${oneDp(a.terms.feePct)}% assumption fee is funded at closing, in the cheque.`
@@ -846,7 +916,10 @@ export function assumableTag(ex: Extraction): string | null {
  * report carry; a line never claims more than the terms.
  */
 export function assumableLine(a: AssumableRead): string {
+  // A balance at or over the memorandum's own ask is said here too — never
+  // against a model's price, which may be its placeholder.
+  const over = a.overPrice?.stated ? `; its ${assumableMoney(a.overPrice.amount)} balance is ${overPriceClause(a.overPrice, "balance")}` : "";
   return a.terms.supplemental
-    ? `The seller's loans are offered for assumption together: ${assumableTermsLine(a)}`
-    : `The seller's loan is offered for assumption: ${assumableTermsLine(a)}`;
+    ? `The seller's loans are offered for assumption together: ${assumableTermsLine(a)}${over}`
+    : `The seller's loan is offered for assumption: ${assumableTermsLine(a)}${over}`;
 }

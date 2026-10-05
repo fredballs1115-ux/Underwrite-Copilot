@@ -449,7 +449,7 @@ export function basisWithheldOf(extraction: ExtractionResult | null): { word: st
  *  this model's new loan. Null where none is offered. */
 function sellerNoteMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["sellerNote"] {
   const s = extraction ? readSellerFinancing(extraction, inputs) : null;
-  if (s) return { line: sellerFinancingLine(s.terms), read: sellerFinancingSentence(s) };
+  if (s) return { line: sellerFinancingLine(s.terms, s.overPrice), read: sellerFinancingSentence(s) };
   // On a note the seller's financing is of the note's purchase: listed as
   // that, and never run against this model's property loan.
   const t = notePurchaseFinancing(extraction);
