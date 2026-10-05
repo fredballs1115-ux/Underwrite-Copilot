@@ -784,6 +784,19 @@ export function deriveUnderwriteInputs(
   let price = priceMetric ? parsePrice(priceMetric.value) : null;
   const priceSpan = priceMetric ? priceRange(priceMetric.value) : null;
   const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+  // An NOI the OM states a month at a time is read as the year it makes
+  // (lib/deal-strategy `noiOfRow`, research pass 40), and every note that
+  // names it says so: "twelve times the $85,000 a month the OM states".
+  const monthWords = (f: { month?: number }) =>
+    f.month != null
+      ? `twelve times the ${Math.round(f.month) < 0 ? "−" : ""}$${Math.abs(Math.round(f.month)).toLocaleString("en-US")} a month the OM states`
+      : null;
+  // A stated NOI the model does not run is named in a sentence by its label
+  // and figure, and a year read off a month by its month too.
+  const namedLabel = (f: { label: string; month?: number }) => {
+    const month = monthWords(f);
+    return month ? `${f.label}, ${month},` : f.label;
+  };
   const spanNote = priceSpan
     ? `the top of the ${usd0(priceSpan.low)}–${usd0(priceSpan.high)} range the OM states, the end that does not flatter the returns`
     : "";
@@ -902,7 +915,8 @@ export function deriveUnderwriteInputs(
     // Only an in-place / Year-1 NOI may back a price out of the going-in cap.
     price = goingFig.value / capPct;
     if (goingFig.value > 0) {
-      mark("purchasePrice", "derived", capRangeWords ? `NOI ÷ ${capRangeWords}` : "NOI ÷ going-in cap");
+      const month = monthWords(goingFig);
+      mark("purchasePrice", "derived", `NOI${month ? ` (${month})` : ""} ÷ ${capRangeWords ?? "going-in cap"}`);
     } else {
       // An NOI of zero or less over the cap is no price: the model runs the
       // quotient (the owner's to change), and the note says why it is none
@@ -911,9 +925,9 @@ export function deriveUnderwriteInputs(
       mark(
         "purchasePrice",
         "derived",
-        `The OM states no price, and its ${goingFig.label} of ${compactUsd(goingFig.value, { thousandsFrom: Infinity })} is not a year's income to price on: that NOI ÷ ${capRangeWords ?? "the stated going-in cap"} is no price — enter the purchase price`,
+        `The OM states no price, and its ${goingFig.label} of ${compactUsd(goingFig.value, { thousandsFrom: Infinity })}${monthWords(goingFig) ? ` (${monthWords(goingFig)})` : ""} is not a year's income to price on: that NOI ÷ ${capRangeWords ?? "the stated going-in cap"} is no price — enter the purchase price`,
       );
-      sources.purchasePrice = { ...sources.purchasePrice!, noPrice: { label: goingFig.label, value: goingFig.value } };
+      sources.purchasePrice = { ...sources.purchasePrice!, noPrice: { label: namedLabel(goingFig), value: goingFig.value } };
     }
   } else {
     price = 10_000_000;
@@ -957,11 +971,13 @@ export function deriveUnderwriteInputs(
   // income is not wrong, the price is not the building's (research pass 37:
   // a GP stake's note had called the building's stated NOI no year-1 income).
   const shareUngrossed = interest.kind === "partial_interest" && interest.sharePct == null;
-  const implausible = (f: { label: string; value: number }) => {
+  const implausible = (f: { label: string; value: number; month?: number }) => {
     // A loss is written with its minus outside the dollar, as every surface
-    // writes one: "−$310,000", never "$-310,000" (research pass 38).
+    // writes one: "−$310,000", never "$-310,000" (research pass 38) — and a
+    // year read off a month says so beside it (research pass 40).
     const whole = Math.round(f.value);
-    const amount = `${whole < 0 ? "−" : ""}$${Math.abs(whole).toLocaleString("en-US")}`;
+    const month = monthWords(f);
+    const amount = `${whole < 0 ? "−" : ""}$${Math.abs(whole).toLocaleString("en-US")}${month ? ` (${month})` : ""}`;
     if (!(f.value > 0)) return `The OM's ${f.label} is ${amount} — no income in place to anchor year 1 on`;
     // No price was read: a stated NOI is set against nothing the memorandum
     // states, so it is never judged against the placeholder (research pass
@@ -995,11 +1011,12 @@ export function deriveUnderwriteInputs(
     );
   } else if (goingFig && plausibleOnPrice(goingFig.value)) {
     noi = goingFig.value;
-    noiRead = `the OM's ${goingFig.label}`;
+    const month = monthWords(goingFig);
+    noiRead = `the OM's ${goingFig.label}${month ? `, ${month}` : ""}`;
     mark(
       "inPlaceRentAnnual",
       "derived",
-      `Grossed up from the OM's ${goingFig.label} at an assumed expense ratio`,
+      `Grossed up from the OM's ${goingFig.label}${month ? ` — ${month} —` : ""} at an assumed expense ratio`,
       pageOfFig(goingFig),
     );
   } else if (
@@ -1008,11 +1025,12 @@ export function deriveUnderwriteInputs(
     plausibleOnPrice(stabilizedFig.value)
   ) {
     noi = stabilizedFig.value;
-    noiRead = `the OM's ${stabilizedFig.label}`;
+    const month = monthWords(stabilizedFig);
+    noiRead = `the OM's ${stabilizedFig.label}${month ? `, ${month}` : ""}`;
     mark(
       "inPlaceRentAnnual",
       "derived",
-      `Grossed up from the OM's ${stabilizedFig.label} — the only NOI stated; on a stabilized asset it is next year's income`,
+      `Grossed up from the OM's ${stabilizedFig.label}${month ? `, ${month},` : ""} — the only NOI stated; on a stabilized asset it is next year's income`,
       pageOfFig(stabilizedFig),
     );
   } else if (capPct) {
@@ -1043,7 +1061,7 @@ export function deriveUnderwriteInputs(
           : `From price × ${capRangeWords ?? "going-in cap"}, at an assumed expense ratio`,
     );
     if (noIncome && skipped && sources.inPlaceRentAnnual) {
-      sources.inPlaceRentAnnual = { ...sources.inPlaceRentAnnual, notRun: { label: skipped.label, value: skipped.value } };
+      sources.inPlaceRentAnnual = { ...sources.inPlaceRentAnnual, notRun: { label: namedLabel(skipped), value: skipped.value } };
     }
   } else {
     noi = price * 0.06;
@@ -1095,7 +1113,7 @@ export function deriveUnderwriteInputs(
     if (skipped && sources.inPlaceRentAnnual) {
       sources.inPlaceRentAnnual = {
         ...sources.inPlaceRentAnnual,
-        notRun: { label: skipped.label, value: skipped.value, ...(onPlaceholder && skipped.value > 0 ? { unpriced: true } : {}) },
+        notRun: { label: namedLabel(skipped), value: skipped.value, ...(onPlaceholder && skipped.value > 0 ? { unpriced: true } : {}) },
       };
     }
   }

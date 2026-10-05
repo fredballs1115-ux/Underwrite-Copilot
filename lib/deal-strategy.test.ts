@@ -1089,20 +1089,24 @@ describe("an implied going-in cap under the floor is a finding, said as the rule
   const RULE =
     "Under 2% of the price is under the going-in cap a stabilized building trades at — a rule of thumb, not a market figure: an NOI that low is, most often, a price for land or a redevelopment, a figure stated a month at a time or in thousands, or a misread.";
 
-  it("names an NOI stated a month at a time, which every return ran as a year's", () => {
+  it("reads an NOI stated a month at a time as twelve times the month, and finds no misread in it (research pass 40)", () => {
+    // It had read $45,000 a month as a year's and found a 0.69% cap.
     const monthly = rows("Retail", [["Asking price", "6,500,000"], ["NOI (monthly)", "45,000", "in_place"], ["Total SF", "28,000 SF"]]);
-    const [f] = assessPlausibility(monthly);
+    expect(assessPlausibility(monthly)).toEqual([]);
+    // The value's own words count too: beside its stated 8.30% cap, the
+    // year it makes ties.
+    const perMonth = rows("Retail", [["Asking price", "6,500,000"], ["NOI (in-place)", "45,000 per month", "in_place"], ["Going-in cap rate", "8.30%"], ["Total SF", "28,000 SF"]]);
+    expect(assessPlausibility(perMonth)).toEqual([]);
+    // A month that, twelve times over, is still under the floor is named
+    // with its month, and read as the year it makes.
+    const thin = rows("Retail", [["Asking price", "6,500,000"], ["NOI (monthly)", "5,000", "in_place"], ["Total SF", "28,000 SF"]]);
+    const [f] = assessPlausibility(thin);
     expect(f).toEqual({
       code: "implied_cap_low",
       severity: "medium",
-      title: "NOI (monthly) of $45k implies a 0.69% cap rate on the $6.5M price",
-      detail: `${RULE} The row reads “NOI (monthly): 45,000” — a month's figure, which every return here runs as a year's. Check the source page before relying on any return built from these two figures.`,
+      title: "NOI (monthly) of $60k (twelve times the $5k a month stated) implies a 0.92% cap rate on the $6.5M price",
+      detail: `${RULE} The row reads “NOI (monthly): 5,000” — a month's figure, read here as twelve times the month. Check the source page before relying on any return built from these two figures.`,
     });
-    // The value's own words count too, beside a stated cap that disagrees.
-    const perMonth = rows("Retail", [["Asking price", "6,500,000"], ["NOI (in-place)", "45,000 per month", "in_place"], ["Going-in cap rate", "8.30%"], ["Total SF", "28,000 SF"]]);
-    const codes = assessPlausibility(perMonth);
-    expect(codes.map((x) => x.code).sort()).toEqual(["cap_mismatch", "implied_cap_low"]);
-    expect(codes.find((x) => x.code === "implied_cap_low")!.detail).toContain("The row reads “NOI (in-place): 45,000 per month” — a month's figure");
   });
 
   it("names an NOI stated in thousands, which every return ran as dollars", () => {

@@ -82,17 +82,18 @@ describe("a building the model runs nearly vacant (research pass 38, item 1)", (
 });
 
 describe("figures the plausibility check finds do not tie withhold the tiles (research pass 38, item 4)", () => {
-  // A retail strip whose NOI the memorandum states a month at a time: the
-  // model ran it as a year's, and the page printed "Equity multiple −1.53x"
-  // and "Year-1 DSCR 0.16x" with no finding.
-  const MONTHLY = deal("Retail", [["Asking price", "6,500,000"], ["NOI (monthly)", "45,000", "in_place"], ["Total SF", "28,000 SF"]]);
+  // A retail strip whose NOI row is a month's figure with no word saying so:
+  // the model ran it as a year's, and the page printed "Equity multiple
+  // −1.53x" and "Year-1 DSCR 0.16x" with no finding. (A row whose words say
+  // a month is read as twelve times it since research pass 40.)
+  const MONTHLY = deal("Retail", [["Asking price", "6,500,000"], ["NOI (in-place)", "45,000", "in_place"], ["Total SF", "28,000 SF"]]);
 
   it("withholds the tiles and the max bid with the finding's own claim, as a placeholder's are", () => {
     const findings = assessPlausibility(MONTHLY, inferStrategy(MONTHLY));
     expect(findings.map((f) => f.code)).toEqual(["implied_cap_low"]);
     const { d, html, text } = drawn(MONTHLY, { findings });
     expect(text).toContain(
-      "The returns and the max bid are withheld: NOI (monthly) of $45k implies a 0.69% cap rate on the $6.5M price, and returns built on figures that do not tie would be a misread's.",
+      "The returns and the max bid are withheld: NOI (in-place) of $45k implies a 0.69% cap rate on the $6.5M price, and returns built on figures that do not tie would be a misread's.",
     );
     expect(text.match(/n\/a — figures don't tie/g)?.length).toBe(4);
     const r = computeUnderwrite(d.inputs);

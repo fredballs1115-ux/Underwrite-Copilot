@@ -31,6 +31,7 @@ import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
 import { yieldOnCostText } from "@/lib/plan-facts";
+import { monthFigureOf } from "@/lib/stated-period";
 import {
   LATER_YEAR,
   METRIC_FIND,
@@ -305,8 +306,15 @@ export type NoiKind = "in_place" | "year1" | "stabilized";
 export interface NoiFigure {
   kind: NoiKind;
   label: string;
+  /** a year's NOI — twelve times the month where the row states a month
+   *  (`month`) */
   value: number;
   page?: string;
+  /** the month's figure the year was read from, where the row states its NOI
+   *  a month at a time and no year beside it (lib/stated-period
+   *  `monthFigureOf`, research pass 40): said beside the year wherever the
+   *  figure is named (`noiFigureWords`); absent otherwise */
+  month?: number;
 }
 
 const NOI_INCLUDE = /net operating income|\bnoi\b/i;
@@ -348,7 +356,9 @@ const NOI_STABILIZED = new RegExp(
 );
 const NOI_IN_PLACE = /t-?12|ttm|trailing|in[- ]?place|current|actual|historical|as[- ]is|run[- ]rate/i;
 
-/** Which NOI a metric is — or null when it is not an NOI figure at all. */
+/** Which NOI a metric is — or null when it is not an NOI figure at all. A
+ *  row it takes whose words say a month ("NOI (monthly)", "Monthly NOI",
+ *  "$85,000/mo") is read as the year the month makes (`noiOfRow`). */
 export function classifyNoi(m: MetricLike): NoiKind | null {
   if (!NOI_INCLUDE.test(m.label) || NOI_EXCLUDE.test(m.label) || slashMakesRate(m.label)) return null;
   if (NOI_STABILIZED.test(m.label)) return "stabilized";
@@ -357,17 +367,47 @@ export function classifyNoi(m: MetricLike): NoiKind | null {
   return "year1";
 }
 
-/** Every parseable NOI in the extraction, classified. Order preserved. */
+/**
+ * An NOI row's figure as a year (research pass 40, H1(a)): a row whose words
+ * say a month — the figure's own ("$85,000/mo", "$85,000 per month") or,
+ * where those state no period, its label's ("NOI (monthly)", "Monthly NOI")
+ * — is read as twelve times the month, or as the year it states beside the
+ * month where the two agree (lib/stated-period `monthFigureOf`, the rule
+ * lib/mixed-use reads a monthly income by); a month and a year that do not
+ * agree are no figure. Every other row reads as it always has — a figure is
+ * never annualised on a guess. The one rule behind every NOI reader here
+ * (`noiFigures`): the plausibility check, the plan and the model.
+ */
+export function noiOfRow(m: Pick<MetricLike, "label" | "value">): { value: number; month?: number } | null {
+  const month = monthFigureOf(m.label, m.value);
+  if (month === "disagree") return null;
+  if (month) return month.yearStated ? { value: month.annual } : { value: month.annual, month: month.month };
+  const value = parseMoney(m.value);
+  return value == null || !Number.isFinite(value) ? null : { value };
+}
+
+/** Every parseable NOI in the extraction, classified, each a year's
+ *  (`noiOfRow`). Order preserved. */
 export function noiFigures(metrics: MetricLike[]): NoiFigure[] {
   const out: NoiFigure[] = [];
   for (const m of metrics) {
     const kind = classifyNoi(m);
     if (!kind) continue;
-    const value = parseMoney(m.value);
-    if (value == null || !Number.isFinite(value)) continue;
-    out.push({ kind, label: m.label, value, page: m.page });
+    const read = noiOfRow(m);
+    if (!read) continue;
+    out.push({ kind, label: m.label, value: read.value, page: m.page, ...(read.month != null ? { month: read.month } : {}) });
   }
   return out;
+}
+
+/**
+ * An NOI figure named as a sentence names it: "NOI (in-place) of $1.40M",
+ * and where it was read off a month, the month beside the year it makes —
+ * "NOI (monthly) of $1.02M (twelve times the $85k a month stated)" — so a
+ * label that says monthly never sits beside a year's figure unexplained.
+ */
+export function noiFigureWords(f: Pick<NoiFigure, "label" | "value" | "month">, money: (n: number) => string = compactUsd): string {
+  return `${f.label} of ${money(f.value)}${f.month != null ? ` (twelve times the ${money(f.month)} a month stated)` : ""}`;
 }
 
 // An operating business's earnings, by the labels the extraction files them
@@ -1237,21 +1277,20 @@ export function planSummary(
   };
 }
 
-// The words on an NOI row that say its figure is not a year's whole dollars:
-// a month at a time ("NOI (monthly)", "45,000 per month", "$/mo"), or in
-// thousands ("2,450 ($000s)", "in thousands").
-const PER_MONTH_WORDS = /\bper\s+month\b|\bmonthly\b|\ba\s+month\b|\/\s*mo(?:nth)?\b/i;
+// The words on an NOI row that say its figure is not whole dollars: in
+// thousands ("2,450 ($000s)", "in thousands"). A month's figure is read as
+// the year it makes (`noiOfRow`), so no row's month is run as a year's.
 const IN_THOUSANDS_WORDS = /\(\s*\$?\s*0{3}'?s?\s*\)|\$\s*0{3}'?s?(?![\d,])|\bin\s+thousands\b/i;
 
-/** Where an NOI row's own words say its figure is a month's or in thousands,
- *  the sentence that quotes them — the row is the one the figure was read
- *  from, label and value as stated; "" where they say neither. */
+/** Where an NOI row's figure was read off a month, or its own words say it
+ *  is in thousands, the sentence that quotes them — the row is the one the
+ *  figure was read from, label and value as stated; "" where neither. */
 function noiRowWords(metrics: MetricLike[], f: NoiFigure): string {
-  const row = metrics.find((m) => m.label === f.label && parseMoney(m.value) === f.value);
+  const row = metrics.find((m) => m.label === f.label && noiOfRow(m)?.value === f.value);
   if (!row) return "";
   const words = `${row.label} ${row.value}`;
   const quoted = `“${row.label.trim()}: ${row.value.trim()}”`;
-  if (PER_MONTH_WORDS.test(words)) return ` The row reads ${quoted} — a month's figure, which every return here runs as a year's.`;
+  if (f.month != null) return ` The row reads ${quoted} — a month's figure, read here as twelve times the month.`;
   if (IN_THOUSANDS_WORDS.test(words)) return ` The row reads ${quoted} — a figure in thousands of dollars, which every return here runs as dollars.`;
   return "";
 }
@@ -1469,7 +1508,7 @@ export function assessPlausibility(
       findings.push({
         code: "label_mismatch",
         severity: "medium",
-        title: `${f.label} of ${money(f.value)} is ${pct(implied, 0)} of the ${money(price)} ${priceWord} on ${withArticle(strategy.label.toLowerCase())} deal`,
+        title: `${noiFigureWords(f, money)} is ${pct(implied, 0)} of the ${money(price)} ${priceWord} on ${withArticle(strategy.label.toLowerCase())} deal`,
         detail: `A building mid-plan does not earn that today. This is almost certainly the finished project's stabilized pro forma carrying an in-place or Year-1 label — read it as the stabilized figure, and confirm what the building actually earns during the works.`,
       });
       continue;
@@ -1478,7 +1517,7 @@ export function assessPlausibility(
       findings.push({
         code: "strategy_unsettled",
         severity: "medium",
-        title: `${f.label} of ${money(f.value)} is ${pct(implied, 0)} of the ${money(price)} ${priceWord}`,
+        title: `${noiFigureWords(f, money)} is ${pct(implied, 0)} of the ${money(price)} ${priceWord}`,
         detail: `A stabilized figure that far above the price belongs to a plan — a conversion, a development, a lease-up — that the deck does not name plainly. Settle what the deal is first: measured against total cost it may be a fine yield; against the price alone it means nothing.`,
       });
       continue;
@@ -1488,8 +1527,8 @@ export function assessPlausibility(
       severity: "high",
       title:
         f.value >= price
-          ? `${f.label} of ${money(f.value)} is above the ${money(price)} ${priceWord}`
-          : `${f.label} of ${money(f.value)} implies ${withArticle(pct(implied, 0))} cap rate`,
+          ? `${noiFigureWords(f, money)} is above the ${money(price)} ${priceWord}`
+          : `${noiFigureWords(f, money)} implies ${withArticle(pct(implied, 0))} cap rate`,
       detail: `No operating property yields ${pct(implied, 0)}. Either the NOI or the price was misread, or the OM's NOI is a stabilized pro forma for a plan the deck describes elsewhere. Check the source pages before relying on any return built from these two figures.`,
     });
   }
@@ -1512,7 +1551,7 @@ export function assessPlausibility(
     findings.push({
       code: "implied_cap_low",
       severity: "medium",
-      title: `${anchor.label} of ${money(anchor.value)} implies ${withArticle(pct(implied, 2))} cap rate on the ${money(price)} ${priceWord}`,
+      title: `${noiFigureWords(anchor, money)} implies ${withArticle(pct(implied, 2))} cap rate on the ${money(price)} ${priceWord}`,
       detail: `Under ${pct(IMPLIED_CAP_FLOOR, 0)} of the price is under the going-in cap a stabilized building trades at — a rule of thumb, not a market figure: an NOI that low is, most often, a price for land or a redevelopment, a figure stated a month at a time or in thousands, or a misread.${noiRowWords(
         metrics,
         anchor,
@@ -1551,7 +1590,7 @@ export function assessPlausibility(
       findings.push({
         code: "ground_rent_mismatch",
         severity: "high",
-        title: `${going.label} of ${money(going.value)} is ${(Math.round((going.value / groundRent) * 10) / 10).toFixed(1)}× the ${money(groundRent)} ground rent on a leased fee`,
+        title: `${noiFigureWords(going, money)} is ${(Math.round((going.value / groundRent) * 10) / 10).toFixed(1)}× the ${money(groundRent)} ground rent on a leased fee`,
         detail: `The buyer of the land collects the ground rent; the building's operating income belongs to its owner and only has to cover that rent. Every return built on the larger figure counts income the buyer never receives — check which income the NOI row states before relying on it.`,
       });
     }
@@ -1664,9 +1703,14 @@ function planLine(plan: PlanSummary, contextSays = false, extraction: Extraction
   // A forward purchase's NOI is the one the memorandum states at delivery,
   // which on a build-to-suit is the lease's first year.
   const noiWord = plan.forward ? "NOI at delivery" : "stabilized NOI";
+  // A figure read off a month says so beside the year it makes (research
+  // pass 40).
+  const monthOf = (f: NoiFigure) => (f.month != null ? `, twelve times the ${money(f.month)} a month stated` : "");
   if (!said?.noi) {
     parts.push(
-      plan.stabilizedNoi ? `${noiWord} ${money(plan.stabilizedNoi.value)} (${plan.stabilizedNoi.label})` : `${noiWord} not stated`,
+      plan.stabilizedNoi
+        ? `${noiWord} ${money(plan.stabilizedNoi.value)} (${plan.stabilizedNoi.label}${monthOf(plan.stabilizedNoi)})`
+        : `${noiWord} not stated`,
     );
   }
   // A share's grossed-up price, either label, reads as it did: the

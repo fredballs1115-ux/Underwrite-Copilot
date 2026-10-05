@@ -209,12 +209,15 @@ export function dealContextFor(
   // period of its own ran into "The OM's NOI at delivery…").
   const summary = strategy.summary.trim().replace(/[.\s]+$/, "");
   const lines = [`Deal type: ${dealTypeLabel(strategy.label, extraction)}${summary ? ` — ${summary}.` : "."}`];
+  // A figure the memorandum states a month at a time is read as the year it
+  // makes, and said so (lib/deal-strategy `noiOfRow`, research pass 40).
+  const monthStated = (f: { month?: number }) => (f.month != null ? ` (twelve times the ${compact(f.month)} a month stated)` : "");
   if (plan?.stabilizedNoi && plan.forward) {
     // A forward purchase's NOI is the one stated at delivery (on a
     // build-to-suit the lease's first year), over the price the buyer pays
     // then — its whole cost, since the developer funds the works.
     lines.push(
-      `The OM's NOI at delivery (${plan.stabilizedNoi.label}) of ${compact(plan.stabilizedNoi.value)} is the delivered building's figure${
+      `The OM's NOI at delivery (${plan.stabilizedNoi.label}) of ${compact(plan.stabilizedNoi.value)}${monthStated(plan.stabilizedNoi)} is the delivered building's figure${
         plan.totalCost != null && plan.yieldOnCost != null
           ? ` — over the ${compact(plan.totalCost)} price, the buyer's whole cost, it is ${withArticle(yieldOnCostText(plan.yieldOnCost))} yield on cost`
           : ""
@@ -222,7 +225,7 @@ export function dealContextFor(
     );
   } else if (plan?.stabilizedNoi) {
     lines.push(
-      `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)} is the finished project's figure${
+      `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)}${monthStated(plan.stabilizedNoi)} is the finished project's figure${
         plan.totalCost != null && plan.yieldOnCost != null
           ? ` — over ${compact(plan.totalCost)} of total cost it is ${withArticle(yieldOnCostText(plan.yieldOnCost))} yield on cost`
           : ""
