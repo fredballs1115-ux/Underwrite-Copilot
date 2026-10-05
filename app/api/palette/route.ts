@@ -1,14 +1,16 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { PALETTE_LIMIT, nameSearchPattern } from "@/lib/palette-search";
+import { PALETTE_LIMIT, nameSearchPattern, topMatches, type PaletteMatch } from "@/lib/palette-search";
+import { readAll, readByIds } from "@/lib/read-all";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
 
 // Feeds the ⌘K command palette: the caller's deals (RLS-scoped — own +
 // team), newest first, trimmed to what the jump list renders. With no query
 // it lists the most recently updated; with one (`?q=`) it searches every
-// deal the caller can see by its name (lib/palette-search), so a deal
-// updated long ago is still found. Search text also carries the property
-// address and document filenames so the palette works as a global search
-// over what it holds, not just a name matcher.
+// deal the caller can see by its name, its address and its documents' file
+// names (lib/palette-search), so a deal updated long ago is still found, and
+// answers how many matched (`total`) beside the fifty it lists. Search text
+// also carries the property address and document filenames so the palette's
+// own filter works over what it holds, not just a name matcher.
 export async function GET(request: Request) {
   const supabase = await createSupabaseServerClient();
   const {
@@ -20,21 +22,62 @@ export async function GET(request: Request) {
   }
 
   const pattern = nameSearchPattern(new URL(request.url).searchParams.get("q"));
-  let query = supabase.from("deals").select("id, name, market:extraction->>market, verdict, stage");
-  if (pattern) query = query.ilike("name", pattern);
-  const { data, error } = await query.order("updated_at", { ascending: false }).limit(PALETTE_LIMIT);
+  const COLS = "id, name, market:extraction->>market, verdict, stage, updated_at";
+  type Row = { id: string; name: string; market: unknown; verdict: unknown; stage: string | null; updated_at: string | null };
 
-  if (error) {
-    return Response.json({ deals: [] }, { status: 500 });
+  let rows: Row[];
+  // How many deals a typed query matched in all, where it is stated.
+  let total: number | null = null;
+  if (!pattern) {
+    const { data, error } = await supabase.from("deals").select(COLS).order("updated_at", { ascending: false }).limit(PALETTE_LIMIT);
+    if (error) return Response.json({ deals: [] }, { status: 500 });
+    rows = (data ?? []) as Row[];
+  } else {
+    // Every deal whose name, address or a document's file name holds the
+    // text — each match read light (its id and when it was updated), a page
+    // at a time, so the palette lists the most recently updated fifty and
+    // says how many matched in all. A failed read is an error, never "no
+    // matches".
+    const failed = { yes: false };
+    const fail = () => {
+      failed.yes = true;
+    };
+    const dealsWhere = (column: string) =>
+      readAll<PaletteMatch>(
+        (from, to) =>
+          supabase
+            .from("deals")
+            .select("id, updated_at")
+            .ilike(column, pattern)
+            .order("updated_at", { ascending: false })
+            .order("id")
+            .range(from, to),
+        fail,
+      );
+    const [byName, byAddress, docRows] = await Promise.all([
+      dealsWhere("name"),
+      dealsWhere("address->>label"),
+      readAll<{ id: string; deal_id: string }>(
+        (from, to) => supabase.from("deal_documents").select("id, deal_id").ilike("filename", pattern).order("id").range(from, to),
+        fail,
+      ),
+    ]);
+    // A deal found by a document alone, read for when it was updated.
+    const known = new Set([...(byName ?? []), ...(byAddress ?? [])].map((m) => m.id));
+    const docOnly = [...new Set((docRows ?? []).map((d) => d.deal_id))].filter((id) => !known.has(id));
+    const byDoc = await readByIds<PaletteMatch>(
+      docOnly,
+      (chunk) => supabase.from("deals").select("id, updated_at").in("id", chunk),
+      fail,
+    );
+    if (failed.yes || !byName || !byAddress || !byDoc) return Response.json({ deals: [] }, { status: 500 });
+    const top = topMatches([byName, byAddress, byDoc]);
+    total = top.total;
+    const full = await readByIds<Row>(top.ids, (chunk) => supabase.from("deals").select(COLS).in("id", chunk));
+    if (!full) return Response.json({ deals: [] }, { status: 500 });
+    const order = new Map(top.ids.map((id, i) => [id, i]));
+    rows = full.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
   }
-
-  const rows = (data ?? []) as {
-    id: string;
-    name: string;
-    market: unknown;
-    verdict: unknown;
-    stage: string | null;
-  }[];
   const ids = rows.map((d) => d.id);
 
   // Address is best-effort: the column arrived in migration 0011 and the
@@ -97,5 +140,5 @@ export async function GET(request: Request) {
     };
   });
 
-  return Response.json({ deals });
+  return Response.json(total == null ? { deals } : { deals, total });
 }

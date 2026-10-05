@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { MarketNavEntry } from "@/lib/market-match";
-import { asksServer, paletteCall, uniqueById, type PaletteRun } from "@/lib/palette-search";
+import { asksServer, paletteCall, paletteMoreLine, uniqueById, type PaletteRun } from "@/lib/palette-search";
 import { DealAvatar } from "./deal-avatar";
 
 /** How long typing rests before the server is asked for every deal whose
@@ -247,7 +247,9 @@ export function CommandPalette({
   // What typed queries found beyond the recent list this time the palette
   // is open, and the last query the server answered (or failed to).
   const [found, setFound] = useState<PaletteDeal[]>([]);
-  const [answered, setAnswered] = useState<{ q: string; ok: boolean } | null>(null);
+  // A search's answer also says how many deals matched in all, where it
+  // lists fewer (the route's `total`).
+  const [answered, setAnswered] = useState<{ q: string; ok: boolean; shown?: number; total?: number | null } | null>(null);
   const [active, setActive] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLUListElement>(null);
@@ -311,9 +313,9 @@ export function CommandPalette({
           if (!r.ok) throw new Error(String(r.status));
           return r.json();
         })
-        .then((d: { deals: PaletteDeal[] }) => {
+        .then((d: { deals: PaletteDeal[]; total?: number }) => {
           setFound((prev) => uniqueById(prev, d.deals));
-          setAnswered({ q: typed, ok: true });
+          setAnswered({ q: typed, ok: true, shown: d.deals.length, total: d.total ?? null });
         })
         .catch(() => {
           // Dropped for the next keystroke: nothing to say. Unreachable: the
@@ -327,6 +329,9 @@ export function CommandPalette({
     };
   }, [ask, typed]);
   const searching = ask && answered?.q !== typed;
+  // More deals matched than the search lists: said under the results, never
+  // left to read as every match (research pass 42).
+  const moreLine = ask && answered?.q === typed && answered.ok ? paletteMoreLine(answered.shown ?? 0, answered.total) : null;
 
   const items = useMemo<Item[]>(() => {
     const q = query.trim().toLowerCase();
@@ -539,6 +544,12 @@ export function CommandPalette({
             </li>
           ))}
         </ul>
+
+        {moreLine && (
+          <p role="status" data-qa="palette-more" className="border-t border-line px-4 py-2 text-xs text-muted">
+            {moreLine}
+          </p>
+        )}
 
         <div className="flex items-center gap-3 border-t border-line bg-faint/60 px-4 py-2 text-[10px] text-muted">
           <span>

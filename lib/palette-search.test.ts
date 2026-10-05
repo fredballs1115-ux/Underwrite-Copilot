@@ -7,7 +7,7 @@
  * and matches a LIKE pattern the way PostgREST and Postgres would.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PALETTE_LIMIT, PALETTE_QUERY_MAX, asksServer, nameSearchPattern, paletteCall, uniqueById } from "./palette-search";
+import { PALETTE_LIMIT, PALETTE_QUERY_MAX, asksServer, nameSearchPattern, paletteCall, paletteMoreLine, uniqueById } from "./palette-search";
 
 describe("nameSearchPattern — a typed query as an ILIKE pattern on the name", () => {
   it("wraps the text, trimmed, and answers null for nothing typed", () => {
@@ -78,7 +78,10 @@ const db = vi.hoisted(() => ({
   /** each deal's runs, newest first as the route asks for them */
   jobs: [] as Job[],
   /** each query's filters, in order */
-  calls: [] as { table: string; ilike?: [string, string]; order?: string; limit?: number; in?: string }[],
+  calls: [] as { table: string; ilike?: [string, string]; order?: string; limit?: number; in?: string; range?: [number, number] }[],
+  /** the most rows one response answers, as a project's max rows */
+  maxRows: 1000,
+  failTable: null as string | null,
 }));
 
 /** A LIKE pattern as Postgres reads it, after PostgREST has turned each `*`
@@ -109,8 +112,14 @@ vi.mock("@/lib/supabase/server", () => ({
           call.ilike = [col, pattern];
           return q;
         },
-        order: (col: string, opts: { ascending: boolean }) => {
-          call.order = `${col} ${opts.ascending ? "asc" : "desc"}`;
+        order: (col: string, opts?: { ascending: boolean }) => {
+          // The first order is the one a read is sorted by; a second is its
+          // tie-break.
+          call.order ??= `${col} ${opts?.ascending === false ? "desc" : "asc"}`;
+          return q;
+        },
+        range: (from: number, to: number) => {
+          call.range = [from, to];
           return q;
         },
         limit: (n: number) => {
@@ -124,10 +133,19 @@ vi.mock("@/lib/supabase/server", () => ({
         },
         then: (resolve: (v: { data: unknown[]; error: null }) => void) => {
           db.calls.push(call);
+          if (db.failTable === table) {
+            (resolve as unknown as (v: { data: null; error: { message: string } }) => void)({ data: null, error: { message: "timeout" } });
+            return;
+          }
           // Row-level security: the reader's own deals, never another's.
           const visible = db.deals.filter((d) => d.user_id === db.user?.id);
           if (table === "deal_documents") {
-            resolve({ data: db.documents.filter((doc) => ids!.includes(doc.deal_id)), error: null });
+            const docs = call.ilike
+              ? db.documents
+                  .map((doc, k) => ({ id: `doc-${k}`, ...doc }))
+                  .filter((doc) => likeMatches(call.ilike![1], doc.filename) && visible.some((d) => d.id === doc.deal_id))
+              : db.documents.filter((doc) => ids!.includes(doc.deal_id));
+            resolve({ data: call.range ? docs.slice(call.range[0], call.range[1] + 1) : docs, error: null });
             return;
           }
           if (table === "analysis_jobs") {
@@ -137,11 +155,15 @@ vi.mock("@/lib/supabase/server", () => ({
             return;
           }
           let rows = ids ? visible.filter((d) => ids!.includes(d.id)) : visible;
-          if (call.ilike) rows = rows.filter((d) => likeMatches(call.ilike![1], d.name));
+          const field = (d: (typeof rows)[number]) =>
+            call.ilike![0] === "address->>label" ? ((d.address as { label?: string } | null)?.label ?? "") : d.name;
+          if (call.ilike) rows = rows.filter((d) => likeMatches(call.ilike![1], field(d)));
           if (call.order) rows = [...rows].sort((a, b) => b.updated_at.localeCompare(a.updated_at));
           if (call.limit != null) rows = rows.slice(0, call.limit);
+          // A project's max rows: at most db.maxRows a response.
+          if (call.range) rows = rows.slice(call.range[0], Math.min(call.range[1] + 1, call.range[0] + db.maxRows));
           resolve({
-            data: rows.map((d) => ({ id: d.id, name: d.name, market: "Baltimore, MD", verdict: d.verdict ?? null, stage: "screening", address: d.address })),
+            data: rows.map((d) => ({ id: d.id, name: d.name, market: "Baltimore, MD", verdict: d.verdict ?? null, stage: "screening", address: d.address, updated_at: d.updated_at })),
             error: null,
           });
         },
@@ -199,11 +221,50 @@ describe("GET /api/palette — the recent deals, or every deal a typed query nam
 
   it("a typed query finds the deal by its name however long ago it was updated, with its address and documents", async () => {
     const { body } = await ask("harbor");
-    expect(db.calls[0]).toEqual({ table: "deals", ilike: ["name", "%harbor%"], order: "updated_at desc", limit: PALETTE_LIMIT });
+    expect(db.calls[0]).toMatchObject({ table: "deals", ilike: ["name", "%harbor%"], order: "updated_at desc" });
     expect(body.deals.map((d) => d.id)).toEqual(["deal-0"]);
     expect(body.deals[0]).toMatchObject({ address: "12 Harbor Rd, Baltimore, MD", docs: "Harbor View rent roll.xlsx" });
     // Row-level security still decides whose: the other account's twin is not there.
     expect(body.deals.map((d) => d.id)).not.toContain("theirs");
+  });
+
+  it("finds an old deal by its address or a document's file name, not only by its name (research pass 42)", async () => {
+    db.deals[5].address = { label: "900 Pratt St, Baltimore, MD" };
+    db.documents.push({ deal_id: "deal-3", filename: "Ellicott OM final.pdf" });
+    expect((await ask("pratt st")).body.deals.map((d) => d.id)).toEqual(["deal-5"]);
+    expect((await ask("ellicott")).body.deals.map((d) => d.id)).toEqual(["deal-3"]);
+    // a stranger's document names no deal of the reader's
+    db.documents.push({ deal_id: "theirs", filename: "Ellicott OM final.pdf" });
+    expect((await ask("ellicott")).body.deals.map((d) => d.id)).toEqual(["deal-3"]);
+  });
+
+  it("says how many matched where it lists fewer, counting past one response's rows", async () => {
+    db.maxRows = 7;
+    const { status, body } = await ask("maple court");
+    db.maxRows = 1000;
+    expect(status).toBe(200);
+    expect(body.deals).toHaveLength(PALETTE_LIMIT);
+    expect(body.deals[0].id).toBe("deal-59");
+    expect((body as unknown as { total: number }).total).toBe(57);
+    expect(paletteMoreLine(PALETTE_LIMIT, 57)).toBe(
+      "Listing the 50 most recently updated of the 57 deals whose name, address or document name holds this — type more to narrow.",
+    );
+    expect(paletteMoreLine(3, 3)).toBeNull();
+    expect(paletteMoreLine(3, null)).toBeNull();
+  });
+
+  it("the palette says the count under its results", async () => {
+    const { readFileSync } = await import("node:fs");
+    const src = readFileSync("app/(app)/command-palette.tsx", "utf8");
+    expect(src).toContain("paletteMoreLine(answered.shown ?? 0, answered.total)");
+    expect(src).toContain('data-qa="palette-more"');
+  });
+
+  it("answers an error, never no matches, where a read failed", async () => {
+    db.failTable = "deal_documents";
+    const { status } = await ask("harbor");
+    db.failTable = null;
+    expect(status).toBe(500);
   });
 
   it("matches LIKE's own characters as typed, never as wildcards", async () => {

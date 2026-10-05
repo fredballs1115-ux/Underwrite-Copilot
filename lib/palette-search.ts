@@ -2,7 +2,11 @@
 // palette read the fifty most recently updated deals and filtered them in
 // the browser, so a deal updated fifty-one deals ago could not be found by
 // any name. An empty query still lists the recent ones; a typed one
-// searches every deal the reader can see, by its name, on the server. Pure.
+// searches every deal the reader can see on the server — by its name, its
+// address and the file names of its documents (research pass 42: the field
+// said "Search deals, addresses, documents…" while the server searched
+// names alone, so an older deal was found by its address only if it was
+// among the fifty) — and says how many matched where it lists fewer. Pure.
 
 /** How many deals one answer carries — the recent list, or a search's. */
 export const PALETTE_LIMIT = 50;
@@ -62,6 +66,28 @@ export function paletteCall(call: string | null, run: PaletteRun | undefined): {
   if (run === "stalled") return { dot: "bg-caution", word: "Stalled" };
   if (run === "running") return { dot: "pulse-bar bg-brand", word: call ? "Re-screening" : "Screening" };
   return { dot: (call ? CALL_DOT[call] : null) ?? "bg-line", word: null };
+}
+
+/** A deal a search matched, with what orders it. */
+export type PaletteMatch = { id: string; updated_at: string | null };
+
+/**
+ * The deals several searches matched (by name, by address, by a document's
+ * file name), each once, most recently updated first: the first `limit` ids
+ * to show, and how many matched in all — the count the palette states where
+ * it shows fewer.
+ */
+export function topMatches(lists: PaletteMatch[][], limit = PALETTE_LIMIT): { ids: string[]; total: number } {
+  const all = uniqueById(...lists);
+  all.sort((a, b) => String(b.updated_at ?? "").localeCompare(String(a.updated_at ?? "")) || a.id.localeCompare(b.id));
+  return { ids: all.slice(0, limit).map((m) => m.id), total: all.length };
+}
+
+/** The line under a search's results where more deals matched than it
+ *  lists, or null where it lists them all. */
+export function paletteMoreLine(shown: number, total: number | null | undefined): string | null {
+  if (total == null || total <= shown) return null;
+  return `Listing the ${shown} most recently updated of the ${total.toLocaleString("en-US")} deals whose name, address or document name holds this — type more to narrow.`;
 }
 
 /** The items of several lists, each id once, in the order first met — the
