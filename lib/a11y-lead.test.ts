@@ -146,3 +146,25 @@ describe("focus never drops to the page, and a status is said (research pass 33,
     expect(pipeline).toMatch(/<p role="alert" className="mt-3 rounded-lg bg-kill\/10/);
   });
 });
+
+describe("tabs that are tabs, and states said in words (research pass 33, items 14 and 25)", () => {
+  const src = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+  it("gives the Analyses tabs and the demo's model views arrow keys, one tab stop and a panel each", () => {
+    const view = src("app/(app)/deals/[id]/deal-view.tsx");
+    expect(view).toMatch(/aria-label="Analyses"\s*onKeyDown=/);
+    expect(view).toMatch(/id=\{`analysis-tab-\$\{a\.key\}`\}[\s\S]{0,200}aria-controls="analysis-tabpanel"\s*tabIndex=\{on \? 0 : -1\}/);
+    expect(view).toMatch(/id="analysis-tabpanel"\s*role="tabpanel"\s*aria-labelledby=\{`analysis-tab-\$\{analysis\}`\}/);
+    const demo = src("app/demo/model-slideshow.tsx");
+    expect(demo).toMatch(/aria-label="Model views"\s*onKeyDown=/);
+    expect(demo).toMatch(/tabIndex=\{i === index \? 0 : -1\}/);
+    expect(demo).toMatch(/role="tabpanel"\s*aria-labelledby=\{`model-tab-\$\{s\.key\}`\}/);
+  });
+
+  it("says what a badge counts, a section that is running, and whether a list or the new-deal form is open", () => {
+    const view = src("app/(app)/deals/[id]/deal-view.tsx");
+    expect((view.match(/<span className="sr-only">\{` finding\$\{/g) ?? []).length).toBe(2);
+    expect(view).toContain('state === "running" ? <span className="sr-only">, running</span> : null');
+    expect(src("app/(app)/deals/[id]/deal-sections.tsx")).toMatch(/onClick=\{\(\) => setOpen\(!open\)\}\s*aria-expanded=\{open\}/);
+    expect(src("app/(app)/deals/pipeline.tsx")).toMatch(/onClick=\{\(\) => setShowForm\(\(s\) => !s\)\}\s*aria-expanded=\{showForm\}/);
+  });
+});

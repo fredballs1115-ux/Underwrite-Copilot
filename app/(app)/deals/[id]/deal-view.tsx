@@ -887,6 +887,9 @@ export function DealView({
               >
                 <TabDot state={state} active={isActiveTab} />
                 {t.label}
+                {/* The dot's colour says a section is being worked on; so do
+                    words, to a screen reader (research pass 33). */}
+                {state === "running" ? <span className="sr-only">, running</span> : null}
                 {count > 0 && (
                   <span
                     title={`${count} finding${count === 1 ? "" : "s"}`}
@@ -895,6 +898,9 @@ export function DealView({
                     }`}
                   >
                     {count}
+                    {/* What the figure counts, said: it had been in a title
+                        only (research pass 33). */}
+                    <span className="sr-only">{` finding${count === 1 ? "" : "s"}`}</span>
                   </span>
                 )}
               </button>
@@ -1613,9 +1619,22 @@ function AnalysesPanel({
 
   return (
     <div className="flex flex-col gap-5">
+      {/* The tabs pattern the deal's own sections use: arrow keys, Home and
+          End move through them, one tab stop, each tied to the panel it
+          opens — they had been tabs in name only (research pass 33). */}
       <div
         role="tablist"
         aria-label="Analyses"
+        onKeyDown={(e) => {
+          const at = ANALYSES.findIndex((a) => a.key === analysis);
+          const n = ANALYSES.length;
+          const next =
+            e.key === "ArrowRight" ? (at + 1) % n : e.key === "ArrowLeft" ? (at - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
+          if (next < 0) return;
+          e.preventDefault();
+          onSelect(ANALYSES[next].key);
+          document.getElementById(`analysis-tab-${ANALYSES[next].key}`)?.focus();
+        }}
         className="flex flex-wrap gap-1.5"
       >
         {ANALYSES.map((a) => {
@@ -1624,9 +1643,12 @@ function AnalysesPanel({
           return (
             <button
               key={a.key}
+              id={`analysis-tab-${a.key}`}
               type="button"
               role="tab"
               aria-selected={on}
+              aria-controls="analysis-tabpanel"
+              tabIndex={on ? 0 : -1}
               onClick={() => onSelect(a.key)}
               className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
                 on
@@ -1640,13 +1662,20 @@ function AnalysesPanel({
               {counts[a.key] > 0 && (
                 <span className="rounded-full bg-kill/10 px-1.5 py-px font-mono text-[10px] tabular-nums text-kill">
                   {counts[a.key]}
+                  <span className="sr-only">{` finding${counts[a.key] === 1 ? "" : "s"}`}</span>
                 </span>
               )}
             </button>
           );
         })}
       </div>
-      <div key={analysis} className="animate-fade flex flex-col gap-6">
+      <div
+        key={analysis}
+        id="analysis-tabpanel"
+        role="tabpanel"
+        aria-labelledby={`analysis-tab-${analysis}`}
+        className="animate-fade flex flex-col gap-6"
+      >
         {content}
         {footer}
       </div>
@@ -1850,18 +1879,19 @@ function TabDot({
 }) {
   const base = "h-1.5 w-1.5 rounded-full";
   if (state === "done") {
-    return <span className={`${base} ${active ? "bg-white" : "bg-pass"}`} />;
+    return <span aria-hidden className={`${base} ${active ? "bg-white" : "bg-pass"}`} />;
   }
   if (state === "running") {
     return (
-      <span className={`${base} pulse-bar ${active ? "bg-white" : "bg-brand"}`} />
+      <span aria-hidden className={`${base} pulse-bar ${active ? "bg-white" : "bg-brand"}`} />
     );
   }
   if (state === "pending") {
-    return <span className={`${base} ${active ? "bg-white/50" : "bg-line"}`} />;
+    return <span aria-hidden className={`${base} ${active ? "bg-white/50" : "bg-line"}`} />;
   }
   return (
     <span
+      aria-hidden
       className={`${base} ${
         active ? "bg-white/40" : "bg-transparent ring-1 ring-inset ring-line"
       }`}

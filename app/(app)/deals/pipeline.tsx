@@ -810,6 +810,7 @@ export function Pipeline({
               <button
                 type="button"
                 onClick={() => setShowForm((s) => !s)}
+                aria-expanded={showForm}
                 className="shadow-card hover-lift rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white"
               >
                 {showForm ? "Close" : "+ New deal"}

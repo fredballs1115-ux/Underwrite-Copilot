@@ -258,6 +258,7 @@ function RevealList({
         <button
           type="button"
           onClick={() => setOpen(!open)}
+          aria-expanded={open}
           className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-brand transition-colors hover:text-brand-strong"
         >
           {open ? "Show less" : `Show ${hidden} ${noun}`}

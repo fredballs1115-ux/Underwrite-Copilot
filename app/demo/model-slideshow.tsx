@@ -169,14 +169,32 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
         from the memorandum&rsquo;s terms.
       </p>
 
-      {/* Step pills double as slide labels and direct navigation. */}
-      <div role="tablist" aria-label="Model views" className="mt-4 flex flex-wrap gap-1.5">
+      {/* Step pills double as slide labels and direct navigation — the tabs
+          pattern whole: arrow keys, Home and End, one tab stop, each tied to
+          its slide (research pass 33: the arrow keys had done nothing). */}
+      <div
+        role="tablist"
+        aria-label="Model views"
+        onKeyDown={(e) => {
+          const n = slides.length;
+          const next =
+            e.key === "ArrowRight" ? (index + 1) % n : e.key === "ArrowLeft" ? (index - 1 + n) % n : e.key === "Home" ? 0 : e.key === "End" ? n - 1 : -1;
+          if (next < 0) return;
+          e.preventDefault();
+          goTo(next);
+          document.getElementById(`model-tab-${slides[next].key}`)?.focus();
+        }}
+        className="mt-4 flex flex-wrap gap-1.5"
+      >
         {slides.map((s, i) => (
           <button
             key={s.key}
+            id={`model-tab-${s.key}`}
             type="button"
             role="tab"
             aria-selected={i === index}
+            aria-controls={`model-panel-${s.key}`}
+            tabIndex={i === index ? 0 : -1}
             onClick={() => goTo(i)}
             className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
               i === index
@@ -199,8 +217,9 @@ export function ModelSlideshow({ model }: { model: UnderwritingModel }) {
         {slides.map((s, i) => (
           <div
             key={s.key}
+            id={`model-panel-${s.key}`}
             role="tabpanel"
-            aria-label={s.label}
+            aria-labelledby={`model-tab-${s.key}`}
             aria-hidden={i !== index}
             className={`col-start-1 row-start-1 min-w-0 ${
               i === index ? "animate-fade" : "hidden pointer-events-none sm:invisible sm:block"
