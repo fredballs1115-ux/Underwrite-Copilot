@@ -39,6 +39,20 @@ export interface DealTag {
 }
 
 /**
+ * What the seller's-loan tag means (lib/assumable-debt `assumableTag`), read
+ * off its own words: a fixed coupon — "Assumable 3.45%", "Assumable 2.65% +
+ * MIP" — the deal page prices against today's rate; a floating rate, a
+ * second loan assumed with it or a loan with no stated rate it reads as
+ * stated and says why it prices nothing (research pass 37). The meeting
+ * workbook's price note says the same.
+ */
+export function debtTagMeaning(tag: string): string {
+  return /^Assumable \d+(?:\.\d+)?%(?: \+ MIP)?$/.test(tag)
+    ? "the seller's loan is offered for assumption — the deal page prices it against today's rate"
+    : "the seller's loan is offered for assumption — the deal page reads its terms as stated and says what it cannot price";
+}
+
+/**
  * A deal's tags in the order they are read: the site's hazard first, then
  * what qualifies the price (how it is sold, what it buys), the financing a
  * buyer can take over, the income's terms, the reports, and the reads a
@@ -77,7 +91,7 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
       "an operating business on its real estate — the deal page reads whose earnings these are, the rent's coverage and the split",
     ),
     // The seller's loan, offered for assumption (#419).
-    tag("debt", slots.debt, "brand", "the seller's loan is offered for assumption — the deal page prices it against today's rate"),
+    tag("debt", slots.debt, "brand", slots.debt ? debtTagMeaning(slots.debt) : ""),
     // A note the seller will carry (#462).
     tag("sellerNote", slots.sellerNote, "brand", "the seller offers to carry financing — the deal page prices the note against today's rate"),
     // A covenant or a contract that sets the rents (#453).

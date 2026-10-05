@@ -7512,6 +7512,44 @@ describe("AssumableLoanCard — the rate, the coverage and what the loan is wort
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });
+
+  it("draws nothing priced for a floating loan and says why; a stated premium rides in the coupon drawn (research pass 37)", () => {
+    const floating = readAssumable(
+      withLoan([
+        row("Assumable loan balance", "$28,000,000"),
+        row("Assumable loan rate", "SOFR + 3.25% (floating), rate cap at 3.50% SOFR through June 2027"),
+        row("Assumable loan maturity", "June 1, 2028"),
+        row("Assumable loan amortization", "Interest-only"),
+      ]),
+      inputs,
+      AS_OF,
+    )!;
+    const html = render(React.createElement(AssumableLoanCard, { view: assumableView(floating, RATE_NOTE, true) }));
+    const text = visibleText(html);
+    expect(text).toContain("$28.0M floating at SOFR + 3.25% to Jun 2028, interest-only as stated, with a rate cap as stated: 3.50% SOFR through June 2027");
+    expect(text).toContain("The loan floats at SOFR + 3.25%: its coupon moves with the index, so no fixed comparison is drawn.");
+    expect(html).not.toContain("data-bar=");
+    expect(html).not.toContain('data-qa="assumable-figures"');
+    expect(text).not.toContain("A new loan today");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    const hud = readAssumable(
+      withLoan([
+        row("Assumable loan balance", "$40,000,000"),
+        row("Assumable loan rate", "3.45%"),
+        row("Assumable loan maturity", "June 30, 2033"),
+        row("Assumable loan amortization", "Interest-only"),
+        row("Mortgage insurance premium", "0.25% annually"),
+      ]),
+      inputs,
+      AS_OF,
+    )!;
+    const withMip = visibleText(render(React.createElement(AssumableLoanCard, { view: assumableView(hud, RATE_NOTE, true) })));
+    expect(withMip).toMatch(/The loan in place, with its MIP\s+3\.70%/);
+    expect(withMip).toContain("230 bps under a new loan's rate");
+    expect(withMip).toContain("The coupon priced is its 3.45% note rate plus the 0.25% MIP, 3.70% a year.");
+    expect(gluedWords(withMip)).toEqual([]);
+  });
 });
 
 // ── A note the seller offers to carry (#462) ─────────────────────────────────

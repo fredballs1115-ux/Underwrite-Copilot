@@ -1293,6 +1293,39 @@ describe("the debt sizer lists a stated loan under whose loan it is (2026-09-30)
     expect(t.offered.map((r) => r.label)).toEqual(["LTV"]);
   });
 
+  it("lists a floating loan's cap, a supplemental loan, a premium and the prepayment terms as the seller's loans', never as the buyer's financing (research pass 37)", () => {
+    const t = omLoanTerms(
+      withRows([
+        row("Assumable loan balance", "$32,000,000"),
+        row("Assumable loan rate cap", "3.50% strike through June 2027"),
+        row("Assumable loan rate", "SOFR + 3.25%"),
+        row("Assumable loan maturity", "August 1, 2029"),
+        row("Mortgage insurance premium", "0.25% annually"),
+        row("Prepayment", "Locked out until August 2029"),
+        row("Assumable supplemental loan balance", "$4,500,000"),
+        row("Assumable supplemental loan rate", "5.95%"),
+        row("Assumable supplemental loan maturity", "August 1, 2029"),
+      ]),
+    );
+    expect(t.assumable.map((r) => `${r.label}: ${r.value}`)).toEqual([
+      "Balance: $32,000,000",
+      "Rate: SOFR + 3.25%",
+      "Rate cap: 3.50% strike through June 2027",
+      "Maturity: August 1, 2029",
+      "Mortgage insurance premium: 0.25% annually",
+      "Prepayment: Locked out until August 2029",
+      "Supplemental balance: $4,500,000",
+      "Supplemental rate: 5.95%",
+      "Supplemental maturity: August 1, 2029",
+    ]);
+    // The supplemental loan's rate and maturity had fallen through to the
+    // buyer's own financing as a plain "Rate" and "Maturity".
+    expect(t.offered.map((r) => r.label)).toEqual(["LTV"]);
+    // A premium or a prepayment row with no seller's loan beside it names no
+    // loan of the seller's.
+    expect(omLoanTerms(withRows([row("Prepayment", "Yield maintenance")])).assumable).toEqual([]);
+  });
+
   it("lists a seller's loan's term as that loan's even where its balance is not stated (the audit, 2026-10-01)", () => {
     const rateOnly = omLoanTerms(withRows([row("Assumable loan rate", "3.45%")]));
     expect(rateOnly.assumable.map((r) => `${r.label}: ${r.value}`)).toEqual(["Rate: 3.45%"]);

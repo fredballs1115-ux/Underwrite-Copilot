@@ -113,7 +113,8 @@ export function AssumableLoanCard({ view }: { view: AssumableView | null }) {
               marker="assume-rate"
               format={pct2}
               rows={[
-                { label: theirs, value: v.couponPct, tone: "bg-brand/70" },
+                // A stated mortgage insurance premium is in the coupon priced.
+                { label: v.mipPct != null ? `${theirs}, with its MIP` : theirs, value: v.couponPct, tone: "bg-brand/70" },
                 { label: "A new loan today", value: v.marketPct, tone: "bg-ink/40" },
               ]}
             />

@@ -106,6 +106,16 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     expect(dealTags(slots({ goingConcern: "Operator lease" }))[0].tone).toBe("brand");
   });
 
+  it("says the seller's loan is priced only where its tag is a fixed coupon (research pass 37)", () => {
+    const title = (debt: string) => dealTags(slots({ debt }))[0].title;
+    for (const debt of ["Assumable 3.45%", "Assumable 2.65% + MIP"]) {
+      expect(title(debt), debt).toBe(`${debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate`);
+    }
+    for (const debt of ["Assumable SOFR + 3.25%", "Assumable 3.85% + supplemental", "Assumable loan", "Assumable floating rate"]) {
+      expect(title(debt), debt).toBe(`${debt}: the seller's loan is offered for assumption — the deal page reads its terms as stated and says what it cannot price`);
+    }
+  });
+
   it("says the reader's 1031 exchange in the composition's own tone, read off the tag's words (lib/exchange-deal)", () => {
     const today = new Date(Date.UTC(2026, 9, 5, 12));
     const block = { relinquishedTransferOn: "2026-09-15", filer: "partnership" as const };

@@ -8,6 +8,7 @@ import { FIRST_READ_TITLE } from "@/lib/first-read";
 import { FOLD_WORD, checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
 import { PLAN_CAP_NA } from "@/lib/cap-slot";
+import { debtTagMeaning } from "@/lib/pipeline-tags";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
@@ -352,7 +353,7 @@ export async function buildPipelineWorkbook(
       const notes = [
         priceSpan ? `The memorandum states a range, ${d.price}: the cell is its top, the end that does not flatter the returns.` : null,
         d.interest ? `${d.interest}: the price does not buy the building outright — the deal page says what it buys.` : null,
-        d.debt ? `${d.debt}: the seller's loan is offered for assumption — the deal page prices it against today's rate.` : null,
+        d.debt ? `${d.debt}: ${debtTagMeaning(d.debt)}.` : null,
         d.affordable ? `${d.affordable}: a covenant or a contract sets these rents — they move with the limits, not the market; the deal page says until when.` : null,
         d.tenancy ? `${d.tenancy}: one lease is the whole income — the deal page reads its guarantor, its term and its increases.` : null,
         d.hotel ? `${d.hotel}: what the hotel is sold with — the deal page reads the flag, the manager and the PIP.` : null,

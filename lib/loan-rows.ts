@@ -21,21 +21,42 @@ const stated = <M extends Row>(rows: [string, M | null][]): { term: string; row:
 // ── The loan offered for assumption ─────────────────────────────────────
 
 const LOAN = "assumable (?:loan|debt|mortgage|financing)";
+/** A second loan offered with the first — a supplemental, a mezzanine loan
+ *  or a second lien — which the extraction files under "Assumable
+ *  supplemental loan …" (research pass 37). Its rows are never the first
+ *  loan's: "Assumable supplemental loan balance" names no "assumable loan",
+ *  and a first loan's label that names a second loan is refused. */
+const SECOND = String.raw`assumable\s+(?:supplemental(?:\s+(?:loan|debt|mortgage|financing))?|(?:second|2nd|mezzanine|subordinate|junior)\s+(?:loan|debt|mortgage|financing|lien))`;
+const NAMES_SECOND = /\bsupplemental\b|\b(?:second|2nd|mezzanine|subordinate|junior)\b/i;
+/** A balance's label names none of the loan's other terms. */
+const NOT_BALANCE = /rate|coupon|maturity|matures|amorti[sz]|\bterm\b|fee|debt service|payment|interest[- ]only|\bi\/?o\b|ltv|loan[- ]to[- ]value|dscr/i;
 
-/** The rows the extraction is asked to label "Assumable loan …" and
- *  "Assumption fee". */
+const or = (...res: RegExp[]) => new RegExp(res.map((re) => re.source).join("|"), "i");
+
+/** The rows the extraction is asked to label "Assumable loan …",
+ *  "Assumption fee", "Mortgage insurance premium", "Prepayment" and
+ *  "Assumable supplemental loan …". */
 export function assumableRows<M extends Row>(metrics: ReadonlyArray<M>) {
   const pick = pickFrom(metrics);
   return {
-    balanceRow: pick(
-      new RegExp(LOAN, "i"),
-      /rate|coupon|maturity|matures|amorti[sz]|\bterm\b|fee|debt service|payment|interest[- ]only|\bi\/?o\b|ltv|loan[- ]to[- ]value|dscr/i,
-    ),
-    rateRow: pick(new RegExp(`${LOAN} (?:interest )?(?:rate|coupon)`, "i")),
-    maturityRow: pick(new RegExp(`${LOAN} (?:maturity|matures)`, "i"), /extension|extended/i),
-    amortRow: pick(new RegExp(`${LOAN} (?:amorti[sz]ation|interest[- ]only)`, "i")),
-    dsRow: pick(new RegExp(`${LOAN} (?:annual )?(?:debt service|payment)`, "i")),
+    balanceRow: pick(new RegExp(LOAN, "i"), or(NOT_BALANCE, NAMES_SECOND)),
+    // An interest rate cap is its own row, never the loan's rate.
+    rateRow: pick(new RegExp(`${LOAN} (?:interest )?(?:rate|coupon)`, "i"), or(/\bcap\b/, NAMES_SECOND)),
+    maturityRow: pick(new RegExp(`${LOAN} (?:maturity|matures)`, "i"), or(/extension|extended/, NAMES_SECOND)),
+    amortRow: pick(new RegExp(`${LOAN} (?:amorti[sz]ation|interest[- ]only)`, "i"), NAMES_SECOND),
+    dsRow: pick(new RegExp(`${LOAN} (?:annual )?(?:debt service|payment)`, "i"), NAMES_SECOND),
     feeRow: pick(/assumption fee/i),
+    /** an interest rate cap on a floating loan: its strike and expiry, as
+     *  stated */
+    capRow: pick(new RegExp(`${LOAN} (?:interest )?rate cap`, "i"), NAMES_SECOND),
+    /** a HUD-insured loan's annual mortgage insurance premium, as stated */
+    mipRow: pick(/^\s*(?:annual\s+)?(?:mortgage\s+insurance\s+premium|mip)\b/i),
+    /** the loan's prepayment terms, as stated: a lockout, yield
+     *  maintenance or defeasance, and whether the sale is subject to it */
+    prepaymentRow: pick(new RegExp(`^\\s*(?:${LOAN}\\s+)?prepayment\\b`, "i")),
+    secondBalanceRow: pick(new RegExp(SECOND, "i"), NOT_BALANCE),
+    secondRateRow: pick(new RegExp(String.raw`${SECOND}\s+(?:interest\s+)?(?:rate|coupon)`, "i"), /\bcap\b/i),
+    secondMaturityRow: pick(new RegExp(String.raw`${SECOND}\s+(?:maturity|matures)`, "i"), /extension|extended/i),
   };
 }
 
@@ -44,16 +65,27 @@ export function assumableRows<M extends Row>(metrics: ReadonlyArray<M>) {
  *  loan is that loan's: listed with no balance beside it, "Assumable loan
  *  rate 3.45%" had fallen through to the buyer's own financing as a plain
  *  rate. (What prices the loan, lib/assumable-debt, still prices none
- *  without a balance.) */
+ *  without a balance.) A mortgage insurance premium and a prepayment row
+ *  name no loan, so they are the seller's loan's only beside a row that
+ *  does. */
 export function assumableStatedRows<M extends Row>(metrics: ReadonlyArray<M>): { term: string; row: M }[] {
   const r = assumableRows(metrics);
+  const aLoan = [r.balanceRow, r.rateRow, r.maturityRow, r.amortRow, r.dsRow, r.capRow, r.secondBalanceRow, r.secondRateRow, r.secondMaturityRow].some(
+    (m) => m != null,
+  );
   return stated([
     ["Balance", r.balanceRow],
     ["Rate", r.rateRow],
+    ["Rate cap", r.capRow],
     ["Maturity", r.maturityRow],
     ["Amortization", r.amortRow],
     ["Debt service", r.dsRow],
     ["Assumption fee", r.feeRow],
+    ["Mortgage insurance premium", aLoan ? r.mipRow : null],
+    ["Prepayment", aLoan ? r.prepaymentRow : null],
+    ["Supplemental balance", r.secondBalanceRow],
+    ["Supplemental rate", r.secondRateRow],
+    ["Supplemental maturity", r.secondMaturityRow],
   ]);
 }
 

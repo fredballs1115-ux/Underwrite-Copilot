@@ -387,7 +387,7 @@ function AssumableBlock({ view }: { view: AssumableView | null | undefined }) {
   const seller = view.kind === "seller";
   const rate =
     view.couponPct != null && view.marketPct != null && view.underMarketBps != null
-      ? `The ${seller ? "note" : "loan"}'s ${view.couponPct.toFixed(2)}% against ${view.marketPct.toFixed(2)}% for a new one — ${Math.abs(view.underMarketBps)} bps ${
+      ? `The ${seller ? "note" : "loan"}'s ${view.couponPct.toFixed(2)}%${view.mipPct != null ? " with its MIP" : ""} against ${view.marketPct.toFixed(2)}% for a new one — ${Math.abs(view.underMarketBps)} bps ${
           view.underMarketBps >= 0 ? "under" : "over"
         }.`
       : "";

@@ -15,6 +15,7 @@ import {
   type AssumableTerms,
 } from "./assumable-debt";
 import { dealContextFor } from "./deal-context";
+import { assumableRows } from "./loan-rows";
 import { gluedWords } from "./render-lint";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
@@ -255,12 +256,190 @@ describe("what the page, the context and the challenger say", () => {
     expect(dealContextFor(SAMPLE_DEAL.extraction as ExtractionResult) ?? "").not.toContain("assumption");
   });
 
-  it("the extraction asks for the rows this reads", async () => {
+  it("the extraction asks for the rows this reads, and each label is read by its own finder alone", async () => {
     const { extractionInstruction } = await import("./anthropic/prompts");
     const prompt = extractionInstruction("multifamily");
     for (const label of LOAN.map((m) => m.label).concat("Assumable loan debt service")) {
       expect(prompt, label).toContain(`"${label}"`);
     }
+    // Every label the prompt names, held to the finder that reads it and to
+    // no other (research pass 37's rows among them).
+    const finders: [string, keyof ReturnType<typeof assumableRows>][] = [
+      ["Assumable loan balance", "balanceRow"],
+      ["Assumable loan rate", "rateRow"],
+      ["Assumable loan maturity", "maturityRow"],
+      ["Assumable loan amortization", "amortRow"],
+      ["Assumable loan debt service", "dsRow"],
+      ["Assumption fee", "feeRow"],
+      ["Assumable loan rate cap", "capRow"],
+      ["Mortgage insurance premium", "mipRow"],
+      ["Prepayment", "prepaymentRow"],
+      ["Assumable supplemental loan balance", "secondBalanceRow"],
+      ["Assumable supplemental loan rate", "secondRateRow"],
+      ["Assumable supplemental loan maturity", "secondMaturityRow"],
+    ];
+    for (const [label, key] of finders) {
+      expect(prompt, label).toContain(`"${label}"`);
+      const found = assumableRows([row(label, "x")]);
+      for (const [other, value] of Object.entries(found)) expect(value != null, `${label} → ${other}`).toBe(other === key);
+    }
+  });
+});
+
+describe("debt that is not one fixed loan, said and never priced as one (research pass 37)", () => {
+  const FLOATING = [
+    row("Assumable loan balance", "$28,000,000"),
+    row("Assumable loan rate", "SOFR + 3.25% (floating), rate cap at 3.50% SOFR through June 2027"),
+    row("Assumable loan maturity", "June 1, 2028"),
+    row("Assumable loan amortization", "Interest-only"),
+  ];
+
+  it("reads a floating rate as its index and its spread, never as a coupon", () => {
+    const t = readAssumableTerms(sample(FLOATING))!;
+    expect(t.ratePct).toBeNull();
+    expect(t.floating).toEqual({ index: "SOFR", spreadPct: 3.25 });
+    expect(t.rateCap).toBe("3.50% SOFR through June 2027");
+    const rate = (value: string) => readAssumableTerms(sample([row("Assumable loan balance", "$28,000,000"), row("Assumable loan rate", value)]))!;
+    expect(rate("Term SOFR plus 325 bps").floating).toEqual({ index: "Term SOFR", spreadPct: 3.25 });
+    expect(rate("325 basis points over 30-day average SOFR").floating).toEqual({ index: "30-day average SOFR", spreadPct: 3.25 });
+    expect(rate("Prime + 1.00%").floating).toEqual({ index: "Prime", spreadPct: 1 });
+    expect(rate("Variable").floating).toEqual({ index: null, spreadPct: null });
+    // A fixed coupon priced off an index when the loan was made is fixed.
+    const fixed = rate("3.45% fixed (set at the 10-year Treasury plus 180 bps at origination)");
+    expect(fixed.floating).toBeUndefined();
+    expect(fixed.ratePct).toBe(3.45);
+    for (const words of ["3.45% (Treasury-based, fixed)", "10-year Treasury + 1.80% at origination: 3.45%, fixed"]) {
+      expect([rate(words).floating, rate(words).ratePct], words).toEqual([undefined, 3.45]);
+    }
+    // A rate cap filed under its own label is the cap, never the rate.
+    const capFirst = readAssumableTerms(
+      sample([row("Assumable loan balance", "$28,000,000"), row("Assumable loan rate cap", "3.50% strike through June 2027"), row("Assumable loan rate", "SOFR + 3.25%")]),
+    )!;
+    expect(capFirst.rateCap).toBe("3.50% strike through June 2027");
+    expect(capFirst.floating).toEqual({ index: "SOFR", spreadPct: 3.25 });
+  });
+
+  it("prices nothing on a floating loan and says why, and never calls its value the rate saved", () => {
+    const e = sample(FLOATING);
+    const a = readAssumable(e, inputs, AS_OF)!;
+    expect(a.read).toBeNull();
+    expect(a.pricedRatePct).toBeNull();
+    expect(a.underMarketBps).toBeNull();
+    expect(a.missing).toEqual([]);
+    expect(assumableSentence(a)).toBe("The loan floats at SOFR + 3.25%: its coupon moves with the index, so no fixed comparison is drawn.");
+    expect(assumableTermsLine(a)).toBe("$28.0M floating at SOFR + 3.25% to Jun 2028, interest-only as stated, with a rate cap as stated: 3.50% SOFR through June 2027");
+    expect(assumableTag(e)).toBe("Assumable SOFR + 3.25%");
+    const context = dealContextFor(e)!;
+    expect(context).toContain("its coupon moves with the index, so there is no fixed coupon to set against a new loan");
+    expect(context).not.toContain("rate saved");
+    const note = assumableNote(readAssumable(e, null, AS_OF)!);
+    expect(note).not.toContain("rate saved");
+    expect(note).toContain("(f) A FLOATING LOAN");
+    const view = assumableView(a, null, false);
+    expect(view).toMatchObject({ couponPct: null, underMarketBps: null, rateLine: null, pricePremium: null, dscrAssume: null });
+    expect(gluedWords(`${view.termsLine} ${view.sentence}`)).toEqual([]);
+    expect(assumableTag(sample([row("Assumable loan balance", "$28,000,000"), row("Assumable loan rate", "Floats over SOFR")]))).toBe("Assumable SOFR, floating");
+    expect(assumableTag(sample([row("Assumable loan balance", "$28,000,000"), row("Assumable loan rate", "Variable")]))).toBe("Assumable floating rate");
+  });
+
+  it("never takes a supplemental loan's rows for the first loan's, and prices neither alone", () => {
+    expect(assumableRows([row("Assumable supplemental loan balance", "$4,500,000")]).balanceRow).toBeNull();
+    expect(assumableRows([row("Assumable loan balance (supplemental)", "$4,500,000")]).balanceRow).toBeNull();
+    const e = sample([
+      row("Assumable loan balance", "$32,000,000"),
+      row("Assumable loan rate", "3.85%"),
+      row("Assumable loan maturity", "August 1, 2029"),
+      row("Assumable loan amortization", "30 years"),
+      row("Assumable supplemental loan balance", "4,500,000"),
+      row("Assumable supplemental loan rate", "5.95%"),
+      row("Assumable supplemental loan maturity", "August 1, 2029"),
+    ]);
+    const a = readAssumable(e, inputs, AS_OF)!;
+    expect(a.terms.balance).toBe(32_000_000);
+    expect(a.terms.supplemental).toEqual({ balance: 4_500_000, ratePct: 5.95, maturity: "2029-08-01" });
+    expect(a.read).toBeNull();
+    expect(a.pricedRatePct).toBeNull();
+    expect(assumableSentence(a)).toBe("A second loan is offered with it: the two are assumed together, so the first is not priced against a new loan alone.");
+    expect(assumableTermsLine(a)).toContain("; with it, a $4.5M supplemental loan at 5.95% to Aug 2029");
+    expect(assumableTag(e)).toBe("Assumable 3.85% + supplemental");
+    expect(assumableLine(a)).toMatch(/^The seller's loans are offered for assumption together: \$32\.0M at 3\.85% to Aug 2029/);
+    expect(dealContextFor(e)).toContain("The two are assumed together");
+    expect(assumableView(a, null, false)).toMatchObject({ couponPct: null, rateLine: null, extraEquity: null });
+  });
+
+  it("reads a first loan's row that states the second beside it as two loans, quoted, with no balance or rate read off it as the first's", () => {
+    const e = sample([
+      row("Assumable loan balance", "32,000,000 first mortgage plus a 4,500,000 supplemental loan"),
+      row("Assumable loan rate", "3.85% (first); 5.95% (supplemental)"),
+      row("Assumable loan maturity", "August 1, 2029"),
+      row("Assumable loan amortization", "30 years"),
+    ]);
+    const a = readAssumable(e, inputs, AS_OF)!;
+    expect(a.terms.ratePct).toBeNull();
+    expect(a.terms.supplemental).toMatchObject({
+      balance: null,
+      balanceStated: "32,000,000 first mortgage plus a 4,500,000 supplemental loan",
+      ratesStated: "3.85% (first); 5.95% (supplemental)",
+    });
+    expect(a.read).toBeNull();
+    expect(assumableTermsLine(a)).toBe(
+      '"32,000,000 first mortgage plus a 4,500,000 supplemental loan" at "3.85% (first); 5.95% (supplemental)", as stated, to Aug 2029',
+    );
+    expect(assumableTag(e)).toBe("Assumable loan + supplemental");
+    // A supplemental loan said to be available, with no figure of its own,
+    // is no second loan offered.
+    const available = readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000 (supplemental financing available)")]))!;
+    expect(available.supplemental).toBeUndefined();
+  });
+
+  it("prices a HUD-insured loan's coupon as its note rate plus the stated mortgage insurance premium, and says so", () => {
+    const e = sample([...LOAN, row("Mortgage insurance premium", "0.25% annually")]);
+    const a = readAssumable(e, inputs, AS_OF)!;
+    expect(a.terms.mipPct).toBe(0.25);
+    expect(a.pricedRatePct).toBeCloseTo(3.7, 10);
+    expect(a.underMarketBps).toBe(230);
+    expect(a.read!.assume!.debtService).toBe(1_110_000);
+    expect(assumableSentence(a)).toMatch(/ The coupon priced is its 3\.45% note rate plus the 0\.25% MIP, 3\.70% a year\.$/);
+    expect(assumableTermsLine(a)).toBe("$30.0M at 3.45% plus the 0.25% MIP to Mar 2031, interest-only as stated");
+    expect(assumableTag(e)).toBe("Assumable 3.45% + MIP");
+    expect(assumableView(a, null, false)).toMatchObject({ couponPct: 3.7, mipPct: 0.25 });
+    // Stated beside the note rate in the rate's own row, the same.
+    const inline = readAssumableTerms(sample([row("Assumable loan balance", "$27,800,000"), row("Assumable loan rate", "2.65% plus 0.25% annual MIP")]))!;
+    expect([inline.ratePct, inline.mipPct]).toEqual([2.65, 0.25]);
+    // The annual premium where an upfront one is stated beside it; an upfront
+    // premium alone is no rate a year.
+    const mip = (value: string) => readAssumableTerms(sample([...LOAN, row("Mortgage insurance premium", value)]))!.mipPct;
+    expect(mip("1.00% upfront; 0.25% annual")).toBe(0.25);
+    expect(mip("1% upfront")).toBeUndefined();
+    // No premium stated, no premium priced.
+    expect(readAssumable(sample(), inputs, AS_OF)!.pricedRatePct).toBe(3.45);
+  });
+
+  it("says a lockout, or a sale subject to the loan, means the model's new loan may not be this buyer's to take", () => {
+    const locked = sample([...LOAN, row("Prepayment", "Locked out until August 2029; the sale is subject to assumption of the existing CMBS loan")]);
+    const a = readAssumable(locked, inputs, AS_OF)!;
+    expect(a.terms.prepayment).toEqual({
+      stated: "Locked out until August 2029; the sale is subject to assumption of the existing CMBS loan",
+      locksIn: true,
+    });
+    const said =
+      'The memorandum states its prepayment terms as "Locked out until August 2029; the sale is subject to assumption of the existing CMBS loan": the model\'s new loan may not be this buyer\'s to take.';
+    expect(assumableSentence(a).endsWith(` ${said}`)).toBe(true);
+    expect(dealContextFor(locked)).toContain(said);
+    // Terms that do not lock the loan in are said as stated, and the card's
+    // sentence is as before.
+    const open = readAssumable(sample([...LOAN, row("Prepayment", "Yield maintenance through 2028, open at par thereafter")]), inputs, AS_OF)!;
+    expect(open.terms.prepayment?.locksIn).toBe(false);
+    expect(readAssumableTerms(sample([...LOAN, row("Prepayment", "Open at par; no prepayment premium")]))!.prepayment?.locksIn).toBe(false);
+    expect(readAssumableTerms(sample([...LOAN, row("Prepayment", "No prepayment permitted before maturity")]))!.prepayment?.locksIn).toBe(true);
+    expect(assumableSentence(open)).toBe(assumableSentence(readAssumable(sample(), inputs, AS_OF)!));
+    expect(assumableContextLine(open)).toContain('Its prepayment terms as stated: "Yield maintenance through 2028, open at par thereafter".');
+  });
+
+  it("the challenger's traps ask (f) to (i) as questions", () => {
+    const note = assumableNote(readAssumable(sample(), null, AS_OF)!);
+    for (const trap of ["(f) A FLOATING LOAN", "(g) A SECOND LOAN", "(h) A HUD-INSURED LOAN", "(i) PREPAYMENT"]) expect(note, trap).toContain(trap);
+    expect(note.slice(note.indexOf("(f)"))).toMatch(/\?; \(g\)[^?]*\?; \(h\)[^?]*\?; \(i\)[^?]*\?$/);
   });
 });
 
