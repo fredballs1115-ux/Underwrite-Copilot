@@ -1018,6 +1018,85 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   1482's and Washington's read "Open: any of" before), and every condition
   key the rules file uses has an `OPEN_QUESTION_LABELS` entry, held by a
   test that walks the file.
+- Research pass 28's deal types, rounds 2, 3, 7 and 8 (wired 2026-10-05).
+  Each reader is pure, reads only rows the extraction labels as stated, and
+  rides every surface the earlier rounds use: the deal context and the
+  challenger's notes (its traps by name), a panel on the deal page and the
+  shared screen, the key terms, the pipeline row, card and CSV and the
+  meeting workbook's price note (its tag), the memo under its title, the
+  workbook's cover, the report's caveat and the compare table's row.
+  - **A forward purchase or a build-to-suit** (`lib/forward-purchase.ts`,
+    `isForwardPurchase` in lib/deal-strategy): the developer funds the
+    works and the buyer pays the price at delivery, so the plan's total
+    cost is the price and a stated budget is the developer's
+    (`planSummary`'s `forward`, `developerBudget`); the yield is struck at
+    delivery (a "Delivery cap rate" row is never read as going-in); a
+    delivery stated as a quarter, month or year alone is read on its LAST
+    day; before delivery the buyer's exposure is the deposit. It builds
+    nothing (`buildsSomething`), so its market check reads no construction
+    cost index. Panel `app/forward-panel.tsx` (`fwd-clock`, `fwd-delivery`,
+    `fwd-outside`, `fwd-deposit`, `fwd-yield`, `fwd-exit`); tag "Forward,
+    6.00% at delivery" / "Build-to-suit, delivers Q3 2027".
+  - **A mixed-use building's two incomes** (`lib/mixed-use.ts`): rows
+    "Residential income", "Commercial income", "Commercial SF",
+    "Commercial occupancy"; a share is said only where both halves are
+    stated, and the model's read says one exit cap capitalises both
+    (separate caps are the owner's change). No lender limit is drawn until a
+    primary source's words are on file. Panel `app/mixed-use-panel.tsx`
+    (`mu-income`, `mu-area`); tag "Commercial 29% of income".
+  - **An operating business on its real estate** (`lib/going-concern.ts`):
+    a going concern (the business sold with the real estate) or an
+    operator's lease (the real estate leased to the operator); EBITDA is
+    never NOI, the split between real estate, fixtures and business only as
+    stated, a coverage as stated or EBITDAR over the stated rent. Panel
+    `app/going-concern-panel.tsx` (`gc-split`, `gc-coverage`, `gc-line`);
+    tag "Going concern" / "Operator lease, 1.85x coverage".
+  - **Condominium units bought in bulk** (`lib/condo.ts`): units offered of
+    the units in the condominium, the dues a unit a month (a period stated
+    or no figure), assessments, reserves and the declaration's terms as
+    stated; the agencies' single-entity limit from
+    `data/research/agency_rules.json` (Fannie Mae's Selling Guide
+    B4-2.1-03, printed by zori run 37260966320: 20% in a project of 21 or
+    more units, 49% under the section's exceptions), aged by the research
+    rule and said as the lender's rule, never a verdict. The panel imports
+    only types (the agency file stays out of the browser). Panel
+    `app/condo-panel.tsx` (`condo-share`, `condo-limit`); tag "Bulk 42 of
+    120 (35%)".
+  - **A sandwich position** (`lib/sandwich-lease.ts`): the buyer is the
+    tenant under a master lease and the landlord of the subleases, so its
+    income is the spread, said with its coverage; the master lease's term is
+    read by `readMasterLeaseTerm` (lib/ground-lease-term) and a master
+    leasehold's exit runs on it (lib/leasehold-exit, "the master lease's
+    term"). Wired by the next round.
+  - **A buyer's 1031 clock** (`lib/exchange-window.ts`): the buy box's
+    exchange (the relinquished property's transfer day, the filer, an
+    extension) against a deal's offers-due date — the 45 days, the 180
+    days cut by the filer's calendar-year due date (26 U.S.C. 1031 and the
+    IRS's instructions, printed from the runner), and whether what the
+    price buys is a question for exchange counsel (a note, an entity share,
+    a leasehold under 30 years). Wired by the next round.
+- The data providers' notices (2026-10-05, research pass 31), each in the
+  provider's own printed words in `lib/data-notices.ts` (no imports):
+  FRED's notice ("This product uses the FRED® API but is not endorsed or
+  certified by the Federal Reserve Bank of St. Louis.") and the BLS's
+  sentence in every footer (`app/data-notices.tsx`, the public and
+  signed-in shells and /demo's own footer) and under the rates strip; the
+  BLS sentence again under a metro tile read from the BLS's own API; the
+  New York Fed's notice, filled for "SOFR data" and "Underwrite Copilot",
+  and the DTCC sentence once under the strip's money market where a SOFR
+  tile is drawn and under the construction panel's SOFR seed. A tile
+  credits the publisher via its channel ("New York Fed via FRED", "U.S.
+  Treasury via FRED", "Freddie Mac via FRED"; the leverage check's survey
+  "Freddie Mac's Primary Mortgage Market Survey® via FRED"); a tracker
+  figure names its house in words a phone shows; Redfin's 2–4 unit medians
+  are credited and linked to the page the research file cites; the address
+  search says "Address search © OpenStreetMap contributors" with the
+  copyright link, and the comps map's attribution names OpenStreetMap; a
+  public-web comp's source is linked only where the web search returned
+  it (`lib/anthropic/search-sources.ts`, otherwise "unverified, not a page
+  the search returned"); a market's link-preview card names its licence's
+  address and "cropped, words added". Whether a card is offered under
+  BY-SA, and the BLS retrieval date, are the owner's (WILL_TODO).
 - Render smoke tests: `lib/deal-view.render.test.ts` and
   `lib/views.render.test.ts` render the signed-in views on fixtures — and the
   shared screen's view (`app/share/[token]/share-view.tsx`; its `page.tsx`
@@ -4041,12 +4120,15 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   `app/(app)/deals/deal-cover.tsx`): an evening illustration of its kind
   of building (`coverKindFor` through `assetClassKey`: an apartment block,
   homes, an office tower, a warehouse, a storefront, a hotel, storage
-  doors, a staked parcel, a plain building — lit from a low sun, some
-  windows glowing, a distant city or hills behind) under one of eight
-  skies picked by hashing the deal's id (`coverToneFor`, the old
-  gradients' index, so a deal keeps its hue), with the deal's own draw
-  (`coverVariantFor`) of the sun, the lit windows and the building's form,
-  so two deals of one kind are two buildings; and at a card's foot "No
+  doors, a staked parcel with a survey flag, a plain building — a distant
+  city or hills behind) under one of twelve skies picked by hashing the
+  deal's id (`coverToneFor`; the four added skies of research pass 29's
+  second round moved a third of deals to a new hue, once), with the deal's
+  own draw (`coverVariantFor`) of its hour (an evening half the time, a
+  night with a moon and stars, or a misted morning), the side the light
+  comes from (the scene mirrored), where the building stands, a lower
+  street beside it and up to two trees, so two deals of one kind are two
+  scenes (`COVER_EDITION` 3); and at a card's foot "No
   photo yet" over its place (`coverPlace`: the address's city and state,
   else the market's name, else the memorandum's words) — the market
   caption's type, and its accessible name saying there is no photograph of
@@ -4215,6 +4297,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     `fetchPriority="high"` (React also emits a preload link for them), the
     rest lazy, and a card's picture zooms a little on hover
     (`motion-safe:`).
+  - **A card's own size** (research pass 29, second round): every stored
+    photograph keeps an 800px copy beside its hero (`size=card`, under the
+    hero's stamp, made from the photograph and never enlarged), and a
+    pipeline card offers the two in a `srcset` sized by the grid's
+    `PIPELINE_CARD_SIZES` — twelve cards on a 2x laptop downloaded 1,039 KB
+    where they had downloaded 3,240 KB, measured on 32 photographs. A
+    photograph stored before has its copy made from the hero on its first
+    ask and stored after the response onto the photograph still stored then
+    (`backfillCard`); the deletion sweep reaches a copy by its path even
+    where a later write lost its record (`picturePaths`). The shared screen
+    draws the stored photograph 16:9 below `sm` (the aerial keeps its one
+    frame), and a card's corner words are never under 10px.
   - **Its own colours first** (#463, the blur-up): every stored photograph
     carries a `preview` (`DealPicture.preview`) — the hero `PREVIEW_PX`
     (24) px on its long side as a WebP data URI, a few hundred characters,
@@ -5358,7 +5452,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   The code verifier lives in the requesting browser's cookies — a link opened
   elsewhere fails, and the page says so. Tests drive the route and the proxy
   with a fake auth client (`lib/auth-callback.test.ts`,
-  `lib/supabase/proxy-session.test.ts`).
+  `lib/supabase/proxy-session.test.ts`). At the door (research pass 32):
+  every answer of the sign-in action carries the address it was sent with
+  and the field opens on it again (React empties a form once its action
+  runs); the sign-up notice names the address and says to open the link in
+  this browser (`accountCreatedNotice`); a weak password is said by the
+  service's own reasons and figures (`weakPasswordCopy`), never a rule the
+  project's settings may not hold; and a signed-out invitee on the way to
+  `/team/join/…` opens on Create account (`initialLoginMode`'s `next`).
 - The private bucket: `lib/storage-paths.ts` is the one definition of where
   objects live (`<userId>/<dealId>.pdf`, `…/<dealId>.model-tmp`,
   `documents/<dealId>/…`, `supplements/<dealId>/…`,
