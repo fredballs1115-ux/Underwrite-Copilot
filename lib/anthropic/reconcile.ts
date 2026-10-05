@@ -45,13 +45,16 @@ export async function reconcileModel(
 ): Promise<ReconciliationResult> {
   const client = getAnthropic();
 
-  // OM document FIRST with cache_control — byte-identical to the prefix the
-  // extract/challenge/comps/market steps send. Whether this step reads the
-  // OM back from their cache is not established: its structured-output
-  // format is its own, and Anthropic's documentation says changing the
-  // format invalidates the prompt cache — the ledger says (./models). The
-  // label text moves after the document so nothing step-specific sits before
-  // the breakpoint.
+  // OM document FIRST with cache_control, the step's label text after it, so
+  // nothing step-specific sits before the breakpoint. The document is the
+  // memorandum's pages — the caller builds its source without `textFirst`
+  // (./om-source) — where the screen's steps send the deck's own text layer
+  // whenever that layer is dense enough to stand in for the pages; so this
+  // prefix matches theirs only on a deck the screen also read as pages, and
+  // even then its structured-output format is its own, which Anthropic's
+  // documentation says invalidates the prompt cache. Whether it reads
+  // anything back from their cache is the ledger's to say (./models).
+  // Reading the text layer here is the owner's call (research pass 41, L7).
   const content: Anthropic.ContentBlockParam[] = [
     omDocument(om),
     {
