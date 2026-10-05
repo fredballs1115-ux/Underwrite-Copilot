@@ -6,11 +6,11 @@ import { buildReportData, renderReportPdf } from "@/lib/memo/report-document";
 import type { MemoData } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
-import { buyBoxCheckSource, evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
-import { inferStrategy } from "@/lib/deal-strategy";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
@@ -133,18 +133,15 @@ export async function GET(
     };
     const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
     if (box) {
-      // The deal page's own check source — first signal, structured address
-      // and inferred kind folded in — so page and PDF make the same call.
+      // The deal page's own check source (lib/buy-box-chip
+      // `dealCheckSource`) — first signal, structured address, inferred kind
+      // and what the price buys folded in — so page and PDF make the same
+      // call.
       const extraction = (deal.extraction as ExtractionResult | null) ?? null;
       const firstSignal = (deal.first_signal as FirstSignal | null) ?? null;
       buyBoxChecks = evaluateBuyBox(
         deal.asset_class,
-        buyBoxCheckSource(
-          extraction,
-          firstSignal,
-          (deal.address as StructuredAddress | null) ?? null,
-          inferStrategy(extraction, firstSignal).kind,
-        ),
+        dealCheckSource(extraction, firstSignal, (deal.address as StructuredAddress | null) ?? null),
         box,
       );
       hurdlePct = box.minIrrPct ?? null;

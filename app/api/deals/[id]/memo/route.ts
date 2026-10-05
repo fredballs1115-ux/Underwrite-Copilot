@@ -12,11 +12,11 @@ import {
 } from "@/lib/memo/memo-document";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { getBrandingForDeal, brandingLogoDataUri } from "@/lib/branding-server";
-import { buyBoxCheckSource, evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { evaluateBuyBox, type BuyBoxCheck } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
 import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
-import { inferStrategy } from "@/lib/deal-strategy";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { verdictBehind } from "@/lib/screen-run";
 import { coverPictureFor } from "@/lib/memo/cover-aerial";
@@ -119,20 +119,17 @@ export async function GET(
     const box = await getBuyBoxForDeal(ownership.user_id, ownership.team_id);
     if (box?.exchange) exchange = { block: box.exchange, readerDay: readerToday((await cookies()).get(TZ_COOKIE)?.value) };
     if (box) {
-      // The same source the deal page judges: the extraction widened with the
-      // first signal and the deal's structured address, and the deal's kind
-      // as the page infers it — so a criterion the page calls "in territory"
-      // is never "unknown" on the PDF.
+      // The same source the deal page judges (lib/buy-box-chip
+      // `dealCheckSource`): the extraction widened with the first signal and
+      // the deal's structured address, the deal's kind as the page infers it
+      // and what the price buys — so a criterion the page calls "in
+      // territory" is never "unknown" on the PDF, nor a cap the page
+      // withholds held to the box's floor.
       const extraction = (deal.extraction as ExtractionResult | null) ?? null;
       const firstSignal = (deal.first_signal as FirstSignal | null) ?? null;
       buyBoxChecks = evaluateBuyBox(
         deal.asset_class,
-        buyBoxCheckSource(
-          extraction,
-          firstSignal,
-          (deal.address as StructuredAddress | null) ?? null,
-          inferStrategy(extraction, firstSignal).kind,
-        ),
+        dealCheckSource(extraction, firstSignal, (deal.address as StructuredAddress | null) ?? null),
         box,
       );
     }

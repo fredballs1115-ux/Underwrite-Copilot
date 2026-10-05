@@ -20,9 +20,12 @@
 
 import { compactUsd } from "@/lib/money";
 import { countNoun } from "@/lib/asset-words";
+import type { CapWithheldKind } from "@/lib/cap-slot";
 import {
   type BuyBox,
   buildingSfFromMetrics,
+  capWithheldDetail,
+  capWithheldOf,
   findMetric,
   findPriceRow,
   parseCount,
@@ -107,6 +110,12 @@ interface ExtractionLike {
   /** what the price buys (#414); on a note the stated cap is the
    *  collateral's, so no cap floor is scored on it */
   interest?: { kind?: string | null } | null;
+  /** why the deal's cap slot holds no cap of its own (lib/criteria
+   *  `capWithheldOf`): no cap floor is scored or tripped on it */
+  capWithheld?: CapWithheldKind | null;
+  /** whether a per-unit figure the memorandum states is the building's: a
+   *  basis ceiling is never tripped on one that is not */
+  statedBasisIsBuildings?: boolean;
   /** the day the screen read the memorandum — a price label's year is read
    *  against its year (lib/criteria `screenYearOf`) */
   screenedOn?: string | null;
@@ -132,14 +141,13 @@ function goingInCapPct(metrics: MetricLike[]): number | null {
   return m ? parsePct(m.value) : null;
 }
 
-/** A note's price is a loan's (#414): the cap its memorandum states is the
- *  collateral's, a return the note's buyer does not earn, so a cap floor is
- *  never scored or tripped on it — evaluateBuyBox's rule. */
-function isNote(extraction: ExtractionLike | null): boolean {
-  return extraction?.interest?.kind === "note";
-}
-const NOTE_CAP_DETAIL = (floor: number) =>
-  `Mandate wants ≥${floor}% going-in, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`;
+/** A note's price is a loan's (#414), a preferred equity position's buys a
+ *  rate and a redemption, and a share's beside its entity's loan grosses up
+ *  to the equity's whole: the cap the memorandum states is a return none of
+ *  their buyers earns, so a cap floor is never scored or tripped on it —
+ *  evaluateBuyBox's rule, by the deal's cap slot's own reason
+ *  (lib/criteria `capWithheldOf`). */
+const capStands = (extraction: ExtractionLike | null): boolean => capWithheldOf(extraction) == null;
 
 /** The deal's asset class: the explicit override wins, else what the screen
  *  read. Mirrors evaluateBuyBox. */
@@ -257,17 +265,19 @@ export function evalDealbreakers(
     else tripped.push(`price ${fmtM(price)} over the ${fmtM(ceiling)} ceiling`);
   }
 
-  // Hard going-in cap floor.
+  // Hard going-in cap floor — never on a cap the deal's cap slot withholds.
   if (db.minCapPct != null) {
-    const cap = isNote(extraction) ? null : goingInCapPct(metrics);
+    const cap = capStands(extraction) ? goingInCapPct(metrics) : null;
     if (cap == null) unknown.push("cap rate");
     else if (cap >= db.minCapPct) clear.push("cap rate");
     else tripped.push(`going-in cap ${cap.toFixed(2)}% under the ${db.minCapPct}% floor`);
   }
 
-  // Hard basis-per-unit ceiling.
+  // Hard basis-per-unit ceiling — never on a per-unit figure struck on a
+  // price that is not the building's (a note's, a position's, the land's, a
+  // share's), which is on a basis the memorandum never says.
   if (db.maxPerUnitK != null) {
-    const perUnit = moneyOf(metrics, METRIC_FIND.perUnit);
+    const perUnit = extraction?.statedBasisIsBuildings === false ? null : moneyOf(metrics, METRIC_FIND.perUnit);
     const ceiling = db.maxPerUnitK * 1e3;
     if (perUnit == null) unknown.push("basis / unit");
     else if (perUnit <= ceiling) clear.push("basis / unit");
@@ -410,13 +420,13 @@ export function scoreMandateFit(
 
   // ---- Going-in cap (floor) ---------------------------------------------
   if (box.minCapPct != null) {
-    const note = isNote(extraction);
-    const cap = note ? null : goingInCapPct(metrics);
+    const withheld = capWithheldOf(extraction);
+    const cap = withheld ? null : goingInCapPct(metrics);
     const s = scoreFloor(cap, box.minCapPct, NEAR_CAP_PT, WEIGHTS.cap);
     const detail =
       s.status === "unknown"
-        ? note
-          ? NOTE_CAP_DETAIL(box.minCapPct)
+        ? withheld
+          ? capWithheldDetail(box.minCapPct, withheld)
           : `Mandate wants ≥${box.minCapPct}% going-in; no parseable cap rate yet.`
         : s.status === "pass"
           ? `Mandate wants ≥${box.minCapPct}% going-in — the deal shows ${cap!.toFixed(2)}%. Clears the floor.`

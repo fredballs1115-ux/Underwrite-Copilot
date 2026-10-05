@@ -10,6 +10,7 @@ import { withArticle } from "@/lib/article";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { EXCHANGE_FILERS, exchangeDay, type ExchangeBlock } from "@/lib/exchange-window";
 import { dayIn } from "@/lib/reader-day";
+import type { CapWithheldKind } from "@/lib/cap-slot";
 
 export interface GeoTarget {
   /** display label, e.g. "Dallas, TX" or "Tarrant County, TX" */
@@ -674,9 +675,71 @@ interface ExtractionLike {
   /** what the price buys (#414); a note's price is a loan's, so the
    *  collateral's cap is not the buyer's and no cap floor is checked on it */
   interest?: { kind?: string | null } | null;
+  /** why the deal's cap slot holds no cap of its own, carried in by
+   *  `buyBoxCheckSource`'s reads (`capWithheldOf`); absent on a raw
+   *  extraction */
+  capWithheld?: CapWithheldKind | null;
+  /** whether a per-unit figure the memorandum states is the building's,
+   *  carried in by `buyBoxCheckSource`'s reads; absent on a raw extraction,
+   *  which is read as before */
+  statedBasisIsBuildings?: boolean;
   /** the day the screen read the memorandum (ExtractionResult.screenedOn) —
    *  the year a price label's year is judged against (`screenYearOf`) */
   screenedOn?: string | null;
+}
+
+/**
+ * Why a deal's stated going-in cap is no cap its buyer earns — its cap
+ * slot's own reason (lib/compare-interest `capSlotWithheld`), carried in by
+ * `buyBoxCheckSource`'s reads: the price buys a loan or a preferred equity
+ * position, or a share beside the loan its entity carries, whose price
+ * grossed up is the equity's whole. A raw extraction, built without the
+ * reads, is read by its stored kind alone: a note, a position. Null where the
+ * stated cap stands. One reader for the buy box's check, the mandate's cap
+ * dimension and its dealbreaker floor.
+ */
+export function capWithheldOf(ex: ExtractionLike | null | undefined): CapWithheldKind | null {
+  if (!ex) return null;
+  if (ex.capWithheld !== undefined) return ex.capWithheld;
+  const kind = ex.interest?.kind;
+  return kind === "note" ? "note" : kind === "preferred_equity" ? "position" : null;
+}
+
+/** The going-in cap check's words where the cap is withheld, by the cap
+ *  slot's own reason — the buy box's check and the mandate's dimension say
+ *  the same sentence. */
+export function capWithheldDetail(floorPct: number, why: CapWithheldKind): string {
+  const head = `Mandate wants ≥${floorPct}% going-in`;
+  if (why === "note") {
+    return `${head}, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`;
+  }
+  if (why === "position") {
+    return `${head}, but this is a preferred equity position: its price buys a rate and a redemption, never a slice of the building, and the building's cap is not a return the position's buyer earns.`;
+  }
+  return `${head}, but beside the loan its entity carries, this share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says.`;
+}
+
+/**
+ * Why a per-unit figure the memorandum states is no basis of the building's
+ * (lib/deal-strategy `statedBasisIsBuildings`, carried in by the reads), in
+ * the words the basis check says it — the collateral's, the land's, the
+ * whole's or the share's, never the building bought outright. Null where the
+ * figure stands, and on a raw extraction.
+ */
+export function basisWithheldWhy(ex: ExtractionLike | null | undefined, noun: string): string | null {
+  if (ex?.statedBasisIsBuildings !== false) return null;
+  switch (ex.interest?.kind) {
+    case "note":
+      return `this is a note: its price is a loan's, and a per-${noun} figure on it is the collateral's, not a basis the note's buyer pays`;
+    case "preferred_equity":
+      return "this is a preferred equity position: its price buys a rate and a redemption, never a slice of the building, and no basis is struck on it";
+    case "leased_fee":
+      return "the price buys the land under the ground lease, and is never divided over the building";
+    case "partial_interest":
+      return `this sells a share of the owning entity: a per-${noun} figure the memorandum states is on a basis it never says, the whole's or the share's`;
+    default:
+      return `a per-${noun} figure the memorandum states is not the building's basis`;
+  }
 }
 
 export function findMetric(
@@ -1120,11 +1183,35 @@ interface AddressLike {
 }
 
 /**
+ * What the buy box reads off a deal beside its rows, by the readers every
+ * slot of the deal reads — readers this module cannot import (lib/deal-
+ * strategy imports it, and the pipeline's client bundle must not load the
+ * interest reader): lib/buy-box-chip's `dealCheckSource` makes them, and
+ * every page, route and document builds its source there.
+ */
+export interface SourceReads {
+  /** what the price buys, as lib/interest `interestOf` reads it — a share
+   *  the extraction filed whose rows say a preferred equity position is one */
+  interestKind: string;
+  /** why the deal's cap slot holds no cap of its own (lib/compare-interest
+   *  `capSlotWithheld`): a note, a position, a share beside the loan its
+   *  entity carries; null where the stated cap stands */
+  capWithheld: CapWithheldKind | null;
+  /** whether a per-unit figure the memorandum states is the building's
+   *  (lib/deal-strategy `statedBasisIsBuildings`): false for a note, a
+   *  position, a leased fee and a share */
+  statedBasisIsBuildings: boolean;
+}
+
+/**
  * Build the pseudo-extraction the buy box is judged against: the full
  * extraction when it's in, else the ~30s first signal standing in, with the
  * user-entered address widening the location haystack either way. ONE
  * implementation — the deal page, the triage endpoint, and anything else
- * must agree on what "fits the box" means mid-screen.
+ * must agree on what "fits the box" means mid-screen. Every caller goes
+ * through lib/buy-box-chip's `dealCheckSource`, which hands in the kind and
+ * the reads; built without the reads, the extraction's stored interest is
+ * read as before.
  */
 export function buyBoxCheckSource(
   extraction: ExtractionLike | null,
@@ -1135,6 +1222,8 @@ export function buyBoxCheckSource(
    *  "unknown" still judges its land cost as the price and a plan deal
    *  keeps its "no going-in cap" reading */
   strategyKind?: string | null,
+  /** what the price buys, by the deal's own readers (`SourceReads`) */
+  reads?: SourceReads | null,
 ): ExtractionLike | null {
   const addressHaystack = [
     extraction?.address,
@@ -1177,8 +1266,12 @@ export function buyBoxCheckSource(
     strategy: strategyKind ? { kind: strategyKind } : (extraction?.strategy ?? null),
     // What the price buys rides along too: without it a note's collateral
     // cap is held to the box's cap floor and the mandate's dealbreaker on
-    // every page, where the rule is that a note's price is a loan's.
-    interest: extraction?.interest ?? null,
+    // every page, where the rule is that a note's price is a loan's. With the
+    // deal's own reads, as its cap slot reads it: a position's price and a
+    // share's beside its entity's loan strike no cap either, and a per-unit
+    // figure on a price that is not the building's is no basis.
+    interest: reads ? { kind: reads.interestKind } : (extraction?.interest ?? null),
+    ...(reads ? { capWithheld: reads.capWithheld, statedBasisIsBuildings: reads.statedBasisIsBuildings } : {}),
     // So does the day the screen read the memorandum: the price band and
     // the mandate's ceiling read a label's year against it, as the page's
     // price slot does.
@@ -1482,7 +1575,18 @@ export function evaluateBuyBox(
     // per key, a park per pad — the figure the OM quotes is the one tested.
     const noun = assetWords(cls).noun?.one ?? "unit";
     const label = `Basis / ${noun}`;
-    if (dollars == null) {
+    // A per-unit figure on a price that is not the building's — a note's, a
+    // position's, the land's, a share's — is on a basis the memorandum never
+    // says: the box's ceiling is never held to it (the audit of 2026-10-05).
+    const withheld = basisWithheldWhy(extraction, noun);
+    if (withheld) {
+      checks.push({
+        label,
+        onPrice: true,
+        status: "unknown",
+        detail: `Mandate caps basis at ${fmtM(max)}/${noun}, but ${withheld}.`,
+      });
+    } else if (dollars == null) {
       checks.push({
         label,
         onPrice: true,
@@ -1515,14 +1619,19 @@ export function evaluateBuyBox(
     const metric = findGoingInCap(metrics);
     const pct = metric ? parsePct(metric.value) : null;
     const planKind = planKindLabel(extraction);
-    if (extraction?.interest?.kind === "note") {
+    const withheld = capWithheldOf(extraction);
+    if (withheld) {
       // A note's price is a loan's: the cap the memorandum states is the
-      // collateral's, which the buyer of the note does not earn (#414).
+      // collateral's, which the buyer of the note does not earn (#414). A
+      // preferred equity position's buys a rate and a redemption, and a
+      // share's beside its entity's loan grosses up to the equity's whole:
+      // the deal's cap slot holds no cap on any of them, and the box holds
+      // none to its floor (the audit of 2026-10-05).
       checks.push({
         label: "Going-in cap",
         onPrice: true,
         status: "unknown",
-        detail: `Mandate wants ≥${box.minCapPct}% going-in, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`,
+        detail: capWithheldDetail(box.minCapPct, withheld),
       });
     } else if (pct == null) {
       checks.push({

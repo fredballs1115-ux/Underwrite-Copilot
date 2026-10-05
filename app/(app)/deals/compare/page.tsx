@@ -5,7 +5,8 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxCheckSource, buyBoxCoverage, evaluateBuyBox, screenYearOf, type BuyBox, type BuyBoxCoverage } from "@/lib/criteria";
+import { buyBoxCoverage, evaluateBuyBox, screenYearOf, type BuyBox, type BuyBoxCoverage } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
 import { checkedSentence } from "@/lib/fit-label";
 import { CompareTable, MODEL_ROWS_NOTE, usd, type Col } from "./compare-table";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -132,12 +133,13 @@ function toCol(
   const statedNoi = goingInNoiText(ex);
 
   // Mandate fit — same engine, the same inputs and the same inferred kind
-  // as the pipeline and deal page, so a development's land cost is judged
-  // by the fit call printed beside it.
+  // as the pipeline and deal page (lib/buy-box-chip `dealCheckSource`), so a
+  // development's land cost is judged by the fit call printed beside it, and
+  // a cap the column withholds is held to no floor.
   let fit: Col["fit"] = null;
   let fitNote: string | null = null;
   let fitCoverage: BuyBoxCoverage | null = null;
-  const checkSource = box ? buyBoxCheckSource(ex, signal, address, strat.kind) : null;
+  const checkSource = box ? dealCheckSource(ex, signal, address) : null;
   if (box && checkSource) {
     const checks = evaluateBuyBox(deal.asset_class, checkSource, box);
     const misses = checks.filter((c) => c.status === "miss");

@@ -25,10 +25,13 @@ vi.mock("@/lib/deal-picture", () => ({
   ensureDealPicture: async () => null,
 }));
 
+import { readdirSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { BUY_BOX_NOT_READ, notifyAnalysisReady } from "./email";
-import { buyBoxChip, buyBoxRead, dealCheckSource } from "./buy-box-chip";
+import { buyBoxChip, buyBoxRead, dealCheckSource, sourceReadsOf } from "./buy-box-chip";
 import { fitScoreLabel } from "./fit-label";
 import { buyBoxCheckSource, evaluateBuyBox } from "./criteria";
+import { evalDealbreakers } from "./mandate";
 import { inferStrategy } from "./deal-strategy";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
 
@@ -353,5 +356,143 @@ describe("the chip says how much of the box it was judged on (research pass 35)"
       tone: "muted",
       note: "The buy box's one criterion could not be checked.",
     });
+  });
+});
+
+// What the price buys decides what the box may hold it to (the audit of
+// 2026-10-05, HIGH-1): the header's cap slot withholds a preferred equity
+// position's cap and a share's beside its entity's loan, and no surface
+// strikes a building basis on a note's, a position's, the land's or a
+// share's price — but the box had held both to its cap floor and its basis
+// ceiling, so the chip beside "n/a — share" read "Fit 100 · Pursue".
+describe("the box holds a deal only to the figures its price buys", () => {
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 2", basis: "na" as const });
+  const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+  const deal = (kind: string, rows: [string, string][], share = "") =>
+    ({
+      dealName: "Main Street Flats",
+      assetClass: "multifamily",
+      market: "Dallas, TX",
+      address: "100 Main St, Dallas, TX",
+      interest: { ...blank, kind, share },
+      metrics: rows.map(([l, v]) => row(l, v)),
+    }) as unknown as ExtractionResult;
+  // The building's own figures, which none of the deals below buys outright:
+  // a 6.50% cap over a 6% floor, and a $400k basis over a $300k ceiling.
+  const BUILDING: [string, string][] = [
+    ["Going-in cap rate", "6.50%"],
+    ["Price per unit", "$400,000"],
+    ["Units", "200"],
+  ];
+  const BOX: BuyBox = {
+    assetClasses: ["multifamily"],
+    minCapPct: 6,
+    maxPerUnitK: 300,
+    dealbreakers: { minCapPct: 6, maxPerUnitK: 300 },
+  };
+  const read = (ex: ExtractionResult) => buyBoxRead("multifamily", dealCheckSource(ex, null, null), BOX);
+  const checkOf = (r: ReturnType<typeof read>, label: string) => r.checks.find((c) => c.label === label);
+  const dimOf = (r: ReturnType<typeof read>, key: string) => r.mandate?.dimensions.find((d) => d.key === key);
+  const redLines = (ex: ExtractionResult) => evalDealbreakers("multifamily", dealCheckSource(ex, null, null), BOX);
+
+  it("a fee simple is held to both, its cap passing and its basis tripping the red line", () => {
+    const r = read(deal("fee_simple", [["Asking price", "$80,000,000"], ...BUILDING]));
+    expect(checkOf(r, "Going-in cap")?.status).toBe("pass");
+    expect(checkOf(r, "Basis / unit")?.status).toBe("miss");
+    expect(r.mandate?.dealbreakerTripped).toBe(true);
+  });
+
+  it("a note: its cap and its basis are the collateral's, held to neither", () => {
+    const r = read(deal("note", [["Asking price", "$12,000,000"], ["Unpaid principal balance", "$15,000,000"], ...BUILDING]));
+    expect(checkOf(r, "Going-in cap")).toMatchObject({ status: "unknown", onPrice: true });
+    expect(checkOf(r, "Going-in cap")?.detail).toContain("this is a note: its price is a loan's");
+    expect(checkOf(r, "Basis / unit")).toMatchObject({ status: "unknown", onPrice: true });
+    expect(checkOf(r, "Basis / unit")?.detail).toContain("this is a note");
+    expect(checkOf(r, "Basis / unit")?.detail).not.toContain("$400k");
+    expect(redLines(deal("note", [["Asking price", "$12,000,000"], ...BUILDING]))).toMatchObject({ tripped: [], unknown: ["cap rate", "basis / unit"] });
+  });
+
+  it("a preferred equity position: no cap, no basis, no red line tripped on the building's figures", () => {
+    const ex = deal("preferred_equity", [
+      ["Asking price", "$15,000,000"],
+      ["Preferred equity amount", "$15,000,000"],
+      ["Preferred return", "12% preferred return, 8% current pay"],
+      ...BUILDING,
+    ]);
+    const r = read(ex);
+    expect(checkOf(r, "Going-in cap")?.status).toBe("unknown");
+    expect(checkOf(r, "Going-in cap")?.detail).toContain("this is a preferred equity position: its price buys a rate and a redemption");
+    expect(checkOf(r, "Going-in cap")?.detail).not.toContain("6.50%");
+    expect(checkOf(r, "Basis / unit")?.status).toBe("unknown");
+    expect(checkOf(r, "Basis / unit")?.detail).toContain("preferred equity position");
+    expect(dimOf(r, "cap")?.status).toBe("unknown");
+    expect(dimOf(r, "cap")?.detail).toBe(checkOf(r, "Going-in cap")?.detail);
+    expect(r.mandate?.dealbreakerTripped).toBe(false);
+    expect(redLines(ex)).toMatchObject({ tripped: [], unknown: ["cap rate", "basis / unit"] });
+    // The chip beside the header's "To redemption" slot is no green Pursue.
+    expect(r.chip.tone).toBe("muted");
+    expect(r.chip.label).not.toContain("Pursue");
+  });
+
+  it("a share the extraction filed whose rows say a position is read as the position lib/interest reads", () => {
+    const ex = deal("partial_interest", [
+      ["Asking price", "$15,000,000"],
+      ["Preferred equity amount", "$15,000,000"],
+      ["Current pay rate", "8%"],
+      ...BUILDING,
+    ]);
+    expect(sourceReadsOf(ex)).toEqual({ interestKind: "preferred_equity", capWithheld: "position", statedBasisIsBuildings: false });
+    expect(checkOf(read(ex), "Going-in cap")?.detail).toContain("preferred equity position");
+  });
+
+  it("a share beside its entity's loan: the equity's whole, no building's cap or basis", () => {
+    const ex = deal(
+      "partial_interest",
+      [["Asking price", "$20,580,000"], ["Entity loan balance", "$56,500,000"], ...BUILDING],
+      "A 49% limited partnership interest",
+    );
+    expect(sourceReadsOf(ex)).toEqual({ interestKind: "partial_interest", capWithheld: "share", statedBasisIsBuildings: false });
+    const r = read(ex);
+    expect(checkOf(r, "Going-in cap")?.status).toBe("unknown");
+    expect(checkOf(r, "Going-in cap")?.detail).toContain("beside the loan its entity carries, this share's price grossed up is the equity's whole");
+    expect(checkOf(r, "Basis / unit")?.status).toBe("unknown");
+    expect(checkOf(r, "Basis / unit")?.detail).toContain("a share of the owning entity");
+    expect(redLines(ex)).toMatchObject({ tripped: [], unknown: ["cap rate", "basis / unit"] });
+    expect(r.chip.label).not.toContain("Pursue");
+  });
+
+  it("a share with a stated percentage and no entity loan keeps its cap, the grossed-up whole's — its stated per-unit figure is no basis", () => {
+    const ex = deal("partial_interest", [["Asking price", "$20,580,000"], ...BUILDING], "A 49% limited partnership interest");
+    expect(sourceReadsOf(ex)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false });
+    const r = read(ex);
+    // The header prints the memorandum's cap for this share, and the box
+    // judges the same figure.
+    expect(checkOf(r, "Going-in cap")?.status).toBe("pass");
+    expect(dimOf(r, "cap")?.status).toBe("pass");
+    // The per-unit row is on a basis the memorandum never says.
+    expect(checkOf(r, "Basis / unit")?.status).toBe("unknown");
+    expect(redLines(ex)).toMatchObject({ tripped: [], clear: ["cap rate"], unknown: ["basis / unit"] });
+  });
+
+  it("every page, route and document builds its source through dealCheckSource", () => {
+    // lib/criteria cannot read what the price buys itself (lib/deal-strategy
+    // imports it, and the pipeline's client bundle must not load the
+    // interest reader), so a source built anywhere else would judge a
+    // position's cap again.
+    const files: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        if (name === "node_modules" || name.startsWith(".")) continue;
+        const p = join(dir, name);
+        if (statSync(p).isDirectory()) walk(p);
+        else if (/\.(ts|tsx)$/.test(name) && !/\.test\./.test(name)) files.push(p);
+      }
+    };
+    walk("app");
+    walk("lib");
+    const direct = files.filter(
+      (f) => !/lib[\\/](criteria|buy-box-chip)\.ts$/.test(f) && /\bbuyBoxCheckSource\(/.test(readFileSync(f, "utf8")),
+    );
+    expect(direct).toEqual([]);
   });
 });

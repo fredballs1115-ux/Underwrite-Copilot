@@ -15,22 +15,52 @@ import {
   foldBuyBoxChecks,
   type BuyBox,
   type BuyBoxCheck,
+  type SourceReads,
 } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore } from "@/lib/mandate";
 import { checkedOf, checkedSentence, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
-import { inferStrategy } from "@/lib/deal-strategy";
+import { inferStrategy, statedBasisIsBuildings } from "@/lib/deal-strategy";
+import { interestOf } from "@/lib/interest";
+import { capSlotWithheld } from "@/lib/compare-interest";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+
+/**
+ * What the buy box reads off a deal beside its rows, by the readers its
+ * slots read (lib/criteria `SourceReads`): what the price buys as
+ * lib/interest reads it, why the cap slot holds no cap of the deal's own
+ * (lib/compare-interest `capSlotWithheld`), and whether a per-unit figure
+ * the memorandum states is the building's (lib/deal-strategy
+ * `statedBasisIsBuildings`). A position's price or a share's beside its
+ * entity's loan had been held to the box's cap floor and its basis ceiling
+ * while the header beside the chip withheld both (the audit of 2026-10-05).
+ */
+export function sourceReadsOf(extraction: ExtractionResult | null): SourceReads {
+  return {
+    interestKind: interestOf(extraction).kind,
+    capWithheld: capSlotWithheld(extraction),
+    statedBasisIsBuildings: statedBasisIsBuildings(extraction),
+  };
+}
 
 /** What the deal is judged on: the extraction when it is in, the first
  *  signal standing in until then, the deal's own address widening the
- *  place, and the kind the two imply (a plan deal keeps its "no going-in
- *  cap" reading, a development its land price). */
+ *  place, the kind the two imply (a plan deal keeps its "no going-in cap"
+ *  reading, a development its land price), and what the price buys
+ *  (`sourceReadsOf`). THE source: the deal page, the email, the pipeline's
+ *  list and its workbook, the compare table, the batch upload's triage, the
+ *  memo, the report and the verdict all build it here. */
 export function dealCheckSource(
   extraction: ExtractionResult | null,
   firstSignal: FirstSignal | null,
   dealAddress: { label?: string; county?: string; state?: string } | null,
 ): ReturnType<typeof buyBoxCheckSource> {
-  return buyBoxCheckSource(extraction, firstSignal, dealAddress, inferStrategy(extraction, firstSignal).kind);
+  return buyBoxCheckSource(
+    extraction,
+    firstSignal,
+    dealAddress,
+    inferStrategy(extraction, firstSignal).kind,
+    sourceReadsOf(extraction),
+  );
 }
 
 export type BuyBoxChipTone = FitTone;

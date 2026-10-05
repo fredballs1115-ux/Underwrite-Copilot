@@ -4,7 +4,8 @@
 // teammate's name — come in, so a test reads a row as the route builds it.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
-import { buyBoxCheckSource, buyBoxCoverage, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
+import { buyBoxCoverage, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
 import { capSlotWithheld, noteCapSlot, ownYieldText } from "@/lib/compare-interest";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
@@ -95,7 +96,10 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
   // prints as a development's price.
   const address =
     addressUpgrade(d.address, extraction) ?? ((d.address as StructuredAddress | null | undefined) ?? null);
-  const source = ctx.box ? buyBoxCheckSource(extraction, signal, address, strategy.kind) : null;
+  // The deal page's own source (lib/buy-box-chip `dealCheckSource`): the
+  // same inferred kind, and what the price buys, so a cap the row withholds
+  // is held to no floor.
+  const source = ctx.box ? dealCheckSource(extraction, signal, address) : null;
   const checks = ctx.box && source ? evaluateBuyBox(d.asset_class, source, ctx.box) : null;
   const fit: PipelineExportRow["fit"] = checks ? foldBuyBoxChecks(checks) : null;
   return {

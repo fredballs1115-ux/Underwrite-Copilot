@@ -21,8 +21,8 @@ import { marketPictureFor } from "@/lib/market-picture";
 import { PICTURE_CREDIT, galleryPage, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import { cacheFresh, type DealVisualCache } from "@/lib/deal-location";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, buyBoxCoverage } from "@/lib/criteria";
-import { inferStrategy } from "@/lib/deal-strategy";
+import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCoverage } from "@/lib/criteria";
+import { dealCheckSource } from "@/lib/buy-box-chip";
 import { pickSlots, readingTerms, shownAssetClass } from "@/lib/pipeline-slots";
 import { floodCell, floodTag, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { scoreMandateFit } from "@/lib/mandate";
@@ -281,17 +281,17 @@ export default async function DealsPage({
     const verdict = d.verdict as { verdict?: string } | null;
     const job = jobByDeal.get(d.id);
     // Same deterministic engine AND the same inputs as the deal page: judge
-    // against buyBoxCheckSource (extraction, else first signal, with the typed
-    // address widening geography) so a deal reads identically on both surfaces.
+    // against the deal page's own source (lib/buy-box-chip `dealCheckSource`:
+    // extraction, else first signal, with the typed address widening
+    // geography, the kind the card infers — so the fit judges a
+    // development's land cost, the price the card prints — and what the
+    // price buys) so a deal reads identically on both surfaces.
     const box = d.team_id ? teamBox : personalBox;
     const checkSource = box
-      ? buyBoxCheckSource(
+      ? dealCheckSource(
           extraction,
           (d.first_signal as FirstSignal | null) ?? null,
           (d.address as StructuredAddress | null) ?? null,
-          // The kind as the card infers it, so the fit chip judges a
-          // development's land cost — the price the card prints.
-          inferStrategy(extraction, (d.first_signal as FirstSignal | null) ?? null).kind,
         )
       : null;
     const mandate =

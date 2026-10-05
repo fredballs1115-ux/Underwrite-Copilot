@@ -3,14 +3,13 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import {
   evaluateBuyBox,
-  buyBoxCheckSource,
   buyBoxCoverage,
   foldBuyBoxChecks,
   type BuyBoxCoverage,
 } from "@/lib/criteria";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
-import { inferStrategy } from "@/lib/deal-strategy";
+import { dealCheckSource } from "@/lib/buy-box-chip";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -80,13 +79,13 @@ export async function GET(
       fit = "nobox";
     } else {
       const extraction = (deal.extraction as ExtractionResult | null) ?? null;
-      const source = buyBoxCheckSource(
+      // The same source the deal page and the pipeline judge (lib/buy-box-
+      // chip) — adjacent surfaces must agree on a development's land cost as
+      // its price, and on a cap or a basis the price does not buy.
+      const source = dealCheckSource(
         extraction,
         (deal.first_signal as FirstSignal | null) ?? null,
         (deal.address as StructuredAddress | null) ?? null,
-        // The same read the deal page and the pipeline make — adjacent
-        // surfaces must agree on a development's land cost as its price.
-        inferStrategy(extraction, (deal.first_signal as FirstSignal | null) ?? null).kind,
       );
       provisional = !extraction;
       if (!source) {

@@ -150,8 +150,9 @@ describe("the eighth review's document cases", () => {
   it("5. both document routes judge the buy box from the deal page's own check source", () => {
     for (const route of ["app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts"]) {
       const src = readFileSync(route, "utf8");
-      expect(src, route).toMatch(/buyBoxCheckSource\(/);
-      expect(src, route).toMatch(/inferStrategy\(extraction, firstSignal\)\.kind/);
+      // The deal page's own builder (lib/buy-box-chip), which infers the kind
+      // from the extraction and the first signal and reads what the price buys.
+      expect(src, route).toMatch(/dealCheckSource\(extraction, firstSignal, /);
       expect(src, route).toMatch(/deal\.address as StructuredAddress/);
       // The raw extraction is never the third argument any more.
       expect(src, route).not.toMatch(/evaluateBuyBox\(\s*deal\.asset_class,\s*\(deal\.extraction as ExtractionResult\)/);
