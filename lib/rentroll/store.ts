@@ -4,6 +4,7 @@ import { matchSavedMapping, type ColumnMapping, type Grid } from "./parse";
 import type { Lease } from "./schema";
 import type { ValidationIssue } from "./validate";
 import { defaultProfileFor, normalizeProfile, type MarketLeasingProfile, type ProfileDraft } from "./profiles";
+import { readAll } from "@/lib/read-all";
 
 /** Persistence for the rent roll engine: imports, saved column mappings, and
  *  market leasing profiles. Rent roll rows are client data — nothing here is
@@ -151,20 +152,32 @@ function parseProfile(row: Record<string, unknown>, fallback: ProfileDraft): Mar
 /** The user's saved profiles, newest first, whatever class each was saved for
  *  — the page lists them all to pick from, and opens a deal only on one of
  *  its own family (lib/rentroll/profiles `openingProfile`). Empty is normal —
- *  the asset-class default stands in until they save one. */
+ *  the asset-class default stands in until they save one. Every one, a page
+ *  at a time (lib/read-all): the newest 30 alone had left an older profile
+ *  of the deal's own family unpicked, with nothing saying the rest exist
+ *  (research pass 42). A failed read throws, never read as none saved. */
 export async function listProfiles(
   supabase: SupabaseClient,
   userId: string,
   assetClass: string,
 ): Promise<MarketLeasingProfile[]> {
-  const { data } = await supabase
-    .from("market_leasing_profiles")
-    .select(PROFILE_COLS)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(30);
+  let failure: unknown = null;
+  const data = await readAll<Record<string, unknown>>(
+    (from, to) =>
+      supabase
+        .from("market_leasing_profiles")
+        .select(PROFILE_COLS)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>,
+    (e) => {
+      failure = e;
+    },
+  );
+  if (!data) throw new Error(`leasing profiles read failed: ${String((failure as { message?: unknown } | null)?.message ?? failure)}`);
   const fallback = defaultProfileFor(assetClass);
-  return ((data ?? []) as Record<string, unknown>[]).map((r) => parseProfile(r, fallback));
+  return data.map((r) => parseProfile(r, fallback));
 }
 
 export async function saveProfile(

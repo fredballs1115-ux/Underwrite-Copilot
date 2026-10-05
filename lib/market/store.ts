@@ -30,17 +30,31 @@ const PERIOD_COLS =
 const PIPELINE_COLS =
   "id, submarket_id, name, address, sf, status, expected_delivery, subtype, owner_occupied, excluded, exclusion_reason, stale_flag, stale_reason, source, notes";
 
+/** The reader's submarkets, newest first — every one, a page at a time
+ *  (lib/read-all): the newest 100 alone had left the rest off /market's list
+ *  and the deal page's picker with nothing saying so (research pass 42). A
+ *  failed read throws rather than answering none (the deal page and /market
+ *  each catch it and draw no submarket). */
 export async function listSubmarkets(
   supabase: SupabaseClient,
   userId: string,
 ): Promise<Submarket[]> {
-  const { data } = await supabase
-    .from("submarkets")
-    .select(SUBMARKET_COLS)
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false })
-    .limit(100);
-  return ((data ?? []) as Record<string, unknown>[]).map(parseSubmarketRow);
+  let failure: unknown = null;
+  const data = await readAll<Record<string, unknown>>(
+    (from, to) =>
+      supabase
+        .from("submarkets")
+        .select(SUBMARKET_COLS)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to) as unknown as PromiseLike<{ data: Record<string, unknown>[] | null; error: unknown }>,
+    (e) => {
+      failure = e;
+    },
+  );
+  if (!data) throw new Error(`submarkets read failed: ${String((failure as { message?: unknown } | null)?.message ?? failure)}`);
+  return data.map(parseSubmarketRow);
 }
 
 export async function getSubmarket(
