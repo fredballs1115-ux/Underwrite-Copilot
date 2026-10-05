@@ -1,1326 +1,1256 @@
 {
   "$schema_note": "Written by scripts/audit-source-links.mjs. lib/link-audit.ts consults this before rendering provenance links: ok:false renders as plain text.",
-  "audited_at": "2026-09-28T20:10:10.957Z",
+  "audited_at": "2026-10-05T21:10:16.625Z",
   "results": {
-    "https://ardorcre.com/medical-office-cap-rates/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:43.013Z"
-    },
-    "https://abgrealty.com/boston-retail-real-estate-trends-what-tenants-and-property-owners-should-watch-in-2026/": {
-      "ok": false,
-      "status": 500,
-      "last_checked_at": "2026-09-28T20:09:43.054Z"
-    },
-    "https://apers.app/learn/asset-classes/retail/grocery-anchored-below-market-anchor-inline-economics": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:43.056Z"
-    },
     "https://anchor1031.com/resources/education/opportunity-zone-hub": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:43.132Z"
-    },
-    "https://arielpa.nyc/news/press-releases/second-quarter-nyc-multifamily-sales-jump-268-year-over-year-ariel-property-advisors-q2-multifamily-quarter-in-review-shows": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:43.133Z"
-    },
-    "https://api.census.gov/data/2023/acs/acs5/groups/B25024.html": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:43.143Z"
-    },
-    "https://apps-nccde.hub.arcgis.com": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:43.148Z"
-    },
-    "https://ballotpedia.org/Massachusetts_Question_9,_Prohibition_of_Rent_Control_Initiative_(1994": {
-      "ok": true,
-      "status": 202,
-      "last_checked_at": "2026-09-28T20:09:43.234Z"
-    },
-    "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q2/us-reports/national/q22026usretailmarketbeat.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:43.302Z"
-    },
-    "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q1/us-reports/industrial/hampton_roads_americas_alliance_marketbeat_industrial_q1_2026.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:43.482Z"
-    },
-    "https://blog.firstam.com/cre-insights/multifamily-cap-rates-poised-to-slip-in-2026": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:09:43.638Z"
-    },
-    "https://chainstoreage.com/new-jersey-retail-vacancy-rates-continue-drop": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:09:43.677Z"
-    },
-    "https://code.dccouncil.gov/us/dc/council/code/sections/42-3502.05": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:43.987Z"
-    },
-    "https://bostonrealestatetimes.com/boston-multifamily-market-strengthens-in-q2-as-vacancy-falls-and-rents-rise/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.160Z"
-    },
-    "https://clscre.com/blog/industrial-outdoor-storage-ios-financing-2026.html": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.203Z"
-    },
-    "https://centercityphila.org/research-reports/retail": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.247Z"
-    },
-    "https://barneswalker.com/legal-glossary/r/rent-control-prohibition-florida/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.316Z"
-    },
-    "https://commercialobserver.com/2026/07/south-florida-miami-retail-leasing-vacancy-rent/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.375Z"
-    },
-    "https://code.dccouncil.gov/us/dc/council/code/sections/42-3404.02": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.414Z"
-    },
-    "https://code.dccouncil.gov/us/dc/council/laws/26-80": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.567Z"
-    },
-    "https://data-fairfaxcountygis.opendata.arcgis.com/datasets/Fairfaxcountygis::tax-administrations-real-estate-sales-data/about": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.576Z"
-    },
-    "https://data.vbgov.com": {
-      "ok": false,
-      "status": null,
-      "last_checked_at": "2026-09-28T20:09:44.631Z"
+      "last_checked_at": "2026-10-05T21:09:41.378Z"
     },
     "https://arbor.com/blog/single-family-rental-investment-snapshot-april-2026/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.649Z"
+      "last_checked_at": "2026-10-05T21:09:41.473Z"
     },
-    "https://data.baltimorecity.gov": {
+    "https://apers.app/learn/asset-classes/retail/grocery-anchored-below-market-anchor-inline-economics": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.660Z"
+      "last_checked_at": "2026-10-05T21:09:41.550Z"
+    },
+    "https://apps-nccde.hub.arcgis.com": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:41.660Z"
+    },
+    "https://api.census.gov/data/2023/acs/acs5/groups/B25024.html": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:41.690Z"
+    },
+    "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q2/us-reports/national/q22026usretailmarketbeat.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:41.743Z"
+    },
+    "https://blog.firstam.com/cre-insights/multifamily-cap-rates-poised-to-slip-in-2026": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:41.788Z"
+    },
+    "https://ballotpedia.org/Massachusetts_Question_9,_Prohibition_of_Rent_Control_Initiative_(1994": {
+      "ok": true,
+      "status": 202,
+      "last_checked_at": "2026-10-05T21:09:41.801Z"
+    },
+    "https://abgrealty.com/boston-retail-real-estate-trends-what-tenants-and-property-owners-should-watch-in-2026/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:41.807Z"
+    },
+    "https://assets.cushmanwakefield.com/-/media/cw/marketbeat-pdfs/2026/q1/us-reports/industrial/hampton_roads_americas_alliance_marketbeat_industrial_q1_2026.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:41.820Z"
+    },
+    "https://bostonrealestatetimes.com/boston-multifamily-market-strengthens-in-q2-as-vacancy-falls-and-rents-rise/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:41.855Z"
+    },
+    "https://arielpa.nyc/news/press-releases/second-quarter-nyc-multifamily-sales-jump-268-year-over-year-ariel-property-advisors-q2-multifamily-quarter-in-review-shows": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:42.012Z"
+    },
+    "https://clscre.com/blog/industrial-outdoor-storage-ios-financing-2026.html": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:42.146Z"
+    },
+    "https://ardorcre.com/medical-office-cap-rates/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:42.155Z"
+    },
+    "https://chainstoreage.com/new-jersey-retail-vacancy-rates-continue-drop": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:42.326Z"
+    },
+    "https://code.dccouncil.gov/us/dc/council/code/sections/42-3502.05": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:42.365Z"
     },
     "https://codelibrary.amlegal.com/codes/philadelphia/latest/philadelphia_pa/0-0-0-278160": {
       "ok": false,
       "status": 403,
-      "last_checked_at": "2026-09-28T20:09:44.701Z"
+      "last_checked_at": "2026-10-05T21:09:42.386Z"
     },
-    "https://deckard.com/resources/2026-str-regulations": {
+    "https://centercityphila.org/research-reports/retail": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:44.818Z"
+      "last_checked_at": "2026-10-05T21:09:42.424Z"
     },
-    "https://data.wprdc.org/api/3/action/datastore_search_sql?sql=SELECT": {
+    "https://code.dccouncil.gov/us/dc/council/code/sections/42-3404.02": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:45.101Z"
+      "last_checked_at": "2026-10-05T21:09:42.452Z"
     },
-    "https://essexrealtygroup.com/chicago-multifamily-report-april-2026/": {
+    "https://code.dccouncil.gov/us/dc/council/laws/26-80": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:45.251Z"
+      "last_checked_at": "2026-10-05T21:09:42.453Z"
     },
-    "https://evictionriskmap.com/rent-control-guide/delaware/": {
+    "https://commercialobserver.com/2026/07/south-florida-miami-retail-leasing-vacancy-rent/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:45.441Z"
+      "last_checked_at": "2026-10-05T21:09:42.498Z"
     },
-    "https://data.richmondgov.com": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:45.485Z"
-    },
-    "https://fred.stlouisfed.org/series/DGS10": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:45.831Z"
-    },
-    "https://fred.stlouisfed.org/series/DRCRELEXFACBS": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.025Z"
-    },
-    "https://eyeonhousing.org/2026/05/single-family-built-to-rent-slowed-at-start-of-2026/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.030Z"
-    },
-    "https://freddiemac.gcs-web.com/news-releases/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.223Z"
-    },
-    "https://dmped.dc.gov/release/mayor-bowser-releases-key-findings-new-study-and-strategic-plan-grow-dcs-retail-market-and": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.286Z"
-    },
-    "https://fred.stlouisfed.org/series/MORTGAGE30US": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.355Z"
-    },
-    "https://ecode360.com/36623772": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.380Z"
-    },
-    "https://geohub-loudoungis.opendata.arcgis.com": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.483Z"
-    },
-    "https://gerarent.com/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.554Z"
-    },
-    "https://fred.stlouisfed.org/series/SOFR": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.561Z"
-    },
-    "https://gisdata-arlgis.opendata.arcgis.com/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.657Z"
-    },
-    "https://gisweb.pwcgov.org": {
+    "https://data.vbgov.com": {
       "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:09:46.739Z"
+      "status": null,
+      "last_checked_at": "2026-10-05T21:09:42.601Z"
     },
-    "https://harborstoneadvisors.com/baltimore-metro-q1-2026-multifamily-market-report/": {
+    "https://barneswalker.com/legal-glossary/r/rent-control-prohibition-florida/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.794Z"
+      "last_checked_at": "2026-10-05T21:09:42.686Z"
     },
-    "https://gerarent.com/us-rents/dallas-tx-hud-metro-fmr-area": {
+    "https://data-fairfaxcountygis.opendata.arcgis.com/datasets/Fairfaxcountygis::tax-administrations-real-estate-sales-data/about": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.796Z"
-    },
-    "https://hellosection8.com/fair_market_rents/hud-metro12580m12580.html": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.957Z"
-    },
-    "https://housing.lacity.gov/residents/what-is-covered-under-the-rso": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:46.961Z"
-    },
-    "https://hcr.ny.gov/system/files/documents/2026/07/gce-fact-sheet-05.04.26-update.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.020Z"
-    },
-    "https://inhabit.corcoran.com/nyc-residential-rental-market-report-july-2026/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.057Z"
-    },
-    "https://investmentgrade.com/mister-car-wash-credit-rating-nnn-cap-rate/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.202Z"
-    },
-    "https://investmentgrade.com/nnn-cap-rates-2026/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.221Z"
-    },
-    "https://kidder.com/market-reports/los-angeles-multifamily-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.544Z"
-    },
-    "https://kidder.com/market-reports/los-angeles-industrial-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.545Z"
-    },
-    "https://icare.fairfaxcounty.gov/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.596Z"
-    },
-    "https://keelteam.com/post/mobile-home-park-cap-rates-explained/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.624Z"
-    },
-    "https://kidder.com/market-reports/los-angeles-retail-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.800Z"
-    },
-    "https://kidder.com/market-reports/los-angeles-office-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.862Z"
-    },
-    "https://investingincre.com/2026/08/13/phoenix-retail-real-estate-is-a-landlords-market/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.883Z"
-    },
-    "https://kidder.com/market-reports/seattle-industrial-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:47.941Z"
-    },
-    "https://kidder.com/market-reports/seattle-office-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.000Z"
-    },
-    "https://kidder.com/market-reports/san-francisco-office-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.017Z"
-    },
-    "https://kidder.com/market-reports/seattle-multifamily-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.092Z"
-    },
-    "https://kidder.com/wp-content/uploads/market_report/multifamily-market-research-san-francisco-2026-1q.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.126Z"
-    },
-    "https://kidder.com/wp-content/uploads/market_report/retail-market-research-san-francisco-2026-1q.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.160Z"
-    },
-    "https://kidder.com/market-reports/seattle-retail-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.211Z"
-    },
-    "https://law.justia.com/codes/georgia/title-44/chapter-7/article-1/section-44-7-19/": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:09:48.247Z"
-    },
-    "https://klnb.com/wp-content/uploads/2025/04/NAIKLNB_MD_Industrial_Q1_2025-1.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.273Z"
-    },
-    "https://klnb.com/wp-content/uploads/2026/04/NAIKLNB_MD_Office_Q1_2026.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.359Z"
-    },
-    "https://logis.loudoun.gov": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.423Z"
-    },
-    "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Richmond-Hampton-Roads-Multifamily-Report_2026-05-21-185215_gnmm.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.455Z"
-    },
-    "https://mytax.dc.gov": {
-      "ok": false,
-      "status": 404,
-      "last_checked_at": "2026-09-28T20:09:48.482Z"
-    },
-    "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.509Z"
-    },
-    "https://law.lis.virginia.gov/vacode/title55.1/chapter12/section55.1-1226/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.596Z"
-    },
-    "https://otr.cfo.dc.gov/page/real-property-tax-rates": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.644Z"
-    },
-    "https://opendata.dc.gov/datasets/integrated-tax-system-public-extract-property-sales": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.710Z"
-    },
-    "https://phl.carto.com/api/v2/sql?q=SELECT": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:48.890Z"
-    },
-    "https://njbmagazine.com/njb-news-now/strong-industrial-demand-and-resilient-office-market-for-q1/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:49.106Z"
-    },
-    "https://plainrent.com/counties/newport-news-city-va": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:49.121Z"
-    },
-    "https://property.phila.gov/?p=": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:49.391Z"
-    },
-    "https://propertysearch.arlingtonva.us/": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:09:49.481Z"
-    },
-    "https://realcostiq.com/cap-rate/boston/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:49.666Z"
-    },
-    "https://realcostiq.com/cap-rate/miami/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:49.675Z"
-    },
-    "https://partnersrealestate.com/research/atlanta-retail-q1-2026-quarterly-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:49.712Z"
-    },
-    "https://plainrent.com/states/district-of-columbia": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:49.771Z"
-    },
-    "https://realestatesolutionist.substack.com/p/rv-listings-rundown-02262026": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:09:49.790Z"
-    },
-    "https://rentguidelinesboard.cityofnewyork.us/resources/faqs/rent-control/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:49.979Z"
-    },
-    "https://opendata.maryland.gov/resource/ed4q-f8tm.json?$where=": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:49.982Z"
-    },
-    "https://rentlimits.com/areas/4808599999": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:50.004Z"
-    },
-    "https://sdat.dat.maryland.gov/RealProperty/": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:09:50.103Z"
-    },
-    "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/Parcels_Composite_NJ_WM/FeatureServer/0/query": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:50.126Z"
-    },
-    "https://rebusinessonline.com/mid-atlantic-retail-market-is-experiencing-methodical-growth/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:50.384Z"
-    },
-    "https://rebusinessonline.com/richmonds-mixed-use-boom-fuels-the-citys-retail-market/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:50.515Z"
+      "last_checked_at": "2026-10-05T21:09:42.728Z"
     },
     "https://crittendenreport.com/self-storage-in-2026-stability-and-optimism/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:50.583Z"
+      "last_checked_at": "2026-10-05T21:09:42.803Z"
+    },
+    "https://deckard.com/resources/2026-str-regulations": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:42.805Z"
+    },
+    "https://data.baltimorecity.gov": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:42.807Z"
+    },
+    "https://data.wprdc.org/api/3/action/datastore_search_sql?sql=SELECT": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.031Z"
+    },
+    "https://dmped.dc.gov/release/mayor-bowser-releases-key-findings-new-study-and-strategic-plan-grow-dcs-retail-market-and": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.110Z"
+    },
+    "https://ecode360.com/36623772": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.168Z"
+    },
+    "https://fred.stlouisfed.org/series/DGS10": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.176Z"
+    },
+    "https://essexrealtygroup.com/chicago-multifamily-report-april-2026/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.295Z"
+    },
+    "https://fred.stlouisfed.org/series/SOFR": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.342Z"
+    },
+    "https://evictionriskmap.com/rent-control-guide/delaware/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.343Z"
+    },
+    "https://eyeonhousing.org/2026/05/single-family-built-to-rent-slowed-at-start-of-2026/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.457Z"
+    },
+    "https://fred.stlouisfed.org/series/MORTGAGE30US": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.532Z"
+    },
+    "https://freddiemac.gcs-web.com/news-releases/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.574Z"
+    },
+    "https://gisweb.pwcgov.org": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:43.628Z"
+    },
+    "https://geohub-loudoungis.opendata.arcgis.com": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.637Z"
+    },
+    "https://fred.stlouisfed.org/series/DRCRELEXFACBS": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.663Z"
+    },
+    "https://gisdata-arlgis.opendata.arcgis.com/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.737Z"
+    },
+    "https://housing.lacity.gov/residents/what-is-covered-under-the-rso": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.859Z"
+    },
+    "https://harborstoneadvisors.com/baltimore-metro-q1-2026-multifamily-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.886Z"
+    },
+    "https://housing.lacity.gov/wp-content/uploads/2023/06/LA-RENTER-Protections-Notification.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:43.936Z"
+    },
+    "https://hcr.ny.gov/system/files/documents/2026/07/gce-fact-sheet-05.04.26-update.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.019Z"
+    },
+    "https://inhabit.corcoran.com/nyc-residential-rental-market-report-july-2026/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.069Z"
+    },
+    "https://investmentgrade.com/mister-car-wash-credit-rating-nnn-cap-rate/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.161Z"
+    },
+    "https://keelteam.com/post/mobile-home-park-cap-rates-explained/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.208Z"
+    },
+    "https://investmentgrade.com/nnn-cap-rates-2026/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.212Z"
+    },
+    "https://kidder.com/market-reports/los-angeles-multifamily-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.327Z"
+    },
+    "https://kidder.com/market-reports/los-angeles-industrial-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.423Z"
+    },
+    "https://icare.fairfaxcounty.gov/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.428Z"
+    },
+    "https://kidder.com/market-reports/los-angeles-office-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.462Z"
+    },
+    "https://kidder.com/market-reports/seattle-industrial-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.574Z"
+    },
+    "https://kidder.com/market-reports/los-angeles-retail-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.584Z"
+    },
+    "https://kidder.com/market-reports/san-francisco-office-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.662Z"
+    },
+    "https://investingincre.com/2026/08/13/phoenix-retail-real-estate-is-a-landlords-market/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.679Z"
+    },
+    "https://kidder.com/market-reports/seattle-multifamily-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.720Z"
+    },
+    "https://kidder.com/wp-content/uploads/market_report/retail-market-research-san-francisco-2026-1q.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.742Z"
+    },
+    "https://kidder.com/wp-content/uploads/market_report/multifamily-market-research-san-francisco-2026-1q.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.761Z"
+    },
+    "https://kidder.com/market-reports/seattle-office-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.799Z"
+    },
+    "https://kidder.com/market-reports/seattle-retail-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:44.858Z"
+    },
+    "https://law.justia.com/codes/georgia/title-44/chapter-7/article-1/section-44-7-19/": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:44.881Z"
+    },
+    "https://klnb.com/wp-content/uploads/2025/04/NAIKLNB_MD_Industrial_Q1_2025-1.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.020Z"
+    },
+    "https://klnb.com/wp-content/uploads/2026/04/NAIKLNB_MD_Office_Q1_2026.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.025Z"
+    },
+    "https://logis.loudoun.gov": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.113Z"
+    },
+    "https://mytax.dc.gov": {
+      "ok": false,
+      "status": 404,
+      "last_checked_at": "2026-10-05T21:09:45.116Z"
+    },
+    "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Richmond-Hampton-Roads-Multifamily-Report_2026-05-21-185215_gnmm.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.197Z"
+    },
+    "https://nmrk.imgix.net/uploads/fields/pdf-market-reports/1Q26-Washington-Metro-Industrial-Market-Report.pdf": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.199Z"
+    },
+    "https://otr.cfo.dc.gov/page/real-property-tax-rates": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.326Z"
+    },
+    "https://law.lis.virginia.gov/vacode/title55.1/chapter12/section55.1-1226/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.376Z"
+    },
+    "https://opendata.dc.gov/datasets/integrated-tax-system-public-extract-property-sales": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.533Z"
+    },
+    "https://njbmagazine.com/njb-news-now/strong-industrial-demand-and-resilient-office-market-for-q1/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.541Z"
+    },
+    "https://phl.carto.com/api/v2/sql?q=SELECT": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.583Z"
+    },
+    "https://realcostiq.com/cap-rate/boston/": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:45.742Z"
+    },
+    "https://property.phila.gov/?p=": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.777Z"
+    },
+    "https://partnersrealestate.com/research/atlanta-retail-q1-2026-quarterly-market-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:45.820Z"
+    },
+    "https://realestatesolutionist.substack.com/p/rv-listings-rundown-02262026": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:45.830Z"
+    },
+    "https://realcostiq.com/cap-rate/miami/": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:45.852Z"
+    },
+    "https://propertysearch.arlingtonva.us/": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:45.954Z"
+    },
+    "https://rentguidelinesboard.cityofnewyork.us/resources/faqs/rent-control/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:46.036Z"
+    },
+    "https://sdat.dat.maryland.gov/RealProperty/": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:46.097Z"
+    },
+    "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/Parcels_Composite_NJ_WM/FeatureServer/0/query": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:46.194Z"
+    },
+    "https://opendata.maryland.gov/resource/ed4q-f8tm.json?$where=": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:46.198Z"
     },
     "https://skyviewadvisors.com/q1-2026-self-storage-industry-report/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:50.662Z"
+      "last_checked_at": "2026-10-05T21:09:46.438Z"
     },
-    "https://sfha.org/files/documents/Payment%20Standards%202026.pdf": {
+    "https://data.richmondgov.com": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:50.791Z"
-    },
-    "https://takomaparkmd.gov/m/newsflash/home/detail/381": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:51.098Z"
-    },
-    "https://silberproperties.com/the-net-lease-market-at-mid-year-cap-rates-hold-as-the-market-splits-in-two/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:51.250Z"
-    },
-    "https://thesisdriven.com/buy-box/niche-industrial-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:51.430Z"
+      "last_checked_at": "2026-10-05T21:09:46.567Z"
     },
     "https://tax.thomsonreuters.com/en/glossary/bonus-depreciation": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:51.502Z"
-    },
-    "https://thesisdriven.com/guides/triple-net-lease": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:51.524Z"
-    },
-    "https://tenanture.com/fair-market-rent/ny": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:51.560Z"
-    },
-    "https://tradenetlease.com/nnn-car-wash-listed-inventory-april-2026/": {
-      "ok": true,
-      "status": 307,
-      "last_checked_at": "2026-09-28T20:09:51.642Z"
-    },
-    "https://thestoragebrief.com/articles/self-storage-cap-rates-2026/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:51.701Z"
-    },
-    "https://usrentprices.com/rent-prices/washington-dc": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:51.792Z"
-    },
-    "https://usrentprices.com/rent-prices/new-york-ny": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:51.864Z"
+      "last_checked_at": "2026-10-05T21:09:46.697Z"
     },
     "https://texas.public.law/statutes/tex._local_gov": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.000Z"
+      "last_checked_at": "2026-10-05T21:09:47.203Z"
     },
-    "https://voucherready.com/articles/rent-and-payment-standards/hud-fair-market-rents-2026-news": {
+    "https://thesisdriven.com/buy-box/niche-industrial-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.077Z"
+      "last_checked_at": "2026-10-05T21:09:47.421Z"
+    },
+    "https://thesisdriven.com/guides/triple-net-lease": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:47.615Z"
+    },
+    "https://thestoragebrief.com/articles/self-storage-cap-rates-2026/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:47.915Z"
+    },
+    "https://tradenetlease.com/nnn-car-wash-listed-inventory-april-2026/": {
+      "ok": true,
+      "status": 307,
+      "last_checked_at": "2026-10-05T21:09:48.014Z"
+    },
+    "https://rebusinessonline.com/richmonds-mixed-use-boom-fuels-the-citys-retail-market/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:48.204Z"
     },
     "https://requitygroup.com/insights/mobile-home-park-cap-rates-tier-2026-guide": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.079Z"
-    },
-    "https://warespace.com/resources/market-reports/washington-dc": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.105Z"
-    },
-    "https://www.bisnow.com/dallas-ft-worth/news/retail/weitzman-projects-grocery-anchored-retail-will-drive-dfw-to-4th-straight-year-of-record-occupancy-in-2026-132610": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.279Z"
-    },
-    "https://www.baystreethospitality.com/post/us-hotel-revpar-diverges-2150bps-gateway-cap-rates-lag-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.408Z"
-    },
-    "https://www.avisonyoung.us/w/big-box-vacancy-compresses-across-chicago-s-industrial-market": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.422Z"
-    },
-    "https://warecre.com/cre-insights/market-property-insights/seattle-warehouse-market-report/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.432Z"
+      "last_checked_at": "2026-10-05T21:09:48.211Z"
     },
     "https://warecre.com/cre-insights/market-property-insights/chicago-warehouse-market-report/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.441Z"
+      "last_checked_at": "2026-10-05T21:09:48.468Z"
     },
-    "https://www.cbre.com/insights/books/us-real-estate-market-outlook-2026/multifamily": {
+    "https://warecre.com/cre-insights/market-property-insights/seattle-warehouse-market-report/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.537Z"
+      "last_checked_at": "2026-10-05T21:09:48.688Z"
+    },
+    "https://warespace.com/resources/market-reports/washington-dc": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:48.813Z"
+    },
+    "https://rebusinessonline.com/mid-atlantic-retail-market-is-experiencing-methodical-growth/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:48.922Z"
+    },
+    "https://www.avisonyoung.us/w/big-box-vacancy-compresses-across-chicago-s-industrial-market": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:49.059Z"
+    },
+    "https://www.baystreethospitality.com/post/us-hotel-revpar-diverges-2150bps-gateway-cap-rates-lag-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:49.079Z"
     },
     "https://www.avisonyoung.us/web/los-angeles/office-market-report": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.555Z"
+      "last_checked_at": "2026-10-05T21:09:49.166Z"
     },
-    "https://www.cbre.com/insights/figures/los-angeles-industrial-figures-q2-2026": {
+    "https://www.bisnow.com/dallas-ft-worth/news/retail/weitzman-projects-grocery-anchored-retail-will-drive-dfw-to-4th-straight-year-of-record-occupancy-in-2026-132610": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.627Z"
+      "last_checked_at": "2026-10-05T21:09:49.187Z"
     },
-    "https://www.cbre.com/insights/figures/dallas-fort-worth-industrial-figures-q2-2026": {
+    "https://www.cbre.com/insights/books/us-real-estate-market-outlook-2026/multifamily": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.758Z"
+      "last_checked_at": "2026-10-05T21:09:49.238Z"
+    },
+    "https://web.archive.org/web/20260922234125id_/https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:49.284Z"
     },
     "https://www.cbh.com/insights/articles/trumps-tax-bill-bonus-depreciation-cost-segregation/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.850Z"
+      "last_checked_at": "2026-10-05T21:09:49.873Z"
+    },
+    "https://silberproperties.com/the-net-lease-market-at-mid-year-cap-rates-hold-as-the-market-splits-in-two/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:50.378Z"
+    },
+    "https://takomaparkmd.gov/m/newsflash/home/detail/381": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.156Z"
     },
     "https://www.cbre.com/insights/figures/baltimore-office-figures-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.962Z"
+      "last_checked_at": "2026-10-05T21:09:51.243Z"
     },
     "https://www.cbre.com/insights/figures/atlanta-industrial-figures-report-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:52.964Z"
+      "last_checked_at": "2026-10-05T21:09:51.266Z"
     },
-    "https://www.cbre.com/insights/figures/miami-industrial-figures-q2-2026": {
+    "https://www.cbre.com/insights/figures/dallas-fort-worth-industrial-figures-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:53.173Z"
+      "last_checked_at": "2026-10-05T21:09:51.292Z"
     },
-    "https://www.cbre.com/insights/figures/richmond-industrial-figures-q2-2026": {
+    "https://www.cbre.com/insights/figures/los-angeles-industrial-figures-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:53.459Z"
-    },
-    "https://www.cbre.com/insights/figures/philadelphia-multifamily-figures-report-q2-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:53.473Z"
-    },
-    "https://www.cbre.com/insights/figures/richmond-office-figures-q1-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:53.594Z"
-    },
-    "https://www.cbre.com/insights/reports/global-data-center-trends-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:53.767Z"
-    },
-    "https://www.cbre.com/insights/reports/us-cap-rate-survey-h1-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:53.833Z"
-    },
-    "https://www.cbre.com/insights/figures/washington-dc-office-figures-q2-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:53.943Z"
-    },
-    "https://www.chicago.gov/city/en/depts/doh/provdrs/landlords/svcs/residential-landlord-and-tenant-ordinance.html": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:54.248Z"
-    },
-    "https://www.colliers.com/-/media/files/unitedstates/national/2026/colliers-us-retail-statistics-report-2026-q2.ashx": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:54.401Z"
-    },
-    "https://www.colliers.com/en/download-article?itemId=e740e46c-55f6-4fdb-ac63-52f0bbb99be3": {
-      "ok": false,
-      "status": 404,
-      "last_checked_at": "2026-09-28T20:09:54.645Z"
-    },
-    "https://www.cnbc.com/2026/04/22/life-sciences-lab-real-estate-rebound.html": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:54.786Z"
+      "last_checked_at": "2026-10-05T21:09:51.293Z"
     },
     "https://www.cbre.com/insights/figures/baltimore-industrial-figures-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:54.999Z"
-    },
-    "https://www.cbre.com/insights/figures/san-francisco-office-figures-q2-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:55.176Z"
-    },
-    "https://www.cbre.com/insights/figures/northern-virginia-office-figures-q2-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:55.231Z"
+      "last_checked_at": "2026-10-05T21:09:51.359Z"
     },
     "https://www.cbre.com/insights/figures/miami-office-figures-report-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:55.278Z"
+      "last_checked_at": "2026-10-05T21:09:51.586Z"
+    },
+    "https://www.cbre.com/insights/figures/miami-industrial-figures-q2-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.634Z"
+    },
+    "https://www.cbre.com/insights/figures/san-francisco-office-figures-q2-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.687Z"
+    },
+    "https://www.cbre.com/insights/figures/washington-dc-office-figures-q2-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.721Z"
+    },
+    "https://www.cbre.com/insights/figures/richmond-office-figures-q1-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.763Z"
+    },
+    "https://www.cbre.com/insights/reports/global-data-center-trends-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.780Z"
+    },
+    "https://www.cbre.com/insights/figures/northern-virginia-office-figures-q2-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.782Z"
+    },
+    "https://www.cbre.com/insights/reports/us-cap-rate-survey-h1-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.801Z"
+    },
+    "https://www.cbre.com/insights/figures/richmond-industrial-figures-q2-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.811Z"
+    },
+    "https://www.cbre.com/insights/figures/philadelphia-multifamily-figures-report-q2-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.850Z"
+    },
+    "https://www.colliers.com/-/media/files/unitedstates/national/2026/colliers-us-retail-statistics-report-2026-q2.ashx": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:51.906Z"
+    },
+    "https://www.colliers.com/en/download-article?itemId=e740e46c-55f6-4fdb-ac63-52f0bbb99be3": {
+      "ok": false,
+      "status": 404,
+      "last_checked_at": "2026-10-05T21:09:52.012Z"
+    },
+    "https://www.chicago.gov/city/en/depts/doh/provdrs/landlords/svcs/residential-landlord-and-tenant-ordinance.html": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:52.261Z"
     },
     "https://www.colliers.com/en/research/atlanta/2026-q2-atlanta-office-market-report": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:55.434Z"
+      "last_checked_at": "2026-10-05T21:09:52.530Z"
     },
     "https://www.colliers.com/en/research/atlanta/2026-q2-atlanta-retail-market-report": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:55.661Z"
+      "last_checked_at": "2026-10-05T21:09:52.591Z"
     },
     "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-2026q1": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:55.734Z"
+      "last_checked_at": "2026-10-05T21:09:52.595Z"
     },
-    "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-q2-2026": {
+    "https://www.cnbc.com/2026/04/22/life-sciences-lab-real-estate-rebound.html": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:56.040Z"
-    },
-    "https://www.colliers.com/en/research/boston/greater-boston-office-report-q2-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:56.096Z"
-    },
-    "https://www.colliers.com/en/research/dallas/dfw-office-market-report-2026-q2": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:56.130Z"
-    },
-    "https://www.colliers.com/en/research/miami/1q26-miami-dade-county-retail": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:56.166Z"
-    },
-    "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-industrial": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:56.452Z"
-    },
-    "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-office": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:56.464Z"
-    },
-    "https://www.colliers.com/en/research/washington-dc/maryland-industrial-report-q4-2024": {
-      "ok": false,
-      "status": 404,
-      "last_checked_at": "2026-09-28T20:09:56.471Z"
-    },
-    "https://www.commerce.wa.gov/housing-policy/hb1217-landlord-resource-center/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:56.635Z"
-    },
-    "https://www.commercialsearch.com/news/life-science-sector-faces-excess-vacancy-after-construction-boom/": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:09:56.793Z"
-    },
-    "https://www.colliers.com/en/research/washington-dc/maryland-industrial-market-report-2026-q1": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:56.864Z"
-    },
-    "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-office-report": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:56.959Z"
-    },
-    "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-industrial-report": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:57.001Z"
-    },
-    "https://www.crowe.com/insights/tax-news-highlights/obbba-makes-enhanced-opportunity-zones-permanent": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:09:57.180Z"
-    },
-    "https://www.colliers.com/en/research/washington-dc/washington-dc-office-market-report-2026-q2": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:57.259Z"
-    },
-    "https://www.colliers.com/en/research/washington-dc/suburban-maryland-office-market-report-2026-q1": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:57.260Z"
-    },
-    "https://www.creghealthcare.com/pages/blog/medical-office-cap-rates-2026.html": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:57.431Z"
-    },
-    "https://www.credaily.com/briefs/single-family-rental-cap-rates-rise-nationwide/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:57.570Z"
-    },
-    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/baltimore-marketbeats": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:58.668Z"
-    },
-    "https://caanet.org/topics/ab-1482/": {
-      "ok": false,
-      "status": null,
-      "last_checked_at": "2026-09-28T20:09:58.777Z"
-    },
-    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.077Z"
-    },
-    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/new-york-city-area-marketbeats/manhattan-office": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.270Z"
-    },
-    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/cbd-office": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.296Z"
-    },
-    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/boston-marketbeats/office": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.404Z"
+      "last_checked_at": "2026-10-05T21:09:52.603Z"
     },
     "https://data.norfolk.gov": {
       "ok": false,
       "status": null,
-      "last_checked_at": "2026-09-28T20:09:59.415Z"
+      "last_checked_at": "2026-10-05T21:09:52.758Z"
     },
-    "https://www.globenewswire.com/news-release/2026/08/20/3348688/0/en/mortgage-rates-decline-for-second-consecutive-week.html": {
+    "https://www.colliers.com/en/research/boston/greater-boston-industrial-report-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.418Z"
+      "last_checked_at": "2026-10-05T21:09:52.859Z"
+    },
+    "https://www.colliers.com/en/research/boston/greater-boston-office-report-q2-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.069Z"
+    },
+    "https://www.colliers.com/en/research/miami/1q26-miami-dade-county-retail": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.277Z"
+    },
+    "https://www.colliers.com/en/research/dallas/dfw-office-market-report-2026-q2": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.280Z"
+    },
+    "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-industrial": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.325Z"
+    },
+    "https://www.colliers.com/en/research/miami/2q26-miami-dade-county-office": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.601Z"
+    },
+    "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-office-report": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.683Z"
+    },
+    "https://www.colliers.com/en/research/philadelphia/2026-q2-philadelphia-regional-industrial-report": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.694Z"
+    },
+    "https://www.colliers.com/en/research/washington-dc/maryland-industrial-report-q4-2024": {
+      "ok": false,
+      "status": 404,
+      "last_checked_at": "2026-10-05T21:09:53.732Z"
+    },
+    "https://www.colliers.com/en/research/washington-dc/maryland-industrial-market-report-2026-q1": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.796Z"
+    },
+    "https://www.commercialsearch.com/news/life-science-sector-faces-excess-vacancy-after-construction-boom/": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:53.802Z"
+    },
+    "https://www.commerce.wa.gov/housing-policy/hb1217-landlord-resource-center/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.816Z"
+    },
+    "https://www.crowe.com/insights/tax-news-highlights/obbba-makes-enhanced-opportunity-zones-permanent": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:09:53.905Z"
+    },
+    "https://www.colliers.com/en/research/washington-dc/suburban-maryland-office-market-report-2026-q1": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:53.965Z"
+    },
+    "https://www.colliers.com/en/research/washington-dc/washington-dc-office-market-report-2026-q2": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:54.027Z"
+    },
+    "https://www.credaily.com/briefs/single-family-rental-cap-rates-rise-nationwide/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:54.187Z"
+    },
+    "https://www.creghealthcare.com/pages/blog/medical-office-cap-rates-2026.html": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:54.195Z"
+    },
+    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats/cbd-office": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:55.494Z"
+    },
+    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/baltimore-marketbeats": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:55.536Z"
+    },
+    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/boston-marketbeats/office": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:55.650Z"
     },
     "https://www.forbes.com/sites/jennifercastenson/2026/06/22/infill-housing-real-estates-diamond-in-the-rough/": {
       "ok": false,
       "status": 403,
-      "last_checked_at": "2026-09-28T20:09:59.424Z"
+      "last_checked_at": "2026-10-05T21:09:55.681Z"
     },
-    "https://www.dchousing.org/api/files/board/610.pdf": {
+    "https://www.globenewswire.com/news-release/2026/08/20/3348688/0/en/mortgage-rates-decline-for-second-consecutive-week.html": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.495Z"
+      "last_checked_at": "2026-10-05T21:09:55.739Z"
     },
-    "https://www.hotelnewsresource.com/article142335.html": {
+    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/new-york-city-area-marketbeats/manhattan-office": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.792Z"
+      "last_checked_at": "2026-10-05T21:09:55.789Z"
     },
-    "https://www.cushmanwakefield.com/en/insights/life-science-report": {
+    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/chicago-marketbeats": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.850Z"
-    },
-    "https://www.hud.gov/opportunity-zones/updates": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.860Z"
-    },
-    "https://www.datacenterfrontier.com/energy/article/55352453/cbres-2026-data-center-outlook-demand-surges-as-delivery-becomes-the-constraint": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:09:59.888Z"
-    },
-    "https://www.hud.gov/program_offices/administration/hudclips/handbooks/hsgh": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:00.010Z"
-    },
-    "https://www.huduser.gov/portal/datasets/fmr/fmr2026/FY2026_FMR_Schedule.pdf": {
-      "ok": true,
-      "status": 202,
-      "last_checked_at": "2026-09-28T20:10:00.059Z"
-    },
-    "https://www.huduser.gov/portal/datasets/fmr/fmrs/FY2026_code/2026summary.odn": {
-      "ok": true,
-      "status": 202,
-      "last_checked_at": "2026-09-28T20:10:00.060Z"
-    },
-    "https://www.ilga.gov/Documents/legislation/ilcs/documents/005008250K5.htm": {
-      "ok": false,
-      "status": null,
-      "last_checked_at": "2026-09-28T20:10:00.093Z"
-    },
-    "https://www.jll.com/en-us/insights/market-dynamics/dallas-fort-worth-industrial": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:00.189Z"
-    },
-    "https://www.jll.com/en-us/insights/market-dynamics/atlanta-industrial": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:00.215Z"
-    },
-    "https://www.govinfo.gov/content/pkg/FR-2026-04-21/pdf/2026-07741.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:00.224Z"
-    },
-    "https://www.jll.com/en-us/insights/market-perspectives/seniors-housing-care-investor-survey-and-trend-outlook": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:00.296Z"
-    },
-    "https://www.institutionalpropertyadvisors.com/research/market-report/retail/washington-dc/washingtondc-2026-investment-forecast-retail-market-report": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:00.315Z"
+      "last_checked_at": "2026-10-05T21:09:55.791Z"
     },
     "https://www.housingwire.com/articles/empty-lots-zillow-housing-shortage/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:00.316Z"
+      "last_checked_at": "2026-10-05T21:09:55.828Z"
     },
-    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/seattle-bellevue-marketbeats": {
+    "https://www.federalregister.gov/d/2026-17891": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:00.478Z"
+      "last_checked_at": "2026-10-05T21:09:55.927Z"
     },
-    "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/san-francisco-multifamily-market-outlook": {
-      "ok": false,
-      "status": 404,
-      "last_checked_at": "2026-09-28T20:10:00.853Z"
-    },
-    "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook": {
-      "ok": false,
-      "status": 404,
-      "last_checked_at": "2026-09-28T20:10:00.881Z"
-    },
-    "https://www.jerseycitynj.gov/cityhall/HousingAndDevelopment/housingpreservation/landlordtenantrelations": {
+    "https://www.datacenterfrontier.com/energy/article/55352453/cbres-2026-data-center-outlook-demand-surges-as-delivery-becomes-the-constraint": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.034Z"
+      "last_checked_at": "2026-10-05T21:09:56.045Z"
+    },
+    "https://www.hud.gov/program_offices/administration/hudclips/handbooks/hsgh": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:56.083Z"
+    },
+    "https://www.hud.gov/opportunity-zones/updates": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:56.085Z"
     },
     "https://www.hospitalitynet.org/report/4132704/hvs-us-market-pulse-may-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.110Z"
+      "last_checked_at": "2026-10-05T21:09:56.089Z"
+    },
+    "https://www.hotelnewsresource.com/article142335.html": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:56.135Z"
+    },
+    "https://www.cushmanwakefield.com/en/united-states/insights/us-marketbeats/seattle-bellevue-marketbeats": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:56.233Z"
+    },
+    "https://www.ilga.gov/Documents/legislation/ilcs/documents/005008250K5.htm": {
+      "ok": false,
+      "status": null,
+      "last_checked_at": "2026-10-05T21:09:56.247Z"
+    },
+    "https://www.jll.com/en-us/insights/market-dynamics/atlanta-industrial": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:56.259Z"
+    },
+    "https://www.huduser.gov/portal/datasets/fmr/fmr2027/FY27_FMRs.xlsx": {
+      "ok": true,
+      "status": 202,
+      "last_checked_at": "2026-10-05T21:09:56.277Z"
+    },
+    "https://www.jll.com/en-us/insights/market-dynamics/dallas-fort-worth-industrial": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:56.299Z"
+    },
+    "https://www.jll.com/en-us/insights/market-perspectives/seniors-housing-care-investor-survey-and-trend-outlook": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:56.329Z"
+    },
+    "https://www.cushmanwakefield.com/en/insights/life-science-report": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:56.366Z"
+    },
+    "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/chicago-multifamily-market-outlook": {
+      "ok": false,
+      "status": 404,
+      "last_checked_at": "2026-10-05T21:09:56.544Z"
+    },
+    "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/san-francisco-multifamily-market-outlook": {
+      "ok": false,
+      "status": 404,
+      "last_checked_at": "2026-10-05T21:09:56.563Z"
+    },
+    "https://www.kbkg.com/feature/obbb-tax-bill-makes-100-bonus-depreciation-permanent-what-you-need-to-know": {
+      "ok": true,
+      "status": 202,
+      "last_checked_at": "2026-10-05T21:09:56.649Z"
     },
     "https://www.jpmorgan.com/insights/real-estate/commercial-term-lending/washington-dc-multifamily-market-outlook": {
       "ok": false,
       "status": 404,
-      "last_checked_at": "2026-09-28T20:10:01.145Z"
+      "last_checked_at": "2026-10-05T21:09:56.739Z"
     },
-    "https://www.lument.com/momentum-building-in-northern-new-jersey-multifamily-market/": {
+    "https://www.jerseycitynj.gov/cityhall/HousingAndDevelopment/housingpreservation/landlordtenantrelations": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.255Z"
+      "last_checked_at": "2026-10-05T21:09:56.909Z"
+    },
+    "https://caanet.org/topics/ab-1482/": {
+      "ok": false,
+      "status": null,
+      "last_checked_at": "2026-10-05T21:09:57.076Z"
     },
     "https://www.jll.com/en-us/insights/market-dynamics/philadelphia-cbd-office": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.468Z"
-    },
-    "https://www.jll.com/en-us/insights/market-dynamics/hampton-roads-industrial": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.539Z"
-    },
-    "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2026-investment-forecast-retail-market-report": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.673Z"
-    },
-    "https://www.marcusmillichap.com/research/market-report/atlanta/atlanta-2q26-multifamily-market-report": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.689Z"
-    },
-    "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2q-2026-multifamily-market-report": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.745Z"
-    },
-    "https://www.marcusmillichap.com/research/market-report/miami-dade/miami-dade-2q26-multifamily-market-report": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.799Z"
-    },
-    "https://www.kbkg.com/feature/obbb-tax-bill-makes-100-bonus-depreciation-permanent-what-you-need-to-know": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:01.875Z"
+      "last_checked_at": "2026-10-05T21:09:57.143Z"
     },
     "https://www.kbcadvisors.com/insights/q2-2026-greater-philadelphia-market-report": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:02.151Z"
+      "last_checked_at": "2026-10-05T21:09:57.330Z"
     },
-    "https://www.marcusmillichap.com/research/market-report/philadelphia/philadelphia-2026-investment-forecast-retail-market-report": {
+    "https://www.jll.com/en-us/insights/market-dynamics/hampton-roads-industrial": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:02.203Z"
+      "last_checked_at": "2026-10-05T21:09:57.370Z"
+    },
+    "https://www.lument.com/momentum-building-in-northern-new-jersey-multifamily-market/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:58.505Z"
+    },
+    "https://www.institutionalpropertyadvisors.com/research/market-report/retail/washington-dc/washingtondc-2026-investment-forecast-retail-market-report": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:09:59.621Z"
+    },
+    "https://www.marcusmillichap.com/research/market-report/atlanta/atlanta-2q26-multifamily-market-report": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:01.688Z"
     },
     "https://www.marcusmillichap.com/research/market-report/washington-dc/washington-dc-2q26-industrial-market-report": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:02.223Z"
+      "last_checked_at": "2026-10-05T21:10:03.149Z"
     },
-    "https://www.marcusmillichap.com/research/market-report/northern-new-jersey/northern-new-jersey-2026-investment-forecast-multifamily-market-report": {
+    "https://www.marcusmillichap.com/research/market-report/miami-dade/miami-dade-2q26-multifamily-market-report": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:02.290Z"
-    },
-    "https://www.marcusmillichap.com/research/market-report/new-york-city/new-york-city-2026-investment-forecast-multifamily-market-report": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:02.327Z"
-    },
-    "https://www.matthews.com/insights/dallas-fort-worth-multifamily-q1-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:04.311Z"
-    },
-    "https://www.matthews.com/insights/ios-sector-update-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:04.413Z"
-    },
-    "https://www.matthews.com/insights/boston-retail-2025": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:04.510Z"
-    },
-    "https://www.matthews.com/insights/los-angeles-ca-retail-market-report-q2-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:04.561Z"
-    },
-    "https://www.matthews.com/insights/new-york-retail-market-report-q2-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:04.749Z"
+      "last_checked_at": "2026-10-05T21:10:03.799Z"
     },
     "https://www.matthews.com/insights/boston-ma-multifamily-market-report-june-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:04.801Z"
+      "last_checked_at": "2026-10-05T21:10:03.877Z"
     },
-    "https://www.minut.com/blog/short-term-rental-laws-us": {
+    "https://www.matthews.com/insights/dallas-fort-worth-multifamily-q1-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:04.894Z"
+      "last_checked_at": "2026-10-05T21:10:04.014Z"
     },
-    "https://www.mmcginvest.com/post/u-s-senior-housing-market-report-2026-outlook-occupancy-cap-rates-and-forecasts-through-2031": {
+    "https://www.marcusmillichap.com/research/market-report/new-york-city/new-york-city-2026-investment-forecast-multifamily-market-report": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:04.895Z"
-    },
-    "https://www.mmcginvest.com/post/us-medical-office-market-outlook-2026-full-waiting-rooms-empty-pipelines": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:04.936Z"
+      "last_checked_at": "2026-10-05T21:10:04.989Z"
     },
     "https://www.matthews.com/insights/los-angeles-multifamily-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:05.052Z"
-    },
-    "https://www.montgomerycountypa.gov": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:05.066Z"
+      "last_checked_at": "2026-10-05T21:10:05.080Z"
     },
     "https://www.matthews.com/insights/new-york-industrial-market-report-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:05.244Z"
+      "last_checked_at": "2026-10-05T21:10:05.303Z"
+    },
+    "https://www.matthews.com/insights/boston-retail-2025": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:05.325Z"
+    },
+    "https://www.marcusmillichap.com/research/market-report/northern-new-jersey/northern-new-jersey-2026-investment-forecast-multifamily-market-report": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:05.581Z"
+    },
+    "https://www.marcusmillichap.com/research/market-report/philadelphia/philadelphia-2026-investment-forecast-retail-market-report": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:05.603Z"
+    },
+    "https://www.matthews.com/insights/los-angeles-ca-retail-market-report-q2-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:06.359Z"
+    },
+    "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2026-investment-forecast-retail-market-report": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:06.372Z"
+    },
+    "https://www.minut.com/blog/short-term-rental-laws-us": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:06.424Z"
+    },
+    "https://www.matthews.com/insights/ios-sector-update-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:06.541Z"
+    },
+    "https://www.mmcginvest.com/post/u-s-senior-housing-market-report-2026-outlook-occupancy-cap-rates-and-forecasts-through-2031": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:06.734Z"
+    },
+    "https://www.mmcginvest.com/post/us-medical-office-market-outlook-2026-full-waiting-rooms-empty-pipelines": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:06.822Z"
+    },
+    "https://www.montgomerycountypa.gov": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:06.916Z"
     },
     "https://www.miamirealtors.com/2026/04/20/broward-county-emerging-as-top-multifamily-investment-market/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:05.276Z"
+      "last_checked_at": "2026-10-05T21:10:07.112Z"
     },
     "https://www.montgomerycountymd.gov/DHCA/housing/landlordtenant/rent-stabilization.html": {
       "ok": false,
       "status": 404,
-      "last_checked_at": "2026-09-28T20:10:05.309Z"
-    },
-    "https://www.nj.gov/treasury/njombudsman/documents/pdf/FY2026FairMarketRentDocumentationSystem.pdf": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:05.482Z"
-    },
-    "https://www.nmrk.com/insights/market-report/baltimore-market-reports": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:10:05.559Z"
-    },
-    "https://www.nmrk.com/insights/market-report/hampton-roads-real-estate-market-reports": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:10:05.650Z"
-    },
-    "https://www.nmrk.com/insights/market-report/northern-new-jersey-market-reports": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:10:05.671Z"
-    },
-    "https://www.nmrk.com/insights/market-report/northern-virginia-market-reports": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:10:05.764Z"
-    },
-    "https://www.nmrk.com/insights/market-report/richmond-real-estate-market-reports": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:10:05.804Z"
-    },
-    "https://www.nahb.org/blog/2025/12/sponsored-acres-infill-sourcing-to-boost-margins": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:05.982Z"
-    },
-    "https://www.nahb.org/blog/2025/08/opprtunity-zones-one-big-beautiful-bill-act": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:06.004Z"
+      "last_checked_at": "2026-10-05T21:10:07.129Z"
     },
     "https://www.nic.org/blog/senior-housing-occupancy-climbs-in-second-quarter-2026/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:06.056Z"
+      "last_checked_at": "2026-10-05T21:10:07.511Z"
+    },
+    "https://www.nahb.org/blog/2025/08/opprtunity-zones-one-big-beautiful-bill-act": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:07.512Z"
+    },
+    "https://www.nahb.org/blog/2025/12/sponsored-acres-infill-sourcing-to-boost-margins": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:07.554Z"
+    },
+    "https://www.nmrk.com/insights/market-report/baltimore-market-reports": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:10:07.628Z"
+    },
+    "https://www.nmrk.com/insights/market-report/northern-new-jersey-market-reports": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:10:07.656Z"
+    },
+    "https://www.nmrk.com/insights/market-report/hampton-roads-real-estate-market-reports": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:10:07.679Z"
+    },
+    "https://www.nmrk.com/insights/market-report/northern-virginia-market-reports": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:10:07.680Z"
+    },
+    "https://www.nmrk.com/insights/market-report/richmond-real-estate-market-reports": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:10:07.699Z"
+    },
+    "https://www.matthews.com/insights/new-york-retail-market-report-q2-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:08.174Z"
     },
     "https://www.matthews.com/insights/q1-2026-dallas-fort-worth-tx-retail-market-report": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:06.788Z"
-    },
-    "https://www.northmarq.com/insights/insights/dallas-fort-worth-multifamily-rents-and-occupancy-climb-open-q1-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:06.918Z"
-    },
-    "https://www.matthews.com/insights/top-10-multifamily-markets-in-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:06.965Z"
-    },
-    "https://www.northmarq.com/insights/insights/declining-multifamily-vacancy-fuels-continued-rent-growth-hampton-roads": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:07.054Z"
-    },
-    "https://www.northmarq.com/news/featured-expert/manufactured-housing-communities-poised-growth-2026-affordability-crisis": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:07.674Z"
-    },
-    "https://www.northmarq.com/insights/insights/atlantas-multifamily-vacancy-shrinks-lowest-level-nearly-three-years": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:07.759Z"
-    },
-    "https://www.northmarq.com/insights/insights/multifamily-fundamentals-philadelphia-remain-stable-despite-wave-new-supply": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:07.812Z"
-    },
-    "https://www.northmarq.com/insights/insights/richmonds-multifamily-vacancy-holds-steady-amid-elevated-supply-q1-2026": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:07.915Z"
+      "last_checked_at": "2026-10-05T21:10:08.264Z"
     },
     "https://www.matthews.com/insights/san-francisco-industrial-q2-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:07.973Z"
+      "last_checked_at": "2026-10-05T21:10:08.266Z"
+    },
+    "https://www.marcusmillichap.com/research/market-report/baltimore/baltimore-2q-2026-multifamily-market-report": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:08.419Z"
+    },
+    "https://www.northmarq.com/insights/insights/atlantas-multifamily-vacancy-shrinks-lowest-level-nearly-three-years": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:08.610Z"
+    },
+    "https://www.matthews.com/insights/top-10-multifamily-markets-in-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:08.630Z"
     },
     "https://www.northmarq.com/insights/insights/boston-multifamily-transaction-activity-accelerates-q1-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:07.986Z"
+      "last_checked_at": "2026-10-05T21:10:08.678Z"
     },
-    "https://www.northmarq.com/insights/insights/vacancy-rises-richmond-new-multifamily-supply-continues-deliver": {
+    "https://www.northmarq.com/insights/insights/dallas-fort-worth-multifamily-rents-and-occupancy-climb-open-q1-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.080Z"
+      "last_checked_at": "2026-10-05T21:10:08.725Z"
+    },
+    "https://www.northmarq.com/insights/insights/declining-multifamily-vacancy-fuels-continued-rent-growth-hampton-roads": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:09.022Z"
     },
     "https://www.northmarq.com/insights/insights/easing-construction-rebalances-regional-outlook-washington-dc-multifamily-market": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.109Z"
+      "last_checked_at": "2026-10-05T21:10:09.089Z"
     },
-    "https://www.odu.edu/sites/default/files/2026/documents/2026-mr-presentation.pdf": {
+    "https://www.northmarq.com/insights/insights/multifamily-fundamentals-philadelphia-remain-stable-despite-wave-new-supply": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.211Z"
+      "last_checked_at": "2026-10-05T21:10:09.214Z"
     },
-    "https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/multifamily-housing.html": {
+    "https://www.northmarq.com/news/featured-expert/manufactured-housing-communities-poised-growth-2026-affordability-crisis": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.274Z"
+      "last_checked_at": "2026-10-05T21:10:09.284Z"
     },
     "https://www.odu.edu/article/the-hampton-roads-real-estate-market-review-forecast-celebrates-its-30th-year": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.294Z"
+      "last_checked_at": "2026-10-05T21:10:09.295Z"
     },
-    "https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/student-housing.html": {
+    "https://www.odu.edu/sites/default/files/2026/documents/2026-mr-presentation.pdf": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.303Z"
+      "last_checked_at": "2026-10-05T21:10:09.388Z"
+    },
+    "https://www.northmarq.com/insights/insights/vacancy-rises-richmond-new-multifamily-supply-continues-deliver": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:09.392Z"
+    },
+    "https://www.northmarq.com/insights/insights/richmonds-multifamily-vacancy-holds-steady-amid-elevated-supply-q1-2026": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:09.395Z"
     },
     "https://www.propertyshark.com/Real-Estate-Reports/2026/07/28/nyc-office-market-report-q2-2026/": {
       "ok": false,
       "status": 403,
-      "last_checked_at": "2026-09-28T20:10:08.333Z"
+      "last_checked_at": "2026-10-05T21:10:09.458Z"
+    },
+    "https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/student-housing.html": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:09.488Z"
+    },
+    "https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/multifamily-housing.html": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:09.489Z"
     },
     "https://www.pwc.com/us/en/industries/financial-services/asset-wealth-management/real-estate/emerging-trends-in-real-estate-pwc-uli/property-type-outlook/office.html": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.443Z"
-    },
-    "https://www.peoples-law.org/baltimore-city-rental-and-housing-laws": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.461Z"
+      "last_checked_at": "2026-10-05T21:10:09.538Z"
     },
     "https://www.realtor.com/research/data/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.546Z"
+      "last_checked_at": "2026-10-05T21:10:09.561Z"
     },
     "https://www.redfin.com/news/data-center/downloads/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.660Z"
-    },
-    "https://www.odu.edu/evwilliams-center/reports": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.750Z"
-    },
-    "https://www.rentdata.org/richmond-va-msa/2025": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.823Z"
-    },
-    "https://www.princegeorgescountymd.gov/departments-offices/permitting-inspections-and-enforcement/about-dpie/code-enforcement/permanent-rent-stabilization-and-protection-act-prsa": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:08.870Z"
-    },
-    "https://www.sf.gov/information--partial-exemption-newly-constructed-rental-units": {
-      "ok": true,
-      "status": 202,
-      "last_checked_at": "2026-09-28T20:10:08.960Z"
-    },
-    "https://www.rva.gov/assessor-real-estate": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.055Z"
+      "last_checked_at": "2026-10-05T21:10:09.622Z"
     },
     "https://www.ropesgray.com/en/insights/viewpoints/102mvfl/data-center-investment-in-2026-ai-demand-power-constraints-and-private-equity": {
       "ok": false,
       "status": 403,
-      "last_checked_at": "2026-09-28T20:10:09.094Z"
+      "last_checked_at": "2026-10-05T21:10:09.795Z"
+    },
+    "https://www.peoples-law.org/baltimore-city-rental-and-housing-laws": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:09.802Z"
+    },
+    "https://www.princegeorgescountymd.gov/departments-offices/permitting-inspections-and-enforcement/about-dpie/code-enforcement/permanent-rent-stabilization-and-protection-act-prsa": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:09.819Z"
+    },
+    "https://www.odu.edu/evwilliams-center/reports": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:09.904Z"
     },
     "https://www.savills.us/research_articles/256536/389555-0/northern-new-jersey-q1-2026-industrial-market-report": {
       "ok": false,
       "status": 403,
-      "last_checked_at": "2026-09-28T20:10:09.129Z"
+      "last_checked_at": "2026-10-05T21:10:10.013Z"
     },
-    "https://www.roi-nj.com/2026/07/02/real_estate_development/northern-and-central-n-j-office-market-pauses-after-recovery-industrial-leasing-strong-in-q2-cushman-wakefield-report/": {
+    "https://www.sf.gov/information--partial-exemption-newly-constructed-rental-units": {
       "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.145Z"
+      "status": 202,
+      "last_checked_at": "2026-10-05T21:10:10.026Z"
     },
     "https://www.thesorso.com/answers/cap-rate-medical-office-building": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.205Z"
+      "last_checked_at": "2026-10-05T21:10:10.162Z"
+    },
+    "https://www.roi-nj.com/2026/07/02/real_estate_development/northern-and-central-n-j-office-market-pauses-after-recovery-industrial-leasing-strong-in-q2-cushman-wakefield-report/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:10.170Z"
     },
     "https://www.tylercauble.com/blog/industrial-real-estate": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.279Z"
+      "last_checked_at": "2026-10-05T21:10:10.187Z"
     },
     "https://www.walkerdunlop.com/outlooks/student-housing-outlook-2026": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.383Z"
-    },
-    "https://www.ushousingdata.com/fair-market-rents/norfolk-city-va": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.536Z"
-    },
-    "https://www.pwcva.gov/department/real-estate-assessments": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:10:09.539Z"
-    },
-    "https://www.roi-nj.com/2024/08/15/real_estate_development/marcus-millichap-report-finds-record-low-vacancy-and-strong-rent-growth-in-north-jersey-retail-market/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.639Z"
-    },
-    "https://www.zillow.com/research/data/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.748Z"
-    },
-    "https://www.yardibreeze.com/blog/2026/03/state-of-self-storage-2026/": {
-      "ok": true,
-      "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.863Z"
+      "last_checked_at": "2026-10-05T21:10:10.332Z"
     },
     "https://www.yardimatrix.com/blog/baltimore-multifamily-market-report/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:09.911Z"
+      "last_checked_at": "2026-10-05T21:10:10.465Z"
+    },
+    "https://www.roi-nj.com/2024/08/15/real_estate_development/marcus-millichap-report-finds-record-low-vacancy-and-strong-rent-growth-in-north-jersey-retail-market/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:10.538Z"
+    },
+    "https://www.zillow.com/research/data/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:10.672Z"
+    },
+    "https://www.yardibreeze.com/blog/2026/03/state-of-self-storage-2026/": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:10.713Z"
+    },
+    "https://www.pwcva.gov/department/real-estate-assessments": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:10:10.715Z"
     },
     "https://www.zillow.com/prince-william-county-va/duplex-triplex/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:10.053Z"
-    },
-    "https://www.princegeorgescountymd.gov/departments-offices/faq/permanent-rent-stabilization-law-housing-community-development/what-full-list-residence-and-building-types-are-exempt-law": {
-      "ok": false,
-      "status": 403,
-      "last_checked_at": "2026-09-28T20:10:10.166Z"
+      "last_checked_at": "2026-10-05T21:10:10.824Z"
     },
     "https://www3.newcastlede.gov/parcel/search/": {
       "ok": true,
       "status": 247,
-      "last_checked_at": "2026-09-28T20:10:10.435Z"
+      "last_checked_at": "2026-10-05T21:10:11.489Z"
     },
     "https://www.tenantbase.com/chicago/q1-2026/": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:10.661Z"
+      "last_checked_at": "2026-10-05T21:10:11.598Z"
+    },
+    "https://www.princegeorgescountymd.gov/departments-offices/faq/permanent-rent-stabilization-law-housing-community-development/what-full-list-residence-and-building-types-are-exempt-law": {
+      "ok": false,
+      "status": 403,
+      "last_checked_at": "2026-10-05T21:10:11.618Z"
     },
     "https://www.virginiamultifamily.com/post/hampton-roads-commercial-real-estate-stability-opportunity-and-a-market-in-transition": {
       "ok": true,
       "status": 200,
-      "last_checked_at": "2026-09-28T20:10:10.957Z"
+      "last_checked_at": "2026-10-05T21:10:12.313Z"
+    },
+    "https://www.rva.gov/assessor-real-estate": {
+      "ok": true,
+      "status": 200,
+      "last_checked_at": "2026-10-05T21:10:16.625Z"
     }
   }
 }
