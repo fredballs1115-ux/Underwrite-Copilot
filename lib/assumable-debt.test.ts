@@ -76,6 +76,20 @@ describe("readAssumableTerms — the loan in place, only as the memorandum state
   it("cites the balance row's page only inside the memorandum", () => {
     expect(readAssumableTerms(sample([row("Assumable loan balance", "$30,000,000", "p. 400")]))!.page).toBe("");
   });
+
+  it("reads a balance with a hyphenated word beside it (research pass 37)", () => {
+    // Any hyphen had read as no balance: no tag, no card and no context line
+    // for a loan written "$24,500,000 (Freddie Mac, non-recourse)".
+    expect(readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000 (Freddie Mac, non-recourse)")]))!.balance).toBe(24_500_000);
+    expect(
+      readAssumableTerms(sample([row("Assumable loan balance", "22,000,000 (tax-exempt multifamily housing revenue bonds, Freddie Mac TEL)")]))!.balance,
+    ).toBe(22_000_000);
+    expect(assumableTag(sample([row("Assumable loan balance", "$24,500,000 (non-recourse)"), row("Assumable loan rate", "3.45%")]))).toBe(
+      "Assumable 3.45%",
+    );
+    // A minus or a range is still no balance.
+    expect(readAssumableTerms(sample([row("Assumable loan balance", "$24.5M - $25M")]))).toBeNull();
+  });
 });
 
 describe("scheduleOf — how the payments run from today", () => {

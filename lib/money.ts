@@ -19,13 +19,48 @@ const SCALE: Record<string, number> = {
   b: 1e9,
 };
 
+// The first figure in a line, as `parseUsd` has always found it: an
+// optional dollar sign, the digits (commas already dropped), a scale.
+const FIRST_FIGURE = /\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(k|thousand|mm|million|m|bn|billion|b)?\b/i;
+// The figure's own sign, in any of its forms — the hyphen-minus, the minus
+// sign (U+2212) and the en dash a word processor sets for one — either
+// opening the value ("-250,000", "−$250k", "- $250,000") or set against
+// the figure or its dollar sign ("Net -250,000", "$-250,000", "$ -250,000").
+// Never a hyphen inside a word ("T-12"), and never a dash set apart between
+// words and the figure ("Senior loan – $24,500,000"), which is punctuation.
+const SIGN_OPENS = /^[\s(]*[-−–]\s*\$?\s*$/;
+const SIGN_SET_AGAINST = /(?:^|[^A-Za-z0-9])[-−–]\$?$|\$\s*[-−–]\s*$/;
+// Accounting brackets around the figure alone: "($250,000)", "$(250,000)".
+const BRACKET_OPENS = /(?:\$\s*)?\(\s*\$?\s*$/;
+const BRACKET_CLOSES = /^\s*\)/;
+// A range whose first end is the figure: a dash and another figure
+// ("$40M - $42M", "40-42M", "$40–42M") — a dash joins two figures only in a
+// range or a compound label ("2025-26"), neither of them the figure — or
+// "to" / "through" and another figure at least half the first ("$40M to
+// $42M"). A figure far below the first after "to" or "through" is a date
+// or a term, not a range's other end ("$900,000 through 2031").
+const DASH_RANGE = /^\s*[-−–—]\s*\$?\s*[0-9]/;
+const WORD_RANGE = /^\s*(?:to|through)\b\s*\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(k|thousand|mm|million|m|bn|billion|b)?\b(?!\s*%)/i;
+
+const scaled = (digits: string, scale: string | undefined) => Number(digits) * (scale ? SCALE[scale.toLowerCase()] ?? 1 : 1);
+
 /**
  * Parse a human dollar string into whole dollars. Understands the notations
  * analysts actually type: "68000000", "$68,000,000", "$68.5M", "63 million",
- * "500k". Returns null for anything negative, unparsable, or below `floor` —
- * the floor is a typo guard ("$68" is never a building price). Callers pick
- * the floor for the figure's scale: whole-asset prices default to $10k;
- * deposits pass something smaller.
+ * "500k". Returns null for anything unparsable or below `floor` — the floor
+ * is a typo guard ("$68" is never a building price). Callers pick the floor
+ * for the figure's scale: whole-asset prices default to $10k; deposits pass
+ * something smaller.
+ *
+ * Null too for a negative — a minus before the figure in any of its forms
+ * ("-250,000", "−$250k", "$-250,000") or accounting brackets around the
+ * figure alone ("($250,000)") — and for a range whose first end is the
+ * figure ("$40M - $42M", "40-42M", "$40M to $42M", "$40–42M"), which is two
+ * figures, not one. A hyphen in the words after the figure is neither:
+ * "$24,500,000 (Freddie Mac, non-recourse)", "$410,000 (2025-26)" and
+ * "$650,000 (T-12)" are the figures they state. (Any hyphen anywhere had
+ * read as nothing, so a stated balance, ground rent or tax bill with a
+ * hyphenated word beside it was silently dropped — research pass 37.)
  *
  * Shared by the LOI panel (client) and the LOI route (server) so the two
  * never disagree about what a price string means. Deliberately loose about
@@ -33,14 +68,18 @@ const SCALE: Record<string, number> = {
  * may have pasted, which is why it is not `readFigure`.
  */
 export function parseUsd(raw: string, floor = 10_000): number | null {
-  const v = raw.trim();
-  if (!v || v.includes("-")) return null;
-  const m = v
-    .replace(/,/g, "")
-    .match(/\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(k|thousand|mm|million|m|bn|billion|b)?\b/i);
+  const v = raw.trim().replace(/,/g, "");
+  if (!v) return null;
+  const m = FIRST_FIGURE.exec(v);
   if (!m) return null;
-  const mult = m[2] ? SCALE[m[2].toLowerCase()] ?? 1 : 1;
-  const n = Number(m[1]) * mult;
+  const before = v.slice(0, m.index + m[0].indexOf(m[1]));
+  const after = v.slice(m.index + m[0].length);
+  if (SIGN_OPENS.test(before) || SIGN_SET_AGAINST.test(before)) return null;
+  if (BRACKET_OPENS.test(before) && BRACKET_CLOSES.test(after)) return null;
+  const n = scaled(m[1], m[2]);
+  if (DASH_RANGE.test(after)) return null;
+  const other = WORD_RANGE.exec(after);
+  if (other && scaled(other[1], other[2]) >= n / 2) return null;
   return Number.isFinite(n) && n >= floor ? Math.round(n) : null;
 }
 

@@ -239,6 +239,15 @@ describe("a forward purchase, read as stated (pass 28)", () => {
     });
   });
 
+  it("reads a deposit with a hyphenated word beside the figure (research pass 37)", () => {
+    const words = "$2,400,000 at signing, non-refundable after the 60-day due-diligence period";
+    expect(readForwardPurchase(deal("Forward purchase at completion", [row("Purchase price", "$48,000,000"), row("Deposit", words)]), TODAY)!.deposit).toEqual({
+      text: words,
+      amount: 2_400_000,
+      sharePct: 5,
+    });
+  });
+
   it("never reads a tenant's security deposit as the buyer's", () => {
     const r = readForwardPurchase(
       deal("Forward purchase at completion", [

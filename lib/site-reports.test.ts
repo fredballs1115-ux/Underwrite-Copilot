@@ -142,6 +142,12 @@ describe("the reports a memorandum cites, read (#465)", () => {
     expect(readSiteReports(null, ASOF)).toBeNull();
   });
 
+  it("reads a repairs total with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no total.
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$630,000 (short-term and life-safety items)")]), ASOF)!.pca!.immediate).toBe(630_000);
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$400,000-$600,000")]), ASOF)!.pca!.immediate).toBeNull();
+  });
+
   it("reads a row that states nothing as no row, never as a clean report", () => {
     // "N/A" is not "None": a Phase I whose finding nobody states was not found clean.
     expect(readSiteReports(deal([row("Phase I ESA findings", "N/A")]), ASOF)).toBeNull();

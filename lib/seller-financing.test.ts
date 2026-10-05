@@ -63,6 +63,14 @@ describe("readSellerFinancingTerms — the note, only as the memorandum states i
     expect(t).toMatchObject({ amount: 10_000_000, sharePct: null, ratePct: 6.5, termYears: 3, interestOnly: true, amortYears: null, second: true });
     expect(readSellerFinancingTerms(sample([row("Seller financing term", "3-5 years")]), null)?.termYears).toBeNull();
   });
+
+  it("reads a stated amount with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no amount.
+    expect(readSellerFinancingTerms(sample([row("Seller financing amount", "$10,000,000 (non-recourse, seller-held)")]), 68_000_000)?.amount).toBe(
+      10_000_000,
+    );
+    expect(readSellerFinancingTerms(sample([row("Seller financing amount", "$10M - $12M")]), null)?.amount).toBeNull();
+  });
 });
 
 describe("readSellerFinancing — the note against the model's new loan", () => {

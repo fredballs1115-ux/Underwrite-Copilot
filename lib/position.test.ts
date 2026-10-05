@@ -61,6 +61,19 @@ describe("a preferred equity position, read as a position (research pass 28, rou
     expect(readPositionTerms(ex([metric("Current pay rate", "8% rising to 9%")])).currentPayPct).toBeNull();
   });
 
+  it("reads its amounts with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no amount.
+    const t = readPositionTerms(
+      ex([
+        metric("Preferred equity amount", "$15,000,000 (fully-funded at closing)"),
+        metric("Senior loan balance", "$52,000,000 (non-recourse CMBS)"),
+        metric("Whole-asset value", "$80,000,000 (as-is)"),
+      ]),
+    );
+    expect(t).toMatchObject({ amount: 15_000_000, seniorBalance: 52_000_000, value: 80_000_000 });
+    expect(readPositionTerms(ex([metric("Preferred equity amount", "$15M - $17M")])).amount).toBeNull();
+  });
+
   it("solves its yield on its own payments, the accrual read as simple where its compounding is not stated", () => {
     const r = readPosition(PREF, 15_000_000, ON)!;
     expect(r.monthsLeft).toBe(32);

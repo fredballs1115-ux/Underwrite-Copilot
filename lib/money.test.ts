@@ -110,6 +110,60 @@ describe("parseUsd, which answers a different question", () => {
   });
 });
 
+describe("parseUsd — a hyphen in the words is no minus and no range (research pass 37)", () => {
+  it("reads the figure a hyphenated word stands beside", () => {
+    // Any hyphen anywhere had read as nothing: a stated balance, tax bill or
+    // ground rent with a hyphenated word beside it was silently dropped.
+    const cases: [string, number][] = [
+      ["$24,500,000 (Freddie Mac, non-recourse)", 24_500_000],
+      ["$410,000 (2025-26)", 410_000],
+      ["$1,250,000 (10-year term)", 1_250_000],
+      ["$650,000 (T-12)", 650_000],
+      ["$900,000 (fair-market reset in 2031)", 900_000],
+      ["$22,000,000 (tax-exempt bonds)", 22_000_000],
+      ["$9,500,000 (C-PACE)", 9_500_000],
+      ["$24.5M non-recourse", 24_500_000],
+      ["$1.2M", 1_200_000],
+    ];
+    for (const [raw, n] of cases) expect(parseUsd(raw), raw).toBe(n);
+  });
+
+  it("refuses a minus before the figure, in each of its forms and either side of the dollar sign", () => {
+    for (const raw of ["-250,000", "−$250k", "$-250,000", "–250,000", "- $250,000", "−250000", "$ -250,000", "Net -250,000", "(-250,000)"]) {
+      expect(parseUsd(raw), raw).toBeNull();
+    }
+    // A dash set apart between words and the figure is punctuation, not a sign.
+    expect(parseUsd("Senior loan – $24,500,000")).toBe(24_500_000);
+  });
+
+  it("refuses accounting brackets around the figure alone, and reads a figure inside words in brackets", () => {
+    for (const raw of ["($250,000)", "(250,000)", "$(250,000)", "( $1.2M )"]) expect(parseUsd(raw), raw).toBeNull();
+    expect(parseUsd("($250,000 credit at closing)")).toBe(250_000);
+  });
+
+  it("refuses a range whose first end is the figure", () => {
+    for (const raw of [
+      "$40M - $42M",
+      "40-42M",
+      "$40M to $42M",
+      "$40–42M",
+      "$40,000,000 – $42,000,000",
+      "$40M through $42M",
+      "$1.2M—$1.5M",
+      "$40 to $42 million",
+      "2025-26 $410,000",
+    ]) {
+      expect(parseUsd(raw), raw).toBeNull();
+    }
+  });
+
+  it("reads a figure followed by a date or a term after \"to\" or \"through\", which is no range's other end", () => {
+    expect(parseUsd("$900,000 through 2031")).toBe(900_000);
+    expect(parseUsd("$1,250,000 to 2030")).toBe(1_250_000);
+    expect(parseUsd("$3,000,000 to the seller at closing")).toBe(3_000_000);
+  });
+});
+
 describe("compactUsd — one compact dollar, rounded one way (research pass 34)", () => {
   it("rounds a half-step up, in whole numbers, never a float's toFixed", () => {
     // The pass's note: "$5.5M" on its card, "$5.6M" on its memo.

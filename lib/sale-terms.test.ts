@@ -74,6 +74,26 @@ describe("readSale — how the property is sold", () => {
     expect(r.page).toBe("p. 3");
   });
 
+  it("reads the bid, the reserve and the stalking horse with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no figure.
+    const r = readSale(
+      ex(
+        [
+          row("Starting bid", "$2,500,000 (non-binding opening bid)"),
+          row("Reserve price", "$3,000,000 (court-approved)"),
+          row("Stalking horse bid", "$3,100,000 (break-up fee 3%)"),
+        ],
+        { method: "auction" },
+      ),
+      TODAY,
+    )!;
+    expect(r.startingBid).toBe(2_500_000);
+    expect(r.reserve).toEqual({ kind: "amount", amount: 3_000_000, stated: "$3,000,000 (court-approved)" });
+    expect(r.stalkingHorse).toBe(3_100_000);
+    // A bid stated as a range is still no one bid.
+    expect(readSale(ex([row("Starting bid", "$2.5M - $3M")], { method: "auction" }), TODAY)!.startingBid).toBeNull();
+  });
+
   it("a deadline stated as a month alone is no day: never counted down, never printed as the month's last (the audit of 2026-10-04)", () => {
     for (const stated of ["October 2026", "10/2026"]) {
       const r = readSale(

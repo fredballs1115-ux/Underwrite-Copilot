@@ -445,6 +445,17 @@ describe("readInterest — what the price buys, said", () => {
     expect(incomeBeforeGroundRentOf(m("Ground rent"))).toBeNull();
   });
 
+  it("reads a ground rent and the income before it with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no rent: the leased fee's mismatch
+    // check, its coverage and its price note were silently skipped.
+    const m = (label: string, value: string) => ex(undefined, [{ label, value, flagged: false, page: "", basis: "na" }]);
+    expect(groundRentOf(m("Ground rent", "$900,000 (fixed until the 2031 fair-market reset)"))).toBe(900_000);
+    expect(incomeBeforeGroundRentOf(m("Income before ground rent", "$6,400,000 (T-12)"))).toBe(6_400_000);
+    // A range is still two figures, and a minus still no rent.
+    expect(groundRentOf(m("Ground rent", "$900,000 - $950,000"))).toBeNull();
+    expect(groundRentOf(m("Ground rent", "-$900,000"))).toBeNull();
+  });
+
   it("cites the interest's page only inside the memorandum", () => {
     expect(readInterest(ex(interest({ kind: "note", page: "p. 88" })), 20_000_000)!.page).toBe("");
     expect(readInterest({ ...ex(interest({ kind: "note", page: "p. 5" })), totalPages: undefined }, 20_000_000)!.page).toBe("");
@@ -945,6 +956,15 @@ describe("a share beside the loan its entity carries: the grossed-up figure is t
     expect(entityLoanOf(recap([], "65% LTV"))).toBeNull();
     expect(entityLoanOf(ex(interest({ kind: "partial_interest", share: "4.5% LP interest" })))).toBeNull();
     expect(entityLoanOf(null)).toBeNull();
+  });
+
+  it("entityLoanOf reads a balance with a hyphenated word beside it (research pass 37)", async () => {
+    // "$40,000,000 (non-recourse CMBS)" had read as no loan, so the share's
+    // grossed-up figure was printed as the asset's and a basis struck on it.
+    const { entityLoanOf } = await import("./interest");
+    expect(entityLoanOf(recap([], "$56,500,000 (non-recourse CMBS)"))).toBe(56_500_000);
+    expect(entityLoanOf(recap([], "$56,500,000 (floating-rate, 2028 maturity)"))).toBe(56_500_000);
+    expect(readInterest(recap([], "$56,500,000 (non-recourse CMBS)"), 1_800_000)!.entityLoan).toBe(56_500_000);
   });
 
   it("the panel's sentence, the short line, the caveat and the traps name both figures", () => {

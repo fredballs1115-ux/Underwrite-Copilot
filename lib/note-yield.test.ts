@@ -104,6 +104,19 @@ describe("readNoteTerms — each term from its own row, and only as stated", () 
       position: "first",
     });
   });
+
+  it("reads a balance and a value with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no balance.
+    const t = readNoteTerms({
+      metrics: [
+        row("Unpaid principal balance", "$24,400,000 (as of the 2025-09-30 cut-off)"),
+        row("Collateral value", "$34,000,000 (as-is)"),
+      ],
+    });
+    expect(t.balance).toBe(24_400_000);
+    expect(t.collateralValue).toBe(34_000_000);
+    expect(readNoteTerms({ metrics: [row("Unpaid principal balance", "-$24,400,000")] }).balance).toBeNull();
+  });
 });
 
 describe("a note behind other debt — its loan-to-value needs a senior balance the OM does not state", () => {

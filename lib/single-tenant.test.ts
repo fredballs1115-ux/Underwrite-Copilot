@@ -399,6 +399,12 @@ describe("readSingleTenant — the one lease the deal is", () => {
     expect(readSingleTenant(ex([row("Annual base rent", "$245,000 ($20.42 PSF)")]), TODAY)?.rent).toBe(245_000);
   });
 
+  it("reads a base rent with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no rent.
+    expect(readSingleTenant(ex([row("Annual base rent", "$468,000 (flat, 10-year primary term remaining)")]), TODAY)?.rent).toBe(468_000);
+    expect(readSingleTenant(ex([row("Annual base rent", "$468,000 - $490,000")]), TODAY)?.rent).toBeNull();
+  });
+
   it("a page is cited only inside the memorandum", () => {
     expect(readSingleTenant(ex([], { singleTenant: tenant({ page: "p. 45" }) }), TODAY)?.page).toBe("");
   });

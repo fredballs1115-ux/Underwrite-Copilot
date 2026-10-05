@@ -47,6 +47,28 @@ describe("taxBillOf — a year's bill as stated", () => {
     expect(taxBillOf("$450,000–$520,000")).toBeNull();
     expect(taxBillOf("TBD")).toBeNull();
   });
+
+  it("reads a bill with a hyphenated word beside the figure (research pass 37)", () => {
+    // "$410,000 (2025-26)" had read as no bill, and the panel said the
+    // memorandum states no full tax bill.
+    expect(taxBillOf("$410,000 (2025-26)")).toBe(410_000);
+    expect(taxBillOf("$42,000 (post-abatement)")).toBe(42_000);
+    expect(taxBillOf("$450,000-$520,000")).toBeNull();
+    const r = readTaxAbatement(
+      ABATED([], "multifamily", [
+        row("NOI (in-place)", "$1,650,000"),
+        row("Tax abatement", "10-year Philadelphia tax abatement"),
+        row("Tax abatement expiration", "December 31, 2029"),
+        row("Abated real estate taxes", "$42,000 (2025-26)"),
+        row("Unabated real estate taxes", "$410,000 (2025-26)"),
+      ]),
+      AS_OF,
+    )!;
+    expect(r.abatedTaxes).toBe(42_000);
+    expect(r.unabatedTaxes).toBe(410_000);
+    expect(r.stepUp).toBe(368_000);
+    expect(r.headline).not.toContain("states no full tax bill");
+  });
 });
 
 describe("readTaxAbatement — the abatement as the memorandum states it", () => {

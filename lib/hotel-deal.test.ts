@@ -96,6 +96,13 @@ describe("readHotelDeal — what a hotel is sold with", () => {
     expect(hotelTag(rooms, TODAY)).toBe("Mgmt encumbered, PIP $12.5k/room");
   });
 
+  it("reads a PIP total and a PIP a key with a hyphenated word beside the figure (research pass 37)", () => {
+    // Any hyphen in the value had read as no PIP.
+    expect(readHotelDeal(ex([row("PIP cost", "$4,200,000 (brand-mandated)")]), TODAY)?.pipTotal).toBe(4_200_000);
+    expect(readHotelDeal(ex([row("PIP cost per key", "$35,000 (brand-mandated)")]), TODAY)?.pipPerKey).toBe(35_000);
+    expect(readHotelDeal(ex([row("PIP cost", "$4.2M-$5M")]), TODAY)?.pipTotal).toBeNull();
+  });
+
   it("a RevPAR that does not tie to its ADR and occupancy is said, never chosen between", () => {
     const off = ex([row("ADR", "$189.50"), row("Occupancy", "74%"), row("RevPAR", "$155.00")]);
     const r = readHotelDeal(off, TODAY)!;
