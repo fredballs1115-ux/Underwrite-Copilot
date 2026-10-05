@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createDealFromBatch,
@@ -9,39 +10,18 @@ import {
 // Each file's deal is named from its file name — a starting point the user
 // can edit before the batch runs; the single upload pre-fills the same way.
 import { nameFromFile } from "@/lib/deal-name";
-import { MAX_OM_PAGES } from "@/lib/pdf";
 import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
+// The run itself, pure (lib/batch-run): each answer's status, what the
+// button sends again, and the plan's limit said once with a link.
+import { capNotice, runBatch, runLabel, type BatchStatus } from "@/lib/batch-run";
 
 const MAX_FILES = 4;
 const MAX_BYTES = 32 * 1024 * 1024;
 
-const ERROR_COPY: Record<string, string> = {
-  name: "Needs a deal name.",
-  auth: "Signed out — sign in and retry.",
-  limit: "Plan limit reached — this one wasn't uploaded.",
-  teamlimit: "Team plan limit reached — this one wasn't uploaded.",
-  file: "The file didn't arrive — try again.",
-  pdf: "Not a valid PDF.",
-  size: "Over the 32 MB limit.",
-  locked: "Needs a password to open — upload an unlocked copy.",
-  pages: `Over ${MAX_OM_PAGES} pages — upload the financial sections.`,
-  save: "Couldn't save the deal — try again.",
-  upload: "Upload failed — try again.",
-};
-
-type ItemStatus =
-  | { kind: "ready" }
-  | { kind: "uploading" }
-  // personal: filed in the member's own pipeline, which the team does not
-  // see (lib/personal-deal).
-  | { kind: "queued"; dealId: string; deduped: boolean; personal: boolean }
-  | { kind: "error"; message: string }
-  | { kind: "skipped"; message: string };
-
 interface Item {
   file: File;
   name: string;
-  status: ItemStatus;
+  status: BatchStatus;
 }
 
 /** Buy-box triage chip states worth showing (anything else stays hidden).
@@ -116,45 +96,20 @@ export function BatchUpload({
     if (running) return;
     setRunning(true);
     setFinished(false);
-    // Sequential on purpose: one small request at a time, and a mid-batch
-    // plan-limit stop skips the rest instead of half-failing in parallel.
-    let hitCap = false;
-    const snapshot = items;
-    for (let i = 0; i < snapshot.length; i++) {
-      const item = snapshot[i];
-      if (item.status.kind === "queued") continue; // re-run after a partial failure
-      if (hitCap) {
-        setItems((prev) =>
-          prev.map((it, j) =>
-            j === i ? { ...it, status: { kind: "skipped", message: "Skipped — plan limit reached." } } : it,
-          ),
-        );
-        continue;
-      }
-      setItems((prev) =>
-        prev.map((it, j) => (j === i ? { ...it, status: { kind: "uploading" } } : it)),
-      );
-      let status: ItemStatus;
-      try {
+    // Sequential on purpose (lib/batch-run): one small request at a time,
+    // and a mid-batch plan-limit stop skips the rest instead of
+    // half-failing in parallel. A row the plan stopped is never sent again.
+    await runBatch(
+      items,
+      (item) => {
         const fd = new FormData();
         fd.set("name", item.name.trim() || nameFromFile(item.file.name));
         fd.set("assetClass", assetClass);
         fd.set("om", item.file);
-        const res = await submit(fd);
-        if (res.ok) {
-          status = { kind: "queued", dealId: res.dealId, deduped: !!res.deduped, personal: !!res.personal };
-        } else {
-          if (res.error === "limit" || res.error === "teamlimit") hitCap = true;
-          status = { kind: "error", message: ERROR_COPY[res.error] ?? "Something went wrong." };
-        }
-      } catch {
-        // No answer came back: the connection dropped or the server failed
-        // first, so the deal may exist — a retry after 15 seconds would make
-        // a twin (the create action merges a repeat only inside that window).
-        status = { kind: "error", message: "No answer came back — it may have been created. Check the pipeline before retrying." };
-      }
-      setItems((prev) => prev.map((it, j) => (j === i ? { ...it, status } : it)));
-    }
+        return submit(fd);
+      },
+      (i, status) => setItems((prev) => prev.map((it, j) => (j === i ? { ...it, status } : it))),
+    );
     setRunning(false);
     setFinished(true);
     // The new rows (with live "Screening…" status) appear behind the panel.
@@ -227,10 +182,13 @@ export function BatchUpload({
 
   const queued = items.filter((it) => it.status.kind === "queued").length;
   const failed = items.filter(
-    (it) => it.status.kind === "error" || it.status.kind === "skipped",
+    (it) => it.status.kind === "error" || it.status.kind === "capped",
   ).length;
-  const canRun =
-    !running && items.some((it) => it.status.kind !== "queued" && it.status.kind !== "uploading");
+  const statuses = items.map((it) => it.status);
+  // The button says what it sends (lib/batch-run): nothing the plan's limit
+  // stopped, so there is no "Retry" that can only fail the same way.
+  const label = runLabel(statuses, running, finished);
+  const cap = capNotice(statuses);
 
   return (
     <details className="group mt-3 border-t border-line pt-3" data-qa="batch-upload">
@@ -357,7 +315,7 @@ export function BatchUpload({
                     </a>
                   </span>
                 )}
-                {(item.status.kind === "error" || item.status.kind === "skipped") && (
+                {(item.status.kind === "error" || item.status.kind === "capped") && (
                   <span className="shrink-0 text-xs font-medium text-kill">
                     {item.status.message}
                   </span>
@@ -366,20 +324,26 @@ export function BatchUpload({
             ))}
           </ul>
         )}
+        {cap && (
+          <p className="text-sm text-kill" role="status" data-qa="batch-cap">
+            {cap.text}{" "}
+            <Link href={cap.href} className="font-medium text-brand hover:text-brand-strong">
+              {cap.link}
+            </Link>
+          </p>
+        )}
         {items.length > 0 && (
           <div className="flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              onClick={run}
-              disabled={!canRun}
-              className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {running
-                ? "Uploading — keep this tab open…"
-                : failed > 0 && finished
-                  ? "Retry failed uploads"
-                  : `Screen ${items.filter((it) => it.status.kind !== "queued").length} deal${items.filter((it) => it.status.kind !== "queued").length === 1 ? "" : "s"}`}
-            </button>
+            {label && (
+              <button
+                type="button"
+                onClick={run}
+                disabled={running}
+                className="rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {label}
+              </button>
+            )}
             {finished && (
               <p className="text-sm text-muted" role="status">
                 {queued} queued{failed ? `, ${failed} not uploaded` : ""} — each
