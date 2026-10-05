@@ -46,7 +46,7 @@ vi.mock("../app/(app)/deals/actions", () => {
 import { PhotoFlip, Pipeline, type DealCard } from "@/app/(app)/deals/pipeline";
 import { ModelView } from "@/app/(app)/deals/[id]/model-view";
 import { modelReturnsRead } from "@/lib/compare-interest";
-import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
+import { CompareTable, MODEL_ROWS_NOTE, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
 import { coverFor } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
@@ -1643,6 +1643,14 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const noModels = renderToStaticMarkup(React.createElement(CompareTable, { cols: cols.slice(1) }));
     expect(noModels).not.toContain(" · model");
     expect(visibleText(noModels)).toContain("6.10% (OM)");
+    // The note over the table says the rows are the first-draft model's, and
+    // that the page, the workbook and the report print the screening
+    // model's, which can differ (research pass 40, M9: the sample reads 8.72%
+    // here and 9.28% on its page).
+    expect(MODEL_ROWS_NOTE).toMatch(/^Rows marked “model” read each deal’s first-draft model/);
+    expect(MODEL_ROWS_NOTE).toContain(
+      "not the screening model whose returns the deal page’s playground, the Excel workbook and the full report print, which can differ",
+    );
   });
 
   it("pictures each building at the head of its column and its phone card, the credit on the picture (#418)", () => {

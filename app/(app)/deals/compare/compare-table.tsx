@@ -32,9 +32,13 @@ export const mult = (n: number | null | undefined) =>
 
 /** What the return rows are, said once over the table (the audit of
  *  2026-09-30): the first-draft model's figures (lib/model, which carries
- *  no date), not the memorandum's that each deal's header prints. */
+ *  no date), not the memorandum's that each deal's header prints — and not
+ *  the screening model's (lib/underwrite/engine), whose returns the deal
+ *  page's playground, the Excel workbook and the full report print, so the
+ *  two can differ for one deal (research pass 40, M9: the sample reads
+ *  8.72% here and 9.28% on its page). */
 export const MODEL_ROWS_NOTE =
-  "Rows marked “model” read each deal’s first-draft model (built on request, not rebuilt when its memorandum is replaced), not the memorandum’s figures on its header; a figure marked (OM) comes from the memorandum’s figures, stated or worked from them (a yield on cost, a note’s yield, a spread), where the model has none.";
+  "Rows marked “model” read each deal’s first-draft model (built on request, not rebuilt when its memorandum is replaced) — not the screening model whose returns the deal page’s playground, the Excel workbook and the full report print, which can differ, nor the memorandum’s figures on its header; a figure marked (OM) comes from the memorandum’s figures, stated or worked from them (a yield on cost, a note’s yield, a spread), where the model has none.";
 
 /** A row a model figure fills says so beside its name. */
 const MODEL_ROW = " · model";
