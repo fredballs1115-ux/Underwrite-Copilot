@@ -58,7 +58,7 @@ export function SiteFlagsCard({
               <Chip label={`Flood zone ${result.flood.zone} · minimal flood hazard`} cls="bg-line/60 text-muted" />
             ) : result.flood.isHighRisk ? (
               <Chip
-                label={`Flood zone ${result.flood.zone} — SFHA (insurance required on federally-backed debt)`}
+                label={`Flood zone ${result.flood.zone} — SFHA (flood insurance required on regulated-lender and agency loans)`}
                 cls="bg-kill/10 text-kill"
               />
             ) : (

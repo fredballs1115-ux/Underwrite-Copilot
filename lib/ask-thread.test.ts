@@ -232,7 +232,7 @@ describe("askDeal — what Ask is told about the deal, as the screen's steps are
   it("carries FEMA's zone where the lookup answered for the address the deal has now", async () => {
     db.deal = { ...db.deal, extraction, first_signal: null, site_flags: flags(ADDRESS), address: { label: ADDRESS } };
     await ask("Is it in a flood zone?");
-    expect(db.context).toContain("FEMA's flood map puts the building in Zone AE, a Special Flood Hazard Area");
+    expect(db.context).toContain("FEMA's flood map puts the building's point in Zone AE, a Special Flood Hazard Area");
     // A lookup made for the address before an edit is the old building's,
     // and one still pending has said nothing: neither is read.
     for (const stale of [flags("500 Elm St, Philadelphia, PA 19103"), flags(ADDRESS, "pending")]) {

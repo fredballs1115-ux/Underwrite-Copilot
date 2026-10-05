@@ -46,7 +46,7 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
     text ? { key, text, tone, title: `${text}: ${why}` } : null;
   return [
     // A Special Flood Hazard Area (#426): a cost and a lender's condition.
-    tag("flood", flood?.tag, "kill", "FEMA's Special Flood Hazard Area — a federally backed loan requires flood insurance; the deal page draws the map"),
+    tag("flood", flood?.tag, "kill", "FEMA's Special Flood Hazard Area at the building's point — federal law requires flood insurance on a regulated or agency lender's loan there; the deal page draws the map"),
     // An auction's figure is where the bidding opens; a court's or a
     // lender's sale is as-is (#456).
     tag("sale", slots.sale, "caution", "the figure is where the bidding opens or the seller is not an owner — the deal page reads the sale"),

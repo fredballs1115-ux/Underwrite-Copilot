@@ -4520,10 +4520,18 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   legend entry — FEMA maps it and leaves it undrawn**. A vector drawing is
   possible (`frameQuery` answers in 0.1–3 s) but New Orleans' polygons are
   228,000 vertices, 5 MB a frame, so the export stays the source.
-  **The sentence** (`floodZoneLine`) says the zone, FEMA's name for it and
-  what it means for a loan — a Special Flood Hazard Area needs flood
-  insurance on a federally backed loan, and the premium belongs in the
-  expense line — with FEMA's base flood elevation where it states one
+  **The sentence** (`floodZoneLine`) says the zone at the building's POINT
+  (FEMA's map at the geocoded point, never a determination for the
+  building), FEMA's name for it and what it means for a loan — in a
+  Special Flood Hazard Area of a community in the National Flood Insurance
+  Program, federal law (42 U.S.C. 4012a, runner-printed in zori probe run
+  37262925199) requires flood insurance on a loan from a federally
+  regulated or federal agency lender, or one Fannie Mae or Freddie Mac
+  buys; the lender's own flood determination decides; the premium belongs
+  in the expense line (`SFHA_INSURANCE`; "a federally backed loan", the
+  first wording, left a bank's borrower thinking the rule was not theirs,
+  research pass 31); outside one, federal law does not require it, though
+  a lender may still ask — with FEMA's base flood elevation where it states one
   (STATIC_BFE with its unit and datum; FEMA writes -9999 for none) or an
   AO zone's depth; the regulatory floodway (new building and fill
   restricted) and a V zone (storm waves add to the flood) say so; open

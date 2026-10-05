@@ -320,9 +320,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
         c.coveredMarket ??
         (c.readMarket ? (c.readCounty ? `${c.readMarket} (by its county, ${c.readCounty})` : `${c.readMarket} (read, not briefed)`) : "—"),
     },
-    // FEMA's zone at the building (#426): a Special Flood Hazard Area means
-    // flood insurance on federally backed debt, a cost and a lender's
-    // condition, set side by side with the others.
+    // FEMA's zone at the building's point (#426): a Special Flood Hazard
+    // Area means flood insurance on a regulated or agency lender's loan, a
+    // cost and a lender's condition, set side by side with the others.
     {
       label: "Flood zone",
       get: (c) => c.flood || "—",

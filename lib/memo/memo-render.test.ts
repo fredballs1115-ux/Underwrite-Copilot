@@ -128,7 +128,7 @@ describe("MemoDocument (redesigned)", () => {
       "September 25, 2026",
       [],
     );
-    expect(data.floodLine).toBe("Flood zone AE: a Special Flood Hazard Area, where flood insurance is required on federally backed debt (FEMA)");
+    expect(data.floodLine).toBe("Flood zone AE: a Special Flood Hazard Area, where federal law requires flood insurance on a loan from a regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys (FEMA)");
     const buf = await renderToBuffer(
       React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
     );

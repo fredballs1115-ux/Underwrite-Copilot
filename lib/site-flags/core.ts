@@ -8,8 +8,8 @@ export interface FloodFlag {
   zone: string;
   /** ZONE_SUBTY where present ("0.2 PCT ANNUAL CHANCE FLOOD HAZARD" …) */
   subtype: string | null;
-  /** A- and V-prefixed zones = Special Flood Hazard Area (mandatory flood
-   *  insurance on federally-backed lending) */
+  /** A- and V-prefixed zones = Special Flood Hazard Area (where federal law
+   *  requires flood insurance on a regulated or agency lender's loan) */
   isHighRisk: boolean;
   /** FEMA's base flood elevation for the zone where it states one (#472):
    *  STATIC_BFE in its own unit and datum, as the runner printed them
@@ -474,6 +474,24 @@ function elevationWords(flood: FloodFlag): string {
 }
 
 /**
+ * What federal law requires in a Special Flood Hazard Area — 42 U.S.C.
+ * 4012a, as the runner printed it from Cornell's LII (zori probe run
+ * 37262925199): a loan from a federally regulated lending institution or a
+ * federal agency lender, or one Fannie Mae or Freddie Mac buys, secured by a
+ * building in an area FEMA identifies as having special flood hazards and
+ * where flood insurance has been made available under the National Flood
+ * Insurance Act, must be covered by flood insurance. Said as that, never as
+ * "a federally backed loan", which a reader borrowing from a bank would take
+ * not to be theirs (research pass 31) — and the lender's own determination,
+ * made for the building, decides, never the map at a geocoded point.
+ */
+const SFHA_INSURANCE =
+  "where the community takes part in the National Flood Insurance Program, federal law requires flood insurance on a loan from a federally regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys — the lender's own flood determination decides — and the premium belongs in the expense line.";
+/** Outside a Special Flood Hazard Area the federal requirement does not
+ *  reach the loan, and a lender may still ask for a policy of its own. */
+const NOT_REQUIRED = "federal law does not require flood insurance there, though a lender may still ask for it";
+
+/**
  * What the map says at the building, in one sentence, from the site-flags
  * lookup at the geocoded point: the zone, what FEMA's legend calls it, and
  * what it means for a loan. A point with no zone polygon is said to be off
@@ -500,27 +518,28 @@ export function floodZoneLine(
     return "FEMA's map marks the building's point as an area this flood map does not include: another community's map, or one not yet digital, covers it — check FEMA's Map Service Center.";
   }
   const zone = `Zone ${flood.zone}`;
+  // The building's POINT: the zone is FEMA's map at the geocoded point the
+  // ring marks, never a determination for the building (research pass 31).
   if (isMinimalHazard(flood)) {
-    return `The building sits in ${zone}, an area of minimal flood hazard, which FEMA maps and leaves undrawn — the shading, where there is any, is the hazard nearby.`;
+    return `FEMA's map puts the building's point in ${zone}, an area of minimal flood hazard, which FEMA maps and leaves undrawn — the shading, where there is any, is the hazard nearby.`;
   }
   const entry = legendEntryFor(legend, flood);
-  const insurance = "a federally backed loan requires flood insurance, and the premium belongs in the expense line.";
   if (flood.isHighRisk) {
     if (entry && /^regulatory floodway/i.test(entry.label)) {
-      return `The building sits in ${zone} in the regulatory floodway, a Special Flood Hazard Area where new building and fill are restricted to keep the channel clear: ${insurance}${elevationWords(flood)}`;
+      return `FEMA's map puts the building's point in ${zone} in the regulatory floodway, a Special Flood Hazard Area where new building and fill are restricted to keep the channel clear: ${SFHA_INSURANCE}${elevationWords(flood)}`;
     }
     const called = entry ? ` (${entry.label.toLowerCase()})` : "";
     const coastal = z.startsWith("V") ? ", a coastal high-hazard area where storm waves add to the flood," : ",";
-    return `The building sits in ${zone}${called}${coastal} a Special Flood Hazard Area: ${insurance}${elevationWords(flood)}`;
+    return `FEMA's map puts the building's point in ${zone}${called}${coastal} a Special Flood Hazard Area: ${SFHA_INSURANCE}${elevationWords(flood)}`;
   }
   const called = entry ? ` (${entry.label.toLowerCase()})` : "";
   if (z === "D") {
-    return `The building sits in ${zone}${called}, where FEMA has not determined the flood hazard: the map neither shows one nor rules one out, and a federally backed lender does not require flood insurance.`;
+    return `FEMA's map puts the building's point in ${zone}${called}, where FEMA has not determined the flood hazard: the map neither shows one nor rules one out, and outside a Special Flood Hazard Area ${NOT_REQUIRED}.`;
   }
   if (!flood.subtype || !entry) {
-    return `The building sits in ${zone}${called}, outside the Special Flood Hazard Area: flood insurance is not required by a federally backed lender.`;
+    return `FEMA's map puts the building's point in ${zone}${called}, outside the Special Flood Hazard Area: ${NOT_REQUIRED}.`;
   }
-  return `The building sits in ${zone}${called}, outside the Special Flood Hazard Area: flood insurance is not required by a federally backed lender, though the hazard is mapped.`;
+  return `FEMA's map puts the building's point in ${zone}${called}, outside the Special Flood Hazard Area, in a hazard FEMA still maps: ${NOT_REQUIRED}.`;
 }
 
 // ── The flood zone wherever the deal is summarized (#426) ───────────────────
@@ -535,8 +554,9 @@ function subtypeWords(subtype: string): string {
 
 /**
  * The pipeline row's tag: a Special Flood Hazard Area only — the zone where
- * a federally backed loan requires flood insurance, which is the fact a
- * list of deals needs beside the price. "Flood AE". Null otherwise.
+ * federal law requires flood insurance on a regulated or agency lender's
+ * loan, which is the fact a list of deals needs beside the price. "Flood
+ * AE". Null otherwise.
  */
 export function floodTag(flood: SiteFlagsResult["flood"] | undefined): string | null {
   if (!flood || flood === "unavailable" || !flood.isHighRisk) return null;
@@ -552,7 +572,7 @@ export function floodTag(flood: SiteFlagsResult["flood"] | undefined): string | 
 export function floodShortLine(flood: SiteFlagsResult["flood"] | undefined): string | null {
   if (!flood || flood === "unavailable" || isMinimalHazard(flood)) return null;
   if (flood.isHighRisk) {
-    return `Flood zone ${flood.zone}: a Special Flood Hazard Area, where flood insurance is required on federally backed debt (FEMA)`;
+    return `Flood zone ${flood.zone}: a Special Flood Hazard Area, where federal law requires flood insurance on a loan from a regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys (FEMA)`;
   }
   return `Flood zone ${flood.zone}${flood.subtype ? ` — ${subtypeWords(flood.subtype)}` : ""} (FEMA)`;
 }
@@ -600,11 +620,14 @@ export function floodContextLine(flood: SiteFlagsResult["flood"] | undefined): s
   if (flood === null) {
     return "FEMA's digital flood map has no zone at the building's point, so whether it floods is not known from the map.";
   }
-  if (isMinimalHazard(flood)) return `FEMA's flood map puts the building in Zone ${flood.zone}, an area of minimal flood hazard.`;
+  if (isMinimalHazard(flood)) return `FEMA's flood map puts the building's point in Zone ${flood.zone}, an area of minimal flood hazard.`;
   if (flood.isHighRisk) {
-    return `FEMA's flood map puts the building in Zone ${flood.zone}, a Special Flood Hazard Area: a federally backed loan requires flood insurance, so the expense line needs a flood premium the seller's figures may not carry.`;
+    return `FEMA's flood map puts the building's point in Zone ${flood.zone}, a Special Flood Hazard Area: where the community takes part in the National Flood Insurance Program, federal law requires flood insurance on a loan from a federally regulated or federal agency lender, or one Fannie Mae or Freddie Mac buys, so the expense line needs a flood premium the seller's figures may not carry.`;
   }
-  return `FEMA's flood map puts the building in Zone ${flood.zone}${flood.subtype ? ` (${subtypeWords(flood.subtype)})` : ""}, outside the Special Flood Hazard Area: flood insurance is not required by a federally backed lender, though the hazard is mapped.`;
+  if (flood.zone.trim().toUpperCase() === "D") {
+    return `FEMA's flood map puts the building's point in Zone D, where FEMA has not determined the flood hazard: outside a Special Flood Hazard Area ${NOT_REQUIRED}.`;
+  }
+  return `FEMA's flood map puts the building's point in Zone ${flood.zone}${flood.subtype ? ` (${subtypeWords(flood.subtype)})` : ""}, outside the Special Flood Hazard Area, in a hazard FEMA still maps: ${NOT_REQUIRED}.`;
 }
 
 /**
