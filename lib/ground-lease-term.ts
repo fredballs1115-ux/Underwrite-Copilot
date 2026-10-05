@@ -184,6 +184,35 @@ export function readGroundLeaseTerm(rows: Rows, asOf: Date = new Date()): Ground
   );
 }
 
+// A master lease's rows (research pass 28, round 9): the lease of the
+// building a sandwich position holds from its owner — "Master lease
+// expiration", "Master lease term remaining", "Master lease options" —
+// never a tenant's lease, a ground lease or a purchase option.
+const MASTER = /\bmaster[\s-]*lease/i;
+const masterRowOf = (rows: Rows, re: RegExp, not?: RegExp) =>
+  (rows?.metrics ?? []).find(
+    (m) => MASTER.test(m.label) && re.test(m.label) && !(not && not.test(m.label)) && !PURCHASE.test(m.label),
+  ) ?? null;
+
+/**
+ * The master lease's term, on a day — a sandwich position's (lib/interest
+ * `isMasterLeasehold`): the same three readings of its end as a ground
+ * lease's, the options apart. Null where the memorandum states no end for
+ * it; a ground lease's rows are never read for it, since the position ends
+ * with the master lease whatever the land's own lease says.
+ */
+export function readMasterLeaseTerm(rows: Rows, asOf: Date = new Date()): GroundLeaseTerm | null {
+  return readLeaseTerm(
+    {
+      endRow: masterRowOf(rows, END_ROW, NOT_END),
+      leftRow: masterRowOf(rows, LEFT_ROW, NOT_LEFT),
+      optionRow: masterRowOf(rows, OPTION_ROW, NOT_OPTION),
+    },
+    rows?.totalPages,
+    asOf,
+  );
+}
+
 // A row that states nothing: "None", "N/A", "Not stated", a dash.
 const STATES_NOTHING = /^\s*(?:none|n\/?a|no|not\s+(?:stated|applicable|disclosed)|[-–—])\s*\.?\s*$/i;
 
@@ -350,23 +379,27 @@ function optionsClause(t: GroundLeaseTerm): string {
   return t.optionsStated ? `, with extension options as stated: ${t.optionsStated.replace(/\.$/, "")}` : "";
 }
 
+/** Which lease a term is: the land's, or the building's master lease a
+ *  sandwich position holds (research pass 28). */
+export type LeaseName = "ground lease" | "master lease";
+
 /**
  * The term in one sentence, for the panel, the deal context and the
  * challenger: when it ends, how far off that is, and how it was read.
  */
-export function groundLeaseTermLine(t: GroundLeaseTerm): string {
+export function groundLeaseTermLine(t: GroundLeaseTerm, lease: LeaseName = "ground lease"): string {
   const end = termEndLabel(t);
   if (endHasPassed(t)) {
-    return `The ground lease's stated end, ${end}, has passed — the term as read cannot be right: check the lease and any extension already exercised`;
+    return `The ${lease}'s stated end, ${end}, has passed — the term as read cannot be right: check the lease and any extension already exercised`;
   }
   const opts = optionsClause(t);
   switch (t.from) {
     case "date":
     case "month":
-      return `The ground lease ends ${end}, ${fromToday(t)}${opts}`;
+      return `The ${lease} ends ${end}, ${fromToday(t)}${opts}`;
     case "year":
-      return `The ground lease ends in ${end}, ${fromToday(t)} — the memorandum states the year alone, read as its first day${opts}`;
+      return `The ${lease} ends in ${end}, ${fromToday(t)} — the memorandum states the year alone, read as its first day${opts}`;
     case "remaining":
-      return `The memorandum states ${t.stated.replace(/\.$/, "")} left on the ground lease; counted from today they run to about ${end}, and the memorandum's own date is earlier, so the term may be shorter${opts}`;
+      return `The memorandum states ${t.stated.replace(/\.$/, "")} left on the ${lease}; counted from today they run to about ${end}, and the memorandum's own date is earlier, so the term may be shorter${opts}`;
   }
 }

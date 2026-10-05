@@ -512,7 +512,9 @@ function LeaseholdBlock({ view }: { view: LeaseholdExitView | null | undefined }
   );
   return (
     <View style={{ marginTop: 12 }} wrap={false}>
-      <TitleRow title="The exit, on the ground lease's term" marginTop={0} />
+      {/* The lease the position runs out with: the land's, or a sandwich
+          position's master lease of the building (research pass 28). */}
+      <TitleRow title={`The exit, on the ${v.lease ?? "ground lease"}'s term`} marginTop={0} />
       <Text style={s.sub}>{str(`${v.termLine}.`)}</Text>
       {v.yearsLeft > 0 ? (
         <View style={{ marginTop: 3 }}>

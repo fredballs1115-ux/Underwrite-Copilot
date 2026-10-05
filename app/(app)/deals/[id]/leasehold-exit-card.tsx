@@ -61,8 +61,10 @@ export function LeaseholdExitCard({ view }: { view: LeaseholdExitView | null }) 
     >
       <div className="border-b border-line px-5 py-4">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          {/* The lease the position runs out with: the land's, or a sandwich
+              position's master lease of the building (research pass 28). */}
           <h2 id="leasehold-exit-heading" className="text-sm font-semibold tracking-tight">
-            The exit, on the ground lease&rsquo;s term
+            {`The exit, on the ${v.lease ?? "ground lease"}\u2019s term`}
           </h2>
           {v.page && <span className="font-mono text-[10px] text-muted">{v.page}</span>}
         </div>
@@ -118,7 +120,7 @@ export function LeaseholdExitCard({ view }: { view: LeaseholdExitView | null }) 
         )}
         <p className="text-xs">
           <Link href="/tools#ground-lease" prefetch={false} className="font-medium text-brand underline-offset-2 hover:underline">
-            Value the leasehold with its ground rent and resets
+            {v.lease === "master lease" ? "Value the position with its master rent and resets" : "Value the leasehold with its ground rent and resets"}
           </Link>
         </p>
       </div>

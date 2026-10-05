@@ -69,8 +69,10 @@ import {
   groundLeaseTermLine,
   groundLeaseTerminationOf,
   readGroundLeaseTerm,
+  readMasterLeaseTerm,
   termEndLabel,
   type GroundLeaseTerm,
+  type LeaseName,
 } from "@/lib/ground-lease-term";
 import { readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
 
@@ -240,6 +242,23 @@ export function isMasterLeasehold(ex: ExtractionResult | null | undefined): bool
   return MASTER_LEASE.test(words) && !NAMES_GROUND_LEASE.test(words);
 }
 
+/**
+ * The lease a leasehold's value runs out with, and its term on a day: a
+ * master leasehold's own master lease (research pass 28, round 9: the
+ * position ends with it, and a ground lease's rows are never read for it),
+ * else the ground lease's. Null where the memorandum states no end for it.
+ * Every reader of a leasehold's term reads it here — the tag, the panel,
+ * the exit on the term.
+ */
+export function leaseholdTermOf(
+  ex: ExtractionResult | null | undefined,
+  asOf: Date = new Date(),
+): { term: GroundLeaseTerm | null; lease: LeaseName } {
+  return isMasterLeasehold(ex)
+    ? { term: readMasterLeaseTerm(ex, asOf), lease: "master lease" }
+    : { term: readGroundLeaseTerm(ex, asOf), lease: "ground lease" };
+}
+
 /** What a ground lease's tenant puts on the land, where the memorandum's
  *  own words name it: in a sentence ("a wireless tower") and its gear as
  *  the subject of one ("the tower and its equipment"). */
@@ -334,7 +353,7 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
   const { kind, sharePct } = interestOf(ex);
   // Ahead by the DAY: inside its last month the whole months count none,
   // and the tag had dropped the term as if it had ended.
-  const term = kind === "leasehold" || kind === "leased_fee" ? readGroundLeaseTerm(ex, asOf) : null;
+  const term = kind === "leasehold" || kind === "leased_fee" ? leaseholdTermOf(ex, asOf).term : null;
   const left = term && endIsAhead(term) ? term.yearsLeft : null;
   const yrs = left != null ? (left < 1 ? "under 1 yr" : `${Math.floor(left)} ${Math.floor(left) === 1 ? "yr" : "yrs"}`) : null;
   switch (kind) {
@@ -344,6 +363,9 @@ export function interestTag(ex: ExtractionResult | null | undefined, asOf: Date 
       // A stated 100% buys all of the entity's interests, never "100% share".
       return sharePct != null ? (isWholeShare(sharePct) ? "All entity interests" : `${shareText(sharePct)} share`) : "Share";
     case "leasehold":
+      // A master lease of the building, sublet (research pass 28): the
+      // position is the lease, and its years are the master lease's.
+      if (isMasterLeasehold(ex)) return yrs ? `Master lease, ${yrs} left` : "Master lease";
       return yrs ? `Leasehold, ${yrs} left` : "Leasehold";
     case "leased_fee":
       return yrs ? (groundLeaseEquipment(ex) ? `Leased fee, lease ends in ${yrs}` : `Leased fee, reverts in ${yrs}`) : "Leased fee";
@@ -666,8 +688,9 @@ export function readInterest(
     groundRent != null && incomeBeforeGroundRent != null ? incomeBeforeGroundRent / groundRent : null;
   // When the ground lease ends (#421): on either side of it, and on a fee
   // simple with one under part of the site — only as the memorandum states.
-  const term =
-    kind === "leasehold" || kind === "leased_fee" || groundLease ? readGroundLeaseTerm(ex, asOf) : null;
+  // A master leasehold's is its master lease's (research pass 28, round 9).
+  const leaseTerm = leaseholdTermOf(ex, asOf);
+  const term = kind === "leasehold" || kind === "leased_fee" || groundLease ? leaseTerm.term : null;
   // A ground lease's equipment and its termination right, wherever a ground
   // lease is involved — only as the memorandum's own words state them.
   const groundLeased = kind === "leasehold" || kind === "leased_fee" || !!groundLease || groundRent != null;
@@ -756,8 +779,9 @@ export function readInterest(
             ]),
       );
       if (coverageClause) lead.push(`Here ${coverageClause}.`);
-      modelCaveat =
-        "The screening model capitalises the exit like a fee-simple building. On a leasehold the value at exit is what the term left will bear — run the ground lease calculator on the stated term.";
+      modelCaveat = masterLease
+        ? "The screening model capitalises the exit like a fee-simple building. On a master lease the position ends with the lease, so the value at exit is what the term left will bear — run the ground lease calculator on the stated term, with the master rent as its rent."
+        : "The screening model capitalises the exit like a fee-simple building. On a leasehold the value at exit is what the term left will bear — run the ground lease calculator on the stated term.";
       break;
     case "leased_fee":
       if (equipment) {
@@ -827,7 +851,7 @@ export function readInterest(
     leadSentences: lead,
     modelCaveat,
     term,
-    termLine: term ? groundLeaseTermLine(term) : "",
+    termLine: term ? groundLeaseTermLine(term, leaseTerm.lease) : "",
     equipment,
     terminationRight,
   };
