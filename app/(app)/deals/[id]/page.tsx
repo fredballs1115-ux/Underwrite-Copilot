@@ -969,10 +969,12 @@ export default async function DealPage({
   const versionCount = versionsRes.error ? 0 : (versionsRes.count ?? 0);
   if (playground && user) {
     const snapshotInputs = playground.inputs;
+    // The page's own client: a Server Component cannot read cookies inside
+    // after() (Next's docs), so a client opened there threw and every
+    // snapshot was lost to the catch below.
     after(async () => {
       try {
-        const client = await createSupabaseServerClient();
-        await snapshotVersion(client, {
+        await snapshotVersion(supabase, {
           dealId: id,
           userId: user.id,
           assumptions: snapshotInputs,
