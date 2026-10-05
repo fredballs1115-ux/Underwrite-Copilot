@@ -1,5 +1,5 @@
 import "server-only";
-import { compactUsd } from "@/lib/money";
+import { compactUsd, scaledText } from "@/lib/money";
 import { Document, Page, View, Text, Image, StyleSheet, renderToBuffer } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
@@ -1610,10 +1610,12 @@ const fmtCompactUsd = (n: number): string => compactUsd(n, { millions: "auto", t
 export function retradePrices(prices: readonly number[]): string[] {
   const min = Math.min(...prices);
   if (min >= 1e6) {
-    const places = min >= 1e7 ? 1 : 2;
-    return prices.map((p) => `$${(p / 1e6).toFixed(places)}M`);
+    const places: 1 | 2 = min >= 1e7 ? 1 : 2;
+    return prices.map((p) => compactUsd(p, { millions: places }));
   }
-  return prices.map((p) => `$${Math.round(p / 1e3).toLocaleString("en-US")}k`);
+  // Thousands down the whole column, a row past a million included
+  // ("$1,050k"), through lib/money's one rounding.
+  return prices.map((p) => `$${Number(scaledText(p, 1e3, 0)).toLocaleString("en-US")}k`);
 }
 
 
