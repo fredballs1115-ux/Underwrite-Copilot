@@ -25,6 +25,7 @@ import { buildComps } from "./market-memory";
 import { PLAN_YOC_TITLE, pctText, planReadLine, yieldOnCostText } from "./plan-facts";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { visibleText } from "./render-lint";
+import { priceRange, priceRangeShort } from "./criteria";
 
 const m = (label: string, value: string): ExtractedMetric => ({ label, value, flagged: false, page: "p. 3" });
 const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): ExtractionResult =>
@@ -112,6 +113,18 @@ describe("a plan's yield on cost and a going-in cap, at the header's two decimal
     expect(text).not.toMatch(/6\.3% \(OM\)|5\.5% \(OM\)/);
     // The card prints the memorandum's 5.45% too.
     expect(pickSlots(stabilized, null).cap).toBe("5.45%");
+  });
+
+  it("a sibling's stated range in the internal comps is its card's and its header's \"$40–42M\", never its top alone (finding 13)", () => {
+    const ranged = ex([m("Pricing guidance", "$40,000,000 – $42,000,000"), m("Going-in cap rate", "5.50%"), m("Units", "150")]);
+    const row = { id: "r", name: "Ranged", asset_class: "multifamily", created_at: "2026-10-01T00:00:00Z", is_sample: false, verdict: null, extraction: ranged };
+    const [comp] = deriveInternalComps("other", "multifamily", { assetClass: "multifamily" }, [row]);
+    expect(comp.priceLabel).toBe("$40–42M");
+    // The card and the header draw the slot's stated range short the same way.
+    expect(pickSlots(ranged, null).price).toBe("$40,000,000 – $42,000,000");
+    expect(priceRangeShort(priceRange(pickSlots(ranged, null).price!)!)).toBe("$40–42M");
+    // Its basis stays on the range's top, the end that does not flatter.
+    expect(comp.basisLabel).toBe("$280k/unit");
   });
 
   it("a sibling's yield in the internal comps is its header's", () => {

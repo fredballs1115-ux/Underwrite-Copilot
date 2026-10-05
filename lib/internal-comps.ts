@@ -5,6 +5,8 @@ import {
   findMetric,
   parsePct,
   parsePrice,
+  priceRange,
+  priceRangeShort,
   screenYearOf,
 } from "@/lib/criteria";
 import {
@@ -77,6 +79,13 @@ const fmtCompact = (dollars: number) =>
     : dollars >= 1e3
       ? `$${Math.round(dollars / 1e3)}k`
       : `$${Math.round(dollars)}`;
+
+/** A price stated as a range, short — "$40–42M", the pipeline card's and
+ *  the deal header's (lib/criteria `priceRangeShort`); null for one figure. */
+const priceRangeOf = (stated: string): string | null => {
+  const range = priceRange(stated);
+  return range ? priceRangeShort(range) : null;
+};
 
 /** Price per unit/SF from the extraction, derived only when both sides parse.
  *  A directly extracted "$/unit" metric wins over the derived one. */
@@ -193,8 +202,13 @@ export function deriveInternalComps(
       call: (row.verdict as { verdict?: string } | null)?.verdict ?? null,
       // The price as asked, with what it buys where that is not the
       // building outright — "$20.0M · 49% share" — and the basis struck
-      // only on the price the building's figures describe (#415).
-      priceLabel: priceNum != null ? `${fmtCompact(priceNum)}${interestTag(ext) ? ` · ${interestTag(ext)!.toLowerCase()}` : ""}` : null,
+      // only on the price the building's figures describe (#415). A range
+      // stays a range, as on the sibling's card and header ("$40–42M"): its
+      // top alone, "$42.0M", read as a price the memorandum never asked.
+      priceLabel:
+        priceNum != null
+          ? `${priceRangeOf(price!.value) ?? fmtCompact(priceNum)}${interestTag(ext) ? ` · ${interestTag(ext)!.toLowerCase()}` : ""}`
+          : null,
       capLabel: capNum != null ? cap!.value : null,
       basisLabel: plan
         ? plan.totalCost != null
