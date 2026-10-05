@@ -49,6 +49,8 @@ export function sameMemorandum(twins: readonly TwinDeal[] | null | undefined): S
 /** The words after the linked deal's name. */
 export function sameMemorandumTail(same: SameMemorandum): string {
   const added = same.added ? `, added ${same.added}` : "";
-  const more = same.more > 0 ? `, and on ${same.more} more of your deals` : "";
+  // "In your pipeline", never "your deals": the twins are every deal the
+  // reader can see, a teammate's included (the batch-2 audit).
+  const more = same.more > 0 ? `, and on ${same.more} more ${same.more === 1 ? "deal" : "deals"} in your pipeline` : "";
   return `${added}${more} — open it to see that screen; this one reads the same file again.`;
 }

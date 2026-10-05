@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { LONGER_THAN_USUAL, isScreenJob, longerThanUsual, typicalScreenMs, typicalScreenPhrase } from "./screen-duration";
+import { LONGER_THAN_USUAL, isScreenJob, longerThanUsual, typicalScreenMs, typicalScreenPhrase, longerThanUsualLine } from "./screen-duration";
 import * as marketing from "./marketing-constants";
 
 describe("typicalScreenMs — the median of the account's measured runs, from three", () => {
@@ -93,5 +93,17 @@ describe("longerThanUsual — a run notably slower than the reader's own (resear
     expect(longerThanUsual(60 * 60_000, null)).toBe(false);
     expect(longerThanUsual(60 * 60_000, typicalScreenMs([180_000, 200_000]))).toBe(false);
     expect(longerThanUsual(Number.NaN, usual)).toBe(false);
+  });
+});
+
+describe("the rail's line for a slow run (the batch-2 audit)", () => {
+  it("says a queued run is waiting its turn, never that it is running", () => {
+    expect(longerThanUsualLine("about 3 minutes", false)).toBe(
+      "This one is taking longer than your screens usually do (about 3 minutes) — it is still running, and it carries on if you leave this page.",
+    );
+    expect(longerThanUsualLine("about 3 minutes", true)).toBe(
+      "This one is taking longer than your screens usually do (about 3 minutes) — it is still waiting its turn to start, and it carries on if you leave this page.",
+    );
+    expect(longerThanUsualLine(null, true)).not.toMatch(/\(\)/);
   });
 });

@@ -571,8 +571,12 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(either).toMatch(/Replace OM/);
     expect((either.match(/Try again/g) ?? []).length).toBe(1);
     expect(either).not.toContain("Trying again would read the same file");
-    // A deal with no OM is offered one.
-    expect(textOf(banner(render(failed(NO_OM_FAILURE, false))))).toMatch(/Attach OM/);
+    // A deal with no OM is offered one, and never told a retry "would read
+    // the same file" it does not have (the batch-2 audit).
+    const noFile = textOf(banner(render(failed(NO_OM_FAILURE, false))));
+    expect(noFile).toMatch(/Attach OM/);
+    expect(noFile).toContain("Attach the OM to screen this deal.");
+    expect(noFile).not.toMatch(/the same file|the right file/);
     // A passing fault keeps its retry and nothing else.
     const busy = banner(render(failed("The analysis service is overloaded right now — try again in a few minutes.")));
     expect(busy).not.toContain('data-qa="document-failure"');

@@ -60,6 +60,15 @@ export function longerThanUsual(elapsedMs: number, typicalMs: number | null | un
   return Number.isFinite(elapsedMs) && elapsedMs > LONGER_THAN_USUAL * typicalMs;
 }
 
+/** The rail's line once a run passes twice the reader's own median. A
+ *  queued run is waiting its turn, never "still running": the clock counts
+ *  from the ask, queue wait included (the batch-2 audit). */
+export function longerThanUsualLine(typicalScreen: string | null, queued: boolean): string {
+  const said = typicalScreen ? ` (${typicalScreen})` : "";
+  const where = queued ? "it is still waiting its turn to start" : "it is still running";
+  return `This one is taking longer than your screens usually do${said} — ${where}, and it carries on if you leave this page.`;
+}
+
 /** A job the progress rail draws as the six-step screen — not a comp
  *  search, a model build or the reconciler, which run on their own. */
 export function isScreenJob(step: string | null | undefined): boolean {

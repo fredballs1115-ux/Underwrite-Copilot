@@ -78,7 +78,7 @@ import { interestOf } from "@/lib/interest";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { servedInline } from "@/lib/inline-types";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
-import { longerThanUsual } from "@/lib/screen-duration";
+import { longerThanUsual, longerThanUsualLine } from "@/lib/screen-duration";
 import { supportMailto } from "@/lib/support-link";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import { isStalled, screenStopped, type BehindWhy, type ResultKey } from "@/lib/screen-run";
@@ -807,8 +807,20 @@ export function DealView({
             {staleResults.length > 0
               ? "The results it did not reach still show below, marked as the previous screen's. "
               : "Nothing was lost. "}
-            {retryIsFutile ? "Trying again would read the same file the same way. " : ""}
-            {operatorFailure ? "Email" : retryIsFutile ? "If this is the right file, email" : "If it fails twice, email"}{" "}
+            {/* "The same file" only where there is one: a deal with no file
+                attached is asked to attach one (the batch-2 audit). */}
+            {remedy === "attach"
+              ? "Attach the OM to screen this deal. "
+              : retryIsFutile
+                ? "Trying again would read the same file the same way. "
+                : ""}
+            {operatorFailure
+              ? "Email"
+              : remedy === "attach"
+                ? "If it does not screen, email"
+                : retryIsFutile
+                  ? "If this is the right file, email"
+                  : "If it fails twice, email"}{" "}
             <a
               className="font-medium text-brand hover:text-brand-strong"
               // The deal and the page's own sentence ride in the email, so
@@ -2168,7 +2180,7 @@ function ProgressRail({
       </ol>
       {slow ? (
         <p className="mt-3 text-xs text-caution" data-qa="longer-than-usual">
-          {`This one is taking longer than your screens usually do${typicalScreen ? ` (${typicalScreen})` : ""} — it is still running, and it carries on if you leave this page.`}
+          {longerThanUsualLine(typicalScreen, job.status === "queued")}
         </p>
       ) : (
         <p className="mt-3 text-xs text-muted">

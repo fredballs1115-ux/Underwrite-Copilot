@@ -89,7 +89,10 @@ export const DATA_PROCESSORS: readonly DataProcessor[] = [
   },
   {
     name: "Google Maps Platform",
-    receives: "only if we have switched it on (it needs our key): a deal's map point, for a street-level photograph and a satellite view",
+    // No satellite view: nothing a reader opens asks Google for one now — the
+    // deal page and the compare columns are held off Google's imagery, and the
+    // pipeline's cards never draw an overhead (the batch-2 audit).
+    receives: "only if we have switched it on (it needs our key): a deal's map point, for a street-level photograph of the building",
     hosts: ["maps.googleapis.com"],
   },
   {

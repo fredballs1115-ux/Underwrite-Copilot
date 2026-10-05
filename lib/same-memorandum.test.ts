@@ -19,7 +19,7 @@ describe("sameMemorandum — the earliest deal holding the same file", () => {
     expect(same).toEqual({ id: "d1", name: "Oakwood Flats", added: "Sep 12, 2026", more: 1 });
     const line = `This same memorandum, byte for byte, is already on ${same!.name}${sameMemorandumTail(same!)}`;
     expect(line).toBe(
-      "This same memorandum, byte for byte, is already on Oakwood Flats, added Sep 12, 2026, and on 1 more of your deals — open it to see that screen; this one reads the same file again.",
+      "This same memorandum, byte for byte, is already on Oakwood Flats, added Sep 12, 2026, and on 1 more deal in your pipeline — open it to see that screen; this one reads the same file again.",
     );
     expect(gluedWords(line)).toEqual([]);
   });
