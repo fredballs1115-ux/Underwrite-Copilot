@@ -83,6 +83,15 @@ export interface DealPicture {
   /** the full derivative's pixel size */
   fullWidth?: number;
   fullHeight?: number;
+  /** `photos/<dealId>/<stamp>-card.jpg`, up to 800px on the long side, never
+   *  enlarged: what a pipeline card's srcset offers beside the hero
+   *  (research pass 29). Kept wherever the hero is longer than it; one
+   *  stored before is made from the hero on its first ask (lib/deal-picture
+   *  `backfillCard`) */
+  card?: string;
+  /** the card derivative's pixel size */
+  cardWidth?: number;
+  cardHeight?: number;
   /** the derivatives' rules it was made under (lib/deal-picture's
    *  DERIVED_VERSION); absent on one made before they were counted */
   derivedV?: number;

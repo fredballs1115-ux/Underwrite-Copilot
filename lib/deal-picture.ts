@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { writeCache, type DealPicture, type DealVisualCache } from "@/lib/deal-location";
 import { RunGate } from "@/lib/anthropic/run-gate";
 import { PREVIEW_PX, isPreview } from "@/lib/photo-preview";
+import { CARD_PX, cardWidthOf } from "@/lib/photo-srcset";
 import { MAX_OM_PAGES } from "@/lib/pdf";
 import { EARLY_SHARE, findOmImages, scanShaped, type OmImage } from "@/lib/om-photo";
 import {
@@ -39,16 +40,18 @@ import {
  * re-searched a month later at most, and the sample deal is never searched
  * at all, because its memorandum is not ours to republish a page of.
  *
- * STORED TWICE, AND A THIRD TIME WHERE IT IS WORTH IT. The broker's JPEG
+ * STORED TWICE, AND MORE WHERE IT IS WORTH IT. The broker's JPEG
  * can be 6,000 pixels and several megabytes, and a list row wants 36 of
  * them. So sharp — already in the tree as Next's own image dependency —
  * writes derivatives into the private bucket under the deal: a hero no
  * wider than 1,600px for the deal page, a 240px square crop for a row, and,
  * where the source is larger than the hero, a full-size copy up to 2,560px
  * (`FULL_MAX_PX`) that a dense screen and the full-screen viewer ask for
- * through a srcset, where the hero alone was drawn stretched. The reader's
- * own upload goes through the same sizes, so a picture is never served as
- * the bytes somebody uploaded.
+ * through a srcset, where the hero alone was drawn stretched. A pipeline
+ * card's srcset offers a card copy beside the hero, 800px on its long side
+ * (`CARD_PX`, research pass 29): every card had downloaded the hero for a
+ * slot of about 350px. The reader's own upload goes through the same sizes,
+ * so a picture is never served as the bytes somebody uploaded.
  *
  * MADE AGAIN, QUIETLY. A memorandum's photograph derived under older rules
  * (`DERIVED_VERSION`: before the full-size copy) is made again from the
@@ -225,6 +228,13 @@ export interface RawPicture {
 /** A picture's bytes as a file (a JPEG, a phone's upload), or as pixels. */
 export type PictureInput = Buffer | RawPicture;
 
+/** A derivative's bytes and its pixel size. */
+export interface DerivedCopy {
+  bytes: Buffer;
+  width: number;
+  height: number;
+}
+
 /** What sharp writes from a picture, before any of it is stored. */
 export interface DerivedPicture {
   hero: Buffer;
@@ -233,10 +243,17 @@ export interface DerivedPicture {
   width: number;
   height: number;
   /** the full-size copy, where the source is larger than the hero */
-  full: { bytes: Buffer; width: number; height: number } | null;
+  full: DerivedCopy | null;
+  /** the card copy (research pass 29), where the hero is longer than one */
+  card: DerivedCopy | null;
   /** the blur-up preview (#463), null where it could not be made */
   preview: string | null;
 }
+
+/** The card copy's encoding: the hero's, so a card's picture is the hero's
+ *  photograph at fewer pixels and nothing else. */
+const CARD_RESIZE = { width: CARD_PX, height: CARD_PX, fit: "inside", withoutEnlargement: true } as const;
+const CARD_JPEG = { quality: 82, mozjpeg: true } as const;
 
 /** The derivatives sharp writes from any picture it can read. */
 export async function derivePicture(input: PictureInput): Promise<DerivedPicture> {
@@ -280,14 +297,112 @@ export async function derivePicture(input: PictureInput): Promise<DerivedPicture
           .jpeg({ quality: 82, mozjpeg: true })
           .toBuffer({ resolveWithObject: true })
       : null;
+  // The card copy (research pass 29), wherever the hero is longer than one:
+  // from the photograph itself, never enlarged, so a small photograph's copy
+  // is its own pixels — where its hero was enlarged for the deal page.
+  const card =
+    Math.max(hero.info.width, hero.info.height) > CARD_PX
+      ? await base.clone().resize(CARD_RESIZE).jpeg(CARD_JPEG).toBuffer({ resolveWithObject: true })
+      : null;
   return {
     hero: hero.data,
     thumb,
     width: hero.info.width,
     height: hero.info.height,
     full: full ? { bytes: full.data, width: full.info.width, height: full.info.height } : null,
+    card: card ? { bytes: card.data, width: card.info.width, height: card.info.height } : null,
     preview: await previewOf(hero.data),
   };
+}
+
+/**
+ * A card copy made from a stored hero's bytes (research pass 29): what the
+ * picture route serves a photograph stored before card copies on its first
+ * ask, and stores after its response (`backfillCard`). Never enlarged; null
+ * where the hero is no longer than a card copy, or could not be read.
+ */
+export async function cardOf(heroBytes: Buffer): Promise<DerivedCopy | null> {
+  try {
+    const meta = await sharp(heroBytes, { failOn: "none" }).metadata();
+    if (!(Math.max(meta.width ?? 0, meta.height ?? 0) > CARD_PX)) return null;
+    const { data, info } = await sharp(heroBytes, { failOn: "none" })
+      .resize(CARD_RESIZE)
+      .jpeg(CARD_JPEG)
+      .toBuffer({ resolveWithObject: true });
+    return { bytes: data, width: info.width, height: info.height };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The path a photograph's card copy is stored at: beside its hero, under the
+ * hero's own stamp, so the URL that names the picture's version names the
+ * copy too (lib/deal-banner `pictureVersion`). Null for a hero not of that
+ * shape.
+ */
+export function cardPathOf(picture: DealPicture): string | null {
+  const m = /^(photos\/[^/]+\/[a-z0-9]+)-hero\.jpg$/.exec(picture.hero ?? "");
+  return m ? `${m[1]}-card.jpg` : null;
+}
+
+/**
+ * Whether a stored photograph should have a card copy it does not have yet:
+ * one stored before card copies, whose hero is longer than a copy
+ * (lib/photo-srcset `cardWidthOf`). The picture route makes it from the hero
+ * on the first ask.
+ */
+export function cardCopyDue(picture: DealPicture): boolean {
+  return !picture.card && cardWidthOf({ width: picture.width, height: picture.height }) !== null && cardPathOf(picture) !== null;
+}
+
+/**
+ * Store the card copy the picture route made for a photograph stored before
+ * card copies, after its response (research pass 29) — as `backfillPreview`
+ * stores a preview: the row is read again before the copy is put and again
+ * just before the write, and the path goes only onto the photograph still
+ * stored then, at its place (the cover, or the gallery's `gallery`th, from
+ * 1), and only where it has no copy yet. A photograph replaced while the
+ * copy was put has its copy taken away again: it is nobody's. Never throws.
+ */
+export async function backfillCard(
+  supabase: SupabaseClient,
+  dealId: string,
+  picture: DealPicture,
+  made: DerivedCopy,
+  gallery?: number,
+): Promise<void> {
+  const path = picture.card ? null : cardPathOf(picture);
+  if (!path) return;
+  const read = async (): Promise<DealVisualCache | null> => {
+    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
+    return (data as { photo?: DealVisualCache | null } | null)?.photo ?? null;
+  };
+  const placed = (photo: DealVisualCache | null): DealPicture | null =>
+    (gallery ? photo?.gallery?.[gallery - 1] : photo?.picture) ?? null;
+  let put = false;
+  try {
+    const before = placed(await read());
+    if (!before || before.hero !== picture.hero || before.card) return;
+    await uploadDealPhoto(path, made.bytes, photoScope(dealId));
+    put = true;
+    const current = await read();
+    const still = placed(current);
+    if (current && still && still.hero === picture.hero) {
+      // Another ask stored the same copy meanwhile: it is in place.
+      if (still.card) return;
+      const next: DealPicture = { ...still, card: path, cardWidth: made.width, cardHeight: made.height };
+      const photo: DealVisualCache = gallery
+        ? { ...current, gallery: (current.gallery ?? []).map((g, i) => (i === gallery - 1 ? next : g)) }
+        : { ...current, picture: next };
+      const { error } = await supabase.from("deals").update({ photo }).eq("id", dealId);
+      if (!error) return;
+    }
+  } catch {
+    // A card copy is a saving, never a reason a request fails.
+  }
+  // Put, and not recorded on the photograph: nobody's file.
+  if (put) await removeStorageFiles([path], photoScope(dealId)).catch(() => {});
 }
 
 /**
@@ -346,9 +461,10 @@ function photoScope(dealId: string) {
   return { kind: "deal", dealId, only: ["photo"] } as const;
 }
 
-/** Every stored file of one picture: its hero, its thumbnail, its full-size copy. */
+/** Every stored file of one picture: its hero, its thumbnail, its card copy
+ *  and its full-size copy. */
 function pathsOf(picture: DealPicture): string[] {
-  return [picture.hero, picture.thumb, ...(picture.full ? [picture.full] : [])];
+  return [picture.hero, picture.thumb, ...(picture.card ? [picture.card] : []), ...(picture.full ? [picture.full] : [])];
 }
 
 /**
@@ -366,6 +482,12 @@ async function putDerived(
   const thumb = dealPhotoPath(dealId, stamp, "thumb");
   await uploadDealPhoto(hero, derived.hero, photoScope(dealId));
   await uploadDealPhoto(thumb, derived.thumb, photoScope(dealId));
+  let card: Pick<DealPicture, "card" | "cardWidth" | "cardHeight"> = {};
+  if (derived.card) {
+    const path = dealPhotoPath(dealId, stamp, "card");
+    await uploadDealPhoto(path, derived.card.bytes, photoScope(dealId));
+    card = { card: path, cardWidth: derived.card.width, cardHeight: derived.card.height };
+  }
   let full: Pick<DealPicture, "full" | "fullWidth" | "fullHeight"> = {};
   if (derived.full) {
     const path = dealPhotoPath(dealId, stamp, "full");
@@ -377,6 +499,7 @@ async function putDerived(
     thumb,
     width: derived.width,
     height: derived.height,
+    ...card,
     ...full,
     source,
     at,
@@ -1115,15 +1238,18 @@ export function pictureSizeFor(size: { width: number; height: number }): "hero" 
   return size.width <= THUMB_PX && size.height <= THUMB_PX ? "thumb" : "hero";
 }
 
-/** A stored size of a picture: the hero, the square thumbnail, or the
- *  full-size copy. */
-export type PictureSize = "hero" | "thumb" | "full";
+/** A stored size of a picture: the hero, the square thumbnail, the
+ *  full-size copy, or the card copy (research pass 29). */
+export type PictureSize = "hero" | "thumb" | "full" | "card";
 
 /** The stored file a size is served from: the full-size copy is the hero
- *  where the source was no larger than the hero, or the picture predates it. */
+ *  where the source was no larger than the hero, or the picture predates it,
+ *  and so is the card copy where none is stored — the picture route makes
+ *  one stored before from the hero (`cardCopyDue`). */
 export function picturePathFor(picture: DealPicture, size: PictureSize): string {
   if (size === "thumb") return picture.thumb;
   if (size === "full") return picture.full ?? picture.hero;
+  if (size === "card") return picture.card ?? picture.hero;
   return picture.hero;
 }
 

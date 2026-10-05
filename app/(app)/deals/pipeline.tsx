@@ -18,7 +18,7 @@ import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
 import { DealBanner } from "./deal-banner";
 import { GalleryCreditPartsText } from "@/app/credit-parts";
-import { shownMarketCredits, type BannerSource } from "@/lib/deal-banner";
+import { bannerSizes, shownMarketCredits, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
@@ -2216,7 +2216,16 @@ const DealTile = memo(function DealTile({
   useEffect(() => {
     if (!canFlip || !warm) return;
     const next = slides[slide % slides.length];
-    if (next) new Image().src = next.src;
+    if (!next) return;
+    // Asked as the card's picture will ask it (research pass 29): the card
+    // copy or the hero, whichever the browser takes for the card, never both.
+    const ahead = new Image();
+    const sizes = bannerSizes(next, PIPELINE_CARD_SIZES, 16 / 10);
+    if (next.srcSet && sizes) {
+      ahead.sizes = sizes;
+      ahead.srcset = next.srcSet;
+    }
+    ahead.src = next.src;
   }, [canFlip, warm, slide, slides]);
   const touch = useRef<{ x: number; y: number } | null>(null);
   const isDead = normalizeStage(d.stage) === "dead";

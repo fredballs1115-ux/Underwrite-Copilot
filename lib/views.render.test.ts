@@ -406,6 +406,9 @@ describe("Pipeline — every card shape renders and reads clean", () => {
           hasStreetAddress: c.hasAddress && c.id !== "h",
           hasAddress: c.hasAddress,
           aerial: false,
+          // The photograph added to the deal, stored with its card copy
+          // beside its hero (research pass 29).
+          pictureSizes: c.id === "b" ? { width: 1600, height: 1067, cardWidth: 800 } : null,
         },
         CARD,
       ),
@@ -465,6 +468,11 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(photo).toContain('loading="eager"');
     expect(photo).toContain('fetchPriority="high"');
     expect(photo).toContain("motion-safe:group-hover:scale-[1.03]");
+    // Offered as its card copy beside its hero, the browser choosing by the
+    // card's slot as the grid writes it (research pass 29): a laptop's card
+    // takes the 800px copy where it took the 1,600px hero.
+    expect(photo).toContain('srcSet="/api/deals/b/picture?size=card 800w, /api/deals/b/picture?size=hero 1600w"');
+    expect(photo).toContain(`sizes="${PIPELINE_CARD_SIZES}"`);
     expect((html.match(/data-deal-cover=/g) ?? []).length).toBe(live.length);
     expect(positionConflicts(html)).toEqual([]);
     // Over the deal's own photograph, the card counts the photographs its

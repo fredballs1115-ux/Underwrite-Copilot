@@ -31,6 +31,7 @@
 import { IMAGE_CREDIT } from "@/lib/imagery-plan";
 import { DEAL_BANNER, DEAL_CARD, DEAL_THUMB } from "@/lib/image-frames";
 import { isPreview } from "@/lib/photo-preview";
+import { cardSrcSet, coverSlotSizes, type StoredPhotoSizes } from "@/lib/photo-srcset";
 import type { MarketPicture } from "@/lib/market-picture";
 import type { PhotoCredit } from "@/lib/credit-parts";
 
@@ -61,6 +62,48 @@ export interface BannerSource {
   /** the photograph's blur-up preview (#463, lib/photo-preview): drawn
    *  blurred in the frame until the photograph has loaded whole */
   preview?: string;
+  /** a stored photograph's card copy and its hero, each at its width
+   *  (lib/photo-srcset `cardSrcSet`, research pass 29): the browser takes
+   *  the copy wherever the card's slot allows. `src` stays the hero, the
+   *  source's identity */
+  srcSet?: string;
+  /** the photograph's shape, width over height, so a panorama's `sizes` says
+   *  the width it is drawn at to cover the card (lib/photo-srcset
+   *  `coverSlotSizes`) */
+  aspect?: number;
+}
+
+/**
+ * A stored photograph's card copy as a source carries it: the srcset of its
+ * card copy and its hero, and its shape — for the deal's own photograph and
+ * each gallery photograph a card flips to (`g`, from 1). Nothing where the
+ * hero is no longer than a card copy, or its sizes are not known.
+ */
+export function cardPictureSet(
+  dealId: string,
+  sizes: StoredPhotoSizes | null | undefined,
+  version?: string | null,
+  g?: number,
+): Pick<BannerSource, "srcSet" | "aspect"> {
+  const id = encodeURIComponent(dealId);
+  const at = g ? `&g=${g}` : "";
+  const srcSet = cardSrcSet((size) => `/api/deals/${id}/picture?size=${size}${at}${versionQuery(version)}`, sizes);
+  if (!srcSet) return {};
+  const w = sizes?.width ?? 0;
+  const h = sizes?.height ?? 0;
+  return { srcSet, aspect: Math.round((w / h) * 1000) / 1000 };
+}
+
+/**
+ * The `sizes` a source's picture is asked with: the slot's, where it offers
+ * one width; and where it offers a srcset, the width it is drawn at to cover
+ * a frame of `frameAspect` — wider than the slot for a panorama, so the
+ * browser never takes the card copy and stretches it. One rule for the
+ * card's picture and for the card's asking ahead for the next photograph.
+ */
+export function bannerSizes(source: BannerSource, slot: string | undefined, frameAspect: number): string | undefined {
+  if (!slot || !source.srcSet || !source.aspect) return slot;
+  return coverSlotSizes(slot, source.aspect, frameAspect);
 }
 
 export interface BannerFacts {
@@ -73,6 +116,10 @@ export interface BannerFacts {
   /** the stored photograph's version (`pictureVersion`): carried in its
    *  URL, so the browser keeps the picture until it is replaced */
   pictureVersion?: string | null;
+  /** the stored photograph's sizes, where the surface offers its card copy
+   *  beside the hero (the pipeline's cards, research pass 29): its hero's
+   *  width and height and its card copy's width */
+  pictureSizes?: StoredPhotoSizes | null;
   /** no picture is cached but the deal's memorandum may hold one nobody has
    *  looked for (lib/deal-picture `pictureMayBeInMemorandum`): the picture
    *  route lifts the cover on this first ask, or answers 404 and the next
@@ -172,7 +219,7 @@ export function shownMarketCredits(
  * of the deal. Null for a path not of that shape.
  */
 export function pictureVersion(path: string | null | undefined): string | null {
-  const m = /\/([A-Za-z0-9]+)-(?:hero|thumb|full)\.jpg$/.exec(path ?? "");
+  const m = /\/([A-Za-z0-9]+)-(?:hero|thumb|full|card)\.jpg$/.exec(path ?? "");
   return m ? m[1] : null;
 }
 
@@ -192,6 +239,9 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
       src: `/api/deals/${id}/picture?size=${size}${versionQuery(f.pictureVersion)}`,
       credit: f.pictureCredit,
       ...(isPreview(f.picturePreview) ? { preview: f.picturePreview } : {}),
+      // The card copy beside the hero, where the surface handed the sizes
+      // over (research pass 29); a row's thumbnail is its own crop.
+      ...(size === "hero" ? cardPictureSet(f.dealId, f.pictureSizes, f.pictureVersion) : {}),
     });
   }
   else if (f.memorandumUnread) {

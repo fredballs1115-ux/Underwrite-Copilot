@@ -1,7 +1,19 @@
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { BANNER, CARD, THUMB, bannerSources, leadMarketId, pictureVersion, shownMarketIds, type BannerSource } from "./deal-banner";
+import {
+  BANNER,
+  CARD,
+  THUMB,
+  bannerSizes,
+  bannerSources,
+  cardPictureSet,
+  leadMarketId,
+  pictureVersion,
+  shownMarketIds,
+  type BannerSource,
+} from "./deal-banner";
+import { PIPELINE_CARD_SIZES } from "./pipeline-view";
 import { IMAGE_CREDIT, imagePlan } from "./imagery-plan";
 import { marketPictureFor } from "./market-picture";
 import { coverFor } from "./deal-cover";
@@ -106,6 +118,8 @@ describe("a stored photograph's URL names its version, so the browser keeps it (
     expect(pictureVersion("photos/3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b/lk2x9a-hero.jpg")).toBe("lk2x9a");
     expect(pictureVersion("photos/x/lk2x9ag3-thumb.jpg")).toBe("lk2x9ag3");
     expect(pictureVersion("photos/x/lk2x9a-full.jpg")).toBe("lk2x9a");
+    // The card copy (research pass 29) carries its hero's stamp.
+    expect(pictureVersion("photos/x/lk2x9a-card.jpg")).toBe("lk2x9a");
     for (const bad of [null, undefined, "", "u1/x.pdf", "photos/x/lk2x9a-hero.png", "photos/x/a b-hero.jpg", "photos/x/a\r\n-hero.jpg"]) {
       expect(pictureVersion(bad), String(bad)).toBeNull();
     }
@@ -118,6 +132,52 @@ describe("a stored photograph's URL names its version, so the browser keeps it (
     // None stored, or a memorandum not yet looked in: no version, revalidated as before.
     expect(bannerSources({ ...base, pictureCredit: "x" }, CARD)[0].src).toBe("/api/deals/d1/picture?size=hero");
     expect(bannerSources({ ...base, memorandumUnread: true, pictureVersion: "lk2x9a" }, CARD)[0].src).toBe("/api/deals/d1/picture?size=hero");
+  });
+});
+
+describe("a card offers the stored photograph's card copy beside its hero (research pass 29)", () => {
+  const own = { ...base, pictureCredit: "From the offering memorandum", pictureVersion: "lk2x9a", aerial: false };
+
+  it("on the card's photograph, under the picture's version, the hero still its source's identity", () => {
+    const [photo] = bannerSources({ ...own, pictureSizes: { width: 1600, height: 1067, cardWidth: 800 } }, CARD);
+    expect(photo.src).toBe("/api/deals/d1/picture?size=hero&v=lk2x9a");
+    expect(photo.srcSet).toBe("/api/deals/d1/picture?size=card&v=lk2x9a 800w, /api/deals/d1/picture?size=hero&v=lk2x9a 1600w");
+    expect(photo.aspect).toBe(1.5);
+    // Stored before card copies: offered all the same, made on its first ask.
+    expect(bannerSources({ ...own, pictureSizes: { width: 1600, height: 1067 } }, CARD)[0].srcSet).toContain("size=card&v=lk2x9a 800w");
+    // A row's thumbnail is its own crop; a hero no longer than a copy, no
+    // sizes handed over, or a memorandum not yet looked in: the plain src.
+    expect(bannerSources({ ...own, pictureSizes: { width: 1600, height: 1067 } }, THUMB)[0].srcSet).toBeUndefined();
+    expect(bannerSources({ ...own, pictureSizes: { width: 800, height: 533 } }, CARD)[0].srcSet).toBeUndefined();
+    expect(bannerSources(own, CARD)[0].srcSet).toBeUndefined();
+    expect(bannerSources({ ...base, memorandumUnread: true, pictureSizes: { width: 1600, height: 1067 } }, CARD)[0].srcSet).toBeUndefined();
+  });
+
+  it("on each gallery photograph a card flips to, at its own place and version", () => {
+    expect(cardPictureSet("d1", { width: 1600, height: 900, cardWidth: 800 }, "lk2x9ag2", 2)).toEqual({
+      srcSet: "/api/deals/d1/picture?size=card&g=2&v=lk2x9ag2 800w, /api/deals/d1/picture?size=hero&g=2&v=lk2x9ag2 1600w",
+      aspect: 1.778,
+    });
+    expect(cardPictureSet("d1", { width: 600, height: 400 }, "x", 1)).toEqual({});
+  });
+
+  it("asks with the card's sizes, wider for a panorama, and draws them on the photograph's <img>", () => {
+    const slot = PIPELINE_CARD_SIZES;
+    const [photo] = bannerSources({ ...own, pictureSizes: { width: 1600, height: 1067, cardWidth: 800 } }, CARD);
+    expect(bannerSizes(photo, slot, 1.6)).toBe(slot);
+    const [pano] = bannerSources({ ...own, pictureSizes: { width: 1600, height: 640, cardWidth: 800 } }, CARD);
+    expect(bannerSizes(pano, slot, 1.6)).toContain("calc(292px * 1.563)");
+    // A source with one width keeps the slot's sizes; no slot, none.
+    expect(bannerSizes({ kind: "market", src: "/m", credit: "c" }, slot, 1.6)).toBe(slot);
+    expect(bannerSizes(photo, undefined, 1.6)).toBeUndefined();
+    const html = renderToStaticMarkup(
+      React.createElement(DealBanner, { sources: [pano], label: "The Fairmount", aspect: "16/10", flush: true, sizes: slot }),
+    );
+    const img = /<img [^>]*>/.exec(html)?.[0] ?? "";
+    expect(img).toContain('src="/api/deals/d1/picture?size=hero&amp;v=lk2x9a"');
+    expect(img).toContain(`srcSet="${pano.srcSet!.replaceAll("&", "&amp;")}"`);
+    expect(img).toContain(`sizes="${bannerSizes(pano, slot, 1.6)}"`);
+    expect(a11yIssues(html)).toEqual([]);
   });
 });
 

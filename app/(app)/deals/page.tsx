@@ -15,7 +15,7 @@ import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
-import { CARD, THUMB, bannerSources, pictureVersion } from "@/lib/deal-banner";
+import { CARD, THUMB, bannerSources, cardPictureSet, pictureVersion } from "@/lib/deal-banner";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
 import { PICTURE_CREDIT, galleryPage, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
@@ -409,6 +409,9 @@ export default async function DealsPage({
           // Its version in its URL, so the browser keeps it until it is
           // replaced rather than asking again on every view.
           pictureVersion: picture ? pictureVersion(picture.hero) : null,
+          // Its sizes, so a card is offered the 800px card copy beside the
+          // hero and takes the one its slot needs (research pass 29).
+          pictureSizes: picture,
           memorandumUnread: unread,
           googleEnabled,
           hasStreetAddress: !!address?.street?.trim(),
@@ -445,6 +448,8 @@ export default async function DealsPage({
                     alt: page
                       ? `Photograph from page ${page} of the memorandum for ${d.name}`
                       : `Photograph from the memorandum for ${d.name}`,
+                    // Its card copy beside its hero (research pass 29).
+                    ...cardPictureSet(d.id, g, v, k + 1),
                   };
                 })
               : [],

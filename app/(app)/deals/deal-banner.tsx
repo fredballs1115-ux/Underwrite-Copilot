@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { BannerSource } from "@/lib/deal-banner";
+import { bannerSizes, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealCover } from "./deal-cover";
 import { MarketCaption } from "./market-caption";
@@ -55,6 +55,12 @@ import { previewStyle } from "@/lib/photo-preview";
  * words, or the photograph's own blur, and says nothing. A card had worn
  * "From the offering memorandum", or a photographer's name and licence,
  * over the drawn cover for as long as a phone took to fetch the photograph.
+ *
+ * A stored photograph offers its card copy beside its hero (`srcSet`,
+ * research pass 29), asked with the card's `sizes` — wider for a panorama
+ * that covers the card by its height (`bannerSizes`) — so a laptop's card
+ * downloads a third of the bytes. Which of them the browser took is the
+ * browser's: a picture counts as loaded by its source, never by the URL.
  */
 export function DealBanner({
   sources,
@@ -116,18 +122,21 @@ export function DealBanner({
   const lift = sources[0]?.pending ? sources[0] : null;
   const rest = lift ? sources.slice(1) : sources;
   const [at, setAt] = useState(0);
-  // Which source has loaded whole: the picture fades in only then.
+  // Which source has loaded whole, by its `src`: the picture fades in only
+  // then. By the source, not by the URL the browser fetched, which a srcset
+  // leaves to the browser (research pass 29).
   const [loaded, setLoaded] = useState<string | null>(null);
   const [lifted, setLifted] = useState<"trying" | "shown" | "gone">("trying");
   const ref = useRef<HTMLImageElement>(null);
   const liftRef = useRef<HTMLImageElement>(null);
+  const baseSrc = rest[at]?.src ?? null;
   useEffect(() => {
     // A picture that settled before hydration fired its event unheard.
     const img = ref.current;
     if (!img?.complete) return;
     if (img.naturalWidth === 0) setAt((i) => i + 1);
-    else setLoaded(img.currentSrc || img.src);
-  }, [at]);
+    else setLoaded(baseSrc);
+  }, [at, baseSrc]);
   useEffect(() => {
     // A picture that settled before hydration fired its event unheard.
     const img = liftRef.current;
@@ -137,7 +146,7 @@ export function DealBanner({
   const [slideLoaded, setSlideLoaded] = useState<string | null>(null);
   const [slideGone, setSlideGone] = useState<ReadonlySet<string>>(new Set());
   const base = rest[at];
-  const baseLoaded = !!base && loaded !== null && loaded.endsWith(base.src);
+  const baseLoaded = !!base && loaded === base.src;
   const shown = !!lift && lifted === "shown";
   const trying = !!lift && lifted === "trying";
   const screen = shown ? lift : base;
@@ -157,6 +166,8 @@ export function DealBanner({
   }, [marketOnScreen, onMarket]);
 
   const shape = aspect === "16/10" ? "aspect-[16/10]" : "aspect-[16/9]";
+  // The frame's shape, for a panorama's `sizes` (`bannerSizes`).
+  const frameAspect = aspect === "16/10" ? 16 / 10 : 16 / 9;
   const altOf = (s: BannerSource) =>
     s.alt ??
     (s.kind === "photo"
@@ -252,15 +263,16 @@ export function DealBanner({
           key={base.src}
           ref={ref}
           src={base.src}
+          srcSet={base.srcSet}
           alt={shown ? "" : altOf(base)}
           aria-hidden={shown ? true : undefined}
           width={640}
           height={aspect === "16/10" ? 400 : 360}
-          sizes={sizes}
+          sizes={bannerSizes(base, sizes, frameAspect)}
           loading={priority ? "eager" : "lazy"}
           fetchPriority={priority ? "high" : undefined}
           decoding="async"
-          onLoad={(e) => setLoaded(e.currentTarget.currentSrc || e.currentTarget.src)}
+          onLoad={() => setLoaded(base.src)}
           onError={() => setAt((i) => i + 1)}
           className={`relative ${shape} w-full object-cover transition-[opacity,transform] duration-500 ease-out motion-safe:group-hover:scale-[1.03] ${
             baseLoaded ? "opacity-100" : "opacity-0"
@@ -274,12 +286,13 @@ export function DealBanner({
         <img
           key={other.src}
           src={other.src}
+          srcSet={other.srcSet}
           alt={otherLoaded ? (other.alt ?? `Photograph of ${label}`) : ""}
           aria-hidden={otherLoaded ? undefined : true}
           data-slide={slide}
           width={640}
           height={aspect === "16/10" ? 400 : 360}
-          sizes={sizes}
+          sizes={bannerSizes(other, sizes, frameAspect)}
           decoding="async"
           onLoad={() => setSlideLoaded(other.src)}
           onError={() => {
