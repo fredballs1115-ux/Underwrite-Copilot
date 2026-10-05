@@ -26,6 +26,7 @@ import { mhContextLine, readManufacturedHousing } from "@/lib/manufactured-housi
 import { readSelfStorage, storageContextLine } from "@/lib/self-storage";
 import { regulationContextLine, type RegulationRead } from "@/lib/rent-regulation";
 import { forwardContextLine, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseContextLine, readMixedUse } from "@/lib/mixed-use";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -136,6 +137,9 @@ export function dealContextFor(
   // A self-storage facility (#471): its two occupancies, the rent sitting
   // tenants pay against the street rate and whose platform it rides on.
   const storage = readSelfStorage(extraction);
+  // A mixed-use building (lib/mixed-use): its residential and commercial
+  // incomes as stated, the commercial share of each and the shops' roll.
+  const mixedUse = readMixedUse(extraction);
   // FEMA's flood zone at the building, where the site lookup has answered
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition.
@@ -162,6 +166,7 @@ export function dealContextFor(
     ...(student ? [studentContextLine(student)] : []),
     ...(park ? [mhContextLine(park)] : []),
     ...(storage ? [storageContextLine(storage)] : []),
+    ...(mixedUse ? [mixedUseContextLine(mixedUse)] : []),
     ...(reports ? [siteReportsContextLine(reports)] : []),
     ...(flood ? [flood] : []),
   ];

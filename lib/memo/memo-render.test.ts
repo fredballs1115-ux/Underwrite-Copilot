@@ -511,6 +511,36 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").forwardLine).toBe("");
   }, 30000);
 
+  it("says a mixed-use building's two incomes under the title (lib/mixed-use), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "Retail / Multifamily",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Residential income", value: "$1,520,000", flagged: false, page: "", basis: "in_place" },
+        { label: "Commercial income", value: "$610,000", flagged: false, page: "", basis: "in_place" },
+      ],
+    };
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "mixed_use",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.mixedUseLine).toBe("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial)");
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial)");
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").mixedUseLine).toBe("");
+  }, 30000);
+
   it("says the rent rules that reach the building under the title, on the day it is given (lib/rent-regulation), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

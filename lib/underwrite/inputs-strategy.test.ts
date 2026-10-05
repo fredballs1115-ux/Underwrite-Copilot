@@ -591,6 +591,30 @@ describe("deriveUnderwriteInputs — a forward purchase, said and never changed 
   });
 });
 
+describe("deriveUnderwriteInputs — a mixed-use building's two incomes under one cap (lib/mixed-use)", () => {
+  it("says the two incomes in a line and that the model capitalises and grows both at one rate, and changes nothing", () => {
+    const mixed = ex(
+      [
+        metric("Asking price", "$25,000,000"),
+        metric("Units", "48"),
+        metric("NOI (in-place)", "$1,400,000"),
+        metric("Going-in cap rate", "5.60%"),
+        metric("Residential income", "$1,520,000"),
+        metric("Commercial income", "$610,000"),
+      ],
+      { assetClass: "Retail / Multifamily" },
+    );
+    const m = deriveUnderwriteInputs(mixed, "fallback");
+    expect(m.meta.mixedUse?.line).toBe("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial)");
+    expect(m.meta.mixedUse?.read).toBe(
+      "The model capitalises the $610k of commercial income at the same 5.60% exit cap as the residential and grows it at the same 3.0% a year: one cap and one growth rate for two incomes that trade to different buyers at different caps, the commercial 28.6% of it.",
+    );
+    // The model is the same model: no input moves for the read.
+    expect(m.inputs).toEqual(deriveUnderwriteInputs(ex(mixed.metrics.slice(0, 4), { assetClass: "Retail / Multifamily" }), "fallback").inputs);
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.mixedUse).toBeNull();
+  });
+});
+
 describe("deriveUnderwriteInputs — the PCA's immediate repairs are capital at closing (#465)", () => {
   const base = [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,520,000"), metric("Units", "240")];
 

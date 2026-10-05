@@ -105,6 +105,13 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
       slots.storage && /Lease-up/.test(slots.storage) ? "caution" : "brand",
       "a self-storage facility — the deal page reads its two occupancies and the rent sitting tenants pay against the street rate",
     ),
+    // A mixed-use building's commercial share (lib/mixed-use).
+    tag(
+      "mixedUse",
+      slots.mixedUse,
+      "brand",
+      "a mixed-use building's commercial share — the deal page reads the two incomes, the commercial space and what one exit cap does to both",
+    ),
   ].filter((t): t is DealTag => t !== null);
 }
 

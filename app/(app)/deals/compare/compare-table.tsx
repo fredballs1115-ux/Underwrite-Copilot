@@ -160,6 +160,9 @@ export type Col = {
    *  delivers Q2 2028", "Build-to-suit, 6.00% at delivery" —
    *  lib/forward-purchase `forwardTag`); absent otherwise */
   forward?: string | null;
+  /** a mixed-use building's commercial share ("Commercial 29% of income" —
+   *  lib/mixed-use `mixedUseTag`); absent otherwise */
+  mixedUse?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -391,6 +394,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     { label: "Manufactured housing", get: (c) => c.mh || "—" },
     // A self-storage facility's occupancy and rates (#471).
     { label: "Self-storage", get: (c) => c.storage || "—" },
+    // A mixed-use building's commercial share (lib/mixed-use): a dash,
+    // never "none", beside a deal with no read.
+    { label: "Mixed-use", get: (c) => c.mixedUse || "—" },
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },

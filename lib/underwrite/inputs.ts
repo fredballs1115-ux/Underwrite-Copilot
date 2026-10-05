@@ -67,6 +67,7 @@ import { mhModelLine, mhShortLine, readManufacturedHousing } from "@/lib/manufac
 import { readSelfStorage, storageModelLine, storageShortLine } from "@/lib/self-storage";
 import { regulationModelLine, regulationShortLine, type RegulationRead } from "@/lib/rent-regulation";
 import { forwardModelLine, forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseModelLine, mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -205,6 +206,11 @@ export interface WorkbookMeta {
    *  as paid at closing with income from its first year, and its year-one
    *  NOI beside the memorandum's at delivery. Absent on anything else. */
   forward?: { line: string; read: string } | null;
+  /** a mixed-use building (lib/mixed-use): its two incomes as stated, the
+   *  commercial share of each and the commercial space in a line, then what
+   *  this model does with them — one exit cap and one growth rate for both.
+   *  Absent on anything else. */
+  mixedUse?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -412,6 +418,18 @@ function forwardMeta(
   return {
     line: forwardShortLine(r),
     read: forwardModelLine(r, { noi1, noiAssumed, price: inputs.purchasePrice }) ?? "",
+  };
+}
+
+/** The cover's lines about a mixed-use building (lib/mixed-use): the two
+ *  incomes in a line, then what this model does with them — one exit cap
+ *  and one growth rate for both. Null on anything else. */
+function mixedUseMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs): WorkbookMeta["mixedUse"] {
+  const r = readMixedUse(extraction);
+  if (!r) return null;
+  return {
+    line: mixedUseShortLine(r),
+    read: mixedUseModelLine(r, { exitCapPct: inputs.exitCapPct, rentGrowthPct: inputs.rentGrowthPct }) ?? "",
   };
 }
 
@@ -1052,6 +1070,7 @@ export function deriveUnderwriteInputs(
       storage: storageMeta(extraction, inputs),
       regulation: regulationMeta(deal?.regulation, inputs),
       forward: forwardMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption"),
+      mixedUse: mixedUseMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

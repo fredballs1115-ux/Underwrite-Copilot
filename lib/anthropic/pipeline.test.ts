@@ -1378,6 +1378,28 @@ describe("runAnalysis — the happy path", () => {
     expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("Forward purchase");
   });
 
+  it("a mixed-use building: the challenger reads the two incomes and the traps they add after the class's own, and the deal context says them (lib/mixed-use)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "Retail / Multifamily",
+      metrics: [
+        ...EXTRACTION.metrics,
+        { label: "Residential income", value: "$1,520,000", flagged: false, page: "", basis: "in_place" },
+        { label: "Commercial income", value: "$610,000", flagged: false, page: "", basis: "in_place" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("MIXED-USE INCOME AS STATED: The memorandum states $1.52M of residential income and $610k of commercial");
+    expect(note).toContain("(d) THE AGENCY LIMIT");
+    expect(note).toContain("(f) THE ZONING");
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Mixed-use income: The memorandum states $1.52M of residential income");
+    expect(context).not.toContain("(d) THE AGENCY LIMIT");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a rent-regulated building: the challenger and the deal context read the rules that reach it, the allowance in force and the regulation traps (lib/rent-regulation)", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     vi.mocked(extractTerms).mockResolvedValue({

@@ -39,6 +39,8 @@ import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./rende
 import { regulationForDeal } from "./rent-regulation";
 import { readForwardPurchase } from "./forward-purchase";
 import { ForwardPanel } from "@/app/forward-panel";
+import { readMixedUse } from "./mixed-use";
+import { MixedUsePanel } from "@/app/mixed-use-panel";
 import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { STALE_MS } from "./screen-run";
@@ -1093,6 +1095,36 @@ describe("DealView — a forward purchase carries no construction (lib/forward-p
     expect(text).toContain(`The model's exit cap, ${(derived.inputs.exitCapPct * 100).toFixed(2)}%`);
     expect(text).toContain("5.50% at delivery, the stated NOI over the price");
     expect(text).toContain("Its year-one NOI is an assumed 6.00% of the price, $4.32M, above the $3.96M the memorandum states at delivery.");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("the deal page's mixed-use panel reads the derived model (lib/mixed-use)", () => {
+  it("draws the two incomes with the model's own exit cap and growth rate in its read", () => {
+    // As app/(app)/deals/[id]/page.tsx draws it: the read on the page's day,
+    // with `meta.mixedUse.read` from the derived model.
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "Retail / Multifamily",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Residential income", value: "$1,520,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Commercial income", value: "$610,000", flagged: false, page: "", basis: "in_place" as const },
+      ],
+    };
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const html = renderToStaticMarkup(
+      React.createElement(MixedUsePanel, {
+        mixedUse: readMixedUse(extraction, new Date("2026-10-05T12:00:00Z")),
+        modelLine: derived.meta.mixedUse?.read ?? "",
+      }),
+    );
+    const text = textOf(html);
+    expect(html.match(/data-bar="mu-income"/g)).toHaveLength(2);
+    expect(text).toContain(
+      `The model capitalises the $610k of commercial income at the same ${(derived.inputs.exitCapPct * 100).toFixed(2)}% exit cap as the residential and grows it at the same ${(derived.inputs.rentGrowthPct * 100).toFixed(1)}% a year`,
+    );
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });

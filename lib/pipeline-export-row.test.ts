@@ -85,6 +85,24 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(pipelineExportRow(deal(), ctx).forward).toBeNull();
   });
 
+  it("says a mixed-use building's commercial share, as the pipeline card says it, and carries it in the price cell's note (lib/mixed-use)", async () => {
+    const mixed = {
+      dealName: "Main Street Lofts",
+      assetClass: "Retail / Multifamily",
+      market: "Baltimore, MD",
+      address: "",
+      metrics: [m("Asking price", "$25,000,000"), m("Residential income", "$1,520,000"), m("Commercial income", "$610,000")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: mixed }), ctx);
+    expect(row.mixedUse).toBe("Commercial 29% of income");
+    expect(row.mixedUse).toBe(pickSlots(mixed, null, "auto").mixedUse);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain("Commercial 29% of income: a mixed-use building's commercial share");
+    expect(pipelineExportRow(deal(), ctx).mixedUse).toBeNull();
+  });
+
   it("prints the deal's one class: the deck's on a deal filed Auto, the analyst's where they filed one", async () => {
     expect(pipelineExportRow(deal(), ctx).assetClass).toBe("multifamily");
     expect(pipelineExportRow(deal({ asset_class: "office" }), ctx).assetClass).toBe("office");

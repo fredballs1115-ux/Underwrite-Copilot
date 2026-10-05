@@ -28,6 +28,8 @@ import { SelfStoragePanel } from "@/app/self-storage-panel";
 import { readSelfStorage } from "@/lib/self-storage";
 import { ForwardPanel } from "@/app/forward-panel";
 import { readForwardPurchase } from "@/lib/forward-purchase";
+import { MixedUsePanel } from "@/app/mixed-use-panel";
+import { readMixedUse } from "@/lib/mixed-use";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
@@ -1544,6 +1546,13 @@ export default async function DealPage({
             against the 85% line, the in-place rent against the street rate,
             and whose platform it rides on (lib/self-storage). */}
         <SelfStoragePanel storage={readSelfStorage(extraction)} modelLine={derived?.meta.storage?.read ?? ""} />
+        {/* A mixed-use building (lib/mixed-use): the residential and
+            commercial incomes on one bar, the commercial share of the area,
+            and what the model's one exit cap does to both. */}
+        <MixedUsePanel
+          mixedUse={readMixedUse(extraction, new Date(`${todayIso}T12:00:00Z`))}
+          modelLine={derived?.meta.mixedUse?.read ?? ""}
+        />
         {/* What the third-party reports found (#465): a tile a report, the
             Phase I's age against the 180-day and one-year marks, the PML
             against the lenders' 20%, and what the model does with the

@@ -28,6 +28,7 @@ import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
 import { regulationForDeal, regulationTag, type DealForRegulation } from "@/lib/rent-regulation";
 import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseTag } from "@/lib/mixed-use";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ListJobStatus } from "@/lib/screen-run";
 
@@ -120,6 +121,10 @@ export interface PipelineSlots {
    *  purchase `forwardTag`); absent or null where the buyer is not paying
    *  for a building at its completion */
   forward?: string | null;
+  /** a mixed-use building's commercial share — "Commercial 29% of income",
+   *  else "Commercial 15% of area" (lib/mixed-use `mixedUseTag`); absent or
+   *  null where neither share is read */
+  mixedUse?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
@@ -292,6 +297,9 @@ export function pickSlots(
     // delivery — the yield then, or the delivery it counts down to — read
     // with the kind the row reads.
     forward: forwardTag(readForwardPurchase(extraction, asOf, strategy)),
+    // A mixed-use building's commercial share of the income or the area
+    // (lib/mixed-use), each only where both halves are stated.
+    mixedUse: mixedUseTag(extraction, asOf),
     // The price by the unit or the foot, as a listing card shows it (#469),
     // in the deal's one class.
     basis: basisTag(extraction, strategy.kind, storedClass),

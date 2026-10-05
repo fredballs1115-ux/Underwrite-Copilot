@@ -63,6 +63,7 @@ import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageNote } from "@/lib/self-storage";
 import { regulationForDeal, regulationNote, type RegulationRead } from "@/lib/rent-regulation";
 import { forwardNote, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseNote, readMixedUse } from "@/lib/mixed-use";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -1387,6 +1388,11 @@ async function runAnalysisSteps(
         // occupancy's definition, new supply and the platform's income.
         const storage = readSelfStorage(ex);
         if (storage) notes.push(storageNote(storage));
+        // A mixed-use building (lib/mixed-use): the two incomes as stated,
+        // then the traps the two add after the class's own MIXED_USE_TRAPS
+        // (a)–(c) — the agency limit, the meters and CAM, the zoning.
+        const mixedUse = readMixedUse(ex);
+        if (mixedUse) notes.push(mixedUseNote(mixedUse));
 
         if (flagged.length) {
           notes.push(

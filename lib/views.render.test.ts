@@ -1586,7 +1586,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const bare = (label: string) => label.replace(/ · model$/, "");
     const tableRows = (html: string) => [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => bare(m[1]));
     const cardRows = (html: string) => [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => bare(m[1]));
-    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Forward purchase", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
+    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Forward purchase", "Mixed-use", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
     // Four deals none of which states a hotel, a sale, a restriction or any
     // of the other deal-type facts: no column of dashes for any of them.
     const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: COLS }));
@@ -1646,6 +1646,18 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(cells).not.toMatch(/\bnone\b/i);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("sets a mixed-use building's commercial share side by side (lib/mixed-use): the tag, a dash beside every other deal", () => {
+    const cols: Col[] = [COLS[0], { ...COLS[1], mixedUse: "Commercial 29% of income" }, COLS[2]];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    const row = html.match(/<tr\b(?:(?!<\/tr>)[\s\S])*?>Mixed-use<\/td>[\s\S]*?<\/tr>/)?.[0] ?? "";
+    expect(row).not.toBe("");
+    const cells = visibleText(row);
+    expect(cells).toContain("Commercial 29% of income");
+    expect(cells.match(/—/g)).toHaveLength(2);
+    expect(cells).not.toMatch(/\bnone\b/i);
+    expect(a11yIssues(html)).toEqual([]);
   });
 
   it("reads a note's and a share's price for what it buys (#423): the note's yield, the share's cap on the whole, returns withheld", () => {
@@ -8929,6 +8941,116 @@ describe("Pipeline — a forward purchase's tag (lib/forward-purchase)", () => {
       const text = visibleText(html);
       expect(text, initialView).toContain("Build-to-suit, 6.00% at delivery");
       const chip = html.match(/<span[^>]*title="Build-to-suit, 6.00% at delivery:[^"]*"[^>]*>/)?.[0] ?? "";
+      expect(chip, initialView).toContain("text-brand");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+  });
+});
+
+// ── A mixed-use building's two incomes (lib/mixed-use) ─────────────────────
+import { MixedUsePanel } from "@/app/mixed-use-panel";
+import { mixedUseModelLine, mixedUseTag, readMixedUse } from "@/lib/mixed-use";
+
+const MU_TODAY = new Date("2026-10-05T12:00:00Z");
+const muDeck = (assetClass: string, metrics: { label: string; value: string }[]) =>
+  ({
+    dealName: "Main Street Lofts",
+    assetClass,
+    totalPages: 40,
+    metrics: metrics.map((m) => ({ ...m, flagged: false, page: "p. 9", basis: "na" as const })),
+  }) as unknown as ExtractionResult;
+const MIXED_DECK = muDeck("Retail / Multifamily", [
+  { label: "Asking price", value: "$25,000,000" },
+  { label: "Units", value: "48" },
+  { label: "Retail SF", value: "9,500 SF" },
+  { label: "Total SF", value: "62,000 SF" },
+  { label: "Residential income", value: "$1,520,000" },
+  { label: "Commercial income", value: "$610,000" },
+  { label: "Commercial occupancy", value: "80%" },
+]);
+
+describe("MixedUsePanel (lib/mixed-use) — the two incomes on one bar, the commercial share of the area", () => {
+  it("draws the incomes as a segment each, the area's share and a tile a stated fact, then the model's read", () => {
+    const r = readMixedUse(MIXED_DECK, MU_TODAY)!;
+    const html = render(
+      React.createElement(MixedUsePanel, { mixedUse: r, modelLine: mixedUseModelLine(r, { exitCapPct: 0.056, rentGrowthPct: 0.03 })! }),
+    );
+    dumpView("mixed-use-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="mixed-use-panel"');
+    expect(text).toContain("28.6% of the income is commercial");
+    expect(html.match(/data-bar="mu-income"/g)).toHaveLength(2);
+    expect(html.match(/data-bar="mu-area"/g)).toHaveLength(1);
+    expect(text).toContain("Residential $1.52M");
+    expect(text).toContain("Commercial $610k, 28.6% of the income");
+    expect(text).toContain("Commercial 9,500 SF of the building's 62,000 SF, 15.3% of its area");
+    expect(html).toContain('data-mu="occupancy"');
+    // The read's first sentence in the open, the rest one click away.
+    expect(text).toContain("which re-lets on commercial terms (longer vacancies, leasing capital, a credit per tenant) where the apartments turn over every year.");
+    expect(html).toContain("Read the rest (2 more)");
+    expect(text).toContain("one cap and one growth rate for two incomes that trade to different buyers at different caps");
+    expect(a11yIssues(html), "mixed-use panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("draws no bar off one half — the half as a tile — and nothing on anything else", () => {
+    const r = readMixedUse(muDeck("Mixed-Use", [{ label: "Commercial income", value: "$610,000" }, { label: "Commercial SF", value: "9,500 SF" }]), MU_TODAY)!;
+    const html = render(React.createElement(MixedUsePanel, { mixedUse: r }));
+    expect(html).not.toContain('data-bar="mu-income"');
+    expect(html).not.toContain('data-bar="mu-area"');
+    for (const key of ["commercial-income", "commercial-sf"]) expect(html).toContain(`data-mu="${key}"`);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(MixedUsePanel, { mixedUse: null }))).toBe("");
+  });
+});
+
+describe("ShareView — a mixed-use building (lib/mixed-use)", () => {
+  it("draws the two incomes, and nothing on the sample", () => {
+    const props = {
+      dealName: "Main Street Lofts",
+      assetClass: "mixed_use",
+      expiresAt: "2026-10-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      today: "2026-10-05",
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: MIXED_DECK }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="mixed-use-panel"');
+    expect(html.match(/data-bar="mu-income"/g)).toHaveLength(2);
+    // The key terms lead with the two incomes, after the count.
+    expect(text).toContain("Residential income");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain("mixed-use-panel");
+  });
+});
+
+describe("Pipeline — a mixed-use building's tag (lib/mixed-use)", () => {
+  const tag = mixedUseTag(MIXED_DECK, MU_TODAY)!;
+  const mixed = card({
+    id: "mu",
+    name: "Main Street Lofts",
+    assetClass: "mixed_use",
+    verdict: "caution",
+    slots: { cap: "5.6%", price: "$25,000,000", yoc: null, mixedUse: tag },
+    market: "Baltimore, MD",
+    coveredMarket: "Baltimore",
+  });
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
+
+  it("says the commercial share in the brand's tone on the row and the card", () => {
+    expect(tag).toBe("Commercial 29% of income");
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([mixed]), initialView }));
+      const text = visibleText(html);
+      expect(text, initialView).toContain("Commercial 29% of income");
+      const chip = html.match(/<span[^>]*title="Commercial 29% of income:[^"]*"[^>]*>/)?.[0] ?? "";
       expect(chip, initialView).toContain("text-brand");
       expect(gluedWords(text), initialView).toEqual([]);
       expect(a11yIssues(html), initialView).toEqual([]);

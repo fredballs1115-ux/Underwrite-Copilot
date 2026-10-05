@@ -72,6 +72,7 @@ import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
 import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import type { AssumableView } from "@/lib/assumable-debt";
 import type { InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
@@ -1012,6 +1013,11 @@ export interface ReportInput {
    *  derived model's `meta.forward`) — printed over the grids; absent where
    *  the caller built no model, and then the line prints alone */
   forward?: { line: string; read: string } | null;
+  /** a mixed-use building's two incomes, and what the model does with them
+   *  — one exit cap and one growth rate for both (lib/mixed-use via the
+   *  derived model's `meta.mixedUse`) — printed over the grids; absent
+   *  where the caller built no model, and then the line prints alone */
+  mixedUse?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427,
    *  #472): the deal's flood frame cut to the band, the key of the zones it
    *  shows and the zone sentence; null for no page */
@@ -1056,6 +1062,7 @@ export function buildReportData(
   storage?: { line: string; read: string } | null,
   regulation?: { line: string; read: string } | null,
   forward?: { line: string; read: string } | null,
+  mixedUse?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -1096,6 +1103,7 @@ export function buildReportData(
     // prints, without the model's growth set beside the allowance.
     regulation: regulation ? (withheld ? { line: regulation.line, read: "" } : regulation) : null,
     forward: modelRead(forward),
+    mixedUse: modelRead(mixedUse),
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1559,6 +1567,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // caller derived the model, else the purchase's line alone.
   const forwardRead = readForwardPurchase(extraction);
   const forward = input.forward ?? (forwardRead ? { line: forwardShortLine(forwardRead), read: "" } : null);
+  // A mixed-use building (lib/mixed-use), the same way.
+  const mixedUseRead = readMixedUse(extraction);
+  const mixedUse = input.mixedUse ?? (mixedUseRead ? { line: mixedUseShortLine(mixedUseRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1790,6 +1801,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           {!sensitivity && <SingleTenantCaveat lease={student} />}
           {!sensitivity && <SingleTenantCaveat lease={mh} />}
           {!sensitivity && <SingleTenantCaveat lease={storage} />}
+          {!sensitivity && <SingleTenantCaveat lease={mixedUse} />}
           {!sensitivity && <AssumptionsBlock read={modelVsMarket} />}
           {!sensitivity && <AssumableBlock view={input.assumable} />}
           {!sensitivity && <AssumableBlock view={input.sellerNote} />}
@@ -1837,6 +1849,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           <SingleTenantCaveat lease={student} />
           <SingleTenantCaveat lease={mh} />
           <SingleTenantCaveat lease={storage} />
+          <SingleTenantCaveat lease={mixedUse} />
 
           {/* The base case the grids are struck around, each input with
               where it came from — the workbook's Deal Summary. */}

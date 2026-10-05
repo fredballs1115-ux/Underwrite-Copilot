@@ -38,6 +38,7 @@ import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
 import { regulationForDeal, regulationTag } from "@/lib/rent-regulation";
 import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseTag } from "@/lib/mixed-use";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
 import { compareReturns } from "@/lib/compare-figures";
@@ -206,6 +207,8 @@ function toCol(
     // A forward purchase (lib/forward-purchase), read on the reader's day
     // with the kind the column reads.
     forward: forwardTag(readForwardPurchase(ex, new Date(`${today}T12:00:00Z`), strat)),
+    // A mixed-use building's commercial share (lib/mixed-use).
+    mixedUse: mixedUseTag(ex, new Date(`${today}T12:00:00Z`)),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
     noteYtm: figs.noteYtmPct,

@@ -36,6 +36,8 @@ import { SelfStoragePanel } from "@/app/self-storage-panel";
 import { readSelfStorage } from "@/lib/self-storage";
 import { ForwardPanel } from "@/app/forward-panel";
 import { readForwardPurchase } from "@/lib/forward-purchase";
+import { MixedUsePanel } from "@/app/mixed-use-panel";
+import { readMixedUse } from "@/lib/mixed-use";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -409,6 +411,10 @@ export function ShareView({
       {/* A self-storage facility (#471): its occupancies and the in-place
           rent against the street rate. */}
       <SelfStoragePanel storage={readSelfStorage(safeExtraction)} />
+
+      {/* A mixed-use building (lib/mixed-use): the residential and
+          commercial incomes and the commercial share of the area. */}
+      <MixedUsePanel mixedUse={readMixedUse(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined)} />
 
       {/* What the third-party reports found (#465): a tile a report, the
           Phase I's age and the seismic PML against the lenders' lines. */}

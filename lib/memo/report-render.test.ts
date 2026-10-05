@@ -1205,6 +1205,36 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, Q3 2027.");
   }, 60000);
 
+  it("prints a mixed-use building's two incomes over the grids, and the one exit cap the model runs both at (lib/mixed-use)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "Retail / Multifamily",
+      metrics: [
+        ...SAMPLE_DEAL.extraction.metrics,
+        { label: "Residential income", value: "$1,520,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "Commercial income", value: "$610,000", flagged: false, page: "", basis: "in_place" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: "mixed_use",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.mixedUse ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.mixedUse).toEqual(derived.meta.mixedUse);
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial). The model capitalises the $610k of commercial income at the same");
+  }, 60000);
+
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

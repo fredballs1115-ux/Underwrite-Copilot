@@ -1471,6 +1471,28 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The forward purchase")).toThrow();
   });
 
+  it("a mixed-use building (lib/mixed-use): its two incomes, then the one exit cap and growth rate the model runs both at", async () => {
+    const mixed = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "Retail / Multifamily",
+        metrics: [
+          ...extraction.metrics,
+          { label: "Residential income", value: "$1,520,000", flagged: false, page: "p. 9" },
+          { label: "Commercial income", value: "$610,000", flagged: false, page: "p. 9" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(mixed));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The two incomes");
+    expect(String(cover.getCell(r, 3).value)).toBe("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial)");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model capitalises the \$610k of commercial income at the same [\d.]+% exit cap as the residential/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The two incomes")).toThrow();
+  });
+
   it("a self-storage facility (#471): its occupancies and rates, then what the model does with the premium over street", async () => {
     const storage = deriveUnderwriteInputs(
       {

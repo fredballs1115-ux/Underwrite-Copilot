@@ -58,13 +58,14 @@ describe("dealTags — one list, in one order, for the list row and the card", (
         student: "Drive-to campus",
         mh: "Lot rent $430 vs $525 mkt, Private water & sewer",
         storage: "Lease-up, 72% occupied",
+        mixedUse: "Commercial 29% of income",
         broker: "CBRE",
         basis: "$274k/unit",
       }),
       { tag: "Flood AE" },
     );
     expect(tags.map((t) => t.key)).toEqual([
-      "flood", "sale", "interest", "forward", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage",
+      "flood", "sale", "interest", "forward", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse",
     ]);
     // The broker and the basis are no tag: one is a CSV column, the other
     // the price's own second line.
@@ -81,6 +82,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
       "Build-to-suit, 6.00% at delivery: the price is paid at delivery and the developer funds the works — the deal page reads the clock, the deposit and the yield at delivery",
     );
     expect(dealTags(slots({ student: "Pre-leased 87%, +5 pts y/y", mh: "Lot rent $430 vs $525 mkt", storage: "In-place 21.1% over street" })).map((t) => t.tone)).toEqual(["brand", "brand", "brand"]);
+    expect(tone("mixedUse")).toBe("brand");
   });
 
   it("says a regime that applies, or the memorandum's claim of one, in the warning tone, and one to check in the muted tone (lib/rent-regulation)", () => {

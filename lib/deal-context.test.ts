@@ -381,6 +381,28 @@ describe("dealContextFor — a forward purchase (lib/forward-purchase)", () => {
   });
 });
 
+describe("dealContextFor — a mixed-use building's two incomes (lib/mixed-use)", () => {
+  it("says the residential and commercial incomes and the commercial share, each as stated", () => {
+    const mixed: ExtractionResult = {
+      dealName: "Main Street Lofts",
+      assetClass: "Retail / Multifamily",
+      metrics: [
+        m("Asking price", "$25,000,000"),
+        m("Units", "48"),
+        m("NOI (in-place)", "$1,400,000"),
+        m("Residential income", "$1,520,000"),
+        m("Commercial income", "$610,000"),
+      ],
+    };
+    const ctx = dealContextFor(mixed)!;
+    expect(ctx).toContain(
+      "Mixed-use income: The memorandum states $1.52M of residential income and $610k of commercial: 28.6% of the income is the commercial space's",
+    );
+    // One half alone reads no share, and an ordinary building says nothing.
+    expect(dealContextFor({ ...mixed, assetClass: "multifamily", metrics: mixed.metrics.filter((r) => r.label !== "Commercial income") })).not.toContain("Mixed-use");
+  });
+});
+
 describe("dealContextFor — the rent rules that reach the building (lib/rent-regulation)", () => {
   const walkUp: ExtractionResult = {
     dealName: "The Walk-up",

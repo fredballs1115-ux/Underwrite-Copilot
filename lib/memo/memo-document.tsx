@@ -49,6 +49,7 @@ import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing
 import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
 import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
+import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
@@ -266,6 +267,14 @@ function forwardLineFor(extraction: ExtractionResult | null, strategy: DealStrat
   return r ? forwardShortLine(r) : "";
 }
 
+/** A mixed-use building (lib/mixed-use) in one line for the memo's header:
+ *  its two incomes as stated, the commercial share and the commercial
+ *  space. "" on anything else. */
+function mixedUseLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readMixedUse(extraction, new Date(`${today}T12:00:00Z`));
+  return r ? mixedUseShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -362,6 +371,9 @@ export type MemoData = {
    *  outside date and the deposit (lib/forward-purchase), in one line; "" on
    *  anything else */
   forwardLine?: string;
+  /** a mixed-use building's two incomes, the commercial share and the
+   *  commercial space (lib/mixed-use), in one line; "" on anything else */
+  mixedUseLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -671,6 +683,7 @@ export function buildMemoData(
     affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
     regulationLine: pdfSafe(regulationLineFor(deal, extraction ?? null, today)),
     forwardLine: pdfSafe(forwardLineFor(extraction ?? null, strategy, today)),
+    mixedUseLine: pdfSafe(mixedUseLineFor(extraction ?? null, today)),
     singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
     hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
     saleLine: pdfSafe(saleLineFor(extraction ?? null)),
@@ -1195,6 +1208,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A self-storage facility (#471): the two occupancies and the
                 in-place rent against the street rate. */}
             {data.storageLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.storageLine}</Text>}
+            {/* A mixed-use building (lib/mixed-use): the residential and
+                commercial incomes and the commercial share. */}
+            {data.mixedUseLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.mixedUseLine}</Text>}
             {/* What a hotel is sold with (#455): the flag, the encumbrance,
                 the PIP and the franchise's end. */}
             {data.hotelLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.hotelLine}</Text>}

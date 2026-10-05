@@ -274,6 +274,36 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(stabilized, "stabilized", SCREEN_YEAR, 2).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate"]);
   });
 
+  it("a mixed-use building's two incomes and its commercial space lead after the count, and a center's retail area never leads as one (lib/mixed-use)", () => {
+    const mixed = [
+      { label: "Occupancy", value: "95%", flagged: true },
+      { label: "Commercial occupancy", value: "80%", flagged: false },
+      { label: "Retail SF", value: "9,500 SF", flagged: false },
+      { label: "Commercial income", value: "$610,000", flagged: false },
+      { label: "Residential income", value: "$1,520,000", flagged: false },
+      { label: "Units", value: "48", flagged: false },
+      { label: "Going-in cap rate", value: "5.60%", flagged: false },
+      { label: "Asking price", value: "$25,000,000", flagged: false },
+    ];
+    expect(keyTermRows(mixed, "stabilized", SCREEN_YEAR, 7).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "Units",
+      "Residential income",
+      "Commercial income",
+      "Retail SF",
+      "Commercial occupancy",
+    ]);
+    // No income half stated: the center's own retail area is not led.
+    const center = [
+      { label: "Occupancy", value: "92%", flagged: true },
+      { label: "Retail SF", value: "120,000 SF", flagged: false },
+      { label: "Going-in cap rate", value: "6.75%", flagged: false },
+      { label: "Asking price", value: "$30,000,000", flagged: false },
+    ];
+    expect(keyTermRows(center, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Occupancy"]);
+  });
+
   it("a student building's pre-leasing and walk lead after the price (#468)", () => {
     const student = [
       { label: "Occupancy", value: "96%", flagged: false },

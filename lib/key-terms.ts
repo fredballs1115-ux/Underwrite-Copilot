@@ -19,6 +19,7 @@ import {
   type StrategyKind,
 } from "./deal-strategy";
 import { forwardTermRows } from "./forward-purchase";
+import { COMMERCIAL_INCOME_ROW, RESIDENTIAL_INCOME_ROW, mixedUseTermRows } from "./mixed-use";
 import { noteTermRows } from "./note-yield";
 import { affordableTermRows } from "./affordable";
 import { singleTenantTermRows } from "./single-tenant";
@@ -145,6 +146,12 @@ export function keyTermRows<M extends KeyTermMetric>(
   // A self-storage facility (#471): the economic occupancy, the street rate
   // and the in-place rent.
   for (const row of storageTermRows(rows)) lead(row);
+  // A mixed-use building (lib/mixed-use): the residential and commercial
+  // incomes, the commercial space and its occupancy — only where an income
+  // half is stated, so a shopping center's "Retail SF" never leads as one.
+  const mixedUse = mixedUseTermRows(rows);
+  if (mixedUse.some((m) => RESIDENTIAL_INCOME_ROW.test(m.label) || COMMERCIAL_INCOME_ROW.test(m.label)))
+    for (const row of mixedUse) lead(row);
   // On a note no cap on the collateral's income is printed at all — the
   // going-in, the in-place, the stabilized, the exit: among the rows a
   // reader would take any of them for a cap on the note's price, which none
