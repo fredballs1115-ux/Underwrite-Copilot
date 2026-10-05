@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ScrollRegion } from "@/app/scroll-region";
 import type { Bridge, BridgeStep } from "@/lib/bridge/attribution";
 import { fieldFormat, formatFieldPair, formatFieldValue } from "@/lib/bridge/fields";
 
@@ -278,7 +279,7 @@ export function BridgeView({
         <Waterfall bridge={bridge} />
       </div>
 
-      <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+      <ScrollRegion label="IRR change by assumption" className="rounded-lg border border-line bg-surface">
         <table className="w-full min-w-[640px] text-sm">
           <thead>
             <tr className="text-left text-[11px] uppercase tracking-wide text-muted">
@@ -297,7 +298,7 @@ export function BridgeView({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
 
       <p className="text-xs leading-relaxed text-muted">
         {bridge.method === "exact"

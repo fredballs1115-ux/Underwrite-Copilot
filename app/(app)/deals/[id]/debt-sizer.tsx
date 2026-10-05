@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ScrollRegion } from "@/app/scroll-region";
 import { findMetric, parseMoney, parsePrice, screenYearOf } from "@/lib/criteria";
 import {
   IMPLIED_CAP_CEILING,
@@ -679,7 +680,7 @@ export function DebtSizer({
             {rateStrip.length > 0 && (
               <>
                 <SubHead>If rates move</SubHead>
-                <div className="scroll-shadows-x mt-2 overflow-x-auto">
+                <ScrollRegion label="If rates move" className="scroll-shadows-x mt-2">
                   <table className="w-full min-w-105 text-sm">
                     <thead>
                       <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
@@ -710,7 +711,7 @@ export function DebtSizer({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollRegion>
               </>
             )}
 
@@ -740,7 +741,7 @@ export function DebtSizer({
                 <summary className="cursor-pointer list-none text-sm font-medium text-brand transition-colors hover:text-brand-strong [&::-webkit-details-marker]:hidden [&::marker]:content-none">
                   Amortization preview ({amortRows.length} years)
                 </summary>
-                <div className="scroll-shadows-x mt-2 overflow-x-auto">
+                <ScrollRegion label="Amortization preview" className="scroll-shadows-x mt-2">
                   <table className="w-full min-w-105 text-sm">
                     <thead>
                       <tr className="text-left text-[10px] font-medium uppercase tracking-wide text-muted">
@@ -763,7 +764,7 @@ export function DebtSizer({
                       ))}
                     </tbody>
                   </table>
-                </div>
+                </ScrollRegion>
               </details>
             )}
           </>

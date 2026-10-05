@@ -1,3 +1,4 @@
+import { ScrollRegion } from "@/app/scroll-region";
 import { withArticle } from "@/lib/article";
 import type { PlanSummary } from "@/lib/deal-strategy";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -84,7 +85,7 @@ export function PlanSensitivity({
       {/* On a phone the grid scrolls sideways inside its card; the row
           labels stay pinned at its left edge (sticky, on the card's own
           surface) so a yield is never read without its row. */}
-      <div className="mt-3 overflow-x-auto" data-qa="plan-grid">
+      <ScrollRegion label="Yield on cost by NOI and budget" className="mt-3" data-qa="plan-grid">
         <table className="w-full min-w-[560px] border-separate border-spacing-1 text-center text-xs">
           <thead>
             <tr>
@@ -132,7 +133,7 @@ export function PlanSensitivity({
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
 
       <ul className="mt-3 space-y-1 text-sm leading-relaxed">
         <li>

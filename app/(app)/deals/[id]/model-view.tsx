@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FileField } from "../../file-field";
 import { useMemo, useState, type ReactNode } from "react";
+import { ScrollRegion } from "@/app/scroll-region";
 import { withArticle } from "@/lib/article";
 import { DOC_KINDS, DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
 import { MODEL_INPUTS, MODEL_PASTES } from "@/lib/model/inputs";
@@ -386,7 +387,7 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
       <p className="mt-1 text-sm leading-relaxed text-muted">
         IRR by exit cap and price; your base case is highlighted.
       </p>
-      <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      <ScrollRegion label="Return sensitivity grid" className="mt-3 rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[34rem] text-sm">
           <thead>
             <tr className="border-b border-line text-right text-[10px] uppercase tracking-wide text-muted">
@@ -427,7 +428,7 @@ export function Sensitivity({ model }: { model: UnderwritingModel }) {
             ))}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
     </section>
   );
 }
@@ -735,7 +736,7 @@ export function Assumptions({
             : `· ${metrics.length - assumed} from your documents, ${assumed} assumed`}
         </span>
       </h2>
-      <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+      <ScrollRegion label="Assumptions" className="mt-3 rounded-xl border border-line bg-surface shadow-sm">
         <table className="w-full min-w-[40rem] text-sm">
           <thead>
             <tr className="border-b border-line text-left text-[10px] uppercase tracking-wide text-muted">
@@ -790,7 +791,7 @@ export function Assumptions({
             })}
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
       {metrics.length > 8 && (
         <button
           type="button"
@@ -897,7 +898,7 @@ export function CashFlow({
         </span>
       </button>
       {open && (
-        <div className="mt-3 overflow-x-auto rounded-xl border border-line bg-surface shadow-sm">
+        <ScrollRegion label="Operating cash flow" className="mt-3 rounded-xl border border-line bg-surface shadow-sm">
           <table className="w-full min-w-[34rem] text-sm">
             <thead>
               <tr className="border-b border-line text-right text-[10px] uppercase tracking-wide text-muted">
@@ -929,7 +930,7 @@ export function CashFlow({
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
       )}
     </section>
   );

@@ -6,8 +6,10 @@
 // accessibility floor (`a11yIssues`).
 import { describe, expect, it } from "vitest";
 import React from "react";
+import { readFileSync } from "node:fs";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CompName, CompsMap, type MapComp } from "@/app/(app)/deals/[id]/comps-map";
+import { ScrollRegion } from "@/app/scroll-region";
 import { a11yIssues } from "./render-lint";
 
 const h = React.createElement;
@@ -50,5 +52,29 @@ describe("the comps table (research pass 33, item 17)", () => {
     // The column header buttons are still the sort controls.
     expect(html).toMatch(/<th\b[^>]*><button type="button"[^>]*>Comp<\/button><\/th>/);
     expect(a11yIssues(html)).toEqual([]);
+  });
+});
+
+describe("a wide table a keyboard can scroll (research pass 33, item 18)", () => {
+  it("is a named region and a Tab stop, keeping the box's own classes and attributes", () => {
+    // A data attribute rides through, as the plan grid's `data-qa` does.
+    const props = { label: "Rollover schedule", className: "mt-3 rounded-xl", "data-qa": "grid", children: h("table", null) };
+    const html = renderToStaticMarkup(h(ScrollRegion, props));
+    expect(html).toBe('<div data-qa="grid" role="region" aria-label="Rollover schedule" tabindex="0" class="overflow-x-auto mt-3 rounded-xl"><table></table></div>');
+  });
+
+  // The containers the pass flagged (axe's scrollable-region-focusable), each
+  // named for its table — and no other overflow container changed.
+  const FLAGGED: [string, string[]][] = [
+    ["app/(app)/deals/[id]/model-view.tsx", ["Return sensitivity grid", "Assumptions", "Operating cash flow"]],
+    ["app/(app)/deals/[id]/rent-roll/dashboard.tsx", ["Rollover schedule"]],
+    ["app/(app)/deals/[id]/valuations/valuations-view.tsx", ["Valuations compared", "Value gap by driver"]],
+    ["app/(app)/deals/[id]/bridge/bridge-view.tsx", ["IRR change by assumption"]],
+    ["app/(app)/deals/[id]/debt-sizer.tsx", ["If rates move", "Amortization preview"]],
+    ["app/(app)/deals/[id]/plan-sensitivity.tsx", ["Yield on cost by NOI and budget"]],
+  ];
+  it.each(FLAGGED)("%s scrolls each flagged table in a named region", (file, labels) => {
+    const src = readFileSync(file, "utf8");
+    expect([...src.matchAll(/<ScrollRegion label="([^"]+)"/g)].map((m) => m[1])).toEqual(labels);
   });
 });

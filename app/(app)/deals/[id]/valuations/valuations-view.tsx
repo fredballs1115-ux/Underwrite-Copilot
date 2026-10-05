@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ScrollRegion } from "@/app/scroll-region";
 import { tallySentence, type ValuationBridge, type AggressivenessTally } from "@/lib/valuation/reconcile";
 import { FIELD_LABELS, VALUATION_FIELDS, type ValuationField } from "@/lib/valuation/types";
 
@@ -208,7 +209,7 @@ export function ValuationsView({
   return (
     <div className="flex flex-col gap-6">
       {/* ── Comparison table ──────────────────────────────────────────── */}
-      <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+      <ScrollRegion label="Valuations compared" className="rounded-lg border border-line bg-surface">
         <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="border-b border-line text-left">
@@ -319,7 +320,7 @@ export function ValuationsView({
             </tr>
           </tbody>
         </table>
-      </div>
+      </ScrollRegion>
 
       <p className="text-xs leading-relaxed text-muted">
         Superscripts are page references — hover for the quote, click to open.{" "}
@@ -356,7 +357,7 @@ export function ValuationsView({
           <div className="rounded-lg border border-line bg-surface p-4">
             <ValueWaterfall bridge={bridge} />
           </div>
-          <div className="overflow-x-auto rounded-lg border border-line bg-surface">
+          <ScrollRegion label="Value gap by driver" className="rounded-lg border border-line bg-surface">
             <table className="w-full min-w-[440px] text-sm">
               <thead>
                 <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted">
@@ -382,7 +383,7 @@ export function ValuationsView({
                 ))}
               </tbody>
             </table>
-          </div>
+          </ScrollRegion>
         </>
       ) : null}
 

@@ -6,6 +6,7 @@ import {
   type LeaseUpCurve,
 } from "@/lib/rentroll/analytics";
 import type { ValidationIssue } from "@/lib/rentroll/validate";
+import { ScrollRegion } from "@/app/scroll-region";
 
 /**
  * The rent roll dashboard. Server-rendered — every figure is deterministic and
@@ -289,7 +290,7 @@ export function RentRollDashboard({
         <div className="mt-3">
           <RolloverChart analytics={analytics} cost={cost} />
         </div>
-        <div className="mt-3 overflow-x-auto">
+        <ScrollRegion label="Rollover schedule" className="mt-3">
           <table className="w-full min-w-[560px] text-sm">
             <thead>
               <tr className="border-b border-line text-left text-[11px] uppercase tracking-wide text-muted">
@@ -317,7 +318,7 @@ export function RentRollDashboard({
               })}
             </tbody>
           </table>
-        </div>
+        </ScrollRegion>
         {analytics.rollover.undatedSf > 0 ? (
           <p className="mt-2 text-xs text-muted">
             {sf(analytics.rollover.undatedSf)} of occupied space carries no expiry date and is not
