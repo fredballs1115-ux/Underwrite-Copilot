@@ -3,6 +3,36 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🟢 2026-10-05 — the second batch (PR #463, in progress)
+
+Nothing in it needs a migration, a key or a purchase so far. Research pass
+25 measured the site's speed from a local build in Chromium; the fixes
+that change nothing a visitor sees are in. Three faster paths change
+how the site is built, so they are yours to decide:
+
+1. **Let a CDN cache /tools and /market.** Both pages render on every visit
+   (112–158 ms of server time each on the sandbox's four cores; Render's
+   starter instance has half of one) because the public shell asks who is
+   signed in (`app/public-shell.tsx`, `getCurrentUser`). A shell that asks
+   in the browser would let both be static and cached. It changes how the
+   chrome learns who you are.
+2. **A faster IRR search.** The engine's `irr` (`lib/underwrite/engine.ts`)
+   scans from −89% in 0.1-point steps before it bisects, about a thousand
+   NPV evaluations a call, and /tools' solver cards spend about 258 ms of
+   a phone's load there. A wider first bracket finds the same root, but the
+   engine is the one the Excel export is held to in CI.
+3. **One sign-in check per page instead of two.** The proxy and the page
+   each ask Supabase Auth who you are. `getClaims()` verifies the session
+   locally where the project signs its tokens with asymmetric keys; whether
+   yours does is a setting in Supabase (Auth → JWT signing keys).
+
+Rent regulation now reaches the screen (NYC's 0% Order #58 renewals, DC's
+4.1% and 2.1% caps, LA's 3%, Washington's and Takoma Park's figures, each
+filed only as a primary source printed it). The model still grows every
+rent at one rate; growing regulated units at the allowance is the model-
+math item already below. San Francisco's page refuses the runner, so no
+SF figure is filed; a source the runner can read would let one in.
+
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
 **Do these (each is yours alone):**

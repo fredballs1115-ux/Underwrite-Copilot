@@ -1025,6 +1025,42 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   whose target id is missing. Never crawl a local `next start` while a
   build runs, and never leave one running across a rebuild: an ISR page it
   re-renders overwrites the fresh build's prerender with its stale code.
+- What a visitor waits for and downloads (research pass 25, 2026-10-05,
+  measured from a local build in Chromium on a 4x-throttled phone and a
+  laptop; the scripts are the pass's, and live-verify's PAGE WEIGHT lines
+  print each page's encoding, bytes and first byte from the live site).
+  Five rules, each measured:
+  - **A page shows before its slowest read.** A route's `loading.tsx` is
+    one Suspense boundary around the whole body, so an async section with
+    no boundary of its own holds the page behind the skeleton until it
+    answers: /market waited 7.1–7.4 s for a retried read although its bytes
+    arrived in 60 ms. Each live section below the explorer streams in its
+    own `<Suspense fallback={null}>` (largest paint 7,368 → 1,416 ms on the
+    phone).
+  - **A table every signed-in reader reads alike is read once an hour for
+    all of them** (`lib/research-read`: `benchmarks`, `regulatory_rules`
+    and the property database's counts, each granted to authenticated
+    readers `using (true)`), and only for a reader who is signed in — a
+    visitor with no account reads the checked-in files, as before. A card
+    built on a table a visitor cannot read is drawn only for a signed-in
+    reader (the weekday intel card told every visitor "Nothing notable").
+  - **No data table reaches a browser** (`lib/client-bundle-tables.test.ts`,
+    above under the rates).
+  - **An animation moves opacity or a transform, never a shadow.** A moving
+    box-shadow repaints its element on every frame: the homepage's two
+    glows painted 872 ms in five seconds on the phone, forever; drawn once
+    on an `::after` layer whose opacity moves, 63 ms.
+  - **A stored picture's URL names its version** (`pictureVersion` in
+    lib/deal-banner: the stamp its files carry, which every stored picture
+    gets anew), and the picture route answers a URL naming the current
+    version `private, max-age=31536000, immutable`; anything else is
+    revalidated as before. Every pipeline card had asked its picture again
+    on every view, each answer behind a sign-in check and a read of the
+    deal.
+  The sign-in page does not prefetch /demo (141 KB of its scripts a phone
+  fetched on every visit). A market band keeps its slots when its picture
+  fails (`CityPhotoView`), so the hero no longer jumps (CLS 0.37 → 0.0002
+  at 1280).
 - The page on paper: `app/globals.css` ends with one `@media print` rule
   setting `print-color-adjust: exact` page-wide, because **every picture on
   this site is a background colour** and browsers drop those when printing
