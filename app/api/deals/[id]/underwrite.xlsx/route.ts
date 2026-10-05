@@ -1,3 +1,5 @@
+import { cookies } from "next/headers";
+import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { isPro } from "@/lib/billing";
 import { HOLD_MONTHS, deriveUnderwriteInputs, type ActualsForModel } from "@/lib/underwrite/inputs";
@@ -126,17 +128,18 @@ export async function GET(
     const address = addressUpgrade(deal.address, extraction) ?? (deal.address as StructuredAddress | null) ?? null;
     const siteFlags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
     // The rent rules that reach the building (lib/rent-regulation), through
-    // the one call every surface makes, on the route's UTC day — the day the
-    // cover says the workbook was built: the cover's "The rent rules" and the
-    // Market Read's rent-growth row read the same regulation.
-    const utcDay = new Date().toISOString().slice(0, 10);
+    // the one call every surface makes, on the reader's own day (lib/reader-
+    // day), as the deal page and the report read them: the cover's "The rent
+    // rules" and the Market Read's rent-growth row read the same regulation.
+    const readerDay = readerToday((await cookies()).get(TZ_COOKIE)?.value);
     const regulation = regulationForDeal(
       { extraction, address, siteFlags, assetClass: deal.asset_class as string | null },
-      utcDay,
+      readerDay,
     );
-    // The model's dated readers read the same day, at its noon (the route
-    // reads no time-zone cookie; research pass 40).
-    const asOf = new Date(`${utcDay}T12:00:00Z`);
+    // The model's dated readers read the same day, at its noon, as the page
+    // and the report read theirs: on the UTC day a Los Angeles reader at 8 pm
+    // saw a lease ending today read "ended" on the cover (audit C4, L8).
+    const asOf = new Date(`${readerDay}T12:00:00Z`);
     const model = deriveUnderwriteInputs(extraction, deal.name, actuals, modelMarketFor((deal as { is_sample?: boolean }).is_sample, debt), {
       regulation,
       asOf,

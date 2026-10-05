@@ -205,6 +205,16 @@ describe("the signed-in pages count from the reader's day", () => {
     }
     // The rent-roll workbook's model reads the reader's day it counts from.
     expect(read("app/api/deals/[id]/rent-roll.xlsx/route.ts")).toContain("new Date(`${readerDay}T12:00:00Z`)");
+    // And the underwriting workbook reads the reader's day as the report
+    // does, its cover's dated lines, its rent rules and its interest read
+    // on it: it had read the UTC day, so a Los Angeles reader at 8 pm saw a
+    // lease ending today read "ended" in the workbook beside a page saying
+    // it ends today (audit C4, L8).
+    const workbook = read("app/api/deals/[id]/underwrite.xlsx/route.ts");
+    expect(workbook).toMatch(/const readerDay = readerToday\(\(await cookies\(\)\)\.get\(TZ_COOKIE\)\?\.value\);/);
+    expect(workbook).toContain("const asOf = new Date(`${readerDay}T12:00:00Z`);");
+    expect(workbook).toMatch(/assetClass: deal\.asset_class as string \| null \},\s*readerDay,\s*\)/);
+    expect(workbook).not.toContain("toISOString().slice(0, 10)");
   });
 
   // The documents' own date, read once per request from the cookie the
