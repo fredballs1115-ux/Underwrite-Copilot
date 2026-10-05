@@ -346,12 +346,20 @@ export function readRegulation(
     preferentialRow != null;
 
   const residential = input.classKey ? assetWords(input.classKey).residential : undefined;
+  // The rules test a BUILDING's units (stabilization's six, the RSO's two),
+  // and a portfolio's count, or a set of single-family homes', is no one
+  // building's: the size question stays open rather than the sum answering
+  // it (the audit of 2026-10-05 — 30 Los Angeles homes read "the Los Angeles
+  // RSO applies", eight Brooklyn four-unit buildings "NYC rent stabilization
+  // applies").
+  const homes = assetClassKey(input.classKey) === "sfr_btr";
+  const portfolio = Array.isArray(ex.properties) && ex.properties.length >= 2;
   let regimes: RegimeRead[] = [];
   if (input.address?.state && residential !== false) {
     const subject = buildSubject({
       address: input.address,
       census: input.census ?? null,
-      sizeText: totalUnits != null ? `${totalUnits} units` : null,
+      sizeText: totalUnits != null && !homes && !portfolio ? `${totalUnits} units` : null,
       yearBuilt: yearBuiltOf(metrics),
       residential,
       today,

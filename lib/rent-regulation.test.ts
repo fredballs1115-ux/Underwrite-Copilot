@@ -383,6 +383,32 @@ describe("a rule the site has not verified", () => {
   });
 });
 
+// The audit of 2026-10-05: a portfolio's count, or a set of homes', was
+// read as one building's against the rules' per-building size tests.
+describe("a count that is no one building's", () => {
+  const property = (name: string) => ({ name, address: "", count: "4", area: "", noi: "", occupancy: "", yearBuilt: "1925", allocatedPrice: "", page: "" });
+
+  it("leaves the size question open on single-family homes and on a portfolio, rather than the sum answering it", () => {
+    const la = { address: { state: "CA", city: "Los Angeles" }, classKey: "sfr_btr" };
+    const homes = readRegulation(ex([row("Homes", "30"), row("Year built", "1965")], "sfr_btr"), la, "2026-10-05")!;
+    const rso = homes.regimes.find((g) => g.ruleId === "ca-la-rso-coverage")!;
+    expect(rso.outcome).toBe("possibly_applies");
+    expect(rso.unknowns).toContain("unit count");
+    expect(homes.headline).not.toContain("The Los Angeles RSO applies by the site's rules");
+    expect(regulationTag(homes)).toBe("Rent rules: check");
+    // Eight four-unit buildings in Brooklyn, 32 units in all.
+    const eight = { ...ex([row("Units", "32"), row("Year built", "1925")]), properties: Array.from({ length: 8 }, (_, i) => property(`Building ${i + 1}`)) };
+    const r = readRegulation(eight, BROOKLYN, "2026-10-05")!;
+    expect(r.regimes[0]).toMatchObject({ ruleId: "ny-nyc-rent-stabilization-coverage", outcome: "possibly_applies" });
+    expect(r.regimes[0].unknowns).toContain("unit count");
+    expect(regulationTag(r)).toBe("Rent rules: check");
+    // The same 32 units in one building: stabilization applies, as before.
+    expect(readRegulation(ex([row("Units", "32"), row("Year built", "1925")]), BROOKLYN, "2026-10-05")!.regimes[0].outcome).toBe("applies");
+    // A one-entry list is one property restated.
+    expect(readRegulation({ ...eight, properties: [property("The building")] }, BROOKLYN, "2026-10-05")!.regimes[0].outcome).toBe("applies");
+  });
+});
+
 describe("Washington DC and Los Angeles", () => {
   it("reads DC's two caps for its rent control year", () => {
     const dc = { address: { state: "DC", city: "Washington" }, classKey: "multifamily" };
