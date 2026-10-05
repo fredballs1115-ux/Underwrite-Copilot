@@ -63,7 +63,8 @@ export function ModelView({
    *  has no document rows of its own to compare them with */
   isSample?: boolean;
   /** what the price buys, read by the compare table's rule (lib/compare-
-   *  interest `modelReturnsRead`): a note's or a share's returns withheld */
+   *  interest `modelReturnsRead`): a note's, a share's or a preferred
+   *  equity position's returns withheld */
   interest?: ModelReturnsRead | null;
 }) {
   // Returns the price did not buy are withheld — and so are the stress
@@ -239,6 +240,15 @@ function Stat({
   );
 }
 
+/** The yield that stands in the cap's slot where the price buys no
+ *  building's cap — lib/compare-interest `OWN_YIELD_WORDS`' labels, whose
+ *  module this client file does not load (as app/(app)/deals/pipeline.tsx
+ *  keeps its own copy). */
+const OWN_YIELD_LABEL: Record<"note" | "position", string> = {
+  note: "Yield to maturity",
+  position: "Yield to redemption",
+};
+
 /** Past this, NOI ÷ price is not a cap rate: no operating US property yields
  *  a quarter of its price a year. The figure is a stabilized pro forma on a
  *  different basis (the finished conversion, the renovated building) or a
@@ -251,7 +261,8 @@ export function ReturnsHeadline({
 }: {
   model: UnderwritingModel;
   /** what the price buys (lib/compare-interest `modelReturnsRead`): a
-   *  note's or a share's returns are withheld, with the reason */
+   *  note's, a share's or a preferred equity position's returns are
+   *  withheld, with the reason */
   interest?: ModelReturnsRead | null;
 }) {
   const r = model.returns;
@@ -317,13 +328,15 @@ export function ReturnsHeadline({
         <Stat label="Levered IRR" value={withheld ? `n/a — ${withheld}` : pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
         <Stat label="Cash-on-cash (Yr 1)" value={withheld ? `n/a — ${withheld}` : pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
         <Stat label="Equity multiple" value={withheld ? `n/a — ${withheld}` : mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
-        {withheld === "note" ? (
+        {withheld === "note" || withheld === "position" ? (
           // A note has no cap: its yield to maturity at its price where it
-          // pays or may, the deal header's own slot (lib/compare-interest).
+          // pays or may, the deal header's own slot (lib/compare-interest);
+          // nor has a preferred equity position: its yield to redemption
+          // where the date has not gone by.
           interest?.noteYtmPct != null ? (
-            <Stat label="Yield to maturity" value={pct(interest.noteYtmPct)} />
+            <Stat label={OWN_YIELD_LABEL[withheld]} value={pct(interest.noteYtmPct)} />
           ) : (
-            <Stat label="Going-in cap" value="n/a — note" />
+            <Stat label="Going-in cap" value={`n/a — ${withheld}`} />
           )
         ) : interest?.share ? (
           // A share's cap is struck on the whole its price implies.

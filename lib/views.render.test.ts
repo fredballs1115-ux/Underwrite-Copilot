@@ -1295,6 +1295,31 @@ describe("ModelView — the sample model renders every panel", () => {
     expect(text).not.toMatch(/Stress the assumptions|Return sensitivity/);
   });
 
+  it("a preferred equity position: the cap and the returns withheld, its yield to redemption in the cap's place, and no stress panel or grid", () => {
+    const AS_OF = new Date("2026-10-05T12:00:00Z");
+    const terms = [
+      stated("Preferred equity amount", "$15,000,000"),
+      stated("Preferred return", "12% preferred return, 8% current pay"),
+      stated("Current pay rate", "8.0%"),
+      stated("Mandatory redemption date", "June 2029"),
+    ];
+    const position = priced({ ...blank, kind: "preferred_equity" }, "$14,000,000", terms);
+    const read = modelReturnsRead(position, SAMPLE_DEAL.model.returns, AS_OF);
+    const text = modelTab(read);
+    expect(text).toMatch(/A preferred equity position's price is a position's: this model runs the whole building as if bought outright at it/);
+    expect(text).toMatch(/Levered IRR\s*n\/a — position/);
+    expect(text).toMatch(/Cash-on-cash \(Yr 1\)\s*n\/a — position/);
+    expect(text).toMatch(/Equity multiple\s*n\/a — position/);
+    expect(text).toMatch(tile("Yield to redemption", `${read.noteYtmPct!.toFixed(2)}%`));
+    expect(text).not.toMatch(/Yield to maturity/);
+    expect(text).not.toContain(sampleCap);
+    expect(text).not.toMatch(/Stress the assumptions|Return sensitivity/);
+    // Past its redemption date there is no yield to state: the cap slot says
+    // it is withheld, in the position's words.
+    const late = modelTab(modelReturnsRead(position, SAMPLE_DEAL.model.returns, new Date("2029-08-01T12:00:00Z")));
+    expect(late).toMatch(/Going-in cap\s*n\/a — position/);
+  });
+
   it("a share: its cap struck on the whole, its returns withheld at the share's price and standing at the whole's", () => {
     // $68M for 49% is $138.8M for the whole; the model ran at $68M.
     const share = priced({ ...blank, kind: "partial_interest", share: "49% limited partnership interest" }, "$68,000,000");

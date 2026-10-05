@@ -132,9 +132,11 @@ type OmTerm = { label: string; value: string; page?: string };
  * under whose loan it is. The seller's loan offered for assumption (#417)
  * and the note the seller offers to carry (#462) are read by their own
  * finders and listed as theirs, never as the buyer's new financing. On a
- * note the loan's terms are the asset being sold (#416), and on a leased
- * fee the property's debt is the leaseholder's building's (`assumableApplies`)
- * — neither is financing this buyer takes, so neither lists any.
+ * note the loan's terms are the asset being sold (#416), on a leased fee
+ * the property's debt is the leaseholder's building's (`assumableApplies`),
+ * and on a preferred equity position the senior loan and its maturity are
+ * the owning entity's, ahead of the position (lib/position) — none is
+ * financing this buyer takes, so none lists any.
  */
 export function omLoanTerms(extraction: ExtractionResult | null): {
   offered: OmTerm[];
@@ -143,7 +145,7 @@ export function omLoanTerms(extraction: ExtractionResult | null): {
 } {
   const none = { offered: [], assumable: [], seller: [] };
   const { kind } = interestOf(extraction);
-  if (kind === "note" || kind === "leased_fee") return none;
+  if (kind === "note" || kind === "leased_fee" || kind === "preferred_equity") return none;
   const metrics = extraction?.metrics ?? [];
   const as = (term: string, m: { value: string; page?: string }): OmTerm => ({ label: term, value: m.value, page: m.page });
   const assumableRows = assumableStatedRows(metrics);
@@ -515,8 +517,9 @@ export function DebtSizer({
 
         {/* What the OM states of a loan, under whose loan it is: its own
             financing assumptions, the seller's loan offered for assumption,
-            the note the seller offers to carry. A note's terms and a leased
-            fee's debt are never listed here (omLoanTerms). */}
+            the note the seller offers to carry. A note's terms, a leased
+            fee's debt and the senior loan ahead of a preferred equity
+            position are never listed here (omLoanTerms). */}
         {omTerms.offered.length > 0 && (
           <>
             <SubHead>Financing stated in the OM</SubHead>

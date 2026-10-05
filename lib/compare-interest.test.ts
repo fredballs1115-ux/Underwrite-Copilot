@@ -123,8 +123,44 @@ describe("a note's going-in cap slot, wherever the deal is summarized", () => {
     expect(src).toMatch(/\{ \.\.\.goingInCapFigure\(extraction, summaryCap \?\? null\), figure: true \}/);
     expect(src).not.toMatch(/\{ label: "Going-in cap", value: summaryCap \?\? null, figure: true \}/);
     expect(src).toMatch(/capText=\{noteCap \? null : summaryCap\}/);
-    expect(src).toMatch(/capWithheld=\{noteCap \? "note" : null\}/);
-    expect(readFileSync("app/(app)/deals/[id]/research-panel.tsx", "utf8")).toMatch(/capWithheld === "note"/);
+    // The slot's own kind: a note's, or a preferred equity position's.
+    expect(src).toMatch(/capWithheld=\{noteCap\?\.of \?\? null\}/);
+    const panel = readFileSync("app/(app)/deals/[id]/research-panel.tsx", "utf8");
+    expect(panel).toMatch(/capWithheld === "note"/);
+    expect(panel).toMatch(/capWithheld === "position"/);
+  });
+});
+
+// A preferred equity position's price buys a rate and a redemption, never a
+// slice of the building (lib/position): the same slot as a note's, in its
+// own words — wherever the deal is summarized.
+describe("a preferred equity position's going-in cap slot, and its model returns", () => {
+  const AS_OF = new Date("2026-10-05T12:00:00Z");
+  // At par: the $20,000,000 asking price for a $20,000,000 position.
+  const terms = [
+    row("Going-in cap rate", "5.50%"),
+    row("Preferred equity amount", "$20,000,000"),
+    row("Preferred return", "12% preferred return, 8% current pay"),
+    row("Current pay rate", "8.0%"),
+    row("Mandatory redemption date", "June 2029"),
+  ];
+  const position = deal({ ...blank, kind: "preferred_equity" }, terms);
+
+  it("withholds the building's cap, with the position's yield to redemption in its place until the date goes by", () => {
+    const slot = noteCapSlot(position, AS_OF);
+    expect(slot?.of).toBe("position");
+    expect(slot?.ytmPct).not.toBeNull();
+    expect(goingInCapFigure(position, "5.50%", AS_OF)).toEqual({ label: "Yield to redemption", value: `${slot!.ytmPct!.toFixed(1)}%` });
+    // Past its redemption date there is no yield to state.
+    const late = new Date("2029-08-01T12:00:00Z");
+    expect(noteCapSlot(position, late)).toEqual({ ytmPct: null, of: "position" });
+    expect(goingInCapFigure(position, "5.50%", late)).toEqual({ label: "Going-in cap", value: "n/a — position" });
+  });
+
+  it("withholds the model's returns as the building's, and says why", () => {
+    const r = modelReturnsRead(position, MODEL, AS_OF);
+    expect(r).toMatchObject({ cap: null, withheld: "position", share: false });
+    expect(r.line).toMatch(/^A preferred equity position's price is a position's: this model runs the whole building as if bought outright at it/);
   });
 });
 

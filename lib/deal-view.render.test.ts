@@ -1320,6 +1320,14 @@ describe("the debt sizer lists a stated loan under whose loan it is (2026-09-30)
     expect(leasedFee).toEqual({ offered: [], assumable: [], seller: [] });
   });
 
+  it("lists nothing as financing on a preferred equity position: the senior loan ahead of it is the entity's (lib/position)", () => {
+    const rows = [row("Preferred equity amount", "$15,000,000"), row("Senior loan balance", "$52,000,000"), row("Senior loan maturity", "December 2029")];
+    const position = omLoanTerms(withRows(rows, { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "p. 3" } as Ex["interest"]));
+    expect(position).toEqual({ offered: [], assumable: [], seller: [] });
+    // Read as a building, the senior loan's maturity would list as the OM's own loan term.
+    expect(omLoanTerms(withRows(rows)).offered.map((r) => r.label)).toContain("Maturity");
+  });
+
   it("draws each group under its own heading on the Financials tab", () => {
     const p = sampleProps("financials");
     const assumable = textOf(render({ ...p, results: { ...p.results, extraction: withRows(ASSUMABLE) } }));
@@ -1618,6 +1626,26 @@ describe("DealView — the Model tab reads the price for what it buys", () => {
     expect(text).toMatch(/A note's price is a loan's/);
     expect(text).toMatch(/Levered IRR\s*n\/a — note/);
     expect(text).toMatch(/Yield to maturity\s*13\.80%/);
+  });
+
+  it("and a preferred equity position's, with its yield to redemption in the cap's place (lib/position)", () => {
+    const html = render({
+      ...sampleProps("financials"),
+      modelInterest: {
+        tag: "Pref equity, 12% to Jun 2029",
+        cap: null,
+        noteYtmPct: 14.3,
+        withheld: "position",
+        share: false,
+        line: "A preferred equity position's price is a position's: this model runs the whole building as if bought outright at it, so its cap and returns are the building's, not the position's, and are withheld.",
+      },
+    } as Props);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toMatch(/A preferred equity position's price is a position's/);
+    expect(text).toMatch(/Levered IRR\s*n\/a — position/);
+    expect(text).toMatch(/Yield to redemption\s*14\.30%/);
+    expect(text).not.toMatch(/Yield to maturity/);
   });
 });
 

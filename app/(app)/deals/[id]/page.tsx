@@ -1128,7 +1128,9 @@ export default async function DealPage({
   // A note has no going-in cap (lib/compare-interest, #423's rule, which the
   // key terms and the compare table keep): the collateral's income over a
   // loan's price is a cap nobody earns, so the slot says the note's yield to
-  // maturity at its price, or that the cap is withheld.
+  // maturity at its price, or that the cap is withheld — and a preferred
+  // equity position's yield to redemption, its price buying a rate and a
+  // redemption, never a slice of the building.
   const returnFigure: HeroFigure = plan
     ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
     : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
@@ -1749,10 +1751,11 @@ export default async function DealPage({
           sizeText={summarySize}
           priceText={subjectPriceNumber != null ? String(Math.round(subjectPriceNumber)) : null}
           // The leverage read spreads the BUYER's cap against debt, so on a
-          // note it does not run on the collateral's (lib/compare-interest):
-          // the panel says why instead.
+          // note it does not run on the collateral's, nor on a preferred
+          // equity position on the building's (lib/compare-interest): the
+          // panel says why instead.
           capText={noteCap ? null : summaryCap}
-          capWithheld={noteCap ? "note" : null}
+          capWithheld={noteCap?.of ?? null}
           planLabel={isPlanDeal(strategy.kind) ? strategy.label : null}
           yearBuilt={summaryYearBuilt}
           sectorFields={

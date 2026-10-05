@@ -269,8 +269,10 @@ export async function ResearchPanel({
   capText?: string | null;
   /** "note" where the deal's price is a loan's: the collateral's income
    *  over it is a cap nobody earns (lib/compare-interest `noteCapSlot`), so
-   *  the leverage check does not run and says why */
-  capWithheld?: "note" | null;
+   *  the leverage check does not run and says why; "position" where it is a
+   *  preferred equity position's, which buys a rate and a redemption, never
+   *  a slice of the building — the same rule, its own reason */
+  capWithheld?: "note" | "position" | null;
   /** the screening rate the model was seeded with off today's curve
    *  (lib/debt-index): the index a fact, the class spread an assumption,
    *  the note naming both — the leverage check reads the cap against it */
@@ -521,9 +523,27 @@ export async function ResearchPanel({
           </p>
         </div>
       )}
+      {/* A preferred equity position: its price buys a rate and a
+          redemption in the owning entity, never a slice of the building, so
+          the building's income over it is a cap nobody earns either. */}
+      {capPct == null && capWithheld === "position" && (
+        <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3" data-qa="leverage-position">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold">Leverage check</p>
+            <span className="rounded-full bg-faint px-2 py-0.5 text-[11px] font-medium text-muted">
+              n/a on a preferred equity position
+            </span>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-muted">
+            {
+              "The price is a position's, not the building's: it buys a preferred return and a redemption in the owning entity, never a slice of the building, so the building's income over it is a cap nobody earns, and there is no cap of the buyer's to spread against debt. The position is read by its yield to redemption at its price, and by where its last dollar sits on the stated value, not by a cap rate."
+            }
+          </p>
+        </div>
+      )}
       {/* A plan deal with no going-in cap: a dark building has nothing to
           spread against debt yet. Say so rather than leaving a gap. */}
-      {capPct == null && capWithheld !== "note" && planLabel && (
+      {capPct == null && !capWithheld && planLabel && (
         <div className="mt-3 rounded-lg border border-line bg-faint/60 p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs font-semibold">Leverage check</p>
