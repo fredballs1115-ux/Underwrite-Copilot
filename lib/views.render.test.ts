@@ -10145,7 +10145,7 @@ describe("ExchangeFields (the buy box's 1031 exchange) — three optional fields
     expect(a11yIssues(html)).toEqual([]);
     // A box written by hand with a filer not on the list reads it as unset.
     const hand = render(React.createElement(ExchangeFields, { exchange: { relinquishedTransferOn: "2026-10-01", filer: "llc" as never }, today: "2026-10-05" }));
-    expect(visibleText(hand)).toContain("close by Mar 30, 2027. A partnership's or an S corporation's calendar-year return is due Mar 15, 2027");
+    expect(visibleText(hand)).toContain("close by Mar 30, 2027. A partnership's or an S corporation's calendar-year return would end it sooner, read to Mar 15, 2027");
   });
 });
 

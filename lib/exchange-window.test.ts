@@ -19,11 +19,13 @@ describe("the buyer's 1031 clock (pass 28, round 4)", () => {
     const unset = w("2026-10-01");
     expect(unset).toMatchObject({ closeBy: "2027-03-30", returnDueBy: "2027-04-15", cutShort: false, filer: null, form: "Form 1040" });
     expect(unset.sentence).toBe(
-      "Identify your replacement property by Nov 15, 2026 (in 41 days), the 45th day from the Oct 1, 2026 transfer; close by Mar 30, 2027. A partnership's or an S corporation's calendar-year return is due Mar 15, 2027, which would end it sooner; set who files in the buy box.",
+      "Identify your replacement property by Nov 15, 2026 (in 41 days), the 45th day from the Oct 1, 2026 transfer; close by Mar 30, 2027. A partnership's or an S corporation's calendar-year return would end it sooner, read to Mar 15, 2027; set who files in the buy box.",
     );
     const partnership = w("2026-10-01", { filer: "partnership" });
     expect(partnership).toMatchObject({ closeBy: "2027-03-15", cutShort: true });
-    expect(partnership.sentence).toContain("close by Mar 15, 2027 — a calendar-year Form 1065 return is due Mar 15, 2027, which ends it before the 180th day unless the return is extended.");
+    expect(partnership.sentence).toContain(
+      "close by Mar 15, 2027 — the due date for a calendar-year Form 1065 return ends it before the 180th day unless the return is extended, and the window is read to Mar 15, 2027.",
+    );
     expect(w("2026-10-01", { filer: "s_corporation" }).closeBy).toBe("2027-03-15");
     expect(w("2026-12-20", { filer: "c_corporation" })).toMatchObject({ returnDueBy: "2027-04-15", closeBy: "2027-04-15", cutShort: true });
     expect(w("2026-12-20", { filer: "trust" }).form).toBe("Form 1041");
@@ -33,6 +35,17 @@ describe("the buyer's 1031 clock (pass 28, round 4)", () => {
     // An early transfer's 180 days end long before any return is due: no
     // partnership aside.
     expect(w("2026-09-15").sentence).not.toContain("partnership");
+  });
+
+  // The pre-merge audit (C1, L6): Apr 15, 2028 is a Saturday, and the
+  // sentence said an individual's return "is due Apr 15, 2028".
+  it("reads the window to the 15th and never says the return is due on it", () => {
+    const x = exchangeWindow({ relinquishedTransferOn: "2027-11-01" }, new Date(Date.UTC(2027, 10, 2, 12)))!;
+    expect(x).toMatchObject({ closeBy: "2028-04-15", cutShort: true, filer: null });
+    expect(x.sentence).toBe(
+      "Identify your replacement property by Dec 16, 2027 (in 44 days), the 45th day from the Nov 1, 2027 transfer; close by Apr 15, 2028 — the due date for an individual's Form 1040 return ends it before the 180th day unless the return is extended, and the window is read to Apr 15, 2028. A partnership's or an S corporation's calendar-year return would end it sooner, read to Mar 15, 2028; set who files in the buy box.",
+    );
+    expect(x.sentence).not.toMatch(/is due/);
   });
 
   it("says where the clock stands: a planned sale, closing, over", () => {

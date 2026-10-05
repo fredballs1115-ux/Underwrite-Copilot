@@ -152,8 +152,11 @@ export function exchangeWindow(block: ExchangeBlock | null | undefined, asOf: Da
 
 function windowSentence(w: Omit<ExchangeWindow, "sentence">): string {
   const from = `from the ${exchangeDay(w.transferOn)} transfer`;
+  // The window is read to the 15th, the earlier day: never said as the day
+  // the return "is due", which a weekend or a holiday can move (the
+  // pre-merge audit: Apr 15, 2028 is a Saturday).
   const cut = w.cutShort
-    ? ` — ${w.filer ? "a calendar-year" : "an individual's"} ${w.form} return is due ${exchangeDay(w.returnDueBy)}, which ends it before the 180th day unless the return is extended`
+    ? ` — the due date for ${w.filer ? "a calendar-year" : "an individual's"} ${w.form} return ends it before the 180th day unless the return is extended, and the window is read to ${exchangeDay(w.returnDueBy)}`
     : w.extended
       ? " — the return is extended, so the full 180 days"
       : "";
@@ -164,7 +167,7 @@ function windowSentence(w: Omit<ExchangeWindow, "sentence">): string {
   const march = Math.round(Date.UTC(year + 1, 2, 15) / 86_400_000);
   const unset =
     !w.filer && !w.extended && march < (dayOf(w.closeBy) ?? 0)
-      ? ` A partnership's or an S corporation's calendar-year return is due ${exchangeDay(isoOf(march))}, which would end it sooner; set who files in the buy box.`
+      ? ` A partnership's or an S corporation's calendar-year return would end it sooner, read to ${exchangeDay(isoOf(march))}; set who files in the buy box.`
       : "";
   switch (w.phase) {
     case "ahead":
