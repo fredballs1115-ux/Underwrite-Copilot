@@ -3,7 +3,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import sharp from "sharp";
 import { describe, expect, it } from "vitest";
 import { COVER_TONES, coverFor, coverKindFor, coverPlace, coverToneFor, coverVariantFor } from "./deal-cover";
-import { COVER_KINDS, coverImage, coverSvg } from "./deal-cover-art";
+import { COVER_KINDS, coverImage, coverSvg, type CoverScene } from "./deal-cover-art";
 import { CARD, THUMB, bannerSources } from "./deal-banner";
 import { COVER_FRAME, DealCover } from "@/app/(app)/deals/deal-cover";
 import { DealBanner } from "@/app/(app)/deals/deal-banner";
@@ -57,6 +57,14 @@ describe("a deal's cover (#442)", () => {
     const tones = new Set(ids.map(coverToneFor));
     for (const tone of tones) expect(Number.isInteger(tone) && tone >= 0 && tone < COVER_TONES.length).toBe(true);
     expect(tones.size).toBeGreaterThanOrEqual(6);
+    // Twelve skies, each worn about as often (research pass 29): eight had
+    // let three of every seventeen deals share one.
+    const many = Array.from({ length: 1200 }, (_, i) => coverToneFor(`deal-${i}`));
+    for (let tone = 0; tone < COVER_TONES.length; tone++) {
+      const share = many.filter((t) => t === tone).length / many.length;
+      expect(share, `sky ${tone}`).toBeGreaterThan(1 / 12 / 2);
+      expect(share, `sky ${tone}`).toBeLessThan((1 / 12) * 2);
+    }
     // The draw varies apart from the sky: deals under one sky still differ.
     expect(new Set(ids.map(coverVariantFor)).size).toBe(ids.length);
     const underOne = ids.filter((id) => coverToneFor(id) === coverToneFor(ids[0]));
@@ -70,45 +78,57 @@ describe("a deal's cover (#442)", () => {
   });
 
   it("reads white where a card's words sit, on the smallest card and up, before the shade under them", async () => {
-    // Every kind under every sky, drawn for real at the card's frame; the
-    // worst pixel under each line across the card's whole width. The place
-    // is white at 13px: AAA. The eyebrow is white at 90% and 9px: AA, as
-    // before.
+    // Every kind under every sky, at every hour on either side (research
+    // pass 29: the variant's three low bits, lib/deal-cover-art `coverDraw`)
+    // with the rest of each draw its own — its building's place, its street,
+    // its trees — drawn for real at the card's frame; the worst pixel under
+    // each line across the card's whole width. The place is white at 13px:
+    // AAA. The eyebrow is white at 90% and 9px: AA, as before.
     const [w, h] = COVER_FRAME.card;
-    for (const kind of COVER_KINDS) {
-      for (let tone = 0; tone < COVER_TONES.length; tone++) {
-        const { data } = await sharp(Buffer.from(coverSvg({ kind, tone, variant: 7919 * (tone + 1) }, w, h)))
-          .removeAlpha()
-          .raw()
-          .toBuffer({ resolveWithObject: true });
-        // Each row's brightest pixel: the one the words read worst on.
-        const brightest = Array.from({ length: h }, (_, y) => {
-          let best = [0, 0, 0];
-          for (let x = 0; x < w; x++) {
-            const i = (y * w + x) * 3;
-            const px = [data[i], data[i + 1], data[i + 2]];
-            if (luminance(px) > luminance(best)) best = px;
-          }
-          return best;
-        });
-        const worst = (card: number, [from, to]: readonly [number, number], alpha: number) => {
-          let least = Infinity;
-          for (let y = Math.floor((1 - to / card) * h); y < Math.ceil((1 - from / card) * h); y++) {
-            const bg = brightest[y];
-            least = Math.min(least, contrast(bg.map((v) => 255 * alpha + v * (1 - alpha)), bg));
-          }
-          return least;
-        };
-        for (const card of CARD_HEIGHTS) {
-          expect(worst(card, WORDS.place, 1), `${kind} ${tone} place at ${card}px`).toBeGreaterThanOrEqual(7);
-          expect(worst(card, WORDS.eyebrow, 0.9), `${kind} ${tone} eyebrow at ${card}px`).toBeGreaterThanOrEqual(4.5);
+    // The rows the words reach on the smallest card, and so on every card.
+    const top = Math.floor((1 - WORDS.eyebrow[1] / Math.min(...CARD_HEIGHTS)) * h);
+    const scenes = COVER_KINDS.flatMap((kind, k) =>
+      COVER_TONES.flatMap((_, tone) =>
+        Array.from({ length: 8 }, (_, hour) => ({ kind, tone, variant: ((((k + 1) * 7919 + (tone + 1) * 104729) << 3) | hour) >>> 0 })),
+      ),
+    );
+    expect(new Set(scenes.map((s) => s.variant & 7)).size).toBe(8);
+    const check = async (scene: CoverScene) => {
+      const { kind, tone, variant } = scene;
+      const { data } = await sharp(Buffer.from(coverSvg(scene, w, h)))
+        .removeAlpha()
+        .extract({ left: 0, top, width: w, height: h - top })
+        .raw()
+        .toBuffer({ resolveWithObject: true });
+      // Each row's brightest pixel: the one the words read worst on.
+      const brightest = Array.from({ length: h - top }, (_, y) => {
+        let best = [0, 0, 0];
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 3;
+          const px = [data[i], data[i + 1], data[i + 2]];
+          if (luminance(px) > luminance(best)) best = px;
         }
+        return best;
+      });
+      const worst = (card: number, [from, to]: readonly [number, number], alpha: number) => {
+        let least = Infinity;
+        for (let y = Math.floor((1 - to / card) * h); y < Math.ceil((1 - from / card) * h); y++) {
+          const bg = brightest[y - top];
+          least = Math.min(least, contrast(bg.map((v) => 255 * alpha + v * (1 - alpha)), bg));
+        }
+        return least;
+      };
+      for (const card of CARD_HEIGHTS) {
+        expect(worst(card, WORDS.place, 1), `${kind} ${tone} ${variant} place at ${card}px`).toBeGreaterThanOrEqual(7);
+        expect(worst(card, WORDS.eyebrow, 0.9), `${kind} ${tone} ${variant} eyebrow at ${card}px`).toBeGreaterThanOrEqual(4.5);
       }
-    }
-    // Every kind under every sky drawn through sharp: about 1.4 s alone, and
-    // past the default 5 s on a machine running the whole suite beside
-    // other work, where it timed out rather than failed.
-  }, 30_000);
+    };
+    // Several at once, so sharp's threads draw them together.
+    for (let i = 0; i < scenes.length; i += 12) await Promise.all(scenes.slice(i, i + 12).map(check));
+    // Every kind under twelve skies at every hour on both sides — 864
+    // drawings through sharp, each read only where the words can reach:
+    // several seconds alone, longer on a machine running other work.
+  }, 180_000);
 
   it("names the place from the address, then the market, then the memorandum's words", () => {
     expect(coverPlace({ city: "Waco", state: "TX" }, "Dallas-Fort Worth TX", "Central Texas")).toBe("Waco, TX");
