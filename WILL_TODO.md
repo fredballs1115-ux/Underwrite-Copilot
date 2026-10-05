@@ -279,6 +279,26 @@ Three are yours:
    model) on the 120. Saying which count the deal's count row is changes
    the extraction.
 
+**Photographs, round 12.** Fifteen more metro areas now show a photograph
+of their market, each judged by eye through the card's and the deal page's
+crops, with every credit exactly as the runner printed it. Helena, Fort
+Smith and Corvallis keep the drawn cover. Six choices are yours to
+overrule (each alternative is the drawn cover unless said):
+1. **La Crosse** is a 4.78:1 panorama, the table's widest. A 3x phone's
+   card draws it about 1.3x its pixels, a little soft; a 2x phone is sharp.
+2. **Lake Havasu City**'s London Bridge wears Christmas wreaths on its
+   piers (photographed Nov 27, 2025), on a card shown all year.
+3. **Casper** is the round's weakest: at a phone's card size the city is a
+   band in the distance below Casper Mountain's pines.
+4. **Hot Springs** and **Jefferson City** are aerials without a horizon.
+   They read as a town and a building rather than a map, but they bend the
+   no-map-like-aerial rule.
+5. **Two credits read "<user> at English Wikipedia"** as printed (Bangor,
+   Jefferson City). A probe of the two file pages would print the bare
+   username, if you prefer it.
+6. **"Amherst Town-Northampton, MA"** keeps the Census title whole; Boise's
+   precedent would shorten it to the town's everyday name.
+
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
 **Do these (each is yours alone):**
