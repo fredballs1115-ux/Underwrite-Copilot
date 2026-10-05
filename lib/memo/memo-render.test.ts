@@ -894,6 +894,15 @@ describe("MemoDocument (redesigned)", () => {
     expect(text).toContain("Sold at auction: bidding opens at $2.5M");
     expect((buf.toString("latin1").match(/\/Type\s*\/Page[^s]/g) ?? []).length).toBe(1);
     expect(buildMemoData({ ...deal, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).saleLine).toBe("");
+    // The bids' deadline is read on the memo's own day (the reader's,
+    // lib/reader-day), never the server's: on the day before it the line
+    // says when bids are due, and on the day after it says nothing of them.
+    const withDeadline = {
+      ...deal,
+      extraction: { ...extraction, metrics: [...extraction.metrics, { label: "Bid deadline", value: "October 6, 2026", flagged: false, page: "p. 3", basis: "na" }] },
+    } as unknown as DealRow;
+    expect(buildMemoData(withDeadline, "October 5, 2026", [], undefined, null, null, "2026-10-05").saleLine).toContain("bids due Oct 6, 2026");
+    expect(buildMemoData(withDeadline, "October 7, 2026", [], undefined, null, null, "2026-10-07").saleLine).not.toContain("bids due");
   }, 30000);
 
   it("the cover aerial prints on page one, and the memo is still one page", async () => {

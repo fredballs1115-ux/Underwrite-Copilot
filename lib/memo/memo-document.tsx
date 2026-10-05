@@ -169,10 +169,15 @@ function portfolioLineFor(extraction: ExtractionResult | null): string {
   return p ? [`A portfolio of ${p.assets.length} properties across ${marketsPhrase(p)}.`, ...portfolioFacts(p)].join(" ") : "";
 }
 
+/** The memo's day as the instant the dated readers read it on: noon UTC
+ *  of the reader's own day (lib/reader-day), so a lease's end, a bid's
+ *  deadline or a Phase I's age is judged on the day the memo is dated. */
+const noonOf = (today: string): Date => new Date(`${today}T12:00:00Z`);
+
 /** What is being sold, in one line for the memo's header (lib/interest):
  *  "" for a plain fee simple, whose memo reads as it always did. */
-function interestLineFor(extraction: ExtractionResult | null): string {
-  const r = readInterest(extraction, askingPriceOf(extraction));
+function interestLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readInterest(extraction, askingPriceOf(extraction), noonOf(today));
   return r ? interestShortLine(r) : "";
 }
 
@@ -180,24 +185,24 @@ function interestLineFor(extraction: ExtractionResult | null): string {
  *  the memo's header (lib/assumable-debt, #419): the terms as stated — the
  *  pricing against today's rate is the deal page's and the report's, which
  *  carry the model. "" where none is offered. */
-function assumableLineFor(extraction: ExtractionResult | null): string {
-  const a = readAssumable(extraction, null);
+function assumableLineFor(extraction: ExtractionResult | null, today: string): string {
+  const a = readAssumable(extraction, null, noonOf(today));
   return a ? assumableLine(a) : "";
 }
 
 /** A covenant or a contract that sets the rents (lib/affordable, #453), in
  *  one line for the memo's header: how much is restricted, under what,
  *  until when. "" on a market-rate deal. */
-function affordableLineFor(extraction: ExtractionResult | null): string {
-  const r = readAffordable(extraction);
+function affordableLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readAffordable(extraction, noonOf(today));
   return r ? affordableShortLine(r) : "";
 }
 
 /** The one lease a single-tenant property is (lib/single-tenant, #454), in
  *  one line for the memo's header: the tenant, its guarantor, when the
  *  lease ends and how its rent grows. "" on anything else. */
-function singleTenantLineFor(extraction: ExtractionResult | null): string {
-  const r = readSingleTenant(extraction);
+function singleTenantLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readSingleTenant(extraction, noonOf(today));
   return r ? singleTenantShortLine(r) : "";
 }
 
@@ -205,8 +210,8 @@ function singleTenantLineFor(extraction: ExtractionResult | null): string {
  *  one line for the memo's header: how much of the building the list
  *  covers, how much of its rent rolls before the model's sale, the anchors
  *  in and out of the sale. "" where fewer than two are listed. */
-function rosterLineFor(extraction: ExtractionResult | null): string {
-  const r = readRoster(extraction);
+function rosterLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readRoster(extraction, noonOf(today));
   return r ? rosterShortLine(r) : "";
 }
 
@@ -231,8 +236,8 @@ function sellerNoteLineFor(extraction: ExtractionResult | null): string {
  *  memorandum states none. */
 /** What the third-party reports found (lib/site-reports, #465), in one
  *  line for the memo's header. "" where the memorandum cites none. */
-function siteReportsLineFor(extraction: ExtractionResult | null): string {
-  const r = readSiteReports(extraction);
+function siteReportsLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readSiteReports(extraction, noonOf(today));
   return r ? siteReportsShortLine(r) : "";
 }
 
@@ -287,7 +292,7 @@ function regulationLineFor(deal: DealRow, extraction: ExtractionResult | null, t
  *  date and the deposit, read on `today` with the kind the memo reads. ""
  *  where the buyer is not paying for a building at its completion. */
 function forwardLineFor(extraction: ExtractionResult | null, strategy: DealStrategy, today: string): string {
-  const r = readForwardPurchase(extraction, new Date(`${today}T12:00:00Z`), strategy);
+  const r = readForwardPurchase(extraction, noonOf(today), strategy);
   return r ? forwardShortLine(r) : "";
 }
 
@@ -295,7 +300,7 @@ function forwardLineFor(extraction: ExtractionResult | null, strategy: DealStrat
  *  its two incomes as stated, the commercial share and the commercial
  *  space. "" on anything else. */
 function mixedUseLineFor(extraction: ExtractionResult | null, today: string): string {
-  const r = readMixedUse(extraction, new Date(`${today}T12:00:00Z`));
+  const r = readMixedUse(extraction, noonOf(today));
   return r ? mixedUseShortLine(r) : "";
 }
 
@@ -303,7 +308,7 @@ function mixedUseLineFor(extraction: ExtractionResult | null, today: string): st
  *  line for the memo's header: what is sold, the operator's earnings and
  *  the rent's coverage. "" on anything else. */
 function goingConcernLineFor(extraction: ExtractionResult | null, today: string): string {
-  const r = readGoingConcern(extraction, new Date(`${today}T12:00:00Z`));
+  const r = readGoingConcern(extraction, noonOf(today));
   return r ? goingConcernShortLine(r) : "";
 }
 
@@ -311,7 +316,7 @@ function goingConcernLineFor(extraction: ExtractionResult | null, today: string)
  *  header: the units offered of the condominium's, a year of their dues and
  *  a special assessment. "" on anything else. */
 function condoLineFor(extraction: ExtractionResult | null, today: string): string {
-  const r = readCondo(extraction, new Date(`${today}T12:00:00Z`));
+  const r = readCondo(extraction, noonOf(today));
   return r ? condoShortLine(r) : "";
 }
 
@@ -320,7 +325,7 @@ function condoLineFor(extraction: ExtractionResult | null, today: string): strin
  *  when the master lease ends. "" on anything but a master lease of the
  *  building. */
 function sandwichLineFor(extraction: ExtractionResult | null, today: string): string {
-  const r = readSandwichLease(extraction, new Date(`${today}T12:00:00Z`));
+  const r = readSandwichLease(extraction, noonOf(today));
   return r ? sandwichShortLine(r) : "";
 }
 
@@ -338,27 +343,27 @@ export interface MemoExchange {
 function exchangeFor(deal: DealRow, extraction: ExtractionResult | null, exchange: MemoExchange | null | undefined) {
   if (!exchange?.block) return null;
   const due = (deal as { offers_due?: string | null }).offers_due ?? null;
-  return exchangeForDeal(exchange.block, extraction, due, new Date(`${exchange.readerDay}T12:00:00Z`));
+  return exchangeForDeal(exchange.block, extraction, due, noonOf(exchange.readerDay));
 }
 
-function taxAbatementLineFor(extraction: ExtractionResult | null): string {
-  const r = readTaxAbatement(extraction);
+function taxAbatementLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readTaxAbatement(extraction, noonOf(today));
   return r ? taxAbatementShortLine(r) : "";
 }
 
 /** How the property is sold (lib/sale-terms, #456), in one line for the
  *  memo's header: the auction's bid, premium, reserve and deadline, or who
  *  is selling. "" on a negotiated sale. */
-function saleLineFor(extraction: ExtractionResult | null): string {
-  const r = readSale(extraction);
+function saleLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readSale(extraction, noonOf(today));
   return r ? saleShortLine(r) : "";
 }
 
 /** What a hotel is sold with (lib/hotel-deal, #455), in one line for the
  *  memo's header: the flag, the encumbrance, the PIP, the franchise's end.
  *  "" on anything but a hotel. */
-function hotelLineFor(extraction: ExtractionResult | null): string {
-  const r = readHotelDeal(extraction);
+function hotelLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readHotelDeal(extraction, noonOf(today));
   return r ? hotelShortLine(r) : "";
 }
 
@@ -782,9 +787,9 @@ export function buildMemoData(
     assetClass: shownAssetClass(str(deal.asset_class), extraction ?? null),
     strategyLine: pdfSafe(strategyLineFor(extraction ?? null, strategy, shownAssetClass(str(deal.asset_class), extraction ?? null))),
     portfolioLine: pdfSafe(portfolioLineFor(extraction ?? null)),
-    interestLine: pdfSafe(interestLineFor(extraction ?? null)),
-    assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
-    affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
+    interestLine: pdfSafe(interestLineFor(extraction ?? null, today)),
+    assumableLine: pdfSafe(assumableLineFor(extraction ?? null, today)),
+    affordableLine: pdfSafe(affordableLineFor(extraction ?? null, today)),
     regulationLine: pdfSafe(regulationLineFor(deal, extraction ?? null, today)),
     forwardLine: pdfSafe(forwardLineFor(extraction ?? null, strategy, today)),
     mixedUseLine: pdfSafe(mixedUseLineFor(extraction ?? null, today)),
@@ -793,14 +798,14 @@ export function buildMemoData(
     sandwichLine: pdfSafe(sandwichLineFor(extraction ?? null, today)),
     exchangeLine: pdfSafe(dealExchange?.line ?? ""),
     exchangeCaution: dealExchange?.tone === "caution",
-    singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
-    hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
-    saleLine: pdfSafe(saleLineFor(extraction ?? null)),
-    rosterLine: pdfSafe(rosterLineFor(extraction ?? null)),
+    singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null, today)),
+    hotelLine: pdfSafe(hotelLineFor(extraction ?? null, today)),
+    saleLine: pdfSafe(saleLineFor(extraction ?? null, today)),
+    rosterLine: pdfSafe(rosterLineFor(extraction ?? null, today)),
     valueAddLine: pdfSafe(valueAddLineFor(extraction ?? null)),
-    taxAbatementLine: pdfSafe(taxAbatementLineFor(extraction ?? null)),
+    taxAbatementLine: pdfSafe(taxAbatementLineFor(extraction ?? null, today)),
     sellerNoteLine: pdfSafe(sellerNoteLineFor(extraction ?? null)),
-    siteReportsLine: pdfSafe(siteReportsLineFor(extraction ?? null)),
+    siteReportsLine: pdfSafe(siteReportsLineFor(extraction ?? null, today)),
     studentLine: pdfSafe(studentLineFor(extraction ?? null)),
     mhLine: pdfSafe(mhLineFor(extraction ?? null)),
     storageLine: pdfSafe(storageLineFor(extraction ?? null)),
