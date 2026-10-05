@@ -376,6 +376,43 @@ function positionSentences(r: Omit<PositionRead, "headline" | "sentences">): str
   return out;
 }
 
+/**
+ * The small print under the position's figures (the panel's, as a note's
+ * `noteCaption` is under the note's): how long it runs to its redemption and
+ * on what accrual its yield was read — or, past its redemption date, that
+ * the date has gone by, where no yield is drawn. "" where neither applies.
+ */
+export function positionCaption(r: PositionRead | null): string {
+  if (!r) return "";
+  const t = r.terms;
+  if (!t.redemption) {
+    return r.currentYieldPct != null || r.currentPayYear != null
+      ? "The memorandum states no redemption date, so there is no yield to redemption to give."
+      : "";
+  }
+  const when = monthYear(t.redemption);
+  if (r.redeemedPast) return `Its ${when} redemption date has gone by: unredeemed, that is a default to be cured under the remedies, not a yield.`;
+  if (r.monthsLeft === 0) {
+    return r.thisMonth
+      ? `Due this month, at its ${when} redemption.`
+      : r.daysLeft === 0
+        ? `Due today, at its ${when} redemption.`
+        : `Under a month to its ${when} redemption.`;
+  }
+  if (r.monthsLeft == null) return "";
+  // The yield's accrual on the side lib/position reads it: as stated, else
+  // simple — the lower.
+  const basis =
+    t.accrualPct == null
+      ? "on its current pay alone — the memorandum states no accrual"
+      : t.compounds === true
+        ? "the accrual compounding, as stated"
+        : t.compounds === false
+          ? "the accrual simple, as stated"
+          : "the accrual read as simple, the lower yield — the memorandum does not say whether it compounds";
+  return `${r.monthsLeft} ${r.monthsLeft === 1 ? "month" : "months"} to its ${when} redemption, ${basis}.`;
+}
+
 /** What the property model's returns are, beside the position's own. */
 export function positionModelLine(r: PositionRead | null): string | null {
   if (!r) return null;

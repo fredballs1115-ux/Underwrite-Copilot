@@ -2,6 +2,7 @@ import Link from "next/link";
 import { LeaseTermBar } from "@/app/lease-term-bar";
 import { termEndLabel } from "@/lib/ground-lease-term";
 import { isWholeShare, noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRead } from "@/lib/interest";
+import { positionCaption } from "@/lib/position";
 
 /**
  * What is being sold (#414) — the pure panel for `lib/interest`, drawn by
@@ -32,6 +33,18 @@ import { isWholeShare, noteCaption, noteCollateralSentence, noteYieldSentence, t
  * when it ends (#421): the years left today, and the extension options
  * after them dashed — the one fact that decides what a leasehold is worth,
  * and what a leased fee's reversion waits on.
+ *
+ * A preferred equity position is read as a position (lib/position), as a
+ * note is read as a note: where its redemption date has not gone by, its
+ * yield to redemption, current yield and cash a year are tiles — each only
+ * where stated — with how long it runs and on what accrual its yield was
+ * read beneath; past the date no figure is drawn, and the line beneath says
+ * the date has gone by. Where the memorandum states the senior loan and the
+ * property's value, the track is that value: the senior loan filled from
+ * the first dollar, the position from its first dollar to its last today,
+ * the accrual owed at redemption on top of it, and a tick at the stated
+ * value — the empty remainder is the common equity under it, and where the
+ * last dollar passes the value the track runs on past the tick.
  */
 // Rounded on the tenths, never a float's toFixed.
 const money = (n: number) =>
@@ -62,12 +75,79 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
           n.cents != null ? { label: "On the dollar", value: `${tenths(n.cents)}¢`, sub: "the price over the balance" } : null,
         ].filter((t): t is { label: string; value: string; sub: string } => t != null)
       : [];
+  // A preferred equity position, read as a position (lib/position): its own
+  // figures where its redemption date has not gone by — a large yield
+  // nobody is owed is not drawn — each only where the memorandum states it.
+  const p = r.kind === "preferred_equity" ? r.position : null;
+  const posTiles =
+    p && !p.redeemedPast
+      ? [
+          p.yieldPct != null ? { label: "To redemption", value: `${tenths(p.yieldPct)}%`, sub: "if paid and redeemed as agreed" } : null,
+          p.currentYieldPct != null ? { label: "Current yield", value: `${tenths(p.currentYieldPct)}%`, sub: "a year's current pay on the price" } : null,
+          p.currentPayYear != null && p.terms.currentPayPct != null
+            ? {
+                label: "Cash a year",
+                value: money(p.currentPayYear),
+                sub: `${tenths(p.terms.currentPayPct)}% current pay${p.terms.amount != null ? ` on ${money(p.terms.amount)}` : ""}`,
+              }
+            : null,
+        ].filter((t): t is { label: string; value: string; sub: string } => t != null)
+      : [];
   // The tiles say the yield; without them the sentence does. The cushion is
   // always the collateral's bar where the memorandum states the value. The
   // first sentence leads and the rest folds, whole in the HTML, as every
-  // deal-type panel reads.
-  const said = n && tiles.length === 0 ? [...r.leadSentences, noteYieldSentence(n)].filter(Boolean) : r.leadSentences;
+  // deal-type panel reads — a position's whole read among them.
+  const said = n && tiles.length === 0 ? [...r.leadSentences, noteYieldSentence(n)].filter(Boolean) : p ? [...r.leadSentences, ...p.sentences] : r.leadSentences;
   const caption = tiles.length > 0 ? noteCaption(n) : "";
+  // Under a position's tiles, how long it runs and on what accrual its yield
+  // was read; past its redemption date, where no figure is drawn, that the
+  // date has gone by.
+  const posCaption = p && (posTiles.length > 0 || p.redeemedPast) ? positionCaption(p) : "";
+  // One block of figures, a note's or a position's: the same tiles, the same
+  // small print beneath.
+  const figures =
+    tiles.length > 0
+      ? { qa: "note-figures", tiles, caption }
+      : posTiles.length > 0 || posCaption
+        ? { qa: "position-figures", tiles: posTiles, caption: posCaption }
+        : null;
+  // The position's stack over the stated value: where its first and last
+  // dollar sit, the track running past the value only where the last
+  // dollar does (lib/position reads the last dollar compounding where the
+  // memorandum does not say, the side that does not flatter it). Each
+  // figure is said in the key beneath, in words a screen reader reads.
+  const stack =
+    p &&
+    p.attachmentPct != null &&
+    p.detachmentTodayPct != null &&
+    p.detachmentPct != null &&
+    p.terms.seniorBalance != null &&
+    p.terms.value != null &&
+    p.terms.amount != null
+      ? (() => {
+          const scale = Math.max(100, p.detachmentPct);
+          const at = (pct: number) => `${(pct * 100) / scale}%`;
+          const span = (from: number, to: number) => ({ left: at(from), width: `${Math.max(1.5, ((to - from) * 100) / scale)}%` });
+          // The accrual is drawn where it moves the last dollar, on the
+          // sentence's own rule (lib/position: "(83.8% today)").
+          const accrues = p.detachmentPct - p.detachmentTodayPct >= 0.05;
+          const accrued = ((p.detachmentPct - p.detachmentTodayPct) / 100) * p.terms.value;
+          return {
+            senior: { width: at(p.attachmentPct) },
+            amount: span(p.attachmentPct, p.detachmentTodayPct),
+            accrued: accrues ? span(p.detachmentTodayPct, p.detachmentPct) : null,
+            value: at(100),
+            seniorText: money(p.terms.seniorBalance),
+            amountText: money(p.terms.amount),
+            accruedText: `${money(accrued)}${p.terms.compounds === true ? ", compounding" : p.terms.compounds === false ? ", simple" : ", if it compounds"}`,
+            valueText: money(p.terms.value),
+            attachText: tenths(p.attachmentPct),
+            todayText: tenths(p.detachmentTodayPct),
+            lastText: tenths(p.detachmentPct),
+            past: p.detachmentPct >= 100,
+          };
+        })()
+      : null;
   // Behind a senior loan the note's own loan-to-value is withheld
   // (lib/note-yield), and the sentence stands where the collateral's track
   // would: the stack on the senior's stated balance, or why there is none.
@@ -169,18 +249,20 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
           {termNeedsWords && <p className="mt-1 text-[11px] leading-snug text-muted">{`${r.termLine}.`}</p>}
         </div>
       )}
-      {tiles.length > 0 && (
-        <div className="mt-2.5" data-qa="note-figures">
-          <dl className="grid grid-cols-3 gap-1.5">
-            {tiles.map((t) => (
-              <div key={t.label} className="rounded-lg border border-line bg-surface px-2.5 py-1.5">
-                <dt className="text-[10px] font-semibold uppercase leading-tight tracking-wider text-muted">{t.label}</dt>
-                <dd className="font-mono text-base font-semibold tabular-nums">{t.value}</dd>
-                <dd className="text-[10px] leading-snug text-muted">{t.sub}</dd>
-              </div>
-            ))}
-          </dl>
-          {caption && <p className="mt-1 text-[11px] leading-snug text-muted">{caption}</p>}
+      {figures && (
+        <div className="mt-2.5" data-qa={figures.qa}>
+          {figures.tiles.length > 0 && (
+            <dl className="grid grid-cols-3 gap-1.5">
+              {figures.tiles.map((t) => (
+                <div key={t.label} className="rounded-lg border border-line bg-surface px-2.5 py-1.5">
+                  <dt className="text-[10px] font-semibold uppercase leading-tight tracking-wider text-muted">{t.label}</dt>
+                  <dd className="font-mono text-base font-semibold tabular-nums">{t.value}</dd>
+                  <dd className="text-[10px] leading-snug text-muted">{t.sub}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+          {figures.caption && <p className="mt-1 text-[11px] leading-snug text-muted">{figures.caption}</p>}
         </div>
       )}
       {collateral && (
@@ -211,6 +293,43 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
                 <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-line" />
               )}
               {`The collateral, as stated ${money(collateral.value)}`}
+            </li>
+          </ul>
+        </div>
+      )}
+      {stack && (
+        <div className="mt-2.5">
+          <div className="relative h-2.5 rounded-full bg-line" aria-hidden>
+            <div className="absolute inset-y-0 left-0 rounded-l-full bg-ink/30" data-bar="pos-senior" style={stack.senior} />
+            <div
+              className={stack.accrued ? "absolute inset-y-0 bg-brand/70" : "absolute inset-y-0 rounded-r-full bg-brand/70"}
+              data-bar="pos-amount"
+              style={stack.amount}
+            />
+            {stack.accrued && <div className="absolute inset-y-0 rounded-r-full bg-brand/30" data-bar="pos-accrued" style={stack.accrued} />}
+            <div className="absolute -inset-y-0.5 -ml-px w-0.5 rounded-full bg-ink" data-bar="pos-value" style={{ left: stack.value }} />
+          </div>
+          {/* A key, as the note's bar has: the senior loan grey, the position
+              dark from its first dollar to its last today, the accrual light
+              on top, and the stated value the tick. */}
+          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted" data-qa="position-stack-key">
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-ink/30" />
+              {`Senior loan ${stack.seniorText} · ${stack.attachText}% of the stated value`}
+            </li>
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/70" />
+              {`The position ${stack.amountText} · ${stack.attachText}% to ${stack.todayText}%${stack.accrued ? " today" : ""}`}
+            </li>
+            {stack.accrued && (
+              <li className="flex items-center gap-1.5">
+                <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/30" />
+                {`Accrued by redemption ${stack.accruedText} · to ${stack.lastText}%`}
+              </li>
+            )}
+            <li className="flex items-center gap-1.5">
+              <span aria-hidden className="inline-block h-3 w-0.5 shrink-0 rounded-full bg-ink" />
+              {`The stated value ${stack.valueText}${stack.past ? " · the last dollar runs past it" : ""}`}
             </li>
           </ul>
         </div>

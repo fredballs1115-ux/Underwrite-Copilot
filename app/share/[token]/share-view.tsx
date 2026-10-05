@@ -360,8 +360,12 @@ export function ShareView({
       </p>
 
       {/* What is being sold (#414) — a note, a share, a leasehold changes
-          what every figure below means; nothing for a plain fee simple. */}
-      <InterestPanel interest={readInterest(safeExtraction, askingPriceOf(safeExtraction))} />
+          what every figure below means; nothing for a plain fee simple.
+          Read on the loader's day, as the panels below are: a note's yield
+          to maturity and a position's to redemption run from it. */}
+      <InterestPanel
+        interest={readInterest(safeExtraction, askingPriceOf(safeExtraction), today ? new Date(`${today}T12:00:00Z`) : undefined)}
+      />
 
       {/* A sandwich position (lib/sandwich-lease): the sublease income
           against the master rent, its cover and the master lease's term —

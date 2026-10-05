@@ -12,6 +12,7 @@ import {
   SENIOR_MATURITY_ROW,
   VALUE_ROW,
   isPreferredEquity,
+  positionCaption,
   positionModelLine,
   positionNote,
   positionTag,
@@ -117,6 +118,32 @@ describe("a preferred equity position, read as a position (research pass 28, rou
     expect(positionTag(r)).toBe("Pref equity, past redemption");
     // Inside the stated month it is due, not past.
     expect(readPosition(PREF, 15_000_000, new Date("2029-06-15T12:00:00Z"))!.redeemedPast).toBe(false);
+  });
+
+  it("says under its figures how long it runs and on what accrual its yield was read, or that its date has gone by", () => {
+    // Not stated whether it compounds: the yield read as simple, said so.
+    expect(positionCaption(readPosition(PREF, 14_000_000, ON))).toBe(
+      "32 months to its Jun 2029 redemption, the accrual read as simple, the lower yield — the memorandum does not say whether it compounds.",
+    );
+    const compounding = ex(
+      [...PREF.metrics.filter((m) => m.label !== "Preferred return"), metric("Accrual rate", "4.0%, compounding monthly")],
+      "preferred_equity",
+    );
+    expect(positionCaption(readPosition(compounding, 14_000_000, ON))).toBe("32 months to its Jun 2029 redemption, the accrual compounding, as stated.");
+    // A position paying its current pay alone: no accrual to read.
+    const cashOnly = ex(PREF.metrics.filter((m) => m.label !== "Preferred return"), "preferred_equity");
+    expect(positionCaption(readPosition(cashOnly, 14_000_000, ON))).toBe(
+      "32 months to its Jun 2029 redemption, on its current pay alone — the memorandum states no accrual.",
+    );
+    // Past its date: a default, not a yield; inside its stated month, due.
+    expect(positionCaption(readPosition(PREF, 14_000_000, new Date("2029-08-01T12:00:00Z")))).toBe(
+      "Its Jun 2029 redemption date has gone by: unredeemed, that is a default to be cured under the remedies, not a yield.",
+    );
+    expect(positionCaption(readPosition(PREF, 14_000_000, new Date("2029-06-15T12:00:00Z")))).toBe("Due this month, at its Jun 2029 redemption.");
+    // No date stated: no yield to give, said; nothing at all with nothing read.
+    const undated = ex(PREF.metrics.filter((m) => m.label !== "Mandatory redemption date"), "preferred_equity");
+    expect(positionCaption(readPosition(undated, 14_000_000, ON))).toBe("The memorandum states no redemption date, so there is no yield to redemption to give.");
+    expect(positionCaption(null)).toBe("");
   });
 
   it("reads no stack without the senior balance, and says why", () => {

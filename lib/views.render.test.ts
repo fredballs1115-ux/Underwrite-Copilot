@@ -8,7 +8,7 @@
 // word doubled; the markup for an image with no alt, a button or link with
 // no accessible name, a form control with no label, an id used twice. Same
 // components, same props the server pages hand them.
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, onTestFinished, vi } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 
@@ -7050,6 +7050,218 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(html.match(/data-bar="interest"/g)).toHaveLength(1);
     expect(a11yIssues(html), "leased fee panel").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+// ── A preferred equity position, read as a position (lib/position) ──────────
+import { pickSlots } from "@/lib/pipeline-slots";
+
+// $15M of preferred equity at a 12% preferred return, 8% of it paid in cash,
+// behind a $52M senior loan on an $80M stated value, offered at $14M — read
+// on a pinned day, since its yield to redemption runs from today.
+const POSITION_TODAY = new Date("2026-10-05T12:00:00Z");
+const positionDeck = (metrics: { label: string; value: string }[]) =>
+  ({
+    dealName: "Harbor View Apartments",
+    assetClass: "multifamily",
+    totalPages: 40,
+    interest: { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "p. 3" },
+    metrics: metrics.map((m) => ({ ...m, flagged: false, page: "p. 6", basis: "na" as const })),
+  }) as unknown as ExtractionResult;
+const POSITION_ROWS = [
+  { label: "Asking price", value: "$14,000,000" },
+  { label: "Preferred equity amount", value: "$15,000,000" },
+  { label: "Preferred return", value: "12% preferred return, 8% current pay" },
+  { label: "Current pay rate", value: "8.0%" },
+  { label: "Mandatory redemption date", value: "June 2029" },
+  { label: "Senior loan balance", value: "$52,000,000" },
+  { label: "Whole-asset value", value: "$80,000,000" },
+];
+const POSITION_DECK = positionDeck(POSITION_ROWS);
+
+describe("InterestPanel — a preferred equity position read as a position (lib/position)", () => {
+  // The panel's stack key, each figure beside a swatch of its own fill.
+  const keyOf = (h: string) => {
+    const at = h.indexOf('data-qa="position-stack-key"');
+    expect(at).toBeGreaterThan(-1);
+    const ul = h.slice(at, h.indexOf("</ul>", at));
+    return [...ul.matchAll(/<li[^>]*><span aria-hidden="true" class="([^"]*)"><\/span>([^<]*)<\/li>/g)].map((m) => ({ swatch: m[1], says: m[2] }));
+  };
+
+  it("draws its yield to redemption, current yield and cash a year as tiles, and its stack over the stated value", () => {
+    const r = readInterestFor(POSITION_DECK, 14_000_000, POSITION_TODAY)!;
+    const html = render(React.createElement(InterestPanel, { interest: r }));
+    dumpView("interest-panel-position", html);
+    const text = visibleText(html);
+    expect(text).toContain("A preferred equity position in the owning entity");
+    // The tiles, each only where stated: to redemption, on the price, in cash.
+    expect(html).toContain('data-qa="position-figures"');
+    expect(html).not.toContain('data-qa="note-figures"');
+    for (const tile of [
+      "To redemption",
+      "14.3%",
+      "if paid and redeemed as agreed",
+      "Current yield",
+      "8.6%",
+      "a year's current pay on the price",
+      "Cash a year",
+      "$1.2M",
+      "8.0% current pay on $15.0M",
+    ]) {
+      expect(text, tile).toContain(tile);
+    }
+    expect(text).toContain("32 months to its Jun 2029 redemption, the accrual read as simple, the lower yield — the memorandum does not say whether it compounds.");
+    // The stack: the senior loan to 65%, the position to 83.75% today, the
+    // accrual to 86.1% at redemption, and the stated value a tick at 100%.
+    for (const bar of ["pos-senior", "pos-amount", "pos-accrued", "pos-value"]) {
+      expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    }
+    expect(html).toContain('data-bar="pos-senior" style="width:65%"');
+    expect(html).toContain('data-bar="pos-amount" style="left:65%;width:18.75%"');
+    expect(html).toMatch(/data-bar="pos-accrued" style="left:83\.75%;width:2\.34\d*%"/);
+    expect(html).toContain('data-bar="pos-value" style="left:100%"');
+    // The track is a picture; its figures are words in the key.
+    expect(html).toMatch(/<div class="relative h-2\.5 rounded-full bg-line" aria-hidden="true"><div class="absolute inset-y-0 left-0 rounded-l-full bg-ink\/30" data-bar="pos-senior"/);
+    const key = keyOf(html);
+    expect(key.map((k) => k.says)).toEqual([
+      "Senior loan $52.0M · 65.0% of the stated value",
+      "The position $15.0M · 65.0% to 83.8% today",
+      "Accrued by redemption $1.9M, if it compounds · to 86.1%",
+      "The stated value $80.0M",
+    ]);
+    expect(key[0].swatch).toContain("bg-ink/30");
+    expect(key[1].swatch).toContain("bg-brand/70");
+    expect(key[2].swatch).toContain("bg-brand/30");
+    expect(key[3].swatch).toContain("w-0.5");
+    // The lead first, the position's whole read one click away, then what
+    // the property model is not.
+    expectLeadThenFold(html, [...r.leadSentences, ...r.position!.sentences]);
+    expect(text).toContain(
+      "The property model runs the whole building at the position's price; that is not this position's return — its yield to redemption is 14.3% and its last dollar sits at 86.1% of the stated value.",
+    );
+    // Neither a note's bar nor a share's.
+    expect(html).not.toContain('data-bar="interest"');
+    expect(html).not.toContain('data-bar="note-balance"');
+    expect(a11yIssues(html), "position panel").toEqual([]);
+    // No glued word, and no article the figure after it does not take.
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).not.toMatch(/\ban 1[0-79]/);
+  });
+
+  it("past its redemption date draws no figure and says the date has gone by; its stack stays", () => {
+    const late = new Date("2029-08-01T12:00:00Z");
+    const html = render(React.createElement(InterestPanel, { interest: readInterestFor(POSITION_DECK, 14_000_000, late) }));
+    const text = visibleText(html);
+    expect(html).not.toContain("To redemption");
+    expect(html).not.toContain("Current yield");
+    expect(html).not.toContain("<dl");
+    expect(html).toContain('data-qa="position-figures"');
+    expect(text).toContain("Its Jun 2029 redemption date has gone by: unredeemed, that is a default to be cured under the remedies, not a yield.");
+    // With no accrual left to run, the last dollar is today's.
+    expect(html).toContain('data-bar="pos-senior"');
+    expect(html).not.toContain('data-bar="pos-accrued"');
+    expect(keyOf(html).map((k) => k.says)).toEqual(["Senior loan $52.0M · 65.0% of the stated value", "The position $15.0M · 65.0% to 83.8%", "The stated value $80.0M"]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("runs the track past the stated value where the last dollar does, and draws no stack without the senior loan", () => {
+    const thin = positionDeck(POSITION_ROWS.map((m) => (m.label === "Whole-asset value" ? { ...m, value: "$66,000,000" } : m)));
+    const html = render(React.createElement(InterestPanel, { interest: readInterestFor(thin, 14_000_000, POSITION_TODAY) }));
+    // $52M + $15M + the accrual over $66M: the value's tick inside the track.
+    const left = Number(html.match(/data-bar="pos-value" style="left:([\d.]+)%"/)?.[1]);
+    expect(left).toBeGreaterThan(90);
+    expect(left).toBeLessThan(100);
+    expect(visibleText(html)).toContain("The stated value $66.0M · the last dollar runs past it");
+    expect(visibleText(html)).toContain("Its last dollar is past the stated value");
+    expect(gluedWords(visibleText(html))).toEqual([]);
+    // No senior balance stated: no stack, and the read in the fold says why.
+    const bare = positionDeck(POSITION_ROWS.filter((m) => m.label !== "Senior loan balance"));
+    const bareHtml = render(React.createElement(InterestPanel, { interest: readInterestFor(bare, 14_000_000, POSITION_TODAY) }));
+    expect(bareHtml).not.toContain('data-bar="pos-');
+    expect(bareHtml).toContain('data-qa="position-figures"');
+    expect(visibleText(bareHtml)).toContain("The memorandum states no senior loan balance, so where the position's last dollar sits is not read.");
+  });
+});
+
+describe("ShareView — a preferred equity position (lib/position)", () => {
+  it("draws the position's tiles and stack on the loader's day, its own rows lead the key terms, and no cap on the building prints", () => {
+    // The view's other readers take the clock; the interest is read on the
+    // loader's day, handed in as `today`.
+    vi.useFakeTimers({ now: POSITION_TODAY, toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const props = {
+      dealName: "Harbor View Apartments",
+      assetClass: "auto",
+      expiresAt: "2026-10-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      today: "2026-10-05",
+    };
+    const extraction = positionDeck([...POSITION_ROWS, { label: "Units", value: "240" }, { label: "Going-in cap rate", value: "5.50%" }]);
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction }));
+    dumpView("share-view-position", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="interest-panel"');
+    expect(text).toContain("A preferred equity position in the owning entity");
+    expect(text).toContain("14.3%");
+    expect(text).toContain("32 months to its Jun 2029 redemption");
+    for (const bar of ["pos-senior", "pos-amount", "pos-accrued", "pos-value"]) {
+      expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    }
+    // The header says whose strategy it is.
+    expect(text).toContain("(the entity's property)");
+    // The key terms lead with the position's own rows, and the building's
+    // cap is not among them.
+    const term = (label: string) => html.indexOf(`<span class="line-clamp-2">${label}</span>`);
+    expect(term("Preferred equity amount")).toBeGreaterThan(-1);
+    expect(term("Preferred equity amount")).toBeLessThan(term("Units"));
+    expect(term("Mandatory redemption date")).toBeLessThan(term("Units"));
+    expect(term("Going-in cap rate")).toBe(-1);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("Pipeline — a preferred equity position's tag and its yield to redemption in the cap's place", () => {
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
+
+  it("says what the price buys and its yield to redemption, on the row and the card", () => {
+    // The slots' yield is read on the clock's day (lib/pipeline-slots).
+    vi.useFakeTimers({ now: POSITION_TODAY, toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const slots = pickSlots(POSITION_DECK, null);
+    const position = card({
+      id: "pe",
+      name: "Harbor View Apartments",
+      assetClass: "multifamily",
+      verdict: "caution",
+      slots,
+      market: "Dallas, TX",
+      coveredMarket: null,
+    });
+    expect(slots).toMatchObject({ cap: null, capWithheld: "position", noteYield: "14.3%", interest: "Pref equity, 12% to Jun 2029" });
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([position]), initialView }));
+      const text = visibleText(html);
+      expect(text, initialView).toContain("Pref equity, 12% to Jun 2029");
+      expect(text, initialView).toContain("14.3%");
+      // Never the note's words in the position's slot.
+      expect(text, initialView).not.toMatch(/\bytm\b/i);
+      expect(html, initialView).toContain("A preferred equity position has no going-in cap");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+    const cards = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([position]), initialView: "cards" })));
+    expect(cards).toContain("Position yield");
+    expect(cards).toContain("to redemption");
   });
 });
 
