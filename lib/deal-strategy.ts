@@ -1356,9 +1356,17 @@ function costFindings(
   //    A bulk condominium purchase's price buys the units offered, so its
   //    price a unit is over them (lib/condo-units `priceUnitCount`, the
   //    card's count), said so in the title.
+  //    A conversion whose memorandum labels no count proposed or planned is
+  //    held to no band per unit (audit C5, MED-3): its count is the building
+  //    as it stands, which the plan already says is not read as the finished
+  //    project's (`costPerUnitWithheld`, said once) — the check had judged
+  //    $120M over today's 40 office units as "$3.0M per key, misread", and
+  //    called the office's units keys. Whether a ground-up development's
+  //    unlabelled count is judged is the owner's.
   const planUnits = planDeal ? (plan?.units ?? null) : null;
-  const offered = planUnits == null ? condoUnitsOffered(extraction) : null;
-  const units = planUnits ?? offered ?? priceUnitCount(extraction);
+  const todayIsNotThePlan = planDeal && strategy.kind === "conversion" && planUnits == null;
+  const offered = planUnits == null && !todayIsNotThePlan ? condoUnitsOffered(extraction) : null;
+  const units = todayIsNotThePlan ? null : (planUnits ?? offered ?? priceUnitCount(extraction));
   const sf = buildingSfFromMetrics(metrics);
   const cls = (extraction.assetClass ?? "").toLowerCase();
   // The class says the basis and the noun (lib/asset-words): a hotel is
@@ -1683,13 +1691,13 @@ export function planWithBasisChecked(
   // value-add's units stand.
   const planned = notYetDelivered(plan.kind) ? "planned " : "";
   // The count the check divided by: the plan's own, else — where a
-  // conversion's or a development's memorandum labels no count proposed or
-  // planned (`costPerUnitWithheld`) — the one it states, said as that and
-  // never as planned: on a conversion it is the building's today, while a
-  // ground-up development has no building today, so its count is said only
-  // as unlabelled (the audit C3b MED-2).
+  // development's memorandum labels no count proposed or planned
+  // (`costPerUnitWithheld`) — the one it states, said as that and never as
+  // planned: a ground-up development has no building today, so its count is
+  // said only as unlabelled (the audit C3b MED-2). A conversion's count
+  // today is held to no band at all (audit C5, MED-3).
   const today = plan.units == null ? unitCountFromMetrics(extraction.metrics ?? []) : null;
-  const todayWords = plan.kind === "conversion" ? " it states for the building today" : " it states, not labelled proposed or planned,";
+  const todayWords = " it states, not labelled proposed or planned,";
   const over =
     sf != null
       ? `the building's ${Math.round(sf).toLocaleString("en-US")} SF`

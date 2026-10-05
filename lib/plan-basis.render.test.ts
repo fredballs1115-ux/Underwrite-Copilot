@@ -55,10 +55,10 @@ describe("a plan's all-in basis the plausibility check finds outside the band (r
     );
   });
 
-  it("names the count it divided by where a conversion labels none planned, beside the plan's own reason", () => {
+  it("holds a conversion that labels no count planned to no band over today's count, and says why once (audit C5, MED-3)", () => {
     // Today's count on a conversion: the plan strikes no basis over it
-    // (`costPerUnitWithheld`), and the band's sentence says whose count it is,
-    // never "its planned units".
+    // (`costPerUnitWithheld`), so no band is held to it either — the check
+    // had said "not read as the finished project's" and "misread" of one deal.
     const conv = ex({
       assetClass: "Multifamily",
       dealName: "The Statler (hotel to apartments)",
@@ -69,9 +69,21 @@ describe("a plan's all-in basis the plausibility check finds outside the band (r
     expect(plan.costPerUnitWithheld).toBe(
       "No basis per unit (all-in) is struck: the memorandum labels no count proposed or planned, so its 150 units are not read as the finished project's.",
     );
-    expect(plan.basisWithheld).toBe(
-      "No all-in basis is struck: the $49k total cost over the 150 units it states for the building today is outside the band any market delivers at, so the total cost or the count was most likely misread.",
-    );
+    expect(plan.basisWithheld ?? null).toBeNull();
+    expect(assessPlausibility(conv).map((f) => f.code)).not.toContain("basis_out_of_band");
+    // The office-to-hotel case: today's 40 office units are never "keys".
+    const hotel = ex({
+      assetClass: "Hospitality",
+      dealName: "The Exchange (office to hotel)",
+      strategy: { kind: "conversion", summary: "Convert a 40-unit office building to a hotel", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$20,000,000"), m("Units", "40"), m("Total project cost", "$120,000,000"), m("NOI (stabilized, pro forma)", "$9,000,000")],
+    });
+    const findings = assessPlausibility(hotel);
+    expect(findings.map((f) => f.code)).not.toContain("basis_out_of_band");
+    expect(JSON.stringify(findings)).not.toMatch(/40 keys|per key/);
+    const hotelPlan = checked(hotel);
+    expect(hotelPlan.basisWithheld ?? null).toBeNull();
+    expect(hotelPlan.costPerUnitWithheld).toContain("its 40 units are not read as the finished project's");
   });
 
   it("judges the basis over the count the plan states, and says it over that count (audit C3b MED-2)", () => {
