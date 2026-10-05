@@ -690,6 +690,25 @@ describe("the card copy a pipeline card's srcset offers beside the hero (researc
     expect(tiny.card).toBeNull();
   });
 
+  it("is swept by its path even where a later write lost its record", () => {
+    // A copy stored after a response can be written over by another write
+    // to the photo cache made from an earlier read; the deletion sweep still
+    // reaches it, by the hero's own path with its size changed.
+    const unrecorded: DealPicture = {
+      hero: "photos/d1/abc-hero.jpg",
+      thumb: "photos/d1/abc-thumb.jpg",
+      source: "om",
+      width: 1600,
+      height: 1000,
+      at: "2026-10-05T00:00:00.000Z",
+    };
+    expect(picturePaths({ picture: unrecorded })).toEqual([unrecorded.hero, unrecorded.thumb, "photos/d1/abc-card.jpg"]);
+    expect(picturePaths({ gallery: [unrecorded] })).toContain("photos/d1/abc-card.jpg");
+    // A recorded copy is listed once.
+    const recorded = { ...unrecorded, card: "photos/d1/abc-card.jpg" };
+    expect(picturePaths({ picture: recorded }).filter((p) => p.endsWith("-card.jpg"))).toHaveLength(1);
+  });
+
   it("is stored beside the hero under its stamp, served as the `card` size, and swept with the rest", async () => {
     store.oms.set("u/d1.pdf", await testMemorandum([{ images: [await testPicture(3200, 2000, "jpeg", 1)] }]));
     const { client, db } = fakeDb(null);
