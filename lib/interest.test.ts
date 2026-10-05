@@ -1411,7 +1411,7 @@ describe("a share beside the loan its entity carries: no building figure is stru
     const { pickSlots } = await import("./pipeline-slots");
     const { compareInterest, modelReturnsRead } = await import("./compare-interest");
     expect(pickSlots(recap(), null).basis).toBeNull();
-    expect(pickSlots(recap([], {}, false), null).basis).toBe("$200k/unit");
+    expect(pickSlots(recap([], {}, false), null).basis).toBe("$200k/unit, the whole");
     // The model runs at the equity's whole (the owner's call); the table's
     // cap is struck on the building's price, which there is none of here.
     const model = { purchasePrice: 40_000_000, year1Noi: 5_000_000, goingInCapPct: 12.5 };

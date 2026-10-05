@@ -9,7 +9,7 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { shownAssetClass } from "@/lib/asset-class";
 import { screenYearOf, unitCountRow } from "@/lib/criteria";
 import { basisOutsideBand, findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
-import { interestOf, interestTag, isMasterLeasehold } from "@/lib/interest";
+import { interestOf, interestTag, isMasterLeasehold, isWholeShare } from "@/lib/interest";
 import { capSlotReason, capSlotWithheld, noteCapSlot, ownYieldText, statedCapSlot } from "@/lib/compare-interest";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
@@ -210,14 +210,21 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind, store
   const words = assetWords(shownAssetClass(storedClass, extraction));
   // A bulk condominium purchase's price a unit divides by the units offered
   // (research pass 38).
-  const b = subjectBasis(metrics, kind, screenYearOf(extraction), interestOf(extraction), extraction.assetClass, condoUnitsOffered(extraction));
+  const sold = interestOf(extraction);
+  const b = subjectBasis(metrics, kind, screenYearOf(extraction), sold, extraction.assetClass, condoUnitsOffered(extraction));
   const cls = shownAssetClass(storedClass, extraction);
+  // A share's basis is the whole building's — its price grossed up over the
+  // building's count — so wherever it stands under the share's own price it
+  // says whose it is, the deal header's "Price · 49% share" rule: the card,
+  // the list and the CSV had printed "$274k/unit" bare under $33.3M while
+  // the memo said "the whole" (research pass 35, audit C3a LOW-10).
+  const whole = sold.kind === "partial_interest" && sold.sharePct != null && !isWholeShare(sold.sharePct) ? ", the whole" : "";
   if (words.basis === "sf") {
-    return b.perSf != null && !basisOutsideBand(b.perSf, "sf", cls) ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;
+    return b.perSf != null && !basisOutsideBand(b.perSf, "sf", cls) ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF${whole}` : null;
   }
   if (words.basis === "unit" && b.perUnit != null && !basisOutsideBand(b.perUnit, "unit", cls)) {
     const noun = countNoun(unitCountRow(metrics)?.label, words.key).replace(/s$/, "");
-    return `${compactUsd(b.perUnit, { trim: true })}/${noun}`;
+    return `${compactUsd(b.perUnit, { trim: true })}/${noun}${whole}`;
   }
   return null;
 }

@@ -34,7 +34,7 @@ import type {
 import { askingPriceOf, findPriceMetric, inferStrategy, notYetDelivered, planSummary, planWithBasisChecked, type DealStrategy } from "@/lib/deal-strategy";
 import { marketsPhrase, portfolioFacts, readPortfolio } from "@/lib/portfolio";
 import { YOC_WITHHELD, planNoiText, yieldOnCostText } from "@/lib/plan-facts";
-import { dealTypeLabel, interestOf, interestShortLine, isWholeShare, readInterest } from "@/lib/interest";
+import { dealTypeLabel, interestOf, interestShortLine, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
 import { affordableShortLine, readAffordable } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
@@ -671,13 +671,11 @@ export function buildMemoData(
   const screenYear = screenYearOf(extraction);
   const priceRow = findPriceMetric(metrics ?? [], strategy.kind, screenYear);
   // A share's basis is the whole building's — its price grossed up over the
-  // building's count — so under the share's own price the tile says whose
-  // it is, the deal header's "Price · 49% share" rule (research pass 35: a
+  // building's count — and the basis tag says so under the share's own
+  // price, here as on the pipeline's card, list and CSV (research pass 35: a
   // reader who divided $33.3M by 248 units found $134k, not $274k).
   const sold = interestOf(extraction ?? null);
-  const wholeBasis = sold.kind === "partial_interest" && sold.sharePct != null && !isWholeShare(sold.sharePct);
-  const basis = extraction && priceRow ? basisTag(extraction, strategy.kind, str(deal.asset_class)) : null;
-  const priceBasis = basis && wholeBasis ? `${basis}, the whole` : basis;
+  const priceBasis = extraction && priceRow ? basisTag(extraction, strategy.kind, str(deal.asset_class)) : null;
   const keyTerms = keyTermRows(metrics, strategy.kind, screenYear, 8, sold.kind).map((m) => ({
     label: str(m.label),
     value: str(m.value),

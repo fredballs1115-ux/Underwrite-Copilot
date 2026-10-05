@@ -72,7 +72,9 @@ describe("olderScreen — a screen stored before the site read what is being sol
     const now = ex(BASE, { interest: SHARE });
     const old = ex(BASE);
     // The readers' figures, unchanged: the share read is the whole's basis.
-    expect(basisTag(now, inferStrategy(now).kind, "multifamily")).toBe("$170k/unit");
+    // Said as the whole's on every surface that prints it, the card, the
+    // list and the CSV with the memo (audit C3a, LOW-10).
+    expect(basisTag(now, inferStrategy(now).kind, "multifamily")).toBe("$170k/unit, the whole");
     expect(interestTag(now)).toBe("49% share");
     expect(olderScreen(now)).toBeNull();
     // The same deal screened before: the whole building's basis, no tag —
