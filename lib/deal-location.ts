@@ -15,13 +15,15 @@ import type { FloodFrameRecord } from "@/lib/flood-frame-core";
  * of clobbering each other's half of it.
  */
 export interface DealVisualCache {
-  /** Street View metadata verdict (set by the photo route) */
+  /** Google's Street View answer as an earlier cut kept it: the metadata's
+   *  verdict, the point it was reached for and the panorama's coordinates.
+   *  No longer written (Google's policies prohibit storing its content but
+   *  for place and panorama IDs, lib/imagery `fetchStreetViewImage`); a row
+   *  written before may carry them, and the next write drops them
+   *  (`writeCache`). */
   status?: "ok" | "none" | "unconfigured";
   checkedAt?: string;
-  /** the point that verdict was reached for, "lat,lng" — a verdict for
-   *  another point is no verdict on this one (#441) */
   checkedFor?: string;
-  /** pano location echo from Street View metadata */
   panoLat?: number;
   panoLng?: number;
   /** geocoded subject position (set here) */
@@ -232,6 +234,20 @@ export async function resolveDealLocation(
  * current row is read first and the patch merged over THAT. One small extra
  * read, on a path that runs about once a month per deal.
  */
+/** The cache with Google's Street View answer taken out: an earlier cut
+ *  stored the metadata's verdict and the panorama's coordinates, which
+ *  Google's policies do not allow (only place and panorama IDs may be
+ *  kept), so every write drops them. */
+export function withoutGoogleContent(cache: DealVisualCache): DealVisualCache {
+  const out = { ...cache };
+  delete out.status;
+  delete out.checkedAt;
+  delete out.checkedFor;
+  delete out.panoLat;
+  delete out.panoLng;
+  return out;
+}
+
 export async function writeCache(
   supabase: SupabaseClient,
   dealId: string,
@@ -249,7 +265,7 @@ export async function writeCache(
       {}) as DealVisualCache;
     await supabase
       .from("deals")
-      .update({ photo: { ...current, ...patch } })
+      .update({ photo: withoutGoogleContent({ ...current, ...patch }) })
       .eq("id", dealId);
   } catch {
     // Pre-0027 schema has no `photo` column — imagery still works, just

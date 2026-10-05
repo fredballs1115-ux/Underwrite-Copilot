@@ -3592,10 +3592,25 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     and the workbook read it too.
   - The location cache is kept with the address it was resolved for
     (`geoFor`, `geoKey`: the line and whether it named a street;
-    `GEO_VERSION` 3), and a Street View verdict with the point it was
-    reached for (`checkedFor`). Before, an edited address kept the old
-    one's point, so the aerial, the pin and the flood zone showed the old
-    place for up to a month.
+    `GEO_VERSION` 3). Before, an edited address kept the old one's point,
+    so the aerial, the pin and the flood zone showed the old place for up
+    to a month.
+  - **Nothing Google answers is kept** (2026-10-05). Its Street View
+    policies, as the runner printed them (zori probe run 37258453291):
+    "Content pre-fetching, indexing, storing, or caching is generally
+    prohibited, except for place IDs and panorama IDs"; and a metadata
+    request comes "without consuming quota" (run 37258539449). So
+    `fetchStreetViewImage` asks the metadata on every request, reads the
+    panorama's position for that request's camera heading and drops it;
+    the deal's cache had kept the verdict and the panorama's coordinates
+    for 30 days, and `writeCache` now drops them from an older row
+    (`withoutGoogleContent`). Every route that can answer with a Google
+    image (the photo, image and aerial routes) sends `GOOGLE_NO_STORE`
+    (`private, no-store`, no validator) where they had told browsers to
+    keep it a day; `lib/google-imagery-terms.test.ts` scans for it. The
+    same page asks a web app showing the imagery for public Terms of Use
+    and a Privacy Policy linked in its footer, so every signed-in page
+    ends on Terms, Privacy and Security (`app/(app)/app-shell.tsx`).
 - Where a deal is, by its county (#447). The markets' keyword lists name
   principal cities and a few counties, so a deal in Frisco, Irvine, Fort
   Lauderdale or Cranberry Township read its STATE's figures.

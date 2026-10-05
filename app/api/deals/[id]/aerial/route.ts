@@ -18,9 +18,11 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import type { StructuredAddress } from "@/lib/address";
 import type { DealVisualCache } from "@/lib/deal-location";
 import {
+  GOOGLE_NO_STORE,
   IMAGE_CREDIT,
   fetchBestAerialImage,
   fetchOneImage,
+  isGoogleImage,
   type ImageSource,
 } from "@/lib/imagery";
 import { DEAL_AERIAL_FRAMES, nearestFrame } from "@/lib/image-frames";
@@ -80,8 +82,9 @@ export async function GET(
     headers: {
       "content-type": best.response.headers.get("content-type") ?? "image/jpeg",
       // A day, not a week: adding the Google key must upgrade an existing
-      // deal's shot on the next view, not after a week of cached USGS.
-      "cache-control": "private, max-age=86400",
+      // deal's shot on the next view, not after a week of cached USGS. A
+      // Google frame is never kept at all (lib/imagery GOOGLE_NO_STORE).
+      "cache-control": isGoogleImage(best.source) ? GOOGLE_NO_STORE : "private, max-age=86400",
       "x-image-source": best.source,
       "x-image-credit": IMAGE_CREDIT[best.source],
     },

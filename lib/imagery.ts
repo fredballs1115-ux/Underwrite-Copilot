@@ -2,12 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredAddress } from "@/lib/address";
 import { usgsAerialUrl } from "@/lib/basemaps";
-import {
-  resolveDealLocation,
-  writeCache,
-  type DealLocation,
-  type DealVisualCache,
-} from "@/lib/deal-location";
+import { resolveDealLocation, type DealLocation, type DealVisualCache } from "@/lib/deal-location";
 import {
   IMAGE_CREDIT,
   MAX_SOURCE_ZOOM,
@@ -57,16 +52,35 @@ export function googleConfigured(): boolean {
   return !!process.env.GOOGLE_MAPS_API_KEY;
 }
 
-const STREET_VIEW_TTL_MS = 30 * 86_400_000;
+/**
+ * The cache-control every response carrying a Google image sends — Street
+ * View's photograph or the satellite frame. Google's Street View policies:
+ * "Content pre-fetching, indexing, storing, or caching is generally
+ * prohibited, except for place IDs and panorama IDs" (developers.google.com/
+ * maps/documentation/streetview/policies, as the runner printed it in zori
+ * probe run 37258453291), so neither the browser nor a shared cache may keep
+ * the image; the satellite frame is held to the same rule (the Static Maps
+ * API's own policy page is the owner's to read before the key is set). The
+ * routes had told browsers to keep both a day.
+ */
+export const GOOGLE_NO_STORE = "private, no-store";
+
+/** Whether a source's image is Google's, and so never kept. */
+export const isGoogleImage = (source: ImageSource): boolean => source === "streetview" || source === "satellite";
 
 /**
  * Google Street View, metadata-checked. Returns the image response, or null
  * when there is no key, no imagery, or the request fails.
  *
- * The metadata endpoint is asked FIRST and its verdict cached on the deal, so
- * a building Google has never photographed costs one lookup ever rather than
- * one per page view. Transient states (quota, denied) 404 the request without
- * poisoning that cache.
+ * Nothing Google answers is kept. Its Street View policies say "Content
+ * pre-fetching, indexing, storing, or caching is generally prohibited,
+ * except for place IDs and panorama IDs" (zori probe run 37258453291), and
+ * its metadata request "provides data about Street View panoramas, such as
+ * location, date, and panorama ID, without consuming quota" (run
+ * 37258539449). So the metadata is asked on every request, its panorama's
+ * position is read for this request's camera heading and dropped, and no
+ * verdict is stored: the earlier cut kept "imagery here or not" and the
+ * panorama's coordinates on the deal for 30 days.
  */
 export async function fetchStreetViewImage(
   supabase: SupabaseClient,
@@ -88,52 +102,27 @@ export async function fetchStreetViewImage(
   if (!building || building.precision !== "street") return null;
   const target = `${building.lat},${building.lng}`;
 
-  // A verdict counts only for the point it was reached for: after the
-  // address changes, the old pano would stand the camera somewhere else.
-  let verdict = cache;
-  const fresh =
-    !!verdict?.checkedAt &&
-    verdict.checkedFor === target &&
-    Date.now() - Date.parse(verdict.checkedAt) < STREET_VIEW_TTL_MS;
-
-  if (!fresh) {
-    try {
-      // Metadata by COORDINATES, not by re-sending the address string: Google
-      // would geocode the string its own way, and a disagreement with our pin
-      // meant the photo and the map showed two different places. `outdoor`
-      // rules out business interiors and user-uploaded panos.
-      const metaUrl =
-        `https://maps.googleapis.com/maps/api/streetview/metadata?location=${target}&source=outdoor&key=${key}`;
-      const meta = (await (
-        await fetch(metaUrl, { signal: AbortSignal.timeout(8_000) })
-      ).json()) as {
-        status?: string;
-        location?: { lat?: number; lng?: number };
-      };
-      if (meta.status === "OK") {
-        verdict = {
-          ...cache,
-          status: "ok",
-          checkedAt: new Date().toISOString(),
-          checkedFor: target,
-          panoLat: meta.location?.lat,
-          panoLng: meta.location?.lng,
-        };
-      } else if (meta.status === "ZERO_RESULTS" || meta.status === "NOT_FOUND") {
-        // Definitive "Google has never driven here" — safe to remember.
-        verdict = { ...cache, status: "none", checkedAt: new Date().toISOString(), checkedFor: target };
-      } else {
-        // OVER_QUERY_LIMIT / REQUEST_DENIED / UNKNOWN_ERROR: configuration or
-        // transient states. Fail this request, never cache the verdict.
-        return null;
-      }
-    } catch {
-      return null;
-    }
-    await writeCache(supabase, dealId, cache, verdict ?? {});
+  let pano: { lat: number; lng: number } | null = null;
+  try {
+    // Metadata by COORDINATES, not by re-sending the address string: Google
+    // would geocode the string its own way, and a disagreement with our pin
+    // meant the photo and the map showed two different places. `outdoor`
+    // rules out business interiors and user-uploaded panos.
+    const metaUrl =
+      `https://maps.googleapis.com/maps/api/streetview/metadata?location=${target}&source=outdoor&key=${key}`;
+    const meta = (await (
+      await fetch(metaUrl, { signal: AbortSignal.timeout(8_000) })
+    ).json()) as {
+      status?: string;
+      location?: { lat?: number; lng?: number };
+    };
+    // No imagery here, a quota or key refusal, an error: no photograph.
+    if (meta.status !== "OK") return null;
+    const { lat, lng } = meta.location ?? {};
+    if (typeof lat === "number" && typeof lng === "number") pano = { lat, lng };
+  } catch {
+    return null;
   }
-
-  if (verdict?.status !== "ok") return null;
 
   // The camera stands where the pano is and must LOOK AT the building. The
   // first cut passed the pano's own coordinates as `location`, which asked
@@ -149,12 +138,7 @@ export async function fetchStreetViewImage(
     pitch: "0",
     key,
   });
-  if (typeof verdict.panoLat === "number" && typeof verdict.panoLng === "number") {
-    params.set(
-      "heading",
-      bearingDeg({ lat: verdict.panoLat, lng: verdict.panoLng }, building).toFixed(1),
-    );
-  }
+  if (pano) params.set("heading", bearingDeg(pano, building).toFixed(1));
   try {
     const img = await fetch(
       `https://maps.googleapis.com/maps/api/streetview?${params.toString()}`,

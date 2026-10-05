@@ -203,6 +203,8 @@ vi.mock("@/lib/deal-picture", () => ({
 }));
 vi.mock("@/lib/imagery", () => ({
   IMAGE_CREDIT: { photo: "Photo", streetview: "Google Street View", aerial: "USGS The National Map (public domain)" },
+  GOOGLE_NO_STORE: "private, no-store",
+  isGoogleImage: (source: string) => source === "streetview" || source === "satellite",
   fetchBestBuildingImage: async (_s: unknown, _id: string, _a: unknown, cache: unknown, _size: unknown, opts: { overhead?: boolean } = {}) => {
     route.planAsked.push(opts);
     route.cacheHanded.push(cache);
@@ -265,6 +267,9 @@ describe("the image route's cover (#443)", () => {
     const res = await ask("w=64&h=64&fallback=cover");
     expect(res.headers.get("content-type")).toBe("image/jpeg");
     expect(res.headers.get("x-image-source")).toBe("streetview");
+    // Google's photograph is never kept, and has no validator to keep it by.
+    expect(res.headers.get("cache-control")).toBe("private, no-store");
+    expect(res.headers.get("etag")).toBeNull();
   });
 
   it("keeps the overheads, and its 404, for a caller that does not ask for the cover", async () => {

@@ -26,7 +26,7 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import type { StructuredAddress } from "@/lib/address";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT, SEARCH_WAIT_MS, ensureDealPicture, pictureSizeFor } from "@/lib/deal-picture";
-import { IMAGE_CREDIT, fetchBestBuildingImage } from "@/lib/imagery";
+import { GOOGLE_NO_STORE, IMAGE_CREDIT, fetchBestBuildingImage, isGoogleImage } from "@/lib/imagery";
 import { coverFor } from "@/lib/deal-cover";
 import { COVER_EDITION, coverSvg } from "@/lib/deal-cover-art";
 import { shownAssetClass } from "@/lib/pipeline-slots";
@@ -129,7 +129,9 @@ export async function GET(
   return new NextResponse(best.response.body, {
     headers: {
       "content-type": best.response.headers.get("content-type") ?? "image/jpeg",
-      ...revalidate,
+      // A Google image is never kept, by the browser or anyone (lib/imagery
+      // GOOGLE_NO_STORE): no etag to revalidate against.
+      ...(isGoogleImage(best.source) ? { "cache-control": GOOGLE_NO_STORE } : revalidate),
       // Lets the caller render the right credit without a second request.
       "x-image-source": best.source,
       "x-image-credit": credit,
