@@ -53,12 +53,19 @@
 // header, the pipeline card and the meeting workbook printed a note's
 // collateral cap as its going-in cap, and the deal page's leverage read ran
 // on it. `noteCapSlot` and `goingInCapFigure` say it for them.
+//
+// And a note UNDER WATER has no yield to show either (research pass 38): its
+// balance is over the collateral's stated value, so its contract yield
+// assumes a repayment the collateral does not cover — a $5M price for a $20M
+// note on an $8M building read "512.5%" in the cap slot. The slot reads "n/a
+// — under water" (`UNDER_WATER_WORDS`) wherever the yield would stand.
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
 import { askingPriceOf, buildingPriceOf, signalGoingInCap } from "@/lib/deal-strategy";
 import { interestOf, interestTag, isGpStake, isTenancyInCommon, isWholeShare, leaseholdTermOf, readInterest } from "@/lib/interest";
 import { leaseEndInHold, type LeaseEndInHold } from "@/lib/leasehold-exit";
+import { noteUnderWater } from "@/lib/note-yield";
 
 export interface CompareModel {
   purchasePrice?: number | null;
@@ -80,9 +87,14 @@ export interface CompareInterest {
    *  loan its entity carries (`buildingPriceOf` has no building's price) */
   cap: number | null;
   /** the buyer's own yield at the price, percent: a note's to maturity
-   *  where it pays or may, a preferred equity position's to redemption
-   *  where the date has not gone by; null otherwise */
+   *  where it pays or may and is not under water, a preferred equity
+   *  position's to redemption where the date has not gone by; null
+   *  otherwise */
   noteYtmPct: number | null;
+  /** a note whose balance is over the collateral's stated value (lib/note-
+   *  yield `noteUnderWater`): no yield stands in its cap slot, which reads
+   *  "n/a — under water"; absent otherwise (research pass 38) */
+  underWater?: boolean;
   /** why the model's returns are withheld; null where they stand */
   withheld: "note" | "share" | "position" | "lease" | null;
   /** where they are withheld for the lease: the year of the model's hold it
@@ -115,6 +127,15 @@ export const OWN_YIELD_WORDS: Record<OwnYield, { label: string; to: string; na: 
   position: { label: "Yield to redemption", to: "to redemption", na: "n/a — position" },
 };
 
+/** A note under water's slot, in the words every surface says it in (lib/
+ *  cap-slot holds the client's copy, a test the two to each other). */
+export const UNDER_WATER_WORDS = {
+  label: "Yield to maturity",
+  na: "n/a — under water",
+  title:
+    "The note's balance is over the collateral's stated value: its contract yield assumes a repayment the collateral does not cover, so no yield stands in the cap's place. What the note fetches is a foreclosure's question.",
+} as const;
+
 /** A note's or a position's own yield as every summary prints it in the cap
  *  slot — the deal header, the pipeline card and its CSV, the meeting
  *  workbook: one decimal, "17.0%". */
@@ -137,7 +158,9 @@ export function compareInterest(
   if (kind === "note") {
     const n = readInterest(ex, askingPriceOf(ex), asOf)?.note ?? null;
     const pays = n != null && !n.matured && n.terms.status !== "non_performing";
-    return { tag, cap: null, noteYtmPct: pays ? n.ytmPct : null, withheld: "note" };
+    // Under water, the contract yield is not the buyer's figure either.
+    const underWater = noteUnderWater(n);
+    return { tag, cap: null, noteYtmPct: pays && !underWater ? n.ytmPct : null, withheld: "note", ...(underWater ? { underWater } : {}) };
   }
 
   if (kind === "preferred_equity") {
@@ -227,17 +250,29 @@ export function modelReturnsRead(
 export function noteCapSlot(
   ex: ExtractionResult | null | undefined,
   asOf: Date = new Date(),
-): { ytmPct: number | null; of: OwnYield } | null {
+): { ytmPct: number | null; of: OwnYield; underWater?: boolean } | null {
   if (!ex) return null;
   const kind = interestOf(ex).kind;
   if (kind !== "note" && kind !== "preferred_equity") return null;
-  return { ytmPct: compareInterest(ex, null, asOf).noteYtmPct, of: kind === "note" ? "note" : "position" };
+  const ci = compareInterest(ex, null, asOf);
+  return { ytmPct: ci.noteYtmPct, of: kind === "note" ? "note" : "position", ...(ci.underWater ? { underWater: true } : {}) };
 }
 
 /** Why a deal's going-in cap slot holds no cap: its price buys a loan or a
  *  position, which have a yield of their own (`OwnYield`), or a share beside
  *  the loan its entity carries. */
 export type CapWithheld = OwnYield | "share";
+
+/** The slot's reason as the pipeline's row carries it: `capSlotWithheld`'s,
+ *  and "under_water" for a note whose yield is withheld too (`noteCapSlot`'s
+ *  `underWater`) — the card, its CSV and the meeting workbook say "n/a —
+ *  under water" (lib/cap-slot `CAP_WITHHELD`). */
+export type CapSlotReason = CapWithheld | "under_water";
+
+/** `capSlotWithheld`, with a note under water named as such. */
+export function capSlotReason(withheld: CapWithheld | null, own: { underWater?: boolean } | null): CapSlotReason | null {
+  return withheld === "note" && own?.underWater ? "under_water" : withheld;
+}
 
 /** A share's withheld cap, in the words every surface says it in. */
 export const SHARE_CAP_WORDS = {
@@ -313,8 +348,9 @@ export function statedCapSlot(
 /**
  * The going-in cap slot beside a deal's price in its header (and the bar
  * that repeats it): the cap as the memorandum states it — or, on a note,
- * its yield to maturity at its price where it pays or may, else the cap
- * withheld ("n/a — note", the compare table's words); and beside the loan
+ * its yield to maturity at its price where it pays or may, "n/a — under
+ * water" where its balance is over the collateral's stated value, else the
+ * cap withheld ("n/a — note", the compare table's words); and beside the loan
  * a share's entity carries, the cap withheld (`capSlotWithheld`).
  */
 export function goingInCapFigure(
@@ -328,6 +364,7 @@ export function goingInCapFigure(
       ? { label: "Going-in cap", value: SHARE_CAP_WORDS.na, title: SHARE_CAP_WORDS.title }
       : { label: "Going-in cap", value: statedCap };
   }
+  if (own.underWater) return { label: UNDER_WATER_WORDS.label, value: UNDER_WATER_WORDS.na, title: UNDER_WATER_WORDS.title };
   const words = OWN_YIELD_WORDS[own.of];
   return own.ytmPct != null
     ? { label: words.label, value: ownYieldText(own.ytmPct) }

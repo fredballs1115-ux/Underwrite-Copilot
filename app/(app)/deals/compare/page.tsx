@@ -246,6 +246,8 @@ function toCol(
     hotel: hotelTag(ex, asOf),
     sale: saleTag(ex, asOf),
     noteYtm: figs.noteYtmPct,
+    // A note under water has no yield to compare either (research pass 38).
+    noteUnderWater: figs.underWater === true,
     withheld: figs.withheld,
     withheldWord: withheldWord(figs),
     // FEMA's zone at the building from the stored site-flags lookup (#426);

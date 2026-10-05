@@ -95,7 +95,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; yocWithheld?: string | null; plan?: boolean; capWithheld?: "note" | "position" | "share" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; yocWithheld?: string | null; plan?: boolean; capWithheld?: "note" | "position" | "share" | "under_water" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -2482,7 +2482,15 @@ const DealTile = memo(function DealTile({
                 ? d.slots.yocWithheld
                 : undefined
           }
-          sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? ownYieldOf(d.slots.capWithheld).to : undefined}
+          sub={
+            !d.slots.cap && !d.slots.yoc && d.slots.noteYield
+              ? ownYieldOf(d.slots.capWithheld).to
+              : // A note under water: no yield, and why, on the card's face
+                // (research pass 38).
+                !d.slots.cap && !d.slots.yoc && d.slots.capWithheld === "under_water"
+                ? "under water"
+                : undefined
+          }
         >
           {d.slots.cap ??
             d.slots.yoc ??

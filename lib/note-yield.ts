@@ -573,3 +573,19 @@ function stackOf(terms: NoteTerms, balance: number, price: number): Pick<NoteRea
     stackAtPricePct: ((senior + price) / value) * 100,
   };
 }
+
+/**
+ * Whether the note is under water: its balance over the collateral's stated
+ * value — behind a senior loan whose balance the memorandum states, the
+ * senior loan and this note together over it (research pass 38). Its
+ * contract yield then assumes a repayment the collateral does not cover, so
+ * no surface shows that yield as the note's figure: the cap slot reads "n/a
+ * — under water", and the sentence says what the yield assumes. What the
+ * note fetches is a foreclosure's question. False where no value is stated,
+ * and where the memorandum leaves the debt's order unclear.
+ */
+export function noteUnderWater(n: NoteRead | null | undefined): boolean {
+  if (!n) return false;
+  if (n.ltvAtBalancePct != null) return n.ltvAtBalancePct > 100;
+  return n.stackAtBalancePct != null && n.stackAtBalancePct > 100;
+}

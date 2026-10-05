@@ -10,7 +10,7 @@ import { shownAssetClass } from "@/lib/asset-class";
 import { screenYearOf, unitCountRow } from "@/lib/criteria";
 import { basisOutsideBand, findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
 import { interestOf, interestTag, isMasterLeasehold } from "@/lib/interest";
-import { capSlotWithheld, noteCapSlot, ownYieldText, statedCapSlot } from "@/lib/compare-interest";
+import { capSlotReason, capSlotWithheld, noteCapSlot, ownYieldText, statedCapSlot } from "@/lib/compare-interest";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -48,8 +48,10 @@ export interface PipelineSlots {
   /** "note" where the going-in cap is withheld because the price is a
    *  loan's, "position" where it is a preferred equity position's, "share"
    *  where it is a share's beside the loan its entity carries
-   *  (lib/compare-interest `capSlotWithheld`); absent or null otherwise */
-  capWithheld?: "note" | "position" | "share" | null;
+   *  (lib/compare-interest `capSlotWithheld`), and "under_water" for a note
+   *  whose balance is over the collateral's stated value, whose yield is
+   *  withheld too (`capSlotReason`); absent or null otherwise */
+  capWithheld?: "note" | "position" | "share" | "under_water" | null;
   /** the buyer's own yield at its price — "13.8%" — in the cap slot: a
    *  note's to maturity where it pays or may, a position's to redemption
    *  where the date has not gone by; absent or null otherwise */
@@ -309,7 +311,8 @@ export function pickSlots(
     // — plan", never a cap on one and a yield on the other. Where the
     // memorandum states none, the first signal's, as the deal header reads it.
     cap: statedCapSlot(extraction, plan != null, signal),
-    capWithheld: withheld,
+    // A note under water withholds its yield too (research pass 38).
+    capWithheld: capSlotReason(withheld, note),
     noteYield: note?.ytmPct != null ? ownYieldText(note.ytmPct) : null,
     // The shared price reader; on a development with no asking price the
     // land or site cost is what is being bought. The first signal's ask

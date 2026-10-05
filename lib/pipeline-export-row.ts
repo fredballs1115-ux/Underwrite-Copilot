@@ -7,7 +7,7 @@ import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { buyBoxCoverage, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
 import { scoreMandateFit } from "@/lib/mandate";
-import { capSlotWithheld, noteCapSlot, ownYieldText } from "@/lib/compare-interest";
+import { capSlotReason, capSlotWithheld, noteCapSlot, ownYieldText } from "@/lib/compare-interest";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
@@ -163,7 +163,9 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // too); none on a plan deal, none where the slot is withheld — a note,
     // a position, a share beside its entity's loan — and the cell says so.
     cap: statedCapSlot(extraction, plan != null, signal),
-    capWithheld: !plan ? capSlotWithheld(extraction) : null,
+    // A note under water withholds its yield too, as on the card (research
+    // pass 38).
+    capWithheld: !plan ? capSlotReason(capSlotWithheld(extraction), noteCapSlot(extraction, asOf)) : null,
     // A note's yield to maturity, or a position's to redemption, at its
     // price — the figure the pipeline card shows in the cap slot ("17.0% to
     // maturity"), read on the route's day; the cell had said "n/a — note".

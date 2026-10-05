@@ -4,6 +4,7 @@ import { LeaseTermBar } from "@/app/lease-term-bar";
 import { Key, KeyItem, MEASURE, PanelHead, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 import { termEndLabel } from "@/lib/ground-lease-term";
 import { isWholeShare, noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRead } from "@/lib/interest";
+import { noteUnderWater } from "@/lib/note-yield";
 import { positionCaption, positionMoney } from "@/lib/position";
 
 /**
@@ -25,8 +26,9 @@ import { positionCaption, positionMoney } from "@/lib/position";
  * the memorandum states the collateral's value, the track is that value,
  * the balance filled light and the price dark over it — the loan-to-value
  * at each, and the empty remainder the cushion. A note that is not paying,
- * or is past its maturity, keeps its sentence: a large yield there is one
- * nobody earns. A note behind other debt draws no collateral track — its
+ * is past its maturity, or is under water (its balance over the stated
+ * value), keeps its sentence: a large yield there is one nobody earns. A
+ * note behind other debt draws no collateral track — its
  * cushion sits on top of the senior loan's balance — so its price is drawn
  * against its balance, and the sentence under it reads the stack where the
  * memorandum states that balance, or says why the loan-to-value is withheld.
@@ -59,9 +61,10 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
   const r = interest;
   const n = r.kind === "note" ? r.note : null;
   // The note's figures, where it pays or may: a yield nobody earns is not
-  // drawn large.
+  // drawn large — nor one the collateral cannot repay, under water (research
+  // pass 38), whose sentence says what its contract yield assumes.
   const tiles =
-    n && !n.matured && n.terms.status !== "non_performing" && (n.ytmPct != null || n.currentYieldPct != null)
+    n && !n.matured && n.terms.status !== "non_performing" && !noteUnderWater(n) && (n.ytmPct != null || n.currentYieldPct != null)
       ? [
           n.ytmPct != null
             ? { label: "To maturity", value: `${tenths(n.ytmPct)}%`, sub: n.terms.status === "performing" ? "yield on the price" : "if paid as agreed" }

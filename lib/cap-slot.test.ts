@@ -4,7 +4,7 @@
 // withheld cap one way.
 import { describe, expect, it } from "vitest";
 import { CAP_WITHHELD, OWN_YIELD, PLAN_CAP_NA, capCellText, ownYieldOf } from "./cap-slot";
-import { OWN_YIELD_WORDS, SHARE_CAP_WORDS } from "./compare-interest";
+import { OWN_YIELD_WORDS, SHARE_CAP_WORDS, UNDER_WATER_WORDS } from "./compare-interest";
 
 describe("capCellText — the pipeline CSV's cap cell", () => {
   it("the cap where there is one", () => {
@@ -41,6 +41,9 @@ describe("the client's words are the server's", () => {
       expect(CAP_WITHHELD[k].na).toBe(OWN_YIELD_WORDS[k].na);
     }
     expect(CAP_WITHHELD.share).toEqual({ na: SHARE_CAP_WORDS.na, title: SHARE_CAP_WORDS.title });
+    // A note under water (research pass 38).
+    expect(CAP_WITHHELD.under_water).toEqual({ na: UNDER_WATER_WORDS.na, title: UNDER_WATER_WORDS.title });
+    expect(capCellText({ cap: null, noteYield: null, capWithheld: "under_water" })).toBe("n/a — under water");
     expect(ownYieldOf("position")).toBe(OWN_YIELD.position);
     expect(ownYieldOf(null)).toBe(OWN_YIELD.note);
   });

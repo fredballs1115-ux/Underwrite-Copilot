@@ -84,7 +84,7 @@ import {
   type GroundLeaseTerm,
   type LeaseName,
 } from "@/lib/ground-lease-term";
-import { readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
+import { noteUnderWater, readNote, readNoteTerms, type NoteRead } from "@/lib/note-yield";
 import { isPreferredEquity, POSITION_TRAPS, positionModelLine, positionTag, readPosition, type PositionRead } from "@/lib/position";
 
 export type { InterestKind };
@@ -805,6 +805,14 @@ export function noteYieldSentence(n: NoteRead | null): string {
     if (n.terms.status === "non_performing") {
       return `If it paid to its ${due} maturity it would yield ${pctText(n.ytmPct)} (${n.paymentBasis}) — it is not paying, so what it earns turns on the time and cost of taking the property.`;
     }
+    // Under water — the balance (or, behind a senior loan, the two
+    // together) over the collateral's stated value: the contract yield
+    // assumes a repayment the collateral does not cover (research pass 38),
+    // so it is said as what it assumes, never as what the note earns.
+    if (noteUnderWater(n) && n.terms.balance != null && n.terms.collateralValue != null) {
+      const senior = n.terms.subordinate && n.terms.seniorBalance != null ? `, behind the senior loan's ${money(n.terms.seniorBalance)},` : "";
+      return `${n.terms.status === "performing" ? "Held" : "Paid as agreed"} to its ${due} maturity it would yield ${pctText(n.ytmPct)} on the price (${n.paymentBasis}) — a contract yield that assumes the ${money(n.terms.balance)} balance is repaid in full, which the collateral's stated ${money(n.terms.collateralValue)}${senior} does not cover: what the note fetches is a foreclosure's question.`;
+    }
     // Under the balance the yield runs past the coupon's cash on the price,
     // the difference the discount accreting; over it, the premium is lost
     // at maturity — and a premium larger than the interest left to collect
@@ -1419,9 +1427,13 @@ export function interestShortLine(r: InterestRead): string {
             ? ", and not paying"
             : n.monthsLeft === 0
               ? `, due ${dueWhen(n)}`
-              : n.ytmPct != null && n.terms.maturity
-                ? `, ${pctText(n.ytmPct)} to its ${monthYear(n.terms.maturity)} maturity${n.terms.status === "performing" ? "" : " if paid as agreed"}`
-                : "";
+              : // Under water, no contract yield is said as the note's
+                // (research pass 38).
+                noteUnderWater(n) && n.ytmPct != null && n.terms.maturity
+                ? `, under water — its contract yield to its ${monthYear(n.terms.maturity)} maturity assumes a repayment the collateral's stated value does not cover`
+                : n.ytmPct != null && n.terms.maturity
+                  ? `, ${pctText(n.ytmPct)} to its ${monthYear(n.terms.maturity)} maturity${n.terms.status === "performing" ? "" : " if paid as agreed"}`
+                  : "";
       return `A loan secured by the property, not the property${
         r.discountPct != null && r.askingPrice != null && r.balance != null
           ? ` — the ${money(r.askingPrice)} price is ${discountPhrase(r.discountPct)} the ${money(r.balance)} balance${earns}`

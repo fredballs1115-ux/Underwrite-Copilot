@@ -24,6 +24,7 @@ import {
   SENSITIVITY_PRICE_FACTORS,
 } from "@/lib/model/sensitivity";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
+import { CAP_WITHHELD } from "@/lib/cap-slot";
 import { YOC_WITHHELD, modelYieldWithheld } from "@/lib/plan-facts";
 import {
   addDealDocument,
@@ -356,6 +357,10 @@ export function ReturnsHeadline({
           // where the date has not gone by.
           interest?.noteYtmPct != null ? (
             <Stat label={OWN_YIELD_LABEL[withheld]} value={pct(interest.noteYtmPct)} />
+          ) : interest?.underWater ? (
+            // Under water, its contract yield assumes a repayment the
+            // collateral does not cover (research pass 38).
+            <Stat label={OWN_YIELD_LABEL.note} value={CAP_WITHHELD.under_water.na} />
           ) : (
             <Stat label="Going-in cap" value={`n/a — ${withheld}`} />
           )

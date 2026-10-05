@@ -12,7 +12,10 @@ export const NOTE_CAP_TITLE =
   "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. The note's yield to maturity at its price stands in its place, where the note pays or may.";
 
 export type OwnYieldKind = "note" | "position";
-export type CapWithheldKind = OwnYieldKind | "share";
+/** Why the slot holds no cap — and "under_water" for a note whose yield is
+ *  withheld too: its balance is over the collateral's stated value
+ *  (lib/compare-interest `capSlotReason`, research pass 38). */
+export type CapWithheldKind = OwnYieldKind | "share" | "under_water";
 
 /** A note's and a preferred equity position's own yield in the cap slot, in
  *  words: what it runs to, the list column's micro-label, the slot where
@@ -39,6 +42,11 @@ export const CAP_WITHHELD: Record<CapWithheldKind, { na: string; title: string }
     na: "n/a — share",
     title:
       "Beside the loan the memorandum states — the entity's, or on a tenancy in common the property's — a share's price grossed up is the equity's whole, not the building's: a cap stated against that price is on a basis the memorandum never says, so no cap is shown.",
+  },
+  under_water: {
+    na: "n/a — under water",
+    title:
+      "The note's balance is over the collateral's stated value: its contract yield assumes a repayment the collateral does not cover, so no yield stands in the cap's place. What the note fetches is a foreclosure's question.",
   },
 };
 

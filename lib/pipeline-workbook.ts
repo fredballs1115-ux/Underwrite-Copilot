@@ -7,7 +7,7 @@ import { parsePct, parsePrice, priceRange, type BuyBoxCoverage } from "@/lib/cri
 import { FIRST_READ_TITLE } from "@/lib/first-read";
 import { FOLD_WORD, checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
-import { PLAN_CAP_NA } from "@/lib/cap-slot";
+import { CAP_WITHHELD, PLAN_CAP_NA } from "@/lib/cap-slot";
 import { debtTagMeaning } from "@/lib/pipeline-tags";
 import { YOC_WITHHELD } from "@/lib/plan-facts";
 
@@ -134,8 +134,10 @@ export interface PipelineExportRow {
    *  "position" where it is a preferred equity position's; and "share"
    *  where it is a share's beside the loan its entity carries (lib/compare-
    *  interest `capSlotWithheld`) — the cell says "n/a — note", "n/a —
-   *  position" or "n/a — share" */
-  capWithheld?: "note" | "position" | "share" | null;
+   *  position" or "n/a — share"; and "under_water" for a note whose
+   *  balance is over the collateral's stated value, whose yield is withheld
+   *  too — "n/a — under water" (`capSlotReason`, research pass 38) */
+  capWithheld?: "note" | "position" | "share" | "under_water" | null;
   /** a note's yield to maturity, or a position's to redemption, at its
    *  price — "17.0%", the pipeline card's figure (lib/compare-interest
    *  `ownYieldText`) — written in the cap cell with what it runs to; null
@@ -400,8 +402,10 @@ export async function buildPipelineWorkbook(
             ? "A note has no going-in cap: the collateral's income over a loan's price is a cap nobody earns. Its yield to maturity at its price stands in its place."
             : "A preferred equity position has no going-in cap: its price buys a rate and a redemption, never a slice of the building. Its yield to redemption at its price stands in its place.";
       } else {
-        // A plan deal's words are the pipeline CSV's too (lib/cap-slot).
-        capCell.value = d.cap ?? (d.planDeal ? PLAN_CAP_NA : d.capWithheld ? `n/a — ${d.capWithheld}` : "—");
+        // A plan deal's words are the pipeline CSV's too (lib/cap-slot), and
+        // so are a withheld slot's — a note under water's with its reason.
+        capCell.value = d.cap ?? (d.planDeal ? PLAN_CAP_NA : d.capWithheld ? CAP_WITHHELD[d.capWithheld].na : "—");
+        if (!d.cap && !d.planDeal && d.capWithheld === "under_water") capCell.note = CAP_WITHHELD.under_water.title;
       }
       capCell.font = baseFont;
       capCell.alignment = { horizontal: "right" };

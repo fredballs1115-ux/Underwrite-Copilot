@@ -5,7 +5,7 @@ import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 import type { FigureSource } from "@/lib/compare-figures";
-import { OWN_YIELD_WORDS, SHARE_CAP_WORDS, type CapWithheld } from "@/lib/compare-interest";
+import { OWN_YIELD_WORDS, SHARE_CAP_WORDS, UNDER_WATER_WORDS, type CapWithheld } from "@/lib/compare-interest";
 import { PLAN_CAP_NA } from "@/lib/cap-slot";
 import { pctText, YOC_WITHHELD } from "@/lib/plan-facts";
 import type { BuyBoxCoverage } from "@/lib/criteria";
@@ -127,6 +127,9 @@ export type Col = {
   /** a note's yield to maturity at its price, percent, where it pays or
    *  may — its answer where a building shows a going-in cap (#423) */
   noteYtm?: number | null;
+  /** a note whose balance is over the collateral's stated value: its slot
+   *  reads "n/a — under water" (lib/compare-interest, research pass 38) */
+  noteUnderWater?: boolean;
   /** the model's returns withheld: a note's are the collateral's, bought
    *  outright; a share's, run at the share's price, set the whole
    *  building's cash flows against a fraction of its cost
@@ -513,7 +516,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
           : c.withheld === "note" || c.withheld === "position"
             ? c.noteYtm != null
               ? `${pct(c.noteYtm)} ${OWN_YIELD_WORDS[c.withheld].to}`
-              : OWN_YIELD_WORDS[c.withheld].na
+              : c.noteUnderWater
+                ? UNDER_WATER_WORDS.na
+                : OWN_YIELD_WORDS[c.withheld].na
             : // A share beside the loan its entity carries: the cap is
               // withheld here as on its header and its card, never a dash
               // that reads as "not stated".
