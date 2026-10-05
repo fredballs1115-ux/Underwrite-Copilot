@@ -127,7 +127,10 @@ const SERVER_KEY_READERS: Record<string, string> = {
   "lib/criteria-server.ts": "the buy box and branding a memo, report or export reads",
   "lib/branding-server.ts": "the buy box and branding a memo, report or export reads",
   "app/(app)/account/page.tsx": "your account's settings",
-  "app/(app)/account/actions.ts": "your account's settings",
+  // A cross-account write: a member's deals and work go to their team's
+  // owner (lib/account-handover), named apart from the settings (audit C5,
+  // LOW-9).
+  "app/(app)/account/actions.ts": "deleting your account, which removes its files and sign-in and hands what you added to a team's pipeline to that team's owner",
   "app/(app)/billing/actions.ts": "billing",
   "app/(app)/team/actions.ts": "billing",
   "lib/billing.ts": "billing",
