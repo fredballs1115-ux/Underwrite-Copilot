@@ -42,6 +42,12 @@ describe("inferStrategy — a building with no income today is a lease-up, not s
     // An NOI stated today is income: the words do not move it.
     expect(inferStrategy(office([row("Occupancy", "0%", "in_place"), row("NOI (in-place)", "$650,000", "in_place")])).kind).toBe("stabilized");
     expect(inferStrategy(office([row("NOI (Year 1)", "$650,000")], { dealName: "1200 Corporate Drive (vacant)" })).kind).toBe("stabilized");
+    // Nor does a pro forma NOI move: on a building read as stabilized the
+    // model runs it as year 1 and a lease-up's model never does, so reading
+    // it as a lease-up would move the model's figures (the owner's call).
+    const proForma = row("NOI (stabilized, pro forma)", "$650,000", "pro_forma");
+    expect(inferStrategy(office([row("Occupancy", "0%", "in_place"), proForma])).kind).toBe("stabilized");
+    expect(inferStrategy(office([proForma], { dealName: "1200 Corporate Drive (vacant)" })).kind).toBe("stabilized");
     // A stated occupancy above 0% says tenants are in place, whatever the words:
     // where a lease-up begins above 0% is the owner's call.
     expect(inferStrategy(office([row("Occupancy", "15%", "in_place")], { dealName: "1200 Corporate Drive (vacant, owner-user or investor)" })).kind).toBe(
@@ -81,6 +87,12 @@ describe("assessPlausibility — no income in place on a deal read as stabilized
     // A stated NOI of nothing still names itself, once.
     const zero = assessPlausibility(stated([row("Occupancy", "0%", "in_place"), row("NOI (in-place)", "$0", "in_place")]));
     expect(zero.filter((x) => x.code === "no_income_in_place").map((x) => x.title)).toEqual(["NOI (in-place) is $0 on a deal read as stabilized"]);
+    // A building its strategy leaves stabilized because it states a pro forma
+    // NOI, with 0% stated beside it, is named the same way.
+    const proForma = assessPlausibility(office([row("Occupancy", "0%", "in_place"), row("NOI (stabilized, pro forma)", "$650,000", "pro_forma")]));
+    expect(proForma.filter((x) => x.code === "no_income_in_place").map((x) => x.title)).toEqual([
+      "Occupancy is 0% and no in-place NOI is stated, on a deal read as stabilized",
+    ]);
   });
 });
 

@@ -78,6 +78,26 @@ describe("deriveUnderwriteInputs — a building with no income today, and land, 
     expect(deriveUnderwriteInputs(office(null), "x").sources.inPlaceRentAnnual?.note).toBe("No NOI or cap in the OM — assumed 6% going-in");
   });
 
+  it("a building stated 0% occupied that states a pro forma NOI keeps its reading, and the model's year 1 stays that NOI", () => {
+    // Read as a lease-up, its model would run the price × a stated cap or the
+    // assumed 6% in place of the stated figure: the model's math, which is
+    // the owner's call, so the deal stays as it was read.
+    const vacantWithProForma: ExtractionResult = {
+      dealName: "1200 Corporate Drive (vacant)",
+      assetClass: "Office",
+      metrics: [
+        { label: "Asking price", value: "8,500,000", flagged: false, page: "p. 2" },
+        { label: "Total SF", value: "42,000 SF", flagged: false, page: "p. 2" },
+        { label: "Occupancy", value: "0%", flagged: false, page: "p. 3", basis: "in_place" },
+        { label: "NOI (stabilized, pro forma)", value: "$650,000", flagged: false, page: "p. 4", basis: "pro_forma" },
+      ],
+    };
+    const d = deriveUnderwriteInputs(vacantWithProForma, "x");
+    expect(d.meta.strategy).toBe("stabilized");
+    expect(computeUnderwrite(d.inputs).cashFlow[0].noi).toBeCloseTo(650_000, 0);
+    expect(d.sources.inPlaceRentAnnual?.note).toMatch(/^Grossed up from the OM's NOI \(stabilized, pro forma\) — the only NOI stated/);
+  });
+
   it("land with no NOI: the 6% and the loan beside it are placeholders, and the returns are not the land's", () => {
     const land: ExtractionResult = {
       dealName: "Cypress Creek 22-acre site",

@@ -166,12 +166,20 @@ const VACANT_OR_OWNER_USER =
 
 /**
  * Whether the deal is a building with no income today (research pass 37):
- * no in-place or Year-1 NOI stated, and either a stated in-place occupancy of
- * 0%, or — where no occupancy is stated — the deal's own words (its name, its
- * plan, the buyer's notes, the first read's) calling it vacant or offering it
- * to an owner-user. A stated occupancy above 0% says the building has
- * tenants, whatever the words; where a lease-up begins above 0% is the
- * owner's call. Land is no building to lease.
+ * no NOI stated, and either a stated in-place occupancy of 0%, or — where no
+ * occupancy is stated — the deal's own words (its name, its plan, the buyer's
+ * notes, the first read's) calling it vacant or offering it to an
+ * owner-user. A stated occupancy above 0% says the building has tenants,
+ * whatever the words; where a lease-up begins above 0% is the owner's call.
+ * Land is no building to lease.
+ *
+ * Any stated NOI keeps the deal as it was read, a stabilized or pro forma
+ * figure included: on a building read as stabilized the model runs that
+ * figure as its year-1 NOI (lib/underwrite/inputs), and a lease-up's model
+ * never does, so reading such a building as a lease-up would move the
+ * model's year-1 NOI to the price × the stated cap or the assumed 6% — the
+ * model's math, the owner's call. A stated 0% beside it is named by the
+ * plausibility check instead (`assessPlausibility`'s no_income_in_place).
  */
 function noIncomeToday(
   extraction: ExtractionResult | null,
@@ -179,7 +187,7 @@ function noIncomeToday(
 ): boolean {
   if (!extraction) return false;
   const metrics = extraction.metrics ?? [];
-  if (noiFigures(metrics).some((f) => f.kind === "in_place" || f.kind === "year1")) return false;
+  if (noiFigures(metrics).length > 0) return false;
   if (!assetWords(extraction.assetClass).operating) return false;
   const occupied = occupancyPctFromMetrics(metrics);
   if (occupied != null) return occupied === 0;
@@ -247,8 +255,8 @@ export function inferStrategy(
   // development, not an operating asset with no price.
   else if (hasMetrics && isLandOnly(extraction?.metrics ?? [], screenYearOf(extraction))) kind = "development";
   // A building with no income today — stated 0% occupied, or called vacant
-  // or offered to an owner-user in the deal's own words — and no in-place or
-  // Year-1 NOI is a lease-up, not an operating asset (research pass 37).
+  // or offered to an owner-user in the deal's own words — and no NOI stated
+  // is a lease-up, not an operating asset (research pass 37).
   else if (hasMetrics && noIncomeToday(extraction, signal)) kind = "lease_up";
   else if (hasMetrics) kind = "stabilized";
   else return { kind: "unknown", label: STRATEGY_LABEL.unknown, summary: "", source: "none" };
