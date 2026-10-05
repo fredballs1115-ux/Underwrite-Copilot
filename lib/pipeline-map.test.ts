@@ -4,8 +4,11 @@ import {
   PIN_UNSCREENED,
   partitionForMap,
   pinColor,
+  PIN_LABEL,
   pinHtml,
+  pinLetter,
   pinTapAction,
+  pinTitle,
   placementLine,
   previewHtml,
   tooltipHtml,
@@ -47,6 +50,33 @@ describe("the pipeline map's rules (#431)", () => {
     // A deal picked for comparison wears a brand ring and a larger pin.
     expect(pinHtml("pass", "street", true)).toContain('stroke="#114e54"');
     expect(pinHtml("pass", "street", true)).toContain('width="30"');
+  });
+
+  it("names the call inside the pin by its letter, never by colour alone, and in its title beside the deal's name (WCAG 1.4.1)", () => {
+    // The letters are the call names' own first letters: Go and Caution are
+    // the same lightness, so the letter is what tells them apart.
+    expect(PIN_LABEL).toEqual({ pass: "Go", caution: "Caution", pass_on: "No-go" });
+    expect(pinLetter("pass")).toBe("G");
+    expect(pinLetter("caution")).toBe("C");
+    expect(pinLetter("pass_on")).toBe("N");
+    expect(pinLetter(null)).toBeNull();
+    expect(pinLetter("unheard-of")).toBeNull();
+    // White on a filled disc; the call's colour on a hollow one.
+    expect(pinHtml("pass", "street")).toMatch(/<text [^>]*fill="#ffffff"[^>]*>G<\/text>/);
+    expect(pinHtml("caution", "area")).toMatch(/<text [^>]*fill="#a05a1c"[^>]*>C<\/text>/);
+    expect(pinHtml("pass_on", "street", true)).toMatch(/<text [^>]*>N<\/text>/);
+    // A deal with no call has no letter to give: it keeps the plain dot.
+    expect(pinHtml(null, "street")).not.toContain("<text");
+    expect(pinHtml(null, "street")).toContain('r="2.6"');
+    expect(pinHtml("pass", "street")).not.toContain('r="2.6"');
+    // The artwork stays out of the accessibility tree; the title names it.
+    expect(pinHtml("pass", "street")).toContain('aria-hidden="true"');
+    expect(pinTitle({ name: "The Maddox", verdict: "pass" })).toBe("The Maddox · Go");
+    expect(pinTitle({ name: "The Maddox", verdict: "caution" })).toBe("The Maddox · Caution");
+    expect(pinTitle({ name: "The Maddox", verdict: "pass_on" })).toBe("The Maddox · No-go");
+    expect(pinTitle({ name: "The Maddox", verdict: null })).toBe("The Maddox · Not screened");
+    // A title is a property, not markup: what the owner typed is kept as typed.
+    expect(pinTitle({ name: "Smith & Co's <b>", verdict: "pass" })).toBe("Smith & Co's <b> · Go");
   });
 
   it("escapes whatever the owner typed into the hover card", () => {

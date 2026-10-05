@@ -72,6 +72,27 @@ export function pinColor(verdict: string | null): string {
 
 export const PIN_LABEL: Record<string, string> = { pass: "Go", caution: "Caution", pass_on: "No-go" };
 
+/** What a deal's call is called on the map: its label, or "Not screened". */
+function callLabel(verdict: string | null): string {
+  return (verdict && PIN_LABEL[verdict]) || "Not screened";
+}
+
+/** The call's first letter, drawn inside its pin — G, C, N — so the call is
+ *  never told by colour alone (WCAG 1.4.1): Go's and Caution's colours are
+ *  the same lightness. A deal with no call keeps the plain dot. */
+export function pinLetter(verdict: string | null): string | null {
+  const label = verdict ? PIN_LABEL[verdict] : undefined;
+  return label ? label.charAt(0) : null;
+}
+
+/** The pin's title — what a screen reader names the pin, and the browser's
+ *  own tooltip — the deal's name with its call beside it. Plain text, never
+ *  HTML: Leaflet sets it as the element's `title` property, so it is not
+ *  escaped (escaping would print "&amp;" for an "&"). */
+export function pinTitle(d: Pick<MapDeal, "name" | "verdict">): string {
+  return `${d.name} · ${callLabel(d.verdict)}`;
+}
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, "&amp;")
@@ -84,24 +105,29 @@ function escapeHtml(s: string): string {
 /** The pin: a disc in the call's colour with a white ring, legible on a
  *  photograph and a street map alike; a placement vaguer than a street is
  *  hollow, since its centre is a district's, not a building's. A deal picked
- *  for comparison wears a second, brand-coloured ring. */
+ *  for comparison wears a second, brand-coloured ring. At its centre, the
+ *  call's letter (`pinLetter`), or a dot for a deal with no call. */
 export function pinHtml(verdict: string | null, precision: LocationPrecision, selected = false): string {
   const c = pinColor(verdict);
   const street = precision === "street";
   const size = selected ? 30 : 22;
   const mid = size / 2;
+  const mark = street ? "#ffffff" : c;
+  const letter = pinLetter(verdict);
   return (
     `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">` +
     (selected ? `<circle cx="${mid}" cy="${mid}" r="${mid - 1.5}" fill="none" stroke="#114e54" stroke-width="3"/>` : "") +
     `<circle cx="${mid}" cy="${mid}" r="9" fill="${street ? c : "#ffffff"}" stroke="${street ? "#ffffff" : c}" stroke-width="2.5"/>` +
-    `<circle cx="${mid}" cy="${mid}" r="2.6" fill="${street ? "#ffffff" : c}"/>` +
+    (letter
+      ? `<text x="${mid}" y="${mid}" dy="0.35em" text-anchor="middle" font-size="11" font-weight="700" fill="${mark}">${letter}</text>`
+      : `<circle cx="${mid}" cy="${mid}" r="2.6" fill="${mark}"/>`) +
     `</svg>`
   );
 }
 
 /** The card's inside, shared by the hover card and the touch preview. */
 function cardBody(d: MapDeal): string {
-  const call = d.verdict && PIN_LABEL[d.verdict] ? PIN_LABEL[d.verdict] : "Not screened";
+  const call = callLabel(d.verdict);
   const figures = [d.price, d.figure].filter((x): x is string => !!x).map(escapeHtml).join(" · ");
   // The route's own frame for the card (lib/image-frames), twice its 48px —
   // never a Google picture, since the card sits over a non-Google map
