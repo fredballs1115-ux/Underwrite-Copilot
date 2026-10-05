@@ -253,6 +253,15 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         />
       </div>
 
+      {/* What a lever's move did, said to a screen reader as it happens: the
+          headline return, against the base once a lever has moved. The four
+          tiles stay out of the live region, which would read all four at
+          every step (research pass 33). */}
+      <p role="status" className="sr-only">
+        {dirty
+          ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${fmtPct(base.leveredIrrPct)}`
+          : `Levered IRR ${fmtPct(current.leveredIrrPct)}, the base case`}
+      </p>
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Metric label="Levered IRR" value={fmtPct(current.leveredIrrPct)} cur={current.leveredIrrPct} was={base.leveredIrrPct} baseText={fmtPct(base.leveredIrrPct)} dirty={dirty} />
         <Metric label="Equity multiple" value={fmtX(current.leveredEquityMultiple)} cur={current.leveredEquityMultiple} was={base.leveredEquityMultiple} baseText={fmtX(base.leveredEquityMultiple)} dirty={dirty} />
@@ -610,8 +619,8 @@ function Lever({
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-xs font-medium">{label}</span>
         <span className="font-mono text-sm font-semibold tabular-nums">
-          {display(v)}
-          <span className={`ml-1.5 text-[11px] font-normal ${atBase ? "text-muted" : "text-brand"}`}>
+          {display(v)}{" "}
+          <span className={`ml-0.5 text-[11px] font-normal ${atBase ? "text-muted" : "text-brand"}`}>
             {atBase
               ? `base ${base}`
               : `(base ${base}, ${d === "base" ? "no change" : d})`}
@@ -626,6 +635,9 @@ function Lever({
         value={idx}
         onChange={(e) => onChange(Number(e.target.value))}
         aria-label={`${label} scenario`}
+        // The slider moves along stops; what a screen reader says is the
+        // figure the stop sets, never the stop's index (research pass 33).
+        aria-valuetext={atBase ? `${display(v)}, the base` : `${display(v)}, base ${base}`}
         className="mt-2 w-full accent-brand"
       />
       <div className="flex justify-between text-[10px] tabular-nums text-muted">

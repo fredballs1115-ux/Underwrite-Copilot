@@ -394,6 +394,11 @@ export function CommandPalette({
       e.preventDefault();
       const item = items[activeIdx];
       if (item) go(item);
+    } else if (e.key === "Tab") {
+      // The dialog is modal and the search field is its one stop — the
+      // arrows move through the results — so Tab stays here rather than
+      // walking out into the page under the scrim (research pass 33).
+      e.preventDefault();
     }
   }
 
@@ -430,6 +435,7 @@ export function CommandPalette({
     >
       <button
         type="button"
+        tabIndex={-1}
         aria-label="Close command palette"
         className="absolute inset-0 bg-black/30 backdrop-blur-[2px]"
         onClick={() => onOpenChange(false)}
@@ -505,6 +511,7 @@ export function CommandPalette({
                   >
                     <button
                       type="button"
+                      tabIndex={-1}
                       onClick={() => go(item)}
                       onMouseMove={() => setActive(index)}
                       className={`flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-sm transition-colors ${

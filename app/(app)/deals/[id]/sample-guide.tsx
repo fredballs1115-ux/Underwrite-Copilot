@@ -46,7 +46,7 @@ export function SampleGuide({ onNavigate }: { onNavigate?: (key: string) => void
         <h2 className="text-sm font-semibold tracking-tight">
           How to read this screen
         </h2>
-        <p className="text-xs text-muted">
+        <p className="text-xs text-ink/75">
           An invented deal on real Brewerytown rules and records.
         </p>
       </div>
@@ -77,7 +77,10 @@ export function SampleGuide({ onNavigate }: { onNavigate?: (key: string) => void
             </>
           );
           return (
-            <li key={s.title}>
+            // min-w-0: a grid item holds its widest line, and the hint's
+            // truncate needs room to give, so at 320px the cards spilled
+            // past the column (research pass 33).
+            <li key={s.title} className="min-w-0">
               {onNavigate ? (
                 <button
                   type="button"
