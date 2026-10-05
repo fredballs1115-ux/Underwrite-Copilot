@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import { getActiveBuyBox } from "@/lib/criteria-server";
 import { buyBoxLines, geoTargets, priceBand } from "@/lib/criteria";
@@ -56,6 +57,10 @@ export default async function CriteriaPage({
   const banner = saved
     ? {
         cls: "bg-pass/10 text-pass",
+        // A saved box sends the reader back where they came from: the
+        // pipeline's checklist links here and the page had no way back
+        // (research pass 32).
+        back: saved === "1",
         text:
           saved === "box"
             ? "New mandate added — fill it in and save."
@@ -91,8 +96,16 @@ export default async function CriteriaPage({
       </div>
 
       {banner && (
-        <p className={`rounded-lg px-3 py-2 text-sm ${banner.cls}`}>
+        <p className={`rounded-lg px-3 py-2 text-sm ${banner.cls}`} role="status">
           {banner.text}
+          {"back" in banner && banner.back && (
+            <>
+              {" "}
+              <Link href="/deals" className="font-medium underline decoration-dotted underline-offset-2">
+                Back to your pipeline →
+              </Link>
+            </>
+          )}
         </p>
       )}
 

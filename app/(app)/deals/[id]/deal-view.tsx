@@ -897,7 +897,7 @@ export function DealView({
       >
         {section === "overview" && (
           <div className="flex flex-col gap-6">
-            {isSample && <SampleGuide />}
+            {isSample && <SampleGuide onNavigate={navigateLegacy} />}
             {screenDiff && <SinceLastScreen diff={screenDiff} />}
             {discrepancies && discrepancies.discrepancies.length > 0 && (
               <ReconciliationPanel dealId={dealId} result={discrepancies} />

@@ -2556,6 +2556,9 @@ function GettingStarted({
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  // The upload first, the sample second, the buy box last: the checklist
+  // had opened on the buy box, the step that asks the most of someone who
+  // has not yet seen a screen (research pass 32).
   const steps: {
     key: string;
     label: string;
@@ -2563,16 +2566,24 @@ function GettingStarted({
     action: ReactNode;
   }[] = [
     {
-      key: "buybox",
-      label: "Set your buy box",
-      done: state.hasBuyBox,
-      action: (
+      key: "screen",
+      label: "Screen your first OM",
+      done: state.hasScreenedOm,
+      action: atLimit ? (
         <Link
-          href="/criteria"
+          href="/billing"
           className="text-xs font-medium text-brand hover:text-brand-strong"
         >
-          Set it →
+          See plans →
         </Link>
+      ) : (
+        <button
+          type="button"
+          onClick={onNewDeal}
+          className="text-xs font-medium text-brand hover:text-brand-strong"
+        >
+          Upload →
+        </button>
       ),
     },
     {
@@ -2594,24 +2605,16 @@ function GettingStarted({
       ),
     },
     {
-      key: "screen",
-      label: "Screen your first OM",
-      done: state.hasScreenedOm,
-      action: atLimit ? (
+      key: "buybox",
+      label: "Set your buy box",
+      done: state.hasBuyBox,
+      action: (
         <Link
-          href="/billing"
+          href="/criteria"
           className="text-xs font-medium text-brand hover:text-brand-strong"
         >
-          See plans →
+          Set it →
         </Link>
-      ) : (
-        <button
-          type="button"
-          onClick={onNewDeal}
-          className="text-xs font-medium text-brand hover:text-brand-strong"
-        >
-          Upload →
-        </button>
       ),
     },
   ];

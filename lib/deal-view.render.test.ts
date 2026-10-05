@@ -150,6 +150,14 @@ describe("DealView — the sample deal renders every section without a runtime e
     });
   }
 
+  it("the sample's reading guide opens each section it names, never a card that does nothing (research pass 32)", () => {
+    const html = render(sampleProps("overview"));
+    expect(textOf(html)).toContain("How to read this screen");
+    for (const to of ["verdict", "financials", "challenger"]) {
+      expect(html).toMatch(new RegExp(`<button type="button" data-guide-step="${to}"`));
+    }
+  });
+
   it("draws where each range's base sits in one neutral colour, and calls no end of a range optimistic", () => {
     // The sample's vacancy base, 9.0% between 6.0% and 9.5%, hugs the high
     // end — the buyer's end on a vacancy, not the sponsor's.
