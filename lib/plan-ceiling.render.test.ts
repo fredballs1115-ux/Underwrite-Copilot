@@ -41,8 +41,10 @@ vi.mock("../app/(app)/deals/actions", () => {
   };
 });
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
-import { assessPlausibility, inferStrategy, planSummary, plausibilityNote } from "@/lib/deal-strategy";
-import { YOC_WITHHELD, planFacts } from "@/lib/plan-facts";
+import { IMPLIED_CAP_CEILING, assessPlausibility, inferStrategy, planSummary, plausibilityNote } from "@/lib/deal-strategy";
+import { YOC_CEILING_PCT, YOC_WITHHELD, modelYieldWithheld, planFacts } from "@/lib/plan-facts";
+import { SAMPLE_DEAL } from "@/lib/sample-deal";
+import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
 import { buildPlanReport, buildYieldOnCostGrid, planBreakevens } from "@/lib/plan-sensitivity";
 import { pickSlots } from "@/lib/pipeline-slots";
 import { dealContextFor } from "@/lib/deal-context";
@@ -178,7 +180,7 @@ describe("a yield on cost no project earns is refused on every surface, in one s
     const fromModel = compareReturns(devTotalThousands, { ...model, yieldOnCostPct: 6597.94 }, strategy);
     expect(fromModel.yoc).toBeNull();
     expect(fromModel.yocWithheld).toBe(
-      "No yield on cost is shown: the first-draft model's 6597.94% puts its stabilized NOI at 25% or more of its total cost, a yield no project earns, so its total cost or its NOI was most likely misread.",
+      "No yield on cost is shown: the first-draft model puts its stabilized NOI at 25% or more of its total cost, a yield no project earns, so its total cost or its NOI was most likely misread.",
     );
     const sound = { ...devTotalThousands, metrics: [metric("Total project cost", "48,500,000"), ...devTotalThousands.metrics.slice(1)] } as ExtractionResult;
     const soundPlan = planSummary(sound, inferStrategy(sound))!;
@@ -217,5 +219,24 @@ describe("a yield on cost no project earns is refused on every surface, in one s
     expect(visibleText(row)).toContain(YOC_WITHHELD);
     expect(visibleText(row)).not.toContain("not stated");
     expect(html).not.toMatch(NO_FIGURE);
+  });
+
+  it("the Model tab refuses the first-draft model's own yield past the ceiling in the compare table's sentence", () => {
+    expect(YOC_CEILING_PCT).toBe(IMPLIED_CAP_CEILING * 100);
+    const model = { ...SAMPLE_DEAL.model!, returns: { ...SAMPLE_DEAL.model!.returns, yieldOnCostPct: 6597.94 } };
+    const sentence = modelYieldWithheld(6597.94)!;
+    expect(sentence).toBe(
+      "No yield on cost is shown: the first-draft model puts its stabilized NOI at 25% or more of its total cost, a yield no project earns, so its total cost or its NOI was most likely misread.",
+    );
+    const text = visibleText(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model })));
+    expect(text).toContain(YOC_WITHHELD);
+    expect(text).toContain(sentence);
+    expect(text).not.toMatch(NO_FIGURE);
+    // The compare table's cell for the same model says the same sentence.
+    expect(compareReturns(devTotalThousands, { yieldOnCostPct: 6597.94 }, strategy).yocWithheld).toBe(sentence);
+    // Under the ceiling the model's figure stands on both.
+    const under = { ...model, returns: { ...model.returns, yieldOnCostPct: 24.99 } };
+    expect(visibleText(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model: under })))).toContain("24.99%");
+    expect(modelYieldWithheld(24.99)).toBeNull();
   });
 });

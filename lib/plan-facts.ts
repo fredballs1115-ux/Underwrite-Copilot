@@ -57,6 +57,24 @@ export const yieldOnCostText = (d: number): string => pctText(d * 100);
  */
 export const YOC_WITHHELD = "n/a — figures don't tie";
 
+/** The ceiling a yield on cost is refused at, percent: lib/deal-strategy's
+ *  IMPLIED_CAP_CEILING, which this import-free module cannot load into the
+ *  pipeline's and the Model tab's client bundles — a test holds the two
+ *  equal. */
+export const YOC_CEILING_PCT = 25;
+
+/**
+ * A first-draft model's own yield on cost at or past the ceiling, refused in
+ * one sentence that never prints the figure — the compare table's cell and
+ * the Model tab's tile, which read the same model, say it alike (research
+ * pass 38); null under it.
+ */
+export function modelYieldWithheld(yieldOnCostPct: number | null | undefined): string | null {
+  return yieldOnCostPct != null && Number.isFinite(yieldOnCostPct) && yieldOnCostPct >= YOC_CEILING_PCT
+    ? `No yield on cost is shown: the first-draft model puts its stabilized NOI at ${YOC_CEILING_PCT}% or more of its total cost, a yield no project earns, so its total cost or its NOI was most likely misread.`
+    : null;
+}
+
 /**
  * The facts a plan is judged on, as label/value pairs — identical on every
  * surface that shows them (the deal page's plan strip, the shared screen a

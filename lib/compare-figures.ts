@@ -28,7 +28,8 @@
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { parsePct } from "@/lib/criteria";
 import { capSlotWithheld, compareInterest, type CapWithheld, type CompareInterest, type CompareModel } from "@/lib/compare-interest";
-import { IMPLIED_CAP_CEILING, isPlanDeal, planSummary, type DealStrategy } from "@/lib/deal-strategy";
+import { isPlanDeal, planSummary, type DealStrategy } from "@/lib/deal-strategy";
+import { modelYieldWithheld } from "@/lib/plan-facts";
 import { statedCapSlot } from "@/lib/pipeline-slots";
 
 /** Where a figure came from: the deal's first-draft model, or the
@@ -78,18 +79,14 @@ export function compareReturns(
   const statedCap = statedCapText ? parsePct(statedCapText) : null;
   // The model's figure, unless it is a yield no project earns; then the
   // header's, as where the model has none — and where neither stands, why.
+  // The Model tab's tile refuses the same figure in the same sentence.
   const rawModelYoc = model?.yieldOnCostPct ?? null;
-  const modelRefused = rawModelYoc != null && rawModelYoc >= IMPLIED_CAP_CEILING * 100;
+  const modelRefused = modelYieldWithheld(rawModelYoc);
   const modelYoc = modelRefused ? null : rawModelYoc;
   const plan = planDeal && modelYoc == null ? planSummary(ex ?? null, strategy) : null;
   const planYoc = plan?.yieldOnCost ?? null;
   const statedYoc = planYoc != null ? planYoc * 100 : null;
-  const yocWithheld =
-    modelYoc != null || statedYoc != null
-      ? null
-      : modelRefused
-        ? `No yield on cost is shown: the first-draft model's ${rawModelYoc!.toFixed(2)}% puts its stabilized NOI at ${IMPLIED_CAP_CEILING * 100}% or more of its total cost, a yield no project earns, so its total cost or its NOI was most likely misread.`
-        : (plan?.yieldWithheld ?? null);
+  const yocWithheld = modelYoc != null || statedYoc != null ? null : (modelRefused ?? plan?.yieldWithheld ?? null);
   return {
     ...ci,
     planDeal,

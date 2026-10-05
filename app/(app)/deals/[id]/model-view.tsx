@@ -24,6 +24,7 @@ import {
   SENSITIVITY_PRICE_FACTORS,
 } from "@/lib/model/sensitivity";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
+import { YOC_WITHHELD, modelYieldWithheld } from "@/lib/plan-facts";
 import {
   addDealDocument,
   removeDealDocument,
@@ -274,6 +275,8 @@ export function ReturnsHeadline({
   // What a withheld tile says after "n/a — ": what the price buys, or where
   // the lease ends inside the hold, when (lib/compare-interest).
   const naWord = withheld ? (interest?.word ?? withheld) : null;
+  // A yield on cost no project earns, refused (research pass 38).
+  const yieldRefused = modelYieldWithheld(r.yieldOnCostPct);
   // The building's NOI over a loan's or a share's price is no misread plan:
   // the price is not the building's, and the line above the figures says so.
   const implausible = !withheld && r.purchasePrice > 0 && r.year1Noi / r.purchasePrice >= IMPLAUSIBLE_CAP;
@@ -314,9 +317,12 @@ export function ReturnsHeadline({
           render as before. */}
       {r.yieldOnCostPct != null && (
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {/* A yield no project earns is refused, its sentence under the
+              tiles — the compare table's cell for this model says the same
+              (lib/plan-facts `modelYieldWithheld`, research pass 38). */}
           <Stat
             label={r.stabilizedYear ? `Yield on cost (Yr ${r.stabilizedYear}, incl. carry)` : "Yield on cost"}
-            value={pct(r.yieldOnCostPct)}
+            value={yieldRefused ? YOC_WITHHELD : pct(r.yieldOnCostPct)}
           />
           <Stat
             label={r.worksCarry != null && r.worksCarry > 0 ? "Total cost (incl. carry)" : "Total cost"}
@@ -328,6 +334,11 @@ export function ReturnsHeadline({
             value={r.stabilizedNoi != null ? usd(r.stabilizedNoi) : "—"}
           />
         </div>
+      )}
+      {yieldRefused && (
+        <p data-qa="yield-withheld" className="mt-3 max-w-2xl text-xs leading-relaxed text-muted">
+          {yieldRefused}
+        </p>
       )}
       {interest?.line && (
         <p data-qa="returns-withheld" className="mt-3 max-w-2xl text-xs leading-relaxed text-muted">
