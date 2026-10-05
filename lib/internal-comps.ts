@@ -18,7 +18,7 @@ import {
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
 import { yieldOnCostText } from "@/lib/plan-facts";
 
@@ -65,6 +65,10 @@ interface SiblingDealRow {
   is_sample: boolean | null;
   verdict: unknown;
   extraction: unknown;
+  /** the sibling's first signal (FirstSignal), read with its extraction for
+   *  its kind, as its own page reads it; absent on a row the caller did not
+   *  select it for */
+  first_signal?: unknown;
 }
 
 const fmtCompact = (dollars: number) =>
@@ -159,8 +163,11 @@ export function deriveInternalComps(
     // describes the finished project — and its comparable basis is total
     // cost over the planned units, never a shell's price over apartments
     // that do not exist yet.
+    // Read with the sibling's first signal, as its own page reads its kind:
+    // a value-add only the signal's take names had its in-place cap printed
+    // as a comp's going-in cap.
     const ext = { ...extraction, metrics } as ExtractionResult;
-    const strategy = inferStrategy(ext);
+    const strategy = inferStrategy(ext, (row.first_signal as FirstSignal | null | undefined) ?? null);
     const plan = planSummary(ext, strategy);
     const price = findPriceMetric(metrics, strategy.kind, screenYearOf(ext));
     // A note's stated cap is the collateral's and a leased fee's a ground

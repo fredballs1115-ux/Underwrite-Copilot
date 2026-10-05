@@ -20,6 +20,8 @@ import { SHARE_CAP_WORDS, capSlotWithheld, goingInCapFigure } from "./compare-in
 import { capCellText } from "./cap-slot";
 import { interestTag } from "./interest";
 import { deriveInternalComps } from "./internal-comps";
+import { deriveAnalytics } from "./analytics";
+import { buildComps } from "./market-memory";
 import { PLAN_YOC_TITLE, pctText, planReadLine, yieldOnCostText } from "./plan-facts";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { visibleText } from "./render-lint";
@@ -300,6 +302,51 @@ describe("a plan deal is judged on its yield on total cost — never said to hav
       // Visible words only: a comment may still describe the old reading.
       const visible = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
       expect(visible, file).not.toMatch(/(?:has|have|carry) no going-in cap/i);
+    }
+  });
+});
+
+describe("analytics, the market memory and the internal comps read a deal's kind with its first signal (finding 7)", () => {
+  // The extraction names no plan; the first signal's take does.
+  const e = ex([m("Asking price", "$20,000,000"), m("Going-in cap rate", "5.00%"), m("Units", "100")], {
+    strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+  });
+  const signal = signalOf({ askPrice: "$20,000,000", take: "A value-add play: the renovation program carries the return — check the premium." });
+  const row = (first_signal: FirstSignal | null) => ({
+    id: "v",
+    name: "Value-add by its signal",
+    asset_class: "multifamily",
+    created_at: "2026-10-01T00:00:00Z",
+    is_sample: false,
+    stage: "screening",
+    verdict: null,
+    extraction: e,
+    first_signal,
+  });
+
+  it("the deal page and the card read a value-add, so no cap is pooled or printed as a comp's", () => {
+    expect(inferStrategy(e, signal).kind).toBe("value_add");
+    expect(pickSlots(e, signal).cap).toBeNull();
+    const [plotted] = deriveAnalytics([row(signal)]);
+    expect(plotted.kind).toBe("value_add");
+    expect(plotted.capPct).toBeNull();
+    const [pooled] = buildComps([row(signal)]);
+    expect(pooled?.capPct ?? null).toBeNull();
+    const [comp] = deriveInternalComps("other", "multifamily", { assetClass: "multifamily" }, [row(signal)]);
+    expect(comp.kindLabel).toBe("Value-add");
+    expect(comp.capLabel).toBeNull();
+  });
+
+  it("a row read without its signal reads as before: the stabilized cap", () => {
+    expect(deriveAnalytics([row(null)])[0].capPct).toBe(5);
+    expect(buildComps([row(null)])[0].capPct).toBe(5);
+    expect(deriveInternalComps("other", "multifamily", { assetClass: "multifamily" }, [row(null)])[0].capLabel).toBe("5.00%");
+  });
+
+  it("the analytics page and the market page select the first signal for it", () => {
+    for (const file of ["app/(app)/analytics/page.tsx", "app/market/page.tsx"]) {
+      const src = readFileSync(join(process.cwd(), file), "utf8");
+      expect(src, file).toMatch(/\.select\("id, name, asset_class, created_at, is_sample,[^"]*extraction, first_signal"\)/);
     }
   });
 });

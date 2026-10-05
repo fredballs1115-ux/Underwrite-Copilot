@@ -11,7 +11,7 @@ import {
 import { interestOf } from "@/lib/interest";
 import { dealClassKey } from "@/lib/asset-words";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
 
 /**
@@ -56,6 +56,9 @@ export interface AnalyticsRow {
   stage?: string | null;
   verdict: unknown;
   extraction: unknown;
+  /** the screen's first signal (FirstSignal): its take names a plan the
+   *  extraction's rows may not, as the deal page reads it */
+  first_signal?: unknown;
 }
 
 export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
@@ -68,7 +71,10 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     // strategy reader never meets a missing array.
     const metrics = Array.isArray(raw.metrics) ? raw.metrics : [];
     const extraction = { ...raw, metrics } as ExtractionResult;
-    const strategy = inferStrategy(extraction);
+    // The deal's kind as its own page reads it: the extraction and the
+    // first signal, whose take can name the plan the rows do not — read
+    // alone, a value-add the signal names was plotted as a stabilized cap.
+    const strategy = inferStrategy(extraction, (r.first_signal as FirstSignal | null | undefined) ?? null);
     const plan = planSummary(extraction, strategy);
 
     // A plan deal has no going-in cap: a stabilized or pro forma cap, or a

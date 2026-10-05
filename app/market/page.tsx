@@ -253,7 +253,9 @@ export default async function MarketDataPage({
     ? await Promise.all([
         supabase
           .from("deals")
-          .select("id, name, asset_class, created_at, is_sample, verdict, extraction")
+          // The first signal too: each deal's kind is read with it, as on
+          // its own page (lib/market-memory).
+          .select("id, name, asset_class, created_at, is_sample, verdict, extraction, first_signal")
           .eq("user_id", user.id)
           .not("extraction", "is", null)
           .order("created_at", { ascending: false })

@@ -30,7 +30,7 @@ import {
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
 import { assetWords, countNoun, dealClassKey, perSuffix } from "@/lib/asset-words";
-import type { ExtractionResult } from "@/lib/anthropic/types";
+import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
 export interface MarketComp {
   dealId: string;
@@ -91,6 +91,10 @@ interface DealRowLike {
   is_sample: boolean | null;
   verdict: unknown;
   extraction: unknown;
+  /** the screen's first signal (FirstSignal), read with the extraction for
+   *  the deal's kind, as its own page reads it; absent on a row the caller
+   *  did not select it for */
+  first_signal?: unknown;
 }
 
 /** A class handed in by a caller, as the key the comps are grouped under
@@ -180,13 +184,15 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     const assetClass = dealClassKey(row.asset_class, extraction);
     if (!assetClass) continue;
 
-    // The deal's kind first, as the comp memory and the analytics read it.
-    // A plan deal (value-add, lease-up, conversion, development) has no
-    // going-in cap — its stabilized cap or yield on cost is the finished
-    // project's — and its basis is total cost over the planned units,
-    // never a shell's or a site's price over apartments not built yet.
+    // The deal's kind first, as the comp memory and the analytics read it —
+    // and as the deal's own page does, with the first signal, whose take
+    // can name a plan the rows do not. A plan deal (value-add, lease-up,
+    // conversion, development) is judged on its yield on total cost — its
+    // stabilized cap or yield on cost is the finished project's — and its
+    // basis is total cost over the planned units, never a shell's or a
+    // site's price over apartments not built yet.
     const ext = { ...extraction, metrics } as ExtractionResult;
-    const strategy = inferStrategy(ext);
+    const strategy = inferStrategy(ext, (row.first_signal as FirstSignal | null | undefined) ?? null);
     const plan = planSummary(ext, strategy);
 
     // The shared going-in reader on an operating asset only: a plan deal's

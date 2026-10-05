@@ -37,7 +37,8 @@ export default async function AnalyticsPage() {
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("deals")
-    .select("id, name, asset_class, created_at, is_sample, stage, verdict, extraction")
+    // The first signal too: the deal's kind is read with it, as on its page.
+    .select("id, name, asset_class, created_at, is_sample, stage, verdict, extraction, first_signal")
     .not("extraction", "is", null)
     .order("created_at", { ascending: true })
     .limit(300);
