@@ -1,7 +1,7 @@
 import "server-only";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
-import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { siteFlagsStale, type FloodMapView, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
@@ -1562,8 +1562,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // citation validates, and none prints (the rule in lib/facts.ts).
   const totalPages = input.totalPages ?? null;
   const dealName = memo.name;
-  // The plan's finished product in the class's own noun (lib/asset-words):
-  // a hotel development is costed per key, never per unit.
+  // The class's own noun (lib/asset-words) — a hotel's keys, never units —
+  // for the comps' basis captions and the portfolio's rows; the plan page
+  // reads the row it counts (`planCount`, below).
   const planNoun = assetWords(memo.assetClass).noun ?? { one: "unit", many: "units" };
   // A hotel's model grows its rooms revenue at the growth lever: the grid's
   // axis and its takeaway call it RevPAR growth, not rent growth.
@@ -1687,6 +1688,14 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   const metrics = list(extraction?.metrics) as NonNullable<
     ExtractionResult["metrics"]
   >;
+  // The plan's finished product in the counting row's own noun
+  // (`countNounOf`): a hotel counting "Rooms" is costed per room, as the
+  // deal page's plan strip, the pipeline card and the workbook say it — else
+  // the class's (research pass 34: this page said "key" beside them).
+  const planCount = countNounOf(
+    metrics.map((m) => ({ label: str(m?.label), value: str(m?.value) })),
+    memo.assetClass,
+  );
   const chList = list(challenges?.challenges) as NonNullable<
     ChallengerResult["challenges"]
   >;
@@ -1794,7 +1803,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             {/* The same reader as the deal page's plan strip and the shared
                 screen (lib/plan-facts.ts) — one set of labels, one money
                 format, one blank rule — so the three never disagree. */}
-            {planFacts(plan.plan, planNoun.one).map(([label, value], _i, all) => (
+            {planFacts(plan.plan, planCount.one).map(([label, value], _i, all) => (
               <View key={label} style={{ width: `${100 / all.length}%` }}>
                 <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted }}>{str(label).toUpperCase()}</Text>
                 <Text style={{ fontSize: 11, fontFamily: "Helvetica-Bold", color: C.brand, marginTop: 1 }}>
@@ -1811,7 +1820,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                   : "Timeline to stabilization: not stated."
               }${
                 plan.plan.costPerUnit != null && plan.plan.units != null
-                  ? ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} planned ${planNoun.many}.`
+                  ? ` The all-in basis is total cost over the ${plan.plan.units.toLocaleString("en-US")} planned ${planCount.many}.`
                   : ""
               }`,
             )}

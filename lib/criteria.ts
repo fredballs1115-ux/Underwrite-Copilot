@@ -970,6 +970,17 @@ export function unitCountFromMetrics(metrics: MetricLike[]): number | null {
   return row ? parseCount(row.value) : null;
 }
 
+/** What one of what that count counts is called, singular and plural: the
+ *  counting row's own noun (`countNoun` — a hotel counting "Rooms" is per
+ *  room), else the class's, else units. The plan's basis on the deal page,
+ *  the shared screen and the report reads it, as the workbook's and the
+ *  pipeline card's per-unit figures do (research pass 34: the plan said
+ *  "key" beside their "room"). */
+export function countNounOf(metrics: readonly MetricLike[], cls: string | null | undefined): { one: string; many: string } {
+  const many = countNoun(unitCountRow(metrics)?.label, cls);
+  return { one: many.replace(/s$/, ""), many };
+}
+
 // ── Today's occupancy ────────────────────────────────────────────────────
 //
 // The occupancy an OM states for the building as it stands — never the

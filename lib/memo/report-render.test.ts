@@ -1845,6 +1845,44 @@ describe("ReportDocument (full report)", () => {
     expect(withPlan).toBe(without + 1);
   }, 45000);
 
+  it("costs a hotel plan per room where the memorandum counts rooms, per key where it counts keys, as the deal page and the workbook do (research pass 34)", async () => {
+    const hotel = (countLabel: string): ExtractionResult => ({
+      dealName: "Harbor Point Hotel — Ground-up Select Service",
+      assetClass: "hospitality_str",
+      market: "Norfolk, VA",
+      strategy: {
+        kind: "development",
+        summary: "Build a 160-room select-service hotel on the waterfront site.",
+        capitalBudget: "$42M hard and soft costs",
+        timeline: "20 months of construction, 18 months of ramp",
+      },
+      metrics: [
+        { label: "Land cost", value: "$6,000,000", flagged: false, page: "p. 3" },
+        { label: "NOI (stabilized, pro forma)", value: "$4,200,000", flagged: false, page: "p. 12" },
+        { label: "Total project cost", value: "$48,000,000", flagged: false, page: "p. 14" },
+        { label: countLabel, value: "160", flagged: false, page: "p. 4" },
+      ],
+    });
+    const render = async (ex: ExtractionResult) => {
+      const deal = { name: ex.dealName, asset_class: "hospitality_str", extraction: ex, challenges: null, comps: null, market: null, reconciliation: null, verdict: SAMPLE_DEAL.verdict, prior_screen: null } as unknown as DealRow;
+      const plan = buildPlanReport(ex, { pct: 0.075, provenance: "assumption" });
+      expect(plan).not.toBeNull();
+      const input = buildReportData(deal, "October 5, 2026", [], null, undefined, plan);
+      return pdfTextOf(
+        await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]),
+      ).replace(/\s+/g, " ");
+    };
+    const rooms = await render(hotel("Rooms (proposed)"));
+    expect(rooms).toContain("BASIS PER ROOM (ALL-IN)");
+    expect(rooms).toContain("The all-in basis is total cost over the 160 planned rooms.");
+    expect(rooms).not.toContain("BASIS PER KEY");
+    expect(rooms).not.toContain("planned keys");
+    // The class's noun where the count is in keys: unchanged.
+    const keys = await render(hotel("Keys (proposed)"));
+    expect(keys).toContain("BASIS PER KEY (ALL-IN)");
+    expect(keys).toContain("The all-in basis is total cost over the 160 planned keys.");
+  }, 60000);
+
   it("gives the site a page of its own: FEMA's flood map as one picture, the ring on the building, the key with the building's zone marked, and the zone's sentence (#427, #472)", async () => {
     const deal = {
       name: SAMPLE_DEAL.name,

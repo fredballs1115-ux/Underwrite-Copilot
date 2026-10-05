@@ -14,8 +14,7 @@ import type {
   VerdictScenario,
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
-import { assetWords } from "@/lib/asset-words";
-import { screenYearOf } from "@/lib/criteria";
+import { countNounOf, screenYearOf } from "@/lib/criteria";
 import { askingPriceOf, inferStrategy, planSummary } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestOf, readInterest } from "@/lib/interest";
 import { assumableLine, readAssumable } from "@/lib/assumable-debt";
@@ -525,7 +524,10 @@ export function ShareView({
         )}
       </section>
 
-      <SharePlan strategy={strategy} plan={plan} noun={assetWords(assetClass).noun?.one} />
+      {/* The basis per the counting row's own noun (a hotel counting "Rooms"
+          is per room), as the deal page's plan strip says it — else the
+          class's. */}
+      <SharePlan strategy={strategy} plan={plan} noun={countNounOf(safeExtraction?.metrics ?? [], assetClass).one} />
 
       {ranges.length > 0 && (
         <section className="mt-6 rounded-2xl border border-line bg-surface p-5 shadow-sm">

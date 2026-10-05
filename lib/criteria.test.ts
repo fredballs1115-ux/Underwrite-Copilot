@@ -26,6 +26,7 @@ import {
   unitCountFromMetrics,
   UNSTAMPED_SCREEN_YEAR,
   activeBox,
+  countNounOf,
   type BuyBox,
   type BuyBoxStore,
 } from "./criteria";
@@ -264,6 +265,20 @@ describe("the count band — units, keys, pads, in the deal's own noun", () => {
     expect(basisTag(snf, "stabilized")).toBe("$150k/bed");
     const marina = { dealName: "Harbor Marina", assetClass: "Marina", metrics: [{ label: "Asking price", value: "$14,000,000", flagged: false, page: "p. 2" }, { label: "Wet slips", value: "250", flagged: false, page: "p. 2" }] };
     expect(basisTag(marina, "stabilized")).toBe("$56k/slip");
+  });
+
+  // Research pass 34: the plan's basis said "key" on a hotel counting rooms,
+  // beside the card's and the workbook's "room".
+  it("names what the count counts in the counting row's own noun, else the class's", () => {
+    expect(countNounOf([{ label: "Asking price", value: "$26,000,000" }, { label: "Rooms (proposed)", value: "160" }], "hospitality_str")).toEqual({ one: "room", many: "rooms" });
+    expect(countNounOf([{ label: "Keys", value: "160" }], "hospitality_str")).toEqual({ one: "key", many: "keys" });
+    // A row about the rooms is no count: the class's noun stands in.
+    expect(countNounOf([{ label: "Rooms renovated", value: "40" }], "hospitality_str")).toEqual({ one: "key", many: "keys" });
+    expect(countNounOf([], "hospitality_str")).toEqual({ one: "key", many: "keys" });
+    expect(countNounOf([{ label: "Pads", value: "150" }, { label: "RV sites", value: "40" }], "manufactured_housing")).toEqual({ one: "pad", many: "pads" });
+    expect(countNounOf([{ label: "Doors", value: "248" }], "multifamily")).toEqual({ one: "unit", many: "units" });
+    expect(countNounOf([], "office")).toEqual({ one: "unit", many: "units" });
+    expect(countNounOf([], null)).toEqual({ one: "unit", many: "units" });
   });
 
   it("the class's noun stands in where the OM stated no count, and the check is unknown", () => {

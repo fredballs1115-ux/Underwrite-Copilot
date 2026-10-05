@@ -5953,6 +5953,50 @@ describe("ShareView — a hotel development is spoken in keys", () => {
     expect(text).toContain("Land cost");
     expect(text).not.toContain("Basis per unit");
   });
+
+  it("costs the plan per room where the memorandum counts rooms, as the deal page's plan strip and the workbook do (research pass 34)", () => {
+    const hotel: ExtractionResult = {
+      dealName: "Harbor Point Hotel — Ground-up Select Service",
+      assetClass: "hospitality_str",
+      market: "Norfolk, VA",
+      strategy: {
+        kind: "development",
+        summary: "Build a 160-room select-service hotel on the waterfront site.",
+        capitalBudget: "$42M hard and soft costs",
+        timeline: "20 months of construction, 18 months of ramp",
+      },
+      metrics: [
+        { label: "Land cost", value: "$6,000,000", flagged: false, page: "p. 3" },
+        { label: "NOI (stabilized, pro forma)", value: "$4,200,000", flagged: true, page: "p. 12" },
+        { label: "Total project cost", value: "$48,000,000", flagged: false, page: "p. 14" },
+        { label: "Rooms (proposed)", value: "160", flagged: false, page: "p. 4" },
+      ],
+    };
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: hotel.dealName ?? "",
+        assetClass: "hospitality_str",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: false,
+        picture: null,
+        extraction: hotel,
+        comps: null,
+        market: null,
+        verdict: {
+          verdict: "caution",
+          reason: "An 8.75% yield on cost against a 7.5% exit cap, before the ramp.",
+          topRisks: [],
+          nextSteps: [],
+          screen: { ranges: [], dealKillers: [], sensitivity: [] },
+        },
+      }),
+    );
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(text).toContain("Basis per room (all-in)");
+    expect(text).toContain("$300k");
+    expect(text).not.toContain("Basis per key");
+  });
 });
 
 // ── The sample screen's leverage check ──────────────────────────────────────

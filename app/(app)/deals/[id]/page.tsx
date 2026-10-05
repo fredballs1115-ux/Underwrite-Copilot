@@ -65,7 +65,7 @@ import { readPortfolio } from "@/lib/portfolio";
 import { loiTermsFor } from "@/lib/loi-terms";
 import { PICTURE_CREDIT, ensureDealPicture, galleryPage, memorandumPhotoCredit } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
-import { assetWords, countNoun } from "@/lib/asset-words";
+import { countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import { cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
@@ -78,7 +78,7 @@ import { floodClassOfZone } from "@/lib/flood-style";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { SiteFlagsCard } from "./site-flags-card";
 import { PublicRecordCard } from "./public-record-card";
-import { buildingSfRow, findGoingInCap, parsePrice, screenYearOf } from "@/lib/criteria";
+import { buildingSfRow, countNounOf, findGoingInCap, parsePrice, screenYearOf } from "@/lib/criteria";
 import { after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { Metadata } from "next";
@@ -1500,8 +1500,10 @@ export default async function DealPage({
       >
         {/* The plan, as the OM states it, when the deal is not a stabilized
             asset — it changes what every figure above means. Then anything
-            that genuinely does not tie. */}
-        <PlanStrip strategy={strategy} plan={plan} noun={assetWords(shownClass).noun?.one} />
+            that genuinely does not tie. Its basis is per the counting row's
+            own noun (a hotel counting "Rooms" is per room), as the Size
+            slot, the card and the workbook say it — else the class's. */}
+        <PlanStrip strategy={strategy} plan={plan} noun={countNounOf(metrics, shownClass).one} />
         {/* What is being sold (#414): a note, a share, a leasehold — said
             before any figure is believed, since it changes what the price
             buys (lib/interest). Nothing for a plain fee simple. */}
