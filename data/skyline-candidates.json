@@ -7874,6 +7874,362 @@
         "Lewiston Clarkston confluence",
         "Lewiston Idaho aerial view"
       ]
+    },
+    {
+      "metroId": "cbsa:24780",
+      "city": "Greenville, North Carolina",
+      "area": "Greenville, NC",
+      "wikipedia": [
+        "Greenville, North Carolina",
+        "East Carolina University",
+        "Tar River (North Carolina)"
+      ],
+      "categories": [
+        "Greenville, North Carolina",
+        "Downtown Greenville, North Carolina",
+        "East Carolina University"
+      ],
+      "queries": [
+        "Greenville North Carolina downtown",
+        "East Carolina University campus",
+        "Tar River Greenville"
+      ]
+    },
+    {
+      "metroId": "cbsa:13980",
+      "city": "Blacksburg, Virginia",
+      "area": "Blacksburg-Christiansburg-Radford, VA",
+      "wikipedia": [
+        "Blacksburg, Virginia",
+        "Virginia Tech",
+        "Burruss Hall",
+        "Radford, Virginia"
+      ],
+      "categories": [
+        "Blacksburg, Virginia",
+        "Virginia Tech campus",
+        "Burruss Hall",
+        "Radford, Virginia"
+      ],
+      "queries": [
+        "Virginia Tech Burruss Hall",
+        "Blacksburg Virginia mountains",
+        "Virginia Tech drillfield"
+      ]
+    },
+    {
+      "metroId": "cbsa:10180",
+      "city": "Abilene, Texas",
+      "area": "Abilene, TX",
+      "wikipedia": [
+        "Abilene, Texas",
+        "Paramount Theatre (Abilene, Texas)"
+      ],
+      "categories": [
+        "Abilene, Texas",
+        "Downtown Abilene, Texas",
+        "Buildings in Abilene, Texas"
+      ],
+      "queries": [
+        "Abilene Texas downtown skyline",
+        "Abilene Texas Paramount Theatre",
+        "Abilene Texas sunset"
+      ]
+    },
+    {
+      "metroId": "cbsa:48660",
+      "city": "Wichita Falls, Texas",
+      "area": "Wichita Falls, TX",
+      "wikipedia": [
+        "Wichita Falls, Texas",
+        "Lake Wichita"
+      ],
+      "categories": [
+        "Wichita Falls, Texas",
+        "Downtown Wichita Falls, Texas"
+      ],
+      "queries": [
+        "Wichita Falls Texas waterfall",
+        "Wichita Falls Texas downtown",
+        "Wichita River Wichita Falls"
+      ]
+    },
+    {
+      "metroId": "cbsa:41660",
+      "city": "San Angelo, Texas",
+      "area": "San Angelo, TX",
+      "wikipedia": [
+        "San Angelo, Texas",
+        "Concho River",
+        "Fort Concho"
+      ],
+      "categories": [
+        "San Angelo, Texas",
+        "Downtown San Angelo, Texas",
+        "Concho River",
+        "Fort Concho"
+      ],
+      "queries": [
+        "San Angelo Texas Concho River",
+        "San Angelo Texas downtown",
+        "Fort Concho San Angelo"
+      ]
+    },
+    {
+      "metroId": "cbsa:36220",
+      "city": "Odessa, Texas",
+      "area": "Odessa, TX",
+      "wikipedia": [
+        "Odessa, Texas"
+      ],
+      "categories": [
+        "Odessa, Texas",
+        "Downtown Odessa, Texas",
+        "Buildings in Odessa, Texas"
+      ],
+      "queries": [
+        "Odessa Texas downtown skyline",
+        "Odessa Texas Ector County",
+        "Odessa Texas aerial"
+      ]
+    },
+    {
+      "metroId": "cbsa:46660",
+      "city": "Valdosta, Georgia",
+      "area": "Valdosta, GA",
+      "wikipedia": [
+        "Valdosta, Georgia",
+        "Lowndes County Courthouse (Georgia)",
+        "Valdosta State University"
+      ],
+      "categories": [
+        "Valdosta, Georgia",
+        "Valdosta State University",
+        "Lowndes County Courthouse (Georgia)"
+      ],
+      "queries": [
+        "Valdosta Georgia courthouse",
+        "Valdosta State University campus",
+        "Valdosta Georgia downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:10500",
+      "city": "Albany, Georgia",
+      "area": "Albany, GA",
+      "wikipedia": [
+        "Albany, Georgia",
+        "Flint River (Georgia)"
+      ],
+      "categories": [
+        "Albany, Georgia",
+        "Downtown Albany, Georgia",
+        "Flint River (Georgia)"
+      ],
+      "queries": [
+        "Albany Georgia Flint River",
+        "Albany Georgia downtown",
+        "Albany Georgia riverfront"
+      ]
+    },
+    {
+      "metroId": "cbsa:22520",
+      "city": "Florence, Alabama",
+      "area": "Florence-Muscle Shoals, AL",
+      "wikipedia": [
+        "Florence, Alabama",
+        "Muscle Shoals, Alabama",
+        "Wilson Dam",
+        "O'Neal Bridge"
+      ],
+      "categories": [
+        "Florence, Alabama",
+        "Wilson Dam",
+        "Muscle Shoals, Alabama",
+        "Tennessee River in Alabama"
+      ],
+      "queries": [
+        "Florence Alabama Tennessee River",
+        "Wilson Dam Muscle Shoals",
+        "Florence Alabama downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:37140",
+      "city": "Paducah, Kentucky",
+      "area": "Paducah, KY",
+      "wikipedia": [
+        "Paducah, Kentucky",
+        "Paducah Wall to Wall murals"
+      ],
+      "categories": [
+        "Paducah, Kentucky",
+        "Downtown Paducah, Kentucky",
+        "Paducah floodwall murals"
+      ],
+      "queries": [
+        "Paducah Kentucky riverfront",
+        "Paducah Kentucky downtown",
+        "Paducah floodwall murals Ohio River"
+      ]
+    },
+    {
+      "metroId": "cbsa:45460",
+      "city": "Terre Haute, Indiana",
+      "area": "Terre Haute, IN",
+      "wikipedia": [
+        "Terre Haute, Indiana",
+        "Vigo County Courthouse",
+        "Indiana State University"
+      ],
+      "categories": [
+        "Terre Haute, Indiana",
+        "Vigo County Courthouse",
+        "Downtown Terre Haute, Indiana"
+      ],
+      "queries": [
+        "Terre Haute Indiana courthouse",
+        "Terre Haute Indiana downtown",
+        "Wabash River Terre Haute"
+      ]
+    },
+    {
+      "metroId": "cbsa:11180",
+      "city": "Ames, Iowa",
+      "area": "Ames, IA",
+      "wikipedia": [
+        "Ames, Iowa",
+        "Iowa State University",
+        "Iowa State University Campanile"
+      ],
+      "categories": [
+        "Ames, Iowa",
+        "Iowa State University Campanile",
+        "Central Campus (Iowa State University)"
+      ],
+      "queries": [
+        "Iowa State University Campanile",
+        "Ames Iowa central campus",
+        "Ames Iowa downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:47940",
+      "city": "Waterloo, Iowa",
+      "area": "Waterloo-Cedar Falls, IA",
+      "wikipedia": [
+        "Waterloo, Iowa",
+        "Cedar Falls, Iowa",
+        "Cedar River (Iowa River tributary)"
+      ],
+      "categories": [
+        "Waterloo, Iowa",
+        "Cedar Falls, Iowa",
+        "Downtown Waterloo, Iowa"
+      ],
+      "queries": [
+        "Waterloo Iowa Cedar River",
+        "Cedar Falls Iowa downtown",
+        "Waterloo Iowa downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:24220",
+      "city": "Grand Forks, North Dakota",
+      "area": "Grand Forks, ND",
+      "wikipedia": [
+        "Grand Forks, North Dakota",
+        "University of North Dakota",
+        "Red River of the North"
+      ],
+      "categories": [
+        "Grand Forks, North Dakota",
+        "Downtown Grand Forks, North Dakota",
+        "University of North Dakota"
+      ],
+      "queries": [
+        "Grand Forks North Dakota Red River",
+        "Grand Forks downtown",
+        "University of North Dakota campus"
+      ]
+    },
+    {
+      "metroId": "cbsa:39380",
+      "city": "Pueblo, Colorado",
+      "area": "Pueblo, CO",
+      "wikipedia": [
+        "Pueblo, Colorado",
+        "Historic Arkansas Riverwalk of Pueblo"
+      ],
+      "categories": [
+        "Pueblo, Colorado",
+        "Historic Arkansas Riverwalk of Pueblo",
+        "Downtown Pueblo, Colorado"
+      ],
+      "queries": [
+        "Pueblo Colorado Riverwalk",
+        "Pueblo Colorado downtown",
+        "Pueblo Colorado mountains"
+      ]
+    },
+    {
+      "metroId": "cbsa:31740",
+      "city": "Manhattan, Kansas",
+      "area": "Manhattan, KS",
+      "wikipedia": [
+        "Manhattan, Kansas",
+        "Kansas State University",
+        "Konza Prairie Biological Station"
+      ],
+      "categories": [
+        "Manhattan, Kansas",
+        "Kansas State University",
+        "Konza Prairie"
+      ],
+      "queries": [
+        "Manhattan Kansas Flint Hills",
+        "Kansas State University campus Anderson Hall",
+        "Konza Prairie"
+      ]
+    },
+    {
+      "metroId": "cbsa:48140",
+      "city": "Wausau, Wisconsin",
+      "area": "Wausau, WI",
+      "wikipedia": [
+        "Wausau, Wisconsin",
+        "Rib Mountain State Park",
+        "Wisconsin River"
+      ],
+      "categories": [
+        "Wausau, Wisconsin",
+        "Rib Mountain State Park",
+        "Downtown Wausau, Wisconsin"
+      ],
+      "queries": [
+        "Wausau Wisconsin Wisconsin River",
+        "Rib Mountain Wausau view",
+        "Wausau Wisconsin downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:43100",
+      "city": "Sheboygan, Wisconsin",
+      "area": "Sheboygan, WI",
+      "wikipedia": [
+        "Sheboygan, Wisconsin",
+        "Sheboygan Breakwater Light"
+      ],
+      "categories": [
+        "Sheboygan, Wisconsin",
+        "Sheboygan Breakwater Light",
+        "Sheboygan River"
+      ],
+      "queries": [
+        "Sheboygan breakwater lighthouse",
+        "Sheboygan Wisconsin harbor",
+        "Sheboygan Lake Michigan"
+      ]
     }
   ]
 }
