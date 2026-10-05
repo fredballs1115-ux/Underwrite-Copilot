@@ -828,8 +828,15 @@ const s = StyleSheet.create({
     fontSize: 10,
     fontFamily: "Helvetica",
     color: C.ink,
-    lineHeight: 1.32,
   },
+  // The memo's line height, on its content rather than its page: react-pdf
+  // 4.x re-resolves the styles of a page whose fixed nodes need the page
+  // count and re-multiplies a numeric line height each pass, so the full
+  // report's numbered footer ("1 / 10") was drawn far above its own page
+  // under a page-wide 1.32 (the report's other pages set none). The font
+  // size is the page's, which the 1.32 is resolved against here, as it
+  // was on the page: 13.2pt for every line inside, as before.
+  body: { fontSize: 10, lineHeight: 1.32 },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1190,8 +1197,11 @@ export function MemoDocument({ data }: { data: MemoData }) {
   );
 }
 
-/** The memo's single page, exported so the full report can lead with it. */
-export function MemoPage({ data }: { data: MemoData }) {
+/** The memo's single page, exported so the full report can lead with it.
+ *  `pageNumbers`: the full report numbers its memo pages as it numbers
+ *  every other ("1 / 10", research pass 35); the standalone memo keeps its
+ *  own footer, the firm's name where the number would be. */
+export function MemoPage({ data, pageNumbers = false }: { data: MemoData; pageNumbers?: boolean }) {
   // The class as the label map says it — a stored "self_storage" reads
   // "Self-storage" on paper, never "Self_storage".
   const subParts = [data.market, assetClassLabel(data.assetClass), data.strategyLine ?? ""].filter(Boolean);
@@ -1208,6 +1218,7 @@ export function MemoPage({ data }: { data: MemoData }) {
           style={s.continued}
           render={({ pageNumber }) => (pageNumber > 1 ? `${data.name} — screening memo, continued` : "")}
         />
+        <View style={s.body}>
         {/* The masthead: brand and date, the rule, the title and its chip —
             and, when there is one, the cover at the far right spanning all
             three rows. It borrows the height the masthead already spends, so
@@ -1583,6 +1594,7 @@ export function MemoPage({ data }: { data: MemoData }) {
             ))}
           </Section>
         )}
+        </View>
 
         <View style={s.footer} fixed>
           <View style={s.footerLeft}>
@@ -1594,9 +1606,13 @@ export function MemoPage({ data }: { data: MemoData }) {
               against source documents.
             </Text>
           </View>
-          <Text style={s.footerText}>
-            {b?.firmName ? pdfSafe(b.firmName) : "Underwrite Copilot"}
-          </Text>
+          {pageNumbers ? (
+            <Text style={s.footerText} render={({ pageNumber, totalPages }) => `${pageNumber} / ${totalPages}`} />
+          ) : (
+            <Text style={s.footerText}>
+              {b?.firmName ? pdfSafe(b.firmName) : "Underwrite Copilot"}
+            </Text>
+          )}
         </View>
         {branded ? (
           <Text style={s.poweredBy} fixed>

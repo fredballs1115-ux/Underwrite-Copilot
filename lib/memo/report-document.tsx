@@ -1857,8 +1857,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
       title={`${dealName} — Full Screening Report`}
       author={memo.branding?.firmName ?? "Underwrite Copilot"}
     >
-      {/* Page 1: the one-page memo, unchanged — the executive read. */}
-      <MemoPage data={memo} />
+      {/* Page 1: the one-page memo, unchanged — the executive read —
+          numbered as every page after it is. */}
+      <MemoPage data={memo} pageNumbers />
 
       {/* What the memo shortens to fit or leaves out, as the verdict
           states it, before any page the model computed. */}

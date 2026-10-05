@@ -10,9 +10,10 @@ import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, proseDays, rangeRead, readDay, ReportDocument } from "./report-document";
+import { MemoDocument, buildMemoData } from "./memo-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leasehold-exit";
-import { pdfFillCountOf, pdfFillRectsOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
+import { pdfFillCountOf, pdfFillRectsOf, pdfPageRunsOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
 import { readPortfolio } from "@/lib/portfolio";
 import { TINY_PNG_DATA_URI, tinyPng } from "./test-png";
 import { floodZoneLine, type FloodMapView } from "@/lib/site-flags/core";
@@ -280,6 +281,56 @@ describe("ReportDocument (full report)", () => {
     expect(flat).toContain("60% LTV at 6.0%, amortizing over 30 years.");
     expect(flat).toContain("amortizing over 30 years; and a 6.00% all-in rate");
     expect(flat).not.toMatch(/year of IO/);
+  }, 60000);
+
+  it("numbers the memo's pages in the full report as it numbers every other, each number on its own page's foot (research pass 35)", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: SAMPLE_DEAL.extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      reconciliation: SAMPLE_DEAL.reconciliation,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = sampleDerivedInputs();
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors: bidFloors(SAMPLE_DEMO_BOX) });
+    // Two overrides turn the memo onto a second page, numbered too.
+    const overrides = [
+      "Rent growth check dismissed: the renovated comps support 4% for two years (analyst)",
+      "Supply check dismissed: the pipeline counts a project that broke ground in 2019 and delivered last spring (analyst)",
+    ];
+    const checks = evaluateBuyBox(
+      SAMPLE_DEAL.asset_class,
+      { assetClass: SAMPLE_DEAL.extraction.assetClass, market: SAMPLE_DEAL.extraction.market, metrics: SAMPLE_DEAL.extraction.metrics },
+      SAMPLE_DEMO_BOX,
+    );
+    const pages = pdfPageRunsOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, {
+          input: buildReportData(deal, "October 5, 2026", checks, sensitivity, undefined, null, overrides),
+        }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    );
+    expect(pages[1].map((r) => r.text).join(" ")).toContain("screening memo, continued");
+    pages.forEach((runs, i) => {
+      const n = runs.find((r) => r.text === `${i + 1} / ${pages.length}`);
+      expect(n, `page ${i + 1}`).toBeDefined();
+      // In the footer band at the page's foot, never drawn off the page —
+      // as the memo's page-wide line height once drew it.
+      expect(n!.y, `page ${i + 1}`).toBeGreaterThan(10);
+      expect(n!.y, `page ${i + 1}`).toBeLessThan(40);
+    });
+    // The standalone memo keeps its own footer: the name, no page count.
+    const memo = pdfPageRunsOf(
+      await renderToBuffer(React.createElement(MemoDocument, { data: buildMemoData(deal, "October 5, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    );
+    expect(memo).toHaveLength(1);
+    expect(memo[0].some((r) => /^\d+ \/ \d+$/.test(r.text))).toBe(false);
+    const name = memo[0].filter((r) => r.text === "Underwrite Copilot").map((r) => r.y);
+    expect(Math.min(...name)).toBeLessThan(40);
   }, 60000);
 
   it("says the challenges run most severe first, the order the challenger is asked for, never the order deals die", async () => {

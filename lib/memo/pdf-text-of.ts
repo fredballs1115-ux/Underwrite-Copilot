@@ -90,15 +90,28 @@ const apply = (m: Matrix, x: number, y: number): [number, number] => [
   m[1] * x + m[3] * y + m[5],
 ];
 
+/** A line of text and where it starts, in the page's own units (PDF user
+ *  space: x from the left edge, y up from the foot). */
+export interface PdfRun {
+  text: string;
+  x: number;
+  y: number;
+}
+
 /** Every line of text of one content stream, in drawing order. */
 function runsOf(content: string): string[] {
-  const out: string[] = [];
+  return positionedRunsOf(content).map((r) => r.text);
+}
+
+/** Every line of text of one content stream with its origin. */
+function positionedRunsOf(content: string): PdfRun[] {
+  const out: PdfRun[] = [];
   const stack: Matrix[] = [];
   let ctm: Matrix = IDENTITY;
   let tm: Matrix = IDENTITY;
   let cur: { x: number; y: number; endX: number | null; text: string } | null = null;
   const flush = () => {
-    if (cur?.text) out.push(cur.text);
+    if (cur?.text) out.push({ text: cur.text, x: cur.x, y: cur.y });
     cur = null;
   };
   const show = (text: string) => {
@@ -219,13 +232,23 @@ function objectStream(pdf: Buffer, id: string): string {
  * on one page, or that a continuation page carries its heading.
  */
 export function pdfPageTextsOf(pdf: Buffer): string[] {
+  return pdfPageRunsOf(pdf).map((runs) => runs.map((r) => r.text).join("\n"));
+}
+
+/**
+ * Each page's lines with where each starts, in page order: a line drawn off
+ * its page reads exactly like one at its foot by text alone, so a test can
+ * hold a footer to the page it belongs on (research pass 35: the full
+ * report's numbered memo footer was drawn far above its page).
+ */
+export function pdfPageRunsOf(pdf: Buffer): PdfRun[][] {
   const latin = pdf.toString("latin1");
   const kids = latin.match(/\/Type\s*\/Pages\b[\s\S]*?\/Kids\s*\[([^\]]*)\]/)?.[1] ?? "";
   const pageIds = [...kids.matchAll(/(\d+)\s+0\s+R/g)].map((m) => m[1]);
   return pageIds.map((id) => {
     const obj = latin.match(new RegExp(String.raw`(?:^|[^\d])${id} 0 obj\b([\s\S]*?)endobj`))?.[1] ?? "";
     const contents = obj.match(/\/Contents\s+(\d+)\s+0\s+R/)?.[1];
-    return contents ? runsOf(objectStream(pdf, contents)).join("\n") : "";
+    return contents ? positionedRunsOf(objectStream(pdf, contents)) : [];
   });
 }
 
