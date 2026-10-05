@@ -1,4 +1,5 @@
 import { compactUsd } from "@/lib/money";
+import { Key, KeyItem, PanelNote, PanelRead, tileSpan } from "@/app/panel-parts";
 import type { MixedUseRead } from "@/lib/mixed-use";
 
 /**
@@ -69,22 +70,16 @@ export function MixedUsePanel({ mixedUse, modelLine = "" }: { mixedUse: MixedUse
             <div className="h-full bg-brand/60" data-bar="mu-income" style={{ width: `${clamp(100 - income.share)}%` }} />
             <div className="h-full bg-caution/60" data-bar="mu-income" style={{ width: `${clamp(income.share)}%` }} />
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-brand/60" />
-              {`Residential ${money(income.residential)}`}
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-caution/60" />
-              {`Commercial ${money(income.commercial)}, ${pct1(income.share)} of the income`}
-            </li>
-          </ul>
+          <Key>
+            <KeyItem mark="swatch" tone="bg-brand/60">{`Residential ${money(income.residential)}`}</KeyItem>
+            <KeyItem mark="swatch" tone="bg-caution/60">{`Commercial ${money(income.commercial)}, ${pct1(income.share)} of the income`}</KeyItem>
+          </Key>
         </div>
       )}
 
       {area && (
         <div className="mt-3 text-[11px]" data-qa="mixed-use-area">
-          <div className="relative h-2.5 rounded-full bg-faint" aria-hidden>
+          <div className="relative h-3 rounded-full bg-faint" aria-hidden>
             <div className="h-full rounded-full bg-caution/60" data-bar="mu-area" style={{ width: `${clamp(area.share)}%` }} />
           </div>
           <p className="mt-1.5 text-muted">{`Commercial ${sfText(area.commercial)} of the building's ${sfText(area.building)}, ${pct1(area.share)} of its area`}</p>
@@ -94,7 +89,7 @@ export function MixedUsePanel({ mixedUse, modelLine = "" }: { mixedUse: MixedUse
       {tiles.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3" data-qa="mixed-use-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className="rounded-lg border border-line bg-surface px-2.5 py-2 text-ink" data-mu={t.key}>
+            <li key={t.key} className={`rounded-lg border border-line bg-surface px-2.5 py-2 text-ink ${tileSpan(t.value)}`} data-mu={t.key}>
               <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-80">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>
@@ -103,17 +98,8 @@ export function MixedUsePanel({ mixedUse, modelLine = "" }: { mixedUse: MixedUse
         </ul>
       )}
 
-      {r.sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={r.sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

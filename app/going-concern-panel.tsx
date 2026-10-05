@@ -1,4 +1,5 @@
 import { compactUsd } from "@/lib/money";
+import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 import { goingConcernShortLine, type GoingConcernRead } from "@/lib/going-concern";
 
 /**
@@ -74,19 +75,16 @@ export function GoingConcernPanel({ goingConcern, modelLine = "" }: { goingConce
               data-bar="gc-coverage"
               style={{ width: `${at(r.coverage.times)}%` }}
             />
-            <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="gc-line" style={{ left: `${at(1)}%` }} />
+            <Tick at={`${at(1)}%`} bar="gc-line" />
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-            <li>
+          <Key>
+            <KeyItem>
               {r.coverage.from === "stated"
                 ? `Rent covered ${times(r.coverage.times)}, as stated`
                 : `${r.ebitda?.label ?? "EBITDAR"} over the ${r.rent != null ? `${money(r.rent)} ` : ""}rent: ${times(r.coverage.times)}`}
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
-              1.00x, where the earnings only just pay the rent
-            </li>
-          </ul>
+            </KeyItem>
+            <KeyItem mark="tick" tone="bg-ink">1.00x, where the earnings only just pay the rent</KeyItem>
+          </Key>
         </div>
       )}
 
@@ -97,22 +95,19 @@ export function GoingConcernPanel({ goingConcern, modelLine = "" }: { goingConce
               <div key={p.key} className={`h-full ${p.cls}`} data-bar="gc-split" style={{ width: `${clamp((p.value / whole) * 100)}%` }} />
             ))}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
+          <Key>
             {parts.map((p) => (
-              <li key={p.key} className="flex items-center gap-1.5">
-                <span aria-hidden className={`inline-block h-2.5 w-2.5 shrink-0 rounded-sm ${p.cls}`} />
-                {`${p.label} ${money(p.value)}`}
-              </li>
+              <KeyItem key={p.key} mark="swatch" tone={p.cls}>{`${p.label} ${money(p.value)}`}</KeyItem>
             ))}
-            <li>The price as the memorandum splits it</li>
-          </ul>
+            <KeyItem>The price as the memorandum splits it</KeyItem>
+          </Key>
         </div>
       )}
 
       {tiles.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3" data-qa="going-concern-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className="rounded-lg border border-line bg-surface px-2.5 py-2 text-ink" data-gc={t.key}>
+            <li key={t.key} className={`rounded-lg border border-line bg-surface px-2.5 py-2 text-ink ${tileSpan(t.value)}`} data-gc={t.key}>
               <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-80">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>
@@ -121,17 +116,8 @@ export function GoingConcernPanel({ goingConcern, modelLine = "" }: { goingConce
         </ul>
       )}
 
-      {r.sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={r.sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

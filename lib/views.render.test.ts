@@ -7148,7 +7148,8 @@ describe("InterestPanel — what the price buys, said before any figure is belie
     expect(key[0].swatch).toContain("bg-brand/70");
     expect(key[1].swatch).toContain("bg-brand/25");
     expect(key[2].swatch).toContain("bg-line");
-    expect(html).toMatch(/<div class="relative h-2\.5 rounded-full bg-line" aria-hidden="true">/);
+    // A primary track, one of the panels' two heights (app/panel-parts).
+    expect(html).toMatch(/<div class="relative h-3 rounded-full bg-line" aria-hidden="true">/);
     expect(a11yIssues(html), "note panel").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
 
@@ -7308,7 +7309,7 @@ describe("InterestPanel — a preferred equity position read as a position (lib/
     expect(html).toMatch(/data-bar="pos-accrued" style="left:83\.75%;width:2\.34\d*%"/);
     expect(html).toContain('data-bar="pos-value" style="left:100%"');
     // The track is a picture; its figures are words in the key.
-    expect(html).toMatch(/<div class="relative h-2\.5 rounded-full bg-line" aria-hidden="true"><div class="absolute inset-y-0 left-0 rounded-l-full bg-ink\/30" data-bar="pos-senior"/);
+    expect(html).toMatch(/<div class="relative h-3 rounded-full bg-line" aria-hidden="true"><div class="absolute inset-y-0 left-0 rounded-l-full bg-ink\/30" data-bar="pos-senior"/);
     const key = keyOf(html);
     expect(key.map((k) => k.says)).toEqual([
       "Senior loan $52.0M · 65.0% of the stated value",
@@ -7682,16 +7683,20 @@ describe("LeaseholdExitCard — the term, the two exits, and the model's returns
  * panels printed their whole read open — the affordable one ran about
  * twenty lines on a phone — where the newer ones say the first sentence
  * and fold the rest. Every one now leads with the reader's first sentence
- * and folds the rest, whole in the HTML, under "Read the rest (N more)".
+ * and folds the rest, whole in the HTML, under "Read the rest (N more)" —
+ * one fold for all of them (app/panel-parts, research pass 36): its lines
+ * held to a readable measure, its control a thumb's height on a touch
+ * screen, where it was 16px.
  */
 function expectLeadThenFold(html: string, sentences: string[]) {
   const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#x27;");
   expect(sentences.length).toBeGreaterThan(1);
-  const lead = `<p class="mt-1 text-sm leading-relaxed">${esc(sentences[0])}</p>`;
+  const lead = `<p class="mt-1 max-w-[68ch] text-sm leading-relaxed">${esc(sentences[0])}</p>`;
   const at = html.indexOf(lead);
   expect(at, "the first sentence leads, alone").toBeGreaterThan(-1);
   const fold = html.slice(at + lead.length);
-  expect(fold.startsWith('<details class="group mt-1 text-sm leading-relaxed">'), "the rest folds under it").toBe(true);
+  expect(fold.startsWith('<details class="group mt-1 max-w-[68ch] text-sm leading-relaxed">'), "the rest folds under it").toBe(true);
+  expect(fold, "a thumb's height on a touch screen").toMatch(/^<details[^>]*><summary class="[^"]*\bpointer-coarse:py-2\.5\b[^"]*">/);
   expect(fold).toContain(`Read the rest (${sentences.length - 1} more)`);
   expect(fold.slice(0, fold.indexOf("</details>"))).toContain(`<p class="mt-1">${esc(sentences.slice(1).join(" "))}</p>`);
 }

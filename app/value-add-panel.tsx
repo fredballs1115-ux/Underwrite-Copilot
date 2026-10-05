@@ -1,4 +1,5 @@
 import type { ValueAddRead } from "@/lib/value-add";
+import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
 /**
  * A value-add renovation program (#460) — the pure panel for
@@ -65,16 +66,7 @@ export function ValueAddPanel({
       {/* The program and its return lead; the premium's proof and the pace
           are one click away and whole in the HTML, since the pictures below
           draw them. */}
-      <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
+      <PanelRead sentences={r.sentences} />
 
       {r.doors != null && total != null && (
         <div className="mt-2.5" data-qa="value-add-doors">
@@ -88,67 +80,52 @@ export function ValueAddPanel({
             )}
             <div className="h-full bg-brand/30" data-bar="va-left" style={{ width: pctOf(r.doors, total) }} />
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
+          <Key>
             {r.renovated != null && r.renovated > 0 && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/80" />
-                {`${r.renovated.toLocaleString("en-US")} renovated`}
-              </li>
+              <KeyItem mark="swatch" tone="bg-brand/80">{`${r.renovated.toLocaleString("en-US")} renovated`}</KeyItem>
             )}
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/30" />
-              {`${r.doors.toLocaleString("en-US")} to renovate`}
-            </li>
-          </ul>
+            <KeyItem mark="swatch" tone="bg-brand/30">{`${r.doors.toLocaleString("en-US")} to renovate`}</KeyItem>
+          </Key>
         </div>
       )}
 
       {r.premium != null && (
-        <div className="mt-3 space-y-1.5 text-[11px]" data-qa="value-add-premium">
+        <BarRows className="mt-3 space-y-1.5 text-[11px]" qa="value-add-premium">
           <p className="font-medium text-ink">The premium a month</p>
           {[
             { key: "va-premium", label: "Priced on", value: r.premium, tone: "bg-brand/70" },
             ...(r.achievedPremium != null ? [{ key: "va-achieved", label: "Achieved", value: r.achievedPremium, tone: "bg-pass/70" }] : []),
           ].map((b) => (
-            <div key={b.key} className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-x-2">
-              <span className="text-muted">{b.label}</span>
-              <div className="relative h-2 rounded-full bg-faint" aria-hidden>
-                <div className={`h-full rounded-full ${b.tone}`} data-bar={b.key} style={{ width: pctOf(b.value, scale) }} />
-                {breakEven != null && (
-                  <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink" data-bar="va-breakeven" style={{ left: pctOf(breakEven, scale) }} />
-                )}
-              </div>
-              <span className="whitespace-nowrap font-mono tabular-nums text-ink">{dollars(b.value)}</span>
-            </div>
+            <BarRow key={b.key} label={b.label} figure={dollars(b.value)}>
+              <div className={`h-full rounded-full ${b.tone}`} data-bar={b.key} style={{ width: pctOf(b.value, scale) }} />
+              {breakEven != null && <Tick at={pctOf(breakEven, scale)} bar="va-breakeven" track="secondary" />}
+            </BarRow>
           ))}
           {breakEven != null && (
-            <p className="text-muted">
-              <span aria-hidden className="mr-1.5 inline-block h-2 w-0.5 bg-ink align-middle" />
-              {`The line is the premium that breaks even at the model's ${(exitCapPct! * 100).toFixed(2)}% exit cap, ${dollars(breakEven)}`}
-            </p>
+            <Key className="">
+              <KeyItem mark="tick" tone="bg-ink">
+                {`The line is the premium that breaks even at the model's ${(exitCapPct! * 100).toFixed(2)}% exit cap, ${dollars(breakEven)}`}
+              </KeyItem>
+            </Key>
           )}
-        </div>
+        </BarRows>
       )}
 
       {r.turnoverNeededPct != null && (
-        <div className="mt-3 space-y-1.5 text-[11px]" data-qa="value-add-pace">
+        <BarRows className="mt-3 space-y-1.5 text-[11px]" qa="value-add-pace">
           <p className="font-medium text-ink">The pace: classic units turning a year</p>
           {[
             { key: "va-needed", label: `For ${r.programMonths} months`, value: r.turnoverNeededPct, tone: "bg-caution/70" },
             ...(r.turnoverPct != null ? [{ key: "va-turnover", label: "The building", value: r.turnoverPct, tone: "bg-brand/70" }] : []),
           ].map((b) => (
-            <div key={b.key} className="grid grid-cols-[6.5rem_1fr_auto] items-center gap-x-2">
-              <span className="text-muted">{b.label}</span>
-              <div className="h-2 rounded-full bg-faint" aria-hidden>
-                <div className={`h-full rounded-full ${b.tone}`} data-bar={b.key} style={{ width: pctOf(b.value, 100) }} />
-              </div>
-              <span className="whitespace-nowrap font-mono tabular-nums text-ink">{`${Math.round(b.value)}%`}</span>
-            </div>
+            <BarRow key={b.key} label={b.label} figure={`${Math.round(b.value)}%`}>
+              <div className={`h-full rounded-full ${b.tone}`} data-bar={b.key} style={{ width: pctOf(b.value, 100) }} />
+            </BarRow>
           ))}
-        </div>
+        </BarRows>
       )}
 
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

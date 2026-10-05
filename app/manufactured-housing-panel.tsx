@@ -1,4 +1,5 @@
 import type { ManufacturedHousingRead } from "@/lib/manufactured-housing";
+import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * A manufactured-housing park (#470) — the pure panel for
@@ -121,32 +122,19 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
                 style={{ left: clamp(residentPct ?? 0), width: clamp(parkPct) }}
               />
             )}
-            {r.occupancyPct != null && (
-              <div className="absolute -inset-y-1 border-l-2 border-dashed border-ink" data-bar="mh-occupied" style={{ left: clamp(r.occupancyPct) }} />
-            )}
+            {r.occupancyPct != null && <Tick at={clamp(r.occupancyPct)} bar="mh-occupied" tone="border-ink" dashed />}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
+          <Key>
             {r.residentOwned != null && residentPct != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-pass/60" />
-                {`${count(r.residentOwned)} homes their residents own (${pct1(residentPct)})`}
-              </li>
+              <KeyItem mark="swatch" tone="bg-pass/60">{`${count(r.residentOwned)} homes their residents own (${pct1(residentPct)})`}</KeyItem>
             )}
             {r.parkOwned != null && parkPct != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-brand/60" />
-                {`${count(r.parkOwned)} ${r.parkOwned === 1 ? "home" : "homes"} the park owns (${pct1(parkPct)})`}
-              </li>
+              <KeyItem mark="swatch" tone="bg-brand/60">{`${count(r.parkOwned)} ${r.parkOwned === 1 ? "home" : "homes"} the park owns (${pct1(parkPct)})`}</KeyItem>
             )}
-            {r.parkOwned === 0 && <li>No park-owned homes</li>}
-            {r.occupancyPct != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-0 shrink-0 border-l-2 border-dashed border-ink" />
-                {`Occupied ${pct1(r.occupancyPct)}`}
-              </li>
-            )}
-            {vacant != null && vacant > 0 && <li>{`${count(vacant)} vacant ${vacant === 1 ? "pad" : "pads"}`}</li>}
-          </ul>
+            {r.parkOwned === 0 && <KeyItem>No park-owned homes</KeyItem>}
+            {r.occupancyPct != null && <KeyItem mark="dashed" tone="border-ink">{`Occupied ${pct1(r.occupancyPct)}`}</KeyItem>}
+            {vacant != null && vacant > 0 && <KeyItem>{`${count(vacant)} vacant ${vacant === 1 ? "pad" : "pads"}`}</KeyItem>}
+          </Key>
         </div>
       )}
 
@@ -166,17 +154,14 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
                   style={{ left: clamp(at(r.marketRange.low)), width: clamp(at(r.marketRange.high - r.marketRange.low)) }}
                 />
               )}
-              {r.marketLotRent != null && (
-                <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="mh-market" style={{ left: clamp(at(r.marketLotRent)) }} />
-              )}
+              {r.marketLotRent != null && <Tick at={clamp(at(r.marketLotRent))} bar="mh-market" />}
             </div>
-            <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-              <li>{`Lot rent ${rent(r.lotRent)} a month`}</li>
+            <Key>
+              <KeyItem>{`Lot rent ${rent(r.lotRent)} a month`}</KeyItem>
               {r.marketLotRent != null && (
-                <li className="flex items-center gap-1.5">
-                  <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
-                  {/* The gap's share is of the lot rent in place, and says so: "16.3%"
-                      alone read as a share of the market's rent. */}
+                // The gap's share is of the lot rent in place, and says so:
+                // "16.3%" alone read as a share of the market's rent.
+                <KeyItem mark="tick" tone="bg-ink">
                   {`The memorandum's market ${rent(r.marketLotRent)}${
                     r.gap != null && r.gap > 0
                       ? ` (${rent(r.gap)} above today's lot rent, ${pct1(r.gapPct ?? 0)} of it)`
@@ -184,9 +169,9 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
                         ? " (no higher than the rent in place)"
                         : ""
                   }`}
-                </li>
+                </KeyItem>
               )}
-            </ul>
+            </Key>
           </div>
           {r.homeRent != null && (
             <div>
@@ -211,7 +196,7 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
       {tiles.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" data-qa="mh-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]}`} data-mh={t.key}>
+            <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]} ${tileSpan(t.value)}`} data-mh={t.key}>
               <span className="block text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               {t.sub && <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>}
@@ -220,17 +205,8 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
         </ul>
       )}
 
-      {r.sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={r.sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

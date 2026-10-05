@@ -1,5 +1,6 @@
 import type { AllowanceRead, RegimeRead, RegulationRead } from "@/lib/rent-regulation";
 import { sentencesOf } from "@/lib/first-sentence";
+import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * The rent rules that reach the building — the pure panel for
@@ -172,20 +173,18 @@ export function RegulationPanel({
       )}
 
       {inForce.length > 0 && (
-        <div className="mt-3 space-y-1.5 text-[11px]" data-qa="regulation-allowance">
+        // A row of bars set against each other, on one scale: the label's
+        // column had taken a phone's whole width and left each bar 15px.
+        <BarRows className="mt-3 space-y-1.5 text-[11px]" qa="regulation-allowance">
           {inForce.map((g) => {
             const a = g.allowance!;
             return (
               <div key={g.ruleId} className="space-y-1.5" data-regime={g.ruleId}>
                 <p className="text-muted">{`${capital(g.name)} allows, for ${a.applies_to} ${dayText(a.period_start)} to ${dayText(a.period_end)}:`}</p>
                 {a.figures.map((f) => (
-                  <div key={f.label} className="grid grid-cols-[minmax(0,11rem)_1fr_3.5rem] items-center gap-2">
-                    <span className="text-muted">{capital(f.label)}</span>
-                    <div className="relative h-2.5 rounded-full bg-faint" aria-hidden>
-                      <div className="h-full rounded-full bg-caution/60" data-bar="reg-allowance" style={{ width: at(f.pct) }} />
-                    </div>
-                    <span className="text-right font-mono tabular-nums">{pctText(f.pct)}</span>
-                  </div>
+                  <BarRow key={f.label} label={capital(f.label)} figure={pctText(f.pct)}>
+                    <div className="h-full rounded-full bg-caution/60" data-bar="reg-allowance" style={{ width: at(f.pct) }} />
+                  </BarRow>
                 ))}
                 {/* The figures' own source — the publisher of the allowance, which is
                     not always the rule's (DC's caps are the Office of the Tenant
@@ -201,15 +200,11 @@ export function RegulationPanel({
             );
           })}
           {model != null && (
-            <div className="grid grid-cols-[minmax(0,11rem)_1fr_3.5rem] items-center gap-2">
-              <span className="text-muted">The model grows every rent</span>
-              <div className="relative h-2.5 rounded-full bg-faint" aria-hidden>
-                <div className="h-full rounded-full bg-brand/60" data-bar="reg-model-growth" style={{ width: at(model) }} />
-              </div>
-              <span className="text-right font-mono tabular-nums">{pctText(model)}</span>
-            </div>
+            <BarRow label="The model grows every rent" figure={pctText(model)}>
+              <div className="h-full rounded-full bg-brand/60" data-bar="reg-model-growth" style={{ width: at(model) }} />
+            </BarRow>
           )}
-        </div>
+        </BarRows>
       )}
 
       {periods.length > 0 && today && (
@@ -222,15 +217,12 @@ export function RegulationPanel({
               <li key={g.ruleId} data-regime={g.ruleId}>
                 <div className="relative h-2 rounded-full bg-faint" aria-hidden>
                   <div className="h-full rounded-full bg-ink/20" data-bar="reg-period" style={{ width: clamp(pos) }} />
-                  <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="reg-today" style={{ left: clamp(pos) }} />
+                  <Tick at={clamp(pos)} bar="reg-today" track="secondary" />
                 </div>
-                <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-                  <span>{`${capital(g.name)}: ${PERIOD_WORDS[a.state](a)}`}</span>
-                  <span className="flex items-center gap-1.5">
-                    <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
-                    {`Today, ${dayText(today)}`}
-                  </span>
-                </p>
+                <Key className="mt-1">
+                  <KeyItem>{`${capital(g.name)}: ${PERIOD_WORDS[a.state](a)}`}</KeyItem>
+                  <KeyItem mark="tick" tone="bg-ink">{`Today, ${dayText(today)}`}</KeyItem>
+                </Key>
               </li>
             );
           })}
@@ -240,7 +232,7 @@ export function RegulationPanel({
       {tiles.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3" data-qa="regulation-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className="rounded-lg border border-line bg-surface px-2.5 py-2 text-ink" data-reg={t.key}>
+            <li key={t.key} className={`rounded-lg border border-line bg-surface px-2.5 py-2 text-ink ${tileSpan(t.value)}`} data-reg={t.key}>
               <span className="block text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>
@@ -249,17 +241,8 @@ export function RegulationPanel({
         </ul>
       )}
 
-      {sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{sentences[0]}</p>}
-      {sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

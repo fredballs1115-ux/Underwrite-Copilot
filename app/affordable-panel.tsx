@@ -1,6 +1,7 @@
 import { endLabel, type AffordableRead, type AffordableTier, type DatedEnd } from "@/lib/affordable";
 import { endHasPassed, leftText } from "@/lib/ground-lease-term";
 import { withArticle } from "@/lib/article";
+import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
 /**
  * Affordable housing (#453) — the pure panel for `lib/affordable`, drawn by
@@ -124,16 +125,7 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
       {/* What is restricted or under contract, and until when, leads; the
           limits, the contract's terms and the clocks are one click away and
           whole in the HTML, since the pictures below draw them. */}
-      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
+      <PanelRead sentences={r.sentences} />
 
       {units && (
         <div className="mt-2.5" data-qa="affordable-units">
@@ -143,24 +135,18 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
             ))}
           </div>
           {hapBar && (
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-faint" aria-hidden>
+            <div className="mt-1 h-2 overflow-hidden rounded-full bg-faint" aria-hidden>
               <div className="h-full bg-caution/70" data-bar="affordable-hap" style={{ width: pctOf(hapBar.units, hapBar.whole) }} />
             </div>
           )}
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
+          <Key>
             {units.segments.map((s) => (
-              <li key={s.key} className="flex items-center gap-1.5">
-                <span aria-hidden className={`inline-block h-2 w-3 shrink-0 rounded-sm ${s.tone}`} />
+              <KeyItem key={s.key} mark="swatch" tone={s.tone}>
                 {s.text}
-              </li>
+              </KeyItem>
             ))}
-            {hapBar && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-1.5 w-3 shrink-0 rounded-sm bg-caution/70" />
-                {`Under the HAP contract · ${count(hapBar.units)} of ${count(hapBar.whole)}`}
-              </li>
-            )}
-          </ul>
+            {hapBar && <KeyItem mark="swatch" tone="bg-caution/70">{`Under the HAP contract · ${count(hapBar.units)} of ${count(hapBar.whole)}`}</KeyItem>}
+          </Key>
         </div>
       )}
 
@@ -219,7 +205,9 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
               <li key={`${t.label}-${i}`} className="text-[11px]">
                 <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                   <span className="font-medium text-ink">{t.units != null ? `${t.label} · ${count(t.units)}` : t.label}</span>
-                  <span className={`font-mono tabular-nums ${over ? "font-semibold text-kill" : "text-muted"}`}>
+                  {/* The rent and its limit stay one phrase: where the row is
+                      too narrow for both, the phrase takes a line of its own. */}
+                  <span className={`whitespace-nowrap font-mono tabular-nums ${over ? "font-semibold text-kill" : "text-muted"}`}>
                     {over
                       ? `${rent(t.rent!)} — over the ${rent(t.maxRent!)} limit`
                       : atLimit
@@ -233,7 +221,7 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
                     data-bar="affordable-rent"
                     style={{ width: pctOf(t.rent!, scale) }}
                   />
-                  {over && <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink" style={{ left: pctOf(t.maxRent!, scale) }} />}
+                  {over && <Tick at={pctOf(t.maxRent!, scale)} track="secondary" />}
                 </div>
               </li>
             );
@@ -241,10 +229,10 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
         </ul>
       )}
 
-      {r.gapLine && <p className="mt-2 text-xs leading-relaxed">{r.gapLine}</p>}
+      {r.gapLine && <p className={`mt-2 ${MEASURE} text-xs leading-relaxed`}>{r.gapLine}</p>}
 
       {(r.summary || r.agreement || r.assistance || r.unreadEnds.length > 0) && (
-        <ul className="mt-2 space-y-0.5 text-xs leading-relaxed text-muted">
+        <ul className={`mt-2 ${MEASURE} space-y-0.5 text-xs leading-relaxed text-muted`}>
           {r.summary && <li>{`The memorandum: ${r.summary}`}</li>}
           {r.agreement && <li>{`The regulatory agreement as stated: ${r.agreement}`}</li>}
           {r.assistance && <li>{`The rental assistance as stated: ${r.assistance}`}</li>}
@@ -253,7 +241,7 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
           ))}
         </ul>
       )}
-      {r.modelCaveat && <p className="mt-2 text-xs leading-relaxed text-muted">{r.modelCaveat}</p>}
+      {r.modelCaveat && <PanelNote>{r.modelCaveat}</PanelNote>}
     </section>
   );
 }

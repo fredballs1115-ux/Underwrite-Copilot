@@ -1,5 +1,6 @@
 import { endLabel } from "@/lib/affordable";
 import type { RosterRead } from "@/lib/tenant-roster";
+import { Key, KeyItem, PanelNote, PanelRead } from "@/app/panel-parts";
 
 /**
  * The tenants a multi-tenant property's memorandum lists (#457) — the pure
@@ -60,16 +61,7 @@ export function RosterPanel({ roster, modelLine = "" }: { roster: RosterRead | n
       {/* What the list covers and the roll lead; the rest of the read is one
           click away and whole in the HTML, since the pictures below draw
           most of it. */}
-      <p className="mt-1 text-sm leading-relaxed">{r.sentences.slice(0, 2).join(" ")}</p>
-      {r.sentences.length > 2 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 2} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(2).join(" ")}</p>
-        </details>
-      )}
+      <PanelRead sentences={r.sentences} lead={2} />
 
       {r.years.length > 0 && (
         <div className="mt-3" data-qa="roster-roll">
@@ -131,28 +123,16 @@ export function RosterPanel({ roster, modelLine = "" }: { roster: RosterRead | n
               />
             ))}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/80" />
-              Anchors
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/55" />
-              The other listed tenants
-            </li>
-            {r.buildingSf != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-faint ring-1 ring-line" />
-                Space the list does not cover
-              </li>
-            )}
+          <Key>
+            <KeyItem mark="swatch" tone="bg-brand/80">Anchors</KeyItem>
+            <KeyItem mark="swatch" tone="bg-brand/55">The other listed tenants</KeyItem>
+            {r.buildingSf != null && <KeyItem mark="swatch" tone="bg-faint ring-1 ring-line">Space the list does not cover</KeyItem>}
             {r.shadow.map((t) => (
-              <li key={t.name} className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm border border-dashed border-caution/70" />
+              <KeyItem key={t.name} mark="swatch" tone="border border-dashed border-caution/70">
                 {`${t.name}${t.sf != null ? `, ${sfText(t.sf)}` : ""} — an anchor not in the sale`}
-              </li>
+              </KeyItem>
             ))}
-          </ul>
+          </Key>
         </div>
       )}
 
@@ -205,7 +185,7 @@ export function RosterPanel({ roster, modelLine = "" }: { roster: RosterRead | n
       </table>
       <p className="mt-1 text-[11px] text-muted">{`A lease ending before the model's sale in year ${r.holdYears} is in the warning tone.`}</p>
 
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

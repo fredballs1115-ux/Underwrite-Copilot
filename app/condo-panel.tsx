@@ -1,4 +1,5 @@
 import { compactUsd } from "@/lib/money";
+import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 import type { CondoRead } from "@/lib/condo";
 
 /**
@@ -73,16 +74,14 @@ export function CondoPanel({ condo, modelLine = "" }: { condo: CondoRead | null;
         <div className="mt-3 text-[11px]" data-qa="condo-share">
           <div className="relative h-3 rounded-full bg-faint" aria-hidden>
             <div className={`h-full rounded-full ${flagged ? "bg-caution/60" : "bg-brand/60"}`} data-bar="condo-share" style={{ width: `${clamp(r.sharePct)}%` }} />
-            {limit && <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="condo-limit" style={{ left: `${clamp(limit.pct)}%` }} />}
+            {limit && <Tick at={`${clamp(limit.pct)}%`} bar="condo-limit" />}
           </div>
-          <ul className="mt-1.5 flex flex-col gap-y-0.5 text-muted">
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className={`inline-block h-2.5 w-2.5 shrink-0 rounded-sm ${flagged ? "bg-caution/60" : "bg-brand/60"}`} />
+          <Key stack>
+            <KeyItem mark="swatch" tone={flagged ? "bg-caution/60" : "bg-brand/60"}>
               {`${r.unitsOffered} of the condominium's ${r.unitsInCondominium} units offered, ${pct1(r.sharePct)}`}
-            </li>
+            </KeyItem>
             {limit && (
-              <li className="flex items-baseline gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
+              <KeyItem mark="tick" tone="bg-ink">
                 <span>
                   {`${limit.lender}'s single-entity limit, ${limit.pct}% of a project of ${limit.minUnits} or more units — the lender's rule, `}
                   <a href={limit.source} target="_blank" rel="noopener noreferrer" className="text-brand hover:underline">
@@ -90,16 +89,16 @@ export function CondoPanel({ condo, modelLine = "" }: { condo: CondoRead | null;
                   </a>
                   {`, its ${dayText(limit.version)} version, read ${dayText(limit.readOn)}${limit.stale ? `; ${limit.stale}` : ""}`}
                 </span>
-              </li>
+              </KeyItem>
             )}
-          </ul>
+          </Key>
         </div>
       )}
 
       {tiles.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3" data-qa="condo-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className="rounded-lg border border-line bg-surface px-2.5 py-2 text-ink" data-condo={t.key}>
+            <li key={t.key} className={`rounded-lg border border-line bg-surface px-2.5 py-2 text-ink ${tileSpan(t.value)}`} data-condo={t.key}>
               <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-80">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>
@@ -108,17 +107,8 @@ export function CondoPanel({ condo, modelLine = "" }: { condo: CondoRead | null;
         </ul>
       )}
 
-      {r.sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={r.sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import type { SelfStorageRead } from "@/lib/self-storage";
+import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * A self-storage facility (#471) — the pure panel for `lib/self-storage`,
@@ -75,22 +76,17 @@ export function SelfStoragePanel({ storage, modelLine = "" }: { storage: SelfSto
       </p>
 
       {occupancies.length > 0 && (
-        <div className="mt-2 space-y-1.5 text-[11px]" data-qa="storage-occupancy">
+        <BarRows className="mt-2 space-y-1.5 text-[11px]" qa="storage-occupancy">
           {occupancies.map((o) => (
-            <div key={o.key} className="grid grid-cols-[6.5rem_1fr_3rem] items-center gap-2">
-              <span className="text-muted">{o.label}</span>
-              <div className="relative h-2.5 rounded-full bg-faint" aria-hidden>
-                <div className={`h-full rounded-full ${o.cls}`} data-bar={`storage-${o.key}`} style={{ width: clamp(o.value) }} />
-                <div className="absolute -inset-y-1 border-l-2 border-dashed border-ink/50" data-bar="storage-stabilized" style={{ left: "85%" }} />
-              </div>
-              <span className="text-right font-mono tabular-nums">{pct1(o.value)}</span>
-            </div>
+            <BarRow key={o.key} label={o.label} figure={pct1(o.value)}>
+              <div className={`h-full rounded-full ${o.cls}`} data-bar={`storage-${o.key}`} style={{ width: clamp(o.value) }} />
+              <Tick at="85%" bar="storage-stabilized" tone="border-ink/50" dashed track="secondary" />
+            </BarRow>
           ))}
-          <p className="flex items-center gap-1.5 text-muted">
-            <span aria-hidden className="inline-block h-2.5 w-0 shrink-0 border-l-2 border-dashed border-ink/50" />
-            85%, past which a facility is read as stabilized
-          </p>
-        </div>
+          <Key className="">
+            <KeyItem mark="dashed" tone="border-ink/50">85%, past which a facility is read as stabilized</KeyItem>
+          </Key>
+        </BarRows>
       )}
 
       {f && r.inPlace && r.street && (
@@ -101,24 +97,23 @@ export function SelfStoragePanel({ storage, modelLine = "" }: { storage: SelfSto
               data-bar="storage-inplace"
               style={{ width: clamp(at(f.inPlace)) }}
             />
-            <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="storage-street" style={{ left: clamp(at(f.street)) }} />
+            <Tick at={clamp(at(f.street))} bar="storage-street" />
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-            <li>{`In-place ${r.inPlace.stated}`}</li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
+          <Key>
+            <KeyItem>{`In-place ${r.inPlace.stated}`}</KeyItem>
+            <KeyItem mark="tick" tone="bg-ink">
               {`Street ${r.street.stated}${
                 r.premiumPct != null && r.premiumPct !== 0 ? ` (in-place ${pct1(Math.abs(r.premiumPct))} ${r.premiumPct > 0 ? "over" : "under"} it)` : ""
               }`}
-            </li>
-          </ul>
+            </KeyItem>
+          </Key>
         </div>
       )}
 
       {tiles.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" data-qa="storage-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className="rounded-lg border border-line bg-surface px-2.5 py-2 text-ink" data-storage={t.key}>
+            <li key={t.key} className={`rounded-lg border border-line bg-surface px-2.5 py-2 text-ink ${tileSpan(t.value)}`} data-storage={t.key}>
               <span className="block text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               {t.sub && <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>}
@@ -127,17 +122,8 @@ export function SelfStoragePanel({ storage, modelLine = "" }: { storage: SelfSto
         </ul>
       )}
 
-      {r.sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={r.sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

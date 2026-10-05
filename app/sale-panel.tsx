@@ -1,4 +1,5 @@
 import { compactUsd } from "@/lib/money";
+import { Key, KeyItem, MEASURE, PanelRead, Tick } from "@/app/panel-parts";
 import type { SaleCeiling } from "@/lib/sale-ceiling";
 import type { SaleRead } from "@/lib/sale-terms";
 
@@ -58,49 +59,25 @@ export function SalePanel({ sale, ceiling = null }: { sale: SaleRead | null; cei
       {/* How it is sold leads; the premium, the reserve and the deadline
           are one click away and whole in the HTML — the bid's picture below
           draws the premium, and the chip above counts down to the deadline. */}
-      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
+      <PanelRead sentences={r.sentences} />
 
       {bid != null && allIn != null && (
         <div className="mt-2.5" data-qa="sale-bid">
           <div className="relative flex h-3 overflow-visible rounded-full bg-faint" aria-hidden>
             <div className="h-full rounded-l-full bg-brand/70" data-bar="sale-bid" style={{ width: pctOf(bid, scale) }} />
             {allIn > bid && <div className="h-full bg-caution/70" data-bar="sale-premium" style={{ width: pctOf(allIn - bid, scale) }} />}
-            {top != null && (
-              <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="sale-ceiling" style={{ left: pctOf(top, scale) }} />
-            )}
+            {top != null && <Tick at={pctOf(top, scale)} bar="sale-ceiling" />}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/70" />
-              {`Starting bid, ${money(bid)}`}
-            </li>
-            {allIn > bid && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-caution/70" />
-                {`Buyer's premium, ${money(allIn - bid)} — ${money(allIn)} all-in`}
-              </li>
-            )}
-            {top != null && ceiling && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-3 w-0.5 shrink-0 rounded-full bg-ink" />
-                {`The model's ceiling at ${ceiling.hurdlePct}%, ${money(top)} all-in`}
-              </li>
-            )}
-          </ul>
+          <Key>
+            <KeyItem mark="swatch" tone="bg-brand/70">{`Starting bid, ${money(bid)}`}</KeyItem>
+            {allIn > bid && <KeyItem mark="swatch" tone="bg-caution/70">{`Buyer's premium, ${money(allIn - bid)} — ${money(allIn)} all-in`}</KeyItem>}
+            {top != null && ceiling && <KeyItem mark="tick" tone="bg-ink">{`The model's ceiling at ${ceiling.hurdlePct}%, ${money(top)} all-in`}</KeyItem>}
+          </Key>
         </div>
       )}
 
-      {ceiling?.line && <p className="mt-2 text-xs font-medium leading-relaxed">{ceiling.line}</p>}
-      {r.terms && <p className="mt-2 text-xs leading-relaxed text-muted">{`The sale's terms as stated: ${r.terms}`}</p>}
+      {ceiling?.line && <p className={`mt-2 ${MEASURE} text-xs font-medium leading-relaxed`}>{ceiling.line}</p>}
+      {r.terms && <p className={`mt-2 ${MEASURE} text-xs leading-relaxed text-muted`}>{`The sale's terms as stated: ${r.terms}`}</p>}
     </section>
   );
 }

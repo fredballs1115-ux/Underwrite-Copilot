@@ -1,6 +1,7 @@
 import { compactUsd } from "@/lib/money";
 import Link from "next/link";
 import { LeaseTermBar } from "@/app/lease-term-bar";
+import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 import { termEndLabel } from "@/lib/ground-lease-term";
 import { isWholeShare, noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRead } from "@/lib/interest";
 import { positionCaption } from "@/lib/position";
@@ -222,16 +223,7 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         <span className="text-sm font-semibold">{r.label}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
       </p>
-      {said.length > 0 && <p className="mt-1 text-sm leading-relaxed">{said[0]}</p>}
-      {said.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${said.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{said.slice(1).join(" ")}</p>
-        </details>
-      )}
+      <PanelRead sentences={said} />
       {r.term && r.termLine && (
         <div className="mt-2.5">
           <LeaseTermBar
@@ -240,13 +232,15 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
             optionYears={r.term.options?.years ?? null}
             ceiling={r.term.includesOptions}
           />
-          {termNeedsWords && <p className="mt-1 text-[11px] leading-snug text-muted">{`${r.termLine}.`}</p>}
+          {termNeedsWords && <p className={`mt-1 ${MEASURE} text-[11px] leading-snug text-muted`}>{`${r.termLine}.`}</p>}
         </div>
       )}
       {figures && (
         <div className="mt-2.5" data-qa={figures.qa}>
           {figures.tiles.length > 0 && (
-            <dl className="grid grid-cols-3 gap-1.5">
+            // Two-up on a phone, as the other panels' tiles are: three to a
+            // row at 320 ran "To redemption" under "Current yield".
+            <dl className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
               {figures.tiles.map((t) => (
                 <div key={t.label} className="rounded-lg border border-line bg-surface px-2.5 py-1.5">
                   <dt className="text-[10px] font-semibold uppercase leading-tight tracking-wider text-muted">{t.label}</dt>
@@ -256,44 +250,31 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
               ))}
             </dl>
           )}
-          {figures.caption && <p className="mt-1 text-[11px] leading-snug text-muted">{figures.caption}</p>}
+          {figures.caption && <p className={`mt-1 ${MEASURE} text-[11px] leading-snug text-muted`}>{figures.caption}</p>}
         </div>
       )}
       {collateral && (
         <div className="mt-2.5">
-          <div className="relative h-2.5 rounded-full bg-line" aria-hidden>
+          <div className="relative h-3 rounded-full bg-line" aria-hidden>
             <div className="absolute inset-y-0 left-0 rounded-full bg-brand/25" data-bar="note-balance" style={{ width: width(collateral.balance) }} />
             <div className="absolute inset-y-0 left-0 rounded-full bg-brand/70" data-bar="interest" style={{ width: width(collateral.price) }} />
-            {collateral.tick != null && (
-              <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink" style={{ left: `${collateral.tick * 100}%` }} />
-            )}
+            {collateral.tick != null && <Tick at={`${collateral.tick * 100}%`} />}
           </div>
           {/* A key, as every other bar has: the price dark, the balance light
               under it, and the collateral's value the whole track — or, on a
               loan under water, the tick. */}
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted" data-qa="note-collateral-key">
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/70" />
-              {`Price ${collateral.priceText} · ${collateral.ltvAtPrice}% of the collateral's value`}
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/25" />
-              {`Unpaid balance ${collateral.balanceText} · ${collateral.ltvAtBalance}%`}
-            </li>
-            <li className="flex items-center gap-1.5">
-              {collateral.tick != null ? (
-                <span aria-hidden className="inline-block h-3 w-0.5 shrink-0 rounded-full bg-ink" />
-              ) : (
-                <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-line" />
-              )}
+          <Key qa="note-collateral-key">
+            <KeyItem mark="swatch" tone="bg-brand/70">{`Price ${collateral.priceText} · ${collateral.ltvAtPrice}% of the collateral's value`}</KeyItem>
+            <KeyItem mark="swatch" tone="bg-brand/25">{`Unpaid balance ${collateral.balanceText} · ${collateral.ltvAtBalance}%`}</KeyItem>
+            <KeyItem mark={collateral.tick != null ? "tick" : "swatch"} tone={collateral.tick != null ? "bg-ink" : "bg-line"}>
               {`The collateral, as stated ${money(collateral.value)}`}
-            </li>
-          </ul>
+            </KeyItem>
+          </Key>
         </div>
       )}
       {stack && (
         <div className="mt-2.5">
-          <div className="relative h-2.5 rounded-full bg-line" aria-hidden>
+          <div className="relative h-3 rounded-full bg-line" aria-hidden>
             <div className="absolute inset-y-0 left-0 rounded-l-full bg-ink/30" data-bar="pos-senior" style={stack.senior} />
             <div
               className={stack.accrued ? "absolute inset-y-0 bg-brand/70" : "absolute inset-y-0 rounded-r-full bg-brand/70"}
@@ -301,37 +282,25 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
               style={stack.amount}
             />
             {stack.accrued && <div className="absolute inset-y-0 rounded-r-full bg-brand/30" data-bar="pos-accrued" style={stack.accrued} />}
-            <div className="absolute -inset-y-0.5 -ml-px w-0.5 rounded-full bg-ink" data-bar="pos-value" style={{ left: stack.value }} />
+            <Tick at={stack.value} bar="pos-value" />
           </div>
           {/* A key, as the note's bar has: the senior loan grey, the position
               dark from its first dollar to its last today, the accrual light
               on top, and the stated value the tick. */}
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted" data-qa="position-stack-key">
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-ink/30" />
-              {`Senior loan ${stack.seniorText} · ${stack.attachText}% of the stated value`}
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/70" />
+          <Key qa="position-stack-key">
+            <KeyItem mark="swatch" tone="bg-ink/30">{`Senior loan ${stack.seniorText} · ${stack.attachText}% of the stated value`}</KeyItem>
+            <KeyItem mark="swatch" tone="bg-brand/70">
               {`The position ${stack.amountText} · ${stack.attachText}% to ${stack.todayText}%${stack.accrued ? " today" : ""}`}
-            </li>
-            {stack.accrued && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/30" />
-                {`Accrued by redemption ${stack.accruedText} · to ${stack.lastText}%`}
-              </li>
-            )}
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-3 w-0.5 shrink-0 rounded-full bg-ink" />
-              {`The stated value ${stack.valueText}${stack.past ? " · the last dollar runs past it" : ""}`}
-            </li>
-          </ul>
+            </KeyItem>
+            {stack.accrued && <KeyItem mark="swatch" tone="bg-brand/30">{`Accrued by redemption ${stack.accruedText} · to ${stack.lastText}%`}</KeyItem>}
+            <KeyItem mark="tick" tone="bg-ink">{`The stated value ${stack.valueText}${stack.past ? " · the last dollar runs past it" : ""}`}</KeyItem>
+          </Key>
         </div>
       )}
       {bar && (
         <div className="mt-2.5" aria-hidden>
-          <div className="h-2.5 rounded-full bg-line">
-            <div className="h-2.5 rounded-full bg-brand/70" data-bar="interest" style={{ width: `${Math.max(1.5, bar.fill * 100)}%` }} />
+          <div className="h-3 rounded-full bg-line">
+            <div className="h-3 rounded-full bg-brand/70" data-bar="interest" style={{ width: `${Math.max(1.5, bar.fill * 100)}%` }} />
           </div>
           <div className="mt-1 flex justify-between gap-3 text-[11px] text-muted">
             <span>{bar.left}</span>
@@ -340,18 +309,18 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
         </div>
       )}
       {ltvWithheld && (
-        <p className="mt-1 text-[11px] leading-snug text-muted" data-qa="note-ltv-withheld">
+        <p className={`mt-1 ${MEASURE} text-[11px] leading-snug text-muted`} data-qa="note-ltv-withheld">
           {ltvWithheld}
         </p>
       )}
       {(r.summary || r.groundLease || r.loan) && (
-        <ul className="mt-2 space-y-0.5 text-xs leading-relaxed text-muted">
+        <ul className={`mt-2 ${MEASURE} space-y-0.5 text-xs leading-relaxed text-muted`}>
           {r.summary && <li>{`The memorandum: ${r.summary}`}</li>}
           {r.groundLease && <li>{`The ${r.masterLease ? "master" : "ground"} lease as stated: ${r.groundLease}`}</li>}
           {r.loan && <li>{`The loan as stated: ${r.loan}`}</li>}
         </ul>
       )}
-      {r.modelCaveat && <p className="mt-2 text-xs leading-relaxed text-muted">{r.modelCaveat}</p>}
+      {r.modelCaveat && <PanelNote>{r.modelCaveat}</PanelNote>}
       {groundLeaseLink && (
         <p className="mt-2 text-xs">
           <Link href="/tools#ground-lease" prefetch={false} className="font-medium text-brand underline-offset-2 hover:underline">

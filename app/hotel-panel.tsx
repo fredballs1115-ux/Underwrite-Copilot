@@ -3,6 +3,7 @@ import { withArticle } from "@/lib/article";
 import { endLabel } from "@/lib/affordable";
 import { endHasPassed, leftText, yearsText } from "@/lib/ground-lease-term";
 import type { HotelDealRead } from "@/lib/hotel-deal";
+import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
 /**
  * What a hotel is sold with (#455) — the pure panel for `lib/hotel-deal`,
@@ -73,37 +74,22 @@ export function HotelPanel({
       {/* The flag leads; the encumbrance, the PIP, the clocks and the rooms
           are one click away and whole in the HTML, since the chip and the
           pictures below draw them. */}
-      {r.sentences.length > 0 && <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
+      <PanelRead sentences={r.sentences} />
 
       {r.pricePerKey != null && r.pipPerKey != null && r.allInPerKey != null && (
         <div className="mt-2.5" data-qa="hotel-basis">
           <div className="flex items-baseline justify-between gap-x-3 text-[11px]">
-            <span className="font-medium text-ink">{`The basis ${withArticle(unit)}`}</span>
-            <span className="font-mono tabular-nums text-muted">{`${k(r.allInPerKey)} all-in`}</span>
+            <span className="min-w-0 font-medium text-ink">{`The basis ${withArticle(unit)}`}</span>
+            <span className="shrink-0 whitespace-nowrap font-mono tabular-nums text-muted">{`${k(r.allInPerKey)} all-in`}</span>
           </div>
           <div className="mt-0.5 flex h-3 overflow-hidden rounded-full bg-faint" aria-hidden>
             <div className="h-full bg-brand/70" data-bar="hotel-price" style={{ width: pctOf(r.pricePerKey, r.allInPerKey) }} />
             <div className="h-full bg-caution/70" data-bar="hotel-pip" style={{ width: pctOf(r.pipPerKey, r.allInPerKey) }} />
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/70" />
-              {`The price, ${k(r.pricePerKey)} ${withArticle(unit)}`}
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-caution/70" />
-              {`The PIP, ${k(r.pipPerKey)} ${withArticle(unit)}`}
-            </li>
-          </ul>
+          <Key>
+            <KeyItem mark="swatch" tone="bg-brand/70">{`The price, ${k(r.pricePerKey)} ${withArticle(unit)}`}</KeyItem>
+            <KeyItem mark="swatch" tone="bg-caution/70">{`The PIP, ${k(r.pipPerKey)} ${withArticle(unit)}`}</KeyItem>
+          </Key>
         </div>
       )}
 
@@ -129,11 +115,9 @@ export function HotelPanel({
                   <dd className="min-w-0">
                     {!passed ? (
                       <div className="flex flex-col gap-0.5 @md/clocks:flex-row @md/clocks:items-center @md/clocks:gap-2">
-                        <div className="relative h-2 min-w-0 overflow-hidden rounded-full bg-faint @md/clocks:flex-1" aria-hidden>
+                        <div className="relative h-2 min-w-0 rounded-full bg-faint @md/clocks:flex-1" aria-hidden>
                           <div className={`h-full rounded-full ${c.tone}`} data-bar="hotel-clock" style={{ width: pctOf(Math.max(0, left), longest) }} />
-                          {holdYears != null && (
-                            <div className="absolute inset-y-0 w-0.5 bg-ink" data-bar="hotel-hold" style={{ left: pctOf(holdYears, longest) }} />
-                          )}
+                          {holdYears != null && <Tick at={pctOf(holdYears, longest)} bar="hotel-hold" track="secondary" />}
                         </div>
                         <span className="font-mono tabular-nums text-muted @md/clocks:w-36 @md/clocks:shrink-0">
                           {`${c.end.from === "year" ? "" : "to "}${endLabel(c.end)} · ${leftText(c.end)}`}
@@ -148,10 +132,9 @@ export function HotelPanel({
             })}
           </dl>
           {holdYears != null && (
-            <p className="mt-1 text-[11px] text-muted">
-              <span aria-hidden className="mr-1.5 inline-block h-2 w-0.5 bg-ink align-middle" />
-              {`The line is the model's sale, ${yearsText(holdYears)} out`}
-            </p>
+            <Key className="mt-1">
+              <KeyItem mark="tick" tone="bg-ink">{`The line is the model's sale, ${yearsText(holdYears)} out`}</KeyItem>
+            </Key>
           )}
         </div>
       )}
@@ -159,21 +142,31 @@ export function HotelPanel({
       {(r.revparComputed != null || r.revparIndex != null) && (
         <div className="mt-3 space-y-1.5 text-[11px]" data-qa="hotel-rooms">
           {r.adr != null && r.occupancyPct != null && r.revparComputed != null && (
+            // Each figure keeps its word: the line breaks between the three
+            // terms, never between "RevPAR" and its figure.
             <p className="font-mono tabular-nums">
-              <span className="text-muted">{"ADR "}</span>
-              <span className="font-semibold text-ink">{dollars(r.adr)}</span>
-              <span className="text-muted">{" × occupancy "}</span>
-              <span className="font-semibold text-ink">{`${(Math.round(r.occupancyPct * 10) / 10).toFixed(1)}%`}</span>
-              <span className="text-muted">{" = RevPAR "}</span>
-              <span className={`font-semibold ${r.ties === false ? "text-kill" : "text-ink"}`}>{dollars(r.revparComputed)}</span>
+              <span className="whitespace-nowrap">
+                <span className="text-muted">{"ADR "}</span>
+                <span className="font-semibold text-ink">{dollars(r.adr)}</span>
+              </span>{" "}
+              <span className="whitespace-nowrap">
+                <span className="text-muted">{"× occupancy "}</span>
+                <span className="font-semibold text-ink">{`${(Math.round(r.occupancyPct * 10) / 10).toFixed(1)}%`}</span>
+              </span>{" "}
+              <span className="whitespace-nowrap">
+                <span className="text-muted">{"= RevPAR "}</span>
+                <span className={`font-semibold ${r.ties === false ? "text-kill" : "text-ink"}`}>{dollars(r.revparComputed)}</span>
+              </span>
               {r.ties === false && r.revpar != null && <span className="text-kill">{` — the memorandum says ${dollars(r.revpar)}`}</span>}
             </p>
           )}
           {r.revparIndex != null && (
             <div>
+              {/* The index keeps its figure and its 100 together, beside the
+                  label: "92 against / 100" had broken under it. */}
               <div className="flex items-baseline justify-between gap-x-3">
-                <span className="font-medium text-ink">RevPAR index against its competitive set</span>
-                <span className="font-mono tabular-nums text-muted">{`${Math.round(r.revparIndex)} against 100`}</span>
+                <span className="min-w-0 font-medium text-ink">RevPAR index against its competitive set</span>
+                <span className="shrink-0 whitespace-nowrap font-mono tabular-nums text-muted">{`${Math.round(r.revparIndex)} against 100`}</span>
               </div>
               <div className="relative mt-0.5 h-2 rounded-full bg-faint" aria-hidden>
                 <div
@@ -181,7 +174,7 @@ export function HotelPanel({
                   data-bar="hotel-index"
                   style={{ width: pctOf(r.revparIndex, indexScale) }}
                 />
-                <div className="absolute -inset-y-0.5 w-0.5 rounded-full bg-ink" style={{ left: pctOf(100, indexScale) }} />
+                <Tick at={pctOf(100, indexScale)} track="secondary" />
               </div>
             </div>
           )}
@@ -189,13 +182,13 @@ export function HotelPanel({
       )}
 
       {(r.franchise || r.management || r.pip) && (
-        <ul className="mt-2 space-y-0.5 text-xs leading-relaxed text-muted">
+        <ul className={`mt-2 ${MEASURE} space-y-0.5 text-xs leading-relaxed text-muted`}>
           {r.franchise && <li>{`The franchise as stated: ${r.franchise}`}</li>}
           {r.management && <li>{`The management as stated: ${r.management}`}</li>}
           {r.pip && <li>{`The PIP as stated: ${r.pip}`}</li>}
         </ul>
       )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

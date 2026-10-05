@@ -1,4 +1,5 @@
 import { compactUsd } from "@/lib/money";
+import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 import { deliveryText, type ForwardRead } from "@/lib/forward-purchase";
 import { sentencesOf } from "@/lib/first-sentence";
 
@@ -103,20 +104,16 @@ export function ForwardPanel({
         <div className="mt-3 text-[11px]" data-qa="forward-clock">
           <div className="relative h-3 rounded-full bg-faint" aria-hidden>
             <div className="h-full rounded-full bg-brand/40" data-bar="fwd-clock" style={{ width: `${clock.delivery}%` }} />
-            <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="fwd-delivery" style={{ left: `${clock.delivery}%` }} />
-            {clock.outside != null && (
-              <div className="absolute -inset-y-1 border-l-2 border-dashed border-caution" data-bar="fwd-outside" style={{ left: `${clock.outside}%` }} />
-            )}
+            <Tick at={`${clock.delivery}%`} bar="fwd-delivery" />
+            {clock.outside != null && <Tick at={`${clock.outside}%`} bar="fwd-outside" tone="border-caution" dashed />}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-            <li>{`Today, ${dayText(today)}`}</li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
+          <Key>
+            <KeyItem>{`Today, ${dayText(today)}`}</KeyItem>
+            <KeyItem mark="tick" tone="bg-ink">
               {`Delivery, ${deliveryText(r.delivery)}${r.monthsToDelivery != null ? `: ${months(r.monthsToDelivery)} away` : ""}`}
-            </li>
+            </KeyItem>
             {r.outside && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-0 shrink-0 border-l-2 border-dashed border-caution" />
+              <KeyItem mark="dashed" tone="border-caution">
                 {`Outside date, ${deliveryText(r.outside)}${
                   r.slackMonths != null
                     ? r.slackMonths < 0
@@ -124,20 +121,20 @@ export function ForwardPanel({
                       : `, ${months(r.slackMonths)} after the delivery`
                     : ""
                 }`}
-              </li>
+              </KeyItem>
             )}
-          </ul>
+          </Key>
         </div>
       )}
 
       {r.deposit && (
         <div className="mt-3 text-[11px]" data-qa="forward-deposit">
           {r.deposit.sharePct != null && (
-            <div className="relative h-2.5 rounded-full bg-faint" aria-hidden>
+            <div className="relative h-3 rounded-full bg-faint" aria-hidden>
               <div className="h-full rounded-full bg-caution/60" data-bar="fwd-deposit" style={{ width: `${Math.max(1.5, clamp(r.deposit.sharePct))}%` }} />
             </div>
           )}
-          <p className="mt-1.5 text-muted">
+          <p className={`mt-1.5 ${MEASURE} text-muted`}>
             {r.deposit.sharePct != null
               ? `Deposit${r.deposit.amount != null ? ` ${money(r.deposit.amount)}` : ""}, ${pct1(r.deposit.sharePct)} of the price, at risk before delivery. As stated: ${r.deposit.text}`
               : `Deposit, at risk before delivery. As stated: ${r.deposit.text}`}
@@ -149,24 +146,19 @@ export function ForwardPanel({
         <div className="mt-3 text-[11px]" data-qa="forward-yield">
           <div className="relative h-3 rounded-full bg-faint" aria-hidden>
             <div className="h-full rounded-full bg-brand/60" data-bar="fwd-yield" style={{ width: `${atYield(r.deliveryYieldPct)}%` }} />
-            {exit != null && <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="fwd-exit" style={{ left: `${atYield(exit)}%` }} />}
+            {exit != null && <Tick at={`${atYield(exit)}%`} bar="fwd-exit" />}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-            <li>{`${pct2(r.deliveryYieldPct)} at delivery, ${r.yieldFrom === "stated_cap" ? "the cap as stated" : "the stated NOI over the price"}`}</li>
-            {exit != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
-                {`The model's exit cap, ${pct2(exit)}`}
-              </li>
-            )}
-          </ul>
+          <Key>
+            <KeyItem>{`${pct2(r.deliveryYieldPct)} at delivery, ${r.yieldFrom === "stated_cap" ? "the cap as stated" : "the stated NOI over the price"}`}</KeyItem>
+            {exit != null && <KeyItem mark="tick" tone="bg-ink">{`The model's exit cap, ${pct2(exit)}`}</KeyItem>}
+          </Key>
         </div>
       )}
 
       {tiles.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3" data-qa="forward-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className="rounded-lg border border-line bg-surface px-2.5 py-2 text-ink" data-fwd={t.key}>
+            <li key={t.key} className={`rounded-lg border border-line bg-surface px-2.5 py-2 text-ink ${tileSpan(t.value)}`} data-fwd={t.key}>
               <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-80">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               <span className="block text-[11px] leading-snug text-muted">As stated</span>
@@ -175,17 +167,8 @@ export function ForwardPanel({
         </ul>
       )}
 
-      {sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{sentences[0]}</p>}
-      {sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

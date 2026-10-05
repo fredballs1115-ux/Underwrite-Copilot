@@ -1,4 +1,5 @@
 import type { StudentHousingRead } from "@/lib/student-housing";
+import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * A student building (#468) — the pure panel for `lib/student-housing`,
@@ -88,35 +89,25 @@ export function StudentHousingPanel({
         <div className="mt-2 text-[11px]" data-qa="student-prelease">
           <div className="relative h-3 rounded-full bg-faint" aria-hidden>
             <div className={`h-full rounded-full ${behind || short ? "bg-caution/60" : "bg-pass/60"}`} data-bar="prelease" style={{ width: clamp(r.preLeasedPct) }} />
-            {r.priorPct != null && (
-              <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="prelease-prior" style={{ left: clamp(r.priorPct) }} />
-            )}
-            {modelOccupancyPct != null && (
-              <div className="absolute -inset-y-1 border-l-2 border-dashed border-brand" data-bar="prelease-model" style={{ left: clamp(modelOccupancyPct) }} />
-            )}
+            {r.priorPct != null && <Tick at={clamp(r.priorPct)} bar="prelease-prior" />}
+            {modelOccupancyPct != null && <Tick at={clamp(modelOccupancyPct)} bar="prelease-model" tone="border-brand" dashed />}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-            <li>{`${pct1(r.preLeasedPct)} signed${r.term ? ` for ${r.term}` : ""}`}</li>
+          <Key>
+            <KeyItem>{`${pct1(r.preLeasedPct)} signed${r.term ? ` for ${r.term}` : ""}`}</KeyItem>
             {r.priorPct != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
+              <KeyItem mark="tick" tone="bg-ink">
                 {`Last year at this point: ${pct1(r.priorPct)}${r.pacePts != null ? ` (${r.pacePts >= 0 ? "+" : "−"}${Math.round(Math.abs(r.pacePts) * 10) / 10} pts)` : ""}`}
-              </li>
+              </KeyItem>
             )}
-            {modelOccupancyPct != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-0 shrink-0 border-l-2 border-dashed border-brand" />
-                {`The model runs at ${pct1(modelOccupancyPct)}`}
-              </li>
-            )}
-          </ul>
+            {modelOccupancyPct != null && <KeyItem mark="dashed" tone="border-brand">{`The model runs at ${pct1(modelOccupancyPct)}`}</KeyItem>}
+          </Key>
         </div>
       )}
 
       {tiles.length > 0 && (
         <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" data-qa="student-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]}`} data-student={t.key}>
+            <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]} ${tileSpan(t.value)}`} data-student={t.key}>
               <span className="block text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>
@@ -125,17 +116,8 @@ export function StudentHousingPanel({
         </ul>
       )}
 
-      {r.sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={r.sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

@@ -1,4 +1,5 @@
 import { abatementEndLabel, abatementEnded, type TaxAbatementRead } from "@/lib/tax-abatement";
+import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
 /**
  * A property-tax abatement (#461) — the pure panel for `lib/tax-abatement`,
@@ -71,16 +72,7 @@ export function TaxAbatementPanel({
       </p>
       {/* When it ends leads; what it is worth is one click away and whole in
           the HTML, since the pictures below draw it. */}
-      <p className="mt-1 text-sm leading-relaxed">{r.sentences[0]}</p>
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
+      <PanelRead sentences={r.sentences} />
 
       {left != null && span != null && r.end && (
         <div className="mt-2.5" data-qa="tax-abatement-clock">
@@ -91,45 +83,31 @@ export function TaxAbatementPanel({
           <div className="relative mt-0.5 flex h-3 rounded-full bg-faint" aria-hidden>
             <div className="h-full rounded-l-full bg-brand/70" data-bar="abate-left" style={{ width: pctOf(left, span) }} />
             <div className="h-full rounded-r-full bg-caution/40" data-bar="abate-after" style={{ width: pctOf(span - left, span) }} />
-            {holdYears != null && (
-              <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="abate-sale" style={{ left: pctOf(holdYears, span) }} />
-            )}
+            {holdYears != null && <Tick at={pctOf(holdYears, span)} bar="abate-sale" />}
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-muted">
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-brand/70" />
-              {`Abated, ${leftWords} from today`}
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-caution/40" />
-              The full bill after
-            </li>
-            {holdYears != null && (
-              <li className="flex items-center gap-1.5">
-                <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
-                {`The model's sale, year ${Math.round(holdYears)}`}
-              </li>
-            )}
-          </ul>
+          <Key>
+            <KeyItem mark="swatch" tone="bg-brand/70">{`Abated, ${leftWords} from today`}</KeyItem>
+            <KeyItem mark="swatch" tone="bg-caution/40">The full bill after</KeyItem>
+            {holdYears != null && <KeyItem mark="tick" tone="bg-ink">{`The model's sale, year ${Math.round(holdYears)}`}</KeyItem>}
+          </Key>
         </div>
       )}
 
       {r.abatedTaxes != null && r.unabatedTaxes != null && r.unabatedTaxes > r.abatedTaxes && (
-        <div className="mt-3 space-y-1.5 text-[11px]" data-qa="tax-abatement-bill">
+        // Today's bill against the full one, on one scale and on tracks of
+        // one length: each row had sized its own figure's column, and the two
+        // bars were drawn 5% apart.
+        <BarRows className="mt-3 space-y-1.5 text-[11px]" qa="tax-abatement-bill">
           <p className="font-medium text-ink">The tax bill a year</p>
           {[
             { key: "abate-now", label: "Paid today", value: r.abatedTaxes, tone: "bg-brand/70" },
             { key: "abate-full", label: "Full bill", value: r.unabatedTaxes, tone: "bg-caution/70" },
           ].map((b) => (
-            <div key={b.key} className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-x-2">
-              <span className="text-muted">{b.label}</span>
-              <div className="h-2 rounded-full bg-faint" aria-hidden>
-                <div className={`h-full rounded-full ${b.tone}`} data-bar={b.key} style={{ width: pctOf(b.value, r.unabatedTaxes!) }} />
-              </div>
-              <span className="whitespace-nowrap font-mono tabular-nums text-ink">{dollars(b.value)}</span>
-            </div>
+            <BarRow key={b.key} label={b.label} figure={dollars(b.value)}>
+              <div className={`h-full rounded-full ${b.tone}`} data-bar={b.key} style={{ width: pctOf(b.value, r.unabatedTaxes!) }} />
+            </BarRow>
           ))}
-        </div>
+        </BarRows>
       )}
 
       {r.stepUp != null && r.noi != null && r.stepUp < r.noi && (
@@ -142,14 +120,13 @@ export function TaxAbatementPanel({
             <div className="h-full bg-brand/40" data-bar="abate-noi" style={{ width: pctOf(r.noi - r.stepUp, r.noi) }} />
             <div className="h-full bg-caution/70" data-bar="abate-step" style={{ width: pctOf(r.stepUp, r.noi) }} />
           </div>
-          <p className="mt-1 flex items-center gap-1.5 text-muted">
-            <span aria-hidden className="inline-block h-2 w-3 shrink-0 rounded-sm bg-caution/70" />
-            {`${Math.round(r.stepUpPctOfNoi!)}% goes to taxes when it ends: ${dollars(r.stepUp)} a year`}
-          </p>
+          <Key className="mt-1">
+            <KeyItem mark="swatch" tone="bg-caution/70">{`${Math.round(r.stepUpPctOfNoi!)}% goes to taxes when it ends: ${dollars(r.stepUp)} a year`}</KeyItem>
+          </Key>
         </div>
       )}
 
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

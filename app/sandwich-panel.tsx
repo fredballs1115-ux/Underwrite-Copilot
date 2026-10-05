@@ -1,5 +1,6 @@
 import { compactUsd } from "@/lib/money";
 import { LeaseTermBar } from "@/app/lease-term-bar";
+import { Key, KeyItem, PanelNote, PanelRead, tileSpan } from "@/app/panel-parts";
 import { endIsAhead, endsByYear, termEndLabel } from "@/lib/ground-lease-term";
 import type { SandwichRead } from "@/lib/sandwich-lease";
 
@@ -95,19 +96,11 @@ export function SandwichPanel({
                 <div className="h-full bg-brand/60" data-bar="sandwich-sublease" style={{ width: pctOf(r.subleaseIncome!, r.masterRent!) }} />
                 {r.spread! < 0 && <div className="h-full bg-kill/60" data-bar="sandwich-shortfall" style={{ width: pctOf(-r.spread!, r.masterRent!) }} />}
               </div>
-              <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-                <li className="flex items-center gap-1.5">
-                  <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-brand/60" />
-                  {`Sublease income ${money(r.subleaseIncome!)} a year`}
-                </li>
-                {r.spread! < 0 && (
-                  <li className="flex items-center gap-1.5">
-                    <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-kill/60" />
-                    {`Shortfall ${money(-r.spread!)} a year, which the position pays`}
-                  </li>
-                )}
-                <li>{`The whole bar: the ${money(r.masterRent!)} master rent, owed whatever the subtenants pay`}</li>
-              </ul>
+              <Key>
+                <KeyItem mark="swatch" tone="bg-brand/60">{`Sublease income ${money(r.subleaseIncome!)} a year`}</KeyItem>
+                {r.spread! < 0 && <KeyItem mark="swatch" tone="bg-kill/60">{`Shortfall ${money(-r.spread!)} a year, which the position pays`}</KeyItem>}
+                <KeyItem>{`The whole bar: the ${money(r.masterRent!)} master rent, owed whatever the subtenants pay`}</KeyItem>
+              </Key>
             </>
           ) : (
             <>
@@ -115,17 +108,11 @@ export function SandwichPanel({
                 <div className="h-full bg-ink/25" data-bar="sandwich-master" style={{ width: pctOf(r.masterRent!, r.subleaseIncome!) }} />
                 <div className="h-full bg-brand/60" data-bar="sandwich-spread" style={{ width: pctOf(r.spread!, r.subleaseIncome!) }} />
               </div>
-              <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-                <li className="flex items-center gap-1.5">
-                  <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-ink/25" />
-                  {`Master rent ${money(r.masterRent!)}, owed whatever the subtenants pay`}
-                </li>
-                <li className="flex items-center gap-1.5">
-                  <span aria-hidden className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm bg-brand/60" />
-                  {`Spread ${money(r.spread!)}, the position's income before its own costs`}
-                </li>
-                <li>{`The whole bar: the subleases' ${money(r.subleaseIncome!)} a year`}</li>
-              </ul>
+              <Key>
+                <KeyItem mark="swatch" tone="bg-ink/25">{`Master rent ${money(r.masterRent!)}, owed whatever the subtenants pay`}</KeyItem>
+                <KeyItem mark="swatch" tone="bg-brand/60">{`Spread ${money(r.spread!)}, the position's income before its own costs`}</KeyItem>
+                <KeyItem>{`The whole bar: the subleases' ${money(r.subleaseIncome!)} a year`}</KeyItem>
+              </Key>
             </>
           )}
         </div>
@@ -149,7 +136,7 @@ export function SandwichPanel({
       {tiles.length > 0 && (
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3" data-qa="sandwich-tiles">
           {tiles.map((t) => (
-            <li key={t.key} className="rounded-lg border border-line bg-surface px-2.5 py-2 text-ink" data-sandwich={t.key}>
+            <li key={t.key} className={`rounded-lg border border-line bg-surface px-2.5 py-2 text-ink ${tileSpan(t.value)}`} data-sandwich={t.key}>
               <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-80">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>
@@ -158,17 +145,8 @@ export function SandwichPanel({
         </ul>
       )}
 
-      {r.sentences.length > 0 && <p className="mt-2 text-sm leading-relaxed">{r.sentences[0]}</p>}
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      <PanelRead sentences={r.sentences} className="mt-2" />
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }

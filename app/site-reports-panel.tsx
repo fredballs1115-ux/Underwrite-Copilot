@@ -1,4 +1,5 @@
 import { PML_LENDER_PCT, findingLabel, reportMonth, type SiteReportsRead } from "@/lib/site-reports";
+import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * What the third-party reports found (#465) — the pure panel for
@@ -117,7 +118,7 @@ export function SiteReportsPanel({ reports, modelLine = "" }: { reports: SiteRep
 
       <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" data-qa="site-report-tiles">
         {tiles.map((t) => (
-          <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]}`} data-report={t.key} title={t.title}>
+          <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]} ${tileSpan(t.value)}`} data-report={t.key} title={t.title}>
             <span className="block text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>
             <span className="block text-sm font-semibold leading-tight">{t.value}</span>
             <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>
@@ -128,16 +129,7 @@ export function SiteReportsPanel({ reports, modelLine = "" }: { reports: SiteRep
       {/* The first report's read leads — the Phase I where there is one —
           and the rest is one click away and whole in the HTML, since the
           tiles and the pictures draw it. */}
-      <p className="mt-2 text-sm leading-relaxed">{r.sentences[0]}</p>
-      {r.sentences.length > 1 && (
-        <details className="group mt-1 text-sm leading-relaxed">
-          <summary className="cursor-pointer text-xs font-semibold text-brand hover:underline">
-            <span className="group-open:hidden">{`Read the rest (${r.sentences.length - 1} more)`}</span>
-            <span className="hidden group-open:inline">Less</span>
-          </summary>
-          <p className="mt-1">{r.sentences.slice(1).join(" ")}</p>
-        </details>
-      )}
+      <PanelRead sentences={r.sentences} className="mt-2" />
 
       {ageMonths != null && ageSpan != null && (
         <div className="mt-3 text-[11px]" data-qa="site-report-age">
@@ -151,19 +143,13 @@ export function SiteReportsPanel({ reports, modelLine = "" }: { reports: SiteRep
               data-bar="esa-age"
               style={{ width: pctOf(ageMonths, ageSpan) }}
             />
-            <div className="absolute -inset-y-1 w-0.5 rounded-full bg-caution" data-bar="esa-180" style={{ left: pctOf(180 / 30.44, ageSpan) }} />
-            <div className="absolute -inset-y-1 w-0.5 rounded-full bg-kill" data-bar="esa-year" style={{ left: pctOf(365 / 30.44, ageSpan) }} />
+            <Tick at={pctOf(180 / 30.44, ageSpan)} bar="esa-180" tone="bg-caution" />
+            <Tick at={pctOf(365 / 30.44, ageSpan)} bar="esa-year" tone="bg-kill" />
           </div>
-          <ul className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-muted">
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-caution" />
-              180 days: interviews, searches and the site visit updated by closing
-            </li>
-            <li className="flex items-center gap-1.5">
-              <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-kill" />
-              One year: a new report
-            </li>
-          </ul>
+          <Key>
+            <KeyItem mark="tick" tone="bg-caution">180 days: interviews, searches and the site visit updated by closing</KeyItem>
+            <KeyItem mark="tick" tone="bg-kill">One year: a new report</KeyItem>
+          </Key>
         </div>
       )}
 
@@ -179,16 +165,15 @@ export function SiteReportsPanel({ reports, modelLine = "" }: { reports: SiteRep
               data-bar="pml"
               style={{ width: pctOf(r.pmlPct, pmlSpan) }}
             />
-            <div className="absolute -inset-y-1 w-0.5 rounded-full bg-ink" data-bar="pml-line" style={{ left: pctOf(PML_LENDER_PCT, pmlSpan) }} />
+            <Tick at={pctOf(PML_LENDER_PCT, pmlSpan)} bar="pml-line" />
           </div>
-          <p className="mt-1.5 flex items-center gap-1.5 text-muted">
-            <span aria-hidden className="inline-block h-2.5 w-0.5 shrink-0 bg-ink" />
-            {`${PML_LENDER_PCT}%: most lenders ask for earthquake insurance or a retrofit at or above it`}
-          </p>
+          <Key>
+            <KeyItem mark="tick" tone="bg-ink">{`${PML_LENDER_PCT}%: most lenders ask for earthquake insurance or a retrofit at or above it`}</KeyItem>
+          </Key>
         </div>
       )}
 
-      {modelLine && <p className="mt-2 text-xs leading-relaxed text-muted">{modelLine}</p>}
+      {modelLine && <PanelNote>{modelLine}</PanelNote>}
     </section>
   );
 }
