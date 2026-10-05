@@ -122,7 +122,7 @@ export function buyBoxRead(
  * count alone, the box's cap and return never judged (research pass 35).
  */
 export function buyBoxChip(checks: BuyBoxCheck[], mandate: MandateScore | null): BuyBoxChip {
-  const coverage = buyBoxCoverage(checks);
+  const coverage = buyBoxCoverage(checks, mandate);
   const note = checkedSentence(coverage) ?? undefined;
   const withNote = (chip: BuyBoxChip): BuyBoxChip => (note ? { ...chip, note } : chip);
   if (mandate?.score != null && mandate.verdict) {

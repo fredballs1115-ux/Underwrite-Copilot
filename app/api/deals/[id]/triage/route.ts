@@ -10,6 +10,7 @@ import {
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
 import { dealCheckSource } from "@/lib/buy-box-chip";
+import { scoreMandateFit } from "@/lib/mandate";
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -91,10 +92,13 @@ export async function GET(
       if (!source) {
         fit = "pending";
       } else {
-        // The pipeline table's exact fold — adjacent surfaces must agree.
-        const checks = evaluateBuyBox((deal.asset_class as string) ?? "auto", source, box);
+        // The pipeline table's exact fold — adjacent surfaces must agree —
+        // and its coverage, which counts what the mandate-fit score judges
+        // that no check lists: the cash-on-cash floor and the red lines.
+        const filedAs = (deal.asset_class as string) ?? "auto";
+        const checks = evaluateBuyBox(filedAs, source, box);
         fit = foldBuyBoxChecks(checks) ?? "unverified";
-        coverage = buyBoxCoverage(checks);
+        coverage = buyBoxCoverage(checks, scoreMandateFit(filedAs, source, box));
       }
     }
   } catch (err) {

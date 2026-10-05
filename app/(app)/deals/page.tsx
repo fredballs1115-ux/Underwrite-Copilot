@@ -325,8 +325,9 @@ export default async function DealsPage({
       fit: checks ? foldBuyBoxChecks(checks) : null,
       // How many of the box's criteria the fit stands on: the card says "2
       // of 4 checked" where not every one could be, and draws no green while
-      // one the price decides is among them, as the deal header's chip does.
-      fitCoverage: checks ? buyBoxCoverage(checks) : null,
+      // one the price decides is among them, as the deal header's chip does
+      // — the score's cash-on-cash floor and red lines counted with them.
+      fitCoverage: checks ? buyBoxCoverage(checks, mandate) : null,
       score: mandate?.score ?? null,
       mandateVerdict: mandate?.verdict ?? null,
       // Judged on the first signal alone until the extraction lands — the

@@ -33,6 +33,7 @@ import {
 } from "./criteria";
 import { countNoun } from "./asset-words";
 import { basisTag } from "./pipeline-slots";
+import { scoreMandateFit } from "./mandate";
 
 /** The year the bare rows in these cases were screened in. A label that
  *  carries a year of its own is read against it; the cases that turn on
@@ -1400,7 +1401,7 @@ describe("buyBoxCoverage — how much of the box a fit stands on", () => {
     const checks = evaluateBuyBox("multifamily", note, box);
     // The fold calls it "fits" on its two passes alone.
     expect(foldBuyBoxChecks(checks)).toBe("fits");
-    expect(buyBoxCoverage(checks)).toEqual({
+    expect(buyBoxCoverage(checks, null)).toEqual({
       checked: 2,
       total: 4,
       unchecked: ["Going-in cap", "Target return"],
@@ -1408,14 +1409,54 @@ describe("buyBoxCoverage — how much of the box a fit stands on", () => {
     });
     // Unknown on something the price does not decide: counted, never priced.
     const placeOnly = evaluateBuyBox("multifamily", ex([["Units", "248"]]), { markets: "Philadelphia", unitsMin: 100 });
-    expect(buyBoxCoverage(placeOnly)).toEqual({ checked: 1, total: 2, unchecked: ["Geography"], priceUnchecked: false });
+    expect(buyBoxCoverage(placeOnly, null)).toEqual({ checked: 1, total: 2, unchecked: ["Geography"], priceUnchecked: false });
     // A box judged whole, and no box at all.
-    expect(buyBoxCoverage(evaluateBuyBox("multifamily", ex([["Units", "248"]]), { unitsMin: 100 }))).toEqual({
+    expect(buyBoxCoverage(evaluateBuyBox("multifamily", ex([["Units", "248"]]), { unitsMin: 100 }), null)).toEqual({
       checked: 1,
       total: 1,
       unchecked: [],
       priceUnchecked: false,
     });
-    expect(buyBoxCoverage([])).toEqual({ checked: 0, total: 0, unchecked: [], priceUnchecked: false });
+    expect(buyBoxCoverage([], null)).toEqual({ checked: 0, total: 0, unchecked: [], priceUnchecked: false });
+  });
+
+  // The audit of 2026-10-05 (HIGH-2): the score judges the box's cash-on-
+  // cash floor and its red lines, which no check lists, so a fit whose
+  // cash-on-cash or whose cap-rate dealbreaker could not be checked read a
+  // green "Fit 100 · Pursue" with no count.
+  it("counts the score's cash-on-cash floor and each red line, and the price decides all but the class and the place", () => {
+    const deal = ex([["Asking price", "$15,000,000"], ["NOI (in-place)", "$900,000"], ["Units", "100"]], { assetClass: "multifamily" });
+    const coc: BuyBox = { assetClasses: ["multifamily"], minCoCPct: 8 };
+    const checks = evaluateBuyBox("multifamily", deal, coc);
+    expect(buyBoxCoverage(checks, scoreMandateFit("multifamily", deal, coc))).toEqual({
+      checked: 1,
+      total: 2,
+      unchecked: ["Cash-on-cash"],
+      priceUnchecked: true,
+    });
+    // A stated cash-on-cash is a criterion checked, counted all the same.
+    const stated = ex([["Cash-on-cash (Yr 1)", "8.5%"]], { assetClass: "multifamily" });
+    expect(buyBoxCoverage(evaluateBuyBox("multifamily", stated, coc), scoreMandateFit("multifamily", stated, coc))).toEqual({
+      checked: 2,
+      total: 2,
+      unchecked: [],
+      priceUnchecked: false,
+    });
+    // Each red line is a criterion of its own: a class it could judge, a
+    // cap the memorandum does not state.
+    const red: BuyBox = { assetClasses: ["multifamily"], dealbreakers: { requireAssetClass: true, minCapPct: 6, requireGeography: true } };
+    const lines = buyBoxCoverage(evaluateBuyBox("multifamily", deal, red), scoreMandateFit("multifamily", deal, red));
+    // (No geography target is set, so the location red line means nothing
+    // and is not counted.)
+    expect(lines).toEqual({ checked: 2, total: 3, unchecked: ["Cap-rate dealbreaker"], priceUnchecked: true });
+    // Unchecked on the class alone, nothing about the price was left.
+    const unread = { ...deal, assetClass: "" };
+    const classOnly: BuyBox = { assetClasses: ["multifamily"], dealbreakers: { requireAssetClass: true } };
+    expect(buyBoxCoverage(evaluateBuyBox("auto", unread, classOnly), scoreMandateFit("auto", unread, classOnly))).toEqual({
+      checked: 0,
+      total: 2,
+      unchecked: ["Asset class", "Asset-class dealbreaker"],
+      priceUnchecked: false,
+    });
   });
 });

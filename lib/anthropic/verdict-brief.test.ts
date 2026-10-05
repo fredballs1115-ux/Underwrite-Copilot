@@ -327,6 +327,23 @@ describe("the verdict is handed the code's buy-box checks, not the bare criteria
     expect(full).not.toContain("Judged on");
   });
 
+  it("counts the score's cash-on-cash floor and the red lines it could not check, as the chip does (the audit of 2026-10-05)", () => {
+    // The score the pipeline hands beside the checks: a cash-on-cash floor
+    // the memorandum gives no figure for, and a cap-rate red line it could
+    // not check.
+    const mandate = {
+      score: 100,
+      verdict: "PURSUE" as const,
+      dimensions: [{ key: "coc" as const, label: "Cash-on-cash", weight: 15, earned: 0, status: "unknown" as const, detail: "" }],
+      dealbreakerTripped: false,
+      unresolvedDealbreakers: 1,
+      dealbreakerCriteria: [{ label: "Cap-rate dealbreaker", checked: false, onPrice: true }],
+    };
+    const known = checks.filter((c) => c.status !== "unknown");
+    const brief = buildBrief({ ...none, buyBox: lines, buyBoxChecks: { checks: known, tripped: [], mandate } });
+    expect(brief).toContain("Judged on 3 of the buy box's 5 criteria; cash-on-cash and cap-rate dealbreaker could not be checked.");
+  });
+
   it("with no checks to hand, the criteria alone — and an entry price is still the verdict's own estimate", () => {
     const brief = buildBrief({ ...none, buyBox: lines });
     expect(brief).not.toContain("The code's checks");

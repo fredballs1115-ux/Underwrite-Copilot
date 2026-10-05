@@ -1296,12 +1296,21 @@ export function foldBuyBoxChecks(
 export interface BuyBoxCoverage {
   /** the criteria the screen could judge, pass, near or miss */
   checked: number;
-  /** every criterion the box sets, as the deal page lists them */
+  /** every criterion the box sets: the checks the deal page lists, its
+   *  cash-on-cash floor and each red line that applies */
   total: number;
   /** the criteria it could not judge, by the deal page's own labels */
   unchecked: string[];
-  /** one of those turns on the price (`BuyBoxCheck.onPrice`) */
+  /** one of those turns on the price (`BuyBoxCheck.onPrice`, the
+   *  cash-on-cash floor, a price, cap or basis red line) */
   priceUnchecked: boolean;
+}
+
+/** What the coverage reads off the mandate-fit score (lib/mandate
+ *  `MandateScore`): its dimensions, and the red lines as criteria. */
+interface MandateCoverageLike {
+  dimensions: ReadonlyArray<{ key: string; label: string; status: string }>;
+  dealbreakerCriteria?: ReadonlyArray<{ label: string; checked: boolean; onPrice: boolean }>;
 }
 
 /**
@@ -1309,22 +1318,48 @@ export interface BuyBoxCoverage {
  * ONE count, beside the fold, that every surface drawing the fit reads (lib/
  * fit-label says it): the deal header's chip and the screen-complete email
  * (lib/buy-box-chip), the pipeline's card, list and CSV, the meeting
- * workbook, the compare table, the batch upload's chip and the deal page's
- * mandate gauge. The fold calls a
+ * workbook, the compare table, the batch upload's chip, the verdict's brief
+ * and the deal page's mandate gauge. The fold calls a
  * deal "fits" on any pass with no miss, and the mandate-fit score rescales
  * over what it could read (lib/mandate), so a note whose cap and return the
  * box cannot judge read "Fit 100 · Pursue" and "Fits" on two of its four
- * criteria. The count is of the checks the deal page lists; the score's own
- * dimensions are its panel's to count.
+ * criteria. The count is of the checks the deal page lists, and of the
+ * criteria the mandate-fit score judges that no check lists: the box's
+ * cash-on-cash floor, and each red line (the audit of 2026-10-05 — a fit
+ * whose cash-on-cash floor or whose cap-rate dealbreaker could not be
+ * checked had read a green "Pursue"). Each of those turns on the price but
+ * the asset-class and location red lines. A caller with no score passes
+ * null, and the checks alone are counted.
  */
-export function buyBoxCoverage(checks: BuyBoxCheck[]): BuyBoxCoverage {
+export function buyBoxCoverage(checks: BuyBoxCheck[], mandate: MandateCoverageLike | null): BuyBoxCoverage {
   const unknown = checks.filter((c) => c.status === "unknown");
-  return {
-    checked: checks.length - unknown.length,
-    total: checks.length,
-    unchecked: unknown.map((c) => c.label),
-    priceUnchecked: unknown.some((c) => c.onPrice === true),
-  };
+  let checked = checks.length - unknown.length;
+  let total = checks.length;
+  const unchecked = unknown.map((c) => c.label);
+  let priceUnchecked = unknown.some((c) => c.onPrice === true);
+  // The year-one cash-on-cash floor: the score judges it, no check lists it.
+  // A return on the equity the price sets, so it turns on the price.
+  for (const d of mandate?.dimensions ?? []) {
+    if (d.key !== "coc") continue;
+    total += 1;
+    if (d.status === "unknown") {
+      unchecked.push(d.label);
+      priceUnchecked = true;
+    } else {
+      checked += 1;
+    }
+  }
+  // Each red line the box sets, tripped, clear or not checked.
+  for (const red of mandate?.dealbreakerCriteria ?? []) {
+    total += 1;
+    if (red.checked) {
+      checked += 1;
+    } else {
+      unchecked.push(red.label);
+      if (red.onPrice) priceUnchecked = true;
+    }
+  }
+  return { checked, total, unchecked, priceUnchecked };
 }
 
 export function evaluateBuyBox(

@@ -394,5 +394,10 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(cell2.value).toBe("Fits");
     expect(cell2.font?.color?.argb).toBe("FF1B7A5E");
     expect(cell2.note).toBeUndefined();
+    // The box's cash-on-cash floor, which no check lists and the score
+    // judges, is a criterion too: the building states no cash-on-cash, so
+    // the same cell is no longer a green Fits (the audit of 2026-10-05).
+    const withCoc = pipelineExportRow(deal({ extraction: building }), { ...ctx, box: { ...box, minCoCPct: 6 } });
+    expect(withCoc.fitCoverage).toEqual({ checked: 4, total: 5, unchecked: ["Cash-on-cash"], priceUnchecked: true });
   });
 });

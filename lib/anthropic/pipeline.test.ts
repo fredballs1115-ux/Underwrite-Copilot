@@ -877,6 +877,11 @@ describe("runAnalysis — the happy path", () => {
       onPrice: true,
     });
     expect(input.buyBoxChecks?.tripped).toEqual(["price $20.0M over the $18.0M ceiling"]);
+    // And the score beside them, whose red lines the brief's coverage counts
+    // as the chip's does.
+    const { scoreMandateFit } = await import("@/lib/mandate");
+    expect(input.buyBoxChecks?.mandate).toEqual(scoreMandateFit("multifamily", dealCheckSource(EXTRACTION, signal, null), box));
+    expect(input.buyBoxChecks?.mandate?.dealbreakerCriteria).toEqual([{ label: "Price dealbreaker", checked: true, onPrice: true }]);
 
     // A read of the checks that fails (here, a first signal stored without
     // its going-in cap) leaves the criteria in the brief, as before.

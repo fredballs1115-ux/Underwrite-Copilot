@@ -92,7 +92,7 @@ import {
   type BuyBoxCheck,
 } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
-import { evalDealbreakers } from "@/lib/mandate";
+import { evalDealbreakers, scoreMandateFit, type MandateScore } from "@/lib/mandate";
 import { notifyAnalysisFailed, notifyAnalysisReady } from "@/lib/email";
 import { requesterOf } from "@/lib/jobs";
 import { omFingerprint } from "@/lib/om-fingerprint";
@@ -720,7 +720,7 @@ async function regenerateVerdict(
   // the verdict is handed the calls the chip shows, never left to re-derive
   // a fit from the bare criteria. Best-effort on its own: a read that fails
   // leaves the criteria in the brief, as before.
-  let buyBoxChecks: { checks: BuyBoxCheck[]; tripped: string[] } | null = null;
+  let buyBoxChecks: { checks: BuyBoxCheck[]; tripped: string[]; mandate: MandateScore | null } | null = null;
   if (box && buyBox) {
     try {
       const address =
@@ -730,6 +730,9 @@ async function regenerateVerdict(
       buyBoxChecks = {
         checks: evaluateBuyBox(filedAs, source, box),
         tripped: source && !hasNoDealbreakers(box.dealbreakers) ? evalDealbreakers(filedAs, source, box).tripped : [],
+        // The score beside them, as the chip reads it: its cash-on-cash
+        // floor and its red lines are criteria the coverage counts.
+        mandate: source ? scoreMandateFit(filedAs, source, box) : null,
       };
     } catch {
       buyBoxChecks = null;

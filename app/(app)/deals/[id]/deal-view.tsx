@@ -1426,7 +1426,7 @@ export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
           // every check and reads "Outside box" on any of them (lib/buy-box-
           // chip), so the gauge says why it differs from its own call.
           outsideOn={data.checks.filter((c) => c.status === "miss").map((c) => c.label.toLowerCase())}
-          priceUnchecked={buyBoxCoverage(data.checks).priceUnchecked}
+          priceUnchecked={buyBoxCoverage(data.checks, data.mandate).priceUnchecked}
         />
       )}
       <div className="mt-3 grid gap-2 sm:grid-cols-2">

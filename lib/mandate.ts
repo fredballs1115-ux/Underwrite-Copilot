@@ -92,7 +92,32 @@ export interface MandateScore {
   dealbreakerTripped: boolean;
   /** dealbreakers configured but not evaluable against this screen yet */
   unresolvedDealbreakers: number;
+  /** each red line the box sets that applies to this deal, as the fit's
+   *  coverage counts it (lib/criteria `buyBoxCoverage`): a criterion of its
+   *  own, checked or not; absent where the box sets none */
+  dealbreakerCriteria?: DealbreakerCriterion[];
 }
+
+/** One red line as a criterion of the box (`MandateScore.dealbreakerCriteria`). */
+export interface DealbreakerCriterion {
+  /** its name as the coverage's sentence says it — "Cap-rate dealbreaker" */
+  label: string;
+  /** whether this screen could judge it, tripped or clear */
+  checked: boolean;
+  /** whether the price decides it — the price ceiling, the cap floor, the
+   *  basis ceiling — so a fit judged without it is no green light */
+  onPrice: boolean;
+}
+
+/** Each red line's name, as the coverage says it, and whether the price
+ *  decides it. Keyed by the names `evalDealbreakers` files them under. */
+const RED_LINE: Record<"asset class" | "location" | "price" | "cap rate" | "basis / unit", Omit<DealbreakerCriterion, "checked">> = {
+  "asset class": { label: "Asset-class dealbreaker", onPrice: false },
+  location: { label: "Location dealbreaker", onPrice: false },
+  price: { label: "Price dealbreaker", onPrice: true },
+  "cap rate": { label: "Cap-rate dealbreaker", onPrice: true },
+  "basis / unit": { label: "Basis dealbreaker", onPrice: true },
+};
 
 /** Structural shape of the extraction the score reads — kept local so this
  *  module stays importable everywhere without dragging in heavy types. */
@@ -220,19 +245,23 @@ function scoreBand(
 const fmtM = (d: number) => compactUsd(d, { thousandsFrom: 0 });
 
 /** Evaluate the hard dealbreakers against the screen. Each returns a bucket:
- *  `tripped` (violated), `clear` (satisfied), or `unknown` (no figure yet).
- *  Exported for the verdict's brief, which names the red lines a deal trips
- *  in these sentences rather than re-deriving them. */
+ *  `tripped` (violated), `clear` (satisfied), or `unknown` (no figure yet) —
+ *  and each red line that applies is a criterion of the box (`criteria`),
+ *  checked or not, which the fit's coverage counts. Exported for the
+ *  verdict's brief, which names the red lines a deal trips in these
+ *  sentences rather than re-deriving them. */
 export function evalDealbreakers(
   dealAssetClass: string,
   extraction: ExtractionLike | null,
   box: BuyBox,
-): { tripped: string[]; clear: string[]; unknown: string[] } {
+): { tripped: string[]; clear: string[]; unknown: string[]; criteria: DealbreakerCriterion[] } {
   const db = box.dealbreakers!;
   const metrics = extraction?.metrics ?? [];
   const tripped: string[] = [];
   const clear: string[] = [];
   const unknown: string[] = [];
+  const criteria: DealbreakerCriterion[] = [];
+  const judged = (name: keyof typeof RED_LINE, checked: boolean) => criteria.push({ ...RED_LINE[name], checked });
 
   // Asset class must be in the mandate list (needs a mandate list to mean
   // anything — inert without one).
@@ -242,6 +271,7 @@ export function evalDealbreakers(
     if (!actual) unknown.push("asset class");
     else if (wanted.includes(actual.toLowerCase())) clear.push("asset class");
     else tripped.push(`asset class is ${actual}, outside the mandate`);
+    judged("asset class", !!actual);
   }
 
   // Must sit in a target geography (needs targets to mean anything).
@@ -250,6 +280,7 @@ export function evalDealbreakers(
     if (!haystack) unknown.push("location");
     else if (inTargetGeo(box, haystack)) clear.push("location");
     else tripped.push("location outside every target market");
+    judged("location", !!haystack);
   }
 
   // Hard purchase-price ceiling — the shared price row, so a development's
@@ -263,6 +294,7 @@ export function evalDealbreakers(
     if (price == null) unknown.push("price");
     else if (price <= ceiling) clear.push("price");
     else tripped.push(`price ${fmtM(price)} over the ${fmtM(ceiling)} ceiling`);
+    judged("price", price != null);
   }
 
   // Hard going-in cap floor — never on a cap the deal's cap slot withholds.
@@ -271,6 +303,7 @@ export function evalDealbreakers(
     if (cap == null) unknown.push("cap rate");
     else if (cap >= db.minCapPct) clear.push("cap rate");
     else tripped.push(`going-in cap ${cap.toFixed(2)}% under the ${db.minCapPct}% floor`);
+    judged("cap rate", cap != null);
   }
 
   // Hard basis-per-unit ceiling — never on a per-unit figure struck on a
@@ -282,9 +315,10 @@ export function evalDealbreakers(
     if (perUnit == null) unknown.push("basis / unit");
     else if (perUnit <= ceiling) clear.push("basis / unit");
     else tripped.push(`basis ${fmtM(perUnit)}/unit over the ${fmtM(ceiling)}/unit ceiling`);
+    judged("basis / unit", perUnit != null);
   }
 
-  return { tripped, clear, unknown };
+  return { tripped, clear, unknown, criteria };
 }
 
 /**
@@ -303,6 +337,7 @@ export function scoreMandateFit(
   const dims: MandateDimension[] = [];
   let dealbreakerTripped = false;
   let unresolvedDealbreakers = 0;
+  let dealbreakerCriteria: DealbreakerCriterion[] = [];
 
   // ---- Asset class (binary) ---------------------------------------------
   if (box.assetClasses?.length) {
@@ -468,26 +503,30 @@ export function scoreMandateFit(
 
   // ---- Dealbreakers (hard) ----------------------------------------------
   if (!hasNoDealbreakers(box.dealbreakers)) {
-    const { tripped, clear, unknown } = evalDealbreakers(dealAssetClass, extraction, box);
+    const { tripped, clear, unknown, criteria } = evalDealbreakers(dealAssetClass, extraction, box);
     unresolvedDealbreakers = unknown.length;
+    dealbreakerCriteria = criteria;
     let status: DimensionStatus, earned: number, detail: string;
     if (tripped.length) {
       dealbreakerTripped = true;
       status = "miss";
       earned = 0;
       detail = `Dealbreaker: ${tripped.join("; ")}. Automatic PASS.`;
-    } else if (clear.length) {
+    } else if (clear.length && !unknown.length) {
       status = "pass";
       earned = WEIGHTS.dealbreakers;
-      detail = unknown.length
-        ? `No dealbreaker tripped (${unknown.length} couldn't be checked — verify).`
-        : "No dealbreaker tripped. All red lines clear.";
+      detail = "No dealbreaker tripped. All red lines clear.";
     } else {
-      // Only unknowns — never claim the red lines passed when none could be
-      // checked. Excluded from the score, surfaced for manual review.
+      // A red line that could not be checked may be the one the deal
+      // crosses: "no red line crossed" is never claimed — let alone scored
+      // at the dimension's full weight — while one is unchecked (the audit
+      // of 2026-10-05). Excluded from the score, surfaced for review, and
+      // counted by the fit's coverage as a criterion not checked.
       status = "unknown";
       earned = 0;
-      detail = `${unknown.length} dealbreaker${unknown.length > 1 ? "s" : ""} couldn't be checked against the screen yet.`;
+      detail = clear.length
+        ? `No dealbreaker tripped of the ${clear.length} checked, but ${unknown.length} couldn't be checked against the screen yet — verify.`
+        : `${unknown.length} dealbreaker${unknown.length === 1 ? "" : "s"} couldn't be checked against the screen yet.`;
     }
     dims.push({ key: "dealbreakers", label: "Dealbreakers", weight: WEIGHTS.dealbreakers, earned, status, detail });
   }
@@ -512,5 +551,5 @@ export function scoreMandateFit(
             ? "WATCH"
             : "PASS";
 
-  return { score, verdict, dimensions: dims, dealbreakerTripped, unresolvedDealbreakers };
+  return { score, verdict, dimensions: dims, dealbreakerTripped, unresolvedDealbreakers, dealbreakerCriteria };
 }

@@ -277,13 +277,14 @@ describe("the chip says how much of the box it was judged on (research pass 35)"
   it("a note against a property box: the count in the call's place, muted, and the criteria named — on the header and in the email", async () => {
     const page = buyBoxRead(SAMPLE_DEAL.asset_class, dealCheckSource(NOTE, null, SAMPLE_DEAL.address), SAMPLE_DEMO_BOX);
     // Two known passes scored 100 and PURSUE; the box's cap and return,
-    // which a note's price cannot be judged by, were never checked.
+    // which a note's price cannot be judged by, were never checked — nor its
+    // cash-on-cash floor, which the memorandum states no figure for.
     expect(page.mandate?.score).toBe(100);
     expect(page.mandate?.verdict).toBe("PURSUE");
     expect(page.chip).toEqual({
-      label: "Fit 100 · 2 of 4 checked",
+      label: "Fit 100 · 2 of 5 checked",
       tone: "muted",
-      note: "Judged on 2 of the buy box's 4 criteria; going-in cap and target return could not be checked.",
+      note: "Judged on 2 of the buy box's 5 criteria; going-in cap, target return and cash-on-cash could not be checked.",
     });
     boxes.current = SAMPLE_DEMO_BOX;
     const chip = await emailedChip({
@@ -299,7 +300,7 @@ describe("the chip says how much of the box it was judged on (research pass 35)"
       photo: null,
       om_storage_path: `u1/${DEAL}.pdf`,
     });
-    expect(chip).toBe("Fit 100 · 2 of 4 checked");
+    expect(chip).toBe("Fit 100 · 2 of 5 checked");
     expect(chip).not.toContain("Pursue");
   });
 
@@ -309,11 +310,12 @@ describe("the chip says how much of the box it was judged on (research pass 35)"
       dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
       SAMPLE_DEMO_BOX,
     ).chip;
-    // The sample misses the 5.75% floor; its memorandum states no IRR.
+    // The sample misses the 5.75% floor; its memorandum states no IRR and
+    // no cash-on-cash.
     expect(sample).toEqual({
-      label: "Fit 63 · Outside box · 3 of 4 checked",
+      label: "Fit 63 · Outside box · 3 of 5 checked",
       tone: "kill",
-      note: "Judged on 3 of the buy box's 4 criteria; target return could not be checked.",
+      note: "Judged on 3 of the buy box's 5 criteria; target return and cash-on-cash could not be checked.",
     });
   });
 
@@ -474,6 +476,34 @@ describe("the box holds a deal only to the figures its price buys", () => {
     expect(redLines(ex)).toMatchObject({ tripped: [], clear: ["cap rate"], unknown: ["basis / unit"] });
   });
 
+  it("a cap-rate red line the box could not check leaves no green Pursue (HIGH-2)", () => {
+    // The note's cap is withheld, so the red line on it cannot be checked;
+    // a fee simple that states no cap reads the same.
+    const box: BuyBox = { assetClasses: ["multifamily"], dealbreakers: { requireAssetClass: true, minCapPct: 6 } };
+    for (const ex of [
+      deal("note", [["Asking price", "$12,000,000"], ["Unpaid principal balance", "$15,000,000"], ["Going-in cap rate", "5.10%"], ["Units", "200"]]),
+      deal("fee_simple", [["Asking price", "$12,000,000"], ["Units", "200"]]),
+    ]) {
+      const r = buyBoxRead("multifamily", dealCheckSource(ex, null, null), box);
+      expect(r.mandate?.dimensions.find((d) => d.key === "dealbreakers")?.status).toBe("unknown");
+      expect(r.chip).toEqual({
+        label: "Fit 100 · 2 of 3 checked",
+        tone: "muted",
+        note: "Judged on 2 of the buy box's 3 criteria; cap-rate dealbreaker could not be checked.",
+      });
+    }
+  });
+
+  it("a cash-on-cash floor the memorandum gives no figure for is counted and leaves no green Pursue (HIGH-2)", () => {
+    const ex = deal("fee_simple", [["Asking price", "$15,000,000"], ["NOI (in-place)", "$900,000"], ["Units", "100"]]);
+    const r = buyBoxRead("multifamily", dealCheckSource(ex, null, null), { assetClasses: ["multifamily"], minCoCPct: 8 });
+    expect(r.chip).toEqual({
+      label: "Fit 100 · 1 of 2 checked",
+      tone: "muted",
+      note: "Judged on 1 of the buy box's 2 criteria; cash-on-cash could not be checked.",
+    });
+  });
+
   it("every page, route and document builds its source through dealCheckSource", () => {
     // lib/criteria cannot read what the price buys itself (lib/deal-strategy
     // imports it, and the pipeline's client bundle must not load the
@@ -494,5 +524,13 @@ describe("the box holds a deal only to the figures its price buys", () => {
       (f) => !/lib[\\/](criteria|buy-box-chip)\.ts$/.test(f) && /\bbuyBoxCheckSource\(/.test(readFileSync(f, "utf8")),
     );
     expect(direct).toEqual([]);
+    // And every surface that counts a fit's coverage hands it the score, so
+    // the cash-on-cash floor and the red lines are counted on each (HIGH-2):
+    // the header, the email, the pipeline's card, list and CSV, the meeting
+    // workbook, the compare table, the batch triage and the verdict's brief.
+    const counting = files.filter((f) => /\bbuyBoxCoverage\(/.test(readFileSync(f, "utf8")));
+    expect(counting.length).toBeGreaterThanOrEqual(7);
+    const scoreless = counting.filter((f) => /\bbuyBoxCoverage\([^()]*,\s*null\s*\)/.test(readFileSync(f, "utf8")));
+    expect(scoreless).toEqual([]);
   });
 });

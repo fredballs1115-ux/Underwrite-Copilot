@@ -6,6 +6,7 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { buyBoxCoverage, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
+import { scoreMandateFit } from "@/lib/mandate";
 import { capSlotWithheld, noteCapSlot, ownYieldText } from "@/lib/compare-interest";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
@@ -102,6 +103,9 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
   const source = ctx.box ? dealCheckSource(extraction, signal, address) : null;
   const checks = ctx.box && source ? evaluateBuyBox(d.asset_class, source, ctx.box) : null;
   const fit: PipelineExportRow["fit"] = checks ? foldBuyBoxChecks(checks) : null;
+  // The mandate-fit score beside the checks: its cash-on-cash floor and its
+  // red lines are criteria the coverage counts, which no check lists.
+  const mandate = ctx.box && source ? scoreMandateFit(d.asset_class, source, ctx.box) : null;
   return {
     name: d.name,
     stage: d.stage ?? "screening",
@@ -175,10 +179,11 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     yieldWithheld: plan?.yieldWithheld ?? null,
     fit,
     // How many of the box's criteria the fit stands on — the pipeline
-    // card's count (lib/criteria `buyBoxCoverage`): the cell says "Fits (2
-    // of 4)" where not every one could be checked, and is never green while
-    // one the price decides is among them.
-    fitCoverage: checks ? buyBoxCoverage(checks) : null,
+    // card's count (lib/criteria `buyBoxCoverage`), the mandate-fit score's
+    // cash-on-cash floor and red lines counted with the checks: the cell
+    // says "Fits (2 of 4)" where not every one could be checked, and is
+    // never green while one the price decides is among them.
+    fitCoverage: checks ? buyBoxCoverage(checks, mandate) : null,
     // Judged on the first signal alone until the extraction lands, as the
     // pipeline page marks it (the card's "First read").
     fitFirstRead: fit != null && !extraction && signal != null,

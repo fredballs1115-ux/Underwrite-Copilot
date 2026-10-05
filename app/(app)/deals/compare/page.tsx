@@ -7,6 +7,7 @@ import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { buyBoxCoverage, evaluateBuyBox, screenYearOf, type BuyBox, type BuyBoxCoverage } from "@/lib/criteria";
 import { dealCheckSource } from "@/lib/buy-box-chip";
+import { scoreMandateFit } from "@/lib/mandate";
 import { checkedSentence } from "@/lib/fit-label";
 import { CompareTable, MODEL_ROWS_NOTE, usd, type Col } from "./compare-table";
 import { countyOf, placeDeal } from "@/lib/market-county";
@@ -155,8 +156,9 @@ function toCol(
     }
     // How many of the box's criteria the fit stands on, and which could not
     // be checked, as the pipeline card and the meeting workbook say it
-    // (lib/criteria `buyBoxCoverage`, lib/fit-label).
-    fitCoverage = buyBoxCoverage(checks);
+    // (lib/criteria `buyBoxCoverage`, lib/fit-label) — the mandate-fit
+    // score's cash-on-cash floor and red lines counted with the checks.
+    fitCoverage = buyBoxCoverage(checks, scoreMandateFit(deal.asset_class, checkSource, box));
     const checked = fit ? checkedSentence(fitCoverage) : null;
     if (checked) fitNote = fitNote ? `${fitNote}. ${checked}` : checked;
   }

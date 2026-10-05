@@ -18,6 +18,7 @@ import {
 } from "@/lib/deal-strategy";
 import { buyBoxCoverage, foldBuyBoxChecks, parsePrice, priceRange, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { checkedSentence } from "@/lib/fit-label";
+import type { MandateScore } from "@/lib/mandate";
 import { interestOf, isWholeShare } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
 import { assetWords } from "@/lib/asset-words";
@@ -98,10 +99,12 @@ export interface VerdictInputs {
   /** the code's checks of this deal against that box — the deal page's own
    *  read (lib/buy-box-chip `dealCheckSource`, lib/criteria
    *  `evaluateBuyBox`): each criterion's call in the code's own sentence,
-   *  and the red lines it trips (lib/mandate `evalDealbreakers`) — so the
-   *  verdict judges fit on the calls the page's chip shows rather than
-   *  re-deriving them; absent with no box */
-  buyBoxChecks?: { checks: BuyBoxCheck[]; tripped: string[] } | null;
+   *  the red lines it trips (lib/mandate `evalDealbreakers`) and the
+   *  mandate-fit score beside them (lib/mandate `scoreMandateFit`), whose
+   *  cash-on-cash floor and red lines the coverage counts — so the verdict
+   *  judges fit on the calls the page's chip shows rather than re-deriving
+   *  them; absent with no box */
+  buyBoxChecks?: { checks: BuyBoxCheck[]; tripped: string[]; mandate?: MandateScore | null } | null;
   /** the latest published rates, dated, with the spread the site's model
    *  adds for the deal's class (lib/debt-index `ratesPromptLine`) — the line
    *  the challenger is handed; absent where the table seeds nothing */
@@ -298,8 +301,9 @@ export function buildBrief(input: VerdictInputs): string {
     const fold = foldBuyBoxChecks(checks);
     // How much of the box that call stands on, as the deal page's chip says
     // it ("2 of 4 checked"): a note's or an unpriced deal's fit is no fit on
-    // the criteria the price decides.
-    const covered = checkedSentence(buyBoxCoverage(checks));
+    // the criteria the price decides — the score's cash-on-cash floor and
+    // red lines counted with the checks.
+    const covered = checkedSentence(buyBoxCoverage(checks, input.buyBoxChecks?.mandate ?? null));
     sections.push(
       "## The buyer's standing buy box",
       [
