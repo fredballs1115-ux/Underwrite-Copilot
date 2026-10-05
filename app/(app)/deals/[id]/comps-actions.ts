@@ -63,7 +63,8 @@ export async function searchPublicComps(formData: FormData) {
   const claim = workerOn
     ? await claimJob(supabase, dealId, "comps_search", null, "running")
     : await claimJob(supabase, dealId, "comps_search");
-  if (claim.outcome === "busy") return;
+  // A claim the database did not take claimed nothing: never run on it.
+  if (claim.outcome === "busy" || claim.outcome === "error") return;
   if (claim.outcome === "none") {
     await supabase.from("analysis_jobs").insert({
       deal_id: dealId,

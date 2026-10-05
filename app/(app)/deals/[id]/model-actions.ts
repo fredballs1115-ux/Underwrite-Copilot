@@ -120,7 +120,8 @@ export async function generateModel(formData: FormData) {
   const claim = workerOn
     ? await claimJob(supabase, dealId, "model", null, "running")
     : await claimJob(supabase, dealId, "model");
-  if (claim.outcome === "busy") return;
+  // A claim the database did not take claimed nothing: never run on it.
+  if (claim.outcome === "busy" || claim.outcome === "error") return;
   if (claim.outcome === "none") {
     await supabase.from("analysis_jobs").insert({
       deal_id: dealId,

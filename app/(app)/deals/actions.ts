@@ -426,6 +426,9 @@ export async function updateManualFacts(
   if (claim.outcome === "busy") {
     return { error: "A screen is already running on this deal — give it a minute to finish." };
   }
+  if (claim.outcome === "error") {
+    return { error: "Couldn’t start the re-screen just now — nothing changed. Try again in a moment." };
+  }
   if (claim.outcome === "none") {
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
       newJobRow(
@@ -879,6 +882,9 @@ export async function rerunAnalysis(formData: FormData) {
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
+  // A claim the database did not take, or a row it would not insert, is a
+  // start that failed — never "a screen is already running" (research pass 30).
+  if (claim.outcome === "error") redirect(`/deals/${dealId}?error=startfail`);
   if (claim.outcome === "none") {
     // No prior job row means no completed prior generation to diff against.
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
@@ -888,7 +894,7 @@ export async function rerunAnalysis(formData: FormData) {
         workerMode ? { workerPayload: { kind: "screen", requestedBy: user.id } } : undefined,
       ),
     );
-    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+    if (insErr) redirect(`/deals/${dealId}?error=startfail`);
   }
 
   // Snapshot for the retrade diff only when the stored results are a
@@ -987,6 +993,8 @@ export async function replaceOm(formData: FormData) {
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
+  // Before the upload: the stored OM is untouched (research pass 30).
+  if (claim.outcome === "error") redirect(`/deals/${dealId}?error=startfail`);
   if (claim.outcome === "none") {
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
       newJobRow(
@@ -997,7 +1005,7 @@ export async function replaceOm(formData: FormData) {
           : undefined,
       ),
     );
-    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+    if (insErr) redirect(`/deals/${dealId}?error=startfail`);
   }
 
   // Keep the same storage path (upsert) so every reference — signed URLs,
@@ -1171,6 +1179,7 @@ export async function reconcileWithModel(formData: FormData) {
   if (claim.outcome === "busy") {
     redirect(`/deals/${dealId}?error=busy`);
   }
+  if (claim.outcome === "error") redirect(`/deals/${dealId}?error=reconcilestartfail`);
   if (claim.outcome === "none") {
     const { error: insErr } = await supabase.from("analysis_jobs").insert(
       workerMode && tmpPath
@@ -1180,7 +1189,7 @@ export async function reconcileWithModel(formData: FormData) {
           })
         : newJobRow(dealId, "reconcile", { status: "running", progress: 10 }),
     );
-    if (insErr) redirect(`/deals/${dealId}?error=busy`);
+    if (insErr) redirect(`/deals/${dealId}?error=reconcilestartfail`);
   } else if (!workerMode) {
     // We own the row now — surface the reconcile step immediately.
     await supabase

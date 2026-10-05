@@ -201,6 +201,12 @@ const MODEL_ERRORS: Record<string, string> = {
     "That file couldn’t be read as a picture — try a JPEG, PNG or WebP of the building.",
   picturesize: "That picture is larger than 12 MB — please try a smaller one.",
   busy: "A screen is already running on this deal — let it finish first.",
+  // The claim or the job row's insert failed: nothing is running, and
+  // nothing changed (research pass 30).
+  startfail:
+    "Couldn’t start the screen just now — our database didn’t take the write, and nothing changed. Try again in a moment.",
+  reconcilestartfail:
+    "Couldn’t start the reconciliation just now — our database didn’t take the write, and nothing changed. Try again in a moment.",
   memoempty: "Run the analysis first — the memo needs a verdict to export.",
   memofail: "Couldn’t build the memo just now — please try again in a moment.",
   docfile: "Please choose a file to add.",
