@@ -75,3 +75,37 @@ export const pdfSafe = (s: string): string =>
   STAND_INS.reduce((t, f) => f(t), s).replace(/[^\n\u0020-\u007e\u00a0-\u00ff]/gu, (ch) =>
     WINANSI_EXTRA.has(ch.codePointAt(0)!) ? ch : "",
   );
+
+/** What the memo and the report call a deal whose name the font cannot
+ *  print (research pass 42, M5). */
+export const NAME_NOT_PRINTABLE = "Deal (name not printable in this PDF's font)";
+
+const letterCount = (s: string): number => (s.match(/\p{L}/gu) ?? []).length;
+
+/** A text as the PDF can print it: composed (a letter typed with a combining
+ *  accent is the accented letter WinAnsi has: "Café", never "Cafe"), safe,
+ *  and its spaces folded; null where printing it would lose a letter. */
+function printableWhole(s: unknown): string | null {
+  const raw = typeof s === "string" ? s.normalize("NFC").replace(/\s+/g, " ").trim() : "";
+  const safe = pdfSafe(raw).replace(/\s+/g, " ").trim();
+  return letterCount(safe) === letterCount(raw) ? safe : null;
+}
+
+/**
+ * The deal's name as the memo and the report print it: the title, the
+ * running header and the PDF's own title alike. Standard Helvetica prints
+ * WinAnsi alone, and `pdfSafe` drops the rest: a name in Japanese printed as
+ * "2", one in Arabic as "12", and two such deals' memos could be taken one
+ * for the other. Where printing the name would lose a letter, it is
+ * NAME_NOT_PRINTABLE followed by the first of `places` (the address, then
+ * the market) the font can print whole: "Deal (name not printable in this
+ * PDF's font) · 1200 N 31st St, Philadelphia, PA". A symbol the font lacks
+ * (an emoji) is no letter and is dropped as before; a name of none at all is
+ * "Deal".
+ */
+export function printableName(name: unknown, places: readonly unknown[] = []): string {
+  const whole = printableWhole(name);
+  if (whole != null) return whole || "Deal";
+  const place = places.map(printableWhole).find((p): p is string => !!p);
+  return place ? `${NAME_NOT_PRINTABLE} · ${place}` : NAME_NOT_PRINTABLE;
+}

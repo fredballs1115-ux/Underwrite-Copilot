@@ -19,7 +19,7 @@ Font.registerHyphenationCallback((word) =>
   word.length <= 24 ? [word] : (word.match(/.{1,12}/g) ?? [word]),
 );
 import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
-import { nameBreaks, pdfSafe } from "./pdf-text";
+import { nameBreaks, pdfSafe, printableName } from "./pdf-text";
 import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
 import { screenedOn } from "@/lib/screen-run";
@@ -378,6 +378,16 @@ function hotelLineFor(extraction: ExtractionResult | null, today: string): strin
  *  for an address the deal has since changed from. The address is the one
  *  the deal page reads the deal at: a blank one the memorandum's, a typed
  *  line its own fields (`addressUpgrade`), the sample's as stored. */
+/** The address the deal page reads the deal at, for the name's fallback: a
+ *  blank one the memorandum's, a typed line its own fields, the sample's as
+ *  stored. */
+function nameAddressOf(deal: DealRow, extraction: ExtractionResult | null): StructuredAddress | null {
+  return (
+    ((deal as { is_sample?: boolean }).is_sample ? null : addressUpgrade(deal.address, extraction)) ??
+    ((deal.address as StructuredAddress | null | undefined) ?? null)
+  );
+}
+
 function floodLineFor(deal: DealRow, extraction: ExtractionResult | null): string {
   const flags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
   const address =
@@ -786,7 +796,11 @@ export function buildMemoData(
   }
 
   return {
-    name: str(deal.name) || "Deal",
+    // The name as the font can print it — where it cannot without losing a
+    // letter, said so with the address or the market, never the "2" a name
+    // in Japanese had printed as (lib/memo/pdf-text `printableName`). The
+    // report's title, header and metadata read this one.
+    name: printableName(deal.name, [nameAddressOf(deal, extraction ?? null)?.label, extraction?.market]),
     market: str(extraction?.market),
     // On a deal filed "Auto-detect", what the deck turned out to be.
     assetClass: shownAssetClass(str(deal.asset_class), extraction ?? null),
