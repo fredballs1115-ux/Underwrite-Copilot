@@ -317,6 +317,34 @@ The fixes that are ours are being made in this batch. These are yours:
    - have a Caution call close on its conditions rather than its next
      steps, which is a prompt change.
 
+**The deal page on a phone (research pass 36).** Every deal-type panel was
+measured at 390, 820 and 1280. A real deal carries one to five panels, which
+is up to four phone screens before the section tabs. The small fixes are in
+this batch: the floating bar shows as the figures leave, the "figures that
+don't tie" warning sits right after the plan, the panels get a wider column,
+and the bars, keys, ticks, money and fold controls are drawn one way. These
+are yours:
+1. **A summary strip under the header's figures**: the deal's own pipeline
+   chips (the card's words and colours), each a jump to its panel. It adds
+   to the page and takes nothing away. This is the one I would do first.
+2. **Fold the panels on a phone** to their headline and picture. Every panel
+   at once would go from 21.9 screens to about 13.2 (simulated), but the
+   model line would hide behind a tap.
+3. **A sticky section bar**, or the panels as their own tab or section.
+4. **Two columns of panels on a wide screen.** It saves less than it sounds:
+   13.8 screens become 11.2–11.8.
+5. **One export menu** for the IC memo, the full report and the model.
+6. **One order and one tone rule for every panel.** The eight earlier panels
+   lead with a paragraph, the nine later ones with a picture, and a neutral
+   panel is teal-tinted in six and white in six. The site's own rule says a
+   picture leads.
+7. **The shared screen's order.** A partner reads every panel before the
+   call. The call now shows as a chip beside the title; moving the verdict
+   block above the panels is yours.
+8. **Dark mode on phones.** The site now asks phones not to darken it. Check
+   it on a Samsung phone, whose browser honours that request only in some
+   versions.
+
 **Run the research seed after the merge** (`node scripts/seed-research.mjs`,
 the step that writes the FY2027 fair market rents). The runner read every
 source link the audit had marked dead. Two research figures changed:
