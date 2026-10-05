@@ -452,6 +452,9 @@ interface ScreenContext {
    *  check read its paragraph where a plan's would, as the challenger and
    *  the verdict do (research pass 41) */
   forward: boolean;
+  /** the extraction the context was built from — the class the deck turned
+   *  out to be is read off it for the market check, as for the challenger */
+  extraction: ExtractionResult | null;
 }
 
 /**
@@ -483,9 +486,9 @@ async function dealContextFromDb(
       firstSignal,
       screenRegulation(data, flags),
     );
-    return { text, forward: !!ex && isForwardPurchase(ex, inferStrategy(ex, firstSignal)) };
+    return { text, forward: !!ex && isForwardPurchase(ex, inferStrategy(ex, firstSignal)), extraction: ex };
   } catch {
-    return { text: null, forward: false };
+    return { text: null, forward: false, extraction: null };
   }
 }
 
@@ -1560,9 +1563,15 @@ async function runAnalysisSteps(
       // One block a market, the address's first: a portfolio's other
       // markets follow in blocks of their own (#413).
       const handed = [primary, ...others].filter((b): b is LiveMarketBrief => !!b).map((b) => b.text);
+      // The class the deck turned out to be, where the deal was filed
+      // "Auto" — the challenger's own rule (above): the check's "detect the
+      // asset class" and its every sector's norms are for a deal no class
+      // has been read for yet (research pass 41).
+      const marketClass =
+        (assetClassKey(shownAssetClass(assetClass, screen.extraction)) as AssetClass | null) ?? assetClass;
       const checked = await checkMarket(
         om(),
-        assetClass,
+        marketClass,
         dealContext,
         handed.length > 0 ? handed.join("\n\n") : null,
         screen.forward,

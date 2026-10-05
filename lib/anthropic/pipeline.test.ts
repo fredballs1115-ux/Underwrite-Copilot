@@ -603,6 +603,27 @@ describe("runAnalysis — the happy path", () => {
     expect(vi.mocked(challengeAssumptions).mock.calls[0][1]).toBe("office");
   });
 
+  // Research pass 41 (L1): the market check was handed the filed "Auto"
+  // after the deck's class was read, so it was told to detect the class and
+  // given every sector's norms.
+  it("hands the market check the class the deck turned out to be, as the challenger is", async () => {
+    state.deals.d1.asset_class = "auto";
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Hospitality" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(checkMarket).mock.calls[0][1]).toBe("hospitality_str");
+
+    vi.mocked(checkMarket).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Specialty asset" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(checkMarket).mock.calls[0][1]).toBe("auto");
+
+    vi.mocked(checkMarket).mockClear();
+    state.deals.d1.asset_class = "office";
+    vi.mocked(extractTerms).mockResolvedValue({ ...EXTRACTION, assetClass: "Multifamily" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(vi.mocked(checkMarket).mock.calls[0][1]).toBe("office");
+  });
+
   it("hands the challenger the trap lists the memorandum's own words call for, and none on an ordinary deal (research pass 23)", async () => {
     await runAnalysis("d1");
     expect(vi.mocked(challengeAssumptions).mock.calls[0][3]).toEqual([]);
