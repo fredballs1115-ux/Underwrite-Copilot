@@ -12,6 +12,7 @@ import { useMemo, useState } from "react";
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { SLIDER_SWEEP_BPS } from "@/lib/marketing-constants";
+import { compactUsd } from "@/lib/money";
 
 const BASE = SAMPLE_DEAL.model.inputs;
 // The exit-cap lever sweeps the SAME band the product's slider does
@@ -23,7 +24,7 @@ const fmtPct = (n: number | null) =>
   n == null || !isFinite(n) ? "—" : `${n.toFixed(1)}%`;
 const fmtX = (n: number | null) =>
   n == null || !isFinite(n) ? "—" : `${n.toFixed(2)}x`;
-const fmtM = (n: number) => `$${(n / 1e6).toFixed(1)}M`;
+const fmtM = (n: number) => compactUsd(n);
 
 function Lever({
   label,

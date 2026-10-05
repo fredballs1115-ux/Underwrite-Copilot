@@ -3,6 +3,7 @@
 // Seeded into the user's pipeline by the "Try a sample deal" action.
 
 import { computeModel, type ModelInputs } from "@/lib/model/compute";
+import { compactUsd } from "@/lib/money";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -317,7 +318,7 @@ const challenges: ChallengerResult = {
   // $3.1M is not the T-12's $3,085,000, so the sentence names the model's
   // figure, and its exit is said as a figure, not as "flat" against the
   // 5.45% going-in cap (the pre-merge audit of 2026-09-30).
-  stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same $${(inputs.year1Opex / 1e6).toFixed(1)}M of year-one expenses.`,
+  stressTest: `With the exit cap at ${inputs.exitCapPct}%, rent growth at ${inputs.rentGrowthPct}% and vacancy at the real ${inputs.vacancyPct}%, the levered IRR falls to ${irrText(returns.leveredIrrPct)}, from ${irrText(irrWith(OM_CASE))} at the OM's ${OM_CASE.exitCapPct}% exit, ${OM_CASE.rentGrowthPct}% growth and ${OM_CASE.vacancyPct}% vacancy — both on the same ${compactUsd(inputs.year1Opex)} of year-one expenses.`,
 };
 
 const comps: BrokerCompsResult = {

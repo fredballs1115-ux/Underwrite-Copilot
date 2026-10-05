@@ -429,17 +429,9 @@ describe("a compact figure is rounded one way on every surface (finding 14)", ()
   });
 
   it("no surface but lib/money writes a compact dollar by hand", () => {
-    // Each is a surface another change owns (research pass 34); its line
-    // goes when it reads through `compactUsd`.
-    const elsewhere = new Set([
-      "app/(app)/deals/[id]/model-view.tsx",
-      "app/(app)/deals/[id]/debt-sizer.tsx",
-      "app/page.tsx",
-      "app/landing-interactive.tsx",
-      "app/landing-stress.tsx",
-      "lib/model/compute.ts",
-      "lib/sample-deal.ts",
-    ]);
+    // Every surface reads through `compactUsd` now; a file listed here
+    // would be one still writing its own.
+    const elsewhere = new Set<string>([]);
     const lead = String.raw`(?:\$\$\{|"\$"\s*\+\s*)`;
     const handWritten = [
       // a float's toFixed on millions: (5_550_000 / 1e6).toFixed(1) is "5.5"

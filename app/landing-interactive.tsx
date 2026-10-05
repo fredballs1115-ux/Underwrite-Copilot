@@ -11,6 +11,7 @@ import { SAMPLE_COMP_PREMIUM_LINE } from "@/lib/marketing-constants";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { computeModel } from "@/lib/model/compute";
 import type { SampleLegal } from "@/lib/sample-legal";
+import { compactUsd } from "@/lib/money";
 
 function prefersReducedMotion(): boolean {
   return (
@@ -245,7 +246,7 @@ function SummaryFigures() {
     <dl className="flex flex-wrap gap-x-8 gap-y-2 rounded-lg border border-line px-3 py-2.5">
       {(
         [
-          ["Price", `$${(INPUTS.purchasePrice / 1e6).toFixed(0)}M`],
+          ["Price", compactUsd(INPUTS.purchasePrice, { wholeMillionsFrom: 0 })],
           ["Size", `${INPUTS.units} units`],
           ["Going-in cap", `${RETURNS.goingInCapPct.toFixed(2)}%`],
         ] as const

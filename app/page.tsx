@@ -44,6 +44,7 @@ import { MarketsGallery } from "./markets-gallery";
 import { HERO_STRIP, HERO_WORDS_TOP, PhotoScrim, PlaceBackdrop } from "./place-band";
 import { HERO_AERIAL, photoSrc, stripPhotos, type PhotoSlot } from "@/lib/photos";
 import { photosOnDisk } from "@/lib/photos-fs";
+import { compactUsd } from "@/lib/money";
 
 // The research layer's scale, DERIVED from the same seeds the app evaluates
 // — the homepage can never claim coverage the rules engine doesn't have.
@@ -1397,7 +1398,7 @@ function DealPreview() {
         <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 border-y border-line py-3">
           {(
             [
-              ["Price", `$${(inputs.purchasePrice / 1e6).toFixed(0)}M`],
+              ["Price", compactUsd(inputs.purchasePrice, { wholeMillionsFrom: 0 })],
               ["Size", `${inputs.units} units`],
               ["Going-in cap", `${r.goingInCapPct.toFixed(2)}%`],
               // The real deal header carries a fourth figure now — the deal's

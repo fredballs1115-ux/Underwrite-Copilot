@@ -26,6 +26,7 @@ import { interestOf } from "@/lib/interest";
 import { assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
 import { assetWords } from "@/lib/asset-words";
 import { SIZER_LENDER_TESTS, sizerSourceLine, sizerStartingRate } from "@/lib/sizer-terms";
+import { compactUsd } from "@/lib/money";
 
 /**
  * Debt & financing — every loan number a screen needs, all deterministic
@@ -43,17 +44,11 @@ import { SIZER_LENDER_TESTS, sizerSourceLine, sizerStartingRate } from "@/lib/si
  * else sensible screening defaults — every figure stays editable.
  */
 
-const fmtUsd = (n: number) =>
-  n >= 1e6
-    ? `$${(n / 1e6).toFixed(2).replace(/\.?0+$/, "")}M`
-    : `$${Math.round(n).toLocaleString("en-US")}`;
+const fmtUsd = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 
 // Tabular contexts keep a fixed two decimals so columns don't jitter
 // ($2.26M / $2.23M / $2.20M, never $2.2M).
-const fmtUsdCol = (n: number) =>
-  n >= 1e6
-    ? `$${(n / 1e6).toFixed(2)}M`
-    : `$${Math.round(n).toLocaleString("en-US")}`;
+const fmtUsdCol = (n: number) => compactUsd(n, { millions: 2, thousandsFrom: Infinity });
 
 // Inputs seed with exact dollars ("$3,456,000"), not the compact display
 // form — "$3.46M" would silently shave the sizing by the rounding.
