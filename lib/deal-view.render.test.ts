@@ -1715,6 +1715,28 @@ describe("the sensitivity playground says whose figures it runs", () => {
   });
 });
 
+describe("DealView — the debt sizer reads the playground's model and the page's deal kind", () => {
+  // Research pass 34: with no first-draft model the sizer seeded the OM's
+  // in-place NOI beside a playground running the T-12's, and read the deal's
+  // kind without the first signal the header reads.
+  it("hands the sizer the screening model's sources, so it starts from the NOI the playground runs", () => {
+    const p = sampleProps("financials") as unknown as Props & { playground: PlaygroundData };
+    const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name, {
+      rentRoll: { summary: SAMPLE_DEAL.rentRoll.summary, asOf: SAMPLE_DEAL.rentRoll.as_of_date },
+      t12: { summary: SAMPLE_DEAL.t12.summary, periodEnd: SAMPLE_DEAL.t12.period_end_date },
+    });
+    const html = render({
+      ...p,
+      model: null,
+      playground: { ...p.playground, inputs: derived.inputs, sources: derived.sources },
+      dealStrategy: inferStrategy(SAMPLE_DEAL.extraction),
+    } as Props);
+    const noi = Math.round(computeUnderwrite(derived.inputs).cashFlow[0].noi).toLocaleString("en-US");
+    expect(html).toMatch(new RegExp(`aria-label="Year-1 NOI"[^>]*value="\\$${noi}"`));
+    expect(textOf(html)).toContain("NOI from the screening model the playground and the workbook run");
+  });
+});
+
 describe("DealView — the LOI panel says what the download drafts", () => {
   it("hands the panel the terms the page read on the server, the LOI route's own reader (lib/loi-terms)", () => {
     // A deal of the reader's own on the Documents tab, where the panel sits.

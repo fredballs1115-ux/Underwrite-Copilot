@@ -11,11 +11,15 @@ import {
   isPlanDeal,
   noiFigures,
   planSummary,
+  type DealStrategy,
+  type StrategyKind,
 } from "@/lib/deal-strategy";
 import { ConstructionDebtPanel } from "./construction-debt-panel";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { statedModelRate } from "@/lib/model/stated-rate";
 import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { yearOneNoi } from "@/lib/underwrite/playground";
+import type { ModelSources } from "@/lib/underwrite/report-grid";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
 import { interestOf } from "@/lib/interest";
@@ -178,6 +182,8 @@ interface Seed {
   ratePct: number;
   amortYears: number;
   seededFrom: "model" | "extraction" | "defaults";
+  /** the NOI is the screening model's year-1 NOI (the derived inputs) */
+  noiFromScreening: boolean;
   /** the rate is the first-draft model's, as a loan's own paper states it */
   rateStated: boolean;
   /** the amortization is the first-draft model's own, not the 30-year default */
@@ -197,6 +203,10 @@ function deriveSeed(
   extraction: ExtractionResult | null,
   today: RateSeed | null,
   underwrite: UnderwriteInputs | null,
+  /** where the derived inputs came from: an assumed year-1 NOI seeds none */
+  underwriteSources: ModelSources | null,
+  /** the deal's kind, as the page reads it (the first signal included) */
+  strategyKind: StrategyKind,
 ): Seed {
   const rate = (statedPct: number | null) =>
     sizerStartingRate({
@@ -232,6 +242,7 @@ function deriveSeed(
       ratePct: r.pct,
       amortYears: modelAmort ?? 30,
       seededFrom: "model",
+      noiFromScreening: false,
       rateStated: r.from === "stated",
       amortFromModel: modelAmort != null,
       rateNote: r.note,
@@ -242,19 +253,32 @@ function deriveSeed(
   // the price the building's own figures describe (#415): a lender sizes
   // the whole asset, so a share's price is grossed up, and a note's or a
   // leased fee's seeds no price the property's loan could be tested on.
-  const priceMetric = findPriceMetric(metrics, inferStrategy(extraction).kind, screenYearOf(extraction));
+  // The deal's kind is the page's, the first signal included.
+  const priceMetric = findPriceMetric(metrics, strategyKind, screenYearOf(extraction));
   const price = buildingPriceOf(extraction, priceMetric ? parsePrice(priceMetric.value) : null);
-  // The in-place or Year-1 NOI, never the stabilized pro forma.
+  // The NOI the screening model runs — the playground's and the workbook's,
+  // a T-12's where one was uploaded, the rate's own source — so the sizer
+  // and the playground's coverage test one NOI (research pass 34: it had
+  // read the OM's in-place NOI beside a playground running the T-12's).
+  // Never an assumed one: a model that had to assume its NOI seeds none,
+  // and a caller that hands no sources cannot say, so it is not read.
+  const screeningNoi =
+    underwrite && underwriteSources && underwriteSources.inPlaceRentAnnual?.provenance !== "assumption"
+      ? plausible(yearOneNoi(underwrite), price)
+      : null;
+  // Else the OM's in-place or Year-1 NOI, never the stabilized pro forma —
+  // the read before the model's, kept where the model had none to give.
   const figs = noiFigures(metrics);
   const going = figs.find((f) => f.kind === "in_place") ?? figs.find((f) => f.kind === "year1") ?? null;
-  const noi = plausible(going?.value ?? null, price);
+  const omNoi = screeningNoi == null ? plausible(going?.value ?? null, price) : null;
   const r = rate(null);
   return {
     price,
-    noi,
+    noi: screeningNoi ?? omNoi,
     ratePct: r.pct,
     amortYears: 30,
-    seededFrom: price != null || noi != null ? "extraction" : "defaults",
+    seededFrom: price != null || omNoi != null ? "extraction" : "defaults",
+    noiFromScreening: screeningNoi != null,
     rateStated: false,
     amortFromModel: false,
     rateNote: r.note,
@@ -288,29 +312,41 @@ export function DebtSizer({
   model,
   extraction,
   underwrite = null,
+  underwriteSources = null,
   rateSeeds = null,
+  strategy: pageStrategy = null,
 }: {
   model: UnderwritingModel | null;
   extraction: ExtractionResult | null;
   /** the derived screening model — carries the capital plan (reserves, TI,
-   *  LC, year-1 capex) that rounds out the FINANCING & CAPITAL card */
+   *  LC, year-1 capex) that rounds out the FINANCING & CAPITAL card, and,
+   *  with no first-draft model, the year-1 NOI the sizer starts from */
   underwrite?: UnderwriteInputs | null;
+  /** where the derived model's inputs came from: an assumed year-1 NOI is
+   *  no NOI to start a loan from */
+  underwriteSources?: ModelSources | null;
   /** today's starting rates off the rates table (lib/debt-index): the
    *  permanent loan's, which is the screening model's own seeded rate, and
    *  the construction loan's; null starts the sizer from the derived
    *  model's own rate (`underwrite`), and the construction panel from its
    *  flat placeholder */
   rateSeeds?: DealRateSeeds | null;
+  /** the deal's kind as the page reads it, the first signal included
+   *  (lib/deal-strategy `inferStrategy(extraction, firstSignal)`); absent,
+   *  the extraction's alone */
+  strategy?: DealStrategy | null;
 }) {
-  const seed = useMemo(
-    () => deriveSeed(model, extraction, rateSeeds?.permanent ?? null, underwrite),
-    [model, extraction, rateSeeds, underwrite],
-  );
-  const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
   // A plan deal's debt is construction or bridge debt sized to cost, paid off
   // at stabilization: the plan block above the permanent sizer, seeded from
-  // the OM's own budget, NOI and timeline.
-  const strategy = useMemo(() => inferStrategy(extraction), [extraction]);
+  // the OM's own budget, NOI and timeline. The deal's kind is the page's —
+  // the header's, which reads the first signal too — so a deal the header
+  // calls a value-add gets its plan block here as well (research pass 34).
+  const strategy = useMemo(() => pageStrategy ?? inferStrategy(extraction), [pageStrategy, extraction]);
+  const seed = useMemo(
+    () => deriveSeed(model, extraction, rateSeeds?.permanent ?? null, underwrite, underwriteSources, strategy.kind),
+    [model, extraction, rateSeeds, underwrite, underwriteSources, strategy],
+  );
+  const omTerms = useMemo(() => omLoanTerms(extraction), [extraction]);
   const plan = useMemo(
     () => (isPlanDeal(strategy.kind) ? planSummary(extraction, strategy) : null),
     [extraction, strategy],
@@ -512,6 +548,7 @@ export function DebtSizer({
             noi: seed.noi != null,
             rate: seed.rateStated,
             amortization: seed.amortFromModel,
+            noiFromScreening: seed.noiFromScreening,
           })}
         </p>
 

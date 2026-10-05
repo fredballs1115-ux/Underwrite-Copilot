@@ -1737,6 +1737,9 @@ export default async function DealPage({
         marketMemory={marketMemory}
         actuals={actuals}
         playground={playground}
+        // The deal's kind the header reads (the first signal included), so
+        // the debt sizer's plan block and price read the same kind.
+        dealStrategy={strategy}
         tasks={dealTasks}
         taskAssignees={taskAssignees}
         todayIso={todayIso}

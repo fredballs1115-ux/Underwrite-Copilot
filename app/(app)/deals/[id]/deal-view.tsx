@@ -69,7 +69,7 @@ import { SinceLastScreen } from "./since-last-screen";
 import { ReplaceOm } from "./replace-om";
 import { ManualDealForm } from "../manual-deal-form";
 import { factsFromExtraction, type ManualDealFacts } from "@/lib/manual-deal";
-import { findPricedMetric, inferStrategy } from "@/lib/deal-strategy";
+import { findPricedMetric, inferStrategy, type DealStrategy } from "@/lib/deal-strategy";
 import type { LoiTerms } from "@/lib/loi-terms";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { LOI_REFUSAL_BANNERS } from "@/lib/loi-refusal";
@@ -362,6 +362,7 @@ export function DealView({
   marketMemory = null,
   actuals = { rentRoll: null, t12: null, noiComparison: null },
   playground = null,
+  dealStrategy = null,
   tasks = null,
   taskAssignees = [],
   todayIso = "",
@@ -454,6 +455,9 @@ export function DealView({
   marketMemory?: MarketGroup | null;
   actuals?: ActualsData;
   playground?: PlaygroundData | null;
+  /** the deal's kind as the page's header reads it, the first signal
+   *  included — the debt sizer's plan block and price read it too */
+  dealStrategy?: DealStrategy | null;
   /** null = deal_tasks table not migrated yet (card hidden) */
   tasks?: DealTask[] | null;
   taskAssignees?: TaskAssignee[];
@@ -999,6 +1003,8 @@ export function DealView({
             facts={facts}
             omUrl={omUrl}
             underwrite={playground?.inputs ?? null}
+            underwriteSources={playground?.sources ?? null}
+            dealStrategy={dealStrategy}
             rateSeeds={rateSeeds}
             modelVsMarket={modelVsMarket}
             assumable={assumable}
@@ -1103,6 +1109,8 @@ function FinancialsPanel({
   facts = {},
   omUrl = null,
   underwrite = null,
+  underwriteSources = null,
+  dealStrategy = null,
   rateSeeds = null,
   modelVsMarket = null,
   assumable = null,
@@ -1125,6 +1133,8 @@ function FinancialsPanel({
   facts?: Record<string, DealFact>;
   omUrl?: string | null;
   underwrite?: UnderwriteInputs | null;
+  underwriteSources?: PlaygroundData["sources"];
+  dealStrategy?: DealStrategy | null;
   rateSeeds?: DealRateSeeds | null;
   modelVsMarket?: ModelVsMarket | null;
   assumable?: AssumableView | null;
@@ -1159,7 +1169,9 @@ function FinancialsPanel({
         model={model}
         extraction={results.extraction}
         underwrite={underwrite}
+        underwriteSources={underwriteSources ?? null}
         rateSeeds={rateSeeds}
+        strategy={dealStrategy}
       />
 
       {/* The seller's loan, where the memorandum offers it for assumption:
