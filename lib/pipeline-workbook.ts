@@ -28,6 +28,13 @@ const KILL = "FFB23A30";
 const USD = "$#,##0";
 const PCT2 = "0.00%";
 
+/** The Pipeline sheet's header row: frozen under, and repeated on every
+ *  printed page. */
+const HEAD_ROW = 4;
+/** The underwrite workbook's print margins (lib/underwrite/workbook), in
+ *  inches. */
+const PRINT_MARGINS = { left: 0.5, right: 0.5, top: 0.6, bottom: 0.6, header: 0.3, footer: 0.3 };
+
 export interface PipelineExportRow {
   name: string;
   stage: string;
@@ -182,25 +189,43 @@ export async function buildPipelineWorkbook(
   wb.created = exportedAt;
 
   /* ------------------------------ Pipeline ------------------------------ */
+  // Frozen through the Deal column as well as under the header: frozen rows
+  // alone, scrolling right kept the figures and lost whose they were
+  // (research pass 35).
   const ws = wb.addWorksheet("Pipeline", {
-    views: [{ state: "frozen", ySplit: 4 }],
+    views: [{ state: "frozen", xSplit: 2, ySplit: HEAD_ROW }],
   });
+  // Each column as wide as its words, and no wider: the sheet prints one page
+  // wide, so every spare unit is smaller type on paper.
   ws.columns = [
     { width: 2 },
-    { width: 34 }, // Deal
-    { width: 20 }, // Stage
+    { width: 34 }, // Deal — a longer name wraps
+    { width: 16 }, // Stage — "Under contract / DD"
     { width: 13 }, // Asset
     { width: 13 }, // Deal type
-    { width: 22 }, // Market
+    { width: 25 }, // Market — "Brewerytown, Philadelphia, PA" whole (22 cut it)
     { width: 14 }, // Price
     { width: 11 }, // Cap
     { width: 13 }, // Yield on cost
     { width: 16 }, // Buy box — "Outside (3 of 4)" on one line; a first read's longer words wrap
-    { width: 10 }, // Verdict
+    { width: 24 }, // Verdict — "Re-screening (was Caution)", "Screen stalled (was Caution)" (10 cut them)
     { width: 12 }, // Offers due
     { width: 12 }, // Added
-    { width: 18 }, // Added by
+    { width: 16 }, // Added by
   ];
+  // Printed as a meeting reads it: landscape, one page wide however many
+  // deals run down it, the header row on every page. With no page setup the
+  // sheet printed over five portrait pages, and pages two to four were rows
+  // of figures with no deal's name beside them.
+  ws.pageSetup = {
+    ...ws.pageSetup,
+    orientation: "landscape",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    printTitlesRow: `${HEAD_ROW}:${HEAD_ROW}`,
+    margins: PRINT_MARGINS,
+  };
 
   const t = ws.getCell("B2");
   t.value = "Pipeline";
@@ -224,7 +249,7 @@ export async function buildPipelineWorkbook(
     "Added",
     "Added by",
   ];
-  const headRow = ws.getRow(4);
+  const headRow = ws.getRow(HEAD_ROW);
   HEADERS.forEach((h, i) => {
     const c = headRow.getCell(i + 2);
     c.value = h;
@@ -233,6 +258,9 @@ export async function buildPipelineWorkbook(
     c.alignment = {
       horizontal: i >= 5 && i <= 7 ? "right" : "left",
       vertical: "middle",
+      // The Buy box column sets its words off the right-aligned yield on
+      // cost beside it: printed one page wide, "—Outside" read as one word.
+      ...(h === "Buy box" ? { indent: 1 } : {}),
     };
     if (h === "Yield on cost") {
       c.note =
@@ -249,7 +277,8 @@ export async function buildPipelineWorkbook(
   );
   for (const r of rows) byStage.get(normalizeStage(r.stage))!.push(r);
 
-  let rowN = 5;
+  const firstRow = HEAD_ROW + 1;
+  let rowN = firstRow;
   let lastDealRow = 0;
   const today = exportedAt.toISOString().slice(0, 10);
   for (const stage of STAGES) {
@@ -257,16 +286,19 @@ export async function buildPipelineWorkbook(
     if (!group.length) continue;
     const isDead = stage === "dead";
 
-    // Stage band.
-    ws.mergeCells(`B${rowN}:N${rowN}`);
-    const band = ws.getCell(`B${rowN}`);
-    band.value = `${STAGE_LABEL[stage]}  ·  ${group.length}`;
-    band.font = { bold: true, size: 10, color: { argb: isDead ? MUTED : BRAND } };
-    band.fill = {
+    // Stage band: its words in the Deal column, its fill across the row —
+    // never one cell merged across the frozen Deal column's edge, which
+    // would split the merged cell between the pane that stays and the pane
+    // that scrolls.
+    const bandFill: ExcelJS.Fill = {
       type: "pattern",
       pattern: "solid",
       fgColor: { argb: isDead ? FAINT : BRAND_SOFT },
     };
+    for (let c = 2; c <= HEADERS.length + 1; c++) ws.getRow(rowN).getCell(c).fill = bandFill;
+    const band = ws.getCell(`B${rowN}`);
+    band.value = `${STAGE_LABEL[stage]}  ·  ${group.length}`;
+    band.font = { bold: true, size: 10, color: { argb: isDead ? MUTED : BRAND } };
     ws.getRow(rowN).height = 16;
     rowN++;
 
@@ -276,6 +308,10 @@ export async function buildPipelineWorkbook(
 
       row.getCell(2).value = d.name;
       row.getCell(2).font = { ...baseFont, bold: !isDead };
+      // A name longer than the frozen column wraps, so the row grows to
+      // print it whole: "Harbor Point — Performing First Mortgage" had lost
+      // its last letter on every page.
+      row.getCell(2).alignment = { wrapText: true };
       row.getCell(3).value = STAGE_LABEL[normalizeStage(d.stage)];
       row.getCell(3).font = baseFont;
       row.getCell(4).value = assetClassLabel(d.assetClass) || "—";
@@ -383,7 +419,7 @@ export async function buildPipelineWorkbook(
       const firstRead = !!fitWord && !!d.fitFirstRead;
       const fitColor = FIT_COLOR[fitTone(null, d.fit, d.fitCoverage)];
       row.getCell(10).value = fitWord ? fitCellText(fitWord, d.fitCoverage, firstRead) : "—";
-      row.getCell(10).alignment = { wrapText: true };
+      row.getCell(10).alignment = { horizontal: "left", indent: 1, wrapText: true };
       row.getCell(10).font = fitWord
         ? firstRead
           ? { size: 10, italic: true, color: { argb: fitColor } }
@@ -430,12 +466,25 @@ export async function buildPipelineWorkbook(
   // Data bars on the three figures a meeting compares across the sheet —
   // price, cap, yield on cost. Excel draws these itself and keeps them live
   // as the numbers change: a picture with no chart library and nothing
-  // computed into a cell. Text cells (a dash, "n/a — plan", a band header)
-  // draw no bar, so a plan deal's cap column stays honestly empty.
+  // computed into a cell.
+  //
+  // Each bar runs from ZERO to the column's largest figure, as the
+  // underwrite workbook's portfolio tab draws its shares, so a bar is its
+  // figure's length: run from the column's smallest, the cheapest deal drew
+  // no bar at all and a $36M price a sliver beside $75M (a 2.1x difference
+  // drawn about 15x), and the lowest cap drew the same empty cell as "n/a —
+  // note" (research pass 35).
+  //
+  // Text cells stay in the range on purpose, and draw nothing: Excel and
+  // LibreOffice draw a data bar on a number alone, and leave a text cell out
+  // of the column's largest — a dash, "n/a — plan", a note's yield said in
+  // words, a stage band. From zero, every figure draws a bar of its own
+  // length, so an empty cap cell is always one of those words, never the
+  // column's lowest cap.
   if (lastDealRow > 0) {
     for (const col of ["G", "H", "I"]) {
       ws.addConditionalFormatting({
-        ref: `${col}5:${col}${lastDealRow}`,
+        ref: `${col}${firstRow}:${col}${lastDealRow}`,
         rules: [
           {
             type: "dataBar",
@@ -445,7 +494,7 @@ export async function buildPipelineWorkbook(
             maxLength: 100,
             showValue: true,
             border: false,
-            cfvo: [{ type: "min" }, { type: "max" }],
+            cfvo: [{ type: "num", value: 0 }, { type: "max" }],
             // The bar's colour rides the rule's model even though the typing
             // omits it (exceljs writes it as the databar's <color>).
             color: { argb: "FFB5CDC9" },
@@ -457,7 +506,20 @@ export async function buildPipelineWorkbook(
 
   /* ------------------------------ Summary ------------------------------- */
   const sum = wb.addWorksheet("Summary");
-  sum.columns = [{ width: 2 }, { width: 30 }, { width: 12 }, { width: 4 }, { width: 30 }, { width: 12 }];
+  // Column C holds the asking value in $#,##0: at 12 wide a team's pipeline
+  // past $1,000,000,000 showed "###" (research pass 35); 18 holds
+  // "$10,000,000,000".
+  sum.columns = [{ width: 2 }, { width: 30 }, { width: 18 }, { width: 4 }, { width: 30 }, { width: 12 }];
+  // One page wide, so the By verdict block prints beside By stage rather
+  // than alone on a page of its own.
+  sum.pageSetup = {
+    ...sum.pageSetup,
+    orientation: "portrait",
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    margins: PRINT_MARGINS,
+  };
   const ts = sum.getCell("B2");
   ts.value = "Pipeline summary";
   ts.font = { bold: true, size: 16, color: { argb: INK } };

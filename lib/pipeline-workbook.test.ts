@@ -201,18 +201,61 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(row.getCell(9).value).toBe("—");
   });
 
-  it("price, cap and yield on cost carry data bars Excel draws itself, over the deal rows only", async () => {
+  it("price, cap and yield on cost carry data bars Excel draws itself, over the deal rows only, each from zero", async () => {
     const ws = (await load([STABILIZED, CONVERSION, LEGACY])).getWorksheet("Pipeline")!;
     const cfs = (
-      ws as unknown as { conditionalFormattings: { ref: string; rules: { type: string; cfvo?: { type: string }[] }[] }[] }
+      ws as unknown as {
+        conditionalFormattings: { ref: string; rules: { type: string; cfvo?: { type: string; value?: number | string }[] }[] }[];
+      }
     ).conditionalFormattings;
     const bars = cfs.filter((cf) => cf.rules.some((r) => r.type === "dataBar"));
     // Three deals under one stage band: rows 5 (band) through 8.
     expect(bars.map((cf) => cf.ref).sort()).toEqual(["G5:G8", "H5:H8", "I5:I8"]);
+    // From zero to the column's largest, as the underwrite workbook's
+    // portfolio tab draws its shares (research pass 35): from the column's
+    // smallest, the cheapest deal drew no bar and the lowest cap the same
+    // empty cell as "n/a — note". A text cell in the range draws none.
     for (const cf of bars) {
       const rule = cf.rules.find((r) => r.type === "dataBar")!;
-      expect(rule.cfvo?.map((c) => c.type)).toEqual(["min", "max"]);
+      expect(rule.cfvo?.map((c) => (c.type === "num" ? [c.type, Number(c.value)] : [c.type]))).toEqual([["num", 0], ["max"]]);
     }
+  });
+
+  it("prints one landscape page wide with its header on every page, and scrolls with the Deal column frozen (research pass 35)", async () => {
+    const wb = await load([
+      { ...STABILIZED, name: "Harbor Point — Performing First Mortgage", market: "Brewerytown, Philadelphia, PA", verdictBehind: "running" },
+      { ...CONVERSION, verdictBehind: "stalled" },
+      LEGACY,
+    ]);
+    const ws = wb.getWorksheet("Pipeline")!;
+    // With no page setup the sheet printed over five portrait pages, the
+    // deal names on the first alone.
+    expect(ws.pageSetup).toMatchObject({ orientation: "landscape", fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: "4:4" });
+    // Frozen through the Deal column as well as under the header.
+    expect(ws.views[0]).toMatchObject({ state: "frozen", xSplit: 2, ySplit: 4 });
+    // No cell merged over the frozen column's edge: the stage band is its
+    // words in the Deal column and its fill across the row.
+    expect((ws as unknown as { model: { merges?: string[] } }).model.merges ?? []).toEqual([]);
+    const band = ws.getRow(5);
+    expect(band.getCell(2).value).toBe("Screening  ·  3");
+    for (let c = 2; c <= HEADERS.length + 1; c++) expect((band.getCell(c).fill as ExcelJS.FillPattern)?.fgColor?.argb, `band col ${c}`).toBe("FFE7EEEC");
+    // Wide enough for the words they hold: LibreOffice prints "Brewerytown,
+    // Philadelphia, PA" 23 units wide at 10 pt, a little under 0.8 of a
+    // unit a character; the Verdict column had cut "(was Caution)" at 10,
+    // and the Market column the "A" of "PA" at 22.
+    const fits = (col: number, words: string) => expect(ws.getColumn(col).width ?? 0, words).toBeGreaterThanOrEqual(Math.ceil(words.length * 0.8));
+    const verdicts = [6, 7].map((r) => String(ws.getRow(r).getCell(11).value));
+    expect(verdicts).toEqual(["Re-screening (was Caution)", "Screen stalled (was Caution)"]);
+    for (const v of verdicts) fits(11, v);
+    fits(6, "Brewerytown, Philadelphia, PA");
+    // A name longer than the frozen column wraps rather than losing its end.
+    expect(ws.getRow(6).getCell(2).alignment?.wrapText).toBe(true);
+
+    // The Summary prints one page wide too, and its asking value holds a
+    // team's pipeline past $1,000,000,000 in $#,##0 without "###".
+    const sum = wb.getWorksheet("Summary")!;
+    expect(sum.pageSetup).toMatchObject({ fitToPage: true, fitToWidth: 1, fitToHeight: 0 });
+    expect(sum.getColumn(3).width ?? 0).toBeGreaterThanOrEqual("$10,000,000,000".length + 2);
   });
 
   it("an empty pipeline writes no data-bar rule", async () => {
