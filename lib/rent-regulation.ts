@@ -304,6 +304,27 @@ function regimeClause(r: RegimeRead): string {
 }
 
 /**
+ * The size the rent rules test, in the words `buildSubject` reads ("248
+ * units"): the building's stated count. The rules test a BUILDING's units
+ * (stabilization's six, the RSO's two), and a portfolio's count, or a set of
+ * single-family homes', is no one building's: the size question stays open
+ * rather than the sum answering it (the audit of 2026-10-05 — 30 Los Angeles
+ * homes read "the Los Angeles RSO applies", eight Brooklyn four-unit
+ * buildings "NYC rent stabilization applies"). One reader for this read and
+ * the deal page's rules panel, which had read the header's Size slot — the
+ * area where a memorandum states both, so its unit questions stayed open
+ * beside a stated count (research pass 34).
+ */
+export function rulesSizeText(ex: ExtractionResult | null | undefined, classKey: string | null | undefined): string | null {
+  if (!ex) return null;
+  const metrics = (Array.isArray(ex.metrics) ? (ex.metrics as unknown[]) : []).filter(isRow);
+  const totalUnits = unitCountFromMetrics(metrics);
+  const homes = assetClassKey(classKey) === "sfr_btr";
+  const portfolio = Array.isArray(ex.properties) && ex.properties.length >= 2;
+  return totalUnits != null && !homes && !portfolio ? `${totalUnits} units` : null;
+}
+
+/**
  * The deal's rent regulation: the regimes the site's rules say reach it,
  * each with its allowance on the day, beside what the memorandum states.
  * Null where no regime reaches the building and the memorandum names none —
@@ -349,20 +370,12 @@ export function readRegulation(
     preferentialRow != null;
 
   const residential = input.classKey ? assetWords(input.classKey).residential : undefined;
-  // The rules test a BUILDING's units (stabilization's six, the RSO's two),
-  // and a portfolio's count, or a set of single-family homes', is no one
-  // building's: the size question stays open rather than the sum answering
-  // it (the audit of 2026-10-05 — 30 Los Angeles homes read "the Los Angeles
-  // RSO applies", eight Brooklyn four-unit buildings "NYC rent stabilization
-  // applies").
-  const homes = assetClassKey(input.classKey) === "sfr_btr";
-  const portfolio = Array.isArray(ex.properties) && ex.properties.length >= 2;
   let regimes: RegimeRead[] = [];
   if (input.address?.state && residential !== false) {
     const subject = buildSubject({
       address: input.address,
       census: input.census ?? null,
-      sizeText: totalUnits != null && !homes && !portfolio ? `${totalUnits} units` : null,
+      sizeText: rulesSizeText(ex, input.classKey),
       yearBuilt: yearBuiltOf(metrics),
       residential,
       today,

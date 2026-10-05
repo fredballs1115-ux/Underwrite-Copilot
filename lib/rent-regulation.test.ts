@@ -23,6 +23,7 @@ import {
   regulationShortLine,
   regulationTag,
   regulationTermRows,
+  rulesSizeText,
   unverifiedRule,
 } from "./rent-regulation";
 import { readAffordable } from "./affordable";
@@ -73,6 +74,30 @@ describe("the file: every rent rule is a regime or says there is none", () => {
       expect(a.figures.length).toBeGreaterThan(0);
       for (const f of a.figures) expect(Number.isFinite(f.pct) && f.pct >= 0 && f.pct <= 25).toBe(true);
     }
+  });
+});
+
+describe("the size the rules test (rulesSizeText)", () => {
+  // The deal page's rules panel had read the header's Size slot, which
+  // shows the area where a memorandum states both, so a 48-unit building's
+  // unit questions stayed open beside its stated count (research pass 34).
+  it("is the building's stated count, whatever else the memorandum states", () => {
+    expect(rulesSizeText(walkUp([row("Total SF", "42,000", "p. 3")]), "multifamily")).toBe("48 units");
+    expect(rulesSizeText(walkUp(), "multifamily")).toBe("48 units");
+    expect(rulesSizeText(ex([row("Total SF", "42,000", "p. 3")]), "multifamily")).toBeNull();
+    expect(rulesSizeText(null, "multifamily")).toBeNull();
+  });
+
+  it("is no one building's count on a portfolio or a set of homes", () => {
+    const portfolio: ExtractionResult = {
+      ...walkUp(),
+      properties: [
+        { name: "One", address: "", count: "24", area: "", noi: "", occupancy: "", yearBuilt: "", allocatedPrice: "", page: "" },
+        { name: "Two", address: "", count: "24", area: "", noi: "", occupancy: "", yearBuilt: "", allocatedPrice: "", page: "" },
+      ],
+    };
+    expect(rulesSizeText(portfolio, "multifamily")).toBeNull();
+    expect(rulesSizeText(walkUp(), "sfr_btr")).toBeNull();
   });
 });
 

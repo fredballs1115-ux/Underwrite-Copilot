@@ -17,7 +17,7 @@ import { PortfolioCard } from "@/app/portfolio-card";
 import { InterestPanel } from "@/app/interest-panel";
 import { AffordablePanel } from "@/app/affordable-panel";
 import { RegulationPanel } from "@/app/regulation-panel";
-import { regulationForDeal } from "@/lib/rent-regulation";
+import { regulationForDeal, rulesSizeText } from "@/lib/rent-regulation";
 import { SingleTenantPanel } from "@/app/single-tenant-panel";
 import { HotelPanel } from "@/app/hotel-panel";
 import { StudentHousingPanel } from "@/app/student-housing-panel";
@@ -1775,7 +1775,12 @@ export default async function DealPage({
           address={dealAddress}
           placement={placement}
           census={siteFlags && siteFlags.status !== "pending" ? { place: siteFlags.place, county: siteFlags.county } : null}
-          sizeText={summarySize}
+          // The rules test the building's stated unit count, read as the
+          // rent-regulation read reads it (lib/rent-regulation
+          // `rulesSizeText`) — never the header's Size slot, which shows the
+          // area where a memorandum states both. Before the extraction, the
+          // first signal's size as the header has it.
+          sizeText={extraction ? rulesSizeText(extraction, shownClass) : summarySize}
           // The price by its class's basis, the pipeline card's own reader.
           basis={extraction ? basisTag(extraction, strategy.kind, deal.asset_class as string | null) : null}
           // The leverage read spreads the BUYER's cap against debt, so on a
