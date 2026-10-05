@@ -155,3 +155,15 @@ export function buyBoxChip(checks: BuyBoxCheck[], mandate: MandateScore | null):
   if (fold) return withNote({ label: fitCellText(FOLD_WORD[fold], coverage), tone: fitTone(null, fold, coverage) });
   return withNote({ label: "Buy box unverified", tone: "muted" });
 }
+
+/**
+ * The chip's words where it stands alone, on the deal header. Without a score the fold's words are the CSV cell's
+ * ("Outside (2 of 3)"), which sit under a "Buy box" heading there and after
+ * "Buy box:" in the email; alone on the header they named nothing, to the
+ * eye or to a screen reader (the audit C3b LOW-2), so they say "Buy box:"
+ * first. A score's words ("Fit 82 · Pursue") and "Buy box unverified" say
+ * what they are already.
+ */
+export function buyBoxChipText(chip: Pick<BuyBoxChip, "label">): string {
+  return /^(?:Fit\b|Buy box\b)/.test(chip.label) ? chip.label : `Buy box: ${chip.label}`;
+}

@@ -134,7 +134,7 @@ import {
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import { type BuyBoxCheck } from "@/lib/criteria";
 import { type MandateScore } from "@/lib/mandate";
-import { BUY_BOX_CHIP_CLS, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
+import { BUY_BOX_CHIP_CLS, buyBoxChipText, buyBoxRead, dealCheckSource } from "@/lib/buy-box-chip";
 import { OM_NOI_BASIS_LABEL, compareNoi, pickOmNoi } from "@/lib/actuals/analyze";
 import {
   signalGoingInCap,
@@ -1178,7 +1178,7 @@ export default async function DealPage({
   // in its tooltip), toned by the same map the sensitivity playground's
   // chip reads.
   const buyBoxChip = boxRead
-    ? { label: boxRead.chip.label, cls: BUY_BOX_CHIP_CLS[boxRead.chip.tone], note: boxRead.chip.note }
+    ? { label: buyBoxChipText(boxRead.chip), cls: BUY_BOX_CHIP_CLS[boxRead.chip.tone], note: boxRead.chip.note }
     : null;
 
   const addressLine =

@@ -28,7 +28,7 @@ vi.mock("@/lib/deal-picture", () => ({
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { BUY_BOX_NOT_READ, notifyAnalysisReady } from "./email";
-import { buyBoxChip, buyBoxRead, dealCheckSource, sourceReadsOf } from "./buy-box-chip";
+import { buyBoxChip, buyBoxChipText, buyBoxRead, dealCheckSource, sourceReadsOf } from "./buy-box-chip";
 import { FOLD_WORD, fitCellText, fitScoreLabel } from "./fit-label";
 import { buyBoxCheckSource, buyBoxCoverage, evaluateBuyBox } from "./criteria";
 import { evalDealbreakers } from "./mandate";
@@ -255,6 +255,22 @@ describe("the chip's fold", () => {
     // 2026-10-05, LOW-10).
     expect(buyBoxChip([check("pass"), check("unknown")], null).label).toBe("Fits (1 of 2)");
     expect(buyBoxChip([], score(0, null)).label).toBe("Buy box unverified");
+  });
+
+  it("names the buy box on the header's chip where its words do not (audit C3b LOW-2)", () => {
+    // The fold's words are the cell's, which sits under a "Buy box" heading
+    // and in the email's "Buy box:" line; the header's chip stands alone, and
+    // read "Outside (2 of 3)" to the eye and to a screen reader alike.
+    const fold = buyBoxChip([check("pass"), check("miss"), check("unknown")], null);
+    expect(fold.label).toBe("Outside (2 of 3)");
+    expect(buyBoxChipText(fold)).toBe("Buy box: Outside (2 of 3)");
+    expect(buyBoxChipText(buyBoxChip([check("pass"), check("unknown")], null))).toBe("Buy box: Fits (1 of 2)");
+    // A score's words already say what they are, and so does "unverified".
+    expect(buyBoxChipText(buyBoxChip([check("miss")], score(30, "PASS")))).toBe("Fit 30 · Outside box");
+    expect(buyBoxChipText(buyBoxChip([], score(0, null)))).toBe("Buy box unverified");
+    // The deal header draws these words.
+    const page = readFileSync(join(__dirname, "..", "app/(app)/deals/[id]/page.tsx"), "utf8");
+    expect(page).toContain("label: buyBoxChipText(boxRead.chip)");
   });
 });
 
