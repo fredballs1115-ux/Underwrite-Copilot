@@ -12,6 +12,7 @@ import { signedInBenchmarkRows, signedInRuleRows } from "@/lib/research-read";
 import {
   asOfLabel,
   evaluateRules,
+  OPEN_QUESTION_LABELS,
   type Benchmark,
   type RegulatoryRule,
   type RuleEvaluation,
@@ -161,22 +162,6 @@ export function benchRowLabel(b: Pick<Benchmark, "metric" | "as_of">): string {
 // over a year old is not ranked.
 const TRACKED_SECTORS = ["office", "industrial", "multifamily", "retail"] as const;
 
-/** Plain-English labels for condition keys surfaced as open questions. */
-const UNKNOWN_LABELS: Record<string, string> = {
-  building_permit_issued_on_or_before: "building permit year",
-  building_permit_issued_after: "building permit year",
-  built_before: "year built",
-  building_age_years_lt: "year built",
-  exemption_registered_with_rad: "RAD exemption registration",
-  units_gte: "unit count",
-  units_lte: "unit count",
-  municipality_adopted_etpa: "whether the municipality adopted ETPA",
-  municipality_population_gte: "municipality population",
-  occupancy: "current occupancy status",
-  owner_occupied_with_units_lte: "whether you'll owner-occupy (and unit count)",
-  owner_total_rental_units_in_state_lte: "total rental units you own in this state",
-  within_city_limits: "whether the building sits inside the city's limits",
-};
 
 /** Condition keys the Deal-facts panel can actually answer — only these earn
  *  the "answer in Deal facts" pointer (units come from the deal itself, and
@@ -580,7 +565,7 @@ export async function ResearchPanel({
         <ul className="mt-3 space-y-3">
           {shown.map((e) => {
             const meta = OUTCOME_META[e.outcome];
-            const open = [...new Set(e.unknowns.map((u) => UNKNOWN_LABELS[u] ?? u))];
+            const open = [...new Set(e.unknowns.map((u) => OPEN_QUESTION_LABELS[u] ?? u))];
             const answerable = e.unknowns.some((u) => ANSWERABLE_IN_DEAL_FACTS.has(u));
             return (
               <li key={e.rule.id} className="rounded-lg border border-line/70 p-3">

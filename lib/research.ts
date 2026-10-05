@@ -334,6 +334,24 @@ function evalConditions(
  *  whether it sits inside the rule's city (`jurisdictionOf` "unknown"). */
 export const WITHIN_CITY_LIMITS = "within_city_limits";
 
+/** Plain-English labels for condition keys surfaced as open questions —
+ *  the rules panel's and lib/rent-regulation's, one list. */
+export const OPEN_QUESTION_LABELS: Record<string, string> = {
+  building_permit_issued_on_or_before: "building permit year",
+  building_permit_issued_after: "building permit year",
+  built_before: "year built",
+  building_age_years_lt: "year built",
+  exemption_registered_with_rad: "RAD exemption registration",
+  units_gte: "unit count",
+  units_lte: "unit count",
+  municipality_adopted_etpa: "whether the municipality adopted ETPA",
+  municipality_population_gte: "municipality population",
+  occupancy: "current occupancy status",
+  owner_occupied_with_units_lte: "whether you'll owner-occupy (and unit count)",
+  owner_total_rental_units_in_state_lte: "total rental units you own in this state",
+  within_city_limits: "whether the building sits inside the city's limits",
+};
+
 /**
  * A rule's exemption conditions with its cross-reference resolved: an
  * `exempt_if` of `{ see_rule: "<id>" }` means "exempt where the rule it names
