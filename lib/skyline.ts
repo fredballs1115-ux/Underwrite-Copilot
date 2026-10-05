@@ -651,6 +651,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Allentown, PA",
     size: [2048, 1151],
   },
+  // Altoona, PA: skyline-sheet run 37313470791 — an article's lead, the city from a hill in warm late-day light, a domed church, a white tower block and a water tower over brick blocks and houses, a long wooded ridge on the horizon with cloud on its top, whole in both crops (the 21:9 keeps the ridge and a strip of sky), crisp. Over Horseshoe Curve from straight above (a map), its park's lawn and benches as a 4.4:1 strip, the domed church at a street's end over a road and cars, a highway under cloud twice and a red cactus twice.
+  "cbsa:11020": {
+    file: "Altoona, Pennsylvania.jpg",
+    place: "Altoona from a hill, a domed church and a white tower block over brick blocks and houses, a ridge beyond",
+    credit: "Quintin Soloviev",
+    license: "CC BY 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/4.0",
+    name: "Altoona, PA",
+    size: [7302, 4381],
+  },
   // Amarillo, TX: skyline-sheet run 36818765688 — Palo Duro Canyon, the landmark the area is known by, its red-banded walls and mesas over juniper from the CCC overlook, sharp, the far rim whole at the 21:9's top; over downtown under a grey overcast behind a signal mast, the towers small under heavy cloud behind scrub and a fence, Cadillac Ranch tiny in a brown field from a drone, a street of signs, the canyon from high in the air, and a canyon strip too short for a phone's card.
   "cbsa:11100": {
     file: "Palo Duro Canyon from CCC Overlook 2024.jpg",
@@ -751,6 +761,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Barnstable Town, MA",
     size: [3888, 2592],
+  },
+  // Beckley, WV: skyline-sheet run 37313470791 — from the bridge's category, the New River Gorge Bridge's steel arch across the gorge from the low bridge below, under a deep blue sky with cumulus, the wooded walls falling to the river, the deck running off the left edge as the bridge does; whole in the card, and the only one of three frames whose deck the 21:9 keeps under a strip of sky; crisp; the bridge is in Fayette County, inside the metro area (the file name says so), so the picture is named for the metro area and its place says it is the bridge (Belton's rule). Over the same view half a minute either side (the 21:9 cuts the deck in both), the deck's roadway over fog (a road filling the frame, its author printed unknown) and a cabin in a meadow.
+  "cbsa:13220": {
+    file: "2017-09-08 13 59 38 View northwest down the New River towards the New River Gorge Bridge (U.S. Route 19) from the Tunney Hunsaker Bridge (Fayette County Route 82) over the New River between Fayette and South Fayette in Fayette County, West Virginia.jpg",
+    place: "The New River Gorge Bridge's arch across the wooded gorge, under a blue sky with cumulus",
+    credit: "Famartin",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Beckley, WV",
+    size: [3264, 2448],
   },
   // Bellingham, WA: skyline-sheet run 36816430466 — an article's lead, downtown from a low drone under cumulus, the red-brick Old City Hall's clock tower and the downtown blocks in sun, forested hills and a ridge behind, every top whole in both crops. Over an aerial over the harbour's industrial waterfront with Mount Baker on the horizon, a 1972 slide of the harbour full of logs, a 1908 postcard with its printed title and a barge leaving the port under grey cloud.
   "cbsa:13380": {
@@ -1213,6 +1233,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Fargo, ND",
     size: [6048, 4024],
   },
+  // Farmington, NM: skyline-sheet run 37313645151 — the Shiprock article's photograph, the rock rising off the desert floor under heavy broken cloud with blue between, its dike running off to the left, snow on far mountains at the right, whole in both crops above the words, crisp (the clouds a little over-processed); a 2.56:1 frame, served at 2400; Shiprock is in San Juan County, the metro area's one county, so the picture is named for the metro area and its place says it is Shiprock (Belton's rule); the credit is the name inside the "Dave Bunnell redirect" the runner printed, which is the file page's Author field whole (its metadata's Artist, an account with no user page: zori probe_url run 37329561789), the same page linking User:Dave Bunnell (run 37329450866). Over the rock close under a blue sky (the 21:9 cuts its summit), Bisti's hoodoos close, Aztec Ruins' low walls as a 4.5:1 strip, the city's lights at night from the air and the civic centre's front with a crowd.
+  "cbsa:22140": {
+    file: "Shiprock NM viewed from the north.jpg",
+    place: "Shiprock rising off the desert floor under heavy broken cloud",
+    credit: "Dave Bunnell",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Farmington, NM",
+    size: [5762, 2250],
+  },
   // Fayetteville, NC: skyline-sheet run 36798176732 — downtown's church spires and tree-lined street from above in clear daylight, every spire whole in both crops, over the Market House down Hay Street on a grey winter day through a heavy phone filter. The runner printed the author as "Public domain, City of Fayetteville"; the credit is the name in it.
   "cbsa:22180": {
     file: "Fayetteville, NC Downtown Skyline.jpg",
@@ -1413,6 +1443,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Hilton Head Island-Bluffton-Port Royal, SC",
     size: [3072, 2304],
   },
+  // Homosassa Springs, FL: skyline-sheet run 37321374937 — a one-market run's find of twenty-eight, from Three Sisters Springs' category: the spring run's clear turquoise water over pale sand under a deep blue sky, the hammock's trees and palms with moss along both banks, kayakers far up the run and one close at the right beside the card's words, whole in both crops (the 21:9 keeps a band of sky), crisp; the springs are in Crystal River, in Citrus County, the metro area's one county, so the picture is named for the metro area and its place says it is Three Sisters Springs (Belton's rule). Over the spring pool under the hammock with no sky and a log under the words, manatees in turquoise water with no shore, the state park's visitor building, murals, observatory, fountain and gift shop, Crystal River's docks, canals and signs, and Yellowstone's geyser basin filed under the springs. The six-market sheet (run 37313645151) held only a white elk wading, highway signs, a footbridge and the visitor centre's interior.
+  "cbsa:26140": {
+    file: "Three Sister Springs.jpg",
+    place: "Three Sisters Springs' clear turquoise run under the hammock, kayakers on the water",
+    credit: "CityofCrystalRiver",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Homosassa Springs, FL",
+    size: [3936, 2624],
+  },
   // Hot Springs, AR: skyline-sheet run 37277388755 — an article's photograph, downtown from the air in summer, a twin-towered hotel and a brick tower in sun in a valley of forested mountains, the town running on up the valley; no horizon, but the buildings stand side-on with their faces lit, so it reads as a photograph, not a map, every top whole in both crops; over Central Avenue from a high window at dawn behind a plain hotel, a hooded figure in a spring's steam at night and a historical marker.
   "cbsa:26300": {
     file: "Downtown Hot Springs, Arkansas (aerial).jpg",
@@ -1482,6 +1522,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
     name: "Johnson City, TN",
     size: [2353, 892],
+  },
+  // Johnstown, PA: skyline-sheet run 37314140256 — from the Inclined Plane's category: the city from the incline's hill, downtown's brick blocks, a stone church and the taller towers on the valley's floor, long brick mill sheds beyond and wooded ridges all round under a white sky, the incline's bridge over the river at the foot; the card and the 21:9 both keep the ridges and a strip of sky; crisp; the view the city is known by, from its own landmark. Over two more frames from the same spot framed lower (one loses the sky at 21:9), the same view as a 4.65:1 strip 1810px tall, the article's lead in haze, a snowy hill over a frozen river, two airliner aerials and a drawn bird's-eye map.
+  "cbsa:27780": {
+    file: "Johnstown, Pennsylvania from the Inclined Plane, 09-12-2026 3.jpg",
+    place: "Johnstown from the Inclined Plane's hill, downtown and the mills in the valley among wooded ridges",
+    credit: "Cutlass",
+    license: "CC0",
+    licenseUrl: "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+    name: "Johnstown, PA",
+    size: [6000, 4000],
   },
   // Kahului-Wailuku, HI: skyline-sheet run 36816430466 — Iao Valley's green ridges above Wailuku under a blue sky and cumulus, sharp, the summit whole with room in both crops; a crop of the photographer's own stitched panorama, without its black corners. Over that panorama and another whose unfilled black corners show in both crops, a tighter crop credited to a sentence naming a file, the Iao Needle under a mist that leaves half the card blank, a hazy view of West Maui from Haleakala's road, and two frames of Kahului Harbor's water and breakwater.
   "cbsa:27980": {
@@ -1633,6 +1683,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Lawrence, KS",
     size: [3000, 1688],
   },
+  // Lawton, OK: skyline-sheet run 37321853635 — a one-market run's find of twenty-six, from the Wichita Mountains Wildlife Refuge's category: the Wichitas' low granite profile on the horizon at a winter sunrise across a frosted prairie, a big sky of streaked cloud with the sun's glare at the left, the mountains above the card's words in both crops, crisp; the refuge is in Comanche County, inside the metro area, so the picture is named for the metro area and its place says it is the refuge (Belton's rule). Over a granite gorge's pool between lichened cliffs (no sky at 21:9), a fishing pier running into the words twice, a coreopsis valley with no mountain, the old high school whose dome the card cuts, Mount Scott's summit road, hazy views of the lake and the plain, a storm view in heavy HDR soft at 1:1, a dusk view whose author is printed unknown, a lizard, anglers and seven bison. The six-market sheet (run 37313645151) held only Mount Scott's views.
+  "cbsa:30020": {
+    file: "A sunrise in winter, Wichita Mountains Wildlife Refuge, SW Oklahoma, U.S.jpg",
+    place: "The Wichita Mountains on the horizon at a winter sunrise, across the refuge's frosted prairie",
+    credit: "Larry Smith",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Lawton, OK",
+    size: [4000, 2573],
+  },
   // Lexington, KY: skyline-sheet run 36780959488 — the landmark the city is known by, sharp at dusk; the downtown aerial was 1544px and dated.
   "cbsa:30460": {
     file: "Rupp Arena view from Triangle Park.jpg",
@@ -1753,6 +1813,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Memphis, TN",
     size: [5979, 2988],
   },
+  // Michigan City-La Porte, IN: skyline-sheet run 37314140256 — from Washington Park's category: the pierhead lighthouse at dusk from a drone, white with its red roof and black lantern at the end of its catwalk and breakwater, a boat's wake beside it, the harbour's lights along the shore and a power station's stack and cooling tower at the right under a blue-grey sky; an oblique with a horizon, the lantern standing above the card's words and whole in both crops (116 px under the 21:9's top), crisp. Over the lighthouse lit against a rose dusk (the 21:9 cuts its vane), the old lighthouse museum under overcast (the 21:9 cuts its lantern), the museum under a blue sky with a flagpole and its historical marker.
+  "cbsa:33140": {
+    file: "Michigan City East Lighthouse aerial 2021 - Michigan City, Indiana.jpg",
+    place: "Michigan City's pierhead lighthouse at dusk from the air, the harbour's lights along the shore",
+    credit: "Dan Previte",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Michigan City-La Porte, IN",
+    size: [5464, 3640],
+  },
   // Midland, TX: skyline-sheet run 36818765688 — the downtown towers the city is known by, in low sun from a drone, an oblique with the plain running out to a horizon, sharp, the towers whole in both crops; over the courthouse square through a window, a black mullion down the middle of both crops.
   "cbsa:33260": {
     file: "Midland, TX skyline (cropped).jpg",
@@ -1812,6 +1882,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
     name: "Morgantown, WV",
     size: [2848, 1709],
+  },
+  // Mount Vernon-Anacortes, WA: skyline-sheet run 37313645151 — an article's lead, the Skagit Valley's tulip fields in bands of orange and yellow running to red barns and a white gambrel barn, the foothills under cloud beyond; the card keeps the barns and the hills, the 21:9 loses the hills and trims the red barn's roof at its top edge, the tulips filling it; an older camera's 1600px frame, a little soft at 1:1, vivid at card size; the valley's fields are in Skagit County, the metro area's one county, so the picture is named for the metro area and its place says it is the Skagit Valley (Belton's rule). Over Mount Vernon from a drone over the Skagit (crisp, but the 21:9 loses the horizon and reads as rooftops), Anacortes under a grey overcast, an intersection of signals and cars, the river in flood at the floodwall, and Deception Pass, which straddles Island County, at dusk and from the air.
+  "cbsa:34580": {
+    file: "Skagit Valley 1.JPG",
+    place: "Tulip fields in the Skagit Valley, bands of orange and yellow running to red barns",
+    credit: "Gina from Kent, WA, USA",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "http://creativecommons.org/licenses/by-sa/3.0/",
+    name: "Mount Vernon-Anacortes, WA",
+    size: [1600, 1200],
+  },
+  // Muskegon-Norton Shores, MI: skyline-sheet run 37314140256 — an article's lead, downtown across Muskegon Lake on a clear evening, a tall brick tower with green roofs, a white office block and a red clock tower over the breakwall under a pale sky, whole in both crops, crisp at 1:1; a soft willow fills the right third and grass the foreground under the words, the round's weakest with Wenatchee's and Wheeling's. Over the harbour's breakwaters and channel from the air (a 1500px film scan whose 21:9 reads close to a map, its printed credit two lines on a card), three 1911 negatives of the harbour, a garbage truck and a lettered postcard; a one-market run (37321177414) found only the same postcard twice more, two 1911 negatives of a lightship, two men in a bed and the lake from the space station.
+  "cbsa:34740": {
+    file: "Muskegon skyline and lake.jpg",
+    place: "Downtown Muskegon across Muskegon Lake, a tall brick tower over the breakwall",
+    credit: "bigmikesndtech",
+    license: "CC BY 2.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/2.0",
+    name: "Muskegon-Norton Shores, MI",
+    size: [3072, 2048],
   },
   // Myrtle Beach, SC: skyline-sheet run 36787138337 — the towers and the beach whole in both crops in daylight, over a hazy high view up the strand to Cherry Grove Pier.
   "cbsa:34820": {
@@ -2133,6 +2223,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Salem, OR",
     size: [3796, 2473],
   },
+  // Sandusky, OH: skyline-sheet run 37313470791 — the Cedar Point article's photograph, the peninsula from a plane, its beach and breakwater, the coasters among trees and the parking lots at its root, the bay and its far shore on the horizon under a blue sky with a line of cumulus; an oblique with a horizon, whole in both crops; a little soft at 1:1, the coasters small and legible at card size. Over riders over the park's "Welcome to Cedar Point" sign, two coasters close, and Kelleys Island from high above in glare (a map). Marblehead Lighthouse's article and category gave nothing on the sheet.
+  "cbsa:41780": {
+    file: "Cedar Point from the air.jpg",
+    place: "Cedar Point's peninsula from the air, its beach and coasters, the bay beyond",
+    credit: "Nyttend",
+    license: "Public domain",
+    licenseUrl: "",
+    name: "Sandusky, OH",
+    size: [2816, 2112],
+  },
   // San Jose-Sunnyvale-Santa Clara, CA: skyline-sheet run 36816505479 — a one-market run's pick of twenty-eight: downtown's towers lit against a violet night sky, sharp and whole in both crops, the crane and every tower with sky above; over the same frame uncropped, downtown small across the valley floor from a height, a look up at the Hotel De Anza with parked cars and a one-way sign at its foot, a steep look down in hazy midday light, a hazy strip 501px tall at 2400 wide, suburbs under green hills, Santana Row's shopping street, a crowd at the Civic, storefronts and a theatre's marquee, two hazy views from airliners, San Francisco's Golden Gate and Alviso's fireworks. The card names the Census title's first city, as Oxnard's, Bakersfield's and Stockton's do: the whole title ran into the credit on a phone's card.
   "cbsa:41940": {
     file: "Downtown SJ at Night cropped1.jpg",
@@ -2365,6 +2465,16 @@ export const SKYLINES: Record<string, SkylineShot> = {
     name: "Tulsa, OK",
     size: [4000, 3000],
   },
+  // Twin Falls, ID: skyline-sheet run 37313470791 — the Shoshone Falls article's photograph, the falls in their basalt amphitheatre at July's low water, white veils down the columns into the dark pool, the canyon's far rim and its trees with a strip of sky; the card keeps the sky, the 21:9 loses it and keeps the falls and the rim in perspective; a 2013 phone frame, a little soft at 1:1, clean at card size; the falls are on the Snake where it parts Twin Falls and Jerome counties, both in the metro area, so the picture is named for the metro area and its place says it is Shoshone Falls (Belton's rule). Over the canyon from the Perrine Bridge in evening light (the runner-up, a canyon rather than the falls), the same in April, houses on the gorge's floor, dark walls under power lines, a street of pickups under trees and a 1400px strip of the canyon.
+  "cbsa:46300": {
+    file: "2013-07-07 17 41 52 Shoshone Falls in Idaho viewed from the northwest.jpg",
+    place: "Shoshone Falls in its basalt canyon, the dark pool below",
+    credit: "Famartin",
+    license: "CC BY-SA 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/3.0",
+    name: "Twin Falls, ID",
+    size: [3264, 2448],
+  },
   // Honolulu, HI: skyline-sheet run 36750858237 — the article's lead image, whole in every crop.
   "cbsa:46520": {
     file: "2022 Views from Diamond Head 02.jpg",
@@ -2414,6 +2524,26 @@ export const SKYLINES: Record<string, SkylineShot> = {
     licenseUrl: "https://creativecommons.org/licenses/by/4.0",
     name: "Waterbury-Shelton, CT",
     size: [4000, 3000],
+  },
+  // Wenatchee-East Wenatchee, WA: skyline-sheet run 37313645151 — the Lake Chelan article's photograph, uplake from the south shore in winter, snowy ridges in alpenglow above the dark lake under pink cloud, whole in both crops, crisp; Lake Chelan is in Chelan County, inside the metro area, so the picture is named for the metro area and its place says it is Lake Chelan, as Glens Falls' is Lake George; nothing of Wenatchee itself reached the sheet, the round's weakest with Muskegon's and Wheeling's. Over snowy vineyard rows across the lake under a grey sky, a boat at a dock and a tent, data centres' roofs in brown hills from the air and the Columbia from an airliner (maps).
+  "cbsa:48300": {
+    file: "Uplake from the south shore Lake Chelan.jpg",
+    place: "Lake Chelan in winter, snowy ridges in alpenglow above the dark lake",
+    credit: "Themerganser",
+    license: "CC BY 3.0",
+    licenseUrl: "https://creativecommons.org/licenses/by/3.0",
+    name: "Wenatchee-East Wenatchee, WA",
+    size: [3072, 2304],
+  },
+  // Wheeling, WV: skyline-sheet run 37313470791 — from Downtown Wheeling's category: downtown across the Ohio from Wheeling Island under a heavy, textured grey sky, brick towers and the Capitol Music Hall's painted wall at the left, the wooded hill behind and the river in front, whole in both crops; a phone frame with an HDR look, a little smoothed at 1:1, clean at card size, leaves at the left edge. Over the same shore smaller behind bushes and a dock's pilings as a 2.4:1 panorama, the Suspension Bridge from its own deck between traffic signals and under its cables, a stereoview card and its PNG, and a street of brick warehouses under wires and stop signs.
+  "cbsa:48540": {
+    file: "Downtown Wheeling, WV - 20200628 - 14 - Skyline from Wheeling Island.jpg",
+    place: "Downtown Wheeling across the Ohio River under a heavy grey sky",
+    credit: "Andre Carrotflower",
+    license: "CC BY-SA 4.0",
+    licenseUrl: "https://creativecommons.org/licenses/by-sa/4.0",
+    name: "Wheeling, WV",
+    size: [4032, 3024],
   },
   // Wichita, KS: skyline-sheet run 36780959488 — the article's lead.
   "cbsa:48620": {
