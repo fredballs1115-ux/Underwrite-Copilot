@@ -210,6 +210,37 @@ describe("the going-in cap: the memorandum's, else the first signal's, withheld 
     expect(text).not.toContain("5.40%");
   });
 
+  it("the analytics, the market memory and the internal comps pool no cap the deal's own header withholds", () => {
+    const share = { kind: "partial_interest" as const, summary: "", share: "49% limited partnership interest", groundLease: "", loan: "", page: "p. 2" };
+    const base = [m("Asking price", "$20,580,000"), m("Going-in cap rate", "5.40%"), m("Units", "200")];
+    const row = (id: string, extraction: ExtractionResult) => ({
+      id,
+      name: id,
+      asset_class: "multifamily",
+      created_at: "2026-10-01T00:00:00Z",
+      is_sample: false,
+      stage: "screening",
+      verdict: null,
+      extraction,
+    });
+    const recap = row("recap", ex([...base, m("Entity loan balance", "$56,500,000")], { interest: share }));
+    const plain = row("plain", ex(base, { interest: share }));
+    const position = row(
+      "position",
+      ex([...base, m("Preferred equity amount", "$20,580,000"), m("Preferred return", "12% preferred return"), m("Mandatory redemption date", "June 2029")], {
+        interest: { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "p. 2" },
+      }),
+    );
+    const charts = Object.fromEntries(deriveAnalytics([recap, plain, position]).map((d) => [d.id, d.capPct]));
+    expect(charts).toEqual({ recap: null, plain: 5.4, position: null });
+    const memory = Object.fromEntries(buildComps([recap, plain, position]).map((c) => [c.dealId, c.capPct]));
+    expect(memory.plain).toBe(5.4);
+    expect(memory.recap ?? null).toBeNull();
+    expect(memory.position ?? null).toBeNull();
+    const comps = Object.fromEntries(deriveInternalComps("other", "multifamily", { assetClass: "multifamily" }, [recap, plain, position]).map((c) => [c.dealId, c.capLabel]));
+    expect(comps).toEqual({ recap: null, plain: "5.40%", position: null });
+  });
+
   it("a note and a position keep their own yield in the slot; a leased fee keeps its cap", () => {
     expect(capSlotWithheld(ex([], { interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" } }))).toBe("note");
     expect(capSlotWithheld(ex([], { interest: { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "" } }))).toBe("position");

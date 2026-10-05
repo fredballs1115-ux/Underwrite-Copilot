@@ -9,6 +9,7 @@ import {
   type StrategyKind,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
+import { capSlotWithheld } from "@/lib/compare-interest";
 import { dealClassKey } from "@/lib/asset-words";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -77,12 +78,15 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     const strategy = inferStrategy(extraction, (r.first_signal as FirstSignal | null | undefined) ?? null);
     const plan = planSummary(extraction, strategy);
 
-    // A plan deal has no going-in cap: a stabilized or pro forma cap, or a
-    // yield on cost, describes the finished project, not the price paid.
-    // …and a note's cap is the collateral's, a leased fee's a ground rent's
-    // (#415): neither is plotted among buildings' going-in caps.
+    // A plan deal is judged on its yield on total cost: a stabilized or pro
+    // forma cap, or a yield on cost, describes the finished project, not the
+    // price paid. …and no cap the deal's own header withholds is plotted
+    // (lib/compare-interest `capSlotWithheld`: a note's is the collateral's,
+    // a position's the building's, a share's beside its entity's loan on a
+    // basis never said), nor a leased fee's, a ground rent's (#415), among
+    // buildings' going-in caps.
     const interestKind = interestOf(extraction).kind;
-    const capMetric = plan || interestKind === "note" || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
+    const capMetric = plan || capSlotWithheld(extraction) || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
     const capPct = capMetric ? parsePct(capMetric.value) : null;
 
     // The asking / purchase price — or, on a development, the land cost.

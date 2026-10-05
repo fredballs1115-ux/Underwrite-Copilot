@@ -29,6 +29,7 @@ import {
   unitCountRow,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
+import { capSlotWithheld } from "@/lib/compare-interest";
 import { assetWords, countNoun, dealClassKey, perSuffix } from "@/lib/asset-words";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
@@ -197,11 +198,13 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
 
     // The shared going-in reader on an operating asset only: a plan deal's
     // stabilized / pro forma cap never averages into what the account
-    // "usually sees" in a market — and neither does a note's (the
-    // collateral's, on a price that is a loan's) or a leased fee's (a
-    // ground rent's cap, a different market entirely), #415.
+    // "usually sees" in a market — and neither does a cap the deal's own
+    // header withholds (lib/compare-interest `capSlotWithheld`: a note's,
+    // the collateral's on a price that is a loan's; a position's; a share's
+    // beside its entity's loan) or a leased fee's (a ground rent's cap, a
+    // different market entirely), #415.
     const interestKind = interestOf(ext).kind;
-    const cap = plan || interestKind === "note" || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
+    const cap = plan || capSlotWithheld(ext) || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
     const rawCap = cap ? parsePct(cap.value) : null;
     // Drop physically implausible caps (a mis-extraction like -5% or 300%) —
     // not fabrication, just refusing to average garbage into the market read.

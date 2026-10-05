@@ -20,6 +20,7 @@ import {
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
+import { capSlotWithheld } from "@/lib/compare-interest";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -179,10 +180,13 @@ export function deriveInternalComps(
     const strategy = inferStrategy(ext, (row.first_signal as FirstSignal | null | undefined) ?? null);
     const plan = planSummary(ext, strategy);
     const price = findPriceMetric(metrics, strategy.kind, screenYearOf(ext));
-    // A note's stated cap is the collateral's and a leased fee's a ground
-    // rent's (#415): neither sits in a column of buildings' caps.
+    // No cap the sibling's own header withholds sits in a column of
+    // buildings' caps (lib/compare-interest `capSlotWithheld`: a note's is
+    // the collateral's, a position's the building's, a share's beside its
+    // entity's loan on a basis never said), nor a leased fee's, a ground
+    // rent's (#415).
     const interestKind = interestOf(ext).kind;
-    const cap = plan || interestKind === "note" || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
+    const cap = plan || capSlotWithheld(ext) || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
     const yoc = plan?.yieldOnCost ?? null;
     if (!price && !cap && yoc == null) continue;
     // Only rows whose values actually parse — a garbled extraction ("TBD",
