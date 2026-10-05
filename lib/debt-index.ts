@@ -299,6 +299,10 @@ export interface RateSeed {
   /** percent — 6.78 means 6.78% */
   pct: number;
   note: string;
+  /** the series id of the index the rate was built on ("SOFR30DAYAVG"),
+   *  where a surface prints that index's figure and owes its publisher's
+   *  notice (lib/data-notices `carriesNyFedNotice`); absent where none */
+  index?: string;
 }
 
 /** The deal page's two starting rates: the permanent loan's (the model's
@@ -316,5 +320,6 @@ export function constructionSeed(seeds: DebtSeeds): RateSeed | null {
   return {
     pct: allInPct(seeds.floating, CONSTRUCTION_SPREAD_BPS),
     note: debtRateNote(seeds.floating, CONSTRUCTION_SPREAD_BPS, "construction spread"),
+    index: seeds.floating.id,
   };
 }

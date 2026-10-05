@@ -11,7 +11,7 @@ import {
   type Observation,
   type YieldCurve,
 } from "@/lib/live-rates";
-import { FRED_NOTICE } from "@/lib/data-notices";
+import { FRED_NOTICE, NY_FED_SOFR_NOTICES, carriesNyFedNotice } from "@/lib/data-notices";
 
 /**
  * Today's rates — across the top of the calculators, and on `/market`.
@@ -113,6 +113,15 @@ export function RatesStrip({
                 <Tile key={r.meta.id} r={r} seeded={seeds.includes(r.meta.id)} />
               ))}
             </div>
+            {/* The New York Fed's terms ask for their notice with any
+                presentation of SOFR, and the DTCC sentence rides with it
+                (lib/data-notices): once, small, beside the tiles that draw
+                SOFR or its 30-day average — never a copy a tile. */}
+            {money.rates.some((r) => carriesNyFedNotice(r.meta.id)) && (
+              <p className="mt-3 text-[10px] leading-snug text-muted" data-qa="nyfed-notice">
+                {NY_FED_SOFR_NOTICES}
+              </p>
+            )}
           </div>
         )}
       </div>

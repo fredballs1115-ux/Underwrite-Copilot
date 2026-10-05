@@ -5,6 +5,7 @@ import { withArticle } from "@/lib/article";
 import { parseMoney } from "@/lib/criteria";
 import type { PlanSummary } from "@/lib/deal-strategy";
 import type { RateSeed } from "@/lib/debt-index";
+import { NY_FED_SOFR_NOTICES, carriesNyFedNotice } from "@/lib/data-notices";
 import {
   DEFAULT_DRAW_PROFILE,
   DEFAULT_EXIT_CAP_PCT,
@@ -160,6 +161,14 @@ export function ConstructionDebtPanel({
           .filter((s): s is string => s !== null)
           .join(" ")}
       </p>
+      {/* A rate built on SOFR prints SOFR's figure, which the New York
+          Fed's terms ask be presented with their notice and the DTCC
+          sentence (lib/data-notices): once, small, under the note. */}
+      {rateSeed && carriesNyFedNotice(rateSeed.index) && (
+        <p className="mt-1 text-[10px] leading-snug text-muted" data-qa="nyfed-notice">
+          {NY_FED_SOFR_NOTICES}
+        </p>
+      )}
 
       {r ? (
         <>

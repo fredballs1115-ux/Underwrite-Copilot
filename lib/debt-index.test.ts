@@ -111,6 +111,9 @@ describe("the all-in rate and its note", () => {
     expect(c?.note).toBe(
       "30-day avg SOFR 3.68% (FRED, Sep 21, 2026) + 350 bps construction spread, a screening default — enter your quote",
     );
+    // The index it was built on, so the panel that prints it owes and draws
+    // the New York Fed's notice (lib/data-notices).
+    expect(c?.index).toBe("SOFR30DAYAVG");
     expect(constructionSeed(NO_DEBT_SEEDS)).toBeNull();
   });
 

@@ -14,6 +14,7 @@ import { SharePlan } from "@/app/share/[token]/plan-facts";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { DEFAULT_DRAW_PROFILE } from "@/lib/construction-debt";
 import { gluedWords, visibleText } from "@/lib/render-lint";
+import { NY_FED_SOFR_NOTICE, NY_FED_SOFR_NOTICES } from "@/lib/data-notices";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -172,6 +173,8 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     expect(text).toContain("Construction rate: a flat 8.00% placeholder, not seeded from an index — enter your quote.");
     expect(text).toContain("Default 60% loan-to-cost — enter your quote.");
     expect(text).toContain("Default 6.0% exit cap — set your exit view.");
+    // No SOFR figure on the panel, so no New York Fed notice either.
+    expect(text).not.toContain(NY_FED_SOFR_NOTICE);
     expect(gluedWords(text)).toEqual([]);
   });
 
@@ -179,6 +182,7 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     const rateSeed = {
       pct: 7.81,
       note: "30-day avg SOFR 4.31% (FRED, Sep 17, 2026) + 350 bps construction spread, a screening default — enter your quote",
+      index: "SOFR30DAYAVG",
     };
     const html = renderToStaticMarkup(React.createElement(ConstructionDebtPanel, { ...props, exitCapPct: 5.5, rateSeed }));
     expect(html).toMatch(/aria-label="Construction loan rate percent"[^>]*value="7.81"/);
@@ -188,6 +192,10 @@ describe("ConstructionDebtPanel — the plan's debt", () => {
     expect(text).not.toContain("placeholder");
     expect(text).toContain("Default 60% loan-to-cost — enter your quote.");
     expect(text).not.toContain("exit cap — set your exit view");
+    // The note prints SOFR's figure, so the New York Fed's notice and the
+    // DTCC sentence stand under it, once (lib/data-notices).
+    expect(text.split(NY_FED_SOFR_NOTICES).length - 1).toBe(1);
+    expect(gluedWords(text)).toEqual([]);
   });
 
   it("states the draw's average from the module's own constant, never a second copy of it", () => {

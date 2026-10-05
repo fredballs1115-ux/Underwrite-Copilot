@@ -7,7 +7,7 @@ import { RatesStrip } from "@/app/rates-strip";
 import { MetroLive } from "@/app/market/metro-live";
 import { readMetroRates, readRates, type RateRow } from "@/lib/live-rates";
 import { FIXTURE_NOW, REAL_ROWS } from "@/lib/live-rates.fixture";
-import { BLS_NOTICE, FRED_NOTICE } from "./data-notices";
+import { BLS_NOTICE, DTCC_SOFR_SENTENCE, FRED_NOTICE, NY_FED_SOFR_NOTICE } from "./data-notices";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 // Where the providers' notices are drawn (lib/data-notices holds their
@@ -57,7 +57,39 @@ describe("the rates strip's notice", () => {
     // The terms forbid stating or implying an endorsement; the notice says
     // the opposite, and nothing else on the strip names the bank.
     expect(count(text, "Federal Reserve Bank of St. Louis")).toBe(1);
-    expect(text.replace(FRED_NOTICE, "")).not.toMatch(/endorse|certified|recommended|favored/i);
+    // (The providers' own notices say "endorse" in the negative; nothing
+    // else on the strip may.)
+    expect(text.replace(FRED_NOTICE, "").replace(NY_FED_SOFR_NOTICE, "")).not.toMatch(
+      /endorse|certified|recommended|favored/i,
+    );
+  });
+});
+
+describe("the New York Fed's notice beside SOFR on the strip", () => {
+  const rates = readRates(REAL_ROWS, FIXTURE_NOW);
+
+  it("stands once under the money-market tiles that draw SOFR and its 30-day average", () => {
+    const html = render(React.createElement(RatesStrip, { rates }));
+    const text = visibleText(html);
+    expect(rates.some((r) => r.meta.id === "SOFR")).toBe(true);
+    expect(rates.some((r) => r.meta.id === "SOFR30DAYAVG")).toBe(true);
+    expect(count(text, NY_FED_SOFR_NOTICE)).toBe(1);
+    expect(count(text, DTCC_SOFR_SENTENCE)).toBe(1);
+    // In the money-market group, after its tiles and before the folded
+    // groups: beside the figures it covers.
+    const money = text.indexOf("Money market");
+    const notice = text.indexOf(NY_FED_SOFR_NOTICE);
+    expect(money).toBeGreaterThan(-1);
+    expect(notice).toBeGreaterThan(text.indexOf("SOFR as of"));
+    expect(notice).toBeLessThan(text.indexOf(FRED_NOTICE));
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("is not drawn where no SOFR figure is", () => {
+    const noSofr = rates.filter((r) => r.meta.id !== "SOFR" && r.meta.id !== "SOFR30DAYAVG");
+    const text = visibleText(render(React.createElement(RatesStrip, { rates: noSofr })));
+    expect(text).toContain("Money market");
+    expect(text).not.toContain(NY_FED_SOFR_NOTICE);
   });
 });
 
