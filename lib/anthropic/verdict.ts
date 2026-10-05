@@ -135,13 +135,20 @@ const shareText = (pct: number): string => `${Number.isInteger(pct) ? pct : pct.
  * The brief used to print the asking price beside the unit count and leave
  * the division to the synthesizer: a 49% share's $20M over 240 units read
  * $83k a unit where the building's basis is $170k, a note's price is a
- * loan's, and an auction's starting bid is where the bidding opens. Each of
- * those says what the code computes, or that there is none and why.
+ * loan's, a preferred equity position's buys a rate and a redemption, and an
+ * auction's starting bid is where the bidding opens. Each of those says what
+ * the code computes, or that there is none and why.
  */
 function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedClass: string | null | undefined): string {
   const { kind, sharePct, entityLoan } = interestOf(ex);
   if (kind === "note") {
     return "THE BUILDING'S BASIS: none — this sells a loan, and its price is a loan's. No price per unit or per SF, no cap and no property return is struck on it; the collateral's own figures belong to the collateral's owner.";
+  }
+  // A preferred equity position (lib/position): its price buys a rate and a
+  // redemption in the owning entity, so a property model's returns at that
+  // price are the building's, never the position's.
+  if (kind === "preferred_equity") {
+    return "THE BUILDING'S BASIS: none — this sells a preferred equity position in the owning entity, and its price buys a preferred return and a redemption, never a slice of the building. No price per unit or per SF, no cap and no property return is struck on it: a property model run at that price returns the whole building's cash flows on it, which are the building's, not the position's. The position's return is its rate and its redemption — read by its yield to redemption at its price and by where its last dollar sits on the stated value.";
   }
   if (kind === "leased_fee") {
     return "THE BUILDING'S BASIS: none — the price buys the land under the ground lease, not the building, and is never divided over the building's units or area.";

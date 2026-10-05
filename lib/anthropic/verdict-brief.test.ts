@@ -180,6 +180,40 @@ describe("the verdict is told what is being sold and the building's own basis", 
     expect(est).not.toMatch(/\/unit/);
   });
 
+  it("a preferred equity position: the context carries the position's own read, and there is no building basis (lib/position)", () => {
+    // Read on a pinned day: its yield to redemption runs from today.
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    onTestFinished(() => {
+      vi.useRealTimers();
+    });
+    const position = base({
+      interest: { kind: "preferred_equity", summary: "A $15M preferred equity investment in the owning entity.", share: "", groundLease: "", loan: "", page: "p. 3" },
+      metrics: [
+        m("Asking price", "$14,000,000"),
+        m("Preferred equity amount", "$15,000,000"),
+        m("Preferred return", "12% preferred return, 8% current pay"),
+        m("Current pay rate", "8.0%"),
+        m("Mandatory redemption date", "June 2029"),
+        m("Senior loan balance", "$52,000,000"),
+        m("Whole-asset value", "$80,000,000"),
+        m("Units", "240"),
+        m("NOI (in-place)", "$4,400,000", "in_place"),
+        m("Going-in cap rate", "5.50%"),
+      ],
+    });
+    const est = section(briefOf(position));
+    expect(est).toContain("This memorandum sells a PREFERRED EQUITY position in the owning entity, not the property");
+    expect(est).toContain("A preferred equity position of $15.0M at 8.00% current pay and 4.00% accruing");
+    expect(est).toContain("14.3% to redemption at its $14.0M price");
+    expect(est).toContain(
+      "THE BUILDING'S BASIS: none — this sells a preferred equity position in the owning entity, and its price buys a preferred return and a redemption, never a slice of the building.",
+    );
+    expect(est).toContain("which are the building's, not the position's");
+    // Never the position's price over the building's units.
+    expect(est).not.toMatch(/\/unit/);
+    expect(est).not.toContain("none computed");
+  });
+
   it("an auction: the starting bid is said to be no price, and no basis is struck on it", () => {
     const auction = base({
       dealName: "Midtown Office Tower",
