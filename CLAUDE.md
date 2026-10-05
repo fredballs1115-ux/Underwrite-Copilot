@@ -1082,6 +1082,35 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     never a Claude step** — the verdict's words reach the shared screen,
     and a counterparty who learns the buyer's deadline holds the price
     (`buyBoxLines(box, { exchange: false })` in the pipeline).
+  - **A preferred equity position** (`lib/position.ts`, round 5): capital
+    behind the mortgage and ahead of the common equity, for a fixed
+    preferred return and a redemption date. Its own interest kind
+    (`preferred_equity`; a share filed before the kind was asked whose rows
+    say a position — a "Preferred equity amount" beside a rate — reads as
+    one, never a fee simple's rows). The extraction files its terms as rows
+    by the reader's own labels ("Preferred equity amount", "Preferred
+    return", "Current pay rate", "Accrual rate", "Mandatory redemption
+    date", "Senior loan balance", "Senior loan maturity", "Whole-asset
+    value", "Extension options", "Remedies"; a test holds the prompt's
+    labels to the reader's). Six rules: a position, not a share (its yield
+    to redemption is solved on its own payments at its price with the
+    engine's `irr`); the last dollar is the risk (first and last dollar over
+    the stated value); current pay is cash, accrual a promise (said apart,
+    the yield read simple and the stack compounding where the words say
+    neither); the redemption is a refinancing (against the senior loan's
+    maturity; a date gone by is a default, not a yield); remedies as
+    stated; a blank is null. `lib/interest.ts` carries it as `position` on
+    the read, its lead and model caveat, `POSITION_TRAPS` and the shared two
+    read for it, the tag ("Pref equity, 12% to Jun 2029"), the short line
+    and "(the entity's property)" as the deal type. Its price is no
+    building's: `buildingPriceOf` and `subjectBasis` answer none, the
+    plausibility check makes no price finding, the plan withholds the
+    price as a position's, and the model's price note says it runs the
+    whole building at that price, which is not the position's return. In
+    a cap slot its yield to redemption stands where a note's yield to
+    maturity does (`noteCapSlot`'s `of`, `OWN_YIELD_WORDS` in
+    lib/compare-interest: "n/a — position" where none can be stated), and
+    its model returns are withheld.
 - The data providers' notices (2026-10-05, research pass 31), each in the
   provider's own printed words in `lib/data-notices.ts` (no imports):
   FRED's notice ("This product uses the FRED® API but is not endorsed or
