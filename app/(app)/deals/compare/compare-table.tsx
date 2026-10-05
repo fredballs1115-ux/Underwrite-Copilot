@@ -62,6 +62,8 @@ export type Col = {
    *  `verdictBehind`). Such a call is shown as the run, the way the
    *  pipeline card shows it, and never crowned "best". */
   behind?: "running" | "failed" | "stalled" | null;
+  /** whether a memorandum is on file (a typed-in deal has none) */
+  hasOm?: boolean;
   hasModel: boolean;
   /** deterministic mandate fit + a one-line why (misses / near-misses) */
   fit: "fits" | "near" | "outside" | null;
@@ -260,7 +262,7 @@ function CallPill({ c, className = "" }: { c: Col; className?: string }) {
         title={p ? `Re-screening — the previous call was ${p.label}` : undefined}
       >
         <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        {p ? "Re-screening…" : "Reading the OM…"}
+        {p ? "Re-screening…" : c.hasOm === false ? "Screening the facts…" : "Reading the OM…"}
       </span>
     );
   }

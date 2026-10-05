@@ -75,6 +75,11 @@ describe("bannerSources — the pictures a card tries, best first, each with its
     });
     // A neighbourhood placement's centre is a district's, not a building's.
     expect(bannerSources({ ...base, hasStreetAddress: false }, CARD)[0].marker).toBeUndefined();
+    // Nor a street address the geocoder placed only on its street or in its
+    // town (the batch-2 audit): the caller says whether the point is the
+    // building's own.
+    expect(bannerSources({ ...base, pointIsBuilding: false }, CARD)[0].marker).toBeUndefined();
+    expect(bannerSources({ ...base, pointIsBuilding: true }, CARD)[0].marker).toBe(true);
     // A frame may pin its zoom.
     expect(bannerSources(base, { ...CARD, z: 16 })[0].src).toBe(`/api/deals/d1/aerial?src=usgs&w=${CARD.w}&h=${CARD.h}&z=16`);
   });

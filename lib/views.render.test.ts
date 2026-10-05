@@ -927,6 +927,10 @@ describe("Pipeline — a deal screened again shows the run, never the call it is
     const first = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...rescreen, verdict: null }]) })));
     expect(first).toContain("Reading the OM…");
     expect(first).not.toContain("Re-screening");
+    // A deal typed in from its facts has no OM to read (the batch-2 audit).
+    const typed = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...rescreen, verdict: null, hasOm: false }]) })));
+    expect(typed).toContain("Screening the facts…");
+    expect(typed).not.toContain("Reading the OM");
     const done = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...rescreen, jobStatus: null }]) })));
     expect(done).not.toContain("screening…");
     expect(done).toMatch(/(^|\n)Go(\n|$)/);
@@ -2615,7 +2619,13 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     // a town's centre (the batch-2 audit).
     const loader = readSource(joinPath(process.cwd(), "app/share/[token]/page.tsx"), "utf8");
     expect(loader).toMatch(/kind: "aerial" as const,[\s\S]*?ring: pointIsBuilding\(\(deal\.photo as DealVisualCache \| null\) \?\? null, address\),/);
-    expect(readSource(joinPath(process.cwd(), "app/(app)/deals/[id]/page.tsx"), "utf8")).toContain("hasStreetAddress={!!dealAddress?.street}");
+    const dealPage = readSource(joinPath(process.cwd(), "app/(app)/deals/[id]/page.tsx"), "utf8");
+    expect(dealPage).toContain("hasStreetAddress={!!dealAddress?.street}");
+    // The deal page and the compare columns ring by the same rule.
+    expect(dealPage).toContain("pointIsBuilding={pointIsBuilding(visualCache, dealAddress)}");
+    expect(readSource(joinPath(process.cwd(), "app/(app)/deals/compare/page.tsx"), "utf8")).toContain(
+      "pointIsBuilding: pointIsBuilding((deal.photo as DealVisualCache | null) ?? null, address),",
+    );
   });
 
   it("draws the shared screen's photograph 16:9 on a phone and 12:5 from sm, the aerial at its one frame's 12:5 (research pass 29)", () => {

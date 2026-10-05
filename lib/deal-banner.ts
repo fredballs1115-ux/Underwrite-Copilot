@@ -132,6 +132,10 @@ export interface BannerFacts {
   /** the address reaches a street — Street View at a district centroid
    *  photographs some arbitrary block */
   hasStreetAddress: boolean;
+  /** the aerial's centre is the building's own point (lib/deal-location
+   *  `pointIsBuilding`): only then is it ringed. Absent, the street address
+   *  decides, as it did before the point's precision was read. */
+  pointIsBuilding?: boolean;
   /** the deal has an address at all — without one there is no overhead */
   hasAddress: boolean;
   /** the photograph of the deal's market, tried before the aerial — the
@@ -267,7 +271,7 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
       kind: "aerial",
       src: `/api/deals/${id}/aerial?src=usgs&w=${frame.w}&h=${frame.h}${z}`,
       credit: IMAGE_CREDIT.aerial,
-      ...(f.hasStreetAddress ? { marker: true } : {}),
+      ...((f.pointIsBuilding ?? f.hasStreetAddress) ? { marker: true } : {}),
     });
   }
   return out;

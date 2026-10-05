@@ -96,6 +96,9 @@ export type DealCard = {
    *  where a finished read's empty slot keeps the dash that says "not
    *  stated" */
   reading?: boolean;
+  /** whether a memorandum is on file: a deal typed in from its facts has
+   *  none, and its first screen reads no OM (the batch-2 audit) */
+  hasOm?: boolean;
   /** a buy box stands against the deal, so a fit is scored once the terms
    *  are read — without one, the fit's dash is final */
   hasBox?: boolean;
@@ -1883,7 +1886,7 @@ const DealRow = memo(function DealRow({
         title={v ? `Re-screening — the previous call was ${v.label}` : undefined}
       >
         <span className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        {v ? "Re-screening…" : "Reading the OM…"}
+        {v ? "Re-screening…" : d.hasOm === false ? "Screening the facts…" : "Reading the OM…"}
       </span>
     ) : v ? (
       <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}>{v.label}</span>
@@ -2162,7 +2165,7 @@ function TileCall({ d }: { d: DealCard }) {
     return (
       <span className={`${pill} bg-white/95 text-ink`} title={v ? `Re-screening — the previous call was ${v.label}` : undefined}>
         <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        {v ? "Re-screening…" : "Reading the OM…"}
+        {v ? "Re-screening…" : d.hasOm === false ? "Screening the facts…" : "Reading the OM…"}
       </span>
     );
   }

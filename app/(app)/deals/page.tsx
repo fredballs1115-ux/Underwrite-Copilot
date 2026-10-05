@@ -364,6 +364,7 @@ export default async function DealsPage({
       // (lib/pipeline-slots). The fit waits with them only where a buy box
       // stands — without one its dash is final.
       reading: readingTerms(jobStatus, !!extraction, !!d.om_storage_path),
+      hasOm: !!d.om_storage_path,
       hasBox: !!box,
       // Gate the aerial thumbnail here rather than letting every row fire a
       // request that can only 404: no address, no possible photograph.

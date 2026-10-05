@@ -146,6 +146,7 @@ export function PropertyVisual({
   dealId,
   label,
   hasStreetAddress,
+  pointIsBuilding = hasStreetAddress,
   googleEnabled,
   hasAddress = true,
   picture = null,
@@ -159,6 +160,11 @@ export function PropertyVisual({
   label: string;
   /** street-level imagery is only honest for a street-level address */
   hasStreetAddress: boolean;
+  /** the aerial's centre is the building: a street address the geocoder
+   *  placed at the house (lib/deal-location `pointIsBuilding`). Only then is
+   *  it ringed — a street's centreline or a town's centre is never the
+   *  building (the batch-2 audit). */
+  pointIsBuilding?: boolean;
   /** GOOGLE_MAPS_API_KEY is set (checked server-side) — unlocks the Street
    *  photo AND the sharp satellite frame, which are separate Google APIs */
   googleEnabled: boolean;
@@ -421,7 +427,7 @@ export function PropertyVisual({
               ? "Imagery: USGS The National Map"
               : "Imagery: USGS The National Map · neighborhood placement, no street address on this deal",
             thumb,
-            ring: hasStreetAddress,
+            ring: pointIsBuilding,
           },
         ];
       case "flood":
@@ -666,7 +672,7 @@ export function PropertyVisual({
                 block or two across, so a street address's building is ringed
                 at the frame's centre — never a neighbourhood placement's,
                 whose centre is a district's. */}
-            {hasStreetAddress && (
+            {pointIsBuilding && (
               <span
                 aria-hidden
                 data-picture="aerial-pin"

@@ -47,6 +47,7 @@ import { cookies } from "next/headers";
 import { compareReturns } from "@/lib/compare-figures";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
+import { pointIsBuilding } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { verdictBehind, type JobLike } from "@/lib/screen-run";
 
@@ -160,6 +161,7 @@ function toCol(
     // reader the memo, the report, the shared screen and the meeting
     // workbook ask): marked as the run, never crowned "best".
     behind: verdictBehind(job),
+    hasOm: !!(deal as { om_storage_path?: string | null }).om_storage_path,
     hasModel: model != null,
     fit,
     fitNote,
@@ -247,6 +249,8 @@ function toCol(
       pictureVersion: picture ? pictureVersion(picture.hero) : null,
       googleEnabled,
       hasStreetAddress: !!address?.street,
+      // Ringed only where the point is the building's (the batch-2 audit).
+      pointIsBuilding: pointIsBuilding((deal.photo as DealVisualCache | null) ?? null, address),
       hasAddress: !!address?.label,
     }),
     // The deal's cover (#442), built as the pipeline page builds it, so the
