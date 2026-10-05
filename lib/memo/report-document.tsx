@@ -503,7 +503,7 @@ function SiteBlock({ view, lookedUp }: { view: FloodMapView; lookedUp?: string |
                 <Image src={k.image} style={{ width: 8, height: 8, marginRight: 4, borderWidth: 0.5, borderColor: C.line }} />
               ) : null}
               <Text style={{ fontSize: 7.5, color: C.ink, fontFamily: k.here ? "Helvetica-Bold" : "Helvetica" }}>
-                {str(k.here ? `${k.label} - ${view.ring !== false ? "at the building" : "at the frame's centre"}` : k.label)}
+                {str(k.here ? `${k.label} — ${view.ring !== false ? "at the building" : "at the frame's centre"}` : k.label)}
               </Text>
             </View>
           ))}
@@ -633,7 +633,7 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
     <View>
       <Text style={s.sub}>
         {str(
-          `Each property as the memorandum states it - a blank is a figure it does not state. ${
+          `Each property as the memorandum states it — a blank is a figure it does not state. ${
             p.shares && basisWord
               ? `The bar is each property's share of the ${basisWord}${p.noiShares ? "; the thinner one beneath, its share of the NOI" : ""}.`
               : "No bars: the properties do not all state a count, nor all an area, so no share of the whole can be drawn."
@@ -695,6 +695,11 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
   );
 }
 
+const COUNT_WORDS = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+/** A count of lines as a sentence says it: "the first two", never "the
+ *  first 2" (research pass 35); ten and over stay figures. */
+const countWord = (n: number) => (n > 0 && n < 10 ? COUNT_WORDS[n] : String(n));
+
 /**
  * Whose figures a printed block of the market check's evidence is: the
  * address's market first ("the Washington DC market's"), a state as the
@@ -711,14 +716,14 @@ function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean)
   // The last `national` lines are the nation's, and said so here rather
   // than folded into "each is the metro's".
   const nat = Math.min(Math.max(b.national ?? 0, 0), b.lines.length);
-  const nationSays = nat > 0 ? (nat === 1 ? " The last is the nation's, and says so." : ` The last ${nat} are the nation's, each said so.`) : "";
+  const nationSays = nat > 0 ? (nat === 1 ? " The last is the nation's, and says so." : ` The last ${countWord(nat)} are the nation's, each said so.`) : "";
   const localCount = b.lines.length - nat;
-  const first_ = localCount === 1 ? "The first is" : `The first ${localCount} are`;
+  const first_ = localCount === 1 ? "The first is" : `The first ${countWord(localCount)} are`;
   if (!first) {
-    return `And ${whose} own, where ${sit}, read on ${readDay(b.readOn)}. Each is ${state ? "the state's" : "the metro's"} - not those properties' own, and never the portfolio's.${nationSays}`;
+    return `And ${whose} own, where ${sit}, read on ${readDay(b.readOn)}. Each is ${state ? "the state's" : "the metro's"} — not those properties' own, and never the portfolio's.${nationSays}`;
   }
   const lead = `Figures the check read beside the rules of thumb: ${whose}, as published, read on ${readDay(b.readOn)}${
-    state ? " - the address lies outside the metros the site tracks" : ""
+    state ? " — the address lies outside the metros the site tracks" : ""
   }.${state ? "" : placedBySentence(b.placedBy)}`;
   const each =
     (nat > 0
@@ -1579,6 +1584,7 @@ const fmtHurdle = (pct: number): string => `${Number(pct.toFixed(1))}%`;
 
 const fmtCompactUsd = (n: number): string => compactUsd(n, { millions: "auto", trim: true, thousandsFrom: 0 });
 
+
 /**
  * One sensitivity grid: a spanning axis title over the column values, a
  * left axis label over bold row labels, and two-line cells (IRR bold, EM
@@ -1997,7 +2003,7 @@ export function ReportDocument({
           <TitleRow title="Yield on cost, stressed" marginTop={14} />
           <Text style={s.sub}>
             {str(
-              `The plan is judged on the spread between the finished project's yield on total cost and the cap rate that product trades at once it is done - not on a cap rate against the price. Stabilized NOI under the pro forma runs down the rows, budget over the OM's across; each cell is the yield on total cost (bold) and its spread over the ${fmtPct(
+              `The plan is judged on the spread between the finished project's yield on total cost and the cap rate that product trades at once it is done — not on a cap rate against the price. Stabilized NOI under the pro forma runs down the rows, budget over the OM's across; each cell is the yield on total cost (bold) and its spread over the ${fmtPct(
                 plan.refCap.pct,
                 2,
               )} reference cap in basis points. The ink-bordered cell is the OM's own case. A pro forma that keeps its spread with NOI 20% short and the budget 30% over is conservative; one that needs its own base case is not.`,
@@ -2012,22 +2018,22 @@ export function ReportDocument({
               plan.breakevens.noiCushion > 0
                 ? `Stabilized NOI can come in ${fmtPct(plan.breakevens.noiCushion)} under the OM's ${fmtCompactUsd(
                     plan.plan.stabilizedNoi!.value,
-                  )} - down to ${fmtCompactUsd(plan.breakevens.noiAtRefCap)} - before the yield on cost falls to the ${fmtPct(
+                  )} — down to ${fmtCompactUsd(plan.breakevens.noiAtRefCap)} — before the yield on cost falls to the ${fmtPct(
                     plan.refCap.pct,
                     2,
                   )} reference cap.`
                 : `The OM's ${fmtCompactUsd(plan.plan.stabilizedNoi!.value)} stabilized NOI already yields less than the ${fmtPct(
                     plan.refCap.pct,
                     2,
-                  )} reference cap on ${fmtCompactUsd(plan.plan.totalCost ?? 0)} of total cost - the plan is under water before any stress.`,
+                  )} reference cap on ${fmtCompactUsd(plan.plan.totalCost ?? 0)} of total cost — the plan is under water before any stress.`,
             )}
           </Text>
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 3, fontFamily: "Helvetica-Oblique" }}>
             {str(
               plan.breakevens.overrunToRefCap != null
-                ? `${budgetNoun(plan)} would have to run ${fmtPct(plan.breakevens.overrunToRefCap, 0)} over - ${fmtCompactUsd(
+                ? `${budgetNoun(plan)} would have to run ${fmtPct(plan.breakevens.overrunToRefCap, 0)} over — ${fmtCompactUsd(
                     plan.plan.budget!.budget * (1 + plan.breakevens.overrunToRefCap),
-                  )} against ${fmtCompactUsd(plan.plan.budget!.budget)} - before the yield fell to the reference cap.`
+                  )} against ${fmtCompactUsd(plan.plan.budget!.budget)} — before the yield fell to the reference cap.`
                 : "Any overrun deepens a yield that already sits below the cap.",
             )}
           </Text>
@@ -2055,9 +2061,12 @@ export function ReportDocument({
 
           <Text style={{ fontSize: 7.5, color: C.muted, marginTop: 10 }}>
             {str(
-              `Reference cap: ${fmtPct(plan.refCap.pct, 2)} - ${refCapNote(
+              // A comma, not a dash, before the note: the default's own note
+              // carries a dash ("the model's exit-cap default — set your own
+              // view in the model").
+              `Reference cap: ${fmtPct(plan.refCap.pct, 2)}, ${refCapNote(
                 plan.refCap.provenance,
-              )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return - this grid is.`,
+              )}. Figures are the OM's as extracted; the challenger's page tests whether the stabilized NOI is as conservative as the deck presents it. The IRR sensitivity page is omitted on a plan deal: the annual screening model books the budget in year 1 and anchors year 1 on in-place income, so its IRR grid is not the plan's return — this grid is.`,
             )}
           </Text>
 

@@ -1894,6 +1894,8 @@ describe("ReportDocument (full report)", () => {
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain("The portfolio");
     expect(text).toContain("3 properties · 3 markets");
+    // A dash, not a spaced hyphen (research pass 35).
+    expect(text).toContain("Each property as the memorandum states it — a blank is a figure it does not state.");
     expect(text).toContain("Pittsburgh PA · 1");
     expect(text).toContain("Ohio · 1");
     expect(text).toContain("Ohio City Commons carries 54% of the stated NOI — the portfolio's income rides on one property.");
@@ -1967,15 +1969,54 @@ describe("ReportDocument (full report)", () => {
     );
     const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
     expect(text).toContain(
-      "Figures the check read beside the rules of thumb: the state of Pennsylvania's, as published, read on Sep 23, 2026 - the address lies outside the metros the site tracks. The first is the state's, not any metro's, the submarket's or the building's. The last is the nation's, and says so.",
+      "Figures the check read beside the rules of thumb: the state of Pennsylvania's, as published, read on Sep 23, 2026 — the address lies outside the metros the site tracks. The first is the state's, not any metro's, the submarket's or the building's. The last is the nation's, and says so.",
     );
     expect(text).not.toContain("the Pennsylvania market's");
     expect(text).toContain("They speak for the portfolio's 1 property in Pennsylvania of its 3, never for the portfolio.");
     expect(text).toContain("• Unemployment 3.7% (Aug 2026, Pennsylvania; FRED)");
     expect(text).toContain(
-      "And the Cleveland OH market's own, where 2 of the portfolio's 3 properties sit, read on Sep 23, 2026. Each is the metro's - not those properties' own, and never the portfolio's.",
+      "And the Cleveland OH market's own, where 2 of the portfolio's 3 properties sit, read on Sep 23, 2026. Each is the metro's — not those properties' own, and never the portfolio's.",
     );
     expect(text).toContain("• Unemployment 4.4% (Jul 2026, Cleveland MSA; FRED)");
+  }, 60000);
+
+  it("counts the brief's lines in words — the first two, the last three — never as bare figures (research pass 35)", async () => {
+    const deal = {
+      name: "The Maddox",
+      asset_class: "multifamily",
+      extraction: { dealName: "The Maddox", assetClass: "multifamily", metrics: [{ label: "Asking price", value: "$40,000,000", flagged: false, page: "p. 3" }] },
+      challenges: null,
+      comps: null,
+      market: {
+        checks: [{ assumption: "Rent growth", omSays: "4.0%", typicalRange: "2.5%–3.5%", assessment: "aggressive", note: "Above the index.", page: "" }],
+        summary: "One aggressive assumption.",
+        liveBrief: {
+          metro: "Washington DC",
+          grain: "metro" as const,
+          readOn: "2026-09-23",
+          lines: [
+            "Unemployment 3.4% (Jul 2026, Washington MSA; FRED)",
+            "Payrolls +0.6% y/y (Jul 2026, Washington MSA; FRED)",
+            "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)",
+            "Debt market — CRE delinquency 1.4% (Q2 2026; FRED)",
+            "Insurance — premiums +6.1% y/y (Aug 2026; BLS via FRED)",
+          ],
+          national: 3,
+        },
+      },
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const text = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(deal, "September 24, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    // It read "The first 2 are the metro's … The last 3 are the nation's".
+    expect(text).toContain(
+      "The first two are the metro's, not the submarket's or the building's. The last three are the nation's, each said so.",
+    );
   }, 60000);
 
   it("says how a county-placed deal reached its market's figures (#447)", async () => {
@@ -2261,6 +2302,14 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("The all-in basis is total cost over the 240 units.");
     expect(text).toContain("$195,000 per unit all-in");
     expect(text).not.toContain("planned unit");
+    // The plan page's asides are set off by dashes, not spaced hyphens;
+    // the reference cap's note, which carries a dash of its own, by a comma.
+    expect(text).toContain("at once it is done — not on a cap rate against the price.");
+    expect(text).toContain("Stabilized NOI can come in 4.8% under the OM's $2.95M — down to $2.81M — before the yield on cost falls to the 6.00% reference cap.");
+    expect(text).toContain("The budget would have to run 49% over — $7.17M against $4.8M — before the yield fell to the reference cap.");
+    expect(text).toContain("Reference cap: 6.00%, the model's exit-cap default — set your own view in the model.");
+    expect(text).toContain("so its IRR grid is not the plan's return — this grid is.");
+    expect(text).not.toMatch(/[\w%)] - [\w$]/);
   }, 60000);
 
   it("gives the site a page of its own: FEMA's flood map as one picture, the ring on the building, the key with the building's zone marked, and the zone's sentence (#427, #472)", async () => {
@@ -2307,7 +2356,9 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("The site");
     expect(text).toContain("FEMA flood map");
     expect(text).toContain("FEMA National Flood Hazard Layer over USGS The National Map; the ring marks the building.");
-    expect(text).toContain("1% annual chance flood hazard - at the building");
+    // A dash, not a spaced hyphen (research pass 35).
+    expect(text).toContain("1% annual chance flood hazard — at the building");
+    expect(text).not.toContain("hazard - at");
     expect(text).toContain("Floodway");
     expect(text).toContain("0.2% annual chance flood hazard");
     expect(text).toContain(
@@ -2362,7 +2413,7 @@ describe("ReportDocument (full report)", () => {
     expect(street).toContain(
       "FEMA National Flood Hazard Layer over USGS The National Map; the frame is centred on the street the address names, not the building: the map data has no house number for it. Location © OpenStreetMap contributors (openstreetmap.org/copyright).",
     );
-    expect(street).toContain("1% annual chance flood hazard - at the frame's centre");
+    expect(street).toContain("1% annual chance flood hazard — at the frame's centre");
     expect(street).not.toContain("the ring marks the building");
   }, 45000);
 
