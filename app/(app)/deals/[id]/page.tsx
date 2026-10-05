@@ -91,7 +91,7 @@ import { parseFactRow, type DealFact } from "@/lib/facts";
 import type { ReconcileResult } from "@/lib/reconcile";
 import { DealActions } from "./deal-actions";
 import { computeScreenDiff, type PriorScreen } from "@/lib/screen-diff";
-import { previousScreenResults, verdictBehind } from "@/lib/screen-run";
+import { storedPreviousResults, verdictBehind } from "@/lib/screen-run";
 import { readingMemorandum } from "@/lib/screen-reading";
 import {
   SCREEN_DURATION_SAMPLE,
@@ -378,8 +378,9 @@ export default async function DealPage({
   // A screen that failed midway, or one still running, leaves a MIXED
   // generation: the results from its step onward still belong to the
   // previous screen. Every surface below marks them, and the count of
-  // finished steps excludes them (lib/screen-run).
-  const staleResults = [...previousScreenResults(job)];
+  // finished steps excludes them (lib/screen-run) — only the ones the deal
+  // stores: a first screen has no previous screen's results to mark.
+  const staleResults = storedPreviousResults(job, { extraction, challenges, comps, market, verdict });
   const verdictLag = verdictBehind(job);
 
   // The call in the header and the sticky bar. While the verdict on file

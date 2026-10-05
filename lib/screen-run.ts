@@ -96,6 +96,33 @@ export function previousScreenResults(job: JobLike | null | undefined): Set<Resu
 }
 
 /**
+ * `previousScreenResults`, held to the results the deal actually stores. A
+ * first screen has no previous screen: a result it never reached is simply
+ * absent, and nothing is the previous screen's. The deal page said "the
+ * results it did not reach still show below, marked as the previous
+ * screen's" over a first screen that had stored nothing at all (research
+ * pass 30).
+ */
+export function storedPreviousResults(
+  job: JobLike | null | undefined,
+  stored: Partial<Record<ResultKey, unknown>>,
+): ResultKey[] {
+  return [...previousScreenResults(job)].filter((k) => stored[k] != null);
+}
+
+/**
+ * Why the latest SCREEN stopped before its end, if it did: it failed before
+ * one of the five results. Null for a finished run, one still going, and a
+ * job that is no screen (a comp search, a model build). The deal page reads
+ * it for its empty sections, which then point at the reason at the top of
+ * the page instead of saying the screen "hasn't run" and offering a second
+ * button for the one beside the failure.
+ */
+export function screenStopped(job: JobLike | null | undefined): "failed" | null {
+  return staleAfterFailure(job).size > 0 ? "failed" : null;
+}
+
+/**
  * Why the stored verdict is the previous screen's, if it is: the latest
  * screen failed before it reached the verdict, or a screen still running
  * has not reached it yet. The memo and the report refuse to print it

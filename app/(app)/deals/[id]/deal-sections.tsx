@@ -397,6 +397,7 @@ export function OverviewView({
   onNavigate,
   stale = [],
   staleWhy = "failed",
+  stopped = false,
 }: {
   results: Results;
   active: boolean;
@@ -410,6 +411,11 @@ export function OverviewView({
   stale?: ReadonlyArray<keyof Results>;
   /** why: the latest screen failed before them, or is still running */
   staleWhy?: "failed" | "running";
+  /** the latest screen stopped before its end (lib/screen-run
+   *  `screenStopped`): what is missing is missing because it stopped, and
+   *  the reason is at the top of the page — never "no concerns", which
+   *  reads as a clean result */
+  stopped?: boolean;
 }) {
   const risks = deriveRisks(results);
   const counts = { high: 0, medium: 0, low: 0 };
@@ -448,7 +454,9 @@ export function OverviewView({
           <p className="mt-1 text-sm text-muted">
             {active
               ? "The verdict and risk digest will appear here as the analysis completes."
-              : "Run the analysis to see the verdict and the consolidated risk digest."}
+              : stopped
+                ? "The screen stopped before its verdict — the reason is at the top of the page."
+                : "Run the analysis to see the verdict and the consolidated risk digest."}
           </p>
         </div>
       )}
@@ -525,7 +533,9 @@ export function OverviewView({
           <p className="mt-3 text-sm text-muted">
             {active
               ? "Concerns will collect here as each section completes."
-              : "No concerns surfaced yet."}
+              : stopped
+                ? "Nothing to digest yet — the screen stopped before it finished."
+                : "No concerns surfaced yet."}
           </p>
         ) : (
           <div className="mt-3">

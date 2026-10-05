@@ -79,7 +79,7 @@ import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { servedInline } from "@/lib/inline-types";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
 import { revealScrollLeft } from "@/lib/tab-strip";
-import type { ResultKey } from "@/lib/screen-run";
+import { screenStopped, type ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { DOC_KIND_LABEL, type DealDocument } from "@/lib/documents";
@@ -461,6 +461,10 @@ export function DealView({
   // A screen, not a side job, is under way: the rail's "Step N of 6" is the
   // progress cue, and the overview's own count of results stands down.
   const screening = active && !SIDE_JOBS.has(job?.step ?? "");
+  // The latest screen stopped before its end (lib/screen-run): an empty
+  // section then points at the reason at the top of the page, rather than
+  // saying the screen "hasn't run" with a second button for the one there.
+  const stopped = screenStopped(job);
 
   // Poll the lightweight status endpoint while a run is in flight. When the
   // step changes (or the run ends), pull the freshly-written section data.
@@ -872,6 +876,7 @@ export function DealView({
               onNavigate={navigateLegacy}
               stale={staleResults}
               staleWhy={staleWhy}
+              stopped={stopped != null}
             />
             {playground && <SensitivityPlayground data={playground} />}
             {tasks !== null && (
@@ -906,6 +911,7 @@ export function DealView({
           <FinancialsPanel
             results={results}
             active={active}
+            stopped={stopped != null}
             step={job?.step ?? null}
             hasOm={hasOm}
             dealId={dealId}
@@ -935,6 +941,7 @@ export function DealView({
             counts={analysisCounts}
             results={results}
             active={active}
+            stopped={stopped != null}
             step={job?.step ?? null}
             dealId={dealId}
             dealName={dealName}
@@ -999,9 +1006,16 @@ export function DealView({
 
 /** Financials: the extracted terms first; the Excel model workflow lives in a
  *  collapsed block below — supporting detail, one click away. */
+/** An empty section after the latest screen stopped before it: the reason
+ *  and its action are at the top of the page, so the section says so and
+ *  offers no second button (research pass 30). */
+const STOPPED_BEFORE =
+  "The last screen stopped before this step — the reason is at the top of the page.";
+
 function FinancialsPanel({
   results,
   active,
+  stopped = false,
   step,
   hasOm,
   dealId,
@@ -1022,6 +1036,8 @@ function FinancialsPanel({
 }: {
   results: Results;
   active: boolean;
+  /** the latest screen stopped before its end (lib/screen-run) */
+  stopped?: boolean;
   step: string | null;
   hasOm: boolean;
   dealId: string;
@@ -1049,6 +1065,8 @@ function FinancialsPanel({
         <TermsView result={results.extraction} facts={facts} omUrl={omUrl} />
       ) : active && (step === "extract" || step === "signal") ? (
         <StatGridSkeleton />
+      ) : hasOm && stopped ? (
+        <EmptyState title={STOPPED_BEFORE} />
       ) : hasOm ? (
         <EmptyState
           title="The screen hasn’t run for this deal yet."
@@ -1374,6 +1392,7 @@ function AnalysesPanel({
   counts,
   results,
   active,
+  stopped = false,
   step,
   dealId,
   dealName,
@@ -1395,6 +1414,8 @@ function AnalysesPanel({
   counts: Record<AnalysisKey, number>;
   results: Results;
   active: boolean;
+  /** the latest screen stopped before its end (lib/screen-run) */
+  stopped?: boolean;
   step: string | null;
   dealId: string;
   dealName: string;
@@ -1503,6 +1524,8 @@ function AnalysesPanel({
     content = (
       <EmptyState title="The OM offered no comps to scrutinize — add your own below, or search the public web." />
     );
+  } else if (hasOm && stopped) {
+    content = <EmptyState title={STOPPED_BEFORE} />;
   } else if (hasOm) {
     content = (
       <EmptyState

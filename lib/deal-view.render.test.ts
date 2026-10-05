@@ -394,6 +394,51 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(textOf(render(sampleProps("overview")))).not.toMatch(/previous screen/);
   });
 
+  it("a FIRST screen that failed claims no previous screen's results, and offers one way on (research pass 30)", () => {
+    // A first screen stores nothing it did not reach, so the page hands no
+    // previous-screen results (lib/screen-run `storedPreviousResults`); the
+    // sections it never reached point at the reason at the top of the page.
+    const failedFirst = (tab: string, analysis: string | null = null): Props =>
+      ({
+        ...sampleProps(tab, analysis),
+        isSample: false,
+        hasOm: true,
+        omUrl: "/api/deals/d1/om",
+        job: {
+          status: "error",
+          step: "extract",
+          progress: 10,
+          error: "The analysis service is overloaded right now — try again in a few minutes.",
+        },
+        results: { extraction: null, challenges: null, comps: null, reconciliation: null, market: null, verdict: null },
+        staleResults: [],
+        playground: null,
+        actuals: { rentRoll: null, t12: null, noiComparison: null },
+      }) as unknown as Props;
+    for (const [tab, analysis] of [["overview", null], ["financials", null], ["analyses", "verdict"], ["analyses", "challenger"]] as const) {
+      const html = render(failedFirst(tab, analysis));
+      expect(a11yIssues(html), `${tab}/${analysis}`).toEqual([]);
+      const text = textOf(html);
+      expect(gluedWords(text), `${tab}/${analysis}`).toEqual([]);
+      expect(text, `${tab}/${analysis}`).toMatch(/overloaded right now/);
+      expect(text, `${tab}/${analysis}`).not.toMatch(/still show below|previous screen/);
+      expect(text, `${tab}/${analysis}`).not.toMatch(/hasn.t run for this deal/);
+      // One button for one action: the banner's.
+      expect(text, `${tab}/${analysis}`).not.toMatch(/Run the screen/);
+      expect((text.match(/Try again/g) ?? []).length, `${tab}/${analysis}`).toBe(1);
+      if (tab !== "overview") expect(text).toContain("The last screen stopped before this step — the reason is at the top of the page.");
+    }
+    const overview = textOf(render(failedFirst("overview")));
+    expect(overview).toContain("The screen stopped before its verdict — the reason is at the top of the page.");
+    // Never "No concerns surfaced yet." — after a failed read it reads as a clean result.
+    expect(overview).not.toMatch(/No concerns surfaced/);
+    expect(overview).toContain("Nothing to digest yet — the screen stopped before it finished.");
+    // A deal that has simply never been screened still offers the screen.
+    const never = textOf(render({ ...failedFirst("financials"), job: null }));
+    expect(never).toMatch(/The screen hasn.t run for this deal yet\./);
+    expect(never).toMatch(/Run the screen/);
+  });
+
   it("a re-screen still running marks the results it has not reached, and says it is running", () => {
     // The research pass of 2026-09-30: mid re-screen, the page showed the
     // run's new terms beside the last run's call as one screen.

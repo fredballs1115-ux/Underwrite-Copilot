@@ -4,9 +4,11 @@ import {
   isLiveJob,
   listJobStatus,
   previousScreenResults,
+  screenStopped,
   screenedOn,
   staleAfterFailure,
   staleWhileRunning,
+  storedPreviousResults,
   verdictBehind,
 } from "./screen-run";
 
@@ -115,6 +117,31 @@ describe("a screen still running — its results are this run's only once their 
     expect(isLiveJob({ status: "queued", step: null })).toBe(true);
     expect(isLiveJob({ status: "running", step: "extract" })).toBe(true);
     expect(isLiveJob({ status: "done", step: "verdict" })).toBe(false);
+  });
+
+  it("only a stored result is the previous screen's: a first screen marks nothing it never reached (research pass 30)", () => {
+    const failedAtExtract = { status: "error", step: "extract" };
+    // A first screen: nothing stored, nothing marked.
+    expect(storedPreviousResults(failedAtExtract, {})).toEqual([]);
+    expect(storedPreviousResults(failedAtExtract, { extraction: null, verdict: undefined })).toEqual([]);
+    // A re-screen: the previous screen's results the run never reached.
+    expect(storedPreviousResults({ status: "error", step: "comps" }, { extraction: {}, challenges: {}, comps: {}, verdict: {} })).toEqual([
+      "comps",
+      "verdict",
+    ]);
+    expect(storedPreviousResults({ status: "running", step: "market" }, { market: {}, verdict: {} })).toEqual(["market", "verdict"]);
+    expect(storedPreviousResults({ status: "done", step: "verdict" }, { verdict: {} })).toEqual([]);
+  });
+
+  it("screenStopped is a screen that failed before its end — never a finished run, a live one or a side job", () => {
+    expect(screenStopped({ status: "error", step: "extract" })).toBe("failed");
+    expect(screenStopped({ status: "error", step: "verdict" })).toBe("failed");
+    expect(screenStopped({ status: "error", step: null })).toBe("failed");
+    expect(screenStopped({ status: "done", step: "verdict" })).toBeNull();
+    expect(screenStopped({ status: "running", step: "comps" })).toBeNull();
+    expect(screenStopped({ status: "error", step: "comps_search" })).toBeNull();
+    expect(screenStopped({ status: "error", step: "model" })).toBeNull();
+    expect(screenStopped(null)).toBeNull();
   });
 
   it("verdictBehind says why the stored call is the previous screen's, or nothing", () => {
