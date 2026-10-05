@@ -239,6 +239,12 @@ describe("an operating business on its real estate (pass 28, round 3)", () => {
     expect(al.headline).toContain("Operating structure, as stated: Owner-operated.");
     // The care traps ride only on a care operation.
     expect(goingConcernNote(readGoingConcern(STATION, TODAY)!)).not.toContain("CARE-OPERATION TRAPS");
+    // An age-restricted tax-credit building that calls itself "senior
+    // living" sells no care: the class table files it as rental housing,
+    // and this reader names no care business on it (the pre-merge audit).
+    expect(operatingBusinessOf(deal({ assetClass: "Senior Living Apartments (LIHTC, 62+)" }, []))).toBeNull();
+    expect(readGoingConcern(deal({ assetClass: "Senior Living Apartments (LIHTC, 62+)" }, [row("Operating structure", "Owner-operated")]), TODAY)).toBeNull();
+    expect(operatingBusinessOf(deal({ assetClass: "Senior Living Apartments" }, []))).toBe("senior_care");
   });
 
   // The audit of 2026-10-05: the stated structure was printed under a first

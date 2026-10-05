@@ -293,6 +293,18 @@ describe("the asset-words table", () => {
     ]) {
       expect(assetClassKey(phrase), phrase).toBe("senior_housing");
     }
+    // But "senior living" beside an affordable or age-restricted program's
+    // own words is a tax-credit building with an age restriction, which
+    // sells no care (the pre-merge audit: each filed as senior housing, so
+    // no rent rules and licensed care's defaults).
+    for (const phrase of ["Senior Living Apartments (LIHTC, 62+)", "Affordable senior living apartments, age 62+", "Senior living apartments (Section 8, 62 and over)"]) {
+      expect(assetClassKey(phrase), phrase).toBe("multifamily");
+      expect(isResidentialClass(phrase), phrase).toBe(true);
+    }
+    // A care word proper keeps it care, whatever the program beside it.
+    for (const phrase of ["Senior Living Apartments (LIHTC, 62+) with assisted living", "Senior living (62+) with meals and services", "Licensed senior living, age-restricted"]) {
+      expect(assetClassKey(phrase), phrase).toBe("senior_housing");
+    }
     // A skilled nursing facility by any of its names is senior housing; each
     // filed as no class, so every class's traps and the generic defaults.
     for (const phrase of [

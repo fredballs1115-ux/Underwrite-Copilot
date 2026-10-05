@@ -260,13 +260,20 @@ const SENIOR_WORDS = String.raw`senior|assisted living|memory care|independent l
 // rules and ran on licensed care's defaults). A care or service word keeps
 // a phrase senior housing: independent living's meals and services are care
 // a resident buys. "Senior living" is the industry's own word for a care
-// community, apartments or not ("Senior Living Apartments").
-const CARE_OR_SERVICE =
-  /\b(?:assisted|memory|skilled|nursing|snf|care|independent[\s-]+living|senior[\s-]+living|ccrcs?|continuing|life[\s-]+plan|licensed|services?|meals?|post[\s-]+acute|rehabilitation)\b/i;
+// community, apartments or not ("Senior Living Apartments") — but not beside
+// an affordable or age-restricted program's own words: "Senior Living
+// Apartments (LIHTC, 62+)" is a tax-credit building with an age restriction,
+// which sells no care unless a care word proper says so (the pre-merge
+// audit: filed as senior housing, it lost the rent rules and ran on licensed
+// care's defaults and traps).
+const CARE_WORDS =
+  /\b(?:assisted|memory|skilled|nursing|snf|care|independent[\s-]+living|ccrcs?|continuing|life[\s-]+plan|licensed|services?|meals?|post[\s-]+acute|rehabilitation)\b/i;
+const HOUSING_PROGRAM = /\b(?:lihtc|tax[\s-]+credits?|section\s+8|age[\s-]+restricted)\b|\b(?:55|62)\s*\+|\b(?:55|62)[\s-]+and[\s-]+(?:over|older)\b/i;
+const careOrService = (s: string) => CARE_WORDS.test(s) || (/\bsenior[\s-]+living\b/i.test(s) && !HOUSING_PROGRAM.test(s));
 const seniorApartments = (s: string) =>
   /\bseniors?\b/i.test(s) &&
   (/\b(?:apartments?|affordable|lihtc|tax[\s-]+credit|section\s+8|age[\s-]+restricted|rental\s+housing)\b/i.test(s) || /\b(?:55|62)\s*\+/.test(s)) &&
-  !CARE_OR_SERVICE.test(s);
+  !careOrService(s);
 const AGE_RESTRICTED = String.raw`active[\s-]+adult|age[\s-]+restricted|55[\s-]+and[\s-]+over`;
 // A mobile home in the plural too ("Mobile homes" ran past the word's end),
 // and a land-lease community, whose residents own their homes and rent the

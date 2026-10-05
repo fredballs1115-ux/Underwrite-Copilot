@@ -199,7 +199,15 @@ const readOtherwise = (ex: ExtractionResult) => READ_OTHERWISE.has(assetClassKey
 
 function businessIn(words: string | null | undefined): OperatingBusiness | null {
   if (typeof words !== "string" || words.trim() === "") return null;
-  for (const [kind, re] of BUSINESS_WORDS) if (re.test(words)) return kind;
+  for (const [kind, re] of BUSINESS_WORDS) {
+    if (!re.test(words)) continue;
+    // Words the class table files as rental housing name no care business:
+    // "Senior Living Apartments (LIHTC, 62+)" is an age-restricted
+    // tax-credit building that sells no care (lib/asset-words), and the
+    // two readers say one thing of it (the pre-merge audit).
+    if (kind === "senior_care" && assetClassKey(words) === "multifamily") continue;
+    return kind;
+  }
   return null;
 }
 
