@@ -378,8 +378,16 @@ export function landingAfterFailedExchange(next: string | null, hadCode: boolean
  * reset asked for on a laptop opens on a phone, since the hash needs no code
  * verifier in the browser that asked (research pass 32; the email templates
  * pointing here are the owner's to set).
+ *
+ * Only the kinds the app sends (research pass 39): a sign-up's confirmation
+ * (app/login/actions `signUp` and `resend`, its template's `type=signup`, or
+ * `email` as the auth service's own guide writes it) and a password reset
+ * (`resetPasswordForEmail`, `recovery`). The app sends no invite (a team's
+ * invite is a link of its own, `/team/join/<token>`, minted on the Team
+ * page), no magic link and no email change, so a link of those kinds is
+ * none of ours and is refused before the auth service is asked.
  */
-export const EMAIL_LINK_TYPES = ["signup", "invite", "magiclink", "recovery", "email_change", "email"] as const;
+export const EMAIL_LINK_TYPES = ["signup", "email", "recovery"] as const;
 export type EmailLinkType = (typeof EMAIL_LINK_TYPES)[number];
 
 /** A link's `type`, or null for one the page does not verify. */
@@ -402,10 +410,6 @@ export function confirmPageCopy(type: EmailLinkType): { heading: string; body: s
       button: "Continue",
     };
   }
-  if (type === "email_change") {
-    return { heading: "Confirm your new email", body: "Confirm the change to your account's email address.", button: "Confirm the change" };
-  }
-  if (type === "magiclink") return { heading: "Sign in", body: "Continue to sign in to Underwrite Copilot.", button: "Sign in" };
   return { heading: "Confirm your email", body: "Confirm your email address to finish setting up your account.", button: "Confirm my email" };
 }
 
@@ -415,9 +419,57 @@ export function confirmPageCopy(type: EmailLinkType): { heading: string; body: s
  *  along. */
 export function landingAfterConfirm(type: EmailLinkType, next: string | null, ok: boolean): string {
   if (ok) return landingAfterExchange(next, type === "recovery" ? "recovery" : null);
-  if (type === "recovery" || type === "magiclink") return "/login?link=expired";
+  if (type === "recovery") return "/login?link=expired";
   const onward = onwardPath(next);
   return `/login?confirmed=1&link=expired${onward ? `&next=${encodeURIComponent(onward)}` : ""}`;
+}
+
+/**
+ * The same link, asking first (research pass 39): pressed in a browser that
+ * is already signed in, `/auth/confirm` verifies nothing and signs nobody
+ * out — it shows who is signed in and asks, and only a second press signs
+ * that account out of this browser and verifies the link. A token hash needs
+ * no code verifier from the browser that asked for it, so a link made for
+ * one account can be opened in another account's browser.
+ */
+export function confirmSwitchPath(type: EmailLinkType, tokenHash: string, next: string | null): string {
+  const q = new URLSearchParams({ token_hash: tokenHash, type, switch: "1" });
+  const safe = safeNextPath(next);
+  if (safe) q.set("next", safe);
+  return `/auth/confirm?${q.toString()}`;
+}
+
+/** What `/auth/confirm` asks before a link replaces the account `email`
+ *  signed in to this browser — or, where the session could not be read to
+ *  name it, whatever account is signed in here. */
+export function confirmSwitchCopy(
+  type: EmailLinkType,
+  email: string | null,
+): { heading: string; body: string; button: string; stay: string } {
+  const does =
+    type === "recovery"
+      ? "This link sets a new password on the account it was sent to, and signs this browser in to that account."
+      : "This link confirms the account it was sent to, and signs this browser in to that account.";
+  if (!email) {
+    return {
+      heading: "This browser may be signed in already",
+      body: `${does} Continuing signs out whoever is signed in here first.`,
+      button: "Sign out and continue",
+      stay: "Keep the account signed in here",
+    };
+  }
+  return {
+    heading: `You’re signed in as ${email}`,
+    body: `${does} If that is another account, continuing signs ${email} out of this browser first.`,
+    button: "Sign out and continue",
+    stay: `Stay signed in as ${email}`,
+  };
+}
+
+/** Where a verified link lands: `/auth/confirm` naming the account now
+ *  signed in, with "not you?" beside it and the way on to `landing`. */
+export function confirmedPath(landing: string): string {
+  return `/auth/confirm?signed_in=1&next=${encodeURIComponent(safeNextPath(landing) ?? "/deals")}`;
 }
 
 export type LinkBanner = { tone: "ok" | "warn"; text: string };
