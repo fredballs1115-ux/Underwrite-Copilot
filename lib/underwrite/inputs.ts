@@ -364,6 +364,19 @@ const CLASS_DEFAULTS: Record<
 const pageOf = (m: unknown): string | undefined =>
   m && typeof m === "object" && "page" in m ? (m as { page?: string }).page : undefined;
 
+/** A cap the OM states as a range — "5.25% - 5.75%", "5.25% to 5.75%" — as
+ *  its two ends, either order written; null for one figure (research pass
+ *  38, C27). */
+const CAP_SPAN = /(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%/i;
+function capSpanOf(raw: string): { low: number; high: number } | null {
+  const m = CAP_SPAN.exec(raw);
+  if (!m) return null;
+  const [a, b] = [Number(m[1]), Number(m[2])];
+  const low = Math.min(a, b);
+  const high = Math.max(a, b);
+  return low > 0 && high > low && high <= 25 ? { low, high } : null;
+}
+
 // Every class the site files has its own defaults; a phrase the model wrote
 // ("boutique hotel") is filed by its words (lib/asset-words), and only a
 // class nothing resolves falls to the generic row.
@@ -752,6 +765,14 @@ export function deriveUnderwriteInputs(
     capDecimal != null && capDecimal / 100 > 0.005 && capDecimal / 100 <= IMPLIED_CAP_CEILING
       ? capDecimal / 100
       : null;
+  // A cap the OM states as a range — "5.25% - 5.75%" — runs at the end the
+  // cap reader took, and every note that names the cap names the range and
+  // that end, as the price note does a price range's (research pass 38,
+  // C27). Which end the model should run at is the owner's call.
+  const capSpan = capMetric && capPct != null ? capSpanOf(capMetric.value) : null;
+  const capEnd = capSpan && capPct != null ? (Math.abs(capPct * 100 - capSpan.low) < 1e-9 ? "low" : Math.abs(capPct * 100 - capSpan.high) < 1e-9 ? "high" : null) : null;
+  const capRangeWords =
+    capSpan && capEnd ? `the ${capEnd} end of the ${capSpan.low.toFixed(2)}%–${capSpan.high.toFixed(2)}% range the OM states as its going-in cap` : null;
   // A range the OM states — pricing guidance, a whisper — is read at its
   // top (#466): the end that does not flatter a single return below.
   let price = priceMetric ? parsePrice(priceMetric.value) : null;
@@ -874,7 +895,7 @@ export function deriveUnderwriteInputs(
   } else if (goingFig && capPct) {
     // Only an in-place / Year-1 NOI may back a price out of the going-in cap.
     price = goingFig.value / capPct;
-    mark("purchasePrice", "derived", "NOI ÷ going-in cap");
+    mark("purchasePrice", "derived", capRangeWords ? `NOI ÷ ${capRangeWords}` : "NOI ÷ going-in cap");
   } else {
     price = 10_000_000;
     // A price row whose value is no price ("6.25% cap rate", "185,000 per
@@ -991,15 +1012,16 @@ export function deriveUnderwriteInputs(
     // the memorandum, so a price typed over the placeholder never shows
     // returns on it (the second audit, MED-2).
     const onPlaceholder = statedPrice == null;
-    const capWords = `the stated ${(Math.round(capPct * 10_000) / 100).toFixed(2)}% going-in cap`;
+    // A cap stated as a range is named with the end taken (C27).
+    const capWords = capRangeWords ?? `the stated ${(Math.round(capPct * 10_000) / 100).toFixed(2)}% going-in cap`;
     mark(
       "inPlaceRentAnnual",
       noIncome || onPlaceholder ? "assumption" : "derived",
       skipped
-        ? `${implausible(skipped)}. Year-1 NOI set from ${onPlaceholder ? `the ${usd0(price)} placeholder × ${capWords}` : "price × the stated going-in cap"} instead`
+        ? `${implausible(skipped)}. Year-1 NOI set from ${onPlaceholder ? `the ${usd0(price)} placeholder × ${capWords}` : `price × ${capRangeWords ?? "the stated going-in cap"}`} instead`
         : onPlaceholder
           ? `The ${usd0(price)} placeholder × ${capWords}, at an assumed expense ratio — the memorandum states no price or NOI, so this NOI is the placeholder's; enter the price and the in-place NOI`
-          : "From price × going-in cap, at an assumed expense ratio",
+          : `From price × ${capRangeWords ?? "going-in cap"}, at an assumed expense ratio`,
     );
     if (noIncome && skipped && sources.inPlaceRentAnnual) {
       sources.inPlaceRentAnnual = { ...sources.inPlaceRentAnnual, notRun: { label: skipped.label, value: skipped.value } };
@@ -1417,7 +1439,7 @@ export function deriveUnderwriteInputs(
   const defaultGap = capPct ? null : defaultExitGap(0.06, defaultEntry);
   mark("exitCapPct", capPct ? "derived" : "assumption",
     capPct
-      ? `Defaulted to the OM's stated going-in cap${ownEntryClause} — set your exit view`
+      ? `Defaulted to ${capRangeWords ?? "the OM's stated going-in cap"}${ownEntryClause} — set your exit view`
       : defaultGap
         ? `${defaultGap} — set your exit view`
         : "Default 6.0% — set your exit view",
