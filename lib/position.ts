@@ -185,9 +185,22 @@ const CURRENT_PART = new RegExp(String.raw`${PAID_ON}|(?:paid\s+)?current(?:ly)?
  *  "12%, paid monthly", "12% per annum, payable quarterly in arrears" — the
  *  current pay in all (audit C3a: each had read as no current pay). */
 const PAID_IN_CASH = new RegExp(String.raw`\b${PAID_ON}\b`, "i");
+/** The words of a shortfall or an unpaid current pay — never "accrued and
+ *  unpaid amounts", which are the accrual's own (audit C5, MED-5). */
+const SHORTFALL_WORD = String.raw`\b(?:shortfall|deficien\w*|(?<!accrued\s+and\s+)unpaid|if\s+not\s+paid|not\s+(?:paid|distributed)\s+(?:currently|when\s+due))\b`;
+/** A clause's characters: up to a comma, a semicolon, a period or a
+ *  bracket, never the point or the comma inside a figure ("12.5%"). */
+const IN_CLAUSE = String.raw`(?:[^,.;()]|(?<=\d)[.,](?=\d))*`;
 /** A clause said of a shortfall or an unpaid amount: its accrual is the
- *  shortfall's, never the whole return's ("any shortfall accrues in full"). */
-const SHORTFALL_CLAUSE = /[^.;]*\b(?:shortfall|deficien\w*|unpaid|if\s+not\s+paid|not\s+(?:paid|distributed)\s+(?:currently|when\s+due))\b[^.;]*/gi;
+ *  shortfall's, never the whole return's ("any shortfall accrues in full").
+ *  The clause alone, from its own start: "12% preferred return, paid
+ *  monthly, with any shortfall accruing" is 12% paid monthly with a
+ *  shortfall's clause beside it — the clause had run back over the whole
+ *  value and read no split at all (audit C5, MED-5). */
+const SHORTFALL_CLAUSE = new RegExp(`${IN_CLAUSE}${SHORTFALL_WORD}${IN_CLAUSE}`, "gi");
+/** From a shortfall's words to the end of its sentence, where its accrual is
+ *  said ("any shortfall, if not paid, accrues"). */
+const SHORTFALL_SENTENCE = new RegExp(String.raw`${SHORTFALL_WORD}(?:[^.;()]|(?<=\d)\.(?=\d))*`, "gi");
 /** The words an accrual is named with: "4% accruing", "4% accrues". */
 const ACCRUAL_PART = /accru/;
 /** A current pay the words state as none: "0%", "0% current pay", "no
@@ -244,7 +257,7 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
   // the parts are read, and said apart (audit C3a: "paid current; any
   // shortfall accrues in full" had read 0% current and 12% accruing).
   const shortfallAccrues = [returnRow?.value, currentRow?.value, accrualRow?.value].some(
-    (v) => v != null && [...v.matchAll(SHORTFALL_CLAUSE)].some((m) => /accru/i.test(m[0])),
+    (v) => v != null && [...v.matchAll(SHORTFALL_SENTENCE)].some((m) => /accru/i.test(m[0])),
   );
   const ownWords = (text: string) => text.replace(SHORTFALL_CLAUSE, " ");
   const statedZero = (text: string) => (ZERO_CURRENT.test(ownWords(text)) ? 0 : null);

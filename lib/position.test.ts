@@ -283,6 +283,28 @@ describe("a current pay the memorandum does not state", () => {
     const parts = readPosition(position(metric("Preferred return", "12%: 8% paid monthly, 4% accrues")), 10_000_000, ON)!;
     expect(parts.terms).toMatchObject({ currentPayPct: 8, accrualPct: 4 });
   });
+
+  it("reads a shortfall's clause after a comma as the clause alone, and accrued-and-unpaid amounts as the accrual's (audit C5, MED-5)", () => {
+    // Each had read no split at all: "does not split its preferred return".
+    for (const [words, current] of [
+      ["12% preferred return, paid monthly, with any shortfall accruing", 12],
+      ["12.5% paid monthly, any unpaid amount accrues and compounds", 12.5],
+    ] as const) {
+      const r = readPosition(position(metric("Preferred return", words)), 10_000_000, ON)!;
+      expect(r.terms, words).toMatchObject({ currentPayPct: current, accrualPct: null, shortfallAccrues: true });
+      expect(r.sentences.join(" "), words).not.toContain("does not split");
+      expect(r.sentences.join(" "), words).toContain("a year is paid in cash; any shortfall in it accrues, as stated");
+    }
+    // Accrued and unpaid amounts compounding are the accrual's terms, never a
+    // shortfall the memorandum states.
+    const parts = readPosition(
+      position(metric("Preferred return", "12% (8% current, 4% accrued; accrued and unpaid amounts compound monthly)")),
+      10_000_000,
+      ON,
+    )!;
+    expect(parts.terms).toMatchObject({ totalPct: 12, currentPayPct: 8, accrualPct: 4, shortfallAccrues: false, compounds: true });
+    expect(parts.sentences.join(" ")).not.toContain("any shortfall");
+  });
 });
 
 // The second pre-merge audit's items on a position (MED-1, LOW-1 to LOW-5,
