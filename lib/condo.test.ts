@@ -98,6 +98,32 @@ describe("condominium units bought in bulk (pass 28, round 8)", () => {
     expect(both.headline).toContain("the dues on 42 units are $328k a year");
     const disagree = readCondo(deal("Condominium units", [row("Units offered", "42"), row("HOA dues", "$650/mo ($7,900/yr)")]), TODAY)!;
     expect(disagree).toMatchObject({ monthlyDues: null, annualDues: null, duesStated: "$650/mo ($7,900/yr)" });
+    expect(disagree.headline).toContain("Dues, as stated: $650/mo ($7,900/yr); a unit's month could not be read from it");
+  });
+
+  // The pre-merge audit (C1, M2): a row stating a unit's month beside the
+  // block's year was said to name neither, a row written without "$" was
+  // not read, and the block's month was read as one unit's.
+  it("reads a unit's month beside the block's year, a figure without '$', and never the block's figure as a unit's", () => {
+    const of42 = (dues: string) => readCondo(deal("Condominium units (bulk)", [row("Units offered", "42"), row("Units in condominium", "120"), row("HOA dues", dues)]), TODAY)!;
+    for (const dues of ["$650 per unit per month; $327,600 a year for the 42 units", "$650/unit/month ($327,600 annually for the 42 offered units)", "650/mo (7,800/yr)"]) {
+      const r = of42(dues);
+      expect(r, dues).toMatchObject({ monthlyDues: 650, annualDues: 327_600, duesStated: null });
+      expect(r.headline, dues).toContain("At $650 a unit a month, the dues on 42 units are $328k a year");
+      expect(r.headline, dues).not.toContain("could not be read");
+    }
+    // The block's year over the units the row names, without the units
+    // offered beside it.
+    expect(monthlyDuesOf("$650 per unit per month; $327,600 a year for the 42 units")).toBe(650);
+    // A year that agrees with neither is no read.
+    expect(monthlyDuesOf("$650 per unit per month; $300,000 a year for the 42 units")).toBeNull();
+    // The block's month is no unit's.
+    const block = readCondo(deal("Condominium units", [row("Units offered", "5"), row("HOA dues", "$3,250 per month for all 5 units")]), TODAY)!;
+    expect(block).toMatchObject({ monthlyDues: null, annualDues: null, duesStated: "$3,250 per month for all 5 units" });
+    expect(block.headline).toContain("Dues, as stated: $3,250 per month for all 5 units; a unit's month could not be read from it, so no year of the block's dues is read.");
+    expect(block.headline).not.toContain("$195k");
+    // "Per unit" beside the units it covers stays the unit's.
+    expect(monthlyDuesOf("$650 per unit per month for all 42 units")).toBe(650);
   });
 
   // The audit of 2026-10-05: a read of the declaration's terms alone wrote
@@ -111,7 +137,7 @@ describe("condominium units bought in bulk (pass 28, round 8)", () => {
   it("says a dues row it cannot read as stated, and a unit's dues to the dollar", () => {
     const bare = readCondo(deal("Condominium units", [row("Units offered", "42"), row("HOA dues", "$650")]), TODAY)!;
     expect(bare).toMatchObject({ monthlyDues: null, duesStated: "$650", annualDues: null });
-    expect(bare.headline).toContain("Dues, as stated: $650; the row names no unit's month or year, so no year of the block's dues is read.");
+    expect(bare.headline).toContain("Dues, as stated: $650; a unit's month could not be read from it, so no year of the block's dues is read.");
     expect(condoShortLine(bare)).toBe("Condominium units: 42 units; dues $650 as stated");
     const dear = readCondo(deal("Condominium units", [row("HOA dues", "$1,250/mo")]), TODAY)!;
     expect(dear.headline).toBe("The dues are $1,250 a unit a month, as stated.");

@@ -93,8 +93,9 @@ export interface CondoRead {
   sharePct: number | null;
   /** a unit's monthly dues, as stated */
   monthlyDues: number | null;
-  /** the dues row's own words where they state no unit's month or year
-   *  (a bare figure, a total): shown as stated, never read */
+  /** the dues row's own words where no unit's month could be read from them
+   *  (a bare figure, the block's total, a month and a year that disagree):
+   *  shown as stated, never read */
   duesStated: string | null;
   /** a year of every offered unit's dues, only where both are stated */
   annualDues: number | null;
@@ -135,34 +136,105 @@ function otherWordsOf(ex: ExtractionResult): string {
  *  block's total or the association's budget, never one unit's. */
 const UNIT_DUES_CEILING = 10_000;
 
+/** A dues figure: a dollar figure, or one written without "$" that a period
+ *  or a unit's word follows at once ("650/mo", "7,800 per year") — never the
+ *  count in "for the 42 units". */
+const DUES_FIGURE =
+  /\$\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:mm|million|m|k)\b)?|(?<!\$\s*)(?<![\w.,])\d[\d,]*(?:\.\d+)?(?=\s*(?:\/\s*(?:mo(?:nth)?|yr|year|unit)\b|per\s+(?:month|year|annum|unit)\b|a\s+(?:month|year|unit)\b|(?:monthly|annually|yearly)\b))/gi;
+const DUES_YEAR = /\/\s*(?:yr|year)\b|\bper\s+(?:year|annum)\b|\bannual(?:ly)?\b|\byearly\b|\ba\s+year\b/i;
+const DUES_MONTH = /\/\s*mo(?:nth)?\b|\bper\s+month\b|\bmonthly\b|\ba\s+month\b/i;
+/** Words that make a figure one unit's. */
+const DUES_UNIT = /\bper\s+(?:unit|door|apartment)\b|\/\s*(?:unit|door|apt)\b|\b(?:a|each)\s+unit\b/i;
+/** Words that make a figure the block's or the association's: "for all 5
+ *  units", "for the 42 units", "total", "in the aggregate". A clause that
+ *  also says "per unit" is the unit's ("$650 per unit for all 42 units"). */
+const DUES_BLOCK = /\bfor\s+(?:all\s+(?:the\s+)?|the\s+)?(?:\d[\d,]*\s+)?(?:offered\s+|bulk\s+)?units\b|\btotal\b|\bin\s+(?:the\s+)?aggregate\b|\bcombined\b/i;
+/** A count the row names beside the block's figure ("for the 42 units"). */
+const DUES_COUNT = /(?<![\w$.,])(\d[\d,]*)\s+(?:offered\s+|bulk\s+)?units\b/i;
+/** Where one figure's words end and the next's begin. */
+const DUES_BREAK = /[;()]|,\s+|\s+(?:or|and|totaling|totalling)\s+|\s+[-–—]\s+/i;
+
+interface DuesClause {
+  n: number;
+  month: boolean;
+  year: boolean;
+  unit: boolean;
+  block: boolean;
+}
+
+/** The row's figures, each with the words of its own clause — the words
+ *  between it and the next figure's clause, a clause with no figure joining
+ *  the one before it. Null where one clause holds two figures. */
+function duesClauses(v: string): DuesClause[] | null {
+  const clauses: Array<{ n: number; text: string }> = [];
+  let lead = "";
+  for (const part of v.split(DUES_BREAK)) {
+    const figures = [...part.matchAll(DUES_FIGURE)].map((m) => parseMoney(m[0])).filter((x): x is number => x != null && x > 0);
+    if (figures.length > 1) return null;
+    if (figures.length === 0) {
+      if (clauses.length > 0) clauses[clauses.length - 1].text += ` ${part}`;
+      else lead += ` ${part}`;
+      continue;
+    }
+    clauses.push({ n: figures[0], text: `${lead} ${part}` });
+    lead = "";
+  }
+  return clauses.map(({ n, text }) => {
+    const unit = DUES_UNIT.test(text);
+    return { n, month: DUES_MONTH.test(text), year: DUES_YEAR.test(text), unit, block: !unit && DUES_BLOCK.test(text) };
+  });
+}
+
 /** A unit's monthly dues from the row's words: "$650 per unit per month",
  *  "$650/mo"; a yearly figure a unit is taken as a twelfth. Null for a
  *  figure that states no period (a bare $650 may be a month's or a year's),
- *  a total, a range or a per-foot rate. */
-export function monthlyDuesOf(stated: string): number | null {
+ *  the block's or the association's figure ("$3,250 per month for all 5
+ *  units"), a range or a per-foot rate. A row that states two figures is
+ *  read at the unit's month only where the other agrees with it: the unit's
+ *  year, or the block's month or year over the units the row names or
+ *  `units`, the units offered ("$650 per unit per month; $327,600 a year
+ *  for the 42 units"). */
+export function monthlyDuesOf(stated: string, units: number | null = null): number | null {
   const v = stated.trim();
   if (!v || /\/\s*(?:sf|sq)\b|\bper\s+(?:sf|square)|psf\b/i.test(v)) return null;
   // A range, its first figure with or without a scale ("$600 - $700",
   // "$1.0M - $1.2M"), is no one figure.
   if (/\d\s*(?:k|mm?|m(?:il(?:lion)?)?|thousand|million)?\.?\s*(?:-|–|—|to)\s*\$?\d/i.test(v.replace(/,/g, ""))) return null;
-  const n = parseMoney(v);
-  if (n == null || !(n > 0)) return null;
-  const yearly = /\/\s*(?:yr|year)\b|\bper\s+(?:year|annum)\b|\bannual(?:ly)?\b|\ba\s+year\b/i.test(v);
-  const monthly = /\/\s*mo(?:nth)?\b|\bper\s+month\b|\bmonthly\b|\ba\s+month\b/i.test(v);
-  if (yearly && monthly) {
-    // Both periods stated ("$650/mo ($7,800/yr)"): the month's figure, only
-    // where the two figures agree — a month's is a twelfth of the year's —
-    // else none, and the row is shown as stated. The year's word had won
-    // and divided the month's figure by twelve (the audit of 2026-10-05:
-    // $54.17 a unit, a twelfth of the truth).
-    const figures = [...v.matchAll(/\$\s*\d[\d,]*(?:\.\d+)?\s*(?:mm|m|k)?\b/gi)].map((m) => parseMoney(m[0])).filter((x): x is number => x != null && x > 0);
-    if (figures.length !== 2) return null;
-    const month = Math.min(...figures);
-    const year = Math.max(...figures);
-    return Math.abs(year - month * 12) <= month * 12 * 0.01 && month <= UNIT_DUES_CEILING ? month : null;
+  const clauses = duesClauses(v);
+  if (!clauses || clauses.length === 0 || clauses.length > 2) return null;
+  const unitsMonth = (n: number) => n > 0 && n <= UNIT_DUES_CEILING;
+  if (clauses.length === 1) {
+    const [c] = clauses;
+    if (c.block || (c.month && c.year)) return null;
+    const perMonth = c.year ? c.n / 12 : c.month ? c.n : null;
+    return perMonth != null && unitsMonth(perMonth) ? perMonth : null;
   }
-  const perMonth = yearly ? n / 12 : monthly ? n : null;
-  return perMonth != null && perMonth <= UNIT_DUES_CEILING ? perMonth : null;
+  // Two figures ("$650/mo ($7,800/yr)"): the unit's month, only where the
+  // other figure agrees with it — else none, and the row is shown as
+  // stated. The year's word had won and divided the month's figure by
+  // twelve (the audit of 2026-10-05: $54.17 a unit, a twelfth of the
+  // truth), and a block's year beside a unit's month was read as neither.
+  const named = v.match(DUES_COUNT);
+  const counts = [named ? parseCount(named[1]) : null, units].filter((c): c is number => c != null && c > 0);
+  const near = (a: number, b: number) => Math.abs(a - b) <= b * 0.01;
+  const agrees = (month: number, other: DuesClause): boolean => {
+    if (other.month && other.year) return false;
+    if (other.year && !other.block && near(other.n, month * 12)) return true;
+    if (other.unit) return false;
+    return counts.some((u) => (other.year && near(other.n, month * u * 12)) || (other.month && near(other.n, month * u)));
+  };
+  for (const [a, b] of [
+    [clauses[0], clauses[1]],
+    [clauses[1], clauses[0]],
+  ]) {
+    if (a.block || (a.month && a.year)) continue;
+    // A figure with no period of its own is a month where the other's
+    // figure makes it one ("$650 per unit ($327,600 a year for the 42
+    // units)").
+    const month = a.year ? a.n / 12 : a.n;
+    if (unitsMonth(month) && agrees(month, b)) return month;
+  }
+  return null;
 }
 
 /**
@@ -192,7 +264,7 @@ export function readCondo(ex: ExtractionResult | null | undefined, asOf: Date = 
   const unitsOffered = countOf(find(UNITS_OFFERED_ROW)) ?? (offeredCount != null && offeredCount > 0 ? offeredCount : null);
   const unitsInCondominium = countOf(find(UNITS_IN_CONDO_ROW));
   const duesRow = find(HOA_DUES_ROW);
-  const monthlyDues = duesRow ? monthlyDuesOf(duesRow.value) : null;
+  const monthlyDues = duesRow ? monthlyDuesOf(duesRow.value, unitsOffered) : null;
   const duesStated = duesRow && monthlyDues == null ? duesRow.value.trim() : null;
   const special = find(SPECIAL_ASSESSMENT_ROW);
   const stated = STATED_ROWS.flatMap(([label, re]) => {
@@ -272,7 +344,10 @@ function sentencesOf(r: Omit<CondoRead, "sentences" | "headline">): string[] {
   } else if (r.monthlyDues != null) {
     out.push(`The dues are ${money(r.monthlyDues)} a unit a month, as stated.`);
   } else if (r.duesStated) {
-    out.push(`Dues, as stated: ${r.duesStated.replace(/\.$/, "")}; the row names no unit's month or year, so no year of the block's dues is read.`);
+    // Said as what the reader could not do, never as what the row lacks: a
+    // row may name a month and a year that do not agree, or the block's
+    // figure alone (the audit of 2026-10-05).
+    out.push(`Dues, as stated: ${r.duesStated.replace(/\.$/, "")}; a unit's month could not be read from it, so no year of the block's dues is read.`);
   }
   if (r.agencyLimit && r.sharePct != null) {
     const a = r.agencyLimit;

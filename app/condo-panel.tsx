@@ -55,7 +55,7 @@ export function CondoPanel({ condo, modelLine = "" }: { condo: CondoRead | null;
   if (r.annualDues != null && r.monthlyDues != null && r.unitsOffered != null)
     tiles.push({ key: "dues-year", label: "A year of dues", value: money(r.annualDues), sub: `${money(r.monthlyDues)} a unit a month on ${r.unitsOffered} units` });
   else if (r.monthlyDues != null) tiles.push({ key: "dues", label: "Dues", value: `${money(r.monthlyDues)} a unit a month`, sub: "As stated" });
-  else if (r.duesStated) tiles.push({ key: "dues", label: "Dues", value: r.duesStated, sub: "As stated; no unit's month or year" });
+  else if (r.duesStated) tiles.push({ key: "dues", label: "Dues", value: r.duesStated, sub: "As stated; no unit's month read from it" });
   if (r.specialAssessment) tiles.push({ key: "special-assessment", label: "Special assessment", value: r.specialAssessment, sub: "A cost each unit carries" });
   for (const s of r.stated) tiles.push({ key: slug(s.label), label: s.label, value: s.value, sub: "As stated" });
 
