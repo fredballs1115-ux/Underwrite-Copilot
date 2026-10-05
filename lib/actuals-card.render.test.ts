@@ -6,7 +6,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { compareNoi } from "@/lib/actuals/analyze";
 import type { T12Summary } from "@/lib/actuals/types";
-import { PropertyActuals, statedDay } from "@/app/(app)/deals/[id]/property-actuals";
+import { PropertyActuals, actualsSourceLine, statedDay } from "@/app/(app)/deals/[id]/property-actuals";
 import { SAMPLE_DEAL } from "@/lib/sample-deal";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -25,6 +25,12 @@ const render = (props: Parameters<typeof PropertyActuals>[0]["data"]) =>
   renderToStaticMarkup(React.createElement(PropertyActuals, { data: props }));
 
 describe("PropertyActuals — the OM figure is named for what it is", () => {
+  it("names the deal's documents by which it holds", () => {
+    expect(actualsSourceLine(true, true)).toBe("From the deal's rent roll and T-12");
+    expect(actualsSourceLine(true, false)).toBe("From the deal's rent roll");
+    expect(actualsSourceLine(false, true)).toBe("From the deal's T-12");
+  });
+
   it("a conversion's in-place figure is compared, and the note says why the pro forma is not", () => {
     const html = render({
       rentRoll: null,
@@ -39,6 +45,10 @@ describe("PropertyActuals — the OM figure is named for what it is", () => {
     expect(html).toContain("$1.15M");
     expect(html).toContain("In line");
     expect(html).toContain("judged on yield on cost, never against today");
+    // The deal's own documents, named by which are here — never "you
+    // uploaded", untrue on the sample and on a teammate's (research pass 32).
+    expect(html).toContain("From the deal&#x27;s T-12");
+    expect(html).not.toContain("you uploaded");
   });
 
   it("a stabilized asset's pro forma story is named as such", () => {
