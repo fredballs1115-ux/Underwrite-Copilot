@@ -421,7 +421,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           : !finite(current.leveredIrrPct)
             ? `No levered IRR solves at these levers${current.noIrr ? `: ${NO_IRR_WHY[current.noIrr]}` : ""}`
             : compare
-              ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${irrText(base)}`
+              ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${finite(base.leveredIrrPct) ? fmtPct(base.leveredIrrPct) : `none solves${base.noIrr ? ` (${NO_IRR_WHY[base.noIrr]})` : ""}`}`
               : baseWithheld
                 ? `Levered IRR ${fmtPct(current.leveredIrrPct)} at your price`
                 : `Levered IRR ${fmtPct(current.leveredIrrPct)}, the base case`}
