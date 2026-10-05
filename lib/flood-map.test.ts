@@ -90,15 +90,39 @@ function fetchers(overlayAlpha = SFHA_ALPHA): FloodFetchers & { seen: { aerial: 
 /** A deals table of one row's photo cache, read and written as the code does. */
 function fakeDb(photo: DealVisualCache | null) {
   const db = { photo };
+  // What a filter on a jsonb path reads ("photo->floodFrame->>path"): the
+  // value at that path, as stored.
+  const at = (path: string): unknown => {
+    let v: unknown = { photo: db.photo };
+    for (const k of path.split(/->>?/)) v = v == null ? undefined : (v as Record<string, unknown>)[k];
+    return v;
+  };
   const client = {
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { photo: db.photo } }) }) }),
-      update: (row: { photo: DealVisualCache }) => ({
-        eq: async () => {
+      update: (row: { photo: DealVisualCache }) => {
+        const filters: (() => boolean)[] = [];
+        const write = async () => {
+          // A write held to the record it read matches no row once that
+          // record has changed (lib/deal-location `onPhotoRecord`).
+          if (filters.some((meets) => !meets())) return { data: [], error: null };
           db.photo = JSON.parse(JSON.stringify(row.photo));
-          return { error: null };
-        },
-      }),
+          return { data: [{ id: "d1" }], error: null };
+        };
+        const chain = {
+          eq: (col: string, v: unknown) => {
+            if (col !== "id") filters.push(() => at(col) === v);
+            return chain;
+          },
+          is: (col: string, v: null) => {
+            filters.push(() => (v === null ? at(col) == null : at(col) === v));
+            return chain;
+          },
+          select: () => write(),
+          then: (ok: (r: unknown) => unknown, fail?: (e: unknown) => unknown) => write().then(ok, fail),
+        };
+        return chain;
+      },
     }),
   } as unknown as SupabaseClient;
   return { client, db };

@@ -8,6 +8,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import {
   uploadOmPdf,
   removeStorageFiles,
+  listDealPictureFiles,
   uploadSupplement,
   modelTmpPath,
   omStoragePath,
@@ -863,7 +864,11 @@ export async function deleteDeal(formData: FormData) {
     .select("id");
   if (delErr) redirect(`/deals/${dealId}?error=delete`);
   if (!gone || gone.length === 0) redirect(`/deals/${dealId}?error=deletepermission`);
-  await removeStorageFiles(paths, scope);
+  // The deal's picture folders are listed too, not only the files its photo
+  // cache names: a picture whose record another write lost is still the
+  // deal's (lib/storage `listDealPictureFiles`, research pass 39).
+  const listed = await listDealPictureFiles(dealId).catch(() => [] as string[]);
+  await removeStorageFiles([...new Set([...paths, ...listed])], scope);
 
   revalidatePath("/deals");
   redirect("/deals?deleted=1");

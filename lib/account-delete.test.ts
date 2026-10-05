@@ -37,6 +37,8 @@ const db = vi.hoisted(() => ({
   pages: [] as { table: string; range: [number, number] }[],
   /** the storage sweep, by the deal each path was checked against */
   swept: [] as string[],
+  /** every path the sweep was handed */
+  sweptPaths: [] as string[],
   /** writes, Stripe calls, the user's deletion and the seat sync, in order */
   events: [] as string[],
 }));
@@ -183,9 +185,12 @@ vi.mock("@/lib/stripe/seats", () => ({
   },
 }));
 vi.mock("@/lib/storage", () => ({
-  removeStorageFiles: async (_paths: string[], scope: { dealId?: string }) => {
+  removeStorageFiles: async (paths: string[], scope: { dealId?: string }) => {
     if (scope.dealId) db.swept.push(scope.dealId);
+    db.sweptPaths.push(...paths);
   },
+  // A picture file in the deal's own folder that no record names.
+  listDealPictureFiles: async (dealId: string) => [`photos/${dealId}/lost1-hero.jpg`],
   modelTmpPath: (p: string) => `${p}.model-tmp`,
   omStoragePath: (u: string, d: string) => `${u}/${d}.pdf`,
 }));
@@ -255,6 +260,7 @@ beforeEach(() => {
   db.reads.length = 0;
   db.pages.length = 0;
   db.swept.length = 0;
+  db.sweptPaths.length = 0;
   db.events.length = 0;
 });
 
@@ -352,8 +358,11 @@ describe("deleting an account says what happened to a team's deals", () => {
     expect(row("deal_versions", "v-mine")?.user_id).toBe("owner-t");
     expect(row("deal_versions", "v-own")).toBeUndefined();
     expect(row("valuations", "val-mine")?.user_id).toBe("owner-t");
-    // D's files were never swept: only the personal deal's were.
+    // D's files were never swept: only the personal deal's were — its
+    // picture folder listed too, beyond what its photo cache names.
     expect(db.swept).toEqual(["personal"]);
+    expect(db.sweptPaths).toContain("photos/personal/lost1-hero.jpg");
+    expect(db.sweptPaths).not.toContain("photos/deal-d/lost1-hero.jpg");
   });
 
   it("the deals in two teams' pipelines go to each team's own owner", async () => {

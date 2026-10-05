@@ -1,7 +1,7 @@
 import "server-only";
 import sharp from "sharp";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { writeCache, type DealPicture, type DealVisualCache } from "@/lib/deal-location";
+import { updateCache, writeCache, type DealPicture, type DealVisualCache } from "@/lib/deal-location";
 import { RunGate } from "@/lib/anthropic/run-gate";
 import { PREVIEW_PX, isPreview } from "@/lib/photo-preview";
 import { CARD_PX, cardWidthOf } from "@/lib/photo-srcset";
@@ -386,28 +386,26 @@ export async function backfillCard(
     if (!before || before.hero !== picture.hero || before.card) return;
     await uploadDealPhoto(path, made.bytes, photoScope(dealId));
     put = true;
-    const current = await read();
-    const still = placed(current);
-    if (current && still && still.hero === picture.hero) {
+    // Written only while the database still holds this photograph at its
+    // place, and only onto the record read (lib/deal-location `updateCache`,
+    // research pass 39): a replacement, a gallery or a flood frame landing
+    // between the read and the write is never undone, and a write that
+    // matched nothing stored nothing (the batch-2 audit).
+    let inPlace = false;
+    const done = await updateCache(supabase, dealId, null, (current) => {
+      const still = placed(current);
+      if (!current || !still || still.hero !== picture.hero) return null;
       // Another ask stored the same copy meanwhile: it is in place.
-      if (still.card) return;
+      if (still.card) {
+        inPlace = true;
+        return null;
+      }
       const next: DealPicture = { ...still, card: path, cardWidth: made.width, cardHeight: made.height };
-      const photo: DealVisualCache = gallery
-        ? { ...current, gallery: (current.gallery ?? []).map((g, i) => (i === gallery - 1 ? next : g)) }
-        : { ...current, picture: next };
-      // Written only while the database still holds this photograph at its
-      // place: a replacement landing between the read and the write is never
-      // undone, and a write that matched nothing stored nothing (the batch-2
-      // audit).
-      const heroAt = gallery ? `photo->gallery->${gallery - 1}->>hero` : "photo->picture->>hero";
-      const { data: wrote, error } = await supabase
-        .from("deals")
-        .update({ photo })
-        .eq("id", dealId)
-        .eq(heroAt, picture.hero)
-        .select("id");
-      if (!error && Array.isArray(wrote) && wrote.length > 0) return;
-    }
+      return gallery
+        ? { gallery: (current.gallery ?? []).map((g, i) => (i === gallery - 1 ? next : g)) }
+        : { picture: next };
+    });
+    if (done.wrote || inPlace) return;
   } catch {
     // A card copy is a saving, never a reason a request fails.
   }
@@ -441,8 +439,10 @@ export async function previewOf(bytes: Buffer): Promise<string | null> {
  * hero bytes a request already holds (#463) — the picture route's, so no
  * photograph is ever fetched for its preview alone. The row is read again
  * just before the write and the preview goes onto the picture stored THEN,
- * only where it is still the one the bytes are of: a photograph replaced
- * while the request ran is never put back. Never throws.
+ * only where it is still the one the bytes are of, and is written onto that
+ * record only (lib/deal-location `updateCache`): a photograph replaced while
+ * the request ran, or between the read and the write, is never put back
+ * (research pass 39). Never throws.
  */
 export async function backfillPreview(
   supabase: SupabaseClient,
@@ -453,17 +453,13 @@ export async function backfillPreview(
   if (picture.preview) return;
   const preview = await previewOf(heroBytes);
   if (!preview) return;
-  try {
-    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
-    const current = (data as { photo?: DealVisualCache | null } | null)?.photo ?? null;
-    if (!current?.picture || current.picture.hero !== picture.hero || current.picture.preview) return;
-    await supabase
-      .from("deals")
-      .update({ photo: { ...current, picture: { ...current.picture, preview } } })
-      .eq("id", dealId);
-  } catch {
-    // A preview is a nicety: never fail a request over one.
-  }
+  // A preview is a nicety: updateCache never throws, and a write that does
+  // not land is made again on a later ask.
+  await updateCache(supabase, dealId, null, (current) =>
+    current?.picture && current.picture.hero === picture.hero && !current.picture.preview
+      ? { picture: { ...current.picture, preview } }
+      : null,
+  );
 }
 
 /** The scope every photo path is read and written under. */
@@ -565,10 +561,13 @@ export async function storePicture(
 }
 
 /**
- * Merge a patch touching the picture into the cache, read at the write:
- * where `expectHero` is given (null for "no picture"), only while the
- * picture stored is still that one. Answers whether it wrote, the picture
- * it replaced and the one stored after.
+ * Merge a patch touching the picture into the cache, read at the write and
+ * written onto the record read (lib/deal-location `updateCache`): where
+ * `expectHero` is given (null for "no picture"), only while the picture
+ * stored is still that one. A write that lands on nothing is read and
+ * decided again, so the picture it replaces is the one stored when it
+ * wrote. Answers whether it wrote, the picture it replaced and the one
+ * stored after.
  */
 async function swapPicture(
   supabase: SupabaseClient,
@@ -577,65 +576,48 @@ async function swapPicture(
   patch: Partial<DealVisualCache>,
   expectHero?: string | null,
 ): Promise<{ stored: boolean; replaced: DealPicture | null; current: DealPicture | null }> {
-  let row: DealVisualCache = fallback ?? {};
-  try {
-    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
-    row = ((data as { photo?: DealVisualCache | null } | null)?.photo ?? fallback ?? {}) as DealVisualCache;
-  } catch {
-    // Read failed: the caller's copy stands in, as writeCache's does.
-  }
-  const was = row.picture ?? null;
-  if (expectHero !== undefined && (was?.hero ?? null) !== expectHero) {
-    return { stored: false, replaced: null, current: was };
-  }
-  try {
-    await supabase.from("deals").update({ photo: { ...row, ...patch } }).eq("id", dealId);
-  } catch {
-    // Pre-0027 schema has no `photo` column — never fail over a cache write.
-  }
+  const done = await updateCache(supabase, dealId, fallback, (row) =>
+    expectHero !== undefined && (row?.picture?.hero ?? null) !== expectHero ? null : patch,
+  );
+  const was = done.read?.picture ?? null;
+  if (!done.wrote) return { stored: false, replaced: null, current: was };
   return { stored: true, replaced: was, current: "picture" in patch ? (patch.picture ?? null) : was };
 }
 
 /**
  * Forget a picture that came from the memorandum — the memorandum was
  * replaced, so its cover may have been too. A picture the reader put there
- * is theirs and stays.
+ * is theirs and stays. Decided on the record as it stands when written
+ * (lib/deal-location `updateCache`), never on the caller's copy: a reader's
+ * photograph stored meanwhile is theirs, and the files removed are those of
+ * the record the write replaced (research pass 39).
  */
 export async function clearOmPicture(
   supabase: SupabaseClient,
   dealId: string,
   cache: DealVisualCache | null,
 ): Promise<void> {
-  const pic = cache?.picture;
-  // The memorandum's other photographs were the old file's too (#448).
-  const galleryFiles = galleryPaths(cache);
-  const galleryPatch =
-    cache?.galleryV !== undefined || cache?.galleryRetry !== undefined || galleryFiles.length > 0
-      ? { gallery: undefined, galleryV: undefined, galleryRetry: undefined }
-      : {};
-  if (!pic || pic.source !== "om") {
-    // No memorandum picture to drop, but a "nothing in there" verdict — and
-    // a count of reads the time cut short — is stale the moment the file
-    // changes.
-    if (cache?.pictureCheckedAt || cache?.pictureRetry || "galleryV" in galleryPatch) {
-      await writeCache(supabase, dealId, cache, {
-        pictureCheckedAt: undefined,
-        pictureSearchV: undefined,
-        pictureRetry: undefined,
-        ...galleryPatch,
-      });
+  let gone: string[] = [];
+  const done = await updateCache(supabase, dealId, cache, (read) => {
+    const pic = read?.picture;
+    // The memorandum's other photographs were the old file's too (#448).
+    const galleryFiles = galleryPaths(read);
+    const galleryPatch =
+      read?.galleryV !== undefined || read?.galleryRetry !== undefined || galleryFiles.length > 0
+        ? { gallery: undefined, galleryV: undefined, galleryRetry: undefined }
+        : {};
+    const verdicts = { pictureCheckedAt: undefined, pictureSearchV: undefined, pictureRetry: undefined };
+    if (!pic || pic.source !== "om") {
+      // No memorandum picture to drop, but a "nothing in there" verdict — and
+      // a count of reads the time cut short — is stale the moment the file
+      // changes.
+      gone = galleryFiles;
+      return read?.pictureCheckedAt || read?.pictureRetry || "galleryV" in galleryPatch ? { ...verdicts, ...galleryPatch } : null;
     }
-    if (galleryFiles.length > 0) await removeStorageFiles(galleryFiles, photoScope(dealId)).catch(() => {});
-    return;
-  }
-  await writeCache(supabase, dealId, cache, {
-    picture: undefined,
-    pictureCheckedAt: undefined,
-    pictureSearchV: undefined,
-    pictureRetry: undefined,
-    ...galleryPatch,
+    gone = [...pathsOf(pic), ...galleryFiles];
+    return { picture: undefined, ...verdicts, ...galleryPatch };
   });
-  await removeStorageFiles([...pathsOf(pic), ...galleryFiles], photoScope(dealId)).catch(() => {});
+  if (done.wrote && gone.length > 0) await removeStorageFiles(gone, photoScope(dealId)).catch(() => {});
 }
 
 /** Every storage path the gallery occupies. */
@@ -958,8 +940,9 @@ export function derivedOutdated(picture: DealPicture | null | undefined): boolea
 
 /**
  * Put `next` in the place of the stored picture `was`, read again just
- * before the write: only while `was` is still the one stored, so a picture
- * the reader put there meanwhile, or a new memorandum's, is never replaced.
+ * before the write and written onto that record only (lib/deal-location
+ * `updateCache`): only while `was` is still the one stored, so a picture the
+ * reader put there meanwhile, or a new memorandum's, is never replaced.
  */
 async function replaceStoredPicture(
   supabase: SupabaseClient,
@@ -967,18 +950,10 @@ async function replaceStoredPicture(
   was: DealPicture,
   next: DealPicture,
 ): Promise<boolean> {
-  try {
-    const { data } = await supabase.from("deals").select("photo").eq("id", dealId).maybeSingle();
-    const current = (data as { photo?: DealVisualCache | null } | null)?.photo ?? null;
-    if (!current?.picture || current.picture.hero !== was.hero) return false;
-    const { error } = await supabase
-      .from("deals")
-      .update({ photo: { ...current, picture: next } })
-      .eq("id", dealId);
-    return !error;
-  } catch {
-    return false;
-  }
+  const done = await updateCache(supabase, dealId, null, (current) =>
+    current?.picture && current.picture.hero === was.hero ? { picture: next } : null,
+  );
+  return done.wrote;
 }
 
 /**

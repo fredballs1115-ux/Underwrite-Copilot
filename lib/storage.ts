@@ -1,6 +1,6 @@
 import "server-only";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { isScopedPath, scopedPath, type StorageScope } from "@/lib/storage-paths";
+import { dealPhotoPath, isScopedPath, scopedPath, type StorageScope } from "@/lib/storage-paths";
 import { INLINE_SAFE_TYPES } from "@/lib/inline-types";
 
 export {
@@ -154,6 +154,41 @@ export async function removeStorageFiles(paths: string[], scope: StorageScope): 
   if (clean.length === 0) return;
   const admin = createSupabaseAdminClient();
   await admin.storage.from(BUCKET).remove(clean);
+}
+
+/** Objects a listing asks for at once. */
+const LIST_PAGE = 1000;
+
+/**
+ * Every object stored in a deal's own picture folders — its photographs
+ * (`photos/<dealId>/`) and its drawn flood frames (`flood/<dealId>/`) — as
+ * full paths, each held to the deal's scope like any other path here. For
+ * the deletion sweeps (research pass 39): the files a deal's photo cache
+ * names are not always all of them — a picture stored by a write that lost
+ * its record to another writer is still the deal's, and recorded nowhere —
+ * so a sweep lists the folders rather than trusting the record alone. A
+ * deal id that is not one of the layout's own segments lists nothing.
+ * Best-effort: a page that fails ends the listing with what was read.
+ */
+export async function listDealPictureFiles(dealId: string): Promise<string[]> {
+  const scope = { kind: "deal", dealId, only: ["photo", "flood"] } as const;
+  // The folders the layout mints for this deal, or none for an id it would
+  // not mint them under.
+  if (!isScopedPath(dealPhotoPath(dealId, "probe", "hero"), scope)) return [];
+  const admin = createSupabaseAdminClient();
+  const out: string[] = [];
+  for (const folder of [`photos/${dealId}`, `flood/${dealId}`]) {
+    for (let offset = 0; ; offset += LIST_PAGE) {
+      const { data, error } = await admin.storage.from(BUCKET).list(folder, { limit: LIST_PAGE, offset });
+      if (error || !data) break;
+      for (const o of data) {
+        const path = `${folder}/${o.name}`;
+        if (isScopedPath(path, scope)) out.push(path);
+      }
+      if (data.length < LIST_PAGE) break;
+    }
+  }
+  return out;
 }
 
 /** A short-lived signed URL so the user can download their file. Null when

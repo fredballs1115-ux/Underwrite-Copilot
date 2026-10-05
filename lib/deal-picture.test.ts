@@ -106,17 +106,22 @@ function fakeDb(photo: DealVisualCache | null) {
     from: () => ({
       select: () => ({ eq: () => ({ maybeSingle: async () => ({ data: { photo: db.photo } }) }) }),
       update: (row: { photo: DealVisualCache }) => {
-        const filters: [string, unknown][] = [];
+        const filters: ((col: string) => boolean)[] = [];
         const write = async () => {
           // A filter the stored row no longer meets matches no row.
-          if (filters.some(([col, v]) => col !== "id" && at(col) !== v)) return { data: [], error: null };
+          if (filters.some((meets) => !meets("d1"))) return { data: [], error: null };
           // What a jsonb column keeps: the object as JSON, undefined dropped.
           db.photo = JSON.parse(JSON.stringify(row.photo));
           return { data: [{ id: "d1" }], error: null };
         };
         const chain = {
           eq: (col: string, v: unknown) => {
-            filters.push([col, v]);
+            if (col !== "id") filters.push(() => at(col) === v);
+            return chain;
+          },
+          // `is null` on a jsonb path: no value there, or a JSON null.
+          is: (col: string, v: null) => {
+            filters.push(() => (v === null ? at(col) == null : at(col) === v));
             return chain;
           },
           select: () => write(),

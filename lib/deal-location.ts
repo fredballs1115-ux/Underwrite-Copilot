@@ -277,18 +277,6 @@ export async function resolveDealLocation(
   return hit ? { lat: hit.lat, lng: hit.lng, precision: hit.precision, source: hit.source } : null;
 }
 
-/**
- * Merge a patch into the deal's imagery cache without losing anything another
- * writer just stored.
- *
- * The cache is one jsonb column shared by the geocoder and the Street View
- * verdict. The first cut merged the patch over the copy of the column the
- * CALLER had loaded — so when the geocoder wrote a fresh point and the Street
- * View check then wrote its verdict over its own, older copy, the new point
- * was silently dropped and the deal went back to the wrong spot. Now the
- * current row is read first and the patch merged over THAT. One small extra
- * read, on a path that runs about once a month per deal.
- */
 /** The cache with Google's Street View answer taken out: an earlier cut
  *  stored the metadata's verdict and the panorama's coordinates, which
  *  Google's policies do not allow (only place and panorama IDs may be
@@ -303,27 +291,117 @@ export function withoutGoogleContent(cache: DealVisualCache): DealVisualCache {
   return out;
 }
 
+/**
+ * The stored files a photo cache names, by the path that names each: its
+ * photograph's hero, its gallery's first photograph and its flood frame —
+ * each stamped anew whenever it is stored, so a record whose paths match is
+ * the record that was read (research pass 39).
+ */
+export function photoRecordKeys(cache: DealVisualCache | null | undefined): {
+  picture: string | null;
+  gallery: string | null;
+  flood: string | null;
+} {
+  return {
+    picture: cache?.picture?.hero ?? null,
+    gallery: cache?.gallery?.[0]?.hero ?? null,
+    flood: cache?.floodFrame?.path ?? null,
+  };
+}
+
+interface PhotoFilters<Q> {
+  eq(column: string, value: string): Q;
+  is(column: string, value: null): Q;
+}
+
+/**
+ * An update of `deals.photo` held to the record it was made from: it
+ * matches the row only while the photograph, the gallery and the flood
+ * frame stored are still the ones `read` names (or still none). A write
+ * that matches nothing changed nothing — another writer's photograph, read
+ * since, is never undone by a copy made before it (the conditional write
+ * lib/deal-picture `backfillCard` makes, for every writer of the column).
+ */
+export function onPhotoRecord<Q extends PhotoFilters<Q>>(query: Q, read: DealVisualCache | null | undefined): Q {
+  const keys = photoRecordKeys(read);
+  const held = (q: Q, column: string, value: string | null): Q => (value ? q.eq(column, value) : q.is(column, null));
+  return held(held(held(query, "photo->picture->>hero", keys.picture), "photo->gallery->0->>hero", keys.gallery), "photo->floodFrame->>path", keys.flood);
+}
+
+/** Reads of the record a cache write makes before it gives up. */
+export const CACHE_WRITE_TRIES = 3;
+
+/** What a cache update did: whether it wrote, and the record it wrote over
+ *  (or last read, where it wrote nothing). */
+export interface CacheUpdate {
+  wrote: boolean;
+  read: DealVisualCache | null;
+}
+
+/**
+ * Change the deal's photo cache by what `change` makes of the record as the
+ * database holds it now — a patch to merge over it, or null for none —
+ * written only onto that record (`onPhotoRecord`). Where another writer
+ * stored a photograph, a gallery or a flood frame between the read and the
+ * write, the write matches nothing and the record is read again and `change`
+ * asked again, so it decides on what is there, never on a copy from before.
+ */
+export async function updateCache(
+  supabase: SupabaseClient,
+  dealId: string,
+  fallback: DealVisualCache | null,
+  change: (read: DealVisualCache | null) => Partial<DealVisualCache> | null,
+): Promise<CacheUpdate> {
+  let read: DealVisualCache | null = fallback;
+  try {
+    for (let tries = 0; tries < CACHE_WRITE_TRIES; tries++) {
+      const { data, error: readErr } = await supabase
+        .from("deals")
+        .select("photo")
+        .eq("id", dealId)
+        .maybeSingle();
+      // A read that failed stands in the caller's copy, as before; a read
+      // that answered is the record, an empty one included.
+      read = readErr ? fallback : (((data as { photo?: DealVisualCache | null } | null)?.photo ?? null) as DealVisualCache | null);
+      const patch = change(read);
+      if (!patch) return { wrote: false, read };
+      const { data: wrote, error } = await onPhotoRecord(
+        supabase
+          .from("deals")
+          .update({ photo: withoutGoogleContent({ ...(read ?? {}), ...patch }) })
+          .eq("id", dealId),
+        read,
+      ).select("id");
+      if (error) return { wrote: false, read };
+      if (Array.isArray(wrote) && wrote.length > 0) return { wrote: true, read };
+    }
+  } catch {
+    // Pre-0027 schema has no `photo` column — imagery still works, just
+    // without the cache. Never fail a page render over a cache write.
+  }
+  return { wrote: false, read };
+}
+
+/**
+ * Merge `patch` into the deal's photo cache without losing anything another
+ * writer stored.
+ *
+ * The cache is one jsonb column shared by the geocoder, the picture search,
+ * the reader's own photograph and the flood frame. The first cut merged the
+ * patch over the copy of the column the CALLER had loaded, so a fresh point
+ * written meanwhile was dropped; then the current row was read first and the
+ * patch merged over that — but written unconditionally, so a photograph
+ * stored between the read and the write was put back to the one before, its
+ * files recorded nowhere (research pass 39). Now the patch is merged over
+ * the record as it stands and written onto that record only (`updateCache`).
+ * A patch that changes the photograph itself decides on the record it reads:
+ * use `updateCache`. Answers whether it wrote.
+ */
 export async function writeCache(
   supabase: SupabaseClient,
   dealId: string,
   fallback: DealVisualCache | null,
   patch: Partial<DealVisualCache>,
-): Promise<void> {
-  try {
-    const { data } = await supabase
-      .from("deals")
-      .select("photo")
-      .eq("id", dealId)
-      .maybeSingle();
-    const current = ((data as { photo?: DealVisualCache | null } | null)?.photo ??
-      fallback ??
-      {}) as DealVisualCache;
-    await supabase
-      .from("deals")
-      .update({ photo: withoutGoogleContent({ ...current, ...patch }) })
-      .eq("id", dealId);
-  } catch {
-    // Pre-0027 schema has no `photo` column — imagery still works, just
-    // without the cache. Never fail a page render over a cache write.
-  }
+): Promise<boolean> {
+  return (await updateCache(supabase, dealId, fallback, () => patch)).wrote;
 }
