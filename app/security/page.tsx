@@ -19,7 +19,7 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "The short version",
     body: [
-      "Offering memorandums travel under confidentiality terms, so the bar is simple: your documents are visible to your account (and your team, if you create one) and to no other person. To run your screen they are read by Anthropic's Claude API, and they are stored with Supabase — the list below names every outside service and what it receives. Isolation is enforced in the database itself, documents sit in private storage behind expiring links, analysis keys never reach the browser, and nothing you upload is used to train AI models.",
+      "Offering memorandums travel under confidentiality terms, so the bar is simple: your documents are visible to your account (and your team, if you create one) and to no other person. To run your screen they are read by Anthropic's Claude API, and they are stored with Supabase — the list below names every outside service and what it receives. Isolation is enforced in the database itself (the few reads that go round it are named below), documents sit in private storage behind expiring links, analysis keys never reach the browser, and nothing you upload is used to train AI models.",
     ],
   },
   {
@@ -31,7 +31,7 @@ const SECTIONS: { h: string; body: string[]; processors?: boolean }[] = [
   {
     h: "Isolation between accounts",
     body: [
-      "Every table that holds deal data is protected by Postgres row-level security. Queries run as your authenticated user, and the database — not just the application code — refuses to return rows that don't belong to your account or your team. A bug in a page can't leak another firm's pipeline, because the database itself won't serve it.",
+      "Every table that holds deal data is protected by Postgres row-level security. While you are signed in, pages query as your authenticated user, and the database — not just the application code — refuses to return rows that don't belong to your account or your team, so a bug in one of those pages can't leak another firm's pipeline. Three things read with the server's own key instead, behind the site's own checks rather than the database's: a shared link's page and its pictures, the pictures in our emails, and the background work that runs your screens.",
     ],
   },
   {

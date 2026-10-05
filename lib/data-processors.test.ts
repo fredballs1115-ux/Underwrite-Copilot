@@ -92,6 +92,33 @@ describe("the outside services a user's data reaches, one list held to the code"
   });
 });
 
+// The security page said a bug in any page could not leak another firm's
+// pipeline because the database would not serve it, while a shared link's
+// page and pictures, the email pictures and the background screens read
+// with the server's own key, behind the site's own checks (research pass
+// 39). The page names them, and this holds the names to the code.
+describe("the security page names the reads that go round row-level security", () => {
+  it("names each reader that uses the server's key, and no longer says every page reads through the database's rules", () => {
+    for (const file of [
+      "app/share/[token]/page.tsx",
+      "app/api/share/[token]/picture/route.ts",
+      "app/api/share/[token]/aerial/route.ts",
+      "app/api/email/picture/[token]/route.ts",
+      "worker/index.ts",
+      "lib/anthropic/pipeline.ts",
+    ]) {
+      expect(src(file), file).toContain("createSupabaseAdminClient");
+    }
+    const text = visibleText(renderToStaticMarkup(React.createElement(SecurityPage))).replace(/\s+/g, " ");
+    expect(text).toContain(
+      "Three things read with the server's own key instead, behind the site's own checks rather than the database's: a shared link's page and its pictures, the pictures in our emails, and the background work that runs your screens.",
+    );
+    expect(text).toContain("so a bug in one of those pages can't leak another firm's pipeline");
+    expect(text).not.toContain("A bug in a page can't leak another firm's pipeline, because the database itself won't serve it.");
+    expect(text).toContain("Isolation is enforced in the database itself (the few reads that go round it are named below)");
+  });
+});
+
 // The list said Anthropic received the documents and the questions asked
 // about them, while every verdict is also handed the buy box and a deal with
 // no OM is screened from the facts typed for it; and it left out the support
