@@ -425,6 +425,12 @@ export const INTEREST_LABEL: Record<InterestKind, string> = {
   unknown: "Not stated",
 };
 
+/** A master leasehold's own words (`isMasterLeasehold`): a lease of the
+ *  building, sublet to its tenants — never a leasehold on a ground lease,
+ *  which the panel's heading, the context line and the report had called it
+ *  (the audit of 2026-10-05). */
+export const MASTER_LEASE_LABEL = "Master lease of the building, sublet";
+
 export interface InterestRead {
   kind: InterestKind;
   label: string;
@@ -833,8 +839,9 @@ export function readInterest(
   const headline = lead.join(" ");
   return {
     kind,
-    // All of the entity's interests is no share of it (research pass 28).
-    label: isWholeShare(sharePct) ? "All of the owning entity's interests" : INTEREST_LABEL[kind],
+    // All of the entity's interests is no share of it (research pass 28),
+    // and a master lease of the building is no ground lease.
+    label: isWholeShare(sharePct) ? "All of the owning entity's interests" : masterLease ? MASTER_LEASE_LABEL : INTEREST_LABEL[kind],
     summary: (it.summary ?? "").trim(),
     page,
     sharePct,
@@ -867,10 +874,13 @@ export function readInterest(
 /** The deal context's line: what is being sold, for every step that reads
  *  the OM after the extraction. */
 export function interestContextLine(r: InterestRead): string {
+  // The memorandum's own words end a sentence of their own: a period they
+  // carry is not doubled ("…$2,000,000 per year..").
+  const asStated = (s: string) => `${s.replace(/\.+\s*$/, "")}.`;
   const facts = [
-    r.groundLease ? `The ${r.masterLease ? "master" : "ground"} lease as stated: ${r.groundLease}.` : "",
+    r.groundLease ? `The ${r.masterLease ? "master" : "ground"} lease as stated: ${asStated(r.groundLease)}` : "",
     r.termLine ? `${r.termLine}.` : "",
-    r.loan ? `The loan as stated: ${r.loan}.` : "",
+    r.loan ? `The loan as stated: ${asStated(r.loan)}` : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -929,9 +939,21 @@ export function interestNote(r: InterestRead): string {
     r.terminationRight && !(eq && r.kind === "leased_fee")
       ? ` A TERMINATION RIGHT — as stated: ${r.terminationRight}: read who may end the ground lease early, from when and on what notice, before trusting the term.`
       : "";
+  // A master lease of the building, sublet (a sandwich position), is no
+  // ground lease: its traps are the master lease's, in place of the ground
+  // lease's resets on land value and a building reverting to the landowner.
+  if (r.masterLease) traps.leasehold = MASTER_LEASE_TRAPS;
   const shared = SHARED_TRAPS_READ[r.kind];
   return `${interestContextLine(r)} ${traps[r.kind]}${terminationTrap}${shared ? ` ${shared}` : ""}`;
 }
+
+/**
+ * A master leasehold's traps — the substance of lib/sandwich-lease's own
+ * list, written here because that module reads this one (`isMasterLeasehold`,
+ * `leaseholdTermOf`), so importing it back would close a cycle.
+ */
+const MASTER_LEASE_TRAPS =
+  "MASTER-LEASE TRAPS, checked by name where the OM gives the inputs: (a) THE TERM AND THE OPTIONS — the master lease's end and its options, and their rent, against the subleases' own ends; (b) THE SPREAD AND WHO PAYS FIRST — the master rent is owed whatever the subtenants pay, its increases against the subleases', and the subtenants' credit; (c) THE FEE OWNER'S LENDER — whether the master lease sits behind the fee owner's mortgage, and whether a non-disturbance agreement keeps it standing through a foreclosure; (d) CONSENT TO ASSIGN AND SUBLET — what the master lease requires of the owner's consent to this sale and to new subleases; (e) THE END — what the master lease requires handed back, and what the subtenants' leases say when it ends.";
 
 /**
  * The two traps the challenger's base instruction gives every property — the

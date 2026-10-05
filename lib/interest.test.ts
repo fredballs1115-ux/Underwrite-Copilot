@@ -343,6 +343,50 @@ describe("readInterest — what the price buys, said", () => {
     expect(covered.headline).toContain("Here the building's $1.8M of income before the master rent covers the $1.1M rent 1.7×.");
   });
 
+  // The audit of 2026-10-05: the panel's heading, the context line and the
+  // report still called a master leasehold "Leasehold on a ground lease",
+  // the challenger grilled it on land-value resets and a building reverting
+  // to the landowner, and the master lease as stated ended "per year..".
+  it("a master leasehold is labelled and grilled as a master lease of the building, and its words end one sentence", () => {
+    const master = ex(
+      interest({
+        kind: "leasehold",
+        summary: "The offering is the master leasehold interest in the building, which the master lessee sublets to its office tenants.",
+        groundLease: "Master lease of the entire building from the fee owner, expiring December 31, 2041; master rent $2,000,000 per year.",
+        page: "4",
+      }),
+      [
+        { label: "Master lease expiration", value: "December 31, 2041", flagged: false, page: "p. 4", basis: "na" },
+        { label: "Ground rent", value: "$2,000,000", flagged: false, page: "p. 4", basis: "in_place" },
+        { label: "Income before ground rent", value: "$3,100,000", flagged: false, page: "p. 6", basis: "in_place" },
+      ],
+    );
+    const r = readInterest(master, 12_000_000, new Date("2026-10-05T12:00:00Z"))!;
+    expect(r.label).toBe("Master lease of the building, sublet");
+    const context = interestContextLine(r);
+    expect(context.startsWith("What is being sold: master lease of the building, sublet.")).toBe(true);
+    expect(context).not.toContain("leasehold on a ground lease");
+    expect(context).toContain("master rent $2,000,000 per year. The master lease ends Dec 2041");
+    expect(context).not.toContain("..");
+    const note = interestNote(r);
+    for (const trap of ["MASTER-LEASE TRAPS", "(a) THE TERM AND THE OPTIONS", "(b) THE SPREAD AND WHO PAYS FIRST", "(c) THE FEE OWNER'S LENDER", "(d) CONSENT TO ASSIGN AND SUBLET", "(e) THE END"]) {
+      expect(note, trap).toContain(trap);
+    }
+    for (const groundLeaseTrap of ["LEASEHOLD TRAPS", "then-current land value", "the building goes to the landowner"]) {
+      expect(note, groundLeaseTrap).not.toContain(groundLeaseTrap);
+    }
+    // A plain leasehold keeps its label and the ground lease's traps.
+    const plain = readInterest(ex(interest({ kind: "leasehold", summary: "Leasehold interest under a 99-year ground lease" })), 20_000_000)!;
+    expect(plain.label).toBe(INTEREST_LABEL.leasehold);
+    expect(interestNote(plain)).toContain("LEASEHOLD TRAPS");
+    expect(interestNote(plain)).not.toContain("MASTER-LEASE TRAPS");
+    // A loan as stated ends one sentence too.
+    expect(interestContextLine(readInterest(ex(interest({ kind: "note", loan: "$24.4M UPB, 5.25% coupon." })), 20_000_000)!)).toContain(
+      "The loan as stated: $24.4M UPB, 5.25% coupon.",
+    );
+    expect(interestContextLine(readInterest(ex(interest({ kind: "note", loan: "$24.4M UPB, 5.25% coupon." })), 20_000_000)!)).not.toContain("coupon..");
+  });
+
   it("a plain leasehold keeps its sentence: a ground lease named, a seller's master lease of vacant space, or no master lease at all", () => {
     const LEAD = "This memorandum sells a LEASEHOLD: the building and a lease on the land, not the land.";
     for (const over of [
