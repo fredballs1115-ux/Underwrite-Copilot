@@ -48,9 +48,10 @@
 --      checked. One write can now fail where it did not: on a deal holding
 --      more than one job row from before claimJob kept them to one, the
 --      comp search's and model build's follow-up update (status 'running'
---      on every row of the deal) is refused for the older rows — the run
---      itself starts as before, and only that update's progress figure is
---      lost.
+--      on every row of the deal) is refused as a whole, since it would make
+--      the older rows live beside the claimed one — the run itself starts
+--      as before on the row its claim took, and only that update's
+--      progress figure is lost.
 --
 --      Needs 0016's payload column (the trigger names it); without it there
 --      is no worker and nothing to queue, and the trigger is left off.
