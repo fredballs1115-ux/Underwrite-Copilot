@@ -98,8 +98,12 @@ async function storedOmRead(dealId: string | undefined): Promise<"pdf" | "text" 
 
 /**
  * Ask-the-deal: answer one question FROM THE OM ONLY, with page citations.
- * Sends the same cached document prefix as the pipeline steps, so a question
- * asked near a screen reads the OM from cache instead of re-paying for it.
+ * Sends the same document block, under the same cache breakpoint, as the
+ * pipeline steps. Questions asked back to back send one structured-output
+ * format, so a second can read the first's cache inside the window; whether
+ * a question asked near a screen reads the screen's — it sends a format of
+ * its own, which Anthropic's documentation says invalidates the cache — is
+ * the ledger's to say (./models).
  */
 export async function askDealQuestion(
   pdf: Buffer,
@@ -120,9 +124,9 @@ export async function askDealQuestion(
   // The same source the screen read — the deck's text layer when dense, the
   // PDF where the layer was not or the screen found it wanting (oversized
   // ones as a Files-API reference) — so a question reads the figures the
-  // screen read, and one asked near a screen shares its cached prefix. The
-  // read also says how many pages the deck has, which every cited page is
-  // held to.
+  // screen read, in the same document block (whether it reads the screen's
+  // cache is the ledger's to say, above). The read also says how many pages
+  // the deck has, which every cited page is held to.
   const omRead = opts?.omRead !== undefined ? opts.omRead : await storedOmRead(opts?.dealId);
   const { om, pages } = await omSourceWithPages(pdf, "om.pdf", {
     textFirst: askTextFirst(omRead),

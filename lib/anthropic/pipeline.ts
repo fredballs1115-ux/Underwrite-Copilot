@@ -1027,9 +1027,12 @@ async function runAnalysisSteps(
     // Step 0 — first signal: the fast headline read, stored the moment it
     // lands so the deal page shows what the deal IS while the deep pass runs.
     // Best-effort: a failure here (or a pre-0009 schema without the column)
-    // must never sink the real screen. This call also warms the prompt cache
-    // for the OM, so extraction and the later steps read it cheaply. Manual
-    // deals derive the signal from the typed facts — no model call.
+    // must never sink the real screen. This call also writes the OM to the
+    // prompt cache; whether the extraction and the later steps read it back
+    // — each sends a structured-output format of its own, which Anthropic's
+    // documentation says invalidates the cache — is the ledger's to say
+    // (./models). Manual deals derive the signal from the typed facts — no
+    // model call.
     if (!completed.has("signal")) {
       await patchJob(dealId, {
         status: "running",

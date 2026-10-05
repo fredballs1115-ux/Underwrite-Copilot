@@ -58,9 +58,11 @@ export async function checkMarket(
       {
         role: "user",
         content: [
-          // Reads the OM from the prompt cache the extraction step wrote; the
-          // context and the figures ride after it so the cached prefix stays
-          // identical.
+          // The OM under the cache breakpoint every step sends (whether this
+          // reads an earlier step's cache, with a structured-output format of
+          // its own, is the ledger's to say — ./models); the context and the
+          // figures ride after it so nothing that varies by deal sits before
+          // it.
           omDocument(om),
           { type: "text", text: marketCheckInstruction(assetClass, context, liveMarket) },
           // Today's date, which every dated figure is read against

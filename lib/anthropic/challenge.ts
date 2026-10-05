@@ -55,7 +55,9 @@ export async function challengeAssumptions(
       {
         role: "user",
         content: [
-          // Reads the OM from the prompt cache the extraction step wrote.
+          // The OM under the cache breakpoint every step sends; whether this
+          // reads an earlier step's cache, with a structured-output format of
+          // its own, is the ledger's to say (./models).
           omDocument(om),
           { type: "text", text: instruction },
           // Today's date, after the cached document (lib/anthropic/today).

@@ -52,8 +52,10 @@ export async function scrutinizeComps(
       {
         role: "user",
         content: [
-          // Reads the OM from the prompt cache the extraction step wrote; the
-          // context rides after it so the cached prefix stays identical.
+          // The OM under the cache breakpoint every step sends (whether this
+          // reads an earlier step's cache, with a structured-output format of
+          // its own, is the ledger's to say — ./models); the context rides
+          // after it so nothing that varies by deal sits before it.
           omDocument(om),
           { type: "text", text: brokerCompsInstruction(context) },
           // Today's date, which a comp's age is judged against

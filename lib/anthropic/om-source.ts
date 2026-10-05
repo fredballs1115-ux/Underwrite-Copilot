@@ -144,8 +144,10 @@ export async function releaseOmSource(om: OmSource | null | undefined): Promise<
 
 /**
  * The document content block for a step's message, from either source.
- * `cache` marks the block for prompt caching (the OM is the shared prefix
- * every pipeline step re-reads) — it applies to both transports.
+ * `cache` marks the block for prompt caching (every pipeline step re-sends
+ * the OM first; whether one step reads another's cache, each with its own
+ * structured-output format, is the ledger's to say — ./models) — it applies
+ * to both transports.
  *
  * File-source documents are typed only in the SDK's beta namespace, but the
  * /v1/messages endpoint accepts them with the files-api beta header (which

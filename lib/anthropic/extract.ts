@@ -181,10 +181,12 @@ export async function extractTerms(
         role: "user",
         content: [
           // Document first, then the instruction (recommended ordering).
-          // The cache_control inside omDocument caches the prefix up to here —
-          // the system prompt + this OM — so the next pipeline steps
-          // (challenge / comps / market), which re-send the same OM
-          // back-to-back, read it from cache at a fraction of the input cost.
+          // The cache_control inside omDocument marks the prefix up to here
+          // — the system prompt and this OM — for the prompt cache. The next
+          // steps (challenge / comps / market) re-send the same OM back to
+          // back, but each with its own structured-output format, which
+          // Anthropic's documentation says invalidates the cache: whether
+          // they read this one back is the ledger's to say (./models).
           omDocument(om),
           { type: "text", text: extractionInstruction(assetClass) },
           // Today's date rides last, after the cached prefix

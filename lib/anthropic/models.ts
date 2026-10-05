@@ -10,28 +10,46 @@
  * WHAT A SCREEN COSTS. Each run writes its ledger to the job row
  * (`analysis_jobs.usage`, migration 0035) and one log line — read those,
  * not this comment, for the number. The shape of the bill, for a deck the
- * model reads as ~300k tokens of PDF: the first signal writes the OM to the
- * prompt cache once (the write premium on the whole deck — the largest
- * single item), the extraction, challenger, comps and market check read it
- * back at a tenth, the verdict never reads the deck at all, and the
- * outputs are compact. On the flagship that is about $3 a screen; the
- * cache write is ~60% of it.
+ * model reads as ~300k tokens of PDF: five steps read the OM — the first
+ * signal, the extraction, the challenger, the comps and the market check —
+ * each sending it as the first block after the system prompt with a cache
+ * breakpoint on it; the verdict never reads the deck at all; and the
+ * outputs are compact.
+ *
+ * WHETHER ONE STEP READS ANOTHER'S CACHE IS NOT ESTABLISHED. Each step also
+ * sends its own structured-output format (`output_config.format`, a schema
+ * a step), and Anthropic's structured-outputs documentation says the API
+ * adds a system prompt describing that format and that changing the format
+ * invalidates the prompt cache — so each step may write the deck to a cache
+ * of its own rather than read back the first signal's. A real screen's
+ * ledger settles it, call by call: a `cacheRead` about the size of the deck
+ * is a step that read an earlier one's cache, a `cacheWrite` about the size
+ * of the deck is a step that wrote its own. The two bills are far apart —
+ * one write and four reads put the deck at about 1.65 times its input price
+ * a screen (1.25 + 4 × 0.1), five writes at about 6.25 times — so no figure
+ * for a screen is believed before the ledger is read.
  *
  * COST LEVERS, in the order to pull them:
- *  1. Prompt caching is already on: the OM document block carries
- *     `cache_control`. That only holds while the steps run back-to-back
- *     inside the cache window — a worker that pauses between steps pays for
- *     a fresh read, and the ledger shows it as a second cache write.
- *  2. The cache is PER MODEL. Splitting the extraction onto a cheaper model
- *     while the judgement stays on the flagship writes the deck to two
- *     caches — it costs MORE, not less. Move the OM-reading steps together:
+ *  1. Prompt caching is marked: the OM document block carries
+ *     `cache_control`. A request reads a cache only where everything before
+ *     its breakpoint matches an earlier request's — the system prompt, the
+ *     format the API adds for structured outputs, and the document — and
+ *     only inside the cache window. The same step sent again (a retry, a
+ *     resumed run, a second question asked of the deck) matches its own
+ *     earlier request; whether two different steps match is the ledger's to
+ *     say (above). A worker that pauses past the window pays a fresh write.
+ *  2. The cache is PER MODEL. Where the ledger shows the steps reading one
+ *     cache, splitting the extraction onto a cheaper model while the
+ *     judgement stays on the flagship writes the deck to two caches — it
+ *     costs MORE, not less: move the OM-reading steps together,
  *     `MODEL_EXTRACTION` and `MODEL_REASONING` to the same id. The one step
  *     that can differ for free is the verdict (`MODEL_VERDICT`), which
  *     reads the gathered results, never the deck.
  *  3. The mid tier at its list price in the table below ($2 in / $10 out per million
- *     against the flagship's $5 / $25) puts the same screen near $1.25 —
- *     near-flagship quality on this kind of read, but it changes the
- *     product; judge a few screens against their saved verdicts first.
+ *     against the flagship's $5 / $25) bills the same tokens at two fifths
+ *     of the flagship's price — near-flagship quality on this kind of read,
+ *     but it changes the product; judge a few screens against their saved
+ *     verdicts first.
  *  4. Fewer tokens per deck — ON by default: the OM goes as its own text
  *     layer, page-tagged, whenever that layer is dense enough to stand in
  *     for the pages (`lib/pdf-text.ts`, `omSourceFor` with `textFirst`),

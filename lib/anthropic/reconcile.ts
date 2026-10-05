@@ -46,9 +46,12 @@ export async function reconcileModel(
   const client = getAnthropic();
 
   // OM document FIRST with cache_control — byte-identical to the prefix the
-  // extract/challenge/comps/market steps send, so this step reads the OM from
-  // the prompt cache (and re-warms it) instead of paying a full re-read of a
-  // 150-200pp PDF. The label text moves after the document for that reason.
+  // extract/challenge/comps/market steps send. Whether this step reads the
+  // OM back from their cache is not established: its structured-output
+  // format is its own, and Anthropic's documentation says changing the
+  // format invalidates the prompt cache — the ledger says (./models). The
+  // label text moves after the document so nothing step-specific sits before
+  // the breakpoint.
   const content: Anthropic.ContentBlockParam[] = [
     omDocument(om),
     {

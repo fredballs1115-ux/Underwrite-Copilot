@@ -26,11 +26,13 @@ const FirstSignalSchema = z.object({
 });
 
 /**
- * The instant headline read. Deliberately the SAME model, system prompt, and
- * document block (with the same cache breakpoint) as the extraction step: this
- * call pays the one-time cache write for the OM, and every later pipeline step
- * reads it back at a fraction of the input price — so the fast first signal is
- * close to free, not a second full read.
+ * The instant headline read. It sends the SAME model, system prompt and
+ * document block (with the same cache breakpoint) as the steps after it, so
+ * that its cache write of the OM could be the one the later steps read back
+ * at a tenth of the input price. Whether they do is not established: each
+ * step sends its own structured-output format, and Anthropic's documentation
+ * says changing that format invalidates the prompt cache — a real screen's
+ * ledger (`analysis_jobs.usage`) says, call by call (./models).
  */
 export async function readFirstSignal(
   om: OmSource,
