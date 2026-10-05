@@ -20,6 +20,7 @@ import { NextResponse, after } from "next/server";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { dealPhotoPathOf } from "@/lib/storage-paths";
+import { pictureVersion } from "@/lib/deal-banner";
 import {
   PICTURE_CREDIT,
   SEARCH_WAIT_MS,
@@ -85,10 +86,21 @@ export async function GET(
   // the picture's identity: a replaced picture is a new path under the SAME
   // URL, and a browser told to revalidate rather than to trust a day's cache
   // sees it at once — while an unchanged one costs a 304 and no bytes.
+  //
+  // A URL that names the picture's version (`v`, lib/deal-banner
+  // `pictureVersion`, which the pipeline and the compare page carry) names
+  // these exact bytes, which never change under it: it is kept for a year
+  // and never asked again. Research pass 25 found every card on the
+  // pipeline asking its picture again on every view, each answer a
+  // revalidation behind a sign-in check and a read of the deal. A URL with
+  // no version, or an older one, is revalidated as before, so a replaced
+  // picture is never held under a URL that names the new one's.
   const etag = `W/"${path}"`;
+  const version = pictureVersion(path);
+  const pinned = version !== null && url.searchParams.get("v") === version;
   const headers = {
     etag,
-    "cache-control": "private, no-cache",
+    "cache-control": pinned ? "private, max-age=31536000, immutable" : "private, no-cache",
     "x-image-source": "photo",
     "x-image-credit": credit,
   };

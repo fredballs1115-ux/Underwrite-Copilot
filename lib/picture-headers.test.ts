@@ -110,3 +110,18 @@ describe("GET /api/deals/[id]/picture?g=N — what the stored row puts in its he
     expect(state.reads).toEqual([]);
   });
 });
+
+describe("GET /api/deals/[id]/picture — a URL that names the picture's version is kept (research pass 25)", () => {
+  it("answers the version the stored files carry as never changing, and anything else as before", async () => {
+    state.row = { id: DEAL, photo: { picture: photo("lk2x9a"), gallery: [photo("lk2x9ag1", 4)] }, om_storage_path: null, is_sample: false };
+    const pinned = await ask("size=thumb&v=lk2x9a");
+    expect(pinned.status).toBe(200);
+    expect(pinned.headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    // A gallery photograph carries its own stamp.
+    expect((await ask("size=hero&g=1&v=lk2x9ag1")).headers.get("cache-control")).toBe("private, max-age=31536000, immutable");
+    // No version, or a picture since replaced: revalidated, never kept.
+    expect((await ask("size=thumb")).headers.get("cache-control")).toBe("private, no-cache");
+    expect((await ask("size=thumb&v=older1")).headers.get("cache-control")).toBe("private, no-cache");
+    expect((await ask("size=hero&g=1&v=lk2x9a")).headers.get("cache-control")).toBe("private, no-cache");
+  });
+});

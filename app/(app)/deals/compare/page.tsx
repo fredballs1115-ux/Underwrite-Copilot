@@ -19,7 +19,7 @@ import { seedBenchmarks } from "@/lib/research-data";
 import { asOfLabel } from "@/lib/research";
 import { findPriceMetric, inferStrategy, noiFigures } from "@/lib/deal-strategy";
 import { dealTypeLabel } from "@/lib/interest";
-import { bannerSources } from "@/lib/deal-banner";
+import { bannerSources, pictureVersion } from "@/lib/deal-banner";
 import { floodCell, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
@@ -202,6 +202,7 @@ function toCol(
     pictures: bannerSources({
       dealId: deal.id,
       pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
+      pictureVersion: picture ? pictureVersion(picture.hero) : null,
       googleEnabled,
       hasStreetAddress: !!address?.street,
       hasAddress: !!address?.label,

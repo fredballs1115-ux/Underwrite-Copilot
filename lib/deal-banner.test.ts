@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BANNER, CARD, bannerSources, leadMarketId, shownMarketIds } from "./deal-banner";
+import { BANNER, CARD, THUMB, bannerSources, leadMarketId, pictureVersion, shownMarketIds } from "./deal-banner";
 import { IMAGE_CREDIT, imagePlan } from "./imagery-plan";
 import { marketPictureFor } from "./market-picture";
 
@@ -93,6 +93,26 @@ describe("bannerSources — the deal's own photograph carries its blur-up previe
     expect(bannerSources({ ...base, memorandumUnread: true, picturePreview: PREVIEW })[0].preview).toBeUndefined();
     // Anything that is not a small image data URI is dropped, never styled.
     expect(bannerSources({ ...base, pictureCredit: "x", picturePreview: 'data:image/webp;base64,a");}' })[0].preview).toBeUndefined();
+  });
+});
+
+describe("a stored photograph's URL names its version, so the browser keeps it (research pass 25)", () => {
+  it("reads the stamp a stored picture's files carry, and nothing else", () => {
+    expect(pictureVersion("photos/3f2b8c1e-7a4d-4e6f-9b0a-1c2d3e4f5a6b/lk2x9a-hero.jpg")).toBe("lk2x9a");
+    expect(pictureVersion("photos/x/lk2x9ag3-thumb.jpg")).toBe("lk2x9ag3");
+    expect(pictureVersion("photos/x/lk2x9a-full.jpg")).toBe("lk2x9a");
+    for (const bad of [null, undefined, "", "u1/x.pdf", "photos/x/lk2x9a-hero.png", "photos/x/a b-hero.jpg", "photos/x/a\r\n-hero.jpg"]) {
+      expect(pictureVersion(bad), String(bad)).toBeNull();
+    }
+  });
+
+  it("carries it on the stored photograph only", () => {
+    const got = bannerSources({ ...base, pictureCredit: "From the offering memorandum", pictureVersion: "lk2x9a" }, CARD);
+    expect(got[0].src).toBe("/api/deals/d1/picture?size=hero&v=lk2x9a");
+    expect(bannerSources({ ...base, pictureCredit: "x", pictureVersion: "lk2x9a" }, THUMB)[0].src).toBe("/api/deals/d1/picture?size=thumb&v=lk2x9a");
+    // None stored, or a memorandum not yet looked in: no version, revalidated as before.
+    expect(bannerSources({ ...base, pictureCredit: "x" }, CARD)[0].src).toBe("/api/deals/d1/picture?size=hero");
+    expect(bannerSources({ ...base, memorandumUnread: true, pictureVersion: "lk2x9a" }, CARD)[0].src).toBe("/api/deals/d1/picture?size=hero");
   });
 });
 

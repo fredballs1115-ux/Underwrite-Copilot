@@ -70,6 +70,9 @@ export interface BannerFacts {
   pictureCredit: string | null;
   /** its blur-up preview, where the photo cache holds one (#463) */
   picturePreview?: string | null;
+  /** the stored photograph's version (`pictureVersion`): carried in its
+   *  URL, so the browser keeps the picture until it is replaced */
+  pictureVersion?: string | null;
   /** no picture is cached but the deal's memorandum may hold one nobody has
    *  looked for (lib/deal-picture `pictureMayBeInMemorandum`): the picture
    *  route lifts the cover on this first ask, or answers 404 and the next
@@ -157,6 +160,27 @@ export function shownMarketCredits(
     .filter((c): c is PhotoCredit => c !== undefined);
 }
 
+/**
+ * A stored photograph's version: the stamp its files are stored under
+ * (`photos/<dealId>/<stamp>-<size>.jpg`, lib/storage-paths). Every picture
+ * the site stores — a memorandum's cover, a gallery photograph, an upload, a
+ * derivation under new rules — is written under a stamp of its own, so the
+ * stamp is the picture's identity. Carried in the picture's URL (`v`), it
+ * lets the route answer a matching request as never changing: research
+ * pass 25 found every card on the pipeline asking its picture again on
+ * every view, each answer a revalidation behind a sign-in check and a read
+ * of the deal. Null for a path not of that shape.
+ */
+export function pictureVersion(path: string | null | undefined): string | null {
+  const m = /\/([A-Za-z0-9]+)-(?:hero|thumb|full)\.jpg$/.exec(path ?? "");
+  return m ? m[1] : null;
+}
+
+/** `&v=<version>`, or nothing where the picture has none. */
+function versionQuery(version: string | null | undefined): string {
+  return version ? `&v=${encodeURIComponent(version)}` : "";
+}
+
 export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): BannerSource[] {
   const id = encodeURIComponent(f.dealId);
   const out: BannerSource[] = [];
@@ -165,7 +189,7 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
   if (f.pictureCredit) {
     out.push({
       kind: "photo",
-      src: `/api/deals/${id}/picture?size=${size}`,
+      src: `/api/deals/${id}/picture?size=${size}${versionQuery(f.pictureVersion)}`,
       credit: f.pictureCredit,
       ...(isPreview(f.picturePreview) ? { preview: f.picturePreview } : {}),
     });

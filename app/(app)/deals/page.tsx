@@ -15,7 +15,7 @@ import { Pipeline, type DealCard } from "./pipeline";
 import { PIPELINE_VIEW_COOKIE, landingView } from "@/lib/pipeline-view";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
-import { CARD, THUMB, bannerSources } from "@/lib/deal-banner";
+import { CARD, THUMB, bannerSources, pictureVersion } from "@/lib/deal-banner";
 import { coverFor, coverPlace } from "@/lib/deal-cover";
 import { marketPictureFor } from "@/lib/market-picture";
 import { PICTURE_CREDIT, galleryPage, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
@@ -391,6 +391,9 @@ export default async function DealsPage({
           // Its colours before its pixels (#463): the blur-up the frame
           // shows until the photograph has loaded whole.
           picturePreview: picture?.preview ?? null,
+          // Its version in its URL, so the browser keeps it until it is
+          // replaced rather than asking again on every view.
+          pictureVersion: picture ? pictureVersion(picture.hero) : null,
           memorandumUnread: unread,
           googleEnabled,
           hasStreetAddress: !!address?.street?.trim(),
@@ -419,9 +422,10 @@ export default async function DealsPage({
               ? (cache?.gallery ?? []).map((g, k) => {
                   // A page the deal's owner wrote is printed only as a page number.
                   const page = galleryPage(g.page);
+                  const v = pictureVersion(g.hero);
                   return {
                     kind: "photo" as const,
-                    src: `/api/deals/${encodeURIComponent(d.id)}/picture?size=hero&g=${k + 1}`,
+                    src: `/api/deals/${encodeURIComponent(d.id)}/picture?size=hero&g=${k + 1}${v ? `&v=${encodeURIComponent(v)}` : ""}`,
                     credit: memorandumPhotoCredit(page),
                     alt: page
                       ? `Photograph from page ${page} of the memorandum for ${d.name}`
