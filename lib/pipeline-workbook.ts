@@ -9,6 +9,7 @@ import { FOLD_WORD, checkedSentence, fitCellText, fitTone, type FitTone } from "
 import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
 import { PLAN_CAP_NA } from "@/lib/cap-slot";
 import { debtTagMeaning } from "@/lib/pipeline-tags";
+import { YOC_WITHHELD } from "@/lib/plan-facts";
 
 /**
  * The whole pipeline as one meeting-ready Excel workbook: a stage-grouped
@@ -144,6 +145,11 @@ export interface PipelineExportRow {
    *  — written raw into the cell, whose "0.00%" shows the "6.27%" the deal
    *  header prints; never a rounded string read back */
   yieldOnCost: number | null;
+  /** why no yield on cost is struck where the plan states both figures —
+   *  at or past the ceiling, a yield no project earns (lib/deal-strategy
+   *  `planSummary`'s `yieldWithheld`): the cell says `YOC_WITHHELD`, this
+   *  in its note; absent or null otherwise */
+  yieldWithheld?: string | null;
   fit: "fits" | "near" | "outside" | null;
   /** how many of the box's criteria the fit stands on (lib/criteria
    *  `buyBoxCoverage`) — the cell says "Fits (2 of 4)" where not every one
@@ -404,6 +410,11 @@ export async function buildPipelineWorkbook(
       if (d.yieldOnCost != null && Number.isFinite(d.yieldOnCost)) {
         yocCell.value = d.yieldOnCost;
         yocCell.numFmt = PCT2;
+      } else if (d.yieldWithheld) {
+        // A yield no project earns is refused in the plan's own words, the
+        // sentence why in the cell's note (research pass 38).
+        yocCell.value = YOC_WITHHELD;
+        yocCell.note = d.yieldWithheld;
       } else {
         yocCell.value = "—";
       }

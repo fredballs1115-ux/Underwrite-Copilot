@@ -1092,3 +1092,124 @@ describe("an implied going-in cap under the floor is a finding, said as the rule
     expect(assessPlausibility(negative).map((x) => x.code)).toEqual(["no_income_in_place"]);
   });
 });
+
+describe("a plan's own figures are held to each other, with or without a price row (research pass 38)", () => {
+  // The pass's fixtures, row for row.
+  const DEV = { kind: "development" as const, summary: "Ground-up 240-unit apartment development", capitalBudget: "", timeline: "" };
+  const VA = { kind: "value_add" as const, summary: "Interior renovation of 200 units", capitalBudget: "", timeline: "" };
+  const plan = (strategy: ExtractionResult["strategy"], list: [string, string, ExtractedMetric["basis"]?][], assetClass = "Multifamily") =>
+    ex(
+      list.map(([label, value, basis]) => metric(label, value, { page: "p. 3", ...(basis ? { basis } : {}) })),
+      { assetClass, strategy, address: "", market: "" },
+    );
+  const devTotalThousands = plan(DEV, [["Total project cost", "48,500 ($000s)"], ["NOI (stabilized, pro forma)", "3,200,000"], ["Units (proposed)", "200"]]);
+  const vaBudgetTiny = plan(VA, [
+    ["Asking price", "20,000,000"],
+    ["Units", "200"],
+    ["NOI (in-place)", "1,100,000", "in_place"],
+    ["NOI (stabilized, pro forma)", "1,500,000"],
+    ["Renovation budget", "2,500"],
+  ]);
+  const REFUSED =
+    "No yield on cost is struck: the $3.2M stabilized NOI is 25% or more of the $49k total cost, a yield no project earns, so the total cost or the NOI was most likely misread.";
+
+  it("refuses a yield on cost at or past the ceiling, as the cap reader refuses a cap, and says why wherever the yield would stand", () => {
+    const s = inferStrategy(devTotalThousands);
+    const p = planSummary(devTotalThousands, s)!;
+    expect(p.totalCost).toBe(48_500);
+    expect(p.yieldOnCost).toBeNull();
+    expect(p.yieldWithheld).toBe(REFUSED);
+    // The plan's facts say so in the cell, never 6597.94% and never a dash;
+    // the challenger's and the verdict's paragraph says the sentence.
+    expect(planFacts(p)).toContainEqual(["Yield on cost", "n/a — figures don't tie"]);
+    const note = plausibilityNote(assessPlausibility(devTotalThousands, s), s, p, devTotalThousands);
+    expect(note).not.toMatch(/6597|6,597/);
+    expect(note).toContain(
+      "no yield on cost is struck: the $3.2M stabilized NOI is 25% or more of the $49k total cost, a yield no project earns, so the total cost or the NOI was most likely misread",
+    );
+    // At the ceiling it is refused; under it, it stands as it did.
+    const at = plan(VA, [["Asking price", "$9,000,000"], ["Renovation budget", "$1,000,000"], ["NOI (stabilized, pro forma)", "$2,500,000"]]);
+    expect(planSummary(at)).toMatchObject({ totalCost: 10_000_000, yieldOnCost: null });
+    expect(planSummary(at)!.yieldWithheld).toContain("$2.5M stabilized NOI is 25% or more of the $10.0M total cost");
+    const under = plan(VA, [["Asking price", "$9,000,000"], ["Renovation budget", "$1,000,000"], ["NOI (stabilized, pro forma)", "$2,499,000"]]);
+    expect(planSummary(under)!.yieldOnCost).toBeCloseTo(0.2499, 10);
+    expect(planSummary(under)!.yieldWithheld).toBeNull();
+    const sound = plan(DEV, [["Land cost", "6,000,000"], ["Total project cost", "72,000,000"], ["NOI (stabilized, pro forma)", "4,600,000"], ["Units (proposed)", "240"]]);
+    expect(planFacts(planSummary(sound)!)).toContainEqual(["Yield on cost", "6.39%"]);
+    // A forward purchase's yield is the NOI at delivery over the price.
+    const forward = plan(
+      { ...DEV, summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion" },
+      [["Purchase price", "$10,000,000"], ["NOI (Year 1)", "$3,000,000"]],
+      "industrial",
+    );
+    expect(planSummary(forward)).toMatchObject({ forward: true, yieldOnCost: null });
+    expect(planSummary(forward)!.yieldWithheld).toBe(
+      "No yield on cost is struck: the $3.0M NOI at delivery is 25% or more of the $10.0M price, a yield no delivered building earns, so the price or the NOI was most likely misread.",
+    );
+  });
+
+  it("runs the plan's total-cost basis band whether or not the memorandum states a price", () => {
+    expect(assessPlausibility(devTotalThousands)).toEqual([
+      {
+        code: "basis_out_of_band",
+        severity: "medium",
+        title: "$49k of total cost over 200 units is $243 per unit",
+        detail:
+          "No multifamily market delivers there. The total cost or the unit count was most likely misread — check both against their source pages before the all-in basis is used anywhere. The row reads “Total project cost: 48,500 ($000s)” — a figure in thousands of dollars, which the plan's cost here reads as dollars.",
+      },
+    ]);
+    // A sound plan with no price row says nothing; a stabilized deal with
+    // none says nothing, as before; what the price buys still decides.
+    const sound = plan(DEV, [["Total project cost", "48,500,000"], ["NOI (stabilized, pro forma)", "3,200,000"], ["Units (proposed)", "200"]]);
+    expect(assessPlausibility(sound)).toEqual([]);
+    expect(assessPlausibility(ex([metric("NOI (Year 1)", "$21,000,000")]))).toEqual([]);
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    expect(assessPlausibility({ ...devTotalThousands, interest: { ...blank, kind: "note" } })).toEqual([]);
+  });
+
+  it("names a works budget under about $1,000 a unit or 1% of the price, said as the rule of thumb it is", () => {
+    expect(assessPlausibility(vaBudgetTiny)).toEqual([
+      {
+        code: "budget_low",
+        severity: "medium",
+        title: "Renovation budget of $2,500 is $12.50 per unit and 0.01% of the $20.0M price",
+        detail:
+          "A works budget under about $1,000 a unit or 1% of the price is under what a renovation or construction program costs — a rule of thumb, not a market figure: a budget that small is, most often, a figure in thousands, one unit's cost entered as the whole program's, or a misread. Check the source page before the total cost, the yield on cost or any return built on the budget is relied on.",
+      },
+    ]);
+    // A row in thousands is quoted.
+    const thousands = plan(VA, [["Asking price", "20,000,000"], ["Units", "200"], ["NOI (stabilized, pro forma)", "1,500,000"], ["Renovation budget", "2,500 ($000s)"]]);
+    expect(assessPlausibility(thousands)[0].detail).toContain(
+      "The row reads “Renovation budget: 2,500 ($000s)” — a figure in thousands of dollars, which the plan's cost here reads as dollars.",
+    );
+    // Either floor alone: a unit's on a cheap building, the price's with no count.
+    const perUnit = plan(VA, [["Asking price", "4,000,000"], ["Units", "200"], ["Renovation budget", "150,000"]]);
+    expect(assessPlausibility(perUnit).map((f) => f.title)).toEqual(["Renovation budget of $150k is $750 per unit"]);
+    const share = plan(VA, [["Asking price", "20,000,000"], ["Renovation budget", "150,000"]], "Office");
+    expect(assessPlausibility(share).map((f) => f.title)).toEqual(["Renovation budget of $150k is 0.75% of the $20.0M price"]);
+    // A sound budget, a lease-up's leasing capital and a development with
+    // its land as the price are held to nothing they meet.
+    const fine = plan(VA, [["Asking price", "20,000,000"], ["Units", "200"], ["Renovation budget", "3,000,000"]]);
+    expect(assessPlausibility(fine)).toEqual([]);
+    const leaseUp = plan({ ...VA, kind: "lease_up" }, [["Asking price", "20,000,000"], ["Units", "200"], ["Capital budget", "150,000"]]);
+    expect(assessPlausibility(leaseUp).map((f) => f.code)).not.toContain("budget_low");
+  });
+
+  it("calls the stabilized NOI \"not a misread\" only where no finding stands and no yield was refused", () => {
+    const tied = (e: ExtractionResult) => {
+      const s = inferStrategy(e);
+      return plausibilityNote(assessPlausibility(e, s), s, planSummary(e, s), e);
+    };
+    expect(tied(CONVERSION)).toMatch(/not a misread/);
+    for (const e of [devTotalThousands, vaBudgetTiny]) {
+      expect(tied(e)).not.toMatch(/not a misread/);
+      expect(tied(e)).toContain("But the plan's figures do not all tie, as said here, so it or the cost it is set against may be a misread");
+      expect(tied(e)).toMatch(/FIGURES THAT DO NOT TIE/);
+    }
+    // A yield refused past the ceiling with no other finding says so too.
+    const refusedOnly = plan(VA, [["Asking price", "$9,000,000"], ["Renovation budget", "$1,000,000"], ["NOI (stabilized, pro forma)", "$3,000,000"]]);
+    expect(assessPlausibility(refusedOnly)).toEqual([]);
+    expect(tied(refusedOnly)).not.toMatch(/not a misread/);
+    expect(tied(refusedOnly)).toContain("may be a misread");
+  });
+});

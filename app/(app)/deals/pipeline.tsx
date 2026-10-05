@@ -42,7 +42,7 @@ import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-dea
 // CSV and the meeting workbook mark the figure with the same words.
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
 import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
-import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
+import { PLAN_YOC_TITLE, YOC_WITHHELD } from "@/lib/plan-facts";
 import { FOLD_WORD, checkedOf, checkedSentence, fitCellText, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
@@ -95,7 +95,7 @@ export type DealCard = {
   /** the broker's call-for-offers date (ISO yyyy-mm-dd), if set */
   offersDue: string | null;
   /** table figures — null renders as an em-dash placeholder */
-  slots: { cap: string | null; price: string | null; yoc: string | null; plan?: boolean; capWithheld?: "note" | "position" | "share" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
+  slots: { cap: string | null; price: string | null; yoc: string | null; yocWithheld?: string | null; plan?: boolean; capWithheld?: "note" | "position" | "share" | null; noteYield?: string | null; interest?: string | null; debt?: string | null; affordable?: string | null; tenancy?: string | null; hotel?: string | null; sale?: string | null; roster?: string | null; valueAdd?: string | null; abatement?: string | null; sellerNote?: string | null; reports?: string | null; broker?: string | null; student?: string | null; mh?: string | null; storage?: string | null; regulation?: string | null; forward?: string | null; mixedUse?: string | null; goingConcern?: string | null; condo?: string | null; sandwich?: string | null; exchange?: string | null; basis?: string | null };
   /** latest analysis-job state: a live run, one that stopped writing
    *  progress (its process died), or a failure that left the verdict behind */
   jobStatus?: "running" | "stalled" | "failed" | null;
@@ -731,7 +731,8 @@ export function Pipeline({
         // column as the card shows it ("17.0% to maturity"), else the cap
         // said withheld rather than left blank (#423).
         capCellText(d.slots),
-        d.slots.yoc ?? "",
+        // A yield no project earns is refused in the plan's own words.
+        d.slots.yoc ?? (d.slots.yocWithheld ? YOC_WITHHELD : ""),
         // A fit judged on the first signal, before the extraction lands, is
         // marked on each of its figures as the card marks it — "Near (first
         // read)" — since a CSV is read away from the page (lib/first-read);
@@ -1821,6 +1822,11 @@ const DealRow = memo(function DealRow({
       <span className="font-mono tabular-nums">{d.slots.yoc}</span>{" "}
       <span className="text-[9px] font-medium uppercase">yoc</span>
     </span>
+  ) : d.slots.yocWithheld ? (
+    // A yield no project earns is refused: n/a, with the plan's sentence why.
+    <span title={d.slots.yocWithheld}>
+      n/a <span className="text-[9px] font-medium uppercase">yoc</span>
+    </span>
   ) : d.slots.noteYield ? (
     // A note, or a preferred equity position, has no going-in cap: its own
     // yield takes the slot.
@@ -2055,6 +2061,11 @@ const DealRow = memo(function DealRow({
               <span title={PLAN_YOC_TITLE} className="text-brand">
                 {d.slots.yoc}
                 <span className="ml-0.5 text-[9px] font-sans font-medium uppercase">yoc</span>
+              </span>
+            ) : d.slots.yocWithheld ? (
+              // A yield no project earns is refused, its sentence the title.
+              <span title={d.slots.yocWithheld} className="font-sans text-xs text-muted">
+                n/a
               </span>
             ) : d.slots.noteYield ? (
               // A note, or a position, has no going-in cap: its own yield, labelled.
@@ -2462,13 +2473,19 @@ const DealTile = memo(function DealTile({
                 ? ownYieldOf(d.slots.capWithheld).label
                 : "Cap"
           }
-          title={!d.slots.cap && !d.slots.yoc && d.slots.capWithheld ? CAP_WITHHELD[d.slots.capWithheld].title : undefined}
+          title={
+            !d.slots.cap && !d.slots.yoc && d.slots.capWithheld
+              ? CAP_WITHHELD[d.slots.capWithheld].title
+              : !d.slots.cap && !d.slots.yoc && d.slots.yocWithheld
+                ? d.slots.yocWithheld
+                : undefined
+          }
           sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? ownYieldOf(d.slots.capWithheld).to : undefined}
         >
           {d.slots.cap ??
             d.slots.yoc ??
             d.slots.noteYield ??
-            (d.slots.capWithheld ? "n/a" : <Unstated reading={!!d.reading} width="w-10" />)}
+            (d.slots.capWithheld || d.slots.yocWithheld ? "n/a" : <Unstated reading={!!d.reading} width="w-10" />)}
         </TileStat>
         <div className="min-w-0">
           <dt className="text-[10px] font-medium uppercase tracking-wide text-muted">Fit</dt>

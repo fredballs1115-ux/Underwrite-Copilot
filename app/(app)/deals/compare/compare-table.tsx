@@ -7,7 +7,7 @@ import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 import type { FigureSource } from "@/lib/compare-figures";
 import { OWN_YIELD_WORDS, SHARE_CAP_WORDS, type CapWithheld } from "@/lib/compare-interest";
 import { PLAN_CAP_NA } from "@/lib/cap-slot";
-import { pctText } from "@/lib/plan-facts";
+import { pctText, YOC_WITHHELD } from "@/lib/plan-facts";
 import type { BuyBoxCoverage } from "@/lib/criteria";
 import { fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 
@@ -107,6 +107,9 @@ export type Col = {
    *  stabilized asset */
   yoc: number | null;
   yocFrom?: FigureSource | null;
+  /** why no yield on cost is shown where one was struck at or past the
+   *  ceiling, a yield no project earns (lib/compare-figures) */
+  yocWithheld?: string | null;
   /** cap vs the freshest 30-yr fixed — same arithmetic as the deal page */
   leverage: LeverageRead | null;
   /** cap over today's 10-year Treasury (lib/leverage `capSpreadRead`) —
@@ -534,7 +537,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
       // cost"), so the row stays while one is compared: the model's figure,
       // else the one the deal's header prints; "not stated" where neither
       // has one, rather than a dash.
-      get: (c) => pct2(c.yoc) ?? (c.planDeal ? "not stated" : null),
+      // A yield no project earns is refused in the plan facts' own words,
+      // never "not stated" (research pass 38).
+      get: (c) => pct2(c.yoc) ?? (c.yocWithheld ? YOC_WITHHELD : c.planDeal ? "not stated" : null),
       mono: true,
       num: (c) => c.yoc,
       src: (c) => (c.yoc != null ? c.yocFrom : null),

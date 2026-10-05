@@ -99,6 +99,14 @@ export const IMPLIED_CAP_CEILING = 0.25;
  *  printed "Equity multiple −1.53x" and "DSCR 0.16x" with no finding. */
 export const IMPLIED_CAP_FLOOR = 0.02;
 
+/** How small a works budget can be, a unit and a share of the price, and
+ *  still be a renovation or construction program — a rule of thumb, not a
+ *  market figure, and said as one (research pass 38): a value-add's
+ *  "Renovation budget 2,500" on 200 apartments was spent as $2,500 of
+ *  capital, $12.50 a door, with no finding. */
+export const BUDGET_FLOOR_PER_UNIT = 1_000;
+export const BUDGET_FLOOR_SHARE = 0.01;
+
 /**
  * The first signal's going-in cap, where it can be a cap on the price at
  * all: the signal is a fast read with no label to check, so a figure at or
@@ -325,6 +333,7 @@ export type FindingCode =
   | "strategy_unsettled"
   | "cap_mismatch"
   | "basis_out_of_band"
+  | "budget_low"
   | "no_income_in_place"
   | "ground_rent_mismatch";
 
@@ -932,8 +941,15 @@ export interface PlanSummary {
    *  the developer's, said and never added to the price; null or absent
    *  otherwise */
   developerBudget?: CapitalBudget | null;
-  /** stabilized NOI ÷ total cost, decimal, when both are known */
+  /** stabilized NOI ÷ total cost, decimal, when both are known — null at or
+   *  over IMPLIED_CAP_CEILING, a yield no project earns (`yieldWithheld`) */
   yieldOnCost: number | null;
+  /** why no yield on cost is struck where both figures are stated: at or
+   *  over IMPLIED_CAP_CEILING the total cost or the NOI was most likely
+   *  misread, as the cap reader refuses a cap past it — one sentence, said
+   *  wherever the yield would stand (research pass 38); null or absent
+   *  otherwise */
+  yieldWithheld?: string | null;
   /** why no total cost or yield on cost is struck where the price is shown,
    *  in one plain sentence: beside the equity's whole (`equityWhole`), the
    *  building's cost is that plus the entity's loan, which the model does
@@ -1019,8 +1035,19 @@ export function planSummary(
       : budget?.isTotal
         ? budget.budget
         : null;
-  const yieldOnCost =
-    stabilizedNoi && totalCost != null && totalCost > 0 ? stabilizedNoi.value / totalCost : null;
+  const rawYield = stabilizedNoi && totalCost != null && totalCost > 0 ? stabilizedNoi.value / totalCost : null;
+  // A yield on cost no project earns is refused, as the cap reader refuses a
+  // cap past the same ceiling, and said why in its place (research pass 38:
+  // "Total project cost 48,500 ($000s)", read as $48,500, printed a
+  // 6597.94% yield on cost on the card, the header, the plan's facts and
+  // every Claude step's context, with no finding anywhere).
+  const yieldWithheld =
+    rawYield != null && rawYield >= IMPLIED_CAP_CEILING && stabilizedNoi && totalCost != null
+      ? forward
+        ? `No yield on cost is struck: the ${money(stabilizedNoi.value)} NOI at delivery is ${pct(IMPLIED_CAP_CEILING, 0)} or more of the ${money(totalCost)} price, a yield no delivered building earns, so the price or the NOI was most likely misread.`
+        : `No yield on cost is struck: the ${money(stabilizedNoi.value)} stabilized NOI is ${pct(IMPLIED_CAP_CEILING, 0)} or more of the ${money(totalCost)} total cost, a yield no project earns, so the total cost or the NOI was most likely misread.`
+      : null;
+  const yieldOnCost = yieldWithheld ? null : rawYield;
   const units = unitCountFromMetrics(metrics);
   // Beside the loan the entity carries, a share's price grosses up to the
   // equity's whole, not the asset's: the label says so on every surface
@@ -1052,6 +1079,7 @@ export function planSummary(
     budget,
     totalCost,
     yieldOnCost,
+    yieldWithheld,
     ...(forward ? { forward: true, developerBudget: statedBudget } : {}),
     costWithheld:
       entityLoan != null && totalCost == null
@@ -1086,11 +1114,146 @@ function noiRowWords(metrics: MetricLike[], f: NoiFigure): string {
   return "";
 }
 
+/** Where a cost row's own words say its figure is in thousands, the sentence
+ *  that quotes them, label and value as stated; "" where they do not, or no
+ *  row is named. */
+function thousandsRowWords(row: MetricLike | null | undefined): string {
+  if (!row || !IN_THOUSANDS_WORDS.test(`${row.label} ${row.value}`)) return "";
+  return ` The row reads “${row.label.trim()}: ${row.value.trim()}” — a figure in thousands of dollars, which the plan's cost here reads as dollars.`;
+}
+
+// The plans whose budget is works — a renovation, a conversion, a building
+// to put up. A lease-up's budget is its leasing capital, which can be small.
+const WORKS_KINDS: ReadonlySet<StrategyKind> = new Set(["value_add", "conversion", "development"]);
+
+/** "$12.50", "$243", "$4,250": a figure a unit, to the cent under $100. */
+const perText = (n: number): string => `$${n < 100 ? n.toFixed(2) : Math.round(n).toLocaleString("en-US")}`;
+
+/**
+ * Rule 4 of the plausibility check, and its plan's half (research pass 38):
+ * a per-unit or per-SF basis outside any US market — on a plan deal the
+ * plan's TOTAL COST over its planned units, run with or without a price row
+ * — and a works budget under what any renovation or construction program
+ * costs. A development stating "Total project cost 48,500 ($000s)" and no
+ * land price read $243 a planned unit, and a value-add's "Renovation budget
+ * 2,500" on 200 apartments $12.50 a door, with no finding for either.
+ * `price` is the price the deal's figures describe (a share's grossed up),
+ * null where the memorandum states none, and `priceWord` names it.
+ */
+function costFindings(
+  extraction: ExtractionResult,
+  strategy: DealStrategy,
+  price: number | null,
+  priceWord: string,
+): PlausibilityFinding[] {
+  const findings: PlausibilityFinding[] = [];
+  const metrics = extraction.metrics ?? [];
+  const planDeal = NON_STABILIZED.has(strategy.kind);
+  const plan = planDeal ? planSummary(extraction, strategy) : null;
+  const interest = interestOf(extraction);
+  const priceRow = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
+  const budgetRow = plan?.budget ? (metrics.find((m) => m.label === plan.budget!.label) ?? null) : null;
+
+  // 4. A per-unit or per-SF basis outside any US market — a misparse. The
+  //    shared count reader: a "Unit mix" or "Vacant units" row read as the
+  //    count would manufacture this finding on a sound deal. On a plan deal
+  //    the basis is TOTAL COST over the planned units (rule 4): $12k of
+  //    land per apartment to be built, or $4/SF for a dead office shell,
+  //    is exactly what such deals trade at, so the shell's or the site's
+  //    price is never held to an operating market's band.
+  const units = unitCountFromMetrics(metrics);
+  const sf = buildingSfFromMetrics(metrics);
+  const cls = (extraction.assetClass ?? "").toLowerCase();
+  // The class says the basis and the noun (lib/asset-words): a hotel is
+  // held to a per-key band, a park to a per-pad one, an office to per SF —
+  // and the finding names the class as a page would, never a stored key.
+  const words = assetWords(cls);
+  const noun = words.noun ?? { one: "unit", many: "units" };
+  const clsWord = words.label ? words.label.toLowerCase() : "such";
+  const basisTotal = planDeal ? (plan?.totalCost ?? null) : price;
+  const basisNoun = planDeal ? "total cost" : priceWord;
+  // The row the basis was read from, quoted where its own words say it is
+  // in thousands: a stated total, else the works and the price.
+  const basisWords = planDeal
+    ? thousandsRowWords(budgetRow) || (plan?.budget?.isTotal ? "" : thousandsRowWords(priceRow))
+    : thousandsRowWords(priceRow);
+  const misread = (other: string) =>
+    planDeal
+      ? `No ${clsWord} market delivers there. The total cost or the ${other} was most likely misread — check both against their source pages before the all-in basis is used anywhere.${basisWords}`
+      : `No ${clsWord} market trades there. The price or the ${other} was most likely misread — check both against their source pages before the basis is used anywhere.${basisWords}`;
+  // A leased fee's price buys the land alone: over the building's units or
+  // feet it is no basis any building market trades at, and never a misread.
+  const landOnly = interest.kind === "leased_fee";
+  // A data center is priced by its power, not its floor, so a fitted one
+  // runs past the ceiling any warehouse sets; and an outdoor-storage yard's
+  // price over the small building on it says nothing about the yard, which
+  // trades by the usable acre. Neither is a misread (the site-researcher's
+  // pass of 2026-09-30): the data center is held to the band's floor only,
+  // the yard to no per-SF band at all.
+  const perSfCeiling = assetClassKey(cls) === "data_center" ? Number.POSITIVE_INFINITY : 3_000;
+  const yard = isOutdoorStorageYard(extraction.assetClass);
+  if (!landOnly && basisTotal != null && cls && words.basis === "unit" && units != null && units >= 1 && units <= 50_000) {
+    const perUnit = basisTotal / units;
+    if (perUnit < 15_000 || perUnit > 2_500_000) {
+      findings.push({
+        code: "basis_out_of_band",
+        severity: "medium",
+        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(units).toLocaleString("en-US")} ${noun.many} is ${money(perUnit)} per ${noun.one}`,
+        detail: misread(`${noun.one} count`),
+      });
+    }
+  } else if (!landOnly && !yard && basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
+    const perSf = basisTotal / sf;
+    if (perSf < 5 || perSf > perSfCeiling) {
+      findings.push({
+        code: "basis_out_of_band",
+        severity: "medium",
+        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(sf).toLocaleString("en-US")} SF is $${perSf < 10 ? perSf.toFixed(2) : Math.round(perSf).toLocaleString("en-US")} per SF`,
+        detail: misread("building size"),
+      });
+    }
+  }
+
+  // 4b. A works budget under what any renovation or construction program
+  //     costs: under about $1,000 a unit of the class's own count, or under
+  //     1% of the price — a rule of thumb, said as one. Only a budget for
+  //     the works alone (a stated total is the basis's, above) on a plan of
+  //     works; a forward purchase's works are the developer's.
+  const budget = plan?.budget ?? null;
+  if (budget && !budget.isTotal && WORKS_KINDS.has(strategy.kind)) {
+    const perUnit = words.basis === "unit" && units != null && units >= 1 ? budget.budget / units : null;
+    const share = price != null && price > 0 ? budget.budget / price : null;
+    const lowPerUnit = perUnit != null && perUnit < BUDGET_FLOOR_PER_UNIT;
+    const lowShare = share != null && share < BUDGET_FLOOR_SHARE;
+    if (lowPerUnit || lowShare) {
+      const shareText = share == null ? "" : share < 0.0001 ? "under 0.01%" : pct(share, 2);
+      const said = [
+        lowPerUnit ? `${perText(perUnit!)} per ${noun.one}` : "",
+        lowShare ? `${shareText} of the ${money(price!)} ${priceWord}` : "",
+      ].filter(Boolean);
+      const floors = [
+        lowPerUnit ? `about ${perText(BUDGET_FLOOR_PER_UNIT)} ${withArticle(noun.one)}` : "",
+        lowShare ? `${pct(BUDGET_FLOOR_SHARE, 0)} of the price` : "",
+      ].filter(Boolean);
+      findings.push({
+        code: "budget_low",
+        severity: "medium",
+        title: `${budget.label} of ${compactUsd(budget.budget, { thousandsFrom: 10_000 })} is ${said.join(" and ")}`,
+        detail: `A works budget under ${floors.join(" or ")} is under what a renovation or construction program costs — a rule of thumb, not a market figure: a budget that small is, most often, a figure in thousands, one ${noun.one}'s cost entered as the whole program's, or a misread.${thousandsRowWords(
+          budgetRow,
+        )} Check the source page before the total cost, the yield on cost or any return built on the budget is relied on.`,
+      });
+    }
+  }
+  return findings;
+}
+
 /**
  * Check the extraction's headline figures against each other. Returns the
  * findings, most severe first, deduplicated by code. Empty when the figures
  * tie — or when there is no price to test them against (silence, not a
- * verdict: a blank is never zero).
+ * verdict: a blank is never zero), except a plan's own figures, which are
+ * tested against each other with or without one (`costFindings`).
  */
 export function assessPlausibility(
   extraction: ExtractionResult | null,
@@ -1098,9 +1261,6 @@ export function assessPlausibility(
 ): PlausibilityFinding[] {
   if (!extraction) return [];
   const metrics = extraction.metrics ?? [];
-  const priceMetric = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
-  const stated = priceMetric ? parsePrice(priceMetric.value) : null;
-  if (stated == null || !(stated > 0)) return [];
   // What the price buys (lib/interest, #414). A note's price is a loan's:
   // set against the collateral's NOI it is a cap rate nobody earns, so no
   // price finding is made at all — the interest banner says why. A share's
@@ -1112,6 +1272,11 @@ export function assessPlausibility(
   // loan's: no price finding (lib/position).
   if (interest.kind === "note" || interest.kind === "preferred_equity") return [];
   if (interest.kind === "partial_interest" && interest.sharePct == null) return [];
+  const priceMetric = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));
+  const stated = priceMetric ? parsePrice(priceMetric.value) : null;
+  // Without a price, a plan's own figures are still tested — its total cost
+  // over its planned units, and its works budget (research pass 38).
+  if (stated == null || !(stated > 0)) return isPlanDeal(strategy.kind) ? costFindings(extraction, strategy, null, "price") : [];
   const price = interest.sharePct != null ? stated / (interest.sharePct / 100) : stated;
   // Beside the entity's stated loan, what a share's price grosses up to is
   // the equity's whole, not the asset's: the loan sits on top of it, and
@@ -1244,60 +1409,10 @@ export function assessPlausibility(
     }
   }
 
-  // 4. A per-unit or per-SF basis outside any US market — a misparse. The
-  //    shared count reader: a "Unit mix" or "Vacant units" row read as the
-  //    count would manufacture this finding on a sound deal. On a plan deal
-  //    the basis is TOTAL COST over the planned units (rule 4): $12k of
-  //    land per apartment to be built, or $4/SF for a dead office shell,
-  //    is exactly what such deals trade at, so the shell's or the site's
-  //    price is never held to an operating market's band.
-  const units = unitCountFromMetrics(metrics);
-  const sf = buildingSfFromMetrics(metrics);
-  const cls = (extraction.assetClass ?? "").toLowerCase();
-  // The class says the basis and the noun (lib/asset-words): a hotel is
-  // held to a per-key band, a park to a per-pad one, an office to per SF —
-  // and the finding names the class as a page would, never a stored key.
-  const words = assetWords(cls);
-  const noun = words.noun ?? { one: "unit", many: "units" };
-  const clsWord = words.label ? words.label.toLowerCase() : "such";
-  const basisTotal = planDeal ? (planSummary(extraction, strategy)?.totalCost ?? null) : price;
-  const basisNoun = planDeal ? "total cost" : priceWord;
-  const misread = (other: string) =>
-    planDeal
-      ? `No ${clsWord} market delivers there. The total cost or the ${other} was most likely misread — check both against their source pages before the all-in basis is used anywhere.`
-      : `No ${clsWord} market trades there. The price or the ${other} was most likely misread — check both against their source pages before the basis is used anywhere.`;
-  // A leased fee's price buys the land alone: over the building's units or
-  // feet it is no basis any building market trades at, and never a misread.
-  const landOnly = interest.kind === "leased_fee";
-  // A data center is priced by its power, not its floor, so a fitted one
-  // runs past the ceiling any warehouse sets; and an outdoor-storage yard's
-  // price over the small building on it says nothing about the yard, which
-  // trades by the usable acre. Neither is a misread (the site-researcher's
-  // pass of 2026-09-30): the data center is held to the band's floor only,
-  // the yard to no per-SF band at all.
-  const perSfCeiling = assetClassKey(cls) === "data_center" ? Number.POSITIVE_INFINITY : 3_000;
-  const yard = isOutdoorStorageYard(extraction.assetClass);
-  if (!landOnly && basisTotal != null && cls && words.basis === "unit" && units != null && units >= 1 && units <= 50_000) {
-    const perUnit = basisTotal / units;
-    if (perUnit < 15_000 || perUnit > 2_500_000) {
-      findings.push({
-        code: "basis_out_of_band",
-        severity: "medium",
-        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(units).toLocaleString("en-US")} ${noun.many} is ${money(perUnit)} per ${noun.one}`,
-        detail: misread(`${noun.one} count`),
-      });
-    }
-  } else if (!landOnly && !yard && basisTotal != null && cls && words.basis === "sf" && sf != null && sf > 100) {
-    const perSf = basisTotal / sf;
-    if (perSf < 5 || perSf > perSfCeiling) {
-      findings.push({
-        code: "basis_out_of_band",
-        severity: "medium",
-        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(sf).toLocaleString("en-US")} SF is $${perSf < 10 ? perSf.toFixed(2) : Math.round(perSf).toLocaleString("en-US")} per SF`,
-        detail: misread("building size"),
-      });
-    }
-  }
+  // 4. The basis against any market's band, and a plan's works budget
+  //    against what any program costs (`costFindings`, which a plan with no
+  //    price row runs too).
+  findings.push(...costFindings(extraction, strategy, price, priceWord));
 
   // 5. A stabilized deal with no income in place reads as something else.
   if (strategy.kind === "stabilized" && going && going.value <= 0) {
@@ -1370,6 +1485,8 @@ function planLine(plan: PlanSummary): string {
   // As the deal page prints it, so a verdict that quotes it quotes the
   // page's own figure.
   if (plan.yieldOnCost != null) parts.push(`yield on total cost ${yieldOnCostText(plan.yieldOnCost)}`);
+  // …where none is struck past the ceiling, the page's sentence why…
+  if (plan.yieldWithheld) parts.push(plan.yieldWithheld.replace(/\.$/, "").replace(/^No /, "no "));
   // …and where none is struck on the equity's whole, the page's sentence why.
   if (plan.costWithheld) parts.push(plan.costWithheld.replace(/\.$/, "").replace(/^No /, "no "));
   parts.push(plan.timeline ? `timeline: ${plan.timeline}` : "timeline to stabilization not stated");
@@ -1379,8 +1496,14 @@ function planLine(plan: PlanSummary): string {
 
 /** How a plan's stabilized pro forma is tested — the paragraph a plan deal's
  *  brief carries after its figures. */
-const PLAN_TEXT =
-  "The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today. Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.";
+const PLAN_TEST =
+  "Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.";
+const PLAN_TEXT = `The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today. ${PLAN_TEST}`;
+/** The same paragraph where a finding stands, or no yield on cost is struck
+ *  past the ceiling (research pass 38): the plan's figures do not all tie,
+ *  so the NOI is never called "not a misread" — it, or the cost it is set
+ *  against, may be one. */
+const PLAN_TEXT_UNTIED = `The stabilized NOI is the sponsor's post-completion pro forma, not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today. But the plan's figures do not all tie, as said here, so it or the cost it is set against may be a misread: check both against their source pages before judging the plan on them. ${PLAN_TEST}`;
 
 /** The paragraph a forward purchase's brief carries in its place: the
  *  developer funds the works, so no construction budget, carry, interest
@@ -1413,7 +1536,15 @@ export function plausibilityNote(
     // construction, so the construction paragraph a development gets is the
     // purchase's own — the facts and traps by name follow in the
     // challenger's notes (lib/forward-purchase `forwardNote`).
-    bits.push(plan?.forward || isForwardPurchase(extraction, strategy) ? FORWARD_PLAN_TEXT : PLAN_TEXT);
+    // "Not a misread" only where no finding stands and no yield on cost was
+    // refused past the ceiling (research pass 38).
+    bits.push(
+      plan?.forward || isForwardPurchase(extraction, strategy)
+        ? FORWARD_PLAN_TEXT
+        : findings.length > 0 || plan?.yieldWithheld
+          ? PLAN_TEXT_UNTIED
+          : PLAN_TEXT,
+    );
   }
   if (findings.length) {
     bits.push(

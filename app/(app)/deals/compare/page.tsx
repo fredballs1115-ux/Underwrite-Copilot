@@ -191,6 +191,7 @@ function toCol(
     capWithheld: figs.capWithheld,
     yoc: figs.yoc,
     yocFrom: figs.yocFrom,
+    yocWithheld: figs.yocWithheld,
     // Same arithmetic as the deal page's leverage check, run on the SAME cap
     // this table shows one row above — never a differently-sourced number.
     leverage: cap != null && bench30 != null ? leverageRead(cap, bench30) : null,

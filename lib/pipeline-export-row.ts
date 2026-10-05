@@ -167,6 +167,8 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // percent cell, where a string rounded to "6.3%" and read back printed
     // the header's 6.27% as "6.30%".
     yieldOnCost: plan?.yieldOnCost ?? null,
+    // …and where none is struck past the ceiling, the plan's sentence why.
+    yieldWithheld: plan?.yieldWithheld ?? null,
     fit,
     // How many of the box's criteria the fit stands on — the pipeline
     // card's count (lib/criteria `buyBoxCoverage`): the cell says "Fits (2

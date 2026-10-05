@@ -1162,8 +1162,12 @@ export default async function DealPage({
   // maturity at its price, or that the cap is withheld — and a preferred
   // equity position's yield to redemption, its price buying a rate and a
   // redemption, never a slice of the building.
+  // A yield no project earns is refused: "n/a", the plan's sentence why in
+  // its title and under the plan's facts (research pass 38).
   const returnFigure: HeroFigure = plan
-    ? { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
+    ? plan.yieldWithheld && summaryYoc == null
+      ? { label: "Yield on cost", value: "n/a", figure: true, title: plan.yieldWithheld }
+      : { label: "Yield on cost", value: summaryYoc ?? null, figure: true }
     : { ...goingInCapFigure(extraction, summaryCap ?? null), figure: true };
   const capWithheld = capSlotWithheld(extraction);
 

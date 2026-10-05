@@ -55,6 +55,10 @@ function planFigures(
   refCapPct: number,
 ): { noi: number; price: number; budget: number } | null {
   if (!plan) return null;
+  // A yield on cost no project earns is struck nowhere, so it is stressed
+  // nowhere either (research pass 38: a $48,500 total read off a row in
+  // thousands drew a grid of 6,000% yields and a 99.9% NOI cushion).
+  if (plan.yieldWithheld) return null;
   const noi = plan.stabilizedNoi?.value ?? null;
   // An OM that states an all-in total and no price: the total is the figure
   // to stress, and there is no price to add to it.

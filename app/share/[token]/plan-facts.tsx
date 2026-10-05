@@ -44,6 +44,7 @@ export function SharePlan({
       <p className="mt-3 text-xs leading-relaxed text-muted">
         {plan.timeline ? `Timeline as stated: ${plan.timeline}. ` : ""}
         {planReadLine(strategy.kind, strategy.label, plan.priceLabel === "Land cost")}
+        {plan.yieldWithheld ? ` ${plan.yieldWithheld}` : ""}
         {plan.costWithheld ? ` ${plan.costWithheld}` : ""}
       </p>
     </section>

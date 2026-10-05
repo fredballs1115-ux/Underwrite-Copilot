@@ -59,6 +59,12 @@ export interface PipelineSlots {
    *  asset shows a cap — to two decimals ("6.27%"), as the deal header
    *  prints it; null for a stabilized asset or an unstated plan */
   yoc: string | null;
+  /** why no yield on cost is struck where the plan states both figures: at
+   *  or past the ceiling, a yield no project earns (lib/deal-strategy
+   *  `planSummary`'s `yieldWithheld`) — the card and the list say "n/a"
+   *  with this as its title, the CSV `YOC_WITHHELD`; absent or null
+   *  otherwise */
+  yocWithheld?: string | null;
   /** a plan deal — value-add, lease-up, conversion, development — judged on
    *  its yield on total cost, so its cap cell says so (lib/cap-slot
    *  `PLAN_CAP_NA`, the meeting workbook's "n/a — plan") whether or not the
@@ -319,6 +325,8 @@ export function pickSlots(
     // report print it (lib/plan-facts `yieldOnCostText`): "6.3%" here had
     // stood beside the header's "6.27%" for one figure.
     yoc: plan?.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : null,
+    // A yield no project earns is refused, and said why (research pass 38).
+    ...(plan?.yieldWithheld ? { yocWithheld: plan.yieldWithheld } : {}),
     // The meeting workbook's `planDeal` (lib/pipeline-export-row reads the
     // same `planSummary`): the CSV's cap cell says "n/a — plan" where the
     // workbook's does.

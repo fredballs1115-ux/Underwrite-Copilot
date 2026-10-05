@@ -11,7 +11,9 @@
 //
 //   A PLAN DEAL'S YIELD ON COST is the model's; with no model figure it is
 //   the one the header prints, the stabilized NOI over the total cost the
-//   plan's own reader (`planSummary`) states.
+//   plan's own reader (`planSummary`) states. Neither is shown at or past
+//   IMPLIED_CAP_CEILING, a yield no project earns: the cell says so and why
+//   (research pass 38), as the plan's facts and the pipeline card do.
 //
 //   THE GOING-IN CAP is the model's, read for what the price buys
 //   (lib/compare-interest); with none it is the memorandum's — else the
@@ -26,7 +28,7 @@
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { parsePct } from "@/lib/criteria";
 import { capSlotWithheld, compareInterest, type CapWithheld, type CompareInterest, type CompareModel } from "@/lib/compare-interest";
-import { isPlanDeal, planSummary, type DealStrategy } from "@/lib/deal-strategy";
+import { IMPLIED_CAP_CEILING, isPlanDeal, planSummary, type DealStrategy } from "@/lib/deal-strategy";
 import { statedCapSlot } from "@/lib/pipeline-slots";
 
 /** Where a figure came from: the deal's first-draft model, or the
@@ -54,6 +56,9 @@ export interface CompareReturns extends CompareInterest {
   /** a plan deal's yield on total cost, percent */
   yoc: number | null;
   yocFrom: FigureSource | null;
+  /** why no yield on cost is shown where one was struck at or past the
+   *  ceiling — the model's, or the plan's own sentence; null otherwise */
+  yocWithheld: string | null;
 }
 
 export function compareReturns(
@@ -71,9 +76,20 @@ export function compareReturns(
   const capWithheld = planDeal ? null : capSlotWithheld(ex);
   const statedCapText = !planDeal && modelCap == null ? statedCapSlot(ex ?? null, planDeal, signal) : null;
   const statedCap = statedCapText ? parsePct(statedCapText) : null;
-  const modelYoc = model?.yieldOnCostPct ?? null;
-  const planYoc = planDeal && modelYoc == null ? (planSummary(ex ?? null, strategy)?.yieldOnCost ?? null) : null;
+  // The model's figure, unless it is a yield no project earns; then the
+  // header's, as where the model has none — and where neither stands, why.
+  const rawModelYoc = model?.yieldOnCostPct ?? null;
+  const modelRefused = rawModelYoc != null && rawModelYoc >= IMPLIED_CAP_CEILING * 100;
+  const modelYoc = modelRefused ? null : rawModelYoc;
+  const plan = planDeal && modelYoc == null ? planSummary(ex ?? null, strategy) : null;
+  const planYoc = plan?.yieldOnCost ?? null;
   const statedYoc = planYoc != null ? planYoc * 100 : null;
+  const yocWithheld =
+    modelYoc != null || statedYoc != null
+      ? null
+      : modelRefused
+        ? `No yield on cost is shown: the first-draft model's ${rawModelYoc!.toFixed(2)}% puts its stabilized NOI at ${IMPLIED_CAP_CEILING * 100}% or more of its total cost, a yield no project earns, so its total cost or its NOI was most likely misread.`
+        : (plan?.yieldWithheld ?? null);
   return {
     ...ci,
     planDeal,
@@ -82,5 +98,6 @@ export function compareReturns(
     capWithheld,
     yoc: modelYoc ?? statedYoc,
     yocFrom: modelYoc != null ? "model" : statedYoc != null ? "om" : null,
+    yocWithheld,
   };
 }

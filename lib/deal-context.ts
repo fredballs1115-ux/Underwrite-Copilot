@@ -215,6 +215,10 @@ export function dealContextFor(
       }, not today's income and not a cap rate on the price.`,
     );
   }
+  // A yield no project earns is refused, and said why (research pass 38):
+  // "over $49k of total cost it is a 6597.94% yield on cost" had gone to
+  // every step.
+  if (plan?.yieldWithheld) lines.push(plan.yieldWithheld);
   // A share's price grossed up beside its entity's loan is the equity's
   // whole: the plan strikes no total cost on it, and says why.
   if (plan?.costWithheld) lines.push(plan.costWithheld);
