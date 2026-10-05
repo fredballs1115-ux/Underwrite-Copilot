@@ -701,6 +701,98 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
   });
 });
 
+// Research pass 34: on a note, a 49% share beside its entity's loan and a
+// preferred equity position, the book printed "Going-In Cap (Yr-1 NOI /
+// Price)" and "Price / Unit" struck on a price that did not buy the
+// building — the equity's whole over 200 units read $210,000 — while the
+// compare table and the deal page withhold them (`buildingPriceOf` answers
+// none). The caveat the cover prints now sits under the tiles too.
+describe("where the price did not buy the building, no building basis or cap is struck on it", () => {
+  const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+  const withUnits = (over: Partial<ExtractionResult>, rows: ExtractionResult["metrics"] = []): ExtractionResult => ({
+    ...extraction,
+    ...over,
+    metrics: [...extraction.metrics, { label: "Units", value: "200", flagged: false, page: "p. 4" }, ...rows],
+  });
+  const opsLabels = (w: ExcelJS.Workbook): string[] => {
+    const ops = w.getWorksheet("Operating Metrics")!;
+    const out: string[] = [];
+    ops.eachRow((row) => out.push(String(row.getCell(1).value ?? "")));
+    return out;
+  };
+  const noErrors = (h: ReturnType<typeof HyperFormula.buildFromSheets>) => {
+    const errors: string[] = [];
+    for (const name of h.getSheetNames()) {
+      (h.getSheetValues(h.getSheetId(name)!) as unknown[][]).forEach((row, ri) =>
+        row.forEach((v, ci) => {
+          if (isErr(v)) errors.push(`${name}[${ri},${ci}]`);
+        }),
+      );
+    }
+    expect(errors).toEqual([]);
+  };
+
+  it("a note: its caveat under the tiles, n/a where the cap, the yield and the per-unit and per-SF prices stood", async () => {
+    const m = deriveUnderwriteInputs(withUnits({ interest: { ...blank, kind: "note" } }), "fallback");
+    expect(m.meta.interest?.basisWithheld).toEqual({ word: "note", why: "the price buys a note secured by the building, not the building" });
+    const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+    const summary = w.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "PURCHASE PRICE");
+    expect(summary.getCell(tiles + 2, 1).value).toBe(m.meta.interest!.modelCaveat);
+    expect(String(summary.getCell(tiles + 2, 1).value)).toContain("not the note's return");
+    expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toBe("n/a — note");
+    expect(summary.getCell(findRow(summary, 4, "Stabilized Yield (on cost)"), 5).value).toBe("n/a — note");
+    const labels = opsLabels(w);
+    expect(labels).not.toContain("Price / Unit");
+    expect(labels).not.toContain("Price / SF");
+    expect(labels).not.toContain("All-in Basis / SF (price + capital plan)");
+    expect(labels).toContain(
+      "Price / Unit and All-in Basis / Unit left out: the price buys a note secured by the building, not the building, so no building basis is struck on it.",
+    );
+    // The building's own income per unit and per foot stays.
+    expect(labels).toContain("Year-1 NOI / Unit");
+    expect(labels).toContain("Year-1 NOI / SF");
+    // The returns stay live; nothing is left pointing at a withheld cell.
+    expect(Number(named(h, "LeveredIRR"))).toBeCloseTo(computeUnderwrite(m.inputs).returns.leveredIrrPct!, 3);
+    noErrors(h);
+  }, 30000);
+
+  it("a share beside its entity's loan and a preferred equity position say n/a; a share of a stated percentage keeps its cap on the whole", async () => {
+    const loan = deriveUnderwriteInputs(
+      withUnits({ interest: { ...blank, kind: "partial_interest", share: "A 49% limited partnership interest" } }, [
+        { label: "Entity loan balance", value: "$56,500,000", flagged: false, page: "p. 9" },
+      ]),
+      "fallback",
+    );
+    expect(loan.meta.interest?.basisWithheld?.word).toBe("share");
+    const position = deriveUnderwriteInputs(
+      withUnits({ interest: { ...blank, kind: "preferred_equity" } }, [
+        { label: "Preferred equity amount", value: "$8,000,000", flagged: false, page: "p. 2" },
+        { label: "Preferred return", value: "12%", flagged: false, page: "p. 2" },
+      ]),
+      "fallback",
+    );
+    expect(position.meta.interest?.basisWithheld?.word).toBe("position");
+    for (const [m, word] of [[loan, "share"], [position, "position"]] as const) {
+      const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+      const summary = w.getWorksheet("Deal Summary")!;
+      expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toBe(`n/a — ${word}`);
+      expect(opsLabels(w)).not.toContain("Price / Unit");
+      const tiles = findRow(summary, 1, "PURCHASE PRICE");
+      expect(summary.getCell(tiles + 2, 1).value).toBe(m.meta.interest!.modelCaveat);
+      noErrors(h);
+    }
+    // A 49% share with no entity loan: the model runs at the whole the
+    // price implies, a building's price, so its cap and basis stand.
+    const share = deriveUnderwriteInputs(withUnits({ interest: { ...blank, kind: "partial_interest", share: "A 49% limited partnership interest" } }), "fallback");
+    expect(share.meta.interest?.basisWithheld ?? null).toBeNull();
+    const { wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(share));
+    const summary = w.getWorksheet("Deal Summary")!;
+    expect(summary.getCell(findRow(summary, 4, "Going-In Cap (Yr-1 NOI / Price)"), 5).value).toMatchObject({ formula: expect.stringContaining("/PurchasePrice") });
+    expect(opsLabels(w)).toContain("Price / Unit");
+  }, 60000);
+});
+
 // ── Labels and colours that say what their cells are ──────────────────────
 describe("the workbook's labels and colours say what their cells are", () => {
   /** Units and an occupancy, no size: the RSF is the count × a typical

@@ -20,6 +20,7 @@ import { scoreMandateFit } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
 import { solveMaxBid, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
 import { placeholderPageLine, placeholderReason, type ModelSources } from "@/lib/underwrite/report-grid";
+import type { ModelReturnsRead } from "@/lib/compare-interest";
 
 /** Everything the playground needs, computed server-side once. */
 export interface PlaygroundData {
@@ -42,6 +43,12 @@ export interface PlaygroundData {
    *  report leaves them out (lib/underwrite/report-grid
    *  `placeholderReturnsLine`); absent, the returns stand as before */
   sources?: ModelSources | null;
+  /** what the price buys, read by the compare table's rule on this model
+   *  (lib/compare-interest `modelReturnsRead`): a note's, a preferred
+   *  equity position's, or a share's beside its entity's loan or of no
+   *  stated percentage — returns the price did not buy, withheld with its
+   *  line, as the first-draft card withholds them; absent, they stand */
+  interest?: ModelReturnsRead | null;
 }
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
@@ -123,12 +130,16 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const sources = data.sources ?? null;
   const pricePlaceholder = sources?.purchasePrice?.provenance === "assumption";
   const priceEntered = priceOverride != null;
-  const withheld = placeholderReason(inputs, sources, { priceEntered }) != null;
+  // And what the price buys (lib/compare-interest): a note's or a position's
+  // model runs the building at a price that did not buy it, so its returns
+  // are withheld whatever price is typed — the first-draft card's rule.
+  const own = data.interest?.withheld ?? null;
+  const withheld = own != null || placeholderReason(inputs, sources, { priceEntered }) != null;
   // The base case, at the modelled price, is a placeholder's wherever the
   // model assumed either figure: a moved lever is then set against nothing.
-  const baseWithheld = placeholderReason(inputs, sources) != null;
+  const baseWithheld = own != null || placeholderReason(inputs, sources) != null;
   const compare = dirty && !baseWithheld;
-  const naWord = pricePlaceholder && !priceEntered ? "no price" : "assumed NOI";
+  const naWord = own ?? (pricePlaceholder && !priceEntered ? "no price" : "assumed NOI");
 
   // The EFFECTIVE base is the sliders' base stops (clamped into physical
   // range), so a degenerate derived input can't make the resting metrics
@@ -238,8 +249,13 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // The DSCR the tile shows, against the coverage the debt sizer tests —
   // none where the tile withholds it.
   const coverageLine = withheld ? null : modelLoanCoverageLine(current.dscrYr1, inputs.ltc);
-  // Why the tiles are withheld, said over them (the report's own reason).
-  const withheldLine = placeholderPageLine(inputs, sources, { priceEntered, maxBid: floorsSet });
+  // Why the tiles are withheld, said over them: what the price buys (the
+  // first-draft card's own line), then the report's placeholder reason.
+  const interestLine =
+    own != null && data.interest?.line
+      ? `${data.interest.line}${floorsSet ? " The max bid, solved on them, is withheld too." : ""}`
+      : null;
+  const withheldLine = placeholderPageLine(inputs, sources, { priceEntered, maxBid: floorsSet && own == null });
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -257,6 +273,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         onChange={setPriceOverride}
         planDeal={planDeal}
         pricePlaceholder={pricePlaceholder}
+        capWithheld={own}
       />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -302,15 +319,21 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
               ? `Levered IRR ${fmtPct(current.leveredIrrPct)} at your price`
               : `Levered IRR ${fmtPct(current.leveredIrrPct)}, the base case`}
       </p>
+      {interestLine && (
+        <p className="mt-4 text-[11px] leading-relaxed text-caution" data-qa="playground-interest">
+          {interestLine}
+        </p>
+      )}
       {withheldLine && (
-        <p className="mt-4 text-[11px] leading-relaxed text-caution" data-qa="playground-withheld">
+        <p className={`${interestLine ? "mt-1.5" : "mt-4"} text-[11px] leading-relaxed text-caution`} data-qa="playground-withheld">
           {withheldLine}
         </p>
       )}
-      <div className={`${withheldLine ? "mt-2" : "mt-4"} grid grid-cols-2 gap-3 sm:grid-cols-4`}>
+      <div className={`${interestLine || withheldLine ? "mt-2" : "mt-4"} grid grid-cols-2 gap-3 sm:grid-cols-4`}>
         {withheld ? (
-          // A placeholder's returns are not figures to read: each tile says
-          // what is missing, as the first-draft card says "n/a — note".
+          // Returns the price did not buy, or a placeholder's, are not
+          // figures to read: each tile says why, as the first-draft card
+          // says "n/a — note".
           ["Levered IRR", "Equity multiple", "Year-1 CoC", "Year-1 DSCR"].map((label) => (
             <Metric key={label} label={label} value={`n/a — ${naWord}`} cur={null} was={null} baseText="" dirty={false} withheld />
           ))
@@ -454,6 +477,7 @@ function PriceCapControls({
   onChange,
   planDeal = false,
   pricePlaceholder = false,
+  capWithheld = null,
 }: {
   basePrice: number;
   noiY1: number;
@@ -466,6 +490,11 @@ function PriceCapControls({
   /** no price was read: the modelled price is a placeholder, so the fields
    *  wait empty for the reader's, and nothing is set against the placeholder */
   pricePlaceholder?: boolean;
+  /** what the price buys where it is no building's (lib/compare-interest
+   *  `withheld`): the building's income over a note's or a position's price
+   *  is a cap nobody earns, so the cap field says "n/a — note" and takes no
+   *  figure; the price still does */
+  capWithheld?: string | null;
 }) {
   const [editing, setEditing] = useState<"price" | "cap" | null>(null);
   const [draft, setDraft] = useState("");
@@ -506,9 +535,11 @@ function PriceCapControls({
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <span className="text-xs font-semibold tracking-tight">Your price</span>
         <span className="text-[11px] text-muted">
-          {planDeal
-            ? "type a price or a cap — year-1 income as modelled, not the plan's stabilized pro forma"
-            : "type a price or a going-in cap"}
+          {capWithheld
+            ? "type a price"
+            : planDeal
+              ? "type a price or a cap — year-1 income as modelled, not the plan's stabilized pro forma"
+              : "type a price or a going-in cap"}
         </span>
       </div>
       <div className="mt-2 grid gap-3 sm:grid-cols-3">
@@ -534,27 +565,37 @@ function PriceCapControls({
           <span className="text-[11px] uppercase tracking-wide text-muted">
             {planDeal ? "Cap on Yr-1 income (as modelled)" : "Cap on Yr-1 NOI (as modelled)"}
           </span>
-          <input
-            inputMode="decimal"
-            value={
-              editing === "cap"
-                ? draft
-                : blank
-                  ? ""
-                  : capPct != null
-                    ? `${capPct.toFixed(2)}%`
-                    : "—"
-            }
-            placeholder={blank ? "or a cap" : undefined}
-            onFocus={(e) => {
-              setEditing("cap");
-              setDraft(e.currentTarget.value);
-            }}
-            onChange={(e) => commitCap(e.currentTarget.value)}
-            onBlur={() => setEditing(null)}
-            aria-label="Going-in cap scenario"
-            className={inputCls}
-          />
+          {capWithheld ? (
+            // No building's cap on a price that did not buy the building.
+            <input
+              readOnly
+              value={`n/a — ${capWithheld}`}
+              aria-label="Going-in cap scenario"
+              className={`${inputCls} text-muted`}
+            />
+          ) : (
+            <input
+              inputMode="decimal"
+              value={
+                editing === "cap"
+                  ? draft
+                  : blank
+                    ? ""
+                    : capPct != null
+                      ? `${capPct.toFixed(2)}%`
+                      : "—"
+              }
+              placeholder={blank ? "or a cap" : undefined}
+              onFocus={(e) => {
+                setEditing("cap");
+                setDraft(e.currentTarget.value);
+              }}
+              onChange={(e) => commitCap(e.currentTarget.value)}
+              onBlur={() => setEditing(null)}
+              aria-label="Going-in cap scenario"
+              className={inputCls}
+            />
+          )}
         </label>
         <div className="flex items-end pb-2.5">
           {pricePlaceholder ? (

@@ -1294,11 +1294,15 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   // What the tiles' returns rest on, said under them before anyone quotes
   // one, a merged row a sentence: on a plan deal they are the screening
   // model's, struck with the whole budget in year 1 (the deal page's own
-  // caveat); on a placeholder price or an assumed year-1 NOI they are the
-  // placeholder's — the report and the deal page withhold them on that
-  // rule (lib/underwrite/report-grid), and the live book says so.
+  // caveat); where the price buys a note, a share, a position, a lease or
+  // the land, what the model is and is not on it (the cover's own line,
+  // lib/interest) — the deal page and the compare table withhold a note's,
+  // a position's and such a share's returns; and on a placeholder price or
+  // an assumed year-1 NOI they are the placeholder's — the report and the
+  // deal page withhold them on that rule (lib/underwrite/report-grid).
   const bandNotes = [
     planDeal ? PLAN_RETURNS_CAVEAT_WORKBOOK : null,
+    meta.interest?.modelCaveat ?? null,
     placeholderWorkbookLine(model.inputs, model.sources),
   ].filter((s): s is string => !!s);
   bandNotes.forEach((text, i) => {
@@ -1308,8 +1312,8 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     c.value = text;
     c.font = { name: ARIAL, size: 9, color: MUTED };
     c.alignment = { wrapText: true, vertical: "top" };
-    // Two lines of the band's width hold about 250 characters.
-    ws.getRow(row).height = text.length > 250 ? 48 : 36;
+    // A line of the band's width holds about 125 characters at this size.
+    ws.getRow(row).height = Math.max(36, Math.ceil(text.length / 125) * 12 + 12);
   });
   r += 3 + bandNotes.length;
 
@@ -1466,7 +1470,21 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     styleFormula(c, fmt);
     rr++;
   };
-  if (planDeal) {
+  // Where the price did not buy the building (lib/deal-strategy
+  // `buildingPriceOf` answers none), no building's cap or yield is struck on
+  // it: the cell says so in the compare table's words ("n/a — note"). No
+  // formula reads these cells, so none is left pointing at nothing.
+  const basisWithheld = meta.interest?.basisWithheld ?? null;
+  const withheldRet = (lab: string) => {
+    label(ws.getCell(rr, 4), lab, { indent: 1 });
+    label(ws.getCell(rr, 5), `n/a — ${basisWithheld!.word}`, { color: MUTED });
+    ws.getCell(rr, 5).alignment = { horizontal: "right" };
+    rr++;
+  };
+  if (planDeal && basisWithheld) {
+    withheldRet("Cap on Yr-1 Income (as modelled)");
+    withheldRet("Yield on Cost (OM stabilized NOI / uses + capital plan)");
+  } else if (planDeal) {
     // A plan deal has no going-in cap: year-1 income here is in-place or
     // assumed, so the cell says what it is. The yield the plan is judged on
     // is the OM's stabilized NOI over total cost — never year-1 NOI over
@@ -1481,6 +1499,9 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
       FMT.pct2,
       "YieldOnCost",
     );
+  } else if (basisWithheld) {
+    withheldRet("Going-In Cap (Yr-1 NOI / Price)");
+    withheldRet("Stabilized Yield (on cost)");
   } else {
     // The model's year-1 NOI over the price — not the OM's stated cap, which
     // the deal's header and cards print; the label says which it is.
@@ -1846,6 +1867,15 @@ function buildOperatingMetrics(
   const capWord = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
   const nounOne = capWord(model.meta.unitNoun?.one ?? "unit");
   const nounMany = capWord(model.meta.unitNoun?.many ?? "units");
+  // Where the price did not buy the building (lib/deal-strategy
+  // `buildingPriceOf` answers none), no building basis is struck on it: the
+  // price and all-in rows are left out with the reason, and the rows that
+  // divide the building's own income stay. No formula reads them.
+  const basisWithheld = model.meta.interest?.basisWithheld ?? null;
+  const basisNote = (rows: string) => {
+    label(ws.getCell(r, 1), `${rows} left out: ${basisWithheld!.why}, so no building basis is struck on it.`, { color: MUTED, size: 9 });
+    r++;
+  };
   let zebra = false;
   if (units && units > 0) {
     label(ws.getCell(r, 1), nounMany);
@@ -1856,16 +1886,20 @@ function buildOperatingMetrics(
     styleInput(u, FMT.int);
     u.alignment = { horizontal: "right" };
     r++;
-    twoCol(`Price / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
-    // What a finished unit costs all-in — the basis a comp is held against
-    // on a plan deal; on a stabilized asset with no capital plan it equals
-    // the price per unit. Live: it moves with the capital plan input.
-    twoCol(
-      `All-in Basis / ${nounOne} (price + capital plan)`,
-      "(PurchasePrice+CapImprovements)/UnitsCount",
-      FMT.usd,
-      (zebra = !zebra),
-    );
+    if (basisWithheld) {
+      basisNote(`Price / ${nounOne} and All-in Basis / ${nounOne}`);
+    } else {
+      twoCol(`Price / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
+      // What a finished unit costs all-in — the basis a comp is held against
+      // on a plan deal; on a stabilized asset with no capital plan it equals
+      // the price per unit. Live: it moves with the capital plan input.
+      twoCol(
+        `All-in Basis / ${nounOne} (price + capital plan)`,
+        "(PurchasePrice+CapImprovements)/UnitsCount",
+        FMT.usd,
+        (zebra = !zebra),
+      );
+    }
     twoCol(
       `Year-1 Rent / ${nounOne} / Month`,
       `${at("rent", 0)}/UnitsCount/12`,
@@ -1892,13 +1926,17 @@ function buildOperatingMetrics(
   // the yardsticks are omitted with a stated reason, never printed as if
   // "$680/SF" were the deal's figure.
   if (model.sources.rsf?.provenance !== "assumption") {
-    twoCol("Price / SF", "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
-    twoCol(
-      "All-in Basis / SF (price + capital plan)",
-      "(PurchasePrice+CapImprovements)/RSF",
-      FMT.psf,
-      (zebra = !zebra),
-    );
+    if (basisWithheld) {
+      basisNote("Price / SF and All-in Basis / SF");
+    } else {
+      twoCol("Price / SF", "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
+      twoCol(
+        "All-in Basis / SF (price + capital plan)",
+        "(PurchasePrice+CapImprovements)/RSF",
+        FMT.psf,
+        (zebra = !zebra),
+      );
+    }
     twoCol("Year-1 NOI / SF", `${at("noi", 0)}/RSF`, FMT.psf, (zebra = !zebra));
     twoCol(
       "Year-1 Rent / SF / Year",

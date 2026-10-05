@@ -152,6 +152,8 @@ import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
+import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { yearOneNoi } from "@/lib/underwrite/playground";
 import { type DealRateSeeds } from "@/lib/debt-index";
 import { constructionSeedFor, modelMarketFor } from "@/lib/model-market";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
@@ -196,6 +198,17 @@ function knownPointOf(
   return cacheFresh(cache, Date.now(), address) && typeof cache?.lat === "number" && typeof cache?.lng === "number"
     ? { lat: cache.lat, lng: cache.lng }
     : null;
+}
+
+/** The derived model's price, year-1 NOI and going-in cap, in the shape the
+ *  compare table's rule reads a model by (lib/compare-interest). */
+function derivedReturnsOf(inputs: UnderwriteInputs): { purchasePrice: number; year1Noi: number; goingInCapPct: number | null } {
+  const year1Noi = yearOneNoi(inputs);
+  return {
+    purchasePrice: inputs.purchasePrice,
+    year1Noi,
+    goingInCapPct: inputs.purchasePrice > 0 ? (year1Noi / inputs.purchasePrice) * 100 : null,
+  };
 }
 
 /** The deal's job row with its age on this server's clock (lib/screen-run
@@ -866,6 +879,11 @@ export default async function DealPage({
         // makes the returns a placeholder's, withheld as the report withholds
         // them (lib/underwrite/report-grid).
         sources: derived.sources,
+        // What the price buys, by the compare table's rule on this model
+        // (lib/compare-interest): a note's, a position's or such a share's
+        // returns are the building's at a price that did not buy it, and
+        // the tiles withhold them as the first-draft card does.
+        interest: modelReturnsRead(extraction, derivedReturnsOf(derived.inputs), new Date(`${todayIso}T12:00:00Z`)),
       }
     : null;
   // The cap the plan's yield on cost is measured against: the model's own

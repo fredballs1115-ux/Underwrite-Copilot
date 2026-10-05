@@ -33,6 +33,7 @@ import {
 import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
 import { computeUnderwrite } from "@/lib/underwrite/engine";
 import { placeholderPageLine } from "@/lib/underwrite/report-grid";
+import { modelReturnsRead } from "@/lib/compare-interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { buyBoxRead } from "@/lib/buy-box-chip";
 import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
@@ -1636,6 +1637,57 @@ describe("the sensitivity playground says whose figures it runs", () => {
     expect(placeholderPageLine(deriveUnderwriteInputs(fee, "x").inputs, deriveUnderwriteInputs(fee, "x").sources, { priceEntered: true, maxBid: false })).toBe(
       "The returns are withheld: the model does not run the memorandum's $600,000 ground rent as its year-1 income, so it runs on an assumed NOI and its returns would be the assumption's.",
     );
+  });
+
+  // Research pass 34: on a note, a share beside its entity's loan and a
+  // preferred equity position, the compare table and the first-draft card
+  // withhold the model's returns, while the playground printed "Levered IRR
+  // 52.0%" and "Cap on Yr-1 NOI (as modelled) 12.86%" bare.
+  it("withholds the returns of a model whose price did not buy the building, with the first-draft card's own line", () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const base = (interest: ExtractionResult["interest"], more: ExtractionResult["metrics"] = []): ExtractionResult => ({
+      dealName: "Harbor View",
+      assetClass: "multifamily",
+      market: "Philadelphia, PA",
+      interest,
+      metrics: [
+        { label: "Asking price", value: "$42,000,000", flagged: false, page: "p. 2" },
+        { label: "NOI (in-place)", value: "$2,600,000", flagged: false, page: "p. 8" },
+        { label: "Units", value: "200", flagged: false, page: "p. 2" },
+        ...more,
+      ],
+    });
+    const cases: [ExtractionResult, string][] = [
+      [base({ ...blank, kind: "note" }), "note"],
+      [base({ ...blank, kind: "partial_interest", share: "A 49% limited partnership interest" }, [{ label: "Entity loan balance", value: "$56,500,000", flagged: false, page: "p. 9" }]), "share"],
+      [base({ ...blank, kind: "preferred_equity" }, [{ label: "Preferred equity amount", value: "$8,000,000", flagged: false, page: "p. 2" }]), "position"],
+    ];
+    for (const [ex, word] of cases) {
+      const d = deriveUnderwriteInputs(ex, ex.dealName!);
+      const noi = computeUnderwrite(d.inputs).cashFlow[0].noi;
+      const interest = modelReturnsRead(ex, { purchasePrice: d.inputs.purchasePrice, year1Noi: noi, goingInCapPct: (noi / d.inputs.purchasePrice) * 100 });
+      expect(interest.withheld, word).toBe(word);
+      const data: PlaygroundData = {
+        inputs: d.inputs,
+        dealAssetClass: "multifamily",
+        checkSource: { assetClass: ex.assetClass, market: ex.market, metrics: ex.metrics },
+        box: SAMPLE_DEMO_BOX,
+        sources: d.sources,
+        interest,
+      };
+      const html = renderToStaticMarkup(React.createElement(SensitivityPlayground, { data }));
+      const text = textOf(html);
+      expect(text, word).toContain(`${interest.line!} The max bid, solved on them, is withheld too.`);
+      // The four tiles; the cap field says it as its value (below).
+      expect(text.match(new RegExp(`n/a — ${word}`, "g"))?.length, word).toBe(4);
+      const irr = computeUnderwrite(d.inputs).returns.leveredIrrPct!;
+      expect(text, word).not.toContain(`${(irr * 100).toFixed(1)}%`);
+      expect(text, word).not.toContain(`${((noi / d.inputs.purchasePrice) * 100).toFixed(2)}%`);
+      expect(html, word).toMatch(new RegExp(`<input readOnly=""[^>]*aria-label="Going-in cap scenario"[^>]*value="n/a — ${word}"`));
+      expect(html, word).not.toContain("Max bid");
+      expect(a11yIssues(html), word).toEqual([]);
+      expect(gluedWords(text), word).toEqual([]);
+    }
   });
 
   it("lifts a placeholder price's half once a price is typed, and draws a priced deal exactly as before", () => {

@@ -46,6 +46,7 @@ import {
 import {
   IMPLIED_CAP_CEILING,
   budgetFromText,
+  buildingPriceOf,
   capitalBudgetFromMetrics,
   askingPriceOf,
   ebitdaFigure,
@@ -136,7 +137,19 @@ export interface WorkbookMeta {
    *  not; absent for a plain fee simple. `equipment` is a ground lease's
    *  tower, billboard or solar array where the memorandum names one, which
    *  the deal type names on a leased fee in place of a building */
-  interest?: { line: string; modelCaveat: string | null; kind?: InterestKind; equipment?: EquipmentUse | null } | null;
+  interest?: {
+    line: string;
+    modelCaveat: string | null;
+    kind?: InterestKind;
+    equipment?: EquipmentUse | null;
+    /** where the price did not buy the building (lib/deal-strategy
+     *  `buildingPriceOf` answers none — a note, a leased fee, a preferred
+     *  equity position, a share of no stated percentage or beside its
+     *  entity's loan): the word its withheld cells say ("n/a — note") and
+     *  why no building basis or cap is struck on the price; absent or null
+     *  where the price is the building's */
+    basisWithheld?: { word: string; why: string } | null;
+  } | null;
   /** the seller's loan offered for assumption (lib/assumable-debt, #419):
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
@@ -344,7 +357,47 @@ export function permanentLoanSpread(assetClass: string | null | undefined): Perm
  *  is not on it — null for a plain fee simple. */
 function interestMeta(extraction: ExtractionResult | null): WorkbookMeta["interest"] {
   const r = readInterest(extraction, askingPriceOf(extraction));
-  return r ? { line: interestShortLine(r), modelCaveat: r.modelCaveat, kind: r.kind, equipment: r.equipment } : null;
+  return r
+    ? {
+        line: interestShortLine(r),
+        modelCaveat: r.modelCaveat,
+        kind: r.kind,
+        equipment: r.equipment,
+        basisWithheld: basisWithheldOf(extraction),
+      }
+    : null;
+}
+
+/**
+ * Why no building basis or going-in cap is struck on the price, where the
+ * price did not buy the building — CLAUDE.md's rule, read through the one
+ * reader every surface divides a price by (lib/deal-strategy
+ * `buildingPriceOf`). Whether a price is the building's turns on what it
+ * buys alone, so any positive figure asks it. Null where it is.
+ */
+function basisWithheldOf(extraction: ExtractionResult | null): { word: string; why: string } | null {
+  if (buildingPriceOf(extraction, 1) != null) return null;
+  const { kind, sharePct, entityLoan } = interestOf(extraction);
+  switch (kind) {
+    case "note":
+      return { word: "note", why: "the price buys a note secured by the building, not the building" };
+    case "preferred_equity":
+      return { word: "position", why: "the price buys a preferred equity position in the owning entity, not the building" };
+    case "leased_fee":
+      return { word: "leased fee", why: "the price buys the land under the building, not the building" };
+    case "partial_interest":
+      return {
+        word: "share",
+        why:
+          entityLoan != null
+            ? isWholeShare(sharePct)
+              ? "the price for all of the entity's interests is the equity's whole, with the entity's loan on top of it, not the building's price"
+              : "the share's price grossed up is the equity's whole, with the entity's loan on top of it, not the building's price"
+            : "the price buys a share the memorandum states no percentage for, which cannot be grossed up to the building's price",
+      };
+    default:
+      return null;
+  }
 }
 
 /** The cover's lines about the seller's loan offered for assumption
