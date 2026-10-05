@@ -1222,6 +1222,39 @@ describe("MemoDocument (redesigned)", () => {
       [],
     );
     expect(note.keyTerms.some((t) => t.sub)).toBe(false);
+
+    // A 49% share: the basis under the share's own price is the whole
+    // building's — the $68.0M the $33.32M grosses up to, over 248 units —
+    // and says so (research pass 35).
+    const share = buildMemoData(
+      {
+        ...base,
+        extraction: {
+          ...SAMPLE_DEAL.extraction,
+          interest: { kind: "partial_interest", summary: "", share: "A 49% limited partnership interest in the owning entity", groundLease: "", loan: "", page: "" },
+          metrics: SAMPLE_DEAL.extraction.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$33,320,000" } : m)),
+        },
+      } as unknown as DealRow,
+      "September 30, 2026",
+      [],
+    );
+    expect(share.keyTerms[0]).toEqual({ label: "Asking price", value: "$33,320,000", flagged: false, sub: "$274k/unit, the whole" });
+    const shareText = pdfTextOf(await renderToBuffer(React.createElement(MemoDocument, { data: share }) as unknown as Parameters<typeof renderToBuffer>[0])).replace(/\s+/g, " ");
+    expect(shareText).toContain("ASKING PRICE $33,320,000 $274k/unit, the whole");
+    // All of the entity's interests (a stated 100%) is no share: its price
+    // is the whole's, and its basis says nothing more.
+    const all = buildMemoData(
+      {
+        ...base,
+        extraction: {
+          ...SAMPLE_DEAL.extraction,
+          interest: { kind: "partial_interest", summary: "", share: "100% of the beneficial interests", groundLease: "", loan: "", page: "" },
+        },
+      } as unknown as DealRow,
+      "September 30, 2026",
+      [],
+    );
+    expect(all.keyTerms[0].sub).toBe("$274k/unit");
   }, 45000);
 
   it("says the deal-killers' and the flips' IRR moves are the screen's estimates, never the model's", async () => {
