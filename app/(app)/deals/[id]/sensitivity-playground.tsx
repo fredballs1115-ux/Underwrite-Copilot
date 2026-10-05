@@ -80,6 +80,18 @@ export interface PlaygroundData {
    *  cost-note `defaultExitGap`), as the exit's SOURCE note sets it; absent,
    *  it is */
   buildingPriced?: boolean;
+  /** the model's name for its price where it is not the price as stated for
+   *  what is sold (the derived model's `meta.priceLabel`: "Whole Price (49%
+   *  share grossed up)"): the price field says it, never "Purchase price"
+   *  over a figure the share does not cost (research pass 40, M7); absent,
+   *  the field reads "Purchase price" */
+  priceLabel?: string | null;
+  /** the share of the whole a partial interest's price buys, as the
+   *  memorandum states it (lib/interest `interestOf`), where the model runs
+   *  the whole it grosses the price up to: the max bid states the share's
+   *  bid, the whole's times the share, beside the whole's; absent where no
+   *  percentage is stated or the price is the whole's */
+  sharePct?: number | null;
 }
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
@@ -380,6 +392,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         planDeal={planDeal}
         pricePlaceholder={priceMissing}
         capWithheld={capNa}
+        priceLabel={data.priceLabel ?? null}
       />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -518,6 +531,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           modeledPrice={bidAgainst ?? inputs.purchasePrice}
           against={bidAgainst != null ? "yours" : "modeled"}
           dirty={dirty}
+          sharePct={data.sharePct ?? null}
         />
       )}
       {box && !floorsSet && (
@@ -628,6 +642,7 @@ function PriceCapControls({
   planDeal = false,
   pricePlaceholder = false,
   capWithheld = null,
+  priceLabel = null,
 }: {
   basePrice: number;
   noiY1: number;
@@ -647,6 +662,10 @@ function PriceCapControls({
    *  building it runs nearly vacant ("97% vacant"). The cap field says it
    *  and takes no figure; the price still does */
   capWithheld?: string | null;
+  /** what the price is where it is not the price as stated for what is sold
+   *  (`PlaygroundData.priceLabel`): the field's name, said in its accessible
+   *  name too; absent, "Purchase price" */
+  priceLabel?: string | null;
 }) {
   const [editing, setEditing] = useState<"price" | "cap" | null>(null);
   const [draft, setDraft] = useState("");
@@ -698,8 +717,8 @@ function PriceCapControls({
       </div>
       <div className="mt-2 grid gap-3 sm:grid-cols-3">
         <label className="block">
-          <span className="text-[11px] uppercase tracking-wide text-muted">
-            Purchase price
+          <span className="text-[11px] uppercase tracking-wide text-muted" data-qa="playground-price-label">
+            {priceLabel ?? "Purchase price"}
           </span>
           <input
             inputMode="decimal"
@@ -711,7 +730,7 @@ function PriceCapControls({
             }}
             onChange={(e) => commitPrice(e.currentTarget.value)}
             onBlur={() => setEditing(null)}
-            aria-label="Purchase price scenario"
+            aria-label={`${priceLabel ?? "Purchase price"} scenario`}
             className={inputCls}
           />
         </label>
@@ -801,6 +820,7 @@ function MaxBidCard({
   modeledPrice,
   against = "modeled",
   dirty,
+  sharePct = null,
 }: {
   bid: MaxBidSolution;
   box: BuyBox;
@@ -809,8 +829,18 @@ function MaxBidCard({
   modeledPrice: number;
   against?: "modeled" | "yours";
   dirty: boolean;
+  /** a partial interest's stated share, where the model runs the whole its
+   *  price grosses up to (`PlaygroundData.sharePct`): the bid solved is the
+   *  whole's, and the share's — the whole's times the share — is said
+   *  beside it (research pass 40, M7) */
+  sharePct?: number | null;
 }) {
   const vs = against === "yours" ? "your price" : "the modeled price";
+  // The share's bid, rounded down as the whole's is, so it still clears.
+  const shareBid = (whole: number, atLeast = false): string | null =>
+    sharePct != null
+      ? `the whole's price, the share grossed up; the ${Number(sharePct.toFixed(2))}% share's is ${atLeast ? "at least " : ""}${fmtBid(whole * (sharePct / 100))}`
+      : null;
   return (
     <div className="mt-3 rounded-xl border border-brand/25 bg-brand/[0.04] p-3.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -830,7 +860,9 @@ function MaxBidCard({
         // window doubles from twice the price while they clear (research
         // pass 40, H2) — so the bid is at least that top, and said so.
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          {`Your floors hold even at ${timesWords(1 + (bid.deltaPct ?? 0))} ${vs} (${fmtBid(bid.price)}), the top of the range searched — the buy box isn't the constraint on this deal.`}
+          {`Your floors hold even at ${timesWords(1 + (bid.deltaPct ?? 0))} ${vs} (${fmtBid(bid.price)}), the top of the range searched — the buy box isn't the constraint on this deal.${
+            shareBid(bid.price) ? ` That is ${shareBid(bid.price, true)}.` : ""
+          }`}
         </p>
       ) : (
         <>
@@ -854,6 +886,12 @@ function MaxBidCard({
               </span>
             )}
           </p>
+          {shareBid(bid.price) && (
+            // The bid is the whole's: the share's is said beside it.
+            <p className="mt-1 text-[11px] text-muted" data-qa="max-bid-share">
+              {`That is ${shareBid(bid.price)}.`}
+            </p>
+          )}
           {bid.at && (
             <p className="mt-1 text-[11px] tabular-nums text-muted">
               at that price: IRR {fmtPct(bid.at.irr)} · year-1 CoC{" "}

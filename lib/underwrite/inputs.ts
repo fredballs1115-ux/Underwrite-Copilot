@@ -181,6 +181,12 @@ export interface WorkbookMeta {
    *  own words for it (lib/deal-strategy `planSummary`). Absent where the
    *  model runs at the price as stated. */
   priceLabel?: string | null;
+  /** the share the memorandum states a partial interest's price buys,
+   *  where the model grossed that price up to the whole it runs (the share
+   *  under 100% `priceLabel` names): the deal page's max bid, solved on the
+   *  whole, states the share's beside it (research pass 40, M7); absent
+   *  where the price is run as stated */
+  grossedUpSharePct?: number | null;
   /** the model's price is a development's land or site cost: the
    *  workbook's yardsticks call it "Land cost / Unit", never "Price / Unit"
    *  (research pass 38); absent otherwise */
@@ -824,6 +830,9 @@ export function deriveUnderwriteInputs(
   // stated for what is sold (WorkbookMeta `priceLabel`): set below where a
   // share's price is grossed up, or is the equity's whole.
   let priceLabel: string | null = null;
+  // The share a partial interest's price was grossed up from (WorkbookMeta
+  // `grossedUpSharePct`), set where it is.
+  let grossedUpSharePct: number | null = null;
   if (price != null && interest.kind === "partial_interest" && isWholeShare(interest.sharePct)) {
     // All of the entity's interests (a stated 100%, research pass 28): the
     // price is the whole's as stated, nothing grossed up — said so, never as
@@ -844,6 +853,7 @@ export function deriveUnderwriteInputs(
     const share = interest.sharePct;
     const stated = price;
     price = stated / (share / 100);
+    grossedUpSharePct = share;
     // Beside the entity's stated loan the figure grossed up is the equity's
     // whole, not the asset's (research pass 23). The note names both; the
     // loan is not added to the price — that is the model's arithmetic, and
@@ -1525,6 +1535,7 @@ export function deriveUnderwriteInputs(
       unitNoun,
       interest: interestMeta(extraction),
       priceLabel,
+      ...(grossedUpSharePct != null ? { grossedUpSharePct } : {}),
       // A development priced at its land, and a bulk condominium purchase's
       // units offered: what the workbook's per-unit yardsticks are of.
       ...(priceIsLand && statedPrice != null ? { priceIsLand: true } : {}),

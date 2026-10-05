@@ -904,6 +904,12 @@ export default async function DealPage({
         // entry set against a default exit under the tiles, as the exit's
         // SOURCE note sets it (research pass 38).
         buildingPriced: !derived.meta.interest?.basisWithheld,
+        // On a share the model's price is the whole its price grosses up
+        // to: the field says so in the workbook tile's own words, and the
+        // max bid states the share's bid beside the whole's, at the share
+        // the memorandum states (research pass 40, M7).
+        priceLabel: derived.meta.priceLabel ?? null,
+        sharePct: derived.meta.grossedUpSharePct ?? null,
       }
     : null;
   // The cap the plan's yield on cost is measured against: the model's own
