@@ -496,8 +496,11 @@ const verdict: VerdictResult = {
         lever: "debt",
         // What the documents' model runs (lib/sample-derive): it amortizes
         // over 30 years from the first month, so no interest-only year
-        // (research pass 35: the read said "with one year of IO").
-        read: "60% LTV at 6.0%, amortizing over 30 years.",
+        // (research pass 35: the read said "with one year of IO"). And it
+        // sizes the loan at 60% of cost, its default, never 60% of value:
+        // the demo report's base case says "Loan … · 60% of cost" beside
+        // this line (audit C3a, LOW-13), and a test holds both to the model.
+        read: "60% of cost, the model's default, at 6.0%, amortizing over 30 years.",
         risk: "A soft refi window or higher rate pressures the takeout.",
       },
     ],

@@ -279,7 +279,15 @@ describe("ReportDocument (full report)", () => {
     // The debt killer says what the model runs: no interest-only year.
     expect(derived.inputs.ioMonths).toBe(0);
     const flat = text.replace(/\s+/g, " ");
-    expect(flat).toContain("60% LTV at 6.0%, amortizing over 30 years.");
+    // And the measure the model sizes its loan on: 60% of cost, its
+    // default, never "LTV" beside the base case's "60% of cost" (audit C3a,
+    // LOW-13); the memorandum's own "Loan-to-value 60%" row stays as stated.
+    expect(derived.inputs.ltc).toBe(0.6);
+    expect(derived.sources.ltc?.provenance).toBe("assumption");
+    expect(derived.inputs.allInRatePct).toBe(0.06);
+    expect(derived.inputs.amortMonths).toBe(360);
+    expect(flat).toContain("60% of cost, the model's default, at 6.0%, amortizing over 30 years.");
+    expect(flat).not.toContain("60% LTV at 6.0%");
     expect(flat).toContain("amortizing over 30 years; and a 6.00% all-in rate");
     expect(flat).not.toMatch(/year of IO/);
   }, 60000);
