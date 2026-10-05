@@ -428,6 +428,13 @@ yours:
 **From the security review of October 5 (research pass 39):**
 1. **Run migration 0036 first** (item 1 under 2026-09-30 below), before
    anything else on this page: the review found its exposures live today.
+   **Then run 0037** (`supabase/migrations/0037_job_queue_and_lookups.sql`)
+   and `supabase/CHECK_MIGRATIONS.sql` again; its two new rows should read
+   ✅. 0037 holds each deal to one live job row whoever writes it, and holds
+   the two public-record lookups to the sizes the app itself asks for. Its
+   one cost: on a deal that still holds several old job rows, the comp
+   search's and the model build's first progress mark is refused; the run
+   itself still starts.
 2. **Your buy box on a shared screen.** The verdict is handed your buy box
    so its call can weigh it, and the shared screen prints the verdict's
    reason and risks as written, so where a deal misses your box those
@@ -438,7 +445,11 @@ yours:
    Until then the share panel says the link's reasons can name your box.
 3. **Who reads the public-record tables in bulk.** Any signed-in account
    can read the property and recorded-sales tables the comps page draws
-   on. Say whether that should stay open to every account.
+   on. Say whether that should stay open to every account. Narrowing it
+   breaks two reads on the deal page's public-record card (the street-address
+   lookup in markets with no coordinates, and the last recorded sale), which
+   would move behind the server first; the two lookups, the comps pull and
+   the scripts keep working as they are.
 4. **The free plan's screening allowance** (item 11 under 2026-09-30
    below) is the one guard on what an account spends; the review weighs
    it again.

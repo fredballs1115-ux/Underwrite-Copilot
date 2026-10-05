@@ -5906,7 +5906,14 @@ and token its minter chose, the free-deal cap can be dodged by an update, a
 user can put their own run back at the head of the worker's queue, and any
 signed-in account can write the alert banner's shared dismissal columns; the
 app's own writes pass it unchanged, and `CHECK_MIGRATIONS.sql` checks it
-(the first draft of part 4 reads ❌ there).
+(the first draft of part 4 reads ❌ there). **0037 (2026-10-05) runs after
+it**: a deal holds one live job row whoever writes it, and the two
+public-record lookups are held to the sizes the app asks for
+(`lib/public-record-asks.ts`, the one file both callers read). The worker
+holds to the same rules in code (`lib/worker-queue.ts`, pure): one run a
+deal at a time, its other queued rows closed as superseded, and one
+account's runs past `OWNER_QUEUE_SHARE` (the batch upload's four) waiting
+behind another account's.
 What remains is seeding and the operator's own accounts, not schema.
 
 ## Agents
