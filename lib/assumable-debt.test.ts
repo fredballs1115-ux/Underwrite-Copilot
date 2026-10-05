@@ -591,3 +591,59 @@ describe("a coupon priced off a Treasury, a supplemental on offer, a bare prime 
     expect(prepay("Subject to this loan; defeasance only")).toBe(true);
   });
 });
+
+// The lead's item 17, and audit C5's MED-2 and LOW-2.
+describe("a second loan on offer or in place, by its own words, and a coupon that resets", () => {
+  const terms = (rows: ReturnType<typeof row>[]) => readAssumableTerms(sample([row("Assumable loan balance", "$32,000,000"), row("Assumable loan rate", "3.85%"), ...rows]))!;
+
+  it("counts a supplemental's own rows as a second loan only where its balance row states a balance, never on offer", () => {
+    // Its rate and maturity rows alone state no loan in place.
+    expect(terms([row("Assumable supplemental loan rate", "5.95%"), row("Assumable supplemental loan maturity", "August 1, 2029")]).supplemental).toBeUndefined();
+    // A balance row that puts the loan on offer is an offer, as in the
+    // first loan's own row.
+    for (const words of ["Up to $3,000,000 available", "$3,000,000 available to a qualified buyer", "May be offered to a qualified buyer", "Not stated"]) {
+      expect(terms([row("Assumable supplemental loan balance", words), row("Assumable supplemental loan rate", "5.95%")]).supplemental, words).toBeUndefined();
+    }
+    // A stated balance is a loan in place.
+    expect(terms([row("Assumable supplemental loan balance", "$4,500,000"), row("Assumable supplemental loan rate", "5.95%")]).supplemental).toMatchObject({
+      balance: 4_500_000,
+      ratePct: 5.95,
+    });
+    expect(terms([row("Assumable supplemental loan balance", "$4,500,000 (originated May 2019)")]).supplemental?.balance).toBe(4_500_000);
+  });
+
+  it("never reads a month as an offer, nor a clause that states its own loan and what may be done with it", () => {
+    const balance = readAssumableTerms(
+      sample([row("Assumable loan balance", "$32,000,000 first mortgage plus a $4,500,000 supplemental loan originated May 2019"), row("Assumable loan rate", "3.85%")]),
+    )!;
+    expect(balance.supplemental?.balanceStated).toBe("$32,000,000 first mortgage plus a $4,500,000 supplemental loan originated May 2019");
+    const rate = readAssumableTerms(
+      sample([row("Assumable loan balance", "$32,000,000"), row("Assumable loan rate", "3.85% (first); 5.95% (supplemental, which may be prepaid at par)")]),
+    )!;
+    expect(rate.supplemental?.ratesStated).toBeDefined();
+    expect(rate.ratePct).toBeNull();
+    // Still an offer where the words offer it.
+    expect(
+      readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000; a supplemental loan may be available to a qualified buyer"), row("Assumable loan rate", "3.85%")]))!
+        .supplemental,
+    ).toBeUndefined();
+  });
+
+  it("reads a coupon that resets or adjusts over a Treasury as no fixed coupon, said so and priced nothing", () => {
+    for (const words of ["7.25% (5-yr Treasury + 300 bps, resets in year 6)", "7.25%, adjusts to 5-year UST + 300 bps at year 5", "4.10% fixed through 2028, then reprices at 10-yr Treasury + 2.25%"]) {
+      const t = readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000"), row("Assumable loan rate", words)]))!;
+      expect(t.ratePct, words).toBeNull();
+      expect(t.floating?.resets, words).toBe(true);
+    }
+    const e = sample([...LOAN.filter((r) => !/rate/i.test(r.label)), row("Assumable loan rate", "7.25% (5-yr Treasury + 300 bps, resets in year 6)")]);
+    const a = readAssumable(e, inputs, AS_OF)!;
+    expect(a.read).toBeNull();
+    expect(assumableSentence(a)).toBe(
+      "The loan's coupon resets over 5-yr Treasury + 3.00%, as stated: a coupon fixed only until its reset is no fixed comparison, so none is drawn.",
+    );
+    expect(assumableTag(e)).toBe("Assumable 5-yr Treasury + 3.00%, resets");
+    expect(assumableTermsLine(a)).toContain(" at a coupon that resets over 5-yr Treasury + 3.00%");
+    // A fixed agency coupon priced off a Treasury, which never resets, stays fixed.
+    expect(readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000"), row("Assumable loan rate", "3.45% (10-yr UST + 180 bps)")]))!.ratePct).toBe(3.45);
+  });
+});

@@ -113,6 +113,10 @@ export interface FloatingRate {
   /** the spread over the index, percent (a figure in basis points read as
    *  one); null where none is stated */
   spreadPct: number | null;
+  /** a coupon stated fixed only until it resets, adjusts or reprices over
+   *  its index ("7.25% (5-yr Treasury + 300 bps, resets in year 6)"): no
+   *  coupon to maturity, so nothing is priced (audit C5, LOW-2) */
+  resets?: boolean;
 }
 
 /** A second loan offered for assumption with the first. */
@@ -291,8 +295,16 @@ const CAP_CLAUSE = /\b(?:(?:interest\s+)?rate\s+cap|capped)\b\s*(?:at|of|:)?\s*(
 /** The words that put a second loan in the first loan's own row. */
 const NAMES_SECOND_LOAN =
   /\bsupplemental\b|\b(?:second|2nd)[\s-]+(?:loan|lien|mortgage|note|trust\s+deed)\b|\(\s*(?:second|2nd)\s*\)|\bmezz(?:anine)?\b|\b(?:junior|subordinate)[\s-]+(?:loan|lien|mortgage|note|debt)\b|\b(?:both|two)\s+loans\b/i;
-/** Words that put a second loan on offer rather than in place. */
-const ON_OFFER = /\bavailable\b|\bup\s+to\b|\bmay\b|\beligib\w*|\boptional\b|\bcould\b|\bpotential\b/i;
+/** Words that say a coupon is fixed only until a later date: it resets,
+ *  adjusts or reprices ("adjustable" floats, FLOATS above). */
+const RESETS = /\bre-?set(?:s|ting)?\b|\badjust(?:s|ed|ing)?\b|\bre-?pric(?:es|ed|ing)\b/i;
+/** Words that put a second loan on offer rather than in place. "May" only as
+ *  the offer itself ("may be offered", "may be available") — never the
+ *  month ("originated May 2019") nor what may be done with a loan in place
+ *  ("which may be prepaid at par"); "available" never as "available for
+ *  assumption", which is the loan in place (audit C5, MED-2). */
+const ON_OFFER =
+  /\bavailable\b(?!\s+(?:for|to\s+be)\s+assum)|\bup\s+to\b|\beligib\w*|\boptional\b|\bcould\s+be\b|\bpotential\b|\bmay\s+(?:also\s+)?(?:be\s+)?(?:offered|available|obtain\w*|taken|drawn|added|arranged|provided|requested|sought)\b/i;
 /** A fee's percentage, which is never a loan's rate: "1% fee", "a fee of 1%". */
 const FEE_PCT = /\d+(?:\.\d+)?\s*%\s*(?:\w+\s+)?fee\b|\bfee\s*(?:of|:)?\s*\d+(?:\.\d+)?\s*%/gi;
 /** Prepayment terms that say the loan stays: a lockout, or a sale subject to
@@ -318,6 +330,10 @@ export function floatingRateOf(text: string | null | undefined): FloatingRate | 
   if (!t) return null;
   const floats = FLOATS.test(t);
   const index = INDEX.exec(t);
+  // A coupon that resets, adjusts or reprices — over a Treasury most often —
+  // is fixed only until then, whatever "fixed" the words say of the years
+  // before: no coupon to its maturity, so none is priced (audit C5, LOW-2).
+  if (RESETS.test(t)) return { index: index ? index[0] : null, spreadPct: index ? spreadOf(t) : null, resets: true };
   if (!floats && !index) return null;
   if (!floats && /\bfixed\b/i.test(t)) return null;
   // A coupon stated beside a Treasury and its spread, with no word that it
@@ -425,14 +441,20 @@ export function readAssumableTerms(ex: MetricRows): AssumableTerms | null {
   const prepayment = prepaymentText ? { stated: prepaymentText, locksIn: LOCKS_IN.test(prepaymentText) } : null;
 
   // A second loan offered with it, from its own rows or the first's words.
-  const second = [rows.secondBalanceRow, rows.secondRateRow, rows.secondMaturityRow].filter(says);
+  // Its own rows state a loan in place only where its balance row states a
+  // balance, and words that put it on offer there are an offer, as in the
+  // first loan's own row (the lead's item 17): a rate or a maturity alone,
+  // or "up to $3,000,000 available", is no second loan assumed with this one.
+  const secondBalance =
+    says(rows.secondBalanceRow) && !ON_OFFER.test(rows.secondBalanceRow.value) ? money(rows.secondBalanceRow.value) : null;
+  const second = secondBalance != null ? [rows.secondBalanceRow, rows.secondRateRow, rows.secondMaturityRow].filter(says) : [];
   const secondRateText = says(rows.secondRateRow) ? rows.secondRateRow.value : "";
   const secondFloating = floatingRateOf(secondRateText);
   const secondMaturity = says(rows.secondMaturityRow) ? readStatedDate(rows.secondMaturityRow.value, 1990, 2100, "first") : null;
   const supplemental: AssumableSecondLoan | null =
     second.length || twoInBalance || twoInRate
       ? {
-          balance: says(rows.secondBalanceRow) ? money(rows.secondBalanceRow.value) : null,
+          balance: secondBalance,
           ratePct: secondRateText && !secondFloating ? couponOf(secondRateText) : null,
           ...(secondFloating ? { floating: secondFloating } : {}),
           maturity: secondMaturity?.iso ?? null,
@@ -649,6 +671,8 @@ function floatingWords(f: FloatingRate): string | null {
 function rateWords(ratePct: number | null, floating: FloatingRate | undefined, mipPct?: number): string {
   if (floating) {
     const w = floatingWords(floating);
+    // A coupon fixed only until it resets (audit C5, LOW-2).
+    if (floating.resets) return w == null ? " at a coupon that resets" : ` at a coupon that resets over ${w}`;
     return w == null ? " at a floating rate" : floating.spreadPct != null ? ` floating at ${w}` : ` floating over ${w}`;
   }
   if (ratePct == null) return "";
@@ -759,7 +783,9 @@ export function assumableSentence(a: AssumableRead, withheld: string | null = nu
       const w = floatingWords(t.floating);
       const who = t.supplemental ? "It" : "The loan";
       said.push(
-        w == null
+        t.floating.resets
+          ? `${t.supplemental ? "Its" : "The loan's"} coupon resets${w == null ? "" : ` over ${w}`}, as stated: a coupon fixed only until its reset is no fixed comparison, so none is drawn.`
+          : w == null
           ? `${who} floats, as stated: its coupon moves with its index, so no fixed comparison is drawn.`
           : `${who} floats ${t.floating.spreadPct != null ? "at" : "over"} ${w}${t.floating.spreadPct != null ? "" : ", at a spread the memorandum does not state"}: its coupon moves with the index, so no fixed comparison is drawn.`,
       );
@@ -914,7 +940,9 @@ export function assumableTag(ex: Extraction): string | null {
   if (!t) return null;
   const floating = t.floating ? floatingWords(t.floating) : null;
   const rate = t.floating
-    ? floating == null
+    ? t.floating.resets
+      ? `${floating ?? "loan"}, resets`
+      : floating == null
       ? "floating rate"
       : t.floating.spreadPct != null
         ? floating
