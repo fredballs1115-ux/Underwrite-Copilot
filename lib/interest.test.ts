@@ -1731,6 +1731,42 @@ describe("an undivided interest held as a tenant in common is the real estate's,
     expect(gluedWords(said)).toEqual([]);
   });
 
+  it("names the loan the property's wherever it stands beside the equity's whole — the plan, the plausibility check, the model tab", async () => {
+    const { planSummary, plausibilityNote, inferStrategy: infer } = await import("./deal-strategy");
+    const { planFacts } = await import("./plan-facts");
+    const { modelReturnsRead } = await import("./compare-interest");
+    const loan = row("Entity loan balance", "$9,000,000");
+    // A value-add held as a tenant in common: the plan's facts and its line.
+    const valueAdd: ExtractionResult = {
+      ...tic({}, [loan, row("Renovation budget", "$1,000,000"), row("NOI (stabilized, pro forma)", "$1,250,000", "pro_forma")]),
+      strategy: { kind: "value_add", summary: "Renovate the suites", capitalBudget: "", timeline: "" },
+    };
+    const plan = planSummary(valueAdd)!;
+    expect(plan.loanOnProperty).toBe(true);
+    expect(planFacts(plan)).toContainEqual(["Equity's whole, the share grossed up", "$14.0M, the property's $9.0M loan on top"]);
+    expect(plan.costWithheld).toBe(
+      "No total cost or yield on cost is struck on the equity's whole: the building's cost is that plus the property's $9.0M loan, which the model does not add.",
+    );
+    expect(plausibilityNote([], infer(valueAdd), plan, valueAdd)).toContain(
+      "(the equity's whole, not the asset's: the stated $9.0M loan on the property sits on top of it)",
+    );
+    // A finding measured on the equity's whole names the loan the same way.
+    const mismatch: ExtractionResult = {
+      ...tic({}, [loan]),
+      metrics: [row("Asking price", "4,200,000"), row("Total SF", "48,000 SF"), row("NOI (in-place)", "980,000", "in_place"), row("Going-in cap rate", "5.00%"), loan],
+    };
+    const f = assessPlausibility(mismatch).find((x) => x.code === "cap_mismatch")!;
+    expect(f.detail).toContain("The $14.0M is the equity's whole, grossed up from the share's price — not the asset's: the stated $9.0M loan on the property sits on top of it.");
+    // The model tab's sentence over the withheld returns.
+    expect(modelReturnsRead(tic({}, [loan]), { purchasePrice: 14_000_000, year1Noi: 980_000, goingInCapPct: 7 }).line).toBe(
+      "An undivided interest's price is for the interest, and grossed up beside the loan on the property it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld.",
+    );
+    // A share's loan is still its entity's.
+    const share = planSummary({ ...valueAdd, interest: interest({ kind: "partial_interest", share: "30% LP interest" }) })!;
+    expect(share.loanOnProperty).toBeUndefined();
+    expect(planFacts(share)).toContainEqual(["Equity's whole, the share grossed up", "$14.0M, the entity's $9.0M loan on top"]);
+  });
+
   it("says a percentage not stated as the interest's, never a share of an entity's", () => {
     const e = tic({ share: "", summary: "An undivided interest held as tenants in common with three co-owners" });
     const r = readInterest(e, askingPriceOf(e))!;

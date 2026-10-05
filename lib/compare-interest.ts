@@ -57,7 +57,7 @@
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { findGoingInCap, parsePct } from "@/lib/criteria";
 import { askingPriceOf, buildingPriceOf, signalGoingInCap } from "@/lib/deal-strategy";
-import { interestOf, interestTag, isGpStake, isWholeShare, leaseholdTermOf, readInterest } from "@/lib/interest";
+import { interestOf, interestTag, isGpStake, isTenancyInCommon, isWholeShare, leaseholdTermOf, readInterest } from "@/lib/interest";
 import { leaseEndInHold, type LeaseEndInHold } from "@/lib/leasehold-exit";
 
 export interface CompareModel {
@@ -203,7 +203,11 @@ export function modelReturnsRead(
                 ? isWholeShare(interestOf(ex).sharePct)
                   ? // All of the entity's interests (a stated 100%, research pass 28).
                     "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
-                  : "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                  : isTenancyInCommon(ex)
+                    ? // An undivided interest held as a tenant in common: its
+                      // loan is the property's (research pass 37).
+                      "An undivided interest's price is for the interest, and grossed up beside the loan on the property it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
+                    : "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
                 : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
           : ci.withheld === "lease"
             ? // The leasehold card's own sentence (lib/leasehold-exit).

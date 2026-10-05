@@ -26,7 +26,7 @@
 
 import { compactUsd } from "@/lib/money";
 import { withArticle } from "@/lib/article";
-import { dealTypeLabel, entityLoanOf, groundRentOf, interestOf, isGpStake, isWholeShare, shareProjectCostOf } from "@/lib/interest";
+import { dealTypeLabel, entityLoanOf, entityLoanWords, groundRentOf, interestOf, isGpStake, isTenancyInCommon, isWholeShare, shareProjectCostOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
@@ -970,6 +970,10 @@ export interface PlanSummary {
    *  equity's whole, said so, and the plan's cost is read as before; absent
    *  otherwise */
   projectCostAbove?: number | null;
+  /** beside `entityLoan`, on an undivided interest held as a tenant in
+   *  common: the loan is the property's, since no entity owns the property
+   *  (research pass 37); absent otherwise */
+  loanOnProperty?: boolean;
   /** the stabilized pro forma NOI, when the OM states one — on a forward
    *  purchase (`forward`) the NOI the OM states at delivery
    *  (`forwardDeliveryNoi`: the stabilized figure, or on a build-to-suit the
@@ -1163,9 +1167,12 @@ export function planSummary(
     yieldOnCost,
     yieldWithheld,
     ...(forward ? { forward: true, developerBudget: statedBudget } : {}),
+    // On a tenancy in common the stated loan is the property's: no entity owns
+    // it (research pass 37).
+    ...(entityLoan != null && isTenancyInCommon(extraction) ? { loanOnProperty: true } : {}),
     costWithheld:
       entityLoan != null && totalCost == null
-        ? `No total cost or yield on cost is struck on the equity's whole: the building's cost is that plus the entity's ${money(entityLoan)} loan, which the model does not add.`
+        ? `No total cost or yield on cost is struck on the equity's whole: the building's cost is that plus ${entityLoanWords(extraction, money(entityLoan), "short")}, which the model does not add.`
         : null,
     units,
     costPerUnit: totalCost != null && units != null ? totalCost / units : null,
@@ -1383,7 +1390,7 @@ export function assessPlausibility(
     entityLoan != null
       ? allInterests
         ? ` The ${money(price)} for all the entity's interests is the equity's whole, not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it.`
-        : ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the asset's: the entity's stated ${money(entityLoan)} loan sits on top of it.`
+        : ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the asset's: ${entityLoanWords(extraction, money(entityLoan))} sits on top of it.`
       : projectCost != null
         ? ` The ${money(price)} is the equity's whole, grossed up from the share's price — not the project's: the memorandum's stated ${money(projectCost)} total project cost sits above it.`
         : "";
@@ -1551,7 +1558,9 @@ function planLine(plan: PlanSummary): string {
     shown != null
       ? `${shareWhole ? "whole price, the share's grossed up," : "price"} ${money(shown)}${
           plan.entityLoan != null
-            ? ` (the equity's whole, not the asset's: the entity's stated ${money(plan.entityLoan)} loan sits on top of it)`
+            ? ` (the equity's whole, not the asset's: ${
+                plan.loanOnProperty ? `the stated ${money(plan.entityLoan)} loan on the property` : `the entity's stated ${money(plan.entityLoan)} loan`
+              } sits on top of it)`
             : plan.projectCostAbove != null
               ? ` (the equity's whole, not the project's: the memorandum's stated ${money(plan.projectCostAbove)} total project cost sits above it)`
               : ""

@@ -322,6 +322,18 @@ export function isDst(ex: ExtractionResult | null | undefined): boolean {
   return shareHoldingOf(ex) === "dst";
 }
 
+/** The stated loan beside a share's grossed-up price, named for whose it is:
+ *  the entity's — or, on an undivided interest held as a tenant in common,
+ *  where no entity owns the property, the property's (research pass 37).
+ *  "stated" reads "the entity's stated $56.5M loan" / "the stated $9.0M loan
+ *  on the property"; "short" reads "the entity's $56.5M loan" / "the
+ *  property's $9.0M loan". `amount` is the caller's money text. */
+export function entityLoanWords(ex: ExtractionResult | null | undefined, amount: string, form: "stated" | "short" = "stated"): string {
+  const tic = isTenancyInCommon(ex);
+  if (form === "short") return tic ? `the property's ${amount} loan` : `the entity's ${amount} loan`;
+  return tic ? `the stated ${amount} loan on the property` : `the entity's stated ${amount} loan`;
+}
+
 /** The minimum the price readers need: the kind; a partial interest's share
  *  where one percentage is stated as the share (`parseSharePct`); and the
  *  loan its entity carries where the memorandum states one (`entityLoanOf`)

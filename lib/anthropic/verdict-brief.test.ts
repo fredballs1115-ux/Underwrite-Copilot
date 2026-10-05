@@ -206,6 +206,19 @@ describe("the verdict is told what is being sold and the building's own basis", 
     expect(est).not.toMatch(/\/unit|share of the owning entity\. This memorandum sells a 50%/);
   });
 
+  it("an undivided interest held as a tenant in common: its loan is the property's, never an entity's", () => {
+    const tic = base({
+      interest: { kind: "partial_interest", summary: "An undivided 30% tenant-in-common interest", share: "30% tenant-in-common interest", groundLease: "", loan: "", page: "p. 2" },
+      metrics: [m("Asking price", "$4,200,000"), m("Units", "60"), m("NOI (in-place)", "$980,000", "in_place"), m("Entity loan balance", "$9,000,000")],
+    });
+    const est = section(briefOf(tic));
+    expect(est).toContain("What is being sold: an undivided interest in the property, as a tenant in common.");
+    expect(est).toContain(
+      "THE BUILDING'S BASIS: none — the interest's price grossed up is the equity's whole, not the building's: the building's cost is that plus the stated $9.0M loan on the property, which the model does not add",
+    );
+    expect(est).not.toMatch(/entity's stated/);
+  });
+
   it("a note: the context carries the note's own read, and there is no building basis", () => {
     // Read on a pinned day: the note matures March 1, 2028, and from Feb 2
     // of that year it is due within the month, with no yield to state.

@@ -100,7 +100,10 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
     [
       plan.priceLabel,
       (plan.price ?? plan.equityWhole) != null
-        ? `${moneyCompact((plan.price ?? plan.equityWhole)!)}${plan.entityLoan != null ? `, the entity's ${moneyCompact(plan.entityLoan)} loan on top` : ""}`
+        ? `${moneyCompact((plan.price ?? plan.equityWhole)!)}${
+            // A tenancy in common's loan is the property's (research pass 37).
+            plan.entityLoan != null ? `, ${plan.loanOnProperty ? "the property's" : "the entity's"} ${moneyCompact(plan.entityLoan)} loan on top` : ""
+          }`
         : (plan.priceWithheld ?? "not stated"),
     ],
     [

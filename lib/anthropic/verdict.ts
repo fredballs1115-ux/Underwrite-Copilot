@@ -19,7 +19,7 @@ import {
 import { buyBoxCoverage, foldBuyBoxChecks, parsePrice, priceRange, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { checkedSentence } from "@/lib/fit-label";
 import type { MandateScore } from "@/lib/mandate";
-import { interestOf, isGpStake, isWholeShare } from "@/lib/interest";
+import { entityLoanWords, interestOf, isGpStake, isTenancyInCommon, isWholeShare } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
 import { assetWords } from "@/lib/asset-words";
 import { basisTag as buildingBasisTag, shownAssetClass } from "@/lib/pipeline-slots";
@@ -197,7 +197,7 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
   if (kind === "partial_interest" && entityLoan != null) {
     return allInterests
       ? `THE BUILDING'S BASIS: none — the price for all of the entity's interests is the equity's whole, not the building's: the building's cost is that plus the entity's stated ${compact(entityLoan)} loan, which the model does not add, so no price per unit or per SF and no cap is struck on it.`
-      : `THE BUILDING'S BASIS: none — the share's price grossed up is the equity's whole, not the building's: the building's cost is that plus the entity's stated ${compact(entityLoan)} loan, which the model does not add, so no price per unit or per SF and no cap is struck on it.`;
+      : `THE BUILDING'S BASIS: none — the ${isTenancyInCommon(ex) ? "interest's" : "share's"} price grossed up is the equity's whole, not the building's: the building's cost is that plus ${entityLoanWords(ex, compact(entityLoan))}, which the model does not add, so no price per unit or per SF and no cap is struck on it.`;
   }
   if (tag) {
     const range = row ? priceRange(row.value) : null;
