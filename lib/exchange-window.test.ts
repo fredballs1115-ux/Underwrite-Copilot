@@ -100,8 +100,18 @@ describe("the buyer's 1031 clock (pass 28, round 4)", () => {
     ]);
     expect(tic.tag).toBe("1031: TIC — ask counsel");
     expect(gluedWords(tic.flags[0].text)).toEqual([]);
-    // A trust's beneficial interests are asked about as a share is.
-    expect(exchangeFit(x, { offersDueIso: null, interestKind: "partial_interest", holding: "dst" })!.tag).toBe("1031: share — ask counsel");
+    // A trust's beneficial interests are said as what they are, never "a
+    // share of the owning entity", and whether they count is counsel's
+    // question, no ruling cited (audit C3b LOW-4).
+    const dst = exchangeFit(x, { offersDueIso: null, interestKind: "partial_interest", holding: "dst" })!;
+    expect(dst.flags).toEqual([
+      {
+        kind: "dst",
+        text: "The price buys beneficial interests in a Delaware statutory trust that holds the real estate; whether those interests count as real property for the exchange is a question for your exchange counsel.",
+      },
+    ]);
+    expect(dst.tag).toBe("1031: DST — ask counsel");
+    expect(dst.flags[0].text).not.toMatch(/owning entity|Rev\. Rul\.|ruling/);
     // A share of the general partner's interest is said as a share of a share.
     const gp = exchangeFit(x, { offersDueIso: null, interestKind: "partial_interest", holding: "gp_stake" })!;
     expect(gp.flags[0].text).toBe(

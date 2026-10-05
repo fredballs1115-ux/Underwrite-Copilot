@@ -188,7 +188,7 @@ function windowSentence(w: Omit<ExchangeWindow, "sentence">): string {
 /** One thing the deal and the exchange say together — a date fact or a
  *  question for exchange counsel, never a verdict. */
 export interface ExchangeFlag {
-  kind: "after_identify" | "id_period_over" | "after_close" | "note" | "entity_share" | "tic" | "position" | "short_leasehold" | "lease_term";
+  kind: "after_identify" | "id_period_over" | "after_close" | "note" | "entity_share" | "tic" | "dst" | "position" | "short_leasehold" | "lease_term";
   text: string;
 }
 
@@ -259,6 +259,15 @@ export function exchangeFit(
       kind: "tic",
       text: `The price buys an undivided interest in the real estate, held as a tenant in common; whether the co-ownership counts as real property or as a partnership interest is ${ASK}.`,
     });
+  } else if (deal.interestKind === "partial_interest" && deal.holding === "dst") {
+    // Beneficial interests in a Delaware statutory trust: what they are for
+    // the exchange is counsel's question, and no ruling is cited here (the
+    // audit C3b LOW-4: they had been filed beside an LP share as "a share of
+    // the owning entity").
+    flags.push({
+      kind: "dst",
+      text: `The price buys beneficial interests in a Delaware statutory trust that holds the real estate; whether those interests count as real property for the exchange is ${ASK}.`,
+    });
   } else if (deal.interestKind === "partial_interest") {
     flags.push({
       kind: "entity_share",
@@ -315,6 +324,7 @@ const TAG: Record<ExchangeFlag["kind"], string> = {
   note: "1031: note — ask counsel",
   entity_share: "1031: share — ask counsel",
   tic: "1031: TIC — ask counsel",
+  dst: "1031: DST — ask counsel",
   position: "1031: position — ask counsel",
   short_leasehold: "1031: lease under 30 yrs",
   // A term not read, or a ceiling of thirty years or more: the thirty years
