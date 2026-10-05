@@ -277,10 +277,15 @@ describe("the asset-words table", () => {
       expect(assetClassKey(phrase), phrase).toBe("multifamily");
       expect(isResidentialClass(phrase), phrase).toBe(true);
     }
-    // A care or service word keeps a phrase senior housing.
+    // A care or service word keeps a phrase senior housing — "senior living"
+    // among them, the industry's word for a care community, apartments or
+    // not (the audit of 2026-10-05: "Senior Living Apartments" filed as
+    // rental housing while the going-concern reader called it a care
+    // community).
     for (const phrase of [
       "Senior housing",
       "Senior living",
+      "Senior Living Apartments",
       "Independent living apartments",
       "Senior apartments with assisted living",
       "Affordable senior housing with services",
@@ -290,8 +295,30 @@ describe("the asset-words table", () => {
     }
     // A skilled nursing facility by any of its names is senior housing; each
     // filed as no class, so every class's traps and the generic defaults.
-    for (const phrase of ["SNF", "Skilled Nursing Facility", "Nursing Home", "Nursing facility", "Post-Acute Care", "Rehabilitation center"]) {
+    for (const phrase of [
+      "SNF",
+      "Skilled Nursing Facility",
+      "Nursing Home",
+      "Nursing facility",
+      "Post-Acute Care",
+      "Nursing and Rehabilitation Center",
+      "Rehabilitation & Nursing Center",
+      "Skilled Nursing & Rehab",
+    ]) {
       expect(assetClassKey(phrase), phrase).toBe("senior_housing");
+    }
+    // Rehabilitation alone is no nursing facility (the audit of 2026-10-05):
+    // a rehabilitation hospital, an addiction or a behavioral-health
+    // rehabilitation center and an outpatient therapy clinic sell no
+    // residence, and are left to the medical rules or to no class.
+    for (const phrase of [
+      "Inpatient Rehabilitation Hospital",
+      "Addiction Rehabilitation Center",
+      "Outpatient Physical Therapy & Rehabilitation Center",
+      "Behavioral Health Rehabilitation Facility",
+      "Rehabilitation center",
+    ]) {
+      expect(assetClassKey(phrase), phrase).not.toBe("senior_housing");
     }
     // A building's rehabilitation is no rehabilitation center.
     expect(assetClassKey("Historic rehabilitation of an office building")).toBe("office");

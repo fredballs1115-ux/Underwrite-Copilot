@@ -247,16 +247,22 @@ const housingWithCommercial = (s: string) =>
 // it — filed as senior housing, a 55+ apartment building in Prince George's
 // County lost its rent cap and ran on licensed care's defaults (research
 // pass 28).
-const SENIOR_WORDS = String.raw`senior|assisted living|memory care|independent living|skilled nursing|snf|nursing\s+(?:homes?|facilit(?:y|ies)|cent(?:er|re)s?)|post[\s-]+acute|rehabilitation\s+(?:cent(?:er|re)s?|facilit(?:y|ies)|hospitals?)|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?)`;
+// Rehabilitation is a nursing facility's only beside the nursing words
+// ("Nursing and Rehabilitation Center"): a rehabilitation hospital, an
+// addiction or a behavioral-health rehabilitation center and an outpatient
+// therapy clinic sell no residence (the audit of 2026-10-05 found each filed
+// as senior housing, on licensed care's defaults and traps).
+const SENIOR_WORDS = String.raw`senior|assisted living|memory care|independent living|skilled nursing|snf|nursing\s+(?:homes?|facilit(?:y|ies)|cent(?:er|re)s?)|post[\s-]+acute|(?:nursing|skilled|post[\s-]+acute|sub[\s-]?acute)\s+(?:and|&)\s+rehab(?:ilitation)?|rehab(?:ilitation)?\s+(?:and|&)\s+(?:nursing|skilled|post[\s-]+acute|sub[\s-]?acute)|ccrcs?|continuing[\s-]+care|life[\s-]+plan\s+communit(?:y|ies)|retirement\s+(?:communit(?:y|ies)|living|homes?|villages?)`;
 // Senior APARTMENTS — "Senior Apartments (LIHTC, 62+)", "Affordable Senior
 // Housing", "62+ apartments" — rent an age-restricted home and sell no care:
 // rental housing the rent rules reach, as an active-adult community is
 // (research pass 28's amendment; filed as senior housing they lost the rent
 // rules and ran on licensed care's defaults). A care or service word keeps
 // a phrase senior housing: independent living's meals and services are care
-// a resident buys.
+// a resident buys. "Senior living" is the industry's own word for a care
+// community, apartments or not ("Senior Living Apartments").
 const CARE_OR_SERVICE =
-  /\b(?:assisted|memory|skilled|nursing|snf|care|independent[\s-]+living|ccrcs?|continuing|life[\s-]+plan|licensed|services?|meals?|post[\s-]+acute|rehabilitation)\b/i;
+  /\b(?:assisted|memory|skilled|nursing|snf|care|independent[\s-]+living|senior[\s-]+living|ccrcs?|continuing|life[\s-]+plan|licensed|services?|meals?|post[\s-]+acute|rehabilitation)\b/i;
 const seniorApartments = (s: string) =>
   /\bseniors?\b/i.test(s) &&
   (/\b(?:apartments?|affordable|lihtc|tax[\s-]+credit|section\s+8|age[\s-]+restricted|rental\s+housing)\b/i.test(s) || /\b(?:55|62)\s*\+/.test(s)) &&
