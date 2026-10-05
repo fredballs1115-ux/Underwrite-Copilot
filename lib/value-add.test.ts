@@ -46,6 +46,12 @@ describe("monthlyOf — a rent or premium a month, to the cent", () => {
     expect(monthlyOf("$200-$275")).toBeNull();
     expect(monthlyOf("TBD")).toBeNull();
   });
+
+  it("reads a premium with its return or its year after a dash as the premium it states (audit C3a)", () => {
+    expect(monthlyOf("$250 – 20% on cost")).toBe(250);
+    expect(monthlyOf("$250 (2025-26 leases)")).toBe(250);
+    expect(monthlyOf("$200 – $275")).toBeNull();
+  });
 });
 
 describe("readValueAdd — the program as the memorandum states it", () => {

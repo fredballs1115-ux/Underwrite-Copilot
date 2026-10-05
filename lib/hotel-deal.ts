@@ -59,7 +59,7 @@ import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import { endHasPassed, endsByYear, fromToday, yearsText } from "@/lib/ground-lease-term";
 import { PROPERTY_HOLDER_WORDS, propertyHolderOf, type PropertyHolder } from "@/lib/interest";
-import { compactUsd, parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd, statesRange } from "@/lib/money";
 
 export type { HotelEncumbrance };
 
@@ -99,10 +99,11 @@ function pctOf(value: string): number | null {
 
 /** A room rate or RevPAR a value states, to the cent ("$189.50") —
  *  parseUsd rounds to whole dollars, which an ADR cannot afford. A range
- *  ("$180–$195") is no single figure. */
+ *  ("$180–$195") is no single figure (lib/money `statesRange`, so "$189.50
+ *  – 2025 actual" is the rate it states). */
 function dollarsOf(value: string): number | null {
+  if (statesRange(value)) return null;
   const v = value.replace(/,/g, "");
-  if (/\d\s*[-–—]\s*\$?\d/.test(v)) return null;
   const m = v.match(/\$?\s*(\d+(?:\.\d+)?)/);
   if (!m) return null;
   const n = Number(m[1]);

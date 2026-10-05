@@ -27,10 +27,14 @@ const SCALE: Record<string, number> = {
 /** The scale words, longest first, as the readers' alternation spells them. */
 export const SCALE_WORDS = "k|thousand|million|mil|mm|mn|m|billion|bil|bn|b";
 
+// The digits of a figure as a memorandum writes them: thousands commas kept
+// (never a trailing one), a decimal part, and never part of a longer number
+// ("$32.50psf" is never 32). The commas are kept so a year is told from a
+// figure: "2026" can be a year, "2,026" cannot.
+const DIGITS = String.raw`\d(?:[\d,]*\d)?(?:\.\d+)?(?!\.?\d)`;
 // The first figure in a line, as `parseUsd` has always found it: an
-// optional dollar sign, the digits (commas already dropped), a scale. The
-// digits are never part of a longer number ("$32.50psf" is never 32).
-const FIRST_FIGURE = new RegExp(String.raw`\$?\s*([0-9]+(?:\.[0-9]+)?)(?!\.?\d)\s*(${SCALE_WORDS})?\b`, "i");
+// optional dollar sign, the digits, a scale.
+const FIRST_FIGURE = new RegExp(String.raw`\$?\s*(${DIGITS})\s*(${SCALE_WORDS})?\b`, "i");
 // The figure's own sign, in any of its forms — the hyphen-minus, the minus
 // sign (U+2212) and the en dash a word processor sets for one — either
 // opening the value ("-250,000", "−$250k", "- $250,000") or set against
@@ -42,16 +46,74 @@ const SIGN_SET_AGAINST = /(?:^|[^A-Za-z0-9])[-−–]\$?$|\$\s*[-−–]\s*$/;
 // Accounting brackets around the figure alone: "($250,000)", "$(250,000)".
 const BRACKET_OPENS = /(?:\$\s*)?\(\s*\$?\s*$/;
 const BRACKET_CLOSES = /^\s*\)/;
-// A range whose first end is the figure: a dash and another figure
-// ("$40M - $42M", "40-42M", "$40–42M") — a dash joins two figures only in a
-// range or a compound label ("2025-26"), neither of them the figure — or
-// "to" / "through" and another figure at least half the first ("$40M to
-// $42M"). A figure far below the first after "to" or "through" is a date
-// or a term, not a range's other end ("$900,000 through 2031").
-const DASH_RANGE = /^\s*[-−–—]\s*\$?\s*[0-9]/;
-const WORD_RANGE = new RegExp(String.raw`^\s*(?:to|through)\b\s*\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(${SCALE_WORDS})?\b(?!\s*%)`, "i");
+// What may follow a figure and make it a range's first end (`opensRange`):
+// a dash — the hyphen, the minus sign, the en or em dash — or "to" /
+// "through", then another figure, its dollar sign and its scale.
+const OTHER_END = new RegExp(
+  String.raw`^(\s*)([-−–—]|to\b|through\b)(\s*\$?\s*)(${DIGITS})(?:\s*(${SCALE_WORDS})(?![a-z]))?`,
+  "i",
+);
+// A figure that is no dollar figure, by the words right after it: a
+// percentage, basis points or a multiple.
+const NOT_DOLLARS = /^\s*(?:%|percent\b|per\s?cent\b|pct\b|bps?\b|basis\s+points?\b|[x×](?![a-z]))/i;
+// A year: four digits from 1900 to 2099 with no dollar sign, no thousands
+// comma, no decimals and no scale ("2026" — never "$2,026" or "2,050").
+const YEAR = /^(?:19|20)\d{2}$/;
+const isYear = (written: string, digits: string, scale: string | undefined) =>
+  !scale && !written.includes("$") && YEAR.test(digits);
 
-const scaled = (digits: string, scale: string | undefined) => Number(digits) * (scale ? SCALE[scale.toLowerCase()] ?? 1 : 1);
+const scaled = (digits: string, scale: string | undefined) =>
+  Number(digits.replace(/,/g, "")) * (scale ? SCALE[scale.toLowerCase()] ?? 1 : 1);
+
+/**
+ * Whether the words right after a figure of `first` dollars make it the
+ * first end of a range — two figures, not one (audit C3a, MED-1):
+ *  - after a year, a dash or "to" and another figure is a span of years
+ *    ("2025-26", "2026–27", "2025 to 2030"): a label, never the figure;
+ *  - a hyphen or a minus sign joined to both figures ("40-42M",
+ *    "$40-$42M") is a range or a compound label, neither of them the figure;
+ *  - otherwise — an en or em dash, joined or spaced, a spaced hyphen, "to"
+ *    or "through" — the other figure is a range's other end only where it
+ *    is dollars and at least half the first, read with its own scale
+ *    ("$40,000,000 – $42,000,000", "$40–42M", "$40 to $42 million"). A
+ *    percentage, a multiple, a year or a smaller figure after it is words
+ *    after the figure: "$450,000 – 10% bumps every 5 years", "$24,500,000 —
+ *    3.45% fixed", "$520,500 – 2026 estimate", "$900,000 through 2031".
+ * An abbreviation's period after a scale is read past ("$1.0 mil. – $1.2
+ * mil.").
+ */
+function opensRange(after: string, first: number, firstIsYear: boolean, scaledFirst: boolean): boolean {
+  const rest = scaledFirst ? after.replace(/^\./, "") : after;
+  const m = OTHER_END.exec(rest);
+  if (!m) return false;
+  const [whole, gap, dash, between, digits, scale] = m;
+  if (firstIsYear) return true;
+  if (/^[-−]$/.test(dash) && !gap && /^\$?$/.test(between)) return true;
+  if (NOT_DOLLARS.test(rest.slice(whole.length))) return false;
+  if (isYear(between, digits, scale)) return false;
+  return scaled(digits, scale) >= first / 2;
+}
+
+// Every figure in a line, as `statesRange` reads them.
+const FIGURES = new RegExp(String.raw`\$?\s*(${DIGITS})(?:\s*(${SCALE_WORDS})(?![a-z]))?`, "gi");
+
+/**
+ * Whether a line states a range anywhere in it — a figure followed by a
+ * range's other end, by `parseUsd`'s own rule (`opensRange`): "$600 - $700",
+ * "$1.0M – $1.2M", "$15k-20k", "$450,000 to $520,000". The one test behind
+ * every reader that refuses a range as no single figure, so none of them
+ * drops a stated figure for the words after it ("$610,000 – 2% annual
+ * increases", "$520,500 – 2026 estimate", "$650/mo (2025-26 budget)"): a
+ * span of years is a label, never a range of the line's figures.
+ */
+export function statesRange(text: string): boolean {
+  for (const m of text.matchAll(FIGURES)) {
+    const [written, digits, scale] = m;
+    if (isYear(written, digits, scale)) continue;
+    if (opensRange(text.slice(m.index + written.length), scaled(digits, scale), false, !!scale)) return true;
+  }
+  return false;
+}
 
 /** What a scale word multiplies by; 1 for none or a word not in the table. */
 export function scaleOf(word: string | undefined): number {
@@ -74,7 +136,11 @@ export function scaleOf(word: string | undefined): number {
  * "$24,500,000 (Freddie Mac, non-recourse)", "$410,000 (2025-26)" and
  * "$650,000 (T-12)" are the figures they state. (Any hyphen anywhere had
  * read as nothing, so a stated balance, ground rent or tax bill with a
- * hyphenated word beside it was silently dropped — research pass 37.)
+ * hyphenated word beside it was silently dropped — research pass 37.) Nor
+ * is a dash before a percentage, a year or a smaller figure, which are
+ * words after the figure (`opensRange`): "$450,000 – 10% bumps every 5
+ * years", "$24,500,000 — 3.45% fixed", "$520,500 – 2026 estimate" are the
+ * figures they state (audit C3a: any dash and digit had read as a range).
  *
  * Shared by the LOI panel (client) and the LOI route (server) so the two
  * never disagree about what a price string means. Deliberately loose about
@@ -82,7 +148,7 @@ export function scaleOf(word: string | undefined): number {
  * may have pasted, which is why it is not `readFigure`.
  */
 export function parseUsd(raw: string, floor = 10_000): number | null {
-  const v = raw.trim().replace(/,/g, "");
+  const v = raw.trim();
   if (!v) return null;
   const m = FIRST_FIGURE.exec(v);
   if (!m) return null;
@@ -91,9 +157,7 @@ export function parseUsd(raw: string, floor = 10_000): number | null {
   if (SIGN_OPENS.test(before) || SIGN_SET_AGAINST.test(before)) return null;
   if (BRACKET_OPENS.test(before) && BRACKET_CLOSES.test(after)) return null;
   const n = scaled(m[1], m[2]);
-  if (DASH_RANGE.test(after)) return null;
-  const other = WORD_RANGE.exec(after);
-  if (other && scaled(other[1], other[2]) >= n / 2) return null;
+  if (opensRange(after, n, isYear(m[0], m[1], m[2]), !!m[2])) return null;
   return Number.isFinite(n) && n >= floor ? Math.round(n) : null;
 }
 

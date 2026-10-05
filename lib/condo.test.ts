@@ -86,6 +86,14 @@ describe("condominium units bought in bulk (pass 28, round 8)", () => {
     expect(monthlyDuesOf("$600 - $700")).toBeNull();
   });
 
+  it("reads dues with a year after a dash, or a span of years beside them, as the dues they state (audit C3a)", () => {
+    // Any digit, dash and digit had read as a range.
+    expect(monthlyDuesOf("$650 – 2026 budget, per unit per month")).toBe(650);
+    expect(monthlyDuesOf("$410 per unit per month (2025-26 budget)")).toBe(410);
+    expect(monthlyDuesOf("$600 - $700 per unit per month")).toBeNull();
+    expect(monthlyDuesOf("$600 to $700 per unit per month")).toBeNull();
+  });
+
   // The audit of 2026-10-05: a row stating both periods was read as a
   // twelfth of its monthly figure — $54.17, a year of 42 units' dues $27,300
   // against the true $327,600.

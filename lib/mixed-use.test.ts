@@ -133,6 +133,26 @@ describe("a mixed-use building's two incomes, read as stated (pass 28, round 7)"
     expect(readMixedUse(projected, TODAY)).toBeNull();
   });
 
+  it("reads an income with its increases or its year after a dash: words after the figure, never a range or a share (audit C3a)", () => {
+    // Any digit, dash and digit had read as a range, so the stated income
+    // was none, and a percentage anywhere in the clause read as a share.
+    expect(statedIncomeOf("$610,000 – 2% annual increases")).toEqual({ annual: 610_000, fromMonth: false });
+    expect(statedIncomeOf("$610,000 - 2% annual increases")).toEqual({ annual: 610_000, fromMonth: false });
+    expect(statedIncomeOf("$610,000 annually")).toEqual({ annual: 610_000, fromMonth: false });
+    expect(statedIncomeOf("$610,000 – 2026 budget")).toEqual({ annual: 610_000, fromMonth: false });
+    expect(statedIncomeOf("$610,000 (2025-26)")).toEqual({ annual: 610_000, fromMonth: false });
+    // The increases' "annual" is not the figure's period: a month's figure
+    // stays a month's.
+    expect(statedIncomeOf("$91,667/month – 3% annual increases")).toEqual({ annual: 1_100_004, fromMonth: true });
+    expect(statedIncomeOf("$91,667 – monthly")).toEqual({ annual: 1_100_004, fromMonth: true });
+    // A range is still two figures, and a share still no income.
+    expect(statedIncomeOf("$600,000 – $700,000")).toBeNull();
+    expect(statedIncomeOf("$600,000 to 700,000")).toBeNull();
+    expect(statedIncomeOf("28.6% – $610,000")).toBeNull();
+    const r = readMixedUse(deal([row("Residential income", "$1,520,000"), row("Commercial income", "$610,000 – 2% annual increases")], "Mixed-use"), TODAY)!;
+    expect(r).toMatchObject({ residentialIncome: 1_520_000, commercialIncome: 610_000, commercialIncomeSharePct: 28.6 });
+  });
+
   // The batch audit: the month test ran over the whole row, so a year's
   // figure with its month in brackets was read as twelve times the year —
   // "$610,000 annually ($50,833/month)" as $7.32M of commercial income,

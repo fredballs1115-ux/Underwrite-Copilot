@@ -42,7 +42,7 @@ import { parsePct } from "@/lib/criteria";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import type { MetricRow } from "@/lib/ground-lease-term";
-import { compactUsd, parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd, statesRange } from "@/lib/money";
 import { parseStatedDate } from "@/lib/note-yield";
 
 const isRow = (m: unknown): m is MetricRow =>
@@ -256,13 +256,13 @@ const bareNumber = (v: string) => {
   return m ? Number(m[1]) : null;
 };
 
-/** The repairs as stated: dollars, "None" as zero, never a range or a
- *  figure per unit or per foot. */
+/** The repairs as stated: dollars, "None" as zero, never a range (lib/money
+ *  `statesRange`) or a figure per unit or per foot. */
 function repairsOf(value: string): number | null {
   const v = value.trim();
   if (NONE.test(v) || /^\$?0(?:\.0+)?$/.test(v) || /^no\s+(?:immediate\s+|critical\s+)?(?:repairs?|needs|items)\b/i.test(v)) return 0;
   if (/\/\s*(?:unit|door|key|sf|sq)|\bper\s+(?:unit|door|key|sf|square)|\bpsf\b/i.test(v)) return null;
-  if (/\d\s*[–—-]\s*\$?\d|\d\s+to\s+\$?\d/i.test(v)) return null;
+  if (statesRange(v)) return null;
   const n = parseUsd(v, 100);
   return n != null && n > 0 ? n : null;
 }

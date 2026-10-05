@@ -146,6 +146,11 @@ describe("the reports a memorandum cites, read (#465)", () => {
     // Any hyphen in the value had read as no total.
     expect(readSiteReports(deal([row("PCA immediate repairs", "$630,000 (short-term and life-safety items)")]), ASOF)!.pca!.immediate).toBe(630_000);
     expect(readSiteReports(deal([row("PCA immediate repairs", "$400,000-$600,000")]), ASOF)!.pca!.immediate).toBeNull();
+    // A year after a dash, or a span of years beside the total, is words
+    // after it (audit C3a), never a range.
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$630,000 – 2025 PCA")]), ASOF)!.pca!.immediate).toBe(630_000);
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$630,000 (2025–26 report)")]), ASOF)!.pca!.immediate).toBe(630_000);
+    expect(readSiteReports(deal([row("PCA immediate repairs", "$400,000 to $600,000")]), ASOF)!.pca!.immediate).toBeNull();
   });
 
   it("reads a row that states nothing as no row, never as a clean report", () => {

@@ -54,6 +54,12 @@ describe("taxBillOf — a year's bill as stated", () => {
     expect(taxBillOf("$410,000 (2025-26)")).toBe(410_000);
     expect(taxBillOf("$42,000 (post-abatement)")).toBe(42_000);
     expect(taxBillOf("$450,000-$520,000")).toBeNull();
+    // A year after a dash is words after the bill, never a range's other end
+    // (audit C3a), and so is a span of years written with an en dash.
+    expect(taxBillOf("$520,500 – 2026 estimate")).toBe(520_500);
+    expect(taxBillOf("$520,500 — 2025 actual")).toBe(520_500);
+    expect(taxBillOf("$520,500 (2025–26 levy)")).toBe(520_500);
+    expect(taxBillOf("$450,000 – $520,000")).toBeNull();
     const r = readTaxAbatement(
       ABATED([], "multifamily", [
         row("NOI (in-place)", "$1,650,000"),

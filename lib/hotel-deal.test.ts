@@ -114,6 +114,13 @@ describe("readHotelDeal — what a hotel is sold with", () => {
     expect(hotelNote(r)).toContain("(d) THE ROOM REVENUE — the memorandum's RevPAR does not tie");
   });
 
+  it("reads an ADR or a RevPAR with its year or its change after a dash, to the cent (audit C3a)", () => {
+    const r = readHotelDeal(ex([row("ADR", "$189.50 – 2025 actual"), row("Occupancy", "74%"), row("RevPAR", "$140.23 — 3.5% over 2024")]), TODAY)!;
+    expect(r.adr).toBe(189.5);
+    expect(r.revpar).toBe(140.23);
+    expect(readHotelDeal(ex([row("ADR", "$180 – $195")]), TODAY)!.adr).toBeNull();
+  });
+
   it("a pro forma ADR or RevPAR is the sponsor's and never read as today's", () => {
     const r = readHotelDeal(ex([row("ADR (pro forma)", "$210.00"), row("Stabilized occupancy", "80%"), row("Pro forma RevPAR", "$168.00")]), TODAY)!;
     expect(r.adr).toBeNull();

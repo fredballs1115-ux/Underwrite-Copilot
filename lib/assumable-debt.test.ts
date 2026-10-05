@@ -91,6 +91,13 @@ describe("readAssumableTerms — the loan in place, only as the memorandum state
     // A minus or a range is still no balance.
     expect(readAssumableTerms(sample([row("Assumable loan balance", "$24.5M - $25M")]))).toBeNull();
   });
+
+  it("reads a balance with its coupon after a dash (audit C3a)", () => {
+    // Any dash and digit had read as a range, so the loan the memorandum
+    // offers read as none.
+    expect(readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000 — 3.45% fixed, matures 2031")]))!.balance).toBe(24_500_000);
+    expect(readAssumableTerms(sample([row("Assumable loan balance", "$24,500,000 – 10 years remaining")]))!.balance).toBe(24_500_000);
+  });
 });
 
 describe("scheduleOf — how the payments run from today", () => {

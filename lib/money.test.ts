@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compactUsd, fmtUsd, parseUsd, readFigure, scaledText } from "./money";
+import { compactUsd, fmtUsd, parseUsd, readFigure, scaledText, statesRange } from "./money";
 
 describe("readFigure", () => {
   it("reads the shorthand an analyst types into a price field", () => {
@@ -175,6 +175,90 @@ describe("parseUsd — a hyphen in the words is no minus and no range (research 
     expect(parseUsd("$900,000 through 2031")).toBe(900_000);
     expect(parseUsd("$1,250,000 to 2030")).toBe(1_250_000);
     expect(parseUsd("$3,000,000 to the seller at closing")).toBe(3_000_000);
+  });
+});
+
+describe("parseUsd — a dash before a percentage, a year or a smaller figure is words after the figure (audit C3a)", () => {
+  it("reads the figure a dash and the words after it stand beside", () => {
+    // Any dash and digit had read as a range, so these stated figures read as
+    // none: a leased fee's ground rent, a single tenant's base rent, a full
+    // tax bill and an assumable balance the memorandum states.
+    const cases: [string, number][] = [
+      ["$450,000 – 10% bumps every 5 years", 450_000],
+      ["$450,000 — 2% annual increases", 450_000],
+      ["$540,000 – 2% annual increases", 540_000],
+      ["$520,500 – 2026 estimate", 520_500],
+      ["$520,500 — 2025 actual", 520_500],
+      ["$24,500,000 — 3.45% fixed, matures 2031", 24_500_000],
+      ["$1,200,000 – 2% annual escalations", 1_200_000],
+      ["$410,000 – 2025", 410_000],
+      ["$520,500–2026", 520_500],
+      ["$610,000 - 2% annual increases", 610_000],
+      ["$24,500,000 – 10 years remaining", 24_500_000],
+      ["$24.5M – 1.25x coverage", 24_500_000],
+      ["$24,500,000 – 180 bps over the 10-year", 24_500_000],
+    ];
+    for (const [raw, n] of cases) expect(parseUsd(raw), raw).toBe(n);
+  });
+
+  it("still refuses a range, whatever the dash, where the other figure is dollars at least half the first", () => {
+    for (const raw of [
+      "$40,000,000 — $42,000,000",
+      "$40M - 42M",
+      "$40,000,000 – 42,000,000",
+      "$1.0M. – $1.2M.",
+      "$950,000 – $1.1M",
+      "$40M – $90M",
+    ]) {
+      expect(parseUsd(raw), raw).toBeNull();
+    }
+    // A low floor's figures: a thousands comma is no year's, so "2,050" is a
+    // range's other end; a year after a dash is not.
+    expect(parseUsd("$1,950 – 2,050 per month", 100)).toBeNull();
+    expect(parseUsd("$1,950 – 2026 rent roll", 100)).toBe(1_950);
+    expect(parseUsd("$850 – $950", 100)).toBeNull();
+    expect(parseUsd("$850 – 95 SF over the average", 100)).toBe(850);
+  });
+
+  it("refuses a span of years read first, never the year as the figure", () => {
+    // "2026–27" is a label; the year is not the rent.
+    expect(parseUsd("2026–27: $1,050 per bed", 100)).toBeNull();
+    expect(parseUsd("2025 – 26 budget $410,000", 100)).toBeNull();
+    expect(parseUsd("2025 to 2030 $410,000", 100)).toBeNull();
+  });
+});
+
+describe("statesRange — the one test of a range behind every reader that refuses one", () => {
+  it("finds a range anywhere in a line", () => {
+    for (const raw of [
+      "$600 - $700",
+      "$1.0M - $1.2M",
+      "$15k-20k",
+      "$450,000 to $520,000",
+      "18-24 months",
+      "Rent of $1,950 – 2,050 a month",
+      "$1.0 mil. – $1.2 mil.",
+      "approx. $600–700 per unit",
+    ]) {
+      expect(statesRange(raw), raw).toBe(true);
+    }
+  });
+
+  it("reads a percentage, a year, a smaller figure or a span of years after a figure as words", () => {
+    for (const raw of [
+      "$610,000 – 2% annual increases",
+      "$520,500 – 2026 estimate",
+      "$650/mo (2025-26 budget)",
+      "$1,100,000 to 2030",
+      "$1,100,000 (FY 2024–2025 levy)",
+      "$24,500,000 — 3.45% fixed, matures 2031",
+      "$650,000 (T-12)",
+      "$1,250,000 (10-year term)",
+      "$15,000 per door – 2025 pricing",
+      "24 months (2025-2027)",
+    ]) {
+      expect(statesRange(raw), raw).toBe(false);
+    }
   });
 });
 

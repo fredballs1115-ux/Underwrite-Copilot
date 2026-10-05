@@ -13,6 +13,7 @@
 // no month is never annualised.
 
 import { parseMoney } from "@/lib/criteria";
+import { statesRange } from "@/lib/money";
 
 /** A value that states nothing: "N/A", "Not stated", "TBD", a dash. */
 export const NOT_STATED = /^(?:n\/?a|not\s+(?:applicable|stated|provided|available|disclosed)|unknown|tbd|none|[-–—])?\.?$/i;
@@ -104,6 +105,20 @@ function periodFigures(rest: string): Array<{ value: number; period: "year" | "m
  *  `monthlyDuesOf` rule). */
 const agree = (year: number, month: number) => Math.abs(year - month * 12) <= Math.abs(month * 12) * 0.01;
 
+/** The lead clause short of a percentage after a dash: "$610,000 – 2%
+ *  annual increases" is the figure and words about its increases (lib/money
+ *  `statesRange`'s rule) — never a share the row states, and never a period
+ *  of the figure's own ("$91,667/month – 3% annual increases" is a
+ *  month's). Words after a dash with no percentage stay the figure's
+ *  ("$91,667 – monthly"). */
+function shortOfDashPercent(lead: string): string {
+  const first = /\d[\d,]*(?:\.\d+)?/.exec(lead);
+  if (!first) return lead;
+  const end = first.index + first[0].length;
+  const cut = /\s*[-−–—]\s*\d+(?:\.\d+)?\s*(?:%|percent\b|per\s?cent\b)/i.exec(lead.slice(end));
+  return cut ? lead.slice(0, end + cut.index) : lead;
+}
+
 /** A year's income as a row states it, and whether it was read from a
  *  month's figure. */
 export interface StatedIncome {
@@ -129,9 +144,13 @@ export function statedIncomeOf(stated: string): StatedIncome | null {
   const v = stated.trim();
   if (!v || NOT_STATED.test(v)) return null;
   // A range, its first figure with or without a scale ("$600 - $700",
-  // "$1.0M - $1.2M"), is no one figure.
-  if (/\d\s*(?:k|mm?|m(?:il(?:lion)?)?|thousand|million)?\.?\s*(?:-|–|—|to)\s*\$?\d/i.test(v.replace(/,/g, ""))) return null;
-  const { lead, rest } = leadClause(v);
+  // "$1.0M - $1.2M"), is no one figure — by lib/money's one rule, so a
+  // percentage, a year or a smaller figure after a dash is words after the
+  // figure ("$610,000 – 2% annual increases"), never a range (audit C3a).
+  if (statesRange(v)) return null;
+  const clause = leadClause(v);
+  const lead = shortOfDashPercent(clause.lead);
+  const rest = clause.rest;
   if (RATE_WORDS.test(lead) || PER_UNIT_WORDS.test(lead) || /%/.test(lead)) return null;
   const n = dollarsOf(lead);
   if (n == null) return null;

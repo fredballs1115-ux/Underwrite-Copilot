@@ -50,7 +50,7 @@ import { assetClassKey } from "@/lib/asset-words";
 import { buildingSfRow, parseSf } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
 import { PROPERTY_HOLDER_WORDS, propertyHolderOf, type PropertyHolder } from "@/lib/interest";
-import { parseUsd } from "@/lib/money";
+import { parseUsd, statesRange } from "@/lib/money";
 import { readRollover, rollYearOf, type LeaseRow, type RollResult } from "@/lib/tools/rollover";
 import { readSingleTenant } from "@/lib/single-tenant";
 
@@ -80,7 +80,6 @@ const clean = (s: string | null | undefined) => (s ?? "").trim();
 
 const PER_SF = /\/\s*(?:sf|sq\.?\s*ft\.?|ft)\b|\bpsf\b|per\s+(?:sf|sq\.?\s*ft|square\s+f(?:oo|ee)t)\b/i;
 const PER_MONTH = /\/\s*mo(?:nth)?\b|per\s+month|monthly/i;
-const RANGE = /\d\s*[-–—]\s*\$?\d|\d\s+to\s+\$?\d/i;
 const MONTH_TO_MONTH = /\bmonth[- ]to[- ]month\b|\bmtm\b|\bholdover\b/i;
 
 /** A figure to the cent: "$12.50" is twelve dollars fifty, never thirteen
@@ -99,7 +98,7 @@ function centsOf(value: string): number | null {
 export function rentOf(value: string | null | undefined, sf: number | null): { annual: number | null; psf: number | null } {
   const v = clean(value);
   const none = { annual: null, psf: null };
-  if (!v || RANGE.test(v)) return none;
+  if (!v || statesRange(v)) return none;
   const monthly = PER_MONTH.test(v);
   if (PER_SF.test(v)) {
     const cents = centsOf(v);

@@ -752,6 +752,15 @@ describe("what the price buys, read by the plausibility check, the deal context 
     );
     // The rent as the NOI: nothing to say.
     expect(assessPlausibility(ex(interest({ kind: "leased_fee" }), [rent, { ...noi, value: "$1,200,000" }]))).toEqual([]);
+    // A rent stated with its bumps after a dash is the rent it states (audit
+    // C3a): read as none, the finding could not fire and the building's
+    // income stood as the land's.
+    const bumps = { ...rent, value: "$450,000 – 10% bumps every 5 years" };
+    expect(groundRentOf(ex(interest({ kind: "leased_fee" }), [bumps]))).toBe(450_000);
+    const flagged = assessPlausibility(ex(interest({ kind: "leased_fee" }), [bumps, { ...noi, value: "$6,000,000" }]));
+    expect(flagged.find((f) => f.code === "ground_rent_mismatch")?.title).toBe(
+      "NOI (in-place) of $6.0M is 13.3× the $450k ground rent on a leased fee",
+    );
     // $2M of land over the building's 240 units is $8,333 a unit — a misread
     // on a fee simple, and simply the land's price on a leased fee.
     const land = (i: ExtractedInterest | undefined): ExtractionResult => ({

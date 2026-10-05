@@ -37,7 +37,7 @@
 //
 // A BLANK IS NULL.
 
-import { compactUsd } from "@/lib/money";
+import { compactUsd, statesRange } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import agencyRules from "@/data/research/agency_rules.json";
 import { parseCount, parseMoney } from "@/lib/criteria";
@@ -199,8 +199,10 @@ export function monthlyDuesOf(stated: string, units: number | null = null): numb
   const v = stated.trim();
   if (!v || /\/\s*(?:sf|sq)\b|\bper\s+(?:sf|square)|psf\b/i.test(v)) return null;
   // A range, its first figure with or without a scale ("$600 - $700",
-  // "$1.0M - $1.2M"), is no one figure.
-  if (/\d\s*(?:k|mm?|m(?:il(?:lion)?)?|thousand|million)?\.?\s*(?:-|–|—|to)\s*\$?\d/i.test(v.replace(/,/g, ""))) return null;
+  // "$1.0M - $1.2M"), is no one figure — by lib/money's one rule, so a
+  // year or a percentage after a dash ("$650 – 2026 budget") and a span of
+  // years ("(2025-26 budget)") are words, never a range (audit C3a).
+  if (statesRange(v)) return null;
   const clauses = duesClauses(v);
   if (!clauses || clauses.length === 0 || clauses.length > 2) return null;
   const unitsMonth = (n: number) => n > 0 && n <= UNIT_DUES_CEILING;

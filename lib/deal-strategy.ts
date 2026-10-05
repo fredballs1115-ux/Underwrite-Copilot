@@ -24,7 +24,7 @@
  *      the screen says "these can't both be right" instead of "105%".
  */
 
-import { SCALE_WORDS, compactUsd, minusFor, scaleOf } from "@/lib/money";
+import { SCALE_WORDS, compactUsd, minusFor, scaleOf, statesRange } from "@/lib/money";
 import { withArticle } from "@/lib/article";
 import { dealTypeLabel, entityLoanOf, entityLoanWords, groundRentOf, interestOf, isGpStake, isTenancyInCommon, isWholeShare, shareProjectCostOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -948,13 +948,13 @@ export const RENOVATION_COST_PER_DOOR_ROW =
 // A door's renovation runs from a paint-and-fixtures turn to a gut; past
 // this it is not one door's cost (a total typed into the row, or a misread).
 const DOOR_COST_CEILING = 250_000;
-const RANGE_IN_VALUE = /\d\s*[-–—]\s*\$?\d|\d\s+to\s+\$?\d/i;
 
 /** One door's renovation cost as stated: "$15,000", "$15k per unit". A
- *  range is two figures and reads as none; so is a figure past a door's. */
+ *  range is two figures and reads as none (lib/money `statesRange`); so is
+ *  a figure past a door's. */
 export function renovationCostPerDoor(value: string | null | undefined): number | null {
   const v = (value ?? "").trim();
-  if (!v || RANGE_IN_VALUE.test(v)) return null;
+  if (!v || statesRange(v)) return null;
   const n = parseMoney(v);
   return n != null && n >= 500 && n <= DOOR_COST_CEILING ? n : null;
 }

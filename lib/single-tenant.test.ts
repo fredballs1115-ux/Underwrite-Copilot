@@ -406,6 +406,13 @@ describe("readSingleTenant — the one lease the deal is", () => {
     expect(readSingleTenant(ex([row("Annual base rent", "$468,000 - $490,000")]), TODAY)?.rent).toBeNull();
   });
 
+  it("reads a base rent with its increases after a dash (audit C3a)", () => {
+    // Any dash and digit had read as a range, so the stated rent was none.
+    expect(readSingleTenant(ex([row("Annual base rent", "$540,000 – 2% annual increases")]), TODAY)?.rent).toBe(540_000);
+    expect(readSingleTenant(ex([row("Annual base rent", "$540,000 — 10% every 5 years")]), TODAY)?.rent).toBe(540_000);
+    expect(readSingleTenant(ex([row("Annual base rent", "$540,000 – $560,000")]), TODAY)?.rent).toBeNull();
+  });
+
   it("a page is cited only inside the memorandum", () => {
     expect(readSingleTenant(ex([], { singleTenant: tenant({ page: "p. 45" }) }), TODAY)?.page).toBe("");
   });

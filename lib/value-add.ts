@@ -39,7 +39,7 @@
 // A BLANK IS NULL. A turnover, a period or an achieved premium the
 // memorandum does not state is not assumed.
 
-import { compactUsd } from "@/lib/money";
+import { compactUsd, statesRange } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { parseCount } from "@/lib/criteria";
@@ -84,13 +84,14 @@ export function valueAddTermRows<M extends { label: string; value: string }>(met
 // ── Reading one figure ─────────────────────────────────────────────────
 
 const clean = (s: string | null | undefined) => (s ?? "").trim();
-const RANGE = /\d\s*[-–—]\s*\$?\d|\d\s+to\s+\$?\d/i;
 
 /** A monthly rent or premium to the cent: "$250", "$250/mo", "$3,000/yr"
- *  read as a month's. A range is two figures and reads as none. */
+ *  read as a month's. A range is two figures and reads as none (lib/money
+ *  `statesRange`, so "$250/mo – 20% on cost" is the premium it states). */
 export function monthlyOf(value: string | null | undefined): number | null {
+  if (statesRange(clean(value))) return null;
   const v = clean(value).replace(/,/g, "");
-  if (!v || RANGE.test(v)) return null;
+  if (!v) return null;
   const m = v.match(/\$?\s*(\d+(?:\.\d+)?)/);
   if (!m) return null;
   const n = Number(m[1]);
@@ -109,7 +110,7 @@ function pctOf(value: string | null | undefined): number | null {
 /** A period in months: "24 months", "2 years", "18-24 months" is none. */
 function monthsOf(value: string | null | undefined): number | null {
   const v = clean(value);
-  if (!v || RANGE.test(v)) return null;
+  if (!v || statesRange(v)) return null;
   const mo = v.match(/(\d+(?:\.\d+)?)\s*(?:months?|mos?)\b/i);
   if (mo) return Number(mo[1]) > 0 ? Number(mo[1]) : null;
   const yr = v.match(/(\d+(?:\.\d+)?)\s*(?:years?|yrs?)\b/i);
