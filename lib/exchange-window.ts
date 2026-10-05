@@ -42,8 +42,8 @@
 // be identified only before it is bid on; said, never judged.
 //
 // WHAT THE PRICE BUYS MUST BE REAL PROPERTY — a note, a share of the owning
-// entity and a short leasehold are each a QUESTION for the buyer's exchange
-// counsel, never a determination.
+// entity, a preferred equity position in it and a short leasehold are each a
+// QUESTION for the buyer's exchange counsel, never a determination.
 //
 // A BLANK IS NULL — no exchange in the buy box, nothing said; an offers-due
 // date that is not a whole day is not compared.
@@ -181,7 +181,7 @@ function windowSentence(w: Omit<ExchangeWindow, "sentence">): string {
 /** One thing the deal and the exchange say together — a date fact or a
  *  question for exchange counsel, never a verdict. */
 export interface ExchangeFlag {
-  kind: "after_identify" | "id_period_over" | "after_close" | "note" | "entity_share" | "short_leasehold";
+  kind: "after_identify" | "id_period_over" | "after_close" | "note" | "entity_share" | "position" | "short_leasehold";
   text: string;
 }
 
@@ -241,6 +241,13 @@ export function exchangeFit(
       kind: "entity_share",
       text: `The price buys a share of the owning entity, not the building. ${REAL_PROPERTY}; whether this share counts is ${ASK}.`,
     });
+  } else if (deal.interestKind === "preferred_equity") {
+    // An interest in the entity, as a share is — a preferred return and a
+    // redemption, never the building (lib/position).
+    flags.push({
+      kind: "position",
+      text: `The price buys a preferred equity position in the owning entity, not the building. ${REAL_PROPERTY}; whether this position counts is ${ASK}.`,
+    });
   } else if (deal.interestKind === "leasehold" && deal.leaseYearsLeft != null && deal.leaseYearsLeft < 30) {
     const left = Math.floor(deal.leaseYearsLeft);
     // Under a year left is said as that, never "0 years" (the batch-2 audit).
@@ -265,6 +272,7 @@ const TAG: Record<ExchangeFlag["kind"], string> = {
   after_close: "1031: offers due after close",
   note: "1031: note — ask counsel",
   entity_share: "1031: share — ask counsel",
+  position: "1031: position — ask counsel",
   short_leasehold: "1031: lease under 30 yrs",
 };
 

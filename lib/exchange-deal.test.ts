@@ -38,6 +38,20 @@ describe("the buy box's 1031 exchange against a deal (lib/exchange-window)", () 
     expect(note).toMatchObject({ tag: "1031: note — ask counsel", tone: "muted" });
     const share = exchangeForDeal(BLOCK, deal([], { kind: "partial_interest", summary: "", share: "49% LP interest", groundLease: "", loan: "", page: "" }), null, TODAY)!;
     expect(share).toMatchObject({ tag: "1031: share — ask counsel", tone: "muted" });
+    // A preferred equity position, its own kind or a share filed before the
+    // kind was asked whose rows say one (lib/interest `interestOf`).
+    const position = exchangeForDeal(BLOCK, deal([], { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "" }), null, TODAY)!;
+    expect(position).toMatchObject({ tag: "1031: position — ask counsel", tone: "muted" });
+    expect(position.line).toBe(
+      "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; the price buys a preferred equity position in the owning entity, not the building. Section 1031 reaches only real property exchanged for real property of like kind; whether this position counts is a question for your exchange counsel",
+    );
+    const filedAsShare = exchangeForDeal(
+      BLOCK,
+      deal([row("Preferred equity amount", "$15,000,000"), row("Current pay rate", "8.0%")], { kind: "partial_interest", summary: "", share: "", groundLease: "", loan: "", page: "" }),
+      null,
+      TODAY,
+    )!;
+    expect(filedAsShare.tag).toBe("1031: position — ask counsel");
     // A leasehold's years are read on the day, its options apart.
     const short = exchangeForDeal(
       BLOCK,

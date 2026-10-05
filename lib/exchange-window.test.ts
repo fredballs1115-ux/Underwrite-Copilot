@@ -75,6 +75,16 @@ describe("the buyer's 1031 clock (pass 28, round 4)", () => {
     );
     expect(note.tag).toBe("1031: note — ask counsel");
     expect(exchangeFit(x, { offersDueIso: null, interestKind: "partial_interest" })!.tag).toBe("1031: share — ask counsel");
+    // A preferred equity position is an interest in the entity, as a share is.
+    const position = exchangeFit(x, { offersDueIso: null, interestKind: "preferred_equity" })!;
+    expect(position.flags).toEqual([
+      {
+        kind: "position",
+        text: "The price buys a preferred equity position in the owning entity, not the building. Section 1031 reaches only real property exchanged for real property of like kind; whether this position counts is a question for your exchange counsel.",
+      },
+    ]);
+    expect(position.tag).toBe("1031: position — ask counsel");
+    expect(gluedWords(position.flags[0].text)).toEqual([]);
     const lease = exchangeFit(x, { offersDueIso: null, interestKind: "leasehold", leaseYearsLeft: 22.6, leaseOptionYears: 20 })!;
     expect(lease.flags[0].text).toBe(
       'The price buys a leasehold with 22 years left, 20 more in its options as stated. The regulation\'s example of a leasehold like kind to real estate is "a leasehold of a fee with 30 years or more to run"; whether this one counts, its options included or not, is a question for your exchange counsel.',

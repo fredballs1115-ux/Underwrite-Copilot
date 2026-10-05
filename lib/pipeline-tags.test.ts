@@ -122,6 +122,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
       exchangeForDeal({ relinquishedTransferOn: "2026-12-01" }, deal(), null, today),
       exchangeForDeal(block, deal({ kind: "note", ...blank }), null, today),
       exchangeForDeal(block, deal({ kind: "partial_interest", ...blank }), null, today),
+      exchangeForDeal(block, deal({ kind: "preferred_equity", ...blank }), null, today),
       exchangeForDeal(block, deal({ kind: "leasehold", ...blank, summary: "Leasehold under a ground lease" }, [row("Ground lease expiration", "June 30, 2049")]), null, today),
     ];
     expect(reads.map((r) => r?.tag)).toEqual([
@@ -132,6 +133,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
       "1031: identify by Jan 15",
       "1031: note — ask counsel",
       "1031: share — ask counsel",
+      "1031: position — ask counsel",
       "1031: lease under 30 yrs",
     ]);
     for (const r of reads) {
@@ -139,7 +141,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
       expect(t, r!.tag).toMatchObject({ key: "exchange", tone: r!.tone });
       expect(t.title, r!.tag).toMatch(/^1031: [^:]+: your 1031 exchange's deadlines against this deal's offers-due date and what its price buys/);
     }
-    expect(reads.map((r) => r!.tone)).toEqual(["brand", "caution", "caution", "caution", "brand", "muted", "muted", "muted"]);
+    expect(reads.map((r) => r!.tone)).toEqual(["brand", "caution", "caution", "caution", "brand", "muted", "muted", "muted", "muted"]);
   });
 
   it("says a regime that applies, or the memorandum's claim of one, in the warning tone, and one to check in the muted tone (lib/rent-regulation)", () => {
