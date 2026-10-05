@@ -1926,6 +1926,32 @@ describe("ReportDocument (full report)", () => {
     for (const p of termPages) expect(p, p.slice(0, 200)).toMatch(/\nTERM\nVALUE\nBASIS\nPAGE\nFLAG\n/);
   }, 45000);
 
+  it("names the comp table's columns, and keeps each cell off the next column's (research pass 35)", async () => {
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: {
+        ...SAMPLE_DEAL.extraction,
+        metrics: [...SAMPLE_DEAL.extraction.metrics, { label: "Offers due", value: "October 22, 2026 at 5:00 PM ET", flagged: false, page: "p. 2", basis: "na" }],
+      },
+      challenges: null,
+      comps: SAMPLE_DEAL.comps,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const text = pdfTextOf(
+      await renderToBuffer(React.createElement(ReportDocument, { input: buildReportData(deal, "October 5, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0]),
+    );
+    // A header row over each group of comps, as every other table has.
+    expect(text).toMatch(/SALE COMPS\nCOMP\nDETAIL\nSUPPORT\nWHY\nPAGE\n/);
+    expect(text).toMatch(/LEASE COMPS\nCOMP\nDETAIL\nSUPPORT\nWHY\nPAGE\n/);
+    // A value as wide as its column wraps inside it, short of the basis
+    // column's dash: it printed "October 22, 2026 at 5:00 PM ET—".
+    expect(text).toMatch(/Offers due\nOctober 22, 2026 at 5:00 PM ?\nET\n—\np\. 2\n/);
+  }, 45000);
+
   it("calls a hotel's growth axis RevPAR growth, which is what the model's growth lever grows there", async () => {
     const hotel = {
       dealName: "Hilton Garden Inn Midtown",

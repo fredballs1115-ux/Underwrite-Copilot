@@ -2220,9 +2220,12 @@ export function ReportDocument({ input }: { input: ReportInput }) {
           </View>
           {metrics.map((m, i) => (
             <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
-              <Text style={{ width: "34%", fontSize: 8.5 }}>{str(m?.label)}</Text>
+              {/* Each text cell keeps a gutter before the next column: a
+                  long value ran into the basis column's dash ("October 22,
+                  2026 at 5:00 PM ET—", research pass 35). */}
+              <Text style={{ width: "34%", fontSize: 8.5, paddingRight: 6 }}>{str(m?.label)}</Text>
               <Text
-                style={{ width: "24%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}
+                style={{ width: "24%", fontSize: 8.5, fontFamily: "Helvetica-Bold", paddingRight: 6 }}
               >
                 {str(m?.value)}
               </Text>
@@ -2306,6 +2309,17 @@ export function ReportDocument({ input }: { input: ReportInput }) {
             .map((g) => (
               <View key={g.label} style={{ marginBottom: 10 }}>
                 <Text style={[s.headText, { marginBottom: 4 }]}>{g.label}</Text>
+                {/* The columns named, as every other table's are, and
+                    repeated on a page the rows run onto (research pass 35:
+                    with none, the page column's dash read as the note's
+                    last word). */}
+                <View style={s.tableHead} fixed>
+                  <Text style={[s.headText, { width: "26%" }]}>Comp</Text>
+                  <Text style={[s.headText, { width: "30%" }]}>Detail</Text>
+                  <Text style={[s.headText, { width: "14%" }]}>Support</Text>
+                  <Text style={[s.headText, { width: "22%" }]}>Why</Text>
+                  <Text style={[s.headText, { width: "8%" }]}>Page</Text>
+                </View>
                 {g.items.map((cp, i) => {
                   // Sale comps only: the basis bar and the subject's tick.
                   const scale = g.label === "Sale comps" ? compScale : null;
@@ -2314,7 +2328,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                   return (
                   <View key={i} style={i % 2 === 1 ? [s.row, s.rowAlt] : s.row} wrap={false}>
                     <Text
-                      style={{ width: "26%", fontSize: 8.5, fontFamily: "Helvetica-Bold" }}
+                      style={{ width: "26%", fontSize: 8.5, fontFamily: "Helvetica-Bold", paddingRight: 6 }}
                     >
                       {str(cp?.name)}
                     </Text>
@@ -2363,7 +2377,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
                         color={SUPPORT_COLOR[str(cp?.support)] ?? C.muted}
                       />
                     </View>
-                    <Text style={{ width: "22%", fontSize: 7.5, color: C.muted }}>
+                    <Text style={{ width: "22%", fontSize: 7.5, color: C.muted, paddingRight: 8 }}>
                       {str(cp?.note)}
                     </Text>
                     <Text style={{ width: "8%", fontSize: 7.5, color: C.muted }}>
