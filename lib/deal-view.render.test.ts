@@ -40,6 +40,7 @@ import { regulationForDeal } from "./rent-regulation";
 import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { STALE_MS } from "./screen-run";
+import { supportMailto } from "./support-link";
 import {
   NO_FIGURES_FAILURE,
   NO_OM_FAILURE,
@@ -446,6 +447,42 @@ describe("DealView — the sample deal renders every section without a runtime e
     const never = textOf(render({ ...failedFirst("financials"), job: null }));
     expect(never).toMatch(/The screen hasn.t run for this deal yet\./);
     expect(never).toMatch(/Run the screen/);
+  });
+
+  it("the support link under a stopped screen carries the deal, its id and the page's own sentence (research pass 30)", () => {
+    const error = "The analysis service is overloaded right now — try again in a few minutes.";
+    const html = render({
+      ...sampleProps("overview"),
+      dealId: "11111111-1111-4111-8111-111111111111",
+      dealName: "Oakwood Flats",
+      isSample: false,
+      hasOm: true,
+      job: { status: "error", step: "comps", progress: 50, error },
+      staleResults: [],
+    } as unknown as Props);
+    const href = /href="(mailto:[^"]+)"/.exec(html)?.[1].replace(/&amp;/g, "&") ?? "";
+    expect(href).toBe(
+      supportMailto({ dealId: "11111111-1111-4111-8111-111111111111", dealName: "Oakwood Flats", step: "comps", error }),
+    );
+    const url = new URL(href);
+    expect(url.pathname).toBe("underwritecopilot.support@gmail.com");
+    expect(url.searchParams.get("subject")).toBe("Screen stopped — Oakwood Flats (11111111-1111-4111-8111-111111111111)");
+    const body = url.searchParams.get("body") ?? "";
+    expect(body).toContain("Deal id: 11111111-1111-4111-8111-111111111111");
+    expect(body).toContain("Stopped at the comps step");
+    expect(body).toContain(`What the page said: ${error}`);
+    expect(body).toContain("\r\n");
+    // The rail's "longer than usual" reads the clock after the page mounts:
+    // the server's markup never says it (lib/screen-duration).
+    const now = new Date().toISOString();
+    const running = render({
+      ...sampleProps("overview"),
+      job: { status: "running", step: "challenge", progress: 30, error: null, updated_at: now, created_at: "2026-01-01T00:00:00Z" },
+      typicalScreen: "about 3 minutes",
+      typicalScreenMs: 180_000,
+    } as unknown as Props);
+    expect(running).not.toContain("longer-than-usual");
+    expect(textOf(running)).toContain("Your screens usually take about 3 minutes");
   });
 
   it("a run waiting its turn says so, naming no analyst; a failure's toast on the deal points at the page's own banner (research pass 30)", () => {

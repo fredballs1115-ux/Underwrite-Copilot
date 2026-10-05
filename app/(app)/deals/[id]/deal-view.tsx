@@ -78,6 +78,8 @@ import { interestOf } from "@/lib/interest";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { servedInline } from "@/lib/inline-types";
 import { elapsedLabel, runStartMs } from "@/lib/run-clock";
+import { longerThanUsual } from "@/lib/screen-duration";
+import { supportMailto } from "@/lib/support-link";
 import { revealScrollLeft } from "@/lib/tab-strip";
 import { isStalled, screenStopped, type BehindWhy, type ResultKey } from "@/lib/screen-run";
 import { useToast } from "../../toaster";
@@ -337,6 +339,7 @@ export function DealView({
   modelErrorCode,
   job: initialJob,
   typicalScreen = null,
+  typicalScreenMs = null,
   results,
   supplements,
   model,
@@ -385,6 +388,10 @@ export function DealView({
    *  the median of their stored run times (lib/screen-duration); null under
    *  three runs, and then the rail claims no duration */
   typicalScreen?: string | null;
+  /** the same median in ms, so the rail can say a run is taking longer
+   *  than usual (lib/screen-duration `longerThanUsual`); null with no
+   *  measured median, and then it says nothing of the kind */
+  typicalScreenMs?: number | null;
   results: Results;
   /** results the latest screen has not rewritten — a failed run never
    *  reached them, or a running one has not yet — so they belong to the
@@ -765,7 +772,7 @@ export function DealView({
     <div className="flex flex-col gap-5">
       {live && (
         <div className="flex flex-col gap-2">
-          <ProgressRail job={job!} typicalScreen={typicalScreen} />
+          <ProgressRail job={job!} typicalScreen={typicalScreen} typicalScreenMs={typicalScreenMs} />
           <NotifyOffer />
         </div>
       )}
@@ -804,7 +811,9 @@ export function DealView({
             {operatorFailure ? "Email" : retryIsFutile ? "If this is the right file, email" : "If it fails twice, email"}{" "}
             <a
               className="font-medium text-brand hover:text-brand-strong"
-              href="mailto:underwritecopilot.support@gmail.com"
+              // The deal and the page's own sentence ride in the email, so
+              // support need not ask for either (research pass 30).
+              href={supportMailto({ dealId, dealName, step: job.step, error: job.error })}
             >
               underwritecopilot.support@gmail.com
             </a>{" "}
@@ -1851,7 +1860,7 @@ function TabDot({
  *  number, so a long step never reads as "hung" the way a frozen
  *  percentage does. The clock is read in the effect, never in render,
  *  so the server's markup and the first client render agree. */
-function useElapsed(startedAt: string | null | undefined): string {
+function useElapsed(startedAt: string | null | undefined): { label: string; ms: number } {
   const [clock, setClock] = useState<{ since: number; now: number } | null>(null);
   useEffect(() => {
     const since = Date.now();
@@ -1863,7 +1872,9 @@ function useElapsed(startedAt: string | null | undefined): string {
       clearInterval(t);
     };
   }, []);
-  return clock ? elapsedLabel(runStartMs(startedAt, clock.since), clock.now) : "0:00";
+  if (!clock) return { label: "0:00", ms: 0 };
+  const start = runStartMs(startedAt, clock.since);
+  return { label: elapsedLabel(start, clock.now), ms: Math.max(0, clock.now - start) };
 }
 
 /** Where the deal has been: every stage change with its date, newest first.
@@ -2069,13 +2080,19 @@ function NotifyOffer() {
 function ProgressRail({
   job,
   typicalScreen = null,
+  typicalScreenMs = null,
 }: {
   job: NonNullable<Job>;
   /** the reader's own screens' measured median, said — or null, and no
    *  duration is claimed (lib/screen-duration) */
   typicalScreen?: string | null;
+  /** the same median in ms (lib/screen-duration `longerThanUsual`) */
+  typicalScreenMs?: number | null;
 }) {
-  const elapsed = useElapsed(job.created_at);
+  const { label: elapsed, ms: elapsedMs } = useElapsed(job.created_at);
+  // Past twice the reader's own measured median — never a duration nobody
+  // measured — the rail says this run is the slow one.
+  const slow = longerThanUsual(elapsedMs, typicalScreenMs);
 
   // Reconcile and model generation run on their own — a simple indicator, not
   // the 6-step pipeline rail.
@@ -2149,11 +2166,17 @@ function ProgressRail({
           );
         })}
       </ol>
-      <p className="mt-3 text-xs text-muted">
-        {typicalScreen
-          ? `Your screens usually take ${typicalScreen} — finished sections open as they land, so feel free to explore them meanwhile.`
-          : "Finished sections open as they land, so feel free to explore them meanwhile."}
-      </p>
+      {slow ? (
+        <p className="mt-3 text-xs text-caution" data-qa="longer-than-usual">
+          {`This one is taking longer than your screens usually do${typicalScreen ? ` (${typicalScreen})` : ""} — it is still running, and it carries on if you leave this page.`}
+        </p>
+      ) : (
+        <p className="mt-3 text-xs text-muted">
+          {typicalScreen
+            ? `Your screens usually take ${typicalScreen} — finished sections open as they land, so feel free to explore them meanwhile.`
+            : "Finished sections open as they land, so feel free to explore them meanwhile."}
+        </p>
+      )}
     </div>
   );
 }

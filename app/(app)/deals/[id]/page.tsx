@@ -426,7 +426,7 @@ export default async function DealPage({
   // the row's step at "verdict" but never writes a ledger, so the time read
   // is the screen's) — one small query, overlapped with the rest of the
   // page. Fewer than three and the rail says no duration at all.
-  const typicalScreenRead: Promise<string | null> =
+  const typicalScreenRead: Promise<{ phrase: string | null; ms: number | null }> =
     jobActive && user && isScreenJob(job?.step)
       ? (async () => {
           const { data } = await supabase
@@ -439,9 +439,10 @@ export default async function DealPage({
             .order("updated_at", { ascending: false })
             .limit(SCREEN_DURATION_SAMPLE);
           const ms = ((data ?? []) as Array<{ ms?: unknown }>).map((r) => r.ms);
-          return typicalScreenPhrase(typicalScreenMs(ms));
-        })().catch(() => null)
-      : Promise.resolve(null);
+          const median = typicalScreenMs(ms);
+          return { phrase: typicalScreenPhrase(median), ms: median };
+        })().catch(() => ({ phrase: null, ms: null }))
+      : Promise.resolve({ phrase: null, ms: null });
   const priorScreen = (deal.prior_screen as PriorScreen | undefined) ?? null;
   const screenDiff =
     !jobActive && job?.status !== "error" && priorScreen && extraction
@@ -1555,7 +1556,8 @@ export default async function DealPage({
         hasOm={!!deal.om_storage_path}
         modelErrorCode={errorCode ?? null}
         job={job}
-        typicalScreen={typicalScreen}
+        typicalScreen={typicalScreen.phrase}
+        typicalScreenMs={typicalScreen.ms}
         results={{ extraction, challenges, comps, reconciliation, market, verdict }}
         staleResults={staleResults}
         firstSignal={firstSignal}
