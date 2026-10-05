@@ -152,8 +152,11 @@ export function PhotoViewerBody({ frames, start = 0, title, onClose }: ViewerPro
       }}
       className="fixed inset-0 z-[60] flex flex-col text-white print:hidden"
     >
-      {/* The dark behind the picture closes the viewer, as the palette's does. */}
-      <button type="button" aria-label="Close the pictures" tabIndex={-1} onClick={onClose} className="absolute inset-0 bg-black/95" />
+      {/* The dark behind the picture closes the viewer, as the palette's does.
+          Solid, as a listing's viewer is: at 95% the page ghosted through
+          it, the sidebar's words and the deal's figures legible behind the
+          photograph (research pass 29). */}
+      <button type="button" aria-label="Close the pictures" tabIndex={-1} onClick={onClose} className="absolute inset-0 bg-black" />
 
       <div className="relative flex items-center justify-between gap-3 px-4 py-3">
         <h2 id="photo-viewer-title" className="min-w-0 truncate text-sm font-semibold">

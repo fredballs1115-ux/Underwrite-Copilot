@@ -4660,6 +4660,11 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(gluedWords(text)).toEqual([]);
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-modal="true"');
+    // The dark behind the picture is solid: at 95% the page ghosted through
+    // it (research pass 29).
+    const backdrop = /<button[^>]*aria-label="Close the pictures"[^>]*>/.exec(html)?.[0] ?? "";
+    expect(backdrop).toMatch(/class="absolute inset-0 bg-black"/);
+    expect(backdrop).not.toMatch(/bg-black\/\d+/);
     // It opens on the view asked for, credited as that view is, the
     // building ringed on the overhead.
     expect(html).toContain('data-viewer-frame="aerial"');
