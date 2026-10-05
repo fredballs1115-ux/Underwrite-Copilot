@@ -51,7 +51,7 @@ describe("a plan's NOI stated a month at a time is said with its month wherever 
     const d = deriveUnderwriteInputs(VALUE_ADD, "x");
     expect(d.meta.stabilizedNoi).toEqual({ value: 1_320_000, page: "p. 3", month: 110_000 });
     const wb = new ExcelJS.Workbook();
-    await wb.xlsx.load(await buildUnderwriteWorkbook(d));
+    await wb.xlsx.load((await buildUnderwriteWorkbook(d)) as unknown as ArrayBuffer);
     const ws = wb.getWorksheet("Deal Summary")!;
     let r = 1;
     while (r < 200 && ws.getCell(r, 1).value !== "OM Stabilized NOI (pro forma)") r++;
