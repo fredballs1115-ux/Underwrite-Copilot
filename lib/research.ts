@@ -265,6 +265,12 @@ function evalCondition(key: string, want: unknown, s: RuleSubject): Tri {
   }
   if (key === "owner_occupied_with_units_lte") {
     const w = typeof want === "number" ? want : Number(want);
+    // A building over the limit is outside the exemption whoever lives in
+    // it, so occupancy is asked only of one the limit can reach (the audit
+    // of 2026-10-05: a 48-unit Seattle building and a 120-unit Newark one
+    // were asked whether the buyer would owner-occupy, and their caps read
+    // "possibly applies").
+    if (s.units !== undefined && Number.isFinite(w) && s.units > w) return "no";
     // The buyer's stated intent (deal-facts boolean) answers this; the
     // occupancy STRING is the fallback for subjects that carry one (tests,
     // the homepage playground).

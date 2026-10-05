@@ -209,12 +209,12 @@ describe("an open question is named as the question it asks", () => {
 
   it("names an open any-of by the questions inside it, never as 'any of'", () => {
     const moco = rules.find((r) => r.id === "md-moco-rent-stabilization")!;
-    // A rental building in the county with no year built and no answer on
+    // A duplex in the county with no year built and no answer on
     // owner-occupancy: both exemptions are open.
     const [e] = evaluateRules([moco], {
       state: "MD",
       locality: ["Montgomery County"],
-      units: 40,
+      units: 2,
       property_type: "rental_housing",
       current_year: 2026,
       today: "2026-10-05",
@@ -232,5 +232,27 @@ describe("an open question is named as the question it asks", () => {
       today: "2026-10-05",
     });
     expect(old.unknowns).not.toContain("building_age_years_lt");
+  });
+
+  // The audit of 2026-10-05: a building over an owner-occupancy exemption's
+  // unit limit was still asked whether the buyer would live in it, so the
+  // cap "possibly applied" where it applies.
+  it("never asks a building over an owner-occupancy exemption's unit limit whether the buyer will live in it", () => {
+    const rule = (id: string) => rules.find((r) => r.id === id)!;
+    const subject = { property_type: "rental_housing", current_year: 2026, today: "2026-10-05" };
+    const [seattle] = evaluateRules([rule("wa-rent-cap-hb1217")], { ...subject, state: "WA", locality: ["Seattle"], units: 48, built_year: 1990 });
+    expect(seattle.unknowns).not.toContain("owner_occupied_with_units_lte");
+    expect(seattle.outcome).toBe("applies");
+    const [newark] = evaluateRules([rule("nj-newark-rent-control")], { ...subject, state: "NJ", locality: ["Newark"], units: 120, built_year: 1960 });
+    expect(newark.unknowns).toEqual([]);
+    expect(newark.outcome).toBe("applies");
+    // MoCo's 40-unit building of no stated year: only its age is open.
+    const [moco] = evaluateRules([rule("md-moco-rent-stabilization")], { ...subject, state: "MD", locality: ["Montgomery County"], units: 40 });
+    expect(moco.unknowns).toEqual(["building_age_years_lt"]);
+    // At or under the limit the question stays open; with no count, open too.
+    const [duplex] = evaluateRules([rule("nj-newark-rent-control")], { ...subject, state: "NJ", locality: ["Newark"], units: 4 });
+    expect(duplex.unknowns).toEqual(["owner_occupied_with_units_lte"]);
+    const [uncounted] = evaluateRules([rule("nj-newark-rent-control")], { ...subject, state: "NJ", locality: ["Newark"] });
+    expect(uncounted.outcome).toBe("possibly_applies");
   });
 });
