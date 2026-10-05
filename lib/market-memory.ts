@@ -29,6 +29,7 @@ import {
   unitCountRow,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
+import { priceUnitCount } from "@/lib/condo-units";
 import { statedCapRead } from "@/lib/compare-interest";
 import { assetWords, countNoun, dealClassKey, perSuffix } from "@/lib/asset-words";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -231,7 +232,9 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
       ? plan.totalCost != null
         ? deriveBasis(metrics, assetClass, plan.totalCost, true, true, perSfBasis, plan.units)
         : null
-      : deriveBasis(metrics, assetClass, price, false, statedBasisIsBuildings(ext), perSfBasis);
+      : // A bulk condominium purchase's price is over the units offered
+        // (lib/condo-units `priceUnitCount`, the card's count).
+        deriveBasis(metrics, assetClass, price, false, statedBasisIsBuildings(ext), perSfBasis, priceUnitCount(ext));
 
     // Nothing usable → not a comp (never pad the memory with empty rows).
     if (capPct == null && !basis) continue;

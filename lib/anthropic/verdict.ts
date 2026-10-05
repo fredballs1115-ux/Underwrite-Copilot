@@ -25,6 +25,7 @@ import { checkedSentence } from "@/lib/fit-label";
 import type { MandateScore } from "@/lib/mandate";
 import { entityLoanWords, interestOf, isGpStake, isMasterLeasehold, isTenancyInCommon, isWholeShare } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
+import { condoUnitsOffered } from "@/lib/condo-units";
 import { assetWords } from "@/lib/asset-words";
 import { assetClassLabel } from "@/lib/asset-class";
 import { basisTag as buildingBasisTag, shownAssetClass } from "@/lib/pipeline-slots";
@@ -236,7 +237,15 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
         : range
           ? "the top of the price range the OM states, the end that does not flatter a return"
           : "the asking price";
-    const over = words.basis === "sf" ? "the building's area" : `the OM's ${noun.one} count`;
+    // A bulk condominium purchase's price is over the units it buys (the
+    // card's own count, lib/condo-units), never the condominium's whole.
+    const offered = words.basis === "sf" ? null : condoUnitsOffered(ex);
+    const over =
+      words.basis === "sf"
+        ? "the building's area"
+        : offered != null
+          ? `the ${offered.toLocaleString("en-US")} ${offered === 1 ? noun.one : noun.many} offered`
+          : `the OM's ${noun.one} count`;
     const never = sharePct != null && !allInterests ? ` The ${share}'s own price over the whole building is no basis.` : "";
     return `THE BUILDING'S BASIS, computed in code: ${tag} — ${what}, over ${over}.${never} Build the basis range on this figure.`;
   }

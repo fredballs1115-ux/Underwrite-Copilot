@@ -81,3 +81,16 @@ export function condoUnitsOffered(ex: ExtractionResult | null | undefined): numb
   const offeredCount = c.classIsCondo ? unitCountFromMetrics(c.rows) : null;
   return condoCountOf(c.find(UNITS_OFFERED_ROW)) ?? (offeredCount != null && offeredCount > 0 ? offeredCount : null);
 }
+
+/**
+ * The one count a building's price a unit divides by: the units a bulk
+ * condominium purchase buys where it is one (`condoUnitsOffered`), else the
+ * memorandum's count row. The plausibility check, the analytics, the market
+ * memory and the internal comps read it, as the card, the comps' tick and
+ * the workbook read the units offered — the audit C3b MED-3: five units of
+ * a 300-unit condominium at $2.0M read $400k a unit on the card and $7k in
+ * the check, which called the sound purchase a misread.
+ */
+export function priceUnitCount(ex: ExtractionResult | null | undefined): number | null {
+  return condoUnitsOffered(ex) ?? unitCountFromMetrics(Array.isArray(ex?.metrics) ? ex.metrics : []);
+}

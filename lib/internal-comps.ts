@@ -19,6 +19,7 @@ import {
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
+import { priceUnitCount } from "@/lib/condo-units";
 import { statedCapRead } from "@/lib/compare-interest";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
@@ -276,7 +277,9 @@ export function deriveInternalComps(
         ? plan.totalCost != null
           ? deriveBasis(metrics, wanted, plan.totalCost, true, true, perSfBasis, plan.units)
           : null
-        : deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext), perSfBasis),
+        : // A bulk condominium purchase's price is over the units offered
+          // (lib/condo-units `priceUnitCount`, the card's count).
+          deriveBasis(metrics, wanted, buildingPriceOf(ext, priceNum), false, statedBasisIsBuildings(ext), perSfBasis, priceUnitCount(ext)),
       kind: strategy.kind,
       kindLabel: plan ? strategy.label : null,
       // To two decimals, as the sibling's own header and card print it.

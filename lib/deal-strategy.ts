@@ -32,6 +32,7 @@ import { assetClassKey, assetWords } from "@/lib/asset-words";
 import { budgetIncludesInterestReserve } from "@/lib/construction-debt";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { monthFigureOf } from "@/lib/stated-period";
+import { condoUnitsOffered, priceUnitCount } from "@/lib/condo-units";
 import {
   LATER_YEAR,
   METRIC_FIND,
@@ -1347,7 +1348,12 @@ function costFindings(
   //    cost buys, and today's building's only where the plan states none (the
   //    audit C3b MED-2: an office-to-hotel conversion's $120M over its 40
   //    units today read $3.0M a key, where its 160 proposed keys are $750k).
-  const units = (planDeal ? plan?.units : null) ?? unitCountFromMetrics(metrics);
+  //    A bulk condominium purchase's price buys the units offered, so its
+  //    price a unit is over them (lib/condo-units `priceUnitCount`, the
+  //    card's count), said so in the title.
+  const planUnits = planDeal ? (plan?.units ?? null) : null;
+  const offered = planUnits == null ? condoUnitsOffered(extraction) : null;
+  const units = planUnits ?? offered ?? priceUnitCount(extraction);
   const sf = buildingSfFromMetrics(metrics);
   const cls = (extraction.assetClass ?? "").toLowerCase();
   // The class says the basis and the noun (lib/asset-words): a hotel is
@@ -1385,7 +1391,7 @@ function costFindings(
       findings.push({
         code: "basis_out_of_band",
         severity: "medium",
-        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(units).toLocaleString("en-US")} ${noun.many} is ${money(perUnit)} per ${noun.one}`,
+        title: `${money(basisTotal)} of ${basisNoun} over ${Math.round(units).toLocaleString("en-US")} ${noun.many}${offered != null ? " offered" : ""} is ${money(perUnit)} per ${noun.one}`,
         detail: misread(`${noun.one} count`),
       });
     }

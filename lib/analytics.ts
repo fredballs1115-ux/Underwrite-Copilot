@@ -7,10 +7,10 @@ import {
   planSummary,
   planWithBasisChecked,
   statedBasisIsBuildings,
-  unitCountFromMetrics,
   type StrategyKind,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
+import { priceUnitCount } from "@/lib/condo-units";
 import { statedCapRead } from "@/lib/compare-interest";
 import { dealClassKey } from "@/lib/asset-words";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
@@ -139,7 +139,9 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
       if (directPer) perUnit = parseMoney(directPer.value);
       const basisPrice = buildingPriceOf(extraction, price);
       if (perUnit == null && basisPrice != null) {
-        const units = unitCountFromMetrics(metrics);
+        // A bulk condominium purchase's price is over the units offered
+        // (lib/condo-units `priceUnitCount`, the card's count).
+        const units = priceUnitCount(extraction);
         if (units != null) perUnit = basisPrice / units;
       }
     }

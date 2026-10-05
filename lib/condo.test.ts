@@ -18,6 +18,14 @@ import {
 import { gluedWords } from "./render-lint";
 import { extractionInstruction } from "./anthropic/prompts";
 import { unitCountRow } from "./criteria";
+import { priceUnitCount } from "./condo-units";
+import { assessPlausibility, inferStrategy } from "./deal-strategy";
+import { basisTag } from "./pipeline-slots";
+import { deriveAnalytics } from "./analytics";
+import { buildComps } from "./market-memory";
+import { deriveInternalComps } from "./internal-comps";
+import { buildBrief } from "./anthropic/verdict";
+import { ex as pass38Ex, m as pass38M } from "./pass38.fixture";
 
 const TODAY = new Date("2026-10-05T12:00:00Z");
 const row = (label: string, value: string, page = "p. 6") => ({ label, value, page, flagged: false });
@@ -240,5 +248,80 @@ describe("the prompt asks for what the reader reads", () => {
     expect(r.stated.map((s) => s.label)).toEqual(STATED_ROWS.map(([label]) => label));
     // Neither count row is taken for the deal's own count.
     expect(unitCountRow([row("Units offered", "42"), row("Units in condominium", "120")])).toBeNull();
+  });
+});
+
+describe("a bulk condominium purchase's price a unit is over the units offered, on every reader (audit C3b MED-3)", () => {
+  // Five units of a 300-unit condominium at $2.0M: $400k a unit. The card,
+  // the comps tick and the workbook divided by the five; the plausibility
+  // check, the analytics, the market memory and the internal comps by the
+  // 300, and the check called a sound purchase a misread at $7k a unit.
+  const small = pass38Ex({
+    assetClass: "Multifamily",
+    dealName: "Harborview Lofts (5 condo units)",
+    metrics: [
+      pass38M("Asking price", "2,000,000"),
+      pass38M("Units offered", "5"),
+      pass38M("Units in condominium", "300"),
+      pass38M("Units", "300"),
+      pass38M("NOI (in-place)", "110,000", "in_place"),
+    ],
+  });
+  const big = pass38Ex({
+    assetClass: "Multifamily",
+    dealName: "Harborview Lofts (42 condo units)",
+    metrics: [
+      pass38M("Asking price", "14,700,000"),
+      pass38M("Units offered", "42"),
+      pass38M("Units in condominium", "120"),
+      pass38M("Units", "120"),
+      pass38M("NOI (in-place)", "760,000", "in_place"),
+      pass38M("HOA dues", "650 per unit per month"),
+    ],
+  });
+  const dealRow = (id: string, e: unknown) => ({
+    id,
+    name: id,
+    asset_class: "multifamily",
+    created_at: "2026-10-01T00:00:00Z",
+    is_sample: false,
+    stage: "screening",
+    verdict: null,
+    extraction: e,
+    first_signal: null,
+  });
+
+  it("reads one count, the units offered, else the count row", () => {
+    expect(priceUnitCount(small)).toBe(5);
+    expect(priceUnitCount(big)).toBe(42);
+    expect(priceUnitCount(pass38Ex({ assetClass: "Multifamily", metrics: [pass38M("Units", "120")] }))).toBe(120);
+    expect(basisTag(small, inferStrategy(small).kind)).toBe("$400k/unit");
+  });
+
+  it("finds no misread in a sound purchase, and pools and prints its price over the units offered", () => {
+    expect(assessPlausibility(small, inferStrategy(small)).map((f) => f.code)).not.toContain("basis_out_of_band");
+    expect(deriveAnalytics([dealRow("d-small", small)] as never).map((d) => d.perUnit)).toEqual([400_000]);
+    expect(buildComps([dealRow("d-small", small)] as never).map((c) => c.perUnit)).toEqual([400_000]);
+    expect(
+      deriveInternalComps("other", "multifamily", { assetClass: "Multifamily" }, [dealRow("d-small", small)] as never).map((c) => c.basisLabel),
+    ).toEqual(["$400k/unit"]);
+    expect(deriveAnalytics([dealRow("d-big", big)] as never).map((d) => d.perUnit)).toEqual([350_000]);
+    expect(buildComps([dealRow("d-big", big)] as never).map((c) => c.perUnit)).toEqual([350_000]);
+    expect(
+      deriveInternalComps("other", "multifamily", { assetClass: "Multifamily" }, [dealRow("d-big", big)] as never).map((c) => c.basisLabel),
+    ).toEqual(["$350k/unit"]);
+  });
+
+  it("says the units offered in the verdict's basis line and the check's title", () => {
+    const brief = buildBrief({ extraction: small, assetClass: "auto" } as never);
+    const basis = brief.slice(brief.indexOf("THE BUILDING'S BASIS"));
+    expect(basis.slice(0, basis.indexOf("\n") < 0 ? undefined : basis.indexOf("\n"))).toContain(
+      "$400k/unit — the asking price, over the 5 units offered.",
+    );
+    // A misread still flags, over the units offered.
+    const misread = pass38Ex({ ...small, metrics: small.metrics.map((r) => (r.label === "Asking price" ? pass38M("Asking price", "20,000") : r)) });
+    expect(assessPlausibility(misread, inferStrategy(misread)).find((f) => f.code === "basis_out_of_band")?.title).toBe(
+      "$20k of price over 5 units offered is $4k per unit",
+    );
   });
 });
