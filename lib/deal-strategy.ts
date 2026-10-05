@@ -1192,8 +1192,8 @@ export function planSummary(
   const yieldWithheld =
     rawYield != null && rawYield >= IMPLIED_CAP_CEILING && stabilizedNoi && totalCost != null
       ? forward
-        ? `No yield on cost is struck: the ${money(stabilizedNoi.value)} NOI at delivery is ${pct(IMPLIED_CAP_CEILING, 0)} or more of the ${money(totalCost)} price, a yield no delivered building earns, so the price or the NOI was most likely misread.`
-        : `No yield on cost is struck: the ${money(stabilizedNoi.value)} stabilized NOI is ${pct(IMPLIED_CAP_CEILING, 0)} or more of the ${money(totalCost)} total cost, a yield no project earns, so the total cost or the NOI was most likely misread.`
+        ? `No yield on cost is struck: the ${money(stabilizedNoi.value)} NOI at delivery over the ${money(totalCost)} price is at or past the ${pct(IMPLIED_CAP_CEILING, 0)} the screen holds as a misread, so the price or the NOI was most likely misread.`
+        : `No yield on cost is struck: the ${money(stabilizedNoi.value)} stabilized NOI over the ${money(totalCost)} total cost is at or past the ${pct(IMPLIED_CAP_CEILING, 0)} the screen holds as a misread, so the total cost or the NOI was most likely misread.`
       : null;
   const yieldOnCost = yieldWithheld ? null : rawYield;
   // The finished product's count (lib/criteria `planCountRow`): on a

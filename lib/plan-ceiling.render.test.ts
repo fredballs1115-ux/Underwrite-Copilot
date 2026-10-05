@@ -76,7 +76,7 @@ const devTotalThousands = {
   metrics: [metric("Total project cost", "48,500 ($000s)"), metric("NOI (stabilized, pro forma)", "3,200,000"), metric("Units (proposed)", "200")],
 } as ExtractionResult;
 const REFUSED =
-  "No yield on cost is struck: the $3.2M stabilized NOI is 25% or more of the $49k total cost, a yield no project earns, so the total cost or the NOI was most likely misread.";
+  "No yield on cost is struck: the $3.2M stabilized NOI over the $49k total cost is at or past the 25% the screen holds as a misread, so the total cost or the NOI was most likely misread.";
 const NO_FIGURE = /6,?597|6,?598/;
 
 const strategy = inferStrategy(devTotalThousands);
@@ -205,7 +205,7 @@ describe("a yield on cost no project earns is refused on every surface, in one s
     const fromModel = compareReturns(devTotalThousands, { ...model, yieldOnCostPct: 6597.94 }, strategy);
     expect(fromModel.yoc).toBeNull();
     expect(fromModel.yocWithheld).toBe(
-      "No yield on cost is shown: the first-draft model puts its stabilized NOI at 25% or more of its total cost, a yield no project earns, so its total cost or its NOI was most likely misread.",
+      "No yield on cost is shown: the first-draft model's stabilized NOI over its total cost is at or past the 25% the screen holds as a misread, so its total cost or its NOI was most likely misread.",
     );
     const sound = { ...devTotalThousands, metrics: [metric("Total project cost", "48,500,000"), ...devTotalThousands.metrics.slice(1)] } as ExtractionResult;
     const soundPlan = planSummary(sound, inferStrategy(sound))!;
@@ -286,7 +286,7 @@ describe("a yield on cost no project earns is refused on every surface, in one s
     const model = { ...SAMPLE_DEAL.model!, returns: { ...SAMPLE_DEAL.model!.returns, yieldOnCostPct: 6597.94 } };
     const sentence = modelYieldWithheld(6597.94)!;
     expect(sentence).toBe(
-      "No yield on cost is shown: the first-draft model puts its stabilized NOI at 25% or more of its total cost, a yield no project earns, so its total cost or its NOI was most likely misread.",
+      "No yield on cost is shown: the first-draft model's stabilized NOI over its total cost is at or past the 25% the screen holds as a misread, so its total cost or its NOI was most likely misread.",
     );
     const text = visibleText(renderToStaticMarkup(React.createElement(ReturnsHeadline, { model })));
     expect(text).toContain(YOC_WITHHELD);

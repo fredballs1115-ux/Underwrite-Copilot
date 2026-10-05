@@ -71,7 +71,7 @@ export const YOC_CEILING_PCT = 25;
  */
 export function modelYieldWithheld(yieldOnCostPct: number | null | undefined): string | null {
   return yieldOnCostPct != null && Number.isFinite(yieldOnCostPct) && yieldOnCostPct >= YOC_CEILING_PCT
-    ? `No yield on cost is shown: the first-draft model puts its stabilized NOI at ${YOC_CEILING_PCT}% or more of its total cost, a yield no project earns, so its total cost or its NOI was most likely misread.`
+    ? `No yield on cost is shown: the first-draft model's stabilized NOI over its total cost is at or past the ${YOC_CEILING_PCT}% the screen holds as a misread, so its total cost or its NOI was most likely misread.`
     : null;
 }
 

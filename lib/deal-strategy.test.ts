@@ -1158,7 +1158,7 @@ describe("a plan's own figures are held to each other, with or without a price r
     ["Renovation budget", "2,500"],
   ]);
   const REFUSED =
-    "No yield on cost is struck: the $3.2M stabilized NOI is 25% or more of the $49k total cost, a yield no project earns, so the total cost or the NOI was most likely misread.";
+    "No yield on cost is struck: the $3.2M stabilized NOI over the $49k total cost is at or past the 25% the screen holds as a misread, so the total cost or the NOI was most likely misread.";
 
   it("refuses a yield on cost at or past the ceiling, as the cap reader refuses a cap, and says why wherever the yield would stand", () => {
     const s = inferStrategy(devTotalThousands);
@@ -1172,12 +1172,12 @@ describe("a plan's own figures are held to each other, with or without a price r
     const note = plausibilityNote(assessPlausibility(devTotalThousands, s), s, p, devTotalThousands);
     expect(note).not.toMatch(/6597|6,597/);
     expect(note).toContain(
-      "no yield on cost is struck: the $3.2M stabilized NOI is 25% or more of the $49k total cost, a yield no project earns, so the total cost or the NOI was most likely misread",
+      "no yield on cost is struck: the $3.2M stabilized NOI over the $49k total cost is at or past the 25% the screen holds as a misread, so the total cost or the NOI was most likely misread",
     );
     // At the ceiling it is refused; under it, it stands as it did.
     const at = plan(VA, [["Asking price", "$9,000,000"], ["Renovation budget", "$1,000,000"], ["NOI (stabilized, pro forma)", "$2,500,000"]]);
     expect(planSummary(at)).toMatchObject({ totalCost: 10_000_000, yieldOnCost: null });
-    expect(planSummary(at)!.yieldWithheld).toContain("$2.5M stabilized NOI is 25% or more of the $10.0M total cost");
+    expect(planSummary(at)!.yieldWithheld).toContain("$2.5M stabilized NOI over the $10.0M total cost is at or past the 25%");
     const under = plan(VA, [["Asking price", "$9,000,000"], ["Renovation budget", "$1,000,000"], ["NOI (stabilized, pro forma)", "$2,499,000"]]);
     expect(planSummary(under)!.yieldOnCost).toBeCloseTo(0.2499, 10);
     expect(planSummary(under)!.yieldWithheld).toBeNull();
@@ -1191,7 +1191,7 @@ describe("a plan's own figures are held to each other, with or without a price r
     );
     expect(planSummary(forward)).toMatchObject({ forward: true, yieldOnCost: null });
     expect(planSummary(forward)!.yieldWithheld).toBe(
-      "No yield on cost is struck: the $3.0M NOI at delivery is 25% or more of the $10.0M price, a yield no delivered building earns, so the price or the NOI was most likely misread.",
+      "No yield on cost is struck: the $3.0M NOI at delivery over the $10.0M price is at or past the 25% the screen holds as a misread, so the price or the NOI was most likely misread.",
     );
   });
 
