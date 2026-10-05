@@ -2,7 +2,7 @@ import type { LiveRate, SeriesSource } from "@/lib/live-rates";
 import { assetWords } from "@/lib/asset-words";
 import { monthOf, type ZoriRead } from "@/lib/zori";
 import type { DerivedModel, InputSource } from "@/lib/underwrite/inputs";
-import type { UnderwriteInputs } from "@/lib/underwrite/engine";
+import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { INSURANCE_INDEX_ID, periodLabel, rentIndexFor } from "@/lib/live-market-brief";
 import { isStateMarket } from "@/lib/market-match";
@@ -177,6 +177,12 @@ export interface ModelVsMarketInput {
    *  (`impliedGoingInCap`) — over the whole price a share implies, for a
    *  share — and said as such */
   goingInCapSource?: "stated" | "implied" | "implied_whole";
+  /** the model's own entry, percent: its year-1 NOI over its price, the
+   *  workbook's "Going-In Cap (Yr-1 NOI / Price)" (`modelEntryCap`) — null
+   *  where it is no cap: a placeholder price or an assumed NOI, or a price
+   *  that did not buy the building. Where it sits 5 bps or more from the
+   *  going-in cap, the exit is set against it and both are named. */
+  modelEntryCapPct?: number | null;
   metro?: { id: string; name: string } | null;
   /** the metro's own series (`readMetroRates`) */
   rates?: readonly LiveRate[];
@@ -781,6 +787,11 @@ function capBandTail(input: ModelVsMarketInput, x: number): { figures: Published
   return { figures, sentence: `${head}, and ${position}` };
 }
 
+/** How far apart, in percentage points, the model's own entry and the
+ *  going-in cap must sit before the exit is set against the model's own:
+ *  5 bps (research pass 34). Closer than that, the two are read as one. */
+const OWN_ENTRY_APART = 0.05;
+
 function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
   const words = assetWords(input.assetClass ?? undefined);
   if (!words.operating) return null;
@@ -817,7 +828,16 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
     };
   }
   const inSpread = Math.round((g - ten.value) * 100);
-  const delta = exitSpread - inSpread;
+  // The model's own entry — its year-1 NOI over its price — where it sits 5
+  // bps or more from the going-in cap: the returns run from it, so the exit
+  // is set against it, and the going-in cap is named beside it. Research
+  // pass 34: a deal stated at 5.45% whose T-12 NOI over the price read
+  // 5.84% was told "the exit holds the spread" while the model sold 39 bps
+  // tighter than it bought, and nothing said so.
+  const own = input.modelEntryCapPct;
+  const ownNamed = own != null && Number.isFinite(own) && own > 0 && Math.abs(own - g) >= OWN_ENTRY_APART ? own : null;
+  const ownSpread = ownNamed != null ? Math.round((ownNamed - ten.value) * 100) : null;
+  const delta = exitSpread - (ownSpread ?? inSpread);
   const tone: CheckTone = delta > 0 ? "widens" : delta < 0 ? "compresses" : "level";
   // A cap the documents imply rather than state is said as the arithmetic
   // it is, so the reader can see what the exit is being set against.
@@ -826,13 +846,22 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
       ? `The going-in cap implied by the OM's NOI over its price, ${g.toFixed(2)}%,`
       : input.goingInCapSource === "implied_whole"
         ? `The going-in cap implied by the OM's NOI over the whole price its share implies, ${g.toFixed(2)}%,`
-        : `The going-in cap ${g.toFixed(2)}%`;
+        : ownNamed != null
+          ? `The going-in cap the OM states, ${g.toFixed(2)}%,`
+          : `The going-in cap ${g.toFixed(2)}%`;
+  const from = ownNamed != null ? " from the model's own entry" : "";
   const clause =
     tone === "widens"
-      ? `so the exit assumes the spread widens ${delta} bps with the 10-year unchanged — the conservative direction.`
+      ? `so the exit assumes the spread widens ${delta} bps${from} with the 10-year unchanged — the conservative direction.`
       : tone === "compresses"
-        ? `so the exit assumes the spread narrows ${-delta} bps with the 10-year unchanged. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.`
-        : "so the exit holds the spread with the 10-year unchanged.";
+        ? `so the exit assumes the spread narrows ${-delta} bps${from} with the 10-year unchanged. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.`
+        : ownNamed != null
+          ? "so the exit holds the spread of the model's own entry with the 10-year unchanged."
+          : "so the exit holds the spread with the 10-year unchanged.";
+  const ownClause =
+    ownNamed != null && ownSpread != null
+      ? `; the model's own year-1 NOI over its price is ${ownNamed.toFixed(2)}%, ${Math.abs(ownSpread)} bps ${ownSpread >= 0 ? "over" : "under"} it,`
+      : ",";
   return {
     key: "exit_cap",
     title: "Exit cap",
@@ -842,7 +871,7 @@ function exitCapCheck(input: ModelVsMarketInput): ModelCheck | null {
     tone,
     toneLabel: TONE_LABEL[tone],
     scope,
-    read: `${head} ${entry} is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it, ${clause}${band.sentence}`,
+    read: `${head} ${entry} is ${Math.abs(inSpread)} bps ${inSpread >= 0 ? "over" : "under"} it${ownClause} ${clause}${band.sentence}`,
   };
 }
 
@@ -896,6 +925,27 @@ export function impliedGoingInCap(extraction: ExtractionResult | null): { pct: n
   const cap = going.value / price;
   if (!(cap > 0.005) || !(cap < IMPLIED_CAP_CEILING)) return null;
   return { pct: cap * 100, whole: price !== asked };
+}
+
+/**
+ * The model's own entry: its year-1 NOI over its price, percent — the
+ * underwrite workbook's "Going-In Cap (Yr-1 NOI / Price)" cell, the figure
+ * the returns run from. Null where it is no cap: a placeholder price or an
+ * assumed NOI (lib/underwrite/inputs marks each "assumption"), or a price
+ * that did not buy the building (`buildingPriceOf`: a note's, a leased
+ * fee's, a position's, such a share's).
+ */
+export function modelEntryCap(
+  derived: Pick<DerivedModel, "inputs" | "sources">,
+  extraction: ExtractionResult | null,
+): number | null {
+  const price = derived.inputs.purchasePrice;
+  if (!(price > 0)) return null;
+  if (derived.sources.purchasePrice?.provenance === "assumption") return null;
+  if (derived.sources.inPlaceRentAnnual?.provenance === "assumption") return null;
+  if (buildingPriceOf(extraction, price) == null) return null;
+  const noi = computeUnderwrite(derived.inputs).cashFlow[0]?.noi ?? null;
+  return noi != null && noi > 0 ? (noi / price) * 100 : null;
 }
 
 /** A deal's going-in cap, percent, and where it came from. */
@@ -987,6 +1037,9 @@ export function modelVsMarketFor(args: {
     plan: planDeal,
     goingInCapPct: goingIn?.pct ?? null,
     goingInCapSource: goingIn?.source,
+    // The model's own year-1 NOI over its price, named beside the going-in
+    // cap where the two sit apart, and the exit set against it.
+    modelEntryCapPct: modelEntryCap(derived, extraction),
     metro,
     rates: reads.rates,
     zori: reads.zori,

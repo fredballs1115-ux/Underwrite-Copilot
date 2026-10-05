@@ -1199,8 +1199,19 @@ export function deriveUnderwriteInputs(
   for (const key of ["expenseRecoveriesAnnual", "otherRevenueAnnual"] as const) {
     mark(key, "assumption", "Folded into the in-place rental revenue — split it out of that line, never add it on top");
   }
+  // The exit defaults to the OM's stated going-in cap (which cap it defaults
+  // to is the owner's call). Where the model's own entry — its year-1 NOI
+  // over its price, the Deal Summary's "Going-In Cap (Yr-1 NOI / Price)" —
+  // sits 5 bps or more from it, the note names that too, so a compression
+  // the default carries is seen (research pass 34). Never on a price that
+  // did not buy the building, where no cap is struck on the price.
+  const ownEntry = capPct && price > 0 && buildingPriceOf(extraction, price) != null ? noi / price : null;
+  const ownEntryClause =
+    capPct && ownEntry != null && Math.abs(ownEntry - capPct) >= 0.0005
+      ? `; the model's own year-1 NOI over its price is ${(ownEntry * 100).toFixed(2)}%`
+      : "";
   mark("exitCapPct", capPct ? "derived" : "assumption",
-    capPct ? "Defaulted to the going-in cap — set your exit view" : "Default 6.0% — set your exit view",
+    capPct ? `Defaulted to the OM's stated going-in cap${ownEntryClause} — set your exit view` : "Default 6.0% — set your exit view",
     capPct ? pageOf(capMetric) : undefined);
   mark("saleCostPct", "assumption", "Default 2.0% of sale price");
 

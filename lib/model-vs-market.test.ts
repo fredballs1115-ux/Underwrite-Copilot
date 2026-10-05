@@ -321,9 +321,17 @@ describe("ModelVsMarketCard — the card on the deal page", () => {
 });
 
 // ── One read for every surface ──────────────────────────────────────────────
-import { dealGoingInCap, impliedGoingInCap, modelVsMarketFor } from "./model-vs-market";
+import { dealGoingInCap, impliedGoingInCap, modelEntryCap, modelVsMarketFor } from "./model-vs-market";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
+import ExcelJS from "exceljs";
+import { renderToBuffer } from "@react-pdf/renderer";
+import { buildUnderwriteWorkbook } from "./underwrite/workbook";
+import { buildSensitivityData } from "./underwrite/report-grid";
+import { buildReportData, ReportDocument } from "./memo/report-document";
+import { pdfTextOf } from "./memo/pdf-text-of";
+import { SAMPLE_DEAL } from "./sample-deal";
+import type { DealRow } from "./deals";
 
 /** A first signal naming no plan, carrying whatever cap the fast read found. */
 const signalWithCap = (goingInCap: string, assetClass = "industrial"): FirstSignal => ({
@@ -392,7 +400,12 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     // The page, the report and the workbook all hand the signal in, so all
     // three read its 5.5% — the page's summary bar's own fallback.
     const own = modelVsMarketFor({ derived, extraction: noCap, firstSignal: signalWithCap("5.5%"), storedAssetClass: "industrial", metro: null, reads })!;
-    expect(own.checks[2].read).toContain("The going-in cap 5.50% is 56 bps over it, so the exit assumes the spread widens 50 bps");
+    // The model's own year-1 NOI over its price is 6.00%, 50 bps from the
+    // signal's cap: both are named, and the exit is set against the model's
+    // own entry, which it holds (research pass 34).
+    expect(own.checks[2].read).toContain(
+      "The going-in cap the OM states, 5.50%, is 56 bps over it; the model's own year-1 NOI over its price is 6.00%, 106 bps over it, so the exit holds the spread of the model's own entry with the 10-year unchanged.",
+    );
     // The extraction's stated cap outranks the signal's.
     const stated = modelVsMarketFor({ derived, extraction, firstSignal: signalWithCap("5.5%"), storedAssetClass: "industrial", metro: null, reads })!;
     expect(stated.checks[2].read).toContain("The going-in cap 6.00% is 106 bps over it");
@@ -427,8 +440,13 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
     expect(impliedGoingInCap(deal)?.pct).toBeCloseTo(5.8, 6);
     const model = deriveUnderwriteInputs(deal, deal.dealName!);
     const exit = modelVsMarketFor({ derived: model, extraction: deal, firstSignal: signalWithCap("5.4%"), storedAssetClass: "industrial", metro: null, reads })!.checks.find((c) => c.key === "exit_cap");
-    expect(exit?.read).toContain("The going-in cap 5.40%");
+    expect(exit?.read).toContain("The going-in cap the OM states, 5.40%,");
     expect(exit?.read).not.toContain("implied");
+    // The model runs the documents' 5.80%, and the exit is set against it
+    // (research pass 34), the going-in cap named beside it.
+    expect(exit?.read).toContain(
+      "the model's own year-1 NOI over its price is 5.80%, 86 bps over it, so the exit assumes the spread widens 20 bps from the model's own entry",
+    );
   });
 
   it("a plan deal reads no going-in cap, whatever the extraction states", () => {
@@ -515,6 +533,101 @@ describe("modelVsMarketFor — the deal page, the report and the workbook call o
   });
 });
 
+// Research pass 34: the exit defaults to the OM's stated cap while the model
+// enters at its own year-1 NOI over its price. Stated at 5.25% with only a
+// $1.7M pro forma NOI on $30M, the model buys at 5.67% and sells at 5.25% —
+// and the card, the report and the workbook's Market Read said "the exit
+// holds the spread". Each now names both and sets the exit against the
+// model's own entry.
+describe("the exit is set against the model's own entry where it sits apart from the stated cap", () => {
+  const shapeA: ExtractionResult = {
+    dealName: "Juniper Flats",
+    assetClass: "multifamily",
+    market: "Washington, DC",
+    address: "100 Juniper St NW, Washington, DC",
+    metrics: [
+      { label: "Asking price", value: "$30,000,000", flagged: false, page: "p. 3" },
+      { label: "Cap rate", value: "5.25%", flagged: false, page: "p. 3" },
+      { label: "NOI (pro forma)", value: "$1,700,000", flagged: false, page: "p. 9" },
+      { label: "Units", value: "100", flagged: false, page: "p. 2" },
+    ],
+  };
+  const derived = deriveUnderwriteInputs(shapeA, shapeA.dealName!);
+  const reads = { rates, zori, national, now: FIXTURE_NOW };
+  const read = modelVsMarketFor({ derived, extraction: shapeA, storedAssetClass: "multifamily", metro: null, reads })!;
+  const exit = read.checks.find((c) => c.key === "exit_cap")!;
+  const sentence =
+    "The exit cap 5.25% is 31 bps over the latest 10-year (4.94%, Sep 17, 2026; FRED). The going-in cap the OM states, 5.25%, is 31 bps over it; the model's own year-1 NOI over its price is 5.67%, 73 bps over it, so the exit assumes the spread narrows 42 bps from the model's own entry with the 10-year unchanged. Cap compression is not a plan: a return that needs the exit to price tighter than the entry is a bet on the market rather than the building.";
+
+  it("names the stated cap and the model's own entry, and calls the compression what it is", () => {
+    expect(derived.inputs.exitCapPct).toBe(0.0525);
+    expect(modelEntryCap(derived, shapeA)).toBeCloseTo((1_700_000 / 30_000_000) * 100, 10);
+    expect(exit.tone).toBe("compresses");
+    expect(exit.toneLabel).toBe("assumes cap compression");
+    expect(exit.read).toBe(sentence);
+    expect(gluedWords(exit.read)).toEqual([]);
+    // The exit's own source says which cap it defaulted to, and the model's.
+    expect(derived.sources.exitCapPct?.note).toBe(
+      "Defaulted to the OM's stated going-in cap; the model's own year-1 NOI over its price is 5.67% — set your exit view",
+    );
+  });
+
+  it("is said the same on the deal page's card, the report and the workbook's Market Read", async () => {
+    const card = visibleText(renderToStaticMarkup(React.createElement(ModelVsMarketCard, { read })));
+    expect(card).toContain(sentence);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(derived, null, read)) as unknown as ArrayBuffer);
+    const tab = wb.getWorksheet("Market Read")!;
+    const cells: string[] = [];
+    tab.eachRow((row) => row.eachCell((c) => cells.push(String(c.value ?? ""))));
+    expect(cells).toContain(sentence);
+    const deal = {
+      name: shapeA.dealName,
+      asset_class: "multifamily",
+      extraction: shapeA,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const sensitivity = buildSensitivityData(derived.inputs, null, { sources: derived.sources });
+    const pdf = await renderToBuffer(
+      React.createElement(ReportDocument, {
+        input: buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, read),
+      }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(pdf)).replace(/\s+/g, " ");
+    expect(text).toContain("the model's own year-1 NOI over its price is 5.67%, 73 bps over it, so the exit assumes the spread narrows 42 bps from the model's own entry");
+    expect(text).not.toContain("holds the spread");
+  }, 60_000);
+
+  it("leaves a model whose entry is the stated cap, a placeholder's, or a price that did not buy the building as before", () => {
+    // The model runs price × the stated cap: one figure, said once.
+    const capOnly: ExtractionResult = { ...shapeA, metrics: shapeA.metrics.filter((m) => !/NOI/.test(m.label)) };
+    const d = deriveUnderwriteInputs(capOnly, "x");
+    const one = modelVsMarketFor({ derived: d, extraction: capOnly, storedAssetClass: "multifamily", metro: null, reads })!.checks.find((c) => c.key === "exit_cap")!;
+    expect(one.read).toContain("The going-in cap 5.25% is 31 bps over it, so the exit holds the spread with the 10-year unchanged.");
+    expect(one.read).not.toContain("own entry");
+    expect(d.sources.exitCapPct?.note).toBe("Defaulted to the OM's stated going-in cap — set your exit view");
+    // A note's price is a loan's: no cap is struck on it, and none is named.
+    const note: ExtractionResult = { ...shapeA, interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" } };
+    const n = deriveUnderwriteInputs(note, "x");
+    expect(modelEntryCap(n, note)).toBeNull();
+    expect(n.sources.exitCapPct?.note).not.toContain("own year-1 NOI");
+    // A placeholder price: the model's NOI over it is no entry.
+    const unpriced: ExtractionResult = {
+      ...shapeA,
+      metrics: [
+        { label: "Asking price", value: "Call for offers", flagged: false, page: "p. 3" },
+        { label: "NOI (in-place)", value: "$1,700,000", flagged: false, page: "p. 9" },
+      ],
+    };
+    expect(modelEntryCap(deriveUnderwriteInputs(unpriced, "x"), unpriced)).toBeNull();
+  });
+});
+
 describe("the going-in cap the documents imply where they state none", () => {
   // A $20,000,000 price and a $1,500,000 NOI, no cap row: 7.50% going in.
   // The model exits at its 6.00% default, 150 bps of compression the check
@@ -557,8 +670,16 @@ describe("the going-in cap the documents imply where they state none", () => {
   it("a stated cap wins, and is said as the stated one", () => {
     const stated: ExtractionResult = { ...priced, metrics: [...priced.metrics, { label: "Going-in cap rate", value: "7.0%", flagged: false, page: "p. 3" }] };
     const exit = exitOf(modelVsMarketFor({ derived: deriveUnderwriteInputs(stated, "x"), extraction: stated, storedAssetClass: "auto", metro: null, reads }));
-    expect(exit?.read).toContain("The going-in cap 7.00% is 206 bps over it");
+    expect(exit?.read).toContain("The going-in cap the OM states, 7.00%, is 206 bps over it");
     expect(exit?.read).not.toContain("implied");
+    // The exit defaults to the stated 7.00% while the model runs the T-12's
+    // $1.5M over the $20M price, 7.50%: it sells 50 bps tighter than it buys,
+    // which "holds the spread" had hidden (research pass 34).
+    expect(exit?.tone).toBe("compresses");
+    expect(exit?.read).toContain(
+      "the model's own year-1 NOI over its price is 7.50%, 256 bps over it, so the exit assumes the spread narrows 50 bps from the model's own entry with the 10-year unchanged. Cap compression is not a plan",
+    );
+    expect(exit?.read).not.toContain("holds the spread");
   });
 
   it("grosses a share's price up to the whole and says so; a note and a leased fee imply none", () => {
