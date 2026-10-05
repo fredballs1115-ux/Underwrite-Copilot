@@ -279,6 +279,44 @@ Three are yours:
    model) on the 120. Saying which count the deal's count row is changes
    the extraction.
 
+**The documents, as their reader opens them (research pass 35).** Every
+document was built for seven kinds of deal and read page by page:
+- the memo;
+- the full report;
+- the three workbooks;
+- the letter of intent;
+- the calendar file;
+- the emails.
+
+The fixes that are ours are being made in this batch. These are yours:
+1. **How a note, a preferred position or an unpriced portfolio scores
+   against a property buy box.** Today two criteria that pass, with the
+   price-dependent ones unknown, score "Fit 100 · Pursue". The chip will
+   now say how many criteria were checked. Whether such a deal should
+   score at all is the rule, and that is yours.
+2. **A hotel's stated PIP is paid out of year-1 cash flow.** That puts the
+   year-1 cash-on-cash at −20% on the test deal, so no price clears a
+   cash-on-cash floor. Lenders usually fund a PIP at closing, from a
+   reserve. Moving it changes the model.
+3. **The letter of intent's binding sections**: exclusivity,
+   confidentiality, brokerage, assignment, governing law and the offer's
+   expiry. Brokers expect them, and legal text is yours to write or
+   approve.
+4. **The target-return check reads the screen's IRR, not the model's.**
+   The report will mark the chip with the model's figure. Making the check
+   itself read the model's IRR is yours.
+5. **The model's defaults, each with no source behind it**:
+   - a pro forma NOI used for year 1 where it is the only NOI stated (4.7%
+     high on the test deal);
+   - the 6.00% exit where no cap is stated;
+   - the 0.5% asset-management fee and the $0.25/SF reserves;
+   - the workbook's live price sensitivity, which steps $1M at a time and
+     so cannot reach the max bid.
+6. **Two larger changes every IC template suggests:**
+   - put the model's returns on the one-page memo;
+   - have a Caution call close on its conditions rather than its next
+     steps, which is a prompt change.
+
 **Run the research seed after the merge** (`node scripts/seed-research.mjs`,
 the step that writes the FY2027 fair market rents). The runner read every
 source link the audit had marked dead. Two research figures changed:
