@@ -105,6 +105,12 @@ export function ShareControl({
             A read-only page — verdict, ranges, and key terms. No sign-in
             needed, expires after 30 days, revocable here anytime.
           </p>
+          {/* The verdict's own words go with it, and the verdict is handed
+              the buy box (research pass 39): said before a link is made. */}
+          <p className="mt-1.5 text-xs leading-relaxed text-ink" data-qa="share-buybox-note">
+            The link shows the call and its reasons, which can name where the
+            deal misses your buy box.
+          </p>
 
           <form action={createShareLink} className="mt-3">
             <input type="hidden" name="dealId" value={dealId} />

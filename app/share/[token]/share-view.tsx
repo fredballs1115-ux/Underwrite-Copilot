@@ -69,7 +69,10 @@ import { SharePicture, type SharePictureSource } from "./share-picture";
  *
  * Deliberately excluded: documents, notes, the buyer's buy box, and
  * anything editable — this is the page an analyst forwards to a partner or
- * lender.
+ * lender. The box has no section here, but the call's reason and risks are
+ * the verdict's own words, and the verdict is handed the box, so they can
+ * name where the deal misses it; the share control says so before a link
+ * is made (research pass 39).
  */
 export interface ShareViewProps {
   dealName: string;
