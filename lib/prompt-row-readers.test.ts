@@ -229,6 +229,15 @@ describe("every extraction label, through every deal-type reader's finder (resea
     for (const label of ["Energy Star rating", "Star rating", "Walk Score rating"]) {
       expect(singleTenantRowsRead([{ label, value: "As stated" }]), label).toEqual([]);
     }
+    // Audit C4, L10: the narrowing had dropped a bare rating that names its
+    // agencies in brackets and agencies named together — labels an older
+    // extraction carries — and must not reopen another kind of rating.
+    for (const label of ["Rating (S&P)", "Rating (S&P / Moody's)", "Moody's / S&P Rating", "S&P/Moody's rating", "Ratings (Fitch)"]) {
+      expect(singleTenantRowsRead([{ label, value: "As stated" }]), label).toHaveLength(1);
+    }
+    for (const label of ["Rating (CMS stars)", "Rating (Energy Star)", "Rating (out of 5)"]) {
+      expect(singleTenantRowsRead([{ label, value: "As stated" }]), label).toEqual([]);
+    }
   });
 
   it("finds every family's own rows through its finder", () => {

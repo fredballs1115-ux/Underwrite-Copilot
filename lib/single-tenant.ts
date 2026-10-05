@@ -99,8 +99,17 @@ const RENT_VALUE_NOT_ANNUAL = /\/\s*mo(?:nth)?\b|per\s+month|monthly/i;
 // ("Tenant credit rating"), by an agency's name, or a bare "Rating" — never
 // another kind of rating: a nursing home's "CMS star rating" had been read
 // as the operator's credit (research pass 41).
-const RATING_ROW =
-  /\bcredit\s+ratings?\b|^\s*(?:tenant|guarantor|lessee|corporate)(?:'s)?\s+ratings?\b|^\s*(?:s&p|moody'?s|fitch)(?:\s+credit)?\s+ratings?\b|^\s*ratings?\s*$/i;
+// A bare rating that names its agencies in brackets ("Rating (S&P / Moody's)")
+// and agencies named together ("Moody's / S&P Rating") are credit ratings
+// too — labels an older extraction carries, which the narrowing had dropped
+// (audit C4, L10); a bracket naming no agency stays another kind.
+const AGENCY = String.raw`(?:s&p|moody'?s|fitch)`;
+const RATING_ROW = new RegExp(
+  String.raw`\bcredit\s+ratings?\b|^\s*(?:tenant|guarantor|lessee|corporate)(?:'s)?\s+ratings?\b|` +
+    String.raw`^\s*${AGENCY}(?:\s*(?:\/|,|&|and)\s*${AGENCY})*(?:\s+credit)?\s+ratings?\b|` +
+    String.raw`^\s*ratings?\s*\(\s*${AGENCY}(?:\s*(?:\/|,|&|and)\s*${AGENCY})*\s*\)\s*$|^\s*ratings?\s*$`,
+  "i",
+);
 // The first date the tenant may leave: an early termination, a termination
 // option or a kick-out — and a firm term's end ("Firm term expiration",
 // "End of firm term"), since after its firm term a tenant such as the
