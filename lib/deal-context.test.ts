@@ -145,6 +145,18 @@ describe("dealContextFor — a portfolio OM says what it offers", () => {
     // One property is not a portfolio, and an unknown single asset says nothing.
     expect(dealContextFor({ ...PORTFOLIO, strategy: undefined, metrics: [], properties: [PORTFOLIO.properties![0]] })).toBeNull();
   });
+
+  // Research pass 41 (L11): "FEMA's flood map puts the building's point in
+  // Zone AE" beside "Portfolio: 2 properties across 2 markets".
+  it("names the point the address was placed at on a portfolio, never the building's", () => {
+    const site = { flood: { zone: "AE", subtype: null, isHighRisk: true }, pointIsBuilding: true };
+    const ctx = dealContextFor(PORTFOLIO, site)!;
+    expect(ctx).toContain("FEMA's flood map puts the point the address was placed at in Zone AE");
+    expect(ctx).not.toContain("the building's point");
+    // One building placed at its house keeps the building's point.
+    const one = { ...PORTFOLIO, properties: [] };
+    expect(dealContextFor(one, site)).toContain("FEMA's flood map puts the building's point in Zone AE");
+  });
 });
 
 describe("dealContextFor — a single tenant's lease is said before any figure (#454)", () => {

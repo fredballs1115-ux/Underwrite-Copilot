@@ -1457,7 +1457,11 @@ async function runAnalysisSteps(
           (dr?.site_flags as SiteFlagsResult | null | undefined) ?? null,
           (dr?.address as { label?: string } | null | undefined)?.label?.trim() ?? "",
         );
-        const flood = challengeFlags ? floodContextLine(challengeFlags.flood, challengeFlags.pointIsBuilding === true) : null;
+        // On a portfolio the address is no one building's: the point it was
+        // placed at, never "the building's point" (research pass 41, L11).
+        const flood = challengeFlags
+          ? floodContextLine(challengeFlags.flood, challengeFlags.pointIsBuilding === true && !portfolio)
+          : null;
         if (flood) notes.push(flood);
 
         // A student building (#468): the pre-lease pace, the beds still to

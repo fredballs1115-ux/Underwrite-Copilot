@@ -162,7 +162,10 @@ export function dealContextFor(
   // by the time the step runs (#426): a Special Flood Hazard Area is a
   // premium in the expense line and a lender's condition. The point is the
   // building's only where the lookup recorded it was (the audit's L10).
-  const flood = floodContextLine(site?.flood, site?.pointIsBuilding === true);
+  // On a portfolio the address is no one building's, so its point is the
+  // point the address was placed at, never "the building's" (research pass
+  // 41, L11: "the building's point" beside "10 properties across 8 markets").
+  const flood = floodContextLine(site?.flood, site?.pointIsBuilding === true && !portfolio);
   // A price stated as a range (#466): which end every figure is struck at.
   const range = priceRangeLine(extraction, strategy.kind);
   const head = [

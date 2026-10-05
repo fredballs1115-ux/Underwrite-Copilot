@@ -1091,6 +1091,23 @@ describe("runAnalysis — the happy path", () => {
     expect(context).toContain("in Zone AE, a Special Flood Hazard Area");
     expect(vi.mocked(claimSiteFlags)).not.toHaveBeenCalled();
 
+    // On a portfolio the address is no one building's: the challenger and
+    // the comps both read the point the address was placed at (research
+    // pass 41, L11).
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(scrutinizeComps).mockClear();
+    const prop = (name: string, address: string) => ({ name, address, count: "100", area: "", noi: "", occupancy: "", yearBuilt: "", allocatedPrice: "", page: "" });
+    vi.mocked(extractTerms).mockResolvedValueOnce({
+      ...EXTRACTION,
+      properties: [prop("Frisco Flats", label), prop("Plano Commons", "2100 Legacy Dr, Plano, TX 75024")],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    for (const text of [vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "", vi.mocked(scrutinizeComps).mock.calls[0][1] ?? ""]) {
+      expect(text).toContain("FEMA's flood map puts the point the address was placed at in Zone AE");
+      expect(text).not.toContain("the building's point");
+    }
+
     // A lookup that has not answered by the challenger's turn: no flood line
     // there and no wait for one — the lookup runs before the comps, as it did.
     vi.mocked(challengeAssumptions).mockClear();
