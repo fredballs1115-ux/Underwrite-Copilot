@@ -538,6 +538,11 @@ export function serializeBuyBoxStore(store: BuyBoxStore): BuyBox | Record<string
   };
 }
 
+// The figure a value leads with, as `parseMoney` reads it once the dollar
+// sign and the commas are dropped: the digits, never an ordinal's, and a
+// scale only where it ends its word (lib/money's one table).
+const MONEY_FIGURE = new RegExp(String.raw`^\s*(\d+(?:\.\d+)?)(?!\.?\d)(?!(?:st|nd|rd|th)\b)(?:\s*(${SCALE_WORDS})(?![a-z]))?`);
+
 /** "$70.7M" / "$70,700,000" / "285k" / "1.2 mm" → dollars (or plain
  *  number), or null. Reads the approximations an OM writes — "±$42M",
  *  "~$42M", "approx. $42,000,000", "circa $42M", "USD 42,000,000" — as
@@ -556,13 +561,15 @@ export function parseMoney(raw: string): number | null {
     s = s.replace(/^[-−–]\s*/, "");
     sign = -1;
   }
-  // A scale is read only where it ends its word (lib/money's one table and
-  // its `\b`, as parseUsd reads it): the spaces stay in, so the first
-  // letter of the next word is never a scale. With every space dropped,
-  // "$450,000 more" read as 450,000 million and "$600,000 base rent" as
-  // 600,000 billion.
+  // A scale is read only where it ends its word (lib/money's one table): the
+  // spaces stay in, so the first letter of the next word is never a scale.
+  // With every space dropped, "$450,000 more" read as 450,000 million and
+  // "$600,000 base rent" as 600,000 billion. The digits never give back a
+  // decimal to a word glued after them (audit C3a): with a word boundary
+  // after the scale, "$12.5mil" read as 12, "1.25x" as 1 and "$32.50psf" as
+  // 32. An ordinal is no figure ("2nd lien").
   s = s.replace(/[,$]/g, "").toLowerCase();
-  const m = s.match(new RegExp(String.raw`^\s*(\d+(?:\.\d+)?)\s*(${SCALE_WORDS})?\b`));
+  const m = s.match(MONEY_FIGURE);
   if (!m) return null;
   const n = Number(m[1]);
   if (!Number.isFinite(n)) return null;
@@ -571,17 +578,9 @@ export function parseMoney(raw: string): number | null {
 
 // ── A price stated as a range (#466) ─────────────────────────────────────
 
-const RANGE_SCALE: Record<string, number> = {
-  k: 1e3,
-  thousand: 1e3,
-  m: 1e6,
-  mm: 1e6,
-  million: 1e6,
-  b: 1e9,
-  bn: 1e9,
-  billion: 1e9,
-};
-const RANGE_FIGURE = String.raw`\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(k|thousand|mm|million|m|bn|billion|b)?`;
+// Each end's scale from lib/money's one table: "$40–42 mil" had read as
+// forty to forty-two dollars.
+const RANGE_FIGURE = String.raw`\$?\s*(\d[\d,]*(?:\.\d+)?)\s*(${SCALE_WORDS})?`;
 const PRICE_RANGE = new RegExp(
   String.raw`^(?:(?:±|\+\/-|~|≈|approx(?:imately|\.)?|about|circa|c\.|usd|us\$)\s*)?(?:between\s+)?${RANGE_FIGURE}\s*(?:[-–—]|to|and)\s*${RANGE_FIGURE}\b`,
   "i",
@@ -604,8 +603,8 @@ export function figureRange(raw: string): { low: number; high: number } | null {
   if (!m) return null;
   const n1 = Number(m[1].replace(/,/g, ""));
   const n2 = Number(m[3].replace(/,/g, ""));
-  const s1 = m[2] ? (RANGE_SCALE[m[2].toLowerCase()] ?? 1) : 1;
-  const s2 = m[4] ? (RANGE_SCALE[m[4].toLowerCase()] ?? 1) : 1;
+  const s1 = scaleOf(m[2]);
+  const s2 = scaleOf(m[4]);
   const high = n2 * s2;
   let low = n1 * s1;
   // "$40–42M": the first figure borrows the second's scale where, so
@@ -619,8 +618,10 @@ export function figureRange(raw: string): { low: number; high: number } | null {
 
 // The figure a value leads with, as `parseMoney` reads it: an approximation
 // word, a bracket or a sign, the dollar, the digits and their scale.
-const LEAD_FIGURE =
-  /^(?:(?:±|\+\/-|~|≈|approx(?:imately|\.)?|about|circa|c\.|usd|us\$)\s*)?(?:between\s+)?\(?\s*[-−–]?\s*(?:us\$|usd|\$)?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:k|thousand|mm|million|m|bn|billion|b)(?![a-z]))?/i;
+const LEAD_FIGURE = new RegExp(
+  String.raw`^(?:(?:±|\+\/-|~|≈|approx(?:imately|\.)?|about|circa|c\.|usd|us\$)\s*)?(?:between\s+)?\(?\s*[-−–]?\s*(?:us\$|usd|\$)?\s*\d[\d,]*(?:\.\d+)?(?:\s*(?:${SCALE_WORDS})(?![a-z]))?`,
+  "i",
+);
 // What a figure is counted per: a unit by any of the nouns a class counts in,
 // a foot by any of its spellings, an acre, a building. Only these: "per the
 // OM", "per broker" and "per appraisal" say where the ask came from.

@@ -6,22 +6,31 @@
  * never disagree about what "M" means, so the scale lives here and both
  * read it. Longer spellings come first in the alternation the readers use
  * ("mm" before "m", "bn" before "b") or the short form wins the match and
- * "$2bn" reads as two billion's worth of nothing.
+ * "$2bn" reads as two billion's worth of nothing. "mil", "mn" and "bil"
+ * are the shorthand a memorandum writes too ("$12.5 mil", "USD 25mn",
+ * "$1.2 bil"): outside the table, "$12.5 mil" read as $12.50 (audit C3a).
  */
 const SCALE: Record<string, number> = {
   k: 1e3,
   thousand: 1e3,
   mm: 1e6,
+  mn: 1e6,
+  mil: 1e6,
   million: 1e6,
   m: 1e6,
   bn: 1e9,
+  bil: 1e9,
   billion: 1e9,
   b: 1e9,
 };
 
+/** The scale words, longest first, as the readers' alternation spells them. */
+export const SCALE_WORDS = "k|thousand|million|mil|mm|mn|m|billion|bil|bn|b";
+
 // The first figure in a line, as `parseUsd` has always found it: an
-// optional dollar sign, the digits (commas already dropped), a scale.
-const FIRST_FIGURE = /\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(k|thousand|mm|million|m|bn|billion|b)?\b/i;
+// optional dollar sign, the digits (commas already dropped), a scale. The
+// digits are never part of a longer number ("$32.50psf" is never 32).
+const FIRST_FIGURE = new RegExp(String.raw`\$?\s*([0-9]+(?:\.[0-9]+)?)(?!\.?\d)\s*(${SCALE_WORDS})?\b`, "i");
 // The figure's own sign, in any of its forms — the hyphen-minus, the minus
 // sign (U+2212) and the en dash a word processor sets for one — either
 // opening the value ("-250,000", "−$250k", "- $250,000") or set against
@@ -40,12 +49,9 @@ const BRACKET_CLOSES = /^\s*\)/;
 // $42M"). A figure far below the first after "to" or "through" is a date
 // or a term, not a range's other end ("$900,000 through 2031").
 const DASH_RANGE = /^\s*[-−–—]\s*\$?\s*[0-9]/;
-const WORD_RANGE = /^\s*(?:to|through)\b\s*\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(k|thousand|mm|million|m|bn|billion|b)?\b(?!\s*%)/i;
+const WORD_RANGE = new RegExp(String.raw`^\s*(?:to|through)\b\s*\$?\s*([0-9]+(?:\.[0-9]+)?)\s*(${SCALE_WORDS})?\b(?!\s*%)`, "i");
 
 const scaled = (digits: string, scale: string | undefined) => Number(digits) * (scale ? SCALE[scale.toLowerCase()] ?? 1 : 1);
-
-/** The scale words, longest first, as the readers' alternation spells them. */
-export const SCALE_WORDS = "k|thousand|mm|million|m|bn|billion|b";
 
 /** What a scale word multiplies by; 1 for none or a word not in the table. */
 export function scaleOf(word: string | undefined): number {
@@ -91,6 +97,10 @@ export function parseUsd(raw: string, floor = 10_000): number | null {
   return Number.isFinite(n) && n >= floor ? Math.round(n) : null;
 }
 
+// A typed field's whole contents: a sign, the digits, a scale, a unit the
+// field prints beside it.
+const FIGURE_TYPED = new RegExp(String.raw`^([-+]?)([0-9]*\.?[0-9]+)(${SCALE_WORDS})?[%x]?$`, "i");
+
 /**
  * One typed figure, read as a number — for a numeric field a person fills in.
  *
@@ -113,7 +123,7 @@ export function readFigure(raw: string): number | null {
   // Commas and spaces are grouping, never meaning; a currency symbol may
   // sit either side of a minus sign ("-$250,000" and "$-250,000" both).
   const v = raw.replace(/[,\s]/g, "").replace(/^([-+]?)\$/, "$1");
-  const m = /^([-+]?)([0-9]*\.?[0-9]+)(k|thousand|mm|million|m|bn|billion|b)?[%x]?$/i.exec(v);
+  const m = FIGURE_TYPED.exec(v);
   if (!m) return null;
   const n = Number(m[2]) * (m[3] ? SCALE[m[3].toLowerCase()] ?? 1 : 1) * (m[1] === "-" ? -1 : 1);
   if (!Number.isFinite(n)) return null;

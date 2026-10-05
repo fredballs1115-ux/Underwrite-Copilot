@@ -98,9 +98,23 @@ describe("parseUsd, which answers a different question", () => {
 
   it("agrees with readFigure about what a suffix means", () => {
     // The one thing the shared scale table exists to guarantee.
-    for (const raw of ["$68.5M", "500k", "2bn", "1.2mm", "63 million"]) {
+    for (const raw of ["$68.5M", "500k", "2bn", "1.2mm", "63 million", "$12.5 mil", "12.5mil", "2.5Mn", "$1.2 bil"]) {
       expect(parseUsd(raw), raw).toBe(readFigure(raw));
     }
+  });
+
+  it("reads mil, mn and bil as the shorthand they are, and never part of a longer number (audit C3a)", () => {
+    expect(parseUsd("$12.5 mil")).toBe(12_500_000);
+    expect(parseUsd("$12.5mil")).toBe(12_500_000);
+    expect(parseUsd("USD 25mn")).toBe(25_000_000);
+    expect(parseUsd("$1.2 bil")).toBe(1_200_000_000);
+    // A figure glued to a word that is no scale is never read by its
+    // integer part.
+    expect(parseUsd("$32.50psf", 1)).toBeNull();
+    expect(parseUsd("$1,250.75psf", 100)).toBeNull();
+    expect(parseUsd("2nd lien $5,000,000")).toBe(5_000_000);
+    expect(readFigure("12.5mil")).toBe(12_500_000);
+    expect(readFigure("2.5mn")).toBe(2_500_000);
   });
 
   it("formats what it parsed", () => {

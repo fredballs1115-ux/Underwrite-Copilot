@@ -119,6 +119,10 @@ describe("a forward purchase, read as stated (pass 28)", () => {
     // every deposit (the audit of 2026-10-05).
     const goHard = readForwardPurchase(deal("Forward purchase at completion", [row("Purchase price", "$30,000,000"), row("Deposit", "$1,500,000 due at go-hard")]), TODAY);
     expect(forwardModelLine(goHard, null)).not.toContain("paid at signing");
+    // A deposit in the memorandum's shorthand reads at its scale (lib/money's
+    // one table, audit C3a).
+    const mil = readForwardPurchase(deal("Forward purchase at completion", [row("Purchase price", "$30,000,000"), row("Deposit", "$1.5 mil at signing")]), TODAY);
+    expect(mil?.deposit?.amount).toBe(1_500_000);
     expect(forwardModelLine(r, { noi1: 3_960_000, noiAssumed: false, price: 72_000_000 })).toContain(
       "Its year-one NOI is $3.96M, the same as the $3.96M the memorandum states at delivery.",
     );

@@ -39,7 +39,7 @@ import {
   type DealStrategy,
 } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
-import { compactUsd, parseUsd } from "@/lib/money";
+import { SCALE_WORDS, compactUsd, parseUsd } from "@/lib/money";
 import { readStatedDate } from "@/lib/note-yield";
 import { withArticle } from "@/lib/article";
 
@@ -69,7 +69,7 @@ const rowOf = (metrics: readonly MetricRow[], re: RegExp, not?: RegExp) =>
 
 /** A figure a dollar reader takes ("$1,000,000", "$2.4M", "1,500,000"),
  *  each read by `parseUsd`, whose floor drops a day count or a year. */
-const DOLLAR_FIGURE = /\$?\s*\d[\d,]*(?:\.\d+)?\s*(?:k|thousand|mm|million|m|bn|billion|b)?\b/gi;
+const DOLLAR_FIGURE = new RegExp(String.raw`\$?\s*\d[\d,]*(?:\.\d+)?(?!\.?\d)\s*(?:${SCALE_WORDS})?\b`, "gi");
 /** A deposit's words that say it grows after its first payment. */
 const STEPS_UP = /\bincreas\w*|\brais(?:es|ed|ing)\b|\bris(?:es|ing)\b|\bstep(?:s|ped|ping)?[\s-]+up\b|\badditional\b|\bsecond\s+deposit\b|\bfurther\s+deposit\b|\bfollowed\s+by\b|\btop(?:s|ped|ping)?[\s-]+up\b/i;
 

@@ -28,9 +28,13 @@ import {
   activeBox,
   buyBoxCoverage,
   countNounOf,
+  figureRange,
+  parsePrice,
+  priceRefusal,
   type BuyBox,
   type BuyBoxStore,
 } from "./criteria";
+import { budgetFromText } from "./deal-strategy";
 import { countNoun } from "./asset-words";
 import { basisTag, statedCapSlot } from "./pipeline-slots";
 import { evalDealbreakers, scoreMandateFit } from "./mandate";
@@ -1184,6 +1188,31 @@ describe("the fifth review's price, per-unit, cap, size, occupancy and money cas
     expect(parseMoney("$1.5M/yr")).toBe(1_500_000);
     expect(parseMoney("$45k-$50k")).toBe(45_000);
     expect(parseMoney("$ 42,000,000")).toBe(42_000_000);
+  });
+
+  it("parseMoney never gives back a decimal to a word glued after the figure, and reads mil, mn and bil (audit C3a)", () => {
+    // The trailing word boundary let the digits backtrack to their integer
+    // part, so a $12.5M ask read as $12.50 and reached the model unfloored.
+    expect(parseMoney("$12.5 mil")).toBe(12_500_000);
+    expect(parseMoney("$12.5mil")).toBe(12_500_000);
+    expect(parseMoney("$2.5Mn")).toBe(2_500_000);
+    expect(parseMoney("USD 25mn")).toBe(25_000_000);
+    expect(parseMoney("$1.2 bil")).toBe(1_200_000_000);
+    expect(parseMoney("1.25x")).toBe(1.25);
+    expect(parseMoney("$32.50psf")).toBe(32.5);
+    expect(parseMoney("$425psf")).toBe(425);
+    // An ordinal is no figure, and a scale is still one only where it ends
+    // its word.
+    expect(parseMoney("2nd lien $5,000,000")).toBeNull();
+    expect(parseMoney("21st Street lot")).toBeNull();
+    expect(parseMoney("$450,000 mileage reimbursement")).toBe(450_000);
+    expect(parseMoney("$450,000 more or less")).toBe(450_000);
+    expect(parseMoney("$12.5M")).toBe(12_500_000);
+    // The price reader and its range read the same table.
+    expect(parsePrice("$12.5 mil")).toBe(12_500_000);
+    expect(figureRange("$40–42 mil")).toEqual({ low: 40_000_000, high: 42_000_000 });
+    expect(priceRefusal("$12.5 mil per unit")).toBe("a figure per unit, per foot or per acre");
+    expect(budgetFromText("$12.5 mil hard and soft costs", 40_000_000)?.budget).toBe(12_500_000);
   });
 });
 

@@ -24,7 +24,7 @@
  *      the screen says "these can't both be right" instead of "105%".
  */
 
-import { compactUsd, minusFor } from "@/lib/money";
+import { SCALE_WORDS, compactUsd, minusFor, scaleOf } from "@/lib/money";
 import { withArticle } from "@/lib/article";
 import { dealTypeLabel, entityLoanOf, entityLoanWords, groundRentOf, interestOf, isGpStake, isTenancyInCommon, isWholeShare, shareProjectCostOf } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -884,7 +884,7 @@ function hasPlanCostRows(metrics: MetricLike[]): boolean {
   return metrics.some((m) => PLAN_COST_ROW.test(m.label));
 }
 
-const MONEY_IN_TEXT = /\$\s?(\d[\d,]*(?:\.\d+)?)\s*(billion|million|thousand|bn|mm|m|k|b)?\b/i;
+const MONEY_IN_TEXT = new RegExp(String.raw`\$\s?(\d[\d,]*(?:\.\d+)?)(?!\.?\d)\s*(${SCALE_WORDS})?\b`, "i");
 // A figure quoted per unit, door, key, bed, pad, site, suite, home or
 // square foot is a RATE — "$18,000 per unit", "$25,000/unit interior
 // renovation", "$45 psf" — not the plan's spend. The metric reader refuses
@@ -913,15 +913,8 @@ export function budgetFromText(
   if (!m) return null;
   const n = Number(m[1].replace(/,/g, ""));
   if (!Number.isFinite(n) || n <= 0) return null;
-  const unit = (m[2] ?? "").toLowerCase();
-  const mult = unit.startsWith("b")
-    ? 1e9
-    : unit.startsWith("m")
-      ? 1e6
-      : unit === "k" || unit === "thousand"
-        ? 1e3
-        : 1;
-  const raw = n * mult;
+  // The scale from lib/money's one table ("$12.5 mil" is $12.5M).
+  const raw = n * scaleOf(m[2]);
   if (raw < 10_000) return null; // "$50/SF" is a rate, not a budget
   const statedAllIn = ALL_IN.test(text);
   const allIn = statedAllIn && price != null;
