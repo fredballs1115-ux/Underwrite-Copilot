@@ -7053,6 +7053,402 @@
           "note": "Eau Claire, WI — Wikideas1, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278486927)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:38660",
+      "city": "Ponce, Puerto Rico",
+      "area": "Ponce, PR",
+      "wikipedia": [
+        "Ponce, Puerto Rico",
+        "Parque de Bombas",
+        "Plaza Las Delicias",
+        "Castillo Serrallés"
+      ],
+      "categories": [
+        "Views of Ponce, Puerto Rico",
+        "Parque de Bombas (Ponce)",
+        "Plaza Las Delicias",
+        "Cruceta El Vigía",
+        "Ponce, Puerto Rico"
+      ],
+      "queries": [
+        "Ponce Puerto Rico skyline",
+        "Ponce Puerto Rico aerial view",
+        "Ponce from Cruceta del Vigia"
+      ]
+    },
+    {
+      "metroId": "cbsa:10380",
+      "city": "Aguadilla, Puerto Rico",
+      "area": "Aguadilla, PR",
+      "wikipedia": [
+        "Aguadilla, Puerto Rico",
+        "Crash Boat Beach",
+        "Rincón, Puerto Rico",
+        "Punta Higuera Light"
+      ],
+      "categories": [
+        "Views of Aguadilla, Puerto Rico",
+        "Crash Boat Beach",
+        "Punta Higuera Light",
+        "Aguadilla, Puerto Rico",
+        "Rincón, Puerto Rico"
+      ],
+      "queries": [
+        "Aguadilla Puerto Rico aerial view",
+        "Aguadilla Puerto Rico panorama",
+        "Rincon Puerto Rico aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:33740",
+      "city": "Monroe, Louisiana",
+      "area": "Monroe, LA",
+      "wikipedia": [
+        "Monroe, Louisiana",
+        "West Monroe, Louisiana",
+        "University of Louisiana at Monroe"
+      ],
+      "categories": [
+        "Views of Monroe, Louisiana",
+        "Downtown Monroe, Louisiana",
+        "Monroe, Louisiana",
+        "West Monroe, Louisiana"
+      ],
+      "queries": [
+        "Monroe Louisiana skyline",
+        "Monroe Louisiana downtown",
+        "Monroe Louisiana aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:23580",
+      "city": "Gainesville, Georgia",
+      "area": "Gainesville, GA",
+      "wikipedia": [
+        "Gainesville, Georgia",
+        "Lake Lanier",
+        "Lake Lanier Olympic Park"
+      ],
+      "categories": [
+        "Views of Gainesville, Georgia",
+        "Downtown Gainesville, Georgia",
+        "Lake Lanier Olympic Park",
+        "Lake Sidney Lanier",
+        "Gainesville, Georgia"
+      ],
+      "queries": [
+        "Gainesville Georgia downtown",
+        "Gainesville Georgia skyline",
+        "Lake Lanier Gainesville aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:30500",
+      "city": "Lexington Park, Maryland",
+      "area": "Lexington Park, MD",
+      "wikipedia": [
+        "Lexington Park, Maryland",
+        "Solomons, Maryland",
+        "Drum Point Light",
+        "Calvert Cliffs State Park",
+        "St. Mary's City, Maryland"
+      ],
+      "categories": [
+        "Solomons, Maryland",
+        "Drum Point Lighthouse",
+        "Calvert Cliffs State Park",
+        "Point Lookout State Park",
+        "Lexington Park, Maryland"
+      ],
+      "queries": [
+        "Solomons Maryland aerial view",
+        "Calvert Cliffs Chesapeake Bay",
+        "Patuxent River Solomons"
+      ]
+    },
+    {
+      "metroId": "cbsa:27340",
+      "city": "Jacksonville, North Carolina",
+      "area": "Jacksonville, NC",
+      "wikipedia": [
+        "Jacksonville, North Carolina",
+        "Hammocks Beach State Park",
+        "Swansboro, North Carolina",
+        "New River (North Carolina)"
+      ],
+      "categories": [
+        "Views of Jacksonville, North Carolina",
+        "Jacksonville, North Carolina",
+        "Hammocks Beach State Park",
+        "Swansboro, North Carolina",
+        "North Topsail Beach, North Carolina"
+      ],
+      "queries": [
+        "Jacksonville North Carolina downtown",
+        "Jacksonville North Carolina New River",
+        "Jacksonville North Carolina aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:32420",
+      "city": "Mayagüez, Puerto Rico",
+      "area": "Mayagüez, PR",
+      "wikipedia": [
+        "Mayagüez, Puerto Rico",
+        "Los Morrillos Light",
+        "Cabo Rojo, Puerto Rico",
+        "Teatro Yagüez"
+      ],
+      "categories": [
+        "Views of Mayagüez, Puerto Rico",
+        "Los Morrillos Light",
+        "Cabo Rojo Light",
+        "Mayagüez, Puerto Rico",
+        "Cabo Rojo, Puerto Rico"
+      ],
+      "queries": [
+        "Mayaguez Puerto Rico aerial view",
+        "Mayaguez Puerto Rico panorama",
+        "Cabo Rojo Puerto Rico aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:49740",
+      "city": "Yuma, Arizona",
+      "area": "Yuma, AZ",
+      "wikipedia": [
+        "Yuma, Arizona",
+        "Ocean-to-Ocean Bridge",
+        "Yuma Territorial Prison State Historic Park"
+      ],
+      "categories": [
+        "Views of Yuma, Arizona",
+        "Downtown Yuma, Arizona",
+        "Ocean-to-Ocean Bridge",
+        "Yuma, Arizona"
+      ],
+      "queries": [
+        "Yuma Arizona downtown",
+        "Yuma Arizona aerial view",
+        "Yuma Arizona Colorado River"
+      ]
+    },
+    {
+      "metroId": "cbsa:21140",
+      "city": "Elkhart, Indiana",
+      "area": "Elkhart-Goshen, IN",
+      "wikipedia": [
+        "Elkhart, Indiana",
+        "Goshen, Indiana",
+        "Elkhart County Courthouse"
+      ],
+      "categories": [
+        "Views of Elkhart, Indiana",
+        "Downtown Elkhart, Indiana",
+        "Downtown Goshen, Indiana",
+        "Elkhart, Indiana",
+        "Goshen, Indiana"
+      ],
+      "queries": [
+        "Elkhart Indiana downtown",
+        "Elkhart Indiana aerial view",
+        "Goshen Indiana downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:44100",
+      "city": "Springfield, Illinois",
+      "area": "Springfield, IL",
+      "wikipedia": [
+        "Springfield, Illinois",
+        "Illinois State Capitol",
+        "Old State Capitol State Historic Site"
+      ],
+      "categories": [
+        "Skyline of Springfield, Illinois",
+        "Views of Springfield, Illinois",
+        "Illinois State Capitol",
+        "Downtown Springfield, Illinois",
+        "Springfield, Illinois"
+      ],
+      "queries": [
+        "Springfield Illinois skyline",
+        "Springfield Illinois downtown",
+        "Springfield Illinois aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:41060",
+      "city": "St. Cloud, Minnesota",
+      "area": "St. Cloud, MN",
+      "wikipedia": [
+        "St. Cloud, Minnesota",
+        "Quarry Park and Nature Preserve",
+        "Munsinger Gardens"
+      ],
+      "categories": [
+        "Views of St. Cloud, Minnesota",
+        "Downtown St. Cloud, Minnesota",
+        "Quarry Park and Nature Preserve",
+        "St. Cloud, Minnesota",
+        "Saint Cloud, Minnesota"
+      ],
+      "queries": [
+        "St. Cloud Minnesota downtown",
+        "St. Cloud Minnesota Mississippi River",
+        "St. Cloud Minnesota aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:27900",
+      "city": "Joplin, Missouri",
+      "area": "Joplin, MO-KS",
+      "wikipedia": [
+        "Joplin, Missouri",
+        "Grand Falls (Missouri)"
+      ],
+      "categories": [
+        "Views of Joplin, Missouri",
+        "Downtown Joplin, Missouri",
+        "Grand Falls (Missouri)",
+        "Joplin, Missouri"
+      ],
+      "queries": [
+        "Joplin Missouri downtown",
+        "Joplin Missouri Main Street",
+        "Joplin Missouri panorama"
+      ]
+    },
+    {
+      "metroId": "cbsa:47580",
+      "city": "Warner Robins, Georgia",
+      "area": "Warner Robins, GA",
+      "wikipedia": [
+        "Warner Robins, Georgia",
+        "Museum of Aviation (Warner Robins, Georgia)",
+        "Robins Air Force Base",
+        "Perry, Georgia"
+      ],
+      "categories": [
+        "Warner Robins, Georgia",
+        "Museum of Aviation (Warner Robins)",
+        "Robins Air Force Base",
+        "Perry, Georgia"
+      ],
+      "queries": [
+        "Warner Robins Georgia",
+        "Robins Air Force Base aerial view",
+        "Museum of Aviation Warner Robins"
+      ]
+    },
+    {
+      "metroId": "cbsa:26380",
+      "city": "Houma, Louisiana",
+      "area": "Houma-Bayou Cane-Thibodaux, LA",
+      "wikipedia": [
+        "Houma, Louisiana",
+        "Thibodaux, Louisiana",
+        "Bayou Terrebonne",
+        "Bayou Lafourche"
+      ],
+      "categories": [
+        "Views of Houma, Louisiana",
+        "Houma, Louisiana",
+        "Thibodaux, Louisiana",
+        "Bayou Terrebonne",
+        "Bayou Lafourche"
+      ],
+      "queries": [
+        "Houma Louisiana downtown",
+        "Houma Louisiana bayou",
+        "Thibodaux Louisiana downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:22500",
+      "city": "Florence, South Carolina",
+      "area": "Florence, SC",
+      "wikipedia": [
+        "Florence, South Carolina",
+        "Darlington Raceway"
+      ],
+      "categories": [
+        "Views of Florence, South Carolina",
+        "Downtown Florence, South Carolina",
+        "Florence, South Carolina",
+        "Darlington Raceway"
+      ],
+      "queries": [
+        "Florence South Carolina downtown",
+        "Florence South Carolina skyline",
+        "Florence South Carolina aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:39540",
+      "city": "Racine, Wisconsin",
+      "area": "Racine-Mount Pleasant, WI",
+      "wikipedia": [
+        "Racine, Wisconsin",
+        "Wind Point Light",
+        "Johnson Wax Headquarters",
+        "Racine Harbor Lighthouse and Life Saving Station"
+      ],
+      "categories": [
+        "Views of Racine, Wisconsin",
+        "Downtown Racine, Wisconsin",
+        "Wind Point Lighthouse",
+        "Racine, Wisconsin"
+      ],
+      "queries": [
+        "Racine Wisconsin skyline",
+        "Racine Wisconsin harbor",
+        "Racine Wisconsin lakefront"
+      ]
+    },
+    {
+      "metroId": "cbsa:40980",
+      "city": "Saginaw, Michigan",
+      "area": "Saginaw, MI",
+      "wikipedia": [
+        "Saginaw, Michigan",
+        "Saginaw River",
+        "Castle Museum of Saginaw County History"
+      ],
+      "categories": [
+        "Views of Saginaw, Michigan",
+        "Downtown Saginaw, Michigan",
+        "Saginaw, Michigan",
+        "Saginaw River"
+      ],
+      "queries": [
+        "Saginaw Michigan downtown",
+        "Saginaw Michigan skyline",
+        "Saginaw Michigan aerial view"
+      ]
+    },
+    {
+      "metroId": "cbsa:28450",
+      "city": "Kenosha, Wisconsin",
+      "area": "Kenosha, WI",
+      "wikipedia": [
+        "Kenosha, Wisconsin",
+        "Kenosha North Pier Light",
+        "Southport Light Station",
+        "Kenosha Streetcar"
+      ],
+      "categories": [
+        "Views of Kenosha, Wisconsin",
+        "Downtown Kenosha, Wisconsin",
+        "Kenosha North Pier Light",
+        "Kenosha, Wisconsin"
+      ],
+      "queries": [
+        "Kenosha Wisconsin skyline",
+        "Kenosha Wisconsin harbor",
+        "Kenosha Wisconsin lakefront"
+      ]
     }
   ]
 }
