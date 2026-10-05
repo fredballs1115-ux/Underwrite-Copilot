@@ -2142,8 +2142,12 @@ describe("the cover says what is being sold, and what the model is and is not on
       {
         ...extraction,
         sale: { method: "auction", terms: "", condition: "", page: "" },
+        // An NOI the auction's floor can carry: the ceiling is the model's
+        // read of the memorandum's figures. On an NOI the model had to assume
+        // the read is left out (lib/model-reads-gate.test.ts).
         metrics: [
-          ...extraction.metrics.filter((m) => !/price|cap rate/i.test(m.label)),
+          ...extraction.metrics.filter((m) => !/price|cap rate|operating income/i.test(m.label)),
+          { label: "Net operating income", value: "$150,000", flagged: false, page: "p. 7" },
           { label: "Starting bid", value: "$2,500,000", flagged: false, page: "p. 3" },
           { label: "Buyer's premium", value: "5%", flagged: false, page: "p. 3" },
         ],

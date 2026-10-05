@@ -153,7 +153,7 @@ import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import { screeningCompareModel } from "@/lib/underwrite/report-grid";
+import { modelReadsWithheld, screeningCompareModel } from "@/lib/underwrite/report-grid";
 import { type DealRateSeeds } from "@/lib/debt-index";
 import { constructionSeedFor, modelMarketFor } from "@/lib/model-market";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
@@ -841,23 +841,30 @@ export default async function DealPage({
         { regulation },
       )
     : null;
+  // The full report's gate (lib/underwrite/report-grid `modelReadsWithheld`):
+  // where the model runs on a placeholder price or an assumed year-1 NOI,
+  // nothing else it computed prints — the assumable and seller-note pricing,
+  // the leasehold's exit, the sale's ceiling, every panel's model line — and
+  // only the memorandum's terms do, as in the report (research pass 38).
+  const readsWithheld = derived ? modelReadsWithheld(derived.inputs, derived.sources, isPlanDeal(strategy.kind)) : null;
+  const shown = readsWithheld ? null : derived;
   // The seller's loan, where the memorandum offers it for assumption
   // (#417): priced against the model's own new loan at the model's own
   // rate — today's index plus the class spread wherever the table seeded
   // it. Only where the price buys the building (lib/assumable-debt).
-  const assumableRead = extraction ? readAssumable(extraction, derived?.inputs ?? null) : null;
+  const assumableRead = extraction ? readAssumable(extraction, shown?.inputs ?? null) : null;
   const assumable = assumableRead
-    ? assumableView(assumableRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed)
+    ? assumableView(assumableRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed, readsWithheld)
     : null;
   // A note the seller offers to carry (#462): the same comparison, the
   // note in the seller's loan's place.
-  const sellerRead = extraction ? readSellerFinancing(extraction, derived?.inputs ?? null) : null;
+  const sellerRead = extraction ? readSellerFinancing(extraction, shown?.inputs ?? null) : null;
   const sellerNote = sellerRead
-    ? sellerFinancingView(sellerRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed)
+    ? sellerFinancingView(sellerRead, derived?.sources.allInRatePct?.note ?? null, !!derived?.meta.rateSeed, readsWithheld)
     : null;
   // A leasehold's exit, valued on the term its ground lease has left at the
   // model's sale (#421) — only where the memorandum states when it ends.
-  const leaseholdRead = extraction ? readLeaseholdExit(extraction, derived?.inputs ?? null) : null;
+  const leaseholdRead = extraction ? readLeaseholdExit(extraction, shown?.inputs ?? null) : null;
   const leaseholdExit = leaseholdRead ? leaseholdExitView(leaseholdRead) : null;
   const rateSeeds: DealRateSeeds = {
     permanent: derived?.meta.rateSeed ?? null,
@@ -1537,8 +1544,8 @@ export default async function DealPage({
             the reader's day (`readerNoon`, lib/reader-day). */}
         <SandwichPanel
           sandwich={readSandwichLease(extraction, readerNoon)}
-          holdYears={derived ? derived.inputs.holdMonths / 12 : null}
-          modelLine={derived?.meta.sandwich?.read ?? ""}
+          holdYears={shown ? shown.inputs.holdMonths / 12 : null}
+          modelLine={shown?.meta.sandwich?.read ?? ""}
         />
         {/* How it is sold (#456): an auction's starting bid is where the
             price starts — the bid, the premium on top, the model's ceiling
@@ -1546,7 +1553,7 @@ export default async function DealPage({
             selling (lib/sale-terms). */}
         <SalePanel
           sale={readSale(extraction, readerNoon)}
-          ceiling={derived ? saleCeiling(extraction, derived.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT) : null}
+          ceiling={shown ? saleCeiling(extraction, shown.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT) : null}
         />
         {/* A forward purchase or a build-to-suit bought at delivery
             (lib/forward-purchase): the clock from today to the delivery and
@@ -1556,8 +1563,8 @@ export default async function DealPage({
         <ForwardPanel
           forward={readForwardPurchase(extraction, readerNoon, strategy)}
           today={todayIso}
-          exitCapPct={derived ? derived.inputs.exitCapPct * 100 : null}
-          modelLine={derived?.meta.forward?.read ?? ""}
+          exitCapPct={shown ? shown.inputs.exitCapPct * 100 : null}
+          modelLine={shown?.meta.forward?.read ?? ""}
         />
         {/* An operating business on its real estate (lib/going-concern):
             the operator's EBITDAR against its rent with the 1.0x line, the
@@ -1565,7 +1572,7 @@ export default async function DealPage({
             what the model does with the business's income. */}
         <GoingConcernPanel
           goingConcern={readGoingConcern(extraction, readerNoon)}
-          modelLine={derived?.meta.goingConcern?.read ?? ""}
+          modelLine={shown?.meta.goingConcern?.read ?? ""}
         />
         {/* A covenant or a contract that sets the rents (#453): the units it
             binds, until when, each tier against its limit — said before any
@@ -1578,8 +1585,8 @@ export default async function DealPage({
         <RegulationPanel
           regulation={regulation}
           today={todayIso}
-          modelGrowthPct={derived ? derived.inputs.rentGrowthPct * 100 : null}
-          modelLine={derived?.meta.regulation?.read ?? ""}
+          modelGrowthPct={shown ? shown.inputs.rentGrowthPct * 100 : null}
+          modelLine={shown?.meta.regulation?.read ?? ""}
         />
         {/* One tenant leases the whole property (#454): its guarantor, the
             term left today and at the model's sale, the options, and the
@@ -1587,12 +1594,12 @@ export default async function DealPage({
         <SingleTenantPanel
           lease={readSingleTenant(extraction, readerNoon)}
           model={
-            derived
+            shown
               ? {
-                  holdMonths: derived.inputs.holdMonths,
-                  rentGrowthPct: derived.inputs.rentGrowthPct,
-                  vacancyPct: derived.inputs.vacancyPct,
-                  exitCapPct: derived.inputs.exitCapPct,
+                  holdMonths: shown.inputs.holdMonths,
+                  rentGrowthPct: shown.inputs.rentGrowthPct,
+                  vacancyPct: shown.inputs.vacancyPct,
+                  exitCapPct: shown.inputs.exitCapPct,
                 }
               : null
           }
@@ -1601,66 +1608,66 @@ export default async function DealPage({
             model's sale a year at a time, the building by the space each
             leases with an anchor outside the sale drawn apart, and each
             tenant's end and rights. */}
-        <RosterPanel roster={readRoster(extraction, readerNoon)} modelLine={derived?.meta.roster?.read ?? ""} />
+        <RosterPanel roster={readRoster(extraction, readerNoon)} modelLine={shown?.meta.roster?.read ?? ""} />
         {/* A value-add renovation program (#460): the doors done and to
             go, the premium priced on against the one achieved with the
             break-even at the model's exit cap, and the pace the period
             asks of turnover. */}
         <ValueAddPanel
           program={readValueAdd(extraction)}
-          exitCapPct={derived ? derived.inputs.exitCapPct : null}
-          modelLine={derived?.meta.valueAdd?.read ?? ""}
+          exitCapPct={shown ? shown.inputs.exitCapPct : null}
+          modelLine={shown?.meta.valueAdd?.read ?? ""}
         />
         {/* A property-tax abatement (#461): the years still abated against
             the model's sale, the bill today against the full one, and the
             share of the NOI that goes to taxes when it ends. */}
         <TaxAbatementPanel
           abatement={readTaxAbatement(extraction, readerNoon)}
-          holdYears={derived ? derived.inputs.holdMonths / 12 : null}
-          modelLine={derived?.meta.taxAbatement?.read ?? ""}
+          holdYears={shown ? shown.inputs.holdMonths / 12 : null}
+          modelLine={shown?.meta.taxAbatement?.read ?? ""}
         />
         {/* What a hotel is sold with (#455): the flag, the manager, the
             encumbrance and the PIP — the basis a key with the PIP on top,
             the agreements' clocks against the model's sale, the rooms. */}
         <HotelPanel
           hotel={readHotelDeal(extraction, readerNoon)}
-          holdYears={derived ? derived.inputs.holdMonths / 12 : null}
-          modelLine={derived?.meta.hotel?.read ?? ""}
+          holdYears={shown ? shown.inputs.holdMonths / 12 : null}
+          modelLine={shown?.meta.hotel?.read ?? ""}
         />
         {/* A student building (#468): the pre-leasing against last year's
             and the occupancy the model runs at, the beds, the walk to
             campus (lib/student-housing). */}
         <StudentHousingPanel
           student={readStudentHousing(extraction)}
-          modelLine={derived?.meta.student?.read ?? ""}
-          modelOccupancyPct={derived ? Math.round((1 - derived.inputs.vacancyPct) * 1000) / 10 : null}
+          modelLine={shown?.meta.student?.read ?? ""}
+          modelOccupancyPct={shown ? Math.round((1 - shown.inputs.vacancyPct) * 1000) / 10 : null}
         />
         {/* A manufactured-housing park (#470): whose homes stand on the pads,
             the lot rent against the memorandum's market, the water and
             sewer, and what the model does with each
             (lib/manufactured-housing). */}
-        <ManufacturedHousingPanel park={readManufacturedHousing(extraction)} modelLine={derived?.meta.mh?.read ?? ""} />
+        <ManufacturedHousingPanel park={readManufacturedHousing(extraction)} modelLine={shown?.meta.mh?.read ?? ""} />
         {/* A self-storage facility (#471): its units, area and rent let
             against the 85% line, the in-place rent against the street rate,
             and whose platform it rides on (lib/self-storage). */}
-        <SelfStoragePanel storage={readSelfStorage(extraction)} modelLine={derived?.meta.storage?.read ?? ""} />
+        <SelfStoragePanel storage={readSelfStorage(extraction)} modelLine={shown?.meta.storage?.read ?? ""} />
         {/* A mixed-use building (lib/mixed-use): the residential and
             commercial incomes on one bar, the commercial share of the area,
             and what the model's one exit cap does to both. */}
         <MixedUsePanel
           mixedUse={readMixedUse(extraction, readerNoon)}
-          modelLine={derived?.meta.mixedUse?.read ?? ""}
+          modelLine={shown?.meta.mixedUse?.read ?? ""}
         />
         {/* Condominium units bought in bulk (lib/condo): the buyer's share of
             the association with a lender's limit on a single owner, a year of
             the dues, the reserves and restrictions as stated, and what the
             model does with the units. */}
-        <CondoPanel condo={readCondo(extraction, readerNoon)} modelLine={derived?.meta.condo?.read ?? ""} />
+        <CondoPanel condo={readCondo(extraction, readerNoon)} modelLine={shown?.meta.condo?.read ?? ""} />
         {/* What the third-party reports found (#465): a tile a report, the
             Phase I's age against the 180-day and one-year marks, the PML
             against the lenders' 20%, and what the model does with the
             immediate repairs. */}
-        <SiteReportsPanel reports={readSiteReports(extraction, readerNoon)} modelLine={derived?.meta.siteReports?.read ?? ""} />
+        <SiteReportsPanel reports={readSiteReports(extraction, readerNoon)} modelLine={shown?.meta.siteReports?.read ?? ""} />
         {/* Who is selling it and when offers are due (#467): the brokers as
             the memorandum prints them, a tap to call or write, and the call
             for offers as written (lib/offering). */}

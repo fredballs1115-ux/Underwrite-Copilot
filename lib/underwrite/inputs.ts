@@ -560,10 +560,10 @@ function mixedUseMeta(extraction: ExtractionResult | null, inputs: UnderwriteInp
  *  (lib/going-concern): the read in a line, then what this model does with
  *  the income — it capitalises its year-one income as rent and allocates
  *  nothing to the business. Null on anything else. */
-function goingConcernMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, noi1: number): WorkbookMeta["goingConcern"] {
+function goingConcernMeta(extraction: ExtractionResult | null, inputs: UnderwriteInputs, noi1: number, noiAssumed = false): WorkbookMeta["goingConcern"] {
   const r = readGoingConcern(extraction);
   if (!r) return null;
-  return { line: goingConcernShortLine(r), read: goingConcernModelLine(r, { noi1, exitCapPct: inputs.exitCapPct }) ?? "" };
+  return { line: goingConcernShortLine(r), read: goingConcernModelLine(r, { noi1, exitCapPct: inputs.exitCapPct, noiAssumed }) ?? "" };
 }
 
 /** The cover's lines about condominium units bought in bulk (lib/condo):
@@ -1413,7 +1413,7 @@ export function deriveUnderwriteInputs(
       regulation: regulationMeta(deal?.regulation, inputs),
       forward: forwardMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption"),
       mixedUse: mixedUseMeta(extraction, inputs),
-      goingConcern: goingConcernMeta(extraction, inputs, noi),
+      goingConcern: goingConcernMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption"),
       condo: condoMeta(extraction, inputs),
       sandwich: sandwichMeta(extraction, inputs),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,

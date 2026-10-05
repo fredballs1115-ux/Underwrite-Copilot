@@ -241,8 +241,10 @@ export function sellerFinancingNote(s: SellerFinancingRead): string {
 }
 
 /** The card's one sentence: what is missing, or that it is a second, or
- *  the answer the two positions give. */
-export function sellerFinancingSentence(s: SellerFinancingRead): string {
+ *  the answer the two positions give — or, where the model's reads are left
+ *  out (`withheld`, lib/underwrite/report-grid `modelReadsWithheld`), why
+ *  nothing is priced. */
+export function sellerFinancingSentence(s: SellerFinancingRead, withheld: string | null = null): string {
   if (s.terms.second) {
     return "It sits behind new senior debt: a second is priced with the first, not against it, so the page does not run it against the model's loan — and most senior lenders forbid seller paper behind them.";
   }
@@ -254,6 +256,7 @@ export function sellerFinancingSentence(s: SellerFinancingRead): string {
     return "Its term is under a year — a note that short is a bridge to a refinance at today's rate, so there is nothing to price against a new loan.";
   }
   const r = s.read;
+  if (withheld) return `It is not priced against a new loan: ${withheld}`;
   if (!r || !s.model) return "The model this deal runs on is not ready, so the note cannot be priced against its new loan yet.";
   const hold = `${s.model.holdYears}-year hold`;
   const balloon =
@@ -282,15 +285,17 @@ export function sellerFinancingSentence(s: SellerFinancingRead): string {
 }
 
 /** The card's figures as plain data — the assumption card's shape, marked
- *  as the seller's note so the card says so. */
-export function sellerFinancingView(s: SellerFinancingRead, rateNote: string | null, seeded: boolean): AssumableView {
+ *  as the seller's note so the card says so. `withheld`: why the model's
+ *  reads are left out, where they are (the read is then taken with no
+ *  model, so only the terms print). */
+export function sellerFinancingView(s: SellerFinancingRead, rateNote: string | null, seeded: boolean, withheld: string | null = null): AssumableView {
   const r = s.read;
   const m = s.model;
   return {
     kind: "seller",
     termsLine: sellerFinancingTermsLine(s.terms),
     page: s.terms.page,
-    sentence: sellerFinancingSentence(s),
+    sentence: sellerFinancingSentence(s, withheld),
     couponPct: s.terms.ratePct,
     marketPct: m ? m.marketRatePct : null,
     rateLine: m

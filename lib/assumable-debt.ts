@@ -659,9 +659,11 @@ const yearsText = (n: number) => `${n} ${n === 1 ? "year" : "years"}`;
  * The card's one sentence under the pictures: what is missing, or that the
  * loan has matured, or the answer the two positions give — and, where its
  * prepayment terms lock the loan in, that the model's new loan may not be
- * this buyer's to take.
+ * this buyer's to take. `withheld` is why the model's reads are left out
+ * (lib/underwrite/report-grid `modelReadsWithheld`): the loan is then read
+ * as stated and priced against nothing, and the sentence says why.
  */
-export function assumableSentence(a: AssumableRead): string {
+export function assumableSentence(a: AssumableRead, withheld: string | null = null): string {
   if (a.matured && a.terms.maturity) {
     return `It is at or past its ${monthYear(a.terms.maturity)} maturity — a loan that has come due is refinanced, not assumed, so there is nothing to price against a new one.`;
   }
@@ -690,6 +692,7 @@ export function assumableSentence(a: AssumableRead): string {
     return `It cannot be priced against a new loan: the memorandum does not state ${list}.${lockIn}`;
   }
   const r = a.read;
+  if (withheld) return `It is not priced against a new loan: ${withheld}${lockIn}`;
   if (!r || !a.model) return `The model this deal runs on is not ready, so the loan cannot be priced against its new loan yet.${lockIn}`;
   const mip =
     t.mipPct != null && t.ratePct != null
@@ -763,14 +766,16 @@ export interface AssumableView {
 /**
  * The view, from the read and the model's own rate note (`seeded`: whether
  * the rate came off today's rates table — a placeholder is said as one).
+ * `withheld`: why the model's reads are left out, where they are — the read
+ * is then taken with no model, so only the terms print (research pass 38).
  */
-export function assumableView(a: AssumableRead, rateNote: string | null, seeded: boolean): AssumableView {
+export function assumableView(a: AssumableRead, rateNote: string | null, seeded: boolean, withheld: string | null = null): AssumableView {
   const r = a.read;
   const m = a.model;
   return {
     termsLine: assumableTermsLine(a),
     page: a.terms.page,
-    sentence: assumableSentence(a),
+    sentence: assumableSentence(a, withheld),
     couponPct: a.pricedRatePct,
     ...(a.terms.mipPct != null && a.pricedRatePct != null ? { mipPct: a.terms.mipPct } : {}),
     marketPct: m ? m.marketRatePct : null,

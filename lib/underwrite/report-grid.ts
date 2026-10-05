@@ -593,6 +593,26 @@ export function placeholderReason(
 }
 
 /**
+ * Why the model's own reads are left out — the assumable loan's and the
+ * seller's note's pricing, the leasehold's exit, the sale's ceiling bid,
+ * every panel's model line — or null where they print. The full report's
+ * gate (lib/memo/report-document `buildReportData`: on a placeholder price or
+ * an assumed year-1 NOI "nothing else it computed prints either"), which the
+ * deal page and the workbook's cover keep too, so only the memorandum's terms
+ * print where the report prints only them (research pass 38: an auction with
+ * no NOI read "the model does not bid at all" on the page and the cover, a
+ * verdict made of the placeholder). A plan deal's report keeps its reads, and
+ * so do they.
+ */
+export function modelReadsWithheld(
+  inputs: UnderwriteInputs,
+  sources: ModelSources | null | undefined,
+  planDeal: boolean,
+): string | null {
+  return planDeal ? null : placeholderReason(inputs, sources);
+}
+
+/**
  * The deal page's sensitivity playground, over its tiles: the returns it
  * withholds and why, the report's own reason — and, while the price is the
  * placeholder's, how to lift it, since the price field is right there. The

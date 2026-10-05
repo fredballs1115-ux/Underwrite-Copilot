@@ -13,7 +13,7 @@ import { datedLong } from "@/lib/debt-index";
 import { documentNotices } from "@/lib/data-notices";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
-import { placeholderWorkbookLine } from "./report-grid";
+import { modelReadsWithheld, placeholderWorkbookLine } from "./report-grid";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -253,6 +253,21 @@ function buildCover(
   builtAt: Date = new Date(),
 ) {
   const { meta } = model;
+  // The full report's gate (lib/underwrite/report-grid `modelReadsWithheld`):
+  // on a placeholder price or an assumed year-1 NOI, the model's reads of the
+  // terms below are left out, said once at their foot, and only the
+  // memorandum's terms print (research pass 38: the cover read "the model
+  // does not bid at all" on an auction whose NOI was the model's own 6%).
+  const readsWithheld = modelReadsWithheld(model.inputs, model.sources, meta.strategy != null && isPlanDeal(meta.strategy));
+  let readLeftOut = false;
+  const showRead = (read: string | null | undefined): boolean => {
+    if (!read) return false;
+    if (readsWithheld) {
+      readLeftOut = true;
+      return false;
+    }
+    return true;
+  };
   ws.getColumn(1).width = 3;
   ws.getColumn(2).width = 26;
   ws.getColumn(3).width = 64;
@@ -372,7 +387,7 @@ function buildCover(
     fact("The forward purchase", meta.forward.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.forward.read) {
+    if (showRead(meta.forward.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.forward.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -389,7 +404,7 @@ function buildCover(
     fact("The operating business", meta.goingConcern.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.goingConcern.read) {
+    if (showRead(meta.goingConcern.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.goingConcern.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -402,23 +417,27 @@ function buildCover(
   // it is worth against this model's own new loan.
   if (meta.assumable) {
     fact("The seller's loan", meta.assumable.line);
-    const c = ws.getCell(r, 3);
-    c.value = meta.assumable.read;
-    c.font = { name: ARIAL, size: 9, color: MUTED };
-    c.alignment = { wrapText: true, vertical: "top" };
-    ws.getRow(r).height = 40;
-    r++;
+    if (showRead(meta.assumable.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.assumable.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 40;
+      r++;
+    }
   }
   // A note the seller offers to carry (#462): as stated, then what it is
   // worth against this model's own new loan.
   if (meta.sellerNote) {
     fact("The seller's note", meta.sellerNote.line);
-    const c = ws.getCell(r, 3);
-    c.value = meta.sellerNote.read;
-    c.font = { name: ARIAL, size: 9, color: MUTED };
-    c.alignment = { wrapText: true, vertical: "top" };
-    ws.getRow(r).height = 40;
-    r++;
+    if (showRead(meta.sellerNote.read)) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.sellerNote.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 40;
+      r++;
+    }
   }
   // A covenant or a contract that sets the rents (#453): how much of the
   // building is restricted and until when, then what this model's one rent
@@ -444,7 +463,7 @@ function buildCover(
     fact("The rent rules", meta.regulation.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.regulation.read) {
+    if (showRead(meta.regulation.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.regulation.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -461,7 +480,7 @@ function buildCover(
     fact("The single tenant", meta.singleTenant.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.singleTenant.read) {
+    if (showRead(meta.singleTenant.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.singleTenant.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -477,7 +496,7 @@ function buildCover(
     fact("The tenants", meta.roster.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.roster.read) {
+    if (showRead(meta.roster.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.roster.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -493,7 +512,7 @@ function buildCover(
     fact("The value-add program", meta.valueAdd.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.valueAdd.read) {
+    if (showRead(meta.valueAdd.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.valueAdd.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -508,7 +527,7 @@ function buildCover(
     fact("The tax abatement", meta.taxAbatement.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.taxAbatement.read) {
+    if (showRead(meta.taxAbatement.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.taxAbatement.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -523,7 +542,7 @@ function buildCover(
     fact("Student housing", meta.student.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.student.read) {
+    if (showRead(meta.student.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.student.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -539,7 +558,7 @@ function buildCover(
     fact("The park", meta.mh.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.mh.read) {
+    if (showRead(meta.mh.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.mh.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -554,7 +573,7 @@ function buildCover(
     fact("The facility", meta.storage.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.storage.read) {
+    if (showRead(meta.storage.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.storage.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -570,7 +589,7 @@ function buildCover(
     fact("The two incomes", meta.mixedUse.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.mixedUse.read) {
+    if (showRead(meta.mixedUse.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.mixedUse.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -587,7 +606,7 @@ function buildCover(
     fact("The condominium units", meta.condo.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.condo.read) {
+    if (showRead(meta.condo.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.condo.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -604,7 +623,7 @@ function buildCover(
     fact("The sandwich position", meta.sandwich.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.sandwich.read) {
+    if (showRead(meta.sandwich.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.sandwich.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -620,7 +639,7 @@ function buildCover(
     fact("The reports", meta.siteReports.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.siteReports.read) {
+    if (showRead(meta.siteReports.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.siteReports.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -636,7 +655,7 @@ function buildCover(
     fact("How it is sold", meta.sale.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.sale.read) {
+    if (showRead(meta.sale.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.sale.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -652,7 +671,7 @@ function buildCover(
     fact("The hotel", meta.hotel.line);
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
     ws.getRow(r - 1).height = 40;
-    if (meta.hotel.read) {
+    if (showRead(meta.hotel.read)) {
       const c = ws.getCell(r, 3);
       c.value = meta.hotel.read;
       c.font = { name: ARIAL, size: 9, color: MUTED };
@@ -665,7 +684,9 @@ function buildCover(
   // lease has left then, and the Exit Cap that runs the workbook on the
   // term — the input stays the model's; the reader decides. The lease's
   // end rides in "What is being sold" above.
-  if (meta.leasehold) {
+  if (meta.leasehold && !showRead(meta.leasehold.line)) {
+    // Left out whole: the exit on the term is the model's own arithmetic.
+  } else if (meta.leasehold) {
     fact("The exit, on the lease's term", meta.leasehold.line);
     // A sentence, not a figure: wrapped, with the room it needs.
     ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
@@ -678,6 +699,15 @@ function buildCover(
       ws.getRow(r).height = 64;
       r++;
     }
+  }
+  // Why the model's reads above are left out, once, where any was.
+  if (readLeftOut && readsWithheld) {
+    const c = ws.getCell(r, 3);
+    c.value = `The model's reads of these terms are left out: ${readsWithheld}`;
+    c.font = { name: ARIAL, size: 9, color: MUTED };
+    c.alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r).height = 40;
+    r++;
   }
   r++;
 

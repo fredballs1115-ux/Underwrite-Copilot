@@ -357,13 +357,20 @@ function sentencesOf(r: Omit<GoingConcernRead, "sentences" | "headline">): strin
  *  runs on as rent and allocates nothing to the business. Null on a lease
  *  to the operator, whose rent IS the landlord's income; said as a
  *  condition where the memorandum does not say whether the business is
- *  sold. */
-export function goingConcernModelLine(r: GoingConcernRead | null, m: { noi1: number | null; exitCapPct: number } | null): string | null {
+ *  sold. Where the model assumed its year-one income (`noiAssumed`: no NOI
+ *  the memorandum states, an assumed 6% of the price), the figure is never
+ *  named as the deal's income (research pass 38: "its $240k year-one
+ *  income" was the assumed 6%). */
+export function goingConcernModelLine(
+  r: GoingConcernRead | null,
+  m: { noi1: number | null; exitCapPct: number; noiAssumed?: boolean } | null,
+): string | null {
   if (!r || r.branch === "operator_lease" || !m || m.noi1 == null) return null;
   const what = r.business ? BUSINESS_NAME[r.business] : "the operating business";
   const whose =
     r.branch === "unstated" ? "if the business is sold with the real estate, that income is the operation's" : `on ${what} that income is the operation's`;
-  return `The model capitalises its ${money(m.noi1)} year-one income at ${withArticle(`${(m.exitCapPct * 100).toFixed(2)}% exit cap`)} as if it were rent; ${whose}, which the real estate does not earn without an operator, and the model allocates nothing to the business.`;
+  const income = m.noiAssumed ? "an assumed year-one income, not one the memorandum states," : `its ${money(m.noi1)} year-one income`;
+  return `The model capitalises ${income} at ${withArticle(`${(m.exitCapPct * 100).toFixed(2)}% exit cap`)} as if it were rent; ${whose}, which the real estate does not earn without an operator, and the model allocates nothing to the business.`;
 }
 
 /** The pipeline row's tag: "Going concern", "Operator lease, 2.10x
