@@ -56,7 +56,9 @@ export interface PlaygroundData {
    *  (lib/compare-interest `modelReturnsRead`): a note's, a preferred
    *  equity position's, or a share's beside its entity's loan or of no
    *  stated percentage — returns the price did not buy, withheld with its
-   *  line, as the first-draft card withholds them; absent, they stand */
+   *  line, as the first-draft card withholds them; and a leasehold's whose
+   *  lease ends inside the hold, withheld with the leasehold card's own
+   *  sentence (research pass 38); absent, they stand */
   interest?: ModelReturnsRead | null;
   /** the occupancy the model read, decimal (the derived model's
    *  `meta.occupancyPct`): where the model runs the building 90% vacant or
@@ -153,8 +155,11 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const priceEntered = priceOverride != null;
   // And what the price buys (lib/compare-interest): a note's or a position's
   // model runs the building at a price that did not buy it, so its returns
-  // are withheld whatever price is typed — the first-draft card's rule.
+  // are withheld whatever price is typed — the first-draft card's rule; and
+  // a leasehold whose lease ends inside the hold sells a building that has
+  // reverted (research pass 38), said by when ("lease ends in year 3").
   const own = data.interest?.withheld ?? null;
+  const ownWord = own ? (data.interest?.word ?? own) : null;
   // A building the model runs 90% vacant or more (research pass 38): its
   // rent line is the occupied space's revenue grossed up through the
   // vacancy, so a step of the lever moves the NOI by a multiple, and no
@@ -172,7 +177,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const baseWithheld = own != null || placeholderReason(inputs, sources) != null || vacantWord != null || misread;
   const compare = dirty && !baseWithheld;
   const naWord =
-    own ??
+    ownWord ??
     (placeholder
       ? pricePlaceholder && !priceEntered
         ? "no price"
@@ -181,9 +186,10 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // No cap is struck on year-1 NOI where the price did not buy the
   // building, where the NOI is the model's assumption (an assumed 6% of the
   // price printed "6.00%" on every such deal), or where the building runs
-  // nearly vacant: the field says which (research pass 38).
+  // nearly vacant: the field says which (research pass 38). A lease that
+  // ends inside the hold leaves year 1 inside it: its cap stands.
   const noiAssumed = sources?.inPlaceRentAnnual?.provenance === "assumption";
-  const capNa = own ?? (noiAssumed ? "assumed NOI" : null) ?? vacantWord;
+  const capNa = (own !== "lease" ? ownWord : null) ?? (noiAssumed ? "assumed NOI" : null) ?? vacantWord;
 
   // The EFFECTIVE base is the sliders' base stops (clamped into physical
   // range), so a degenerate derived input can't make the resting metrics

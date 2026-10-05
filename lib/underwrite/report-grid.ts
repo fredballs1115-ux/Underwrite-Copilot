@@ -5,6 +5,7 @@
 // the on-screen sliders can never disagree.
 
 import { withArticle } from "@/lib/article";
+import type { CompareModel, ModelReturnsRead } from "@/lib/compare-interest";
 import { findingWithholdsReturns, type PlausibilityFinding } from "@/lib/deal-strategy";
 import { moneyCompact } from "@/lib/plan-facts";
 import { computeUnderwrite, type UnderwriteInputs } from "./engine";
@@ -354,7 +355,8 @@ export interface SensitivityData {
    *  one is */
   maxBidWithheld?: string | null;
   /** why the report leaves the model's returns out, or null where it may
-   *  print them (`placeholderReturnsLine`); null where no sources were given */
+   *  print them (`placeholderReturnsLine`, else `leaseReturnsLine`); null
+   *  where no sources or interest read were given */
   withheld?: string | null;
   /** what the modelled price is — the ask, a share grossed up to the whole,
    *  an auction's floor, NOI over the going-in cap — as the derived model
@@ -478,6 +480,30 @@ export interface SensitivityOptions {
    *  more, the max bid is withheld and the sentence names the occupancy
    *  stated (`nearlyVacantReason`) */
   occupancyPct?: number | null;
+  /** what the price buys, read on this model by the compare table's rule
+   *  (lib/compare-interest `modelReturnsRead` over `screeningCompareModel`):
+   *  where a leasehold's lease ends inside the hold, the grids and the max
+   *  bid are left out with the leasehold card's own sentence, as the deal
+   *  page's playground withholds its tiles (research pass 38) */
+  interest?: Pick<ModelReturnsRead, "withheld" | "line"> | null;
+}
+
+/**
+ * The screening model as lib/compare-interest reads a model: its price,
+ * year-1 NOI, going-in cap and hold, from one run of the engine. The deal
+ * page's playground and the report route hand this same read to
+ * `modelReturnsRead`, so the page and the report withhold the same returns
+ * for the same reason (research pass 38).
+ */
+export function screeningCompareModel(inputs: UnderwriteInputs): CompareModel {
+  const run = computeUnderwrite(inputs);
+  const year1Noi = run.cashFlow[0]?.noi ?? 0;
+  return {
+    purchasePrice: inputs.purchasePrice,
+    year1Noi,
+    goingInCapPct: inputs.purchasePrice > 0 ? (year1Noi / inputs.purchasePrice) * 100 : null,
+    holdYears: run.holdYears,
+  };
 }
 
 // Whole dollars, a loss's minus outside the dollar: "−$310,000" (research
@@ -503,6 +529,16 @@ const usd0 = (n: number) => {
 export function placeholderReturnsLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
   const reason = placeholderReason(inputs, sources);
   return reason ? `The IRR grids and the max bid are left out: ${reason}` : null;
+}
+
+/**
+ * Why the report leaves the model's returns out where a leasehold's lease
+ * ends inside the hold (lib/compare-interest's rule, research pass 38): the
+ * grids and the bid would price a sale of a building that has reverted, so
+ * they are left out over the leasehold card's own sentence. Null otherwise.
+ */
+export function leaseReturnsLine(interest: Pick<ModelReturnsRead, "withheld" | "line"> | null | undefined): string | null {
+  return interest?.withheld === "lease" && interest.line ? `The IRR grids and the max bid are left out. ${interest.line}` : null;
 }
 
 /**
@@ -707,7 +743,9 @@ export function buildSensitivityData(
     // and which clear on their own, so the sentence names them.
     noBid: box && solved && solved.price == null ? noBidRead(inputs, box, levers) : null,
     maxBidWithheld: vacant,
-    withheld: placeholderReturnsLine(inputs, opts.sources),
+    // A placeholder's reason first; else a leasehold whose lease ends inside
+    // the hold, said in the leasehold card's own sentence.
+    withheld: placeholderReturnsLine(inputs, opts.sources) ?? leaseReturnsLine(opts.interest),
     priceSource: opts.sources?.purchasePrice ?? null,
     baseCase: opts.sources ? buildBaseCase(inputs, opts.sources) : null,
   };

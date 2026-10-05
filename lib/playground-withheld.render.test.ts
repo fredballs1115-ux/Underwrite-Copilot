@@ -6,12 +6,17 @@
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { computeUnderwrite } from "@/lib/underwrite/engine";
-import { buildSensitivityData, maxBidSentence, nearlyVacantReason } from "@/lib/underwrite/report-grid";
+import { buildSensitivityData, maxBidSentence, nearlyVacantReason, screeningCompareModel } from "@/lib/underwrite/report-grid";
+import { modelReturnsRead, withheldWord } from "@/lib/compare-interest";
+import { compareReturns } from "@/lib/compare-figures";
+import { leaseholdExitSentence, readLeaseholdExit } from "@/lib/leasehold-exit";
 import { SensitivityPlayground, type PlaygroundData } from "@/app/(app)/deals/[id]/sensitivity-playground";
 import { DebtSizer } from "@/app/(app)/deals/[id]/debt-sizer";
+import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
+import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { assessPlausibility, inferStrategy } from "@/lib/deal-strategy";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { a11yIssues, gluedWords, visibleText as textOf } from "./render-lint";
@@ -194,5 +199,92 @@ describe("an NOI of zero or less beside a stated cap: the price × the cap is an
       expect(html).not.toContain("$616,250");
       expect(textOf(html)).not.toContain("NOI from the screening model");
     }
+  });
+});
+
+describe("a leasehold whose lease ends inside the hold has no sale to return on (research pass 38, item 9)", () => {
+  // The pass's fixture: a retail leasehold, $12M at a stated 9.17% cap, its
+  // ground lease ending December 31, 2028 with no options. Page and report
+  // printed "Levered IRR 17.7%", a 2.01x multiple and a max bid of $12.6M
+  // (+5.0%), each on a year-5 sale of a building that reverted in year 3.
+  const AS_OF = new Date("2026-10-05T12:00:00Z");
+  const LEASE2 = deal(
+    "Retail",
+    [
+      ["Asking price", "12,000,000"],
+      ["NOI (in-place)", "1,100,000", "in_place"],
+      ["Going-in cap rate", "9.17%"],
+      ["Total SF", "64,000 SF"],
+      ["Ground lease expiration", "December 31, 2028"],
+    ],
+    { interest: { kind: "leasehold", summary: "Leasehold interest under a ground lease", share: "", groundLease: "Ground lease expires December 31, 2028; no extension options", loan: "", page: "p. 4" } },
+  );
+  const SENTENCE =
+    "The ground lease ends Dec 2028, in year 3 of the model's 5-year hold: the building reverts to the landowner before the model sells it, so the income after that and the sale proceeds are not this buyer's to collect.";
+  const d = deriveUnderwriteInputs(LEASE2, LEASE2.dealName!);
+  const read = modelReturnsRead(LEASE2, screeningCompareModel(d.inputs), AS_OF);
+
+  it("withholds the page's tiles and its max bid over the leasehold card's own sentence; the cap stands", () => {
+    // The card's sentence and the read's are one.
+    expect(leaseholdExitSentence(readLeaseholdExit(LEASE2, d.inputs, AS_OF)!)).toBe(SENTENCE);
+    expect(read).toMatchObject({ withheld: "lease", word: "lease ends in year 3", line: SENTENCE });
+    const { html, text } = drawn(LEASE2, { interest: read });
+    expect(text).toContain(`${SENTENCE} The max bid, solved on them, is withheld too.`);
+    expect(text.match(/n\/a — lease ends in year 3/g)?.length).toBe(4);
+    for (const figure of ["17.7%", "2.01x", "$12.6M", "+5.0%"]) expect(text, figure).not.toContain(figure);
+    expect(html).not.toContain("Max bid");
+    // Year 1 is inside the lease: the cap on it stands, at the model's figure.
+    expect(capField(html)).toBe("9.17%");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("leaves the report's grids and max bid out over the same sentence", () => {
+    const report = buildSensitivityData(d.inputs, 15, { sources: d.sources, occupancyPct: d.meta.occupancyPct, interest: read });
+    expect(report.withheld).toBe(`The IRR grids and the max bid are left out. ${SENTENCE}`);
+    // Without the read, the grids stood, as before.
+    expect(buildSensitivityData(d.inputs, 15, { sources: d.sources }).withheld).toBeNull();
+  });
+
+  it("says it on the first-draft model's card and the compare table, by that model's own hold", () => {
+    const model = { ...SAMPLE_DEAL.model!, holdYears: 5 };
+    const card = renderToStaticMarkup(
+      React.createElement(ReturnsHeadline, { model, interest: modelReturnsRead(LEASE2, { ...model.returns, holdYears: model.holdYears }, AS_OF) }),
+    );
+    expect(textOf(card)).toContain(SENTENCE);
+    expect(textOf(card).match(/n\/a — lease ends in year 3/g)?.length).toBe(3);
+    // A model held ten years would sell it in year 10, after the reversion too;
+    // the compare table's cells say so by that hold.
+    const figs = compareReturns(LEASE2, { ...screeningCompareModel(d.inputs), holdYears: 5 }, inferStrategy(LEASE2), AS_OF);
+    expect(figs).toMatchObject({ withheld: "lease" });
+    expect(withheldWord(figs)).toBe("lease ends in year 3");
+    const col: Col = {
+      id: "lease2",
+      name: "Plaza Shops (leasehold)",
+      assetClass: "retail",
+      market: "",
+      coveredMarket: null,
+      verdict: null,
+      reason: null,
+      hasModel: true,
+      fit: null,
+      fitNote: null,
+      strategy: "Stabilized",
+      planDeal: false,
+      irr: null,
+      em: null,
+      coc: null,
+      cap: figs.cap,
+      yoc: null,
+      leverage: null,
+      price: "$12,000,000",
+      noi: "$1,100,000",
+      withheld: figs.withheld,
+      withheldWord: withheldWord(figs),
+    };
+    // The table's three return rows (the phone's cards say them again).
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: [col] }));
+    const table = textOf(html.match(/<table\b[\s\S]*?<\/table>/)?.[0] ?? "");
+    expect(table.match(/n\/a — lease ends in year 3/g)?.length).toBe(3);
   });
 });

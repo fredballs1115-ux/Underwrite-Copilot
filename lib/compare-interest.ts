@@ -29,6 +29,14 @@
 //   date has not gone by — and the model's returns are withheld as the
 //   building's, bought outright, not the position's.
 //
+//   A LEASE THAT ENDS INSIDE THE HOLD HAS NO SALE (research pass 38). A
+//   leasehold's model sells the building at the hold's end; where its lease
+//   ends first — the ground lease, or a sandwich position's master lease —
+//   the building has reverted by then, so the returns are withheld with the
+//   leasehold card's own sentence (lib/leasehold-exit `leaseEndInHold`),
+//   read against the hold of the model handed in. The cap stands: year 1 is
+//   inside the lease.
+//
 //   EVERYTHING ELSE STANDS. A leasehold's and a leased fee's model runs at
 //   what the price buys (the lease's building, the land's rent), and the
 //   price row says which, with the years to the lease's end.
@@ -40,7 +48,8 @@
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
-import { interestOf, interestTag, isWholeShare, readInterest } from "@/lib/interest";
+import { interestOf, interestTag, isWholeShare, leaseholdTermOf, readInterest } from "@/lib/interest";
+import { leaseEndInHold, type LeaseEndInHold } from "@/lib/leasehold-exit";
 
 export interface CompareModel {
   purchasePrice?: number | null;
@@ -48,6 +57,9 @@ export interface CompareModel {
   year1Noi?: number | null;
   /** the model's going-in cap, percent */
   goingInCapPct?: number | null;
+  /** the model's hold, whole years: a leasehold whose lease ends inside it
+   *  has its returns withheld (research pass 38); absent, they stand */
+  holdYears?: number | null;
 }
 
 export interface CompareInterest {
@@ -63,7 +75,24 @@ export interface CompareInterest {
    *  where the date has not gone by; null otherwise */
   noteYtmPct: number | null;
   /** why the model's returns are withheld; null where they stand */
-  withheld: "note" | "share" | "position" | null;
+  withheld: "note" | "share" | "position" | "lease" | null;
+  /** where they are withheld for the lease: the year of the model's hold it
+   *  ends in and the leasehold card's own sentence; absent otherwise */
+  leaseEnd?: LeaseEndInHold | null;
+}
+
+/**
+ * What a withheld return says after "n/a — ", in one place for every
+ * surface that withholds one: what the price buys ("note", "share",
+ * "position"), or where the lease ends inside the hold, when — "lease ends
+ * in year 3", "master lease ends in year 3", "lease has ended". Null where
+ * the returns stand.
+ */
+export function withheldWord(ci: Pick<CompareInterest, "withheld" | "leaseEnd">): string | null {
+  if (ci.withheld !== "lease") return ci.withheld;
+  const e = ci.leaseEnd;
+  const lease = e?.lease === "master lease" ? "master lease" : "lease";
+  return e == null ? lease : e.passed ? `${lease} has ended` : `${lease} ends in year ${e.year}`;
 }
 
 /** What has a yield of its own in the cap slot, where the price buys no
@@ -116,6 +145,15 @@ export function compareInterest(
     return { tag, cap, noteYtmPct: null, withheld: atWhole ? null : "share" };
   }
 
+  // A lease that ends inside the model's hold: the sale the returns are
+  // built on is of a building that has reverted.
+  const hold = model?.holdYears ?? null;
+  if (kind === "leasehold" && hold != null && hold > 0) {
+    const { term, lease } = leaseholdTermOf(ex, asOf);
+    const leaseEnd = term ? leaseEndInHold(term, lease, hold) : null;
+    if (leaseEnd) return { tag, cap: modelCap, noteYtmPct: null, withheld: "lease", leaseEnd };
+  }
+
   return { tag, cap: modelCap, noteYtmPct: null, withheld: null };
 }
 
@@ -129,6 +167,8 @@ export function compareInterest(
 export interface ModelReturnsRead extends CompareInterest {
   /** a share of the owning entity: its cap is the whole's, said so */
   share: boolean;
+  /** what a withheld return says after "n/a — " (`withheldWord`) */
+  word: string | null;
   line: string | null;
 }
 
@@ -152,8 +192,11 @@ export function modelReturnsRead(
                   "This price buys all of the entity's interests, and beside the loan the entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
                 : "A share's price is for the share, and grossed up beside the loan its entity carries it is the equity's whole, not the building's: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
               : "A share's price is for the share, and the memorandum states no percentage to gross it up by: this model ran the whole building's cash flows at it, so its cap and returns are withheld."
-          : null;
-  return { ...ci, share: !!ex && interestOf(ex).kind === "partial_interest", line };
+          : ci.withheld === "lease"
+            ? // The leasehold card's own sentence (lib/leasehold-exit).
+              (ci.leaseEnd?.sentence ?? null)
+            : null;
+  return { ...ci, share: !!ex && interestOf(ex).kind === "partial_interest", word: withheldWord(ci), line };
 }
 
 /**

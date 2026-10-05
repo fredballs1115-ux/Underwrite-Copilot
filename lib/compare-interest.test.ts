@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { compareInterest, goingInCapFigure, modelReturnsRead, noteCapSlot } from "@/lib/compare-interest";
+import { compareInterest, goingInCapFigure, modelReturnsRead, noteCapSlot, withheldWord } from "@/lib/compare-interest";
 
 const row = (label: string, value: string, page = "p. 5") => ({ label, value, flagged: false, page });
 const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
@@ -199,6 +199,49 @@ describe("modelReturnsRead — the Model tab under the table's rule", () => {
   });
 
   it("a fee simple says nothing and stands", () => {
-    expect(modelReturnsRead(deal(undefined, []), MODEL)).toEqual({ tag: null, cap: 9.5, noteYtmPct: null, withheld: null, share: false, line: null });
+    expect(modelReturnsRead(deal(undefined, []), MODEL)).toEqual({ tag: null, cap: 9.5, noteYtmPct: null, withheld: null, share: false, word: null, line: null });
+  });
+});
+
+// Research pass 38: a retail leasehold whose ground lease ends December 31,
+// 2028 printed "Levered IRR 17.7%" and a max bid on a year-5 sale of a
+// building that reverted in year 3, beside the leasehold card's own
+// sentence saying so.
+describe("a leasehold whose lease ends inside the model's hold has no sale to return on", () => {
+  const AS_OF = new Date(Date.UTC(2026, 9, 5, 12));
+  const HELD = { ...MODEL, holdYears: 5 };
+  const lease2 = deal({ ...blank, kind: "leasehold", groundLease: "Ground lease expires December 31, 2028; no extension options" }, [
+    row("Ground lease expiration", "December 31, 2028"),
+  ]);
+  const SENTENCE =
+    "The ground lease ends Dec 2028, in year 3 of the model's 5-year hold: the building reverts to the landowner before the model sells it, so the income after that and the sale proceeds are not this buyer's to collect.";
+
+  it("withholds the returns over the leasehold card's own sentence, said by when; the cap stands", () => {
+    const r = modelReturnsRead(lease2, HELD, AS_OF);
+    expect(r).toMatchObject({ tag: "Leasehold, 2 yrs left", cap: 9.5, withheld: "lease", word: "lease ends in year 3", line: SENTENCE, share: false });
+    expect(withheldWord(r)).toBe("lease ends in year 3");
+    // A sandwich position's master lease ending inside the hold: the
+    // position ends with it.
+    const sandwich = deal({ ...blank, kind: "leasehold", summary: "A master lease of the building, sublet to its tenants", groundLease: "Master lease from the owner through December 31, 2028" }, [
+      row("Master lease expiration", "December 31, 2028"),
+      row("Master lease rent", "$2,400,000"),
+      row("Sublease income", "$2,900,000"),
+    ]);
+    const s = modelReturnsRead(sandwich, HELD, AS_OF);
+    expect(s).toMatchObject({ withheld: "lease", word: "master lease ends in year 3" });
+    expect(s.line).toBe(
+      "The master lease ends Dec 2028, in year 3 of the model's 5-year hold: the position ends with it before the model sells it, so the income after that and the sale proceeds are not this buyer's to collect.",
+    );
+  });
+
+  it("stands where the lease outlasts the hold, where the model names no hold, and on a fee simple", () => {
+    const long = deal({ ...blank, kind: "leasehold" }, [row("Ground lease expiration", "December 31, 2071")]);
+    expect(modelReturnsRead(long, HELD, AS_OF)).toMatchObject({ withheld: null, word: null, line: null });
+    expect(compareInterest(lease2, MODEL, AS_OF).withheld).toBeNull();
+    expect(compareInterest(deal(undefined, [row("Ground lease expiration", "December 31, 2028")]), HELD, AS_OF).withheld).toBeNull();
+    // A ten-year hold reaches a lease ending in 2033; a five-year one does not.
+    const ten = deal({ ...blank, kind: "leasehold" }, [row("Ground lease expiration", "December 31, 2033")]);
+    expect(compareInterest(ten, HELD, AS_OF).withheld).toBeNull();
+    expect(withheldWord(compareInterest(ten, { ...MODEL, holdYears: 10 }, AS_OF))).toBe("lease ends in year 8");
   });
 });

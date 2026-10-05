@@ -46,6 +46,7 @@ import { sandwichTag } from "@/lib/sandwich-lease";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
 import { compareReturns } from "@/lib/compare-figures";
+import { withheldWord } from "@/lib/compare-interest";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
@@ -116,7 +117,9 @@ function toCol(
   // yield to its maturity and what the price buys (a leasehold's years
   // left) had read the clock.
   const asOf = new Date(`${today}T12:00:00Z`);
-  const figs = compareReturns(ex, r ?? null, strat, asOf, signal);
+  // The model's own hold rides with its returns: a leasehold whose lease
+  // ends inside it has its returns withheld (research pass 38).
+  const figs = compareReturns(ex, r ? { ...r, holdYears: model?.holdYears ?? null } : null, strat, asOf, signal);
   const planDeal = figs.planDeal;
   const cap = figs.cap;
   // The price and the year-1 NOI: the model's, else the memorandum's — the
@@ -240,6 +243,7 @@ function toCol(
     sale: saleTag(ex, asOf),
     noteYtm: figs.noteYtmPct,
     withheld: figs.withheld,
+    withheldWord: withheldWord(figs),
     // FEMA's zone at the building from the stored site-flags lookup (#426);
     // blank before it has answered, never a guess.
     flood: floodCell(

@@ -179,7 +179,7 @@ export function readLeaseholdExit(
     lease,
     holdYears,
     endsInHold,
-    endsInYear: endsInHold ? Math.max(1, Math.ceil(term.yearsToTheDay)) : null,
+    endsInYear: leaseEndInHold(term, lease, holdYears)?.year ?? null,
     exitNoi,
     exitCapPct,
     capitalised,
@@ -254,20 +254,50 @@ function endWords(lease: LeaseName) {
       };
 }
 
+/** A lease that ends inside the model's hold, or has ended. */
+export interface LeaseEndInHold {
+  /** the year of the hold it ends in — 1 where it already has */
+  year: number;
+  /** its stated end has gone by */
+  passed: boolean;
+  lease: LeaseName;
+  /** the card's own sentence (`leaseholdExitSentence`) */
+  sentence: string;
+}
+
+/**
+ * Where the lease ends inside the model's hold, or has ended: the year it
+ * ends in and the card's own sentence — the one rule the card, the deal
+ * page's playground, the report's grids and the compare table withhold the
+ * model's returns by (lib/compare-interest, research pass 38): every one of
+ * them sells the building at the hold's end, after it reverted. Null where
+ * the lease outlasts the hold.
+ */
+export function leaseEndInHold(term: GroundLeaseTerm, lease: LeaseName, holdYears: number): LeaseEndInHold | null {
+  if (!endsByYear(term, holdYears)) return null;
+  const year = Math.max(1, Math.ceil(term.yearsToTheDay));
+  const end = termEndLabel(term);
+  const w = endWords(lease);
+  const passed = endHasPassed(term);
+  return {
+    year,
+    passed,
+    lease,
+    sentence: passed
+      ? `${w.theLease}'s stated end, ${end}, has passed, so there is no term to value — check the lease and any extension already exercised before reading anything the model says.`
+      : `${w.theLease} ends ${term.from === "year" ? "in " : ""}${end}, in year ${year} of the model's ${holdYears}-year hold: ${w.ends}, so the income after that and the sale proceeds are not this buyer's to collect.`,
+  };
+}
+
 /**
  * The card's one sentence: the lease ending inside the hold, or the exit on
  * the term against the exit as the model runs it.
  */
 export function leaseholdExitSentence(r: LeaseholdExitRead): string {
-  const hold = `${r.holdYears}-year hold`;
   const end = termEndLabel(r.term);
   const w = endWords(r.lease);
-  if (endHasPassed(r.term)) {
-    return `${w.theLease}'s stated end, ${end}, has passed, so there is no term to value — check the lease and any extension already exercised before reading anything the model says.`;
-  }
-  if (r.endsInHold) {
-    return `${w.theLease} ends ${r.term.from === "year" ? "in " : ""}${end}, in year ${r.endsInYear} of the model's ${hold}: ${w.ends}, so the income after that and the sale proceeds are not this buyer's to collect.`;
-  }
+  const inHold = leaseEndInHold(r.term, r.lease, r.holdYears);
+  if (inHold) return inHold.sentence;
   const t = r.onTerm;
   // Past the sale by under a whole month: the term's arithmetic counts
   // none of it, and a buyer at the sale buys almost no lease.

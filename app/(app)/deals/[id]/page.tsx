@@ -152,8 +152,7 @@ import type { DealTask, TaskAssignee } from "@/lib/deal-tasks";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { ActualsData } from "./property-actuals";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
-import type { UnderwriteInputs } from "@/lib/underwrite/engine";
-import { yearOneNoi } from "@/lib/underwrite/playground";
+import { screeningCompareModel } from "@/lib/underwrite/report-grid";
 import { type DealRateSeeds } from "@/lib/debt-index";
 import { constructionSeedFor, modelMarketFor } from "@/lib/model-market";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
@@ -198,17 +197,6 @@ function knownPointOf(
   return cacheFresh(cache, Date.now(), address) && typeof cache?.lat === "number" && typeof cache?.lng === "number"
     ? { lat: cache.lat, lng: cache.lng }
     : null;
-}
-
-/** The derived model's price, year-1 NOI and going-in cap, in the shape the
- *  compare table's rule reads a model by (lib/compare-interest). */
-function derivedReturnsOf(inputs: UnderwriteInputs): { purchasePrice: number; year1Noi: number; goingInCapPct: number | null } {
-  const year1Noi = yearOneNoi(inputs);
-  return {
-    purchasePrice: inputs.purchasePrice,
-    year1Noi,
-    goingInCapPct: inputs.purchasePrice > 0 ? (year1Noi / inputs.purchasePrice) * 100 : null,
-  };
 }
 
 /** The deal's job row with its age on this server's clock (lib/screen-run
@@ -883,7 +871,10 @@ export default async function DealPage({
         // (lib/compare-interest): a note's, a position's or such a share's
         // returns are the building's at a price that did not buy it, and
         // the tiles withhold them as the first-draft card does.
-        interest: modelReturnsRead(extraction, derivedReturnsOf(derived.inputs), new Date(`${todayIso}T12:00:00Z`)),
+        // And where a leasehold's lease ends inside the model's hold, its
+        // returns are withheld over the leasehold card's own sentence — the
+        // report's read of the same model (research pass 38).
+        interest: modelReturnsRead(extraction, screeningCompareModel(derived.inputs), new Date(`${todayIso}T12:00:00Z`)),
         // The occupancy the model read: a building it runs 90% vacant or
         // more has its returns, cap and bid withheld, the sentence naming
         // the occupancy stated (lib/underwrite/report-grid).
@@ -1711,7 +1702,9 @@ export default async function DealPage({
         // note's cap and returns withheld, its yield in the cap's place; a
         // share's cap struck on the whole, its returns standing only where
         // the model ran at that whole.
-        modelInterest={model ? modelReturnsRead(extraction, model.returns) : null}
+        // …and where a leasehold's lease ends inside the model's own hold,
+        // its returns withheld over the leasehold card's sentence.
+        modelInterest={model ? modelReturnsRead(extraction, { ...model.returns, holdYears: model.holdYears }) : null}
         metroDemand={
           reads && liveMarket
             ? metroDemand(reads.rates, readClass)

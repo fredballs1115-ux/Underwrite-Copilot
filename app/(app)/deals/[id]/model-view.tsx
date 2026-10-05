@@ -271,6 +271,9 @@ export function ReturnsHeadline({
 }) {
   const r = model.returns;
   const withheld = interest?.withheld ?? null;
+  // What a withheld tile says after "n/a — ": what the price buys, or where
+  // the lease ends inside the hold, when (lib/compare-interest).
+  const naWord = withheld ? (interest?.word ?? withheld) : null;
   // The building's NOI over a loan's or a share's price is no misread plan:
   // the price is not the building's, and the line above the figures says so.
   const implausible = !withheld && r.purchasePrice > 0 && r.year1Noi / r.purchasePrice >= IMPLAUSIBLE_CAP;
@@ -332,9 +335,9 @@ export function ReturnsHeadline({
         </p>
       )}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Stat label="Levered IRR" value={withheld ? `n/a — ${withheld}` : pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
-        <Stat label="Cash-on-cash (Yr 1)" value={withheld ? `n/a — ${withheld}` : pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
-        <Stat label="Equity multiple" value={withheld ? `n/a — ${withheld}` : mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Levered IRR" value={naWord ? `n/a — ${naWord}` : pct(r.leveredIrrPct)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Cash-on-cash (Yr 1)" value={naWord ? `n/a — ${naWord}` : pct(r.cashOnCashPct)} tone={implausible ? "kill" : undefined} />
+        <Stat label="Equity multiple" value={naWord ? `n/a — ${naWord}` : mult(r.equityMultiple)} tone={implausible ? "kill" : undefined} />
         {withheld === "note" || withheld === "position" ? (
           // A note has no cap: its yield to maturity at its price where it
           // pays or may, the deal header's own slot (lib/compare-interest);

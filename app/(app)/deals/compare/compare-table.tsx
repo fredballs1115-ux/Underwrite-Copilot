@@ -130,8 +130,13 @@ export type Col = {
   /** the model's returns withheld: a note's are the collateral's, bought
    *  outright; a share's, run at the share's price, set the whole
    *  building's cash flows against a fraction of its cost
-   *  (lib/compare-interest, #423) */
-  withheld?: "note" | "share" | "position" | null;
+   *  (lib/compare-interest, #423); a leasehold's whose lease ends inside
+   *  the model's hold sell a building that has reverted (research pass 38) */
+  withheld?: "note" | "share" | "position" | "lease" | null;
+  /** what a withheld return says after "n/a — " (lib/compare-interest
+   *  `withheldWord`): "note", "share", "position", "lease ends in year 3";
+   *  absent, the reason's own word */
+  withheldWord?: string | null;
   /** FEMA's flood zone at the building as a cell ("AE (SFHA)", "X
    *  (minimal)", "no FEMA digital map" — lib/site-flags `floodCell`, #426);
    *  blank before the lookup has answered */
@@ -469,12 +474,13 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // A conversion and a stabilized building are not the same kind of thing,
     // and a side-by-side that hides that compares apples to plans.
     { label: "Deal type", get: (c) => c.strategy ?? "—" },
-    // A note's or a share's model returns are not the deal's (#423): said
+    // A note's or a share's model returns are not the deal's (#423), nor a
+    // leasehold's whose lease ends inside the hold (research pass 38): said
     // as withheld, with the reason, rather than left a bare dash.
     // The returns are the first-draft model's alone.
     {
       label: "Levered IRR",
-      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.irr)),
+      get: (c) => (c.withheld ? `n/a — ${c.withheldWord ?? c.withheld}` : pct(c.irr)),
       best: (c) => crownable(c) && c.irr != null && c.irr === bestIrr,
       mono: true,
       num: (c) => c.irr,
@@ -482,7 +488,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     },
     {
       label: "Equity multiple",
-      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : mult(c.em)),
+      get: (c) => (c.withheld ? `n/a — ${c.withheldWord ?? c.withheld}` : mult(c.em)),
       best: (c) => crownable(c) && c.em != null && c.em === bestEm,
       mono: true,
       num: (c) => c.em,
@@ -490,7 +496,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     },
     {
       label: "Cash-on-cash (Yr 1)",
-      get: (c) => (c.withheld ? `n/a — ${c.withheld}` : pct(c.coc)),
+      get: (c) => (c.withheld ? `n/a — ${c.withheldWord ?? c.withheld}` : pct(c.coc)),
       mono: true,
       num: (c) => c.coc,
       src: (c) => (c.withheld || c.coc == null ? null : "model"),

@@ -23,7 +23,8 @@ import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
 import { SALE_HURDLE_PCT, saleCeilingRead } from "@/lib/sale-ceiling";
 import { liveDebtSeeds } from "@/lib/debt-index-read";
 import { modelMarketFor } from "@/lib/model-market";
-import { buildSensitivityData, type SensitivityData } from "@/lib/underwrite/report-grid";
+import { buildSensitivityData, screeningCompareModel, type SensitivityData } from "@/lib/underwrite/report-grid";
+import { modelReturnsRead } from "@/lib/compare-interest";
 import { bidFloors, type BidFloors } from "@/lib/underwrite/solver";
 import { buildPlanReport, type PlanReport } from "@/lib/plan-sensitivity";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
@@ -258,6 +259,10 @@ export async function GET(
         floors,
         termRead: termReadFor(extraction),
         occupancyPct: derived.meta.occupancyPct ?? null,
+        // Where a leasehold's lease ends inside the hold, the grids and the
+        // bid are left out over the leasehold card's own sentence — the
+        // deal page's read of the same model (lib/compare-interest).
+        interest: modelReturnsRead(extraction, screeningCompareModel(derived.inputs)),
       });
       // The plan page for the kind the deal page reads — the extraction and
       // the first signal — the same read buildReportData gates the IRR page on.
