@@ -54,6 +54,35 @@ describe("dealContextFor — what the screen established, for every step that re
     expect(ctx).not.toContain("Timeline as stated");
   });
 
+  // Audit C4, L5: a value-add's units stand today, so its basis is never
+  // "per planned unit" (lib/deal-strategy `notYetDelivered`, the memo's
+  // rule).
+  it("a value-add's basis is per unit, never per planned unit", () => {
+    const ctx = dealContextFor({
+      ...CONVERSION,
+      dealName: "Maddox Apartments",
+      strategy: { kind: "value_add", summary: "Renovate the interiors", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$17,000,000"), m("Stabilized NOI", "$1,320,000"), m("Renovation budget", "$2,000,000"), m("Units", "100")],
+    })!;
+    expect(ctx).toContain("Total cost is $190k per unit (100 units)");
+    expect(ctx).not.toContain("planned");
+    expect(ctx).toContain("never the price alone");
+  });
+
+  // Audit C4, L6: a forward purchase's price is the finished building's, the
+  // buyer's whole cost at delivery; the memorandum states no land price.
+  it("a forward purchase's basis is its price, the buyer's whole cost at delivery, never the land price", () => {
+    const ctx = dealContextFor({
+      ...CONVERSION,
+      dealName: "Riverside Forward",
+      strategy: { kind: "development", summary: "Forward purchase of a 300-unit building at completion", capitalBudget: "", timeline: "" },
+      metrics: [m("Purchase price", "$90,000,000"), m("Stabilized NOI", "$5,400,000"), m("Units (proposed)", "300")],
+    })!;
+    expect(ctx).toContain("Total cost is $300k per planned unit (300 units)");
+    expect(ctx).toContain("the price, the buyer's whole cost at delivery");
+    expect(ctx).not.toContain("land price");
+  });
+
   it("says nothing about units or timing the OM does not state", () => {
     const ctx = dealContextFor({
       ...CONVERSION,

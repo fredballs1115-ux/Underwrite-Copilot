@@ -2,7 +2,7 @@ import { compactUsd } from "@/lib/money";
 import { floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
-import { askingPriceOf, findPriceMetric, inferStrategy, planSummary, planWithBasisChecked, type StrategyKind } from "@/lib/deal-strategy";
+import { askingPriceOf, findPriceMetric, inferStrategy, notYetDelivered, planSummary, planWithBasisChecked, type StrategyKind } from "@/lib/deal-strategy";
 import { priceRange, priceRangeShort, screenYearOf } from "@/lib/criteria";
 import { yieldOnCostText } from "@/lib/plan-facts";
 import { assetWords } from "@/lib/asset-words";
@@ -254,11 +254,18 @@ export function dealContextFor(
     const noun = assetWords(extraction?.assetClass).noun ?? { one: "unit", many: "units" };
     // What the price alone buys, by the kind of plan: a development's land,
     // a conversion's shell, and a value-add's or a lease-up's standing
-    // building — never "the shell's" there (research pass 41).
-    const priceAlone =
-      plan.kind === "development" ? "the land price" : plan.kind === "conversion" ? "the shell's price" : "the price alone";
+    // building — never "the shell's" there (research pass 41). A forward
+    // purchase's price is the finished building's, the buyer's whole cost
+    // at delivery: no land price is stated beside it (audit C4, L6).
+    const against = plan.forward
+      ? "the price, the buyer's whole cost at delivery"
+      : `never ${plan.kind === "development" ? "the land price" : plan.kind === "conversion" ? "the shell's price" : "the price alone"}`;
+    // "Planned" only where the building is still to be delivered: a
+    // value-add's or a lease-up's units stand today (audit C4, L5, the
+    // memo's rule).
+    const per = `per ${notYetDelivered(plan.kind) ? "planned " : ""}${noun.one}`;
     lines.push(
-      `Total cost is ${compact(plan.costPerUnit)} per planned ${noun.one} (${plan.units.toLocaleString("en-US")} ${noun.many}) — the basis to hold sale comps and per-${noun.one} norms against, never ${priceAlone}.`,
+      `Total cost is ${compact(plan.costPerUnit)} ${per} (${plan.units.toLocaleString("en-US")} ${noun.many}) — the basis to hold sale comps and per-${noun.one} norms against, ${against}.`,
     );
   }
   if (plan?.timeline) lines.push(`Timeline as stated: ${plan.timeline.replace(/\.\s*$/, "")}.`);
