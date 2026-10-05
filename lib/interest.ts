@@ -159,9 +159,16 @@ export function parseSharePct(text: string | null | undefined): number | null {
     return (readShareWords(after) ?? readShareWords(before)) === "share" ? [h.n] : [];
   });
   const valid = [...new Set(shares)];
+  // A stated 100% beside a share under it is what the entity holds, never
+  // the share sold: "a 49% limited partnership interest in the entity that
+  // owns 100% of the fee simple interest" sells 49% (the audit of
+  // 2026-10-05 — admitting 100% had left it no share at all, and the model
+  // ran the whole building at the share's price). A 100% counts only alone.
+  const under = valid.filter((n) => n < 100);
+  const shareOf = under.length > 0 ? under : valid;
   // Two different shares ("a 49% LP interest and a 2% GP interest") is not
   // one share: withheld rather than picked.
-  return valid.length === 1 ? valid[0] : null;
+  return shareOf.length === 1 ? shareOf[0] : null;
 }
 
 /** A share stated as 100% — all of the owning entity's interests, like a

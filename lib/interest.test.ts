@@ -111,6 +111,34 @@ describe("parseSharePct — a partial interest's share, off the OM's own words",
     expect(parseSharePct("a 49% LP interest (the sponsor keeps a 51% GP interest)")).toBeNull();
   });
 
+  // The audit of 2026-10-05: admitting a stated 100% as a share left a share
+  // stated beside the entity's 100% holding with no percentage at all, so
+  // the model ran the whole building at the share's $24.5M.
+  it("reads the share sold beside the 100% the entity holds, and a 100% only alone", () => {
+    for (const text of [
+      "49% limited partnership interest in the entity that owns 100% of the fee simple interest",
+      "49% LP interest; the partnership owns 100% of the property",
+      "100% of the Class A membership interests, representing 49% of the LLC",
+    ]) {
+      expect(parseSharePct(text), text).toBe(49);
+    }
+    expect(parseSharePct("100% of the beneficial interests, offered in $100,000 units")).toBe(100);
+    // Two shares under 100 are still two.
+    expect(parseSharePct("a 49% LP interest and a 2% GP interest in the partnership that owns 100% of the property")).toBeNull();
+    const lp = ex(
+      interest({ kind: "partial_interest", summary: "A 49% limited partnership interest.", share: "49% limited partnership interest in the partnership that owns 100% of the fee simple interest" }),
+      [{ label: "NOI (in-place)", value: "$2,800,000", flagged: false, page: "p. 3", basis: "in_place" }],
+    );
+    const withPrice = { ...lp, metrics: lp.metrics.map((m) => (m.label === "Asking price" ? { ...m, value: "$24,500,000" } : m)) };
+    const r = readInterest(withPrice, 24_500_000)!;
+    expect(r.sharePct).toBe(49);
+    expect(r.impliedWhole).toBeCloseTo(50_000_000, 0);
+    expect(r.headline).not.toContain("states no single percentage");
+    expect(interestTag(withPrice)).toBe("49% share");
+    expect(interestShortLine(r)).toBe("A 49% share of the owning entity — $24.5M for the share is $50.0M for the whole");
+    expect(deriveUnderwriteInputs(withPrice, "S").inputs.purchasePrice).toBeCloseTo(50_000_000, 0);
+  });
+
   it("a preferred-equity price is never grossed up on its return", () => {
     const pref = ex(interest({ kind: "partial_interest", share: "Preferred equity, 12% preferred return" }));
     expect(interestOf(pref)).toEqual({ kind: "partial_interest", sharePct: null, entityLoan: null });
