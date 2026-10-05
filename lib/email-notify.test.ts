@@ -40,6 +40,7 @@ import {
 } from "./email";
 import { replyToAddress } from "./email-send";
 import { readEmailPictureToken } from "./email-picture";
+import { interruptedMessage } from "./worker-interruptions";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -384,7 +385,7 @@ describe("the analysis emails go only where the reader has not said no", () => {
   it("the worker emails a screen it gives up on, or that throws, as the pipeline does its own — to whoever asked", () => {
     const src = readFileSync(join(process.cwd(), "worker/index.ts"), "utf8");
     expect(src).toMatch(
-      /if \(payload\.kind === "screen"\) \{\s*await notifyAnalysisFailed\(admin, next\.deal_id as string, INTERRUPTED_MSG, \{\s*requestedBy: requesterOf\(payload\.requestedBy\),/,
+      /if \(payload\.kind === "screen"\) \{\s*await notifyAnalysisFailed\(admin, next\.deal_id as string, message, \{\s*requestedBy: requesterOf\(payload\.requestedBy\),/,
     );
     expect(src).toMatch(
       /if \(failed && job\.payload\.kind === "screen"\) \{\s*await notifyAnalysisFailed\(admin, job\.dealId, message, \{ requestedBy: requesterOf\(job\.payload\.requestedBy\) \}\)/,
@@ -485,8 +486,11 @@ describe("a stopped screen's email says what stands, and tells the operators wha
   });
 
   it("says a worker that gave up in plain words, with the deal page's own button", () => {
+    // The sentence is lib/worker-interruptions' (its own test words each
+    // kind); the worker gives up on it, failing the job and emailing it.
     const src = readFileSync(join(process.cwd(), "worker/index.ts"), "utf8");
-    const msg = /const INTERRUPTED_MSG =([\s\S]*?);\n/.exec(src)![1];
+    expect(src).toMatch(/const message = interruptedMessage\(/);
+    const msg = interruptedMessage(["restart", "restart", "restart"], 3, 30);
     expect(msg).not.toMatch(/worker|hit /);
     expect(msg).toContain("while our servers restarted");
     expect(msg).toContain("Choose “Try again” on the deal page");

@@ -38,6 +38,12 @@ import { downloadDealFile, removeSupplementFile, type StorageScope } from "@/lib
 import { runWeeklyDigests } from "@/lib/digest";
 import { notifyAnalysisFailed } from "@/lib/email";
 import { requesterOf } from "@/lib/jobs";
+import {
+  interruptedMessage,
+  interruptionKinds,
+  interruptionOf,
+  type InterruptionKind,
+} from "@/lib/worker-interruptions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 // Tunables — env-overridable so the test rig can run the real binary fast.
@@ -62,11 +68,8 @@ const DIGEST_DOW = int0(process.env.WORKER_DIGEST_DOW, 1);
 const DIGEST_HOUR_UTC = int0(process.env.WORKER_DIGEST_HOUR_UTC, 13);
 const DIGEST_CHECK_MS = int(process.env.WORKER_DIGEST_CHECK_MS, 15 * 60_000);
 
-// Said to the analyst on the deal page and in the stopped-screen email, so
-// in plain words: what happened, and the deal page's own button.
-const INTERRUPTED_MSG =
-  `The screen was interrupted ${MAX_ATTEMPTS} time${MAX_ATTEMPTS === 1 ? "" : "s"} while our servers restarted, ` +
-  "so it stopped trying on its own. Choose “Try again” on the deal page to run it fresh.";
+// The job timeout as the stopped-screen sentence says it, in minutes.
+const TIMEOUT_MINUTES = Math.round(JOB_TIMEOUT_MS / 60_000);
 
 function int(v: string | undefined, fallback: number): number {
   const n = Number(v);
@@ -94,6 +97,10 @@ interface ClaimedJob {
     /** who asked for the run (lib/jobs `WorkerPayload`), read through
      *  `requesterOf`: the screen's emails go to them */
     requestedBy?: unknown;
+    /** why each earlier attempt was put back in line — a restart, the job
+     *  timeout, a crash (lib/worker-interruptions), as `requeueCurrent`
+     *  records them */
+    interruptions?: unknown;
   };
 }
 
@@ -224,7 +231,12 @@ async function claimNext(): Promise<ClaimedJob | null> {
   const payload = (next.payload as ClaimedJob["payload"]) ?? {};
 
   if (attempts >= MAX_ATTEMPTS) {
-    const killed = await failJob(next.id as string, INTERRUPTED_MSG, {
+    // Said to the analyst on the deal page and in the stopped-screen email,
+    // in plain words: what happened — by the interruptions the payload
+    // recorded, never a restart that was a timeout or a crash — and the deal
+    // page's own button, which picks up from the last finished step.
+    const message = interruptedMessage(interruptionKinds(payload.interruptions), attempts, TIMEOUT_MINUTES);
+    const killed = await failJob(next.id as string, message, {
       status: "queued",
       attempts,
     });
@@ -237,7 +249,7 @@ async function claimNext(): Promise<ClaimedJob | null> {
       // verdict; the pipeline sends it on its own failures, and these are
       // the worker's — to whoever asked for the run.
       if (payload.kind === "screen") {
-        await notifyAnalysisFailed(admin, next.deal_id as string, INTERRUPTED_MSG, {
+        await notifyAnalysisFailed(admin, next.deal_id as string, message, {
           requestedBy: requesterOf(payload.requestedBy),
         });
       }
@@ -267,17 +279,33 @@ async function claimNext(): Promise<ClaimedJob | null> {
   };
 }
 
-/** Put the in-flight job back in line (deploy/shutdown/timeout). The payload
- *  keeps its per-step checkpoints, so the next attempt resumes, not restarts. */
+/** Put the in-flight job back in line (deploy/shutdown/timeout/crash). The
+ *  payload keeps its per-step checkpoints, so the next attempt resumes, not
+ *  restarts, and it records why this attempt was interrupted
+ *  (lib/worker-interruptions), so the run's last failure says what really
+ *  happened. */
 async function requeueCurrent(reason: string): Promise<void> {
   if (!current) return;
+  const job = current;
+  const kind = interruptionOf(reason);
+  let recorded: InterruptionKind[] | null = null;
   try {
-    const requeue = () =>
-      admin
+    // The payload is read afresh each pass, so the steps the pipeline
+    // checkpointed meanwhile are kept; the kind is appended once.
+    const requeue = async () => {
+      const { data } = await admin.from("analysis_jobs").select("payload").eq("id", job.id).maybeSingle();
+      const payload = ((data?.payload as Record<string, unknown> | null) ?? job.payload) as Record<string, unknown>;
+      recorded ??= [...interruptionKinds(payload.interruptions), kind];
+      await admin
         .from("analysis_jobs")
-        .update({ status: "queued", updated_at: new Date().toISOString() })
-        .eq("id", current!.id)
+        .update({
+          status: "queued",
+          updated_at: new Date().toISOString(),
+          payload: { ...payload, interruptions: recorded },
+        })
+        .eq("id", job.id)
         .eq("status", "running");
+    };
     // Twice, a beat apart: the pipeline's own patchJob writes are keyed by
     // deal_id with no fence, so one already in flight at shutdown can land
     // AFTER the first requeue and flip the row back to "running" — which the
@@ -286,7 +314,7 @@ async function requeueCurrent(reason: string): Promise<void> {
     await requeue();
     await sleep(250);
     await requeue();
-    log(`job ${current.id} re-queued (${reason})`);
+    log(`job ${job.id} re-queued (${reason})`);
   } catch {
     // If this write is lost the row goes stale and the existing stall
     // recovery reclaims it — slower, but nothing is stranded.
