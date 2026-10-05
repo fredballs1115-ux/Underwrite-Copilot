@@ -14,6 +14,7 @@ import {
   indexName,
   isDebtSeedSeries,
   ratesPromptLine,
+  SOFR_LEVEL_RULE,
   type SurveyRate,
 } from "./debt-index";
 import { SERIES } from "./live-rates";
@@ -197,6 +198,16 @@ describe("today's rates, as a line a Claude step reads (the audit of 2026-09-30)
     expect(line).toContain(`the 10-yr Treasury ${seeds.tenYear!.pct.toFixed(2)}% (${datedLong(seeds.tenYear!.asOf)})`);
     expect(line).toContain(`30-day avg SOFR ${seeds.floating!.pct.toFixed(2)}% (${datedLong(seeds.floating!.asOf)}), a floating, bridge or construction loan's index`);
     expect(line).toContain("never state a rate as current that is not one of them or built from one of them");
+  });
+
+  // Audit B, LOW-6: a step's words reach the deal page and the shared screen
+  // with no notice under them, so SOFR's level is the one figure it is
+  // handed to judge by and never to write.
+  it("tells the step to judge by SOFR but never write its level, only where SOFR is handed over", () => {
+    const seeds = debtSeeds(rates, 60);
+    expect(ratesPromptLine(seeds, 60)!.endsWith(` ${SOFR_LEVEL_RULE}`)).toBe(true);
+    expect(SOFR_LEVEL_RULE).toMatch(/never write its level/);
+    expect(ratesPromptLine({ ...seeds, floating: null }, 60)).not.toContain("New York Fed");
   });
 
   it("says the 10-year once where the hold prices off it", () => {

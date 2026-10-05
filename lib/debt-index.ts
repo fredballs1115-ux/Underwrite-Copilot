@@ -269,8 +269,22 @@ export function ratesPromptLine(seeds: DebtSeeds, holdMonths: number, spread?: P
     );
   }
   if (parts.length === 0) return null;
-  return `LATEST PUBLISHED RATES (FRED, each dated the day it is for): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.`;
+  return `LATEST PUBLISHED RATES (FRED, each dated the day it is for): ${parts.join("; ")}. A loan's rate is its index plus the lender's spread. Judge the financing — and whether the going-in cap sits below the cost of the debt — against these figures, and never state a rate as current that is not one of them or built from one of them.${
+    seeds.floating ? ` ${SOFR_LEVEL_RULE}` : ""
+  }`;
 }
+
+/**
+ * SOFR's level stays out of what a Claude step writes (audit B, LOW-6): the
+ * New York Fed licenses its rates with a notice beside each figure, which
+ * every SOFR figure the site draws carries (the rates strip), and a step's
+ * words reach the deal page, the shared screen and the documents with no
+ * notice under them. So a step judges a floating loan against SOFR and
+ * names it, never its level; an all-in rate built from it is the step's own
+ * figure, not the Fed's.
+ */
+export const SOFR_LEVEL_RULE =
+  "SOFR is the New York Fed's figure, republished only beside its notice: judge a floating loan against it, but never write its level — name SOFR and the spread instead.";
 
 /** Index plus spread, as a percent to two places — the figure a term sheet prints. */
 export function allInPct(index: DebtIndex, spreadBps: number): number {
