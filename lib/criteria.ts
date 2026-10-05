@@ -1642,7 +1642,9 @@ export function buyBoxLines(box: BuyBox, opts: { exchange?: boolean } = {}): str
     const filer = EXCHANGE_FILERS.find((f) => f.id === exchange.filer);
     lines.push(
       `1031 exchange: the relinquished property transferred ${exchangeDay(exchange.relinquishedTransferOn!)}; ${
-        filer ? `${filer.label.toLowerCase()} files the return (${filer.form})` : "who files the return is not set, so it is read as an individual's"
+        // Only the article is lowercased: "an S corporation", never "an s
+        // corporation" (the pre-merge audit).
+        filer ? `${filer.label.charAt(0).toLowerCase()}${filer.label.slice(1)} files the return (${filer.form})` : "who files the return is not set, so it is read as an individual's"
       }${exchange.returnExtended ? "; the return is extended" : ""}`,
     );
   }
