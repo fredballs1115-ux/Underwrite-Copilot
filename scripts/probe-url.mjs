@@ -189,6 +189,39 @@ for (const url of urls) {
         console.log(`  page lines containing "${m}": ${hits.length}`);
         for (const h of hits.slice(0, 6)) console.log(`    ${clip(h)}`);
       }
+      // And the links whose words or address name a match word, resolved
+      // against the page: a publisher moves a page and memory keeps the
+      // old address (Montgomery County's rent stabilization page answered
+      // 404 at the address the rules file had), so the live address is
+      // read off a page that links to it, never written from memory.
+      const anchors = Array.from(text.matchAll(/<a\b[^>]*?\bhref=["']([^"'#][^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)).map((a) => ({
+        href: a[1].replace(/&amp;/g, "&"),
+        words: a[2]
+          .replace(/<[^>]+>/g, " ")
+          .replace(/&nbsp;/g, " ")
+          .replace(/&amp;/g, "&")
+          .replace(/\s+/g, " ")
+          .trim(),
+      }));
+      for (const m of match) {
+        const needle = m.toLowerCase();
+        const hits = anchors.filter((a) => a.words.toLowerCase().includes(needle) || a.href.toLowerCase().includes(needle));
+        const seen = new Set();
+        const shown = [];
+        for (const a of hits) {
+          let abs = a.href;
+          try {
+            abs = new URL(a.href, res.url || url).href;
+          } catch {
+            // a malformed address is printed as the page wrote it
+          }
+          if (seen.has(abs)) continue;
+          seen.add(abs);
+          shown.push(`${clip(a.words || "(no words)", 120)} -> ${clip(abs, 300)}`);
+        }
+        console.log(`  links naming "${m}": ${shown.length}`);
+        for (const l of shown.slice(0, 8)) console.log(`    ${l}`);
+      }
     }
     continue;
   }
