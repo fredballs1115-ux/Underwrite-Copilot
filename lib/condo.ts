@@ -263,7 +263,7 @@ function sentencesOf(r: Omit<CondoRead, "sentences" | "headline">): string[] {
       }, on conditions that include the owner marketing units for sale to bring its share to ${a.pct}% or less and being current on its assessments.`,
     );
   }
-  if (r.specialAssessment) out.push(`Special assessment, as stated: ${r.specialAssessment.replace(/\.$/, "")}: a cost each unit carries.`);
+  if (r.specialAssessment) out.push(`A special assessment, as stated (${r.specialAssessment.replace(/\.$/, "")}), is a cost each unit carries.`);
   for (const s of r.stated) out.push(`${s.label}, as stated: ${s.value.replace(/\.$/, "")}.`);
   return out;
 }
