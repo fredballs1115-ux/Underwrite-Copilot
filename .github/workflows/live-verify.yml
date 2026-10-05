@@ -501,6 +501,12 @@ jobs:
           }
           both() { grep -q "on-photo" p_why.html && grep -q "band-words" p_why.html; }
           copies() { [ "$(grep -o "Copy as table" p_tools2.html | wc -l)" -ge 2 ]; }
+          # The homepage's gallery credit as it reads since 2026-10-01: each
+          # photographer's licence follows them, linked to its text, and the
+          # line ends on where the photographs came from and that they are
+          # cropped (lib/credit-parts). It had ended "via Wikimedia Commons,
+          # CC BY …", the licences listed once at its end.
+          gallerycredit() { grep -q "via Wikimedia Commons, cropped to fit" body.html && grep -q "creativecommons.org/licenses/" body.html; }
           bidtwice() { [ "$(grep -o "What you can pay" p_tools2.html | wc -l)" -ge 2 ]; }
           # The strip renders (its money market heading is there) and carries no
           # series its publisher licenses to FRED alone (#482). grep -c, not
@@ -510,7 +516,7 @@ jobs:
           echo "ROUND MARKERS — what the live site is actually serving:"
           mark "#302 photo treatment (on-photo + band-words on /why)" both
           mark "#302 deal math reads the shorthand (seeded \$20M on /tools)" grep -q 'value="\$20M"' p_tools2.html
-          mark "#302 gallery credit names the licence" grep -q "via Wikimedia Commons, CC BY" body.html
+          mark "#302 gallery credit names the licence" gallerycredit
           mark "#304 the cash-flow strip is on /tools" grep -q "Paste a cash flow" p_tools2.html
           mark "#305 the work leaves the page (Copy link)" grep -q "Copy link to this sizing" p_tools2.html
           mark "#306 net effective rent, both ways" grep -q "The face rent is" p_tools2.html
