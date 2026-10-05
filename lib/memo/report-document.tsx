@@ -79,6 +79,7 @@ import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
 import { condoShortLine, readCondo } from "@/lib/condo";
+import { condoUnitsOffered } from "@/lib/condo-units";
 import { readSandwichLease, sandwichShortLine } from "@/lib/sandwich-lease";
 import type { AssumableView } from "@/lib/assumable-debt";
 import { basisWithheldOf, type InputSource } from "@/lib/underwrite/inputs";
@@ -2016,6 +2017,8 @@ export function ReportDocument({
       screenYearOf(extraction),
       interestOf(extraction),
       extraction?.assetClass,
+      // A bulk condominium purchase's units offered (research pass 38).
+      condoUnitsOffered(extraction),
     ),
     planNoun.one,
   );

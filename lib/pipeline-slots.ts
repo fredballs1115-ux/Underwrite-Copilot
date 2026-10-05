@@ -33,6 +33,7 @@ import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseTag } from "@/lib/mixed-use";
 import { goingConcernTag } from "@/lib/going-concern";
 import { condoTag } from "@/lib/condo";
+import { condoUnitsOffered } from "@/lib/condo-units";
 import { sandwichTag } from "@/lib/sandwich-lease";
 import { exchangeForDeal } from "@/lib/exchange-deal";
 import type { ExchangeBlock } from "@/lib/exchange-window";
@@ -207,7 +208,9 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind, store
   if (isMasterLeasehold(extraction)) return null;
   const metrics = extraction.metrics ?? [];
   const words = assetWords(shownAssetClass(storedClass, extraction));
-  const b = subjectBasis(metrics, kind, screenYearOf(extraction), interestOf(extraction), extraction.assetClass);
+  // A bulk condominium purchase's price a unit divides by the units offered
+  // (research pass 38).
+  const b = subjectBasis(metrics, kind, screenYearOf(extraction), interestOf(extraction), extraction.assetClass, condoUnitsOffered(extraction));
   const cls = shownAssetClass(storedClass, extraction);
   if (words.basis === "sf") {
     return b.perSf != null && !basisOutsideBand(b.perSf, "sf", cls) ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;

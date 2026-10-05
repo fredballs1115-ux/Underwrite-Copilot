@@ -85,6 +85,7 @@ import { forwardModelLine, forwardShortLine, readForwardPurchase } from "@/lib/f
 import { mixedUseModelLine, mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernModelLine, goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
 import { condoModelLine, condoShortLine, readCondo } from "@/lib/condo";
+import { condoUnitsOffered } from "@/lib/condo-units";
 import { readSandwichLease, sandwichModelLine, sandwichShortLine } from "@/lib/sandwich-lease";
 import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
@@ -174,6 +175,15 @@ export interface WorkbookMeta {
    *  own words for it (lib/deal-strategy `planSummary`). Absent where the
    *  model runs at the price as stated. */
   priceLabel?: string | null;
+  /** the model's price is a development's land or site cost: the
+   *  workbook's yardsticks call it "Land cost / Unit", never "Price / Unit"
+   *  (research pass 38); absent otherwise */
+  priceIsLand?: boolean;
+  /** the units a bulk condominium purchase buys (lib/condo-units
+   *  `condoUnitsOffered`): the workbook's per-unit yardsticks divide by
+   *  them, never by the condominium's whole count (research pass 38) — the
+   *  area the model runs on stays the owner's; absent otherwise */
+  unitsOffered?: number | null;
   /** the seller's loan offered for assumption (lib/assumable-debt, #419):
    *  the loan as stated, and what it is worth against this model's new
    *  loan; absent where none is offered */
@@ -1426,6 +1436,10 @@ export function deriveUnderwriteInputs(
       unitNoun,
       interest: interestMeta(extraction),
       priceLabel,
+      // A development priced at its land, and a bulk condominium purchase's
+      // units offered: what the workbook's per-unit yardsticks are of.
+      ...(priceIsLand && statedPrice != null ? { priceIsLand: true } : {}),
+      ...(condoUnitsOffered(extraction) != null ? { unitsOffered: condoUnitsOffered(extraction) } : {}),
       assumable: assumableMeta(extraction, inputs),
       sellerNote: sellerNoteMeta(extraction, inputs),
       leasehold: leaseholdMeta(extraction, inputs),

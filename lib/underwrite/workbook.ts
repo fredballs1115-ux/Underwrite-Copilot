@@ -2064,13 +2064,21 @@ function buildOperatingMetrics(
     r++;
   };
 
-  const units = model.meta.units;
+  // A bulk condominium purchase's yardsticks are a unit it buys: the units
+  // offered, never the condominium's whole count (research pass 38).
+  const offered = model.meta.unitsOffered ?? null;
+  const units = offered ?? model.meta.units;
   // The per-unit rows in the class's own noun (lib/asset-words): "Price /
   // Key" on a hotel, "Price / Pad" on a park. The named range stays
   // UnitsCount, so every formula reads the same cell whatever it is called.
   const capWord = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
   const nounOne = capWord(model.meta.unitNoun?.one ?? "unit");
-  const nounMany = capWord(model.meta.unitNoun?.many ?? "units");
+  const nounMany = offered != null ? `${capWord(model.meta.unitNoun?.many ?? "units")} offered` : capWord(model.meta.unitNoun?.many ?? "units");
+  // A development priced at its land: its price is the land's, and a figure
+  // struck on it is the land's cost a planned unit, never a price a unit
+  // (research pass 38).
+  const priceWord = model.meta.priceIsLand ? "Land cost" : "Price";
+  const plusPlan = model.meta.priceIsLand ? "land + capital plan" : "price + capital plan";
   // Where the price did not buy the building (lib/deal-strategy
   // `buildingPriceOf` answers none), no building basis is struck on it: the
   // price and all-in rows are left out with the reason, and the rows that
@@ -2109,12 +2117,12 @@ function buildOperatingMetrics(
     } else if (pricePlaceholder) {
       placeholderNote(`Price / ${nounOne} and All-in Basis / ${nounOne}`);
     } else {
-      twoCol(`Price / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
+      twoCol(`${priceWord} / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
       // What a finished unit costs all-in — the basis a comp is held against
       // on a plan deal; on a stabilized asset with no capital plan it equals
       // the price per unit. Live: it moves with the capital plan input.
       twoCol(
-        `All-in Basis / ${nounOne} (price + capital plan)`,
+        `All-in Basis / ${nounOne} (${plusPlan})`,
         "(PurchasePrice+CapImprovements)/UnitsCount",
         FMT.usd,
         (zebra = !zebra),
@@ -2151,9 +2159,9 @@ function buildOperatingMetrics(
     } else if (pricePlaceholder) {
       placeholderNote("Price / SF and All-in Basis / SF");
     } else {
-      twoCol("Price / SF", "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
+      twoCol(`${priceWord} / SF`, "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
       twoCol(
-        "All-in Basis / SF (price + capital plan)",
+        `All-in Basis / SF (${plusPlan})`,
         "(PurchasePrice+CapImprovements)/RSF",
         FMT.psf,
         (zebra = !zebra),

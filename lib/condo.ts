@@ -37,8 +37,19 @@
 import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import agencyRules from "@/data/research/agency_rules.json";
-import { parseCount, parseMoney, unitCountFromMetrics } from "@/lib/criteria";
+import { parseMoney } from "@/lib/criteria";
 import { researchAge, staleMark } from "@/lib/research-age";
+import {
+  CONDO_NOT_STATED,
+  HOA_DUES_ROW,
+  SPECIAL_ASSESSMENT_ROW,
+  UNITS_IN_CONDO_ROW,
+  UNITS_OFFERED_ROW,
+  condoCountOf,
+  condoRows,
+  condoUnitsOffered,
+  isCondoRow,
+} from "@/lib/condo-units";
 
 /** Fannie Mae's single-entity limit, as the runner printed it
  *  (data/research/agency_rules.json): a single entity owning more than
@@ -62,22 +73,11 @@ const SINGLE_ENTITY = (agencyRules.rules as Array<SingleEntityRule & { id: strin
 const dayText = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
-type Row = { label: string; value: string; page?: string };
-const isRow = (m: unknown): m is Row =>
-  !!m && typeof m === "object" && typeof (m as Row).label === "string" && typeof (m as Row).value === "string";
-const NOT_STATED = /^(?:n\/?a|not\s+(?:applicable|stated|provided|available|disclosed)|unknown|tbd|none|[-–—])?\.?$/i;
-
-/** A condominium by the deal's own words — never a "condo-quality" finish,
- *  apartments "built to condominium specifications" or "condominium-grade",
- *  or a plan to sell them "as a condominium conversion" (the audit of
- *  2026-10-05: each read an apartment building as condominium units). */
-const CONDO_WORDS =
-  /\bcondominiums?\b(?![\s-]+(?:grade|quality|style|caliber|level|finish(?:es|ed)?|specs?|specifications?|standards?|conversions?)\b)|\bcondo\s+units?\b|\bfractured\s+condo(?:minium)?s?\b|\bbulk\s+(?:condo\s+)?units?\b|\bcondos\b/i;
-
-export const UNITS_OFFERED_ROW = /^\s*(?:units?\s+offered|units?\s+(?:for\s+sale|in\s+(?:the\s+)?(?:offering|sale|portfolio))|offered\s+units?)\b/i;
-export const UNITS_IN_CONDO_ROW = /^\s*(?:(?:total\s+)?units?\s+in\s+(?:the\s+)?(?:condominium|condo|building|project|association)|condominium\s+units?|total\s+condominium\s+units?)\b/i;
-export const HOA_DUES_ROW = /^\s*(?:hoa|association|condo(?:minium)?)\s+(?:dues|fees?|assessments?)\b(?!\s*\((?:special|annual\s+total))/i;
-export const SPECIAL_ASSESSMENT_ROW = /^\s*special\s+assessments?\b/i;
+// The gate and the units offered are lib/condo-units' (no agency table), so
+// a client component asks the same question without loading it.
+const isRow = isCondoRow;
+const NOT_STATED = CONDO_NOT_STATED;
+export { HOA_DUES_ROW, SPECIAL_ASSESSMENT_ROW, UNITS_IN_CONDO_ROW, UNITS_OFFERED_ROW };
 export const STATED_ROWS: ReadonlyArray<readonly [string, RegExp]> = [
   ["Association reserves", /^\s*(?:association|hoa|condo(?:minium)?)\s+reserves?\b|^\s*reserve\s+(?:fund|balance)\b/i],
   ["Rental restrictions", /^\s*rental\s+restrictions?\b|^\s*leasing\s+restrictions?\b/i],
@@ -124,13 +124,6 @@ export interface CondoRead {
 // the block's in thousands.
 const money = (n: number): string => compactUsd(n, { millions: "auto", thousandsFrom: 1e4 });
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
-
-/** The deal's words beside its class: its name, its plan and its interest. */
-function otherWordsOf(ex: ExtractionResult): string {
-  return [ex.dealName, ex.strategy?.summary, ex.interest?.summary]
-    .filter((w): w is string => typeof w === "string" && w.trim() !== "")
-    .join(" \n ");
-}
 
 /** The most a unit's dues are read at, a month: a figure over it is the
  *  block's total or the association's budget, never one unit's. */
@@ -245,23 +238,16 @@ export function monthlyDuesOf(stated: string, units: number | null = null): numb
  * the dues, a special assessment) — and it states one of the figures.
  */
 export function readCondo(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): CondoRead | null {
-  if (!ex) return null;
-  const rows = (Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow).filter((m) => !NOT_STATED.test(m.value.trim()));
-  const find = (re: RegExp) => rows.find((m) => re.test(m.label)) ?? null;
-  const classIsCondo = CONDO_WORDS.test(typeof ex.assetClass === "string" ? ex.assetClass : "");
-  const condoRow = [UNITS_OFFERED_ROW, UNITS_IN_CONDO_ROW, HOA_DUES_ROW, SPECIAL_ASSESSMENT_ROW].some((re) => find(re) != null);
-  if (!classIsCondo && !(condoRow && CONDO_WORDS.test(otherWordsOf(ex)))) return null;
-  const countOf = (r: Row | null) => {
-    const n = r ? parseCount(r.value) : null;
-    return n != null && n > 0 ? n : null;
-  };
+  // Condominium units by lib/condo-units' gate, which the price-a-unit
+  // readers share.
+  const c = condoRows(ex);
+  if (!c) return null;
+  const { find } = c;
+  const countOf = condoCountOf;
   // The units sold: a row of their own, else — where the class itself is a
-  // condominium — the deal's own unit count: on a bulk sale the
-  // memorandum's "Units" are the units offered, and the count reader never
-  // takes "Units in building" for it. Never the building's count on the
-  // words alone.
-  const offeredCount = classIsCondo ? unitCountFromMetrics(rows) : null;
-  const unitsOffered = countOf(find(UNITS_OFFERED_ROW)) ?? (offeredCount != null && offeredCount > 0 ? offeredCount : null);
+  // condominium — the deal's own unit count (lib/condo-units
+  // `condoUnitsOffered`, the one count every price a unit divides by).
+  const unitsOffered = condoUnitsOffered(ex);
   const unitsInCondominium = countOf(find(UNITS_IN_CONDO_ROW));
   const duesRow = find(HOA_DUES_ROW);
   const monthlyDues = duesRow ? monthlyDuesOf(duesRow.value, unitsOffered) : null;

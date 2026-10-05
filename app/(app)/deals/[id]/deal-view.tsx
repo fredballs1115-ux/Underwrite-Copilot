@@ -75,6 +75,7 @@ import type { LoiTerms } from "@/lib/loi-terms";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 import { LOI_REFUSAL_BANNERS } from "@/lib/loi-refusal";
 import { subjectBasis, type SubjectBasis } from "@/lib/comp-detail";
+import { condoUnitsOffered } from "@/lib/condo-units";
 import { interestOf } from "@/lib/interest";
 import { dealFileLinkFor } from "@/lib/deal-file-link";
 import { servedInline } from "@/lib/inline-types";
@@ -1047,6 +1048,8 @@ export function DealView({
               screenYearOf(results.extraction),
               interestOf(results.extraction),
               results.extraction?.assetClass,
+              // A bulk condominium purchase's units offered (research pass 38).
+              condoUnitsOffered(results.extraction),
             )}
           />
         )}

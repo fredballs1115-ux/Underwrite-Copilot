@@ -149,6 +149,10 @@ export function subjectBasis(
    *  read for an outdoor-storage yard (lib/deal-strategy
    *  `isOutdoorStorageYard`) */
   assetClass?: string | null,
+  /** the units a bulk condominium purchase buys (lib/condo-units
+   *  `condoUnitsOffered`): its price a unit divides by them, never by the
+   *  condominium's whole count (research pass 38) */
+  unitsOffered?: number | null,
 ): SubjectBasis {
   const none = { perUnit: null, perSf: null };
   if (kind === "conversion" || kind === "development") return none;
@@ -160,7 +164,7 @@ export function subjectBasis(
   const stated = row ? parsePrice(row.value) : null;
   if (stated == null || stated < 10_000) return none;
   const price = interest?.sharePct != null ? stated / (interest.sharePct / 100) : stated;
-  const units = unitCountFromMetrics(metrics);
+  const units = unitsOffered != null && unitsOffered > 0 ? unitsOffered : unitCountFromMetrics(metrics);
   const sf = isOutdoorStorageYard(assetClass) ? null : buildingSfFromMetrics(metrics);
   return {
     perUnit: units != null && units > 0 ? Math.round(price / units) : null,
