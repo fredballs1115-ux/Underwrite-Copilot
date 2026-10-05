@@ -810,10 +810,15 @@ describe("planSummary / plausibilityNote — a forward purchase", () => {
     // The community states no budget: none is the buyer's.
     const sb = inferStrategy(btr);
     expect(plausibilityNote([], sb, planSummary(btr, sb), btr)).toContain("no construction budget is the buyer's: the developer funds the works");
-    // A development the buyer builds keeps the construction paragraph.
+    // A development the buyer builds keeps the construction paragraph: here
+    // its budget, tested, and its stabilized NOI said to be unstated — a
+    // year-1 NOI is no finished project's pro forma.
     const own = ex(bts.metrics, { assetClass: "industrial", strategy: { ...dev, summary: "Ground-up distribution center" } });
     const so = inferStrategy(own);
-    expect(plausibilityNote([], so, planSummary(own, so), own)).toContain("against the cost of construction debt");
+    const ownNote = plausibilityNote([], so, planSummary(own, so), own);
+    expect(ownNote).toContain("Test the budget it states and its schedule against comparable projects");
+    expect(ownNote).toContain("The memorandum states no stabilized NOI");
+    expect(ownNote).not.toContain("A FORWARD PURCHASE");
   });
 });
 

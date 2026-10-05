@@ -1615,12 +1615,42 @@ function planLine(plan: PlanSummary): string {
  *  brief carries after its figures. */
 const PLAN_TEST =
   "Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.";
-const PLAN_TEXT = `The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today. ${PLAN_TEST}`;
-/** The same paragraph where a finding stands, or no yield on cost is struck
+/** The test where the memorandum states the stabilized NOI and no budget:
+ *  no total cost, so no yield on cost, and the budget is asked for rather
+ *  than tested (research pass 37's rule for a lease-up, carried to the
+ *  works). */
+const PLAN_TEST_NO_BUDGET =
+  "Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market and the operating ratio. The memorandum states no construction or renovation budget, so there is no total cost and no yield on cost to judge the plan on: ask for the budget, its schedule, its contingency and the carry through the works before judging it — never on a going-in cap on the acquisition price.";
+const PLAN_HEAD =
+  "The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today.";
+/** The same opening where a finding stands, or no yield on cost is struck
  *  past the ceiling (research pass 38): the plan's figures do not all tie,
  *  so the NOI is never called "not a misread" — it, or the cost it is set
  *  against, may be one. */
-const PLAN_TEXT_UNTIED = `The stabilized NOI is the sponsor's post-completion pro forma, not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today. But the plan's figures do not all tie, as said here, so it or the cost it is set against may be a misread: check both against their source pages before judging the plan on them. ${PLAN_TEST}`;
+const PLAN_HEAD_UNTIED =
+  "The stabilized NOI is the sponsor's post-completion pro forma, not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today. But the plan's figures do not all tie, as said here, so it or the cost it is set against may be a misread: check both against their source pages before judging the plan on them.";
+
+/**
+ * The paragraph a plan whose works are the plan carries — a value-add, a
+ * conversion, a development (a lease-up's is `leaseUpPlanText`, a forward
+ * purchase's `FORWARD_PLAN_TEXT`). A stabilized NOI and a budget are spoken
+ * of, and tested, only where the memorandum states them, each it does not
+ * state said to be not stated (research pass 37: the paragraph had told
+ * every step to test "the stabilized NOI" and "the budget" on a plan that
+ * stated neither). Without a plan summary it is the paragraph as it was.
+ */
+function worksPlanText(plan: PlanSummary | null, untied: boolean): string {
+  const head = untied ? PLAN_HEAD_UNTIED : PLAN_HEAD;
+  if (!plan) return `${head} ${PLAN_TEST}`;
+  if (plan.stabilizedNoi != null) return `${head} ${plan.budget != null ? PLAN_TEST : PLAN_TEST_NO_BUDGET}`;
+  return [
+    "The memorandum states no stabilized NOI, so there is no pro forma for the finished project to test and no yield on cost to judge, and none is built here.",
+    plan.budget != null
+      ? "Test the budget it states and its schedule against comparable projects, with the carry and any income through the works."
+      : "Nor does it state a construction or renovation budget: ask for it, its schedule, its contingency and the carry through the works before any figure is put on the plan.",
+    "Judge the plan on what the memorandum states and ask for the rest — never on a going-in cap on the acquisition price.",
+  ].join(" ");
+}
 
 /** The paragraph a forward purchase's brief carries in its place: the
  *  developer funds the works, so no construction budget, carry, interest
@@ -1629,12 +1659,12 @@ const FORWARD_PLAN_TEXT =
   "A FORWARD PURCHASE: the buyer pays the price at delivery and the developer funds the works, so the buyer carries no construction — no budget, no carry through the works, no interest reserve and no construction or bridge loan of its own; the price is the buyer's whole cost. The NOI the memorandum states at delivery is the delivered building's figure, not today's income: test it against today's leased comparables, and judge the purchase on its yield at delivery against the exit cap, on the clock to delivery against the outside date, and on the deposit at risk before delivery — never on a going-in cap on a building that stands.";
 
 /**
- * A lease-up's paragraph in place of `PLAN_TEXT` (research pass 37): the
+ * A lease-up's paragraph in place of `worksPlanText` (research pass 37): the
  * building stands and the plan is the leasing, so a stabilized NOI and a
  * budget are spoken of only where the memorandum states them — each one it
  * does not state is said to be not stated, never tested as if it were. Where
  * the plan's figures do not all tie (`untied`), its stabilized NOI is never
- * called "not a misread", as `PLAN_TEXT_UNTIED` says for any plan.
+ * called "not a misread", as `PLAN_HEAD_UNTIED` says for any plan.
  */
 function leaseUpPlanText(plan: PlanSummary | null, untied = false): string {
   const noi = plan?.stabilizedNoi != null;
@@ -1688,9 +1718,7 @@ export function plausibilityNote(
         ? FORWARD_PLAN_TEXT
         : strategy.kind === "lease_up"
           ? leaseUpPlanText(plan, findings.length > 0 || !!plan?.yieldWithheld)
-          : findings.length > 0 || plan?.yieldWithheld
-            ? PLAN_TEXT_UNTIED
-            : PLAN_TEXT,
+          : worksPlanText(plan, findings.length > 0 || !!plan?.yieldWithheld),
     );
   }
   if (findings.length) {

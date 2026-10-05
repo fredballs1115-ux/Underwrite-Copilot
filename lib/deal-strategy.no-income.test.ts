@@ -96,6 +96,43 @@ describe("assessPlausibility — no income in place on a deal read as stabilized
   });
 });
 
+describe("plausibilityNote — the works' paragraph speaks only of what the memorandum states", () => {
+  // Research pass 37's rule for a lease-up, carried to a value-add, a
+  // conversion and a development: the paragraph had told every step to test
+  // "the stabilized NOI" and "the budget" on a plan that stated neither.
+  const plan = (rows: ReturnType<typeof row>[], kind: "development" | "conversion" | "value_add") => {
+    const e = office(rows, { strategy: { kind, summary: "The plan", capitalBudget: "", timeline: "" } });
+    const s = inferStrategy(e);
+    return plausibilityNote([], s, planSummary(e, s), e);
+  };
+
+  it("says a stabilized NOI and a budget the memorandum does not state are not stated, and never tests them", () => {
+    const note = plan([], "development");
+    expect(note).toContain("The memorandum states no stabilized NOI, so there is no pro forma for the finished project to test and no yield on cost to judge, and none is built here.");
+    expect(note).toContain("Nor does it state a construction or renovation budget: ask for it, its schedule, its contingency and the carry through the works before any figure is put on the plan.");
+    expect(note).not.toMatch(/The stabilized NOI is the sponsor's|the construction or renovation budget and schedule against comparable projects/);
+    expect(gluedWords(note)).toEqual([]);
+  });
+
+  it("tests a stated budget where no NOI is stated, and asks for the budget where only the NOI is", () => {
+    const budgetOnly = plan([row("Renovation budget", "$2,100,000")], "value_add");
+    expect(budgetOnly).toContain("The memorandum states no stabilized NOI");
+    expect(budgetOnly).toContain("Test the budget it states and its schedule against comparable projects");
+    const noiOnly = plan([row("NOI (stabilized, pro forma)", "$1,050,000", "pro_forma")], "conversion");
+    expect(noiOnly).toContain("The stabilized NOI is the sponsor's post-completion pro forma");
+    expect(noiOnly).toContain("The memorandum states no construction or renovation budget, so there is no total cost and no yield on cost to judge the plan on");
+    expect(noiOnly).not.toContain("and the yield on total cost against the exit cap");
+    for (const n of [budgetOnly, noiOnly]) expect(gluedWords(n)).toEqual([]);
+  });
+
+  it("is the paragraph as it was where both are stated", () => {
+    const both = plan([row("NOI (stabilized, pro forma)", "$1,050,000", "pro_forma"), row("Total project cost", "$12,000,000")], "development");
+    expect(both).toContain("The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income");
+    expect(both).toContain("the construction or renovation budget and schedule against comparable projects");
+    expect(both).not.toMatch(/states no stabilized NOI|states no construction or renovation budget/);
+  });
+});
+
 describe("plausibilityNote — a lease-up's paragraph speaks only of what the memorandum states", () => {
   it("says a stabilized NOI and a budget the memorandum does not state are not stated, and never tests them", () => {
     const e = office([row("Occupancy", "0%", "in_place")], { dealName: "1200 Corporate Drive (vacant, owner-user or investor)" });
