@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { assetClassLabel } from "@/lib/asset-class";
 import type { BannerSource } from "@/lib/deal-banner";
+import type { DealCoverFacts } from "@/lib/deal-cover";
 import { DealBanner } from "../deal-banner";
 import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 import type { FigureSource } from "@/lib/compare-figures";
@@ -163,6 +164,10 @@ export type Col = {
   /** the building's pictures to try, best first, each with its own credit
    *  (lib/deal-banner, #418) — absent where the caller draws none */
   pictures?: BannerSource[];
+  /** the deal's cover (lib/deal-cover, #442), as its pipeline card wears it:
+   *  what holds the frame while a picture loads, and the frame where none
+   *  answers — absent, the blank plate */
+  cover?: DealCoverFacts | null;
 };
 
 const FIT_LABEL: Record<NonNullable<Col["fit"]>, { text: string; cls: string }> = {
@@ -533,7 +538,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
           const reason = reasonLine(c);
           return (
             <li key={c.id} className="rounded-2xl border border-line bg-surface p-4 shadow-card">
-              {c.pictures && <DealBanner sources={c.pictures} label={c.name} className="mb-3" />}
+              {c.pictures && <DealBanner sources={c.pictures} cover={c.cover ?? null} label={c.name} className="mb-3" />}
               <div className="flex items-start justify-between gap-3">
                 <Link href={`/deals/${c.id}`} className="font-medium text-ink hover:text-brand">
                   {c.name}
@@ -594,7 +599,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                     className="border-b border-l border-line p-4 text-left align-top"
                   >
                     {c.pictures && (
-                      <DealBanner sources={c.pictures} label={c.name} className="mb-3 w-full max-w-[16rem]" />
+                      <DealBanner sources={c.pictures} cover={c.cover ?? null} label={c.name} className="mb-3 w-full max-w-[16rem]" />
                     )}
                     <Link
                       href={`/deals/${c.id}`}

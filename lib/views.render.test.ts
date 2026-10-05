@@ -1503,6 +1503,47 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect((html.match(/<li /g) ?? []).length).toBe(pictured.length);
   });
 
+  it("wears each deal's cover and its photograph's blur-up, as its pipeline card does, keeping the aerial (research pass 29)", () => {
+    // The compare page passed neither, so a deal with no address and no
+    // photograph showed the old dashed plate where its card wears its cover,
+    // and a photograph arrived with no colours of its own first.
+    const PREVIEW = "data:image/webp;base64,UklGRlIAAABXRUJQVlA4IEYAAAAwAgCdASoYABAAPm0wkkWkIqGYBABABsSgCdMoRwBAbAhvCgAA/vy3qgA=";
+    const facts = { googleEnabled: false, hasStreetAddress: true, hasAddress: true };
+    const covered = [
+      {
+        ...COLS[0],
+        pictures: bannerSources({ ...facts, dealId: "a", pictureCredit: "From the offering memorandum", picturePreview: PREVIEW }),
+        cover: coverFor({ seed: "a", assetClass: "multifamily", place: "Philadelphia, PA" }),
+      },
+      { ...COLS[1], pictures: bannerSources({ ...facts, dealId: "b", pictureCredit: null }), cover: coverFor({ seed: "b", assetClass: "office", place: "Philadelphia, PA" }) },
+      {
+        ...COLS[2],
+        pictures: bannerSources({ ...facts, dealId: "c", pictureCredit: null, hasStreetAddress: false, hasAddress: false }),
+        cover: coverFor({ seed: "c", assetClass: "retail", place: "Tysons, VA" }),
+      },
+    ];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: covered }));
+    dumpView("compare-covered", html);
+    expect(a11yIssues(html), "a11y compare covered").toEqual([]);
+    expect(positionConflicts(html)).toEqual([]);
+    // Once in the table and once in the phone cards: no blank plate — the
+    // deal with nothing to show wears its cover, words and all.
+    expect(html).not.toContain('data-deal-banner="blank"');
+    expect((html.match(/data-deal-banner="cover"/g) ?? []).length).toBe(2);
+    expect((html.match(/role="img" aria-label="No photograph of [^"]* yet, in Tysons, VA"/g) ?? []).length).toBe(2);
+    expect((visibleText(html).match(/No photo yet/g) ?? []).length).toBe(2);
+    // The photograph's own colours first while it loads (#463).
+    expect((html.match(/data-deal-banner="photo"[^>]*>\s*<span aria-hidden="true" data-preview="banner"/g) ?? []).length).toBe(2);
+    // The aerial keeps its place here, the cover holding its frame wordless
+    // while it loads.
+    expect((html.match(/data-deal-banner="aerial"[^>]*><span aria-hidden="true" data-deal-cover="office"/g) ?? []).length).toBe(2);
+    // The page builds both as the pipeline page does.
+    const page = readFileSync("app/(app)/deals/compare/page.tsx", "utf8");
+    expect(page).toContain("picturePreview: picture?.preview ?? null");
+    expect(page).toMatch(/cover: coverFor\(\{\s*seed: deal\.id,\s*assetClass: shownAssetClass\(deal\.asset_class, ex\),\s*place: coverPlace\(address, marketPictureFor\(/);
+    expect(page).not.toMatch(/bannerSources\(\{[^}]*aerial: false/);
+  });
+
   it("sets FEMA's flood zone side by side, the Special Flood Hazard Area in red and a pending lookup as a dash (#426)", () => {
     const cols: Col[] = [
       col({ ...COLS[0], id: "f1", name: "Riverside Flats", flood: "AE (SFHA)" }),

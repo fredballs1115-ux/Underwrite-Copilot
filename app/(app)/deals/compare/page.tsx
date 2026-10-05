@@ -20,6 +20,8 @@ import { asOfLabel } from "@/lib/research";
 import { findPriceMetric, inferStrategy, noiFigures } from "@/lib/deal-strategy";
 import { dealTypeLabel } from "@/lib/interest";
 import { bannerSources, pictureVersion } from "@/lib/deal-banner";
+import { coverFor, coverPlace } from "@/lib/deal-cover";
+import { marketPictureFor } from "@/lib/market-picture";
 import { floodCell, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { affordableTag } from "@/lib/affordable";
 import { singleTenantTag } from "@/lib/single-tenant";
@@ -84,6 +86,11 @@ function toCol(
   // the deck) — never printed as it stands: the column shows the deal's one
   // class through `shownAssetClass`.
   const filedClass = (deal.asset_class as string | null) ?? null;
+  // The same placement the pipeline and the deal page make (lib/market-
+  // county, #447) — all three surfaces agree, a county-placed deal naming
+  // its county.
+  const storedFlags = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
+  const placed = placeDeal(address, countyOf(address, siteFlagsStale(storedFlags, address?.label) ? null : storedFlags));
 
   // A plan deal's generated model books dark years first, so its year-1 cap
   // is negative or a default — not a figure to compare on, and not one to
@@ -138,19 +145,9 @@ function toCol(
     // a deal the extraction has read.
     assetClass: shownAssetClass(deal.asset_class, ex),
     market: ex?.market || "—",
-    // The same placement the pipeline and the deal page make (lib/market-
-    // county, #447) — all three surfaces agree, a county-placed deal naming
-    // its county.
-    ...(() => {
-      const stored = (deal as { site_flags?: SiteFlagsResult | null }).site_flags ?? null;
-      const flags = siteFlagsStale(stored, address?.label) ? null : stored;
-      const placed = placeDeal(address, countyOf(address, flags));
-      return {
-        coveredMarket: placed.briefed?.name ?? null,
-        readMarket: placed.read?.name ?? null,
-        readCounty: placed.placedBy?.county ?? null,
-      };
-    })(),
+    coveredMarket: placed.briefed?.name ?? null,
+    readMarket: placed.read?.name ?? null,
+    readCounty: placed.placedBy?.county ?? null,
     verdict: verdict?.verdict ?? null,
     reason: verdict?.reason ?? null,
     // A re-screen still running, or one that failed before its verdict,
@@ -223,14 +220,26 @@ function toCol(
     noiFrom: modelNoi ? "model" : statedNoi ? "om" : null,
     // Each building pictured at the head of its column (#418): its own
     // photograph where the deal has one cached, then Street View, then the
-    // USGS aerial — each pinned, so its credit is the picture on screen.
+    // USGS aerial — each pinned, so its credit is the picture on screen. The
+    // overhead stays here, where two columns' overheads tell two buildings
+    // apart (lib/deal-banner); no market photograph.
     pictures: bannerSources({
       dealId: deal.id,
       pictureCredit: picture ? PICTURE_CREDIT[picture.source] : null,
+      // Its colours before its pixels (#463), as on its pipeline card.
+      picturePreview: picture?.preview ?? null,
       pictureVersion: picture ? pictureVersion(picture.hero) : null,
       googleEnabled,
       hasStreetAddress: !!address?.street,
       hasAddress: !!address?.label,
+    }),
+    // The deal's cover (#442), built as the pipeline page builds it, so the
+    // column wears the drawing its card wears: under a picture while it
+    // loads, and in place of the blank plate where no picture answers.
+    cover: coverFor({
+      seed: deal.id,
+      assetClass: shownAssetClass(deal.asset_class, ex),
+      place: coverPlace(address, marketPictureFor(address, ex?.market ?? null, placed.briefed ?? placed.read, placed.county)?.name, ex?.market),
     }),
   };
 }
