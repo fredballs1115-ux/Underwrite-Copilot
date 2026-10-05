@@ -16,7 +16,8 @@ import {
   plausibilityNote,
   type DealStrategy,
 } from "@/lib/deal-strategy";
-import { foldBuyBoxChecks, parsePrice, priceRange, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { buyBoxCoverage, foldBuyBoxChecks, parsePrice, priceRange, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { checkedSentence } from "@/lib/fit-label";
 import { interestOf, isWholeShare } from "@/lib/interest";
 import { readSale } from "@/lib/sale-terms";
 import { assetWords } from "@/lib/asset-words";
@@ -291,6 +292,10 @@ export function buildBrief(input: VerdictInputs): string {
     const checks = input.buyBoxChecks?.checks ?? [];
     const tripped = input.buyBoxChecks?.tripped ?? [];
     const fold = foldBuyBoxChecks(checks);
+    // How much of the box that call stands on, as the deal page's chip says
+    // it ("2 of 4 checked"): a note's or an unpriced deal's fit is no fit on
+    // the criteria the price decides.
+    const covered = checkedSentence(buyBoxCoverage(checks));
     sections.push(
       "## The buyer's standing buy box",
       [
@@ -301,6 +306,7 @@ export function buildBrief(input: VerdictInputs): string {
               "The code's checks of this deal against the box, computed before you read this — the calls the deal page's buy-box chip shows. Use each call and its figure as it stands; never re-derive a check or recompute its figure:",
               ...checks.map((c) => `- ${c.label} — ${CHECK_WORD[c.status]}: ${c.detail}`),
               ...(fold ? [`The code's call across the checks: ${FOLD_WORD[fold]}.`] : []),
+              ...(covered ? [covered] : []),
               ...(tripped.length > 0 ? [`Red lines the buyer set that this deal trips: ${tripped.join("; ")}.`] : []),
               "",
               "Judge this deal's fit on these checks: reference clear misses in the reason and topRisks, and if the deal fails the box on price or basis, say in nextSteps what entry price WOULD fit. The code computes no entry price: one you name is your own estimate — give its arithmetic and say it is yours. A deal can be well-underwritten and still be outside the box — say so plainly.",

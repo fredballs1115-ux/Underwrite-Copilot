@@ -282,10 +282,16 @@ describe("the verdict is handed the code's buy-box checks, not the bare criteria
     expect(box).toContain("- Asset class — fits: Mandate is multifamily — this is multifamily. In scope.");
     expect(box).toContain("- Target return — not checked: Mandate targets ≥15% IRR; no parseable IRR in the screen yet.");
     expect(box).toContain("The code's call across the checks: outside the box on at least one criterion.");
+    // How much of the box the call stands on, in the deal page's chip's words.
+    expect(box).toContain("Judged on 3 of the buy box's 4 criteria; target return could not be checked.");
     expect(box).toContain("Red lines the buyer set that this deal trips: price $20.0M over the $18.0M ceiling.");
     expect(box).toContain("The code computes no entry price: one you name is your own estimate — give its arithmetic and say it is yours.");
     // A check's call is never the verdict's own word "pass".
     expect(box).not.toMatch(/— pass\b/);
+    // A box checked in full says no count.
+    const known = checks.filter((c) => c.status !== "unknown");
+    const full = buildBrief({ ...none, buyBox: lines, buyBoxChecks: { checks: known, tripped: [] } });
+    expect(full).not.toContain("Judged on");
   });
 
   it("with no checks to hand, the criteria alone — and an entry price is still the verdict's own estimate", () => {

@@ -34,8 +34,14 @@ describe("markFirstRead — an exported figure says it is a first read", () => {
     // stands on (lib/fit-label `fitCellText`, research pass 35), and marks a
     // first read as markFirstRead does.
     expect(csv).toMatch(
-      /fitCellText\(d\.fit \? FIT_META\[d\.fit\]\.label : "", d\.fitCoverage, d\.fitFirstRead\),\s*markFirstRead\(d\.score != null \? String\(d\.score\) : "", d\.fitFirstRead\),\s*markFirstRead\(d\.mandateVerdict \? MANDATE_META\[d\.mandateVerdict\]\.label : "", d\.fitFirstRead\),/,
+      /fitCellText\(d\.fit \? FIT_META\[d\.fit\]\.label : "", d\.fitCoverage, d\.fitFirstRead\),\s*markFirstRead\(d\.score != null \? String\(d\.score\) : "", d\.fitFirstRead\),/,
     );
+    // The Mandate fit cell says the score's call in the deal header's chip's
+    // words (lib/fit-label `fitScoreLabel`, less its "Fit N · "), marked a
+    // first read the same way.
+    const fitCell = csv.slice(csv.indexOf("markFirstRead(", csv.indexOf("String(d.score)")));
+    expect(fitCell).toMatch(/^markFirstRead\(\s*d\.mandateVerdict && d\.score != null\s*\?\s*fitScoreLabel\(d\.score, d\.mandateVerdict, d\.fit === "outside", d\.fitCoverage\)/);
+    expect(fitCell.slice(0, 600)).toContain("d.fitFirstRead,");
     for (const [word, read] of [["Near", true], ["Fits", false], ["", true]] as const) {
       expect(fitCellText(word, null, read)).toBe(markFirstRead(word, read));
     }

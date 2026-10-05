@@ -740,7 +740,19 @@ export function Pipeline({
         // workbook's cell does (lib/fit-label `fitCellText`).
         fitCellText(d.fit ? FIT_META[d.fit].label : "", d.fitCoverage, d.fitFirstRead),
         markFirstRead(d.score != null ? String(d.score) : "", d.fitFirstRead),
-        markFirstRead(d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "", d.fitFirstRead),
+        // The score's call in the deal header's chip's own words (lib/
+        // fit-label `fitScoreLabel`): "Outside box" on a miss outright, and
+        // the count in the call's place where the screen could not check
+        // every criterion ("2 of 4 checked"), never a bare "Pursue" over half
+        // the box.
+        markFirstRead(
+          d.mandateVerdict && d.score != null
+            ? fitScoreLabel(d.score, d.mandateVerdict, d.fit === "outside", d.fitCoverage).replace(/^Fit \d+ · /, "")
+            : d.mandateVerdict
+              ? MANDATE_META[d.mandateVerdict].label
+              : "",
+          d.fitFirstRead,
+        ),
         d.jobStatus === "failed"
           ? "Failed"
           : d.jobStatus === "stalled"
@@ -1618,8 +1630,12 @@ function MetaLine({
 }) {
   const shown = bits.filter(Boolean);
   if (shown.length === 0) return null;
+  // `relative` holds a bit's screen-reader text (an absolute `sr-only`
+  // span, "added by …") inside the clipped line: its containing block had
+  // been outside it, so at 320px it sat past the screen's edge and the list
+  // scrolled sideways (research pass 36).
   return (
-    <p className={`${flush ? "" : "mt-0.5 "}truncate text-xs text-muted ${className ?? ""}`}>
+    <p className={`${flush ? "" : "mt-0.5 "}relative truncate text-xs text-muted ${className ?? ""}`}>
       {shown.map((b, idx) => (
         <Fragment key={idx}>
           {idx > 0 && " · "}
@@ -2438,7 +2454,13 @@ const DealTile = memo(function DealTile({
             takes it where the note pays or may, else it says n/a. */}
         <TileStat
           label={
-            !d.slots.cap && d.slots.yoc ? "Yield on cost" : !d.slots.cap && d.slots.noteYield ? ownYieldOf(d.slots.capWithheld).label : "Cap"
+            // A plan deal is judged on its yield on total cost, stated or
+            // not: a dash under "Cap" read as a cap the memorandum left out.
+            !d.slots.cap && (d.slots.yoc || d.slots.plan)
+              ? "Yield on cost"
+              : !d.slots.cap && d.slots.noteYield
+                ? ownYieldOf(d.slots.capWithheld).label
+                : "Cap"
           }
           title={!d.slots.cap && !d.slots.yoc && d.slots.capWithheld ? CAP_WITHHELD[d.slots.capWithheld].title : undefined}
           sub={!d.slots.cap && !d.slots.yoc && d.slots.noteYield ? ownYieldOf(d.slots.capWithheld).to : undefined}
