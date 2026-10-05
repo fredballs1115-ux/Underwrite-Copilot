@@ -15,7 +15,7 @@ import {
   type AssumableTerms,
 } from "./assumable-debt";
 import { dealContextFor } from "./deal-context";
-import { assumableRows } from "./loan-rows";
+import { assumableLevyRows, assumableRows, assumableStatedRows } from "./loan-rows";
 import { gluedWords } from "./render-lint";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { deriveUnderwriteInputs } from "./underwrite/inputs";
@@ -434,6 +434,68 @@ describe("debt that is not one fixed loan, said and never priced as one (researc
     expect(readAssumableTerms(sample([...LOAN, row("Prepayment", "No prepayment permitted before maturity")]))!.prepayment?.locksIn).toBe(true);
     expect(assumableSentence(open)).toBe(assumableSentence(readAssumable(sample(), inputs, AS_OF)!));
     expect(assumableContextLine(open)).toContain('Its prepayment terms as stated: "Yield maintenance through 2028, open at par thereafter".');
+  });
+
+  it("refuses a PACE assessment or a special district's levy filed as the seller's loan, and every term filed beside it", () => {
+    // Research pass 37's C-PACE fixture: priced as the buyer's alternative
+    // to a mortgage ("Assumable 6.85%", DSCR 4.21x), which it never is.
+    const cpace = sample([
+      row("Assumable loan balance (C-PACE assessment)", "9,500,000"),
+      row("Assumable loan rate", "6.85%"),
+      row("Assumable loan maturity", "December 1, 2049"),
+      row("Assumable loan amortization", "25 years"),
+      row("Assumption fee", "None stated by the provider"),
+    ]);
+    expect(readAssumableTerms(cpace)).toBeNull();
+    expect(readAssumable(cpace, inputs, AS_OF)).toBeNull();
+    expect(assumableTag(cpace)).toBeNull();
+    expect(dealContextFor(cpace) ?? "").not.toContain("seller's loan");
+    expect(assumableStatedRows(cpace.metrics)).toEqual([]);
+    expect(assumableLevyRows(cpace.metrics).map((m) => m.label)).toEqual([
+      "Assumable loan balance (C-PACE assessment)",
+      "Assumable loan rate",
+      "Assumable loan maturity",
+      "Assumable loan amortization",
+      "Assumption fee",
+    ]);
+    // Named in the value, or by any of the levies' names, the same.
+    for (const value of [
+      "$9,500,000 (C-PACE)",
+      "$9,500,000 PACE assessment",
+      "$9,500,000 (Property Assessed Clean Energy)",
+      "$2,150,000 CDD bonds",
+      "$4,000,000 MUD bonds",
+      "$1,800,000 (PID assessment)",
+      "$3,100,000 (CFD No. 2018-1)",
+      "$3,100,000 Mello-Roos special tax",
+      "$1,200,000 special assessment",
+    ]) {
+      const e = sample([row("Assumable loan balance", value), row("Assumable loan rate", "6.85%")]);
+      expect(assumableTag(e), value).toBeNull();
+      expect(assumableStatedRows(e.metrics), value).toEqual([]);
+    }
+    // A balance free of the levy's words beside the levy's own is the
+    // seller's loan, and only the levy's rows are refused.
+    const beside = sample([
+      row("Assumable loan balance", "$24,500,000"),
+      row("Assumable loan balance (C-PACE)", "$9,500,000"),
+      row("Assumable loan rate", "3.45%"),
+      row("Assumable loan maturity", "March 31, 2031"),
+      row("Assumable loan amortization", "Interest-only"),
+    ]);
+    expect(readAssumableTerms(beside)).toMatchObject({ balance: 24_500_000, ratePct: 3.45 });
+    expect(assumableLevyRows(beside.metrics).map((m) => m.label)).toEqual(["Assumable loan balance (C-PACE)"]);
+    // "pace" and "mud" as words are no levy.
+    expect(assumableTag(sample([row("Assumable loan balance", "$24,500,000 (amortizing at a steady pace)"), row("Assumable loan rate", "3.45%")]))).toBe(
+      "Assumable 3.45%",
+    );
+  });
+
+  it("the extraction never files a levy as the seller's loan", async () => {
+    const { extractionInstruction } = await import("./anthropic/prompts");
+    expect(extractionInstruction("multifamily")).toContain(
+      "never a quote for new financing or the OM's own proposed loan, and never a PACE assessment or a special district's levy on the tax bill",
+    );
   });
 
   it("the challenger's traps ask (f) to (i) as questions", () => {

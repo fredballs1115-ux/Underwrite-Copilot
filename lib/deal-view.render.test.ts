@@ -1326,6 +1326,21 @@ describe("the debt sizer lists a stated loan under whose loan it is (2026-09-30)
     expect(omLoanTerms(withRows([row("Prepayment", "Yield maintenance")])).assumable).toEqual([]);
   });
 
+  it("lists a PACE assessment filed under the seller's loan's labels nowhere — neither as that loan nor as the buyer's financing (research pass 37)", () => {
+    const t = omLoanTerms(
+      withRows([
+        row("Assumable loan balance (C-PACE assessment)", "9,500,000"),
+        row("Assumable loan rate", "6.85%"),
+        row("Assumable loan maturity", "December 1, 2049"),
+        row("Assumable loan amortization", "25 years"),
+      ]),
+    );
+    expect(t.assumable).toEqual([]);
+    // Its rate, maturity and amortization had been the OM's own "Rate",
+    // "Maturity" and "Amortization" once the seller's loan let them go.
+    expect(t.offered.map((r) => r.label)).toEqual(["LTV"]);
+  });
+
   it("lists a seller's loan's term as that loan's even where its balance is not stated (the audit, 2026-10-01)", () => {
     const rateOnly = omLoanTerms(withRows([row("Assumable loan rate", "3.45%")]));
     expect(rateOnly.assumable.map((r) => `${r.label}: ${r.value}`)).toEqual(["Rate: 3.45%"]);

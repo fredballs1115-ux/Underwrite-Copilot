@@ -23,7 +23,7 @@ import type { ModelSources } from "@/lib/underwrite/report-grid";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import type { DealRateSeeds, RateSeed } from "@/lib/debt-index";
 import { interestOf } from "@/lib/interest";
-import { assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
+import { assumableLevyRows, assumableStatedRows, sellerNoteStatedRows } from "@/lib/loan-rows";
 import { assetWords } from "@/lib/asset-words";
 import { SIZER_LENDER_TESTS, sizerSourceLine, sizerStartingRate } from "@/lib/sizer-terms";
 import { compactUsd } from "@/lib/money";
@@ -149,7 +149,10 @@ export function omLoanTerms(extraction: ExtractionResult | null): {
   const as = (term: string, m: { value: string; page?: string }): OmTerm => ({ label: term, value: m.value, page: m.page });
   const assumableRows = assumableStatedRows(metrics);
   const sellerRows = sellerNoteStatedRows(metrics);
-  const claimed = new Set<unknown>([...assumableRows, ...sellerRows].map((e) => e.row));
+  // A PACE assessment or a special district's levy filed under the seller's
+  // loan's labels is neither that loan nor the buyer's financing: it is
+  // listed nowhere here (research pass 37).
+  const claimed = new Set<unknown>([...[...assumableRows, ...sellerRows].map((e) => e.row), ...assumableLevyRows(metrics)]);
   // The rest is what the OM states of a loan with no owner named: its own
   // financing assumptions (the LTV it underwrites, the rate it quotes).
   const rest = metrics.filter((m) => !claimed.has(m));

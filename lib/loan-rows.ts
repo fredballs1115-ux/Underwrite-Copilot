@@ -9,10 +9,12 @@
 
 type Row = { label: string; value: string };
 
+const isRow = (m: Row | null | undefined): m is Row => !!m && typeof m.label === "string";
+
 const pickFrom =
   <M extends Row>(metrics: ReadonlyArray<M>) =>
   (re: RegExp, not?: RegExp): M | null =>
-    metrics.find((m) => m && typeof m.label === "string" && re.test(m.label) && !(not && not.test(m.label))) ?? null;
+    metrics.find((m) => isRow(m) && re.test(m.label) && !(not && not.test(m.label))) ?? null;
 
 /** A term and the row that states it, in the order a list of them reads. */
 const stated = <M extends Row>(rows: [string, M | null][]): { term: string; row: M }[] =>
@@ -33,13 +35,66 @@ const NOT_BALANCE = /rate|coupon|maturity|matures|amorti[sz]|\bterm\b|fee|debt s
 
 const or = (...res: RegExp[]) => new RegExp(res.map((re) => re.source).join("|"), "i");
 
+/** A PACE assessment or a special district's levy on the tax bill — C-PACE,
+ *  a CDD, MUD, PID or CFD, Mello-Roos, a special assessment — which no
+ *  buyer takes over in a mortgage's place: it sits beside one, on the tax
+ *  bill (research pass 37). The two words that are English words too
+ *  ("pace", "mud") are read only as capitals or with their own nouns. */
+const LEVY_WORDS =
+  /\bc-?pace\b|\bpace\s+(?:assessments?|financing|loans?|liens?|programs?|bonds?)\b|\bproperty[- ]assessed\s+clean\s+energy\b|\bcdd\b|\bcommunity\s+development\s+districts?\b|\bmunicipal\s+utility\s+districts?\b|\bpid\b|\bpublic\s+improvement\s+districts?\b|\bcfd\b|\bcommunity\s+facilities\s+districts?\b|\bmello[- ]?roos\b|\bspecial\s+(?:tax\s+)?assessments?\b|\bspecial\s+(?:assessment\s+|taxing\s+)?districts?\b|\bspecial\s+tax(?:es)?\b/i;
+const LEVY_CAPS = /\bPACE\b|\bMUD\b/;
+const namesLevy = (m: Row) => [m.label, m.value].some((t) => typeof t === "string" && (LEVY_WORDS.test(t) || LEVY_CAPS.test(t)));
+const FIRST_LOAN = new RegExp(LOAN, "i");
+const SECOND_LOAN = new RegExp(SECOND, "i");
+/** The rows a seller's loan shares with no loan named in the label. */
+const SHARED_ROW = /assumption fee|mortgage\s+insurance\s+premium|^\s*(?:annual\s+)?mip\b|^\s*(?:assumable\s+(?:loan|debt|mortgage|financing)\s+)?prepayment\b/i;
+
+/**
+ * The rows filed under the seller's loan that are a levy's: each row whose
+ * label or value names one, and — where the only balance stated is the
+ * levy's, or the one balance stated sits beside a row that names the levy —
+ * every row of that loan, whose terms are then the levy's too. Where a
+ * balance free of the levy's words sits beside a levy's own balance, only
+ * the levy's rows are refused.
+ */
+function levyRowsOf<M extends Row>(metrics: ReadonlyArray<M>): Set<M> {
+  const refused = new Set<M>();
+  const rows = metrics.filter(isRow);
+  const first = rows.filter((m) => FIRST_LOAN.test(m.label));
+  for (const set of [first, rows.filter((m) => SECOND_LOAN.test(m.label))]) {
+    const levy = set.filter(namesLevy);
+    if (!levy.length) continue;
+    const balances = set.filter((m) => !NOT_BALANCE.test(m.label));
+    const apart = balances.some(namesLevy) && balances.some((m) => !namesLevy(m));
+    for (const m of apart ? levy : set) refused.add(m);
+  }
+  // A row the seller's loan shares with no loan named in its label — its
+  // fee, its premium, its prepayment terms — is the levy's where it names
+  // one; the fee is no loan's where the levy took the whole loan's place.
+  const firstWhole = first.length > 0 && first.every((m) => refused.has(m));
+  for (const m of rows) {
+    if (!SHARED_ROW.test(m.label)) continue;
+    if (namesLevy(m) || (firstWhole && /assumption fee/i.test(m.label))) refused.add(m);
+  }
+  return refused;
+}
+
+/** The rows filed under the seller's loan that are a PACE assessment's or a
+ *  special district's levy (`levyRowsOf`): never the seller's loan, and never
+ *  the buyer's own financing either — the debt sizer lists them nowhere. */
+export function assumableLevyRows<M extends Row>(metrics: ReadonlyArray<M>): M[] {
+  return [...levyRowsOf(metrics)];
+}
+
 /** The rows the extraction is asked to label "Assumable loan …",
  *  "Assumption fee", "Mortgage insurance premium", "Prepayment" and
- *  "Assumable supplemental loan …". */
+ *  "Assumable supplemental loan …" — never a row that is a PACE
+ *  assessment's or a special district's levy (`assumableLevyRows`). */
 export function assumableRows<M extends Row>(metrics: ReadonlyArray<M>) {
-  const pick = pickFrom(metrics);
+  const levy = levyRowsOf(metrics);
+  const pick = pickFrom(levy.size ? metrics.filter((m) => !levy.has(m)) : metrics);
   return {
-    balanceRow: pick(new RegExp(LOAN, "i"), or(NOT_BALANCE, NAMES_SECOND)),
+    balanceRow: pick(FIRST_LOAN, or(NOT_BALANCE, NAMES_SECOND)),
     // An interest rate cap is its own row, never the loan's rate.
     rateRow: pick(new RegExp(`${LOAN} (?:interest )?(?:rate|coupon)`, "i"), or(/\bcap\b/, NAMES_SECOND)),
     maturityRow: pick(new RegExp(`${LOAN} (?:maturity|matures)`, "i"), or(/extension|extended/, NAMES_SECOND)),
@@ -54,7 +109,7 @@ export function assumableRows<M extends Row>(metrics: ReadonlyArray<M>) {
     /** the loan's prepayment terms, as stated: a lockout, yield
      *  maintenance or defeasance, and whether the sale is subject to it */
     prepaymentRow: pick(new RegExp(`^\\s*(?:${LOAN}\\s+)?prepayment\\b`, "i")),
-    secondBalanceRow: pick(new RegExp(SECOND, "i"), NOT_BALANCE),
+    secondBalanceRow: pick(SECOND_LOAN, NOT_BALANCE),
     secondRateRow: pick(new RegExp(String.raw`${SECOND}\s+(?:interest\s+)?(?:rate|coupon)`, "i"), /\bcap\b/i),
     secondMaturityRow: pick(new RegExp(String.raw`${SECOND}\s+(?:maturity|matures)`, "i"), /extension|extended/i),
   };
