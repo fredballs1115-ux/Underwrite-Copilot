@@ -1615,7 +1615,13 @@ export function gridSubjectOf(extraction: ExtractionResult | null): string | nul
     case "leased fee":
       return "a building's model, run at the leased fee's price";
     default:
-      return interestOf(extraction).entityLoan != null ? "the whole building, run at the equity's whole" : "the whole building, run at the share's price";
+    {
+      // A share of no stated percentage (a GP stake's among them) is run at
+      // its own price, whatever loan is stated beside it: nothing grossed it
+      // up to an equity's whole (audit C3a, LOW-8).
+      const { sharePct, entityLoan } = interestOf(extraction);
+      return sharePct != null && entityLoan != null ? "the whole building, run at the equity's whole" : "the whole building, run at the share's own price";
+    }
   }
 }
 

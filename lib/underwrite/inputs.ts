@@ -477,23 +477,31 @@ export function basisWithheldOf(extraction: ExtractionResult | null): { word: st
       // An undivided interest held as a tenant in common is the real
       // estate's: a loan the memorandum states is the property's, never an
       // entity's (research pass 37).
+      // A share of no stated percentage is run at its own price, grossed up
+      // to nothing, whatever loan is stated beside it: the loan is said
+      // beside the reason, never folded into an equity's whole the model
+      // never ran (audit C3a, LOW-8).
       if (isTenancyInCommon(extraction)) {
         return {
           word: "share",
           why:
-            entityLoan != null
+            entityLoan != null && sharePct != null
               ? "the interest's price grossed up is the equity's whole, with the loan on the property on top of it, not the building's price"
-              : "the price buys an undivided interest the memorandum states no percentage for, which cannot be grossed up to the building's price",
+              : `the price buys an undivided interest the memorandum states no percentage for, which cannot be grossed up to the building's price${
+                  entityLoan != null ? ", the loan on the property stated beside it" : ""
+                }`,
         };
       }
       return {
         word: "share",
         why:
-          entityLoan != null
+          entityLoan != null && sharePct != null
             ? isWholeShare(sharePct)
               ? "the price for all of the entity's interests is the equity's whole, with the entity's loan on top of it, not the building's price"
               : "the share's price grossed up is the equity's whole, with the entity's loan on top of it, not the building's price"
-            : "the price buys a share the memorandum states no percentage for, which cannot be grossed up to the building's price",
+            : `the price buys a share the memorandum states no percentage for, which cannot be grossed up to the building's price${
+                entityLoan != null ? ", the entity's loan stated beside it" : ""
+              }`,
       };
     default:
       return null;
