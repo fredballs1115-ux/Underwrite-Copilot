@@ -1067,14 +1067,21 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
     income is the spread, said with its coverage; the master lease's term is
     read by `readMasterLeaseTerm` (lib/ground-lease-term) and a master
     leasehold's exit runs on it (lib/leasehold-exit, "the master lease's
-    term"). Wired by the next round.
+    term"). The two rents are read from their months where stated a month
+    at a time; a spread of zero is said as none. Panel
+    `app/sandwich-panel.tsx`; it rides the surfaces above.
   - **A buyer's 1031 clock** (`lib/exchange-window.ts`): the buy box's
     exchange (the relinquished property's transfer day, the filer, an
     extension) against a deal's offers-due date — the 45 days, the 180
     days cut by the filer's calendar-year due date (26 U.S.C. 1031 and the
     IRS's instructions, printed from the runner), and whether what the
     price buys is a question for exchange counsel (a note, an entity share,
-    a leasehold under 30 years). Wired by the next round.
+    a leasehold under 30 years). `lib/exchange-deal.ts` hands it each
+    deal's own facts: the deal header's chip (`exchange-chip.tsx`), the
+    pipeline's tag and the memo's line. **Never the shared screen, and
+    never a Claude step** — the verdict's words reach the shared screen,
+    and a counterparty who learns the buyer's deadline holds the price
+    (`buyBoxLines(box, { exchange: false })` in the pipeline).
 - The data providers' notices (2026-10-05, research pass 31), each in the
   provider's own printed words in `lib/data-notices.ts` (no imports):
   FRED's notice ("This product uses the FRED® API but is not endorsed or

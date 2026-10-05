@@ -4,8 +4,11 @@
 // reads them — the offers-due day the deal carries (the reader's own, else
 // the memorandum's, lib/offering) and what its price buys (lib/interest,
 // and on a leasehold the years its lease has left on the day) — so the deal
-// header's chip, the pipeline's tag, the memo's line and the verdict's
-// brief say one thing.
+// header's chip, the pipeline's tag and the memo's line say one thing.
+//
+// Never handed to a Claude step: the verdict's words reach the shared
+// screen, and a counterparty who learned the buyer's deadline would hold
+// the price (the batch-2 audit).
 //
 // Pure: no I/O. The day is the caller's: the reader's own on a signed-in
 // page and in the memo route (lib/reader-day), the UTC day in the worker.
@@ -38,8 +41,8 @@ export interface DealExchange {
    *  question for exchange counsel about what the price buys the muted
    *  one; the clock alone the brand's */
   tone: "caution" | "muted" | "brand";
-  /** the clock and the first flag in one line, for the memo and the
-   *  verdict's brief (lib/exchange-window `exchangeShortLine`) */
+  /** the clock and the first flag in one line, for the memo
+   *  (lib/exchange-window `exchangeShortLine`) */
   line: string;
 }
 
