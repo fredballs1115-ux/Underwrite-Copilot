@@ -103,8 +103,10 @@ export function pinHtml(verdict: string | null, precision: LocationPrecision, se
 function cardBody(d: MapDeal): string {
   const call = d.verdict && PIN_LABEL[d.verdict] ? PIN_LABEL[d.verdict] : "Not screened";
   const figures = [d.price, d.figure].filter((x): x is string => !!x).map(escapeHtml).join(" · ");
-  // The route's own frame for the card (lib/image-frames), twice its 48px.
-  const img = `/api/deals/${encodeURIComponent(d.id)}/image?w=${PIPELINE_MAP_PICTURE.w}&amp;h=${PIPELINE_MAP_PICTURE.h}&amp;fallback=cover`;
+  // The route's own frame for the card (lib/image-frames), twice its 48px —
+  // never a Google picture, since the card sits over a non-Google map
+  // (Google's terms: no Street View beside one; lib/imagery-plan `google`).
+  const img = `/api/deals/${encodeURIComponent(d.id)}/image?w=${PIPELINE_MAP_PICTURE.w}&amp;h=${PIPELINE_MAP_PICTURE.h}&amp;fallback=cover&amp;google=0`;
   return (
     `<img src="${img}" alt="" width="48" height="48" class="uc-maptip-img"/>` +
     `<div class="uc-maptip-body">` +

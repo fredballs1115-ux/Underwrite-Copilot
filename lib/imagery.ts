@@ -366,7 +366,7 @@ export async function fetchBestBuildingImage(
   address: StructuredAddress | null,
   cache: DealVisualCache | null,
   size: { width: number; height: number },
-  opts: { overhead?: boolean } = {},
+  opts: { overhead?: boolean; google?: boolean } = {},
 ): Promise<BestImage | null> {
   return runPlan(
     imagePlan({
@@ -374,6 +374,7 @@ export async function fetchBestBuildingImage(
       googleConfigured: googleConfigured(),
       hasPicture: !!cache?.picture,
       overhead: opts.overhead,
+      google: opts.google,
     }),
     supabase,
     dealId,

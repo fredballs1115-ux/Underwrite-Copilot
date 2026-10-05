@@ -236,7 +236,7 @@ describe("the image route's cover (#443)", () => {
     expect(res.headers.get("content-type")).toContain("image/svg+xml");
     expect(res.headers.get("x-image-source")).toBe("cover");
     expect(res.headers.get("content-security-policy")).toBe("default-src 'none'");
-    expect(route.planAsked).toEqual([{ overhead: false }]);
+    expect(route.planAsked).toEqual([{ overhead: false, google: true }]);
     const svg = await res.text();
     // The class the deck turned out to be, where the deal was filed "auto";
     // the sky and the draw the pipeline's card wears for the same deal.
@@ -275,7 +275,19 @@ describe("the image route's cover (#443)", () => {
   it("keeps the overheads, and its 404, for a caller that does not ask for the cover", async () => {
     const res = await ask("w=640&h=360");
     expect(res.status).toBe(404);
-    expect(route.planAsked).toEqual([{ overhead: true }]);
+    expect(route.planAsked).toEqual([{ overhead: true, google: true }]);
+  });
+
+  it("asks no Google source for a surface beside a non-Google map, under a validator of its own", async () => {
+    // The pipeline map's hover card and every deal avatar: Google's terms
+    // forbid Street View beside a non-Google map.
+    const res = await ask("w=64&h=64&fallback=cover&google=0");
+    expect(res.status).toBe(200);
+    expect(route.planAsked).toEqual([{ overhead: false, google: false }]);
+    const mine = res.headers.get("etag") ?? "";
+    const theirs = (await ask("w=64&h=64&fallback=cover")).headers.get("etag") ?? "";
+    expect(mine).toContain(":nog");
+    expect(mine).not.toBe(theirs);
   });
 
   it("answers a deal the caller cannot read with a 404, never a cover", async () => {

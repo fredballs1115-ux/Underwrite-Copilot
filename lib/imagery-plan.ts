@@ -17,6 +17,13 @@ export interface ImagePlanInput {
    *  rule is pictures, not maps, says no, and draws the deal's cover
    *  where no photograph answers (#443). */
   overhead?: boolean;
+  /** whether a Google source may answer at all (default yes, where the key
+   *  is set). A surface that draws a non-Google map on the same screen
+   *  says no: Google Maps Platform's terms (zori probe run 37262665824)
+   *  forbid "display[ing] Street View imagery and non-Google Maps on the
+   *  same screen" — the pipeline map's hover card, and every deal avatar,
+   *  which the ⌘K list and the deal page draw over or beside a map. */
+  google?: boolean;
 }
 
 /**
@@ -43,10 +50,11 @@ export interface ImagePlanInput {
  */
 export function imagePlan(opts: ImagePlanInput): ImageSource[] {
   const plan: ImageSource[] = [];
+  const google = opts.googleConfigured && opts.google !== false;
   if (opts.hasPicture) plan.push("photo");
-  if (opts.hasStreetAddress && opts.googleConfigured) plan.push("streetview");
+  if (opts.hasStreetAddress && google) plan.push("streetview");
   if (opts.overhead === false) return plan;
-  if (opts.googleConfigured) plan.push("satellite");
+  if (google) plan.push("satellite");
   plan.push("aerial");
   return plan;
 }

@@ -493,7 +493,7 @@ describe("DealView — the sample deal renders every section without a runtime e
       ],
     } as unknown as Props);
     expect(html).toContain("From your pipeline");
-    expect(html).toContain('src="/api/deals/deal-2/image?w=64&amp;h=64&amp;fallback=cover"');
+    expect(html).toContain('src="/api/deals/deal-2/image?w=64&amp;h=64&amp;fallback=cover&amp;google=0"');
     // Before the name, in the same cell.
     expect(html.indexOf("/api/deals/deal-2/image")).toBeLessThan(html.indexOf("Girard Flats"));
     expect(a11yIssues(html)).toEqual([]);

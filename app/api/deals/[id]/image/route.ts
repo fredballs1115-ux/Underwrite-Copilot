@@ -56,6 +56,10 @@ export async function GET(
   // nearest it, where the route had drawn any size from 48 to 1280.
   const { w: width, h: height } = nearestFrame(DEAL_IMAGE_FRAMES, q.get("w"), q.get("h"));
   const coverFallback = q.get("fallback") === "cover";
+  // `?google=0`: a surface that draws a non-Google map on the same screen
+  // (the pipeline map's hover card, a deal avatar) — Google's terms forbid
+  // Street View beside one (lib/imagery-plan `google`).
+  const google = q.get("google") !== "0";
 
   // The deal's own photograph first — found in its memorandum on the first
   // ask and stored, so the plan below can serve it.
@@ -89,7 +93,7 @@ export async function GET(
   // deals' pictures the next day rather than after a week of aerials.
   const etag = picture
     ? `W/"${picture[pictureSizeFor({ width, height })]}"`
-    : `W/"map:${geoAt}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? `:cover${COVER_EDITION}` : ""}"`;
+    : `W/"map:${geoAt}:${new Date().toISOString().slice(0, 10)}:${width}x${height}${coverFallback ? `:cover${COVER_EDITION}` : ""}${google ? "" : ":nog"}"`;
   const revalidate = { etag, "cache-control": "private, no-cache" };
   if (req.headers.get("if-none-match") === etag) {
     return new NextResponse(null, { status: 304, headers: revalidate });
@@ -101,7 +105,7 @@ export async function GET(
     (deal.address as StructuredAddress | null) ?? null,
     withPicture,
     { width, height },
-    { overhead: !coverFallback },
+    { overhead: !coverFallback, google },
   );
   if (!best && coverFallback) {
     const row = deal as { asset_class?: string | null; extracted_class?: string | null };

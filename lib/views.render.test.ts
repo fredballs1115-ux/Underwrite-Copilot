@@ -5466,7 +5466,7 @@ describe("DealStickyBar — the deal kept in view past its header", () => {
 
   it("carries the building, the name as the way back up, the call and the two figures", () => {
     expect(a11yIssues(html), "a11y sticky bar").toEqual([]);
-    expect(html).toContain('src="/api/deals/d1/image?w=64&amp;h=64&amp;fallback=cover"');
+    expect(html).toContain('src="/api/deals/d1/image?w=64&amp;h=64&amp;fallback=cover&amp;google=0"');
     const text = visibleText(html);
     expect(text.replace(/\s+/g, " ")).toContain("Back to the top: The Maddox");
     expect(text).toContain("Go");
@@ -5503,7 +5503,7 @@ describe("DealAvatar — each deal in a list pictured, the call on the corner wh
   it("draws the pipeline row's own picture route at twice the slot, lazily, with the call's dot", () => {
     const html = renderToStaticMarkup(React.createElement(DealAvatar, { dealId: "d1", dot: "bg-pass" }));
     expect(a11yIssues(html), "a11y deal avatar").toEqual([]);
-    expect(html).toContain('src="/api/deals/d1/image?w=64&amp;h=64&amp;fallback=cover"');
+    expect(html).toContain('src="/api/deals/d1/image?w=64&amp;h=64&amp;fallback=cover&amp;google=0"');
     expect(html).toContain('data-deal-avatar="picture"');
     expect(html).toContain('loading="lazy"');
     // Decorative beside the deal's name, which the row already reads out.
@@ -7940,7 +7940,7 @@ describe("the deal's own pages head with the building (#464)", () => {
     const html = render(React.createElement(DealCrumb, { dealId: "d1", name: "Smith & Sons Lofts" }));
     expect(html).toContain('href="/deals/d1"');
     expect(html).toContain("data-deal-crumb");
-    expect(html).toContain('src="/api/deals/d1/image?w=80&amp;h=80&amp;fallback=cover"');
+    expect(html).toContain('src="/api/deals/d1/image?w=80&amp;h=80&amp;fallback=cover&amp;google=0"');
     expect(html).toContain('width="40"');
     expect(visibleText(html).trim()).toBe("← Smith & Sons Lofts");
     expect(a11yIssues(html)).toEqual([]);

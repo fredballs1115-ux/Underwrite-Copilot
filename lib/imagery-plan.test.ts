@@ -46,6 +46,21 @@ describe("imagePlan", () => {
     ]);
   });
 
+  it("takes no Google source where the surface draws a non-Google map beside it", () => {
+    // Google's terms forbid Street View and a non-Google map on one screen:
+    // the pipeline map's hover card and every deal avatar ask `google=0`.
+    expect(imagePlan({ hasStreetAddress: true, googleConfigured: true, google: false })).toEqual(["aerial"]);
+    expect(
+      imagePlan({ hasStreetAddress: true, googleConfigured: true, hasPicture: true, google: false, overhead: false }),
+    ).toEqual(["photo"]);
+    // Unset, it is the key's to decide, as before.
+    expect(imagePlan({ hasStreetAddress: true, googleConfigured: true, google: true })).toEqual([
+      "streetview",
+      "satellite",
+      "aerial",
+    ]);
+  });
+
   it("with no key, every deal still gets the keyless USGS aerial", () => {
     for (const hasStreetAddress of CONFIGS) {
       expect(imagePlan({ hasStreetAddress, googleConfigured: false })).toEqual([

@@ -53,7 +53,7 @@ describe("the pipeline map's rules (#431)", () => {
     const html = tooltipHtml(deal({ id: "x/1", name: `<img src=x onerror="alert(1)"> & Co's`, verdict: "caution", price: "$68.0M", figure: "5.6% cap" }));
     expect(html).not.toContain("<img src=x");
     expect(html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; Co&#39;s");
-    expect(html).toContain("/api/deals/x%2F1/image?w=96&amp;h=96&amp;fallback=cover");
+    expect(html).toContain("/api/deals/x%2F1/image?w=96&amp;h=96&amp;fallback=cover&amp;google=0");
     expect(html).toContain("Caution");
     expect(html).toContain("$68.0M · 5.6% cap");
     expect(tooltipHtml(deal({ id: "y" }))).toContain("Not screened");
@@ -65,7 +65,7 @@ describe("the pipeline map's rules (#431)", () => {
     expect(html).not.toContain("<img src=x");
     expect(html).toContain("&lt;img src=x onerror=&quot;alert(1)&quot;&gt; &amp; Co&#39;s");
     expect(html).toMatch(/^<a class="uc-maptip" href="\/deals\/x%2F1" data-maptip-link>/);
-    expect(html).toContain("/api/deals/x%2F1/image?w=96&amp;h=96&amp;fallback=cover");
+    expect(html).toContain("/api/deals/x%2F1/image?w=96&amp;h=96&amp;fallback=cover&amp;google=0");
     expect(html).toContain("$68.0M · 5.6% cap");
     // The chevron says the card opens something; the hover card has none
     // and is no link, since a mouse never reaches it before it closes.
