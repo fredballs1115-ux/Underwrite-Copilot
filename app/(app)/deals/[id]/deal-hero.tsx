@@ -92,7 +92,10 @@ export function DealHero({
     // is the card's last row.
     <header data-deal-hero className="@container shadow-card rounded-2xl border border-line bg-surface">
       <div className={GRID}>
-        <div className="@container/facts flex min-w-0 flex-col justify-center gap-4 px-6 py-5 [grid-area:facts]">
+        {/* The name, the call and the figures: the block the bar that keeps
+            the deal in view watches (`DealStickyBar`), never the whole
+            header, whose deal-kind panels run on for screens below it. */}
+        <div data-deal-hero-facts className="@container/facts flex min-w-0 flex-col justify-center gap-4 px-6 py-5 [grid-area:facts]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               {/* Focusable from script only: "Back to the top" lands here,

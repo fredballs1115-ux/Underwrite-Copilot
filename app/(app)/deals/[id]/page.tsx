@@ -1652,8 +1652,9 @@ export default async function DealPage({
         )}
       </DealHero>
 
-      {/* The deal, kept in view once the header scrolls away (#437): the
-          header's own price and return figures, a blank left out. */}
+      {/* The deal, kept in view once the header's name and figures scroll
+          away (#437), its panels or not: the header's own price and return
+          figures, a blank left out. */}
       <DealStickyBar
         dealId={id}
         name={deal.name as string}

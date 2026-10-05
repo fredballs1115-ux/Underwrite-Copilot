@@ -4,17 +4,24 @@ import { useEffect, useState } from "react";
 import { DealAvatar } from "@/app/(app)/deal-avatar";
 
 /**
- * The deal, kept in view (#437). Once the header (`DealHero`) scrolls away,
- * a slim bar holds the building's picture, its name, the call and the two
- * figures the deal is read by — the way a listing keeps its price and its
- * address in reach once its photographs are behind the reader — and its
- * name takes the reader back to the top. At the top of the window on a
- * wide screen; at the foot on a phone, clear of the app's own sticky top
- * bar and under the thumb.
+ * The deal, kept in view (#437). Once the header's name, call and figures
+ * (`DealHero`'s facts block) scroll away, a slim bar holds the building's
+ * picture, its name, the call and the two figures the deal is read by — the
+ * way a listing keeps its price and its address in reach once its
+ * photographs are behind the reader — and its name takes the reader back to
+ * the top. At the top of the window on a wide screen; at the foot on a
+ * phone, clear of the app's own sticky top bar and under the thumb.
  *
- * It watches the header with an IntersectionObserver and hides with it in
- * view; hidden, it is inert and out of the accessibility tree, so a screen
- * reader or a Tab key never meets a second copy of the header.
+ * It watches the facts block (`data-deal-hero-facts`) with an
+ * IntersectionObserver, never the whole header: the deal-kind panels sit
+ * inside the header, so a hotel sold at auction, five panels deep, kept the
+ * bar hidden for 2,800px of a phone after its figures had gone (research
+ * pass 36). It
+ * shows once the block is ABOVE what the reader can see — under a phone's
+ * own top bar counts as gone — and never while the block is still below the
+ * fold, as on a short landscape screen. In view, the bar hides; hidden, it
+ * is inert and out of the accessibility tree, so a screen reader or a Tab
+ * key never meets a second copy of the header.
  */
 export function DealStickyBar({
   dealId,
@@ -34,11 +41,29 @@ export function DealStickyBar({
 }) {
   const [shown, setShown] = useState(false);
   useEffect(() => {
-    const hero = document.querySelector("[data-deal-hero]");
-    if (!hero || typeof IntersectionObserver === "undefined") return;
-    const io = new IntersectionObserver(([entry]) => setShown(!entry.isIntersecting), { threshold: 0 });
-    io.observe(hero);
-    return () => io.disconnect();
+    const facts = document.querySelector("[data-deal-hero-facts]");
+    if (!facts || typeof IntersectionObserver === "undefined") return;
+    let io: IntersectionObserver | null = null;
+    const watch = () => {
+      io?.disconnect();
+      // The app's top bar (a phone's, `md:hidden`) covers the top of the
+      // window: figures under it are out of sight already.
+      const covered = Math.round(document.querySelector("[data-app-topbar]")?.getBoundingClientRect().height ?? 0);
+      io = new IntersectionObserver(
+        ([entry]) => setShown(!entry.isIntersecting && entry.boundingClientRect.top < (entry.rootBounds?.top ?? covered)),
+        { rootMargin: `${-covered}px 0px 0px 0px`, threshold: 0 },
+      );
+      io.observe(facts);
+    };
+    watch();
+    // The top bar comes and goes at `md`: measured again when the window
+    // crosses it (a phone turned on its side).
+    const wide = window.matchMedia?.("(min-width: 48rem)");
+    wide?.addEventListener?.("change", watch);
+    return () => {
+      io?.disconnect();
+      wide?.removeEventListener?.("change", watch);
+    };
   }, []);
 
   return (
