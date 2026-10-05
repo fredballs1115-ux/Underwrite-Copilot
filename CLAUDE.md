@@ -933,6 +933,128 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   chip and the screen-complete email (lib/buy-box-chip), the pipeline's
   card, list and CSV, the meeting workbook, the compare table and the
   batch upload's chip. A fully checked deal's words are as before.
+- **The deal-type panels draw from one set of parts** (research pass 36,
+  2026-10-05). `app/panel-parts.tsx` (pure) holds them:
+  - `PanelHead`: the eyebrow is the panel's `h2`, so a screen reader moving
+    by headings meets each panel;
+  - `PanelRead` and `PanelFold`: the read, with one "Read the rest (N more)"
+    control, 36px tall on a touch screen, and the whole text in the HTML;
+  - `PanelNote`;
+  - `Key` and `KeyItem`: one swatch, tick or dashed mark, set to the middle
+    of its label's first line;
+  - `Tick`: centred on its value and kept inside its track, 4px past each
+    edge of a primary track and 2px past a secondary one;
+  - `BarRows` and `BarRow`: label, bar and figure columns of one width, so
+    bars on one scale start at one x on tracks of one length, stacked under
+    the label until the group is 24rem wide;
+  - `tileSpan`: a tile of words spans both columns below `sm`;
+  - `MEASURE`: 68 characters.
+
+  Every deal-type panel, the lease-term bar and the portfolio card draw
+  with them. `lib/panel-parts.render.test.ts` holds the parts to their
+  rules and every panel's source to drawing with them. A panel's drawn
+  money goes through `compactUsd`, one option set a panel. Exact dollars
+  stay only where the figure is a term the memorandum states and a reader
+  checks it against, each marked so in a comment: a tier's rent and limit,
+  a lot rent, a rent a bed, ADR and RevPAR to the cent, a base rent, and
+  the PCA's immediate repairs.
+- **A phone's deal page** (research pass 36):
+  - **The kept-in-view bar** watches the header's facts block
+    (`data-deal-hero-facts`), not the whole header, whose panels can run
+    screens long. While the bar shows, the page pads its scroll by it
+    (`app/globals.css`: the phone's foot, and the top from `md`), so a
+    focused control never scrolls under it (WCAG 2.4.11).
+  - **The header's tools and controls**: below `sm` the tools are one
+    sideways row and the controls another (`ToolRow`,
+    `app/(app)/deals/[id]/tool-row.tsx`). Each row scrolls under a drawn
+    edge fade, never a mask, since a mask would clip the share panel and
+    the deal's menu that open out of them (both `sm:relative`). A
+    keyboard's focus is scrolled clear of the fade. From `sm` the rows are
+    `display: contents`, box for box the old toolbar.
+  - **Order**: the plausibility panel sits right after the plan and the
+    interest panel, and a test holds the order.
+  - **Light only**: the root layout's viewport says `colorScheme: "only
+    light"`. A phone that darkens websites had inverted every black
+    reference tick (`lib/color-scheme.test.ts`).
+  - **The compare page** decides cards or table by its own column, a
+    container query: the table from `@xl` for two or three deals, from
+    `@2xl` for four.
+  - **The shared screen** says the call beside its title, with the day it
+    was written. It is dashed and reads "From the previous screen" where
+    `verdictBehind` says so (`previousCallNote`).
+  - **The offering card** keeps a deadline's time on one line with its
+    zone (`ListingTeam`).
+- **The documents, page by page** (research pass 35, 2026-10-05):
+  - **The page a grid lands on is measured.** The full report renders
+    through `renderReportPdf` (lib/memo/report-document), which names the
+    page the sensitivity grids land on. Where the memo or the call runs to
+    a second page, it draws again naming that page. The target-return
+    chip's "model 9.3%, p. 3" is the page as laid out, never assumed.
+  - **Page numbers.** The report numbers the memo's pages as its own ("1 /
+    10"). The memo's 1.32 line height sits on a wrapper inside its page,
+    never on the page itself. react-pdf 4.x re-resolves a page whose fixed
+    nodes need the page count, and multiplies a numeric line height on
+    each pass: the first cut drew page 1's footer at y 5,590 on a 792-point
+    page. `pdfPageRunsOf` holds every "N / M" to its page's foot.
+  - **The one-page memo stays on one page** with a cover, the screened date
+    and a wrapped line under the title, measured by a test.
+  - **The grid's takeaway** is two full clauses. Where the price buys no
+    building, it leads with what the grids are of (`basisWithheldOf`,
+    exported from lib/underwrite/inputs): "The collateral, run at the
+    note's price: …".
+  - **The max-bid line** names the floor no price clears, and how far each
+    other floor clears alone (`noBidRead`). On a leasehold it gives the
+    bid's IRR on the lease's term (`termReadFor`, lib/leasehold-exit's own
+    arithmetic).
+  - **The retrade grid** prints its prices at one precision down the column
+    (`retradePrices`, through `compactUsd` and `scaledText`).
+  - **The assumptions are named.** The base case names the exit cap and the
+    rent's source. The line under the grids names the asset-management fee
+    and the reserves, each from the model's inputs with its provenance. A
+    stored day is written in prose wherever a source note is printed
+    (`proseDays`).
+  - **Spelling** follows the site: modelled, colour, centre, while the -ize
+    words stay.
+  - **The demo's fictional memorandum** has 48 pages and cites p. 14 for
+    its sale comps.
+- **What `parseUsd` refuses** (research pass 37, 2026-10-05). It refuses
+  only what is not one positive figure:
+  - a minus before the figure in any form (the hyphen-minus, the minus
+    sign, the en dash), on either side of the dollar sign;
+  - accounting brackets around the figure alone;
+  - a range whose first end is the figure ("$40M - $42M", "40-42M", "$40M
+    to $42M"). "To" or "through" makes a range only where the other figure
+    is at least half the first, so "$900,000 through 2031" is the figure.
+
+  A hyphen in the words after the figure is read past ("$24,500,000
+  (Freddie Mac, non-recourse)", "$650,000 (T-12)"). It had refused any
+  value with a hyphen anywhere, so figures the memorandum stated read as
+  none. `parseMoney` is untouched. Stored deals re-read on their next view.
+- **Assumable debt that is not one fixed loan** (research pass 37):
+  - **A floating rate**, one naming an index or saying it floats, is
+    carried as its index and spread with no coupon. The card prices
+    nothing and says why ("Assumable SOFR + 3.25%").
+  - **A supplemental loan** ("Assumable supplemental loan balance / rate /
+    maturity", or a figure of its own in the first loan's row) is never
+    read as the first's, and nothing is priced on the first alone.
+  - **A stated mortgage insurance premium** is added to the note rate the
+    card prices.
+  - **A "Prepayment" row's lockout**, or a sale subject to the loan, is
+    said.
+
+  The tag's tooltip and the meeting workbook's note say the page prices
+  only a fixed coupon (`debtTagMeaning` in lib/pipeline-tags). The finder
+  refuses a row naming C-PACE, PACE, a CDD, MUD, PID or CFD, Mello-Roos or
+  a special assessment, and every term filed beside the levy's balance
+  goes with it. A levy sits beside a mortgage on the tax bill; it replaces
+  none.
+- **A phased forward purchase** (research pass 37). A delivery row naming
+  several dates is read at the latest, the side that does not flatter.
+  Where its words name phases, tranches, takedowns or numbered buildings,
+  every place the delivery is said lists them: "phased: 3 takedowns, the
+  last Q2 2028" in the read, the tag "Forward, 3 takedowns to Q2 2028",
+  and a lighter tick on the panel for each takedown
+  (`data-bar="fwd-phase"`). The model still runs one closing and says so.
 - A manufactured-housing park (#470): the extraction labels a park's
   figures as rows of their own, each only as stated — "Pads" (never with
   the RV sites in it), "Occupied pads", "Lot rent" (the average monthly
