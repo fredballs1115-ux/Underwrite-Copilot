@@ -425,6 +425,36 @@ yours:
 5. **The research reseed** above also carries Chicago's corrected band to
    signed-in pages.
 
+**From the check of the model's arithmetic (research pass 40, October 5).**
+The screening model was worked by hand from first principles on twelve
+deals: the engine, the workbook's live formulas, the report's grids and the
+max bid agree with the hand figures to the dollar. The fix round makes the
+report and the workbook withhold the returns wherever the deal page does,
+and corrects the words around several figures. These are yours, since each
+changes a figure the model runs on or how a figure is defined:
+1. **An interest-only period of part of a year** (say 18 months) is charged
+   by whole years in the annual cash flow while the debt schedule runs the
+   months, so the two disagree (a levered IRR of 7.13% against 7.28% worked
+   by hand). Only a figure typed into the workbook reaches it.
+2. **An amortization shorter than the hold** keeps charging debt service
+   after the loan is paid off, and **a hold of part of a year** runs whole
+   years of cash beside a part-year payoff. Both are reached only by typing
+   into the workbook.
+3. **The equity multiple nets a year-1 capital call against the
+   distributions** (1.52x printed, 1.42x as distributions over
+   contributions on a deal carrying $2M of repairs). The fix round says so
+   beside the figure; the definition is yours.
+4. **The T-12's other income is folded into the rent line.** Splitting it
+   into its own line changes the rows the model runs on.
+5. **A note's yield to maturity drops the part-month before maturity**, so
+   a discount note reads slightly high.
+6. **Leasing capital.** Tenant improvements and leasing commissions default
+   to zero on every class (the workbook will say "None modelled"). A default
+   for office, retail and industrial is yours.
+7. **The construction panel's 55% average draw** errs high against the
+   equity-first draw the /tools card runs; the panel will say so, and
+   switching the method is yours.
+
 **From the security review of October 5 (research pass 39):**
 1. **Run migration 0036 first** (item 1 under 2026-09-30 below), before
    anything else on this page: the review found its exposures live today.
