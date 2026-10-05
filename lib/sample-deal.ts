@@ -75,6 +75,12 @@ const bpsFrom = (v: number | null): string => {
 const OM_CASE = { exitCapPct: 5.25, rentGrowthPct: 4, vacancyPct: 6 } as const;
 /** The OM's stated NOI less the T-12's, the gap the reconciliation names. */
 const NOI_GAP = 3_880_000 - 3_706_500;
+/** The model's exit against its own going-in cap, read off the model and
+ *  said as a figure, never as "flat": the exit is 5.50% and the going-in
+ *  5.45%, 5 bps of expansion (research pass 40, L8: "Held flat to
+ *  going-in"). The going-in figure itself stays on the tab's own tile, where
+ *  a price that buys no building withholds it. */
+const EXIT_OVER_ENTRY = `${inputs.exitCapPct.toFixed(2)}%, ${Math.round((inputs.exitCapPct - returns.goingInCapPct) * 100)} bps over the going-in cap`;
 
 const modelMetrics: ReconciledMetric[] = [
   {
@@ -123,7 +129,7 @@ const modelMetrics: ReconciledMetric[] = [
     unit: "%",
     sources: [{ doc: "Market", value: "5.5%", locator: "", basis: "market norm" }],
     authority: "Market",
-    rationale: "Held flat to going-in — no compression thesis.",
+    rationale: `${EXIT_OVER_ENTRY} — no compression thesis.`,
     confidence: "medium",
     isConflict: false,
   },
@@ -256,7 +262,7 @@ const model: UnderwritingModel = {
   cashFlow,
   returns,
   summary:
-    "Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load, rent growth is haircut to the market norm, the capital reserve is funded at the lender's $300/unit, and the exit holds flat to going-in with no compression assumed.",
+    `Reconciled across the OM, rent roll, and T-12. Actuals set the in-place income and expense load, rent growth is haircut to the market norm, the capital reserve is funded at the lender's $300/unit, and the exit is ${EXIT_OVER_ENTRY}, with no compression assumed.`,
   caveats: [
     "Single-tranche debt and straight-line growth — a screening model, not a full build.",
     "Capital reserve is a flat annual figure; confirm against a real engineering budget.",
