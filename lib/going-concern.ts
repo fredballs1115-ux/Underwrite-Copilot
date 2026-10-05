@@ -79,6 +79,14 @@ const BUSINESS_WORDS: ReadonlyArray<readonly [OperatingBusiness, RegExp]> = [
     "fuel",
     /\b(?:gas(?:oline)?\s+stations?|fuel(?:ing)?\s+(?:stations?|centers?|plazas?)|filling\s+stations?|service\s+stations?|truck\s+stops?|travel\s+(?:centers?|plazas?))\b/i,
   ],
+  // A store with a fuel word beside it sells fuel (audit C3a: "Convenience
+  // Store with Fuel", "C-Store w/ Gas" and "(8 fueling positions)" had read
+  // as a store with no pumps, and the challenger dropped the tanks). A
+  // utility's gas ("gas and electric") is no fuel.
+  [
+    "fuel",
+    /\b(?:convenience\s+stores?|c-stores?)\b[^.;]{0,40}?(?:\bfuel(?:ing)?\b|\bgas(?:oline)?\b(?!\s*(?:and|&|\/)\s*electric|\s+(?:utilit|meter|heat|service\b))|\bdiesel\b|\bpumps?\b|\bMPDs?\b)|\b(?:fuel(?:ing)?|gasoline|diesel)\b[^.;]{0,40}?\b(?:convenience\s+stores?|c-stores?)\b/i,
+  ],
   ["convenience_store", /\bconvenience\s+stores?\b|\bc-stores?\b/i],
   ["car_wash", /\bcar\s*wash(?:es)?\b|\bexpress\s+(?:tunnel\s+)?wash\b/i],
   ["marina", /\bmarinas?\b|\bboat\s*(?:yards?|storage)\b|\bdry[\s-]stack\b/i],

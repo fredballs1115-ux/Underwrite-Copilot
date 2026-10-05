@@ -195,6 +195,15 @@ describe("an operating business on its real estate (pass 28, round 3)", () => {
     // Fuel's own words still read fuel, the store beside them or not.
     for (const words of ["Gas Station / Convenience Store", "Truck stop", "Filling station", "Service station and c-store"])
       expect(operatingBusinessOf(deal({ assetClass: words }, [])), words).toBe("fuel");
+    // A store that sells fuel is a fuel seller, and the challenger keeps the
+    // tanks (audit C3a: each had read as a store with no pumps).
+    for (const words of ["Convenience Store with Fuel", "C-Store w/ Gas", "Convenience store and fuel sales", "Convenience Store (8 fueling positions)"]) {
+      const d = deal({ assetClass: words, strategy: { kind: "stabilized", summary: "Sale of the going concern", capitalBudget: "", timeline: "" } }, [row("EBITDA (T-12)", "$410,000")]);
+      expect(operatingBusinessOf(d), words).toBe("fuel");
+      expect(goingConcernNote(readGoingConcern(d, TODAY)!), words).toContain("THE TANKS AND THE SITE");
+    }
+    // Utilities beside a store are no fuel.
+    expect(operatingBusinessOf(deal({ assetClass: "Convenience store, tenant pays gas and electric" }, []))).toBe("convenience_store");
     // And a single tenant's name names it where the class says nothing.
     const wash = deal({ assetClass: "Net lease", singleTenant: { ...WASH.singleTenant!, tenant: "Express Car Wash LLC" } }, [row("Annual base rent", "$276,000")]);
     expect(operatingBusinessOf(wash)).toBe("car_wash");
