@@ -455,6 +455,50 @@ changes a figure the model runs on or how a figure is defined:
    equity-first draw the /tools card runs; the panel will say so, and
    switching the method is yours.
 
+**From the check of what each Claude step is handed (research pass 41,
+October 5).** Every step's input was rebuilt from the code on 29 deal
+shapes. The fix round corrects the words each step reads; these are yours,
+since each changes how a step is called, what it costs, or what it is told
+to weigh:
+1. **The prompt cache (pass 18's item, below), now worth checking first.**
+   Each step that reads the memorandum sends its own output format, and
+   Anthropic's documentation says a change of format invalidates the
+   cache. If so, the deck is written to the cache on five calls a screen
+   and read back on none: about 3.8 times what one write and four reads
+   cost, roughly $9 against $2.50 a screen on a 300,000-token deck at the
+   list price. One real screen settles it: in `analysis_jobs.usage` (or the
+   cost card on /data-health), does every call that reads the memorandum
+   show a cache write near the deck's size and a cache read near zero? If
+   it does, the calls need restructuring, which changes how every step is
+   called.
+2. **The extraction's 16,000-token answer.** A 150-property portfolio with
+   a full set of rows comes close, and the code's own estimate puts a long
+   tape with many rows past it. The fix round names a cut-off as the
+   document's and records its spend; raising the cap is yours (up to about
+   20,000 needs no other change, more needs a streamed call). Measure a
+   real portfolio screen's output first.
+3. **Thinking, before any model switch.** The steps send no thinking
+   setting, so thinking is off on today's model. On the newer models named
+   as the cost lever, thinking is on by default and counts against each
+   step's answer cap, which was sized for answers alone (the verdict's
+   4,000, Ask's 2,500, the first signal's 1,500). One call on the new model
+   should be read before the switch.
+4. **A plan deal's in-place cap in the buy box.** The pipeline card shows
+   "n/a — plan", but the buy box still judges a value-add's stated going-in
+   cap. Say whether it should.
+5. **The reconciler reads the PDF** where the screen reads the text layer
+   (a third to a quarter of the tokens). Switching it changes what that
+   step reads.
+6. **Trap lists that do not concern the deal.** A class phrase no rule
+   files (a fuel station and its store) gets all sixteen classes' traps,
+   about 10,000 characters; one cited report fires all five site-report
+   traps; the market figures' preamble describes lines the block may not
+   hold. Gating each changes what a step is told to look for.
+7. **Dated market claims in the trap lists** ("as of August 2026 …
+   several big-port submarkets had repriced double digits off peak") and
+   one rule of thumb stated as near-certain. A step may repeat them as
+   fact; sourcing, dating or removing them is yours.
+
 **From the security review of October 5 (research pass 39):**
 1. **Run migration 0036 first** (item 1 under 2026-09-30 below), before
    anything else on this page: the review found its exposures live today.
