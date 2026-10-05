@@ -1,4 +1,5 @@
 import "server-only";
+import { compactUsd } from "@/lib/money";
 import {
   Document,
   Font,
@@ -126,8 +127,7 @@ function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStra
   // it (lib/interest `dealTypeLabel`): the collateral's, or the building
   // someone else owns on the land.
   const kind = dealTypeLabel(strategy.label, extraction);
-  const m = (n: number) =>
-    n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+  const m = (n: number) => compactUsd(n, { thousandsFrom: Infinity });
   // A forward purchase's NOI is the one stated at delivery (lib/deal-strategy
   // `forwardDeliveryNoi`), over the price the buyer pays then.
   const noiWord = plan?.forward ? "NOI at delivery" : "stabilized NOI";

@@ -37,7 +37,7 @@
 
 import { parsePageNumber } from "@/lib/facts";
 import { interestOf } from "@/lib/interest";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 import { daysBetween, monthsBetween, readStatedDate, sameMonth } from "@/lib/note-yield";
 import { readAssumption, type AssumptionRead } from "@/lib/tools/loan-assumption";
 import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
@@ -351,15 +351,8 @@ const monthYear = (isoDate: string) => {
   const [y, m] = isoDate.split("-").map(Number);
   return `${MONTHS[m - 1]} ${y}`;
 };
-// Rounded on the tenths, never a float's toFixed.
-export const assumableMoney = (n: number) =>
-  Math.abs(n) >= 1e8
-    ? `$${Math.round(n / 1e6)}M`
-    : Math.abs(n) >= 1e6
-      ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`
-      : Math.abs(n) >= 1e3
-        ? `$${Math.round(n / 1e3)}k`
-        : `$${Math.round(n)}`;
+// Rounded on the tenths, never a float's toFixed (lib/money `compactUsd`).
+export const assumableMoney = (n: number) => compactUsd(n, { wholeMillionsFrom: 1e8 });
 const pctText = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}%`;
 
 /** The loan as the memorandum states it, in one line: "$24.5M at 3.45% to

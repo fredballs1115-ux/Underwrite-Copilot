@@ -41,6 +41,7 @@
 //
 // A BLANK IS NULL. An economic occupancy is never read from a physical one.
 
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey } from "@/lib/asset-words";
 import { parsePct } from "@/lib/criteria";
@@ -148,8 +149,7 @@ export interface SelfStorageRead {
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 const pts = (n: number) => `${Math.round(Math.abs(n) * 10) / 10} ${Math.abs(n) === 1 ? "point" : "points"}`;
 const cents = (n: number) => (Number.isInteger(n) ? `$${n.toLocaleString("en-US")}` : `$${n.toFixed(2)}`);
-const money = (n: number) =>
-  Math.abs(n) >= 1e6 ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M` : Math.abs(n) >= 1e3 ? `$${Math.round(n / 1e3).toLocaleString("en-US")}k` : `$${Math.round(n)}`;
+const money = (n: number) => compactUsd(n);
 
 /** "$1.38/SF a month", "$118 a unit a month": a rate in the words a sentence
  *  says it in. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { compactUsd } from "@/lib/money";
 import {
   Fragment,
   memo,
@@ -179,7 +180,9 @@ function compactPrice(raw: string): string {
   if (range) return priceRangeShort(range);
   const n = parseMoney(raw);
   if (n == null || !(n > 0)) return raw;
-  return n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+  // Rounded as every surface rounds a compact figure (lib/money): "$5.5M"
+  // here had stood beside the memo's "$5.6M" for a $5,550,000 price.
+  return compactUsd(n);
 }
 
 const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string; cls: string }> = {

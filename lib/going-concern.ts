@@ -41,6 +41,7 @@
 //
 // A BLANK IS NULL.
 
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { assetClassKey } from "@/lib/asset-words";
@@ -173,12 +174,7 @@ export interface GoingConcernRead {
   headline: string;
 }
 
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto" });
 const times = (n: number) => `${n.toFixed(2)}x`;
 
 /** The words the sale is described in — the class, the name, the plan, the

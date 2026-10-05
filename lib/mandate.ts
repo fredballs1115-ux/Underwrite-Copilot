@@ -18,6 +18,7 @@
 // in the screen yet) are excluded from the denominator, never counted as a
 // pass or a fail. Any tripped dealbreaker caps the verdict at PASS.
 
+import { compactUsd } from "@/lib/money";
 import { countNoun } from "@/lib/asset-words";
 import {
   type BuyBox,
@@ -208,8 +209,7 @@ function scoreBand(
   return { status: "miss", earned: 0 };
 }
 
-const fmtM = (d: number) =>
-  d >= 1e6 ? `$${(d / 1e6).toFixed(1)}M` : `$${Math.round(d / 1e3)}k`;
+const fmtM = (d: number) => compactUsd(d, { thousandsFrom: 0 });
 
 /** Evaluate the hard dealbreakers against the screen. Each returns a bucket:
  *  `tripped` (violated), `clear` (satisfied), or `unknown` (no figure yet).

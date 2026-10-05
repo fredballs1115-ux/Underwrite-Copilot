@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
 import {
   buildingPriceOf,
@@ -227,9 +228,4 @@ export function parsedPhrase(n: number): string {
   return `${n} deals parsed`;
 }
 
-export const fmtUsdCompact = (dollars: number): string =>
-  dollars >= 1e6
-    ? `$${(dollars / 1e6).toFixed(1)}M`
-    : dollars >= 1e3
-      ? `$${Math.round(dollars / 1e3)}k`
-      : `$${Math.round(dollars)}`;
+export const fmtUsdCompact = (dollars: number): string => compactUsd(dollars);

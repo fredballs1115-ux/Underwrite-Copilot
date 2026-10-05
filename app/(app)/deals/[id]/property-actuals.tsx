@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import type { RentRollSummary, T12Summary, NoiComparison } from "@/lib/actuals/types";
 import { assetWords, rentQuotedMonthly } from "@/lib/asset-words";
 
@@ -12,11 +13,7 @@ const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
 
 const usd = (n: number | null | undefined): string => {
   if (n == null || !Number.isFinite(n)) return "—";
-  const sign = n < 0 ? "−" : "";
-  const a = Math.abs(n);
-  if (a >= 1e6) return `${sign}$${(a / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `${sign}$${Math.round(a / 1e3)}k`;
-  return `${sign}$${Math.round(a)}`;
+  return compactUsd(n, { millions: 2 });
 };
 const pct = (dec: number | null | undefined): string =>
   dec == null || !Number.isFinite(dec) ? "—" : `${(dec * 100).toFixed(1)}%`;

@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import type { PlanSummary, StrategyKind } from "@/lib/deal-strategy";
 import { withArticle } from "@/lib/article";
 
@@ -24,13 +25,9 @@ export function planReadLine(kind: StrategyKind, label: string, landPrice: boole
   return `${withArticle(label.toLowerCase(), true)} deal is judged on its yield on total cost${notCap}: the stabilized NOI is the finished project's figure, set over everything the plan costs — never a cap rate on the ${landPrice ? "land" : "acquisition"} price.`;
 }
 
-/** $21.0M / $850k / $400 — the compact money the plan's facts print in. */
-export const moneyCompact = (n: number): string =>
-  Math.abs(n) >= 1e6
-    ? `$${(n / 1e6).toFixed(1)}M`
-    : Math.abs(n) >= 1e3
-      ? `$${Math.round(n / 1e3)}k`
-      : `$${Math.round(n)}`;
+/** $21.0M / $850k / $400 — the compact money the plan's facts print in,
+ *  rounded as every surface rounds it (lib/money `compactUsd`). */
+export const moneyCompact = (n: number): string => compactUsd(n);
 
 /**
  * A percent figure — a going-in cap, a yield on cost — as every surface that

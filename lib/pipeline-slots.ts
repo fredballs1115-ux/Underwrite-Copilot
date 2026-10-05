@@ -4,6 +4,7 @@
 // page, the meeting .xlsx and the analytics agree on which figure a deal
 // carries, and what the price buys where it is not the building (#415).
 // Pure: no I/O, no LLM.
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { shownAssetClass } from "@/lib/asset-class";
 import { findGoingInCap, screenYearOf, unitCountRow } from "@/lib/criteria";
@@ -169,9 +170,6 @@ export interface PipelineSlots {
   basis?: string | null;
 }
 
-const compactUsd = (n: number) =>
-  n >= 1e6 ? `$${(Math.round(n / 1e5) / 10).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-
 /**
  * The price by the class's own basis — "$274k/unit", "$200k/key", "$212/SF"
  * — read through the comps page's subject reader (lib/comp-detail
@@ -193,7 +191,7 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind, store
   if (words.basis === "sf") return b.perSf != null ? `$${Math.round(b.perSf).toLocaleString("en-US")}/SF` : null;
   if (words.basis === "unit" && b.perUnit != null) {
     const noun = countNoun(unitCountRow(metrics)?.label, words.key).replace(/s$/, "");
-    return `${compactUsd(b.perUnit)}/${noun}`;
+    return `${compactUsd(b.perUnit, { trim: true })}/${noun}`;
   }
   return null;
 }

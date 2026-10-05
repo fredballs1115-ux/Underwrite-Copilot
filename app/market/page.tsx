@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import type { Metadata } from "next";
 import { Fragment, Suspense } from "react";
 import Link from "next/link";
@@ -454,7 +455,7 @@ async function MidAtlanticTable({ signedIn }: { signedIn: boolean }) {
   const tableStale = staleMark(researchAge(priceRows[0].price!.as_of, todayIso()));
   const redfinHref = redfinSourceHref(priceRows[0].price!.source);
 
-  const money = (n: number | null) => (n === null ? "—" : `$${Math.round(n / 1000)}k`);
+  const money = (n: number | null) => (n === null ? "—" : compactUsd(n, { thousandsFrom: 0 }));
   const range = (b: { low: number | null; high: number | null } | undefined) =>
     !b || b.low === null
       ? "—"

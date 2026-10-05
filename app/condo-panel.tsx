@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import type { CondoRead } from "@/lib/condo";
 
 /**
@@ -24,12 +25,7 @@ import type { CondoRead } from "@/lib/condo";
 
 /** "$650", "$1,250", "$328k" — the reader's own money: a unit's dues to the
  *  dollar, a year of the block's in thousands. */
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e4 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n).toLocaleString("en-US")}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto", thousandsFrom: 1e4 });
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
 const slug = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

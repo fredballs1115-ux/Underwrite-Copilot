@@ -38,7 +38,7 @@
 
 import type { ExtractionResult, SaleMethod } from "@/lib/anthropic/types";
 import { parsePageNumber } from "@/lib/facts";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 import { readStatedDate } from "@/lib/note-yield";
 import { withArticle } from "@/lib/article";
 
@@ -178,8 +178,7 @@ export interface SaleRead {
 type SaleFacts = Omit<SaleRead, "headline" | "sentences">;
 
 const isoOf = (d: Date) => d.toISOString().slice(0, 10);
-const money = (n: number) =>
-  n >= 1e6 ? `$${(Math.round(n / 1e4) / 100).toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const dayLabel = (iso: string) => {
   const [y, m, d] = iso.split("-").map(Number);

@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import {
   DEFAULT_LEASE_UP_MONTHS,
   type RentRollAnalytics,
@@ -14,13 +15,7 @@ import { ScrollRegion } from "@/app/scroll-region";
  * charting dependency.
  */
 
-const usd = (n: number): string => {
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "−" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(2)}M`;
-  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1000)}k`;
-  return `${sign}$${Math.round(abs)}`;
-};
+const usd = (n: number): string => compactUsd(n, { millions: 2 });
 const sf = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
 const pct1 = (n: number | null) => (n == null ? "—" : `${(n * 100).toFixed(1)}%`);
 const psf = (n: number | null) => (n == null ? "—" : `$${n.toFixed(2)}`);

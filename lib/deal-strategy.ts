@@ -24,6 +24,7 @@
  *      the screen says "these can't both be right" instead of "105%".
  */
 
+import { compactUsd } from "@/lib/money";
 import { withArticle } from "@/lib/article";
 import { dealTypeLabel, entityLoanOf, groundRentOf, interestOf, isWholeShare } from "@/lib/interest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
@@ -327,12 +328,7 @@ export interface PlausibilityFinding {
   detail: string;
 }
 
-const money = (n: number): string =>
-  Math.abs(n) >= 1e6
-    ? `$${(n / 1e6).toFixed(1)}M`
-    : Math.abs(n) >= 1e3
-      ? `$${Math.round(n / 1e3)}k`
-      : `$${Math.round(n)}`;
+const money = (n: number): string => compactUsd(n);
 const pct = (x: number, dp = 1): string => `${(x * 100).toFixed(dp)}%`;
 
 // The one price reader — shared with the buy-box check, the mandate score

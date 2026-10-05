@@ -44,7 +44,7 @@
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 import { daysBetween, monthsBetween, readStatedDate, sameMonth } from "@/lib/note-yield";
 import { irr } from "@/lib/underwrite/engine";
 
@@ -225,13 +225,7 @@ const iso = (d: Date) => d.toISOString().slice(0, 10);
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const monthYear = (isoDay: string) => `${MONTHS[Number(isoDay.slice(5, 7)) - 1]} ${isoDay.slice(0, 4)}`;
 const pctText = (n: number, places = 2) => `${n.toFixed(places)}%`;
-const money2 = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  if (a >= 1e3) return `$${Math.round(n / 1e3).toLocaleString("en-US")}k`;
-  return `$${Math.round(n).toLocaleString("en-US")}`;
-};
+const money2 = (n: number): string => compactUsd(n, { millions: "auto" });
 
 /** The position read at its price on a day. Null unless the memorandum
  *  sells one (`isPreferredEquity`) and states its amount. */

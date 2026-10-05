@@ -45,6 +45,7 @@
 // A BLANK IS NULL. An RV site is never a pad, and no count is derived from
 // another the memorandum does not state.
 
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey } from "@/lib/asset-words";
 import { parseCount, parsePct, priceRange } from "@/lib/criteria";
@@ -298,8 +299,7 @@ export interface ManufacturedHousingRead {
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 const rent = (n: number) => (Number.isInteger(n) ? `$${n.toLocaleString("en-US")}` : `$${n.toFixed(2)}`);
 const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-const money = (n: number) =>
-  Math.abs(n) >= 1e6 ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M` : Math.abs(n) >= 1e3 ? `$${Math.round(n / 1e3).toLocaleString("en-US")}k` : usd(n);
+const money = (n: number) => compactUsd(n);
 const count = (n: number) => n.toLocaleString("en-US");
 
 /** Whether the deal is a manufactured-housing park: the class the deck was

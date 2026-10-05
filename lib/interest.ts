@@ -61,7 +61,7 @@
 import type { ExtractionResult, InterestKind } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { parsePageNumber } from "@/lib/facts";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 import {
   endHasPassed,
   endIsAhead,
@@ -525,15 +525,8 @@ export interface InterestRead {
   terminationRight: string;
 }
 
-// Rounded on the tenths, never a float's toFixed.
-const money = (n: number) =>
-  n >= 1e8
-    ? `$${Math.round(n / 1e6)}M`
-    : n >= 1e6
-      ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`
-      : n >= 1e3
-        ? `$${Math.round(n / 1e3)}k`
-        : `$${Math.round(n)}`;
+// Rounded on the tenths, never a float's toFixed (lib/money `compactUsd`).
+const money = (n: number) => compactUsd(n, { wholeMillionsFrom: 1e8 });
 const one = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 // A coverage ratio: "5.0×".
 const times = (n: number) => `${one(n)}×`;

@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import Link from "next/link";
 import { LeaseTermBar } from "@/app/lease-term-bar";
 import type { LeaseholdExitView } from "@/lib/leasehold-exit";
@@ -15,15 +16,8 @@ import type { LeaseholdExitView } from "@/lib/leasehold-exit";
  * valued on the years left, on one track. Then the model's own returns at
  * that exit, and the one sentence.
  */
-// Rounded on the tenths, never a float's toFixed.
-const money = (n: number) =>
-  Math.abs(n) >= 1e8
-    ? `$${Math.round(n / 1e6)}M`
-    : Math.abs(n) >= 1e6
-      ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`
-      : Math.abs(n) >= 1e3
-        ? `$${Math.round(n / 1e3)}k`
-        : `$${Math.round(n)}`;
+// Rounded on the tenths, never a float's toFixed (lib/money `compactUsd`).
+const money = (n: number) => compactUsd(n, { wholeMillionsFrom: 1e8 });
 const pct2 = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}%`;
 const pct1 = (n: number) => {
   const v = Math.round(n * 10) / 10;

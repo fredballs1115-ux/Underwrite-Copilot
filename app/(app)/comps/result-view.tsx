@@ -5,6 +5,7 @@
 // per-row source links, then provenance. Every failure mode is a sentence,
 // not a blank.
 
+import { compactUsd } from "@/lib/money";
 import { fmtMiles, kmToMiles } from "@/lib/geo";
 import {
   COVERAGE_DISCOVERY,
@@ -16,8 +17,7 @@ import {
   type RecordCompsResult,
 } from "@/lib/public-comps/core";
 
-const fmtMoney = (n: number) =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(2)}M` : `$${Math.round(n).toLocaleString()}`;
+const fmtMoney = (n: number) => compactUsd(n, { millions: 2, thousandsFrom: Infinity });
 
 const fmtDate = (iso: string) => {
   const d = new Date(iso + "T00:00:00Z");

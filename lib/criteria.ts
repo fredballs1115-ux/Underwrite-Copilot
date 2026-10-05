@@ -5,6 +5,7 @@
 // mandate's bound, the deal's figure, and the call in plain English.
 // (Universal module: used by server pages and the background pipeline.)
 
+import { compactUsd, scaledText } from "@/lib/money";
 import { withArticle } from "@/lib/article";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { EXCHANGE_FILERS, exchangeDay, type ExchangeBlock } from "@/lib/exchange-window";
@@ -613,16 +614,19 @@ export function parsePrice(raw: string): number | null {
   return r ? r.high : parseMoney(raw);
 }
 
-const rangeEnd = (n: number, unit: number, suffix: string) => {
-  const v = n / unit;
-  return `${Number.isInteger(v) ? v : Math.round(v * 10) / 10}${suffix}`;
-};
+// Counted in tenths of the unit in whole numbers, as every compact figure
+// is (lib/money `scaledText`): "$40–42M", "$9–9.5M".
+const rangeEnd = (n: number, unit: number, suffix: string) => `${scaledText(n, unit, 1, true)}${suffix}`;
+
+// A figure that rounds to a thousand thousands is said in millions, as
+// `compactUsd` says it alone: "$1M", never "$1000k".
+const inMillions = (n: number) => Math.round(n / 100) >= 10_000;
 
 /** A range as one short figure — "$40–42M", "$950k–$1.1M" — for a slot
  *  that shows one price. */
 export function priceRangeShort(r: { low: number; high: number }): string {
-  if (r.low >= 1e6) return `$${rangeEnd(r.low, 1e6, "")}–${rangeEnd(r.high, 1e6, "M")}`;
-  if (r.high >= 1e6) return `$${rangeEnd(r.low, 1e3, "k")}–$${rangeEnd(r.high, 1e6, "M")}`;
+  if (inMillions(r.low)) return `$${rangeEnd(r.low, 1e6, "")}–${rangeEnd(r.high, 1e6, "M")}`;
+  if (inMillions(r.high)) return `$${rangeEnd(r.low, 1e3, "k")}–$${rangeEnd(r.high, 1e6, "M")}`;
   if (r.low >= 1e3) return `$${rangeEnd(r.low, 1e3, "")}–${rangeEnd(r.high, 1e3, "k")}`;
   return `$${Math.round(r.low)}–${Math.round(r.high)}`;
 }
@@ -635,12 +639,7 @@ export function parsePct(raw: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-const fmtM = (dollars: number) =>
-  dollars >= 1e6
-    ? `$${(dollars / 1e6).toFixed(1)}M`
-    : dollars >= 1e3
-      ? `$${Math.round(dollars / 1e3)}k`
-      : `$${Math.round(dollars)}`;
+const fmtM = (dollars: number) => compactUsd(dollars);
 
 const fmtSf = (sf: number) =>
   sf >= 1e6

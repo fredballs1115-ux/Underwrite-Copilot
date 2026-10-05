@@ -1,5 +1,6 @@
 "use client";
 
+import { compactUsd } from "@/lib/money";
 import { useMemo, useState } from "react";
 import { withArticle } from "@/lib/article";
 import { parseMoney } from "@/lib/criteria";
@@ -17,10 +18,7 @@ import {
 } from "@/lib/construction-debt";
 import { yieldOnCostText } from "@/lib/plan-facts";
 
-const fmtUsd = (n: number) =>
-  Math.abs(n) >= 1e6
-    ? `$${(n / 1e6).toFixed(2).replace(/\.?0+$/, "")}M`
-    : `$${Math.round(n).toLocaleString("en-US")}`;
+const fmtUsd = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 const fmtInput = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 const pct = (d: number, dp = 1) => `${(d * 100).toFixed(dp)}%`;
 

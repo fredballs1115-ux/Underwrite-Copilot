@@ -1,4 +1,5 @@
 import "server-only";
+import { compactUsd } from "@/lib/money";
 import { Document, Page, View, Text, Image, StyleSheet } from "@react-pdf/renderer";
 import type { DealRow } from "@/lib/deals";
 import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
@@ -1420,10 +1421,7 @@ function YocGridPdf({ grid, axis }: { grid: YocGrid; axis: string }) {
  */
 const fmtHurdle = (pct: number): string => `${Number(pct.toFixed(1))}%`;
 
-const fmtCompactUsd = (n: number): string =>
-  n >= 1e6
-    ? `$${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2).replace(/\.?0+$/, "")}M`
-    : `$${Math.round(n / 1e3)}k`;
+const fmtCompactUsd = (n: number): string => compactUsd(n, { millions: "auto", trim: true, thousandsFrom: 0 });
 
 /**
  * One sensitivity grid: a spanning axis title over the column values, a

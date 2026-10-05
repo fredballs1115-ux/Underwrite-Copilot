@@ -38,7 +38,7 @@ import { assetClassKey } from "@/lib/asset-words";
 import { parseCount, parsePct } from "@/lib/criteria";
 import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 
 type Row = { label: string; value: string; page?: string };
 const isRow = (m: unknown): m is Row =>
@@ -138,7 +138,7 @@ export interface StudentHousingRead {
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 const pts = (n: number) => `${Math.round(Math.abs(n) * 10) / 10} ${Math.abs(n) === 1 ? "point" : "points"}`;
 const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
-const k = (n: number) => (n >= 1000 ? `$${Math.round(n / 1000)}k` : usd(n));
+const k = (n: number) => compactUsd(n);
 
 /** Whether the deal is student housing: the class the deck was read as, or
  *  a stated pre-leasing figure beside a count of beds. */

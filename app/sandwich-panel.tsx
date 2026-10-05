@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import { LeaseTermBar } from "@/app/lease-term-bar";
 import { endIsAhead, endsByYear, termEndLabel } from "@/lib/ground-lease-term";
 import type { SandwichRead } from "@/lib/sandwich-lease";
@@ -30,12 +31,7 @@ import type { SandwichRead } from "@/lib/sandwich-lease";
  */
 
 /** "$1.82M", "$720k" — the reader's own money. */
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto" });
 const times = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}×`;
 const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (part / whole) * 100))}%`;
 

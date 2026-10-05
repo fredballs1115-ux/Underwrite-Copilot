@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import { ScrollRegion } from "@/app/scroll-region";
 import { withArticle } from "@/lib/article";
 import type { PlanSummary } from "@/lib/deal-strategy";
@@ -13,12 +14,7 @@ import {
   type SpreadBucket,
 } from "@/lib/plan-sensitivity";
 
-const money = (n: number): string =>
-  Math.abs(n) >= 1e6
-    ? `$${(n / 1e6).toFixed(1)}M`
-    : Math.abs(n) >= 1e3
-      ? `$${Math.round(n / 1e3)}k`
-      : `$${Math.round(n)}`;
+const money = (n: number): string => compactUsd(n);
 const pct = (d: number, dp = 1): string => `${(d * 100).toFixed(dp)}%`;
 const delta = (d: number): string => `${d > 0 ? "+" : ""}${Math.round(d * 100)}%`;
 

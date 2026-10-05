@@ -34,6 +34,7 @@
 //
 // A BLANK IS NULL.
 
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import agencyRules from "@/data/research/agency_rules.json";
 import { parseCount, parseMoney, unitCountFromMetrics } from "@/lib/criteria";
@@ -120,12 +121,7 @@ export interface CondoRead {
 
 // A unit's dues are said to the dollar ($1,250 is never "$1k"); a year of
 // the block's in thousands.
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e4 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n).toLocaleString("en-US")}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto", thousandsFrom: 1e4 });
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 
 /** The deal's words beside its class: its name, its plan and its interest. */

@@ -8,6 +8,7 @@
 // teammate's, never another account's); this module just shapes and groups
 // them. Pure + unit-tested.
 
+import { compactUsd } from "@/lib/money";
 import {
   buildingSfFromMetrics,
   findGoingInCap,
@@ -418,11 +419,8 @@ export function marketMemoryFor(
 /** "$274k/unit", "$200k/key", "$60k/pad", "$212/SF" — a unit basis wears the
  *  noun it was counted in (lib/asset-words), never "unit" for a hotel's keys. */
 export const fmtBasis = (dollars: number, basis: "unit" | "sf", noun: string | null = "unit") =>
-  basis === "unit"
-    ? dollars >= 1e3
-      ? `$${Math.round(dollars / 1e3)}k/${noun ?? "unit"}`
-      : `$${Math.round(dollars)}/${noun ?? "unit"}`
-    : `$${Math.round(dollars)}/SF`;
+  // The pipeline card's own basis writer (lib/pipeline-slots `basisTag`).
+  basis === "unit" ? `${compactUsd(dollars, { trim: true })}/${noun ?? "unit"}` : `$${Math.round(dollars)}/SF`;
 
 /** "Basis / key", "Basis / SF": the group's own noun where it carries a
  *  basis, else the class's (lib/asset-words `perSuffix` — "/acre" on land,
@@ -446,10 +444,15 @@ export function fmtCapRange(s: Stat): string {
 export function fmtBasisRange(s: BasisStat): string {
   const noun = s.noun ?? "unit";
   if (s.min === s.max) return fmtBasis(s.min, s.basis, noun);
-  // Share the "/key" or "/SF" suffix across the range.
+  // Share the "/key" or "/SF" suffix across the range, and the "k" where
+  // both ends are in thousands. Each end is the card's own figure
+  // (lib/money `compactUsd`), so a key past a million reads "$1.2M", never
+  // "$1200k".
   if (s.basis === "unit") {
-    const lo = s.min >= 1e3 ? `$${Math.round(s.min / 1e3)}` : `$${Math.round(s.min)}`;
-    const hi = s.max >= 1e3 ? `${Math.round(s.max / 1e3)}k` : `${Math.round(s.max)}`;
+    const lo = compactUsd(s.min, { trim: true });
+    const hi = compactUsd(s.max, { trim: true });
+    if (lo === hi) return `${lo}/${noun}`;
+    if (lo.endsWith("k") && hi.endsWith("k")) return `${lo.slice(0, -1)}–${hi.slice(1)}/${noun}`;
     return `${lo}–${hi}/${noun}`;
   }
   return `$${Math.round(s.min)}–${Math.round(s.max)}/SF`;

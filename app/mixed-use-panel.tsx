@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import type { MixedUseRead } from "@/lib/mixed-use";
 
 /**
@@ -21,12 +22,7 @@ import type { MixedUseRead } from "@/lib/mixed-use";
  */
 
 /** "$1.52M", "$610k" — the reader's own money. */
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto" });
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 const sfText = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
 const clamp = (n: number) => Math.max(0, Math.min(100, n));

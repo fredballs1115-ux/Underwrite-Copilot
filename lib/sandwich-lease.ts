@@ -34,6 +34,7 @@
 // stated NOI is set against the spread only to say where the two disagree,
 // never to choose one.
 
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { noiFigures } from "@/lib/deal-strategy";
@@ -89,12 +90,7 @@ export interface SandwichRead {
   headline: string;
 }
 
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto" });
 const times = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}×`;
 const pctWhole = (n: number) => `${Math.round(n)}%`;
 

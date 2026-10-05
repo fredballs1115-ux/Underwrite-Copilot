@@ -8,6 +8,7 @@
 // a percentage with no "cap" beside it, or a cap stated as a range is not a
 // basis or a cap, and reads as nothing — the same honesty as the report's
 // rangeRead.
+import { compactUsd } from "@/lib/money";
 import { buildingSfFromMetrics, parsePrice } from "@/lib/criteria";
 import { findPricedMetric, isOutdoorStorageYard, unitCountFromMetrics, type StrategyKind } from "@/lib/deal-strategy";
 import type { InterestKind } from "@/lib/interest";
@@ -218,7 +219,7 @@ export function basisScale(
  *  caption a bar's tooltip uses. */
 export function fmtBasis(value: number, unit: "unit" | "sf", noun = "unit"): string {
   if (unit === "sf") return `$${Math.round(value).toLocaleString("en-US")}/SF`;
-  return value >= 1_000_000
-    ? `$${(value / 1_000_000).toFixed(2).replace(/\.?0+$/, "")}M/${noun}`
-    : `$${Math.round(value / 1_000).toLocaleString("en-US")}k/${noun}`;
+  // The pipeline card's own basis writer (lib/pipeline-slots `basisTag`):
+  // one figure, one rounding, on the card and beside the comps.
+  return `${compactUsd(value, { trim: true })}/${noun}`;
 }

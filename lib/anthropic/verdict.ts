@@ -1,4 +1,5 @@
 import "server-only";
+import { compactUsd } from "@/lib/money";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { getAnthropic } from "./client";
@@ -121,8 +122,7 @@ const FOLD_WORD: Record<"fits" | "near" | "outside", string> = {
 };
 
 // "$170k", "$40.8M" — as the deal context writes a figure (lib/deal-context).
-const compact = (n: number): string =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+const compact = (n: number): string => compactUsd(n);
 const dollars = (n: number): string => `$${Math.round(n).toLocaleString("en-US")}`;
 const shareText = (pct: number): string => `${Number.isInteger(pct) ? pct : pct.toFixed(1)}%`;
 

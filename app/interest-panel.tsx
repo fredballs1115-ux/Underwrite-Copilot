@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import Link from "next/link";
 import { LeaseTermBar } from "@/app/lease-term-bar";
 import { termEndLabel } from "@/lib/ground-lease-term";
@@ -46,15 +47,8 @@ import { positionCaption } from "@/lib/position";
  * value — the empty remainder is the common equity under it, and where the
  * last dollar passes the value the track runs on past the tick.
  */
-// Rounded on the tenths, never a float's toFixed.
-const money = (n: number) =>
-  n >= 1e8
-    ? `$${Math.round(n / 1e6)}M`
-    : n >= 1e6
-      ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`
-      : n >= 1e3
-        ? `$${Math.round(n / 1e3)}k`
-        : `$${Math.round(n)}`;
+// Rounded on the tenths, never a float's toFixed (lib/money `compactUsd`).
+const money = (n: number) => compactUsd(n, { wholeMillionsFrom: 1e8 });
 const times = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)}×`;
 const tenths = (n: number) => (Math.round(n * 10) / 10).toFixed(1);
 const width = (share: number) => `${Math.max(1.5, Math.min(1, share) * 100)}%`;

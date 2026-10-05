@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import { goingConcernShortLine, type GoingConcernRead } from "@/lib/going-concern";
 
 /**
@@ -24,12 +25,7 @@ import { goingConcernShortLine, type GoingConcernRead } from "@/lib/going-concer
  */
 
 /** "$8.50M", "$410k" — the reader's own money. */
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto" });
 const times = (n: number) => `${n.toFixed(2)}x`;
 const clamp = (n: number) => Math.max(0, Math.min(100, n));
 const slug = (label: string) => label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");

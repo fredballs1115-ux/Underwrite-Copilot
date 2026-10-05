@@ -38,7 +38,7 @@ import {
   type DealStrategy,
 } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 import { readStatedDate } from "@/lib/note-yield";
 import { withArticle } from "@/lib/article";
 
@@ -184,12 +184,7 @@ export interface ForwardRead {
 
 /** "$48.0M", "$3.96M", "$950k": two places under $10M, where a model's NOI
  *  and the memorandum's sit a few percent apart. */
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto" });
 const pctText = (n: number) => `${n.toFixed(2)}%`;
 
 /**

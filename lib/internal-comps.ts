@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import {
   METRIC_FIND,
   buildingSfFromMetrics,
@@ -74,12 +75,7 @@ interface SiblingDealRow {
   first_signal?: unknown;
 }
 
-const fmtCompact = (dollars: number) =>
-  dollars >= 1e6
-    ? `$${(dollars / 1e6).toFixed(1)}M`
-    : dollars >= 1e3
-      ? `$${Math.round(dollars / 1e3)}k`
-      : `$${Math.round(dollars)}`;
+const fmtCompact = (dollars: number) => compactUsd(dollars);
 
 /** A price stated as a range, short — "$40–42M", the pipeline card's and
  *  the deal header's (lib/criteria `priceRangeShort`); null for one figure. */

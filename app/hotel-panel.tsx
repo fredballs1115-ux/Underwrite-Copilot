@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import { withArticle } from "@/lib/article";
 import { endLabel } from "@/lib/affordable";
 import { endHasPassed, leftText, yearsText } from "@/lib/ground-lease-term";
@@ -24,11 +25,7 @@ import type { HotelDealRead } from "@/lib/hotel-deal";
  */
 
 const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (part / whole) * 100))}%`;
-const k = (n: number) => {
-  if (n >= 1e6) return `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`;
-  const v = Math.round(n / 100) / 10;
-  return `$${Number.isInteger(v) ? v.toLocaleString("en-US") : v.toFixed(1)}k`;
-};
+const k = (n: number) => compactUsd(n, { thousandsFrom: 0, thousandsPlaces: 1 });
 const dollars = (n: number) => `$${(Math.round(n * 100) / 100).toFixed(2)}`;
 
 const ENCUMBRANCE_LABEL: Record<HotelDealRead["encumbrance"], string | null> = {

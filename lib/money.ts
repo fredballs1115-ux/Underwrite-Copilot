@@ -79,3 +79,79 @@ export function fmtUsd(raw: string | null, floor = 10_000): string {
   const n = parseUsd(raw ?? "", floor);
   return n !== null ? `$${n.toLocaleString("en-US")}` : "";
 }
+
+/**
+ * A non-negative figure in `unit`s (1e6 for millions, 1e3 for thousands) at
+ * `places` decimals, rounded half up on its last place IN WHOLE NUMBERS: the
+ * figure is counted in that place — Math.round(5_550_000 / 1e5) is 56 tenths
+ * of a million — and the string is built from the count's own digits. Never
+ * a float's toFixed: (5_550_000 / 1e6).toFixed(1) is "5.5", because 5.55 is
+ * stored as 5.5499…, so the pipeline card had said "$5.5M" for a note its
+ * memo, its shared screen and its workbook cover said "$5.6M" for. `trim`
+ * drops the zeros after the point ("40.0" → "40", "2.50" → "2.5").
+ */
+export function scaledText(abs: number, unit: number, places: number, trim = false): string {
+  const count = Math.round(abs / (unit / 10 ** places));
+  if (places === 0) return String(count);
+  const digits = String(count).padStart(places + 1, "0");
+  const text = `${digits.slice(0, -places)}.${digits.slice(-places)}`;
+  return trim ? text.replace(/\.?0+$/, "") : text;
+}
+
+/** How a compact figure is written: what each surface chose, held to one
+ *  rounding. */
+export interface CompactUsdOptions {
+  /** decimals on a figure in millions: 1 ("$5.6M", the default), 2
+   *  ("$5.55M"), or "auto" — two under $10M, one from it ("$5.55M",
+   *  "$48.0M") */
+  millions?: 1 | 2 | "auto";
+  /** drop the zeros after the point on a figure in millions: "$1M",
+   *  "$1.5M" */
+  trim?: boolean;
+  /** from this size a figure in millions is written whole: "$120M" */
+  wholeMillionsFrom?: number;
+  /** under a million, from this size the figure is written in thousands
+   *  ("$850k"), under it in whole dollars ("$9,350"): 1,000 by default; 0
+   *  writes every figure under a million in thousands, Infinity none */
+  thousandsFrom?: number;
+  /** decimals on a figure in thousands: 0 ("$35k", the default) or up to
+   *  one ("$12.5k", "$35k") */
+  thousandsPlaces?: 0 | 1;
+}
+
+/**
+ * A dollar figure written short — "$5.6M", "$850k", "$9,350" — the one
+ * writer behind every surface that writes money that way, so a figure reads
+ * the same on the pipeline card, the memo, the shared screen and the
+ * workbook. Rounded half up on its last shown place in whole numbers
+ * (`scaledText`); a thousands figure that rounds up to a thousand thousands
+ * is a million ("$1.0M", never "$1000k"). A negative's minus sign goes
+ * outside the dollar, the site's U+2212 ("−$1.5M"), and a figure that
+ * rounds to nothing carries none.
+ */
+export function compactUsd(n: number, o: CompactUsdOptions = {}): string {
+  if (!Number.isFinite(n)) return "—";
+  const abs = Math.abs(n);
+  const body = compactBody(abs, o);
+  return `${n < 0 && /[1-9]/.test(body) ? "−" : ""}$${body}`;
+}
+
+function compactBody(abs: number, o: CompactUsdOptions): string {
+  if (abs < 1e6) {
+    const kFrom = o.thousandsFrom ?? 1e3;
+    if (abs < kFrom) return Math.round(abs).toLocaleString("en-US");
+    const places = o.thousandsPlaces ?? 0;
+    // Under a thousand thousands once rounded: the figure stays in thousands.
+    if (Math.round(abs / (1e3 / 10 ** places)) < 1000 * 10 ** places) return `${scaledText(abs, 1e3, places, true)}k`;
+  }
+  const auto = o.millions === "auto";
+  let places: number = o.millions === "auto" ? (abs >= 1e7 ? 1 : 2) : (o.millions ?? 1);
+  // A figure that rounds up across a shape's edge is written in the next
+  // shape, as a thousands figure that rounds to a thousand is a million:
+  // $9,996,000 is "$10.0M" where ten millions take one place, and
+  // $99,960,000 "$100M" where a hundred are written whole.
+  if (auto && places === 2 && Math.round(abs / 1e4) >= 1_000) places = 1;
+  const step = 1e6 / 10 ** places;
+  if (o.wholeMillionsFrom != null && Math.round(abs / step) * step >= o.wholeMillionsFrom) places = 0;
+  return `${scaledText(abs, 1e6, places, o.trim)}M`;
+}

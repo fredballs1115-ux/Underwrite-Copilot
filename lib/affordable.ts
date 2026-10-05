@@ -48,7 +48,7 @@ import { countNoun } from "@/lib/asset-words";
 import { parseCount, unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
 import { parsePageNumber } from "@/lib/facts";
 import { endHasPassed, fromToday } from "@/lib/ground-lease-term";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 import { monthsBetween, readStatedDate, sameMonth, sameYear, yearsBetween } from "@/lib/note-yield";
 
 export type { AffordableProgram };
@@ -345,8 +345,7 @@ export interface AffordableRead {
   modelCaveat: string | null;
 }
 
-const money = (n: number) =>
-  n >= 1e6 ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M` : n >= 1e4 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n).toLocaleString("en-US")}`;
+const money = (n: number) => compactUsd(n, { thousandsFrom: 1e4 });
 /** A share of the building, never rounded to all or none it is not: 239 of
  *  240 is 99%, 1 of 240 is 1%. */
 export const sharePctText = (n: number) => `${n >= 100 ? 100 : n <= 0 ? 0 : Math.min(99, Math.max(1, Math.round(n)))}%`;

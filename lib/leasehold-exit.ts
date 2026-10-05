@@ -38,6 +38,7 @@
 // and its rent usually resets to market when it is, so the term with every
 // option is read beside the term, never instead of it.
 
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { interestOf, leaseholdTermOf } from "@/lib/interest";
 import {
@@ -197,15 +198,8 @@ export function readLeaseholdExit(
 
 // ── Saying it ───────────────────────────────────────────────────────────
 
-// Rounded on the tenths, never a float's toFixed.
-export const exitMoney = (n: number) =>
-  Math.abs(n) >= 1e8
-    ? `$${Math.round(n / 1e6)}M`
-    : Math.abs(n) >= 1e6
-      ? `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`
-      : Math.abs(n) >= 1e3
-        ? `$${Math.round(n / 1e3)}k`
-        : `$${Math.round(n)}`;
+// Rounded on the tenths, never a float's toFixed (lib/money `compactUsd`).
+export const exitMoney = (n: number) => compactUsd(n, { wholeMillionsFrom: 1e8 });
 const pct2 = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}%`;
 // A return can be negative, and a minus is a minus sign.
 const pct1 = (n: number) => {

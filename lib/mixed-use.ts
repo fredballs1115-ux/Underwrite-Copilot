@@ -35,6 +35,7 @@
 // A BLANK IS NULL. An income stated per foot, per unit or as a range is no
 // year's income; a pro forma, budget or stabilized figure is not today's.
 
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { assetClassKey } from "@/lib/asset-words";
 import { buildingSfFromMetrics, parseMoney, parsePct, parseSf } from "@/lib/criteria";
@@ -104,12 +105,7 @@ export interface MixedUseRead {
   headline: string;
 }
 
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto" });
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 const sfText = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
 

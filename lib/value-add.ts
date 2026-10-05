@@ -39,6 +39,7 @@
 // A BLANK IS NULL. A turnover, a period or an achieved premium the
 // memorandum does not state is not assumed.
 
+import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
 import { parseCount } from "@/lib/criteria";
@@ -156,10 +157,7 @@ export interface ValueAddRead {
   headline: string;
 }
 
-const money = (n: number) =>
-  n >= 1e6
-    ? `$${(Math.round(n / 1e4) / 100).toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M`
-    : `$${Math.round(n).toLocaleString("en-US")}`;
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 const dollars = (n: number) => (Number.isInteger(n) ? `$${n.toLocaleString("en-US")}` : `$${n.toFixed(2)}`);
 const pct = (n: number) => `${Math.round(n)}%`;
 const years1 = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)} years`;

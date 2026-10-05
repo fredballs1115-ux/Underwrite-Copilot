@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import type { SaleCeiling } from "@/lib/sale-ceiling";
 import type { SaleRead } from "@/lib/sale-terms";
 
@@ -17,8 +18,7 @@ import type { SaleRead } from "@/lib/sale-terms";
  */
 
 const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (part / whole) * 100))}%`;
-const money = (n: number) =>
-  n >= 1e6 ? `$${(Math.round(n / 1e4) / 100).toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
 
 const METHOD_CHIP: Record<SaleRead["method"], string> = {
   auction: "Auction",

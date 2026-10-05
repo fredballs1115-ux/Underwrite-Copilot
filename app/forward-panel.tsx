@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import { deliveryText, type ForwardRead } from "@/lib/forward-purchase";
 import { sentencesOf } from "@/lib/first-sentence";
 
@@ -25,12 +26,7 @@ import { sentencesOf } from "@/lib/first-sentence";
  */
 
 /** "$48.0M", "$3.96M", "$950k" — the reader's own money. */
-const money = (n: number): string => {
-  const a = Math.abs(n);
-  if (a >= 1e7) return `$${(n / 1e6).toFixed(1)}M`;
-  if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
-  return a >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
-};
+const money = (n: number): string => compactUsd(n, { millions: "auto" });
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 const pct2 = (n: number) => `${n.toFixed(2)}%`;
 const clamp = (n: number) => Math.max(0, Math.min(100, n));

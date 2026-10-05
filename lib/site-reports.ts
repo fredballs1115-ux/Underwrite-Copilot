@@ -42,7 +42,7 @@ import { parsePct } from "@/lib/criteria";
 import { askingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import type { MetricRow } from "@/lib/ground-lease-term";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 import { parseStatedDate } from "@/lib/note-yield";
 
 const isRow = (m: unknown): m is MetricRow =>
@@ -240,9 +240,8 @@ export interface SiteReportsRead {
  *  retrofit. */
 export const PML_LENDER_PCT = 20;
 
-const money = (n: number) =>
-  n >= 1e6 ? `$${(Math.round(n / 1e4) / 100).toFixed(2).replace(/0$/, "").replace(/\.0$/, "")}M` : `$${Math.round(n).toLocaleString("en-US")}`;
-const compact = (n: number) => (n >= 1e6 ? `$${(Math.round(n / 1e5) / 10).toFixed(1).replace(/\.0$/, "")}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`);
+const money = (n: number) => compactUsd(n, { millions: 2, trim: true, thousandsFrom: Infinity });
+const compact = (n: number) => compactUsd(n, { trim: true });
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];

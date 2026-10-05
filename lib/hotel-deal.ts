@@ -54,7 +54,7 @@ import { unitCountFromMetrics, unitCountRow } from "@/lib/criteria";
 import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
 import { parsePageNumber } from "@/lib/facts";
 import { endHasPassed, endsByYear, fromToday, yearsText } from "@/lib/ground-lease-term";
-import { parseUsd } from "@/lib/money";
+import { compactUsd, parseUsd } from "@/lib/money";
 
 export type { HotelEncumbrance };
 
@@ -259,14 +259,7 @@ const ENCUMBRANCES: HotelEncumbrance[] = ["unencumbered", "brand", "management",
 
 const noPeriod = (s: string) => s.replace(/[.;,\s]+$/, "");
 // "$4.2M", "$35k", "$12.5k": a PIP per key is often a half-thousand.
-const money = (n: number) => {
-  if (n >= 1e6) return `$${(Math.round(n / 1e5) / 10).toFixed(1)}M`;
-  if (n >= 1e3) {
-    const k = Math.round(n / 100) / 10;
-    return `$${Number.isInteger(k) ? k.toLocaleString("en-US") : k.toFixed(1)}k`;
-  }
-  return `$${Math.round(n).toLocaleString("en-US")}`;
-};
+const money = (n: number) => compactUsd(n, { thousandsPlaces: 1 });
 const dollars = (n: number) => `$${(Math.round(n * 100) / 100).toFixed(2)}`;
 const pct1 = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)}%`;
 

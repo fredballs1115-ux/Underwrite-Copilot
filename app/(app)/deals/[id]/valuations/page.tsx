@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/server";
@@ -83,8 +84,7 @@ const FIELD_HINT: Record<ValuationField, string> = {
   discountRate: "%",
 };
 /** "$2.0M", "$450k" — a dollar figure for a sentence. */
-const usdShort = (n: number): string =>
-  Math.abs(n) >= 1_000_000 ? `$${(n / 1_000_000).toFixed(1)}M` : `$${Math.round(n / 1000)}k`;
+const usdShort = (n: number): string => compactUsd(n, { thousandsFrom: 0 });
 
 const toNamed = (v: Valuation): NamedValuation => ({
   sourceLabel: v.sourceLabel,

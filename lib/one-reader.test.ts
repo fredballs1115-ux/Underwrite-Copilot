@@ -4,7 +4,7 @@
 // the internal comps. Each case here is a deal of the pass's own shape, read
 // through the reader each surface calls.
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
@@ -18,11 +18,15 @@ import { buildPipelineWorkbook, type PipelineExportRow } from "./pipeline-workbo
 import { compareReturns } from "./compare-figures";
 import { SHARE_CAP_WORDS, capSlotWithheld, goingInCapFigure } from "./compare-interest";
 import { capCellText } from "./cap-slot";
-import { interestTag } from "./interest";
+import { interestShortLine, interestTag, readInterest } from "./interest";
 import { deriveInternalComps } from "./internal-comps";
-import { deriveAnalytics } from "./analytics";
-import { buildComps } from "./market-memory";
-import { PLAN_YOC_TITLE, pctText, planReadLine, yieldOnCostText } from "./plan-facts";
+import { deriveAnalytics, fmtUsdCompact } from "./analytics";
+import { buildComps, fmtBasisRange } from "./market-memory";
+import { PLAN_YOC_TITLE, moneyCompact, pctText, planReadLine, yieldOnCostText } from "./plan-facts";
+import { portfolioMoney } from "./portfolio";
+import { exitMoney } from "./leasehold-exit";
+import { assumableMoney } from "./assumable-debt";
+import { fmtBasis } from "./comp-detail";
 import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { visibleText } from "./render-lint";
 import { priceRange, priceRangeShort } from "./criteria";
@@ -392,6 +396,75 @@ describe("analytics, the market memory and the internal comps read a deal's kind
       const src = readFileSync(join(process.cwd(), file), "utf8");
       expect(src, file).toMatch(/\.select\("id, name, asset_class, created_at, is_sample,[^"]*extraction, first_signal"\)/);
     }
+  });
+});
+
+describe("a compact figure is rounded one way on every surface (finding 14)", () => {
+  // The pass's note: priced $5,550,000, it was "$5.5M" on its card and "the
+  // $5.6M price is …" on its memo, its shared screen and its workbook cover.
+  const note = ex([m("Asking price", "$5,550,000"), m("Unpaid principal balance", "$6,000,000")], {
+    interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+    totalPages: 40,
+  });
+
+  it("every reader that writes money short says the note's $5.6M", () => {
+    for (const write of [moneyCompact, fmtUsdCompact, portfolioMoney, exitMoney, assumableMoney]) {
+      expect(write(5_550_000)).toBe("$5.6M");
+    }
+    const r = readInterest(note, 5_550_000, new Date("2026-10-05T12:00:00Z"))!;
+    expect(r.lead).toContain("The $5.6M price is");
+    expect(interestShortLine(r)).toContain("the $5.6M price");
+    const row = { id: "n", name: "Note", asset_class: "multifamily", created_at: "2026-10-01T00:00:00Z", is_sample: false, verdict: null, extraction: note };
+    expect(deriveInternalComps("other", "multifamily", { assetClass: "multifamily" }, [row])[0].priceLabel).toBe("$5.6M · note");
+  });
+
+  it("a key past a million reads one way on the card, beside the comps and in the market memory", () => {
+    const e = ex([m("Asking price", "$430,000,000"), m("Keys", "200")], { assetClass: "hospitality_str" });
+    const card = basisTag(e, inferStrategy(e).kind, "hospitality_str");
+    expect(card).toBe("$2.2M/key");
+    // The comps' caption had printed "$2.15M/key", the memory "$2150k/key".
+    expect(fmtBasis(2_150_000, "unit", "key")).toBe(card);
+    expect(fmtBasisRange({ min: 2_150_000, median: 2_150_000, max: 2_150_000, basis: "unit", noun: "key" })).toBe(card);
+    expect(fmtBasisRange({ min: 950_000, median: 1_000_000, max: 1_150_000, basis: "unit", noun: "key" })).toBe("$950k–$1.2M/key");
+  });
+
+  it("no surface but lib/money writes a compact dollar by hand", () => {
+    // Each is a surface another change owns (research pass 34); its line
+    // goes when it reads through `compactUsd`.
+    const elsewhere = new Set([
+      "app/(app)/deals/[id]/model-view.tsx",
+      "app/(app)/deals/[id]/debt-sizer.tsx",
+      "app/page.tsx",
+      "app/landing-interactive.tsx",
+      "app/landing-stress.tsx",
+      "lib/model/compute.ts",
+      "lib/sample-deal.ts",
+    ]);
+    const lead = String.raw`(?:\$\$\{|"\$"\s*\+\s*)`;
+    const handWritten = [
+      // a float's toFixed on millions: (5_550_000 / 1e6).toFixed(1) is "5.5"
+      new RegExp(String.raw`${lead}\(\s*[\w.!?]+\s*\/\s*(?:1e6|1_000_000)\s*\)\s*\.toFixed\(`),
+      // a second writer of tenths of a million
+      new RegExp(String.raw`${lead}\(\s*Math\.round\(\s*[\w.!?]+\s*\/\s*1e5\s*\)\s*\/\s*10\s*\)`),
+      // a second writer of thousands
+      new RegExp(String.raw`${lead}Math\.round\(\s*[\w.!?]+\s*\/\s*(?:1e3|1000|1_000)\s*\)`),
+    ];
+    const found: string[] = [];
+    const walk = (dir: string) => {
+      for (const d of readdirSync(join(process.cwd(), dir), { withFileTypes: true })) {
+        const rel = `${dir}/${d.name}`;
+        if (d.isDirectory()) walk(rel);
+        else if (/\.tsx?$/.test(d.name) && !/\.test\.tsx?$/.test(d.name) && rel !== "lib/money.ts" && !elsewhere.has(rel)) {
+          const text = readFileSync(join(process.cwd(), rel), "utf8");
+          if (handWritten.some((re) => re.test(text))) found.push(rel);
+        }
+      }
+    };
+    walk("app");
+    walk("lib");
+    expect(found).toEqual([]);
+    // The card's own price writer is the helper.
+    expect(readFileSync(join(process.cwd(), "app/(app)/deals/pipeline.tsx"), "utf8")).toMatch(/return compactUsd\(n\);/);
   });
 });
 

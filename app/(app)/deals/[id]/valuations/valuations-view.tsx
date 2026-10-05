@@ -1,5 +1,6 @@
 "use client";
 
+import { compactUsd } from "@/lib/money";
 import { useState } from "react";
 import { ScrollRegion } from "@/app/scroll-region";
 import { tallySentence, type ValuationBridge, type AggressivenessTally } from "@/lib/valuation/reconcile";
@@ -32,13 +33,7 @@ export interface ColumnData {
   };
 }
 
-const usd = (n: number): string => {
-  const abs = Math.abs(n);
-  const sign = n < 0 ? "−" : "";
-  if (abs >= 1_000_000) return `${sign}$${(abs / 1_000_000).toFixed(abs >= 100_000_000 ? 0 : 1)}M`;
-  if (abs >= 1_000) return `${sign}$${Math.round(abs / 1000)}k`;
-  return `${sign}$${Math.round(abs)}`;
-};
+const usd = (n: number): string => compactUsd(n, { wholeMillionsFrom: 1e8 });
 
 const FORMAT: Record<ValuationField, (n: number) => string> = {
   headlineValue: usd,

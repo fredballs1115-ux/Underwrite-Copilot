@@ -1,3 +1,4 @@
+import { compactUsd } from "@/lib/money";
 import { floodContextLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
@@ -32,8 +33,7 @@ import { condoContextLine, readCondo } from "@/lib/condo";
 import { readSandwichLease, sandwichContextLine } from "@/lib/sandwich-lease";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
-const compact = (n: number): string =>
-  n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `$${Math.round(n / 1e3)}k` : `$${Math.round(n)}`;
+const compact = (n: number): string => compactUsd(n);
 
 /**
  * A price the OM states as a range — pricing guidance, a whisper — said once,
