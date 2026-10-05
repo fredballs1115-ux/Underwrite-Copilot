@@ -32,6 +32,8 @@ import { screenedAnOm } from "@/lib/onboarding";
 import { olderScreen } from "@/lib/older-screen";
 import { readAllResult, readByIds } from "@/lib/read-all";
 import { pipelineReadNote } from "@/lib/pipeline-read-note";
+import { inTurns } from "@/lib/in-turns";
+import { after } from "next/server";
 
 export const metadata: Metadata = { title: "Pipeline" };
 
@@ -242,22 +244,8 @@ export default async function DealsPage({
     const next = offersDueUpgrade(null, d.extraction as ExtractionResult | null);
     if (next) dueFills.push([d.id, next]);
   }
-  if (dueFills.length) {
-    await Promise.all(
-      dueFills.map(([id, offers_due]) =>
-        supabase
-          .from("deals")
-          .update({ offers_due })
-          .eq("id", id)
-          .is("offers_due", null)
-          .then(
-            () => undefined,
-            () => undefined,
-          ),
-      ),
-    );
-    for (const [id, due] of dueFills) dueById.set(id, due);
-  }
+  // Read here from the values computed; written behind the response (below).
+  for (const [id, due] of dueFills) dueById.set(id, due);
   const nameById = new Map((mates ?? []).map((m) => [m.id, m.full_name || m.email || "Teammate"]));
 
   // Every deal placed by its address (#441): a deal uploaded with the
@@ -273,23 +261,39 @@ export default async function DealsPage({
     const next = addressUpgrade(d.address, d.extraction as ExtractionResult | null);
     if (next) upgrades.set(d.id, next);
   }
-  if (upgrades.size) {
-    await Promise.all(
-      [...upgrades].map(([id, address]) =>
+  for (const d of rows) {
+    const next = upgrades.get(d.id);
+    if (next) d.address = next;
+  }
+
+  // Both write-backs go behind the response, a few at a time (lib/in-turns):
+  // the page had awaited every one at once before it drew anything, so a
+  // pipeline of older screens waited on a burst of updates (research pass
+  // 42). The client was made before the render, so the callback reads no
+  // request API; a write that fails is logged and made again on the next
+  // view, which computes the same value.
+  if (dueFills.length || upgrades.size) {
+    const writes: (() => PromiseLike<boolean>)[] = [
+      ...dueFills.map(([id, offers_due]) => () =>
+        supabase
+          .from("deals")
+          .update({ offers_due })
+          .eq("id", id)
+          .is("offers_due", null)
+          .then(({ error: e }) => !e),
+      ),
+      ...[...upgrades].map(([id, address]) => () =>
         supabase
           .from("deals")
           .update({ address })
           .eq("id", id)
-          .then(
-            () => undefined,
-            () => undefined,
-          ),
+          .then(({ error: e }) => !e),
       ),
-    );
-    for (const d of rows) {
-      const next = upgrades.get(d.id);
-      if (next) d.address = next;
-    }
+    ];
+    after(async () => {
+      const failed = await inTurns(writes, (write) => write());
+      if (failed) console.error(`[pipeline] ${failed} of ${writes.length} write-backs failed; the next view makes them again`);
+    });
   }
 
   // Today on the reader's own calendar (their browser's zone, from its
