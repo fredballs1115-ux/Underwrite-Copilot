@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
 import { HyperFormula } from "hyperformula";
 import { buildUnderwriteWorkbook } from "./workbook";
-import { deriveUnderwriteInputs } from "./inputs";
+import { deriveUnderwriteInputs, type ActualsForModel } from "./inputs";
 import { ex, m } from "@/lib/pass38.fixture";
 
 type Grid = (number | string | boolean | null)[][];
@@ -23,9 +23,9 @@ const cellToHf = (v: unknown): number | string | boolean | null => {
   return (o.result as number | string | undefined) ?? null;
 };
 
-async function opsOf(extraction: ReturnType<typeof ex>) {
+async function opsOf(extraction: ReturnType<typeof ex>, actuals?: ActualsForModel) {
   const wb = new ExcelJS.Workbook();
-  await wb.xlsx.load((await buildUnderwriteWorkbook(deriveUnderwriteInputs(extraction, "x"))) as unknown as ArrayBuffer);
+  await wb.xlsx.load((await buildUnderwriteWorkbook(deriveUnderwriteInputs(extraction, "x", actuals))) as unknown as ArrayBuffer);
   const sheets: Record<string, Grid> = {};
   wb.eachSheet((ws) => {
     const grid: Grid = [];
@@ -59,9 +59,19 @@ const office = (noi: string, occupancy: string) =>
     metrics: [m("Asking price", "20,000,000"), m("NOI (in-place)", noi, "in_place"), m("Total SF", "60,000 SF"), m("Occupancy", occupancy, "in_place")],
   });
 
+// A T-12's expense load: the breakeven row is struck on the building's own
+// expenses, and on a class's default ratio it is left out (research pass 40,
+// M2, workbook-default-ratio.test.ts).
+const t12 = (noi: number, opex: number): ActualsForModel => ({
+  t12: {
+    periodEnd: "2026-06-30",
+    summary: { collectedRent: noi + opex, vacancyLoss: null, otherIncome: null, egi: noi + opex, opex: [], totalOpex: opex, noi, noiDerived: false },
+  },
+});
+
 describe("the workbook's breakeven occupancy (research pass 38, item 14)", () => {
   it("says a breakeven past full occupancy in words, with the formula live", async () => {
-    const { ws, labels, values } = await opsOf(office("300,000", "90%"));
+    const { ws, labels, values } = await opsOf(office("300,000", "90%"), t12(300_000, 600_000));
     const r = labels.indexOf("Breakeven Occupancy");
     expect(r).toBeGreaterThan(0);
     expect((ws.getCell(r + 1, 2).value as { formula: string }).formula).toContain('"not reached at full occupancy"');
@@ -69,7 +79,7 @@ describe("the workbook's breakeven occupancy (research pass 38, item 14)", () =>
   });
 
   it("prints a breakeven under full occupancy as the figure", async () => {
-    const { labels, values } = await opsOf(office("1,500,000", "90%"));
+    const { labels, values } = await opsOf(office("1,500,000", "90%"), t12(1_500_000, 1_000_000));
     const r = labels.indexOf("Breakeven Occupancy");
     expect(typeof values[r][1]).toBe("number");
     expect(values[r][1] as number).toBeLessThan(1);

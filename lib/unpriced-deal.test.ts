@@ -106,7 +106,7 @@ describe("an unpriced deal whose memorandum states only a cap (the second audit,
     expect(placeholderReason(d.inputs, d.sources, { priceEntered: true })).not.toBeNull();
     expect(placeholderPageLine(d.inputs, d.sources, { priceEntered: true, maxBid: false })).toMatch(/^The returns are withheld: /);
     expect(placeholderWorkbookLine(d.inputs, d.sources)).toBe(
-      "No price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on a $10,000,000 placeholder price and an assumed NOI, and its returns are a placeholder's. Enter the price you would pay as the Purchase Price on the Assumptions tab, and the In-Place Rental Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves the NOI struck on the placeholder.",
+      "No price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on a $10,000,000 placeholder price and an assumed NOI, and its returns are a placeholder's. Enter the price you would pay as the Purchase Price on the Assumptions tab, and the Potential Gross Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves the NOI struck on the placeholder.",
     );
   });
 });

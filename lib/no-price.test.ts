@@ -120,7 +120,7 @@ describe("a price backed out of an NOI of zero or less is no price (research pas
     expect(formulas.some((c) => /^IF\(PurchasePrice<=0,"n\/a",/.test((c.v as { formula: string }).formula))).toBe(true);
     const line = placeholderWorkbookLine(d.inputs, d.sources)!;
     expect(line).toBe(
-      "No price was read from the memorandum, and its −$310,000 NOI (in-place) is not a year's income to price on, so that NOI over the stated going-in cap is no price and the returns run on it describe no deal. Enter the price you would pay as the Purchase Price on the Assumptions tab, and the In-Place Rental Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves the memorandum's NOI as the year-1 NOI.",
+      "No price was read from the memorandum, and its −$310,000 NOI (in-place) is not a year's income to price on, so that NOI over the stated going-in cap is no price and the returns run on it describe no deal. Enter the price you would pay as the Purchase Price on the Assumptions tab, and the Potential Gross Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves the memorandum's NOI as the year-1 NOI.",
     );
     expect(cells.some((c) => c.v === line)).toBe(true);
     // No basis is struck on it.

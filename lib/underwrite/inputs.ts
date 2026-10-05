@@ -291,6 +291,13 @@ export interface WorkbookMeta {
    *  the stated end has passed). Absent on anything but a master lease of
    *  the building. */
   sandwich?: { line: string; read: string } | null;
+  /** the share of effective gross income the model's operating expenses
+   *  take where it is the class's screening default, not a T-12's load
+   *  (research pass 40, M2): the operating expenses and the potential gross
+   *  revenue are then the year-1 NOI grossed up through it and the vacancy,
+   *  so the workbook's Operating Metrics leave out the rows that would only
+   *  restate it. Absent where a T-12's load runs. */
+  defaultExpenseRatio?: { ratio: number; classWord: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -1461,7 +1468,7 @@ export function deriveUnderwriteInputs(
     mark(key, "assumption", "None itemized — the general hold stands in for it; enter it to itemize");
   }
   for (const key of ["expenseRecoveriesAnnual", "otherRevenueAnnual"] as const) {
-    mark(key, "assumption", "Folded into the in-place rental revenue — split it out of that line, never add it on top");
+    mark(key, "assumption", "Folded into the potential gross revenue line — split it out of that line, never add it on top");
   }
   // The exit defaults to the OM's stated going-in cap (which cap it defaults
   // to is the owner's call). Where the model's own entry — its year-1 NOI
@@ -1543,6 +1550,7 @@ export function deriveUnderwriteInputs(
             read: hotelModelLine(hotelRead, { holdMonths: inputs.holdMonths, capitalYr1: capitalBudget, capitalIsPip: pipCapital != null }),
           }
         : null,
+      ...(t12Er == null ? { defaultExpenseRatio: { ratio: cd.expenseRatio, classWord } } : {}),
       // Rent-roll actual occupancy outranks the OM's stated figure.
       occupancyPct: rrOcc ?? (occPct != null ? occPct / 100 : null),
       rsf,

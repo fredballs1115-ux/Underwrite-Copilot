@@ -711,10 +711,10 @@ export function placeholderWorkbookLine(inputs: UnderwriteInputs, sources: Model
   const noi = sources?.inPlaceRentAnnual?.provenance === "assumption";
   const enter = price
     ? noi
-      ? ` Enter the price you would pay as the Purchase Price on the Assumptions tab, and the In-Place Rental Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves ${noPrice ? "the memorandum's NOI as the year-1 NOI" : "the NOI struck on the placeholder"}.`
+      ? ` Enter the price you would pay as the Purchase Price on the Assumptions tab, and the Potential Gross Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves ${noPrice ? "the memorandum's NOI as the year-1 NOI" : "the NOI struck on the placeholder"}.`
       : " Enter the price you would pay as the Purchase Price on the Assumptions tab."
     : noi
-      ? " Enter the In-Place Rental Revenue and expenses that make the year-1 NOI you would run on the Assumptions tab."
+      ? " Enter the Potential Gross Revenue and expenses that make the year-1 NOI you would run on the Assumptions tab."
       : "";
   return `${reason[0].toUpperCase()}${reason.slice(1)}${enter}`;
 }

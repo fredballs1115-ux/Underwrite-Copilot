@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import ExcelJS from "exceljs";
 import { HyperFormula } from "hyperformula";
-import { buildUnderwriteWorkbook } from "./workbook";
+import { RENT_LINE_LABEL, buildUnderwriteWorkbook } from "./workbook";
 import { deriveUnderwriteInputs } from "./inputs";
 import { computeUnderwrite } from "./engine";
 import { buildSensitivityGrids } from "./sensitivity";
@@ -386,8 +386,18 @@ describe("the Sensitivity tab stays centred on the inputs as they stand", () => 
 describe("Operating Metrics tab — the ratio ladder ties to the engine", () => {
   let hf: ReturnType<typeof HyperFormula.buildFromSheets>;
   let wb: ExcelJS.Workbook;
+  // The ladder's margins read the building's own expenses, so it runs on a
+  // T-12 here: on a class's default ratio the rows that would be struck on
+  // it are left out (research pass 40, M2; workbook-default-ratio.test.ts).
+  const t12Model = deriveUnderwriteInputs(extraction, "fallback", {
+    t12: {
+      periodEnd: "2026-06-30",
+      summary: { collectedRent: 4_200_000, vacancyLoss: null, otherIncome: null, egi: 4_200_000, opex: [], totalOpex: 1_200_000, noi: 3_000_000, noiDerived: false },
+    },
+  });
+  const t12Engine = computeUnderwrite(t12Model.inputs);
   beforeAll(async () => {
-    const buf = await buildUnderwriteWorkbook(model);
+    const buf = await buildUnderwriteWorkbook(t12Model);
     ({ hf, wb } = await loadIntoHf(buf));
   });
 
@@ -415,13 +425,14 @@ describe("Operating Metrics tab — the ratio ladder ties to the engine", () => 
       "Price / SF",
       "All-in Basis / SF (price + capital plan)",
       "Year-1 NOI / SF",
+      "Year-1 Potential Gross Revenue / SF / Year",
     ]) {
       expect(opsLabelRow(wb, lab), lab).toBeGreaterThan(0);
     }
   });
 
   it("Year-1 breakeven occupancy = (OpEx + Debt Service) / PGR, per the engine", () => {
-    const y1 = engine.cashFlow[0];
+    const y1 = t12Engine.cashFlow[0];
     const expected =
       (y1.operatingExpenses + y1.debtService) / y1.potentialGrossRevenue;
     const r = opsLabelRow(wb, "Breakeven Occupancy");
@@ -429,7 +440,7 @@ describe("Operating Metrics tab — the ratio ladder ties to the engine", () => 
   });
 
   it("Year-1 DSCR on the ladder matches the engine", () => {
-    const y1 = engine.cashFlow[0];
+    const y1 = t12Engine.cashFlow[0];
     const r = opsLabelRow(wb, "DSCR (NOI)");
     expect(Number(opsValue(hf, r, 2))).toBeCloseTo(y1.noi / y1.debtService, 6);
   });
@@ -587,7 +598,7 @@ describe("plan deals — the workbook says what the deal is and keeps the plan o
 
   it("keeps the stabilized pro forma out of year-1 income and says why", () => {
     const assum = wb.getWorksheet("Assumptions")!;
-    const row = findRow(assum, 1, "In-Place Rental Revenue (annual)");
+    const row = findRow(assum, 1, RENT_LINE_LABEL);
     expect(String(assum.getCell(row, 3).value)).toMatch(/does not anchor year 1/);
     // Year-1 NOI is the 6% screening default on a $20M price — not $21M.
     expect(planEngine.cashFlow[0].noi).toBeGreaterThan(0);
@@ -1019,7 +1030,7 @@ describe("the workbook's labels and colours say what their cells are", () => {
       return { value: assum.getCell(r, 2).value, source: String(assum.getCell(r, 3).value ?? "") };
     };
     const itemized = "Assumption — None itemized — the general hold stands in for it; enter it to itemize";
-    const folded = "Assumption — Folded into the in-place rental revenue — split it out of that line, never add it on top";
+    const folded = "Assumption — Folded into the potential gross revenue line — split it out of that line, never add it on top";
     expect(row("Acquisition Fee %")).toEqual({
       value: 0,
       source: "Assumption — None modelled — enter it with its cap: the fee is the lesser of the two",
@@ -1082,7 +1093,15 @@ describe("the workbook's labels and colours say what their cells are", () => {
   });
 
   it("says what the breakeven occupancy covers — the expenses and the debt service, before reserves, capital and the fee", async () => {
-    const ws = (await book(model)).getWorksheet("Operating Metrics")!;
+    // The row prints where the expenses are a T-12's; on a class's default
+    // ratio it is left out (research pass 40, M2).
+    const withT12 = deriveUnderwriteInputs(extraction, "fallback", {
+      t12: {
+        periodEnd: "2026-06-30",
+        summary: { collectedRent: 4_200_000, vacancyLoss: null, otherIncome: null, egi: 4_200_000, opex: [], totalOpex: 1_200_000, noi: 3_000_000, noiDerived: false },
+      },
+    });
+    const ws = (await book(withT12)).getWorksheet("Operating Metrics")!;
     let note = "";
     ws.eachRow((row) => {
       const v = String(row.getCell(1).value ?? "");
@@ -1158,7 +1177,10 @@ describe("the per-unit rows in the class's own noun (lib/asset-words)", () => {
     expect(labels).toContain("Keys");
     expect(labels).toContain("Price / Key");
     expect(labels).toContain("All-in Basis / Key (price + capital plan)");
-    expect(labels).toContain("Year-1 Rent / Key / Month");
+    expect(labels).toContain("Year-1 NOI / Key");
+    // The rent line a key is the potential gross revenue, left out here on
+    // the class's default expense ratio, and named so (research pass 40, M2).
+    expect(labels.some((l) => l.startsWith("Year-1 Potential Gross Revenue / Key / Month, OpEx / Key"))).toBe(true);
     expect(labels.some((l) => /\/ Unit\b|^Units$/.test(l))).toBe(false);
   });
 

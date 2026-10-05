@@ -83,6 +83,12 @@ const YEAR1_YIELD_LABEL = "Year-1 Yield on Total Cost";
  *  10 pt: a market name past it wraps. */
 const MARKET_LINE = 20;
 
+/** The Assumptions tab's rent line, as it is: the year-1 NOI grossed up
+ *  through the expense ratio and the vacancy, other income folded in — the
+ *  building's potential gross revenue, never a rent roll's rents (research
+ *  pass 40, M2). Its named range stays InPlaceRent. */
+export const RENT_LINE_LABEL = "Potential Gross Revenue (annual) — the year-1 NOI grossed up through the expense ratio and vacancy";
+
 function sourceText(s: InputSource | undefined): string {
   if (!s) return "";
   // A figure read from a document other than the OM (a rent roll) is said
@@ -905,7 +911,15 @@ function buildAssumptions(
   derived("Closing Costs % of price", "ClosingCostsTotal/PurchasePrice", "ClosingCostPct_Buy", FMT.pct2);
 
   header("Income");
-  input("In-Place Rental Revenue (annual)", inp.inPlaceRentAnnual, "InPlaceRent", FMT.usd, "inPlaceRentAnnual");
+  // The rent line is the year-1 NOI grossed up through the expense ratio and
+  // the vacancy (lib/underwrite/inputs): named so, wrapped in its column
+  // (research pass 40, M2: "In-Place Rental Revenue $7.47M" sat against the
+  // sample's $6.5M collected).
+  input(RENT_LINE_LABEL, inp.inPlaceRentAnnual, "InPlaceRent", FMT.usd, "inPlaceRentAnnual");
+  ws.getCell(r - 1, 1).alignment = { indent: 1, wrapText: true, vertical: "top" };
+  ws.getCell(r - 1, 2).alignment = { vertical: "top" };
+  ws.getCell(r - 1, 3).alignment = { vertical: "top" };
+  ws.getRow(r - 1).height = 40;
   input("Expense Recoveries (annual)", inp.expenseRecoveriesAnnual, "Recoveries", FMT.usd, "expenseRecoveriesAnnual");
   input("Other Revenue (annual)", inp.otherRevenueAnnual, "OtherRev", FMT.usd, "otherRevenueAnnual");
   input("General Vacancy & Credit Loss %", inp.vacancyPct, "VacancyPct", FMT.pct1, "vacancyPct", true);
@@ -2018,7 +2032,9 @@ function buildOperatingMetrics(
   model: DerivedModel,
   holdYears: number,
 ) {
-  ws.getColumn(1).width = 34;
+  // Wide enough for "Year-1 Potential Gross Revenue / Unit / Month" and
+  // "All-in Basis / Unit (price + capital plan)" beside their figures.
+  ws.getColumn(1).width = 46;
   const firstCol = 2;
   const lastCol = firstCol + holdYears - 1;
   for (let c = firstCol; c <= lastCol; c++) ws.getColumn(c).width = 13;
@@ -2056,21 +2072,33 @@ function buildOperatingMetrics(
   // stays live.
   const vacancyPct = Math.round(model.inputs.vacancyPct * 100);
   const breakevenLeftOut = model.inputs.vacancyPct >= 0.9;
+  // Where the expense ratio is the class's screening default, not a T-12's
+  // load, the operating expenses and the potential gross revenue are the
+  // year-1 NOI grossed up through it and the vacancy (lib/underwrite/inputs):
+  // the expense ratio, the NOI margin and the breakeven struck on them would
+  // only restate the default, so they are left out with a sentence, as the
+  // per-SF yardsticks are on an assumed area (research pass 40, M2). The
+  // ratios that read the NOI and the debt alone stay.
+  const defaultRatio = model.meta.defaultExpenseRatio ?? null;
   const breakeven = (y: number) => `(-${at("opex", y)}-${at("debt", y)})/${at("pgr", y)}`;
   const ratioRows: [string, (y: number) => string, string][] = [
-    [
-      "Expense Ratio (OpEx / EGR)",
-      (y) => `IF(${at("egr", y)}=0,"n/a",-${at("opex", y)}/${at("egr", y)})`,
-      FMT.pct1,
-    ],
-    [
-      "NOI Margin",
-      (y) => `IF(${at("egr", y)}=0,"n/a",${at("noi", y)}/${at("egr", y)})`,
-      FMT.pct1,
-    ],
+    ...(defaultRatio
+      ? []
+      : ([
+          [
+            "Expense Ratio (OpEx / EGR)",
+            (y: number) => `IF(${at("egr", y)}=0,"n/a",-${at("opex", y)}/${at("egr", y)})`,
+            FMT.pct1,
+          ],
+          [
+            "NOI Margin",
+            (y: number) => `IF(${at("egr", y)}=0,"n/a",${at("noi", y)}/${at("egr", y)})`,
+            FMT.pct1,
+          ],
+        ] as [string, (y: number) => string, string][])),
     ["DSCR (NOI)", (y) => `${at("dscr", y)}`, FMT.ratio],
     ["Debt Yield", (y) => `${at("debtyield", y)}`, FMT.pct1],
-    ...(breakevenLeftOut
+    ...(breakevenLeftOut || defaultRatio
       ? []
       : ([
           [
@@ -2109,18 +2137,40 @@ function buildOperatingMetrics(
   });
   bottomBorder(ws, r - 1, 1, lastCol);
   r++;
-  label(
-    ws.getCell(r, 1),
-    breakevenLeftOut
-      ? `Breakeven Occupancy left out: the model runs the building ${vacancyPct}% vacant, so its Potential Gross Revenue is its year-1 income grossed up from ${100 - vacancyPct}% occupancy, and a breakeven occupancy struck against it is no figure to screen on.`
-      : // What the formula covers, said: the row leaves reserves, capital and
-        // the asset management fee out, so it is not where cash flow crosses
-        // zero — and where they are more than the building collects full,
-        // the row says so.
-        "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
-    { color: MUTED, size: 9 },
-  );
-  r += 2;
+  // Why rows read off a default ratio are left out, in one sentence a block.
+  const defaultRatioNote = (rows: string, these: string) =>
+    `${rows} left out: the expense ratio is the ${defaultRatio!.classWord} default (${Math.round(defaultRatio!.ratio * 100)}% of EGI), not a T-12's, so the operating expenses and the potential gross revenue are the year-1 NOI grossed up through it and the vacancy, and ${these} would be struck on that default, not on the building's own figures.`;
+  if (breakevenLeftOut) {
+    label(
+      ws.getCell(r, 1),
+      `Breakeven Occupancy left out: the model runs the building ${vacancyPct}% vacant, so its Potential Gross Revenue is its year-1 income grossed up from ${100 - vacancyPct}% occupancy, and a breakeven occupancy struck against it is no figure to screen on.`,
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  }
+  if (defaultRatio) {
+    label(
+      ws.getCell(r, 1),
+      breakevenLeftOut
+        ? defaultRatioNote("Expense Ratio and NOI Margin", "the two")
+        : defaultRatioNote("Expense Ratio, NOI Margin and Breakeven Occupancy", "the three"),
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  }
+  if (!breakevenLeftOut && !defaultRatio) {
+    // What the formula covers, said: the row leaves reserves, capital and
+    // the asset management fee out, so it is not where cash flow crosses
+    // zero — and where they are more than the building collects full, the
+    // row says so.
+    label(
+      ws.getCell(r, 1),
+      "Breakeven occupancy = (OpEx + Debt Service) ÷ Potential Gross Revenue — the occupancy at which revenue covers the year's operating expenses and debt service, before reserves, capital costs and the asset management fee. Screen it against the market's actual vacancy, not the pro forma's.",
+      { color: MUTED, size: 9 },
+    );
+    r++;
+  }
+  r++;
 
   sectionHeader(ws, r, "Per-unit & per-SF yardsticks — year 1", 1, lastCol);
   r++;
@@ -2211,19 +2261,27 @@ function buildOperatingMetrics(
         (zebra = !zebra),
       );
     }
-    twoCol(
-      `Year-1 Rent / ${nounOne} / Month`,
-      `${at("rent", 0)}/UnitsCount/12`,
-      FMT.usd,
-      (zebra = !zebra),
-    );
+    // The rent line is the Assumptions tab's potential gross revenue, the
+    // year-1 NOI grossed up (research pass 40, M2), and is named so; where
+    // the expense ratio is the class's default it and the opex are left out
+    // (below), and the NOI, the anchor, stays.
+    if (!defaultRatio) {
+      twoCol(
+        `Year-1 Potential Gross Revenue / ${nounOne} / Month`,
+        `${at("rent", 0)}/UnitsCount/12`,
+        FMT.usd,
+        (zebra = !zebra),
+      );
+    }
     twoCol(`Year-1 NOI / ${nounOne}`, `${at("noi", 0)}/UnitsCount`, FMT.usd, (zebra = !zebra));
-    twoCol(
-      `Year-1 OpEx / ${nounOne}`,
-      `-${at("opex", 0)}/UnitsCount`,
-      FMT.usd,
-      (zebra = !zebra),
-    );
+    if (!defaultRatio) {
+      twoCol(
+        `Year-1 OpEx / ${nounOne}`,
+        `-${at("opex", 0)}/UnitsCount`,
+        FMT.usd,
+        (zebra = !zebra),
+      );
+    }
   } else {
     label(
       ws.getCell(r, 1),
@@ -2251,18 +2309,32 @@ function buildOperatingMetrics(
       );
     }
     twoCol("Year-1 NOI / SF", `${at("noi", 0)}/RSF`, FMT.psf, (zebra = !zebra));
-    twoCol(
-      "Year-1 Rent / SF / Year",
-      `${at("rent", 0)}/RSF`,
-      FMT.psf,
-      (zebra = !zebra),
-    );
+    if (!defaultRatio) {
+      twoCol(
+        "Year-1 Potential Gross Revenue / SF / Year",
+        `${at("rent", 0)}/RSF`,
+        FMT.psf,
+        (zebra = !zebra),
+      );
+    }
   } else {
     label(
       ws.getCell(r, 1),
       "Building size not stated in the OM or rent roll — per-SF yardsticks omitted rather than guessed (enter RSF on Assumptions to add them).",
       { color: MUTED, size: 9 },
     );
+    r++;
+  }
+  // The rows a default ratio leaves out of this block, said once.
+  const leftOut = defaultRatio
+    ? [
+        ...(units && units > 0 ? [`Potential Gross Revenue / ${nounOne} / Month`, `OpEx / ${nounOne}`] : []),
+        ...(model.sources.rsf?.provenance !== "assumption" ? ["Potential Gross Revenue / SF / Year"] : []),
+      ]
+    : [];
+  if (leftOut.length > 0) {
+    const rows = leftOut.length === 1 ? leftOut[0] : `${leftOut.slice(0, -1).join(", ")} and ${leftOut[leftOut.length - 1]}`;
+    label(ws.getCell(r, 1), defaultRatioNote(`Year-1 ${rows}`, leftOut.length === 1 ? "it" : "they"), { color: MUTED, size: 9 });
     r++;
   }
   bottomBorder(ws, r - 1, 1, 2);

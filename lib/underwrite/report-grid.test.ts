@@ -528,7 +528,7 @@ describe("placeholderReturnsLine — a model on a placeholder prints none of its
       "No price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns are the placeholder's. Enter the price you would pay as the Purchase Price on the Assumptions tab.",
     );
     expect(placeholderWorkbookLine(inputs, noi)).toBe(
-      "No year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns are the assumption's. Enter the In-Place Rental Revenue and expenses that make the year-1 NOI you would run on the Assumptions tab.",
+      "No year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns are the assumption's. Enter the Potential Gross Revenue and expenses that make the year-1 NOI you would run on the Assumptions tab.",
     );
     expect(placeholderWorkbookLine(inputs, { purchasePrice: x("extracted"), inPlaceRentAnnual: x("derived") })).toBeNull();
     expect(placeholderWorkbookLine(inputs, null)).toBeNull();
