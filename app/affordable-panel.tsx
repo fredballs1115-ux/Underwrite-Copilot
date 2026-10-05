@@ -1,7 +1,7 @@
 import { endLabel, type AffordableRead, type AffordableTier, type DatedEnd } from "@/lib/affordable";
 import { endHasPassed, leftText } from "@/lib/ground-lease-term";
 import { withArticle } from "@/lib/article";
-import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
+import { Key, KeyItem, MEASURE, PanelHead, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
 /**
  * Affordable housing (#453) — the pure panel for `lib/affordable`, drawn by
@@ -119,11 +119,10 @@ export function AffordablePanel({ affordable }: { affordable: AffordableRead | n
       data-qa="affordable-panel"
       className="mt-4 rounded-xl border border-l-4 border-brand/30 border-l-brand bg-brand/5 px-4 py-3"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-brand">Affordable housing</span>
+      <PanelHead title="Affordable housing" tone="text-brand">
         <span className="text-sm font-semibold">{r.label}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
       {/* What is restricted or under contract, and until when, leads; the
           limits, the contract's terms and the clocks are one click away and
           whole in the HTML, since the pictures below draw them. */}

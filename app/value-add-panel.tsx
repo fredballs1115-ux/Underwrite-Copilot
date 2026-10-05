@@ -1,5 +1,5 @@
 import type { ValueAddRead } from "@/lib/value-add";
-import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
+import { BarRow, BarRows, Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
 /**
  * A value-add renovation program (#460) — the pure panel for
@@ -54,8 +54,7 @@ export function ValueAddPanel({
       data-qa="value-add-panel"
       className="mt-4 rounded-xl border border-l-4 border-brand/30 border-l-brand bg-brand/5 px-4 py-3"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-brand">Value-add program</span>
+      <PanelHead title="Value-add program" tone="text-brand">
         {r.returnOnCostPct != null && <span className="text-sm font-semibold">{`${Math.round(r.returnOnCostPct)}% on cost`}</span>}
         <span
           className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${
@@ -65,7 +64,7 @@ export function ValueAddPanel({
           {r.achievedPremium != null ? "Premium proven on renovated units" : "Premium not yet proven"}
         </span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
       {/* The program and its return lead; the premium's proof and the pace
           are one click away and whole in the HTML, since the pictures below
           draw them. */}

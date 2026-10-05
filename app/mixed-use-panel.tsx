@@ -1,5 +1,5 @@
 import { compactUsd } from "@/lib/money";
-import { Key, KeyItem, PanelNote, PanelRead, tileSpan } from "@/app/panel-parts";
+import { Key, KeyItem, PanelHead, PanelNote, PanelRead, tileSpan } from "@/app/panel-parts";
 import type { MixedUseRead } from "@/lib/mixed-use";
 
 /**
@@ -58,11 +58,10 @@ export function MixedUsePanel({ mixedUse, modelLine = "" }: { mixedUse: MixedUse
 
   return (
     <section aria-label="Mixed-use income" data-qa="mixed-use-panel" className="mt-4 rounded-xl border border-l-4 border-line border-l-brand bg-surface px-4 py-3">
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-brand">Mixed-use</span>
+      <PanelHead title="Mixed-use" tone="text-brand">
         <span className="text-sm font-semibold">{headline}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
 
       {income && (
         <div className="mt-3 text-[11px]" data-qa="mixed-use-income">

@@ -1,5 +1,5 @@
 import { compactUsd } from "@/lib/money";
-import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
+import { Key, KeyItem, MEASURE, PanelHead, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 import { deliveryText, type ForwardRead } from "@/lib/forward-purchase";
 import { sentencesOf } from "@/lib/first-sentence";
 
@@ -95,10 +95,9 @@ export function ForwardPanel({
       data-qa="forward-panel"
       className={`mt-4 rounded-xl border border-l-4 px-4 py-3 ${flagged ? "border-caution/30 border-l-caution bg-caution/5" : "border-line border-l-brand bg-surface"}`}
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${flagged ? "text-caution" : "text-brand"}`}>{what}</span>
+      <PanelHead title={what} tone={flagged ? "text-caution" : "text-brand"}>
         <span className="text-sm font-semibold">{headline}</span>
-      </p>
+      </PanelHead>
 
       {clock && today && r.delivery && (
         <div className="mt-3 text-[11px]" data-qa="forward-clock">

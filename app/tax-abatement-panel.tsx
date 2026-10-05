@@ -1,6 +1,6 @@
 import { compactUsd } from "@/lib/money";
 import { abatementEndLabel, abatementEnded, type TaxAbatementRead } from "@/lib/tax-abatement";
-import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
+import { BarRow, BarRows, Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
 /**
  * A property-tax abatement (#461) — the pure panel for `lib/tax-abatement`,
@@ -69,12 +69,11 @@ export function TaxAbatementPanel({
       data-qa="tax-abatement-panel"
       className="mt-4 rounded-xl border border-l-4 border-caution/30 border-l-caution bg-caution/5 px-4 py-3"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-caution">Tax abatement</span>
+      <PanelHead title="Tax abatement" tone="text-caution">
         {leftWords != null && <span className="text-sm font-semibold">{`${leftWords.charAt(0).toUpperCase()}${leftWords.slice(1)} left`}</span>}
         {chip && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${chip.tone}`}>{chip.text}</span>}
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
       {/* When it ends leads; what it is worth is one click away and whole in
           the HTML, since the pictures below draw it. */}
       <PanelRead sentences={r.sentences} />

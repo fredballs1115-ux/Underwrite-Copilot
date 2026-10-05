@@ -1,6 +1,6 @@
 import { compactUsd } from "@/lib/money";
 import { LeaseTermBar } from "@/app/lease-term-bar";
-import { Key, KeyItem, PanelNote, PanelRead, tileSpan } from "@/app/panel-parts";
+import { Key, KeyItem, PanelHead, PanelNote, PanelRead, tileSpan } from "@/app/panel-parts";
 import { endIsAhead, endsByYear, termEndLabel } from "@/lib/ground-lease-term";
 import type { SandwichRead } from "@/lib/sandwich-lease";
 
@@ -83,10 +83,9 @@ export function SandwichPanel({
       data-qa="sandwich-panel"
       className={`mt-4 rounded-xl border border-l-4 px-4 py-3 ${flagged ? "border-caution/30 border-l-caution bg-caution/5" : "border-line border-l-brand bg-surface"}`}
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${flagged ? "text-caution" : "text-brand"}`}>Sandwich position</span>
+      <PanelHead title="Sandwich position" tone={flagged ? "text-caution" : "text-brand"}>
         <span className="text-sm font-semibold">{headline}</span>
-      </p>
+      </PanelHead>
 
       {bothRents && r.masterRent! > 0 && r.subleaseIncome! > 0 && (
         <div className="mt-3 text-[11px]" data-qa="sandwich-spread">

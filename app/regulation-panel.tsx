@@ -1,6 +1,6 @@
 import type { AllowanceRead, RegimeRead, RegulationRead } from "@/lib/rent-regulation";
 import { sentencesOf } from "@/lib/first-sentence";
-import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
+import { BarRow, BarRows, Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * The rent rules that reach the building — the pure panel for
@@ -120,10 +120,9 @@ export function RegulationPanel({
       data-qa="regulation-panel"
       className={`mt-4 rounded-xl border border-l-4 px-4 py-3 ${flagged ? "border-caution/30 border-l-caution bg-caution/5" : "border-line border-l-brand bg-surface"}`}
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${flagged ? "text-caution" : "text-brand"}`}>Rent regulation</span>
+      <PanelHead title="Rent regulation" tone={flagged ? "text-caution" : "text-brand"}>
         <span className="text-sm font-semibold">{headline}</span>
-      </p>
+      </PanelHead>
 
       {r.regimes.length > 0 && (
         <ul className="mt-2 space-y-1 text-[11px]" data-qa="regulation-regimes">

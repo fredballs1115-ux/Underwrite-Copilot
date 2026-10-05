@@ -3,7 +3,7 @@ import { withArticle } from "@/lib/article";
 import { endLabel } from "@/lib/affordable";
 import { endHasPassed, leftText, yearsText } from "@/lib/ground-lease-term";
 import type { HotelDealRead } from "@/lib/hotel-deal";
-import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
+import { Key, KeyItem, MEASURE, PanelHead, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
 /**
  * What a hotel is sold with (#455) — the pure panel for `lib/hotel-deal`,
@@ -68,12 +68,11 @@ export function HotelPanel({
       data-qa="hotel-panel"
       className="mt-4 rounded-xl border border-l-4 border-brand/30 border-l-brand bg-brand/5 px-4 py-3"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-brand">Hotel</span>
+      <PanelHead title="Hotel" tone="text-brand">
         {r.brand && <span className="text-sm font-semibold">{r.brand}</span>}
         {encumbrance && <span className="rounded-full border border-brand/30 px-2 py-0.5 text-[10px] font-semibold text-brand">{encumbrance}</span>}
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
       {/* The flag leads; the encumbrance, the PIP, the clocks and the rooms
           are one click away and whole in the HTML, since the chip and the
           pictures below draw them. */}

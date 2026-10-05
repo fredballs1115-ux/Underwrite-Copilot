@@ -1,7 +1,7 @@
 import { compactUsd } from "@/lib/money";
 import Link from "next/link";
 import { LeaseTermBar } from "@/app/lease-term-bar";
-import { Key, KeyItem, MEASURE, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
+import { Key, KeyItem, MEASURE, PanelHead, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 import { termEndLabel } from "@/lib/ground-lease-term";
 import { isWholeShare, noteCaption, noteCollateralSentence, noteYieldSentence, type InterestRead } from "@/lib/interest";
 import { positionCaption } from "@/lib/position";
@@ -218,11 +218,10 @@ export function InterestPanel({ interest }: { interest: InterestRead | null }) {
       data-qa="interest-panel"
       className="mt-4 rounded-xl border border-l-4 border-brand/30 border-l-brand bg-brand/5 px-4 py-3"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-brand">What is being sold</span>
+      <PanelHead title="What is being sold" tone="text-brand">
         <span className="text-sm font-semibold">{r.label}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
       <PanelRead sentences={said} />
       {r.term && r.termLine && (
         <div className="mt-2.5">

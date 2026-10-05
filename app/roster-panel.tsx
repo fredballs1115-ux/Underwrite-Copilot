@@ -1,6 +1,6 @@
 import { endLabel } from "@/lib/affordable";
 import type { RosterRead } from "@/lib/tenant-roster";
-import { Key, KeyItem, PanelNote, PanelRead } from "@/app/panel-parts";
+import { Key, KeyItem, PanelHead, PanelNote, PanelRead } from "@/app/panel-parts";
 
 /**
  * The tenants a multi-tenant property's memorandum lists (#457) — the pure
@@ -48,8 +48,7 @@ export function RosterPanel({ roster, modelLine = "" }: { roster: RosterRead | n
       data-qa="roster-panel"
       className="mt-4 rounded-xl border border-l-4 border-brand/30 border-l-brand bg-brand/5 px-4 py-3"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-brand">Tenants</span>
+      <PanelHead title="Tenants" tone="text-brand">
         <span className="text-sm font-semibold">{`${r.tenants.length} listed`}</span>
         {r.coveragePct != null && (
           <span className="rounded-full border border-brand/30 px-2 py-0.5 text-[10px] font-semibold text-brand">{`${pct(r.coveragePct)} of the building`}</span>
@@ -57,7 +56,7 @@ export function RosterPanel({ roster, modelLine = "" }: { roster: RosterRead | n
         {r.shadow.length > 0 && (
           <span className="rounded-full border border-caution/40 px-2 py-0.5 text-[10px] font-semibold text-caution">Shadow-anchored</span>
         )}
-      </p>
+      </PanelHead>
       {/* What the list covers and the roll lead; the rest of the read is one
           click away and whole in the HTML, since the pictures below draw
           most of it. */}

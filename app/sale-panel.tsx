@@ -1,5 +1,5 @@
 import { compactUsd } from "@/lib/money";
-import { Key, KeyItem, MEASURE, PanelRead, Tick } from "@/app/panel-parts";
+import { Key, KeyItem, MEASURE, PanelHead, PanelRead, Tick } from "@/app/panel-parts";
 import type { SaleCeiling } from "@/lib/sale-ceiling";
 import type { SaleRead } from "@/lib/sale-terms";
 
@@ -49,8 +49,7 @@ export function SalePanel({ sale, ceiling = null }: { sale: SaleRead | null; cei
       data-qa="sale-panel"
       className="mt-4 rounded-xl border border-l-4 border-caution/40 border-l-caution bg-caution/5 px-4 py-3"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-caution">How it is sold</span>
+      <PanelHead title="How it is sold" tone="text-caution">
         <span className="text-sm font-semibold">{METHOD_CHIP[r.method]}</span>
         {due && (
           <span className="rounded-full border border-caution/40 px-2 py-0.5 text-[10px] font-semibold text-caution" data-qa="sale-deadline">
@@ -58,7 +57,7 @@ export function SalePanel({ sale, ceiling = null }: { sale: SaleRead | null; cei
           </span>
         )}
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
       {/* How it is sold leads; the premium, the reserve and the deadline
           are one click away and whole in the HTML — the bid's picture below
           draws the premium, and the chip above counts down to the deadline. */}

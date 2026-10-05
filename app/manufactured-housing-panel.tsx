@@ -1,6 +1,6 @@
 import { compactUsd } from "@/lib/money";
 import type { ManufacturedHousingRead } from "@/lib/manufactured-housing";
-import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
+import { Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * A manufactured-housing park (#470) — the pure panel for
@@ -105,13 +105,12 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
       data-qa="mh-panel"
       className={`mt-4 rounded-xl border border-l-4 px-4 py-3 ${flagged ? "border-caution/30 border-l-caution bg-caution/5" : "border-line border-l-pass bg-surface"}`}
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${flagged ? "text-caution" : "text-pass"}`}>Manufactured housing</span>
+      <PanelHead title="Manufactured housing" tone={flagged ? "text-caution" : "text-pass"}>
         <span className="text-sm font-semibold">
           {pads != null ? `${count(pads)} pads${r.occupancyPct != null ? `, ${pct1(r.occupancyPct)} occupied` : ""}` : "A park of home sites"}
         </span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
 
       {drawPads && (
         <div className="mt-2 text-[11px]" data-qa="mh-pads">

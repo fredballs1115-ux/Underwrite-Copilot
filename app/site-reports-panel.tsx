@@ -1,5 +1,5 @@
 import { PML_LENDER_PCT, findingLabel, reportMonth, type SiteReportsRead } from "@/lib/site-reports";
-import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
+import { Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * What the third-party reports found (#465) — the pure panel for
@@ -113,11 +113,10 @@ export function SiteReportsPanel({ reports, modelLine = "" }: { reports: SiteRep
       data-qa="site-reports-panel"
       className={`mt-4 rounded-xl border border-l-4 px-4 py-3 ${flagged ? "border-caution/30 border-l-caution bg-caution/5" : "border-line border-l-pass bg-surface"}`}
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${flagged ? "text-caution" : "text-pass"}`}>Third-party reports</span>
+      <PanelHead title="Third-party reports" tone={flagged ? "text-caution" : "text-pass"}>
         <span className="text-sm font-semibold">{flagged ? "Findings to price" : "Nothing flagged"}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
 
       <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" data-qa="site-report-tiles">
         {tiles.map((t) => (

@@ -1,12 +1,12 @@
 import type { ReactNode } from "react";
 
 /**
- * The parts every deal-type panel draws with (research pass 36) — its read
- * and fold, the key under a picture, a tick on a track and a row of label,
- * bar and figure — so the eighteen panels, the lease-term bar and the
- * portfolio card say each thing the same way. Pure, and it imports nothing
- * but React's types: the leasehold card reaches it through the lease-term
- * bar from a client component, and no data table may ride along
+ * The parts every deal-type panel draws with (research pass 36) — its
+ * heading, its read and fold, the key under a picture, a tick on a track and
+ * a row of label, bar and figure — so the eighteen panels, the lease-term bar
+ * and the portfolio card say each thing the same way. Pure, and it imports
+ * nothing but React's types: the leasehold card reaches it through the
+ * lease-term bar from a client component, and no data table may ride along
  * (lib/client-bundle-tables.test.ts).
  *
  * Two track heights, no more: a panel's own picture is a primary track,
@@ -17,6 +17,22 @@ import type { ReactNode } from "react";
 /** A line of a panel's prose stops near 68 characters, however wide the
  *  panel is: at 1280 a sentence had run to 153. */
 export const MEASURE = "max-w-[68ch]";
+
+/**
+ * A panel's heading row: its eyebrow is the panel's `h2`, in the eyebrow's
+ * own styles, and whatever the panel says beside it follows. The panels sit
+ * under the deal's `h1` on the deal page and the shared screen, before the
+ * sections' own `h2`s; with no heading of their own, a screen reader moving
+ * by headings went from the deal's name past every panel.
+ */
+export function PanelHead({ title, tone, children }: { title: string; tone: string; children?: ReactNode }) {
+  return (
+    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+      <h2 className={`text-[11px] font-semibold uppercase tracking-wider ${tone}`}>{title}</h2>
+      {children}
+    </div>
+  );
+}
 
 /**
  * The rest of a read, one tap away and whole in the HTML. On a touch screen
@@ -148,7 +164,7 @@ export function Tick({
  */
 export function BarRows({ children, className = "", qa }: { children: ReactNode; className?: string; qa?: string }) {
   return (
-    <div className={`@container/bars ${className}`} data-qa={qa}>
+    <div className={className ? `@container/bars ${className}` : "@container/bars"} data-qa={qa}>
       {children}
     </div>
   );

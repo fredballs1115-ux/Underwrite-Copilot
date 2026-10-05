@@ -1,5 +1,5 @@
 import type { SelfStorageRead } from "@/lib/self-storage";
-import { BarRow, BarRows, Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
+import { BarRow, BarRows, Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * A self-storage facility (#471) — the pure panel for `lib/self-storage`,
@@ -61,8 +61,7 @@ export function SelfStoragePanel({ storage, modelLine = "" }: { storage: SelfSto
       data-qa="storage-panel"
       className={`mt-4 rounded-xl border border-l-4 px-4 py-3 ${flagged ? "border-caution/30 border-l-caution bg-caution/5" : "border-line border-l-pass bg-surface"}`}
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${flagged ? "text-caution" : "text-pass"}`}>Self-storage</span>
+      <PanelHead title="Self-storage" tone={flagged ? "text-caution" : "text-pass"}>
         <span className="text-sm font-semibold">
           {r.leaseUp && r.physicalPct != null
             ? `In lease-up, ${pct1(r.physicalPct)} of units let`
@@ -73,7 +72,7 @@ export function SelfStoragePanel({ storage, modelLine = "" }: { storage: SelfSto
                 : "Let month to month"}
         </span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
 
       {occupancies.length > 0 && (
         <BarRows className="mt-2 space-y-1.5 text-[11px]" qa="storage-occupancy">

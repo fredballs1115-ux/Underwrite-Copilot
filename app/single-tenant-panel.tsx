@@ -1,5 +1,5 @@
 import { LeaseTermBar } from "@/app/lease-term-bar";
-import { PanelNote, PanelRead } from "@/app/panel-parts";
+import { PanelHead, PanelNote, PanelRead } from "@/app/panel-parts";
 import { termEndLabel } from "@/lib/ground-lease-term";
 import {
   pct2,
@@ -83,11 +83,10 @@ export function SingleTenantPanel({ lease, model = null }: { lease: SingleTenant
       data-qa="single-tenant-panel"
       className="mt-4 rounded-xl border border-l-4 border-brand/30 border-l-brand bg-brand/5 px-4 py-3"
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-brand">Single tenant</span>
+      <PanelHead title="Single tenant" tone="text-brand">
         <span className="text-sm font-semibold">{r.tenant}</span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
       {/* Who leases it and who guarantees it lead; the term, the options
           and the increases are one click away and whole in the HTML, since
           the pictures below draw them. */}

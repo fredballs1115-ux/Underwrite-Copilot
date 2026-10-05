@@ -1,6 +1,6 @@
 import { compactUsd } from "@/lib/money";
 import type { StudentHousingRead } from "@/lib/student-housing";
-import { Key, KeyItem, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
+import { Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick, tileSpan } from "@/app/panel-parts";
 
 /**
  * A student building (#468) — the pure panel for `lib/student-housing`,
@@ -82,13 +82,12 @@ export function StudentHousingPanel({
       data-qa="student-housing-panel"
       className={`mt-4 rounded-xl border border-l-4 px-4 py-3 ${flagged ? "border-caution/30 border-l-caution bg-caution/5" : "border-line border-l-pass bg-surface"}`}
     >
-      <p className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        <span className={`text-[11px] font-semibold uppercase tracking-wider ${flagged ? "text-caution" : "text-pass"}`}>Student housing</span>
+      <PanelHead title="Student housing" tone={flagged ? "text-caution" : "text-pass"}>
         <span className="text-sm font-semibold">
           {r.preLeasedPct != null ? `Pre-leased ${pct1(r.preLeasedPct)}${r.term ? ` for ${r.term}` : ""}` : "Leased by the bed"}
         </span>
         {r.page && <span className="font-mono text-[10px] text-muted">{r.page}</span>}
-      </p>
+      </PanelHead>
 
       {r.preLeasedPct != null && (
         <div className="mt-2 text-[11px]" data-qa="student-prelease">
