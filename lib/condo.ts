@@ -141,7 +141,9 @@ const UNIT_DUES_CEILING = 10_000;
 export function monthlyDuesOf(stated: string): number | null {
   const v = stated.trim();
   if (!v || /\/\s*(?:sf|sq)\b|\bper\s+(?:sf|square)|psf\b/i.test(v)) return null;
-  if (/\d\s*(?:-|–|—|to)\s*\$?\d/i.test(v.replace(/,/g, ""))) return null;
+  // A range, its first figure with or without a scale ("$600 - $700",
+  // "$1.0M - $1.2M"), is no one figure.
+  if (/\d\s*(?:k|mm?|m(?:il(?:lion)?)?|thousand|million)?\.?\s*(?:-|–|—|to)\s*\$?\d/i.test(v.replace(/,/g, ""))) return null;
   const n = parseMoney(v);
   if (n == null || !(n > 0)) return null;
   const yearly = /\/\s*(?:yr|year)\b|\bper\s+(?:year|annum)\b|\bannual(?:ly)?\b|\ba\s+year\b/i.test(v);

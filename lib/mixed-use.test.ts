@@ -80,6 +80,10 @@ describe("a mixed-use building's two incomes, read as stated (pass 28, round 7)"
     expect(annualIncomeOf("$50,000 per month")).toBe(600_000);
     expect(annualIncomeOf("$610K")).toBe(610_000);
     expect(annualIncomeOf("$32.50/SF")).toBeNull();
+    // A range is no one figure, its ends written with a scale or without.
+    expect(annualIncomeOf("$600,000 - $700,000")).toBeNull();
+    expect(annualIncomeOf("$1.0M - $1.2M")).toBeNull();
+    expect(annualIncomeOf("$600k to $700k")).toBeNull();
     expect(annualIncomeOf("$2,100 per unit")).toBeNull();
     expect(annualIncomeOf("$600,000 - $650,000")).toBeNull();
     expect(annualIncomeOf("28.6% of EGI")).toBeNull();

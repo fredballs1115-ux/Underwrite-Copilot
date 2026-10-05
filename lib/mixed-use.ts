@@ -61,7 +61,9 @@ export function annualIncomeOf(stated: string): number | null {
   if (!v || NOT_STATED.test(v)) return null;
   if (/\/\s*(?:sf|sq|unit|door|key)\b|\bper\s+(?:sf|sq|square|unit|door|key)\b|psf\b/i.test(v)) return null;
   if (/%/.test(v)) return null;
-  if (/\d\s*(?:-|–|—|to)\s*\$?\d/i.test(v.replace(/,/g, ""))) return null;
+  // A range, its first figure with or without a scale ("$600 - $700",
+  // "$1.0M - $1.2M"), is no one figure.
+  if (/\d\s*(?:k|mm?|m(?:il(?:lion)?)?|thousand|million)?\.?\s*(?:-|–|—|to)\s*\$?\d/i.test(v.replace(/,/g, ""))) return null;
   const n = parseMoney(v);
   if (n == null || !(n > 0)) return null;
   const monthly = /\/\s*mo(?:nth)?\b|\bper\s+month\b|\bmonthly\b|\ba\s+month\b/i.test(v);
