@@ -160,6 +160,42 @@ describe("a sandwich position's spread and term (pass 28, round 9)", () => {
     expect(sandwichModelLine(readSandwichLease(deal([row("Master lease rent", "$1,100,000")]), TODAY), { holdYears: 5 })).toContain("states no end for the master lease");
     expect(sandwichModelLine(null, null)).toBeNull();
   });
+
+  // The pre-merge audit (C1, L2): a cushion under one percent read "a fall
+  // of 0%", and the panel's tile "Cushion 0%".
+  it("says a cushion under one percent as under 1%, never a rounded 0%", () => {
+    const thin = readSandwichLease(deal([row("Master lease rent", "$996,000"), row("Sublease income", "$1,000,000")]), TODAY)!;
+    expect(thin.cushionPct).toBeCloseTo(0.4, 6);
+    expect(thin.cushionText).toBe("under 1%");
+    expect(thin.headline).toContain("a fall of under 1% in the sublease income takes the whole spread.");
+    expect(thin.headline).not.toContain("0%");
+    expect(readSandwichLease(SANDWICH, TODAY)!.cushionText).toBe("40%");
+  });
+
+  // The pre-merge audit (C1, L4): a term that counts its options read "the
+  // master lease ends Dec 2061" and "30.2 years after the model's sale", and
+  // a count from today dropped its "about".
+  it("says a term that counts its options as a ceiling, and a count from today as about, on the short line and the model's", () => {
+    const ceiling = readSandwichLease(
+      deal([row("Master lease rent", "$1,100,000"), row("Sublease income", "$1,820,000"), row("Master lease expiration", "December 31, 2061, including all extension options")]),
+      TODAY,
+    )!;
+    expect(ceiling.term?.includesOptions).toBe(true);
+    expect(sandwichShortLine(ceiling)).toBe(
+      "Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease runs up to Dec 2061, its extension options counted in",
+    );
+    const ceilingModel = sandwichModelLine(ceiling, { holdYears: 5 })!;
+    expect(ceilingModel).toBe(
+      "The model capitalises the position's income at its sale as if it ran forever; the master lease runs up to Dec 2061, its extension options counted in: a ceiling, so whether the position outlasts the model's 5-year hold is not read from it, and it ends with the lease.",
+    );
+    expect(ceilingModel).not.toContain("after the model's sale");
+    const count = readSandwichLease(deal([row("Master lease rent", "$1,100,000"), row("Sublease income", "$1,820,000"), row("Master lease term remaining", "15 years")]), TODAY)!;
+    expect(sandwichShortLine(count)).toBe("Sandwich position: subleases $1.82M against a $1.10M master rent (1.65×); the master lease ends about Oct 2041");
+    expect(sandwichModelLine(count, { holdYears: 5 })).toBe(
+      "The model capitalises the position's income at its sale as if it ran forever; the master lease ends about Oct 2041, about 10 years after the model's sale, and the position with it — the exit on that term is the one to read.",
+    );
+    for (const text of [sandwichShortLine(ceiling), ceilingModel, sandwichShortLine(count)]) expect(gluedWords(text)).toEqual([]);
+  });
 });
 
 describe("the master lease's term is the position's, on every surface that reads a leasehold's term", () => {

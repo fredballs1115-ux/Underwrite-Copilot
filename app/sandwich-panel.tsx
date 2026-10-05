@@ -70,10 +70,16 @@ export function SandwichPanel({
 
   const tiles: { key: string; label: string; value: string; sub: string }[] = [];
   if (r.coverage != null) tiles.push({ key: "cover", label: "Cover", value: times(r.coverage), sub: "The sublease income over the master rent" });
-  if (r.cushionPct != null)
-    tiles.push({ key: "cushion", label: "Cushion", value: `${Math.round(r.cushionPct)}%`, sub: "Of the sublease income lost before the spread is gone" });
-  if (!bothRents && r.masterRent != null) tiles.push({ key: "master-rent", label: "Master rent", value: money(r.masterRent), sub: "A year's, as stated" });
-  if (!bothRents && r.subleaseIncome != null) tiles.push({ key: "sublease-income", label: "Sublease income", value: money(r.subleaseIncome), sub: "A year's, as stated" });
+  // The reader's own words for the cushion ("under 1%" below one, never a
+  // rounded "0%"), the sentence's and the tile's alike.
+  if (r.cushionText != null)
+    tiles.push({ key: "cushion", label: "Cushion", value: r.cushionText.charAt(0).toUpperCase() + r.cushionText.slice(1), sub: "Of the sublease income lost before the spread is gone" });
+  // A rent stated a month at a time is a year of twelve, said so as the
+  // sentence beside it says (the pre-merge audit).
+  const yearOf = (fromMonth: boolean | undefined) => (fromMonth ? "A year's: twelve times the month stated" : "A year's, as stated");
+  if (!bothRents && r.masterRent != null) tiles.push({ key: "master-rent", label: "Master rent", value: money(r.masterRent), sub: yearOf(r.masterRentFromMonth) });
+  if (!bothRents && r.subleaseIncome != null)
+    tiles.push({ key: "sublease-income", label: "Sublease income", value: money(r.subleaseIncome), sub: yearOf(r.subleaseIncomeFromMonth) });
 
   const term = r.term && endIsAhead(r.term) ? r.term : null;
 

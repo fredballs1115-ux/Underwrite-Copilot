@@ -10028,6 +10028,22 @@ describe("SandwichPanel (lib/sandwich-lease) — the subleases against the maste
     expect(one).toContain('data-sandwich="master-rent"');
     expect(one).not.toContain('data-qa="sandwich-spread"');
     expect(visibleText(one)).toContain("Master rent $1.10M a year");
+    expect(visibleText(one)).toContain("A year's, as stated");
+    // A rent stated a month at a time is said as twelve months on the tile
+    // too, as the sentence beside it says (the pre-merge audit, C1 L3).
+    const monthly = visibleText(render(React.createElement(SandwichPanel, { sandwich: readSandwichLease(sandwichDeck([{ label: "Master lease rent", value: "$91,667/month" }]), SANDWICH_TODAY) })));
+    expect(monthly).toContain("A year's: twelve times the month stated");
+    expect(monthly).not.toContain("A year's, as stated");
+    // A cushion under one percent is said so on the tile (C1 L2).
+    const thin = visibleText(
+      render(
+        React.createElement(SandwichPanel, {
+          sandwich: readSandwichLease(sandwichDeck([{ label: "Master lease rent", value: "$996,000" }, { label: "Sublease income", value: "$1,000,000" }]), SANDWICH_TODAY),
+        }),
+      ),
+    );
+    expect(thin).toContain("Under 1%");
+    expect(thin).not.toMatch(/Cushion\s*0%/);
     expect(renderToStaticMarkup(React.createElement(SandwichPanel, { sandwich: null }))).toBe("");
     const plain = { ...MASTER_INTEREST, summary: "Leasehold under a 99-year ground lease", groundLease: "Ground lease to 2090" };
     expect(readSandwichLease(sandwichDeck([{ label: "Master lease rent", value: "$1,100,000" }, { label: "Sublease income", value: "$1,820,000" }], plain), SANDWICH_TODAY)).toBeNull();

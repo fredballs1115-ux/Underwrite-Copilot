@@ -71,11 +71,12 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
     tag("interest", slots.interest, "brand", "the price does not buy the building outright — the deal page says what it buys"),
     // A sandwich position (lib/sandwich-lease): the spread between the
     // subleases and the master rent; subleases that bring in less than the
-    // master rent warn.
+    // master rent, or exactly it — no spread at all — warn, as the panel
+    // does (the pre-merge audit).
     tag(
       "sandwich",
       slots.sandwich,
-      slots.sandwich && /^Subleases under/.test(slots.sandwich) ? "caution" : "brand",
+      slots.sandwich && /^Subleases (?:under|equal)\b/.test(slots.sandwich) ? "caution" : "brand",
       "a master lease of the building, sublet — the master rent is owed whatever the subtenants pay; the deal page reads the spread, its cover and the master lease's term",
     ),
     // A forward purchase (lib/forward-purchase): the price is paid when the

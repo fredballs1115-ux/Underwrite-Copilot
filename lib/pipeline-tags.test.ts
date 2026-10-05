@@ -95,6 +95,8 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     // less than the master rent warn.
     expect(tone("sandwich")).toBe("brand");
     expect(dealTags(slots({ sandwich: "Subleases under the master rent" }))[0]).toMatchObject({ key: "sandwich", tone: "caution" });
+    // No spread at all warns too, as the panel does (the pre-merge audit).
+    expect(dealTags(slots({ sandwich: "Subleases equal the master rent" }))[0]).toMatchObject({ key: "sandwich", tone: "caution" });
     expect(tags.find((t) => t.key === "sandwich")?.title).toBe(
       "Spread $720k, 1.65× cover: a master lease of the building, sublet — the master rent is owed whatever the subtenants pay; the deal page reads the spread, its cover and the master lease's term",
     );

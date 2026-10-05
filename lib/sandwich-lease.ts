@@ -75,6 +75,9 @@ export interface SandwichRead {
   /** the share of the sublease income that can be lost before the spread
    *  is gone, a percent — only where the spread is positive */
   cushionPct: number | null;
+  /** the cushion as said, by the sentence and the panel's tile alike: "40%",
+   *  and "under 1%" below one, never a rounded "0%" (the pre-merge audit) */
+  cushionText: string | null;
   /** the master lease's term, read on the day (lib/ground-lease-term) */
   term: GroundLeaseTerm | null;
   /** a rent the memorandum states a month at a time, read as twelve */
@@ -90,7 +93,18 @@ export interface SandwichRead {
 
 const money = (n: number): string => compactUsd(n, { millions: "auto" });
 const times = (n: number) => `${(Math.round(n * 100) / 100).toFixed(2)}×`;
-const pctWhole = (n: number) => `${Math.round(n)}%`;
+const pctWhole = (n: number) => (n < 1 ? "under 1%" : `${Math.round(n)}%`);
+
+/** When the master lease ends, in a clause after "the master lease": "ends
+ *  Dec 2071", "ends in 2071" for a year alone, "ends about Oct 2041" for a
+ *  count from today (lib/interest's short-line wording, since the
+ *  memorandum's own date is earlier) — and "runs up to Dec 2061, its
+ *  extension options counted in" where the stated term already counts
+ *  them: a ceiling, never the term (the pre-merge audit). */
+function endsClause(t: GroundLeaseTerm): string {
+  const when = `${t.from === "year" ? "in " : t.from === "remaining" ? "about " : ""}${termEndLabel(t)}`;
+  return t.includesOptions ? `runs up to ${when}, its extension options counted in` : `ends ${when}`;
+}
 
 /**
  * A sandwich position's two rents and its term, each only as stated. Null
@@ -130,6 +144,7 @@ export function readSandwichLease(ex: ExtractionResult | null | undefined, asOf:
     spread,
     coverage,
     cushionPct,
+    cushionText: cushionPct != null ? pctWhole(cushionPct) : null,
     term,
     termLine: term ? groundLeaseTermLine(term, "master lease") : "",
     noiOverSpread,
@@ -150,8 +165,8 @@ function sentencesOf(r: Omit<SandwichRead, "sentences" | "headline">): string[] 
           ? `The subleases bring in exactly the ${money(r.masterRent)} master rent: the position has no spread before its own costs.`
           : `The subleases bring in ${money(r.subleaseIncome)} a year against the ${money(r.masterRent)} master rent: the position pays ${money(-r.spread)} a year more than its subtenants bring in.`,
     );
-    if (r.cushionPct != null) {
-      out.push(`The master rent is owed whatever the subtenants pay: a fall of ${pctWhole(r.cushionPct)} in the sublease income takes the whole spread.`);
+    if (r.cushionText != null) {
+      out.push(`The master rent is owed whatever the subtenants pay: a fall of ${r.cushionText} in the sublease income takes the whole spread.`);
     }
   } else if (r.masterRent != null) {
     out.push(`The master rent is ${money(r.masterRent)} a year, ${r.masterRentFromMonth ? "twelve times the month the memorandum states" : "as stated"}; the memorandum states no sublease income beside it, so the spread is not read.`);
@@ -185,18 +200,22 @@ export function sandwichModelLine(r: SandwichRead | null, m: { holdYears: number
     return "The model capitalises the position's income at its sale as if it ran forever; the memorandum states no end for the master lease, so how much of that the term bears is not read.";
   }
   if (endHasPassed(r.term)) return null;
-  const end = `${r.term.from === "year" ? "in " : ""}${termEndLabel(r.term)}`;
-  if (!m || !(m.holdYears > 0)) {
-    return `The model capitalises the position's income at its sale as if it ran forever; the master lease ends ${end}, and the position with it.`;
-  }
+  const lead = "The model capitalises the position's income at its sale as if it ran forever";
+  const ends = endsClause(r.term);
+  if (!m || !(m.holdYears > 0)) return `${lead}; the master lease ${ends}, and the position with it.`;
   const after = r.term.yearsToTheDay - m.holdYears;
-  return after <= 0
-    ? `The model capitalises the position's income at its sale as if it ran forever; the master lease ends ${end}, inside the model's ${m.holdYears}-year hold, so the sale the model prices cannot happen.`
-    : `The model capitalises the position's income at its sale as if it ran forever; the master lease ends ${end}, ${yearsText(after)} after the model's sale, and the position with it — the exit on that term is the one to read.`;
+  if (after <= 0) return `${lead}; the master lease ${ends}, inside the model's ${m.holdYears}-year hold, so the sale the model prices cannot happen.`;
+  // A term that counts its options is a ceiling: never said to outlast the
+  // hold, since it does only if the options are taken (the pre-merge audit).
+  if (r.term.includesOptions) {
+    return `${lead}; the master lease ${ends}: a ceiling, so whether the position outlasts the model's ${m.holdYears}-year hold is not read from it, and it ends with the lease.`;
+  }
+  return `${lead}; the master lease ${ends}, ${r.term.from === "remaining" ? "about " : ""}${yearsText(after)} after the model's sale, and the position with it — the exit on that term is the one to read.`;
 }
 
 /** The pipeline row's tag: "Spread $720k, 1.65× cover"; the term is the
- *  interest tag's ("Master lease, 15 yrs left"). */
+ *  interest tag's ("Master lease, 15 yrs left"). A spread of none or less
+ *  is said in words, in the warning tone (lib/pipeline-tags). */
 export function sandwichTag(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): string | null {
   const r = readSandwichLease(ex, asOf);
   if (!r || r.spread == null || r.coverage == null) return null;
@@ -217,7 +236,7 @@ export function sandwichShortLine(r: SandwichRead): string {
         : r.subleaseIncome != null
           ? `subleases ${money(r.subleaseIncome)}`
           : "",
-    r.term && !endHasPassed(r.term) ? `the master lease ends ${r.term.from === "year" ? "in " : ""}${termEndLabel(r.term)}` : "",
+    r.term && !endHasPassed(r.term) ? `the master lease ${endsClause(r.term)}` : "",
   ].filter(Boolean);
   return `Sandwich position: ${parts.join("; ")}`;
 }
