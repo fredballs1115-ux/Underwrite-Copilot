@@ -1439,7 +1439,10 @@ describe("the sensitivity playground says whose figures it runs", () => {
     const at = html.indexOf('data-qa="playground-fit"');
     expect(at).toBeGreaterThan(-1);
     const fit = textOf(html.slice(html.indexOf(">", at) + 1));
-    expect(fit).toMatch(/^Fit 36 · Pass\s+with the model's IRR and cash-on-cash scored · Fit 63 on the memorandum's figures/);
+    // The model's figures miss the box outright as the memorandum's do, so
+    // the chip says so whatever the score's call (lib/fit-label: it had read
+    // "Fit 36 · Pass" beside the pipeline card's "Outside box" wording).
+    expect(fit).toMatch(/^Fit 36 · Outside box\s+with the model's IRR and cash-on-cash scored · Fit 63 on the memorandum's figures/);
     expect(fit).not.toMatch(/\/100/);
     // "The memorandum's figures" is the header's own read: the same scorer
     // on the same source the page's chip folds.

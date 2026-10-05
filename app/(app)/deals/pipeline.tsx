@@ -42,6 +42,7 @@ import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-dea
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
 import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
 import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
+import { fitScoreLabel } from "@/lib/fit-label";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
@@ -1799,17 +1800,15 @@ const DealRow = memo(function DealRow({
   // A fit judged on the first signal alone says so wherever it is drawn —
   // the deal page's "First read" — until the extraction lands.
   const firstRead = !!d.fitFirstRead && (!!scored || !!d.fit);
+  // The deal header's chip's own words (lib/fit-label): "Outside box"
+  // wherever the deal misses the box outright, whatever the score's call.
   const fitWords = scored
-    ? `${
-        d.fit === "outside"
-          ? `Fit ${scored.score} · Outside box`
-          : `Fit ${scored.score} · ${MANDATE_META[scored.verdict].label}`
-      }${firstRead ? ", first read" : ""}`
+    ? `${fitScoreLabel(scored.score, scored.verdict, d.fit === "outside")}${firstRead ? ", first read" : ""}`
     : null;
   const fitTitle = scored
     ? `${
         d.fit === "outside"
-          ? `${scored.score} / 100 mandate fit, but outside the box on a criterion the score doesn't weigh (e.g. price)`
+          ? `${scored.score} / 100 mandate fit (${MANDATE_META[scored.verdict].label}), but outside the box: it misses at least one criterion outright, and that wins over the score's call`
           : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`
       }${firstRead ? `. ${FIRST_READ_TITLE}` : ""}`
     : null;

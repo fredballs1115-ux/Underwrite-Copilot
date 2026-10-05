@@ -27,6 +27,7 @@ vi.mock("@/lib/deal-picture", () => ({
 
 import { BUY_BOX_NOT_READ, notifyAnalysisReady } from "./email";
 import { buyBoxChip, buyBoxRead, dealCheckSource } from "./buy-box-chip";
+import { fitScoreLabel } from "./fit-label";
 import { buyBoxCheckSource, evaluateBuyBox } from "./criteria";
 import { inferStrategy } from "./deal-strategy";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
@@ -231,7 +232,13 @@ describe("the chip's fold", () => {
       label: "Fit 82 · Outside box",
       tone: "kill",
     });
-    expect(buyBoxChip([check("miss")], score(30, "PASS"))).toEqual({ label: "Fit 30 · Pass", tone: "kill" });
+    // A low score and a miss outright: the miss wins the words too, as on the
+    // pipeline card (lib/fit-label) — the header had read "Fit 30 · Pass"
+    // beside the card's "Fit 30 · Outside box" (research pass 34).
+    expect(buyBoxChip([check("miss")], score(30, "PASS"))).toEqual({ label: "Fit 30 · Outside box", tone: "kill" });
+    expect(buyBoxChip([check("miss")], score(30, "PASS")).label).toBe(fitScoreLabel(30, "PASS", true));
+    // A low score with nothing missed outright keeps the score's own call.
+    expect(buyBoxChip([check("pass"), check("near")], score(30, "PASS"))).toEqual({ label: "Fit 30 · Pass", tone: "kill" });
   });
 
   it("folds the checks where there is no score", () => {

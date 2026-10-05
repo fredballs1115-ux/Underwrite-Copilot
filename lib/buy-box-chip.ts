@@ -16,6 +16,7 @@ import {
   type BuyBoxCheck,
 } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
+import { fitScoreLabel } from "@/lib/fit-label";
 import { inferStrategy } from "@/lib/deal-strategy";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
@@ -61,11 +62,6 @@ const MANDATE_TONE: Record<MandateVerdict, BuyBoxChipTone> = {
   WATCH: "caution",
   PASS: "kill",
 };
-const MANDATE_WORD: Record<MandateVerdict, string> = {
-  PURSUE: "Pursue",
-  WATCH: "Watch",
-  PASS: "Pass",
-};
 
 /** The deal's checks, its mandate-fit score and the one chip they fold to. */
 export function buyBoxRead(
@@ -85,15 +81,18 @@ export function buyBoxRead(
  * "Fit 82 · Pursue", toned by the PURSUE/WATCH/PASS call — except that the
  * fold covers ALL criteria (the price band and per-unit cap included, which
  * the 0–100 score deliberately does not weigh), so a deal outside the box on
- * one of those never shows a green Pursue: a hard "outside" wins the chip.
- * Without a score the older fold (Outside / Near / Fits) stands in.
+ * one of those never shows a green Pursue: a hard "outside" wins the chip,
+ * whatever the score's call (lib/fit-label `fitScoreLabel`, the pipeline
+ * card's own words). Without a score the older fold (Outside / Near / Fits)
+ * stands in.
  */
 export function buyBoxChip(checks: BuyBoxCheck[], mandate: MandateScore | null): BuyBoxChip {
   if (mandate?.score != null && mandate.verdict) {
-    if (foldBuyBoxChecks(checks) === "outside" && mandate.verdict !== "PASS") {
-      return { label: `Fit ${mandate.score} · Outside box`, tone: "kill" };
-    }
-    return { label: `Fit ${mandate.score} · ${MANDATE_WORD[mandate.verdict]}`, tone: MANDATE_TONE[mandate.verdict] };
+    const outside = foldBuyBoxChecks(checks) === "outside";
+    return {
+      label: fitScoreLabel(mandate.score, mandate.verdict, outside),
+      tone: outside ? "kill" : MANDATE_TONE[mandate.verdict],
+    };
   }
   if (checks.some((c) => c.status === "miss")) return { label: "Outside buy box", tone: "kill" };
   if (checks.some((c) => c.status === "near")) return { label: "Near buy box", tone: "caution" };

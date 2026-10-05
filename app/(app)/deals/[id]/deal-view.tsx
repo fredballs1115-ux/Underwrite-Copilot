@@ -1302,7 +1302,7 @@ function MandateScoreHeader({
         {mandate.unresolvedDealbreakers > 0 && !mandate.dealbreakerTripped
           ? ` ${mandate.unresolvedDealbreakers} dealbreaker${mandate.unresolvedDealbreakers > 1 ? "s" : ""} couldn't be checked — verify manually.`
           : ""}
-        {outsideOn.length > 0 && mandate.verdict !== "PASS"
+        {outsideOn.length > 0
           ? ` It misses the box outright on ${outsideOn.join(" and ")}, so the deal's chip reads Outside box whatever the score's call.`
           : ""}
       </p>
