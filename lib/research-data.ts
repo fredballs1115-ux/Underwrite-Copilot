@@ -550,12 +550,16 @@ export function buildSubject(input: {
   };
 }
 
-/** Parse "$1,234,567" + "12 units" into price-per-unit, when both parse. */
-export function pricePerUnit(priceText?: string | null, sizeText?: string | null): number | null {
-  const p = num(priceText);
-  const u = sizeText && /\bunits?\b/i.test(sizeText) ? num(sizeText) : undefined;
-  if (!p || !u || u < 1) return null;
-  return Math.round(p / u);
+/**
+ * The benchmarks' heading on the deal page, with the deal's own price by its
+ * class's basis beside it: the pipeline card's figure (lib/pipeline-slots
+ * `basisTag`) — "$280k/unit", "$200k/room", "$212/SF" — in the deal's own
+ * noun, or none where the card prints none. The panel had parsed the
+ * header's size text for "units", so its figure vanished whenever an area
+ * was stated, and it called a hotel's rooms units.
+ */
+export function vsMarketHeading(basis: string | null | undefined): string {
+  return `vs. market${basis ? ` — this deal ≈ ${basis}` : ""}`;
 }
 
 /** Format a benchmark's low–high for display, by what the metric IS: percent

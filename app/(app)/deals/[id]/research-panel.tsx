@@ -25,9 +25,9 @@ import {
   fmtBenchValue,
   mergeBenchmarks,
   mergeRules,
-  pricePerUnit,
   seedBenchmarks,
   seedRules,
+  vsMarketHeading,
 } from "@/lib/research-data";
 import { withArticle } from "@/lib/article";
 import { FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrToday, fmrWhen, readFmrMetric, type FmrBed } from "@/lib/fmr";
@@ -242,7 +242,7 @@ export function SourceLink({
 export async function ResearchPanel({
   address,
   sizeText,
-  priceText,
+  basis = null,
   capText,
   capWithheld = null,
   yearBuilt,
@@ -264,8 +264,12 @@ export async function ResearchPanel({
    *  briefed market, a metro area whose figures are read, and how — the
    *  address matchers answer where it is not given */
   placement?: Pick<DealPlacement, "briefed" | "read" | "placedBy"> | null;
+  /** the header's size, for the rules' unit count */
   sizeText?: string | null;
-  priceText?: string | null;
+  /** the deal's price by its class's basis, as its pipeline card prints it
+   *  (lib/pipeline-slots `basisTag`: "$280k/unit", "$200k/room", "$212/SF"),
+   *  beside the benchmarks; null where the card prints none */
+  basis?: string | null;
   /** the deal's going-in cap as displayed (e.g. "5.8%") — for the leverage check */
   capText?: string | null;
   /** "note" where the deal's price is a loan's: the collateral's income
@@ -358,7 +362,6 @@ export async function ResearchPanel({
         : 1;
     return own(a.metric) - own(b.metric);
   });
-  const ppu = pricePerUnit(priceText, sizeText);
 
   // Leverage check (deterministic code, not a model call): the going-in cap
   // against the week's 30-yr fixed — the survey off the same cached rates
@@ -644,9 +647,7 @@ export async function ResearchPanel({
 
       {hasBenchmarks && (
         <div className="mt-4 border-t border-line pt-3">
-          <h3 className="text-[11px] uppercase tracking-wide text-muted">
-            vs. market{ppu ? ` — this deal ≈ $${ppu.toLocaleString()}/unit` : ""}
-          </h3>
+          <h3 className="text-[11px] uppercase tracking-wide text-muted">{vsMarketHeading(basis)}</h3>
           <ul className="mt-2 space-y-2">
             {benchItems(metroBench).map((item) => {
               if (item.kind === "fmr") {

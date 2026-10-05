@@ -66,7 +66,7 @@ import { loiTermsFor } from "@/lib/loi-terms";
 import { PICTURE_CREDIT, ensureDealPicture, galleryPage, memorandumPhotoCredit } from "@/lib/deal-picture";
 import { assetClassLabel } from "@/lib/asset-class";
 import { countNoun } from "@/lib/asset-words";
-import { shownAssetClass } from "@/lib/pipeline-slots";
+import { basisTag, shownAssetClass } from "@/lib/pipeline-slots";
 import { cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
@@ -1066,8 +1066,8 @@ export default async function DealPage({
     ((deal as { public_comps?: RecordCompsResult | null }).public_comps) ?? null;
   // The price the building's own figures describe (#415) — a share's
   // grossed up to the whole, none for a note or a leased fee — which the
-  // public-record comps' median call and the research panel's per-unit
-  // read divide; the header still shows the price as asked.
+  // public-record comps' median call divides (the research panel reads the
+  // pipeline card's basis instead); the header still shows the price as asked.
   const priceTag = interestTag(extraction);
   const subjectPriceNumber = buildingPriceOf(extraction, summaryPrice ? parsePrice(summaryPrice) : null);
   // Also re-kick a lingering "pending" sentinel: a deploy can kill the
@@ -1776,7 +1776,8 @@ export default async function DealPage({
           placement={placement}
           census={siteFlags && siteFlags.status !== "pending" ? { place: siteFlags.place, county: siteFlags.county } : null}
           sizeText={summarySize}
-          priceText={subjectPriceNumber != null ? String(Math.round(subjectPriceNumber)) : null}
+          // The price by its class's basis, the pipeline card's own reader.
+          basis={extraction ? basisTag(extraction, strategy.kind, deal.asset_class as string | null) : null}
           // The leverage read spreads the BUYER's cap against debt, so on a
           // note it does not run on the collateral's, nor on a preferred
           // equity position on the building's, nor on a share beside its

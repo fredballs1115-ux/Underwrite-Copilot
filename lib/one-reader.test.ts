@@ -11,7 +11,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import ExcelJS from "exceljs";
 import type { ExtractedMetric, ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { inferStrategy, planSummary } from "./deal-strategy";
-import { pickSlots } from "./pipeline-slots";
+import { basisTag, pickSlots } from "./pipeline-slots";
+import { vsMarketHeading } from "./research-data";
 import { pipelineExportRow, type ExportRowContext } from "./pipeline-export-row";
 import { buildPipelineWorkbook, type PipelineExportRow } from "./pipeline-workbook";
 import { compareReturns } from "./compare-figures";
@@ -246,6 +247,35 @@ describe("a note's and a position's own yield, wherever the cap slot is printed 
       expect((await workbookRow(row)).getCell(8).value).toBe(`${slots.noteYield} ${to}`);
     });
   }
+});
+
+describe("the research panel's per-unit read is the card's basis, in the deal's own noun (finding 11)", () => {
+  it("apartments stating both their units and their area: the card's $280k/unit, where the panel had printed nothing", () => {
+    const e = ex([m("Asking price", "$42,000,000"), m("Units", "150"), m("Rentable SF", "142,500 SF")]);
+    const basis = basisTag(e, inferStrategy(e).kind, "multifamily");
+    expect(basis).toBe("$280k/unit");
+    expect(pickSlots(e, null, "multifamily").basis).toBe(basis);
+    expect(vsMarketHeading(basis)).toBe("vs. market — this deal ≈ $280k/unit");
+  });
+
+  it("a hotel counting its rooms: a room, never a unit", () => {
+    const e = ex([m("Asking price", "$36,000,000"), m("Rooms", "180"), m("Building SF", "120,000 SF")], { assetClass: "hospitality_str" });
+    const basis = basisTag(e, inferStrategy(e).kind, "hospitality_str");
+    expect(basis).toBe("$200k/room");
+    expect(vsMarketHeading(basis)).toBe("vs. market — this deal ≈ $200k/room");
+  });
+
+  it("no figure where the card has none: a conversion, a note", () => {
+    expect(vsMarketHeading(null)).toBe("vs. market");
+  });
+
+  it("the deal page hands the panel the card's reader, and the panel parses no size text", () => {
+    const page = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/page.tsx"), "utf8");
+    expect(page).toMatch(/basis=\{extraction \? basisTag\(extraction, strategy\.kind, deal\.asset_class as string \| null\) : null\}/);
+    const panel = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/research-panel.tsx"), "utf8");
+    expect(panel).toContain("{vsMarketHeading(basis)}");
+    expect(panel).not.toMatch(/pricePerUnit|\/unit` : ""/);
+  });
 });
 
 describe("the card's dated slots on the reader's day, never the clock (finding 18)", () => {
