@@ -140,6 +140,12 @@ export interface InputSource {
    *  never says no income was read; `unpriced` where a positive NOI was not
    *  run because no price was read to set it against (the placeholder) */
   notRun?: { label: string; value: number; unpriced?: boolean };
+  /** on the price: no price is stated, and the NOI it was backed out of
+   *  over the stated going-in cap (`label`, `value`) is zero or less — not a
+   *  year's income to price on, so the quotient is no price (research pass
+   *  38). The model runs the figure, which is the owner's to change; no
+   *  surface shows it, and the returns are withheld with the reason */
+  noPrice?: { label: string; value: number };
 }
 
 export interface WorkbookMeta {
@@ -895,7 +901,20 @@ export function deriveUnderwriteInputs(
   } else if (goingFig && capPct) {
     // Only an in-place / Year-1 NOI may back a price out of the going-in cap.
     price = goingFig.value / capPct;
-    mark("purchasePrice", "derived", capRangeWords ? `NOI ÷ ${capRangeWords}` : "NOI ÷ going-in cap");
+    if (goingFig.value > 0) {
+      mark("purchasePrice", "derived", capRangeWords ? `NOI ÷ ${capRangeWords}` : "NOI ÷ going-in cap");
+    } else {
+      // An NOI of zero or less over the cap is no price: the model runs the
+      // quotient (the owner's to change), and the note says why it is none
+      // without printing it, marked so that no surface shows it and every
+      // one withholds the returns struck on it (research pass 38).
+      mark(
+        "purchasePrice",
+        "derived",
+        `The OM states no price, and its ${goingFig.label} of ${compactUsd(goingFig.value, { thousandsFrom: Infinity })} is not a year's income to price on: that NOI ÷ ${capRangeWords ?? "the stated going-in cap"} is no price — enter the purchase price`,
+      );
+      sources.purchasePrice = { ...sources.purchasePrice!, noPrice: { label: goingFig.label, value: goingFig.value } };
+    }
   } else {
     price = 10_000_000;
     // A price row whose value is no price ("6.25% cap rate", "185,000 per

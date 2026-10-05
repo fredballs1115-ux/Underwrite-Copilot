@@ -52,6 +52,10 @@ const LINE = "FFE7E4DD";
 
 const FMT = {
   usd: '$#,##0;($#,##0);"-"',
+  // A price backed out of an NOI of zero or less over the stated cap is no
+  // price (lib/underwrite/inputs `noPrice`, research pass 38): the cell keeps
+  // the model's figure, live, and shows words for it until a price is typed.
+  usdNoPrice: '$#,##0;"no price: enter one";"no price: enter one"',
   psf: "$0.00",
   pct1: "0.0%",
   pct2: "0.00%",
@@ -212,7 +216,7 @@ export async function buildUnderwriteWorkbook(
   buildMonthlyCashFlow(wsMonthly, cf, inputs, holdYears);
   const debtHeadRow = buildDebtSchedule(wsDebt, inputs);
   buildOperatingMetrics(wsOps, cf, model, holdYears);
-  buildSensitivity(wsSens, wsEng, inputs);
+  buildSensitivity(wsSens, wsEng, inputs, model.sources.purchasePrice?.noPrice != null);
 
   const visible = [
     wsCover,
@@ -853,7 +857,7 @@ function buildAssumptions(
     }
     r++;
   }
-  input("Purchase Price", inp.purchasePrice, "PurchasePrice", FMT.usd, "purchasePrice", true);
+  input("Purchase Price", inp.purchasePrice, "PurchasePrice", sources.purchasePrice?.noPrice ? FMT.usdNoPrice : FMT.usd, "purchasePrice", true);
   // Hold is STRUCTURAL: it sets the number of cash-flow years and the sale
   // year, which are baked at export. Not a flex input — editing it in the file
   // would only partially recalc (a longer-hold IRR would be wrong). Nor does a
@@ -1393,8 +1397,16 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   // is named as that whole (`meta.priceLabel`), never a price the share
   // costs.
   let r = 3;
+  // A price backed out of an NOI of zero or less is none: the tile says so
+  // in words, live, until a price is typed (research pass 38).
+  const noPrice = model.sources.purchasePrice?.noPrice != null;
+  const priceFmt = noPrice ? FMT.usdNoPrice : FMT.usd;
   const priceTile =
-    model.sources.purchasePrice?.provenance === "assumption" ? "Purchase Price (assumed)" : (meta.priceLabel ?? "Purchase Price");
+    model.sources.purchasePrice?.provenance === "assumption"
+      ? "Purchase Price (assumed)"
+      : noPrice
+        ? "Purchase Price (none read)"
+        : (meta.priceLabel ?? "Purchase Price");
   // Where no levered IRR solves, why, live (research pass 38, lib/underwrite/
   // no-irr): the sale's net proceeds short of the loan, the equity's cash
   // back nil, or no rate at all — where the tile had said "—" and the
@@ -1404,7 +1416,7 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   // words it will show.
   const irrSolves = computeUnderwrite(model.inputs).returns.leveredIrrPct != null;
   const kpis: [string, string, string][] = [
-    [priceTile, "PurchasePrice", FMT.usd],
+    [priceTile, "PurchasePrice", priceFmt],
     ["Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, FMT.pct1],
     ["Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult],
     ["Year-1 Cash-on-Cash", `IF(Equity=0,"n/a",${levcfY1}/Equity)`, FMT.pct1],
@@ -1535,17 +1547,17 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   sectionHeader(ws, r, "Sources", 1, 2);
   sectionHeader(ws, r, "Uses", 4, 5); r++;
   const rowStart = r;
-  const usesRow = (rr: number, lab: string, formula: string, name?: string, bold = false) => {
+  const usesRow = (rr: number, lab: string, formula: string, name?: string, bold = false, fmt: string = FMT.usd) => {
     label(ws.getCell(rr, 4), lab, { bold, indent: 1 });
     const c = ws.getCell(rr, 5);
     c.value = { formula } as ExcelJS.CellFormulaValue;
     if (name) c.name = name;
-    styleFormula(c, FMT.usd, INK, bold);
+    styleFormula(c, fmt, INK, bold);
   };
   // Uses = acquisition cost + financing. Capital improvements / TI / LC are
   // OPERATING outflows in the Cash Flow ladder, not capitalized here — folding
   // them into uses AND the ladder would double-count them.
-  usesRow(r, "Purchase Price", "PurchasePrice"); r++;
+  usesRow(r, "Purchase Price", "PurchasePrice", undefined, false, priceFmt); r++;
   usesRow(r, "DD / Closing Costs", "ClosingCostsTotal"); r++;
   usesRow(r, "Acquisition Fee", "MIN(AcqFeePct*PurchasePrice,AcqFeeCap)", "AcqFee"); r++;
   usesRow(r, "Loan Basis (acquisition cost)", `SUM(${cellA1(rowStart, 5)}:${cellA1(r - 1, 5)})`, "LoanBasis"); r++;
@@ -1666,7 +1678,8 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     // (price, closing, fees) plus the capital plan, so it reads a little
     // under the deal page's, the memo's and the report's, which divide by
     // the price plus the budget; the label says which.
-    ret("Cap on Yr-1 Income (as modelled)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    // No cap on a price of zero or less, which is none (research pass 38).
+    ret("Cap on Yr-1 Income (as modelled)", `IF(PurchasePrice<=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
     ret(
       "Yield on Cost (OM stabilized NOI / uses + capital plan)",
       `IF(OR(NOT(ISNUMBER(StabilizedNOI)),TotalCost=0),"n/a",StabilizedNOI/TotalCost)`,
@@ -1688,10 +1701,13 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
     // MED-5: the workbook had said "n/a — leased fee" beside the page's
     // 4.00%); what a leased fee's cap means is the owner's.
     const onLand = basisWithheld != null && meta.interest?.kind === "leased_fee";
-    ret(onLand ? "Going-In Cap on the Land's Price (Yr-1 NOI / Price)" : "Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    // No cap or yield on a price or uses of zero or less, which are none: an
+    // NOI under zero over the quotient it backed out read as the stated cap
+    // (research pass 38).
+    ret(onLand ? "Going-In Cap on the Land's Price (Yr-1 NOI / Price)" : "Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice<=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
     // Year-1 NOI over the total uses — no stabilized figure, so never called
     // one (it read "Stabilized Yield (on cost)").
-    ret(onLand ? `${YEAR1_YIELD_LABEL} (the Land's)` : YEAR1_YIELD_LABEL, `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
+    ret(onLand ? `${YEAR1_YIELD_LABEL} (the Land's)` : YEAR1_YIELD_LABEL, `IF(TotalUses<=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
   }
   ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);
   ret("Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, FMT.pct1, "LeveredIRR");
@@ -2116,10 +2132,15 @@ function buildOperatingMetrics(
   // research pass 38): left out with the reason, as the per-SF block is on
   // an assumed area.
   const pricePlaceholder = model.sources.purchasePrice?.provenance === "assumption";
+  // And where the price was backed out of an NOI of zero or less over the
+  // stated cap, it is none, and no basis is struck on it (research pass 38).
+  const noPrice = model.sources.purchasePrice?.noPrice ?? null;
   const placeholderNote = (rows: string) => {
     label(
       ws.getCell(r, 1),
-      `${rows} left out: no price was read from the memorandum, so the Purchase Price is a placeholder and a basis struck on it would be the placeholder's.`,
+      noPrice
+        ? `${rows} left out: no price was read from the memorandum, and its ${noPrice.label} is not a year's income to price on, so the Purchase Price is no price and no basis is struck on it.`
+        : `${rows} left out: no price was read from the memorandum, so the Purchase Price is a placeholder and a basis struck on it would be the placeholder's.`,
       { color: MUTED, size: 9 },
     );
     r++;
@@ -2136,7 +2157,7 @@ function buildOperatingMetrics(
     r++;
     if (basisWithheld) {
       basisNote(`Price / ${nounOne} and All-in Basis / ${nounOne}`);
-    } else if (pricePlaceholder) {
+    } else if (pricePlaceholder || noPrice) {
       placeholderNote(`Price / ${nounOne} and All-in Basis / ${nounOne}`);
     } else {
       twoCol(`${priceWord} / ${nounOne}`, "PurchasePrice/UnitsCount", FMT.usd, (zebra = !zebra));
@@ -2178,7 +2199,7 @@ function buildOperatingMetrics(
   if (model.sources.rsf?.provenance !== "assumption") {
     if (basisWithheld) {
       basisNote("Price / SF and All-in Basis / SF");
-    } else if (pricePlaceholder) {
+    } else if (pricePlaceholder || noPrice) {
       placeholderNote("Price / SF and All-in Basis / SF");
     } else {
       twoCol(`${priceWord} / SF`, "PurchasePrice/RSF", FMT.psf, (zebra = !zebra));
@@ -2231,13 +2252,16 @@ function buildSensitivity(
   wsSens: ExcelJS.Worksheet,
   eng: ExcelJS.Worksheet,
   inp: UnderwriteInputs,
+  /** the price was backed out of an NOI of zero or less, and is none: the
+   *  price axis says so in words, live, until a price is typed */
+  noPrice = false,
 ) {
   const inc = defaultIncrements(inp);
   const steps = [-2, -1, 0, 1, 2];
   const AXES = {
     cap: { name: "ExitCap", step: inc.capStep, min: 0.0025, fmt: FMT.pct2 },
     hold: { name: "HoldMonths", step: inc.monthsStep, min: 12, fmt: FMT.int },
-    price: { name: "PurchasePrice", step: inc.priceStep, min: 0, fmt: FMT.usd },
+    price: { name: "PurchasePrice", step: inc.priceStep, min: 0, fmt: noPrice ? FMT.usdNoPrice : FMT.usd },
     ltc: { name: "LTC", step: inc.ltcStep, min: 0, fmt: FMT.pct2 },
     rate: { name: "AllInRate", step: inc.rateStep, min: 0.0025, fmt: FMT.pct2 },
   } satisfies Record<string, SensAxisDef>;

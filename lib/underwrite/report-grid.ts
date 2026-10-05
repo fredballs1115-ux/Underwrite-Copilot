@@ -593,6 +593,19 @@ export function placeholderReason(
   const noi = sources.inPlaceRentAnnual?.provenance === "assumption";
   const notRun = sources.inPlaceRentAnnual?.notRun ?? null;
   const be = opts.printed ? "are" : "would be";
+  // No price stated, and an NOI of zero or less over the stated cap backed
+  // one out (lib/underwrite/inputs `noPrice`, research pass 38): the
+  // quotient is no price, and the year-1 NOI the model runs is that NOI
+  // whatever price is typed — said without the figure, which no surface
+  // shows.
+  const noPrice = sources.purchasePrice?.noPrice ?? null;
+  if (noPrice) {
+    const its = `${usd0(noPrice.value)} ${noPrice.label}`;
+    const describe = opts.printed ? "describe" : "would describe";
+    return opts.priceEntered
+      ? `the memorandum's ${its} is not a year's income to price on, and the model runs it as its year-1 NOI whatever price is typed, so the returns run on it ${describe} no deal.`
+      : `no price was read from the memorandum, and its ${its} is not a year's income to price on, so that NOI over the stated going-in cap is no price and the returns run on it ${describe} no deal.`;
+  }
   // A stated NOI with no stated price to be set against (`notRun.unpriced`)
   // is named as stated, never said to be unread (research pass 38: "nor a
   // year-1 NOI the model could run on" beside the memorandum's $4,000,000).
@@ -655,17 +668,23 @@ export function placeholderPageLine(
 ): string | null {
   const reason = placeholderReason(inputs, sources, { priceEntered: o.priceEntered });
   if (!reason) return null;
-  const typeIt = !o.priceEntered && sources?.purchasePrice?.provenance === "assumption";
+  // No price at all — the placeholder, or a price backed out of an NOI of
+  // zero or less (`noPrice`) — with none typed yet.
+  const noPrice = sources?.purchasePrice?.noPrice != null;
+  const typeIt = !o.priceEntered && (sources?.purchasePrice?.provenance === "assumption" || noPrice);
   // A price typed reprices the model, never a year-1 NOI struck on the
   // placeholder: where both were assumed, the returns stay withheld whatever
   // is typed, and the line says so rather than promise them (the second
-  // audit, MED-2).
+  // audit, MED-2) — nor the memorandum's NOI of zero or less, which the
+  // model runs as its year-1 NOI.
   const noiAssumed = sources?.inPlaceRentAnnual?.provenance === "assumption";
   const tail = !typeIt
     ? ""
-    : noiAssumed
-      ? " A price typed above reprices the model, but not its year-1 NOI, which was struck on the placeholder — so the returns stay withheld."
-      : " Type the price you would pay above to run the model on it.";
+    : noPrice
+      ? " A price typed above reprices the model, but not its year-1 NOI, which stays the memorandum's — so the returns stay withheld."
+      : noiAssumed
+        ? " A price typed above reprices the model, but not its year-1 NOI, which was struck on the placeholder — so the returns stay withheld."
+        : " Type the price you would pay above to run the model on it.";
   return `The returns${o.maxBid ? " and the max bid" : ""} are withheld: ${reason}${tail}`;
 }
 
@@ -677,14 +696,18 @@ export function placeholderPageLine(
 export function placeholderWorkbookLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
   const reason = placeholderReason(inputs, sources, { printed: true });
   if (!reason) return null;
-  const price = sources?.purchasePrice?.provenance === "assumption";
+  // A price backed out of an NOI of zero or less is no price either: the
+  // line asks for the price as it does over the placeholder.
+  const noPrice = sources?.purchasePrice?.noPrice != null;
+  const price = sources?.purchasePrice?.provenance === "assumption" || noPrice;
   // The year-1 NOI is the rent line's, an input of its own: a price entered
   // over the placeholder leaves an NOI struck on it where it was (the second
-  // audit, MED-2), so the line names the NOI too wherever it was assumed.
+  // audit, MED-2), so the line names the NOI too wherever it was assumed —
+  // and beside no price, the memorandum's own NOI, which the model runs.
   const noi = sources?.inPlaceRentAnnual?.provenance === "assumption";
   const enter = price
     ? noi
-      ? " Enter the price you would pay as the Purchase Price on the Assumptions tab, and the In-Place Rental Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves the NOI struck on the placeholder."
+      ? ` Enter the price you would pay as the Purchase Price on the Assumptions tab, and the In-Place Rental Revenue and expenses that make the year-1 NOI you would run: a price entered alone leaves ${noPrice ? "the memorandum's NOI as the year-1 NOI" : "the NOI struck on the placeholder"}.`
       : " Enter the price you would pay as the Purchase Price on the Assumptions tab."
     : noi
       ? " Enter the In-Place Rental Revenue and expenses that make the year-1 NOI you would run on the Assumptions tab."

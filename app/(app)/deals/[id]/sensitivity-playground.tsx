@@ -165,6 +165,11 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // rule (lib/underwrite/report-grid), the reason said over them.
   const sources = data.sources ?? null;
   const pricePlaceholder = sources?.purchasePrice?.provenance === "assumption";
+  // A price backed out of the memorandum's NOI of zero or less over its cap
+  // is no price (lib/underwrite/inputs `noPrice`, research pass 38): never
+  // shown, and the field waits for the reader's as over the placeholder.
+  const noPrice = sources?.purchasePrice?.noPrice != null;
+  const priceMissing = pricePlaceholder || noPrice;
   const priceEntered = priceOverride != null;
   // And what the price buys (lib/compare-interest): a note's or a position's
   // model runs the building at a price that did not buy it, so its returns
@@ -192,9 +197,11 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const naWord =
     ownWord ??
     (placeholder
-      ? pricePlaceholder && !priceEntered
+      ? priceMissing && !priceEntered
         ? "no price"
-        : "assumed NOI"
+        : noPrice
+          ? "no income"
+          : "assumed NOI"
       : (vacantWord ?? (misread ? MISREAD_WORD : "")));
   // No cap is struck on year-1 NOI where the price did not buy the
   // building, where the NOI is the model's assumption (an assumed 6% of the
@@ -202,7 +209,12 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // nearly vacant: the field says which (research pass 38). A lease that
   // ends inside the hold leaves year 1 inside it: its cap stands.
   const noiAssumed = sources?.inPlaceRentAnnual?.provenance === "assumption";
-  const capNa = (own !== "lease" ? ownWord : null) ?? (noiAssumed ? "assumed NOI" : null) ?? vacantWord;
+  // No cap on no price, nor on an NOI of zero or less at a price typed.
+  const capNa =
+    (own !== "lease" ? ownWord : null) ??
+    (noPrice ? (priceEntered ? "no income" : "no price") : null) ??
+    (noiAssumed ? "assumed NOI" : null) ??
+    vacantWord;
 
   // The EFFECTIVE base is the sliders' base stops (clamped into physical
   // range), so a degenerate derived input can't make the resting metrics
@@ -283,7 +295,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   const floorsSet = !!box && (box.minIrrPct != null || box.minCoCPct != null || box.minCapPct != null);
   // Where the model's price is a placeholder, the bid is measured against
   // the price the reader typed, never against the placeholder.
-  const bidAgainst = pricePlaceholder && priceOverride != null ? priceOverride : null;
+  const bidAgainst = priceMissing && priceOverride != null ? priceOverride : null;
   const bid = useMemo(() => {
     // A bid solved on a placeholder's returns is the placeholder's (the
     // report leaves it out too).
@@ -363,7 +375,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         value={priceOverride}
         onChange={setPriceOverride}
         planDeal={planDeal}
-        pricePlaceholder={pricePlaceholder}
+        pricePlaceholder={priceMissing}
         capWithheld={capNa}
       />
 
@@ -586,6 +598,12 @@ function parsePriceText(s: string): number | null {
 
 const fmtUsd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
 
+/** Under this a price typed where the model has no price of its own is
+ *  taken for a fragment on its way to a figure ("5" before "5,000,000"):
+ *  the 1% of the placeholder's $10,000,000 the guard holds a fragment to
+ *  over the placeholder. A keystroke filter, no figure about a deal. */
+const FRAGMENT_FLOOR = 100_000;
+
 /**
  * Price ⇄ going-in cap, as one linked control. Typing either reprices the
  * whole model: price is a real engine input (debt, fees, and equity re-size
@@ -636,8 +654,10 @@ function PriceCapControls({
     if (n == null) return;
     // Ignore keystroke fragments ("5" on the way to "55000000"): only prices
     // within 1%–100x of the modeled price commit; anything else waits for
-    // more typing. Snapping (nearly) back to base clears the override.
-    if (n < basePrice * 0.01 || n > basePrice * 100) return;
+    // more typing. Snapping (nearly) back to base clears the override. A
+    // modelled figure of zero or less is no price to measure a fragment
+    // against (research pass 38), so there a fragment is judged by its size.
+    if (basePrice > 0 ? n < basePrice * 0.01 || n > basePrice * 100 : n < FRAGMENT_FLOOR) return;
     onChange(Math.abs(n - basePrice) < 0.5 ? null : n);
   };
   const commitPrice = (s: string) => {
