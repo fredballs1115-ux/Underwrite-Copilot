@@ -344,6 +344,16 @@ are yours:
 8. **Dark mode on phones.** The site now asks phones not to darken it. Check
    it on a Samsung phone, whose browser honours that request only in some
    versions.
+9. **The order of the header's controls on a phone.** The tools and the
+   controls now scroll sideways in one row each, so the Stage select and the
+   deal's menu start past the screen's right edge. Both are reachable and
+   named; whether they should lead the row is yours.
+10. **The plan's stress grid** (`PlanSensitivity`) sits after the listing
+    team, where it once followed the "figures that don't tie" warning. It
+    was left where it is because the fix moved one element.
+11. **The panels grew a little on a phone.** The wider column, the stacked
+    bar rows and the full-width word tiles make each panel 18–116px taller
+    at 390. Folding them (item 2) is the answer to that, and it is yours.
 
 **Run the research seed after the merge** (`node scripts/seed-research.mjs`,
 the step that writes the FY2027 fair market rents). The runner read every
