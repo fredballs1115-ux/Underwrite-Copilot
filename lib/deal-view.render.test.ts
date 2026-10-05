@@ -448,6 +448,20 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(never).toMatch(/Run the screen/);
   });
 
+  it("a run waiting its turn says so, naming no analyst; a failure's toast on the deal points at the page's own banner (research pass 30)", () => {
+    const now = new Date().toISOString();
+    const queued = textOf(
+      render({ ...sampleProps("overview"), job: { status: "queued", step: "signal", progress: 0, error: null, updated_at: now, created_at: now } } as unknown as Props),
+    );
+    expect(queued).toContain("Queued — waiting its turn to start…");
+    expect(queued).not.toMatch(/analyst slot/);
+    // The toast fires in the page's poll, which a static render does not
+    // run: its words are held at the source.
+    const src = readFileSync(join(process.cwd(), "app/(app)/deals/[id]/deal-view.tsx"), "utf8");
+    expect(src).toContain('toast("The screen stopped — the reason is at the top of this page.", "error")');
+    expect(src).not.toMatch(/toast\("[^"]*open the deal for details/);
+  });
+
   it("a covered market whose figures could not be read says so on the market check, never 'not pulled comps' (research pass 30)", () => {
     const base = sampleProps("analyses", "market");
     const failed: Props = {

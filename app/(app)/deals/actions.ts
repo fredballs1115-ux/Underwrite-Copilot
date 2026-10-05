@@ -44,6 +44,7 @@ import {
 } from "@/lib/manual-deal";
 import { runAnalysis, runReconciliation } from "@/lib/anthropic/pipeline";
 import { checkPdfOpens } from "@/lib/pdf-open";
+import { capRefusalOf } from "@/lib/deal-allowance";
 
 // Claude's document limit is 32MB of raw PDF. Small OMs ride inline in the
 // request; anything past the base64-inflation ceiling uploads once via the
@@ -62,6 +63,7 @@ export type CreateDealError =
   | "limit"
   | "teamlimit"
   | "file"
+  | "empty"
   | "pdf"
   | "size"
   | "locked"
@@ -102,9 +104,13 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     return { ok: false, error: billing.team ? "teamlimit" : "limit" };
   }
 
-  if (!(file instanceof File) || file.size === 0) {
+  // No file chosen arrives as an empty File with no name; a file that is
+  // chosen and empty (0 bytes) has its name, and is said as empty — not
+  // "choose a PDF", and not a retry of the same empty file.
+  if (!(file instanceof File) || (file.size === 0 && !file.name)) {
     return { ok: false, error: "file" };
   }
+  if (file.size === 0) return { ok: false, error: "empty" };
   // Accept when the browser says PDF, says nothing (some drag sources report an
   // empty type for a real PDF), or the name ends in .pdf — then let the magic
   // bytes below be the real gate.
@@ -168,7 +174,9 @@ async function createDealCore(formData: FormData): Promise<CreateDealResult> {
     })
     .select("id")
     .single();
-  if (insertErr || !deal) return { ok: false, error: "save" };
+  // The database's own cap refusal is the plan's limit, said as one — a
+  // double-submit or a second tab the read above let through.
+  if (insertErr || !deal) return { ok: false, error: capRefusalOf(insertErr) ?? "save" };
 
   const dealId = deal.id as string;
   const path = omStoragePath(user.id, dealId);
@@ -265,6 +273,12 @@ export async function createDealFromBatch(
  *  user typed is ever lost. */
 export type ManualDealState = { error: string } | null;
 
+/** The typed-facts form's words for a plan's limit — the app's own check
+ *  and the database's refusal alike. */
+const MANUAL_LIMIT = "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.";
+const MANUAL_TEAM_LIMIT =
+  "Your team’s trial deals and your personal free deals are all in use — start the Team plan or upgrade to Pro.";
+
 /**
  * Create a deal from TYPED facts — no OM. The facts become a normal
  * ExtractionResult (plus an instant first signal), so the buy box, mandate
@@ -291,11 +305,7 @@ export async function createManualDeal(
 
   const billing = await getBilling(supabase, user.id);
   if (!billing.canCreateDeal) {
-    return {
-      error: billing.team
-        ? "Your team’s trial deals and your personal free deals are all in use — start the Team plan or upgrade to Pro."
-        : "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.",
-    };
+    return { error: billing.team ? MANUAL_TEAM_LIMIT : MANUAL_LIMIT };
   }
 
   // Same 15s idempotency window as the upload path — a double-click can't
@@ -340,7 +350,11 @@ export async function createManualDeal(
     .select("id")
     .single();
   if (insertErr || !deal) {
-    return { error: "Couldn’t save the deal. Please try again." };
+    // The database's own cap refusal is the plan's limit, never "try again".
+    const cap = capRefusalOf(insertErr);
+    return {
+      error: cap === "teamlimit" ? MANUAL_TEAM_LIMIT : cap === "limit" ? MANUAL_LIMIT : "Couldn’t save the deal. Please try again.",
+    };
   }
   const dealId = deal.id as string;
 
@@ -949,9 +963,10 @@ export async function replaceOm(formData: FormData) {
   }
 
   const file = formData.get("om");
-  if (!(file instanceof File) || file.size === 0) {
+  if (!(file instanceof File) || (file.size === 0 && !file.name)) {
     redirect(`/deals/${dealId}?error=omfile`);
   }
+  if (file.size === 0) redirect(`/deals/${dealId}?error=omempty`);
   const looksPdf =
     file.type === "application/pdf" ||
     file.type === "" ||

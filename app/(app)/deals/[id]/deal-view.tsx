@@ -169,6 +169,10 @@ const PIPELINE = ["signal", "extract", "challenge", "comps", "market", "verdict"
 // them as one indicator, and the overview keeps its meter while they run.
 const SIDE_JOBS = new Set(["reconcile", "model", "comps_search"]);
 
+/** A run waiting for its turn: a few run at once, one after another past
+ *  that. It named "an open analyst slot", an analyst nobody has. */
+const QUEUED_LABEL = "Queued — waiting its turn to start…";
+
 const STEP_LABELS: Record<string, string> = {
   signal: "First pass — reading the headline figures…",
   extract: "Reading the OM and extracting the key terms…",
@@ -188,6 +192,8 @@ const MODEL_ERRORS: Record<string, string> = {
   modelupload:
     "Your model didn’t finish uploading — nothing was changed. Please try again.",
   omfile: "Choose the reissued OM (PDF) to upload.",
+  omempty:
+    "That PDF is empty (0 bytes) — download or export it again, and upload that. The stored OM is unchanged.",
   ompdf: "The replacement OM must be a PDF.",
   omsize: "That PDF is larger than 32 MB — please try a smaller file.",
   omlocked:
@@ -543,7 +549,8 @@ export function DealView({
         ) {
           notified.current = true;
           if (data.status === "error") {
-            toast("The screen hit a problem — open the deal for details.", "error");
+            // The reader is on the deal: the reason is in the banner above.
+            toast("The screen stopped — the reason is at the top of this page.", "error");
           } else {
             toast(completionMessage(endedStep), "success");
           }
@@ -2079,7 +2086,7 @@ function ProgressRail({
           <Spinner />
           <span className="text-sm">
             {job.status === "queued"
-              ? "Queued — waiting for an open analyst slot…"
+              ? QUEUED_LABEL
               : (STEP_LABELS[job.step ?? ""] ?? "Working…")}
           </span>
           <span className="ml-auto font-mono text-xs tabular-nums text-muted">
@@ -2110,7 +2117,7 @@ function ProgressRail({
         <Spinner />
         <span className="text-sm">
           {job.status === "queued"
-            ? "Queued — waiting for an open analyst slot…"
+            ? QUEUED_LABEL
             : (STEP_LABELS[job.step ?? ""] ?? "Analyzing…")}
         </span>
         <span className="ml-auto font-mono text-xs tabular-nums text-muted">

@@ -13,6 +13,8 @@ const state = vi.hoisted(() => ({
   inserted: [] as Record<string, unknown>[],
   /** the deal the 15-second double-submit check finds, if any */
   recent: null as { id: string; team_id: string | null } | null,
+  /** the deals insert's refusal, as the database's cap trigger raises it */
+  insertError: null as { message: string } | null,
 }));
 
 vi.mock("next/navigation", () => ({
@@ -66,7 +68,8 @@ vi.mock("@/lib/supabase/server", () => {
           return api;
         },
         maybeSingle: async () => ({ data: table === "deals" && op === "select" ? state.recent : null, error: null }),
-        single: async () => ({ data: { id: "new-deal" }, error: null }),
+        single: async () =>
+          state.insertError ? { data: null, error: state.insertError } : { data: { id: "new-deal" }, error: null },
         then: (ok: (v: unknown) => unknown, fail?: (e: unknown) => unknown) => Promise.resolve({ data: null, error: null }).then(ok, fail),
       };
       return api;
@@ -77,6 +80,9 @@ vi.mock("@/lib/supabase/server", () => {
 
 import { createDeal, createDealFromBatch, createManualDeal } from "@/app/(app)/deals/actions";
 import { TEAM_TRIAL_DEALS } from "./teams";
+import { statusOf } from "./batch-run";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 const billing = (team: { active: boolean; dealCount: number } | null) => ({
   plan: "free",
@@ -117,6 +123,7 @@ const uploadForm = () => {
 beforeEach(() => {
   state.inserted.length = 0;
   state.recent = null;
+  state.insertError = null;
 });
 
 describe("a member's new deal says where it was filed", () => {
@@ -155,5 +162,63 @@ describe("a member's new deal says where it was filed", () => {
     state.recent = { id: "earlier", team_id: "team-1" };
     expect(await landing(() => createManualDeal(null, manualForm()))).toBe("/deals/earlier");
     expect(state.inserted).toEqual([]);
+  });
+});
+
+// Research pass 30: a refusal says its own cause. The database's cap trigger
+// (migration 0036) refuses a deal the app's read let through — a
+// double-submit, a second tab — and that read as "Couldn't save the deal.
+// Please try again", a retry into the same cap; a chosen file of 0 bytes
+// read as "Please choose a PDF".
+describe("a refused upload says why", () => {
+  const uploadOf = (file: File) => {
+    const fd = new FormData();
+    fd.set("name", "Harbor View Apartments");
+    fd.set("om", file);
+    return fd;
+  };
+
+  it("the database's cap refusal is the plan's limit, never 'try again'", async () => {
+    state.billing = billing(null);
+    state.insertError = { message: "free_deal_limit_reached" };
+    expect(await createDealFromBatch(uploadForm())).toEqual({ ok: false, error: "limit" });
+    expect(await landing(() => createDeal(uploadForm()))).toBe("/deals?error=limit");
+    expect(await createManualDeal(null, manualForm())).toEqual({
+      error: "You’ve reached the free-plan deal limit. Upgrade to Pro for unlimited deals.",
+    });
+    state.insertError = { message: "team_plan_required" };
+    expect(await createDealFromBatch(uploadForm())).toEqual({ ok: false, error: "teamlimit" });
+    expect((await createManualDeal(null, manualForm()))?.error).toMatch(/^Your team’s trial deals and your personal free deals are all in use/);
+    // Any other refusal is a save that failed.
+    state.insertError = { message: "canceling statement due to statement timeout" };
+    expect(await createDealFromBatch(uploadForm())).toEqual({ ok: false, error: "save" });
+    expect(await createManualDeal(null, manualForm())).toEqual({ error: "Couldn’t save the deal. Please try again." });
+  });
+
+  it("a chosen file of 0 bytes is empty; no file chosen is no file", async () => {
+    state.billing = billing(null);
+    expect(await createDealFromBatch(uploadOf(new File([], "harbor-view.pdf", { type: "application/pdf" })))).toEqual({
+      ok: false,
+      error: "empty",
+    });
+    expect(await createDealFromBatch(uploadOf(new File([], "", { type: "application/octet-stream" })))).toEqual({
+      ok: false,
+      error: "file",
+    });
+    expect(state.inserted).toEqual([]);
+  });
+
+  it("every code the create action answers has its sentence on the upload page and in the batch panel", () => {
+    const actions = readFileSync(join(process.cwd(), "app/(app)/deals/actions.ts"), "utf8");
+    const union = /export type CreateDealError =([^;]+);/.exec(actions)![1];
+    const codes = [...union.matchAll(/"(\w+)"/g)].map((m) => m[1]);
+    expect(codes).toContain("empty");
+    const page = readFileSync(join(process.cwd(), "app/(app)/deals/page.tsx"), "utf8");
+    for (const code of codes) {
+      expect(page, code).toMatch(new RegExp(`\\n  ${code}:`));
+      // The batch says each one too (the limits as stopped by the plan).
+      const status = statusOf({ ok: false, error: code });
+      expect((status as { message: string }).message, code).not.toBe("Something went wrong.");
+    }
   });
 });

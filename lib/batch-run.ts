@@ -31,6 +31,7 @@ export const BATCH_ERROR_COPY: Record<string, string> = {
   name: "Needs a deal name.",
   auth: "Signed out — sign in and retry.",
   file: "The file didn't arrive — try again.",
+  empty: "The file is empty (0 bytes) — download or export it again.",
   pdf: "Not a valid PDF.",
   size: "Over the 32 MB limit.",
   locked: "Needs a password to open — upload an unlocked copy.",

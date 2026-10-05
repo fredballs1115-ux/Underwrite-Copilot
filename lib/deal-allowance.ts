@@ -13,6 +13,21 @@
 import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 import { FREE_DEALS } from "@/lib/marketing-constants";
 
+/**
+ * The database's own refusal of a deal over its plan's cap (the deals
+ * insert trigger, migration 0036, which raises `free_deal_limit_reached` or
+ * `team_plan_required`): the app's own read lets a double-submit or a second
+ * tab through, and the trigger then refuses the insert. It had read as
+ * "Couldn't save the deal. Please try again.", a retry that hits the same
+ * cap (research pass 30). Which limit, or null for any other failure.
+ */
+export function capRefusalOf(err: { message?: string | null } | null | undefined): "limit" | "teamlimit" | null {
+  const m = err?.message ?? "";
+  if (/\bteam_plan_required\b/.test(m)) return "teamlimit";
+  if (/\bfree_deal_limit_reached\b/.test(m)) return "limit";
+  return null;
+}
+
 /** What the count reads — `Billing` (lib/billing) is one. */
 export interface AllowanceFacts {
   /** the reader's own plan: "pro" puts no cap on their own deals */

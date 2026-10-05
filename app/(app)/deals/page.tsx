@@ -35,6 +35,8 @@ export const metadata: Metadata = { title: "Pipeline" };
 const ERRORS: Record<string, string> = {
   name: "Please give the deal a name.",
   file: "Please choose a PDF offering memorandum to upload.",
+  // GOV.UK's own words for it: a chosen file of 0 bytes is empty.
+  empty: "That file is empty (0 bytes) — download or export it again, and upload that. Nothing was saved.",
   pdf: "That file isn’t a PDF — please upload the OM as a PDF.",
   size: "That PDF is larger than 32 MB — please try a smaller file for now.",
   locked: "That PDF asks for a password to open, and the screen cannot read it — save a copy without the password (or ask the broker for one) and upload that. Nothing was saved.",
