@@ -80,19 +80,75 @@ them.
 - **FRED itself is fine** with its notice: its API terms (zori probe run
   37262488972) require "This product uses the FRED® API but is not
   endorsed or certified by the Federal Reserve Bank of St. Louis." shown
-  prominently — being added — and the owner's permission for a
-  third-party series beyond personal use. Among the 41 national series
-  only Freddie Mac's survey and SOFR are copyrighted (rates run
-  37262658315); the New York Fed licenses SOFR "for your personal or
-  business purposes" with its notice, also being added, as is the BLS's
-  "cannot vouch" sentence for the three series read from its API. Pass
-  31's summary that FRED forbids storing or databases was wrong: no line
-  of the printed terms says so.
-- **Google Maps, the day you set the key**: its terms (same run as
-  Google News) forbid "display[ing] Street View imagery and non-Google Maps
-  on the same screen" and require the site's terms to state that "use of
-  Google Maps features and content is subject to" Google's end-user terms
-  and privacy policy. I make the code comply before you set the key.
+  prominently — now in every footer and under the rates strip — and the
+  owner's permission for a third-party series beyond personal use. Among
+  the 41 national series only Freddie Mac's survey and SOFR are
+  copyrighted (rates run 37262658315); the New York Fed licenses SOFR "for
+  your personal or business purposes" with its notice, now printed under
+  every SOFR figure with the DTCC sentence, as is the BLS's "cannot vouch"
+  sentence. Pass 31's summary that FRED forbids storing or databases was
+  wrong: no line of the printed terms says so.
+  - **The BLS asks for the retrieval date** of what its API returned. The
+    pull never stamps the day it fetched an observation it already had,
+    so the site cannot say it yet; stamping it on every BLS upsert is a
+    change to the weekday pull. Say if you want it.
+  - **A market's link-preview card** puts words over a Creative Commons
+    photograph. It now names the licence's address and says "cropped,
+    words added"; whether a card over a CC BY-SA photograph must itself be
+    offered under BY-SA is a licensing question for you or counsel.
+- **Google Maps, the day you set the key.** Its Platform terms (printed
+  from cloud.google.com/maps-platform/terms, zori probe run 37266021924):
+  "(e) No Use With Non-Google Maps. To avoid quality issues and/or brand
+  confusion, Customer will not use the Google Maps Core Services with or
+  near a non-Google Map in a Customer Application. For example, Customer
+  will not (i) display or use Places content on a non-Google Map, (ii)
+  display Street View imagery and non-Google Maps on the same screen, or
+  (iii) link a Google Map to non-Google Maps Content or a non-Google Map."
+  The site's maps are USGS, FEMA and OpenStreetMap tiles. What the code
+  does now: the terms page states Google's terms only once the key is
+  set; the pipeline map's hover card and every deal avatar never ask for a
+  Google picture; and the deal page and the compare page will be held off
+  Google too (their filmstrip and columns draw the aerial and the flood
+  map beside it). That leaves Street View on the pipeline's cards and
+  list rows only, in an application that also has map pages — whether
+  that is "near a non-Google Map in a Customer Application" is for you to
+  read, with counsel if need be, before you set the key.
+
+## 🟡 2026-10-05 — a stranger's first hour (research pass 32): yours
+
+The fixes that were ours are in the batch (the sign-in form keeps the
+address, the sign-up notice names it, a weak password is said by the
+service's reasons, an invite opens on Create account, the upload lands
+where its own-pipeline notice shows, the FAQ and /security say who reads
+a document, the free plan's card says where comps and local rules run,
+the exports are marked Pro, and the onboarding order). These are yours:
+
+1. **Sign in with Microsoft (and Google).** It skips the check-your-email
+   step where sign-ups are lost, and Dealpath sells the same to the same
+   buyers. Needs your app registrations in Supabase's Auth providers, and
+   the privacy page naming them.
+2. **A free export while checkout is dark.** The memo, the report and the
+   Excel model are Pro, and Upgrade cannot take money yet; a newcomer has
+   nothing to take to a committee. Letting a free account export its first
+   screened deal is a pricing decision.
+3. **The reset and confirmation emails' templates.** Corporate link
+   scanners (Outlook's Safe Links and its kind) open an email's link to
+   check it and use its one-time code up, and a reset asked for on a
+   laptop cannot be opened on a phone. `/auth/confirm` is built: it takes
+   the link's token hash and verifies only when the person presses its
+   button. Point the templates at it in Supabase (Auth → Email
+   Templates), following Supabase's own token-hash guidance for the exact
+   variable names: the reset as `/auth/confirm?token_hash=…&type=recovery`
+   and the confirmation as `type=signup` (or `email`, as their guide
+   says), each with `&next=` where it carried one.
+4. **The address box runs on Photon's free demo geocoder**
+   (photon.komoot.io), which promises no uptime and throttles heavy use.
+   Self-hosting it, or another geocoder, is yours; its credit to
+   OpenStreetMap is now on the page.
+5. **Anthropic's terms, printed** (zori probe run 37265637547): "Anthropic
+   may not train models on Customer Content from Services", and "Customer
+   Content is Customer's Confidential Information". /security now quotes
+   the first; it claims no retention period.
 
 ## 🟢 2026-10-05 — the second batch (PR #463, in progress)
 
