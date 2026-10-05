@@ -5,6 +5,7 @@ import {
   GEO_VERSION,
   cacheFresh,
   geoKey,
+  pointIsBuilding,
   resolveDealLocation,
   type DealVisualCache,
 } from "./deal-location";
@@ -64,6 +65,34 @@ describe("cacheFresh", () => {
   it("expires after thirty days", () => {
     const old = new Date(NOW - 31 * 86_400_000).toISOString();
     expect(cacheFresh({ geoAt: old, geoV: GEO_VERSION, lat: 1, lng: 1 }, NOW)).toBe(false);
+  });
+});
+
+describe("pointIsBuilding (the batch-2 audit)", () => {
+  const placed = (precision: "street" | "block" | "area"): DealVisualCache => ({
+    geoAt: new Date(NOW - 1000).toISOString(),
+    geoV: GEO_VERSION,
+    geoFor: geoKey(ADDR),
+    lat: 38.94,
+    lng: -76.96,
+    geoPrecision: precision,
+    geoSource: precision === "street" ? "census" : "photon",
+  });
+
+  it("rings a street address the geocoder placed at the house", () => {
+    expect(pointIsBuilding(placed("street"), ADDR, NOW)).toBe(true);
+  });
+
+  it("never rings a street's centreline, a town's centre, or a point not placed for this address", () => {
+    expect(pointIsBuilding(placed("block"), ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding(placed("area"), ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding(null, ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding({ ...placed("street"), geoFor: "another address" }, ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding({ ...placed("street"), geoAt: new Date(NOW - 31 * 86_400_000).toISOString() }, ADDR, NOW)).toBe(false);
+    expect(pointIsBuilding({ ...placed("street"), geoMiss: true, lat: undefined, lng: undefined }, ADDR, NOW)).toBe(false);
+    // An address with no street names no building, wherever its point is.
+    const noStreet: StructuredAddress = { ...ADDR, street: "" };
+    expect(pointIsBuilding({ ...placed("street"), geoFor: geoKey(noStreet) }, noStreet, NOW)).toBe(false);
   });
 });
 

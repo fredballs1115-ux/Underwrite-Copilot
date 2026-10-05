@@ -168,6 +168,28 @@ export function cacheFresh(
   );
 }
 
+/** Whether a picture framed on the deal's point may ring its centre as the
+ *  building: a street address the geocoder placed at the house itself. A
+ *  point placed only to the street (its centreline) or to the town is that
+ *  street's or that town's centre, never the building's, and a point not
+ *  yet placed for this address says nothing — so none of them is ringed
+ *  (the batch-2 audit: the shared screen ringed a town's centre as "the
+ *  building" wherever the address named a street). */
+export function pointIsBuilding(
+  cache: DealVisualCache | null,
+  address: StructuredAddress | null,
+  now = Date.now(),
+): boolean {
+  return (
+    !!address?.street?.trim() &&
+    cacheFresh(cache, now, address) &&
+    cache?.geoMiss !== true &&
+    typeof cache?.lat === "number" &&
+    typeof cache?.lng === "number" &&
+    cache?.geoPrecision === "street"
+  );
+}
+
 /** Swappable in tests; production uses the shared resolver. */
 export interface LocationDeps {
   geocode?: (address: StructuredAddress | null) => Promise<Geocoded | null>;

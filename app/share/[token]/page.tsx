@@ -13,7 +13,7 @@ import { shownAssetClass } from "@/lib/pipeline-slots";
 import { SHARE_REFUSAL_COPY, resolveShare } from "@/lib/share-resolve";
 import { Expired, ShareView } from "./share-view";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
-import type { DealVisualCache } from "@/lib/deal-location";
+import { pointIsBuilding, type DealVisualCache } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { SHARE_AERIAL } from "@/lib/image-frames";
 import { SITE_NAME } from "@/lib/page-meta";
@@ -109,16 +109,17 @@ export default async function SharePage({
         ]
       : []),
     // The one frame the aerial route draws (lib/image-frames), around the
-    // address the route reads. A street address's building is ringed at its
-    // centre, the deal page's rule (`hasStreetAddress`); a neighbourhood
-    // placement's centre is a district's, and is not.
+    // point the deal's location cache holds. Its centre is ringed only where
+    // that point is the building's — a street address placed at the house
+    // (`pointIsBuilding`) — never a street's centreline, a town's centre or
+    // a neighbourhood placement's.
     ...(address?.label
       ? [
           {
             kind: "aerial" as const,
             src: `/api/share/${token}/aerial?w=${SHARE_AERIAL.w}&h=${SHARE_AERIAL.h}`,
             credit: SHARE_AERIAL_CREDIT,
-            ring: !!address.street?.trim(),
+            ring: pointIsBuilding((deal.photo as DealVisualCache | null) ?? null, address),
           },
         ]
       : []),

@@ -2592,10 +2592,12 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     );
     expect(photo).toContain('data-share-picture="photo"');
     expect(photo).not.toContain('data-picture="aerial-pin"');
-    // The loader rings the aerial where — and only where — the address it is
-    // drawn around has a street, the deal page's `hasStreetAddress`.
+    // The loader rings the aerial where — and only where — the point it is
+    // drawn around is the building's: a street address placed at the house
+    // (lib/deal-location `pointIsBuilding`), never a street's centreline or
+    // a town's centre (the batch-2 audit).
     const loader = readSource(joinPath(process.cwd(), "app/share/[token]/page.tsx"), "utf8");
-    expect(loader).toMatch(/kind: "aerial" as const,[\s\S]*?ring: !!address\.street\?\.trim\(\),/);
+    expect(loader).toMatch(/kind: "aerial" as const,[\s\S]*?ring: pointIsBuilding\(\(deal\.photo as DealVisualCache \| null\) \?\? null, address\),/);
     expect(readSource(joinPath(process.cwd(), "app/(app)/deals/[id]/page.tsx"), "utf8")).toContain("hasStreetAddress={!!dealAddress?.street}");
   });
 
