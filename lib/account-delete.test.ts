@@ -402,7 +402,8 @@ describe("deleting an account says what happened to a team's deals", () => {
     db.tables.deal_versions = Array.from({ length: n }, (_, i) => ({ id: `v-${String(i).padStart(5, "0")}`, deal_id: "shared", user_id: ME }));
     expect(await landing()).toBe("/login?deleted=teamwork");
     expect(rows("deal_versions").filter((v) => v.user_id === "owner-1")).toHaveLength(n);
-    expect(db.pages.filter((p) => p.table === "deal_versions").map((p) => p.range[0])).toEqual([0, READ_PAGE, n]);
+    // Each later page asks from the row the one before ended on (audit C5, MED-1).
+    expect(db.pages.filter((p) => p.table === "deal_versions").map((p) => p.range[0])).toEqual([0, READ_PAGE - 1, n - 1]);
     const moves = db.writes.filter((w) => w.table === "deal_versions" && w.op === "update");
     expect(moves).toHaveLength(Math.ceil(n / HANDOVER_CHUNK));
     for (const w of moves) {

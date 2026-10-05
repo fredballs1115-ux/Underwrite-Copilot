@@ -10,7 +10,7 @@
  * no error, no count, no sign the rest exist — and a `.limit(5000)` is capped
  * the same way. So a read whose rows a page counts, totals or lists whole
  * asks for them a page at a time, ordered by a stable key so the pages
- * neither overlap nor skip, and ends at an empty page. A list of ids put in
+ * neither overlap nor skip, and ends where a page brings no new row. A list of ids put in
  * a URL goes ID_CHUNK at a time. A failed read is said or thrown by its
  * caller, never read as no rows.
  *
@@ -21,8 +21,8 @@
  */
 
 /** Rows a read asks for per page. A server set to answer fewer is read
- *  correctly too: the next page starts after the rows that came back, and
- *  the read ends at an empty page. */
+ *  correctly too: the next page starts at the last row that came back, and
+ *  the read ends where a page brings no new row. */
 export const READ_PAGE = 1000;
 
 /** Ids an `in` filter carries per request. A UUID takes 39 characters of the
@@ -32,25 +32,77 @@ export const ID_CHUNK = 100;
 
 type Result<T> = PromiseLike<{ data: T[] | null; error: unknown }>;
 
+/** Times a read is begun again when its rows moved under it before it fails
+ *  (audit C5, MED-1). */
+export const READ_ATTEMPTS = 3;
+
+/** What the read could not settle: rows were added, removed or reordered
+ *  between its pages on every attempt. */
+export const ROWS_MOVED = "the rows changed while they were being read";
+
+/** A row's identity: its `id`, else the row itself. */
+function keyOf(row: unknown): string {
+  const id = (row as { id?: unknown } | null)?.id;
+  return id === undefined || id === null ? JSON.stringify(row) : `${typeof id}:${String(id)}`;
+}
+
+/** One pass: the rows, or "moved" where a later page did not begin on the row
+ *  the page before it ended on, or a row came back twice. */
+async function readPass<T>(
+  page: (from: number, to: number) => Result<T>,
+): Promise<{ rows: T[] } | { moved: true } | { error: unknown }> {
+  const rows: T[] = [];
+  const seen = new Set<string>();
+  for (let from = 0; ; ) {
+    // Every page after the first asks from the row before it, so the page
+    // says whether the rows ahead of it moved since the page before.
+    const overlap = from > 0 ? 1 : 0;
+    const { data, error } = await page(from - overlap, from - overlap + READ_PAGE - 1);
+    if (error) return { error };
+    const got = data ?? [];
+    if (overlap) {
+      // An empty page here means even the row the read ended on has gone.
+      if (got.length === 0 || keyOf(got[0]) !== keyOf(rows[rows.length - 1])) return { moved: true };
+    }
+    const fresh = got.slice(overlap);
+    if (fresh.length === 0) return { rows };
+    for (const row of fresh) {
+      const key = keyOf(row);
+      if (seen.has(key)) return { moved: true };
+      seen.add(key);
+      rows.push(row);
+    }
+    from += fresh.length;
+  }
+}
+
 /** Every row a read matches, a page at a time — null if any page fails, after
- *  handing its error to `onError`. The read must be ordered, so the pages do
- *  not overlap. */
+ *  handing its error to `onError`. The read must be ordered on a stable key
+ *  (an `id` last), so the pages do not overlap.
+ *
+ *  Offsets count rows, so a row added or removed ahead of the next page
+ *  shifts it: an added deal read the oldest one twice and missed itself, a
+ *  removed one skipped the row after it (audit C5, MED-1). So every page
+ *  after the first asks from the row the page before ended on and checks it
+ *  is still there, and a row read twice is caught by its id. Where the rows
+ *  moved, the read begins again, READ_ATTEMPTS times at most, then fails
+ *  with ROWS_MOVED — a total is never struck on a set the read could not
+ *  settle. A row added and another removed ahead of the same page leave the
+ *  page where it was: every row there the whole time is still read once. */
 export async function readAll<T>(
   page: (from: number, to: number) => Result<T>,
   onError?: (error: unknown) => void,
 ): Promise<T[] | null> {
-  const rows: T[] = [];
-  for (let from = 0; ; ) {
-    const { data, error } = await page(from, from + READ_PAGE - 1);
-    if (error) {
-      onError?.(error);
+  for (let attempt = 0; attempt < READ_ATTEMPTS; attempt++) {
+    const pass = await readPass(page);
+    if ("error" in pass) {
+      onError?.(pass.error);
       return null;
     }
-    const got = data ?? [];
-    if (got.length === 0) return rows;
-    rows.push(...got);
-    from += got.length;
+    if ("rows" in pass) return pass.rows;
   }
+  onError?.(new Error(ROWS_MOVED));
+  return null;
 }
 
 /** `readAll` as a query answers: every row, or no rows and the failed

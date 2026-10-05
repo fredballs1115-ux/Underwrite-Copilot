@@ -6,6 +6,7 @@ import {
   ID_CHUNK,
   IN_LIST_CHARS,
   READ_PAGE,
+  ROWS_MOVED,
   chunks,
   chunksBySize,
   readAll,
@@ -33,23 +34,70 @@ describe("readAll", () => {
     expect(got?.length).toBe(2_345);
     expect(got?.map((r) => r.id)).toEqual(Array.from({ length: 2_345 }, (_, i) => i));
     expect(t.asked[0]).toEqual([0, READ_PAGE - 1]);
-    expect(t.asked.at(-1)?.[0]).toBe(2_345);
+    // Each later page asks from the row the one before ended on.
+    expect(t.asked[1]).toEqual([READ_PAGE - 1, 2 * READ_PAGE - 2]);
+    expect(t.asked.at(-1)?.[0]).toBe(2_344);
   });
 
   it("reads a server set to answer fewer rows than a page asks for", async () => {
     const t = table(25, 7);
     expect((await readAll(t.page))?.length).toBe(25);
-    expect(t.asked.map(([from]) => from)).toEqual([0, 7, 14, 21, 25]);
+    expect(t.asked.map(([from]) => from)).toEqual([0, 6, 12, 18, 24]);
   });
 
   it("is null on a failed page, and says why", async () => {
     const said: unknown[] = [];
+    let calls = 0;
     const got = await readAll(
-      (from) => Promise.resolve(from === 0 ? { data: [{ id: 0 }], error: null } : { data: null, error: { message: "timeout" } }),
+      () => Promise.resolve(calls++ === 0 ? { data: [{ id: 0 }], error: null } : { data: null, error: { message: "timeout" } }),
       (e) => said.push(e),
     );
     expect(got).toBeNull();
     expect(said).toEqual([{ message: "timeout" }]);
+  });
+});
+
+describe("readAll while rows are added or removed (audit C5, MED-1)", () => {
+  it("never reads a deal twice or misses one when another lands between its pages", async () => {
+    // Newest first; a batch upload lands after the first page answers.
+    const rows = [{ id: "d3" }, { id: "d2" }, { id: "d1" }];
+    let calls = 0;
+    const got = await readAll<{ id: string }>(async (from, to) => {
+      const page = { data: rows.slice(from, to + 1), error: null };
+      if (calls++ === 0) rows.unshift({ id: "d4" });
+      return page;
+    });
+    // Before: [d3, d2, d1, d1] — the oldest twice, the new one missing.
+    expect(got?.map((r) => r.id)).toEqual(["d4", "d3", "d2", "d1"]);
+  });
+
+  it("never skips a row when one is deleted between its pages", async () => {
+    const rows = Array.from({ length: 1_500 }, (_, i) => ({ id: `x${1_500 - i}` }));
+    let calls = 0;
+    const got = await readAll<{ id: string }>(async (from, to) => {
+      const page = { data: rows.slice(from, Math.min(to + 1, from + 1_000)), error: null };
+      if (calls++ === 0) rows.splice(10, 1);
+      return page;
+    });
+    // Before: 1,499 read with x500 missing beside the deleted x1490.
+    expect(got?.length).toBe(1_499);
+    expect(new Set(got?.map((r) => r.id))).toEqual(new Set(rows.map((r) => r.id)));
+  });
+
+  it("fails, saying so, rather than hand over a set it could not settle", async () => {
+    const rows = Array.from({ length: 3 }, (_, i) => ({ id: `r${i}` }));
+    let n = 100;
+    const said: unknown[] = [];
+    const got = await readAll<{ id: string }>(
+      async (from) => {
+        const page = { data: rows.slice(from, from + 2), error: null };
+        rows.unshift({ id: `r${n++}` }); // a row lands after every page
+        return page;
+      },
+      (e) => said.push(e),
+    );
+    expect(got).toBeNull();
+    expect(String((said[0] as Error).message)).toBe(ROWS_MOVED);
   });
 });
 
