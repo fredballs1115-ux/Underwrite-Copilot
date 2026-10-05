@@ -434,10 +434,12 @@ export function basisLabel(g: Pick<MarketGroup, "assetClass" | "perUnit">): stri
   return `Basis / ${suffix.slice(1)}`;
 }
 
-/** "4.9–5.5%" or "5.2%" when the ends coincide. */
+/** "4.90–5.45%" or "5.20%" when the ends coincide: two decimals, as every
+ *  surface prints a deal's own cap (research pass 34), so a range's end
+ *  reads as the deal it came from does. */
 export function fmtCapRange(s: Stat): string {
-  const lo = s.min.toFixed(1);
-  const hi = s.max.toFixed(1);
+  const lo = s.min.toFixed(2);
+  const hi = s.max.toFixed(2);
   return lo === hi ? `${lo}%` : `${lo}–${hi}%`;
 }
 
