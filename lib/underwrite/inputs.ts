@@ -1382,6 +1382,10 @@ export function deriveUnderwriteInputs(
     ? {
         provenance: "extracted",
         note: `T-12 actual expense load${ttmNote} — ${Math.round(t12Er * 100)}% of EGI`,
+        // The T-12's own figure, never the OM's: the SOURCE column credits
+        // the document it was read from, as a rent roll's rows do (research
+        // pass 40, M3: "OM — T-12 actual expense load …").
+        doc: "T-12",
       }
     : {
         // Derived when the NOI it ties to came from the OM; an assumption when

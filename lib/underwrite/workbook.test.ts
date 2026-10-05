@@ -10,6 +10,7 @@ import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { regulationForDeal } from "@/lib/rent-regulation";
 import { STRATEGY_READING } from "@/lib/deal-strategy";
+import { sampleDerivedInputs } from "@/lib/sample-derive";
 
 /**
  * Proof that the generated workbook's formulas are LIVE and compute the same
@@ -1017,6 +1018,18 @@ describe("the workbook's labels and colours say what their cells are", () => {
     // claims nothing about credit loss either way.
     const fallback = (await book(model)).getWorksheet("Assumptions")!;
     expect(String(fallback.getCell(findRow(fallback, 1, "General Vacancy & Credit Loss %"), 3).value)).not.toMatch(/credit/);
+  });
+
+  // Research pass 40, M3: the sample's T-12 expense load printed "OM — T-12
+  // actual expense load …", crediting the memorandum with the statement's
+  // figure. It is the T-12's, as a rent roll's rows are the rent roll's.
+  it("credits the T-12's expense load to the T-12, never the OM", async () => {
+    const sample = sampleDerivedInputs();
+    expect(sample.sources.expenseLines?.doc).toBe("T-12");
+    const assum = (await book(sample)).getWorksheet("Assumptions")!;
+    expect(String(assum.getCell(findRow(assum, 1, "Operating expenses"), 3).value)).toBe(
+      "T-12 actual expense load (TTM to 2026-05-31) — 45% of EGI",
+    );
   });
 
   // A default of none is a claim: these rows printed $0 or 0.00% with an

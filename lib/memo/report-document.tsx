@@ -1381,6 +1381,9 @@ export function sourceSays(src: InputSource | null | undefined, totalPages: numb
 function provenanceOf(src: InputSource | null | undefined, totalPages: number | null): string {
   if (!src) return "";
   if (src.provenance === "extracted") {
+    // A figure read from another document (a rent roll, a T-12) is that
+    // document's, never the OM's (research pass 40, M3).
+    if (src.doc) return src.doc;
     const page = citedPage(src.page, totalPages);
     return page === "—" ? "OM" : `OM ${page}`;
   }
