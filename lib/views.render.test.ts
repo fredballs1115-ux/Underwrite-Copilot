@@ -1893,7 +1893,7 @@ describe("DualAxisTrend — a submarket's vacancy bars and rent line render", ()
 
 // ── A submarket, opened on its metro's photograph (#424) ────────────────────
 import { SubmarketCards } from "@/app/market/submarket-cards";
-import { MarketBand } from "@/app/place-band";
+import { MARKET_BAND_PICTURE, MarketBand } from "@/app/place-band";
 import { EMPTY_RULES, type Submarket } from "@/lib/market/types";
 import { SKYLINES, commonsPage, galleryCredit, skylineSrcSet } from "@/lib/skyline";
 
@@ -1973,8 +1973,10 @@ describe("SubmarketCards and the submarket's band — the metro its owner typed,
     const credit = /<div class="pointer-events-none col-start-1 row-start-2"><p class="([^"]*)">/.exec(html)?.[1] ?? "";
     expect(credit).toContain("text-white/75");
     expect(credit).not.toMatch(/\b(absolute|bottom-3)\b/);
-    // The picture fills its own row only.
-    expect(html).toContain('class="pointer-events-none absolute inset-0 col-start-1 row-start-1 row-end-2"');
+    // The picture fills its own row only: a strip across its top on a phone,
+    // the row behind the words from sm.
+    expect(html).toContain(`class="pointer-events-none ${MARKET_BAND_PICTURE}"`);
+    expect(MARKET_BAND_PICTURE).toMatch(/^absolute inset-x-0 top-0 h-\[\d+rem\] col-start-1 row-start-1 row-end-2 sm:inset-0 sm:h-auto$/);
     // The credit still names the photograph shown, its licence linked.
     expect(visibleText(html).replace(/\n/g, "")).toContain(`${SKYLINES.st_louis.place} · `);
     expect(html).toContain(`href="${commonsPage(SKYLINES.st_louis.file)}"`);
@@ -1993,8 +1995,9 @@ describe("/market's loading outline, and the metro explorer as its #explorer", (
     dumpView("market-loading", html);
     expect(a11yIssues(html)).toEqual([]);
     expect(html).toContain('role="status" aria-label="Loading the markets"');
-    // The band at MarketBand's own heights, 15rem and 21rem from sm.
-    expect(html).toContain('class="skeleton mt-4 h-60 w-full rounded-2xl sm:h-84"');
+    // The band at MarketBand's own heights: on a phone its 14rem strip and a
+    // one-line name under it (300px, measured in Chromium), 21rem from sm.
+    expect(html).toContain('class="skeleton mt-4 h-75 w-full rounded-2xl sm:h-84"');
     expect((html.match(/skeleton h-7 w-24 rounded-full/g) ?? []).length).toBe(10);
     // An outline, not words.
     expect(visibleText(html).trim()).toBe("");
@@ -5914,8 +5917,10 @@ describe("ReadOnlyMetroView — the market page for a metro read without a brief
 
   it("opens on a photograph band, not a texture: the taller band under the caption scrim", () => {
     // The gradient is anchored in px to the words, so the band above them
-    // is the photograph's (app/place-band's CAPTION_SCRIM).
-    expect(html).toContain("min-h-[15rem]");
+    // is the photograph's (app/place-band's CAPTION_SCRIM); on a phone the
+    // photograph is a strip with the words under it.
+    expect(html).toContain("h-[14rem]");
+    expect(html).toContain("pt-[14rem]");
     expect(html).toContain("sm:min-h-[21rem]");
     expect(html).toContain("background-image:linear-gradient(to top, ");
     expect(html).toContain("color-mix(in srgb, var(--color-sidebar) 80%, transparent) 120px");

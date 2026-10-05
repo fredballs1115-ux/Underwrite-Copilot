@@ -37,12 +37,16 @@ import { hasSkyline } from "@/lib/skyline";
 //              over a short card band it veiled the whole lower half of every
 //              photograph, and at the card's old 256px a skyline was a
 //              texture (see `PlaceBand` on why ~300px is a photograph). So
-//              this one is anchored in PIXELS to the tallest words it holds
-//              — an eyebrow over a name wrapped to two lines on a phone,
-//              110px — and everything above `CAPTION_SCRIM`'s last stop is
+//              from `sm` this one is anchored in PIXELS to the tallest words
+//              it holds — an eyebrow over a name wrapped to two lines,
+//              121px — and everything above `CAPTION_SCRIM`'s last stop is
 //              photograph under the veil alone. Simulated through the real
-//              crop at 1064×336 and 302×240 before it shipped: the same
-//              Cleveland frame went from a veiled strip to the towers.
+//              crop at 1064×336 before it shipped: the same Cleveland frame
+//              went from a veiled strip to the towers. Below `sm` the
+//              picture is a strip across the top of the band, fading into it
+//              at its foot, with the words under it on the band's own colour
+//              (`MARKET_BAND_PICTURE`) — the hero's answer: under the scrim a
+//              240px phone band had been a teal wash with 32px of sky.
 //
 // WHY BOTTOM-TO-TOP AND NOT LEFT-TO-RIGHT, which is the more obvious shape
 // for a headline: every file in lib/skyline is a PANORAMA — 8443×3361 for
@@ -106,11 +110,13 @@ const heroSideGradient = `linear-gradient(to right, ${HERO_SIDE_SCRIM.map(
 ).join(", ")})`;
 
 /**
- * The caption scrim's stops, in px up from the bottom, with the scrim's
- * alpha at each: opaque under the words, 80% at the top of the tallest
- * caption, clear by 208px. lib/place-band.contrast.test.ts holds white and
- * the accent eyebrow to the floor at the words' reach against a pure white
- * frame, and holds the photograph to showing above it.
+ * The caption scrim's stops from `sm` up, in px up from the bottom, with the
+ * scrim's alpha at each: opaque under the words, 80% at the top of the
+ * tallest caption, clear by 208px. lib/place-band.contrast.test.ts holds
+ * white and the accent eyebrow to the floor at the words' reach against a
+ * pure white frame, and holds the photograph to showing above it. Below
+ * `sm` the market band's words are under its picture, not over it, and this
+ * scrim is not drawn (`MARKET_BAND_PICTURE`).
  */
 export const CAPTION_SCRIM: ReadonlyArray<{ px: number; alpha: number }> = [
   { px: 0, alpha: 1 },
@@ -128,6 +134,21 @@ const captionGradient = `linear-gradient(to top, ${CAPTION_SCRIM.map(
  * cannot drift between the photograph we fetch and the one they supply.
  */
 export function PhotoScrim({ scrim = "band" }: { scrim?: Scrim }) {
+  if (scrim === "caption") {
+    // A market's band (`MarketBand`). Below sm the picture is a strip with
+    // the words under it: nothing over the photograph but the fade into the
+    // band at its foot, where the words begin — no veil, no scrim. From sm
+    // the words sit over the picture's foot: the veil, the measured caption
+    // scrim, and the foot's band, as before.
+    return (
+      <>
+        <div className="absolute inset-0 bg-gradient-to-b from-sidebar/0 from-75% to-sidebar to-100% sm:hidden" />
+        <div className="absolute inset-0 hidden bg-sidebar/20 sm:block" />
+        <div className="absolute inset-0 hidden sm:block" style={{ backgroundImage: captionGradient }} />
+        <div className="absolute inset-x-0 bottom-0 hidden h-24 bg-gradient-to-t from-sidebar/90 to-transparent sm:block" />
+      </>
+    );
+  }
   return (
     <>
       <div className="absolute inset-0 bg-sidebar/20" />
@@ -142,8 +163,6 @@ export function PhotoScrim({ scrim = "band" }: { scrim?: Scrim }) {
           <div className="absolute inset-0 hidden bg-gradient-to-t from-sidebar from-0% via-sidebar/85 via-55% to-sidebar/0 to-100% lg:block" />
           <div className="absolute inset-0 hidden lg:block" style={{ backgroundImage: heroSideGradient }} />
         </>
-      ) : scrim === "caption" ? (
-        <div className="absolute inset-0" style={{ backgroundImage: captionGradient }} />
       ) : (
         <>
           <div className="absolute inset-0 bg-sidebar/85 lg:hidden" />
@@ -280,8 +299,24 @@ export function PlaceBand({
  * the band taller instead. The picture's row is a grid area with an explicit
  * end line, since an absolutely placed box whose end line is `auto` reaches
  * the grid's padding edge — over the credit's row too.
+ *
+ * Below `sm` the picture is a strip across the top of that row, and the
+ * words start at its foot (`MARKET_BAND_WORDS_TOP`), on the band's own
+ * colour — the homepage hero's answer (`HERO_STRIP`). Under the caption
+ * scrim a 240px phone band had been a teal wash: opaque to 120px, 80% veiled
+ * above that, and the 20% veil over all of it, so no pixel of the photograph
+ * showed untouched (measured in Chromium on a white frame, 2026-10-05) and
+ * night frames went black. As a strip, the top three quarters are the
+ * photograph with nothing over it — more than half the band whether the name
+ * takes one line or two (lib/place-band.contrast.test.ts). From `sm` the
+ * picture fills the row behind the words, as before.
  */
-export const MARKET_BAND_PICTURE = "absolute inset-0 col-start-1 row-start-1 row-end-2";
+export const MARKET_BAND_PICTURE =
+  "absolute inset-x-0 top-0 h-[14rem] col-start-1 row-start-1 row-end-2 sm:inset-0 sm:h-auto";
+/** Where the market band's words start: at the strip's foot on a phone, so
+ *  they sit on the band and never on the sky; from `sm`, at the foot of the
+ *  picture they sit over. */
+export const MARKET_BAND_WORDS_TOP = "pt-[14rem] sm:pt-12";
 export const MARKET_BAND_CREDIT_ROW = "col-start-1 row-start-2";
 /** The credit's own type: solid band colour behind it, so the tier is
  *  measured against the band's colour (lib/place-band.contrast.test.ts). */
@@ -293,12 +328,13 @@ export const MARKET_BAND_CREDIT = "pointer-events-auto px-5 pb-3 pt-2 text-right
  * One component for the briefed markets and the ones read without a brief
  * on /market, and for a submarket's own page, which opens on its metro's
  * photograph with the submarket's name as the page's heading — so none of
- * them can drift. 15rem on a phone and 21rem from `sm` — the card band was
- * 13rem / 16rem, which `PlaceBand`'s own measure calls a texture — under the
- * "caption" scrim, which is anchored to these words in pixels and leaves the
- * rest of the band to the photograph. The photograph's credit is drawn in a
- * row of its own under the picture (`MARKET_BAND_CREDIT_ROW`), never over
- * the words.
+ * them can drift. On a phone the photograph is a 14rem strip with the words
+ * under it (`MARKET_BAND_PICTURE`); from `sm` the band is 21rem — the card
+ * band was 13rem / 16rem, which `PlaceBand`'s own measure calls a texture —
+ * under the "caption" scrim, which is anchored to these words in pixels and
+ * leaves the rest of the band to the photograph. The photograph's credit is
+ * drawn in a row of its own under the picture (`MARKET_BAND_CREDIT_ROW`),
+ * never over the words.
  */
 export function MarketBand({
   metro,
@@ -328,11 +364,13 @@ export function MarketBand({
         creditLayer={MARKET_BAND_CREDIT_ROW}
         creditClassName={MARKET_BAND_CREDIT}
       >
-        <div className="on-photo band-words relative col-start-1 row-start-1 flex min-h-[15rem] w-full flex-col justify-end px-5 pb-6 pt-10 sm:min-h-[21rem] sm:px-6 sm:pb-7 sm:pt-12">
+        <div
+          className={`on-photo band-words relative col-start-1 row-start-1 flex w-full flex-col justify-end px-5 pb-6 ${MARKET_BAND_WORDS_TOP} sm:min-h-[21rem] sm:px-6 sm:pb-7`}
+        >
           <p className="text-[11px] font-semibold uppercase tracking-wider text-accent">{eyebrow}</p>
           {/* Two lines at most: the scrim is measured to the top of a name
-              wrapped to two lines on a phone, and a submarket's name is
-              whatever its owner typed. The whole name stays in the text. */}
+              wrapped to two lines, and a submarket's name is whatever its
+              owner typed. The whole name stays in the text. */}
           <Heading className="mt-1 line-clamp-2 text-2xl font-semibold tracking-tight sm:text-3xl">{name}</Heading>
         </div>
       </PlaceBackdrop>
