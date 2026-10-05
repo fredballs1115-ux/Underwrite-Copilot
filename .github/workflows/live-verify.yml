@@ -1245,6 +1245,7 @@ jobs:
           mark "#522 one deal, one set of figures" grep -q "One deal, one set of figures" p_whats-new.html
           mark "#523 seven more cities, pictured" grep -q "Seven more cities, pictured" p_whats-new.html
           mark "#524 nine more cities, pictured" grep -q "Nine more cities, pictured" p_whats-new.html
+          mark "#525 ten more cities, pictured" grep -q "Ten more cities, pictured" p_whats-new.html
           mark "#482 the rates strip shows no ICE or Moody's series" noice
           echo ""
           echo "MARKER ROLL-UP: ${MARKS_OK} present, ${MARKS_BAD} not deployed"

@@ -1888,7 +1888,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  Two hundred and eighteen are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  Two hundred and twenty-eight are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -2029,7 +2029,22 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   printed (WVhybrid, Renelibrary, Visit Beloit and Noahmcdonald1, the
   last though the file's name says Noah McDonald), each its file page's
   Author field with no other attribution asked, as zori probe_url runs
-  37382024313 and 37383378486 printed them),
+  37382024313 and 37383378486 printed them; then round 17: Albany
+  (Oregon; a green truss bridge from a pier, an Oregon State Archives
+  photograph), Anniston-Oxford (a downtown Anniston street, the title
+  kept whole), Bay City (the riverfront across the Saginaw) and
+  Burlington (North Carolina; its tallest building from the air) — run
+  37387656865 — Dothan (its tower and radar dome), Elizabethtown (the
+  LaRue County Courthouse, named for the metro area), Elmira (the city on
+  the Chemung) and Gadsden (Noccalula Falls, in a strong blue cast) — run
+  37388036901 — Cape Girardeau (the Bill Emerson Memorial Bridge, "Cape
+  Girardeau, MO", from a one-market run, 37388585938) and, from a
+  one-market run for round 16's markets, Lewiston-Auburn (the
+  Lewiston-Auburn Railroad Bridge; 37389070836); six credits are account
+  names or carry one as printed (Rivers Langley's "SaveRivers",
+  WeaponizingArchitecture, Ak1047, Prussian_Fool, Antony-22 and DSKEO),
+  each its file page's Author field with no other attribution asked, as
+  zori probe_url runs 37389642101 and 37389764574 printed them),
   each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
@@ -2103,9 +2118,21 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   names no place) on the drawn cover, and a one-market run each for round
   15's Abilene (37382378067), Wichita Falls (37382472733), Odessa
   (37382579601), Paducah (37383040068), Grand Forks (37383135473) and
-  Albany (Georgia; 37383227834) found nothing better. A one-state
+  Albany (Georgia; 37383227834) found nothing better. Round 17 left Alexandria
+  (Louisiana), Battle Creek, Chambersburg (its courthouse's cupola cut in
+  both crops), Cleveland (Tennessee; its one strong frame, Craigmiles Hall
+  from a drone, carries a studio's watermark that the full-screen viewer
+  would show), Dalton (a plain modern courthouse), Decatur (Alabama;
+  one-market run 37388724728, cranes and a low riverfront), Decatur
+  (Illinois; its downtown behind a signal head, one-market run
+  37388651151), El Centro (field patchworks that read as maps) and Fond
+  du Lac (one-market run 37388499210, a hazy main street) on the drawn
+  cover, and a one-market run each for round 16's Muncie (37388875891),
+  St. Joseph (37388961347), Lebanon (Pennsylvania; 37389183232),
+  Pocatello (the city small from Howard Mountain; 37389259456) and
+  Pinehurst-Southern Pines (37389358864) found nothing better. A one-state
   title is mostly kept whole (the card
-  truncates a long one and the deal page shows it in full); 35 of the 201
+  truncates a long one and the deal page shows it in full); 36 of the 211
   are cut, most to their first city, three to the city the place is known
   by (Fort Myers, Daytona Beach, Sarasota) and two to the city's everyday
   name (Boise, Honolulu). A two-state title is cut to

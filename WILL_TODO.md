@@ -673,6 +673,25 @@ drawn cover. Three choices are yours to overrule:
    whose file's name says Noah McDonald; the credit is the author Commons
    names).
 
+**Photographs, round 17.** Ten more: Albany, OR (a green truss bridge),
+Anniston-Oxford (a downtown street), Bay City (the riverfront), Burlington,
+NC (its tallest building from the air), Cape Girardeau (the Bill Emerson
+Bridge), Dothan (its tower and radar dome), Elizabethtown (the LaRue County
+Courthouse), Elmira (the city on the Chemung), Gadsden (Noccalula Falls)
+and, from round 16, Lewiston-Auburn (the railroad bridge). Nine keep the
+drawn cover. Three choices are yours to overrule:
+1. **Four modest picks**: Bay City (the buildings small in the frame),
+   Dothan, Elizabethtown (flat grey light) and Gadsden (a strong blue
+   cast). The drawn cover is the alternative for each.
+2. **Cleveland, TN keeps the drawn cover**: its one strong frame, Craigmiles
+   Hall from a drone, carries a studio's watermark in a corner. The card
+   and the deal page's header crop it away, but the full-screen viewer
+   shows it. Say if you would rather have it.
+3. **Burlington's runner-up was passed over**: a crisp frame of the
+   Alamance County Courthouse with a Confederate monument's statue beside
+   it. The tower was chosen instead; say if you would rather have the
+   courthouse.
+
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
 **Do these (each is yours alone):**

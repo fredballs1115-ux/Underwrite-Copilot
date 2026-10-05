@@ -8671,6 +8671,12 @@
         "Lewiston Maine mills",
         "Lewiston Auburn falls Androscoggin",
         "Basilica of Saints Peter and Paul Lewiston"
+      ],
+      "candidates": [
+        {
+          "file": "Approaching the Lewiston-Auburn Railroad Bridge, Auburn ME.jpg",
+          "note": "Lewiston-Auburn, ME — John Phelan, CC BY 4.0; the Lewiston-Auburn Railroad Bridge. The chosen file, in lib/skyline.ts (skyline-sheet run 37389070836, a one-market run)."
+        }
       ]
     },
     {
@@ -8775,6 +8781,12 @@
         "Albany Oregon downtown",
         "Albany Oregon Willamette River",
         "Albany Oregon historic district"
+      ],
+      "candidates": [
+        {
+          "file": "Albany - DPLA - 06f3bb247d96d8dcd93b6e575b04adc7.jpg",
+          "note": "Albany, OR — Gary Halvorson, Oregon State Archives, CC BY 4.0; a green truss bridge over the river. The chosen file, in lib/skyline.ts (skyline-sheet run 37387656865)."
+        }
       ]
     },
     {
@@ -8815,6 +8827,12 @@
         "Anniston Alabama downtown",
         "Anniston Alabama Noble Street",
         "Oxford Alabama"
+      ],
+      "candidates": [
+        {
+          "file": "Anniston, Alabama.JPG",
+          "note": "Anniston-Oxford, AL — Rivers Langley; SaveRivers (as printed), CC BY-SA 3.0; a downtown Anniston street. The chosen file, in lib/skyline.ts (skyline-sheet run 37387656865)."
+        }
       ]
     },
     {
@@ -8855,6 +8873,12 @@
         "Bay City Michigan downtown",
         "Bay City Michigan Saginaw River",
         "Bay City Michigan skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Bay City, Michigan (2022).jpg",
+          "note": "Bay City, MI — WeaponizingArchitecture, CC BY-SA 4.0; the riverfront across the Saginaw River. The chosen file, in lib/skyline.ts (skyline-sheet run 37387656865)."
+        }
       ]
     },
     {
@@ -8875,6 +8899,12 @@
         "Burlington North Carolina downtown",
         "Burlington NC depot",
         "Alamance County North Carolina"
+      ],
+      "candidates": [
+        {
+          "file": "Tallest building in Burlington.jpg",
+          "note": "Burlington, NC — Ak1047, CC BY-SA 4.0; the city's tallest building from the air. The chosen file, in lib/skyline.ts (skyline-sheet run 37387656865)."
+        }
       ]
     },
     {
@@ -8895,6 +8925,12 @@
         "Cape Girardeau Missouri riverfront",
         "Cape Girardeau Missouri downtown",
         "Bill Emerson Memorial Bridge"
+      ],
+      "candidates": [
+        {
+          "file": "Bill Emerson Bridge.jpg",
+          "note": "Cape Girardeau, MO — Daniel Schwen, CC BY-SA 4.0; the Bill Emerson Memorial Bridge. The chosen file, in lib/skyline.ts (skyline-sheet run 37388585938, a one-market run)."
+        }
       ]
     },
     {
@@ -9015,6 +9051,12 @@
         "Dothan Alabama downtown",
         "Dothan Alabama murals",
         "Dothan Alabama skyline"
+      ],
+      "candidates": [
+        {
+          "file": "DowntownDothan02 (cropped).jpg",
+          "note": "Dothan, AL — Prussian_Fool, CC BY-SA 4.0; downtown's tower. The chosen file, in lib/skyline.ts (skyline-sheet run 37388036901)."
+        }
       ]
     },
     {
@@ -9055,6 +9097,12 @@
         "Elizabethtown Kentucky downtown",
         "Elizabethtown Kentucky courthouse",
         "Hardin County Kentucky"
+      ],
+      "candidates": [
+        {
+          "file": "LaRue County Courthouse 2022a.jpg",
+          "note": "Elizabethtown, KY — Antony-22, CC BY-SA 4.0; the LaRue County Courthouse. The chosen file, in lib/skyline.ts (skyline-sheet run 37388036901)."
+        }
       ]
     },
     {
@@ -9075,6 +9123,12 @@
         "Elmira New York downtown",
         "Elmira New York Chemung River",
         "Elmira New York skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Chemung River Elmira.jpg",
+          "note": "Elmira, NY — DSKEO, CC BY-SA 4.0; the city on the Chemung River. The chosen file, in lib/skyline.ts (skyline-sheet run 37388036901)."
+        }
       ]
     },
     {
@@ -9115,6 +9169,12 @@
         "Gadsden Alabama downtown",
         "Noccalula Falls Gadsden",
         "Gadsden Alabama Coosa River"
+      ],
+      "candidates": [
+        {
+          "file": "View of Nocolulu falls from the shore in Godsden Alabama.jpg",
+          "note": "Gadsden, AL — Gentry George, U.S. Fish and Wildlife Service, public domain; Noccalula Falls. The chosen file, in lib/skyline.ts (skyline-sheet run 37388036901)."
+        }
       ]
     }
   ]
