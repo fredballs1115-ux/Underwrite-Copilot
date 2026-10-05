@@ -1361,7 +1361,10 @@ function costFindings(
   // and the finding names the class as a page would, never a stored key.
   const words = assetWords(cls);
   const noun = words.noun ?? { one: "unit", many: "units" };
-  const clsWord = words.label ? words.label.toLowerCase() : "such";
+  // The class's own label in a sentence: its words lowercased, an acronym
+  // kept as written ("hospitality / STR", "SFR / BTR"; the audit C3b had
+  // "No hospitality / str market").
+  const clsWord = words.label ? words.label.replace(/\b[A-Z][a-z][\w-]*/g, (w) => w.toLowerCase()) : "such";
   const basisTotal = planDeal ? (plan?.totalCost ?? null) : price;
   const basisNoun = planDeal ? "total cost" : priceWord;
   // The row the basis was read from, quoted where its own words say it is

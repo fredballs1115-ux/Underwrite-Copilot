@@ -1273,3 +1273,25 @@ describe("a plan's own figures are held to each other, with or without a price r
     expect(tied(refusedOnly)).toContain("may be a misread");
   });
 });
+
+describe("the basis finding names the class as its label writes it (audit C3b item 20)", () => {
+  const deal = (assetClass: string, count: [string, string], price: string): ExtractionResult =>
+    ({
+      dealName: "Test",
+      assetClass,
+      totalPages: 40,
+      metrics: [
+        { label: "Asking price", value: price, flagged: false, page: "p. 2", basis: "na" },
+        { label: count[0], value: count[1], flagged: false, page: "p. 2", basis: "na" },
+        { label: "NOI (in-place)", value: "$50,000", flagged: false, page: "p. 2", basis: "in_place" },
+      ],
+    }) as ExtractionResult;
+  const detail = (e: ExtractionResult) => assessPlausibility(e).find((f) => f.code === "basis_out_of_band")?.detail ?? "";
+
+  it("keeps an acronym in the class's label as written, and lowercases its words", () => {
+    // It had read "No hospitality / str market" and "No sfr / btr market".
+    expect(detail(deal("hospitality_str", ["Keys", "200"], "$1,000,000"))).toMatch(/^No hospitality \/ STR market trades there\./);
+    expect(detail(deal("sfr_btr", ["Homes", "200"], "$1,000,000"))).toMatch(/^No SFR \/ BTR market trades there\./);
+    expect(detail(deal("multifamily", ["Units", "200"], "$1,000,000"))).toMatch(/^No multifamily market trades there\./);
+  });
+});
