@@ -1311,9 +1311,13 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
  * model runs the whole asset its price implies, so its bid is the whole
  * building's, and says so. A share whose percentage the memorandum does not
  * state cannot be grossed up to the whole at all, so a bid solved on it is
- * neither the share's price nor the building's: none prints.
+ * neither the share's price nor the building's: none prints. A leasehold's
+ * bid is solved on the model's capitalised exit, a perpetuity's, so the
+ * line says what that price returns on the lease's term, from the term
+ * block's own read (research pass 35: "At that price: IRR 19.8%" one
+ * paragraph above a block taking 5.5 points off the base IRR).
  */
-function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestOf>): string {
+function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestOf>, leasehold?: LeaseholdExitView | null): string {
   if (interest.kind === "note") {
     return "No max bid: the model's price is the collateral's, run as if the building were bought at the loan's price, so a bid solved on it is not a price for the note.";
   }
@@ -1326,9 +1330,30 @@ function maxBidLineFor(s: SensitivityData, interest: ReturnType<typeof interestO
   const line = maxBidSentence(s);
   // All of the entity's interests (a stated 100%) is no share: the bid is
   // for them, as the price is (research pass 28).
-  return interest.kind === "partial_interest" && !isWholeShare(interest.sharePct) && s.maxBid && !s.maxBid.unbounded
-    ? `${line} It is the whole building's price, not the share's.`
-    : line;
+  if (interest.kind === "partial_interest" && !isWholeShare(interest.sharePct) && s.maxBid && !s.maxBid.unbounded) {
+    return `${line} It is the whole building's price, not the share's.`;
+  }
+  const bid = s.maxBid;
+  if (interest.kind === "leasehold" && leasehold && bid) {
+    const lease = leasehold.lease ?? "ground lease";
+    const see = `see The exit, on the ${lease}'s term, below`;
+    if (leasehold.endsInHold) {
+      return `${line} It is solved on a sale the model cannot make: ${
+        leasehold.yearsLeft > 0 ? `the ${lease} ends inside its hold` : `the ${lease}'s stated end has passed`
+      } (${see}).`;
+    }
+    if (bid.onTerm) {
+      const lead = bid.unbounded ? "That is on the model's capitalised exit" : "That IRR runs on the model's capitalised exit";
+      const where = `on the term the ${lease} has left at the sale`;
+      const at = bid.unbounded ? "at twice the modeled price" : "at that price";
+      return `${line} ${lead}; ${
+        bid.onTerm.irr != null
+          ? `${where} the levered IRR ${at} is ${pctOrDash(bid.onTerm.irr)}`
+          : `${where}, the sale ${at} does not repay the model's loan, so no levered return solves`
+      } (${see}).`;
+    }
+  }
+  return line;
 }
 
 /**
@@ -2053,7 +2078,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               and named by the one that binds (lib/underwrite/report-grid) —
               none on a note, the whole building's on a share. */}
           <Text style={{ fontSize: 8, color: C.ink, marginTop: 7, fontFamily: "Helvetica-Oblique" }}>
-            {str(maxBidLineFor(sensitivity, interestOf(extraction)))}
+            {str(maxBidLineFor(sensitivity, interestOf(extraction), input.leasehold))}
           </Text>
           </View>
 

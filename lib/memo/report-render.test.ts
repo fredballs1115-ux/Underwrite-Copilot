@@ -11,7 +11,7 @@ import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { buildReportData, rangeRead, readDay, ReportDocument } from "./report-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
-import { leaseholdExitView, readLeaseholdExit } from "@/lib/leasehold-exit";
+import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leasehold-exit";
 import { pdfFillCountOf, pdfFillRectsOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
 import { readPortfolio } from "@/lib/portfolio";
 import { TINY_PNG_DATA_URI, tinyPng } from "./test-png";
@@ -1632,6 +1632,57 @@ describe("ReportDocument (full report)", () => {
     expect((await pdfFillCountOf(buf)) - (await pdfFillCountOf(without))).toBeGreaterThanOrEqual(6);
     expect(await pdfTextOf(without)).not.toContain("The exit, on the ground lease's term");
   }, 45000);
+
+  it("says what a leasehold's max bid returns on the lease's term, not only on the capitalised exit (research pass 35)", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 5)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 12", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      totalPages: 48,
+      interest: { kind: "leasehold", summary: "The leasehold interest in the building", share: "", groundLease: "Ground lease through December 31, 2071; unsubordinated.", loan: "", page: "p. 12" },
+      metrics: [...SAMPLE_DEAL.extraction.metrics, row("Ground lease expiration", "December 31, 2071"), row("Ground lease extension options", "Four 10-year options")],
+    } as ExtractionResult;
+    const deal = {
+      name: SAMPLE_DEAL.name,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    // The route's own chain: the box's floors, and the term's own read.
+    const derived = deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name);
+    const floors = bidFloors(SAMPLE_DEMO_BOX)!;
+    const sensitivity = buildSensitivityData(derived.inputs, SAMPLE_DEMO_BOX.minIrrPct ?? null, { sources: derived.sources, floors, termRead: termReadFor(extraction) });
+    const bid = sensitivity.maxBid!;
+    expect(bid.unbounded).toBe(false);
+    // The term block's own read at the bid's price, under the bid's levers.
+    const onTerm = readLeaseholdExit(extraction, { ...derived.inputs, ...pageBaseLevers(derived.inputs), purchasePrice: bid.price })!.onTerm!;
+    expect(bid.onTerm).toEqual({ irr: onTerm.leveredIrrPct! / 100 });
+    // On the term, the bid's price earns less than the capitalised exit says.
+    expect(onTerm.leveredIrrPct! / 100).toBeLessThan(bid.at!.irr!);
+    const view = leaseholdExitView(readLeaseholdExit(extraction, derived.inputs)!);
+    const text = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, {
+          input: buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, undefined, undefined, undefined, null, null, view),
+        }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    expect(text).toContain(
+      `going-in cap ${(bid.at!.cap! * 100).toFixed(2)}%. That IRR runs on the model's capitalised exit; on the term the ground lease has left at the sale the levered IRR at that price is ${onTerm.leveredIrrPct!.toFixed(1)}% (see The exit, on the ground lease's term, below).`,
+    );
+    // A report without the term block says nothing of a term.
+    const bare = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(deal, "October 5, 2026", [], sensitivity) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    );
+    expect(bare).not.toContain("That IRR runs on the model's capitalised exit");
+  }, 60000);
 
   it("gives a portfolio memorandum a page of its own: each property, its bars and what the memorandum states", async () => {
     const prop = (name: string, address: string, count: string, noi: string, occupancy: string, allocatedPrice: string, page: string) => ({

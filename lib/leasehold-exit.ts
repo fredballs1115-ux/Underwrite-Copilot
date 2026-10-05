@@ -196,6 +196,25 @@ export function readLeaseholdExit(
   };
 }
 
+/**
+ * The levered IRR on the term at other inputs — the report's max bid, solved
+ * on the model's capitalised exit at a price of its own (research pass 35):
+ * this module's own read at those inputs, as a decimal, so the bid's return
+ * on the term is the term block's arithmetic and never a second formula.
+ * Null on anything but a leasehold; the read answers null where the lease
+ * leaves no term to price at the sale.
+ */
+export function termReadFor(
+  ex: ExtractionResult | null | undefined,
+  asOf: Date = new Date(),
+): ((inputs: UnderwriteInputs) => { irr: number | null } | null) | null {
+  if (!ex || interestOf(ex).kind !== "leasehold") return null;
+  return (inputs) => {
+    const t = readLeaseholdExit(ex, inputs, asOf)?.onTerm;
+    return t ? { irr: t.leveredIrrPct == null ? null : t.leveredIrrPct / 100 } : null;
+  };
+}
+
 // ── Saying it ───────────────────────────────────────────────────────────
 
 // Rounded on the tenths, never a float's toFixed (lib/money `compactUsd`).

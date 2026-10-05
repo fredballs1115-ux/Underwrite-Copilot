@@ -16,7 +16,7 @@ import { todayReads } from "@/lib/model-vs-market-read";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { assumableView, readAssumable, type AssumableView } from "@/lib/assumable-debt";
 import { readSellerFinancing, sellerFinancingView } from "@/lib/seller-financing";
-import { leaseholdExitView, readLeaseholdExit, type LeaseholdExitView } from "@/lib/leasehold-exit";
+import { leaseholdExitView, readLeaseholdExit, termReadFor, type LeaseholdExitView } from "@/lib/leasehold-exit";
 import { dealOverrideLines } from "@/lib/market/deal-checks";
 import { verdictBehind } from "@/lib/screen-run";
 import { HOLD_MONTHS, deriveUnderwriteInputs } from "@/lib/underwrite/inputs";
@@ -251,7 +251,9 @@ export async function GET(
       // documents' or placeholders; on a placeholder's model the report
       // leaves the grids and the max bid out and says why. The max bid is
       // solved on the box's floors, as the deal page solves it.
-      sensitivity = buildSensitivityData(derived.inputs, hurdlePct, { sources: derived.sources, floors });
+      // A leasehold's bid is solved on the capitalised exit; the term's own
+      // read says what it returns on the lease's term (research pass 35).
+      sensitivity = buildSensitivityData(derived.inputs, hurdlePct, { sources: derived.sources, floors, termRead: termReadFor(extraction) });
       // The plan page for the kind the deal page reads — the extraction and
       // the first signal — the same read buildReportData gates the IRR page on.
       plan = buildPlanReport(

@@ -266,6 +266,11 @@ export interface MaxBidLine {
   binding?: keyof BidFloors | null;
   /** the model's IRR, year-1 cash-on-cash and going-in cap at that price */
   at?: BidMetrics | null;
+  /** on a leasehold, the levered IRR at that price on the lease's term
+   *  (`SensitivityOptions.termRead`, decimal; null where the sale there does
+   *  not repay the loan) — the bid itself is solved on the model's
+   *  capitalised exit; absent where no term was read */
+  onTerm?: { irr: number | null } | null;
 }
 
 /** The floors a max bid was solved on, and whose they are: the buy box's
@@ -436,6 +441,13 @@ export interface SensitivityOptions {
    *  max bid is solved on every one set, the deal page's own call; none set
    *  solves the screening hurdle's IRR alone */
   floors?: BidFloors | null;
+  /** a leasehold's exit on its term — the caller's lib/leasehold-exit
+   *  `readLeaseholdExit` at the inputs given, its levered IRR as a decimal,
+   *  or null where the lease leaves no term to price at the sale. The max
+   *  bid is solved on the model's capitalised exit, a perpetuity's, so the
+   *  report says what the bid returns on the term too (research pass 35),
+   *  by the term block's own arithmetic, never a second formula. */
+  termRead?: ((inputs: UnderwriteInputs) => { irr: number | null } | null) | null;
 }
 
 const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
@@ -555,7 +567,17 @@ export function buildSensitivityData(
     takeaway: gridTakeaway(grid, hurdle),
     maxBid:
       solved.price != null && solved.deltaPct != null
-        ? { price: solved.price, deltaPct: solved.deltaPct, unbounded: solved.unbounded, binding: solved.binding, at: solved.at }
+        ? {
+            price: solved.price,
+            deltaPct: solved.deltaPct,
+            unbounded: solved.unbounded,
+            binding: solved.binding,
+            at: solved.at,
+            // The bid's own price under the bid's own levers, on the term.
+            ...(opts.termRead
+              ? { onTerm: opts.termRead({ ...inputs, expenseLines: inputs.expenseLines.map((l) => ({ ...l })), ...levers, purchasePrice: solved.price }) }
+              : {}),
+          }
         : null,
     maxBidFloors,
     // No price clears the box's floors together: which one never clears,
