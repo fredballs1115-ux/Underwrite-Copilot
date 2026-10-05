@@ -159,9 +159,14 @@ export function signalGoingInCap(
   // "approx. 6%" had read 0.6, "-1.5%" +1.5 and "6.2% on T-12" 6.212): a
   // range at its low end, the rule a stated cap range runs on; else the
   // first percentage (`parsePct`, its sign kept, so a negative falls out of
-  // the band); else a bare figure.
-  const range = text.match(/(\d+(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d+(?:\.\d+)?)\s*%/i);
-  const bare = text.match(/^\s*(\d+(?:\.\d+)?)\s*$/);
+  // the band); else a bare figure, which may say its unit in words or carry
+  // an approximation ("5.5 percent", "6.25 cap", "~6.1"). A range's first
+  // end is a figure under 100 of its own, never a year's digits: "6.0% on
+  // 2025–6.5% pro forma" is the 6.0% in place (audit C5, LOW-1).
+  const range = text.match(/(?<![\d.])(\d{1,2}(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d{1,2}(?:\.\d+)?)\s*%/i);
+  const bare = text.match(
+    /^\s*(?:~|≈|approx(?:\.|imately)?|about|est(?:\.|imated)?)?\s*(\d+(?:\.\d+)?)\s*(?:percent\b|per\s?cent\b|pct\b|cap(?:\s+rate)?\b)?\s*$/i,
+  );
   const pct = range ? Math.min(Number(range[1]), Number(range[2])) : (parsePct(text) ?? (bare ? Number(bare[1]) : NaN));
   return Number.isFinite(pct) && pct > 0.5 && pct <= IMPLIED_CAP_CEILING * 100 ? { text, pct } : null;
 }

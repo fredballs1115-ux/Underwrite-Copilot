@@ -257,6 +257,13 @@ describe("the going-in cap: the memorandum's, else the first signal's, withheld 
       ["5.25%–5.50%", 5.25],
       ["5.5", 5.5],
       ["n/a", null],
+      // A unit in words or an approximation, and a range's first end never a
+      // year's digits (audit C5, LOW-1).
+      ["5.5 percent", 5.5],
+      ["6.25 cap", 6.25],
+      ["~6.1", 6.1],
+      ["6.0% on 2025–6.5% pro forma", 6],
+      ["6%–6.5%", 6],
     ];
     for (const [text, pct] of cases) expect(signalGoingInCap({ goingInCap: text })?.pct ?? null, text).toBe(pct);
     // The buy box, the analytics and the market memory read the same figure.
