@@ -474,10 +474,46 @@ describe("trap lists keyed on the memorandum's own words", () => {
     expect(cold).toContain("(a) THE REFRIGERATION");
     expect(cold).toContain("(c) THE CAPITAL RESERVE — a cold-storage building's reserve runs above a dry warehouse's");
     // Questions to check, never a statement of law or a figure.
-    for (const k of ["cannabis", "special_purpose", "lab", "cold_storage"] as const) {
+    for (const k of ["cannabis", "special_purpose", "lab", "cold_storage", "qof"] as const) {
       const text = challengerInstruction("retail", [k]).slice(challengerInstruction("retail").length);
       expect(text, k).not.toMatch(/\billegal\b|\bunlawful\b|\d/);
     }
+  });
+});
+
+// Research pass 28: an interest in a qualified opportunity fund filed as a
+// share of no stated percentage, and nothing said whose the tax benefit is.
+describe("a qualified opportunity fund's interest, keyed on its own class or interest words", () => {
+  const ex = (over: Partial<ExtractionResult>): ExtractionResult => ({ dealName: "Subject", assetClass: "multifamily", metrics: [], ...over });
+  const interest = (summary: string, share = "") => ({ kind: "partial_interest" as const, summary, share, groundLease: "", loan: "", page: "" });
+
+  it("keys the line on the fund's own name, never on a property in an Opportunity Zone", () => {
+    for (const over of [
+      { assetClass: "Qualified Opportunity Fund interest" },
+      { interest: interest("Limited partnership interests in Harbor View Qualified Opportunity Fund, LP") },
+      { interest: interest("Units in a QOF that owns the property") },
+      { interest: interest("", "LP interests in the Opportunity Zone Fund") },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(over)), JSON.stringify(over)).toEqual(["qof"]);
+    }
+    for (const over of [
+      { assetClass: "Multifamily in a Qualified Opportunity Zone" },
+      { strategy: { kind: "development", summary: "Ground-up apartments in an Opportunity Zone tract", capitalBudget: "", timeline: "" } },
+      // The deal's name is no class or interest word.
+      { dealName: "QOF Fund I | Garden Apartments" },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(over)), JSON.stringify(over)).toEqual([]);
+    }
+  });
+
+  it("says the deferral and the ten-year exclusion are the investor's, never the property's returns", () => {
+    const p = challengerInstruction("multifamily", ["qof"]);
+    expect(p.startsWith(challengerInstruction("multifamily"))).toBe(true);
+    expect(p).toContain("QUALIFIED OPPORTUNITY FUND TRAP");
+    expect(p).toContain(
+      "the deferral of a capital gain and the ten-year exclusion of the interest's own appreciation belong to an investor who puts an eligible gain into the fund in time",
+    );
+    expect(p).toContain("never count either in the property's returns");
   });
 });
 

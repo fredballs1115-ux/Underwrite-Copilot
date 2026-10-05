@@ -105,9 +105,10 @@ const TRAPS_BY_CLASS: Record<Exclude<AssetClass, "auto">, readonly string[]> = {
 /** Trap lists keyed on the memorandum's own words rather than on its class
  *  (research pass 23): a cannabis tenant, a building made for one use and
  *  sold to be converted, and a lab or a cold-storage building the class
- *  table files under office or industrial. Each is a set of questions to
+ *  table files under office or industrial — and (research pass 28) an
+ *  interest in a qualified opportunity fund. Each is a set of questions to
  *  check — never a claim of law and never a figure. */
-export type KeyedTrapList = "cannabis" | "special_purpose" | "lab" | "cold_storage";
+export type KeyedTrapList = "cannabis" | "special_purpose" | "lab" | "cold_storage" | "qof";
 
 const CANNABIS_TRAPS = `CANNABIS-TENANT TRAPS, where the memorandum's tenant is a cannabis business — a dispensary, a cultivation or a processing facility — checked by name where the OM gives the inputs: (a) FEDERAL LAW AND THE FINANCING — ask how federal law treats the tenant's business today, and which lenders will lend on a building let to it and on what terms: many will not, so the loan a screening model assumes may not exist; (b) THE LICENSE — ask whether the tenant's license is tied to this site, and what a lapse, a revocation or a move does to the lease and its rent; (c) THE RENT PREMIUM — set the rent against what the space would let for to an ordinary tenant, and ask whether the premium survives a renewal or a re-let; (d) THE BUILDING WITHOUT THE TENANT — ask what it is worth if the tenant leaves: a fit-out for growing, processing or security may be worth nothing to the next tenant.`;
 
@@ -117,11 +118,16 @@ const LAB_TRAPS = `LABORATORY TRAPS, where the building is a lab or a life-scien
 
 const COLD_STORAGE_TRAPS = `COLD-STORAGE TRAPS, where the building is refrigerated or frozen storage, checked by name where the OM gives the inputs: (a) THE REFRIGERATION — the system, its refrigerant, its age and its replacement cost; (b) POWER — the service's capacity, the power bill and who pays it; (c) THE CAPITAL RESERVE — a cold-storage building's reserve runs above a dry warehouse's, its refrigeration plant, insulated envelope, slab and doors wearing out on their own clocks: ask for a condition report rather than holding it to a dry warehouse's reserve.`;
 
+// An interest in a qualified opportunity fund (research pass 28): the tax
+// benefit is the investor's, never the property's.
+const QOF_TRAPS = `QUALIFIED OPPORTUNITY FUND TRAP, where the memorandum sells an interest in a qualified opportunity fund, checked by name: THE TAX BENEFIT IS THE INVESTOR'S — the deferral of a capital gain and the ten-year exclusion of the interest's own appreciation belong to an investor who puts an eligible gain into the fund in time, and to no one else: ask whether this buyer has such a gain and whether its window is still open, and never count either in the property's returns, which are the same with them or without.`;
+
 const KEYED_TRAPS: Record<KeyedTrapList, string> = {
   cannabis: CANNABIS_TRAPS,
   special_purpose: SPECIAL_PURPOSE_TRAPS,
   lab: LAB_TRAPS,
   cold_storage: COLD_STORAGE_TRAPS,
+  qof: QOF_TRAPS,
 };
 
 // The plant's own words. "Dispensary" and "cultivation" alone are a
@@ -148,6 +154,9 @@ const SPECIAL_PURPOSE_CONVERTED = new RegExp(
 // The class phrase names the special use itself ("Church", "Special
 // purpose (school)") — read with a plan to convert or build.
 const SPECIAL_PURPOSE_CLASS = new RegExp(String.raw`^\s*(?:special[\s-]+(?:purpose|use)|religious|institutional|${SPECIAL_USE})\b`, "i");
+// A qualified opportunity fund by its own name — never a property that
+// merely sits in an Opportunity Zone.
+const QOF_WORDS = /\bqualified[\s-]+opportunity[\s-]+(?:zone[\s-]+)?funds?\b|\bqofs?\b|\bopportunity[\s-]+zones?[\s-]+funds?\b/i;
 
 /**
  * The keyed trap lists the memorandum's own words call for — its class
@@ -179,6 +188,10 @@ export function keyedTrapsFor(ex: ExtractionResult | null | undefined, kind?: St
   const own = ownMarketBuilding(ex.assetClass);
   if (own === "lab") out.push("lab");
   if (own === "cold_storage") out.push("cold_storage");
+  // A qualified opportunity fund's interest, named in the deck's own class
+  // or interest words (research pass 28).
+  const interestWords = [ex.assetClass, ex.interest?.summary, ex.interest?.share].filter((w): w is string => typeof w === "string").join(" \n ");
+  if (QOF_WORDS.test(interestWords)) out.push("qof");
   return out;
 }
 
