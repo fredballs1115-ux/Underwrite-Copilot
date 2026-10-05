@@ -341,6 +341,21 @@ describe("AskPanel — page chips open the OM only for the memorandum the deal h
   });
 });
 
+describe("AskPanel — on the sample deal, said with the plan it needs (research pass 32)", () => {
+  const sample = (isPro: boolean) =>
+    visibleText(
+      renderToStaticMarkup(
+        React.createElement(AskPanel, { dealId: DEAL, qa: [], hasOm: false, isSample: true, isPro, omUrl: null }),
+      ),
+    );
+
+  it("tells a free reader Ask is Pro on a real deal, never to ask away", () => {
+    expect(sample(false)).toContain("On Pro, you can put questions to a real deal's memorandum.");
+    expect(sample(false)).not.toMatch(/ask away/);
+    expect(sample(true)).toContain("upload a real deal and ask away");
+  });
+});
+
 describe("AskPanel — who asked, on a team deal", () => {
   const MATE = "33333333-3333-4333-8333-333333333333";
   const GONE = "44444444-4444-4444-8444-444444444444";

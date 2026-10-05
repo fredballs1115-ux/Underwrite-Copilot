@@ -257,7 +257,7 @@ function CallPill({ c, className = "" }: { c: Col; className?: string }) {
         title={p ? `Re-screening — the previous call was ${p.label}` : undefined}
       >
         <span aria-hidden className="pulse-bar h-1.5 w-1.5 rounded-full bg-brand" />
-        {p ? "Re-screening…" : "Screening…"}
+        {p ? "Re-screening…" : "Reading the OM…"}
       </span>
     );
   }

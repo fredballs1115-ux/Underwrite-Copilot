@@ -112,7 +112,7 @@ export function BatchUpload({
     );
     setRunning(false);
     setFinished(true);
-    // The new rows (with live "Screening…" status) appear behind the panel.
+    // The new rows (with their live "Reading the OM…" status) appear behind the panel.
     router.refresh();
   }
 

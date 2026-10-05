@@ -152,8 +152,13 @@ export function AskPanel({
 
       {!askable ? (
         <p className="mt-3 text-sm text-muted">
+          {/* Said with the plan it needs: "ask away" had told a free reader
+              they could, where Ask is Pro on their own deal (research pass
+              32). */}
           {isSample
-            ? "The sample deal has no OM behind it — upload a real deal and ask away."
+            ? isPro
+              ? "The sample deal has no OM behind it — upload a real deal and ask away."
+              : "The sample deal has no OM behind it. On Pro, you can put questions to a real deal's memorandum."
             : "Upload the OM first — answers come from the document itself."}
         </p>
       ) : !isPro ? (

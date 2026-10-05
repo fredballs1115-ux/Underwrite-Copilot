@@ -508,7 +508,9 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     // the failed run each say Failed, the stalled one Stalled.
     expect((html.match(/>Failed</g) ?? []).length).toBe(2);
     expect((html.match(/>Stalled</g) ?? []).length).toBe(1);
-    expect(text).toContain("Screening…");
+    // A first screen's run chip reads as the run, never the stage's own word
+    // "Screening" a finished deal still sits under (research pass 32).
+    expect(text).toContain("Reading the OM…");
     // What the picture must not hide is chipped on it where the chip fits
     // whole, and waits on the card's line under the figures where it does
     // not (lib/pipeline-tags): every tag shows exactly once at each width
@@ -917,9 +919,9 @@ describe("Pipeline — a deal screened again shows the run, never the call it is
       // The old call is not drawn as the deal's call.
       expect(text, initialView).not.toMatch(/(^|\n)Go(\n|$)/);
     }
-    // A first screen still says Screening, and a finished one its call.
+    // A first screen says it is reading the OM, and a finished one its call.
     const first = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...rescreen, verdict: null }]) })));
-    expect(first).toContain("Screening…");
+    expect(first).toContain("Reading the OM…");
     expect(first).not.toContain("Re-screening");
     const done = visibleText(render(React.createElement(Pipeline, { ...props, deals: withThumbs([{ ...rescreen, jobStatus: null }]) })));
     expect(done).not.toContain("screening…");
