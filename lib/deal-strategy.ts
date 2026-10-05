@@ -1609,12 +1609,19 @@ export function planWithBasisChecked(
   // "Planned" only where the building is still to be delivered: a
   // value-add's units stand.
   const planned = notYetDelivered(plan.kind) ? "planned " : "";
+  // The count the check divided by: the plan's own, else — where a
+  // conversion's or a development's memorandum labels no count proposed or
+  // planned (`costPerUnitWithheld`) — the one it states for the building
+  // today, said as that and never as planned.
+  const today = plan.units == null ? unitCountFromMetrics(extraction.metrics ?? []) : null;
   const over =
     sf != null
       ? `the building's ${Math.round(sf).toLocaleString("en-US")} SF`
       : plan.units != null
         ? `the ${plan.units.toLocaleString("en-US")} ${planned}${plan.units === 1 ? noun.one : noun.many}`
-        : `its ${planned}${noun.many}`;
+        : today != null
+          ? `the ${today.toLocaleString("en-US")} ${today === 1 ? noun.one : noun.many} it states for the building today`
+          : `its ${planned}${noun.many}`;
   return {
     ...plan,
     costPerUnit: null,

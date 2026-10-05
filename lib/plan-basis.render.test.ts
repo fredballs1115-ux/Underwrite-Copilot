@@ -55,6 +55,25 @@ describe("a plan's all-in basis the plausibility check finds outside the band (r
     );
   });
 
+  it("names the count it divided by where a conversion labels none planned, beside the plan's own reason", () => {
+    // Today's count on a conversion: the plan strikes no basis over it
+    // (`costPerUnitWithheld`), and the band's sentence says whose count it is,
+    // never "its planned units".
+    const conv = ex({
+      assetClass: "Multifamily",
+      dealName: "The Statler (hotel to apartments)",
+      strategy: { kind: "conversion", summary: "Convert a 150-room hotel to apartments", capitalBudget: "", timeline: "" },
+      metrics: [m("Total project cost", "48,500 ($000s)"), m("NOI (stabilized, pro forma)", "3,200,000"), m("Units", "150")],
+    });
+    const plan = checked(conv);
+    expect(plan.costPerUnitWithheld).toBe(
+      "No basis per unit (all-in) is struck: the memorandum labels no count proposed or planned, so its 150 units are not read as the finished project's.",
+    );
+    expect(plan.basisWithheld).toBe(
+      "No all-in basis is struck: the $49k total cost over the 150 units it states for the building today is outside the band any market delivers at, so the total cost or the count was most likely misread.",
+    );
+  });
+
   it("keeps a basis inside the band as before", () => {
     const fine = ex({ ...vaCheap, metrics: vaCheap.metrics.map((r) => (r.label === "Asking price" ? m("Asking price", "30,000,000") : r)) });
     const plan = checked(fine);
