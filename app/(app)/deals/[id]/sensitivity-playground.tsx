@@ -19,7 +19,13 @@ import { METRIC_FIND, type BuyBox } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
 import { solveMaxBid, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
-import { placeholderPageLine, placeholderReason, type ModelSources } from "@/lib/underwrite/report-grid";
+import {
+  nearlyVacantPageLine,
+  nearlyVacantWord,
+  placeholderPageLine,
+  placeholderReason,
+  type ModelSources,
+} from "@/lib/underwrite/report-grid";
 import type { ModelReturnsRead } from "@/lib/compare-interest";
 
 /** Everything the playground needs, computed server-side once. */
@@ -49,6 +55,12 @@ export interface PlaygroundData {
    *  stated percentage — returns the price did not buy, withheld with its
    *  line, as the first-draft card withholds them; absent, they stand */
   interest?: ModelReturnsRead | null;
+  /** the occupancy the model read, decimal (the derived model's
+   *  `meta.occupancyPct`): where the model runs the building 90% vacant or
+   *  more, its returns, its cap and its max bid are withheld, the sentence
+   *  naming the occupancy stated (lib/underwrite/report-grid
+   *  `nearlyVacantReason`) */
+  occupancyPct?: number | null;
 }
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
@@ -134,12 +146,25 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // model runs the building at a price that did not buy it, so its returns
   // are withheld whatever price is typed — the first-draft card's rule.
   const own = data.interest?.withheld ?? null;
-  const withheld = own != null || placeholderReason(inputs, sources, { priceEntered }) != null;
+  // A building the model runs 90% vacant or more (research pass 38): its
+  // rent line is the occupied space's revenue grossed up through the
+  // vacancy, so a step of the lever moves the NOI by a multiple, and no
+  // return, cap or bid is struck on it.
+  const vacantWord = nearlyVacantWord(inputs);
+  const placeholder = placeholderReason(inputs, sources, { priceEntered }) != null;
+  const withheld = own != null || placeholder || vacantWord != null;
   // The base case, at the modelled price, is a placeholder's wherever the
   // model assumed either figure: a moved lever is then set against nothing.
-  const baseWithheld = own != null || placeholderReason(inputs, sources) != null;
+  const baseWithheld = own != null || placeholderReason(inputs, sources) != null || vacantWord != null;
   const compare = dirty && !baseWithheld;
-  const naWord = own ?? (pricePlaceholder && !priceEntered ? "no price" : "assumed NOI");
+  const naWord =
+    own ?? (placeholder ? (pricePlaceholder && !priceEntered ? "no price" : "assumed NOI") : (vacantWord ?? ""));
+  // No cap is struck on year-1 NOI where the price did not buy the
+  // building, where the NOI is the model's assumption (an assumed 6% of the
+  // price printed "6.00%" on every such deal), or where the building runs
+  // nearly vacant: the field says which (research pass 38).
+  const noiAssumed = sources?.inPlaceRentAnnual?.provenance === "assumption";
+  const capNa = own ?? (noiAssumed ? "assumed NOI" : null) ?? vacantWord;
 
   // The EFFECTIVE base is the sliders' base stops (clamped into physical
   // range), so a degenerate derived input can't make the resting metrics
@@ -255,7 +280,11 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     own != null && data.interest?.line
       ? `${data.interest.line}${floorsSet ? " The max bid, solved on them, is withheld too." : ""}`
       : null;
-  const withheldLine = placeholderPageLine(inputs, sources, { priceEntered, maxBid: floorsSet && own == null });
+  // A placeholder's reason first; else, on a building the model runs nearly
+  // vacant, that reason (lib/underwrite/report-grid).
+  const withheldLine =
+    placeholderPageLine(inputs, sources, { priceEntered, maxBid: floorsSet && own == null }) ??
+    nearlyVacantPageLine(inputs, data.occupancyPct, { maxBid: floorsSet && own == null });
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -279,7 +308,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         onChange={setPriceOverride}
         planDeal={planDeal}
         pricePlaceholder={pricePlaceholder}
-        capWithheld={own}
+        capWithheld={capNa}
       />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -500,10 +529,12 @@ function PriceCapControls({
   /** no price was read: the modelled price is a placeholder, so the fields
    *  wait empty for the reader's, and nothing is set against the placeholder */
   pricePlaceholder?: boolean;
-  /** what the price buys where it is no building's (lib/compare-interest
-   *  `withheld`): the building's income over a note's or a position's price
-   *  is a cap nobody earns, so the cap field says "n/a — note" and takes no
-   *  figure; the price still does */
+  /** why no cap is struck on year-1 NOI, in the words after "n/a — ": what
+   *  the price buys where it is no building's (lib/compare-interest
+   *  `withheld`: the building's income over a note's or a position's price
+   *  is a cap nobody earns), an NOI the model assumed ("assumed NOI"), or a
+   *  building it runs nearly vacant ("97% vacant"). The cap field says it
+   *  and takes no figure; the price still does */
   capWithheld?: string | null;
 }) {
   const [editing, setEditing] = useState<"price" | "cap" | null>(null);

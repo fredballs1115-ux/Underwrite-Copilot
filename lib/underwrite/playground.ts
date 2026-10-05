@@ -46,8 +46,14 @@ export const LEVER_STEPS: Record<
   exitCapPct: { step: 0.0025, span: 2, sliderSpan: 8, min: 0.0025, max: 0.25, sliderFloor: 0.02 },
   // 50bps steps; slider ±3 steps = ±150bps (the spec's 1.0–4.0% example)
   rentGrowthPct: { step: 0.005, span: 2, sliderSpan: 3, min: -0.05, max: 0.15 },
-  // 1.0pt steps; slider ±3 steps = ±3pt (the spec's 2–8% example)
-  vacancyPct: { step: 0.01, span: 2, sliderSpan: 3, min: 0, max: 0.95 },
+  // 1.0pt steps; slider ±3 steps = ±3pt (the spec's 2–8% example). The top
+  // is the model's own: lib/underwrite/inputs reads a stated occupancy as
+  // the vacancy and stops at 99%, so the slider rests on the model's
+  // vacancy, never above or below it. It stopped at 95% and clamped the
+  // base there: a building stated 0% occupied ran at 95%, five times the
+  // revenue the model's 99% gives it — "Levered IRR 160.2%" on a deal the
+  // report read at 12.74% (research pass 38).
+  vacancyPct: { step: 0.01, span: 2, sliderSpan: 3, min: 0, max: 0.99 },
 };
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -55,7 +61,9 @@ const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n
 /** Stops `span` steps either side of the base, clamped to the lever's
  *  physical range. The base itself is clamped FIRST — a degenerate derived
  *  input (e.g. a 0% cap read off a garbled extraction) must not produce
- *  non-monotonic stops where dragging left raises the value. */
+ *  non-monotonic stops where dragging left raises the value. Every range
+ *  holds every base the model derives, so a route-derived model's base is
+ *  its own figure. */
 function stops(
   lever: PercentLever,
   base: number,

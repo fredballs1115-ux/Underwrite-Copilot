@@ -17,6 +17,10 @@ import {
   heatCellEm,
   heatCellText,
   maxBidSentence,
+  nearlyVacantPageLine,
+  nearlyVacantReason,
+  nearlyVacantWord,
+  NEARLY_VACANT,
   pageBaseLevers,
   placeholderPageLine,
   placeholderReason,
@@ -557,5 +561,67 @@ describe("placeholderReturnsLine — a model on a placeholder prints none of its
     const line = buildSensitivityData(fee.inputs, null, { sources: fee.sources }).withheld;
     expect(line).toContain("the model does not run the memorandum's $600,000 ground rent as its year-1 income");
     expect(line).not.toContain("no year-1 NOI");
+  });
+});
+
+// Research pass 38's fixtures, row for row: a building the memorandum states
+// nearly empty. The model reads the occupancy as its vacancy (it stops at
+// 99%) and grosses the year-1 revenue up through it into the rent line.
+const rp38 = (assetClass: string, rows: [string, string, string?][]) =>
+  ({
+    dealName: "1200 Corporate Drive",
+    assetClass,
+    metrics: rows.map(([label, value, basis]) => ({ label, value, flagged: false, page: "p. 3", ...(basis ? { basis } : {}) })),
+  }) as Parameters<typeof deriveUnderwriteInputs>[0];
+// A vacant office at a stated 7.00% cap: the NOI is the price times the cap.
+const OCC0_CAP = rp38("Office", [["Asking price", "8,500,000"], ["Total SF", "42,000 SF"], ["Occupancy", "0%", "in_place"], ["Cap rate", "7.00%"]]);
+// 3% occupied, the memorandum's own NOI.
+const OCC3 = rp38("Office", [["Asking price", "8,500,000"], ["Total SF", "42,000 SF"], ["Occupancy", "3%", "in_place"], ["NOI (in-place)", "45,000", "in_place"]]);
+
+describe("a building the model runs nearly vacant: the page's base is the model's own, and no bid is solved (research pass 38)", () => {
+  it("solves the report's bid levers at the model's own vacancy, the base its grids run, so the page and the report agree", () => {
+    const d = deriveUnderwriteInputs(OCC0_CAP, "x");
+    expect(d.inputs.vacancyPct).toBe(0.99);
+    // The page's resting tiles run at the sliders' base stops; the report's
+    // base case runs the model as it stands. One figure, both places.
+    const levers = pageBaseLevers(d.inputs);
+    expect(levers.vacancyPct).toBe(d.inputs.vacancyPct);
+    const page = runScenario(d.inputs, levers);
+    const report = buildSensitivityData(d.inputs, null, { sources: d.sources, occupancyPct: d.meta.occupancyPct });
+    expect(page.leveredIrrPct).toBe(report.baseCase!.leveredIrr);
+    expect(page.dscrYr1).toBe(report.baseCase!.dscrY1);
+    // The pass printed 160.2% and 13.28x on the page beside the report's 12.74%.
+    expect(page.leveredIrrPct!).toBeLessThan(0.2);
+  });
+
+  it("withholds the report's max bid with the page's own sentence, naming the occupancy stated", () => {
+    const vacant = deriveUnderwriteInputs(OCC0_CAP, "x");
+    const s = buildSensitivityData(vacant.inputs, null, { sources: vacant.sources, occupancyPct: vacant.meta.occupancyPct });
+    expect(s.maxBid).toBeNull();
+    expect(s.noBid).toBeNull();
+    // It had read "clears at every tested price" beside a base under its own hurdle.
+    expect(maxBidSentence(s)).toBe(
+      "No max bid: stated 0% occupied, the model's rent line is its year-1 revenue grossed up through 99% vacancy, so a step of vacancy moves the NOI by a multiple — run a lease-up.",
+    );
+    const three = deriveUnderwriteInputs(OCC3, "x");
+    expect(three.inputs.vacancyPct).toBeCloseTo(0.97, 10);
+    expect(nearlyVacantReason(three.inputs, three.meta.occupancyPct)).toBe(
+      "stated 3% occupied, the model's rent line is that space's revenue grossed up through 97% vacancy, so a step of vacancy moves the NOI by a multiple — run a lease-up.",
+    );
+    expect(nearlyVacantPageLine(three.inputs, three.meta.occupancyPct, { maxBid: true })).toBe(
+      "The returns, the cap on year-1 NOI and the max bid are withheld: stated 3% occupied, the model's rent line is that space's revenue grossed up through 97% vacancy, so a step of vacancy moves the NOI by a multiple — run a lease-up.",
+    );
+    expect(nearlyVacantWord(three.inputs)).toBe("97% vacant");
+    // With no occupancy handed in, the model's own vacancy is said.
+    expect(nearlyVacantReason(three.inputs)).toMatch(/^run at 97% vacancy, the model's rent line is its year-1 revenue/);
+  });
+
+  it("reads a building under the line exactly as before", () => {
+    const s = buildSensitivityData(baseInputs(), null, { occupancyPct: 0.95 });
+    expect(s.maxBidWithheld).toBeNull();
+    expect(s.maxBid).toEqual(buildSensitivityData(baseInputs(), null).maxBid);
+    expect(nearlyVacantReason(baseInputs({ vacancyPct: 0.89 }), 0.11)).toBeNull();
+    expect(nearlyVacantWord(baseInputs({ vacancyPct: 0.89 }))).toBeNull();
+    expect(nearlyVacantWord(baseInputs({ vacancyPct: NEARLY_VACANT }))).toBe("90% vacant");
   });
 });

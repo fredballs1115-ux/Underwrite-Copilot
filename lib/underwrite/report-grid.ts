@@ -319,7 +319,9 @@ export function noBidRead(inputs: UnderwriteInputs, floors: BidFloors, levers: P
 /**
  * The levers the deal page's max bid is solved under at rest: each
  * slider's base stop — the base clamped into the lever's range, which for
- * a route-derived model is the base itself — so the report's bid is the
+ * a route-derived model is the base itself (the vacancy lever reaches the
+ * model's own 99%, research pass 38: at a 95% stop the report solved its
+ * bid at a vacancy its grids did not run) — so the report's bid is the
  * page's own call on the same inputs.
  */
 export function pageBaseLevers(inputs: UnderwriteInputs): Partial<PlaygroundLevers> {
@@ -346,6 +348,10 @@ export interface SensitivityData {
   /** where the buy box's floors clear at no price together, each floor's
    *  own solve (`noBidRead`); null where a bid solved or the box set none */
   noBid?: NoBidRead | null;
+  /** why no max bid is solved, said in its place (`nearlyVacantReason`: a
+   *  building the model runs at 90% vacancy or more); null or absent where
+   *  one is */
+  maxBidWithheld?: string | null;
   /** why the report leaves the model's returns out, or null where it may
    *  print them (`placeholderReturnsLine`); null where no sources were given */
   withheld?: string | null;
@@ -466,6 +472,11 @@ export interface SensitivityOptions {
    *  report says what the bid returns on the term too (research pass 35),
    *  by the term block's own arithmetic, never a second formula. */
   termRead?: ((inputs: UnderwriteInputs) => { irr: number | null } | null) | null;
+  /** the occupancy the model read, decimal (the derived model's
+   *  `meta.occupancyPct`): where the model runs the building 90% vacant or
+   *  more, the max bid is withheld and the sentence names the occupancy
+   *  stated (`nearlyVacantReason`) */
+  occupancyPct?: number | null;
 }
 
 const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
@@ -556,6 +567,68 @@ export function placeholderWorkbookLine(inputs: UnderwriteInputs, sources: Model
   return `${reason[0].toUpperCase()}${reason.slice(1)}${price ? " Enter the price you would pay as the Purchase Price on the Assumptions tab." : ""}`;
 }
 
+/**
+ * The vacancy at and past which the model's returns are not set beside a
+ * vacancy lever, and no bid is solved on them (research pass 38). The model
+ * reads a stated occupancy as its vacancy and grosses its year-1 revenue up
+ * through it into the rent line (lib/underwrite/inputs), so a building 3%
+ * occupied carries that space's revenue times thirty-three, and its expense
+ * line, a share of the revenue, stands still while a step of the lever
+ * moves the revenue by a multiple: from 97% to 95% vacancy the NOI of a
+ * deal the report read at 13.3% put the page's tiles at 55%.
+ */
+export const NEARLY_VACANT = 0.9;
+
+/** A share as a sentence says it: "3%", "0.5%", "97%". */
+const shareWords = (dec: number) => `${Number((dec * 100).toFixed(1))}%`;
+
+/** What a withheld tile and the cap field say after "n/a — " where the
+ *  model runs the building nearly vacant: "97% vacant". Null under
+ *  `NEARLY_VACANT`. */
+export function nearlyVacantWord(inputs: Pick<UnderwriteInputs, "vacancyPct">): string | null {
+  return inputs.vacancyPct >= NEARLY_VACANT ? `${shareWords(inputs.vacancyPct)} vacant` : null;
+}
+
+/**
+ * Why a nearly vacant building's returns and bids are withheld, in the words
+ * after a surface's own opening — the deal page's playground and the
+ * report's max bid say it alike: "stated 3% occupied, the model's rent line
+ * is that space's revenue grossed up through 97% vacancy, so a step of
+ * vacancy moves the NOI by a multiple — run a lease-up." `occupancy` is the
+ * occupancy the model read (decimal), named where it is given. Null under
+ * `NEARLY_VACANT`.
+ */
+export function nearlyVacantReason(
+  inputs: Pick<UnderwriteInputs, "vacancyPct">,
+  occupancy?: number | null,
+): string | null {
+  if (!(inputs.vacancyPct >= NEARLY_VACANT)) return null;
+  const through = `${shareWords(inputs.vacancyPct)} vacancy`;
+  const occ = occupancy != null && Number.isFinite(occupancy) && occupancy >= 0 ? occupancy : null;
+  const lead = occ != null ? `stated ${shareWords(occ)} occupied` : `run at ${through}`;
+  // A building stated empty has no occupied space whose revenue it is: the
+  // model's floor is its own 1%.
+  const what = occ != null && occ > 0 ? "that space's revenue" : "its year-1 revenue";
+  return `${lead}, the model's rent line is ${what} grossed up through ${through}, so a step of vacancy moves the NOI by a multiple — run a lease-up.`;
+}
+
+/**
+ * The deal page's playground, over its tiles, where the model runs the
+ * building nearly vacant: what it withholds — the returns, the cap on year-1
+ * NOI and, where a buy box floor would solve one, the max bid — and why.
+ * Null under `NEARLY_VACANT`.
+ */
+export function nearlyVacantPageLine(
+  inputs: Pick<UnderwriteInputs, "vacancyPct">,
+  occupancy: number | null | undefined,
+  o: { maxBid: boolean },
+): string | null {
+  const reason = nearlyVacantReason(inputs, occupancy);
+  if (!reason) return null;
+  const what = o.maxBid ? "The returns, the cap on year-1 NOI and the max bid" : "The returns and the cap on year-1 NOI";
+  return `${what} are withheld: ${reason}`;
+}
+
 /** Everything the report's sensitivity page renders, in one pure build. */
 export function buildSensitivityData(
   inputs: UnderwriteInputs,
@@ -576,7 +649,10 @@ export function buildSensitivityData(
   const box = opts.floors && (opts.floors.minIrr != null || opts.floors.minCoc != null || opts.floors.minCap != null) ? opts.floors : null;
   const maxBidFloors: MaxBidFloors = box ? { floors: box, from: "buybox" } : { floors: { minIrr: hurdle / 100 }, from: "screening" };
   const levers = pageBaseLevers(inputs);
-  const solved = solveMaxBid(inputs, maxBidFloors.floors, levers);
+  // A building the model runs nearly vacant has no bid worth solving: the
+  // deal page withholds its own, and the report says why in its place.
+  const vacant = nearlyVacantReason(inputs, opts.occupancyPct);
+  const solved = vacant ? null : solveMaxBid(inputs, maxBidFloors.floors, levers);
   return {
     grid,
     priceGrid,
@@ -584,7 +660,7 @@ export function buildSensitivityData(
     hurdleSource: hurdlePct != null && Number.isFinite(hurdlePct) && hurdlePct > 0 ? "buybox" : "default",
     takeaway: gridTakeaway(grid, hurdle),
     maxBid:
-      solved.price != null && solved.deltaPct != null
+      solved && solved.price != null && solved.deltaPct != null
         ? {
             price: solved.price,
             deltaPct: solved.deltaPct,
@@ -600,7 +676,8 @@ export function buildSensitivityData(
     maxBidFloors,
     // No price clears the box's floors together: which one never clears,
     // and which clear on their own, so the sentence names them.
-    noBid: box && solved.price == null ? noBidRead(inputs, box, levers) : null,
+    noBid: box && solved && solved.price == null ? noBidRead(inputs, box, levers) : null,
+    maxBidWithheld: vacant,
     withheld: placeholderReturnsLine(inputs, opts.sources),
     priceSource: opts.sources?.purchasePrice ?? null,
     baseCase: opts.sources ? buildBaseCase(inputs, opts.sources) : null,
@@ -656,7 +733,12 @@ function noBidSentence(floors: BidFloors, nb: NoBidRead | null): string | null {
  * that price. A bundle with no recorded floors reads as the screening
  * hurdle's IRR, which is what it was solved on.
  */
-export function maxBidSentence(s: Pick<SensitivityData, "maxBid" | "maxBidFloors" | "hurdlePct" | "hurdleSource" | "noBid">): string {
+export function maxBidSentence(
+  s: Pick<SensitivityData, "maxBid" | "maxBidFloors" | "hurdlePct" | "hurdleSource" | "noBid" | "maxBidWithheld">,
+): string {
+  // Withheld rather than solved (a building the model runs nearly vacant):
+  // the deal page's own reason, in the bid's place.
+  if (s.maxBidWithheld) return `No max bid: ${s.maxBidWithheld}`;
   const f = s.maxBidFloors ?? { floors: { minIrr: s.hurdlePct / 100 }, from: "screening" as const };
   const box = f.from === "buybox";
   const hurdle = `${Number(s.hurdlePct.toFixed(1))}%`;

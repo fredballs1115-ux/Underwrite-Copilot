@@ -884,6 +884,10 @@ export default async function DealPage({
         // returns are the building's at a price that did not buy it, and
         // the tiles withhold them as the first-draft card does.
         interest: modelReturnsRead(extraction, derivedReturnsOf(derived.inputs), new Date(`${todayIso}T12:00:00Z`)),
+        // The occupancy the model read: a building it runs 90% vacant or
+        // more has its returns, cap and bid withheld, the sentence naming
+        // the occupancy stated (lib/underwrite/report-grid).
+        occupancyPct: derived.meta.occupancyPct ?? null,
       }
     : null;
   // The cap the plan's yield on cost is measured against: the model's own
