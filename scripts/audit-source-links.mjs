@@ -5,8 +5,9 @@
 //   SUPABASE_URL=... SUPABASE_SERVICE_ROLE_KEY=... node scripts/audit-source-links.mjs
 //                                                  # + DB benchmarks/rules
 //
-// HEAD-checks each unique http(s) URL (GET fallback for servers that reject
-// HEAD), writes data/research/link_audit.json, and prints dead links. The
+// HEAD-checks each unique http(s) URL (a GET where the HEAD is refused,
+// answered 404 or never answered — some servers 404 a HEAD on a live page),
+// writes data/research/link_audit.json, and prints dead links. The
 // app's provenance components consult that file: verified-dead links render
 // as plain text instead of a clickable 404. Re-run any time; commit the
 // updated audit file so the deployed app picks it up.
@@ -55,13 +56,28 @@ const check = async (url) => {
     });
     return res.status;
   };
+  // A HEAD the server refuses, answers 404 to, or never answers is asked
+  // again as the GET a reader's browser sends: some servers 404 a HEAD on a
+  // page that is there, and a dead link is shown as plain text, so a false
+  // "dead" costs a figure its provenance link.
+  const get = async () => {
+    try {
+      return await probe("GET");
+    } catch {
+      return null;
+    }
+  };
+  let status;
   try {
-    let status = await probe("HEAD");
-    if (status === 405 || status === 403 || status === 400) status = await probe("GET");
-    return { ok: status >= 200 && status < 400, status };
+    status = await probe("HEAD");
   } catch {
-    return { ok: false, status: null };
+    status = null;
   }
+  if (status === null || status === 400 || status === 403 || status === 404 || status === 405) {
+    const again = await get();
+    if (again !== null) status = again;
+  }
+  return status === null ? { ok: false, status: null } : { ok: status >= 200 && status < 400, status };
 };
 
 const list = [...urls].sort();
