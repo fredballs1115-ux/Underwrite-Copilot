@@ -1106,6 +1106,84 @@ describe("ReportDocument (full report)", () => {
     expect(noModelText).toContain("Single tenant: Walgreens Co.");
   }, 60000);
 
+  // The batch audit: a plan deal whose plan page could not be built printed
+  // "No screening model was built for this report" and then the model's own
+  // reads — "At the model's sale in 5 years …", "the model's 6.00% exit cap".
+  it("says why a plan deal's plan page is left out where its model was built, and prints its terms without the model's reads", async () => {
+    vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 5)), toFake: ["Date"] });
+    const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 4", basis: "na" as const });
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      strategy: { kind: "development", summary: "Ground-up development", capitalBudget: "", timeline: "" },
+      singleTenant: { tenant: "Walgreens Co.", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" },
+      metrics: [row("Asking price", "$10,000,000"), row("Units", "100"), row("Lease expiration", "March 31, 2046"), row("Rent increases", "10% every 5 years")],
+    } as unknown as ExtractionResult;
+    const deal = {
+      name: "X",
+      asset_class: "multifamily",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: null,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, "X");
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const plan = buildPlanReport(extraction, { pct: derived.inputs.exitCapPct, provenance: "assumption" }, null);
+    expect(plan).toBeNull();
+    expect(derived.meta.singleTenant?.read).toBeTruthy();
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, plan, null, undefined, null, null, null, null, derived.meta.singleTenant ?? null);
+    expect(input.singleTenant).toBeNull();
+    expect(input.planLeftOut?.count).toBe("no yield on cost struck");
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).not.toContain("No screening model was built");
+    expect(text).toContain("The plan page is left out");
+    expect(text).toContain(
+      "No stabilized NOI or budget was read from the memorandum, so no yield on cost is struck: the plan page is left out, and these are the memorandum's terms as read, without the model's read beside them.",
+    );
+    // The lease's own line, as the memorandum states it — none of the
+    // model's read of it.
+    expect(text).toContain("Single tenant: Walgreens Co.");
+    expect(text).not.toContain("At the model's sale");
+    expect(text).not.toContain("exit cap");
+    // A report whose route built no model still says so.
+    const none = buildReportData(deal, "October 5, 2026", [], null, undefined, null);
+    expect(none.planLeftOut).toBeNull();
+    const noneText = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input: none }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(noneText).toContain("No screening model was built for this report");
+    expect(noneText).not.toContain("The plan page is left out");
+    // A forward purchase's works are the developer's: said as that, never
+    // as a memorandum that states too little.
+    const forward = {
+      ...extraction,
+      singleTenant: undefined,
+      strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [row("Purchase price", "$48,000,000"), row("NOI (stabilized, pro forma)", "$2,880,000"), row("Construction budget", "$31,000,000"), row("Delivery date", "Q3 2027")],
+    } as unknown as ExtractionResult;
+    const fwdDerived = deriveUnderwriteInputs(forward, "Y");
+    const fwd = buildReportData({ ...deal, extraction: forward } as unknown as DealRow, "October 5, 2026", [], buildSensitivityData(fwdDerived.inputs, null), undefined, null);
+    expect(fwd.planLeftOut).toEqual({
+      count: "the developer funds the works",
+      why: "The developer funds the works, so the buyer has no budget for the plan page to stress: the plan page is left out, and these are the memorandum's terms as read, without the model's read beside them.",
+    });
+    // Every figure the plan page needs read, and no plan page handed in: the
+    // memorandum is never said to state too little.
+    const whole = {
+      ...extraction,
+      singleTenant: undefined,
+      metrics: [row("Purchase price", "$20,000,000"), row("NOI (stabilized, pro forma)", "$2,100,000"), row("Total project cost", "$30,000,000")],
+    } as unknown as ExtractionResult;
+    const wholeDerived = deriveUnderwriteInputs(whole, "Z");
+    expect(buildPlanReport(whole, { pct: wholeDerived.inputs.exitCapPct, provenance: "assumption" }, null)).not.toBeNull();
+    const notHanded = buildReportData({ ...deal, extraction: whole } as unknown as DealRow, "October 5, 2026", [], buildSensitivityData(wholeDerived.inputs, null), undefined, null);
+    expect(notHanded.planLeftOut).toEqual({
+      count: "left out",
+      why: "No plan page was built for this report, so these are the memorandum's terms as read, without the model's read beside them.",
+    });
+  }, 90000);
+
   it("prints what a hotel is sold with over the grids, and the PIP the model carries (#455)", async () => {
     vi.useFakeTimers({ now: new Date(Date.UTC(2026, 8, 30)), toFake: ["Date"] });
     const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 6", basis: "na" as const });

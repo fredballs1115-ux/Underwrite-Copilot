@@ -60,7 +60,7 @@ import { planFacts, yieldOnCostText } from "@/lib/plan-facts";
 import type { ModelVsMarket } from "@/lib/model-vs-market";
 import { readGrainNote, readScope } from "@/lib/model-vs-market-scope";
 import { assetClassKey, assetWords } from "@/lib/asset-words";
-import { askingPriceOf, inferStrategy, isPlanDeal, notYetDelivered } from "@/lib/deal-strategy";
+import { askingPriceOf, inferStrategy, isPlanDeal, notYetDelivered, planSummary } from "@/lib/deal-strategy";
 import { interestOf, isWholeShare, noteCollateralSentence, noteYieldSentence, readInterest } from "@/lib/interest";
 import { affordableShortLine, readAffordable, type AffordableRead } from "@/lib/affordable";
 import { readSingleTenant, singleTenantShortLine } from "@/lib/single-tenant";
@@ -986,6 +986,15 @@ export interface ReportInput {
    *  NOI shortfall and budget overrun; null for a stabilized asset or when
    *  the OM did not state a budget and a stabilized NOI */
   plan?: PlanReport | null;
+  /** why a plan deal's plan page is left out where the route built a model
+   *  but no yield on cost can be stressed on what was read (a figure the
+   *  page needs was not read, named; the developer funds a forward
+   *  purchase's works; the price is not the project's): printed on the page
+   *  that carries the deal's terms — its pill and its sentence — whose
+   *  model reads are then withheld as a placeholder model's are. Null
+   *  everywhere else: a report whose route built no model says that
+   *  instead. */
+  planLeftOut?: { count: string; why: string } | null;
   /** the OM's real page count, from the extraction — a citation prints only
    *  when it falls inside it (lib/facts.ts: never an unvalidated page);
    *  null when the count is unknown, and then no page prints */
@@ -1115,6 +1124,41 @@ export interface ReportInput {
 const TARGET_RETURN = "Target return";
 
 /**
+ * Why a plan deal's plan page is left out where its model was built, in
+ * words true of the deal. The plan page (lib/plan-sensitivity
+ * `buildPlanReport`) stresses a yield on cost: a stabilized NOI over the
+ * price and the buyer's budget, or over an all-in total. A forward
+ * purchase's works are the developer's; a price that is not the project's
+ * says so; otherwise the figures the page could not read are named — "read",
+ * since a budget the memorandum states may be one the reader refused. Where
+ * every figure was read, the caller simply built no plan page, and the
+ * sentence says only that.
+ */
+function planLeftOutWhy(extraction: ExtractionResult | null, signal: FirstSignal | null): { count: string; why: string } {
+  const plan = planSummary(extraction, inferStrategy(extraction, signal));
+  const terms = "these are the memorandum's terms as read, without the model's read beside them.";
+  const rest = `the plan page is left out, and ${terms}`;
+  if (plan?.forward) {
+    return { count: "the developer funds the works", why: `The developer funds the works, so the buyer has no budget for the plan page to stress: ${rest}` };
+  }
+  if (plan?.priceWithheld) {
+    return { count: "no yield on cost struck", why: `The price is ${plan.priceWithheld}, so no yield on cost is struck: ${rest}` };
+  }
+  if (plan?.costWithheld) return { count: "no yield on cost struck", why: `${plan.costWithheld.replace(/\.$/, "")}: ${rest}` };
+  const noi = plan?.stabilizedNoi?.value ?? null;
+  const budget = plan?.budget?.budget ?? null;
+  const price = plan?.price ?? (plan?.budget?.isTotal ? 0 : null);
+  const missing = [
+    noi == null ? "stabilized NOI" : noi > 0 ? null : "stabilized NOI above zero",
+    budget == null ? "budget" : budget > 0 ? null : "budget above zero",
+    price == null ? "price to set the budget against" : null,
+  ].filter((m): m is string => m != null);
+  if (missing.length === 0) return { count: "left out", why: `No plan page was built for this report, so ${terms}` };
+  const named = missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(", ")} or ${missing[missing.length - 1]}`;
+  return { count: "no yield on cost struck", why: `No ${named} was read from the memorandum, so no yield on cost is struck: ${rest}` };
+}
+
+/**
  * The memo page's target-return chip, where the buy-box check read no IRR
  * from the screen ("—") and the report grades the model's own against the
  * same target a few pages on: the chip names the model's figure and its
@@ -1195,7 +1239,15 @@ export function buildReportData(
   // lines the memorandum states, as for a caller that built no model. A
   // plan deal's page already says why its IRR page is left out.
   const withheld = planDeal ? null : (sensitivity?.withheld ?? null);
-  const modelRead = <T,>(v: T | null | undefined): T | null => (withheld ? null : (v ?? null));
+  // A plan deal whose plan page could not be built (no yield on cost can be
+  // struck on what was read) prints neither page, so its model's reads
+  // would stand beside no grid at all: they are withheld as a placeholder
+  // model's are, and the page that carries its terms says why — never "No
+  // screening model was built", which is a report whose route built none
+  // (the batch audit: the page said so over the model's reads).
+  const planLeftOut = planDeal && !plan && sensitivity != null ? planLeftOutWhy(extraction, firstSignalOf(deal)) : null;
+  const readsWithheld = !!withheld || !!planLeftOut;
+  const modelRead = <T,>(v: T | null | undefined): T | null => (readsWithheld ? null : (v ?? null));
   // The grids the report prints, and the page they land on where the memo
   // and the call each take one: the memo's target-return chip names it.
   const graded = planDeal || withheld ? null : (sensitivity ?? null);
@@ -1227,7 +1279,7 @@ export function buildReportData(
     // The rent rules are the site's rules and the memorandum's words, not
     // the model's: where the model's reads are withheld, the line still
     // prints, without the model's growth set beside the allowance.
-    regulation: regulation ? (withheld ? { line: regulation.line, read: "" } : regulation) : null,
+    regulation: regulation ? (readsWithheld ? { line: regulation.line, read: "" } : regulation) : null,
     forward: modelRead(forward),
     mixedUse: modelRead(mixedUse),
     goingConcern: modelRead(goingConcern),
@@ -1241,6 +1293,7 @@ export function buildReportData(
     sensitivity: graded,
     withheld,
     plan: plan ?? null,
+    planLeftOut,
     totalPages: typeof pages === "number" && Number.isFinite(pages) && pages > 0 ? Math.round(pages) : null,
     targetReturnPage,
   };
@@ -2281,10 +2334,23 @@ export function ReportDocument({
         </PageChrome>
       )}
 
+      {/* A plan deal whose plan page could not be built: no plan page and
+          no IRR page, so where its terms print, the page says why, and they
+          print as the memorandum states them — the model's reads withheld
+          (buildReportData), never beside a "no model built" line, since a
+          model was built. */}
+      {!sensitivity && !plan && input.planLeftOut && (anyCaveat || (modelVsMarket?.checks.length ?? 0) > 0) && (
+        <PageChrome title="The plan page is left out" count={input.planLeftOut.count} dealName={dealName} branding={memo.branding}>
+          <Text style={s.sub}>{str(input.planLeftOut.why)}</Text>
+          {caveats}
+          <AssumptionsBlock read={modelVsMarket} />
+        </PageChrome>
+      )}
+
       {/* No grid page at all — no model was built for this report — and
           terms the grids would have carried: they print here, never
           nowhere (#183). */}
-      {!sensitivity && !plan && !input.withheld && (anyCaveat || (modelVsMarket?.checks.length ?? 0) > 0) && (
+      {!sensitivity && !plan && !input.withheld && !input.planLeftOut && (anyCaveat || (modelVsMarket?.checks.length ?? 0) > 0) && (
         <PageChrome title="The deal's terms" count="no model built" dealName={dealName} branding={memo.branding}>
           <Text style={s.sub}>
             {str("No screening model was built for this report, so these are the memorandum's terms as read, without the model's read beside them.")}
