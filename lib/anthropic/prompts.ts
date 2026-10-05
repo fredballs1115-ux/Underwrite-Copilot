@@ -106,9 +106,10 @@ const TRAPS_BY_CLASS: Record<Exclude<AssetClass, "auto">, readonly string[]> = {
  *  (research pass 23): a cannabis tenant, a building made for one use and
  *  sold to be converted, and a lab or a cold-storage building the class
  *  table files under office or industrial — and (research pass 28) an
- *  interest in a qualified opportunity fund. Each is a set of questions to
- *  check — never a claim of law and never a figure. */
-export type KeyedTrapList = "cannabis" | "special_purpose" | "lab" | "cold_storage" | "qof";
+ *  interest in a qualified opportunity fund and a portfolio of tower or
+ *  billboard easements. Each is a set of questions to check — never a claim
+ *  of law and never a figure. */
+export type KeyedTrapList = "cannabis" | "special_purpose" | "lab" | "cold_storage" | "qof" | "easement";
 
 const CANNABIS_TRAPS = `CANNABIS-TENANT TRAPS, where the memorandum's tenant is a cannabis business — a dispensary, a cultivation or a processing facility — checked by name where the OM gives the inputs: (a) FEDERAL LAW AND THE FINANCING — ask how federal law treats the tenant's business today, and which lenders will lend on a building let to it and on what terms: many will not, so the loan a screening model assumes may not exist; (b) THE LICENSE — ask whether the tenant's license is tied to this site, and what a lapse, a revocation or a move does to the lease and its rent; (c) THE RENT PREMIUM — set the rent against what the space would let for to an ordinary tenant, and ask whether the premium survives a renewal or a re-let; (d) THE BUILDING WITHOUT THE TENANT — ask what it is worth if the tenant leaves: a fit-out for growing, processing or security may be worth nothing to the next tenant.`;
 
@@ -122,12 +123,17 @@ const COLD_STORAGE_TRAPS = `COLD-STORAGE TRAPS, where the building is refrigerat
 // benefit is the investor's, never the property's.
 const QOF_TRAPS = `QUALIFIED OPPORTUNITY FUND TRAP, where the memorandum sells an interest in a qualified opportunity fund, checked by name: THE TAX BENEFIT IS THE INVESTOR'S — the deferral of a capital gain and the ten-year exclusion of the interest's own appreciation belong to an investor who puts an eligible gain into the fund in time, and to no one else: ask whether this buyer has such a gain and whether its window is still open, and never count either in the property's returns, which are the same with them or without.`;
 
+// A portfolio of easements under wireless towers or billboards (research
+// pass 28): what is sold is the easement, never the land or a lease on it.
+const EASEMENT_TRAPS = `TOWER AND BILLBOARD EASEMENT TRAPS, where the memorandum sells easements under wireless towers or billboards, checked by name where the OM gives the inputs: (a) THE EASEMENT'S TERM — ask whether each easement is perpetual or for a term, when each term ends, and what the grant lets its holder do with the site if the tenant leaves; (b) THE FEE OWNER'S MORTGAGE — ask whether each easement was recorded ahead of the landowner's mortgage or carries a non-disturbance agreement from its lender, and what becomes of the easement if that mortgage is foreclosed; (c) THE CARRIERS' CONCENTRATION — ask which carriers or advertisers pay the rent across the portfolio, each one's share of it, and what rights each holds to end, move or cut its lease.`;
+
 const KEYED_TRAPS: Record<KeyedTrapList, string> = {
   cannabis: CANNABIS_TRAPS,
   special_purpose: SPECIAL_PURPOSE_TRAPS,
   lab: LAB_TRAPS,
   cold_storage: COLD_STORAGE_TRAPS,
   qof: QOF_TRAPS,
+  easement: EASEMENT_TRAPS,
 };
 
 // The plant's own words. "Dispensary" and "cultivation" alone are a
@@ -157,6 +163,15 @@ const SPECIAL_PURPOSE_CLASS = new RegExp(String.raw`^\s*(?:special[\s-]+(?:purpo
 // A qualified opportunity fund by its own name — never a property that
 // merely sits in an Opportunity Zone.
 const QOF_WORDS = /\bqualified[\s-]+opportunity[\s-]+(?:zone[\s-]+)?funds?\b|\bqofs?\b|\bopportunity[\s-]+zones?[\s-]+funds?\b/i;
+// An easement named beside the wireless or billboard gear it carries, in one
+// clause ("Cell Tower Easement Portfolio", "perpetual easements beneath 42
+// wireless towers", "billboard easements") — never an access easement on a
+// building whose roof happens to carry antennas.
+const EASEMENT_GEAR = String.raw`(?:cell(?:ular)?|wireless|telecom(?:munications?)?|antennas?|monopoles?|billboards?|outdoor[\s-]+advertising|(?:communications?|broadcast|transmission)[\s-]+towers?)\b`;
+const EASEMENT_PORTFOLIO = new RegExp(
+  String.raw`\beasements?\b[^.;\n]{0,60}?\b${EASEMENT_GEAR}|\b${EASEMENT_GEAR}[^.;\n]{0,60}?\beasements?\b|\btowers?[\s-]+easements?\b`,
+  "i",
+);
 
 /**
  * The keyed trap lists the memorandum's own words call for — its class
@@ -192,6 +207,13 @@ export function keyedTrapsFor(ex: ExtractionResult | null | undefined, kind?: St
   // or interest words (research pass 28).
   const interestWords = [ex.assetClass, ex.interest?.summary, ex.interest?.share].filter((w): w is string => typeof w === "string").join(" \n ");
   if (QOF_WORDS.test(interestWords)) out.push("qof");
+  // A tower or billboard easement portfolio, by the deck's class, name,
+  // plan or interest — the easement's own terms where the extraction filed
+  // them as the ground lease (research pass 28).
+  const easementWords = [ex.assetClass, ex.dealName, ex.strategy?.summary, ex.interest?.summary, ex.interest?.groundLease]
+    .filter((w): w is string => typeof w === "string" && w.trim() !== "")
+    .join(" \n ");
+  if (EASEMENT_PORTFOLIO.test(easementWords)) out.push("easement");
   return out;
 }
 

@@ -474,7 +474,7 @@ describe("trap lists keyed on the memorandum's own words", () => {
     expect(cold).toContain("(a) THE REFRIGERATION");
     expect(cold).toContain("(c) THE CAPITAL RESERVE — a cold-storage building's reserve runs above a dry warehouse's");
     // Questions to check, never a statement of law or a figure.
-    for (const k of ["cannabis", "special_purpose", "lab", "cold_storage", "qof"] as const) {
+    for (const k of ["cannabis", "special_purpose", "lab", "cold_storage", "qof", "easement"] as const) {
       const text = challengerInstruction("retail", [k]).slice(challengerInstruction("retail").length);
       expect(text, k).not.toMatch(/\billegal\b|\bunlawful\b|\d/);
     }
@@ -514,6 +514,45 @@ describe("a qualified opportunity fund's interest, keyed on its own class or int
       "the deferral of a capital gain and the ten-year exclusion of the interest's own appreciation belong to an investor who puts an eligible gain into the fund in time",
     );
     expect(p).toContain("never count either in the property's returns");
+  });
+});
+
+// Research pass 28: a portfolio of easements under wireless towers or
+// billboards filed as a net lease, its easements read as no lease at all.
+describe("a tower or billboard easement portfolio, keyed on an easement named with its gear", () => {
+  const ex = (over: Partial<ExtractionResult>): ExtractionResult => ({ dealName: "Subject", assetClass: "net_lease", metrics: [], ...over });
+  const interest = (summary: string, groundLease = "") => ({ kind: "leased_fee" as const, summary, share: "", groundLease, loan: "", page: "" });
+
+  it("keys the list on an easement beside a tower's, a carrier's or a billboard's words, and never on an access easement", () => {
+    for (const over of [
+      { assetClass: "Cell Tower Easement Portfolio" },
+      { dealName: "Billboard Easement Portfolio" },
+      { interest: interest("Perpetual easements beneath 42 wireless towers across 9 states") },
+      { interest: interest("Fee interests in the land", "Perpetual easement for a monopole carrying Verizon and T-Mobile antennas") },
+      { assetClass: "Tower easements" },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(over)), JSON.stringify(over)).toEqual(["easement"]);
+    }
+    for (const over of [
+      { assetClass: "Cell tower site" },
+      { assetClass: "Office", interest: interest("Fee simple, subject to a recorded access easement. The roof carries cell antennas.") },
+      {
+        assetClass: "Retail",
+        singleTenant: { tenant: "Verizon Wireless", guarantor: "", leaseType: "NNN", landlordObligations: "", tenantRights: "", page: "" },
+        interest: interest("Fee simple with a shared access easement"),
+      },
+    ] as Partial<ExtractionResult>[]) {
+      expect(keyedTrapsFor(ex(over)), JSON.stringify(over)).toEqual([]);
+    }
+  });
+
+  it("asks the easement's term, the fee owner's mortgage and non-disturbance, and the carriers' concentration", () => {
+    const p = challengerInstruction("net_lease", ["easement"]);
+    expect(p.startsWith(challengerInstruction("net_lease"))).toBe(true);
+    expect(p).toContain("TOWER AND BILLBOARD EASEMENT TRAPS");
+    for (const trap of ["(a) THE EASEMENT'S TERM — ask whether each easement is perpetual or for a term", "(b) THE FEE OWNER'S MORTGAGE", "non-disturbance agreement", "(c) THE CARRIERS' CONCENTRATION"]) {
+      expect(p, trap).toContain(trap);
+    }
   });
 });
 
