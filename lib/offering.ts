@@ -77,6 +77,59 @@ export function offersDueUpgrade(current: string | null | undefined, ex: Extract
   return offersDueOf(ex)?.iso ?? null;
 }
 
+// ── In a calendar ───────────────────────────────────────────────────────
+
+// A time of day as written — "5:00 PM", "3 p.m.", "12:00 noon", "17:00" —
+// with the zone that follows it where one does: "ET", "(EST)", "Eastern
+// Time", "local time".
+const TIME_OF_DAY =
+  /\b(?:(?:12(?::00)?\s*)?noon|\d{1,2}(?::[0-5]\d)?\s*[ap]\.?\s?m\b\.?|\d{1,2}:[0-5]\d(?!\d))(?:,?\s*\((?:[ECMP][SD]?T|Eastern|Central|Mountain|Pacific|local)[^)]{0,24}\)|,?\s*\b[ECMP][SD]?T\b|,?\s+(?:Eastern|Central|Mountain|Pacific)(?:\s+(?:Standard|Daylight))?(?:\s+Time)?\b|\s+local\s+time\b)?/gi;
+
+/**
+ * The time of day the memorandum's words give the deadline, as written
+ * with its zone: "5:00 PM ET". Null where they give none, or two different
+ * ones — a window is not a deadline.
+ */
+export function offersDueTimeOf(stated: string): string | null {
+  const found = new Map<string, string>();
+  for (const m of stated.matchAll(TIME_OF_DAY)) {
+    const said = m[0].trim();
+    found.set(said.toLowerCase().replace(/[\s.,()]/g, ""), said);
+  }
+  return found.size === 1 ? [...found.values()][0] : null;
+}
+
+export interface OffersDueEventText {
+  summary: string;
+  description: string;
+}
+
+/**
+ * The calendar event's words (research pass 35). An all-day event holds no
+ * time of day, and a deadline at noon read off a calendar as "all day" is
+ * a deadline missed — so where the deal's deadline is the memorandum's day,
+ * the description opens on the memorandum's own words, the time with them,
+ * and its page where the memorandum has one, then the deal's link; and the
+ * summary carries the time where the words state one. A day the reader set
+ * that is not the memorandum's gets the link alone: the memorandum's words
+ * are about another day.
+ */
+export function offersDueEventText(
+  due: string,
+  name: string,
+  link: string,
+  ex: ExtractionResult | null | undefined,
+): OffersDueEventText {
+  const read = offersDueOf(ex);
+  if (!read || read.iso !== due) return { summary: `Offers due — ${name}`, description: link };
+  const time = offersDueTimeOf(read.stated);
+  const page = parsePageNumber(read.page);
+  return {
+    summary: time ? `Offers due ${time} — ${name}` : `Offers due — ${name}`,
+    description: `Offers due as the memorandum states it: ${read.stated}${page != null ? ` (OM p. ${page})` : ""}\n${link}`,
+  };
+}
+
 // ── The listing team ────────────────────────────────────────────────────
 
 export interface ListingBroker {
