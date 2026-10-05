@@ -164,6 +164,29 @@ describe("the signed-in pages count from the reader's day", () => {
     const deal = read("app/(app)/deals/[id]/page.tsx");
     expect(deal).toContain("today={todayIso}");
     expect(deal).toContain("todayIso={todayIso}");
+    // Every deal-type panel that says "today", counts the days to a date or
+    // reads a date as passed reads the reader's noon — the sale's bid
+    // deadline, a lease's or a restriction's end, the abatement's, the
+    // franchise's, a Phase I's age (audit C2 named the first reads; these
+    // had kept the server's clock).
+    for (const call of [
+      "readSale(extraction, readerNoon)",
+      "readAffordable(extraction, readerNoon)",
+      "readSingleTenant(extraction, readerNoon)",
+      "readRoster(extraction, readerNoon)",
+      "readTaxAbatement(extraction, readerNoon)",
+      "readHotelDeal(extraction, readerNoon)",
+      "readSiteReports(extraction, readerNoon)",
+      "readSandwichLease(extraction, readerNoon)",
+      "readForwardPurchase(extraction, readerNoon, strategy)",
+      "readGoingConcern(extraction, readerNoon)",
+      "readMixedUse(extraction, readerNoon)",
+      "readCondo(extraction, readerNoon)",
+      "exchangeForDeal(buyBox?.exchange, extraction, offersDue, readerNoon)",
+    ]) {
+      expect(deal, call).toContain(call);
+    }
+    expect(deal.match(/new Date\(`\$\{todayIso\}T12:00:00Z`\)/g) ?? [], "the reader's noon is built once").toHaveLength(1);
   });
 
   // The documents' own date, read once per request from the cookie the

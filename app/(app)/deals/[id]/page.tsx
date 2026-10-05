@@ -1497,7 +1497,7 @@ export default async function DealPage({
                 buy box holds an exchange still running: the deadlines against
                 this deal's offers-due day and what its price buys, read on the
                 reader's own day. Never on the shared screen. */}
-            <ExchangeChip exchange={exchangeForDeal(buyBox?.exchange, extraction, offersDue, new Date(`${todayIso}T12:00:00Z`))} />
+            <ExchangeChip exchange={exchangeForDeal(buyBox?.exchange, extraction, offersDue, readerNoon)} />
             <StageSelect
               key={((deal as { stage?: string }).stage as string) ?? "screening"}
               dealId={id}
@@ -1529,9 +1529,11 @@ export default async function DealPage({
         {/* A sandwich position (lib/sandwich-lease): the sublease income
             against the master rent with the spread filled, its cover, the
             master lease's term against the model's hold, and what the model
-            does with a position that ends. Read on the reader's day. */}
+            does with a position that ends. Every panel below that says
+            "today", counts the days to a date or reads a date as passed reads
+            the reader's day (`readerNoon`, lib/reader-day). */}
         <SandwichPanel
-          sandwich={readSandwichLease(extraction, new Date(`${todayIso}T12:00:00Z`))}
+          sandwich={readSandwichLease(extraction, readerNoon)}
           holdYears={derived ? derived.inputs.holdMonths / 12 : null}
           modelLine={derived?.meta.sandwich?.read ?? ""}
         />
@@ -1540,7 +1542,7 @@ export default async function DealPage({
             at the buyer's hurdle; a court's or a lender's sale says who is
             selling (lib/sale-terms). */}
         <SalePanel
-          sale={readSale(extraction)}
+          sale={readSale(extraction, readerNoon)}
           ceiling={derived ? saleCeiling(extraction, derived.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT) : null}
         />
         {/* A forward purchase or a build-to-suit bought at delivery
@@ -1549,7 +1551,7 @@ export default async function DealPage({
             at delivery against the model's exit cap — the buyer carries no
             construction. Read on the reader's day, with the page's kind. */}
         <ForwardPanel
-          forward={readForwardPurchase(extraction, new Date(`${todayIso}T12:00:00Z`), strategy)}
+          forward={readForwardPurchase(extraction, readerNoon, strategy)}
           today={todayIso}
           exitCapPct={derived ? derived.inputs.exitCapPct * 100 : null}
           modelLine={derived?.meta.forward?.read ?? ""}
@@ -1559,13 +1561,13 @@ export default async function DealPage({
             price as the memorandum splits it, the contracts as stated, and
             what the model does with the business's income. */}
         <GoingConcernPanel
-          goingConcern={readGoingConcern(extraction, new Date(`${todayIso}T12:00:00Z`))}
+          goingConcern={readGoingConcern(extraction, readerNoon)}
           modelLine={derived?.meta.goingConcern?.read ?? ""}
         />
         {/* A covenant or a contract that sets the rents (#453): the units it
             binds, until when, each tier against its limit — said before any
             rent growth is believed (lib/affordable). */}
-        <AffordablePanel affordable={readAffordable(extraction)} />
+        <AffordablePanel affordable={readAffordable(extraction, readerNoon)} />
         {/* The rent rules that reach the building (lib/rent-regulation):
             each regime and whether it applies, the regulated share as
             stated, the allowance in force against the model's one growth
@@ -1580,7 +1582,7 @@ export default async function DealPage({
             term left today and at the model's sale, the options, and the
             lease's increases against the model's growth (lib/single-tenant). */}
         <SingleTenantPanel
-          lease={readSingleTenant(extraction)}
+          lease={readSingleTenant(extraction, readerNoon)}
           model={
             derived
               ? {
@@ -1596,7 +1598,7 @@ export default async function DealPage({
             model's sale a year at a time, the building by the space each
             leases with an anchor outside the sale drawn apart, and each
             tenant's end and rights. */}
-        <RosterPanel roster={readRoster(extraction)} modelLine={derived?.meta.roster?.read ?? ""} />
+        <RosterPanel roster={readRoster(extraction, readerNoon)} modelLine={derived?.meta.roster?.read ?? ""} />
         {/* A value-add renovation program (#460): the doors done and to
             go, the premium priced on against the one achieved with the
             break-even at the model's exit cap, and the pace the period
@@ -1610,7 +1612,7 @@ export default async function DealPage({
             the model's sale, the bill today against the full one, and the
             share of the NOI that goes to taxes when it ends. */}
         <TaxAbatementPanel
-          abatement={readTaxAbatement(extraction)}
+          abatement={readTaxAbatement(extraction, readerNoon)}
           holdYears={derived ? derived.inputs.holdMonths / 12 : null}
           modelLine={derived?.meta.taxAbatement?.read ?? ""}
         />
@@ -1618,7 +1620,7 @@ export default async function DealPage({
             encumbrance and the PIP — the basis a key with the PIP on top,
             the agreements' clocks against the model's sale, the rooms. */}
         <HotelPanel
-          hotel={readHotelDeal(extraction)}
+          hotel={readHotelDeal(extraction, readerNoon)}
           holdYears={derived ? derived.inputs.holdMonths / 12 : null}
           modelLine={derived?.meta.hotel?.read ?? ""}
         />
@@ -1643,19 +1645,19 @@ export default async function DealPage({
             commercial incomes on one bar, the commercial share of the area,
             and what the model's one exit cap does to both. */}
         <MixedUsePanel
-          mixedUse={readMixedUse(extraction, new Date(`${todayIso}T12:00:00Z`))}
+          mixedUse={readMixedUse(extraction, readerNoon)}
           modelLine={derived?.meta.mixedUse?.read ?? ""}
         />
         {/* Condominium units bought in bulk (lib/condo): the buyer's share of
             the association with a lender's limit on a single owner, a year of
             the dues, the reserves and restrictions as stated, and what the
             model does with the units. */}
-        <CondoPanel condo={readCondo(extraction, new Date(`${todayIso}T12:00:00Z`))} modelLine={derived?.meta.condo?.read ?? ""} />
+        <CondoPanel condo={readCondo(extraction, readerNoon)} modelLine={derived?.meta.condo?.read ?? ""} />
         {/* What the third-party reports found (#465): a tile a report, the
             Phase I's age against the 180-day and one-year marks, the PML
             against the lenders' 20%, and what the model does with the
             immediate repairs. */}
-        <SiteReportsPanel reports={readSiteReports(extraction)} modelLine={derived?.meta.siteReports?.read ?? ""} />
+        <SiteReportsPanel reports={readSiteReports(extraction, readerNoon)} modelLine={derived?.meta.siteReports?.read ?? ""} />
         {/* Who is selling it and when offers are due (#467): the brokers as
             the memorandum prints them, a tap to call or write, and the call
             for offers as written (lib/offering). */}
