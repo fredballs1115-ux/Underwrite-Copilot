@@ -13,6 +13,7 @@ import {
   mixedUseTag,
   mixedUseTermRows,
   readMixedUse,
+  statedIncomeOf,
 } from "./mixed-use";
 import { gluedWords } from "./render-lint";
 import { extractionInstruction } from "./anthropic/prompts";
@@ -130,6 +131,32 @@ describe("a mixed-use building's two incomes, read as stated (pass 28, round 7)"
     expect(annualIncomeOf("N/A")).toBeNull();
     const projected = deal([row("Residential income", "$1,520,000"), row("Commercial income (pro forma)", "$720,000")], "Mixed-Use");
     expect(readMixedUse(projected, TODAY)).toBeNull();
+  });
+
+  // The batch audit: the month test ran over the whole row, so a year's
+  // figure with its month in brackets was read as twelve times the year —
+  // "$610,000 annually ($50,833/month)" as $7.32M of commercial income,
+  // 82.8% of the building's.
+  it("reads the period from the words attached to the figure it reads, never the whole row's", () => {
+    expect(annualIncomeOf("$610,000 annually ($50,833/month)")).toBe(610_000);
+    expect(annualIncomeOf("$1,100,000 per annum ($91,667/month)")).toBe(1_100_000);
+    expect(statedIncomeOf("$1,100,000 a year, or $91,667 a month")).toEqual({ annual: 1_100_000, fromMonth: false });
+    expect(statedIncomeOf("$1.1M/yr or $91.7k/mo")).toEqual({ annual: 1_100_000, fromMonth: false });
+    // The year's figure where a month's leads and the two agree.
+    expect(statedIncomeOf("$91,667/month ($1.1M a year)")).toEqual({ annual: 1_100_000, fromMonth: false });
+    // A month's figure alone, its period in its own words or its own bracket.
+    expect(statedIncomeOf("$91,667/month")).toEqual({ annual: 1_100_004, fromMonth: true });
+    expect(statedIncomeOf("$91,667 (monthly)")).toEqual({ annual: 1_100_004, fromMonth: true });
+    expect(statedIncomeOf("$91,667 a month, escalating 3% a year")).toEqual({ annual: 1_100_004, fromMonth: true });
+    // A year's figure beside a month's that is not its twelfth: neither is
+    // chosen.
+    expect(annualIncomeOf("$1,100,000 per annum ($95,000/month)")).toBeNull();
+    const r = readMixedUse(deal([row("Residential income", "$1,520,000"), row("Commercial income", "$610,000 annually ($50,833/month)")], "Mixed-use"), TODAY)!;
+    expect(r).toMatchObject({ residentialIncome: 1_520_000, commercialIncome: 610_000, commercialIncomeSharePct: 28.6 });
+    expect(r.headline).toContain("$610k of commercial: 28.6% of the income is the commercial space's");
+    expect(mixedUseTag(deal([row("Residential income", "$1,520,000"), row("Commercial income", "$610,000 annually ($50,833/month)")], "Mixed-use"), TODAY)).toBe(
+      "Commercial 29% of income",
+    );
   });
 
   it("is no mixed-use read on another building, or with nothing commercial stated", () => {

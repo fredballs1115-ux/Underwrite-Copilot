@@ -95,6 +95,30 @@ describe("a sandwich position's spread and term (pass 28, round 9)", () => {
     expect(readSandwichLease(deal([row("Master lease rent", "$1,100,000"), row("Sublease income (pro forma)", "$2,000,000")]), TODAY)!.subleaseIncome).toBeNull();
   });
 
+  // The batch audit: the month test ran over the whole row, so "$1,100,000
+  // per annum ($91,667/month)" was a $13.2M master rent — "the position pays
+  // $11.4M a year more than its subtenants bring in" — and "$1,100,000 a
+  // year, or $91,667 a month" was said to be "twelve times the month the
+  // memorandum states".
+  it("reads a year's rent with its month beside it as the year, and says a year as stated", () => {
+    const both = deal([
+      row("Master lease rent", "$1,100,000 per annum ($91,667/month)"),
+      row("Sublease income", "$1,820,000"),
+      row("Master lease expiration", "December 31, 2041"),
+    ]);
+    const r = readSandwichLease(both, TODAY)!;
+    expect(r).toMatchObject({ masterRent: 1_100_000, spread: 720_000, masterRentFromMonth: false });
+    expect(r.coverage).toBeCloseTo(1.6545, 3);
+    expect(r.headline).toContain("The subleases bring in $1.82M a year against the $1.10M master rent: a spread of $720k");
+    expect(sandwichTag(both, TODAY)).toBe("Spread $720k, 1.65× cover");
+    expect(sandwichShortLine(r)).toContain("subleases $1.82M against a $1.10M master rent (1.65×)");
+    const year = readSandwichLease(deal([row("Master lease rent", "$1,100,000 a year, or $91,667 a month"), row("Master lease expiration", "December 31, 2041")]), TODAY)!;
+    expect(year).toMatchObject({ masterRent: 1_100_000, masterRentFromMonth: false });
+    expect(year.headline).toContain("The master rent is $1.10M a year, as stated;");
+    expect(year.headline).not.toContain("twelve times the month");
+    expect(annualOf("$1,100,000 per annum ($91,667/month)")).toBe(1_100_000);
+  });
+
   it("is no read off a plain leasehold, a fee simple, or a master leasehold that states nothing", () => {
     expect(readSandwichLease(deal([row("Master lease rent", "$1,100,000")], { summary: "Leasehold under a 99-year ground lease", groundLease: "Ground lease to 2090" }), TODAY)).toBeNull();
     expect(readSandwichLease(deal([row("Master lease rent", "$1,100,000")], { kind: "fee_simple" as never }), TODAY)).toBeNull();

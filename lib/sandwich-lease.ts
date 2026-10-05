@@ -40,7 +40,7 @@ import { withArticle } from "@/lib/article";
 import { noiFigures } from "@/lib/deal-strategy";
 import { endHasPassed, groundLeaseTermLine, termEndLabel, yearsText, type GroundLeaseTerm } from "@/lib/ground-lease-term";
 import { isMasterLeasehold, leaseholdTermOf } from "@/lib/interest";
-import { annualIncomeOf } from "@/lib/mixed-use";
+import { statedIncomeOf } from "@/lib/mixed-use";
 
 type Row = { label: string; value: string; page?: string };
 const isRow = (m: unknown): m is Row =>
@@ -53,18 +53,16 @@ export const MASTER_RENT_ROW = /^\s*(?:annual\s+|current\s+|in[- ]place\s+)?mast
 export const SUBLEASE_INCOME_ROW =
   /^\s*(?:annual\s+|current\s+|in[- ]place\s+)?(?:sub[\s-]?lease|subtenant|sub[\s-]?tenant)\s+(?:income|rents?|revenues?)\b(?!\s+(?:increases?|escalations?|per)\b)/i;
 const MASTER_TERM_ROW = /^\s*master[\s-]+lease\s+(?:expir|term|end|options?|extension|renewal)/i;
-/** A row's figure stated a month at a time (lib/mixed-use's own words). */
-const MONTH_WORDS = /\/\s*mo(?:nth)?\b|\bper\s+month\b|\bmonthly\b|\ba\s+month\b/i;
 /** A master-lease term row that is its options, not its end. */
 const MASTER_OPTIONS_ROW = /options?|extension|renewal/i;
 
-/** A year's rent or income from a row's words, the figure before any
- *  clause that follows it ("$1,100,000 a year, increasing 2% annually");
+/** A year's rent or income from a row's words (lib/mixed-use
+ *  `statedIncomeOf`): the figure read with the words attached to it, never
+ *  a clause that follows it ("$1,100,000 a year, increasing 2% annually");
  *  a monthly figure taken twelve times; null for a rate, a range or a
  *  share. */
 export function annualOf(stated: string): number | null {
-  const lead = stated.split(/;|,\s+(?=[a-z(])/i)[0] ?? "";
-  return annualIncomeOf(lead);
+  return statedIncomeOf(stated)?.annual ?? null;
 }
 
 export interface SandwichRead {
@@ -103,19 +101,19 @@ export function readSandwichLease(ex: ExtractionResult | null | undefined, asOf:
   if (!ex || !isMasterLeasehold(ex)) return null;
   const rows = (Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow).filter((m) => !NOT_STATED.test(m.value.trim()));
   const rowOf = (re: RegExp) => rows.find((m) => re.test(m.label) && !NOT_TODAY.test(m.label));
-  const yearOf = (re: RegExp) => {
-    const r = rowOf(re);
-    return r ? annualOf(r.value) : null;
-  };
   // A rent the memorandum states a month at a time is read as twelve of
-  // them, and said so — never "as stated" (the batch-2 audit). The month
-  // words are lib/mixed-use `annualIncomeOf`'s own.
-  const monthly = (re: RegExp) => {
+  // them, and said so — never "as stated" (the batch-2 audit). Whether it
+  // was is the reader's own answer (lib/mixed-use `statedIncomeOf`), from
+  // the words attached to the figure read, never the whole row's: "$1,100,000
+  // a year, or $91,667 a month" states a year (the batch audit).
+  const statedOf = (re: RegExp) => {
     const r = rowOf(re);
-    return !!r && MONTH_WORDS.test(r.value);
+    return r ? statedIncomeOf(r.value) : null;
   };
-  const masterRent = yearOf(MASTER_RENT_ROW);
-  const subleaseIncome = yearOf(SUBLEASE_INCOME_ROW);
+  const master = statedOf(MASTER_RENT_ROW);
+  const sublease = statedOf(SUBLEASE_INCOME_ROW);
+  const masterRent = master?.annual ?? null;
+  const subleaseIncome = sublease?.annual ?? null;
   const { term } = leaseholdTermOf(ex, asOf);
   if (masterRent == null && subleaseIncome == null && !term) return null;
 
@@ -135,8 +133,8 @@ export function readSandwichLease(ex: ExtractionResult | null | undefined, asOf:
     term,
     termLine: term ? groundLeaseTermLine(term, "master lease") : "",
     noiOverSpread,
-    masterRentFromMonth: masterRent != null && monthly(MASTER_RENT_ROW),
-    subleaseIncomeFromMonth: subleaseIncome != null && monthly(SUBLEASE_INCOME_ROW),
+    masterRentFromMonth: master?.fromMonth ?? false,
+    subleaseIncomeFromMonth: sublease?.fromMonth ?? false,
   };
   const sentences = sentencesOf(read);
   return { ...read, sentences, headline: sentences.join(" ") };
