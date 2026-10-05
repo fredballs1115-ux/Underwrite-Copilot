@@ -42,6 +42,8 @@ vi.mock("@/lib/imagery", () => {
   };
   return {
     IMAGE_CREDIT: { photo: "Photo", streetview: "Google Street View", aerial: "USGS The National Map", satellite: "Google" },
+    GOOGLE_NO_STORE: "private, no-store",
+    isGoogleImage: (source: string) => source === "streetview" || source === "satellite",
     fetchOneImage: async (_src: string, _s: unknown, _id: string, _a: unknown, _c: unknown, size: { width: number; height: number }) => answer(size),
     fetchBestAerialImage: async (_s: unknown, _id: string, _a: unknown, _c: unknown, size: { width: number; height: number }) => answer(size),
     fetchBestBuildingImage: async (_s: unknown, _id: string, _a: unknown, _c: unknown, size: { width: number; height: number }) => answer(size),

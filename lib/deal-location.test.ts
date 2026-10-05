@@ -164,21 +164,32 @@ describe("resolveDealLocation", () => {
 
   it("merges over the ROW's current cache, not the caller's copy", async () => {
     // The clobber this guards: the geocoder wrote a fresh point, then a
-    // Street View verdict was written by a caller still holding the OLD
-    // cache. Before, the fresh point was lost. Now the row is read first.
-    const staleCopy: DealVisualCache = { status: "none", checkedAt: "2026-01-01T00:00:00Z" };
+    // second writer arrived still holding the OLD cache. Before, the fresh
+    // point was lost. Now the row is read first.
+    const staleCopy: DealVisualCache = { pictureCheckedAt: "2026-01-01T00:00:00Z" };
     const { client, row, writes } = fakeSupabase(staleCopy);
     await resolveDealLocation(client, "d1", ADDR, staleCopy, deps(async () => CENSUS));
-    // Now a second writer arrives with the stale copy and a verdict patch.
+    // Now a second writer arrives with the stale copy and a patch.
     const { writeCache } = await import("./deal-location");
-    await writeCache(client, "d1", staleCopy, { status: "ok", checkedAt: "2026-09-07T12:00:00Z" });
+    await writeCache(client, "d1", staleCopy, { pictureCheckedAt: "2026-09-07T12:00:00Z" });
     expect(row.photo).toMatchObject({
-      lat: CENSUS.lat,      // survived
-      lng: CENSUS.lng,      // survived
-      status: "ok",         // applied
-      geoV: GEO_VERSION,    // survived
+      lat: CENSUS.lat,                          // survived
+      lng: CENSUS.lng,                          // survived
+      pictureCheckedAt: "2026-09-07T12:00:00Z", // applied
+      geoV: GEO_VERSION,                        // survived
     });
     expect(writes).toHaveLength(2);
+  });
+
+  it("drops Google's Street View answer from every write, an older row's included", async () => {
+    // Google's policies prohibit storing its content but for place and
+    // panorama IDs (lib/imagery `fetchStreetViewImage`): an earlier cut
+    // kept the metadata's verdict and the panorama's coordinates.
+    const older: DealVisualCache = { status: "ok", checkedAt: "2026-09-01T00:00:00Z", checkedFor: "38.9,-76.9", panoLat: 38.9001, panoLng: -76.9002 };
+    const { client, row } = fakeSupabase(older);
+    const { writeCache } = await import("./deal-location");
+    await writeCache(client, "d1", older, { status: "ok", pictureCheckedAt: "2026-10-05T00:00:00Z" });
+    expect(row.photo).toEqual({ pictureCheckedAt: "2026-10-05T00:00:00Z" });
   });
 
   it("returns null for a deal with no address, without touching the cache", async () => {
