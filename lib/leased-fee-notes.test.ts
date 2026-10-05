@@ -47,3 +47,49 @@ describe("a leased fee whose stated NOI is its ground rent (the second audit, ME
     expect(d.sources.inPlaceRentAnnual?.note).toContain("the model does not read it");
   });
 });
+
+// The second audit's MED-5: a leased fee's cap read two ways in one deal —
+// the deal page's playground printed the model's 4.00%, the workbook "n/a —
+// leased fee". The workbook's cap and yield cells now withhold where the
+// deal header's cap slot does, and a leased fee's cap stands, labelled as
+// the land's price. What a leased fee's cap means is the owner's.
+describe("a leased fee's cap in the workbook (the second audit, MED-5)", () => {
+  const summaryOf = async (d: ReturnType<typeof deriveUnderwriteInputs>) => {
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load((await buildUnderwriteWorkbook(d)) as unknown as ArrayBuffer);
+    const ws = wb.getWorksheet("Deal Summary")!;
+    const rows = new Map<string, unknown>();
+    ws.eachRow((row) => rows.set(String(row.getCell(4).value ?? ""), row.getCell(5).value));
+    return rows;
+  };
+
+  it("prints the cap on the land's price, live, as the page prints it", async () => {
+    const rows = await summaryOf(deriveUnderwriteInputs(fee([m("NOI (in-place)", "600,000", "in_place", "p. 5")]), "x"));
+    expect(rows.get("Going-In Cap on the Land's Price (Yr-1 NOI / Price)")).toMatchObject({ formula: expect.stringContaining("/PurchasePrice") });
+    expect(rows.get("Year-1 Yield on Total Cost (the Land's)")).toMatchObject({ formula: expect.stringContaining("/TotalUses") });
+    expect([...rows.values()]).not.toContain("n/a — leased fee");
+  });
+
+  it("still withholds a note's and a share's of no stated percentage", async () => {
+    const note = deriveUnderwriteInputs(
+      ex({
+        assetClass: "Office",
+        dealName: "Quarry Point (note sale)",
+        interest: { kind: "note", summary: "A first mortgage note", share: "", groundLease: "", loan: "First mortgage note", page: "p. 2" },
+        metrics: [m("Asking price", "15,000,000"), m("Unpaid principal balance", "18,000,000"), m("NOI (in-place)", "1,500,000", "in_place")],
+      }),
+      "x",
+    );
+    expect((await summaryOf(note)).get("Going-In Cap (Yr-1 NOI / Price)")).toBe("n/a — note");
+    const share = deriveUnderwriteInputs(
+      ex({
+        assetClass: "Office",
+        dealName: "Quarry Point (interest)",
+        interest: { kind: "partial_interest", summary: "A limited partnership interest", share: "", groundLease: "", loan: "", page: "p. 2" },
+        metrics: [m("Asking price", "15,000,000"), m("NOI (in-place)", "1,500,000", "in_place")],
+      }),
+      "x",
+    );
+    expect((await summaryOf(share)).get("Going-In Cap (Yr-1 NOI / Price)")).toBe("n/a — share");
+  });
+});

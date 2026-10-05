@@ -1660,16 +1660,25 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
       FMT.pct2,
       "YieldOnCost",
     );
-  } else if (basisWithheld) {
+  } else if (basisWithheld && meta.interest?.kind !== "leased_fee") {
+    // Withheld where the deal header's cap slot is (lib/compare-interest
+    // `capSlotWithheld`: a note, a position, a share beside its entity's
+    // loan), and on a share of no stated percentage, whose price is no
+    // building's and whose cap the deal page's playground withholds too.
     withheldRet("Going-In Cap (Yr-1 NOI / Price)");
     withheldRet(YEAR1_YIELD_LABEL);
   } else {
     // The model's year-1 NOI over the price — not the OM's stated cap, which
-    // the deal's header and cards print; the label says which it is.
-    ret("Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
+    // the deal's header and cards print; the label says which it is. On a
+    // leased fee the price is the land's, and the cap stands as the deal
+    // header and the playground print it, labelled so (the second audit,
+    // MED-5: the workbook had said "n/a — leased fee" beside the page's
+    // 4.00%); what a leased fee's cap means is the owner's.
+    const onLand = basisWithheld != null && meta.interest?.kind === "leased_fee";
+    ret(onLand ? "Going-In Cap on the Land's Price (Yr-1 NOI / Price)" : "Going-In Cap (Yr-1 NOI / Price)", `IF(PurchasePrice=0,"n/a",${noiY1}/PurchasePrice)`, FMT.pct2);
     // Year-1 NOI over the total uses — no stabilized figure, so never called
     // one (it read "Stabilized Yield (on cost)").
-    ret(YEAR1_YIELD_LABEL, `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
+    ret(onLand ? `${YEAR1_YIELD_LABEL} (the Land's)` : YEAR1_YIELD_LABEL, `IF(TotalUses=0,"n/a",${noiY1}/TotalUses)`, FMT.pct2);
   }
   ret("Unlevered IRR", `IFERROR(IRR(${unlevRange}),"check inputs")`, FMT.pct1);
   ret("Levered IRR", `IFERROR(IRR(${levRange}),${noIrrFormula})`, FMT.pct1, "LeveredIRR");
