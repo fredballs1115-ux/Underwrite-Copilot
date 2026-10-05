@@ -64,6 +64,21 @@ describe("the buy box's 1031 exchange against a deal (lib/exchange-window)", () 
     expect(exchangeForDeal(BLOCK, deal([row("Ground lease expiration", "December 31, 2090")], lease("Leasehold under a ground lease", "Ground lease to 2090")), null, TODAY)?.tag).toBe(
       "1031: identify by Oct 30",
     );
+    // A term that already counts its options is a ceiling: the thirty years
+    // are asked, its options included or not, and so they are where the
+    // memorandum states no end (the pre-merge audit, C1 L5: "1031: identify
+    // by Nov 4", no question raised).
+    const ceiling = exchangeForDeal(
+      { relinquishedTransferOn: "2026-09-20" },
+      deal([row("Ground lease expiration", "December 31, 2061, including all extension options")], lease("Leasehold interest under a ground lease", "Ground lease to 2061 including options")),
+      null,
+      TODAY,
+    )!;
+    expect(ceiling).toMatchObject({ tag: "1031: lease term — ask counsel", tone: "muted" });
+    expect(ceiling.fit.flags[0].text).toContain("The price buys a leasehold with up to 35 years left, its options included.");
+    const unread = exchangeForDeal(BLOCK, deal([], lease("Leasehold under a ground lease", "")), null, TODAY)!;
+    expect(unread).toMatchObject({ tag: "1031: lease term — ask counsel", tone: "muted" });
+    expect(unread.fit.flags[0].text).toContain("The price buys a leasehold whose years left are not read from the memorandum.");
     // A sandwich position's years are its master lease's.
     const master = exchangeForDeal(
       BLOCK,

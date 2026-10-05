@@ -78,6 +78,9 @@ export function exchangeForDeal(
     interestKind: kind,
     leaseYearsLeft: lease ? lease.yearsLeft : null,
     leaseOptionYears: lease?.options?.years ?? null,
+    // A term that already counts its options is a ceiling: the thirty years
+    // are asked whatever its length (the pre-merge audit).
+    leaseCeiling: lease?.includesOptions ?? false,
   });
   if (!fit?.tag) return null;
   const first = fit.flags[0]?.kind;

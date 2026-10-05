@@ -107,6 +107,29 @@ describe("the buyer's 1031 clock (pass 28, round 4)", () => {
     expect(exchangeFit(x, { offersDueIso: null, interestKind: "leasehold", leaseYearsLeft: 0.6 })!.flags[0].text).toMatch(
       /^The price buys a leasehold with under a year left\./,
     );
+    // A term that already counts its options is a ceiling, asked whatever
+    // its length, and a leasehold whose end is not read is asked too (the
+    // pre-merge audit, C1 L5).
+    const ceiling = exchangeFit(x, { offersDueIso: null, interestKind: "leasehold", leaseYearsLeft: 35.2, leaseCeiling: true })!;
+    expect(ceiling.flags).toEqual([
+      {
+        kind: "lease_term",
+        text: 'The price buys a leasehold with up to 35 years left, its options included. The regulation\'s example of a leasehold like kind to real estate is "a leasehold of a fee with 30 years or more to run"; whether this one counts, its options included or not, is a question for your exchange counsel.',
+      },
+    ]);
+    expect(ceiling.tag).toBe("1031: lease term — ask counsel");
+    const shortCeiling = exchangeFit(x, { offersDueIso: null, interestKind: "leasehold", leaseYearsLeft: 22.6, leaseCeiling: true, leaseOptionYears: 20 })!;
+    expect(shortCeiling.flags[0]).toMatchObject({ kind: "short_leasehold" });
+    expect(shortCeiling.flags[0].text).toMatch(/^The price buys a leasehold with up to 22 years left, its options included\./);
+    expect(shortCeiling.tag).toBe("1031: lease under 30 yrs");
+    const unread = exchangeFit(x, { offersDueIso: null, interestKind: "leasehold" })!;
+    expect(unread.flags).toEqual([
+      {
+        kind: "lease_term",
+        text: 'The price buys a leasehold whose years left are not read from the memorandum. The regulation\'s example of a leasehold like kind to real estate is "a leasehold of a fee with 30 years or more to run"; whether this one counts is a question for your exchange counsel.',
+      },
+    ]);
+    for (const t of [ceiling.flags[0].text, unread.flags[0].text]) expect(gluedWords(t)).toEqual([]);
     expect(exchangeShortLine(x, note)).toBe(
       "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; the price buys a loan secured by the building, not the building. Section 1031 reaches only real property exchanged for real property of like kind; whether a note counts is a question for your exchange counsel",
     );

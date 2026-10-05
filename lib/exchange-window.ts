@@ -184,7 +184,7 @@ function windowSentence(w: Omit<ExchangeWindow, "sentence">): string {
 /** One thing the deal and the exchange say together — a date fact or a
  *  question for exchange counsel, never a verdict. */
 export interface ExchangeFlag {
-  kind: "after_identify" | "id_period_over" | "after_close" | "note" | "entity_share" | "position" | "short_leasehold";
+  kind: "after_identify" | "id_period_over" | "after_close" | "note" | "entity_share" | "position" | "short_leasehold" | "lease_term";
   text: string;
 }
 
@@ -209,9 +209,13 @@ export function exchangeFit(
     offersDueIso: string | null;
     interestKind: InterestKind | null;
     /** the lease's years left today and its options' years, where the
-     *  price buys a leasehold (lib/interest's term) */
+     *  price buys a leasehold (lib/interest's term); null where no end is
+     *  read */
     leaseYearsLeft?: number | null;
     leaseOptionYears?: number | null;
+    /** the stated term already counts its extension options: its years
+     *  are a ceiling */
+    leaseCeiling?: boolean;
   },
 ): ExchangeFit | null {
   if (!w || w.phase === "over") return null;
@@ -251,15 +255,30 @@ export function exchangeFit(
       kind: "position",
       text: `The price buys a preferred equity position in the owning entity, not the building. ${REAL_PROPERTY}; whether this position counts is ${ASK}.`,
     });
-  } else if (deal.interestKind === "leasehold" && deal.leaseYearsLeft != null && deal.leaseYearsLeft < 30) {
-    const left = Math.floor(deal.leaseYearsLeft);
-    // Under a year left is said as that, never "0 years" (the batch-2 audit).
-    const leftWords = left < 1 ? "under a year" : `${left} ${left === 1 ? "year" : "years"}`;
-    const opts = deal.leaseOptionYears && deal.leaseOptionYears > 0 ? `, ${Math.round(deal.leaseOptionYears)} more in its options as stated` : "";
-    flags.push({
-      kind: "short_leasehold",
-      text: `The price buys a leasehold with ${leftWords} left${opts}. The regulation's example of a leasehold like kind to real estate is "a leasehold of a fee with 30 years or more to run"; whether this one counts, its options included or not, is ${ASK}.`,
-    });
+  } else if (deal.interestKind === "leasehold") {
+    const years = deal.leaseYearsLeft ?? null;
+    const ceiling = deal.leaseCeiling === true;
+    const REGULATION = `The regulation's example of a leasehold like kind to real estate is "a leasehold of a fee with 30 years or more to run"`;
+    if (years == null) {
+      // No end read: the thirty years are as open a question as a short
+      // lease's (the pre-merge audit).
+      flags.push({ kind: "lease_term", text: `The price buys a leasehold whose years left are not read from the memorandum. ${REGULATION}; whether this one counts is ${ASK}.` });
+    } else if (years < 30 || ceiling) {
+      const left = Math.floor(years);
+      // Under a year left is said as that, never "0 years" (the batch-2
+      // audit); a term that counts its options is a ceiling, "up to" (the
+      // pre-merge audit: 35 years with every option in it raised nothing).
+      const leftWords = left < 1 ? "under a year" : `${ceiling ? "up to " : ""}${left} ${left === 1 ? "year" : "years"}`;
+      const opts = ceiling
+        ? ", its options included"
+        : deal.leaseOptionYears && deal.leaseOptionYears > 0
+          ? `, ${Math.round(deal.leaseOptionYears)} more in its options as stated`
+          : "";
+      flags.push({
+        kind: years < 30 ? "short_leasehold" : "lease_term",
+        text: `The price buys a leasehold with ${leftWords} left${opts}. ${REGULATION}; whether this one counts, its options included or not, is ${ASK}.`,
+      });
+    }
   }
   const tag = flags.length
     ? TAG[flags[0].kind]
@@ -277,6 +296,9 @@ const TAG: Record<ExchangeFlag["kind"], string> = {
   entity_share: "1031: share — ask counsel",
   position: "1031: position — ask counsel",
   short_leasehold: "1031: lease under 30 yrs",
+  // A term not read, or a ceiling of thirty years or more: the thirty years
+  // are a question, never said to be short.
+  lease_term: "1031: lease term — ask counsel",
 };
 
 /** The exchange read in one line for the memo and the verdict's brief: the
