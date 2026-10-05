@@ -191,13 +191,23 @@ describe("the routes draw a typed size at the nearest listed frame", () => {
     // The deal page's own sizes are drawn as asked.
     asked.sizes = [];
     await get(aerialRoute, "aerial?src=usgs&w=1280&h=576");
-    await get(aerialRoute, "aerial?src=satellite&w=1280&h=960");
+    await get(aerialRoute, "aerial?src=usgs&w=1280&h=960");
     await get(aerialRoute, "aerial?src=usgs&w=640&h=360");
     expect(asked.sizes).toEqual([
       { width: 1280, height: 576 },
       { width: 1280, height: 960 },
       { width: 640, height: 360 },
     ]);
+  });
+
+  it("/api/deals/[id]/aerial refuses the satellite frame no page asks for, before anything is fetched (research pass 39)", async () => {
+    asked.sizes = [];
+    for (const size of ["w=1280&h=576", "w=1280&h=960", ""]) {
+      const res = await get(aerialRoute, `aerial?src=satellite&${size}`);
+      expect(res.status).toBe(404);
+      expect(res.headers.get("x-image-source")).toBeNull();
+    }
+    expect(asked.sizes).toEqual([]);
   });
 
   it("/api/deals/[id]/image", async () => {

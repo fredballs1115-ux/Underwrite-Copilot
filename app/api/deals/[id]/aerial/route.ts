@@ -53,13 +53,16 @@ export async function GET(
   if (!deal) return NextResponse.json({ error: "not found" }, { status: 404 });
 
   const q = new URL(req.url).searchParams;
+  // The Google satellite frame is no longer drawn here: no page asks for it
+  // since the deal page and the compare columns were held off Google's
+  // imagery (a544615), and each frame was a billed Google call. Refused
+  // before anything is fetched (research pass 39).
+  if (q.get("src") === "satellite") return new NextResponse(null, { status: 404 });
   // `src` pins the answer to ONE source with no fallback. The deal page uses
-  // it so each tab can credit exactly what it is showing: crediting Google
-  // for a USGS frame is sloppy, and crediting USGS for a Google frame drops
-  // an attribution Google requires. Without it, best-available wins.
-  const pinned = ({ satellite: "satellite", usgs: "aerial" } as const)[
-    q.get("src") ?? ""
-  ] as ImageSource | undefined;
+  // it so each tab can credit exactly what it is showing: crediting USGS for
+  // another source's frame drops an attribution. Without it, best-available
+  // wins.
+  const pinned = ({ usgs: "aerial" } as const)[q.get("src") ?? ""] as ImageSource | undefined;
 
   const frame = nearestFrame(DEAL_AERIAL_FRAMES, q.get("w"), q.get("h"));
   const size = {
