@@ -56,9 +56,10 @@
 }
 
 /* A control the keyboard reaches is scrolled clear of a bar that stays on
-   screen (WCAG 2.4.11, research pass 33): the homepage's sticky header, and
-   on a phone the app's top bar and the deal's bar at the foot, which covered
-   whole controls on Shift+Tab and Tab. The homepage's sections take their
+   screen (WCAG 2.4.11, research pass 33): the homepage's sticky header, on a
+   phone the app's top bar and the deal's bar at the foot, which covered
+   whole controls on Shift+Tab and Tab, and from md the deal's bar at the
+   top. The homepage's sections take their
    anchor offset from here too, so a jump lands under the header as before. */
 html:has([data-home-bar]) {
   scroll-padding-top: 4rem;
@@ -69,6 +70,14 @@ html:has([data-home-bar]) {
   }
   html:has([data-deal-sticky]:not([inert])) {
     scroll-padding-bottom: 4.5rem;
+  }
+}
+/* From md the deal's bar is fixed at the top of the content column, so a
+   control reached by Shift+Tab is scrolled clear of it there (the pre-merge
+   audit of 2026-10-05: the phone had the rule, the desktop did not). */
+@media (min-width: 48rem) {
+  html:has([data-deal-sticky]:not([inert])) {
+    scroll-padding-top: 4rem;
   }
 }
 

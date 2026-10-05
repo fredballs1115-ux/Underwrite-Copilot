@@ -77,11 +77,15 @@ describe("the focus ring, wherever a keyboard reaches", () => {
 });
 
 describe("a focused control is never under a bar that stays on screen (WCAG 2.4.11)", () => {
-  it("scrolls clear of the homepage's header, and on a phone of the app's top bar and the deal's foot bar", () => {
+  it("scrolls clear of the homepage's header, on a phone of the app's top bar and the deal's foot bar, and from md of the deal's top bar", () => {
     expect(ruleBody("html:has([data-home-bar])")).toMatch(/scroll-padding-top: 4rem/);
     const phone = css.slice(css.indexOf("@media (max-width: 47.99rem)"));
     expect(phone).toMatch(/html:has\(\[data-app-topbar\]\) \{\s*scroll-padding-top: 7\.5rem;/);
     expect(phone).toMatch(/html:has\(\[data-deal-sticky\]:not\(\[inert\]\)\) \{\s*scroll-padding-bottom: 4\.5rem;/);
+    // From md the deal's bar sits at the top, so the padding is there too.
+    const wide = css.slice(css.indexOf("@media (min-width: 48rem)"));
+    expect(css).toContain("@media (min-width: 48rem)");
+    expect(wide).toMatch(/^@media \(min-width: 48rem\) \{\s*html:has\(\[data-deal-sticky\]:not\(\[inert\]\)\) \{\s*scroll-padding-top: 4rem;/);
     expect(src("app/page.tsx")).toMatch(/<header data-home-bar className="sticky top-0/);
     expect(src("app/(app)/app-shell.tsx")).toMatch(/<header data-app-topbar className="sticky top-0/);
     const bar = src("app/(app)/deals/[id]/deal-sticky-bar.tsx");
