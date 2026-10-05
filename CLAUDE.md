@@ -869,6 +869,70 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   basis is the all-in cost. `TileStat`'s `sub` draws it under the price
   (`data-qa="tile-sub"`); the list row's price tooltip and the CSV's
   "Basis" column carry it too.
+- **One figure, one reader** (research pass 34, 2026-10-05): a deal's
+  figure reads the same on every surface that summarizes it — the deal
+  header, the pipeline card, list and CSV, the meeting workbook, the
+  compare table, the analytics, the market memory and the internal comps —
+  because each goes through one writer. `lib/one-reader.test.ts` reads
+  deals of each shape through the reader every surface calls.
+  - **A short dollar is `compactUsd`** (lib/money): "$5.6M", "$850k",
+    "$9,350", rounded half up on its last shown place in whole numbers
+    (`scaledText`: a float's `toFixed` wrote $5,550,000 "$5.5M" on a card
+    and "$5.6M" on its memo); a thousands figure that rounds to a thousand
+    thousands is a million; a negative's U+2212 minus outside the dollar,
+    and none on a figure that rounds to nothing. Each surface's shape is an option (`millions` 1, 2
+    or "auto", `trim`, `wholeMillionsFrom`, `thousandsFrom`,
+    `thousandsPlaces`), never arithmetic of its own; the test fails on any
+    file outside lib/money that writes a compact dollar by hand.
+  - **A cap, a yield on cost and a cap range at two decimals** (`pctText`
+    in lib/plan-facts), the header's own: the card had read 6.3% beside
+    the header's 6.27%.
+  - **The cap slot where no cap of the deal's own stands** is decided by
+    `capSlotWithheld` (lib/compare-interest: a note, a preferred equity
+    position, a share beside the loan its entity carries) and said in
+    `lib/cap-slot.ts` (no imports, for the pipeline's client module; a
+    test holds its words to lib/compare-interest's): a note's yield to
+    maturity or a position's to redemption with what it runs to
+    (`OWN_YIELD`), "n/a — share" (`CAP_WITHHELD`), and on a plan deal
+    "n/a — plan" (`PLAN_CAP_NA`, the CSV's `capCellText` and the meeting
+    workbook alike), its yield on cost in a column of its own. A plan
+    deal is said to be judged on its yield on total cost, never to have
+    no cap. A cap the header withholds is pooled nowhere (the analytics,
+    the market memory, the internal comps) and set against nothing (the
+    model's exit read, `dealGoingInCap`).
+  - **A deal's kind and going-in cap read its first signal** beside the
+    extraction (`inferStrategy(ex, firstSignal)`): the memorandum's cap,
+    else the first signal's, on the header, the card, the CSV, the
+    workbook and the compare table; and the analytics, the market memory,
+    the internal comps and the deal page's comps select `first_signal` to
+    read a value-add as one.
+  - **"Outside box" wherever a deal misses its buy box outright**
+    (`fitScoreLabel` in lib/fit-label), whatever the score's call: the
+    header had printed "Fit 18 · Pass" beside the card's "Fit 18 · Outside
+    box" for one deal.
+  - **The rent rules test the building's stated unit count**
+    (`rulesSizeText` in lib/rent-regulation: "N units" from the count row
+    through `unitCountFromMetrics`, none on homes or a portfolio), never the
+    header's Size slot, which shows the area where a memorandum states
+    both and left an apartment building's unit questions open.
+- **A fit says what it was judged on** (research pass 35, 2026-10-05).
+  The score rescales over the criteria the screen could read, so a note
+  whose cap and return the box cannot judge read "Fit 100 · Pursue" on two
+  of four. `buyBoxCoverage` (lib/criteria) counts them beside the fold
+  (`BuyBoxCheck.onPrice` marks the criteria the price decides: the price
+  band, the basis, the going-in cap, the target return) and lib/fit-label
+  (no runtime imports) says it ONE way: `fitScoreLabel` puts the count in
+  the call's place ("Fit 100 · 2 of 4 checked" — a call over part of the
+  box is no call), a miss outright keeping its words ("Fit 63 · Outside
+  box · 3 of 4 checked"); `fitTone` is never green while a criterion the
+  price decides is unchecked (muted: nothing about the price was judged);
+  `fitCellText` writes an export cell ("Fits (2 of 4)", "Near (2 of 4,
+  first read)"); `checkedSentence` is the tooltip, the cell's note and the
+  verdict's brief ("Judged on 3 of the buy box's 4 criteria; target
+  return could not be checked."). Every fit reads it: the deal header's
+  chip and the screen-complete email (lib/buy-box-chip), the pipeline's
+  card, list and CSV, the meeting workbook, the compare table and the
+  batch upload's chip. A fully checked deal's words are as before.
 - A manufactured-housing park (#470): the extraction labels a park's
   figures as rows of their own, each only as stated — "Pads" (never with
   the RV sites in it), "Occupied pads", "Lot rent" (the average monthly
