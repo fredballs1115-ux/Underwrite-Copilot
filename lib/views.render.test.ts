@@ -8602,24 +8602,50 @@ describe("TaxAbatementPanel — the clock against the sale, the bill, and the NO
     expect(html.match(/data-bar="abate-sale"/g)).toHaveLength(1);
     expect(text).toContain("Ends 2029");
     expect(text).toContain("The model's sale, year 5");
-    // The bill: today's against the full one, on one scale — and on tracks
-    // of one length, the figure's column one width (research pass 36: each
-    // row had sized its own, and the two bars were drawn 5% apart).
+    // The bill: the full bill the track, the bill paid today and the
+    // step-up filling it, so the parts drawn add (audit C3a).
     expect(html.match(/data-bar="abate-now"/g)).toHaveLength(1);
+    expect(html.match(/data-bar="abate-up"/g)).toHaveLength(1);
     expect(html.match(/data-bar="abate-full"/g)).toHaveLength(1);
     const bill = html.slice(html.indexOf('data-qa="tax-abatement-bill"'), html.indexOf('data-qa="tax-abatement-noi"'));
-    expect(bill.match(/@sm\/bars:grid-cols-\[9rem_minmax\(0,1fr\)_4rem\]/g)).toHaveLength(2);
-    // Every figure the panel draws in one compact writer: the NOI's bar had
-    // read "$3,000,000" beside the model's "$8.18M".
-    expect(visibleText(bill)).toMatch(/Paid today\s+\$70k\s+Full bill\s+\$520k/);
-    // The NOI: the step-up's share marked.
+    expect(visibleText(bill)).toMatch(/Full bill \$520,000[\s\S]*Paid today, \$70,000[\s\S]*The step-up when it ends, \$450,000/);
+    // The NOI: the step-up's share marked, the step-up the bill's own figure;
+    // the NOI in the panel's compact writer (it had read "$3,000,000" beside
+    // the model's "$8.18M").
     expect(html.match(/data-bar="abate-noi"/g)).toHaveLength(1);
     expect(html.match(/data-bar="abate-step"/g)).toHaveLength(1);
     expect(text).toMatch(/The in-place NOI\s+\$3M/);
-    expect(text).toContain("15% goes to taxes when it ends: $450k a year");
+    expect(text).toContain("15% goes to taxes when it ends: $450,000 a year");
     expect(text).toContain("its exit is struck on a NOI the building no longer earns");
     expect(a11yIssues(html), "tax abatement panel").toEqual([]);
     expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("draws three figures that add, and says three that do not (audit C3a)", () => {
+    // Drawn compact, $521k less $70k had been drawn as a $450k step-up.
+    const odd = (savings?: string) =>
+      abated([
+        row("NOI (in-place)", "$3,000,000", "p. 12"),
+        row("Tax abatement", "10-year Philadelphia tax abatement"),
+        row("Tax abatement expiration", "2029"),
+        row("Abated real estate taxes", "$70,499"),
+        row("Unabated real estate taxes", "$520,500"),
+        ...(savings ? [row("Annual tax abatement savings", savings)] : []),
+      ]);
+    const text = visibleText(render(React.createElement(TaxAbatementPanel, { abatement: readTaxAbatement(odd(), AS_OF) })));
+    expect(text).toContain("Full bill $520,500");
+    expect(text).toContain("Paid today, $70,499");
+    expect(text).toContain("The step-up when it ends, $450,001");
+    expect(text).toContain("goes to taxes when it ends: $450,001 a year");
+    // A stated savings that is the bills' difference ties; one that is not
+    // is said, and no bill is drawn.
+    expect(render(React.createElement(TaxAbatementPanel, { abatement: readTaxAbatement(odd("$450,001"), AS_OF) }))).toContain('data-bar="abate-up"');
+    const html = render(React.createElement(TaxAbatementPanel, { abatement: readTaxAbatement(odd("$400,000"), AS_OF) }));
+    expect(html).not.toContain('data-bar="abate-now"');
+    expect(visibleText(html)).toContain(
+      "The memorandum's tax figures do not add: the $520,500 full bill less the $70,499 paid today is $450,001, against the $400,000 a year of savings it states.",
+    );
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
   it("no end is named as none, no model means no sale line, and nothing without an abatement", () => {

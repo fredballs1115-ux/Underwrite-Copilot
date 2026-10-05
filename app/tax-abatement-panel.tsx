@@ -1,6 +1,6 @@
 import { compactUsd } from "@/lib/money";
 import { abatementEndLabel, abatementEnded, type TaxAbatementRead } from "@/lib/tax-abatement";
-import { BarRow, BarRows, Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
+import { Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick } from "@/app/panel-parts";
 
 /**
  * A property-tax abatement (#461) — the pure panel for `lib/tax-abatement`,
@@ -13,7 +13,9 @@ import { BarRow, BarRows, Key, KeyItem, PanelHead, PanelNote, PanelRead, Tick } 
  *   - THE CLOCK: the years still abated from today, the years on the full
  *     bill after them, and the model's sale as a line where the page has
  *     the model.
- *   - THE BILL: the tax paid today against the full bill, on one scale.
+ *   - THE BILL: the full bill as the track, the tax paid today and the
+ *     step-up filling it — or, where the memorandum's three figures do not
+ *     add, the sentence that says so instead of a picture.
  *   - THE NOI: the in-place NOI with the step-up's share of it marked —
  *     what goes to taxes when the abatement ends.
  *
@@ -28,6 +30,13 @@ const pctOf = (part: number, whole: number) => `${Math.max(0, Math.min(100, (par
 // "$3,000,000" beside the model's "$8.18M" (research pass 36). Millions as
 // the model's line writes them.
 const money = (n: number) => compactUsd(n, { millions: 2, trim: true });
+// The two bills are the memorandum's own terms, which a reader checks
+// against it, so they are drawn to the dollar, and the step-up is their
+// difference to the dollar, so the three figures drawn add (audit C3a:
+// "$521k" less "$70k" had been drawn as a "$450k" step-up).
+const usd = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
+// Within a dollar, the stated savings is the bills' difference.
+const ties = (a: number, b: number) => Math.abs(a - b) <= 1;
 const years1 = (n: number) => `${(Math.round(n * 10) / 10).toFixed(1)} ${Math.round(n * 10) === 10 ? "year" : "years"}`;
 
 export function TaxAbatementPanel({
@@ -62,6 +71,22 @@ export function TaxAbatementPanel({
           : null;
   // The clock runs a year past whichever comes later, the end or the sale.
   const span = left != null ? Math.max(left, holdYears ?? 0) + 1 : null;
+  // The bill: the full bill, the part paid today and the step-up, three
+  // figures that add — or, where the memorandum also states its savings
+  // and they are not the bills' difference, three that do not.
+  const bill =
+    r.abatedTaxes != null && r.unabatedTaxes != null && r.unabatedTaxes > r.abatedTaxes
+      ? {
+          full: r.unabatedTaxes,
+          paid: r.abatedTaxes,
+          up: r.unabatedTaxes - r.abatedTaxes,
+          savings: r.savings,
+          adds: r.savings == null || ties(r.savings, r.unabatedTaxes - r.abatedTaxes),
+        }
+      : null;
+  // One figure for the step-up on the panel: to the dollar where the bills
+  // state it, compact where only the savings does.
+  const stepUpText = (n: number) => (bill ? usd(n) : money(n));
 
   return (
     <section
@@ -97,21 +122,30 @@ export function TaxAbatementPanel({
         </div>
       )}
 
-      {r.abatedTaxes != null && r.unabatedTaxes != null && r.unabatedTaxes > r.abatedTaxes && (
-        // Today's bill against the full one, on one scale and on tracks of
-        // one length: each row had sized its own figure's column, and the two
-        // bars were drawn 5% apart.
-        <BarRows className="mt-3 space-y-1.5 text-[11px]" qa="tax-abatement-bill">
-          <p className="font-medium text-ink">The tax bill a year</p>
-          {[
-            { key: "abate-now", label: "Paid today", value: r.abatedTaxes, tone: "bg-brand/70" },
-            { key: "abate-full", label: "Full bill", value: r.unabatedTaxes, tone: "bg-caution/70" },
-          ].map((b) => (
-            <BarRow key={b.key} label={b.label} figure={money(b.value)}>
-              <div className={`h-full rounded-full ${b.tone}`} data-bar={b.key} style={{ width: pctOf(b.value, r.unabatedTaxes!) }} />
-            </BarRow>
-          ))}
-        </BarRows>
+      {bill && bill.adds && (
+        // The full bill is the track; the bill paid today and the step-up
+        // fill it, so the parts drawn add to the whole they are drawn in.
+        <div className="mt-3 text-[11px]" data-qa="tax-abatement-bill">
+          <div className="flex items-baseline justify-between gap-x-3">
+            <span className="font-medium text-ink">The tax bill a year</span>
+            <span className="shrink-0 whitespace-nowrap font-mono tabular-nums text-muted">{`Full bill ${usd(bill.full)}`}</span>
+          </div>
+          <div className="mt-0.5 flex h-3 overflow-hidden rounded-full bg-faint" data-bar="abate-full" aria-hidden>
+            <div className="h-full bg-brand/70" data-bar="abate-now" style={{ width: pctOf(bill.paid, bill.full) }} />
+            <div className="h-full bg-caution/70" data-bar="abate-up" style={{ width: pctOf(bill.up, bill.full) }} />
+          </div>
+          <Key>
+            <KeyItem mark="swatch" tone="bg-brand/70">{`Paid today, ${usd(bill.paid)}`}</KeyItem>
+            <KeyItem mark="swatch" tone="bg-caution/70">{`The step-up when it ends, ${usd(bill.up)}`}</KeyItem>
+          </Key>
+        </div>
+      )}
+      {bill && !bill.adds && (
+        // Three stated figures that do not add are said, never drawn as if
+        // they did.
+        <p className="mt-3 max-w-[68ch] text-[11px] text-caution" data-qa="tax-abatement-bill">
+          {`The memorandum's tax figures do not add: the ${usd(bill.full)} full bill less the ${usd(bill.paid)} paid today is ${usd(bill.up)}, against the ${usd(bill.savings!)} a year of savings it states.`}
+        </p>
       )}
 
       {r.stepUp != null && r.noi != null && r.stepUp < r.noi && (
@@ -125,7 +159,7 @@ export function TaxAbatementPanel({
             <div className="h-full bg-caution/70" data-bar="abate-step" style={{ width: pctOf(r.stepUp, r.noi) }} />
           </div>
           <Key className="mt-1">
-            <KeyItem mark="swatch" tone="bg-caution/70">{`${Math.round(r.stepUpPctOfNoi!)}% goes to taxes when it ends: ${money(r.stepUp)} a year`}</KeyItem>
+            <KeyItem mark="swatch" tone="bg-caution/70">{`${Math.round(r.stepUpPctOfNoi!)}% goes to taxes when it ends: ${stepUpText(r.stepUp)} a year`}</KeyItem>
           </Key>
         </div>
       )}
