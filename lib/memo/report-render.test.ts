@@ -9,7 +9,7 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, rangeRead, readDay, ReportDocument } from "./report-document";
+import { buildReportData, proseDays, rangeRead, readDay, ReportDocument } from "./report-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leasehold-exit";
 import { pdfFillCountOf, pdfFillRectsOf, pdfPageTextsOf, pdfTextOf } from "./pdf-text-of";
@@ -499,13 +499,36 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain(`Loan ${usd(b.loan)} · 60% of cost · assumption`);
     expect(text).toContain(`Equity ${usd(b.equity)} · total uses less the loan`);
     expect(text).toContain("Hold 5 years · assumption");
-    expect(text).toContain(`Year-1 NOI ${usd(b.noiY1)} · derived`);
+    // The year-1 NOI's note is the rent's derivation, said as the rent's
+    // (research pass 35: it printed as the NOI's own source).
+    expect(text).toContain(
+      `Year-1 NOI ${usd(b.noiY1)} The model's rent: grossed up from the OM's NOI (pro forma) — the only NOI stated; on a stabilized asset it is next year's income (derived)`,
+    );
+    expect(text).not.toContain(`Year-1 NOI ${usd(b.noiY1)} · derived`);
+    // The exit cap the grids' bold row runs at, with where it came from.
+    expect(text).toContain(
+      "Exit cap 5.45% · derived Defaulted to the OM's stated going-in cap; the model's own year-1 NOI over its price is 5.71% — set your exit view",
+    );
     expect(text).toContain(`Total uses ${usd(b.totalUses)}`);
     expect(text).toContain(`Total sources ${usd(b.loan + b.equity)}`);
-    // The grid's terms: the rate a placeholder, said only as an assumption.
+    // The grid's terms: the rate a placeholder, said only as an assumption;
+    // the asset-management fee and the reserves every year carries, as the
+    // model holds them.
     expect(text).toContain(
-      "The grids run on a 5-year hold (assumption); a loan of 60% of cost (assumption), amortizing over 30 years; and a 6.00% all-in rate (assumption). These returns carry a 1.0% closing hold and a 2.0% cost of sale, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.",
+      "The grids run on a 5-year hold (assumption); a loan of 60% of cost (assumption), amortizing over 30 years; and a 6.00% all-in rate (assumption). Every year's cash flow carries an asset-management fee of 0.5% of equity (assumption) and capital reserves of $0.25 a square foot, grown with expenses (assumption). These returns carry a 1.0% closing hold and a 2.0% cost of sale, and no transfer or recordation tax: none is modelled on the purchase, and the cost of sale carries none a seller may owe at the exit. Set each in the Excel model, entering the jurisdiction's tax where it levies one.",
     );
+    // A memorandum that states no cap: the model's default, said as one.
+    const uncapped = await render(
+      deriveUnderwriteInputs({ ...extraction, metrics: extraction.metrics.filter((m) => !/cap/i.test(m.label)) }, SAMPLE_DEAL.name),
+    );
+    expect(uncapped.text).toContain("Exit cap 6.00% · assumption Default 6.0% — set your exit view");
+    // The sample's own model, its T-12 folded in: the trailing year's day in
+    // prose, never "TTM to 2026-05-31".
+    const actuals = sampleDerivedInputs();
+    expect(actuals.sources.inPlaceRentAnnual?.note).toContain("TTM to 2026-05-31");
+    const withActuals = await render(actuals);
+    expect(withActuals.text).toContain("The model's rent: grossed up from the T-12 actual NOI (TTM to May 31, 2026) at the T-12 actual expense ratio (derived)");
+    expect(withActuals.text).not.toContain("2026-05-31");
     // A rate seeded off today's curve prints its dated source note.
     const seeded = await render(
       deriveUnderwriteInputs(extraction, SAMPLE_DEAL.name, undefined, {
@@ -1907,6 +1930,13 @@ describe("ReportDocument (full report)", () => {
     expect(readDay("")).toBe("");
     expect(readDay(null)).toBe("");
     expect(readDay("last week")).toBe("last week");
+    // A source note's stored days, in prose (research pass 35); anything
+    // that is no calendar day is left as written.
+    expect(proseDays("Grossed up from the T-12 actual NOI (TTM to 2026-05-31) at the T-12 actual expense ratio")).toBe(
+      "Grossed up from the T-12 actual NOI (TTM to May 31, 2026) at the T-12 actual expense ratio",
+    );
+    expect(proseDays("Rent roll actual as of 2026-05-01, re-read 2026-09-30")).toBe("Rent roll actual as of May 1, 2026, re-read Sep 30, 2026");
+    expect(proseDays("Lot 2026-13-45; parcel 1999-02-30")).toBe("Lot 2026-13-45; parcel 1999-02-30");
   });
 
   it("reads the OM's figure onto its typical range", () => {

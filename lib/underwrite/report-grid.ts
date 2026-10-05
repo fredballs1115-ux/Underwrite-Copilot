@@ -386,6 +386,18 @@ export interface BaseCase {
   amortYears: number;
   /** months of interest-only; 999 is the whole term */
   ioMonths: number;
+  /** the exit cap, decimal, with its source — the grids' bold row, and on a
+   *  deal whose memorandum states no cap the model's default (research
+   *  pass 35: the base case named neither) */
+  exitCap: number;
+  exitCapSource: InputSource | null;
+  /** what every year's cash flow carries below the NOI, each with its
+   *  source: the asset-management fee (decimal of equity a year) and the
+   *  capital reserves ($ a square foot a year, grown with expenses) */
+  amFee: number;
+  amFeeSource: InputSource | null;
+  reservesPsf: number;
+  reservesSource: InputSource | null;
   leveredIrr: number | null;
   equityMultiple: number | null;
   cocY1: number | null;
@@ -418,6 +430,12 @@ export function buildBaseCase(inputs: UnderwriteInputs, sources: ModelSources): 
     rateSource: sources.allInRatePct ?? null,
     amortYears: inputs.amortMonths / 12,
     ioMonths: inputs.ioMonths,
+    exitCap: inputs.exitCapPct,
+    exitCapSource: sources.exitCapPct ?? null,
+    amFee: inputs.amFeePctEquity,
+    amFeeSource: sources.amFeePctEquity ?? null,
+    reservesPsf: inputs.reservesPsf,
+    reservesSource: sources.reservesPsf ?? null,
     leveredIrr: uw.returns.leveredIrrPct,
     equityMultiple: uw.returns.leveredEquityMultiple,
     cocY1: y1 && su.equity > 0 ? y1.leveredCashFlow / su.equity : null,

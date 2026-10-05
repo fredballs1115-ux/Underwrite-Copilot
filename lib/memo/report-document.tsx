@@ -115,6 +115,20 @@ export function readDay(v: string | null | undefined): string {
   return new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 }
 
+/**
+ * A source note's stored days as a reader writes them: "TTM to 2026-05-31"
+ * reads "TTM to May 31, 2026" (research pass 35). Only a real calendar day
+ * changes; anything else is left as written. The notes keep their ISO days
+ * where they are stored, for the workbook's Sources column.
+ */
+export function proseDays(s: string): string {
+  return s.replace(/\b(\d{4})-(\d{2})-(\d{2})\b/g, (iso, y, m, d) => {
+    const t = Date.UTC(Number(y), Number(m) - 1, Number(d));
+    const back = new Date(t);
+    return back.getUTCFullYear() === Number(y) && back.getUTCMonth() === Number(m) - 1 && back.getUTCDate() === Number(d) ? readDay(iso) : iso;
+  });
+}
+
 const SEV_COLOR: Record<string, string> = {
   high: C.kill,
   medium: C.caution,
@@ -1189,7 +1203,7 @@ const fmtUsd0 = (n: number): string => `$${Math.round(n).toLocaleString("en-US")
  */
 export function sourceSays(src: InputSource | null | undefined, totalPages: number | null): string {
   if (!src) return "";
-  const note = (src.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  const note = proseDays((src.note ?? "").trim().replace(/[.;,\s]+$/, ""));
   const page = citedPage(src.page, totalPages);
   const tag =
     src.provenance === "extracted" ? (page === "—" ? "" : page) : src.provenance === "derived" ? "derived" : "assumption";
@@ -1212,8 +1226,11 @@ const xOrDash = (d: number | null | undefined, dp = 2) => (d == null || !Number.
 /**
  * The terms the grids run on, said under them: the hold, the loan against
  * cost and how it amortizes, the rate with its source note — dated where
- * today's curve seeded it — each with its provenance, then what the returns
- * carry for buying and selling (the deal page's playground's own line).
+ * today's curve seeded it — each with its provenance; then what every
+ * year's cash flow carries below the NOI, the asset-management fee and the
+ * capital reserves (research pass 35: both came out of every return and
+ * were named nowhere in the report); then what the returns carry for buying
+ * and selling (the deal page's playground's own line).
  */
 export function gridTermsLine(b: BaseCase, totalPages: number | null): string {
   const tag = (src: InputSource | null) => (src ? ` (${provenanceOf(src, totalPages)})` : "");
@@ -1226,13 +1243,22 @@ export function gridTermsLine(b: BaseCase, totalPages: number | null): string {
   // The seeded rate's note names the index and its day ("5-yr Treasury
   // 4.78% (FRED, Sep 17, 2026) + 200 bps …"); a placeholder's is only the
   // instruction to enter one, which the provenance already says.
-  const rawNote = (b.rateSource?.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  const rawNote = proseDays((b.rateSource?.note ?? "").trim().replace(/[.;,\s]+$/, ""));
   const rateNote = /^enter\b/i.test(rawNote) ? "" : rawNote;
-  return [
-    `The grids run on ${withArticle(`${b.holdYears}-year hold`)}${tag(b.holdSource)}`,
-    `a loan of ${(b.ltc * 100).toFixed(0)}% of cost${tag(b.ltcSource)}, ${amort}`,
-    `and ${withArticle(`${(b.rate * 100).toFixed(2)}% all-in rate`)}${rateNote ? `: ${rateNote}` : ""}${tag(b.rateSource)}.`,
-  ].join("; ") + ` ${b.costLine}`;
+  // Each as the model holds it, never a figure typed here.
+  const yearly = [
+    b.amFee > 0 ? `an asset-management fee of ${Number((b.amFee * 100).toFixed(2))}% of equity${tag(b.amFeeSource)}` : "",
+    b.reservesPsf > 0 ? `capital reserves of $${b.reservesPsf.toFixed(2)} a square foot, grown with expenses${tag(b.reservesSource)}` : "",
+  ].filter(Boolean);
+  return (
+    [
+      `The grids run on ${withArticle(`${b.holdYears}-year hold`)}${tag(b.holdSource)}`,
+      `a loan of ${(b.ltc * 100).toFixed(0)}% of cost${tag(b.ltcSource)}, ${amort}`,
+      `and ${withArticle(`${(b.rate * 100).toFixed(2)}% all-in rate`)}${rateNote ? `: ${rateNote}` : ""}${tag(b.rateSource)}.`,
+    ].join("; ") +
+    (yearly.length > 0 ? ` Every year's cash flow carries ${yearly.join(" and ")}.` : "") +
+    ` ${b.costLine}`
+  );
 }
 
 /**
@@ -1264,7 +1290,15 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
       <Text style={{ fontSize: 7.5, color: C.ink, fontFamily: bold ? "Helvetica-Bold" : "Helvetica" }}>{fmtUsd0(n)}</Text>
     </View>
   );
-  const noiNote = (b.noiSource?.note ?? "").trim().replace(/[.;,\s]+$/, "");
+  // The year-1 NOI's note is the rent input's: how the model's rent was
+  // backed out of the NOI it anchors on, which names that NOI. Said as the
+  // rent's, with the rent's provenance (research pass 35: printed under the
+  // NOI as its own source, with an ISO day in it).
+  const rentNote = proseDays((b.noiSource?.note ?? "").trim().replace(/[.;,\s]+$/, ""));
+  const noiNote = rentNote
+    ? `The model's rent: ${rentNote[0].toLowerCase()}${rentNote.slice(1)}${b.noiSource ? ` (${provenanceOf(b.noiSource, totalPages)})` : ""}`
+    : "";
+  const exitNote = proseDays((b.exitCapSource?.note ?? "").trim().replace(/[.;,\s]+$/, ""));
   return (
     <View style={{ marginBottom: 10 }} wrap={false}>
       <TitleRow title="The base case" count="the ink-bordered cells" marginTop={0} />
@@ -1282,7 +1316,10 @@ function BaseCaseBlock({ b, totalPages }: { b: BaseCase; totalPages: number | nu
           {line("Loan", `${fmtUsd0(b.loan)} · ${(b.ltc * 100).toFixed(0)}% of cost · ${provenanceOf(b.ltcSource, totalPages)}`)}
           {line("Equity", `${fmtUsd0(b.equity)} · total uses less the loan`)}
           {line("Hold", `${b.holdYears} years · ${provenanceOf(b.holdSource, totalPages)}`)}
-          {line("Year-1 NOI", `${fmtUsd0(b.noiY1)} · ${provenanceOf(b.noiSource, totalPages)}`, noiNote)}
+          {line("Year-1 NOI", fmtUsd0(b.noiY1), noiNote)}
+          {/* The exit the grids' bold row runs at, and where it came from:
+              on a memorandum that states no cap, the model's default. */}
+          {line("Exit cap", `${(b.exitCap * 100).toFixed(2)}%${b.exitCapSource ? ` · ${provenanceOf(b.exitCapSource, totalPages)}` : ""}`, exitNote)}
         </View>
         <View style={{ width: "42%" }}>
           <Text style={{ fontSize: 6.5, letterSpacing: 0.6, color: C.muted, marginBottom: 2 }}>USES</Text>
