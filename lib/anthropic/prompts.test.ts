@@ -464,6 +464,11 @@ describe("trap lists keyed on the memorandum's own words", () => {
     for (const trap of ["(a) FEDERAL LAW AND THE FINANCING", "(b) THE LICENSE", "(c) THE RENT PREMIUM", "(d) THE BUILDING WITHOUT THE TENANT"]) {
       expect(p, trap).toContain(trap);
     }
+    // Research pass 28: the screen's own model finances such a building as
+    // it does any other — said, and the model unchanged.
+    expect(p).toContain(
+      "The screen's own model finances the building with an ordinary loan at its default loan-to-cost, as if any lender would make it: its levered returns rest on financing a cannabis-tenant building may not get.",
+    );
     const sp = challengerInstruction("auto", ["special_purpose"]);
     for (const trap of ["(a) THE USE PERMIT AND THE ZONING", "(b) LANDMARK OR HISTORIC STATUS", "(c) DEED RESTRICTIONS", "(d) THE TAX EXEMPTION"]) {
       expect(sp, trap).toContain(trap);
