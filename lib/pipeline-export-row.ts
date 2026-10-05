@@ -6,7 +6,7 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { buyBoxCheckSource, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
 import { capSlotWithheld, noteCapSlot, ownYieldText } from "@/lib/compare-interest";
-import { findPriceMetric, inferStrategy, planSummary } from "@/lib/deal-strategy";
+import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
 import { assumableTag } from "@/lib/assumable-debt";
 import { affordableTag } from "@/lib/affordable";
@@ -110,7 +110,11 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // says it (lib/interest `dealTypeLabel`).
     dealType: strategy.kind === "unknown" ? null : dealTypeLabel(strategy.label, extraction),
     planDeal: plan != null,
-    price: findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? null,
+    // The pipeline card's own price reader: the memorandum's, else the first
+    // signal's ask before the extraction lands — only where it is a figure
+    // (`signalAskPrice`). A first screen's row had read "—" beside the
+    // card's price.
+    price: findPriceMetric(metrics, strategy.kind, screenYearOf(extraction))?.value ?? signalAskPrice(signal),
     interest: interestTag(extraction, asOf),
     debt: assumableTag(extraction),
     affordable: affordableTag(extraction),

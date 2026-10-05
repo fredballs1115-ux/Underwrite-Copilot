@@ -284,6 +284,25 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(pipelineExportRow(deal(), ctx)).toMatchObject({ cap: "5.90%", capWithheld: null, noteYield: null });
   });
 
+  it("prices a first screen's row from the first signal's ask, as the card does, before the extraction lands (research pass 34)", async () => {
+    const early = pipelineExportRow(deal({ extraction: null, first_signal: SIGNAL }), ctx);
+    expect(early.price).toBe("$20,000,000");
+    expect(early.price).toBe(pickSlots(null, SIGNAL).price);
+    const buf = await buildPipelineWorkbook([early], new Date("2026-09-08T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    // Row 6 is the deal; column 7 its price, a number the sheet can sum.
+    expect(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).value).toBe(20_000_000);
+    // A word where a price goes is no price, on the card or the sheet.
+    for (const askPrice of ["Call for offers", "Unpriced", ""]) {
+      const row = pipelineExportRow(deal({ extraction: null, first_signal: { ...SIGNAL, askPrice } }), ctx);
+      expect(row.price, askPrice).toBeNull();
+      expect(row.price, askPrice).toBe(pickSlots(null, { ...SIGNAL, askPrice }).price);
+    }
+    // The memorandum's price wins once it is read.
+    expect(pipelineExportRow(deal({ first_signal: { ...SIGNAL, askPrice: "$19,000,000" } }), ctx).price).toBe("$41,250,000");
+  });
+
   it("says whose strategy the deal type is on a note or a leased fee, as the deal header does", async () => {
     const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
     const sold = (kind: "note" | "leased_fee" | "fee_simple") =>
