@@ -27,11 +27,48 @@ how the site is built, so they are yours to decide:
    yours does is a setting in Supabase (Auth → JWT signing keys).
 
 Rent regulation now reaches the screen (NYC's 0% Order #58 renewals, DC's
-4.1% and 2.1% caps, LA's 3%, Washington's and Takoma Park's figures, each
-filed only as a primary source printed it). The model still grows every
-rent at one rate; growing regulated units at the allowance is the model-
-math item already below. San Francisco's page refuses the runner, so no
-SF figure is filed; a source the runner can read would let one in.
+4.1% and 2.1% caps, LA's 3%, Montgomery County's 5.2%, Washington's and
+Takoma Park's figures, each filed only as a primary source printed it).
+The model still grows every rent at one rate; growing regulated units at
+the allowance is the model-math item already below. San Francisco's and
+Prince George's pages refuse the runner and Jersey City's states no
+figure, so none is filed for them; a source the runner can read would let
+one in.
+
+**A forward purchase or build-to-suit** is now read apart from a
+development (the price paid at delivery, the developer's works, the
+delivery clock, the deposit). One decision is yours, because it changes
+the model's math: run the model on the memorandum's NOI at delivery (and
+its delivery cap as the exit default) instead of refusing that figure and
+assuming 6% of the price, and put the deposit paid at signing into the
+cash flows. Pass 28 measured the 180-home build-to-rent example: 8.27%
+unlevered and 10.43% levered today, against 6.19% and 5.69% on the
+memorandum's $3.96M at the same 6% exit, or 7.77% and 9.29% with the exit
+at its stated 5.5%.
+
+**Pictures (research pass 29, judged by eye on the real components).**
+The defects that were ours are being fixed in this batch (the market
+caption's contrast, a credit shown over the drawn cover while a photo
+loads, cards too narrow at tablet widths, the phone bands, tower tops cut
+on laptop bands, and smaller items). These five are yours:
+1. **Portrait covers lose their tops.** A tall memorandum cover cut to the
+   card's or header's wide frame keeps its middle, so a tower's crown and
+   spire go; the memo's and the email's crops keep them. Proposal: anchor
+   only a portrait source's crop at its top third. It reverses the
+   recorded "crops stay centred" decision for that one case.
+2. **The memo's cover photograph is 1.45 inches** in the header's corner.
+   A listing flyer leads with the photograph across the top; that is a
+   layout change to the one-page memo.
+3. **The deal page leads with the USGS overhead** where a deal has no
+   photograph and no market photograph (and shows nothing with no
+   address), while its pipeline card wears the drawn cover. Leading with
+   the cover there, the aerial one step along, is yours to decide.
+4. **A photograph per comparable**: a memorandum's sale-comps pages
+   usually print one; lifting them is an extraction change.
+5. **A photograph of every building without one** needs a new source: the
+   Street View key (above, with Google's terms), or Mapillary (CC BY-SA,
+   but its terms restrict building a database of places). Never a listing
+   portal's photograph.
 
 ## 🟢 2026-09-30 — the batch (PR #462): what it needs from you
 
@@ -2320,9 +2357,16 @@ overhead shot. Without it nothing breaks or looks broken.
    without it and fails only here.
 3. **Billing** must be enabled on the project. Google's free allowance for
    Street View is a Pro-SKU tier (roughly 5,000 calls/month at the time of
-   writing — confirm on Google's pricing page, it changes). Our metadata
-   verdict is cached per deal for 30 days, so a deal costs about one call,
-   not one per page view.
+   writing — confirm on Google's pricing page, it changes). **Nothing is
+   cached** (since Oct 5): Google's policies prohibit keeping its imagery
+   (only place and panorama IDs may be stored), so every view of a Street
+   View photograph is one billed image request; the metadata check before
+   it does not consume quota. Set a daily quota cap in the Cloud console.
+   Google also asks for its logo as the attribution "whenever possible"
+   (the site writes "Street View imagery © Google" in words), and for
+   public Terms of Use and a Privacy Policy linked in the footer, which
+   every signed-in page now has; read `/terms` and `/privacy` against
+   Google's requirements before the key goes in.
 4. **Credentials → Create credentials → API key.** Restrict it under **API
    restrictions** to the Street View Static API. Do NOT add an HTTP-referrer
    restriction: this key is used server-side and sends no referrer, so a
