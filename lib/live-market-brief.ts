@@ -62,7 +62,9 @@ export interface LiveMarketInput {
    *  office or industrial reads no neighbour's rent index (`rentIndexFor`) */
   deckWords?: string | null;
   /** a plan deal (development, conversion) also reads the construction
-   *  lenders' standards */
+   *  lenders' standards — never a forward purchase, whose developer funds
+   *  the works (lib/forward-purchase `readsConstructionLending`, which the
+   *  pipeline and the deal page both ask) */
   plan?: boolean;
   /** the deal builds something (lib/deal-strategy `buildsSomething`: a
    *  development, a conversion, or a value-add with a stated budget), so it

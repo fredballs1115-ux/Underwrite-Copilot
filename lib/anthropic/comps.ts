@@ -41,6 +41,9 @@ export async function scrutinizeComps(
   /** what the screen established — the deal's kind and, on a plan deal, the
    *  plan's figures — so the comps are held against the right basis */
   context?: string | null,
+  /** a forward purchase (lib/forward-purchase): its paragraph stands where
+   *  a plan's would — the price is the buyer's whole cost at delivery */
+  forward = false,
 ): Promise<BrokerCompsResult> {
   const client = getAnthropic();
 
@@ -57,7 +60,7 @@ export async function scrutinizeComps(
           // its own, is the ledger's to say — ./models); the context rides
           // after it so nothing that varies by deal sits before it.
           omDocument(om),
-          { type: "text", text: brokerCompsInstruction(context) },
+          { type: "text", text: brokerCompsInstruction(context, forward) },
           // Today's date, which a comp's age is judged against
           // (lib/anthropic/today).
           { type: "text", text: todayLine() },

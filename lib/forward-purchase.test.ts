@@ -22,6 +22,7 @@ import {
   isForwardPurchase,
   readDeliveryDate,
   readForwardPurchase,
+  readsConstructionLending,
 } from "./forward-purchase";
 import { gluedWords, visibleText } from "./render-lint";
 import { extractionInstruction } from "./anthropic/prompts";
@@ -205,6 +206,20 @@ describe("a forward purchase, read as stated (pass 28)", () => {
     } as unknown as ExtractionResult;
     expect(readForwardPurchase(standing, TODAY)).toBeNull();
     expect(readForwardPurchase(null, TODAY)).toBeNull();
+  });
+
+  // Research pass 41: the market check read the construction lenders'
+  // standards for a purchase whose developer funds the works.
+  it("reads no construction lending for a forward purchase; every other plan deal reads it", () => {
+    expect(readsConstructionLending(bts)).toBe(false);
+    expect(readsConstructionLending(btr)).toBe(false);
+    const own = deal("Ground-up 240-unit apartment community", [row("Land cost", "$9,000,000"), row("Total project cost", "$70,000,000")]);
+    expect(readsConstructionLending(own)).toBe(true);
+    const leaseUp = { ...own, strategy: { kind: "lease_up", summary: "", capitalBudget: "", timeline: "" } } as unknown as ExtractionResult;
+    expect(readsConstructionLending(leaseUp)).toBe(true);
+    const standing = { ...bts, strategy: { kind: "stabilized", summary: "Fully leased", capitalBudget: "", timeline: "" } } as unknown as ExtractionResult;
+    expect(readsConstructionLending(standing)).toBe(false);
+    expect(readsConstructionLending(null)).toBe(false);
   });
 
   // The audit of 2026-10-05: a deposit that steps up was said at its first

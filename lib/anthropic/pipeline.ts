@@ -62,7 +62,7 @@ import { readStudentHousing, studentNote } from "@/lib/student-housing";
 import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageNote } from "@/lib/self-storage";
 import { regulationForDeal, regulationNote, type RegulationRead } from "@/lib/rent-regulation";
-import { forwardNote, readForwardPurchase } from "@/lib/forward-purchase";
+import { forwardNote, isForwardPurchase, readForwardPurchase, readsConstructionLending } from "@/lib/forward-purchase";
 import { mixedUseNote, readMixedUse } from "@/lib/mixed-use";
 import { goingConcernNote, readGoingConcern } from "@/lib/going-concern";
 import { condoNote, readCondo } from "@/lib/condo";
@@ -444,6 +444,16 @@ function screenRegulation(
   );
 }
 
+/** What the screen established, for the steps after the extraction. */
+interface ScreenContext {
+  /** the deal context (lib/deal-context), or null with nothing to say */
+  text: string | null;
+  /** a forward purchase (lib/forward-purchase): the comps and the market
+   *  check read its paragraph where a plan's would, as the challenger and
+   *  the verdict do (research pass 41) */
+  forward: boolean;
+}
+
 /**
  * What the screen established about the deal — its kind and, on a plan deal,
  * the plan's figures — for the steps that read the OM after the extraction.
@@ -453,26 +463,29 @@ async function dealContextFromDb(
   admin: ReturnType<typeof createSupabaseAdminClient>,
   dealId: string,
   flags: SiteFlagsResult | null,
-): Promise<string | null> {
+): Promise<ScreenContext> {
   try {
     const { data } = await admin
       .from("deals")
       .select("extraction, first_signal, address, asset_class")
       .eq("id", dealId)
       .single();
+    const ex = (data?.extraction as ExtractionResult | null) ?? null;
+    const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
     // Where the FEMA lookup has answered (`siteFlagsForScreen`), the step
     // reads the flood zone too (#426). The deal's kind is read with the
     // first signal beside the extraction, as the market figures read it.
     // The rent rules are read after the lookup, so a city's regime reads the
     // building's own municipality where the Census geocoder named it.
-    return dealContextFor(
-      (data?.extraction as ExtractionResult | null) ?? null,
+    const text = dealContextFor(
+      ex,
       flags && flags.status !== "pending" ? { flood: flags.flood, pointIsBuilding: flags.pointIsBuilding } : null,
-      (data?.first_signal as FirstSignal | null | undefined) ?? null,
+      firstSignal,
       screenRegulation(data, flags),
     );
+    return { text, forward: !!ex && isForwardPurchase(ex, inferStrategy(ex, firstSignal)) };
   } catch {
-    return null;
+    return { text: null, forward: false };
   }
 }
 
@@ -575,8 +588,11 @@ async function liveMarketFromDb(
     // a deal only the first signal calls a development or a conversion is a
     // plan here too, and reads what building costs (the audit of 2026-09-30).
     const firstSignal = (data?.first_signal as FirstSignal | null | undefined) ?? null;
-    const kind = inferStrategy(ex, firstSignal).kind;
-    const plan = isPlanDeal(kind);
+    const strategy = inferStrategy(ex, firstSignal);
+    const kind = strategy.kind;
+    // The construction lenders' standards on a plan deal, never a forward
+    // purchase's: its developer funds the works (research pass 41).
+    const plan = readsConstructionLending(ex, strategy);
     // What building costs is read only where the deal builds something — a
     // development, a conversion, a value-add with a stated budget — never a
     // lease-up's finished building (lib/deal-strategy buildsSomething).
@@ -1504,10 +1520,11 @@ async function runAnalysisSteps(
         : await storedSiteFlags(admin, dealId);
     // What the screen established, built ONCE for the comps, the market
     // check and the verdict, so the three are told the same thing.
-    const dealContext = await dealContextFromDb(admin, dealId, siteFlags);
+    const screen = await dealContextFromDb(admin, dealId, siteFlags);
+    const dealContext = screen.text;
     if (!completed.has("comps")) {
       await patchJob(dealId, { status: "running", step: "comps", progress: 50 });
-      const comps = manual ? manualCompsStub() : await scrutinizeComps(om(), dealContext);
+      const comps = manual ? manualCompsStub() : await scrutinizeComps(om(), dealContext, screen.forward);
       await writeResult(admin, dealId, "comps", comps);
       await markDone("comps");
     }
@@ -1522,7 +1539,13 @@ async function runAnalysisSteps(
       // One block a market, the address's first: a portfolio's other
       // markets follow in blocks of their own (#413).
       const handed = [primary, ...others].filter((b): b is LiveMarketBrief => !!b).map((b) => b.text);
-      const checked = await checkMarket(om(), assetClass, dealContext, handed.length > 0 ? handed.join("\n\n") : null);
+      const checked = await checkMarket(
+        om(),
+        assetClass,
+        dealContext,
+        handed.length > 0 ? handed.join("\n\n") : null,
+        screen.forward,
+      );
       const record = (b: LiveMarketBrief) => ({
         metro: b.metro,
         grain: b.grain,

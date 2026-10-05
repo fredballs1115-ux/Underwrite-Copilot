@@ -358,13 +358,24 @@ ${context.trim()}
 </deal_context>`;
 }
 
-/** Step 3 — Broker-comp scrutiny (the sale & lease comps inside the OM) */
-export function brokerCompsInstruction(context?: string | null): string {
+/** How a plan deal's comps are read: against the finished product's total
+ *  cost, never the shell's or the land's price. */
+const PLAN_COMPS_CLAUSE = `IF THE OM DESCRIBES A PLAN — a conversion, a ground-up development, a lease-up, a heavy value-add — the comps are for the FINISHED product, not the building as bought. Hold sale comps against the subject's total cost per unit or per SF (price plus the full construction or renovation budget), never against the shell's or the land's price; hold lease comps against the rents behind the stabilized pro forma, and say whether they are today's leased rents for finished product of that quality and vintage or the sponsor's hopes. A comp set that shows only finished-product trades with no cost-to-build comparison, or only new-delivery rents, leans favorable by construction.`;
+
+/** A forward purchase's comps in the plan paragraph's place (research pass
+ *  41, as the challenger's `FORWARD_CLAUSE`): the price is the buyer's whole
+ *  cost at delivery, so nothing is added to it. */
+const FORWARD_COMPS_CLAUSE = `THIS OM SELLS A FORWARD PURCHASE — a building bought when it is finished: the buyer pays the price at delivery and the developer funds the works, so no construction budget, carry or construction loan is the buyer's, and the comps are for the FINISHED product. Hold sale comps against the price per unit or per SF — the buyer's whole cost at delivery, never the price plus the developer's budget — and a comp's cap against the yield struck at delivery (the NOI the OM states at delivery over the price), never against a going-in cap on a building that stands today; hold lease comps against the rents behind the NOI at delivery, and say whether they are today's leased rents for finished product of that quality and vintage or the sponsor's hopes. A comp set that shows only new-delivery rents leans favorable by construction.`;
+
+/** Step 3 — Broker-comp scrutiny (the sale & lease comps inside the OM).
+ *  `forward` is a forward purchase (lib/forward-purchase): its paragraph
+ *  stands where a plan's would, as the challenger's does. */
+export function brokerCompsInstruction(context?: string | null, forward = false): string {
   return `Scrutinize the comparable sales and lease comps included in the attached offering memorandum. These come from the OM itself — do NOT use any outside data source. An OM's comp set is assembled by the sell side to support the asking price — that's the incentive at work, not misconduct — so your job is to extract every comp shown, judge how well each actually supports the subject deal's pricing and rents, and flag selection bias. Describe the incentive, never the party: say "the comp set leans favorable" or "seller assumptions run aggressive," not that anyone cherry-picked or misled.
 
 Extract both sale comps and lease comps if present. For each comp, \`detail\` leads with what the OM states of its basis — for a sale comp the price per unit (or per SF, or per key) and the cap rate, then the date and size, as in "$252k/unit · 5.4% cap · Mar 2026 · 210 units"; for a lease comp the rent and the unit type or space, as in "$2,520/mo · 2BR" or "$38/SF NNN · 12,000 SF" — and carries nothing the OM does not state (a comp whose terms the OM withholds says so). Record \`page\` — the OM page it appears on, as a short string like "p. 31" (empty string if unknown) — then compare it to the subject property and rate it: \`supports\` (genuinely backs the OM's numbers), \`favorable\` (leans the seller's way), or \`stretched\` (doesn't really support the deal). Also identify what's conspicuously missing — recent weaker trades omitted, only the best submarkets shown, or stale comps used because recent ones are unfavorable.
 
-IF THE OM DESCRIBES A PLAN — a conversion, a ground-up development, a lease-up, a heavy value-add — the comps are for the FINISHED product, not the building as bought. Hold sale comps against the subject's total cost per unit or per SF (price plus the full construction or renovation budget), never against the shell's or the land's price; hold lease comps against the rents behind the stabilized pro forma, and say whether they are today's leased rents for finished product of that quality and vintage or the sponsor's hopes. A comp set that shows only finished-product trades with no cost-to-build comparison, or only new-delivery rents, leans favorable by construction.
+${forward ? FORWARD_COMPS_CLAUSE : PLAN_COMPS_CLAUSE}
 
 If the OM contains no comps at all, say so clearly in the summary and return empty comp lists. Finish with a one-sentence verdict: does the OM's comp set actually justify the pricing, or is it stretched?${dealContextClause(
     context,
@@ -384,7 +395,18 @@ Finish with a one-sentence takeaway: does the buyer's model support or undercut 
   )}`;
 }
 
-/** Step 5 — Market plausibility check */
+/** How a plan deal's figures are checked: the finished product's, and the
+ *  budget against typical costs. */
+const PLAN_MARKET_CLAUSE = `If the OM describes a plan (a conversion, development, lease-up or heavy value-add), its stabilized pro forma is the finished project's figure — check the rents, occupancy and operating ratio BEHIND it against typical ranges for finished product in that submarket, the construction or renovation budget against typical costs per SF or per unit for that kind of work, and the lease-up pace against typical absorption; do not compare the stabilized NOI to the acquisition price as if it were a cap rate.`;
+
+/** A forward purchase's check in the plan paragraph's place (research pass
+ *  41, as the challenger's `FORWARD_CLAUSE`): the developer's budget is not
+ *  the buyer's, and the yield is struck at delivery. */
+const FORWARD_MARKET_CLAUSE = `This OM sells a forward purchase — a building bought when it is finished: the buyer pays the price at delivery and the developer funds the works, so the price is the buyer's whole cost and no construction budget, carry or construction loan is the buyer's — none is checked against typical costs as the buyer's. The NOI it states at delivery is the delivered building's figure — check the rents, occupancy and operating ratio BEHIND it against typical ranges for finished product in that submarket, and the lease-up pace against typical absorption where it delivers with space to lease. The yield is struck at delivery — that NOI over the price — never as a going-in cap on a building that stands today.`;
+
+/** Step 5 — Market plausibility check. `forward` is a forward purchase
+ *  (lib/forward-purchase): its paragraph stands where a plan's would, as
+ *  the challenger's does. */
 export function marketCheckInstruction(
   assetClass: AssetClass,
   context?: string | null,
@@ -392,6 +414,7 @@ export function marketCheckInstruction(
    *  market (lib/live-market-brief's `text`) — appended after the deal
    *  context, so the cached document prefix stays byte-identical */
   liveMarket?: string | null,
+  forward = false,
 ): string {
   return `Sanity-check the offering memorandum's key assumptions against general market norms for the asset class and submarket. ${assetClassClause(
     assetClass,
@@ -401,7 +424,7 @@ You do NOT have a live comps feed — reason from typical ranges and explicitly 
 
 Two demand-side traps to check by name: absorption or demand claims that never mention the SUPPLY side (competing space delivering into the same submarket), and growth stories resting on projected population or job growth rather than evidence that exists today — in-place rents, current occupancy, existing rooftops. The OM's own leasing anecdotes are the seller's narrative, not market data.
 
-If the OM describes a plan (a conversion, development, lease-up or heavy value-add), its stabilized pro forma is the finished project's figure — check the rents, occupancy and operating ratio BEHIND it against typical ranges for finished product in that submarket, the construction or renovation budget against typical costs per SF or per unit for that kind of work, and the lease-up pace against typical absorption; do not compare the stabilized NOI to the acquisition price as if it were a cap rate.
+${forward ? FORWARD_MARKET_CLAUSE : PLAN_MARKET_CLAUSE}
 
 Be clear throughout that these are rules-of-thumb, not pulled comps, and must be verified against real market data.${sectorNormsClause(
     assetClass,
@@ -543,8 +566,18 @@ CONVENTION: every field ending in Pct (including ltvPct and ratePct) is a percen
 Finally: a one-paragraph \`summary\` of how the sources reconciled and what drives the returns, and \`caveats\` — what the buyer must verify, what was uncertain or missing, and the model's simplifications. Everything is a first draft to verify, with every number traceable to a source.`;
 }
 
-/** Step 6 — Verdict (synthesizes everything above) */
-export function verdictInstruction(): string {
+/** A plan deal's basis range and deal-killers in the verdict, and a forward
+ *  purchase's in their place (research pass 41, as the challenger's
+ *  `FORWARD_CLAUSE`): the price is the buyer's whole cost at delivery, no
+ *  construction is the buyer's, and the yield is struck at delivery. */
+const PLAN_BASIS_RANGE = `on a plan deal named in the brief, TOTAL COST per unit or per SF, never the shell's or the land's price alone`;
+const FORWARD_BASIS_RANGE = `on the forward purchase the brief names, the PRICE per unit or per SF — the buyer's whole cost at delivery, never the price plus the developer's budget`;
+const PLAN_KILLERS = `When the brief names a deal strategy with a plan (conversion, development, lease-up, value-add), read the three on the plan's terms: basis is total cost per unit or per SF, exit is the stabilized NOI at the exit cap against that total cost, debt is the construction or bridge financing and the carry through the works — and the stabilized pro forma is the finished project's figure to be tested for conservatism, never a misread and never a going-in cap on the price.`;
+const FORWARD_KILLERS = `The brief names a forward purchase — a building bought when it is finished, the price paid at delivery and the works funded by the developer: read the three on the purchase's terms. Basis is the price per unit or per SF, the buyer's whole cost at delivery, never the price plus the developer's budget; exit is the yield struck at delivery (the NOI the OM states at delivery over the price) against the exit cap; debt is the buyer's own loan at closing, struck at the rates of the closing day — no construction or bridge loan, no interest reserve and no carry through the works is the buyer's. The NOI at delivery is the delivered building's figure to be tested for conservatism, never today's income and never a going-in cap on a building that stands.`;
+
+/** Step 6 — Verdict (synthesizes everything above). `forward` is a forward
+ *  purchase (lib/forward-purchase): its words stand where a plan's would. */
+export function verdictInstruction(forward = false): string {
   return `You are the head of acquisitions making a first-pass screen decision. Using the gathered analysis provided below — the extracted terms, the challenges and stress test, the comp scrutiny, the reconciliation against the buyer's model, and the market plausibility check — give a clear go / no-go for spending more time on this deal.
 
 The brief opens with what the screen established about the deal, checked in code: what is being sold, how it is sold, the deal's kind and the building's own basis. Read every figure after it in that light. Where it says a price is not the building's — a note's price is a loan's, a share's price buys the share and the building's is the whole it implies, a leased fee's price buys the land — or that a figure is not a price at all — an auction's starting bid is where the bidding opens — never strike a basis, a cap or a return on that figure: build the basis on the figure the brief computes, or say there is none and why.
@@ -552,8 +585,8 @@ The brief opens with what the screen established about the deal, checked in code
 Choose a verdict: \`pass\` (worth deeper work), \`caution\` (proceed only with named conditions), or \`pass_on\` (kill it). Give a two-sentence rationale, the top risks, and — if pursuing — the 2–3 concrete next steps.
 
 Then produce the pre-model \`screen\` — the part that makes this reproducible instead of a coin flip:
-- \`ranges\`: the deal-defining inputs as RANGES, never single hero numbers. Always include the market rent in the class's own terms (per unit, key, bed, pad or home per month; per SF per year; the ADR and occupancy for a hotel; land has no rent, so give its residual value and its carry instead), the expense load (ratio or per-unit), and the exit cap; add basis (price per unit, key, bed, pad, SF or acre — built on the building's basis the brief computes where it computes one; on a plan deal named in the brief, TOTAL COST per unit or per SF, never the shell's or the land's price alone; where the brief says there is no building basis, none is struck on the price, and a basis range is then your own estimate from the comps, its \`source\` saying so) and any other input that swings the deal. For each give a \`low\`, \`base\`, and \`high\` in numeric order — \`low\` the smaller figure and \`high\` the larger, whichever end is the conservative one (a higher exit cap, vacancy or expense load is the buyer's end; a higher rent the sponsor's) — and \`base\` your defensible pick between them, the \`source\` it traces to (name it explicitly — a public/market norm, a comp, or the OM page; if it's only the sponsor's claim, say so), a one-line \`basis\` that says which end is the conservative one and what drives the spread, and a \`confidence\`. A 10% drift hides inside a single number — the range is the honesty.
-- \`dealKillers\`: stress the three that kill deals first, in this order — \`basis\` (are you buying right?), \`exit\` (does the exit cap hold — and does the plan survive a slow sale? "there is always a buyer" is the assumption that fails first), \`debt\` (does the financing pencil and survive a shock?). For each give the current \`read\` and the \`risk\` that would break it. When the brief names a deal strategy with a plan (conversion, development, lease-up, value-add), read the three on the plan's terms: basis is total cost per unit or per SF, exit is the stabilized NOI at the exit cap against that total cost, debt is the construction or bridge financing and the carry through the works — and the stabilized pro forma is the finished project's figure to be tested for conservatism, never a misread and never a going-in cap on the price.
+- \`ranges\`: the deal-defining inputs as RANGES, never single hero numbers. Always include the market rent in the class's own terms (per unit, key, bed, pad or home per month; per SF per year; the ADR and occupancy for a hotel; land has no rent, so give its residual value and its carry instead), the expense load (ratio or per-unit), and the exit cap; add basis (price per unit, key, bed, pad, SF or acre — built on the building's basis the brief computes where it computes one; ${forward ? FORWARD_BASIS_RANGE : PLAN_BASIS_RANGE}; where the brief says there is no building basis, none is struck on the price, and a basis range is then your own estimate from the comps, its \`source\` saying so) and any other input that swings the deal. For each give a \`low\`, \`base\`, and \`high\` in numeric order — \`low\` the smaller figure and \`high\` the larger, whichever end is the conservative one (a higher exit cap, vacancy or expense load is the buyer's end; a higher rent the sponsor's) — and \`base\` your defensible pick between them, the \`source\` it traces to (name it explicitly — a public/market norm, a comp, or the OM page; if it's only the sponsor's claim, say so), a one-line \`basis\` that says which end is the conservative one and what drives the spread, and a \`confidence\`. A 10% drift hides inside a single number — the range is the honesty.
+- \`dealKillers\`: stress the three that kill deals first, in this order — \`basis\` (are you buying right?), \`exit\` (does the exit cap hold — and does the plan survive a slow sale? "there is always a buyer" is the assumption that fails first), \`debt\` (does the financing pencil and survive a shock?). For each give the current \`read\` and the \`risk\` that would break it. ${forward ? FORWARD_KILLERS : PLAN_KILLERS}
 - \`sensitivity\`: how the call moves across the ranges — at the \`conservative\` end (low rents, high expenses, soft exit), at your \`base\`, and at the \`sponsor\`'s optimistic end. Give all three; for each, the resulting \`call\` (pass / caution / pass_on) and a one-line \`note\` on what drives it. This is the honest answer to "where does this deal flip?"
 
 Every figure must name where it came from. This is a first-pass screen, not investment advice.`;

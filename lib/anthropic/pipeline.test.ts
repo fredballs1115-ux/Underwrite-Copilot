@@ -1426,14 +1426,67 @@ describe("runAnalysis — the happy path", () => {
     const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
     expect(context).toContain("Forward purchase: A build-to-suit bought at delivery");
     expect(context).not.toContain("FORWARD-PURCHASE TRAPS");
+    // The comps and the market check read the purchase's paragraph in the
+    // plan's place too (research pass 41).
+    expect(vi.mocked(scrutinizeComps).mock.calls[0][2]).toBe(true);
+    expect(vi.mocked(checkMarket).mock.calls[0][4]).toBe(true);
     expect(errSpy).not.toHaveBeenCalled();
 
     // An ordinary deal's challenger keeps the plan paragraph.
     vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(scrutinizeComps).mockClear();
+    vi.mocked(checkMarket).mockClear();
     vi.mocked(extractTerms).mockResolvedValue(EXTRACTION);
     await runAnalysis("d1");
     expect(vi.mocked(challengeAssumptions).mock.calls[0][4]).toBe(false);
     expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("Forward purchase");
+    expect(vi.mocked(scrutinizeComps).mock.calls[0][2]).toBe(false);
+    expect(vi.mocked(checkMarket).mock.calls[0][4]).toBe(false);
+  });
+
+  it("a forward purchase reads its own loan's lending standards, never the construction lenders' (research pass 41)", async () => {
+    state.deals.d1.asset_class = "industrial";
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [
+      { series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 },
+      { series_id: "SUBLPDRCSN", obs_date: "2026-07-01", value: 3.1 },
+      { series_id: "SUBLPDRCSC", obs_date: "2026-07-01", value: 8.2 },
+    ];
+    const forward = {
+      ...EXTRACTION,
+      assetClass: "industrial",
+      strategy: { kind: "development", summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Purchase price", value: "$48,000,000", flagged: false, page: "", basis: "na" },
+        { label: "NOI (Year 1)", value: "$2,880,000", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery date", value: "Q3 2027", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult;
+    vi.mocked(extractTerms).mockResolvedValue(forward);
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const handed = vi.mocked(checkMarket).mock.calls[0][3] ?? "";
+    expect(handed).toContain("banks tightening standards for nonfarm nonresidential loans");
+    expect(handed).not.toContain("construction and land development loans");
+
+    // The same deal built by the buyer reads the construction lenders' too.
+    vi.mocked(checkMarket).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...forward,
+      strategy: { kind: "development", summary: "Ground-up distribution center", capitalBudget: "", timeline: "" },
+    } as unknown as ExtractionResult);
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(vi.mocked(checkMarket).mock.calls[0][3] ?? "").toContain("construction and land development loans");
   });
 
   it("a mixed-use building: the challenger reads the two incomes and the traps they add after the class's own, and the deal context says them (lib/mixed-use)", async () => {

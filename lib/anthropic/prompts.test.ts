@@ -59,6 +59,49 @@ describe("plan deals are judged on their own terms", () => {
     expect(challengerInstruction("industrial", ["cold_storage"], true)).toContain("COLD-STORAGE TRAPS");
   });
 
+  // Research pass 41: the comps, the market check and the verdict kept the
+  // construction plan's words on a forward purchase — "price plus the full
+  // construction or renovation budget", "the construction or renovation
+  // budget against typical costs", "debt is the construction or bridge
+  // financing and the carry through the works" — beside a deal context that
+  // says the price is the buyer's whole cost.
+  it("a forward purchase's comps, market check and verdict read the purchase's terms in the plan's place (research pass 41)", () => {
+    const comps = brokerCompsInstruction("Deal type: Development.", true);
+    expect(comps).toContain("THIS OM SELLS A FORWARD PURCHASE");
+    expect(comps).toContain("the buyer's whole cost at delivery, never the price plus the developer's budget");
+    expect(comps).toContain("no construction budget, carry or construction loan is the buyer's");
+    expect(comps).toContain("the yield struck at delivery");
+    expect(comps).not.toContain("IF THE OM DESCRIBES A PLAN");
+    expect(comps).not.toContain("price plus the full construction or renovation budget");
+    // The context still rides last, after the paragraph.
+    expect(comps).toContain("<deal_context>\nDeal type: Development.\n</deal_context>");
+
+    for (const cls of ["industrial", "sfr_btr", "auto"] as const) {
+      const market = marketCheckInstruction(cls, null, null, true);
+      expect(market, cls).toContain("This OM sells a forward purchase");
+      expect(market, cls).toContain("the price is the buyer's whole cost and no construction budget, carry or construction loan is the buyer's");
+      expect(market, cls).toContain("The yield is struck at delivery");
+      expect(market, cls).not.toContain("If the OM describes a plan");
+      expect(market, cls).not.toContain("the construction or renovation budget against typical costs");
+      expect(market, cls).not.toContain("do not compare the stabilized NOI to the acquisition price");
+    }
+
+    const verdict = verdictInstruction(true);
+    expect(verdict).toContain("The brief names a forward purchase");
+    expect(verdict).toContain("no construction or bridge loan, no interest reserve and no carry through the works is the buyer's");
+    expect(verdict).toContain("exit is the yield struck at delivery");
+    expect(verdict).toContain("the PRICE per unit or per SF — the buyer's whole cost at delivery, never the price plus the developer's budget");
+    expect(verdict).not.toContain("debt is the construction or bridge financing and the carry through the works");
+    expect(verdict).not.toContain("TOTAL COST per unit or per SF, never the shell's or the land's price alone");
+
+    // Any other deal is told exactly what it was told before.
+    expect(brokerCompsInstruction("ctx", false)).toBe(brokerCompsInstruction("ctx"));
+    expect(brokerCompsInstruction("ctx")).toContain("IF THE OM DESCRIBES A PLAN");
+    expect(marketCheckInstruction("industrial", "ctx", "live", false)).toBe(marketCheckInstruction("industrial", "ctx", "live"));
+    expect(verdictInstruction(false)).toBe(verdictInstruction());
+    expect(verdictInstruction()).toContain("debt is the construction or bridge financing and the carry through the works");
+  });
+
   it("the market check tests the figures BEHIND the stabilized pro forma, not NOI ÷ price", () => {
     const p = marketCheckInstruction("multifamily");
     expect(p).toContain("If the OM describes a plan");

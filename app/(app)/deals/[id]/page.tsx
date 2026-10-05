@@ -27,7 +27,7 @@ import { readManufacturedHousing } from "@/lib/manufactured-housing";
 import { SelfStoragePanel } from "@/app/self-storage-panel";
 import { readSelfStorage } from "@/lib/self-storage";
 import { ForwardPanel } from "@/app/forward-panel";
-import { readForwardPurchase } from "@/lib/forward-purchase";
+import { readForwardPurchase, readsConstructionLending } from "@/lib/forward-purchase";
 import { MixedUsePanel } from "@/app/mixed-use-panel";
 import { readMixedUse } from "@/lib/mixed-use";
 import { GoingConcernPanel } from "@/app/going-concern-panel";
@@ -687,7 +687,9 @@ export default async function DealPage({
       national: reads.national.filter((r) => BRIEF_NATIONAL_IDS.includes(r.meta.id)),
       assetClass: readClass,
       deckWords: extraction?.assetClass ?? null,
-      plan: isPlanDeal(inferStrategy(extraction, firstSignal).kind),
+      // The pipeline's own rule: no construction lending on a forward
+      // purchase, whose developer funds the works.
+      plan: readsConstructionLending(extraction, inferStrategy(extraction, firstSignal)),
       builds: buildsSomething(extraction, inferStrategy(extraction, firstSignal).kind),
     });
     marketSince = briefDelta(storedBrief.readOn, storedBrief.figures, today?.figures ?? []);

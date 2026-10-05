@@ -35,6 +35,7 @@ import {
   forwardWordsOf,
   inferStrategy,
   isForwardPurchase,
+  isPlanDeal,
   type DealStrategy,
 } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
@@ -46,6 +47,20 @@ import { withArticle } from "@/lib/article";
 // imports (`planSummary` reads it to say the developer funds the works);
 // re-exported here so every surface reads the purchase from one module.
 export { isForwardPurchase };
+
+/**
+ * Whether the market check reads the construction lenders' standards for
+ * the deal (lib/live-market-brief's `plan`): every plan deal's, but a
+ * forward purchase's (research pass 41) — its developer funds the works,
+ * so no construction loan is the buyer's (rule 1). The pipeline and the
+ * deal page's since-this-screen both ask here, so the two read one set.
+ */
+export function readsConstructionLending(
+  ex: ExtractionResult | null | undefined,
+  strategy: DealStrategy = inferStrategy(ex ?? null),
+): boolean {
+  return isPlanDeal(strategy.kind) && !isForwardPurchase(ex, strategy);
+}
 
 type MetricRow = { label: string; value: string; page?: string };
 

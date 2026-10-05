@@ -11,6 +11,7 @@ import {
   assessPlausibility,
   findPricedMetric,
   inferStrategy,
+  isForwardPurchase,
   isOutdoorStorageYard,
   isPlanDeal,
   planSummary,
@@ -187,21 +188,29 @@ function buildingBasisLine(ex: ExtractionResult, strategy: DealStrategy, storedC
     // No all-in basis is handed on where the plausibility check finds it
     // outside the band (research pass 38: "$243 per planned unit").
     const plan = planWithBasisChecked(ex, strategy, planSummary(ex, strategy));
-    const deal = strategy.label.toLowerCase();
-    const never = strategy.kind === "development" ? "the land's price" : "the price alone";
+    // A forward purchase's total cost is its price, the buyer's whole cost
+    // at delivery: the developer's budget is never added to it (research
+    // pass 41 — "the land's price is never the basis" had been said of it).
+    const deal = plan?.forward ? "forward purchase" : `${strategy.label.toLowerCase()} deal`;
+    const cost = plan?.forward ? "the price, the buyer's whole cost at delivery" : "total cost";
+    const never = plan?.forward
+      ? "the price plus the developer's budget"
+      : strategy.kind === "development"
+        ? "the land's price"
+        : "the price alone";
     const priceAlone = tag ? ` The price alone is ${tag}, before the works.` : "";
     if (plan?.basisWithheld) {
-      return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, and none is handed on. ${plan.basisWithheld} No basis range is built on it.${priceAlone}`;
+      return `THE BUILDING'S BASIS: on this ${deal} it is ${cost}, and none is handed on. ${plan.basisWithheld} No basis range is built on it.${priceAlone}`;
     }
     if (plan?.costPerUnit != null && plan.units != null && plan.totalCost != null) {
-      return `THE BUILDING'S BASIS, computed in code: on this ${deal} deal it is total cost — ${compact(plan.totalCost)} over ${plan.units.toLocaleString("en-US")} planned ${noun.many} is ${compact(plan.costPerUnit)} per planned ${noun.one}, never ${never} over them.${priceAlone}`;
+      return `THE BUILDING'S BASIS, computed in code: on this ${deal} it is ${cost} — ${compact(plan.totalCost)} over ${plan.units.toLocaleString("en-US")} planned ${noun.many} is ${compact(plan.costPerUnit)} per planned ${noun.one}, never ${never} over them.${priceAlone}`;
     }
     if (plan?.totalCost != null) {
-      return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, ${compact(plan.totalCost)} all-in as computed in code; the OM states no planned count to set it per ${noun.one}, and ${never} is never the basis.${priceAlone}`;
+      return `THE BUILDING'S BASIS: on this ${deal} it is ${cost}, ${compact(plan.totalCost)} all-in as computed in code; the OM states no planned count to set it per ${noun.one}, and ${never} is never the basis.${priceAlone}`;
     }
     // A share beside its entity's loan: the plan's own sentence on why.
-    if (plan?.costWithheld) return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost. ${plan.costWithheld}`;
-    return `THE BUILDING'S BASIS: on this ${deal} deal it is total cost, which the code cannot compute from what the OM states; ${never} is never the basis.${priceAlone}`;
+    if (plan?.costWithheld) return `THE BUILDING'S BASIS: on this ${deal} it is ${cost}. ${plan.costWithheld}`;
+    return `THE BUILDING'S BASIS: on this ${deal} it is ${cost}, which the code cannot compute from what the OM states; ${never} is never the basis.${priceAlone}`;
   }
   // A share beside the loan its entity carries: grossed up, its price is the
   // equity's whole, which no basis is struck on.
@@ -527,6 +536,11 @@ export async function synthesizeVerdict(
   input: VerdictInputs,
 ): Promise<VerdictResult> {
   const client = getAnthropic();
+  // A forward purchase reads the three deal-killers on the purchase's terms,
+  // as the challenger, the comps and the market check do: the deal's kind
+  // read with the first signal, as the brief reads it.
+  const ex = input.extraction;
+  const forward = !!ex && isForwardPurchase(ex, inferStrategy(ex, input.firstSignal ?? null));
 
   const out = await structured("The verdict", () => client.messages.parse({
     model: MODELS.verdict,
@@ -536,7 +550,7 @@ export async function synthesizeVerdict(
       {
         role: "user",
         content: [
-          { type: "text", text: verdictInstruction() },
+          { type: "text", text: verdictInstruction(forward) },
           {
             type: "text",
             text: `Here is the gathered analysis to synthesize:\n\n${buildBrief(

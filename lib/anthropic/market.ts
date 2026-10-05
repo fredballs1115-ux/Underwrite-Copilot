@@ -47,6 +47,9 @@ export async function checkMarket(
   /** the metro's published figures, dated (lib/live-market-brief's `text`),
    *  where the deal sits in a covered market; null outside them */
   liveMarket?: string | null,
+  /** a forward purchase (lib/forward-purchase): its paragraph stands where
+   *  a plan's would — the developer's budget is not the buyer's */
+  forward = false,
 ): Promise<MarketResult> {
   const client = getAnthropic();
 
@@ -64,7 +67,7 @@ export async function checkMarket(
           // figures ride after it so nothing that varies by deal sits before
           // it.
           omDocument(om),
-          { type: "text", text: marketCheckInstruction(assetClass, context, liveMarket) },
+          { type: "text", text: marketCheckInstruction(assetClass, context, liveMarket, forward) },
           // Today's date, which every dated figure is read against
           // (lib/anthropic/today).
           { type: "text", text: todayLine() },

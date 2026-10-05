@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult, ExtractedMetric } from "@/lib/anthropic/types";
 import {
+  FORWARD_READING,
   IMPLIED_CAP_CEILING,
+  STRATEGY_READING,
   assessPlausibility,
   budgetFromText,
   capitalBudgetFromMetrics,
@@ -819,6 +821,38 @@ describe("planSummary / plausibilityNote — a forward purchase", () => {
     expect(ownNote).toContain("Test the budget it states and its schedule against comparable projects");
     expect(ownNote).toContain("The memorandum states no stabilized NOI");
     expect(ownNote).not.toContain("A FORWARD PURCHASE");
+  });
+
+  it("opens on the purchase's own line, never a development's budget (research pass 41)", () => {
+    const s = inferStrategy(bts);
+    const note = plausibilityNote(assessPlausibility(bts, s), s, planSummary(bts, s), bts);
+    expect(note).toMatch(/^DEAL STRATEGY: Development — Forward purchase of a 300,000 SF build-to-suit distribution center at completion/);
+    expect(note).toContain(FORWARD_READING);
+    expect(note).not.toContain("only a budget");
+    expect(note).not.toContain(STRATEGY_READING.development);
+    // Read from the deck's words alone, the purchase's line is the inferred
+    // summary too, and said once.
+    const inferred = ex(bts.metrics, {
+      assetClass: "industrial",
+      dealName: "Forward purchase of a to-be-built distribution center",
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+    });
+    const si = inferStrategy(inferred);
+    expect(si.kind).toBe("development");
+    expect(si.summary).toBe(FORWARD_READING);
+    const inferredNote = plausibilityNote([], si, planSummary(inferred, si), inferred);
+    expect(inferredNote.split(FORWARD_READING)).toHaveLength(2);
+    expect(inferredNote).not.toContain(STRATEGY_READING.development);
+    // A development the buyer builds keeps its own line.
+    const own = ex(bts.metrics, { assetClass: "industrial", strategy: { ...dev, summary: "Ground-up distribution center" } });
+    const so = inferStrategy(own);
+    expect(plausibilityNote([], so, planSummary(own, so), own)).toContain(STRATEGY_READING.development);
+    const ownInferred = ex(bts.metrics, {
+      assetClass: "industrial",
+      dealName: "A to-be-built distribution center",
+      strategy: { kind: "unknown", summary: "", capitalBudget: "", timeline: "" },
+    });
+    expect(inferStrategy(ownInferred).summary).toBe(STRATEGY_READING.development);
   });
 });
 

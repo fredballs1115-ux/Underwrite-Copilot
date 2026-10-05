@@ -319,6 +319,19 @@ describe("the verdict is told what is being sold and the building's own basis", 
     );
   });
 
+  it("a forward purchase's basis is its price, the buyer's whole cost at delivery, never the price plus the developer's budget (research pass 41)", () => {
+    const forward = base({
+      assetClass: "Industrial",
+      strategy: { kind: "development", summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [m("Purchase price", "$48,000,000"), m("NOI (Year 1)", "$2,880,000", "pro_forma"), m("Construction budget", "$31,000,000"), m("Delivery date", "Q3 2027")],
+    });
+    const brief = section(briefOf(forward, "industrial"));
+    expect(brief).toContain(
+      "THE BUILDING'S BASIS: on this forward purchase it is the price, the buyer's whole cost at delivery, $48.0M all-in as computed in code; the OM states no planned count to set it per unit, and the price plus the developer's budget is never the basis.",
+    );
+    expect(brief).not.toContain("the land's price is never the basis");
+  });
+
   it("a brief with no extraction and no context is the old one", () => {
     const plain = buildBrief({ extraction: null, ...none });
     expect(plain).not.toContain("What the screen established");

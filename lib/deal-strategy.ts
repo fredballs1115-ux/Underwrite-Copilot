@@ -90,6 +90,11 @@ export const STRATEGY_READING: Record<StrategyKind, string> = {
   unknown: "",
 };
 
+/** A forward purchase's line in its kind's place (`isForwardPurchase`,
+ *  research pass 41): the budget is the developer's, never the buyer's. */
+export const FORWARD_READING =
+  "To be built and bought at delivery; there is no in-place income and no budget of the buyer's, only a price paid at delivery, a clock to it and the NOI stated at delivery.";
+
 /** How far above the price an NOI can sit before the two cannot describe the
  *  same stabilized building. A 25% cap rate does not exist for an operating
  *  US property; anything past it is a pro forma on a different basis or a
@@ -286,7 +291,9 @@ export function inferStrategy(
   return {
     kind,
     label: STRATEGY_LABEL[kind],
-    summary: stated?.summary?.trim() || (kind === "stabilized" ? "" : STRATEGY_READING[kind]),
+    summary:
+      stated?.summary?.trim() ||
+      (kind === "stabilized" ? "" : forwardOfKind(extraction, kind) ? FORWARD_READING : STRATEGY_READING[kind]),
     source: "inferred",
   };
 }
@@ -1781,9 +1788,16 @@ export function plausibilityNote(
 ): string {
   const bits: string[] = [];
   if (isPlanDeal(strategy.kind)) {
-    // An inferred plan deal's summary IS the reading line; print it once.
-    const reading = STRATEGY_READING[strategy.kind];
-    const summary = strategy.summary && strategy.summary !== reading ? ` — ${strategy.summary}` : "";
+    // A forward purchase's own line in its kind's place (research pass 41:
+    // a development's "only a budget" opened a purchase whose budget is the
+    // developer's). An inferred plan deal's summary IS the reading line;
+    // print it once.
+    const forward = !!plan?.forward || isForwardPurchase(extraction, strategy);
+    const reading = forward ? FORWARD_READING : STRATEGY_READING[strategy.kind];
+    const summary =
+      strategy.summary && strategy.summary !== reading && strategy.summary !== STRATEGY_READING[strategy.kind]
+        ? ` — ${strategy.summary}`
+        : "";
     bits.push(`DEAL STRATEGY: ${dealTypeLabel(strategy.label, extraction)}${summary} ${reading}`);
     if (plan) bits.push(`THE PLAN AS THE OM STATES IT: ${planLine(plan)}.`);
     // A forward purchase (research pass 28): the buyer carries no
@@ -1796,7 +1810,7 @@ export function plausibilityNote(
     // stands and no yield on cost was refused past the ceiling (research
     // pass 38), on a lease-up as on any plan.
     bits.push(
-      plan?.forward || isForwardPurchase(extraction, strategy)
+      forward
         ? FORWARD_PLAN_TEXT
         : strategy.kind === "lease_up"
           ? leaseUpPlanText(plan, findings.length > 0 || !!plan?.yieldWithheld)
