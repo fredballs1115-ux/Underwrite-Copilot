@@ -279,6 +279,19 @@ Three are yours:
    model) on the 120. Saying which count the deal's count row is changes
    the extraction.
 
+**Run the research seed after the merge** (`node scripts/seed-research.mjs`,
+the step that writes the FY2027 fair market rents). The runner read every
+source link the audit had marked dead. Two research figures changed:
+1. **Chicago's apartment vacancy** now reads 5.1% (Cushman & Wakefield's
+   Q2 2026 occupancy of 94.9%). JPMorgan's page states neither the 96.3%
+   occupancy nor the 3.7% the file had credited to it, and no cited page
+   states the old 4.6%.
+2. **Montgomery County's industrial rent** lost its link: Colliers took the
+   report down and the Internet Archive holds no copy.
+
+Visitors read the file today. Signed-in pages read the benchmarks table
+over the file, so they keep the old 3.7–4.6% band until the seed runs.
+
 **Photographs, round 12.** Fifteen more metro areas now show a photograph
 of their market, each judged by eye through the card's and the deal page's
 crops, with every credit exactly as the runner printed it. Helena, Fort
