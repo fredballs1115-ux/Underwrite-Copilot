@@ -158,10 +158,12 @@ export async function GET(
       plan: terms.plan,
       // What the memorandum states the sale is, where it is not the
       // property from its owner: each line marked in the letter for review
-      // — and a short sale's closing conditioned on its lender's approval.
+      // — a short sale's closing conditioned on its lender's approval, and a
+      // flagged hotel's franchisor noted under the Closing clause.
       leasehold: terms.leasehold,
       seller: terms.seller,
       shortSale: terms.shortSale,
+      hotel: terms.hotel,
       properties: terms.properties,
       buyerName,
       firmName,

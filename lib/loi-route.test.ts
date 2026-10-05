@@ -411,9 +411,45 @@ describe("the LOI drafts what the memorandum states, each such line marked for r
     expect(loiTermsFor(extraction, null).shortSale).toBeNull();
   });
 
+  // Research pass 35 (F15): a hotel's letter said nothing about its flag, the
+  // franchisor's approval or the PIP the buyer funds.
+  it("a flagged hotel: the letter notes under its Closing clause what the sale carries and the franchisor's approval", async () => {
+    const hotel: ExtractionResult = {
+      ...extraction,
+      assetClass: "hospitality_str",
+      totalPages: 40,
+      hotel: { brand: "Hilton Garden Inn", franchise: "", management: "", encumbrance: "brand", pip: "", page: "p. 5" },
+      metrics: [...extraction.metrics, row("Keys", "120"), row("PIP cost", "$4,200,000")],
+    };
+    const terms = loiTermsFor(hotel, null);
+    expect(terms.hotel).toEqual({
+      stated: "the hotel is flagged Hilton Garden Inn and sold encumbered by the franchise, with a $4.2M PIP",
+      page: "p. 5",
+    });
+    db.row = { ...db.row, extraction: hotel, first_signal: null };
+    const res = await download();
+    expect(res.status).toBe(200);
+    const letter = await letterText(res);
+    const note =
+      "[Review before sending: the memorandum says the hotel is flagged Hilton Garden Inn and sold encumbered by the franchise, with a $4.2M PIP (p. 5); the PSA should condition closing on the franchisor approving the transfer and the PIP as issued.]";
+    expect(letter).toContain(note);
+    // Under the Closing clause; no clause is added for it.
+    expect(letter.indexOf(note)).toBeGreaterThan(letter.indexOf("5. Closing"));
+    expect(letter.indexOf(note)).toBeLessThan(letter.indexOf("6. Purchase and Sale Agreement"));
+    // The panel says what the download carries, in the same list.
+    expect(panelText(hotel, null)).toMatch(
+      /It is a flagged hotel, so the draft notes under its closing that the PSA should condition the closing on the franchisor approving the transfer and the PIP as issued\.\s*Each is highlighted in the draft for review\./,
+    );
+    // No franchisor has a transfer to approve on an independent hotel, or
+    // one sold unencumbered: no note.
+    for (const over of [{ brand: "Independent" }, { encumbrance: "unencumbered" as const }]) {
+      expect(loiTermsFor({ ...hotel, hotel: { ...hotel.hotel!, ...over } }, null).hotel).toBeNull();
+    }
+  });
+
   it("a plain fee simple sold the usual way: the letter is the letter it always was", async () => {
     const plain = loiTermsFor(extraction, null);
-    expect(plain).toMatchObject({ refusal: null, leasehold: null, seller: null, shortSale: null, properties: [], notes: [] });
+    expect(plain).toMatchObject({ refusal: null, leasehold: null, seller: null, shortSale: null, hotel: null, properties: [], notes: [] });
     db.row = { ...db.row, first_signal: null };
     const res = await download();
     expect(res.status).toBe(200);
@@ -421,7 +457,11 @@ describe("the LOI drafts what the memorandum states, each such line marked for r
     expect(textOfXml(xml)).toContain(
       "Cascade (“Buyer”) is pleased to submit this non-binding letter of intent to acquire the above-referenced property (the “Property”) from its owner (“Seller”) on the principal terms set out below.",
     );
-    expect(xml).not.toMatch(/w:highlight/);
+    // One highlight only: the closing line every letter carries, marked to
+    // come out before sending (research pass 35) — nothing the memorandum
+    // decided.
+    expect(xml.match(/<w:highlight w:val="yellow"\/>/g)).toHaveLength(1);
+    expect(textOfXml(xml)).toContain("[Draft prepared with Underwrite Copilot for negotiation purposes");
     expect(textOfXml(xml)).not.toContain("[Review");
     // Word for word what the letter builder drafts with none of the new terms.
     const params = {
@@ -438,7 +478,9 @@ describe("the LOI drafts what the memorandum states, each such line marked for r
       firmName: null,
     };
     const before = await letterXml(await buildLoiDocx(params));
-    const after = await letterXml(await buildLoiDocx({ ...params, plan: null, leasehold: null, seller: null, shortSale: null, properties: [] }));
+    const after = await letterXml(
+      await buildLoiDocx({ ...params, plan: null, leasehold: null, seller: null, shortSale: null, hotel: null, properties: [] }),
+    );
     expect(after).toBe(before);
     expect(panelHtml(extraction, null)).not.toMatch(/data-qa="loi-notes"/);
   });

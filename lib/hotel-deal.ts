@@ -406,6 +406,46 @@ export function hotelShortLine(r: HotelDealRead): string {
 }
 
 /**
+ * What the memorandum says a hotel's sale carries, for the letter of
+ * intent's review note (research pass 35): the flag, the encumbrance and
+ * the PIP as stated — "the hotel is flagged Hilton Garden Inn and sold
+ * encumbered by the franchise, with a $4.2M PIP". The letter (lib/loi) says
+ * beside it that the PSA should condition the closing on the franchisor
+ * approving the transfer and the PIP as issued. Null where no franchisor
+ * has a transfer to approve: an independent hotel, one sold unencumbered
+ * (the buyer chooses its flag), and one the memorandum names no flag,
+ * brand encumbrance or PIP for.
+ */
+export function hotelSaleFacts(r: HotelDealRead): string | null {
+  if (r.independent || r.encumbrance === "unencumbered") return null;
+  const flagSold = r.encumbrance === "brand" || r.encumbrance === "brand_and_management";
+  if (!r.brand && !flagSold && r.pipStated == null && !r.pip) return null;
+  const sold: Record<HotelEncumbrance, string> = {
+    brand: "sold encumbered by the franchise",
+    brand_and_management: "sold encumbered by the franchise and management",
+    management: "sold encumbered by management",
+    unencumbered: "",
+    unknown: "",
+  };
+  const unit = r.keyNoun.replace(/s$/, "");
+  // The PIP as stated: its total, or its figure a key, or its words — never
+  // the one derived from the other.
+  const pip =
+    r.pipStated === "total" && r.pipTotal != null
+      ? withArticle(`${money(r.pipTotal)} PIP`)
+      : r.pipStated === "per_key" && r.pipPerKey != null
+        ? `a PIP of ${money(r.pipPerKey)} ${withArticle(unit)}`
+        : r.pip
+          ? `a PIP stated as “${noPeriod(r.pip)}”`
+          : null;
+  const head = [r.brand ? `flagged ${noPeriod(r.brand)}` : "", sold[r.encumbrance]].filter(Boolean).join(" and ");
+  if (!head) return pip ? `the sale carries ${pip}` : null;
+  // A flag with no PIP stated: silence is not a zero, since a brand may
+  // require one on a change of ownership.
+  return `the hotel is ${head}${pip ? `, with ${pip}` : ", and states no PIP"}`;
+}
+
+/**
  * The pipeline row's tag: "Mgmt encumbered, PIP $35k/key", "Unencumbered",
  * "PIP $4.2M", "Independent". Null on anything that is not a hotel read.
  */

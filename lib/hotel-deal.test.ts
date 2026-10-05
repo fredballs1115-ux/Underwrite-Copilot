@@ -4,6 +4,7 @@ import {
   hotelContextLine,
   hotelModelLine,
   hotelNote,
+  hotelSaleFacts,
   hotelShortLine,
   hotelTag,
   hotelTermRows,
@@ -228,5 +229,39 @@ describe("the hotel against the model, and on every summary", () => {
     const r = readHotelDeal(COURTYARD, TODAY)!;
     expect([r.pipTotal, r.franchiseEnds, r.managementEnds, r.adr, r.revpar, r.revparIndex, r.ffeReservePct].every((v) => v != null)).toBe(true);
     expect(readHotelDeal(ex([row("PIP cost per key", "$35,000")]), TODAY)?.pipPerKey).toBe(35_000);
+  });
+});
+
+// Research pass 35 (F15): the letter of intent said nothing about a hotel's
+// flag. Its note is built from what the memorandum states, and only where a
+// franchisor has a transfer to approve.
+describe("hotelSaleFacts — what the letter of intent notes a flagged hotel's sale carries", () => {
+  const facts = (e: ExtractionResult) => hotelSaleFacts(readHotelDeal(e, TODAY)!);
+
+  it("says the flag, the encumbrance and the PIP as stated", () => {
+    expect(facts(COURTYARD)).toBe("the hotel is flagged Courtyard by Marriott and sold encumbered by management, with a $4.2M PIP");
+    // A PIP a key as stated, never the total derived from it.
+    expect(facts(ex([row("PIP cost per key", "$35,000")], { hotel: hotel({ brand: "Hilton Garden Inn", encumbrance: "brand" }) }))).toBe(
+      "the hotel is flagged Hilton Garden Inn and sold encumbered by the franchise, with a PIP of $35k a key",
+    );
+    // The figure decides the article.
+    expect(facts(ex([row("PIP cost", "$8,000,000")], { hotel: hotel({ encumbrance: "brand_and_management" }) }))).toBe(
+      "the hotel is flagged Courtyard by Marriott and sold encumbered by the franchise and management, with an $8.0M PIP",
+    );
+    // A PIP in words alone is quoted.
+    expect(facts(ex([], { hotel: hotel({ pip: "Brand-mandated renovation of all guestrooms by 2028." }) }))).toBe(
+      "the hotel is flagged Courtyard by Marriott and sold encumbered by management, with a PIP stated as “Brand-mandated renovation of all guestrooms by 2028”",
+    );
+    // A flag with no PIP stated says so; a PIP with no flag named is the sale's.
+    expect(facts(ex([], { hotel: hotel({ encumbrance: "unknown" }) }))).toBe("the hotel is flagged Courtyard by Marriott, and states no PIP");
+    expect(facts(ex([row("PIP cost", "$4,200,000")], { hotel: hotel({ brand: "", encumbrance: "unknown" }) }))).toBe("the sale carries a $4.2M PIP");
+  });
+
+  it("is null where no franchisor has a transfer to approve", () => {
+    // Independent, sold unencumbered (the buyer chooses its flag), or no
+    // flag, brand encumbrance or PIP named.
+    expect(facts(ex([row("PIP cost", "$4,200,000")], { hotel: hotel({ brand: "Independent" }) }))).toBeNull();
+    expect(facts(ex([row("PIP cost", "$4,200,000")], { hotel: hotel({ encumbrance: "unencumbered" }) }))).toBeNull();
+    expect(facts(ex([], { hotel: hotel({ brand: "" }) }))).toBeNull();
   });
 });

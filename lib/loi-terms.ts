@@ -40,6 +40,13 @@
 //   carries an entitlements contingency — a condition, with no figure in
 //   it, marked for review beside the memorandum's words.
 //
+//   A HOTEL'S FLAG WAITS ON ITS FRANCHISOR. Where the memorandum sells a
+//   hotel with a flag, a brand encumbrance or a PIP (lib/hotel-deal), the
+//   draft notes under its Closing clause what the memorandum says the sale
+//   carries, and that the PSA should condition the closing on the
+//   franchisor approving the transfer and the PIP as issued (research pass
+//   35) — a note for review, with no clause drafted for it.
+//
 //   A BLANK IS NULL. An extraction saved before the interest or the sale was
 //   read is a fee simple sold the usual way, and drafts as before.
 //
@@ -51,6 +58,7 @@ import { inferStrategy, isPlanDeal, type StrategyKind } from "@/lib/deal-strateg
 import { interestOf, readInterest } from "@/lib/interest";
 import { readSale, statesStalkingHorse } from "@/lib/sale-terms";
 import { readPortfolio } from "@/lib/portfolio";
+import { hotelSaleFacts, readHotelDeal } from "@/lib/hotel-deal";
 import { LOI_REFUSAL, type LoiRefusalKind } from "@/lib/loi-refusal";
 
 /** A fact the draft takes from the memorandum: its own words where it
@@ -79,6 +87,11 @@ export interface LoiTerms {
    *  lender approving the sale and the payoff it will accept — the sale's
    *  terms as stated beside it */
   shortSale: LoiStated | null;
+  /** a hotel with a flag, a brand encumbrance or a PIP: what the memorandum
+   *  says the sale carries (lib/hotel-deal `hotelSaleFacts`, our words from
+   *  its facts, never a quote) and the hotel's page, for the note under the
+   *  draft's Closing clause */
+  hotel: LoiStated | null;
   /** a portfolio's properties, in the memorandum's order: the draft lists
    *  them by name ("" for an address the memorandum does not print, or one
    *  that is the name itself) */
@@ -128,6 +141,7 @@ export function loiTermsFor(
       leasehold: null,
       seller: null,
       shortSale: null,
+      hotel: null,
       properties: [],
       notes: [],
     };
@@ -146,6 +160,13 @@ export function loiTermsFor(
   // The owner sells, but its lender decides: the closing waits on the
   // lender's approval of the sale and the payoff it will accept.
   const shortSale = sale?.method === "short_sale" ? { stated: sale.terms, page: sale.page } : null;
+
+  // A flagged hotel: its franchisor approves the transfer and issues the
+  // PIP the buyer funds. The page is the hotel's, else its PIP row's, each
+  // validated against the memorandum's length (lib/hotel-deal).
+  const hotelRead = readHotelDeal(extraction);
+  const hotelFacts = hotelRead ? hotelSaleFacts(hotelRead) : null;
+  const hotel = hotelRead && hotelFacts ? { stated: hotelFacts, page: hotelRead.page || hotelRead.pipPage } : null;
 
   const properties = (readPortfolio(extraction)?.assets ?? []).map((a) => ({
     name: a.name,
@@ -171,6 +192,11 @@ export function loiTermsFor(
       "It is a short sale, so the draft makes the closing conditional on the seller's lender approving the sale and the payoff it will accept.",
     );
   }
+  if (hotel) {
+    notes.push(
+      "It is a flagged hotel, so the draft notes under its closing that the PSA should condition the closing on the franchisor approving the transfer and the PIP as issued.",
+    );
+  }
 
-  return { plan, refusal: null, leasehold, seller, shortSale, properties, notes };
+  return { plan, refusal: null, leasehold, seller, shortSale, hotel, properties, notes };
 }

@@ -47,6 +47,13 @@ export interface LoiParams {
    *  its lender approving the sale and the payoff it will accept, marked for
    *  review. Null on every other sale. */
   shortSale?: StatedFact | null;
+  /** a hotel with a flag, a brand encumbrance or a PIP: what the memorandum
+   *  says the sale carries (lib/hotel-deal `hotelSaleFacts` — our words
+   *  from its facts, so never quoted) and its page. The letter notes under
+   *  its Closing clause that the PSA should condition the closing on the
+   *  franchisor approving the transfer and the PIP as issued, marked for
+   *  review, and drafts no clause for it. Null on every other deal. */
+  hotel?: StatedFact | null;
   /** a portfolio's properties, as the memorandum lists them: the letter
    *  lists them by name, marked for review. Empty for one property. */
   properties?: { name: string; address: string }[];
@@ -124,9 +131,9 @@ function sentence(parts: Part[], before = 120): Paragraph {
 
 /** The note beside a line the memorandum decided: bracketed, italic and
  *  highlighted, so it is read and taken out before the letter is sent. */
-function reviewNote(text: string): Paragraph {
+function reviewNote(text: string, before = 0): Paragraph {
   return new Paragraph({
-    spacing: { before: 0, after: 120 },
+    spacing: { before, after: 120 },
     children: [
       new TextRun({
         text: `[${text}]`,
@@ -138,6 +145,16 @@ function reviewNote(text: string): Paragraph {
       }),
     ],
   });
+}
+
+/** A party's signature lines under its name: who signs, with the date, then
+ *  the signer's printed name and title. */
+function signatureLines(): Paragraph[] {
+  return [
+    para("By: ______________________________        Date: ______________", { before: 160, after: 40 }),
+    para("Name: ____________________________", { before: 40, after: 40 }),
+    para("Title: _____________________________", { before: 40 }),
+  ];
 }
 
 /** How much of the memorandum's own sentence a note quotes. */
@@ -163,9 +180,10 @@ function quoted(f: StatedFact): string {
  * receiver's or a lender's sale, a portfolio — each such line highlighted
  * beside a note for review, and no clause added for it. A short sale is
  * the one the memorandum adds a clause for: it closes only on its lender's
- * approval, so that condition is drafted, highlighted beside its note. The
- * deals this skeleton is the wrong document for never reach it
- * (lib/loi-refusal).
+ * approval, so that condition is drafted, highlighted beside its note. A
+ * flagged hotel gets a note under its Closing clause — the franchisor's
+ * approval of the transfer and its PIP — and no clause. The deals this
+ * skeleton is the wrong document for never reach it (lib/loi-refusal).
  */
 export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
   // XML 1.0 cannot carry these control characters; docx writes them verbatim
@@ -186,6 +204,7 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
     leasehold: cleanFact(p.leasehold),
     seller: cleanFact(p.seller),
     shortSale: cleanFact(p.shortSale),
+    hotel: cleanFact(p.hotel),
     properties: (p.properties ?? []).map((x) => ({ name: clean(x.name).trim(), address: clean(x.address).trim() })),
   };
 
@@ -272,6 +291,13 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
         `Review before sending: the memorandum says this is a short sale its lender must approve${quoted(p.shortSale)}.`,
       ]
     : null;
+  // A flagged hotel's franchisor approves the transfer and issues the PIP
+  // the buyer funds (lib/loi-terms): what the memorandum says the sale
+  // carries, under the Closing clause, for review — the clause itself is
+  // the buyer's counsel's to write, so none is drafted.
+  const hotelNote = p.hotel
+    ? `Review before sending: the memorandum says ${p.hotel.stated}${p.hotel.page ? ` (${p.hotel.page})` : ""}; the PSA should condition closing on the franchisor approving the transfer and the PIP as issued.`
+    : null;
 
   // Numbered in order, so an added clause renumbers the ones after it. A
   // third entry is the review note of a clause the memorandum decided.
@@ -350,32 +376,30 @@ export async function buildLoiDocx(p: LoiParams): Promise<Buffer> {
       before: 200,
     }),
     ...opening,
-    ...sections.flatMap(([title, body, review], i) => numbered(i + 1, title, body, review)),
+    ...sections.flatMap(([title, body, review], i) => [
+      ...numbered(i + 1, title, body, review),
+      ...(title === "Closing" && hotelNote ? [reviewNote(hotelNote)] : []),
+    ]),
     para(
       "NON-BINDING: This letter is an expression of mutual interest only. Except for this paragraph, no provision of this letter creates any legally binding obligation on either party, and no such obligation shall arise unless and until a definitive PSA is executed and delivered by both parties. Either party may discontinue discussions at any time for any reason.",
       { bold: true, before: 280 },
     ),
     para("Sincerely,", { before: 320 }),
     para(p.buyerName, { bold: true, before: 240 }),
-    para("By: ______________________________        Date: ______________", {
-      before: 160,
-    }),
+    // Each party signs By, and prints the signer's name and title under it
+    // (research pass 35: neither block had a Name or a Title line).
+    ...signatureLines(),
     para("Acknowledged and agreed (non-binding):", { color: MUTED, before: 360 }),
-    para("Seller: ___________________________        Date: ______________", {
-      before: 160,
-    }),
-    new Paragraph({
-      spacing: { before: 420 },
-      children: [
-        new TextRun({
-          text: "Draft prepared with Underwrite Copilot for negotiation purposes — have counsel review before sending or signing.",
-          size: 16,
-          color: MUTED,
-          italics: true,
-          font: "Calibri",
-        }),
-      ],
-    }),
+    para("Seller: ___________________________", { before: 160, after: 40 }),
+    ...signatureLines(),
+    // The line meant to come out before the letter is sent, marked as every
+    // such line is — bracketed, italic and highlighted. It had been small
+    // grey italic, the one such line left unmarked, so a letter sent as
+    // downloaded carried it (research pass 35).
+    reviewNote(
+      "Draft prepared with Underwrite Copilot for negotiation purposes — have counsel review before sending or signing.",
+      420,
+    ),
   ];
 
   const doc = new Document({
