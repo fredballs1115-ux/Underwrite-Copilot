@@ -43,6 +43,7 @@
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import { withArticle } from "@/lib/article";
+import { assetClassKey } from "@/lib/asset-words";
 import { parseMoney } from "@/lib/criteria";
 import { ebitdaFigure, type EbitdaFigure } from "@/lib/deal-strategy";
 import { FINDING_WORDS, readSiteReports } from "@/lib/site-reports";
@@ -162,21 +163,44 @@ const money = (n: number): string => {
 };
 const times = (n: number) => `${n.toFixed(2)}x`;
 
-/** The words the business is named in: the class, the name, the plan, the
- *  interest and a single tenant — never a shopping center's tenant list,
- *  where a station on an outparcel is one tenant among many. */
+/** The words the sale is described in — the class, the name, the plan, the
+ *  interest and a single tenant — read only for whether the business is
+ *  sold with the real estate (`GOING_CONCERN_WORDS`), never for what the
+ *  business is. */
 function wordsOf(ex: ExtractionResult): string {
   return [ex.assetClass, ex.dealName, ex.strategy?.summary, ex.interest?.summary, ex.singleTenant?.tenant]
     .filter((w): w is string => typeof w === "string" && w.trim() !== "")
     .join(" \n ");
 }
 
-/** The business the memorandum's own words name, or null. */
-export function operatingBusinessOf(ex: ExtractionResult | null | undefined): OperatingBusiness | null {
-  if (!ex) return null;
-  const words = wordsOf(ex);
+// The classes the site reads by readers of their own — a building of
+// apartments, offices, shops or warehouses, a hotel, a data center. On one
+// of them a business is named only by the class's own words ("Retail
+// (convenience store / gas station)"), and a stated EBITDA alone makes no
+// read: a hotel's EBITDA is its own industry's figure, after its management
+// fee, and a data center's is its operator's, never an operating business on
+// a building that rents.
+const READ_OTHERWISE: ReadonlySet<string> = new Set(["multifamily", "office", "retail", "industrial", "hospitality_str", "data_center"]);
+const readOtherwise = (ex: ExtractionResult) => READ_OTHERWISE.has(assetClassKey(ex.assetClass ?? "") ?? "");
+
+function businessIn(words: string | null | undefined): OperatingBusiness | null {
+  if (typeof words !== "string" || words.trim() === "") return null;
   for (const [kind, re] of BUSINESS_WORDS) if (re.test(words)) return kind;
   return null;
+}
+
+/** The business the memorandum's own words name, or null: the class's
+ *  words, then the name of a single tenant that leases the whole property —
+ *  never the deal's name ("Marina Bay Apartments" is an apartment building),
+ *  the plan's summary or a center's tenant list, where a station on an
+ *  outparcel or a daycare in a strip is one tenant among many (the audit of
+ *  2026-10-05). On a class the site reads otherwise, the class's words
+ *  alone. */
+export function operatingBusinessOf(ex: ExtractionResult | null | undefined): OperatingBusiness | null {
+  if (!ex) return null;
+  const fromClass = businessIn(ex.assetClass);
+  if (fromClass || readOtherwise(ex)) return fromClass;
+  return businessIn(ex.singleTenant?.tenant);
 }
 
 /** A coverage as written: "2.10x", "2.1 times", "1.85". */
@@ -190,14 +214,14 @@ function coverageOf(value: string): number | null {
  * The operating business on the property, as stated: what is sold, the
  * operator's earnings, the rent and its coverage, the split, the contracts
  * and the ground. Null unless the memorandum's own words name an operating
- * business or it states an EBITDA beside a price.
+ * business, or it states an EBITDA on a class the site reads no other way.
  */
 export function readGoingConcern(ex: ExtractionResult | null | undefined, asOf: Date = new Date()): GoingConcernRead | null {
   if (!ex) return null;
   const rows = (Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow).filter((m) => !NOT_STATED.test(m.value.trim()));
   const business = operatingBusinessOf(ex);
   const ebitda = ebitdaFigure(rows);
-  if (!business && !ebitda) return null;
+  if (!business && (!ebitda || readOtherwise(ex))) return null;
   const find = (re: RegExp) => rows.find((m) => re.test(m.label)) ?? null;
 
   const tenant = readSingleTenant(ex, asOf);

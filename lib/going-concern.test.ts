@@ -142,6 +142,47 @@ describe("an operating business on its real estate (pass 28, round 3)", () => {
     expect(goingConcernModelLine(null, null)).toBeNull();
   });
 
+  // The audit of 2026-10-05: the business was read from the deal's name and
+  // its plan's summary, so an apartment building called "Marina Bay" was "a
+  // marina", and a stated EBITDA made a hotel and a data center operating
+  // businesses whose earnings were "before a management fee".
+  it("never names a business from the deal's name or its summary, and reads no EBITDA alone on a class the site reads otherwise", () => {
+    const units = [row("Asking price", "$40,000,000"), row("Units", "240"), row("NOI (in-place)", "$2,400,000")];
+    const plan = (summary: string) => ({ strategy: { kind: "stabilized", summary, capitalBudget: "", timeline: "" } }) as Partial<ExtractionResult>;
+    const none: [string, ExtractionResult][] = [
+      ["Marina Bay Apartments", deal({ assetClass: "Multifamily", dealName: "Marina Bay Apartments" }, units)],
+      ["The Residences at Country Club", deal({ assetClass: "Multifamily", dealName: "The Residences at Country Club" }, units)],
+      [
+        "a grocery center with a station outparcel",
+        deal({ assetClass: "Retail", dealName: "Main Street Plaza", ...plan("Grocery-anchored center with a convenience store and gas station outparcel.") }, units),
+      ],
+      ["apartments beside a golf course", deal({ assetClass: "Multifamily", dealName: "Fairway Commons", ...plan("Renovate units in a community adjacent to a golf course.") }, units)],
+      ["a strip with a daycare", deal({ assetClass: "Retail", dealName: "Oak Plaza", ...plan("Strip center with a daycare and a nail salon.") }, units)],
+      ["Marina Corporate Center", deal({ assetClass: "Office", dealName: "Marina Corporate Center" }, units)],
+      [
+        "a hotel stating its EBITDA",
+        deal({ assetClass: "Hotel", dealName: "Hampton Inn Downtown" }, [
+          row("Asking price", "$42,000,000"),
+          row("Keys", "150"),
+          row("EBITDA (T-12)", "$3,400,000"),
+          row("NOI (in-place)", "$2,900,000"),
+        ]),
+      ],
+      ["a data center stating its EBITDA", deal({ assetClass: "Data Center", dealName: "DC-1" }, [row("Asking price", "$200,000,000"), row("EBITDA", "$14,000,000")])],
+    ];
+    for (const [what, d] of none) {
+      expect(operatingBusinessOf(d), what).toBeNull();
+      expect(readGoingConcern(d, TODAY), what).toBeNull();
+      expect(goingConcernTag(d, TODAY), what).toBeNull();
+    }
+    // The class's own words still name it on a class the site reads otherwise.
+    const station = deal({ assetClass: "Retail (convenience store / gas station)" }, [row("EBITDA", "$410,000")]);
+    expect(operatingBusinessOf(station)).toBe("fuel");
+    // And a single tenant's name names it where the class says nothing.
+    const wash = deal({ assetClass: "Net lease", singleTenant: { ...WASH.singleTenant!, tenant: "Express Car Wash LLC" } }, [row("Annual base rent", "$276,000")]);
+    expect(operatingBusinessOf(wash)).toBe("car_wash");
+  });
+
   it("is no read where nothing names an operating business and no EBITDA is stated", () => {
     expect(readGoingConcern(deal({ assetClass: "Multifamily" }, [row("NOI (in-place)", "$1,200,000")]), TODAY)).toBeNull();
     // An EBITDA alone makes a read, with the business unnamed.
