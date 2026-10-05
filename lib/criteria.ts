@@ -105,6 +105,12 @@ export interface BuyBoxCheck {
   status: BuyBoxStatus;
   /** one plain-English analyst line: mandate, deal figure, call */
   detail: string;
+  /** the criterion turns on the price — the price band, the basis, the
+   *  going-in cap, the target return — so a note's or a position's price, a
+   *  plan deal or a memorandum that states no cap or return can leave it
+   *  unknown, and a fit judged without it is no green light
+   *  (`buyBoxCoverage`) */
+  onPrice?: boolean;
 }
 
 // Near-miss tolerances, per criterion kind. Exported because the mandate-fit
@@ -1190,6 +1196,41 @@ export function foldBuyBoxChecks(
   return null;
 }
 
+/** How much of the box the fit stands on (research pass 35). */
+export interface BuyBoxCoverage {
+  /** the criteria the screen could judge, pass, near or miss */
+  checked: number;
+  /** every criterion the box sets, as the deal page lists them */
+  total: number;
+  /** the criteria it could not judge, by the deal page's own labels */
+  unchecked: string[];
+  /** one of those turns on the price (`BuyBoxCheck.onPrice`) */
+  priceUnchecked: boolean;
+}
+
+/**
+ * How many of the box's criteria the fold and the score were judged on —
+ * ONE count, beside the fold, that every surface drawing the fit reads (lib/
+ * fit-label says it): the deal header's chip and the screen-complete email
+ * (lib/buy-box-chip), the pipeline's card, list and CSV, the meeting
+ * workbook, the compare table, the batch upload's chip and the deal page's
+ * mandate gauge. The fold calls a
+ * deal "fits" on any pass with no miss, and the mandate-fit score rescales
+ * over what it could read (lib/mandate), so a note whose cap and return the
+ * box cannot judge read "Fit 100 · Pursue" and "Fits" on two of its four
+ * criteria. The count is of the checks the deal page lists; the score's own
+ * dimensions are its panel's to count.
+ */
+export function buyBoxCoverage(checks: BuyBoxCheck[]): BuyBoxCoverage {
+  const unknown = checks.filter((c) => c.status === "unknown");
+  return {
+    checked: checks.length - unknown.length,
+    total: checks.length,
+    unchecked: unknown.map((c) => c.label),
+    priceUnchecked: unknown.some((c) => c.onPrice === true),
+  };
+}
+
 export function evaluateBuyBox(
   dealAssetClass: string,
   extraction: ExtractionLike | null,
@@ -1395,6 +1436,7 @@ export function evaluateBuyBox(
             : "asking price";
       checks.push({
         label: "Price",
+        onPrice: true,
         status: "unknown",
         detail: `Mandate is ${bandText}; no parseable ${missing} in the screen yet.`,
       });
@@ -1404,6 +1446,7 @@ export function evaluateBuyBox(
       if (!belowMin && !aboveMax) {
         checks.push({
           label: "Price",
+          onPrice: true,
           status: "pass",
           detail: `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}. Inside the band.`,
         });
@@ -1415,6 +1458,7 @@ export function evaluateBuyBox(
         const end = range ? `its ${belowMin ? "bottom" : "top"} ` : "";
         checks.push({
           label: "Price",
+          onPrice: true,
           status: near ? "near" : "miss",
           detail: near
             ? `Mandate is ${bandText} — the ${noun} is ${shown(dollars)}, ${end}${Math.round(off * 100)}% ${belowMin ? "under" : "over"}. Close enough to price; a retrade could land it inside.`
@@ -1438,12 +1482,14 @@ export function evaluateBuyBox(
     if (dollars == null) {
       checks.push({
         label,
+        onPrice: true,
         status: "unknown",
         detail: `Mandate caps basis at ${fmtM(max)}/${noun}; no parseable per-${noun} figure yet.`,
       });
     } else if (dollars <= max) {
       checks.push({
         label,
+        onPrice: true,
         status: "pass",
         detail: `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}. Inside.`,
       });
@@ -1452,6 +1498,7 @@ export function evaluateBuyBox(
       const near = off <= NEAR_REL;
       checks.push({
         label,
+        onPrice: true,
         status: near ? "near" : "miss",
         detail: near
           ? `Mandate caps basis at ${fmtM(max)}/${noun} — this is ${fmtM(dollars)}/${noun}, ${Math.round(off * 100)}% over. Within negotiating range.`
@@ -1470,12 +1517,14 @@ export function evaluateBuyBox(
       // collateral's, which the buyer of the note does not earn (#414).
       checks.push({
         label: "Going-in cap",
+        onPrice: true,
         status: "unknown",
         detail: `Mandate wants ≥${box.minCapPct}% going-in, but this is a note: its price is a loan's, and the collateral's cap is not a return the note's buyer earns.`,
       });
     } else if (pct == null) {
       checks.push({
         label: "Going-in cap",
+        onPrice: true,
         status: "unknown",
         detail: planKind
           ? `Mandate wants ≥${box.minCapPct}% going-in, but ${withArticle(planKind)} deal is judged on its yield on total cost, not on a going-in cap — its stabilized figure is the finished project's, never a cap against the price.`
@@ -1484,6 +1533,7 @@ export function evaluateBuyBox(
     } else if (pct >= box.minCapPct) {
       checks.push({
         label: "Going-in cap",
+        onPrice: true,
         status: "pass",
         detail: `Mandate wants ≥${box.minCapPct}% going-in — the deal shows ${pct.toFixed(2)}%. Clears the floor.`,
       });
@@ -1492,6 +1542,7 @@ export function evaluateBuyBox(
       const near = box.minCapPct - pct <= NEAR_CAP_PT;
       checks.push({
         label: "Going-in cap",
+        onPrice: true,
         status: near ? "near" : "miss",
         detail: near
           ? `Mandate wants ≥${box.minCapPct}% going-in — the deal shows ${pct.toFixed(2)}%, ${gapBps}bps light. Close; a price cut could clear it.`
@@ -1507,12 +1558,14 @@ export function evaluateBuyBox(
     if (pct == null) {
       checks.push({
         label: "Target return",
+        onPrice: true,
         status: "unknown",
         detail: `Mandate targets ≥${box.minIrrPct}% IRR; no parseable IRR in the screen yet.`,
       });
     } else if (pct >= box.minIrrPct) {
       checks.push({
         label: "Target return",
+        onPrice: true,
         status: "pass",
         detail: `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${pct.toFixed(1)}%. On target (broker figure — verify).`,
       });
@@ -1520,6 +1573,7 @@ export function evaluateBuyBox(
       const near = box.minIrrPct - pct <= NEAR_IRR_PT;
       checks.push({
         label: "Target return",
+        onPrice: true,
         status: near ? "near" : "miss",
         detail: near
           ? `Mandate targets ≥${box.minIrrPct}% IRR — the OM projects ${pct.toFixed(1)}%, ${(box.minIrrPct - pct).toFixed(1)}pt shy. Within reach if the assumptions hold up.`

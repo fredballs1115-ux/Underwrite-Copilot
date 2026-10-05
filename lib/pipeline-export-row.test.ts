@@ -351,4 +351,48 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     // No buy box, no fit: nothing to mark.
     expect(pipelineExportRow(deal({ extraction: null, first_signal: SIGNAL, address }), ctx).fitFirstRead).toBe(false);
   });
+
+  it("says how much of the box a note's fit stands on, and draws it muted, never a green Fits (research pass 35)", async () => {
+    const blank = { summary: "", share: "", groundLease: "", loan: "", page: "" };
+    const note = {
+      dealName: "Harbor Point note",
+      assetClass: "multifamily",
+      market: "Baltimore, MD",
+      address: "",
+      interest: { ...blank, kind: "note" },
+      metrics: [m("Asking price", "$68,000,000"), m("Going-in cap rate", "5.45%"), m("Units", "248")],
+    } as ExtractionResult;
+    const box: BuyBox = { assetClasses: ["multifamily"], unitsMin: 100, unitsMax: 400, minCapPct: 5.75, minIrrPct: 13 };
+    const row = pipelineExportRow(deal({ extraction: note }), { ...ctx, box });
+    // The fold's "fits" on the class and the count alone…
+    expect(row.fit).toBe("fits");
+    // …and the count of what it stands on, as the pipeline card reads it.
+    expect(row.fitCoverage).toEqual({ checked: 2, total: 4, unchecked: ["Going-in cap", "Target return"], priceUnchecked: true });
+    const buf = await buildPipelineWorkbook([row], new Date("2026-09-08T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    // Row 6 is the deal; column 10 its Buy box.
+    const cell = wb.getWorksheet("Pipeline")!.getRow(6).getCell(10);
+    expect(cell.value).toBe("Fits (2 of 4)");
+    // Muted, never the pass green, while the cap and the return go unjudged.
+    expect(cell.font?.color?.argb).toBe("FF5F6B69");
+    expect(cell.font?.color?.argb).not.toBe("FF1B7A5E");
+    expect(JSON.stringify(cell.note)).toContain("Judged on 2 of the buy box's 4 criteria; going-in cap and target return could not be checked.");
+    // The same deal as a building, its cap and a stated return checked: the
+    // cell reads as it always has, in green, with no note.
+    const building = {
+      ...note,
+      interest: { ...blank, kind: "fee_simple" },
+      metrics: [m("Asking price", "$68,000,000"), m("Going-in cap rate", "6.00%"), m("Units", "248"), m("Levered IRR", "14%")],
+    } as ExtractionResult;
+    const whole = pipelineExportRow(deal({ extraction: building }), { ...ctx, box });
+    expect(whole.fitCoverage).toMatchObject({ checked: 4, total: 4 });
+    const buf2 = await buildPipelineWorkbook([whole], new Date("2026-09-08T12:00:00Z"), null);
+    const wb2 = new ExcelJS.Workbook();
+    await wb2.xlsx.load(buf2 as unknown as ArrayBuffer);
+    const cell2 = wb2.getWorksheet("Pipeline")!.getRow(6).getCell(10);
+    expect(cell2.value).toBe("Fits");
+    expect(cell2.font?.color?.argb).toBe("FF1B7A5E");
+    expect(cell2.note).toBeUndefined();
+  });
 });

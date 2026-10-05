@@ -147,6 +147,35 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(cells.map((c) => c.value)).toContain("—");
   });
 
+  it("a fit that stands on part of the box says on how much, names the rest in its note, and is never green while the price went unjudged (research pass 35)", async () => {
+    const note = { checked: 2, total: 4, unchecked: ["Going-in cap", "Target return"], priceUnchecked: true };
+    const place = { checked: 3, total: 4, unchecked: ["Geography"], priceUnchecked: false };
+    const ws = (
+      await load([
+        { ...STABILIZED, fit: "fits", fitCoverage: note },
+        { ...CONVERSION, fit: "near", fitCoverage: note, fitFirstRead: true },
+        { ...LEGACY, fit: "fits", fitCoverage: place },
+      ])
+    ).getWorksheet("Pipeline")!;
+    const [fits, near, placeOnly] = [6, 7, 8].map((r) => ws.getRow(r).getCell(10));
+    expect(fits.value).toBe("Fits (2 of 4)");
+    // Muted, not the pass green: the box's cap and return were never judged.
+    expect(fits.font?.color?.argb).toBe("FF5F6B69");
+    expect(JSON.stringify(fits.note)).toContain("going-in cap and target return could not be checked");
+    // A near miss keeps its amber, and a first read is marked beside the count.
+    expect(near.value).toBe("Near (2 of 4, first read)");
+    expect(near.font?.color?.argb).toBe("FFA05A1C");
+    expect(near.font?.italic).toBe(true);
+    expect(JSON.stringify(near.note)).toContain("judged on the first pass over the memorandum");
+    // Only the place unknown: the count, and the fit's own green.
+    expect(placeOnly.value).toBe("Fits (3 of 4)");
+    expect(placeOnly.font?.color?.argb).toBe("FF1B7A5E");
+    // The column holds "Outside (3 of 4)" on a line, and a first read's
+    // longer words wrap rather than run under the verdict beside them.
+    expect(ws.getColumn(10).width).toBeGreaterThanOrEqual(16);
+    expect(near.alignment?.wrapText).toBe(true);
+  });
+
   it("a share's price keeps its figure and carries what it buys as the cell's note; a building's has none (#415)", async () => {
     const ws = (await load([{ ...STABILIZED, interest: "49% share" }, CONVERSION])).getWorksheet("Pipeline")!;
     const share = ws.getRow(6).getCell(7);

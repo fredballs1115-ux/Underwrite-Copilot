@@ -10,13 +10,14 @@
  */
 import {
   buyBoxCheckSource,
+  buyBoxCoverage,
   evaluateBuyBox,
   foldBuyBoxChecks,
   type BuyBox,
   type BuyBoxCheck,
 } from "@/lib/criteria";
-import { scoreMandateFit, type MandateScore, type MandateVerdict } from "@/lib/mandate";
-import { fitScoreLabel } from "@/lib/fit-label";
+import { scoreMandateFit, type MandateScore } from "@/lib/mandate";
+import { checkedOf, checkedSentence, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
 import { inferStrategy } from "@/lib/deal-strategy";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
@@ -32,7 +33,7 @@ export function dealCheckSource(
   return buyBoxCheckSource(extraction, firstSignal, dealAddress, inferStrategy(extraction, firstSignal).kind);
 }
 
-export type BuyBoxChipTone = "pass" | "caution" | "kill" | "muted";
+export type BuyBoxChipTone = FitTone;
 
 /** The chip's colours by tone — the deal header's, and the sensitivity
  *  playground's, which draws its own read of the box in the same chip. */
@@ -46,6 +47,10 @@ export const BUY_BOX_CHIP_CLS: Record<BuyBoxChipTone, string> = {
 export interface BuyBoxChip {
   label: string;
   tone: BuyBoxChipTone;
+  /** which of the box's criteria could not be checked, as a sentence —
+   *  the chip's tooltip — where not every one could (lib/fit-label
+   *  `checkedSentence`) */
+  note?: string;
 }
 
 export interface BuyBoxRead {
@@ -56,12 +61,6 @@ export interface BuyBoxRead {
   /** the call as one chip */
   chip: BuyBoxChip;
 }
-
-const MANDATE_TONE: Record<MandateVerdict, BuyBoxChipTone> = {
-  PURSUE: "pass",
-  WATCH: "caution",
-  PASS: "kill",
-};
 
 /** The deal's checks, its mandate-fit score and the one chip they fold to. */
 export function buyBoxRead(
@@ -85,17 +84,28 @@ export function buyBoxRead(
  * whatever the score's call (lib/fit-label `fitScoreLabel`, the pipeline
  * card's own words). Without a score the older fold (Outside / Near / Fits)
  * stands in.
+ *
+ * Where the screen could not check every criterion the box sets, the chip
+ * says how many it did, and is never green while one the price decides is
+ * among those it could not (lib/criteria `buyBoxCoverage`, lib/fit-label):
+ * a note read "Fit 100 · Pursue" in green on its asset class and its unit
+ * count alone, the box's cap and return never judged (research pass 35).
  */
 export function buyBoxChip(checks: BuyBoxCheck[], mandate: MandateScore | null): BuyBoxChip {
+  const coverage = buyBoxCoverage(checks);
+  const note = checkedSentence(coverage) ?? undefined;
+  const withNote = (chip: BuyBoxChip): BuyBoxChip => (note ? { ...chip, note } : chip);
   if (mandate?.score != null && mandate.verdict) {
-    const outside = foldBuyBoxChecks(checks) === "outside";
-    return {
-      label: fitScoreLabel(mandate.score, mandate.verdict, outside),
-      tone: outside ? "kill" : MANDATE_TONE[mandate.verdict],
-    };
+    const fold = foldBuyBoxChecks(checks);
+    return withNote({
+      label: fitScoreLabel(mandate.score, mandate.verdict, fold === "outside", coverage),
+      tone: fitTone(mandate.verdict, fold, coverage),
+    });
   }
-  if (checks.some((c) => c.status === "miss")) return { label: "Outside buy box", tone: "kill" };
-  if (checks.some((c) => c.status === "near")) return { label: "Near buy box", tone: "caution" };
+  const count = checkedOf(coverage);
+  const counted = (words: string) => (count ? `${words} · ${count}` : words);
+  if (checks.some((c) => c.status === "miss")) return withNote({ label: counted("Outside buy box"), tone: "kill" });
+  if (checks.some((c) => c.status === "near")) return withNote({ label: counted("Near buy box"), tone: "caution" });
   if (checks.length > 0 && checks.every((c) => c.status === "pass")) return { label: "Fits buy box", tone: "pass" };
-  return { label: "Buy box unverified", tone: "muted" };
+  return withNote({ label: "Buy box unverified", tone: "muted" });
 }

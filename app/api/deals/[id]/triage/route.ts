@@ -4,7 +4,9 @@ import { getBuyBoxForDeal } from "@/lib/criteria-server";
 import {
   evaluateBuyBox,
   buyBoxCheckSource,
+  buyBoxCoverage,
   foldBuyBoxChecks,
+  type BuyBoxCoverage,
 } from "@/lib/criteria";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import type { StructuredAddress } from "@/lib/address";
@@ -64,6 +66,11 @@ export async function GET(
 
   let fit: TriageFit;
   let provisional = true;
+  // How many of the box's criteria the fit stands on (lib/criteria
+  // `buyBoxCoverage`), so the chip says "Fits box (2 of 4)" as the pipeline
+  // card says it, and is not green while a criterion the price decides
+  // could not be checked.
+  let coverage: BuyBoxCoverage | null = null;
   try {
     const box = await getBuyBoxForDeal(
       deal.user_id as string,
@@ -86,17 +93,17 @@ export async function GET(
         fit = "pending";
       } else {
         // The pipeline table's exact fold — adjacent surfaces must agree.
-        fit =
-          foldBuyBoxChecks(
-            evaluateBuyBox((deal.asset_class as string) ?? "auto", source, box),
-          ) ?? "unverified";
+        const checks = evaluateBuyBox((deal.asset_class as string) ?? "auto", source, box);
+        fit = foldBuyBoxChecks(checks) ?? "unverified";
+        coverage = buyBoxCoverage(checks);
       }
     }
   } catch (err) {
     // Eternal "pending" chips with silent logs would be undebuggable.
     console.error(`triage failed for deal ${id}:`, err);
     fit = "pending";
+    coverage = null;
   }
 
-  return Response.json({ fit, provisional }, { headers: NO_STORE });
+  return Response.json({ fit, provisional, coverage }, { headers: NO_STORE });
 }

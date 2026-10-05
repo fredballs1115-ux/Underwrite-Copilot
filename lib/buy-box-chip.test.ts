@@ -153,7 +153,9 @@ describe("the screen-complete email's chip is the deal header's", () => {
       SAMPLE_DEMO_BOX,
     );
     expect(page.mandate?.score).not.toBeNull();
-    expect(page.chip.label).toMatch(/^Fit \d+ · (Pursue|Watch|Pass|Outside box)$/);
+    // The score, then its call or a miss outright — and how many of the
+    // box's criteria it stands on where not every one could be checked.
+    expect(page.chip.label).toMatch(/^Fit \d+ · (Pursue|Watch|Pass|Outside box|\d+ of \d+ checked)( · \d+ of \d+ checked)?$/);
     const chip = await emailedChip({
       name: SAMPLE_DEAL.name,
       user_id: "u1",
@@ -247,5 +249,109 @@ describe("the chip's fold", () => {
     expect(buyBoxChip([check("pass")], null).label).toBe("Fits buy box");
     expect(buyBoxChip([check("pass"), check("unknown")], null).label).toBe("Buy box unverified");
     expect(buyBoxChip([], score(0, null)).label).toBe("Buy box unverified");
+  });
+});
+
+describe("the chip says how much of the box it was judged on (research pass 35)", () => {
+  const check = (label: string, status: BuyBoxCheck["status"], onPrice = false): BuyBoxCheck => ({
+    label,
+    status,
+    detail: "",
+    ...(onPrice ? { onPrice: true } : {}),
+  });
+  const score = (s: number, verdict: MandateScore["verdict"]): MandateScore => ({
+    score: s,
+    verdict,
+    dimensions: [],
+    dealbreakerTripped: false,
+    unresolvedDealbreakers: 0,
+  });
+  const NOTE = {
+    ...SAMPLE_DEAL.extraction,
+    interest: { kind: "note", summary: "", share: "", groundLease: "", loan: "", page: "" },
+  } as unknown as ExtractionResult;
+
+  it("a note against a property box: the count in the call's place, muted, and the criteria named — on the header and in the email", async () => {
+    const page = buyBoxRead(SAMPLE_DEAL.asset_class, dealCheckSource(NOTE, null, SAMPLE_DEAL.address), SAMPLE_DEMO_BOX);
+    // Two known passes scored 100 and PURSUE; the box's cap and return,
+    // which a note's price cannot be judged by, were never checked.
+    expect(page.mandate?.score).toBe(100);
+    expect(page.mandate?.verdict).toBe("PURSUE");
+    expect(page.chip).toEqual({
+      label: "Fit 100 · 2 of 4 checked",
+      tone: "muted",
+      note: "Judged on 2 of the buy box's 4 criteria; going-in cap and target return could not be checked.",
+    });
+    boxes.current = SAMPLE_DEMO_BOX;
+    const chip = await emailedChip({
+      name: "Harbor Point — Performing First Mortgage",
+      user_id: "u1",
+      team_id: null,
+      asset_class: SAMPLE_DEAL.asset_class,
+      extraction: NOTE,
+      first_signal: null,
+      address: SAMPLE_DEAL.address,
+      verdict: { verdict: "caution", reason: "A performing note." },
+      is_sample: false,
+      photo: null,
+      om_storage_path: `u1/${DEAL}.pdf`,
+    });
+    expect(chip).toBe("Fit 100 · 2 of 4 checked");
+    expect(chip).not.toContain("Pursue");
+  });
+
+  it("a miss outright keeps its words and its red, the count after it", () => {
+    const sample = buyBoxRead(
+      SAMPLE_DEAL.asset_class,
+      dealCheckSource(SAMPLE_DEAL.extraction, null, SAMPLE_DEAL.address),
+      SAMPLE_DEMO_BOX,
+    ).chip;
+    // The sample misses the 5.75% floor; its memorandum states no IRR.
+    expect(sample).toEqual({
+      label: "Fit 63 · Outside box · 3 of 4 checked",
+      tone: "kill",
+      note: "Judged on 3 of the buy box's 4 criteria; target return could not be checked.",
+    });
+  });
+
+  it("a box checked whole reads exactly as before, with no note", () => {
+    const whole = [check("Asset class", "pass"), check("Going-in cap", "pass", true), check("Target return", "pass", true)];
+    expect(buyBoxChip(whole, score(100, "PURSUE"))).toEqual({ label: "Fit 100 · Pursue", tone: "pass" });
+    expect(buyBoxChip([...whole.slice(0, 2), check("Target return", "near", true)], score(64, "WATCH"))).toEqual({
+      label: "Fit 64 · Watch",
+      tone: "caution",
+    });
+  });
+
+  it("is green only while every criterion the price decides was checked; a near miss keeps its amber", () => {
+    // Only the place is unknown: the count, and the call's own green.
+    const place = buyBoxChip([check("Geography", "unknown"), check("Going-in cap", "pass", true)], score(100, "PURSUE"));
+    expect(place).toEqual({
+      label: "Fit 100 · 1 of 2 checked",
+      tone: "pass",
+      note: "Judged on 1 of the buy box's 2 criteria; geography could not be checked.",
+    });
+    // The return is unknown: no green.
+    expect(buyBoxChip([check("Asset class", "pass"), check("Target return", "unknown", true)], score(100, "PURSUE")).tone).toBe("muted");
+    // A near miss with the cap unknown stays a warning.
+    const near = buyBoxChip([check("Units", "near"), check("Going-in cap", "unknown", true)], score(64, "WATCH"));
+    expect(near.label).toBe("Fit 64 · 1 of 2 checked");
+    expect(near.tone).toBe("caution");
+  });
+
+  it("the fold without a score says the count beside a near or a miss; a box it could judge none of stays unverified", () => {
+    expect(buyBoxChip([check("Price", "near", true), check("Basis / unit", "unknown", true)], null)).toEqual({
+      label: "Near buy box · 1 of 2 checked",
+      tone: "caution",
+      note: "Judged on 1 of the buy box's 2 criteria; basis / unit could not be checked.",
+    });
+    expect(buyBoxChip([check("Price", "miss", true), check("Basis / unit", "unknown", true)], null).label).toBe(
+      "Outside buy box · 1 of 2 checked",
+    );
+    expect(buyBoxChip([check("Price", "unknown", true)], null)).toEqual({
+      label: "Buy box unverified",
+      tone: "muted",
+      note: "The buy box's one criterion could not be checked.",
+    });
   });
 });

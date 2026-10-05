@@ -21,7 +21,7 @@ import { marketPictureFor } from "@/lib/market-picture";
 import { PICTURE_CREDIT, galleryPage, memorandumPhotoCredit, pictureMayBeInMemorandum } from "@/lib/deal-picture";
 import { cacheFresh, type DealVisualCache } from "@/lib/deal-location";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource } from "@/lib/criteria";
+import { evaluateBuyBox, foldBuyBoxChecks, buyBoxCheckSource, buyBoxCoverage } from "@/lib/criteria";
 import { inferStrategy } from "@/lib/deal-strategy";
 import { pickSlots, readingTerms, shownAssetClass } from "@/lib/pipeline-slots";
 import { floodCell, floodTag, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
@@ -296,6 +296,9 @@ export default async function DealsPage({
       : null;
     const mandate =
       box && checkSource ? scoreMandateFit(d.asset_class, checkSource, box) : null;
+    // The box's checks, read once: the fold the card draws and how many of
+    // the box's criteria it stands on (lib/criteria `buyBoxCoverage`).
+    const checks = box && checkSource ? evaluateBuyBox(d.asset_class, checkSource, box) : null;
     // Where the deal is, the deal page's answer (lib/market-county, #447):
     // its briefed market, else the metro area whose figures it reads — by
     // its county where its address names no place a market's keywords know.
@@ -319,10 +322,11 @@ export default async function DealsPage({
       stage: (d.stage as DealCard["stage"]) ?? "screening",
       // Any miss → outside; else any near-miss → near; all-pass → fits.
       // Unknown-only results (nothing checkable yet) stay null and render as —.
-      fit:
-        box && checkSource
-          ? foldBuyBoxChecks(evaluateBuyBox(d.asset_class, checkSource, box))
-          : null,
+      fit: checks ? foldBuyBoxChecks(checks) : null,
+      // How many of the box's criteria the fit stands on: the card says "2
+      // of 4 checked" where not every one could be, and draws no green while
+      // one the price decides is among them, as the deal header's chip does.
+      fitCoverage: checks ? buyBoxCoverage(checks) : null,
       score: mandate?.score ?? null,
       mandateVerdict: mandate?.verdict ?? null,
       // Judged on the first signal alone until the extraction lands — the

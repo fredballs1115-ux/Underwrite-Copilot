@@ -867,6 +867,8 @@ describe("runAnalysis — the happy path", () => {
       label: "Price",
       status: "miss",
       detail: "Mandate is $15.0M max — the ask is $20.0M. Beyond the mandate.",
+      // A criterion the price decides (lib/criteria `buyBoxCoverage`).
+      onPrice: true,
     });
     expect(input.buyBoxChecks?.tripped).toEqual(["price $20.0M over the $18.0M ceiling"]);
 

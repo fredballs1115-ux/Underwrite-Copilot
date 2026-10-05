@@ -1447,7 +1447,10 @@ describe("the sensitivity playground says whose figures it runs", () => {
     // "The memorandum's figures" is the header's own read: the same scorer
     // on the same source the page's chip folds.
     const header = buyBoxRead(SAMPLE_DEAL.asset_class, p.playground.checkSource as never, SAMPLE_DEMO_BOX);
-    expect(header.chip.label).toBe("Fit 63 · Outside box");
+    // The memorandum states no IRR, so the header's chip stands on three of
+    // the box's four criteria and says so (research pass 35); the
+    // playground's, scoring the model's IRR, checks all four.
+    expect(header.chip.label).toBe("Fit 63 · Outside box · 3 of 4 checked");
     expect(header.mandate?.score).toBe(63);
     expect(gluedWords(textOf(html))).toEqual([]);
   });

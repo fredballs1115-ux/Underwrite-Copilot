@@ -5,7 +5,8 @@ import type { DealRow } from "@/lib/deals";
 import type { ExtractionResult, VerdictResult } from "@/lib/anthropic/types";
 import type { UnderwritingModel } from "@/lib/model/types";
 import { getBuyBoxForDeal } from "@/lib/criteria-server";
-import { buyBoxCheckSource, evaluateBuyBox, screenYearOf, type BuyBox } from "@/lib/criteria";
+import { buyBoxCheckSource, buyBoxCoverage, evaluateBuyBox, screenYearOf, type BuyBox, type BuyBoxCoverage } from "@/lib/criteria";
+import { checkedSentence } from "@/lib/fit-label";
 import { CompareTable, MODEL_ROWS_NOTE, usd, type Col } from "./compare-table";
 import { countyOf, placeDeal } from "@/lib/market-county";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
@@ -132,6 +133,7 @@ function toCol(
   // by the fit call printed beside it.
   let fit: Col["fit"] = null;
   let fitNote: string | null = null;
+  let fitCoverage: BuyBoxCoverage | null = null;
   const checkSource = box ? buyBoxCheckSource(ex, signal, address, strat.kind) : null;
   if (box && checkSource) {
     const checks = evaluateBuyBox(deal.asset_class, checkSource, box);
@@ -146,6 +148,12 @@ function toCol(
     } else if (checks.some((c) => c.status === "pass")) {
       fit = "fits";
     }
+    // How many of the box's criteria the fit stands on, and which could not
+    // be checked, as the pipeline card and the meeting workbook say it
+    // (lib/criteria `buyBoxCoverage`, lib/fit-label).
+    fitCoverage = buyBoxCoverage(checks);
+    const checked = fit ? checkedSentence(fitCoverage) : null;
+    if (checked) fitNote = fitNote ? `${fitNote}. ${checked}` : checked;
   }
 
   return {
@@ -170,6 +178,7 @@ function toCol(
     hasModel: model != null,
     fit,
     fitNote,
+    fitCoverage,
     // Whose strategy it is on a note or a leased fee, as the deal header
     // says it (lib/interest `dealTypeLabel`).
     strategy: strat.kind === "unknown" ? null : dealTypeLabel(strat.label, ex),

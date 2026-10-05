@@ -14,7 +14,8 @@ import type {
 } from "@/lib/anthropic/types";
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords } from "@/lib/asset-words";
-import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { buyBoxCoverage, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
+import { MANDATE_TONE } from "@/lib/fit-label";
 import type { MandateScore, MandateVerdict } from "@/lib/mandate";
 import {
   fmtCapRange,
@@ -1245,6 +1246,7 @@ function MandateScoreHeader({
   mandate,
   unscored,
   outsideOn = [],
+  priceUnchecked = false,
 }: {
   mandate: MandateScore;
   /** buy-box criteria that are checked (below) but not part of the fit score */
@@ -1252,9 +1254,20 @@ function MandateScoreHeader({
   /** criteria the deal misses outright — the header's chip reads "Outside
    *  box" on any of them, whatever the score's call */
   outsideOn?: string[];
+  /** a criterion the price decides could not be checked (lib/criteria
+   *  `buyBoxCoverage`) — the gauge is then never green, as the header's
+   *  chip is not (lib/fit-label `fitTone`) */
+  priceUnchecked?: boolean;
 }) {
   const score = mandate.score!;
-  const meta = MANDATE_META[mandate.verdict!];
+  const called = MANDATE_META[mandate.verdict!];
+  // The header chip's colour rule: a score over part of the box, its price
+  // unjudged, is drawn muted rather than as a green light; its call and what
+  // it was scored on stay said.
+  const meta =
+    priceUnchecked && MANDATE_TONE[mandate.verdict!] === "pass"
+      ? { ...called, text: "text-muted", bar: "bg-muted", chip: "bg-faint text-muted" }
+      : called;
   const scored = mandate.dimensions.filter((d) => d.status !== "unknown").length;
   const pending = mandate.dimensions.length - scored;
 
@@ -1413,6 +1426,7 @@ export function BuyBoxPanel({ data }: { data: BuyBoxPanelData }) {
           // every check and reads "Outside box" on any of them (lib/buy-box-
           // chip), so the gauge says why it differs from its own call.
           outsideOn={data.checks.filter((c) => c.status === "miss").map((c) => c.label.toLowerCase())}
+          priceUnchecked={buyBoxCoverage(data.checks).priceUnchecked}
         />
       )}
       <div className="mt-3 grid gap-2 sm:grid-cols-2">

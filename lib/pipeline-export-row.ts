@@ -4,7 +4,7 @@
 // teammate's name — come in, so a test reads a row as the route builds it.
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
-import { buyBoxCheckSource, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
+import { buyBoxCheckSource, buyBoxCoverage, evaluateBuyBox, foldBuyBoxChecks, screenYearOf, type BuyBox } from "@/lib/criteria";
 import { capSlotWithheld, noteCapSlot, ownYieldText } from "@/lib/compare-interest";
 import { findPriceMetric, inferStrategy, planSummary, signalAskPrice } from "@/lib/deal-strategy";
 import { dealTypeLabel, interestTag } from "@/lib/interest";
@@ -96,8 +96,8 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
   const address =
     addressUpgrade(d.address, extraction) ?? ((d.address as StructuredAddress | null | undefined) ?? null);
   const source = ctx.box ? buyBoxCheckSource(extraction, signal, address, strategy.kind) : null;
-  const fit: PipelineExportRow["fit"] =
-    ctx.box && source ? foldBuyBoxChecks(evaluateBuyBox(d.asset_class, source, ctx.box)) : null;
+  const checks = ctx.box && source ? evaluateBuyBox(d.asset_class, source, ctx.box) : null;
+  const fit: PipelineExportRow["fit"] = checks ? foldBuyBoxChecks(checks) : null;
   return {
     name: d.name,
     stage: d.stage ?? "screening",
@@ -168,6 +168,11 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // the header's 6.27% as "6.30%".
     yieldOnCost: plan?.yieldOnCost ?? null,
     fit,
+    // How many of the box's criteria the fit stands on — the pipeline
+    // card's count (lib/criteria `buyBoxCoverage`): the cell says "Fits (2
+    // of 4)" where not every one could be checked, and is never green while
+    // one the price decides is among them.
+    fitCoverage: checks ? buyBoxCoverage(checks) : null,
     // Judged on the first signal alone until the extraction lands, as the
     // pipeline page marks it (the card's "First read").
     fitFirstRead: fit != null && !extraction && signal != null,

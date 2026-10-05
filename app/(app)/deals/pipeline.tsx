@@ -33,7 +33,7 @@ import { ASSET_CLASS_OPTIONS, assetClassLabel } from "@/lib/asset-class";
 import { rowMarketLabel } from "@/lib/placed-by";
 import { StageSelect } from "./[id]/stage-select";
 import { OffersDueBit } from "./offers-due";
-import { parseMoney, priceRange, priceRangeShort } from "@/lib/criteria";
+import { parseMoney, priceRange, priceRangeShort, type BuyBoxCoverage } from "@/lib/criteria";
 import { compareSortValues, pipelineSortValue, type PipelineSortKey, type SortDir } from "@/lib/pipeline-sort";
 import { PERSONAL_TAG, PICTURE_TIERS, dealTags, placeTagsByTier, type DealTag, type TagTone } from "@/lib/pipeline-tags";
 import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-deal";
@@ -43,7 +43,7 @@ import { SHARING_OPTIONS, dealLanding, matchesSharing } from "@/lib/personal-dea
 import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
 import { CAP_WITHHELD, capCellText, ownYieldOf } from "@/lib/cap-slot";
 import { PLAN_YOC_TITLE } from "@/lib/plan-facts";
-import { fitScoreLabel } from "@/lib/fit-label";
+import { FOLD_WORD, checkedOf, checkedSentence, fitCellText, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
 import type { AllowancePool, DealAllowance } from "@/lib/deal-allowance";
 import { nameIsFromFile, prefillName, restoredFileName } from "@/lib/deal-name";
 import {
@@ -70,6 +70,10 @@ export type DealCard = {
   personal?: boolean;
   /** deterministic buy-box result against the user's mandate */
   fit: "fits" | "near" | "outside" | null;
+  /** how many of the box's criteria the fit stands on (lib/criteria
+   *  `buyBoxCoverage`): the card says "2 of 4 checked" where not every one
+   *  could be, and draws no green while one the price decides is among them */
+  fitCoverage?: BuyBoxCoverage | null;
   /** 0–100 mandate-fit score + its PURSUE/WATCH/PASS call (null pre-screen) */
   score: number | null;
   mandateVerdict: "PURSUE" | "WATCH" | "PASS" | null;
@@ -185,19 +189,28 @@ function compactPrice(raw: string): string {
   return compactUsd(n);
 }
 
-const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string; cls: string }> = {
-  outside: { label: "Outside", cls: "text-kill" },
-  near: { label: "Near", cls: "text-caution" },
-  fits: { label: "Fits", cls: "text-pass" },
+// The fit's words and the score's call; their colour is the tone's alone
+// (`FIT_TONE_CLS`), never a word's own.
+const FIT_META: Record<NonNullable<DealCard["fit"]>, { label: string }> = {
+  outside: { label: FOLD_WORD.outside },
+  near: { label: FOLD_WORD.near },
+  fits: { label: FOLD_WORD.fits },
 };
 
-const MANDATE_META: Record<
-  NonNullable<DealCard["mandateVerdict"]>,
-  { label: string; cls: string }
-> = {
-  PASS: { label: "Pass", cls: "text-kill" },
-  WATCH: { label: "Watch", cls: "text-caution" },
-  PURSUE: { label: "Pursue", cls: "text-pass" },
+/** A fit's colour by its tone (lib/fit-label `fitTone`): the call's, and
+ *  muted — never green — while a criterion the price decides could not be
+ *  checked, as the deal header's chip is. */
+const FIT_TONE_CLS: Record<FitTone, string> = {
+  pass: "text-pass",
+  caution: "text-caution",
+  kill: "text-kill",
+  muted: "text-muted",
+};
+
+const MANDATE_META: Record<NonNullable<DealCard["mandateVerdict"]>, { label: string }> = {
+  PASS: { label: "Pass" },
+  WATCH: { label: "Watch" },
+  PURSUE: { label: "Pursue" },
 };
 
 /** First click on a header sorts the way people expect that column to lead:
@@ -718,8 +731,11 @@ export function Pipeline({
         d.slots.yoc ?? "",
         // A fit judged on the first signal, before the extraction lands, is
         // marked on each of its figures as the card marks it — "Near (first
-        // read)" — since a CSV is read away from the page (lib/first-read).
-        markFirstRead(d.fit ? FIT_META[d.fit].label : "", d.fitFirstRead),
+        // read)" — since a CSV is read away from the page (lib/first-read);
+        // and the fit says how many of the box's criteria it stands on where
+        // not every one could be checked, "Fits (2 of 4)", as the meeting
+        // workbook's cell does (lib/fit-label `fitCellText`).
+        fitCellText(d.fit ? FIT_META[d.fit].label : "", d.fitCoverage, d.fitFirstRead),
         markFirstRead(d.score != null ? String(d.score) : "", d.fitFirstRead),
         markFirstRead(d.mandateVerdict ? MANDATE_META[d.mandateVerdict].label : "", d.fitFirstRead),
         d.jobStatus === "failed"
@@ -1799,33 +1815,57 @@ const DealRow = memo(function DealRow({
   // bar the narrower widths draw. The words "buy box" live on the Buy box
   // page and the deal header's chip — the row doesn't repeat them.
   const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
-  const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
+  // The call's colour — red on a miss outright — and never green while a
+  // criterion the price decides could not be checked (lib/fit-label
+  // `fitTone`, the deal header's chip's rule).
+  const fitCls = scored ? FIT_TONE_CLS[fitTone(scored.verdict, d.fit, d.fitCoverage)] : "";
   // A fit judged on the first signal alone says so wherever it is drawn —
   // the deal page's "First read" — until the extraction lands.
   const firstRead = !!d.fitFirstRead && (!!scored || !!d.fit);
+  // How many of the box's criteria the fit stands on, where the screen
+  // could not check every one: "2 of 4" in the column, "2 of 4 checked"
+  // where there is room, and which ones in the tooltip.
+  const checkedShort = scored || d.fit ? checkedOf(d.fitCoverage, true) : null;
+  const checkedNote = scored || d.fit ? checkedSentence(d.fitCoverage) : null;
   // The deal header's chip's own words (lib/fit-label): "Outside box"
-  // wherever the deal misses the box outright, whatever the score's call.
+  // wherever the deal misses the box outright, whatever the score's call,
+  // and the count in the call's place where the box was not judged whole.
   const fitWords = scored
-    ? `${fitScoreLabel(scored.score, scored.verdict, d.fit === "outside")}${firstRead ? ", first read" : ""}`
+    ? `${fitScoreLabel(scored.score, scored.verdict, d.fit === "outside", d.fitCoverage)}${firstRead ? ", first read" : ""}`
     : null;
   const fitTitle = scored
-    ? `${
+    ? [
         d.fit === "outside"
           ? `${scored.score} / 100 mandate fit (${MANDATE_META[scored.verdict].label}), but outside the box: it misses at least one criterion outright, and that wins over the score's call`
-          : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`
-      }${firstRead ? `. ${FIRST_READ_TITLE}` : ""}`
+          : checkedShort
+            ? `${scored.score} / 100 mandate fit, on the criteria the screen could check`
+            : `${scored.score} / 100 · ${MANDATE_META[scored.verdict].label} — mandate fit`,
+        checkedNote,
+        firstRead ? FIRST_READ_TITLE : null,
+      ]
+        .filter((s): s is string => !!s)
+        .map((s) => s.replace(/\.$/, ""))
+        .join(". ")
     : null;
   const firstReadMark = firstRead ? (
     <span className="text-[9px] font-medium uppercase text-brand" title={FIRST_READ_TITLE}>
       first read
     </span>
   ) : null;
+  const checkedMark = checkedShort ? (
+    <span className="whitespace-nowrap text-[9px] font-medium text-muted" title={checkedNote ?? undefined} data-qa="fit-checked">
+      {checkedShort}
+    </span>
+  ) : null;
   // Without a score there is no bar to draw, so the fit stays a word in the
   // meta line; with one, the bar below carries it and the word goes.
   const fitBit =
     !scored && d.fit ? (
-      <span className={`font-medium ${FIT_META[d.fit].cls}`} title={firstRead ? FIRST_READ_TITLE : undefined}>
-        {FIT_META[d.fit].label} box{firstRead ? ", first read" : ""}
+      <span
+        className={`font-medium ${FIT_TONE_CLS[fitTone(null, d.fit, d.fitCoverage)]}`}
+        title={[checkedNote, firstRead ? FIRST_READ_TITLE : null].filter(Boolean).join(" ") || undefined}
+      >
+        {`${FIT_META[d.fit].label} box${checkedShort ? `, ${checkedOf(d.fitCoverage)}` : ""}${firstRead ? ", first read" : ""}`}
       </span>
     ) : null;
   // Below `lg` the score column is hidden, and as a word at the end of the
@@ -1841,6 +1881,7 @@ const DealRow = memo(function DealRow({
         fit
       </span>
       <FitBar score={scored.score} />
+      {checkedShort ? <span aria-hidden>{checkedMark}</span> : null}
       {firstRead ? <span aria-hidden>{firstReadMark}</span> : null}
       <span className="sr-only">{fitWords}</span>
     </span>
@@ -2019,13 +2060,18 @@ const DealRow = memo(function DealRow({
             >
               {scored.score}
               <FitBar score={scored.score} />
+              {checkedMark}
               {firstReadMark}
             </span>
           ) : d.fit ? (
             <>
-              <span className={FIT_META[d.fit].cls} title={firstRead ? FIRST_READ_TITLE : undefined}>
+              <span
+                className={FIT_TONE_CLS[fitTone(null, d.fit, d.fitCoverage)]}
+                title={[checkedNote, firstRead ? FIRST_READ_TITLE : null].filter(Boolean).join(" ") || undefined}
+              >
                 {FIT_META[d.fit].label}
               </span>
+              {checkedMark}
               {firstReadMark}
             </>
           ) : (
@@ -2268,7 +2314,14 @@ const DealTile = memo(function DealTile({
   const asset = assetMeta(d.assetClass ?? "");
   const place = d.coveredMarket ?? d.readMarket ?? d.market;
   const scored = d.score != null && d.mandateVerdict ? { score: d.score, verdict: d.mandateVerdict } : null;
-  const fitCls = scored ? (d.fit === "outside" ? "text-kill" : MANDATE_META[scored.verdict].cls) : "";
+  // The deal header's chip's colour rule (lib/fit-label `fitTone`): red on a
+  // miss outright, and never green while a criterion the price decides
+  // could not be checked.
+  const fitCls = scored ? FIT_TONE_CLS[fitTone(scored.verdict, d.fit, d.fitCoverage)] : "";
+  // How many of the box's criteria the fit stands on, under it, where not
+  // every one could be checked: "2 of 4 checked", which ones in its tooltip.
+  const fitChecked = scored || d.fit ? checkedOf(d.fitCoverage) : null;
+  const fitCheckedNote = fitChecked ? checkedSentence(d.fitCoverage) : null;
   // What the picture must not hide — a Special Flood Hazard Area, how it is
   // sold, what the price buys where it is not the building, the seller's
   // loan… (lib/pipeline-tags). A chip rides on the picture only where it
@@ -2398,19 +2451,31 @@ const DealTile = memo(function DealTile({
             {scored ? (
               <span
                 className={`flex items-center gap-1.5 tabular-nums ${fitCls}`}
-                title={d.fitFirstRead ? `${scored.score} / 100 mandate fit. ${FIRST_READ_TITLE}` : `${scored.score} / 100 mandate fit`}
+                title={[`${scored.score} / 100 mandate fit`, fitCheckedNote?.replace(/\.$/, ""), d.fitFirstRead ? FIRST_READ_TITLE : null]
+                  .filter(Boolean)
+                  .join(". ")}
               >
                 {scored.score}
                 <FitBar score={scored.score} />
               </span>
             ) : d.fit ? (
-              <span className={FIT_META[d.fit].cls} title={d.fitFirstRead ? FIRST_READ_TITLE : undefined}>
+              <span
+                className={FIT_TONE_CLS[fitTone(null, d.fit, d.fitCoverage)]}
+                title={[fitCheckedNote, d.fitFirstRead ? FIRST_READ_TITLE : null].filter(Boolean).join(" ") || undefined}
+              >
                 {FIT_META[d.fit].label}
               </span>
             ) : (
               <Unstated reading={!!d.reading && !!d.hasBox} width="w-12" className="font-normal text-line" />
             )}
           </dd>
+          {/* Not every criterion of the box could be checked: how many were,
+              under the fit, as the deal header's chip says it. */}
+          {fitChecked ? (
+            <dd className="truncate text-[10px] font-medium text-muted" title={fitCheckedNote ?? undefined} data-qa="fit-checked">
+              {fitChecked}
+            </dd>
+          ) : null}
           {/* Judged on the first signal while the extraction is on its
               way: said under the fit, as the deal page says it. */}
           {d.fitFirstRead && (scored || d.fit) ? (

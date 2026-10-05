@@ -14,6 +14,8 @@ import { PERSONAL_CHIP, PERSONAL_TITLE } from "@/lib/personal-deal";
 // The run itself, pure (lib/batch-run): each answer's status, what the
 // button sends again, and the plan's limit said once with a link.
 import { capNotice, runBatch, runLabel, type BatchStatus } from "@/lib/batch-run";
+import type { BuyBoxCoverage } from "@/lib/criteria";
+import { checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 
 const MAX_FILES = 4;
 const MAX_BYTES = 32 * 1024 * 1024;
@@ -26,11 +28,42 @@ interface Item {
 
 /** Buy-box triage chip states worth showing (anything else stays hidden).
  *  Keys are the pipeline table's fit vocabulary — one vocabulary everywhere. */
-const TRIAGE_CHIP: Record<string, { label: string; cls: string }> = {
-  fits: { label: "Fits box", cls: "bg-pass/10 text-pass" },
-  near: { label: "Near box", cls: "bg-caution/10 text-caution" },
-  outside: { label: "Outside box", cls: "bg-kill/15 text-kill" },
+const TRIAGE_CHIP: Record<string, string> = {
+  fits: "Fits box",
+  near: "Near box",
+  outside: "Outside box",
 };
+
+/** The chip's colours by the fit's tone (lib/fit-label `fitTone`): the
+ *  fold's own, and muted — never green — while a criterion the price
+ *  decides could not be checked, as the pipeline card is. */
+const TRIAGE_TONE_CLS: Record<FitTone, string> = {
+  pass: "bg-pass/10 text-pass",
+  caution: "bg-caution/10 text-caution",
+  kill: "bg-kill/15 text-kill",
+  muted: "bg-faint text-muted",
+};
+
+type Triage = { fit: string; provisional: boolean; coverage?: BuyBoxCoverage | null };
+
+/** A deal's triage as a chip: "Fits box", or "Fits box (2 of 4)" where the
+ *  box could not be judged whole (lib/fit-label `fitCellText`); null for a
+ *  state not worth showing. */
+function triageChip(t: Triage | undefined): { label: string; cls: string; title: string } | null {
+  const word = t ? TRIAGE_CHIP[t.fit] : undefined;
+  if (!t || !word) return null;
+  const fold = t.fit as "fits" | "near" | "outside";
+  return {
+    label: `${fitCellText(word, t.coverage)}${t.provisional ? " ~" : ""}`,
+    cls: TRIAGE_TONE_CLS[fitTone(null, fold, t.coverage)],
+    title: [
+      t.provisional ? "Provisional — from the first-pass read; the full screen refines it" : "From the completed extraction",
+      checkedSentence(t.coverage),
+    ]
+      .filter(Boolean)
+      .join(". "),
+  };
+}
 
 /**
  * Batch OM triage: pick several OM PDFs (a call-for-offers day), queue them
@@ -55,9 +88,7 @@ export function BatchUpload({
   const [pickError, setPickError] = useState<string | null>(null);
   // Buy-box triage per queued deal — filled in by polling as first signals
   // land (~30s into each screen), so the day's stack self-sorts up front.
-  const [triage, setTriage] = useState<
-    Record<string, { fit: string; provisional: boolean }>
-  >({});
+  const [triage, setTriage] = useState<Record<string, Triage>>({});
 
   function addFiles(list: FileList | null) {
     if (!list || !list.length) return;
@@ -144,11 +175,13 @@ export function BatchUpload({
             const body = (await res.json()) as {
               fit?: string;
               provisional?: boolean;
+              coverage?: BuyBoxCoverage | null;
             };
             return {
               id,
               fit: body.fit ?? "pending",
               provisional: body.provisional ?? true,
+              coverage: body.coverage ?? null,
             };
           } catch {
             return null;
@@ -163,7 +196,7 @@ export function BatchUpload({
           // Never overwrite a resolved verdict with a transient "pending".
           if (r.fit === "pending" && next[r.id] && next[r.id].fit !== "pending")
             continue;
-          next[r.id] = { fit: r.fit, provisional: r.provisional };
+          next[r.id] = { fit: r.fit, provisional: r.provisional, coverage: r.coverage };
         }
         return next;
       });
@@ -294,19 +327,14 @@ export function BatchUpload({
                         {PERSONAL_CHIP}
                       </span>
                     )}
-                    {TRIAGE_CHIP[triage[item.status.dealId]?.fit ?? ""] && (
-                      <span
-                        title={
-                          triage[item.status.dealId].provisional
-                            ? "Provisional — from the first-pass read; the full screen refines it"
-                            : "From the completed extraction"
-                        }
-                        className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${TRIAGE_CHIP[triage[item.status.dealId].fit].cls}`}
-                      >
-                        {TRIAGE_CHIP[triage[item.status.dealId].fit].label}
-                        {triage[item.status.dealId].provisional ? " ~" : ""}
-                      </span>
-                    )}
+                    {(() => {
+                      const chip = triageChip(triage[item.status.dealId]);
+                      return chip ? (
+                        <span title={chip.title} className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${chip.cls}`}>
+                          {chip.label}
+                        </span>
+                      ) : null;
+                    })()}
                     <a
                       href={`/deals/${item.status.dealId}`}
                       className="text-xs font-medium text-pass hover:underline"

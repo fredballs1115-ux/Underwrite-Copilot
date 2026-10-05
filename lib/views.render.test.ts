@@ -648,6 +648,57 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(a11yIssues(list)).toEqual([]);
   });
 
+  it("a fit that stands on part of the box says how much, and is muted — never green — while the price went unjudged (research pass 35)", () => {
+    // A note against a property box: two known passes scored 100 and PURSUE,
+    // the box's cap and return never judged.
+    const note = card({
+      id: "n",
+      name: "Harbor Point — Performing First Mortgage",
+      verdict: "caution",
+      fit: "fits",
+      score: 100,
+      mandateVerdict: "PURSUE",
+      fitCoverage: { checked: 2, total: 4, unchecked: ["Going-in cap", "Target return"], priceUnchecked: true },
+      slots: { cap: null, price: "$68,000,000", yoc: null, capWithheld: "note", noteYield: "17.3%" },
+      market: "Brewerytown, Philadelphia, PA",
+      coveredMarket: "Philadelphia",
+    });
+    const whole = CARDS.find((c) => c.id === "b")!;
+    const props = {
+      deals: withThumbs([note, whole]),
+      errorMessage: null,
+      notice: null,
+      onboarding: { hasBuyBox: true, sampleId: "h", hasScreenedOm: true },
+      billing: BILLING,
+      todayIso: TODAY,
+    };
+    const tiles = (html: string) => new Map(html.split(/(?=<li [^>]*data-deal-tile=")/).slice(1).map((p) => [p.match(/data-deal-tile="([^"]+)"/)?.[1] ?? "", p]));
+    const cards = render(React.createElement(Pipeline, props));
+    expect(a11yIssues(cards), "a11y pipeline cards").toEqual([]);
+    expect(gluedWords(visibleText(cards))).toEqual([]);
+    const tile = tiles(cards).get("n")!;
+    // The count under the score, which criteria in its tooltip…
+    expect(tile).toMatch(/<dd[^>]*data-qa="fit-checked"[^>]*>2 of 4 checked<\/dd>/);
+    expect(tile).toContain("going-in cap and target return could not be checked");
+    // …and the score muted, not the call's green.
+    expect(tile).toMatch(/tabular-nums text-muted"[^>]*>100</);
+    expect(tile).not.toMatch(/tabular-nums text-pass"[^>]*>100</);
+    // A box checked whole reads as it always has.
+    const other = tiles(cards).get("b")!;
+    expect(other).not.toContain('data-qa="fit-checked"');
+    expect(other).toMatch(/tabular-nums text-pass"[^>]*>88</);
+
+    const list = render(React.createElement(Pipeline, { ...props, initialView: "list" as const }));
+    expect(a11yIssues(list), "a11y pipeline list").toEqual([]);
+    expect(gluedWords(visibleText(list))).toEqual([]);
+    // The header chip's words for a screen reader, the short count in the
+    // score column and on the narrow line, and no "Pursue" for the note.
+    expect((list.match(/Fit 100 · 2 of 4 checked/g) ?? []).length).toBe(1);
+    expect((list.match(/data-qa="fit-checked"[^>]*>2 of 4</g) ?? []).length).toBe(2);
+    expect(list).not.toContain("Fit 100 · Pursue");
+    expect(list).toContain("Fit 88 · Pursue");
+  });
+
   it("opens the new-deal form with its name field still required and editable — a chosen PDF only pre-fills it (lib/deal-name)", () => {
     const html = render(
       React.createElement(Pipeline, {
@@ -1464,6 +1515,26 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const single = renderToStaticMarkup(React.createElement(CompareTable, { cols: [COLS[0]] }));
     expect(single).not.toContain("data-spread-bar");
     expect(single).not.toContain("data-signed-bar");
+  });
+
+  it("says how much of the box a fit stands on, as the pipeline card does, and draws it muted while the price went unjudged (research pass 35)", () => {
+    const coverage = { checked: 2, total: 4, unchecked: ["Going-in cap", "Target return"], priceUnchecked: true };
+    const note = col({
+      id: "n",
+      name: "Harbor Point — Performing First Mortgage",
+      fit: "fits",
+      fitNote: "Judged on 2 of the buy box's 4 criteria; going-in cap and target return could not be checked.",
+      fitCoverage: coverage,
+    });
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: [note, COLS[1]] }));
+    expect(a11yIssues(html)).toEqual([]);
+    const text = visibleText(html);
+    expect(gluedWords(text)).toEqual([]);
+    // In the table and on the phone card alike: the count, muted…
+    expect((html.match(/<span class="font-semibold text-muted">Fits \(2 of 4\)<\/span>/g) ?? []).length).toBe(2);
+    expect(text).toContain("going-in cap and target return could not be checked");
+    // …while a fit judged whole keeps its green and its one word.
+    expect((html.match(/<span class="font-semibold text-pass">Fits<\/span>/g) ?? []).length).toBe(2);
   });
 
   it("marks a call a running or failed re-screen is replacing, the pipeline card's way, and never crowns it", () => {

@@ -1113,10 +1113,12 @@ export default async function DealPage({
 
   // The buy-box call as one chip (lib/buy-box-chip's `buyBoxChip`: the
   // mandate-fit score leads — "Fit 82 · Pursue" — unless a hard "outside"
-  // fold wins, and the older fold stands in without a score), toned by the
-  // same map the sensitivity playground's chip reads.
+  // fold wins, and the older fold stands in without a score; "Fit 100 · 2
+  // of 4 checked" where the box could not be judged whole, which criteria
+  // in its tooltip), toned by the same map the sensitivity playground's
+  // chip reads.
   const buyBoxChip = boxRead
-    ? { label: boxRead.chip.label, cls: BUY_BOX_CHIP_CLS[boxRead.chip.tone] }
+    ? { label: boxRead.chip.label, cls: BUY_BOX_CHIP_CLS[boxRead.chip.tone], note: boxRead.chip.note }
     : null;
 
   const addressLine =
@@ -1212,7 +1214,7 @@ export default async function DealPage({
               </span>
             )}
             {buyBoxChip && (
-              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${buyBoxChip.cls}`}>
+              <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${buyBoxChip.cls}`} title={buyBoxChip.note}>
                 {buyBoxChip.label}
               </span>
             )}

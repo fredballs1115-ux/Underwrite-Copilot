@@ -7,6 +7,8 @@ import type { CapSpreadRead, LeverageRead } from "@/lib/leverage";
 import type { FigureSource } from "@/lib/compare-figures";
 import { OWN_YIELD_WORDS, SHARE_CAP_WORDS, type CapWithheld } from "@/lib/compare-interest";
 import { pctText } from "@/lib/plan-facts";
+import type { BuyBoxCoverage } from "@/lib/criteria";
+import { fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 
 export const VERDICT_PILL: Record<string, { label: string; cls: string }> = {
   pass: { label: "Go", cls: "bg-pass/10 text-pass" },
@@ -73,9 +75,14 @@ export type Col = {
   /** whether a memorandum is on file (a typed-in deal has none) */
   hasOm?: boolean;
   hasModel: boolean;
-  /** deterministic mandate fit + a one-line why (misses / near-misses) */
+  /** deterministic mandate fit + a one-line why (misses / near-misses, and
+   *  which criteria could not be checked) */
   fit: "fits" | "near" | "outside" | null;
   fitNote: string | null;
+  /** how many of the box's criteria the fit stands on (lib/criteria
+   *  `buyBoxCoverage`): "Fits (2 of 4)" where not every one could be
+   *  checked, and never green while one the price decides is among them */
+  fitCoverage?: BuyBoxCoverage | null;
   /** the deal's strategy label (Stabilized / Value-add / Conversion …), null when unknown */
   strategy: string | null;
   /** a deal with a plan (value-add, lease-up, conversion, development): its
@@ -203,11 +210,28 @@ export type Col = {
   cover?: DealCoverFacts | null;
 };
 
-const FIT_LABEL: Record<NonNullable<Col["fit"]>, { text: string; cls: string }> = {
-  fits: { text: "Fits", cls: "text-pass" },
-  near: { text: "Near miss", cls: "text-caution" },
-  outside: { text: "Outside", cls: "text-kill" },
+const FIT_LABEL: Record<NonNullable<Col["fit"]>, string> = {
+  fits: "Fits",
+  near: "Near miss",
+  outside: "Outside",
 };
+
+/** The fit's colour by its tone (lib/fit-label `fitTone`): the fold's
+ *  own, and muted — never green — while a criterion the price decides could
+ *  not be checked, as the deal header's chip and the pipeline card are. */
+const FIT_TONE_CLS: Record<FitTone, string> = {
+  pass: "text-pass",
+  caution: "text-caution",
+  kill: "text-kill",
+  muted: "text-muted",
+};
+
+/** The fit in words and colour: "Fits", or "Fits (2 of 4)" where the box
+ *  could not be judged whole (lib/fit-label `fitCellText`). */
+function fitShown(c: Col): { text: string; cls: string } | null {
+  if (!c.fit) return null;
+  return { text: fitCellText(FIT_LABEL[c.fit], c.fitCoverage), cls: FIT_TONE_CLS[fitTone(null, c.fit, c.fitCoverage)] };
+}
 
 /** The row's spread as a bar — the pipeline's fit bar, scaled to the row's
  *  largest figure. Muted on a rejected deal (drawn, so the proportions stay
@@ -630,7 +654,7 @@ export function CompareTable({ cols }: { cols: Col[] }) {
               {reason && <p className="mt-1 text-xs leading-relaxed text-muted">{reason}</p>}
               {c.fit && (
                 <p className="mt-2 text-xs">
-                  <span className={`font-semibold ${FIT_LABEL[c.fit].cls}`}>{FIT_LABEL[c.fit].text}</span>
+                  <span className={`font-semibold ${fitShown(c)!.cls}`}>{fitShown(c)!.text}</span>
                   {c.fitNote && <span className="text-muted"> · {c.fitNote}</span>}
                 </p>
               )}
@@ -722,8 +746,8 @@ export function CompareTable({ cols }: { cols: Col[] }) {
                   <td key={c.id} className="border-l border-line px-4 py-3 align-top">
                     {c.fit ? (
                       <>
-                        <span className={`font-semibold ${FIT_LABEL[c.fit].cls}`}>
-                          {FIT_LABEL[c.fit].text}
+                        <span className={`font-semibold ${fitShown(c)!.cls}`}>
+                          {fitShown(c)!.text}
                         </span>
                         {c.fitNote && (
                           <p className="mt-0.5 max-w-[16rem] text-xs leading-relaxed text-muted">

@@ -3,8 +3,9 @@ import ExcelJS from "exceljs";
 import { applyWorkbookBranding, type ExportBranding } from "@/lib/excel-branding";
 import { STAGES, STAGE_LABEL, isOpenStage, normalizeStage, type Stage } from "@/lib/stages";
 import { assetClassLabel } from "@/lib/asset-class";
-import { parsePct, parsePrice, priceRange } from "@/lib/criteria";
-import { FIRST_READ_TITLE, markFirstRead } from "@/lib/first-read";
+import { parsePct, parsePrice, priceRange, type BuyBoxCoverage } from "@/lib/criteria";
+import { FIRST_READ_TITLE } from "@/lib/first-read";
+import { FOLD_WORD, checkedSentence, fitCellText, fitTone, type FitTone } from "@/lib/fit-label";
 import { OWN_YIELD_WORDS } from "@/lib/compare-interest";
 
 /**
@@ -135,6 +136,11 @@ export interface PipelineExportRow {
    *  header prints; never a rounded string read back */
   yieldOnCost: number | null;
   fit: "fits" | "near" | "outside" | null;
+  /** how many of the box's criteria the fit stands on (lib/criteria
+   *  `buyBoxCoverage`) — the cell says "Fits (2 of 4)" where not every one
+   *  could be checked, names them in its note, and is never green while
+   *  one the price decides is among them */
+  fitCoverage?: BuyBoxCoverage | null;
   /** the fit is judged on the screen's first signal, the extraction not
    *  landed yet — the pipeline card's "First read" (lib/first-read); the
    *  cell says so beside the fit it shows */
@@ -150,10 +156,14 @@ export interface PipelineExportRow {
   addedBy: string | null;
 }
 
-const FIT_LABEL: Record<string, { label: string; color: string }> = {
-  fits: { label: "Fits", color: PASS },
-  near: { label: "Near", color: CAUTION },
-  outside: { label: "Outside", color: KILL },
+/** A fit's colour by its tone (lib/fit-label `fitTone`): the fold's own —
+ *  green, amber, red — and muted, never green, while a criterion the price
+ *  decides could not be checked. */
+const FIT_COLOR: Record<FitTone, string> = {
+  pass: PASS,
+  caution: CAUTION,
+  kill: KILL,
+  muted: MUTED,
 };
 
 const VERDICT_LABEL: Record<string, { label: string; color: string }> = {
@@ -185,7 +195,7 @@ export async function buildPipelineWorkbook(
     { width: 14 }, // Price
     { width: 11 }, // Cap
     { width: 13 }, // Yield on cost
-    { width: 10 }, // Buy box
+    { width: 16 }, // Buy box — "Outside (3 of 4)" on one line; a first read's longer words wrap
     { width: 10 }, // Verdict
     { width: 12 }, // Offers due
     { width: 12 }, // Added
@@ -364,15 +374,23 @@ export async function buildPipelineWorkbook(
       // A fit judged on the first signal is the card's "First read": said on
       // the cell, in italic as a call not yet the screen's own is, and
       // explained in its note — never passed off as the full screen's fit.
-      const fit = d.fit ? FIT_LABEL[d.fit] : null;
-      const firstRead = !!fit && !!d.fitFirstRead;
-      row.getCell(10).value = fit ? markFirstRead(fit.label, firstRead) : "—";
-      row.getCell(10).font = fit
+      // A fit that stands on part of the box says on how much — "Fits (2 of
+      // 4)" — names what could not be checked in its note, and is not green
+      // while that includes a criterion the price decides: a note's cap and
+      // return, which the box cannot judge, had read a green "Fits"
+      // (research pass 35).
+      const fitWord = d.fit ? FOLD_WORD[d.fit] : null;
+      const firstRead = !!fitWord && !!d.fitFirstRead;
+      const fitColor = FIT_COLOR[fitTone(null, d.fit, d.fitCoverage)];
+      row.getCell(10).value = fitWord ? fitCellText(fitWord, d.fitCoverage, firstRead) : "—";
+      row.getCell(10).alignment = { wrapText: true };
+      row.getCell(10).font = fitWord
         ? firstRead
-          ? { size: 10, italic: true, color: { argb: fit.color } }
-          : { size: 10, bold: true, color: { argb: fit.color } }
+          ? { size: 10, italic: true, color: { argb: fitColor } }
+          : { size: 10, bold: true, color: { argb: fitColor } }
         : baseFont;
-      if (firstRead) row.getCell(10).note = FIRST_READ_TITLE;
+      const fitNote = fitWord ? [checkedSentence(d.fitCoverage), firstRead ? FIRST_READ_TITLE : null].filter(Boolean).join(" ") : "";
+      if (fitNote) row.getCell(10).note = fitNote;
 
       const v = d.verdict ? VERDICT_LABEL[d.verdict] : null;
       // A call the latest screen has not re-run is the previous screen's,

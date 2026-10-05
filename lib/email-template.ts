@@ -11,7 +11,8 @@ export interface AnalysisReadyEmailInput {
   /** hex for the verdict accent, e.g. "#1b7a5e" */
   verdictColor: string;
   /** the deal header's buy-box chip (lib/buy-box-chip): "Fit 82 · Pursue",
-   *  "Fit 61 · Outside box", "Fits buy box", "Near buy box", "Outside buy
+   *  "Fit 61 · Outside box", "Fit 100 · 2 of 4 checked" where the box could
+   *  not be judged whole, "Fits buy box", "Near buy box", "Outside buy
    *  box", "Buy box unverified" — or "No buy box set", or lib/email's line
    *  for a box it could not read. Drawn after "Buy box:", as the plain-text
    *  part has always said it: beside the call's pill, a bare "Fit 82 ·

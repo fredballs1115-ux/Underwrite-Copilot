@@ -26,6 +26,7 @@ import {
   unitCountFromMetrics,
   UNSTAMPED_SCREEN_YEAR,
   activeBox,
+  buyBoxCoverage,
   countNounOf,
   type BuyBox,
   type BuyBoxStore,
@@ -1323,5 +1324,68 @@ describe("evaluateBuyBox — the basis check in the deal's own noun (lib/asset-w
     expect(check(park, "Basis / pad")?.status).toBe("pass");
     const apts = evaluateBuyBox("multifamily", ex([["Price per unit", "$150,000"]]), box);
     expect(check(apts, "Basis / unit")?.status).toBe("pass");
+  });
+});
+
+// Research pass 35: a note read "Fit 100 · Pursue" and "Fits" on its asset
+// class and its unit count, the box's cap and return never judged. Every
+// surface that draws the fit now says how much of the box it stands on, from
+// one count beside the fold.
+describe("buyBoxCoverage — how much of the box a fit stands on", () => {
+  const FULL: BuyBox = {
+    assetClasses: ["multifamily"],
+    markets: "Philadelphia",
+    sfMin: 100_000,
+    unitsMin: 100,
+    priceMaxM: 80,
+    maxPerUnitK: 300,
+    minCapPct: 5.75,
+    minIrrPct: 13,
+  };
+
+  it("marks exactly the criteria the price decides: the price band, the basis, the going-in cap, the target return", () => {
+    const checks = evaluateBuyBox("multifamily", ex([], { market: "Philadelphia, PA" }), FULL);
+    expect(checks.filter((c) => c.onPrice).map((c) => c.label)).toEqual(["Price", "Basis / unit", "Going-in cap", "Target return"]);
+    expect(checks.filter((c) => !c.onPrice).map((c) => c.label)).toEqual(["Asset class", "Geography", "Size", "Units"]);
+    // Whatever each one's status: a pass on the price is still a price criterion.
+    const passed = evaluateBuyBox(
+      "multifamily",
+      ex([["Asking price", "$60,000,000"], ["Going-in cap rate", "6.00%"], ["Levered IRR", "14%"], ["Price per unit", "$250,000"]]),
+      FULL,
+    );
+    expect(passed.filter((c) => c.onPrice).map((c) => `${c.label}:${c.status}`)).toEqual([
+      "Price:pass",
+      "Basis / unit:pass",
+      "Going-in cap:pass",
+      "Target return:pass",
+    ]);
+  });
+
+  it("counts what could be judged, names what could not, and says when the price is among them", () => {
+    const note = {
+      ...ex([["Asking price", "$68,000,000"], ["Going-in cap rate", "5.45%"], ["Units", "248"]], { assetClass: "multifamily" }),
+      interest: { kind: "note" },
+    };
+    const box: BuyBox = { assetClasses: ["multifamily"], unitsMin: 100, unitsMax: 400, minCapPct: 5.75, minIrrPct: 13 };
+    const checks = evaluateBuyBox("multifamily", note, box);
+    // The fold calls it "fits" on its two passes alone.
+    expect(foldBuyBoxChecks(checks)).toBe("fits");
+    expect(buyBoxCoverage(checks)).toEqual({
+      checked: 2,
+      total: 4,
+      unchecked: ["Going-in cap", "Target return"],
+      priceUnchecked: true,
+    });
+    // Unknown on something the price does not decide: counted, never priced.
+    const placeOnly = evaluateBuyBox("multifamily", ex([["Units", "248"]]), { markets: "Philadelphia", unitsMin: 100 });
+    expect(buyBoxCoverage(placeOnly)).toEqual({ checked: 1, total: 2, unchecked: ["Geography"], priceUnchecked: false });
+    // A box judged whole, and no box at all.
+    expect(buyBoxCoverage(evaluateBuyBox("multifamily", ex([["Units", "248"]]), { unitsMin: 100 }))).toEqual({
+      checked: 1,
+      total: 1,
+      unchecked: [],
+      priceUnchecked: false,
+    });
+    expect(buyBoxCoverage([])).toEqual({ checked: 0, total: 0, unchecked: [], priceUnchecked: false });
   });
 });

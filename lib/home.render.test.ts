@@ -53,7 +53,12 @@ describe("the homepage, as a screen reader hears it", () => {
     // "Caution" and "WATCH" sat side by side with nothing saying which was
     // the verdict and which the fit against the buy box.
     expect(card).toMatch(/<span class="sr-only">Verdict: <\/span>(Go|Caution|No-go)<\/span>/);
-    expect(card).toMatch(/<span class="sr-only">Buy-box <\/span>Fit \d+ · (Pursue|Watch|Pass|Outside box)<\/span>/);
+    // The fit's words, with how many of the box's criteria it stands on
+    // where the sample's memorandum leaves one unchecked (research pass 35:
+    // it states no IRR, so the box's target return is never judged).
+    expect(card).toMatch(
+      /<span class="sr-only">Buy-box <\/span>Fit \d+ · (Pursue|Watch|Pass|Outside box|\d+ of \d+ checked)( · \d+ of \d+ checked)?<\/span>/,
+    );
     // And it is the deal header's own chip for the same deal and box, never
     // a call only the homepage makes.
     const chip = buyBoxRead(
