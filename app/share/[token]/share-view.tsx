@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { placedByClause } from "@/lib/placed-by";
+import { andList, figureHolders } from "@/lib/region-line";
 import { firstSentence } from "@/lib/first-sentence";
 import { screenedOn, type BehindWhy } from "@/lib/screen-run";
 import { liveReadFailedLine } from "@/lib/market-read-failed";
@@ -274,8 +275,10 @@ const figureCount = (n: number): string => `${n} published ${n === 1 ? "figure" 
  *  (the debt market, lessor rents, the insurance index, CRE prices), so a
  *  block ending in the 10-year is never called "each the metro's". */
 function splitOf(b: { lines: string[]; national?: number }, local: string, each: string, none: string): string {
-  const nat = Math.min(Math.max(b.national ?? 0, 0), b.lines.length);
-  return nat > 0 ? `${b.lines.length - nat} ${local} and ${nat} the nation's, ${none}` : each;
+  // A Census region's rental vacancy line is the region's, counted apart
+  // from the market's own (audit C4, L7).
+  const holders = figureHolders(b.lines, b.national, local);
+  return holders.length > 1 ? `${andList(holders)}, ${none}` : each;
 }
 
 /** Every line the nation's: none of the market's own figures was current,

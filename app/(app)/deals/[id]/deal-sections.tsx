@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useMemo, useState, type ReactNode } from "react";
 import { rerunAnalysis, reconcileWithModel } from "../actions";
 import { placedByClause } from "@/lib/placed-by";
+import { andList, figureHolders } from "@/lib/region-line";
 import { stressTestTitle } from "@/lib/stress-test-title";
 import { currentBriefLine } from "@/lib/permit-split";
 import { screenedOn, type BehindWhy } from "@/lib/screen-run";
@@ -1736,8 +1737,11 @@ function briefCount(brief: NonNullable<MarketResult["liveBrief"]>): string {
   const n = brief.lines.length;
   const nat = Math.min(Math.max(brief.national ?? 0, 0), n);
   const whose = brief.grain === "state" ? "the state’s rather than any metro’s" : "the metro’s rather than the submarket’s";
+  // Whose each line is, counted: the market's own, a Census region's
+  // rental vacancy (the region's, said so — audit C4, L7) and the nation's.
+  const holders = figureHolders(brief.lines, nat, whose, "’");
   // Every line the nation's: no figure of the market's own was current.
-  const split = nat >= n ? "each dated, each the nation’s" : nat > 0 ? `each dated: ${n - nat} ${whose} and ${nat} the nation’s` : `each dated, each ${whose}`;
+  const split = nat >= n ? "each dated, each the nation’s" : holders.length > 1 ? `each dated: ${andList(holders)}` : `each dated, each ${whose}`;
   const tail = brief.portfolio
     ? ", and never the portfolio’s"
     : brief.grain === "state"

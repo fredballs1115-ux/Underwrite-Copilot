@@ -268,6 +268,35 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(text).not.toMatch(/each the metro’s rather than the submarket’s/);
   });
 
+  // Audit C4, L7: a Census region's rental vacancy line is the region's,
+  // and the fold had counted it among the metro's.
+  it("counts a Census region's line apart from the metro's", () => {
+    const p = sampleProps("analyses", "market");
+    const props: Props = {
+      ...p,
+      results: {
+        ...p.results,
+        market: {
+          ...p.results.market!,
+          liveBrief: {
+            metro: "Washington DC",
+            readOn: "2026-09-23",
+            lines: [
+              "Unemployment 3.4% (Jul 2026, Washington MSA; FRED)",
+              "Rental vacancy, South Census region: 9.5% (Q2 2026; FRED)",
+              "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)",
+            ],
+            national: 1,
+          },
+        },
+      },
+    };
+    const text = textOf(render(props));
+    expect(text).toMatch(
+      /3 published figures as of Sep 23, 2026, each dated: 1 the metro’s rather than the submarket’s, 1 the South Census region’s and 1 the nation’s\./,
+    );
+  });
+
   it("a market check that read the metro's published figures folds them open under the summary", () => {
     const p = sampleProps("analyses", "market");
     const withBrief: Props = {

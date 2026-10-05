@@ -2171,7 +2171,34 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain(
       "The first two are the metro's, not the submarket's or the building's. The last three are the nation's, each said so.",
     );
-  }, 60000);
+    // Audit C4, L7: a Census region's rental vacancy line among the first
+    // is the region's, and said apart.
+    const regional = {
+      ...deal,
+      market: {
+        ...(deal.market as object),
+        liveBrief: {
+          metro: "Washington DC",
+          grain: "metro" as const,
+          readOn: "2026-09-23",
+          lines: [
+            "Unemployment 3.4% (Jul 2026, Washington MSA; FRED)",
+            "Rental vacancy, South Census region: 9.5% (Q2 2026; FRED)",
+            "Debt market — 10-year Treasury 4.94% (Sep 17, 2026; FRED)",
+          ],
+          national: 1,
+        },
+      },
+    } as unknown as DealRow;
+    const regionText = pdfTextOf(
+      await renderToBuffer(
+        React.createElement(ReportDocument, { input: buildReportData(regional, "September 24, 2026", []) }) as unknown as Parameters<typeof renderToBuffer>[0],
+      ),
+    ).replace(/\s+/g, " ");
+    expect(regionText).toContain(
+      "The first two are the metro's, not the submarket's or the building's — save the rental vacancy line for the South Census region, which is the region's and says so. The last is the nation's, and says so.",
+    );
+  }, 90000);
 
   // The pre-merge audit (C1, M3): a block of the nation's lines alone was
   // headed as the state's figures, "The first 0 are the state's".

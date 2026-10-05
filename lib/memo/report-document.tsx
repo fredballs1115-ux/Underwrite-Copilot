@@ -5,6 +5,7 @@ import type { DealRow } from "@/lib/deals";
 import { countNounOf, screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { siteFlagsStale, type FloodMapView, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { placedBySentence } from "@/lib/placed-by";
+import { regionClause } from "@/lib/region-line";
 import { currentBriefLine } from "@/lib/permit-split";
 import { OSM_LOCATION_WORDS, REPORT_FLOOD_SIZE } from "@/lib/basemaps";
 import { documentNotices } from "@/lib/data-notices";
@@ -741,6 +742,9 @@ function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean)
   const nationSays = nat > 0 ? (nat === 1 ? " The last is the nation's, and says so." : ` The last ${countWord(nat)} are the nation's, each said so.`) : "";
   const localCount = b.lines.length - nat;
   const first_ = localCount === 1 ? "The first is" : `The first ${countWord(localCount)} are`;
+  // A Census region's rental vacancy among them is the region's, said apart
+  // as the model's header and the verdict's brief say it (audit C4, L7).
+  const region = regionClause(b.lines.slice(0, localCount));
   // Every line the nation's: none of the market's own figures was current,
   // said in place of "the first none are the metro's" (the pre-merge audit).
   if (localCount === 0 && nat > 0) {
@@ -752,7 +756,7 @@ function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean)
       : `And the nation's, where ${sit}, read on ${readDay(b.readOn)}: none of ${whose} own was current.${each}`;
   }
   if (!first) {
-    return `And ${whose} own, where ${sit}, read on ${readDay(b.readOn)}. Each is ${state ? "the state's" : "the metro's"} — not those properties' own, and never the portfolio's.${nationSays}`;
+    return `And ${whose} own, where ${sit}, read on ${readDay(b.readOn)}. Each is ${state ? "the state's" : "the metro's"} — not those properties' own, and never the portfolio's${region}.${nationSays}`;
   }
   const lead = `Figures the check read beside the rules of thumb: ${whose}, as published, read on ${readDay(b.readOn)}${
     state ? " — the address lies outside the metros the site tracks" : ""
@@ -760,11 +764,11 @@ function briefHeading(b: NonNullable<MarketResult["liveBrief"]>, first: boolean)
   const each =
     (nat > 0
       ? state
-        ? ` ${first_} the state's, not any metro's, the submarket's or the building's.`
-        : ` ${first_} the metro's, not the submarket's or the building's.`
+        ? ` ${first_} the state's, not any metro's, the submarket's or the building's${region}.`
+        : ` ${first_} the metro's, not the submarket's or the building's${region}.`
       : state
-        ? " Each is the state's, not any metro's, the submarket's or the building's."
-        : " Each is the metro's, not the submarket's or the building's.") + nationSays;
+        ? ` Each is the state's, not any metro's, the submarket's or the building's${region}.`
+        : ` Each is the metro's, not the submarket's or the building's${region}.`) + nationSays;
   const forWhom = pf
     ? pf.here > 0
       ? ` They speak for the portfolio's ${pf.here} ${pf.here === 1 ? "property" : "properties"} in ${b.metro} of its ${pf.of}, never for the portfolio.`

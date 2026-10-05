@@ -15,6 +15,7 @@ import { isDataMetro, isStateMarket } from "@/lib/market-match";
 import { ownMarketBuilding } from "@/lib/tracker-read";
 import { placedByClause, type CountyPlacedBy } from "@/lib/placed-by";
 import { NO_MULTI_UNIT_SERIES } from "@/lib/permit-split";
+import { regionClause } from "@/lib/region-line";
 
 export type { CountyPlacedBy } from "@/lib/placed-by";
 
@@ -344,28 +345,13 @@ export interface LiveMarketBrief {
 }
 
 /** How a Census region's rental vacancy line opens: "Rental vacancy, South
- *  Census region: 9.5% …". */
+ *  Census region: 9.5% …" — read back by lib/region-line's `regionOfLine`. */
 const REGION_LINE_LEAD = "Rental vacancy";
-const REGION_LINE = /^Rental vacancy, ([^:]*\bCensus region):/;
 
-/**
- * The Census region a stored line is for — "South Census region" — or null
- * for a line of the market's own or the nation's. A block's header, and the
- * verdict's brief over the stored lines, say a region's line apart from the
- * metro's, as they count the nation's lines apart (research pass 41: "each is
- * the metro area's" had stood over a South Census region line).
- */
-export function regionOfLine(line: string): string | null {
-  return REGION_LINE.exec(line)?.[1] ?? null;
-}
-
-/** " — save the rental vacancy line for the South Census region, which is
- *  the region's and says so" — or "" where no line is a region's. */
-export function regionClause(lines: readonly string[]): string {
-  const regions = [...new Set(lines.map(regionOfLine).filter((r): r is string => r != null))];
-  if (regions.length === 0) return "";
-  return ` — save the rental vacancy line for the ${regions.join(" and the ")}, which is the region's and says so`;
-}
+// A region's line said apart from the metro's: the readers live in
+// lib/region-line, import-free, so the deal page's client fold reads them
+// too (audit C4, L7).
+export { regionClause, regionOfLine } from "@/lib/region-line";
 
 const signed = (v: number, dp = 1): string => `${v > 0 ? "+" : v < 0 ? "-" : ""}${Math.abs(v).toFixed(dp)}`;
 const whole = (n: number): string => Math.round(n).toLocaleString("en-US");

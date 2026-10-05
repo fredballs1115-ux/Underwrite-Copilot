@@ -6976,6 +6976,36 @@ describe("PortfolioCard — a portfolio OM's properties, one row each", () => {
     expect(gluedWords(text)).toEqual([]);
   });
 
+  // Audit C4, L7: a Census region's rental vacancy line is the region's,
+  // counted apart from the metro's.
+  it("the shared screen's market read counts a Census region's line apart from the metro's", () => {
+    const html = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: extraction.dealName,
+        assetClass: "multifamily",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: false,
+        picture: null,
+        extraction: { ...extraction, properties: undefined } as unknown as ExtractionResult,
+        comps: null,
+        market: {
+          checks: [],
+          summary: "Rents are ahead of the metro's asking rents.",
+          liveBrief: {
+            metro: "Washington DC",
+            grain: "metro",
+            readOn: "2026-09-23",
+            lines: ["Unemployment 3.4% (Jul 2026, Washington MSA; FRED)", "Rental vacancy, South Census region: 9.5% (Q2 2026; FRED)"],
+          },
+        },
+        verdict: { verdict: "caution", reason: "One market.", topRisks: [], nextSteps: [], screen: { ranges: [], dealKillers: [], sensitivity: [] } },
+      }),
+    );
+    expect(visibleText(html)).toContain(
+      "Checked beside 2 published figures for the Washington DC market, read on 2026-09-23 — 1 the metro's and 1 the South Census region's, none the building's.",
+    );
+  });
+
   // The pre-merge audit (C1, M3): a block of the nation's lines alone read
   // "Checked beside 1 published figure for the state of Pennsylvania … 0 the
   // state's and 1 the nation's".
