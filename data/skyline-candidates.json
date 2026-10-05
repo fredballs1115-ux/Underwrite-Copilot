@@ -8350,6 +8350,358 @@
           "note": "Sheboygan, WI — AsherHeimermann, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37330877189)."
         }
       ]
+    },
+    {
+      "metroId": "cbsa:14010",
+      "city": "Bloomington, Illinois",
+      "area": "Bloomington, IL",
+      "wikipedia": [
+        "Bloomington, Illinois",
+        "Normal, Illinois",
+        "Illinois State University"
+      ],
+      "categories": [
+        "Bloomington, Illinois",
+        "Downtown Bloomington, Illinois",
+        "Normal, Illinois"
+      ],
+      "queries": [
+        "Bloomington Illinois downtown",
+        "Uptown Normal Illinois",
+        "McLean County Museum of History"
+      ]
+    },
+    {
+      "metroId": "cbsa:36780",
+      "city": "Oshkosh, Wisconsin",
+      "area": "Oshkosh-Neenah, WI",
+      "wikipedia": [
+        "Oshkosh, Wisconsin",
+        "Neenah, Wisconsin",
+        "Lake Winnebago"
+      ],
+      "categories": [
+        "Oshkosh, Wisconsin",
+        "Neenah, Wisconsin",
+        "Lake Winnebago"
+      ],
+      "queries": [
+        "Oshkosh Wisconsin downtown",
+        "Fox River Oshkosh",
+        "Lake Winnebago sunset"
+      ]
+    },
+    {
+      "metroId": "cbsa:31860",
+      "city": "Mankato, Minnesota",
+      "area": "Mankato, MN",
+      "wikipedia": [
+        "Mankato, Minnesota",
+        "North Mankato, Minnesota",
+        "Minnesota River"
+      ],
+      "categories": [
+        "Mankato, Minnesota",
+        "Minnesota River",
+        "Minneopa State Park"
+      ],
+      "queries": [
+        "Mankato Minnesota downtown",
+        "Minneopa Falls",
+        "Mankato Minnesota River"
+      ]
+    },
+    {
+      "metroId": "cbsa:33220",
+      "city": "Midland, Michigan",
+      "area": "Midland, MI",
+      "wikipedia": [
+        "Midland, Michigan",
+        "The Tridge",
+        "Dow Gardens"
+      ],
+      "categories": [
+        "Midland, Michigan",
+        "The Tridge",
+        "Dow Gardens"
+      ],
+      "queries": [
+        "Midland Michigan Tridge",
+        "Dow Gardens Midland",
+        "Midland Michigan downtown"
+      ]
+    },
+    {
+      "metroId": "cbsa:34620",
+      "city": "Muncie, Indiana",
+      "area": "Muncie, IN",
+      "wikipedia": [
+        "Muncie, Indiana",
+        "Ball State University",
+        "White River (Indiana)"
+      ],
+      "categories": [
+        "Muncie, Indiana",
+        "Downtown Muncie, Indiana",
+        "Ball State University"
+      ],
+      "queries": [
+        "Muncie Indiana downtown",
+        "Ball State University campus",
+        "Muncie Indiana skyline"
+      ]
+    },
+    {
+      "metroId": "cbsa:27500",
+      "city": "Janesville, Wisconsin",
+      "area": "Janesville-Beloit, WI",
+      "wikipedia": [
+        "Janesville, Wisconsin",
+        "Beloit, Wisconsin",
+        "Rock River (Mississippi River tributary)"
+      ],
+      "categories": [
+        "Janesville, Wisconsin",
+        "Beloit, Wisconsin",
+        "Beloit College"
+      ],
+      "queries": [
+        "Janesville Wisconsin downtown",
+        "Beloit Wisconsin Rock River",
+        "Rotary Botanical Gardens Janesville"
+      ]
+    },
+    {
+      "metroId": "cbsa:27180",
+      "city": "Jackson, Tennessee",
+      "area": "Jackson, TN",
+      "wikipedia": [
+        "Jackson, Tennessee",
+        "Union University"
+      ],
+      "categories": [
+        "Jackson, Tennessee",
+        "Downtown Jackson, Tennessee"
+      ],
+      "queries": [
+        "Jackson Tennessee downtown",
+        "Jackson Tennessee courthouse",
+        "Casey Jones Village"
+      ]
+    },
+    {
+      "metroId": "cbsa:36980",
+      "city": "Owensboro, Kentucky",
+      "area": "Owensboro, KY",
+      "wikipedia": [
+        "Owensboro, Kentucky",
+        "Glover Cary Bridge",
+        "William H. Natcher Bridge"
+      ],
+      "categories": [
+        "Owensboro, Kentucky",
+        "Glover Cary Bridge",
+        "William H. Natcher Bridge"
+      ],
+      "queries": [
+        "Owensboro Kentucky riverfront",
+        "Owensboro Kentucky downtown",
+        "Blue Bridge Owensboro"
+      ]
+    },
+    {
+      "metroId": "cbsa:45500",
+      "city": "Texarkana, Texas",
+      "area": "Texarkana, TX-AR",
+      "wikipedia": [
+        "Texarkana, Texas",
+        "Texarkana, Arkansas"
+      ],
+      "categories": [
+        "Texarkana, Texas",
+        "Texarkana, Arkansas"
+      ],
+      "queries": [
+        "Texarkana downtown",
+        "Texarkana State Line Avenue",
+        "Texarkana post office state line"
+      ]
+    },
+    {
+      "metroId": "cbsa:43300",
+      "city": "Sherman, Texas",
+      "area": "Sherman-Denison, TX",
+      "wikipedia": [
+        "Sherman, Texas",
+        "Denison, Texas",
+        "Lake Texoma"
+      ],
+      "categories": [
+        "Sherman, Texas",
+        "Denison, Texas",
+        "Lake Texoma"
+      ],
+      "queries": [
+        "Sherman Texas downtown",
+        "Denison Texas Main Street",
+        "Lake Texoma sunset"
+      ]
+    },
+    {
+      "metroId": "cbsa:41140",
+      "city": "St. Joseph, Missouri",
+      "area": "St. Joseph, MO-KS",
+      "wikipedia": [
+        "St. Joseph, Missouri",
+        "Missouri River",
+        "Pony Express National Museum"
+      ],
+      "categories": [
+        "St. Joseph, Missouri",
+        "Downtown St. Joseph, Missouri",
+        "Buildings in St. Joseph, Missouri"
+      ],
+      "queries": [
+        "St. Joseph Missouri downtown",
+        "St. Joseph Missouri skyline",
+        "St Joseph Missouri river"
+      ]
+    },
+    {
+      "metroId": "cbsa:40660",
+      "city": "Rome, Georgia",
+      "area": "Rome, GA",
+      "wikipedia": [
+        "Rome, Georgia",
+        "Berry College"
+      ],
+      "categories": [
+        "Rome, Georgia",
+        "Berry College",
+        "Etowah River"
+      ],
+      "queries": [
+        "Rome Georgia downtown Broad Street",
+        "Rome Georgia clock tower",
+        "Berry College campus"
+      ]
+    },
+    {
+      "metroId": "cbsa:48700",
+      "city": "Williamsport, Pennsylvania",
+      "area": "Williamsport, PA",
+      "wikipedia": [
+        "Williamsport, Pennsylvania",
+        "West Branch Susquehanna River"
+      ],
+      "categories": [
+        "Williamsport, Pennsylvania",
+        "Downtown Williamsport, Pennsylvania",
+        "West Branch Susquehanna River"
+      ],
+      "queries": [
+        "Williamsport Pennsylvania downtown",
+        "Williamsport Susquehanna River",
+        "Millionaires Row Williamsport"
+      ]
+    },
+    {
+      "metroId": "cbsa:30340",
+      "city": "Lewiston, Maine",
+      "area": "Lewiston-Auburn, ME",
+      "wikipedia": [
+        "Lewiston, Maine",
+        "Auburn, Maine",
+        "Androscoggin River"
+      ],
+      "categories": [
+        "Lewiston, Maine",
+        "Auburn, Maine",
+        "Androscoggin River"
+      ],
+      "queries": [
+        "Lewiston Maine mills",
+        "Lewiston Auburn falls Androscoggin",
+        "Basilica of Saints Peter and Paul Lewiston"
+      ]
+    },
+    {
+      "metroId": "cbsa:30140",
+      "city": "Lebanon, Pennsylvania",
+      "area": "Lebanon, PA",
+      "wikipedia": [
+        "Lebanon, Pennsylvania",
+        "Lebanon County, Pennsylvania"
+      ],
+      "categories": [
+        "Lebanon, Pennsylvania",
+        "Lebanon County, Pennsylvania"
+      ],
+      "queries": [
+        "Lebanon Pennsylvania downtown",
+        "Lebanon Pennsylvania farmland",
+        "Cornwall Iron Furnace"
+      ]
+    },
+    {
+      "metroId": "cbsa:37620",
+      "city": "Parkersburg, West Virginia",
+      "area": "Parkersburg-Vienna, WV",
+      "wikipedia": [
+        "Parkersburg, West Virginia",
+        "Blennerhassett Island Historical State Park",
+        "Little Kanawha River"
+      ],
+      "categories": [
+        "Parkersburg, West Virginia",
+        "Blennerhassett Island",
+        "Vienna, West Virginia"
+      ],
+      "queries": [
+        "Parkersburg West Virginia downtown",
+        "Parkersburg Ohio River",
+        "Blennerhassett mansion"
+      ]
+    },
+    {
+      "metroId": "cbsa:38540",
+      "city": "Pocatello, Idaho",
+      "area": "Pocatello, ID",
+      "wikipedia": [
+        "Pocatello, Idaho",
+        "Idaho State University",
+        "Portneuf River"
+      ],
+      "categories": [
+        "Pocatello, Idaho",
+        "Idaho State University",
+        "Portneuf River"
+      ],
+      "queries": [
+        "Pocatello Idaho downtown",
+        "Pocatello Idaho mountains",
+        "Idaho State University campus"
+      ]
+    },
+    {
+      "metroId": "cbsa:38240",
+      "city": "Pinehurst, North Carolina",
+      "area": "Pinehurst-Southern Pines, NC",
+      "wikipedia": [
+        "Pinehurst, North Carolina",
+        "Southern Pines, North Carolina",
+        "Pinehurst Resort"
+      ],
+      "categories": [
+        "Pinehurst, North Carolina",
+        "Southern Pines, North Carolina",
+        "Pinehurst Resort"
+      ],
+      "queries": [
+        "Pinehurst North Carolina village",
+        "Southern Pines downtown",
+        "Pinehurst No. 2 golf course"
+      ]
     }
   ]
 }
