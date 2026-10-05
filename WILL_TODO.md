@@ -3,6 +3,97 @@
 Companion to `INTEGRATION_NOTES.md` (what was built + ops steps) and
 `RESEARCH_STATE.md` (session resume state). This file is the forward list.
 
+## 🔴 2026-10-05 — your repository is public, with confidential deal work on main
+
+`gh api repos/fredballs1115-ux/Underwrite-Copilot` reports `"visibility":
+"public"`. Main holds 55 files that are not the site and were never meant
+to be published, added June 30 – July 1:
+
+- `equity-deck/` — a deal's investment overview deck, built from a
+  broker's confidential opinion of value, with its build scripts and
+  photographs (its own `CHANGES.md` says what it holds; this file does not
+  repeat it).
+- `scratchpad/` — submarket charts and workbooks built from a licensed
+  data service's exports, with their build scripts.
+
+In order: (1) make the repository private today (GitHub → Settings →
+General → Danger Zone → Change visibility). Private repositories run
+Actions on your plan's free minutes, and the scheduled pulls spend some;
+Render keeps deploying only if it is connected through its GitHub app.
+(2) Say "remove them" and I delete both folders from main at once; say
+"purge history" and I prepare the history rewrite (a force-push to main)
+for you to approve — deleting in a commit leaves them in history.
+(3) They have been public about three months: whether anyone is told is
+yours and your firm's counsel's.
+
+## 🟠 2026-10-05 — the data the site shows, against each provider's terms
+
+Research pass 31 audited every source's licence. Every quote below was
+printed by the GitHub runner from the provider's own page (the sandbox
+cannot reach them); the decisions are yours, and the code changes wait for
+them.
+
+- **Freddie Mac's mortgage survey** (the 30- and 15-year tiles on /tools'
+  and /market's rates strip, and the leverage check's survey read). Its
+  terms (freddiemac.com/terms, zori probe run 37262564561): "Data is
+  provided for internal business purposes or your own personal use only"
+  and "You may not redistribute Data, publish Data, or commercially exploit
+  Data or derived products/services without a separate written agreement
+  or license from Freddie Mac." FRED's notes on both series say "Copyright,
+  2016, Freddie Mac. Reprinted with permission." **My recommendation:
+  remove both tiles and the survey read** (the leverage check already
+  reads the 10-year plus the class spread) unless Freddie Mac grants a
+  licence. This answers the "terms question" listed under 2026-09-30.
+- **Google News** (the News page's search doors and the weekday intel's
+  Google watches). Google's terms (google.com/intl/en_us/terms_google_news.html,
+  zori probe run 37262837134): "You may only display the content of the
+  Service for your own personal use (i.e., non-commercial use) … For
+  example, you may not … take the results from the Service and reformat
+  and display them". The feed's own `<copyright>` reads "This XML feed is
+  made available solely fo[r …]". The site fetches, scores, reformats and
+  displays it. Bing's RSS answered the runner with an HTML page, so its
+  terms are unprinted. **My recommendation: drop the search-host doors and
+  the Google watches** and keep publishers' own feeds and government feeds
+  (each feed's terms printed before it is relied on).
+- **Realtor.com** (the for-sale line and the hotness rank on /market and
+  the market check). Its terms of service (same run): "Move grants you a
+  limited license to access and use the Move Network and Content solely for
+  informational, personal and non-commercial purposes" and "No
+  reproduction, distribution, or transmission of the copyrighted materials
+  on the Move Network is permitted without the written permission of
+  Move." The research data page printed no permission of its own. **Ask
+  Realtor.com's economics team, or remove.**
+- **Redfin** (the 2–4 unit medians in the research files). Its terms of use
+  (same run): "Any information you obtain from the Redfin website is
+  intended for your personal, non-commercial use." **Ask, or remove.**
+- **Zillow** (asking rents, the apartment index, home values). Its terms
+  (same run) allow "the aggregate level data provided on the Zillow
+  Local-Info Pages (the “Aggregate Data”)" to be "used for non-personal
+  uses, e.g., real estate market analysis", displayed in derivative works
+  "only so long as the Zillow Compani[es …]" — the print cut off there.
+  The site credits Zillow everywhere; whether the research CSVs are that
+  Aggregate Data is yours to read on the page.
+- **Brokerage research figures** (CBRE, Colliers, Cushman & Wakefield and
+  others in `data/research`, ranked on /market and in downloads). Pass 31
+  found their site terms limit use to personal, non-commercial; those
+  pages are not yet runner-printed. Decide keep / ask / signed-in only.
+- **FRED itself is fine** with its notice: its API terms (zori probe run
+  37262488972) require "This product uses the FRED® API but is not
+  endorsed or certified by the Federal Reserve Bank of St. Louis." shown
+  prominently — being added — and the owner's permission for a
+  third-party series beyond personal use. Among the 41 national series
+  only Freddie Mac's survey and SOFR are copyrighted (rates run
+  37262658315); the New York Fed licenses SOFR "for your personal or
+  business purposes" with its notice, also being added, as is the BLS's
+  "cannot vouch" sentence for the three series read from its API. Pass
+  31's summary that FRED forbids storing or databases was wrong: no line
+  of the printed terms says so.
+- **Google Maps, the day you set the key**: its terms (same run as
+  Google News) forbid "display[ing] Street View imagery and non-Google Maps
+  on the same screen" and require the site's terms to state that "use of
+  Google Maps features and content is subject to" Google's end-user terms
+  and privacy policy. I make the code comply before you set the key.
+
 ## 🟢 2026-10-05 — the second batch (PR #463, in progress)
 
 Nothing in it needs a migration, a key or a purchase so far. Research pass
@@ -2389,10 +2480,16 @@ overhead shot. Without it nothing breaks or looks broken.
    View photograph is one billed image request; the metadata check before
    it does not consume quota. Set a daily quota cap in the Cloud console.
    Google also asks for its logo as the attribution "whenever possible"
-   (the site writes "Street View imagery © Google" in words), and for
-   public Terms of Use and a Privacy Policy linked in the footer, which
-   every signed-in page now has; read `/terms` and `/privacy` against
-   Google's requirements before the key goes in.
+   (the site writes "Street View imagery © Google" in words). Its terms
+   (cloud.google.com/maps-platform/terms, zori probe run 37262665824) go
+   further than a footer link: the site's terms must "notify users that
+   the Customer Application includes Google Maps features and content" and
+   "state that use of Google Maps features and content is subject to" the
+   Google Maps End User Additional Terms of Service and Google's Privacy
+   Policy, and Street View may not be shown "and non-Google Maps on the
+   same screen" — the deal page draws its map, aerial and flood views
+   beside it. The code is made to comply before you set the key (see the
+   licences section at the top).
 4. **Credentials → Create credentials → API key.** Restrict it under **API
    restrictions** to the Street View Static API. Do NOT add an HTTP-referrer
    restriction: this key is used server-side and sends no referrer, so a
