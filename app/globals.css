@@ -463,8 +463,12 @@ body {
   from { transform: translateX(-50%); }
   to { transform: translateX(0); }
 }
+/* 90s, not 70s, since each figure carries its house beside it (research
+   pass 31, C5): the row grew about 28% (13,900px against 10,850px at the
+   band's 13px mono), and a fixed duration over a longer row is a faster
+   band — 90s holds the speed it read at, about 155px a second. */
 .ticker-track-reverse {
-  animation: ticker-slide-reverse 70s linear infinite;
+  animation: ticker-slide-reverse 90s linear infinite;
 }
 .ticker-track-reverse:hover,
 .ticker-track-reverse:focus-within,

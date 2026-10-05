@@ -26,9 +26,9 @@ function galleryToday(): string {
  * where none is chosen, a USGS frame of its business district from above
  * (see lib/metro-imagery for why USGS is sharp at this scale and needs no
  * key), carrying the same research fact the marquee shows, each figure with
- * its own period (dated research, not a feed) and the tile's title naming
- * who published it, and linking to the same market brief. It is navigation
- * with a picture on it, not decoration.
+ * its own period (dated research, not a feed), who published it said under
+ * the tile and the whole citation on its title, and linking to the same
+ * market brief. It is navigation with a picture on it, not decoration.
  *
  * A tile whose image 404s still renders: the name and the fact are the
  * content, the photograph is the context. That is also why the <img> sits
@@ -43,6 +43,7 @@ export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
         id: entry.id,
         name: entry.name,
         fact: fact?.text ?? entry.region ?? "covered market",
+        houses: fact?.houses ?? null,
         cite: fact?.cite ?? null,
         readOn: fact?.readOn ?? null,
         place: metroView(entry.id)?.place ?? null,
@@ -135,6 +136,16 @@ export function MarketsGallery({ today = galleryToday() }: { today?: string }) {
                 </p>
               </div>
             </Link>
+            {/* Who published the tile's figures, under the photograph in the
+                page's own flow (research pass 31, C5): a phone shows no
+                title, and a phone's two-column tile holds the figures alone
+                over its photograph — about five lines of them before its
+                top is clipped, where the longest house would add two. */}
+            {m.houses && (
+              <p className="mt-1.5 text-[11px] leading-snug text-muted" data-qa="fact-houses">
+                {m.houses}
+              </p>
+            )}
           </li>
         ))}
       </ul>

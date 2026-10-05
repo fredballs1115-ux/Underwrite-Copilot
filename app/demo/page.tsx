@@ -14,7 +14,7 @@ import { fmrLabel, fmrToday, fmrWhen } from "@/lib/fmr";
 import { monthOf } from "@/lib/zori";
 import { rankLabel } from "@/lib/rank";
 import { sectorStandings } from "@/lib/sector-leaderboard";
-import { blockCitations, snapshotAge } from "@/lib/tracker-read";
+import { blockCitations, houseShort, snapshotAge } from "@/lib/tracker-read";
 import { researchAge, staleMark } from "@/lib/research-age";
 import metrosSeed from "@/data/research/metros.json";
 import { sampleLegal } from "@/lib/sample-legal";
@@ -209,9 +209,16 @@ export default async function DemoPage() {
   const phillyTrackerStale = staleMark(phillyTrackerAge);
   const credit = (sector: string, label: "Vacancy" | "Rent") => {
     const fig = blockCitations(phillySnapshot?.[sector]).find((f) => f.label === label);
-    // The narrower stock a figure covers rides with its period ("Class A
-    // space, Q2 2026"), so a Class A rent never reads as the market's.
-    return { period: [fig?.read.slice, fig?.read.period ?? "undated"].filter(Boolean).join(", "), title: fig?.words };
+    // Who published the figure comes first, in words a phone shows (research
+    // pass 31, C5: the house had been in the title alone), then the narrower
+    // stock it covers ("Class A space, Q2 2026"), so a Class A rent never
+    // reads as the market's, then its period.
+    return {
+      cited: [houseShort(fig?.read ?? { house: null }), fig?.read.slice, fig?.read.period ?? "undated"]
+        .filter(Boolean)
+        .join(", "),
+      title: fig?.words,
+    };
   };
   const phillySectors = {
     office: band("office_vacancy_pct"),
@@ -511,7 +518,7 @@ export default async function DemoPage() {
                       <span className="font-mono tabular-nums text-ink" title={credit("office", "Vacancy").title}>
                         {phillySectors.office}
                       </span>
-                      {` (${[credit("office", "Vacancy").period, phillyRanks.office].filter(Boolean).join(", ")})`}
+                      {` (${[credit("office", "Vacancy").cited, phillyRanks.office].filter(Boolean).join(", ")})`}
                     </>
                   )}
                   {phillySectors.industrial && (
@@ -520,14 +527,14 @@ export default async function DemoPage() {
                       <span className="font-mono tabular-nums text-ink" title={credit("industrial", "Vacancy").title}>
                         {phillySectors.industrial}
                       </span>
-                      {` (${[credit("industrial", "Vacancy").period, phillyRanks.industrial].filter(Boolean).join(", ")})`}
+                      {` (${[credit("industrial", "Vacancy").cited, phillyRanks.industrial].filter(Boolean).join(", ")})`}
                       {typeof phillySectors.industrialRent === "number" && (
                         <>
                           {" at "}
                           <span className="font-mono tabular-nums text-ink" title={credit("industrial", "Rent").title}>
                             ${phillySectors.industrialRent.toFixed(2)}/SF
                           </span>
-                          {` (${credit("industrial", "Rent").period})`}
+                          {` (${credit("industrial", "Rent").cited})`}
                         </>
                       )}
                     </>
@@ -538,7 +545,7 @@ export default async function DemoPage() {
                       <span className="font-mono tabular-nums text-ink" title={credit("multifamily", "Vacancy").title}>
                         {phillySectors.multifamily}
                       </span>
-                      {` (${[credit("multifamily", "Vacancy").period, phillyRanks.multifamily].filter(Boolean).join(", ")})`}
+                      {` (${[credit("multifamily", "Vacancy").cited, phillyRanks.multifamily].filter(Boolean).join(", ")})`}
                     </>
                   )}
                   {phillySectors.retail && (
@@ -547,7 +554,7 @@ export default async function DemoPage() {
                       <span className="font-mono tabular-nums text-ink" title={credit("retail", "Vacancy").title}>
                         {phillySectors.retail}
                       </span>
-                      {` (${[credit("retail", "Vacancy").period, phillyRanks.retail].filter(Boolean).join(", ")})`}
+                      {` (${[credit("retail", "Vacancy").cited, phillyRanks.retail].filter(Boolean).join(", ")})`}
                     </>
                   )}{" "}
                   — ranges are tracker spreads, never averaged; ranks run
