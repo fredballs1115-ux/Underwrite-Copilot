@@ -163,6 +163,10 @@ export type Col = {
   /** a mixed-use building's commercial share ("Commercial 29% of income" —
    *  lib/mixed-use `mixedUseTag`); absent otherwise */
   mixedUse?: string | null;
+  /** an operating business on its real estate ("Going concern", "Operator
+   *  lease, 2.61x coverage" — lib/going-concern `goingConcernTag`); absent
+   *  otherwise */
+  goingConcern?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -370,6 +374,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // A forward purchase (lib/forward-purchase): the price is paid at
     // delivery and the developer funds the works — a dash, never "none".
     { label: "Forward purchase", get: (c) => c.forward || "—" },
+    // An operating business on its real estate (lib/going-concern): whose
+    // earnings the income is, a dash beside a deal with no read.
+    { label: "Operating business", get: (c) => c.goingConcern || "—" },
     { label: "Tenancy", get: (c) => c.tenancy || "—" },
     // A shadow anchor is not bought, and a roll before the sale is income
     // the model counts and the buyer may not keep (#457).

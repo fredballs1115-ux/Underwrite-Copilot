@@ -41,6 +41,8 @@ import { readForwardPurchase } from "./forward-purchase";
 import { ForwardPanel } from "@/app/forward-panel";
 import { readMixedUse } from "./mixed-use";
 import { MixedUsePanel } from "@/app/mixed-use-panel";
+import { readGoingConcern } from "./going-concern";
+import { GoingConcernPanel } from "@/app/going-concern-panel";
 import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { STALE_MS } from "./screen-run";
@@ -1125,6 +1127,37 @@ describe("the deal page's mixed-use panel reads the derived model (lib/mixed-use
     expect(text).toContain(
       `The model capitalises the $610k of commercial income at the same ${(derived.inputs.exitCapPct * 100).toFixed(2)}% exit cap as the residential and grows it at the same ${(derived.inputs.rentGrowthPct * 100).toFixed(1)}% a year`,
     );
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("the deal page's operating-business panel reads the derived model (lib/going-concern)", () => {
+  it("draws a business sold with its real estate with the model's own year-one income and exit cap in its read", () => {
+    // As app/(app)/deals/[id]/page.tsx draws it: the read on the page's day,
+    // with `meta.goingConcern.read` from the derived model.
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Route 9 Fuel & Market",
+      assetClass: "Gas Station / Convenience Store",
+      strategy: { kind: "stabilized" as const, summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Asking price", value: "$3,200,000", flagged: false, page: "", basis: "na" as const },
+        { label: "NOI (in-place)", value: "$256,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "EBITDA (T-12)", value: "$410,000", flagged: false, page: "", basis: "in_place" as const },
+      ],
+    };
+    const derived = deriveUnderwriteInputs(extraction, "Route 9 Fuel & Market");
+    const html = renderToStaticMarkup(
+      React.createElement(GoingConcernPanel, {
+        goingConcern: readGoingConcern(extraction, new Date("2026-10-05T12:00:00Z")),
+        modelLine: derived.meta.goingConcern?.read ?? "",
+      }),
+    );
+    const text = textOf(html);
+    expect(html).toContain('data-qa="going-concern-panel"');
+    expect(text).toMatch(/The model capitalises its \$256k year-one income at an? [\d.]+% exit cap as if it were rent/);
+    expect(text).toContain(`${(derived.inputs.exitCapPct * 100).toFixed(2)}% exit cap`);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });

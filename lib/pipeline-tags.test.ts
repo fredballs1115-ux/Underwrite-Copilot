@@ -45,6 +45,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
         sale: "Auction, 5% premium",
         interest: "49% share",
         forward: "Build-to-suit, 6.00% at delivery",
+        goingConcern: "Operator lease, 2.61x coverage",
         debt: "Assumable 3.45%",
         sellerNote: "Seller financing 5.00%",
         affordable: "LIHTC, 75% restricted",
@@ -65,7 +66,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
       { tag: "Flood AE" },
     );
     expect(tags.map((t) => t.key)).toEqual([
-      "flood", "sale", "interest", "forward", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse",
+      "flood", "sale", "interest", "forward", "goingConcern", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage", "mixedUse",
     ]);
     // The broker and the basis are no tag: one is a CSV column, the other
     // the price's own second line.
@@ -83,6 +84,12 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     );
     expect(dealTags(slots({ student: "Pre-leased 87%, +5 pts y/y", mh: "Lot rent $430 vs $525 mkt", storage: "In-place 21.1% over street" })).map((t) => t.tone)).toEqual(["brand", "brand", "brand"]);
     expect(tone("mixedUse")).toBe("brand");
+    // A lease the operator's earnings cover is the brand's; a business sold
+    // with its real estate, one not settled, or a coverage under 1.00x warns.
+    expect(tone("goingConcern")).toBe("brand");
+    for (const words of ["Going concern", "Operating business", "Operator lease, 0.85x coverage"])
+      expect(dealTags(slots({ goingConcern: words }))[0], words).toMatchObject({ key: "goingConcern", tone: "caution" });
+    expect(dealTags(slots({ goingConcern: "Operator lease" }))[0].tone).toBe("brand");
   });
 
   it("says a regime that applies, or the memorandum's claim of one, in the warning tone, and one to check in the muted tone (lib/rent-regulation)", () => {

@@ -29,6 +29,7 @@ import { selfStorageTag } from "@/lib/self-storage";
 import { regulationForDeal, regulationTag, type DealForRegulation } from "@/lib/rent-regulation";
 import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseTag } from "@/lib/mixed-use";
+import { goingConcernTag } from "@/lib/going-concern";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ListJobStatus } from "@/lib/screen-run";
 
@@ -125,6 +126,11 @@ export interface PipelineSlots {
    *  else "Commercial 15% of area" (lib/mixed-use `mixedUseTag`); absent or
    *  null where neither share is read */
   mixedUse?: string | null;
+  /** an operating business on its real estate — "Going concern", "Operator
+   *  lease, 2.61x coverage", "Operating business" (lib/going-concern
+   *  `goingConcernTag`); absent or null where the memorandum names no
+   *  operating business and states no EBITDA */
+  goingConcern?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
@@ -300,6 +306,9 @@ export function pickSlots(
     // A mixed-use building's commercial share of the income or the area
     // (lib/mixed-use), each only where both halves are stated.
     mixedUse: mixedUseTag(extraction, asOf),
+    // An operating business on its real estate (lib/going-concern): sold
+    // with the business, or leased to the operator and its coverage.
+    goingConcern: goingConcernTag(extraction, asOf),
     // The price by the unit or the foot, as a listing card shows it (#469),
     // in the deal's one class.
     basis: basisTag(extraction, strategy.kind, storedClass),

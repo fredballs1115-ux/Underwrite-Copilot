@@ -1493,6 +1493,30 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The two incomes")).toThrow();
   });
 
+  it("an operating business (lib/going-concern): what is sold and whose earnings, then the income the model capitalises as rent", async () => {
+    const station = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        dealName: "Route 9 Fuel & Market",
+        assetClass: "Gas Station / Convenience Store",
+        strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+        metrics: [
+          { label: "Asking price", value: "$3,200,000", flagged: false, page: "p. 2" },
+          { label: "NOI (in-place)", value: "$256,000", flagged: false, page: "p. 5" },
+          { label: "EBITDA (T-12)", value: "$410,000", flagged: false, page: "p. 5" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(station));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The operating business");
+    expect(String(cover.getCell(r, 3).value)).toBe("Fuel station and its store: sold with the business; EBITDA (T-12) $410k");
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(/^The model capitalises its \$256k year-one income at a [\d.]+% exit cap as if it were rent/);
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The operating business")).toThrow();
+  });
+
   it("a self-storage facility (#471): its occupancies and rates, then what the model does with the premium over street", async () => {
     const storage = deriveUnderwriteInputs(
       {

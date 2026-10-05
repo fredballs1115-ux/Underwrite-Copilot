@@ -102,6 +102,10 @@ export interface PipelineExportRow {
   /** a mixed-use building's commercial share — "Commercial 29% of income"
    *  (lib/mixed-use `mixedUseTag`); carried in the price cell's note */
   mixedUse?: string | null;
+  /** an operating business on its real estate — "Going concern", "Operator
+   *  lease, 2.61x coverage" (lib/going-concern `goingConcernTag`); carried in
+   *  the price cell's note */
+  goingConcern?: string | null;
   /** the going-in cap on today's income — always null on a plan deal, and
    *  on a note (`capWithheld`) */
   cap: string | null;
@@ -298,6 +302,7 @@ export async function buildPipelineWorkbook(
         d.regulation ? `${d.regulation}: the rent rules that reach the building — the deal page reads the regime, the regulated share and the allowance in force against the model's growth.` : null,
         d.forward ? `${d.forward}: the price is paid at delivery and the developer funds the works — the deal page reads the clock, the deposit and the yield at delivery.` : null,
         d.mixedUse ? `${d.mixedUse}: a mixed-use building's commercial share — the deal page reads the two incomes, the commercial space and what one exit cap does to both.` : null,
+        d.goingConcern ? `${d.goingConcern}: an operating business on its real estate — the deal page reads whose earnings these are, the rent's coverage and the split.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 

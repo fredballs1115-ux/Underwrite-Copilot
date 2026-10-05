@@ -30,6 +30,8 @@ import { ForwardPanel } from "@/app/forward-panel";
 import { readForwardPurchase } from "@/lib/forward-purchase";
 import { MixedUsePanel } from "@/app/mixed-use-panel";
 import { readMixedUse } from "@/lib/mixed-use";
+import { GoingConcernPanel } from "@/app/going-concern-panel";
+import { readGoingConcern } from "@/lib/going-concern";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
@@ -1468,6 +1470,14 @@ export default async function DealPage({
           today={todayIso}
           exitCapPct={derived ? derived.inputs.exitCapPct * 100 : null}
           modelLine={derived?.meta.forward?.read ?? ""}
+        />
+        {/* An operating business on its real estate (lib/going-concern):
+            the operator's EBITDAR against its rent with the 1.0x line, the
+            price as the memorandum splits it, the contracts as stated, and
+            what the model does with the business's income. */}
+        <GoingConcernPanel
+          goingConcern={readGoingConcern(extraction, new Date(`${todayIso}T12:00:00Z`))}
+          modelLine={derived?.meta.goingConcern?.read ?? ""}
         />
         {/* A covenant or a contract that sets the rents (#453): the units it
             binds, until when, each tier against its limit — said before any

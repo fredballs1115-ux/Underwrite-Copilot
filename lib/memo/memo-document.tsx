@@ -50,6 +50,7 @@ import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
 import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
 import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseShortLine, readMixedUse } from "@/lib/mixed-use";
+import { goingConcernShortLine, readGoingConcern } from "@/lib/going-concern";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
@@ -275,6 +276,14 @@ function mixedUseLineFor(extraction: ExtractionResult | null, today: string): st
   return r ? mixedUseShortLine(r) : "";
 }
 
+/** An operating business on its real estate (lib/going-concern) in one
+ *  line for the memo's header: what is sold, the operator's earnings and
+ *  the rent's coverage. "" on anything else. */
+function goingConcernLineFor(extraction: ExtractionResult | null, today: string): string {
+  const r = readGoingConcern(extraction, new Date(`${today}T12:00:00Z`));
+  return r ? goingConcernShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -374,6 +383,10 @@ export type MemoData = {
   /** a mixed-use building's two incomes, the commercial share and the
    *  commercial space (lib/mixed-use), in one line; "" on anything else */
   mixedUseLine?: string;
+  /** an operating business on its real estate — what is sold, the
+   *  operator's earnings and the rent's coverage (lib/going-concern), in one
+   *  line; "" on anything else */
+  goingConcernLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -684,6 +697,7 @@ export function buildMemoData(
     regulationLine: pdfSafe(regulationLineFor(deal, extraction ?? null, today)),
     forwardLine: pdfSafe(forwardLineFor(extraction ?? null, strategy, today)),
     mixedUseLine: pdfSafe(mixedUseLineFor(extraction ?? null, today)),
+    goingConcernLine: pdfSafe(goingConcernLineFor(extraction ?? null, today)),
     singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
     hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
     saleLine: pdfSafe(saleLineFor(extraction ?? null)),
@@ -1174,6 +1188,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* A forward purchase (lib/forward-purchase): the price is paid at
                 delivery and the developer funds the works. */}
             {data.forwardLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.forwardLine}</Text>}
+            {/* An operating business (lib/going-concern): whose earnings
+                these are, and the rent's coverage. */}
+            {data.goingConcernLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.goingConcernLine}</Text>}
             {/* The seller's loan offered for assumption (#419), as stated. */}
             {data.assumableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.assumableLine}</Text>}
             {/* A note the seller offers to carry (#462), as stated. */}

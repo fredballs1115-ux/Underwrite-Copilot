@@ -1586,7 +1586,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const bare = (label: string) => label.replace(/ · model$/, "");
     const tableRows = (html: string) => [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => bare(m[1]));
     const cardRows = (html: string) => [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => bare(m[1]));
-    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Forward purchase", "Mixed-use", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
+    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Forward purchase", "Operating business", "Mixed-use", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
     // Four deals none of which states a hotel, a sale, a restriction or any
     // of the other deal-type facts: no column of dashes for any of them.
     const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: COLS }));
@@ -1658,6 +1658,19 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(cells.match(/—/g)).toHaveLength(2);
     expect(cells).not.toMatch(/\bnone\b/i);
     expect(a11yIssues(html)).toEqual([]);
+  });
+
+  it("sets an operating business side by side (lib/going-concern): the tag, a dash beside every other deal", () => {
+    const cols: Col[] = [COLS[0], { ...COLS[1], goingConcern: "Operator lease, 2.61x coverage" }, COLS[2]];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    const row = html.match(/<tr\b(?:(?!<\/tr>)[\s\S])*?>Operating business<\/td>[\s\S]*?<\/tr>/)?.[0] ?? "";
+    expect(row).not.toBe("");
+    const cells = visibleText(row);
+    expect(cells).toContain("Operator lease, 2.61x coverage");
+    expect(cells.match(/—/g)).toHaveLength(2);
+    expect(cells).not.toMatch(/\bnone\b/i);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
   });
 
   it("reads a note's and a share's price for what it buys (#423): the note's yield, the share's cap on the whole, returns withheld", () => {
@@ -9052,6 +9065,156 @@ describe("Pipeline — a mixed-use building's tag (lib/mixed-use)", () => {
       expect(text, initialView).toContain("Commercial 29% of income");
       const chip = html.match(/<span[^>]*title="Commercial 29% of income:[^"]*"[^>]*>/)?.[0] ?? "";
       expect(chip, initialView).toContain("text-brand");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+  });
+});
+
+// ── An operating business on its real estate (lib/going-concern) ─────────
+import { GoingConcernPanel } from "@/app/going-concern-panel";
+import { goingConcernModelLine, goingConcernTag, readGoingConcern } from "@/lib/going-concern";
+
+const GC_TODAY = new Date("2026-10-05T12:00:00Z");
+const gcDeck = (dealName: string, assetClass: string, metrics: { label: string; value: string }[], extra: Record<string, unknown> = {}) =>
+  ({
+    dealName,
+    assetClass,
+    totalPages: 36,
+    ...extra,
+    metrics: metrics.map((m) => ({ ...m, flagged: false, page: "p. 6", basis: "na" as const })),
+  }) as unknown as ExtractionResult;
+const STATION_DECK = gcDeck(
+  "Route 9 Fuel & Market",
+  "Gas Station / Convenience Store",
+  [
+    { label: "Asking price", value: "$3,200,000" },
+    { label: "NOI (in-place)", value: "$256,000" },
+    { label: "EBITDA (T-12)", value: "$410,000" },
+    { label: "Real estate value", value: "$2,000,000" },
+    { label: "FF&E value", value: "$400,000" },
+    { label: "Business value", value: "$800,000" },
+    { label: "Fuel supply agreement", value: "Shell branded supply through 2029" },
+    { label: "Tank system", value: "Three double-walled fiberglass USTs, installed 2004" },
+  ],
+  { strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" } },
+);
+const WASH_DECK = gcDeck(
+  "Express Wash NNN",
+  "Car wash",
+  [
+    { label: "Asking price", value: "$4,600,000" },
+    { label: "Annual base rent", value: "$276,000" },
+    { label: "EBITDAR (T-12)", value: "$720,000" },
+    { label: "Market rent", value: "$240,000 a year, per the broker" },
+  ],
+  { singleTenant: { tenant: "Tidal Wave Auto Spa", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" } },
+);
+
+describe("GoingConcernPanel (lib/going-concern) — the rent's coverage against a 1.00x line, the price as the memorandum splits it", () => {
+  it("draws a business sold with its real estate in the warning tone: the split a segment each, a tile a contract, then the model's read", () => {
+    const r = readGoingConcern(STATION_DECK, GC_TODAY)!;
+    const modelLine = goingConcernModelLine(r, { noi1: 256_000, exitCapPct: 0.08 })!;
+    const html = render(React.createElement(GoingConcernPanel, { goingConcern: r, modelLine }));
+    dumpView("going-concern-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="going-concern-panel"');
+    expect(html).toContain("border-l-caution");
+    expect(text).toContain("Fuel station and its store: sold with the business; EBITDA (T-12) $410k");
+    expect(html.match(/data-bar="gc-split"/g)).toHaveLength(3);
+    expect(html).not.toContain('data-bar="gc-coverage"');
+    for (const part of ["Real estate $2.00M", "Fixtures and equipment $400k", "Business $800k"]) expect(text).toContain(part);
+    for (const key of ["fuel-supply-agreement", "tank-system"]) expect(html).toContain(`data-gc="${key}"`);
+    // The read's first sentence in the open, the rest one click away.
+    expect(text).toContain("a real estate cap struck on them prices the business as if it were rent.");
+    expect(html).toContain("Read the rest (4 more)");
+    expect(text).toContain("The model capitalises its $256k year-one income at an 8.00% exit cap as if it were rent");
+    expect(a11yIssues(html), "going-concern panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("draws a lease to the operator in the brand's tone, its EBITDAR over the rent against the 1.00x line, and nothing on anything else", () => {
+    const r = readGoingConcern(WASH_DECK, GC_TODAY)!;
+    const html = render(React.createElement(GoingConcernPanel, { goingConcern: r }));
+    const text = visibleText(html);
+    expect(html).toContain("border-l-brand");
+    expect(text).toContain("Car wash: leased to the operator; EBITDAR (T-12) $720k; rent covered 2.61x");
+    for (const bar of ["gc-coverage", "gc-line"]) expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    expect(text).toContain("EBITDAR (T-12) over the $276k rent: 2.61x");
+    expect(text).toContain("1.00x, where the earnings only just pay the rent");
+    expect(html).not.toContain('data-bar="gc-split"');
+    expect(html).toContain('data-gc="market-rent"');
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(GoingConcernPanel, { goingConcern: null }))).toBe("");
+    const apartments = gcDeck("Maple Court", "Multifamily", [{ label: "Asking price", value: "$20,000,000" }, { label: "Units", value: "240" }]);
+    expect(readGoingConcern(apartments, GC_TODAY)).toBeNull();
+  });
+});
+
+describe("ShareView — an operating business (lib/going-concern)", () => {
+  it("draws the business without the model's read, and nothing on the sample", () => {
+    const props = {
+      dealName: "Route 9 Fuel & Market",
+      assetClass: "auto",
+      expiresAt: "2026-10-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      today: "2026-10-05",
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: STATION_DECK }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="going-concern-panel"');
+    expect(html.match(/data-bar="gc-split"/g)).toHaveLength(3);
+    expect(text).not.toContain("The model capitalises");
+    // The key terms lead with the earnings and the contracts, ahead of the
+    // memorandum's own NOI.
+    const term = (label: string) => html.indexOf(`<span class="line-clamp-2">${label}</span>`);
+    expect(term("EBITDA (T-12)")).toBeGreaterThan(-1);
+    expect(term("EBITDA (T-12)")).toBeLessThan(term("NOI (in-place)"));
+    expect(term("Fuel supply agreement")).toBeLessThan(term("NOI (in-place)"));
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain("going-concern-panel");
+  });
+});
+
+describe("Pipeline — an operating business's tag (lib/going-concern)", () => {
+  const washTag = goingConcernTag(WASH_DECK, GC_TODAY)!;
+  const stationTag = goingConcernTag(STATION_DECK, GC_TODAY)!;
+  const wash = card({
+    id: "gw",
+    name: "Express Wash NNN",
+    assetClass: "Car wash",
+    verdict: "pass",
+    slots: { cap: "6.0%", price: "$4,600,000", yoc: null, goingConcern: washTag },
+    market: "Tampa, FL",
+    coveredMarket: null,
+  });
+  const station = card({
+    id: "gs",
+    name: "Route 9 Fuel & Market",
+    assetClass: "Gas Station / Convenience Store",
+    verdict: "caution",
+    slots: { cap: "8.0%", price: "$3,200,000", yoc: null, goingConcern: stationTag },
+    market: "Kingston, NY",
+    coveredMarket: null,
+  });
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
+
+  it("says a lease the operator's earnings cover in the brand's tone, and a business sold with its real estate in the warning tone, on the row and the card", () => {
+    expect(washTag).toBe("Operator lease, 2.61x coverage");
+    expect(stationTag).toBe("Going concern");
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([wash, station]), initialView }));
+      const text = visibleText(html);
+      const chip = (words: string) => html.match(new RegExp(`<span[^>]*title="${words}:[^"]*"[^>]*>`))?.[0] ?? "";
+      expect(text, initialView).toContain("Operator lease, 2.61x coverage");
+      expect(chip("Operator lease, 2.61x coverage"), initialView).toContain("text-brand");
+      expect(chip("Going concern"), initialView).toContain("text-caution");
       expect(gluedWords(text), initialView).toEqual([]);
       expect(a11yIssues(html), initialView).toEqual([]);
     }

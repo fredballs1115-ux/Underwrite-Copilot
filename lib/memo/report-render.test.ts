@@ -1235,6 +1235,38 @@ describe("ReportDocument (full report)", () => {
     expect(text).toContain("Mixed-use: $1.52M residential and $610k commercial income (28.6% commercial). The model capitalises the $610k of commercial income at the same");
   }, 60000);
 
+  it("prints an operating business over the grids, and the income the model capitalises as rent (lib/going-concern)", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      dealName: "Route 9 Fuel & Market",
+      assetClass: "Gas Station / Convenience Store",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Asking price", value: "$3,200,000", flagged: false, page: "", basis: "na" as const },
+        { label: "NOI (in-place)", value: "$256,000", flagged: false, page: "", basis: "in_place" as const },
+        { label: "EBITDA (T-12)", value: "$410,000", flagged: false, page: "", basis: "in_place" as const },
+      ],
+    } as ExtractionResult;
+    const deal = {
+      name: "Route 9 Fuel & Market",
+      asset_class: "auto",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, "Route 9 Fuel & Market");
+    const sensitivity = buildSensitivityData(derived.inputs, null);
+    const input = buildReportData(deal, "October 5, 2026", [], sensitivity, undefined, null, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.goingConcern ?? null);
+    expect(input.sensitivity).not.toBeNull();
+    expect(input.goingConcern).toEqual(derived.meta.goingConcern);
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain("Fuel station and its store: sold with the business; EBITDA (T-12) $410k. The model capitalises its $256k year-one income");
+  }, 60000);
+
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

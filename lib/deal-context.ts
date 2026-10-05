@@ -27,6 +27,7 @@ import { readSelfStorage, storageContextLine } from "@/lib/self-storage";
 import { regulationContextLine, type RegulationRead } from "@/lib/rent-regulation";
 import { forwardContextLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseContextLine, readMixedUse } from "@/lib/mixed-use";
+import { goingConcernContextLine, readGoingConcern } from "@/lib/going-concern";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -109,6 +110,10 @@ export function dealContextFor(
   // the clock, the deposit and the yield at delivery, read with the kind
   // the screen reads.
   const forward = readForwardPurchase(extraction, new Date(), strategy);
+  // An operating business on its real estate (lib/going-concern): whether
+  // the business is sold with it or leased from it, the operator's earnings
+  // and their coverage of the rent, the split and the contracts as stated.
+  const goingConcern = readGoingConcern(extraction);
   // The listed tenants of a multi-tenant property (#457): how much of the
   // rent rolls before the model's sale, the anchors in and out of the
   // sale, and the rights that ride on them.
@@ -151,6 +156,7 @@ export function dealContextFor(
     ...(sale ? [saleContextLine(sale)] : []),
     ...(range ? [range] : []),
     ...(forward ? [forwardContextLine(forward)] : []),
+    ...(goingConcern ? [goingConcernContextLine(goingConcern)] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
     ...(sellerNote ? [sellerFinancingContextLine(sellerNote)] : []),
     ...(noteFinancing ? [notePurchaseFinancingContextLine(noteFinancing)] : []),

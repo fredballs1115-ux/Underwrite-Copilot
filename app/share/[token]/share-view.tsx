@@ -38,6 +38,8 @@ import { ForwardPanel } from "@/app/forward-panel";
 import { readForwardPurchase } from "@/lib/forward-purchase";
 import { MixedUsePanel } from "@/app/mixed-use-panel";
 import { readMixedUse } from "@/lib/mixed-use";
+import { GoingConcernPanel } from "@/app/going-concern-panel";
+import { readGoingConcern } from "@/lib/going-concern";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -369,6 +371,10 @@ export function ShareView({
         forward={readForwardPurchase(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined, strategy)}
         today={today}
       />
+
+      {/* An operating business on its real estate (lib/going-concern): the
+          operator's earnings against its rent, the split and the contracts. */}
+      <GoingConcernPanel goingConcern={readGoingConcern(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined)} />
 
       {/* A covenant or a contract that sets the rents (#453): how much of the
           building is restricted, until when, and what the model is not. */}

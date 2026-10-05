@@ -64,6 +64,7 @@ import { readSelfStorage, storageNote } from "@/lib/self-storage";
 import { regulationForDeal, regulationNote, type RegulationRead } from "@/lib/rent-regulation";
 import { forwardNote, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseNote, readMixedUse } from "@/lib/mixed-use";
+import { goingConcernNote, readGoingConcern } from "@/lib/going-concern";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -1393,6 +1394,12 @@ async function runAnalysisSteps(
         // (a)–(c) — the agency limit, the meters and CAM, the zoning.
         const mixedUse = readMixedUse(ex);
         if (mixedUse) notes.push(mixedUseNote(mixedUse));
+        // An operating business on its real estate (lib/going-concern): the
+        // operator's earnings, the rent and its coverage, the split and the
+        // contracts as stated, then the operating-business traps by name —
+        // a care operation's own after them.
+        const goingConcern = readGoingConcern(ex);
+        if (goingConcern) notes.push(goingConcernNote(goingConcern));
 
         if (flagged.length) {
           notes.push(

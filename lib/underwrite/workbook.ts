@@ -335,6 +335,23 @@ function buildCover(
       r++;
     }
   }
+  // An operating business on its real estate (lib/going-concern): what is
+  // sold, the operator's earnings and the rent's coverage, then what this
+  // model does with the income — capitalised as rent, nothing allocated to
+  // the business.
+  if (meta.goingConcern) {
+    fact("The operating business", meta.goingConcern.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.goingConcern.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.goingConcern.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
   // The seller's loan offered for assumption (#419): as stated, then what
   // it is worth against this model's own new loan.
   if (meta.assumable) {

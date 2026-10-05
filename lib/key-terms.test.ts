@@ -304,6 +304,39 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     expect(keyTermRows(center, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Occupancy"]);
   });
 
+  it("an operating business's earnings, coverage and contracts lead after the count, and a shared row alone never leads as one (lib/going-concern)", () => {
+    const station = [
+      { label: "Occupancy", value: "100%", flagged: true },
+      { label: "Tank system", value: "Three double-walled fiberglass USTs", flagged: false },
+      { label: "Fuel supply agreement", value: "Shell through 2029", flagged: false },
+      { label: "EBITDA (T-12)", value: "$410,000", flagged: false },
+      { label: "Going-in cap rate", value: "8.00%", flagged: false },
+      { label: "Asking price", value: "$3,200,000", flagged: false },
+    ];
+    expect(keyTermRows(station, "stabilized", SCREEN_YEAR, 5).map((m) => m.label)).toEqual([
+      "Asking price",
+      "Going-in cap rate",
+      "EBITDA (T-12)",
+      "Fuel supply agreement",
+      "Tank system",
+    ]);
+    // An apartment building's management fee is no operating business's.
+    const apartments = [
+      { label: "Occupancy", value: "95%", flagged: true },
+      { label: "Management fee", value: "3% of EGI", flagged: false },
+      { label: "Going-in cap rate", value: "5.50%", flagged: false },
+      { label: "Asking price", value: "$42,000,000", flagged: false },
+    ];
+    expect(keyTermRows(apartments, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate", "Occupancy"]);
+    // A care operation's beds lead it.
+    const snf = [
+      { label: "Licensed beds", value: "120", flagged: false },
+      { label: "Management fee", value: "5% of revenue", flagged: false },
+      { label: "Asking price", value: "$18,000,000", flagged: false },
+    ];
+    expect(keyTermRows(snf, "stabilized", SCREEN_YEAR, 3).map((m) => m.label)).toEqual(["Asking price", "Licensed beds", "Management fee"]);
+  });
+
   it("a student building's pre-leasing and walk lead after the price (#468)", () => {
     const student = [
       { label: "Occupancy", value: "96%", flagged: false },

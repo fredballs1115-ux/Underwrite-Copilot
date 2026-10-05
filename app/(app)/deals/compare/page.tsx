@@ -39,6 +39,7 @@ import { selfStorageTag } from "@/lib/self-storage";
 import { regulationForDeal, regulationTag } from "@/lib/rent-regulation";
 import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import { mixedUseTag } from "@/lib/mixed-use";
+import { goingConcernTag } from "@/lib/going-concern";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
 import { compareReturns } from "@/lib/compare-figures";
@@ -209,6 +210,8 @@ function toCol(
     forward: forwardTag(readForwardPurchase(ex, new Date(`${today}T12:00:00Z`), strat)),
     // A mixed-use building's commercial share (lib/mixed-use).
     mixedUse: mixedUseTag(ex, new Date(`${today}T12:00:00Z`)),
+    // An operating business on its real estate (lib/going-concern).
+    goingConcern: goingConcernTag(ex, new Date(`${today}T12:00:00Z`)),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
     noteYtm: figs.noteYtmPct,

@@ -403,6 +403,31 @@ describe("dealContextFor — a mixed-use building's two incomes (lib/mixed-use)"
   });
 });
 
+describe("dealContextFor — an operating business on its real estate (lib/going-concern)", () => {
+  it("says whose earnings the income is, and the contracts as stated, with what the price buys", () => {
+    const station: ExtractionResult = {
+      dealName: "Route 9 Fuel & Market",
+      assetClass: "Gas Station / Convenience Store",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+      metrics: [
+        m("Asking price", "$3,200,000"),
+        m("NOI (in-place)", "$256,000"),
+        m("EBITDA (T-12)", "$410,000"),
+        m("Fuel supply agreement", "Shell branded supply through 2029"),
+        m("Tank system", "Three double-walled fiberglass USTs, installed 2004"),
+      ],
+    };
+    const ctx = dealContextFor(station)!;
+    expect(ctx).toContain(
+      "Operating business: The memorandum sells a fuel station and its store with its real estate: its earnings are the operation's, and a real estate cap struck on them prices the business as if it were rent.",
+    );
+    expect(ctx).toContain("It states EBITDA (T-12) of $410k: the operator's earnings, before a management fee and a reserve for the fixtures, never the real estate's NOI.");
+    expect(ctx).toContain("Fuel supply agreement, as stated: Shell branded supply through 2029.");
+    expect(ctx.indexOf("Operating business:")).toBeLessThan(ctx.indexOf("Deal type:"));
+    expect(dealContextFor({ ...station, dealName: "Route 9", assetClass: "Retail", strategy: undefined, metrics: station.metrics.filter((r) => !/EBITDA/.test(r.label)) })).not.toContain("Operating business");
+  });
+});
+
 describe("dealContextFor — the rent rules that reach the building (lib/rent-regulation)", () => {
   const walkUp: ExtractionResult = {
     dealName: "The Walk-up",

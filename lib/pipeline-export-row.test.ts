@@ -103,6 +103,25 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(pipelineExportRow(deal(), ctx).mixedUse).toBeNull();
   });
 
+  it("says an operating business, as the pipeline card says it, and carries it in the price cell's note (lib/going-concern)", async () => {
+    const station = {
+      dealName: "Route 9 Fuel & Market",
+      assetClass: "Gas Station / Convenience Store",
+      market: "Hudson Valley, NY",
+      address: "",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+      metrics: [m("Asking price", "$3,200,000"), m("NOI (in-place)", "$256,000"), m("EBITDA (T-12)", "$410,000")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: station }), ctx);
+    expect(row.goingConcern).toBe("Going concern");
+    expect(row.goingConcern).toBe(pickSlots(station, null, "auto").goingConcern);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain("Going concern: an operating business on its real estate");
+    expect(pipelineExportRow(deal(), ctx).goingConcern).toBeNull();
+  });
+
   it("prints the deal's one class: the deck's on a deal filed Auto, the analyst's where they filed one", async () => {
     expect(pipelineExportRow(deal(), ctx).assetClass).toBe("multifamily");
     expect(pipelineExportRow(deal({ asset_class: "office" }), ctx).assetClass).toBe("office");

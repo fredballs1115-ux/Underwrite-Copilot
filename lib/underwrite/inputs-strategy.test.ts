@@ -615,6 +615,34 @@ describe("deriveUnderwriteInputs — a mixed-use building's two incomes under on
   });
 });
 
+describe("deriveUnderwriteInputs — an operating business's income capitalised as rent (lib/going-concern)", () => {
+  const station = ex(
+    [metric("Asking price", "$3,200,000"), metric("NOI (in-place)", "$256,000"), metric("EBITDA (T-12)", "$410,000")],
+    {
+      assetClass: "Gas Station / Convenience Store",
+      strategy: { kind: "stabilized", summary: "Sale of the going concern: real estate, fuel business and store", capitalBudget: "", timeline: "" },
+    },
+  );
+
+  it("says the business in a line and that the model capitalises its income as rent, allocating nothing to the business", () => {
+    const m = deriveUnderwriteInputs(station, "fallback");
+    expect(m.meta.goingConcern?.line).toBe("Fuel station and its store: sold with the business; EBITDA (T-12) $410k");
+    expect(m.meta.goingConcern?.read).toBe(
+      `The model capitalises its $256k year-one income at a ${(m.inputs.exitCapPct * 100).toFixed(2)}% exit cap as if it were rent; on a fuel station and its store that income is the operation's, which the real estate does not earn without an operator, and the model allocates nothing to the business.`,
+    );
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.goingConcern).toBeNull();
+  });
+
+  it("on a lease to the operator says the read with no model line: the rent is the landlord's income", () => {
+    const wash = ex([metric("Asking price", "$4,600,000"), metric("Annual base rent", "$276,000"), metric("EBITDAR (T-12)", "$720,000")], {
+      assetClass: "Car wash",
+      singleTenant: { tenant: "Tidal Wave Auto Spa", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" },
+    });
+    const m = deriveUnderwriteInputs(wash, "fallback");
+    expect(m.meta.goingConcern).toEqual({ line: "Car wash: leased to the operator; EBITDAR (T-12) $720k; rent covered 2.61x", read: "" });
+  });
+});
+
 describe("deriveUnderwriteInputs — the PCA's immediate repairs are capital at closing (#465)", () => {
   const base = [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,520,000"), metric("Units", "240")];
 

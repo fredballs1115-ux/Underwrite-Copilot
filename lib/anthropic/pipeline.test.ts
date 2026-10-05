@@ -1400,6 +1400,31 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("an operating business: the challenger reads whose earnings these are and the operating-business traps, and the deal context says it (lib/going-concern)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "Car wash",
+      dealName: "Express Wash NNN",
+      singleTenant: { tenant: "Tidal Wave Auto Spa", guarantor: "", leaseType: "Absolute NNN", landlordObligations: "", tenantRights: "", page: "" },
+      metrics: [
+        { label: "Asking price", value: "$4,600,000", flagged: false, page: "", basis: "na" },
+        { label: "Annual base rent", value: "$276,000", flagged: false, page: "", basis: "in_place" },
+        { label: "EBITDAR (T-12)", value: "$720,000", flagged: false, page: "", basis: "in_place" },
+      ],
+    } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    const note = vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "";
+    expect(note).toContain("OPERATING BUSINESS AS STATED: The memorandum sells the real estate under a car wash, leased to its operator");
+    expect(note).toContain("Its EBITDAR covers the $276k rent 2.61x.");
+    expect(note).toContain("OPERATING-BUSINESS TRAPS, checked by name");
+    expect(note).not.toContain("CARE-OPERATION TRAPS");
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Operating business: The memorandum sells the real estate under a car wash");
+    expect(context).not.toContain("OPERATING-BUSINESS TRAPS");
+    expect(errSpy).not.toHaveBeenCalled();
+  });
+
   it("a rent-regulated building: the challenger and the deal context read the rules that reach it, the allowance in force and the regulation traps (lib/rent-regulation)", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     vi.mocked(extractTerms).mockResolvedValue({

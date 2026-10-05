@@ -20,6 +20,7 @@ import {
 } from "./deal-strategy";
 import { forwardTermRows } from "./forward-purchase";
 import { COMMERCIAL_INCOME_ROW, RESIDENTIAL_INCOME_ROW, mixedUseTermRows } from "./mixed-use";
+import { goingConcernTermRows } from "./going-concern";
 import { noteTermRows } from "./note-yield";
 import { affordableTermRows } from "./affordable";
 import { singleTenantTermRows } from "./single-tenant";
@@ -46,6 +47,11 @@ const COLLATERAL_CAP =
 function isCollateralCap(row: { label: string; value: string }): boolean {
   return COLLATERAL_CAP.test(row.label) || findGoingInCap([row]) === row;
 }
+
+/** Rows an operating business shares with other deals — a franchise, a
+ *  licence, a management fee — which lead the business's key terms only
+ *  beside a row of its own. */
+const SHARED_OPERATING_ROW = /^\s*(?:franchise|licen[cs]es?\b|management\s+fee)/i;
 
 export interface KeyTermMetric {
   label: string;
@@ -152,6 +158,13 @@ export function keyTermRows<M extends KeyTermMetric>(
   const mixedUse = mixedUseTermRows(rows);
   if (mixedUse.some((m) => RESIDENTIAL_INCOME_ROW.test(m.label) || COMMERCIAL_INCOME_ROW.test(m.label)))
     for (const row of mixedUse) lead(row);
+  // An operating business (lib/going-concern): its earnings, the rent's
+  // coverage, then the contracts and a care operation's facts — only where
+  // a row of the operation's own is stated, so a franchise's end, a licence
+  // or a management fee alone (a hotel's, an apartment building's) never
+  // leads as one.
+  const business = goingConcernTermRows(rows);
+  if (business.some((m) => !SHARED_OPERATING_ROW.test(m.label))) for (const row of business) lead(row);
   // On a note no cap on the collateral's income is printed at all — the
   // going-in, the in-place, the stabilized, the exit: among the rows a
   // reader would take any of them for a cap on the note's price, which none
