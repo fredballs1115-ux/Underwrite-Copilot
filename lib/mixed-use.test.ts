@@ -80,6 +80,41 @@ describe("a mixed-use building's two incomes, read as stated (pass 28, round 7)"
     expect(readMixedUse(over, TODAY)!.commercialAreaSharePct).toBeNull();
   });
 
+  // The audit of 2026-10-05: the first commercial row alone was read, the
+  // model's line said "as the residential" with no residential income, and
+  // an average rent a unit was read as the building's residential income.
+  it("adds every kind of commercial income, says the model's cap against the residential only where one is stated, and reads no average rent as income", () => {
+    const three = readMixedUse(
+      deal([row("Residential income", "$1,500,000"), row("Retail income", "$300,000"), row("Office income", "$400,000")], "Mixed-use"),
+      TODAY,
+    )!;
+    expect(three).toMatchObject({ commercialIncome: 700_000, commercialIncomeSharePct: 31.8, commercialRows: ["Retail income", "Office income"] });
+    expect(three.headline).toContain("The memorandum states $1.50M of residential income and $700k of commercial (retail income and office income, added): 31.8% of the income");
+    expect(mixedUseTag(deal([row("Residential income", "$1,500,000"), row("Retail income", "$300,000"), row("Office income", "$400,000")], "Mixed-use"), TODAY)).toBe(
+      "Commercial 32% of income",
+    );
+    // An office and retail building: no residential, and the model's line says so.
+    const officeRetail = readMixedUse(deal([row("Office income", "$1,200,000"), row("Retail income", "$400,000"), row("Building SF", "60,000 SF")], "Mixed-use (office/retail)"), TODAY)!;
+    expect(officeRetail.commercialIncome).toBe(1_600_000);
+    const line = mixedUseModelLine(officeRetail, { exitCapPct: 0.065, rentGrowthPct: 0.03 })!;
+    expect(line).toBe(
+      "The model capitalises the $1.60M of commercial income at its 6.50% exit cap and grows it at 3.0% a year: one cap and one growth rate for all of the building's income, where commercial space trades to its own buyers at its own cap.",
+    );
+    expect(line).not.toContain("as the residential");
+    // A commercial total beside a kind's own row is a sum the reader cannot know.
+    const overlap = readMixedUse(deal([row("Residential income", "$1,500,000"), row("Commercial income", "$700,000"), row("Retail income", "$300,000")], "Mixed-use"), TODAY)!;
+    expect(overlap).toMatchObject({ commercialIncome: null, commercialIncomeSharePct: null, commercialUnread: ["Commercial income", "Retail income"] });
+    expect(overlap.headline).toContain("The memorandum states commercial income in more than one row (Commercial income, Retail income), and whether one includes another is its to say");
+    // An average rent a unit is no building's residential income.
+    const average = readMixedUse(deal([row("Units", "48"), row("Residential rent", "$1,850/mo average"), row("Commercial income", "$610,000")], "Mixed-use"), TODAY)!;
+    expect(average.residentialIncome).toBeNull();
+    expect(average.commercialIncomeSharePct).toBeNull();
+    expect(annualIncomeOf("$1,850/mo average")).toBeNull();
+    expect(annualIncomeOf("$1,850 avg")).toBeNull();
+    expect(readMixedUse(deal([row("Residential rent (average)", "$1,850/mo"), row("Commercial income", "$610,000")], "Mixed-use"), TODAY)!.residentialIncome).toBeNull();
+    for (const r of [three, officeRetail, overlap]) expect(gluedWords(r.headline)).toEqual([]);
+  });
+
   it("reads a year's income: a monthly figure twelve times, never a rate, a range, a share or a projection", () => {
     expect(annualIncomeOf("$50,000/mo")).toBe(600_000);
     expect(annualIncomeOf("$50,000 per month")).toBe(600_000);

@@ -54,12 +54,19 @@ export const COMMERCIAL_SF_ROW =
   /^\s*(?:commercial|retail|office|ground[- ]floor(?:\s+(?:retail|commercial))?)\s+(?:sf|s\.f\.?|sq\.?\s?ft\.?|square\s+(?:feet|footage)|area|space|gla|nra)\b/i;
 export const COMMERCIAL_OCCUPANCY_ROW = /^\s*(?:commercial|retail|office|ground[- ]floor)\s+(?:occupancy|occupied|leased)\b/i;
 
+/** A rent per unit by another name: an average, a mean or a typical rent
+ *  is one unit's, never the building's year (the audit of 2026-10-05:
+ *  "Residential rent: $1,850/mo average" read as $22k of residential
+ *  income, and the commercial as 96.5% of the building's). */
+const PER_UNIT_WORDS = /\baverage\b|\bavg\b|\bmean\b|\btypical\b/i;
+
 /** A year's income as a row states it: dollars, a monthly figure taken
- *  twelve times; null for a rate (per foot, per unit), a range or a share. */
+ *  twelve times; null for a rate (per foot, per unit, an average), a range
+ *  or a share. */
 export function annualIncomeOf(stated: string): number | null {
   const v = stated.trim();
   if (!v || NOT_STATED.test(v)) return null;
-  if (/\/\s*(?:sf|sq|unit|door|key)\b|\bper\s+(?:sf|sq|square|unit|door|key)\b|psf\b/i.test(v)) return null;
+  if (/\/\s*(?:sf|sq|unit|door|key)\b|\bper\s+(?:sf|sq|square|unit|door|key)\b|psf\b/i.test(v) || PER_UNIT_WORDS.test(v)) return null;
   if (/%/.test(v)) return null;
   // A range, its first figure with or without a scale ("$600 - $700",
   // "$1.0M - $1.2M"), is no one figure.
@@ -72,7 +79,15 @@ export function annualIncomeOf(stated: string): number | null {
 
 export interface MixedUseRead {
   residentialIncome: number | null;
+  /** the commercial income: one row's, or the sum of one row a kind
+   *  (retail, office) where the memorandum states each apart */
   commercialIncome: number | null;
+  /** the rows summed into the commercial income, where more than one */
+  commercialRows: string[];
+  /** commercial rows whose sum the reader cannot know — a commercial total
+   *  beside a kind's own row, or one kind twice at two figures — named, and
+   *  no commercial income read off them */
+  commercialUnread: string[];
   /** the commercial share of the two stated incomes, a percent */
   commercialIncomeSharePct: number | null;
   commercialSf: number | null;
@@ -98,11 +113,20 @@ const money = (n: number): string => {
 const pct1 = (n: number) => `${Math.round(n * 10) / 10}%`;
 const sfText = (n: number) => `${Math.round(n).toLocaleString("en-US")} SF`;
 
+/** A commercial income row's kind: a retail row, an office row, or a
+ *  commercial total. */
+function commercialKind(label: string): "retail" | "office" | "commercial" {
+  if (/^\s*(?:ground[- ]floor\s+)?retail\b/i.test(label)) return "retail";
+  if (/^\s*office\b/i.test(label)) return "office";
+  return "commercial";
+}
+
 /** Whether the deal is mixed-use: the class, or both halves of the income
  *  stated. */
 function isMixedUse(ex: ExtractionResult, rows: Row[]): boolean {
   if (assetClassKey(ex.assetClass ?? "") === "mixed_use") return true;
-  const today = (re: RegExp) => rows.some((m) => re.test(m.label) && !NOT_TODAY.test(m.label) && annualIncomeOf(m.value) != null);
+  const today = (re: RegExp) =>
+    rows.some((m) => re.test(m.label) && !NOT_TODAY.test(m.label) && !PER_UNIT_WORDS.test(m.label) && annualIncomeOf(m.value) != null);
   return today(RESIDENTIAL_INCOME_ROW) && today(COMMERCIAL_INCOME_ROW);
 }
 
@@ -115,12 +139,29 @@ export function readMixedUse(ex: ExtractionResult | null | undefined, asOf: Date
   if (!ex) return null;
   const rows = (Array.isArray(ex.metrics) ? ex.metrics : []).filter(isRow).filter((m) => !NOT_STATED.test(m.value.trim()));
   if (!isMixedUse(ex, rows)) return null;
-  const find = (re: RegExp) => rows.find((m) => re.test(m.label) && !NOT_TODAY.test(m.label)) ?? null;
+  const find = (re: RegExp) => rows.find((m) => re.test(m.label) && !NOT_TODAY.test(m.label) && !PER_UNIT_WORDS.test(m.label)) ?? null;
 
   const residentialRow = find(RESIDENTIAL_INCOME_ROW);
-  const commercialRow = find(COMMERCIAL_INCOME_ROW);
   const residentialIncome = residentialRow ? annualIncomeOf(residentialRow.value) : null;
-  const commercialIncome = commercialRow ? annualIncomeOf(commercialRow.value) : null;
+  // Every commercial row, not the first: an office income and a retail
+  // income stated apart are one commercial income, added (the audit of
+  // 2026-10-05: the retail row was dropped, so $300k of retail beside $400k
+  // of office read as 16.7% of the income where it is 31.8%). A commercial
+  // total beside a kind's own row, or one kind twice at two figures, is a
+  // sum the reader cannot know: named, never added.
+  const commercial = rows.flatMap((m) => {
+    if (!COMMERCIAL_INCOME_ROW.test(m.label) || NOT_TODAY.test(m.label) || PER_UNIT_WORDS.test(m.label)) return [];
+    const value = annualIncomeOf(m.value);
+    return value == null ? [] : [{ row: m as Row, kind: commercialKind(m.label), value }];
+  });
+  const kinds = new Map<string, number[]>();
+  for (const c of commercial) kinds.set(c.kind, [...(kinds.get(c.kind) ?? []), c.value]);
+  const unknowable =
+    (kinds.has("commercial") && kinds.size > 1) || [...kinds.values()].some((vs) => new Set(vs).size > 1);
+  const commercialIncome = commercial.length === 0 || unknowable ? null : [...kinds.values()].reduce((sum, vs) => sum + vs[0], 0);
+  const commercialRow = commercial[0]?.row ?? null;
+  const commercialRows = !unknowable && kinds.size > 1 ? [...new Set(commercial.map((c) => c.row.label))] : [];
+  const commercialUnread = unknowable ? [...new Set(commercial.map((c) => c.row.label))] : [];
   const sfRow = find(COMMERCIAL_SF_ROW);
   const commercialSf = sfRow ? parseSf(sfRow.value) : null;
   const buildingSf = buildingSfFromMetrics(rows);
@@ -132,6 +173,8 @@ export function readMixedUse(ex: ExtractionResult | null | undefined, asOf: Date
   const read: Omit<MixedUseRead, "sentences" | "headline"> = {
     residentialIncome,
     commercialIncome,
+    commercialRows,
+    commercialUnread,
     commercialIncomeSharePct: share(commercialIncome, residentialIncome),
     commercialSf,
     buildingSf,
@@ -143,7 +186,7 @@ export function readMixedUse(ex: ExtractionResult | null | undefined, asOf: Date
     roll: rosterTag(ex, asOf),
     page: "",
   };
-  const facts = read.commercialIncome != null || read.commercialSf != null || read.commercialOccupancyPct != null;
+  const facts = read.commercialIncome != null || read.commercialUnread.length > 0 || read.commercialSf != null || read.commercialOccupancyPct != null;
   if (!facts) return null;
   const pages = typeof ex.totalPages === "number" && ex.totalPages > 0 ? ex.totalPages : null;
   const pageRow = commercialRow ?? residentialRow ?? sfRow;
@@ -155,14 +198,21 @@ export function readMixedUse(ex: ExtractionResult | null | undefined, asOf: Date
 
 function sentencesOf(r: Omit<MixedUseRead, "sentences" | "headline">): string[] {
   const out: string[] = [];
+  // "(retail income and office income, added)" where the commercial income
+  // is the sum of rows the memorandum states apart.
+  const added = r.commercialRows.length > 1 ? ` (${r.commercialRows.map((l) => l.toLowerCase()).join(" and ")}, added)` : "";
   if (r.commercialIncome != null && r.residentialIncome != null && r.commercialIncomeSharePct != null) {
     out.push(
-      `The memorandum states ${money(r.residentialIncome)} of residential income and ${money(r.commercialIncome)} of commercial: ${pct1(
+      `The memorandum states ${money(r.residentialIncome)} of residential income and ${money(r.commercialIncome)} of commercial${added}: ${pct1(
         r.commercialIncomeSharePct,
       )} of the income is the commercial space's, which re-lets on commercial terms (longer vacancies, leasing capital, a credit per tenant) where the apartments turn over every year.`,
     );
   } else if (r.commercialIncome != null) {
-    out.push(`The memorandum states ${money(r.commercialIncome)} of commercial income and no residential figure beside it, so no share of the income is read.`);
+    out.push(`The memorandum states ${money(r.commercialIncome)} of commercial income${added} and no residential figure beside it, so no share of the income is read.`);
+  } else if (r.commercialUnread.length > 0) {
+    out.push(
+      `The memorandum states commercial income in more than one row (${r.commercialUnread.join(", ")}), and whether one includes another is its to say: no commercial total or share is read.`,
+    );
   }
   if (r.commercialSf != null && r.buildingSf != null && r.commercialAreaSharePct != null) {
     const both = r.commercialIncomeSharePct != null;
@@ -188,8 +238,18 @@ function sentencesOf(r: Omit<MixedUseRead, "sentences" | "headline">): string[] 
  */
 export function mixedUseModelLine(r: MixedUseRead | null, m: { exitCapPct: number; rentGrowthPct: number } | null): string | null {
   if (!r || r.commercialIncome == null) return null;
-  const at = m && m.exitCapPct > 0 ? ` at the same ${(m.exitCapPct * 100).toFixed(2)}% exit cap` : " at the same exit cap";
-  const growth = m && Number.isFinite(m.rentGrowthPct) ? ` and grows it at the same ${(m.rentGrowthPct * 100).toFixed(1)}% a year` : "";
+  const cap = m && m.exitCapPct > 0 ? `${(m.exitCapPct * 100).toFixed(2)}% ` : "";
+  const rate = m && Number.isFinite(m.rentGrowthPct) ? `${(m.rentGrowthPct * 100).toFixed(1)}%` : null;
+  // "As the residential" only where the memorandum states a residential
+  // income (the audit of 2026-10-05: an office and retail building with no
+  // apartments was told its commercial income ran "as the residential").
+  if (r.residentialIncome == null) {
+    return `The model capitalises the ${money(r.commercialIncome)} of commercial income at its ${cap}exit cap${
+      rate ? ` and grows it at ${rate} a year` : ""
+    }: one cap and one growth rate for all of the building's income, where commercial space trades to its own buyers at its own cap.`;
+  }
+  const at = ` at the same ${cap}exit cap`;
+  const growth = rate ? ` and grows it at the same ${rate} a year` : "";
   return `The model capitalises the ${money(r.commercialIncome)} of commercial income${at} as the residential${growth}: one cap and one growth rate for two incomes that trade to different buyers at different caps${
     r.commercialIncomeSharePct != null ? `, the commercial ${pct1(r.commercialIncomeSharePct)} of it` : ""
   }.`;
