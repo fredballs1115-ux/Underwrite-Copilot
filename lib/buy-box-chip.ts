@@ -19,7 +19,7 @@ import {
 } from "@/lib/criteria";
 import { scoreMandateFit, type MandateScore } from "@/lib/mandate";
 import { checkedOf, checkedSentence, fitScoreLabel, fitTone, type FitTone } from "@/lib/fit-label";
-import { inferStrategy, statedBasisIsBuildings } from "@/lib/deal-strategy";
+import { inferStrategy, signalGoingInCap, statedBasisIsBuildings } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
 import { capSlotWithheld } from "@/lib/compare-interest";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -28,17 +28,21 @@ import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
  * What the buy box reads off a deal beside its rows, by the readers its
  * slots read (lib/criteria `SourceReads`): what the price buys as
  * lib/interest reads it, why the cap slot holds no cap of the deal's own
- * (lib/compare-interest `capSlotWithheld`), and whether a per-unit figure
- * the memorandum states is the building's (lib/deal-strategy
- * `statedBasisIsBuildings`). A position's price or a share's beside its
- * entity's loan had been held to the box's cap floor and its basis ceiling
- * while the header beside the chip withheld both (the audit of 2026-10-05).
+ * (lib/compare-interest `capSlotWithheld`), whether a per-unit figure the
+ * memorandum states is the building's (lib/deal-strategy
+ * `statedBasisIsBuildings`), and the first signal's going-in cap as the
+ * header reads it (lib/deal-strategy `signalGoingInCap`). A position's price
+ * or a share's beside its entity's loan had been held to the box's cap floor
+ * and its basis ceiling while the header beside the chip withheld both, and
+ * the header printed the first signal's cap where the box said none could be
+ * read (the audit of 2026-10-05).
  */
-export function sourceReadsOf(extraction: ExtractionResult | null): SourceReads {
+export function sourceReadsOf(extraction: ExtractionResult | null, firstSignal: FirstSignal | null): SourceReads {
   return {
     interestKind: interestOf(extraction).kind,
     capWithheld: capSlotWithheld(extraction),
     statedBasisIsBuildings: statedBasisIsBuildings(extraction),
+    signalCap: signalGoingInCap(firstSignal),
   };
 }
 
@@ -59,7 +63,7 @@ export function dealCheckSource(
     firstSignal,
     dealAddress,
     inferStrategy(extraction, firstSignal).kind,
-    sourceReadsOf(extraction),
+    sourceReadsOf(extraction, firstSignal),
   );
 }
 

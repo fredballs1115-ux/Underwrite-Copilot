@@ -1,5 +1,5 @@
 import { compactUsd } from "@/lib/money";
-import { METRIC_FIND, findGoingInCap, findMetric, parseMoney, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
+import { METRIC_FIND, findMetric, parseMoney, parsePrice, screenYearOf } from "@/lib/criteria";
 import {
   buildingPriceOf,
   findPriceMetric,
@@ -10,7 +10,7 @@ import {
   type StrategyKind,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
-import { capSlotWithheld } from "@/lib/compare-interest";
+import { statedCapRead } from "@/lib/compare-interest";
 import { dealClassKey } from "@/lib/asset-words";
 import { MEDIAN_FLOOR } from "@/lib/public-comps/core";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
@@ -76,19 +76,22 @@ export function deriveAnalytics(rows: AnalyticsRow[]): AnalyticsDeal[] {
     // The deal's kind as its own page reads it: the extraction and the
     // first signal, whose take can name the plan the rows do not — read
     // alone, a value-add the signal names was plotted as a stabilized cap.
-    const strategy = inferStrategy(extraction, (r.first_signal as FirstSignal | null | undefined) ?? null);
+    const signal = (r.first_signal as FirstSignal | null | undefined) ?? null;
+    const strategy = inferStrategy(extraction, signal);
     const plan = planSummary(extraction, strategy);
 
-    // A plan deal is judged on its yield on total cost: a stabilized or pro
+    // The cap the deal's own header prints (lib/compare-interest
+    // `statedCapRead`): the memorandum's going-in cap, else its first
+    // signal's, which the series had left out (the audit of 2026-10-05). A
+    // plan deal is judged on its yield on total cost: a stabilized or pro
     // forma cap, or a yield on cost, describes the finished project, not the
-    // price paid. …and no cap the deal's own header withholds is plotted
-    // (lib/compare-interest `capSlotWithheld`: a note's is the collateral's,
-    // a position's the building's, a share's beside its entity's loan on a
-    // basis never said), nor a leased fee's, a ground rent's (#415), among
-    // buildings' going-in caps.
+    // price paid. …and no cap the header withholds is plotted
+    // (`capSlotWithheld`: a note's is the collateral's, a position's the
+    // building's, a share's beside its entity's loan on a basis never said),
+    // nor a leased fee's, a ground rent's (#415), among buildings' going-in
+    // caps.
     const interestKind = interestOf(extraction).kind;
-    const capMetric = plan || capSlotWithheld(extraction) || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
-    const capPct = capMetric ? parsePct(capMetric.value) : null;
+    const capPct = interestKind === "leased_fee" ? null : (statedCapRead(extraction, plan != null, signal)?.pct ?? null);
 
     // The asking / purchase price — or, on a development, the land cost.
     const priceMetric = findPriceMetric(metrics, strategy.kind, screenYearOf(extraction));

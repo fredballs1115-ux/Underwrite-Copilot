@@ -7,10 +7,10 @@
 import { compactUsd } from "@/lib/money";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { shownAssetClass } from "@/lib/asset-class";
-import { findGoingInCap, screenYearOf, unitCountRow } from "@/lib/criteria";
-import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, signalGoingInCap, type StrategyKind } from "@/lib/deal-strategy";
+import { screenYearOf, unitCountRow } from "@/lib/criteria";
+import { findPriceMetric, inferStrategy, planSummary, signalAskPrice, type StrategyKind } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
-import { capSlotWithheld, noteCapSlot, ownYieldText } from "@/lib/compare-interest";
+import { capSlotWithheld, noteCapSlot, ownYieldText, statedCapSlot } from "@/lib/compare-interest";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { subjectBasis } from "@/lib/comp-detail";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -208,28 +208,14 @@ export function basisTag(extraction: ExtractionResult, kind: StrategyKind, store
   return null;
 }
 
-/**
- * The going-in cap the memorandum states, as a pipeline row's Cap slot
- * shows it — and where the extraction states none, or has not landed yet,
- * the first signal's, where it can be a cap on the price at all (lib/deal-
- * strategy `signalGoingInCap`): the deal header's own fallback, and
- * lib/model-vs-market's `dealGoingInCap`'s, so a cap the header prints is
- * never a dash on the card. None on a plan deal, which is judged on its
- * yield on total cost (its slot carries that), and none where the slot is
- * withheld (lib/compare-interest `capSlotWithheld`): a note's and a
- * position's carry their own yield, and a share's beside the loan its
- * entity carries says why. The compare table reads it where a deal's model
- * has no cap (lib/compare-figures), and the meeting workbook's row reads it
- * too, so every surface shows one figure.
- */
-export function statedCapSlot(
-  extraction: ExtractionResult | null,
-  planDeal: boolean,
-  signal?: { goingInCap?: string | null } | null,
-): string | null {
-  if (planDeal || capSlotWithheld(extraction)) return null;
-  return findGoingInCap(extraction?.metrics ?? [])?.value ?? signalGoingInCap(signal)?.text ?? null;
-}
+// The going-in cap a row's Cap slot shows — the memorandum's, else the first
+// signal's, none on a plan deal or where the slot is withheld — is
+// `statedCapSlot` in lib/compare-interest, beside `capSlotWithheld`, so the
+// memories that pool a cap (lib/market-memory, which the browser loads
+// through the deal page's strip; the internal comps; the analytics) read the
+// header's own figure without loading every slot reader here. Every surface
+// still imports it from here.
+export { statedCapSlot };
 
 // The asset class a pipeline row shows — the deal's one class — is
 // `shownAssetClass` in lib/asset-class, beside the labels it reads, so the

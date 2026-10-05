@@ -207,6 +207,44 @@ describe("the going-in cap: the memorandum's, else the first signal's, withheld 
     expect(compareText([compareCol(e, "x", signal)])).toContain("5.60% (OM)");
   });
 
+  it("a cap only the first signal read pools where the header prints it: the analytics, the market memory and the internal comps (the audit of 2026-10-05)", () => {
+    const e = ex([m("Asking price", "$24,000,000"), m("In-place NOI", "$1,344,000"), m("Units", "120")]);
+    const signal = signalOf({ askPrice: "$24,000,000", goingInCap: "5.6%" });
+    const row = (id: string, extraction: ExtractionResult, first_signal: FirstSignal | null) => ({
+      id,
+      name: id,
+      asset_class: "multifamily",
+      created_at: "2026-10-01T00:00:00Z",
+      is_sample: false,
+      stage: "screening",
+      verdict: null,
+      extraction,
+      first_signal,
+    });
+    const read = row("read", e, signal);
+    // A row selected without its signal: the memorandum's figures alone.
+    const unread = row("unread", e, null);
+    // A leased fee's signal cap is a ground rent's: never pooled, as before.
+    const leased = row(
+      "leased",
+      ex([m("Asking price", "$15,000,000"), m("Units", "120")], {
+        interest: { kind: "leased_fee", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      }),
+      signal,
+    );
+    expect(pickSlots(e, signal).cap).toBe("5.6%");
+    const charts = Object.fromEntries(deriveAnalytics([read, unread, leased]).map((d) => [d.id, d.capPct]));
+    expect(charts).toEqual({ read: 5.6, unread: null, leased: null });
+    const memory = Object.fromEntries(buildComps([read, unread, leased]).map((c) => [c.dealId, c.capPct]));
+    expect(memory.read).toBe(5.6);
+    expect(memory.unread ?? null).toBeNull();
+    expect(memory.leased ?? null).toBeNull();
+    const comps = Object.fromEntries(
+      deriveInternalComps("other", "multifamily", { assetClass: "multifamily" }, [read, unread, leased]).map((c) => [c.dealId, c.capLabel]),
+    );
+    expect(comps).toEqual({ read: "5.6%", unread: null, leased: null });
+  });
+
   it("a 49% share: the memorandum's cap on the header, the card, the workbook and now the compare table", async () => {
     const share = ex([m("Asking price", "$20,580,000"), m("Going-in cap rate", "5.40%"), m("Units", "200")], {
       interest: { kind: "partial_interest", summary: "", share: "49% limited partnership interest", groundLease: "", loan: "", page: "p. 2" },

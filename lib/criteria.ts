@@ -1201,6 +1201,10 @@ export interface SourceReads {
    *  (lib/deal-strategy `statedBasisIsBuildings`): false for a note, a
    *  position, a leased fee and a share */
   statedBasisIsBuildings: boolean;
+  /** the first signal's going-in cap, as the deal header reads it
+   *  (lib/deal-strategy `signalGoingInCap`): only where it can be a cap on
+   *  the price at all; null otherwise */
+  signalCap: { text: string; pct: number } | null;
 }
 
 /**
@@ -1236,13 +1240,15 @@ export function buyBoxCheckSource(
   // The first signal's cap is a fast read with no label to check. It counts
   // as the going-in cap only when it can be a cap on the price at all: a
   // yield on cost or a stabilized pro forma on a plan deal reads as "105%"
-  // here, and a buy-box check on that would be confidently wrong.
-  const signalCapPct = firstSignal ? parsePct(firstSignal.goingInCap) : null;
-  const signalCapPlausible = signalCapPct != null && signalCapPct > 0.5 && signalCapPct <= 25;
+  // here, and a buy-box check on that would be confidently wrong. Read by
+  // the deal header's own reader (the reads' `signalCap`), so the cap the
+  // header prints is the cap the box judges — at the figure that reader
+  // read, whatever else its text carries.
+  const signalCapRow = reads?.signalCap ? { label: "Going-in cap rate", value: `${reads.signalCap.pct}%` } : null;
   const signalMetrics = firstSignal
     ? [
         { label: "Asking price", value: firstSignal.askPrice },
-        ...(signalCapPlausible ? [{ label: "Going-in cap rate", value: firstSignal.goingInCap }] : []),
+        ...(signalCapRow ? [signalCapRow] : []),
         {
           // Broad per-area test: "sf", "psf", "sq ft", "square foot", "/ft"
           // must all count — a per-SF figure misread as per-unit would give
@@ -1255,11 +1261,24 @@ export function buyBoxCheckSource(
       ].filter((m) => m.value.trim())
     : [];
   if (!extraction && !firstSignal && !dealAddress) return null;
+  // Where the memorandum states no going-in cap, the header prints the first
+  // signal's (lib/pipeline-slots `statedCapSlot`) — none on a plan deal,
+  // none where the cap slot is withheld — and the box judges the same
+  // figure: it had said "no parseable cap rate" beside the cap the header
+  // printed (the audit of 2026-10-05).
+  const kind = strategyKind ?? extraction?.strategy?.kind ?? null;
+  const planDeal = !!kind && kind !== "stabilized" && kind !== "unknown";
+  const stated = extraction?.metrics;
+  const metrics = stated
+    ? signalCapRow && !planDeal && !reads?.capWithheld && !findGoingInCap(stated)
+      ? [...stated, signalCapRow]
+      : stated
+    : signalMetrics;
   return {
     assetClass: extraction?.assetClass ?? firstSignal?.assetClass ?? "",
     market: extraction?.market ?? firstSignal?.market ?? "",
     address: addressHaystack,
-    metrics: extraction?.metrics ?? signalMetrics,
+    metrics,
     // The kind rides along: without it the buy box loses the plan deal's
     // cap reading and the development's land price on the very page that
     // shows them.

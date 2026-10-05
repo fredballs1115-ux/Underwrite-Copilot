@@ -2,9 +2,7 @@ import { compactUsd } from "@/lib/money";
 import {
   METRIC_FIND,
   buildingSfFromMetrics,
-  findGoingInCap,
   findMetric,
-  parsePct,
   parsePrice,
   priceRange,
   priceRangeShort,
@@ -21,7 +19,7 @@ import {
   unitCountFromMetrics,
 } from "@/lib/deal-strategy";
 import { interestOf, interestTag } from "@/lib/interest";
-import { capSlotWithheld } from "@/lib/compare-interest";
+import { statedCapRead } from "@/lib/compare-interest";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { assetWords, dealClassKey, perSuffix } from "@/lib/asset-words";
 import { yieldOnCostText } from "@/lib/plan-facts";
@@ -173,22 +171,26 @@ export function deriveInternalComps(
     // a value-add only the signal's take names had its in-place cap printed
     // as a comp's going-in cap.
     const ext = { ...extraction, metrics } as ExtractionResult;
-    const strategy = inferStrategy(ext, (row.first_signal as FirstSignal | null | undefined) ?? null);
+    const signal = (row.first_signal as FirstSignal | null | undefined) ?? null;
+    const strategy = inferStrategy(ext, signal);
     const plan = planSummary(ext, strategy);
     const price = findPriceMetric(metrics, strategy.kind, screenYearOf(ext));
-    // No cap the sibling's own header withholds sits in a column of
-    // buildings' caps (lib/compare-interest `capSlotWithheld`: a note's is
-    // the collateral's, a position's the building's, a share's beside its
-    // entity's loan on a basis never said), nor a leased fee's, a ground
-    // rent's (#415).
+    // The cap the sibling's own header prints (lib/compare-interest
+    // `statedCapRead`): the memorandum's, else its first signal's — the
+    // research pass's "one figure, one reader" named this column, which had
+    // left the signal's cap out (the audit of 2026-10-05). No cap the header
+    // withholds sits in a column of buildings' caps (`capSlotWithheld`: a
+    // note's is the collateral's, a position's the building's, a share's
+    // beside its entity's loan on a basis never said), and no plan deal's,
+    // nor a leased fee's, a ground rent's (#415).
     const interestKind = interestOf(ext).kind;
-    const cap = plan || capSlotWithheld(ext) || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
+    const cap = interestKind === "leased_fee" ? null : statedCapRead(ext, plan != null, signal);
     const yoc = plan?.yieldOnCost ?? null;
     if (!price && !cap && yoc == null) continue;
     // Only rows whose values actually parse — a garbled extraction ("TBD",
     // "see broker") isn't a comp.
     const priceNum = price ? parsePrice(price.value) : null;
-    const capNum = cap ? parsePct(cap.value) : null;
+    const capNum = cap?.pct ?? null;
     if (priceNum == null && capNum == null && yoc == null) continue;
     // An outdoor-storage yard trades by the acre: no per-SF column for its
     // shop building.
@@ -209,7 +211,7 @@ export function deriveInternalComps(
         priceNum != null
           ? `${priceRangeOf(price!.value) ?? fmtCompact(priceNum)}${interestTag(ext) ? ` · ${interestTag(ext)!.toLowerCase()}` : ""}`
           : null,
-      capLabel: capNum != null ? cap!.value : null,
+      capLabel: capNum != null ? cap!.text : null,
       basisLabel: plan
         ? plan.totalCost != null
           ? deriveBasis(metrics, wanted, plan.totalCost, true, true, perSfBasis)

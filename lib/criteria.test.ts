@@ -32,8 +32,10 @@ import {
   type BuyBoxStore,
 } from "./criteria";
 import { countNoun } from "./asset-words";
-import { basisTag } from "./pipeline-slots";
+import { basisTag, statedCapSlot } from "./pipeline-slots";
 import { scoreMandateFit } from "./mandate";
+import { dealCheckSource } from "./buy-box-chip";
+import type { ExtractionResult, FirstSignal } from "./anthropic/types";
 
 /** The year the bare rows in these cases were screened in. A label that
  *  carries a year of its own is read against it; the cases that turn on
@@ -518,38 +520,76 @@ describe("geography — market-level territory chips", () => {
 // forma on a conversion reads as "105%" here, and a buy-box check on that
 // would be confidently wrong.
 describe("buyBoxCheckSource — the first signal's cap only when it can be a cap", () => {
-  const signal = (goingInCap: string) => ({
-    dealName: "1200 K Street — Office-to-Residential Conversion",
-    assetClass: "multifamily",
-    market: "Washington, DC",
-    askPrice: "$20,000,000",
-    goingInCap,
-    perUnit: "$62,500 per unit",
-  });
+  const signal = (goingInCap: string) =>
+    ({
+      dealName: "1200 K Street — Office-to-Residential Conversion",
+      assetClass: "multifamily",
+      market: "Washington, DC",
+      askPrice: "$20,000,000",
+      goingInCap,
+      perUnit: "$62,500 per unit",
+      size: "",
+      take: "",
+    }) as FirstSignal;
   const capRow = (src: ReturnType<typeof buyBoxCheckSource>) =>
     src?.metrics.find((m) => /going-in cap/i.test(m.label)) ?? null;
+  // Every page builds its source through the deal page's own builder, which
+  // reads the signal's cap with the header's reader (lib/deal-strategy
+  // `signalGoingInCap`).
+  const source = (extraction: unknown, s: FirstSignal) => dealCheckSource(extraction as ExtractionResult | null, s, null);
 
   it("keeps a plausible going-in cap", () => {
-    const src = buyBoxCheckSource(null, signal("6.2%"), null);
+    const src = source(null, signal("6.2%"));
     expect(capRow(src)?.value).toBe("6.2%");
     expect(src?.metrics.find((m) => m.label === "Asking price")?.value).toBe("$20,000,000");
   });
 
   it("drops a figure that cannot be a cap on the price — a yield on cost, a garbled read, a blank", () => {
-    expect(capRow(buyBoxCheckSource(null, signal("105%"), null))).toBeNull();
-    expect(capRow(buyBoxCheckSource(null, signal("0%"), null))).toBeNull();
-    expect(capRow(buyBoxCheckSource(null, signal(""), null))).toBeNull();
+    expect(capRow(source(null, signal("105%")))).toBeNull();
+    expect(capRow(source(null, signal("0%")))).toBeNull();
+    expect(capRow(source(null, signal("")))).toBeNull();
     // The price still stands in either way.
-    expect(buyBoxCheckSource(null, signal("105%"), null)?.metrics.length).toBeGreaterThan(0);
+    expect(source(null, signal("105%"))?.metrics.length).toBeGreaterThan(0);
   });
 
-  it("the full extraction, when present, is used as-is", () => {
+  it("the full extraction's own cap, when it states one, is the cap", () => {
     const extraction = {
       assetClass: "multifamily",
       market: "Washington, DC",
       metrics: [{ label: "Going-in cap rate", value: "5.9%" }],
     };
-    expect(capRow(buyBoxCheckSource(extraction, signal("105%"), null))?.value).toBe("5.9%");
+    expect(capRow(source(extraction, signal("5.6%")))?.value).toBe("5.9%");
+    expect(source(extraction, signal("5.6%"))?.metrics).toHaveLength(1);
+  });
+
+  // The audit of 2026-10-05 (MED-3): the header printed the first signal's
+  // 5.6% where the memorandum states no cap, while the fit beside it said
+  // the cap could not be checked.
+  it("where the memorandum states no cap, the first signal's — the cap the header prints — is the cap the box judges", () => {
+    const extraction = {
+      dealName: "X",
+      assetClass: "multifamily",
+      market: "Dallas, TX",
+      metrics: [
+        { label: "Asking price", value: "$24,000,000" },
+        { label: "In-place NOI", value: "$1,344,000" },
+        { label: "Units", value: "120" },
+      ],
+    };
+    const s = { ...signal("5.6%"), dealName: "X", market: "Dallas, TX", askPrice: "$24,000,000", take: "A stabilized garden community." };
+    const box: BuyBox = { assetClasses: ["multifamily"], minCapPct: 5.5 };
+    const checks = evaluateBuyBox("multifamily", source(extraction, s), box);
+    expect(check(checks, "Going-in cap")).toMatchObject({
+      status: "pass",
+      detail: "Mandate wants ≥5.5% going-in — the deal shows 5.60%. Clears the floor.",
+    });
+    // The header's own slot, by the same reader.
+    expect(statedCapSlot(extraction as unknown as ExtractionResult, false, s)).toBe("5.6%");
+    // Not on a plan deal, whose slot carries its yield on cost, and not
+    // where the signal's figure cannot be a cap.
+    const plan = { ...extraction, strategy: { kind: "value_add", summary: "", capitalBudget: "", timeline: "" } };
+    expect(capRow(source(plan, s))).toBeNull();
+    expect(capRow(source(extraction, { ...s, goingInCap: "105%" }))).toBeNull();
   });
 });
 

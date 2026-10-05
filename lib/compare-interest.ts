@@ -47,7 +47,8 @@
 // on it. `noteCapSlot` and `goingInCapFigure` say it for them.
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
-import { askingPriceOf, buildingPriceOf } from "@/lib/deal-strategy";
+import { findGoingInCap, parsePct } from "@/lib/criteria";
+import { askingPriceOf, buildingPriceOf, signalGoingInCap } from "@/lib/deal-strategy";
 import { interestOf, interestTag, isWholeShare, leaseholdTermOf, readInterest } from "@/lib/interest";
 import { leaseEndInHold, type LeaseEndInHold } from "@/lib/leasehold-exit";
 
@@ -251,6 +252,46 @@ export function capSlotWithheld(ex: ExtractionResult | null | undefined): CapWit
   if (kind === "preferred_equity") return "position";
   if (kind === "partial_interest" && entityLoan != null) return "share";
   return null;
+}
+
+/**
+ * The going-in cap the memorandum states, as a deal's cap slot shows it —
+ * and where the extraction states none, or has not landed yet, the first
+ * signal's, where it can be a cap on the price at all (lib/deal-strategy
+ * `signalGoingInCap`): the deal header's own fallback, and lib/model-vs-
+ * market's `dealGoingInCap`'s, so a cap the header prints is never a dash on
+ * the card. None on a plan deal, which is judged on its yield on total cost
+ * (its slot carries that), and none where the slot is withheld
+ * (`capSlotWithheld`): a note's and a position's carry their own yield, and
+ * a share's beside the loan its entity carries says why. As the text the
+ * slot prints and the figure it reads — the figure null where the text names
+ * none — so the memories that pool a cap (the internal comps, the market
+ * memory, the analytics) pool the one the header prints.
+ */
+export function statedCapRead(
+  extraction: ExtractionResult | null | undefined,
+  planDeal: boolean,
+  signal?: { goingInCap?: string | null } | null,
+): { text: string; pct: number | null } | null {
+  if (planDeal || capSlotWithheld(extraction)) return null;
+  const row = findGoingInCap(extraction?.metrics ?? []);
+  if (row) return { text: row.value, pct: parsePct(row.value) };
+  const fromSignal = signalGoingInCap(signal);
+  return fromSignal ? { text: fromSignal.text, pct: fromSignal.pct } : null;
+}
+
+/**
+ * The going-in cap a pipeline row's Cap slot shows (`statedCapRead`'s text):
+ * the compare table reads it where a deal's model has no cap
+ * (lib/compare-figures), and the meeting workbook's row reads it too, so
+ * every surface shows one figure. lib/pipeline-slots re-exports it.
+ */
+export function statedCapSlot(
+  extraction: ExtractionResult | null,
+  planDeal: boolean,
+  signal?: { goingInCap?: string | null } | null,
+): string | null {
+  return statedCapRead(extraction, planDeal, signal)?.text ?? null;
 }
 
 /**

@@ -11,10 +11,8 @@
 import { compactUsd } from "@/lib/money";
 import {
   buildingSfFromMetrics,
-  findGoingInCap,
   findMetric,
   parseMoney,
-  parsePct,
   parsePrice,
   METRIC_FIND,
   screenYearOf,
@@ -30,7 +28,7 @@ import {
   unitCountRow,
 } from "@/lib/deal-strategy";
 import { interestOf } from "@/lib/interest";
-import { capSlotWithheld } from "@/lib/compare-interest";
+import { statedCapRead } from "@/lib/compare-interest";
 import { assetWords, countNoun, dealClassKey, perSuffix } from "@/lib/asset-words";
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 
@@ -194,19 +192,22 @@ export function buildComps(rows: DealRowLike[]): MarketComp[] {
     // basis is total cost over the planned units, never a shell's or a
     // site's price over apartments not built yet.
     const ext = { ...extraction, metrics } as ExtractionResult;
-    const strategy = inferStrategy(ext, (row.first_signal as FirstSignal | null | undefined) ?? null);
+    const signal = (row.first_signal as FirstSignal | null | undefined) ?? null;
+    const strategy = inferStrategy(ext, signal);
     const plan = planSummary(ext, strategy);
 
-    // The shared going-in reader on an operating asset only: a plan deal's
-    // stabilized / pro forma cap never averages into what the account
-    // "usually sees" in a market — and neither does a cap the deal's own
-    // header withholds (lib/compare-interest `capSlotWithheld`: a note's,
-    // the collateral's on a price that is a loan's; a position's; a share's
-    // beside its entity's loan) or a leased fee's (a ground rent's cap, a
-    // different market entirely), #415.
+    // The cap the deal's own header prints (lib/compare-interest
+    // `statedCapRead`): the memorandum's going-in cap, else its first
+    // signal's — the memory had left the signal's out (the audit of
+    // 2026-10-05) — on an operating asset only: a plan deal's stabilized /
+    // pro forma cap never averages into what the account "usually sees" in
+    // a market — and neither does a cap the header withholds
+    // (`capSlotWithheld`: a note's, the collateral's on a price that is a
+    // loan's; a position's; a share's beside its entity's loan) or a leased
+    // fee's (a ground rent's cap, a different market entirely), #415.
     const interestKind = interestOf(ext).kind;
-    const cap = plan || capSlotWithheld(ext) || interestKind === "leased_fee" ? null : findGoingInCap(metrics);
-    const rawCap = cap ? parsePct(cap.value) : null;
+    const cap = interestKind === "leased_fee" ? null : statedCapRead(ext, plan != null, signal);
+    const rawCap = cap?.pct ?? null;
     // Drop physically implausible caps (a mis-extraction like -5% or 300%) —
     // not fabrication, just refusing to average garbage into the market read.
     const capPct = rawCap != null && rawCap > 0 && rawCap <= 25 ? rawCap : null;

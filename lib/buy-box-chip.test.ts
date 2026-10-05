@@ -443,7 +443,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
       ["Current pay rate", "8%"],
       ...BUILDING,
     ]);
-    expect(sourceReadsOf(ex)).toEqual({ interestKind: "preferred_equity", capWithheld: "position", statedBasisIsBuildings: false });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "preferred_equity", capWithheld: "position", statedBasisIsBuildings: false, signalCap: null });
     expect(checkOf(read(ex), "Going-in cap")?.detail).toContain("preferred equity position");
   });
 
@@ -453,7 +453,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
       [["Asking price", "$20,580,000"], ["Entity loan balance", "$56,500,000"], ...BUILDING],
       "A 49% limited partnership interest",
     );
-    expect(sourceReadsOf(ex)).toEqual({ interestKind: "partial_interest", capWithheld: "share", statedBasisIsBuildings: false });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: "share", statedBasisIsBuildings: false, signalCap: null });
     const r = read(ex);
     expect(checkOf(r, "Going-in cap")?.status).toBe("unknown");
     expect(checkOf(r, "Going-in cap")?.detail).toContain("beside the loan its entity carries, this share's price grossed up is the equity's whole");
@@ -465,7 +465,7 @@ describe("the box holds a deal only to the figures its price buys", () => {
 
   it("a share with a stated percentage and no entity loan keeps its cap, the grossed-up whole's — its stated per-unit figure is no basis", () => {
     const ex = deal("partial_interest", [["Asking price", "$20,580,000"], ...BUILDING], "A 49% limited partnership interest");
-    expect(sourceReadsOf(ex)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false });
+    expect(sourceReadsOf(ex, null)).toEqual({ interestKind: "partial_interest", capWithheld: null, statedBasisIsBuildings: false, signalCap: null });
     const r = read(ex);
     // The header prints the memorandum's cap for this share, and the box
     // judges the same figure.
