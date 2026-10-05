@@ -2465,9 +2465,10 @@ const DealTile = memo(function DealTile({
 /**
  * A card's way through its deal's photographs (#450), over the picture: an
  * arrow each side, shown on hover or focus and always on a touch screen,
- * named for the deal, and a dot a photograph — five at most, a window round
- * the one on screen. The card draws it only once its own photograph is
- * whole on screen, and it fades in with it. Pure, so a test draws it.
+ * named for the deal, and a dot a photograph on a dark pill — five at
+ * most, a window round the one on screen. The card draws it only once its
+ * own photograph is whole on screen, and it fades in with it. Pure, so a
+ * test draws it.
  */
 export function PhotoFlip({
   name,
@@ -2503,14 +2504,19 @@ export function PhotoFlip({
           </svg>
         </button>
       ))}
-      <span aria-hidden className="absolute bottom-7 left-1/2 flex -translate-x-1/2 gap-1">
-        {Array.from({ length: Math.min(count, 5) }, (_, k) => (
-          <span
-            key={first + k}
-            className={`h-1.5 w-1.5 rounded-full shadow-sm ${first + k === slide ? "bg-white" : "bg-white/55"}`}
-          />
-        ))}
-      </span>
+      {/* On a dark pill, the photograph count's own: bare white dots went
+          missing over a bright sky or a white facade (research pass 29). */}
+      {count > 1 ? (
+        <span
+          aria-hidden
+          data-flip="dots"
+          className="absolute bottom-7 left-1/2 flex -translate-x-1/2 items-center gap-1 rounded-full bg-black/60 px-1.5 py-1"
+        >
+          {Array.from({ length: Math.min(count, 5) }, (_, k) => (
+            <span key={first + k} className={`h-1.5 w-1.5 rounded-full ${first + k === slide ? "bg-white" : "bg-white/50"}`} />
+          ))}
+        </span>
+      ) : null}
     </div>
   );
 }

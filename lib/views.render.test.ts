@@ -551,12 +551,21 @@ describe("Pipeline — every card shape renders and reads clean", () => {
     expect(html).toMatch(/^<div data-flip="photos"/);
     expect(html).toContain('aria-label="Previous photo of 1400 Market — office to residential"');
     expect(html).toContain('aria-label="Next photo of 1400 Market — office to residential"');
-    // A dot a photograph, the one on screen solid.
-    expect((html.match(/rounded-full shadow-sm bg-white(?:\/55)?"/g) ?? []).length).toBe(5);
-    expect((html.match(/rounded-full shadow-sm bg-white"/g) ?? []).length).toBe(1);
+    // A dot a photograph, the one on screen solid, on a dark pill of the
+    // photograph count's own (research pass 29: bare white dots went
+    // missing over a bright sky).
+    const pill = /<span aria-hidden="true" data-flip="dots" class="([^"]*)">([\s\S]*?)<\/span><\/div>/.exec(html);
+    expect(pill, "the dots' pill").not.toBeNull();
+    for (const cls of ["rounded-full", "bg-black/60"]) expect(pill![1].split(/\s+/), cls).toContain(cls);
+    const dots = (markup: string) => markup.match(/<span class="h-1\.5 w-1\.5 rounded-full bg-white(?:\/50)?"><\/span>/g) ?? [];
+    expect(dots(pill![2])).toHaveLength(5);
+    expect(dots(pill![2]).filter((d) => d.includes('bg-white"'))).toHaveLength(1);
     // Five at most: a window round the one on screen.
     const many = render(React.createElement(PhotoFlip, { name: "The Maddox", count: 9, slide: 6, onStep: () => {} }));
-    expect((many.match(/rounded-full shadow-sm bg-white(?:\/55)?"/g) ?? []).length).toBe(5);
+    expect(dots(many)).toHaveLength(5);
+    // One photograph has nothing to flip to: no dots, and no pill for them.
+    const one = render(React.createElement(PhotoFlip, { name: "The Maddox", count: 1, slide: 0, onStep: () => {} }));
+    expect(one).not.toContain('data-flip="dots"');
     // It fades in with the photograph it flips through.
     expect(html).toMatch(/^<div data-flip="photos" class="[^"]*\bstarting:opacity-0\b/);
   });
