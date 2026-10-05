@@ -375,7 +375,20 @@ export const OPEN_QUESTION_LABELS: Record<string, string> = {
   action: "whether an eviction is at issue",
   see_rule: "the exemption the rule refers to",
   within_city_limits: "whether the building sits inside the city's limits",
+  rule_unverified: "the ordinance itself, which the site has not verified",
 };
+
+/** The open question a rule the site has not verified carries. */
+export const RULE_UNVERIFIED = "rule_unverified";
+
+/** A rule the site has not verified — its research found nothing to cite
+ *  ("unverified_not_found"), or it carries no source. New Jersey's municipal
+ *  rule says itself that every municipality but the two screened by their
+ *  own rules is unscreened ("rules unknown, check the ordinance before
+ *  offer"), and had been read as applying to every rental building in the
+ *  state (the audit of 2026-10-05). */
+export const unverifiedRule = (rule: Pick<RegulatoryRule, "status" | "source">): boolean =>
+  rule.status === "unverified_not_found" || !rule.source;
 
 /**
  * A rule's exemption conditions with its cross-reference resolved: an
@@ -423,13 +436,24 @@ export function evaluateRules(rules: RegulatoryRule[], subject: RuleSubject): Ru
     // Only a rule that would otherwise reach the deal asks where it is.
     const asks = where === "unknown" && (outcome === "applies" || outcome === "possibly_applies");
     if (asks) outcome = "possibly_applies";
+    // A rule the site has not verified reaches no deal for certain: where it
+    // would, it possibly does, and says why — on every surface that reads
+    // the evaluation, never "Applies" beside an "unverified" badge (the
+    // batch-2 audit).
+    const unchecked = unverifiedRule(rule) && (outcome === "applies" || outcome === "possibly_applies");
+    if (unchecked) outcome = "possibly_applies";
 
     out.push({
       rule,
       applies: applies.result,
       exempt: exemptTri,
       outcome,
-      unknowns: [...(asks ? [WITHIN_CITY_LIMITS] : []), ...applies.unknowns, ...(hasExemption ? exempt.unknowns : [])],
+      unknowns: [
+        ...(unchecked ? [RULE_UNVERIFIED] : []),
+        ...(asks ? [WITHIN_CITY_LIMITS] : []),
+        ...applies.unknowns,
+        ...(hasExemption ? exempt.unknowns : []),
+      ],
       dated: subject.today ? datedNotes(rule.effect, subject.today) : [],
     });
   }

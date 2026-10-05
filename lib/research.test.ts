@@ -4,6 +4,7 @@ import {
   evaluateRules,
   jurisdictionMatches,
   OPEN_QUESTION_LABELS,
+  RULE_UNVERIFIED,
   vsRange,
   type RegulatoryRule,
   type RuleSubject,
@@ -95,6 +96,27 @@ describe("jurisdictionMatches", () => {
         locality: ["Mount Rainier", "Prince Georges County"],
       })
     ).toBe(true);
+  });
+});
+
+// The batch-2 audit: the regulation panel said an unverified rule possibly
+// applies while the rules panel beside it said "Applies" with an
+// "unverified" badge. The evaluation itself now says it, for every surface.
+describe("evaluateRules — a rule the site has not verified", () => {
+  it("possibly applies where it would apply, and says why; a verified rule is unchanged", () => {
+    const subject = { ...dcRowhouse, building_permit_year: 1960 };
+    const unverified = { ...dcCoverage, id: "unverified-coverage", status: "unverified_not_found" as const };
+    const sourceless = { ...dcCoverage, id: "sourceless-coverage", source: "" };
+    const out = evaluateRules([dcCoverage, unverified, sourceless], subject);
+    expect(out.find((r) => r.rule.id === dcCoverage.id)).toMatchObject({ outcome: "applies" });
+    for (const id of ["unverified-coverage", "sourceless-coverage"]) {
+      const e = out.find((r) => r.rule.id === id)!;
+      expect(e.outcome, id).toBe("possibly_applies");
+      expect(e.unknowns[0], id).toBe(RULE_UNVERIFIED);
+    }
+    expect(OPEN_QUESTION_LABELS[RULE_UNVERIFIED]).toBe("the ordinance itself, which the site has not verified");
+    // A rule that reaches no deal stays not applicable, verified or not.
+    expect(evaluateRules([unverified], { ...dcRowhouse, building_permit_year: 1994 })[0].outcome).toBe("not_applicable");
   });
 });
 

@@ -33,7 +33,15 @@
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import table from "@/data/research/rent_allowances.json";
-import { evaluateRules, jurisdictionOf, OPEN_QUESTION_LABELS, type RegulatoryRule, type RuleEvaluation } from "@/lib/research";
+import {
+  evaluateRules,
+  jurisdictionOf,
+  OPEN_QUESTION_LABELS,
+  RULE_UNVERIFIED,
+  unverifiedRule,
+  type RegulatoryRule,
+  type RuleEvaluation,
+} from "@/lib/research";
 import { buildSubject, seedRules } from "@/lib/research-data";
 import { assetClassKey, assetWords, countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/asset-class";
@@ -282,14 +290,9 @@ export function allowanceSentence(name: string, a: AllowanceRead): string {
   return `Under ${name}, the allowance for ${a.applies_to} ${periodText(a)} is ${figuresText(a)} (${a.order}).${next}`;
 }
 
-/** A rule the site has not verified — its research found nothing to cite
- *  ("unverified_not_found"), or it carries no source. New Jersey's municipal
- *  rule says itself that every municipality but the two screened by their
- *  own rules is unscreened ("rules unknown, check the ordinance before
- *  offer"), and had been read as applying to every rental building in the
- *  state (the audit of 2026-10-05). */
-export const unverifiedRule = (rule: Pick<RegulatoryRule, "status" | "source">): boolean =>
-  rule.status === "unverified_not_found" || !rule.source;
+/** A rule the site has not verified (lib/research, where the evaluation
+ *  itself reads it as possibly applying). */
+export { unverifiedRule };
 
 /** The open question an unverified rule carries: its own caution. */
 export const UNVERIFIED_OPEN = "whether one reaches this address, which the site's rule has not verified — check the ordinance before an offer";
@@ -374,7 +377,9 @@ export function readRegulation(
       .filter((e) => !(ownPlace && !e.rule.jurisdiction_local && unverifiedRule(e.rule)))
       .map((e): RegimeRead => {
         const unverified = unverifiedRule(e.rule);
-        const open = e.unknowns.map((k) => OPEN_QUESTION_LABELS[k] ?? k.replace(/_/g, " "));
+        // The evaluation's own unverified question is said here in the
+        // regulation's words (UNVERIFIED_OPEN), never twice.
+        const open = e.unknowns.filter((k) => k !== RULE_UNVERIFIED).map((k) => OPEN_QUESTION_LABELS[k] ?? k.replace(/_/g, " "));
         return {
           ruleId: e.rule.id,
           name: REGIMES[e.rule.id].name,
