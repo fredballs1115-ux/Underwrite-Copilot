@@ -2,6 +2,7 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Benchmark, RegulatoryRule } from "@/lib/research";
+import { readAll } from "@/lib/read-all";
 
 /**
  * The reference tables a SIGNED-IN reader may read, read once an hour for
@@ -31,11 +32,28 @@ function admin() {
   return createSupabaseAdminClient();
 }
 
+/** Every row of a reference table, a page at a time in its id's order
+ *  (lib/read-all) — or a throw with the failed page's words, so no part of a
+ *  table is cached as the whole of it. One read answers at most the
+ *  project's max rows, and `benchmarks` holds the monthly pulls' rows beside
+ *  the research rows: a single read had handed the pages the first 1,000 in
+ *  no order, with nothing saying the rest exist (research pass 42). */
+async function readWhole(table: "benchmarks" | "regulatory_rules"): Promise<unknown[]> {
+  const supabase = admin();
+  let failure: unknown = null;
+  const rows = await readAll<unknown>(
+    (from, to) => supabase.from(table).select("*").order("id").range(from, to),
+    (e) => {
+      failure = e;
+    },
+  );
+  if (!rows) throw new Error(`${table}: ${String((failure as { message?: unknown } | null)?.message ?? failure)}`);
+  return rows;
+}
+
 const cachedBenchmarkRows = unstable_cache(
   async (): Promise<Benchmark[]> => {
-    const { data, error } = await admin().from("benchmarks").select("*");
-    if (error) throw new Error(`benchmarks: ${error.message}`);
-    return (data ?? []) as unknown as Benchmark[];
+    return (await readWhole("benchmarks")) as unknown as Benchmark[];
   },
   ["signed-in-benchmark-rows"],
   { revalidate: 3600, tags: ["benchmarks"] },
@@ -43,9 +61,7 @@ const cachedBenchmarkRows = unstable_cache(
 
 const cachedRuleRows = unstable_cache(
   async (): Promise<RegulatoryRule[]> => {
-    const { data, error } = await admin().from("regulatory_rules").select("*");
-    if (error) throw new Error(`regulatory_rules: ${error.message}`);
-    return (data ?? []) as unknown as RegulatoryRule[];
+    return (await readWhole("regulatory_rules")) as unknown as RegulatoryRule[];
   },
   ["signed-in-rule-rows"],
   { revalidate: 3600, tags: ["regulatory_rules"] },
