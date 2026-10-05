@@ -759,6 +759,48 @@ describe("the workbook's labels and colours say what their cells are", () => {
     }
   });
 
+  // Research pass 34: an unpriced memorandum's book led with "PURCHASE PRICE
+  // $10,000,000 | LEVERED IRR 73.0%" and nothing under it, while the report
+  // left those returns out as the placeholder's; only the Assumptions tab's
+  // SOURCE said to enter the price.
+  it("marks a placeholder price on the headline tiles and says under them whose returns they are, the live model untouched", async () => {
+    const unpriced: ExtractionResult = {
+      ...extraction,
+      metrics: [
+        { label: "Asking price", value: "Call for offers", flagged: false, page: "p. 5" },
+        { label: "Net operating income", value: "$2,000,000", flagged: false, page: "p. 7" },
+        { label: "Rentable square feet", value: "300,000", flagged: false, page: "p. 4" },
+      ],
+    };
+    const m = deriveUnderwriteInputs(unpriced, "fallback");
+    expect(m.sources.purchasePrice?.provenance).toBe("assumption");
+    const { hf: h, wb: w } = await loadIntoHf(await buildUnderwriteWorkbook(m));
+    const summary = w.getWorksheet("Deal Summary")!;
+    const tiles = findRow(summary, 1, "PURCHASE PRICE (ASSUMED)");
+    expect(summary.getCell(tiles + 1, 1).value).toMatchObject({ formula: "PurchasePrice" });
+    expect(summary.getCell(tiles + 2, 1).value).toBe(
+      "No price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns are the placeholder's. Enter the price you would pay as the Purchase Price on the Assumptions tab.",
+    );
+    expect(summary.getCell(tiles + 2, 1).alignment?.wrapText).toBe(true);
+    // The returns stay live formulas: the book is still a model to fill in.
+    expect(summary.getCell(tiles + 1, 2).value).toMatchObject({ formula: expect.stringContaining("IRR(") });
+    expect(Number(named(h, "LeveredIRR"))).toBeCloseTo(computeUnderwrite(m.inputs).returns.leveredIrrPct!, 3);
+    const errors: string[] = [];
+    for (const name of h.getSheetNames()) {
+      (h.getSheetValues(h.getSheetId(name)!) as unknown[][]).forEach((row, ri) =>
+        row.forEach((v, ci) => {
+          if (isErr(v)) errors.push(`${name}[${ri},${ci}]`);
+        }),
+      );
+    }
+    expect(errors).toEqual([]);
+    // A priced book's tile is plain, with nothing under it.
+    const priced = (await book(model)).getWorksheet("Deal Summary")!;
+    const plain = findRow(priced, 1, "PURCHASE PRICE");
+    expect(priced.getCell(plain + 2, 1).value ?? null).toBeNull();
+    expect(() => findRow(priced, 1, "PURCHASE PRICE (ASSUMED)")).toThrow();
+  }, 30000);
+
   it("the Deal Summary marks a rentable SF that is an assumption, as the Operating Metrics tab does", async () => {
     expect(countedModel.sources.rsf?.provenance).toBe("assumption");
     const assumed = (await book(countedModel)).getWorksheet("Deal Summary")!;

@@ -397,25 +397,77 @@ const usd0 = (n: number) => `$${Math.round(n).toLocaleString("en-US")}`;
  * named, never said to be unread.
  */
 export function placeholderReturnsLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
+  const reason = placeholderReason(inputs, sources);
+  return reason ? `The IRR grids and the max bid are left out: ${reason}` : null;
+}
+
+/**
+ * Why the model's returns are a placeholder's, in the words after a
+ * surface's own opening — the one rule the report, the deal page's
+ * sensitivity playground and the workbook's Deal Summary each say it by:
+ * "no price was read from the memorandum, so the model runs on a
+ * $10,000,000 placeholder and its returns would be the placeholder's."
+ * `printed`: the workbook prints the returns (live, so the reader can enter
+ * the figure), so they "are" the placeholder's; the report and the page
+ * withhold them, so they "would be". `priceEntered`: the reader typed a
+ * price over the placeholder (the playground), which lifts the price's half
+ * — an assumed NOI stays the assumption's whatever price is typed. Null
+ * where the model assumed neither.
+ */
+export function placeholderReason(
+  inputs: UnderwriteInputs,
+  sources: ModelSources | null | undefined,
+  opts: { priceEntered?: boolean; printed?: boolean } = {},
+): string | null {
   if (!sources) return null;
-  const price = sources.purchasePrice?.provenance === "assumption";
+  const price = !opts.priceEntered && sources.purchasePrice?.provenance === "assumption";
   const noi = sources.inPlaceRentAnnual?.provenance === "assumption";
   const notRun = sources.inPlaceRentAnnual?.notRun ?? null;
-  const out = "The IRR grids and the max bid are left out:";
+  const be = opts.printed ? "are" : "would be";
   if (price && noi) {
     return notRun
-      ? `${out} no price was read from the memorandum, and the model does not run its ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns would be a placeholder's.`
-      : `${out} no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns would be a placeholder's.`;
+      ? `no price was read from the memorandum, and the model does not run its ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns ${be} a placeholder's.`
+      : `no price was read from the memorandum, nor a year-1 NOI the model could run on, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder price`)} and an assumed NOI, and its returns ${be} a placeholder's.`;
   }
   if (price) {
-    return `${out} no price was read from the memorandum, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder`)} and its returns would be the placeholder's.`;
+    return `no price was read from the memorandum, so the model runs on ${withArticle(`${usd0(inputs.purchasePrice)} placeholder`)} and its returns ${be} the placeholder's.`;
   }
   if (noi) {
     return notRun
-      ? `${out} the model does not run the memorandum's ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so it runs on an assumed NOI and its returns would be the assumption's.`
-      : `${out} no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.`;
+      ? `the model does not run the memorandum's ${usd0(notRun.value)} ${notRun.label} as its year-1 income, so it runs on an assumed NOI and its returns ${be} the assumption's.`
+      : `no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns ${be} the assumption's.`;
   }
   return null;
+}
+
+/**
+ * The deal page's sensitivity playground, over its tiles: the returns it
+ * withholds and why, the report's own reason — and, while the price is the
+ * placeholder's, how to lift it, since the price field is right there. The
+ * max bid is named only where a buy box floor would have solved one. Null
+ * where the returns stand.
+ */
+export function placeholderPageLine(
+  inputs: UnderwriteInputs,
+  sources: ModelSources | null | undefined,
+  o: { priceEntered: boolean; maxBid: boolean },
+): string | null {
+  const reason = placeholderReason(inputs, sources, { priceEntered: o.priceEntered });
+  if (!reason) return null;
+  const typeIt = !o.priceEntered && sources?.purchasePrice?.provenance === "assumption";
+  return `The returns${o.maxBid ? " and the max bid" : ""} are withheld: ${reason}${typeIt ? " Type the price you would pay above to run the model on it." : ""}`;
+}
+
+/**
+ * The workbook's Deal Summary, under its headline tiles: the same reason,
+ * said of returns it prints — and, where the price is the placeholder, the
+ * input to replace it in. Null where the model assumed neither.
+ */
+export function placeholderWorkbookLine(inputs: UnderwriteInputs, sources: ModelSources | null | undefined): string | null {
+  const reason = placeholderReason(inputs, sources, { printed: true });
+  if (!reason) return null;
+  const price = sources?.purchasePrice?.provenance === "assumption";
+  return `${reason[0].toUpperCase()}${reason.slice(1)}${price ? " Enter the price you would pay as the Purchase Price on the Assumptions tab." : ""}`;
 }
 
 /** Everything the report's sensitivity page renders, in one pure build. */

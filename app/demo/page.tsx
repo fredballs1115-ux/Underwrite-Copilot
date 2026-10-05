@@ -126,6 +126,8 @@ export default async function DemoPage() {
       dealAssetClass: SAMPLE_DEAL.asset_class,
       checkSource,
       box: SAMPLE_DEMO_BOX,
+      // The deal page's own read of where each input came from.
+      sources: derived.sources,
     },
     underwrite: derived.inputs,
   };

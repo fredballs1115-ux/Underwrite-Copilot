@@ -19,6 +19,7 @@ import { METRIC_FIND, type BuyBox } from "@/lib/criteria";
 import { scoreMandateFit } from "@/lib/mandate";
 import { BUY_BOX_CHIP_CLS, buyBoxRead } from "@/lib/buy-box-chip";
 import { solveMaxBid, type BidFloors, type MaxBidSolution } from "@/lib/underwrite/solver";
+import { placeholderPageLine, placeholderReason, type ModelSources } from "@/lib/underwrite/report-grid";
 
 /** Everything the playground needs, computed server-side once. */
 export interface PlaygroundData {
@@ -35,6 +36,12 @@ export interface PlaygroundData {
   /** the deal's strategy kind from the derived model (stabilized / value_add /
    *  conversion …). A plan deal's price ⇄ cap control says what its cap is. */
   strategy?: string | null;
+  /** where each of the model's inputs came from (lib/underwrite/inputs): a
+   *  price or a year-1 NOI the model had to assume makes its returns a
+   *  placeholder's, which the tiles and the max bid withhold, as the full
+   *  report leaves them out (lib/underwrite/report-grid
+   *  `placeholderReturnsLine`); absent, the returns stand as before */
+  sources?: ModelSources | null;
 }
 
 const PLAN_KINDS = new Set(["value_add", "lease_up", "conversion", "development"]);
@@ -108,6 +115,21 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     vacIdx !== vacs.baseIdx ||
     priceOverride != null;
 
+  // What the model had to assume (lib/underwrite/inputs): a placeholder
+  // price until the reader types one, an assumed NOI whatever price is
+  // typed. Its returns are then a placeholder's — the full report leaves
+  // them out, and the tiles and the max bid here are withheld on the same
+  // rule (lib/underwrite/report-grid), the reason said over them.
+  const sources = data.sources ?? null;
+  const pricePlaceholder = sources?.purchasePrice?.provenance === "assumption";
+  const priceEntered = priceOverride != null;
+  const withheld = placeholderReason(inputs, sources, { priceEntered }) != null;
+  // The base case, at the modelled price, is a placeholder's wherever the
+  // model assumed either figure: a moved lever is then set against nothing.
+  const baseWithheld = placeholderReason(inputs, sources) != null;
+  const compare = dirty && !baseWithheld;
+  const naWord = pricePlaceholder && !priceEntered ? "no price" : "assumed NOI";
+
   // The EFFECTIVE base is the sliders' base stops (clamped into physical
   // range), so a degenerate derived input can't make the resting metrics
   // disagree with what the levers say they're at.
@@ -148,26 +170,30 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
   // the two score different figures, and the chip says which it scores.
   const score = useMemo(() => {
     if (!box || !checkSource) return null;
-    const at = (m: ScenarioMetrics) =>
+    // A withheld return swaps nothing: the box scores the memorandum's own
+    // figures in its place, and the chip's line says so.
+    const at = (m: ScenarioMetrics, swap: boolean) =>
       buyBoxRead(
         dealAssetClass,
         {
           ...checkSource,
-          metrics: withScenarioReturns(checkSource.metrics, m.leveredIrrPct, m.cocYr1Pct),
+          metrics: swap ? withScenarioReturns(checkSource.metrics, m.leveredIrrPct, m.cocYr1Pct) : checkSource.metrics,
         },
         box,
       );
-    const b = at(base);
-    const c = dirty ? at(current) : b;
+    const b = at(base, !baseWithheld);
+    const c = dirty ? at(current, !withheld) : b;
     if (c.mandate?.score == null || !c.mandate.verdict) return null;
     // The returns the box scores that the model, not the memorandum, put
     // in: a floor the box does not set, or a return with no root, swaps
     // nothing, and the chip must not claim it.
     const m = dirty ? current : base;
-    const scored = [
-      box.minIrrPct != null && finite(m.leveredIrrPct) ? "IRR" : null,
-      box.minCoCPct != null && finite(m.cocYr1Pct) ? "cash-on-cash" : null,
-    ].filter((s): s is string => s != null);
+    const scored = withheld
+      ? []
+      : [
+          box.minIrrPct != null && finite(m.leveredIrrPct) ? "IRR" : null,
+          box.minCoCPct != null && finite(m.cocYr1Pct) ? "cash-on-cash" : null,
+        ].filter((s): s is string => s != null);
     return {
       chip: c.chip,
       score: c.mandate.score,
@@ -175,13 +201,19 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
       scored,
       onMemorandum: scoreMandateFit(dealAssetClass, checkSource, box).score,
     };
-  }, [box, checkSource, dealAssetClass, base, current, dirty]);
+  }, [box, checkSource, dealAssetClass, base, current, dirty, withheld, baseWithheld]);
 
   // Max bid: the highest price that still clears the box's return floors,
   // solved under the CURRENT slider scenario — drag exit cap out 50bps and
   // watch your number drop. Pure engine (grid + bisection), ~2ms per solve.
+  const floorsSet = !!box && (box.minIrrPct != null || box.minCoCPct != null || box.minCapPct != null);
+  // Where the model's price is a placeholder, the bid is measured against
+  // the price the reader typed, never against the placeholder.
+  const bidAgainst = pricePlaceholder && priceOverride != null ? priceOverride : null;
   const bid = useMemo(() => {
-    if (!box) return null;
+    // A bid solved on a placeholder's returns is the placeholder's (the
+    // report leaves it out too).
+    if (!box || withheld) return null;
     const floors: BidFloors = {
       ...(box.minIrrPct != null ? { minIrr: box.minIrrPct / 100 } : {}),
       ...(box.minCoCPct != null ? { minCoc: box.minCoCPct / 100 } : {}),
@@ -189,12 +221,12 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     };
     if (floors.minIrr == null && floors.minCoc == null && floors.minCap == null)
       return null;
-    return solveMaxBid(inputs, floors, {
+    return solveMaxBid(bidAgainst != null ? { ...inputs, purchasePrice: bidAgainst } : inputs, floors, {
       exitCapPct: caps.values[capIdx],
       rentGrowthPct: growths.values[growthIdx],
       vacancyPct: vacs.values[vacIdx],
     });
-  }, [box, inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx]);
+  }, [box, withheld, bidAgainst, inputs, caps, growths, vacs, capIdx, growthIdx, vacIdx]);
 
   const reset = () => {
     setCapIdx(caps.baseIdx);
@@ -203,8 +235,11 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
     setPriceOverride(null);
   };
 
-  // The DSCR the tile shows, against the coverage the debt sizer tests.
-  const coverageLine = modelLoanCoverageLine(current.dscrYr1, inputs.ltc);
+  // The DSCR the tile shows, against the coverage the debt sizer tests —
+  // none where the tile withholds it.
+  const coverageLine = withheld ? null : modelLoanCoverageLine(current.dscrYr1, inputs.ltc);
+  // Why the tiles are withheld, said over them (the report's own reason).
+  const withheldLine = placeholderPageLine(inputs, sources, { priceEntered, maxBid: floorsSet });
 
   return (
     <section className="shadow-card rounded-2xl border border-line bg-surface p-5">
@@ -221,6 +256,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         value={priceOverride}
         onChange={setPriceOverride}
         planDeal={planDeal}
+        pricePlaceholder={pricePlaceholder}
       />
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -258,15 +294,34 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
           tiles stay out of the live region, which would read all four at
           every step (research pass 33). */}
       <p role="status" className="sr-only">
-        {dirty
-          ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${fmtPct(base.leveredIrrPct)}`
-          : `Levered IRR ${fmtPct(current.leveredIrrPct)}, the base case`}
+        {withheld
+          ? "Levered IRR withheld"
+          : compare
+            ? `Levered IRR ${fmtPct(current.leveredIrrPct)}, base ${fmtPct(base.leveredIrrPct)}`
+            : baseWithheld
+              ? `Levered IRR ${fmtPct(current.leveredIrrPct)} at your price`
+              : `Levered IRR ${fmtPct(current.leveredIrrPct)}, the base case`}
       </p>
-      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <Metric label="Levered IRR" value={fmtPct(current.leveredIrrPct)} cur={current.leveredIrrPct} was={base.leveredIrrPct} baseText={fmtPct(base.leveredIrrPct)} dirty={dirty} />
-        <Metric label="Equity multiple" value={fmtX(current.leveredEquityMultiple)} cur={current.leveredEquityMultiple} was={base.leveredEquityMultiple} baseText={fmtX(base.leveredEquityMultiple)} dirty={dirty} />
-        <Metric label="Year-1 CoC" value={fmtPct(current.cocYr1Pct)} cur={current.cocYr1Pct} was={base.cocYr1Pct} baseText={fmtPct(base.cocYr1Pct)} dirty={dirty} />
-        <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={dirty} />
+      {withheldLine && (
+        <p className="mt-4 text-[11px] leading-relaxed text-caution" data-qa="playground-withheld">
+          {withheldLine}
+        </p>
+      )}
+      <div className={`${withheldLine ? "mt-2" : "mt-4"} grid grid-cols-2 gap-3 sm:grid-cols-4`}>
+        {withheld ? (
+          // A placeholder's returns are not figures to read: each tile says
+          // what is missing, as the first-draft card says "n/a — note".
+          ["Levered IRR", "Equity multiple", "Year-1 CoC", "Year-1 DSCR"].map((label) => (
+            <Metric key={label} label={label} value={`n/a — ${naWord}`} cur={null} was={null} baseText="" dirty={false} withheld />
+          ))
+        ) : (
+          <>
+            <Metric label="Levered IRR" value={fmtPct(current.leveredIrrPct)} cur={current.leveredIrrPct} was={base.leveredIrrPct} baseText={fmtPct(base.leveredIrrPct)} dirty={compare} />
+            <Metric label="Equity multiple" value={fmtX(current.leveredEquityMultiple)} cur={current.leveredEquityMultiple} was={base.leveredEquityMultiple} baseText={fmtX(base.leveredEquityMultiple)} dirty={compare} />
+            <Metric label="Year-1 CoC" value={fmtPct(current.cocYr1Pct)} cur={current.cocYr1Pct} was={base.cocYr1Pct} baseText={fmtPct(base.cocYr1Pct)} dirty={compare} />
+            <Metric label="Year-1 DSCR" value={fmtX(current.dscrYr1)} cur={current.dscrYr1} was={base.dscrYr1} baseText={fmtX(base.dscrYr1)} dirty={compare} />
+          </>
+        )}
       </div>
       {/* The model sizes its loan by cost alone, with no coverage test: where
           the DSCR the tile shows is under the debt sizer's own test, one
@@ -293,11 +348,12 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
         <MaxBidCard
           bid={bid}
           box={box!}
-          modeledPrice={inputs.purchasePrice}
+          modeledPrice={bidAgainst ?? inputs.purchasePrice}
+          against={bidAgainst != null ? "yours" : "modeled"}
           dirty={dirty}
         />
       )}
-      {box && !bid && (
+      {box && !floorsSet && (
         <p className="mt-3 text-xs text-muted">
           Add an IRR, cash-on-cash, or cap-rate floor to your buy box and this
           panel will solve for your max bid.
@@ -315,7 +371,7 @@ export function SensitivityPlayground({ data }: { data: PlaygroundData }) {
             >
               {score.chip.label}
             </span>
-            <span>{playgroundFitLine(score, dirty)}</span>
+            <span>{playgroundFitLine(score, compare)}</span>
           </p>
         ) : box && checkSource ? (
           // A box IS set but no configured dimension is computable for this
@@ -397,6 +453,7 @@ function PriceCapControls({
   value,
   onChange,
   planDeal = false,
+  pricePlaceholder = false,
 }: {
   basePrice: number;
   noiY1: number;
@@ -406,6 +463,9 @@ function PriceCapControls({
    *  year-1 income as modelled, never on the finished project's stabilized
    *  pro forma — say so, or the control reads as the plan's yield */
   planDeal?: boolean;
+  /** no price was read: the modelled price is a placeholder, so the fields
+   *  wait empty for the reader's, and nothing is set against the placeholder */
+  pricePlaceholder?: boolean;
 }) {
   const [editing, setEditing] = useState<"price" | "cap" | null>(null);
   const [draft, setDraft] = useState("");
@@ -413,6 +473,9 @@ function PriceCapControls({
   const capPct = price > 0 && noiY1 > 0 ? (noiY1 / price) * 100 : null;
   const atBase = value == null;
   const deltaPct = basePrice > 0 ? ((price - basePrice) / basePrice) * 100 : 0;
+  // A placeholder price is no price to show in a field labelled "Purchase
+  // price", nor a cap struck on it: both wait for the reader's figure.
+  const blank = pricePlaceholder && atBase;
 
   // Snapping back to (nearly) the modeled price clears the override entirely,
   // so "base" stays an exact state, never a float hair away from it.
@@ -455,7 +518,8 @@ function PriceCapControls({
           </span>
           <input
             inputMode="decimal"
-            value={editing === "price" ? draft : fmtUsd0(price)}
+            value={editing === "price" ? draft : blank ? "" : fmtUsd0(price)}
+            placeholder={blank ? "Type a price" : undefined}
             onFocus={(e) => {
               setEditing("price");
               setDraft(e.currentTarget.value);
@@ -475,10 +539,13 @@ function PriceCapControls({
             value={
               editing === "cap"
                 ? draft
-                : capPct != null
-                  ? `${capPct.toFixed(2)}%`
-                  : "—"
+                : blank
+                  ? ""
+                  : capPct != null
+                    ? `${capPct.toFixed(2)}%`
+                    : "—"
             }
+            placeholder={blank ? "or a cap" : undefined}
             onFocus={(e) => {
               setEditing("cap");
               setDraft(e.currentTarget.value);
@@ -490,7 +557,13 @@ function PriceCapControls({
           />
         </label>
         <div className="flex items-end pb-2.5">
-          {atBase ? (
+          {pricePlaceholder ? (
+            // Nothing is set against a placeholder: the price is the reader's
+            // own, or there is none yet.
+            <span className="text-xs text-muted">
+              {atBase ? "no price was read — type the price you would pay" : "your price"}
+            </span>
+          ) : atBase ? (
             <span className="text-xs text-muted">at the modeled price</span>
           ) : (
             <span
@@ -531,13 +604,18 @@ function MaxBidCard({
   bid,
   box,
   modeledPrice,
+  against = "modeled",
   dirty,
 }: {
   bid: MaxBidSolution;
   box: BuyBox;
+  /** the price the bid is set against: the modelled one, or the reader's
+   *  own where the model's is a placeholder (`against: "yours"`) */
   modeledPrice: number;
+  against?: "modeled" | "yours";
   dirty: boolean;
 }) {
+  const vs = against === "yours" ? "your price" : "the modeled price";
   return (
     <div className="mt-3 rounded-xl border border-brand/25 bg-brand/[0.04] p-3.5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -554,8 +632,7 @@ function MaxBidCard({
         </p>
       ) : bid.unbounded ? (
         <p className="mt-1.5 text-sm leading-relaxed text-muted">
-          Your floors hold even at twice the modeled price — the buy box
-          isn&apos;t the constraint on this deal.
+          {`Your floors hold even at twice ${vs} — the buy box isn't the constraint on this deal.`}
         </p>
       ) : (
         <>
@@ -570,7 +647,7 @@ function MaxBidCard({
                 }`}
               >
                 {bid.deltaPct >= 0 ? "+" : "−"}
-                {Math.abs(bid.deltaPct * 100).toFixed(1)}% vs the modeled price
+                {Math.abs(bid.deltaPct * 100).toFixed(1)}% vs {vs}
               </span>
             )}
             {bid.binding && (
@@ -655,6 +732,7 @@ function Metric({
   was,
   baseText,
   dirty,
+  withheld = false,
 }: {
   label: string;
   value: string;
@@ -662,6 +740,8 @@ function Metric({
   was: number | null;
   baseText: string;
   dirty: boolean;
+  /** a return withheld, its value the reason ("n/a — no price"), said small */
+  withheld?: boolean;
 }) {
   // Higher is better for all four headline metrics.
   const cls =
@@ -673,7 +753,11 @@ function Metric({
   return (
     <div className="rounded-xl border border-line/70 p-3">
       <p className="text-[11px] text-muted">{label}</p>
-      <p className={`font-mono text-lg font-semibold tabular-nums ${cls}`}>{value}</p>
+      {withheld ? (
+        <p className="mt-1 text-sm font-medium text-muted">{value}</p>
+      ) : (
+        <p className={`font-mono text-lg font-semibold tabular-nums ${cls}`}>{value}</p>
+      )}
       {dirty && <p className="text-[10px] tabular-nums text-muted">base {baseText}</p>}
     </div>
   );

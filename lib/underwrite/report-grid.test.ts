@@ -17,7 +17,10 @@ import {
   heatCellEm,
   heatCellText,
   maxBidSentence,
+  placeholderPageLine,
+  placeholderReason,
   placeholderReturnsLine,
+  placeholderWorkbookLine,
   HEAT_BG,
 } from "./report-grid";
 
@@ -393,6 +396,34 @@ describe("placeholderReturnsLine — a model on a placeholder prints none of its
       "Priced",
     );
     expect(buildSensitivityData(priced.inputs, null, { sources: priced.sources }).withheld).toBeNull();
+  });
+
+  it("says one reason on three surfaces: the report and the deal page withhold the returns, the workbook prints them live (research pass 34)", () => {
+    const price = { purchasePrice: x("assumption"), inPlaceRentAnnual: x("derived") };
+    const noi = { purchasePrice: x("extracted"), inPlaceRentAnnual: x("assumption") };
+    expect(placeholderReason(inputs, price)).toBe(
+      "no price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns would be the placeholder's.",
+    );
+    // The deal page: the reason over the tiles, the max bid named only where
+    // a floor would solve one, and the price field named while it is empty.
+    expect(placeholderPageLine(inputs, price, { priceEntered: false, maxBid: true })).toBe(
+      "The returns and the max bid are withheld: no price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns would be the placeholder's. Type the price you would pay above to run the model on it.",
+    );
+    expect(placeholderPageLine(inputs, price, { priceEntered: false, maxBid: false })).toMatch(/^The returns are withheld: /);
+    // A price typed lifts the price's half; an assumed NOI stays.
+    expect(placeholderPageLine(inputs, price, { priceEntered: true, maxBid: true })).toBeNull();
+    expect(placeholderPageLine(inputs, noi, { priceEntered: true, maxBid: false })).toBe(
+      "The returns are withheld: no year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns would be the assumption's.",
+    );
+    // The workbook prints them, live: "are", and the input to replace.
+    expect(placeholderWorkbookLine(inputs, price)).toBe(
+      "No price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns are the placeholder's. Enter the price you would pay as the Purchase Price on the Assumptions tab.",
+    );
+    expect(placeholderWorkbookLine(inputs, noi)).toBe(
+      "No year-1 NOI the model could run on was read from the memorandum, so the model runs on an assumed one and its returns are the assumption's.",
+    );
+    expect(placeholderWorkbookLine(inputs, { purchasePrice: x("extracted"), inPlaceRentAnnual: x("derived") })).toBeNull();
+    expect(placeholderWorkbookLine(inputs, null)).toBeNull();
   });
 
   it("names a leased fee's ground rent rather than saying no year-1 income was read (research pass 34)", () => {

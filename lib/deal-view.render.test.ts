@@ -31,6 +31,9 @@ import {
   type PlaygroundData,
 } from "@/app/(app)/deals/[id]/sensitivity-playground";
 import { PLAN_RETURNS_CAVEAT } from "@/lib/underwrite/plan-caveat";
+import { computeUnderwrite } from "@/lib/underwrite/engine";
+import { placeholderPageLine } from "@/lib/underwrite/report-grid";
+import type { ExtractionResult } from "@/lib/anthropic/types";
 import { buyBoxRead } from "@/lib/buy-box-chip";
 import { deriveRisks } from "@/app/(app)/deals/[id]/deal-sections";
 import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";
@@ -1552,6 +1555,105 @@ describe("the sensitivity playground says whose figures it runs", () => {
     // The model's cap is named as the model's, never "Going-in cap".
     expect(held).toContain("Cap on Yr-1 NOI (as modelled)");
     expect(held).not.toMatch(/Going-in cap/);
+  });
+
+  // Research pass 34: an unpriced memorandum ("Call for offers", $2M NOI)
+  // printed a 73.0% levered IRR, a 9.86x multiple and a max bid against a
+  // $10,000,000 placeholder, while the full report left them out as the
+  // placeholder's. The tiles and the bid are withheld on the report's rule,
+  // the reason said over them, until the reader types a price.
+  const unpricedRows = (more: ExtractionResult["metrics"] = []): ExtractionResult => ({
+    dealName: "Unpriced Court",
+    assetClass: "multifamily",
+    market: "Philadelphia, PA",
+    metrics: [
+      { label: "Asking price", value: "Call for offers", flagged: false, page: "p. 2" },
+      { label: "NOI (in-place)", value: "$2,000,000", flagged: false, page: "p. 8" },
+      { label: "Units", value: "120", flagged: false, page: "p. 2" },
+      ...more,
+    ],
+  });
+  const drawFor = (ex: ExtractionResult, withSources = true) => {
+    const d = deriveUnderwriteInputs(ex, ex.dealName!);
+    const data: PlaygroundData = {
+      inputs: d.inputs,
+      dealAssetClass: "multifamily",
+      checkSource: { assetClass: ex.assetClass, market: ex.market, metrics: ex.metrics },
+      box: SAMPLE_DEMO_BOX,
+      ...(withSources ? { sources: d.sources } : {}),
+    };
+    return { d, html: renderToStaticMarkup(React.createElement(SensitivityPlayground, { data })) };
+  };
+
+  it("withholds a placeholder price's returns and max bid, says why over the tiles, and leaves the price to the reader", () => {
+    const { d, html } = drawFor(unpricedRows());
+    expect(d.sources.purchasePrice?.provenance).toBe("assumption");
+    const text = textOf(html);
+    expect(text).toContain(
+      "The returns and the max bid are withheld: no price was read from the memorandum, so the model runs on a $10,000,000 placeholder and its returns would be the placeholder's. Type the price you would pay above to run the model on it.",
+    );
+    // The placeholder's own IRR, which the tile had printed, is nowhere.
+    const irr = computeUnderwrite(d.inputs).returns.leveredIrrPct!;
+    expect(irr).toBeGreaterThan(0.5);
+    expect(text).not.toContain(`${(irr * 100).toFixed(1)}%`);
+    expect(text.match(/n\/a — no price/g)?.length).toBe(4);
+    expect(html).not.toContain("Max bid");
+    expect(html).not.toContain("Add an IRR");
+    // The price field waits for the reader's figure: no placeholder in it,
+    // and no cap struck on one.
+    expect(html).not.toContain('value="$10,000,000"');
+    expect(html).toMatch(/placeholder="Type a price"/);
+    expect(text).toContain("no price was read — type the price you would pay");
+    expect(text).not.toContain("at the modeled price");
+    // The box scores the memorandum's own figures, never the placeholder's.
+    const at = html.indexOf('data-qa="playground-fit"');
+    expect(textOf(html.slice(html.indexOf(">", at) + 1))).toMatch(/mandate fit on the memorandum's figures/);
+    expect(html).toMatch(/<p role="status" class="sr-only">Levered IRR withheld<\/p>/);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("keeps an assumed NOI's returns withheld whatever price is typed, and names a leased fee's ground rent", () => {
+    // A leased fee stating its rent and no cap: the model runs an assumed
+    // 6% of the price, and typing a price cannot lift that.
+    const fee: ExtractionResult = {
+      ...unpricedRows(),
+      interest: { kind: "leased_fee", summary: "", share: "", groundLease: "", loan: "", page: "" },
+      metrics: [
+        { label: "Asking price", value: "$15,000,000", flagged: false, page: "p. 2" },
+        { label: "Ground rent", value: "$600,000", flagged: false, page: "p. 4" },
+      ],
+    };
+    const { html } = drawFor(fee);
+    const text = textOf(html);
+    expect(text).toContain(
+      "The returns and the max bid are withheld: the model does not run the memorandum's $600,000 ground rent as its year-1 income, so it runs on an assumed NOI and its returns would be the assumption's.",
+    );
+    expect(text).not.toContain("Type the price");
+    expect(text.match(/n\/a — assumed NOI/g)?.length).toBe(4);
+    // The price is the memorandum's, so it stands in its field.
+    expect(html).toContain('value="$15,000,000"');
+    expect(placeholderPageLine(deriveUnderwriteInputs(fee, "x").inputs, deriveUnderwriteInputs(fee, "x").sources, { priceEntered: true, maxBid: false })).toBe(
+      "The returns are withheld: the model does not run the memorandum's $600,000 ground rent as its year-1 income, so it runs on an assumed NOI and its returns would be the assumption's.",
+    );
+  });
+
+  it("lifts a placeholder price's half once a price is typed, and draws a priced deal exactly as before", () => {
+    const d = deriveUnderwriteInputs(unpricedRows(), "Unpriced Court");
+    expect(placeholderPageLine(d.inputs, d.sources, { priceEntered: true, maxBid: true })).toBeNull();
+    // The sample is priced from its memorandum: its sources change nothing.
+    const sample = sampleProps(null) as unknown as { playground: PlaygroundData };
+    const derived = deriveUnderwriteInputs(SAMPLE_DEAL.extraction, SAMPLE_DEAL.name, {
+      rentRoll: { summary: SAMPLE_DEAL.rentRoll.summary, asOf: SAMPLE_DEAL.rentRoll.as_of_date },
+      t12: { summary: SAMPLE_DEAL.t12.summary, periodEnd: SAMPLE_DEAL.t12.period_end_date },
+    });
+    const without = renderToStaticMarkup(React.createElement(SensitivityPlayground, { data: sample.playground }));
+    const withSources = renderToStaticMarkup(
+      React.createElement(SensitivityPlayground, { data: { ...sample.playground, sources: derived.sources } }),
+    );
+    expect(withSources).toBe(without);
+    expect(withSources).not.toContain('data-qa="playground-withheld"');
+    expect(textOf(withSources)).toContain("Max bid");
   });
 });
 

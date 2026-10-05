@@ -862,6 +862,10 @@ export default async function DealPage({
         // A plan deal's price ⇄ cap control must say its cap is year-1
         // income as modelled, not the finished project's pro forma.
         strategy: derived.meta.strategy ?? null,
+        // Where each input came from: a placeholder price or an assumed NOI
+        // makes the returns a placeholder's, withheld as the report withholds
+        // them (lib/underwrite/report-grid).
+        sources: derived.sources,
       }
     : null;
   // The cap the plan's yield on cost is measured against: the model's own

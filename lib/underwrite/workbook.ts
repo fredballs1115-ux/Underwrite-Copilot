@@ -13,6 +13,7 @@ import { datedLong } from "@/lib/debt-index";
 import { documentNotices } from "@/lib/data-notices";
 import { portfolioFacts, type PortfolioRead } from "@/lib/portfolio";
 import { PLAN_RETURNS_CAVEAT_WORKBOOK } from "./plan-caveat";
+import { placeholderWorkbookLine } from "./report-grid";
 
 /**
  * The institutional acquisition-template workbook (Feature 1). Visible tabs:
@@ -1254,10 +1255,12 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   const levcfY1 = cfAddr(cf.rows.levcf, cf.firstOpCol);
 
   // ── KPI BAND ── five headline tiles the IC reads first. Values are live
-  // formulas over the same named cells the rest of the book uses.
+  // formulas over the same named cells the rest of the book uses. A price
+  // no document stated is the model's placeholder, marked as the Project
+  // Overview marks an assumed size.
   let r = 3;
   const kpis: [string, string, string][] = [
-    ["Purchase Price", "PurchasePrice", FMT.usd],
+    [model.sources.purchasePrice?.provenance === "assumption" ? "Purchase Price (assumed)" : "Purchase Price", "PurchasePrice", FMT.usd],
     ["Levered IRR", `IFERROR(IRR(${levRange}),"—")`, FMT.pct1],
     ["Equity Multiple", `IF(Equity=0,"n/a",(SUM(${levcfRange})+NetSaleProceeds)/Equity)`, FMT.mult],
     ["Year-1 Cash-on-Cash", `IF(Equity=0,"n/a",${levcfY1}/Equity)`, FMT.pct1],
@@ -1288,21 +1291,27 @@ function buildDealSummary(ws: ExcelJS.Worksheet, model: DerivedModel, cf: CfMap,
   ws.getRow(r + 1).height = 24;
   const dealKind = meta.strategy ?? "unknown";
   const planDeal = dealKind !== "unknown" && isPlanDeal(dealKind);
-  if (planDeal) {
-    // On a plan deal the tiles are the screening model's returns, struck
-    // with the whole budget in year 1 — the deal page's own caveat, said
-    // under them before anyone quotes one.
-    const row = r + 2;
+  // What the tiles' returns rest on, said under them before anyone quotes
+  // one, a merged row a sentence: on a plan deal they are the screening
+  // model's, struck with the whole budget in year 1 (the deal page's own
+  // caveat); on a placeholder price or an assumed year-1 NOI they are the
+  // placeholder's — the report and the deal page withhold them on that
+  // rule (lib/underwrite/report-grid), and the live book says so.
+  const bandNotes = [
+    planDeal ? PLAN_RETURNS_CAVEAT_WORKBOOK : null,
+    placeholderWorkbookLine(model.inputs, model.sources),
+  ].filter((s): s is string => !!s);
+  bandNotes.forEach((text, i) => {
+    const row = r + 2 + i;
     ws.mergeCells(row, 1, row, 5);
     const c = ws.getCell(row, 1);
-    c.value = PLAN_RETURNS_CAVEAT_WORKBOOK;
+    c.value = text;
     c.font = { name: ARIAL, size: 9, color: MUTED };
     c.alignment = { wrapText: true, vertical: "top" };
-    ws.getRow(row).height = 36;
-    r += 4;
-  } else {
-    r += 3;
-  }
+    // Two lines of the band's width hold about 250 characters.
+    ws.getRow(row).height = text.length > 250 ? 48 : 36;
+  });
+  r += 3 + bandNotes.length;
 
   // ── PROJECT OVERVIEW ──
   sectionHeader(ws, r, "Project Overview", 1, 5); r++;
