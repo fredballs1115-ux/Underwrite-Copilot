@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import {
+  HOA_DUES_ROW,
+  SPECIAL_ASSESSMENT_ROW,
+  STATED_ROWS,
+  UNITS_IN_CONDO_ROW,
+  UNITS_OFFERED_ROW,
   condoContextLine,
   condoModelLine,
   condoNote,
@@ -11,6 +16,8 @@ import {
   readCondo,
 } from "./condo";
 import { gluedWords } from "./render-lint";
+import { extractionInstruction } from "./anthropic/prompts";
+import { unitCountRow } from "./criteria";
 
 const TODAY = new Date("2026-10-05T12:00:00Z");
 const row = (label: string, value: string, page = "p. 6") => ({ label, value, page, flagged: false });
@@ -117,5 +124,40 @@ describe("condominium units bought in bulk (pass 28, round 8)", () => {
   it("writes every sentence without a glued word", () => {
     const r = readCondo(BULK, TODAY)!;
     for (const text of [r.headline, condoShortLine(r), condoContextLine(r)]) expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("the prompt asks for what the reader reads", () => {
+  it("names each condominium row by a label the reader's own pattern takes", () => {
+    const prompt = extractionInstruction("auto");
+    const labels: [string, RegExp][] = [
+      ["Units offered", UNITS_OFFERED_ROW],
+      ["Units in condominium", UNITS_IN_CONDO_ROW],
+      ["HOA dues", HOA_DUES_ROW],
+      ["Special assessment", SPECIAL_ASSESSMENT_ROW],
+      ...STATED_ROWS.map(([label, re]) => [label, re] as [string, RegExp]),
+    ];
+    expect(labels).toHaveLength(9);
+    for (const [label, re] of labels) {
+      expect(prompt).toContain(`"${label}"`);
+      expect(re.test(label), label).toBe(true);
+    }
+    // One unit's dues with their period, never the block's total.
+    expect(prompt).toContain("one unit's dues exactly as written WITH its period");
+    // Each label, as the extraction writes it, is read.
+    const r = readCondo(
+      deal("Condominium units (bulk sale)", [
+        row("Units offered", "42"),
+        row("Units in condominium", "120"),
+        row("HOA dues", "$650 per unit per month"),
+        row("Special assessment", "$4,000 a unit, roof replacement"),
+        ...STATED_ROWS.map(([label]) => row(label, `${label} as stated`)),
+      ]),
+      TODAY,
+    )!;
+    expect(r).toMatchObject({ unitsOffered: 42, unitsInCondominium: 120, monthlyDues: 650, specialAssessment: "$4,000 a unit, roof replacement" });
+    expect(r.stated.map((s) => s.label)).toEqual(STATED_ROWS.map(([label]) => label));
+    // Neither count row is taken for the deal's own count.
+    expect(unitCountRow([row("Units offered", "42"), row("Units in condominium", "120")])).toBeNull();
   });
 });
