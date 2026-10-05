@@ -79,6 +79,7 @@ import { basisScale, fmtBasis, subjectBasis } from "@/lib/comp-detail";
 import { gapDisagreementLine, gapScale } from "@/lib/gap-detail";
 import { parsePageNumber } from "@/lib/facts";
 import { portfolioFacts, propertyFigures, readPortfolio, shareBasisWord, shareOfTrack, type PortfolioRead } from "@/lib/portfolio";
+import { liveReadFailedLine } from "@/lib/market-read-failed";
 
 const C = {
   brand: "#114e54",
@@ -1602,6 +1603,9 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   ]
     .map((b) => ({ ...b, lines: list(b.rec?.lines).map(str).filter(Boolean).map(currentBriefLine) }))
     .filter((b) => b.lines.length > 0);
+  // A covered market whose figures could not be read that day: said under
+  // the checks, as the deal page says it (lib/market-read-failed).
+  const liveReadFailed = liveBrief ? null : liveReadFailedLine(market?.liveReadFailed);
   const rows = list(reconciliation?.rows) as NonNullable<
     ReconciliationResult["rows"]
   >;
@@ -2276,6 +2280,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               <Text style={s.summaryText}>{str(market?.summary)}</Text>
             </View>
           ) : null}
+          {liveReadFailed ? <Text style={[s.sub, { marginTop: 8 }]}>{liveReadFailed}</Text> : null}
           {briefBlocks.map((b, bi) => (
             <View key={`${str(b.rec.metro)}-${bi}`} style={{ marginTop: 8 }}>
               <Text style={s.sub}>{str(briefHeading(b.rec, b.first))}</Text>

@@ -2707,6 +2707,28 @@ describe("ShareView — the read-only screen a partner or lender opens", () => {
     expect(st).toContain("From the previous screen — the sender’s latest run stopped before it.");
     expect(st).not.toMatch(/re-screening|re-screen has not reached/);
 
+    // A covered market whose figures could not be read the day the check
+    // ran says so in the market read (lib/market-read-failed).
+    const readFailed = renderToStaticMarkup(
+      React.createElement(ShareView, {
+        dealName: conversion.dealName ?? "",
+        assetClass: "multifamily",
+        expiresAt: "2026-10-05T12:00:00Z",
+        verdictStale: false,
+        picture: null,
+        extraction: conversion,
+        comps: null,
+        market: { summary: "Rents are firm.", checks: [], liveReadFailed: { market: "Washington DC", grain: "metro" } } as unknown as MarketResult,
+        verdict,
+      }),
+    );
+    expect(a11yIssues(readFailed), "a11y share-read-failed").toEqual([]);
+    const rf = visibleText(readFailed);
+    expect(gluedWords(rf)).toEqual([]);
+    expect(rf).toContain(
+      "The published figures for the Washington DC market could not be read when this check ran, so it reasoned from rules of thumb alone — re-screen to include them.",
+    );
+
     const expired = renderToStaticMarkup(
       React.createElement(Expired, { reason: "The sender revoked this link." }),
     );

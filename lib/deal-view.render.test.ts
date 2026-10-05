@@ -448,6 +448,34 @@ describe("DealView — the sample deal renders every section without a runtime e
     expect(never).toMatch(/Run the screen/);
   });
 
+  it("a covered market whose figures could not be read says so on the market check, never 'not pulled comps' (research pass 30)", () => {
+    const base = sampleProps("analyses", "market");
+    const failed: Props = {
+      ...base,
+      results: {
+        ...base.results,
+        market: { ...base.results.market!, liveBrief: null, liveReadFailed: { market: "Philadelphia PA", grain: "metro" } },
+      },
+    };
+    const html = render(failed);
+    expect(a11yIssues(html)).toEqual([]);
+    const text = textOf(html);
+    expect(gluedWords(text)).toEqual([]);
+    expect(html).toContain('data-qa="live-read-failed"');
+    expect(text).toContain(
+      "The published figures for the Philadelphia PA market could not be read when this check ran, so it reasoned from rules of thumb alone — re-screen to include them.",
+    );
+    expect(text).toContain("rules of thumb — the published figures were not read");
+    expect(text).not.toContain("not pulled comps");
+    // A state's figures are the state's.
+    const state = textOf(
+      render({ ...failed, results: { ...failed.results, market: { ...failed.results.market!, liveReadFailed: { market: "Pennsylvania", grain: "state" } } } }),
+    );
+    expect(state).toContain("The published figures for the state of Pennsylvania could not be read");
+    // The sample read none and failed none: it says nothing of the kind.
+    expect(render(base)).not.toContain("live-read-failed");
+  });
+
   it("a failure in the document offers Replace OM in its banner, never a 'Try again' that reads the same file the same way (research pass 30)", () => {
     const failed = (error: string, hasOm = true): Props =>
       ({

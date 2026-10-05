@@ -2,6 +2,7 @@ import Link from "next/link";
 import { placedByClause } from "@/lib/placed-by";
 import { firstSentence } from "@/lib/first-sentence";
 import { screenedOn, type BehindWhy } from "@/lib/screen-run";
+import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { basePosition, rangeInOrder } from "@/lib/verdict-range";
 import type {
   BrokerCompsResult,
@@ -632,6 +633,13 @@ export function ShareView({
               <h2 className="text-sm font-semibold tracking-tight">Market read</h2>
               {staleReads.includes("market") && <PreviousRead why={staleWhy} />}
               <Fold text={market.summary} className="mt-2 text-sm leading-relaxed text-muted" />
+              {/* A covered market's figures that could not be read that day
+                  (lib/market-read-failed), said rather than left out. */}
+              {!market.liveBrief && liveReadFailedLine(market.liveReadFailed) && (
+                <p className="mt-2 text-xs text-caution" data-qa="live-read-failed">
+                  {liveReadFailedLine(market.liveReadFailed)}
+                </p>
+              )}
               {market.liveBrief && market.liveBrief.lines.length > 0 && (
                 <p className="mt-2 text-xs text-muted">
                   {market.liveBrief.grain === "state"

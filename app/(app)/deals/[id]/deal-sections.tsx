@@ -6,6 +6,7 @@ import { rerunAnalysis, reconcileWithModel } from "../actions";
 import { placedByClause } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
 import { screenedOn, type BehindWhy } from "@/lib/screen-run";
+import { liveReadFailedLine } from "@/lib/market-read-failed";
 import { PendingButton } from "../../pending-button";
 import {
   addSupplementNote,
@@ -1581,6 +1582,9 @@ export function MarketCheck({
   // A portfolio across markets (#413): each other market's own figures,
   // folded under the address's the same way.
   const others = (result.otherBriefs ?? []).filter((b) => b.lines.length > 0);
+  // A covered market whose figures could not be read that day: said so,
+  // never read like a market outside the covered ones (research pass 30).
+  const readFailed = !brief ? liveReadFailedLine(result.liveReadFailed) : null;
   return (
     <section className="space-y-4">
       <SectionHeader
@@ -1591,10 +1595,17 @@ export function MarketCheck({
               ? `rules of thumb, read beside each market's published figures`
               : brief
                 ? `rules of thumb, read beside ${brief.grain === "state" ? "the state's" : "the metro's"} published figures`
-                : "rules-of-thumb, not pulled comps"}
+                : readFailed
+                  ? "rules of thumb — the published figures were not read"
+                  : "rules-of-thumb, not pulled comps"}
           </span>
         }
       />
+      {readFailed && (
+        <p className="rounded-xl border border-caution/30 bg-caution/5 px-4 py-3 text-sm text-caution" data-qa="live-read-failed">
+          {readFailed}
+        </p>
+      )}
       {result.summary && <Callout>{result.summary}</Callout>}
       {brief && brief.lines.length > 0 && <LiveBriefRead brief={brief} />}
       {others.map((b) => (

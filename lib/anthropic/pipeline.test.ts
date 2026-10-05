@@ -32,6 +32,8 @@ interface State {
   failUpdateOf?: string;
   /** the next N reads of a deal answer with an error, as a network blip does */
   failDealReads?: number;
+  /** every read of `rates` and `benchmarks` answers with an error */
+  failFigureReads?: boolean;
 }
 
 /** A chainable, thenable query like supabase-js's, over an in-memory store. */
@@ -144,6 +146,9 @@ class FakeQuery {
     }
     // The two public-figure tables the market check reads, filtered the one
     // way the read filters them: a series by its id, a metro by its name.
+    if ((table === "rates" || table === "benchmarks") && state.failFigureReads) {
+      return { data: null, error: { message: "TypeError: fetch failed" } };
+    }
     if (table === "rates") {
       const id = this.where("series_id");
       return { data: (state.rates ?? []).filter((r) => r.series_id === id), error: null };
@@ -653,6 +658,45 @@ describe("runAnalysis — the happy path", () => {
       ["sloos_multifamily", -5.7],
     ]);
     expect(errSpy).not.toHaveBeenCalled();
+  });
+
+  it("a covered market whose figures could not be read says so on the check, never reads like a market outside the covered ones (research pass 30)", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.failFigureReads = true;
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    // The screen goes on: a check without figures, never a failed screen.
+    expect(job().status).toBe("done");
+    expect(vi.mocked(checkMarket).mock.calls[0][3]).toBeNull();
+    const stored = state.deals.d1.market as MarketResult;
+    expect(stored.liveBrief).toBeNull();
+    expect(stored.liveReadFailed).toEqual({ market: "Washington DC", grain: "metro" });
+    // A deal in no market the site reads — no address, and none in its
+    // memorandum — stores no such mark: nothing failed.
+    state = freshState();
+    state.failFigureReads = true;
+    vi.mocked(extractTerms).mockResolvedValueOnce({ ...EXTRACTION, address: "", market: "" } as unknown as ExtractionResult);
+    await runAnalysis("d1");
+    expect(job().status).toBe("done");
+    expect((state.deals.d1.market as MarketResult).liveReadFailed).toBeUndefined();
+    // Nor does a covered market whose figures were read.
+    state = freshState();
+    state.deals.d1.address = { city: "Washington", state: "DC" };
+    state.rates = [{ series_id: "DGS10", obs_date: "2026-09-22", value: 4.9 }];
+    vi.useFakeTimers({ now: new Date("2026-09-23T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect((state.deals.d1.market as MarketResult).liveBrief?.metro).toBe("Washington DC");
+    expect((state.deals.d1.market as MarketResult).liveReadFailed).toBeUndefined();
+    warn.mockRestore();
   });
 
   it("an office in a covered metro is handed the metro's jobs and no housing figure; an apartment building the same day still is (research pass 18)", async () => {

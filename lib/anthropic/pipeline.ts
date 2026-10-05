@@ -66,6 +66,7 @@ import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } fro
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
 import { countyOf, placeDeal } from "@/lib/market-county";
+import { isStateMarket } from "@/lib/market-match";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
 import { SERIES, metroSeriesFor, readMetroRates, readRates } from "@/lib/live-rates";
 import { debtSeeds, isDebtSeedSeries, ratesPromptLine } from "@/lib/debt-index";
@@ -493,6 +494,18 @@ interface LiveMarketRead {
   primary: LiveMarketBrief | null;
   /** a portfolio's other markets, in the order read */
   others: LiveMarketBrief[];
+  /** the deal sits in a market the site reads figures for and none could be
+   *  read — a read of the figures, or of the deal's address, failed — so the
+   *  check says it reasoned from rules of thumb that day, never that the
+   *  market has no figures (lib/market-read-failed, research pass 30) */
+  failed: { market: string | null; grain: "metro" | "state" } | null;
+}
+
+/** A failed read, said for the market it was for where the deal was placed. */
+function readFailedFor(market: { id: string; name: string } | null): NonNullable<LiveMarketRead["failed"]> {
+  return market
+    ? { market: market.name, grain: isStateMarket(market.id) ? "state" : "metro" }
+    : { market: null, grain: "metro" };
 }
 
 async function liveMarketFromDb(
@@ -501,12 +514,26 @@ async function liveMarketFromDb(
   flags: SiteFlagsResult | null = null,
   now: Date = new Date(),
 ): Promise<LiveMarketRead> {
+  // The market whose figures are being read, once the deal is placed, and
+  // how many of its reads failed: a covered market's check that read none
+  // of its figures for a failure says so.
+  let placed: { id: string; name: string } | null = null;
+  let failures = 0;
+  const failedRead = () => {
+    failures++;
+  };
   try {
-    const { data } = await admin
+    const { data, error: dealErr } = await admin
       .from("deals")
       .select("address, asset_class, extraction, first_signal")
       .eq("id", dealId)
-      .single();
+      .maybeSingle();
+    // The deal's own address could not be read: where it sits is unknown,
+    // and no figure was read for it.
+    if (dealErr) {
+      console.warn(`[pipeline] the deal's address could not be read for the market check of ${dealId}: ${dealErr.message}`);
+      return { primary: null, others: [], failed: readFailedFor(null) };
+    }
     // The column holds the structured object the deal form saved (the deals
     // list and the compare page read it the same way); a row that still
     // carries the form's JSON string is parsed the form's way.
@@ -530,6 +557,7 @@ async function liveMarketFromDb(
     // under `state:PA`), said as the state's. A deal with no readable state
     // or county reads nothing of its own, as before.
     const metro = placeDeal(address, countyOf(address, flags)).live;
+    placed = metro ?? null;
     // The debt-market lines read the deal's class, and whether the deal is
     // a plan, so the lending-standards series is the one a bank reports for
     // this kind of loan. The class is the one every page shows
@@ -549,8 +577,8 @@ async function liveMarketFromDb(
     // lease-up's finished building (lib/deal-strategy buildsSomething).
     const builds = buildsSomething(ex, kind);
     const others = otherPortfolioMarkets(ex, metro?.id ?? null);
-    if (!metro && !others) return { primary: null, others: [] };
-    const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)));
+    if (!metro && !others) return { primary: null, others: [], failed: null };
+    const nationalRows = await fetchSeriesRows(admin, SERIES.filter((s) => BRIEF_NATIONAL_IDS.includes(s.id)), failedRead);
     const national = readRates(nationalRows, now);
     const readMarket = async (
       market: { id: string; name: string; placedBy?: { county: string; area: string } },
@@ -558,8 +586,8 @@ async function liveMarketFromDb(
       portfolio: Parameters<typeof liveMarketBrief>[0]["portfolio"],
     ): Promise<LiveMarketBrief | null> => {
       const [rateRows, bench] = await Promise.all([
-        fetchSeriesRows(admin, metroSeriesFor(market.id).series),
-        fetchBenchRows(admin, market.name, [...ZILLOW_METRICS, ...REALTOR_METRICS]),
+        fetchSeriesRows(admin, metroSeriesFor(market.id).series, failedRead),
+        fetchBenchRows(admin, market.name, [...ZILLOW_METRICS, ...REALTOR_METRICS], failedRead),
       ]);
       return liveMarketBrief({
         metro: market,
@@ -595,10 +623,12 @@ async function liveMarketFromDb(
     const primary = metro
       ? await readMarket(metro, true, whole ? { ...whole, othersRead: read.map((b) => b.metro), notRead: unread } : null)
       : null;
-    return { primary, others: read };
+    // The deal's market was wanted, nothing came back, and reads failed: a
+    // failed read, never a market with no figures to read.
+    return { primary, others: read, failed: metro && !primary && failures > 0 ? readFailedFor(metro) : null };
   } catch (err) {
     console.warn(`[pipeline] live market figures unavailable for deal ${dealId}:`, err instanceof Error ? err.message : err);
-    return { primary: null, others: [] };
+    return { primary: null, others: [], failed: readFailedFor(placed) };
   }
 }
 
@@ -1409,7 +1439,7 @@ async function runAnalysisSteps(
     // page can say what the check read.
     if (!completed.has("market")) {
       await patchJob(dealId, { status: "running", step: "market", progress: 70 });
-      const { primary, others } = await liveMarketFromDb(admin, dealId, siteFlags);
+      const { primary, others, failed } = await liveMarketFromDb(admin, dealId, siteFlags);
       // One block a market, the address's first: a portfolio's other
       // markets follow in blocks of their own (#413).
       const handed = [primary, ...others].filter((b): b is LiveMarketBrief => !!b).map((b) => b.text);
@@ -1428,6 +1458,9 @@ async function runAnalysisSteps(
         ...checked,
         liveBrief: primary ? record(primary) : null,
         ...(others.length > 0 ? { otherBriefs: others.map(record) } : {}),
+        // Stored so the page says the figures were not read that day, and
+        // that a re-screen reads them (lib/market-read-failed).
+        ...(failed ? { liveReadFailed: failed } : {}),
       };
       await writeResult(admin, dealId, "market", market);
       await markDone("market");

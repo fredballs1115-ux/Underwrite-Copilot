@@ -129,6 +129,26 @@ describe("ReportDocument (full report)", () => {
     expect(briefedText).toContain("10-year Treasury 4.94%");
     expect(await pdfTextOf(buf)).not.toContain("Figures the check read");
 
+    // A covered market whose figures could not be read that day says so
+    // under the checks (lib/market-read-failed, research pass 30).
+    const readFailed = {
+      ...deal,
+      market: { ...SAMPLE_DEAL.market, liveReadFailed: { market: "Philadelphia PA", grain: "metro" } },
+    } as unknown as DealRow;
+    const failedText = (
+      await pdfTextOf(
+        await renderToBuffer(
+          React.createElement(ReportDocument, {
+            input: buildReportData(readFailed, "August 24, 2026", checks, sensitivity),
+          }) as unknown as Parameters<typeof renderToBuffer>[0],
+        ),
+      )
+    ).replace(/\s+/g, " ");
+    expect(failedText).toMatch(
+      /The published figures for the Philadelphia PA market could not be read when this check ran, so it reasoned from rules of thumb alone . re-screen to include them\./,
+    );
+    expect(await pdfTextOf(buf)).not.toContain("could not be read when this check ran");
+
     // The model's assumptions against the published figures land under the
     // sensitivity grids when the route read them; the plain report has no
     // such block rather than an empty one.

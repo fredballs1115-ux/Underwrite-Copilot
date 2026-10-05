@@ -460,6 +460,12 @@ export interface MarketResult {
    *  The national figures ride in `liveBrief` alone. Absent on a single
    *  property, a portfolio in one market, or a check run before this. */
   otherBriefs?: LiveBriefRecord[] | null;
+  /** The deal sits in a market the site reads figures for, and the check
+   *  could read none of them — a failed read of the figures or of the
+   *  deal's address (lib/market-read-failed): said as a failed read on the
+   *  page, never as a market outside the covered ones. Absent where the
+   *  figures were read or there were none to read. */
+  liveReadFailed?: { market: string | null; grain?: "metro" | "state" } | null;
 }
 
 export interface LiveBriefRecord {
