@@ -704,6 +704,15 @@ describe("planSummary / plausibilityNote — a forward purchase", () => {
     strategy: { ...dev, summary: "Forward purchase of a 180-home build-to-rent community, purchase at certificate of occupancy" },
   });
 
+  it("builds nothing the buyer pays for: what building costs is the developer's to bear", () => {
+    // The market check reads the construction cost indexes only where the
+    // deal builds something; a forward purchase's works are the developer's.
+    expect(buildsSomething(bts, "development")).toBe(false);
+    expect(buildsSomething(btr, "development")).toBe(false);
+    const own = ex(bts.metrics, { assetClass: "industrial", strategy: { ...dev, summary: "Ground-up distribution center" } });
+    expect(buildsSomething(own, "development")).toBe(true);
+  });
+
   it("strikes the total cost at the price, says the stated budget is the developer's, and reads the yield at delivery", () => {
     const plan = planSummary(bts, inferStrategy(bts))!;
     expect(plan).toMatchObject({ forward: true, price: 48_000_000, budget: null, totalCost: 48_000_000 });

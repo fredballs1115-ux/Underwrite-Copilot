@@ -363,14 +363,18 @@ export const notYetDelivered = (kind: StrategyKind): boolean => kind === "develo
 
 /**
  * Whether the deal builds something, so what building costs speaks to it:
- * a development or a conversion, or a value-add that states its budget (in
- * total, or a door at a time). A lease-up's building is already built, and
+ * a development or a conversion — never a forward purchase, whose works are
+ * the developer's — or a value-add that states its budget (in total, or a
+ * door at a time). A lease-up's building is already built, and
  * a value-add with no budget has none to check an escalation against — the
  * construction-cost lines of the market check read this, never the wider
  * `isPlanDeal` (the audit of 2026-09-30).
  */
 export function buildsSomething(extraction: ExtractionResult | null | undefined, kind: StrategyKind): boolean {
-  if (kind === "development" || kind === "conversion") return true;
+  // A forward purchase's works are the developer's, at the developer's cost:
+  // the buyer pays a price at delivery and has no budget for a cost index to
+  // be checked against (lib/forward-purchase).
+  if (kind === "development" || kind === "conversion") return !forwardOfKind(extraction, kind);
   if (kind !== "value_add" || !extraction) return false;
   const metrics = extraction.metrics ?? [];
   return capitalBudgetFromMetrics(metrics, null) != null || renovationProgramBudget(metrics, null) != null;
@@ -410,12 +414,18 @@ export function isForwardPurchase(
   ex: ExtractionResult | null | undefined,
   strategy: DealStrategy = inferStrategy(ex ?? null),
 ): boolean {
+  return forwardOfKind(ex, strategy.kind);
+}
+
+/** `isForwardPurchase` on the deal's kind alone, for a caller that holds
+ *  the kind and not the strategy (`buildsSomething`). */
+function forwardOfKind(ex: ExtractionResult | null | undefined, kind: StrategyKind): boolean {
   if (!ex) return false;
-  if (strategy.kind !== "development" && strategy.kind !== "conversion") return false;
+  if (kind !== "development" && kind !== "conversion") return false;
   const words = forwardWordsOf(ex);
   if (FORWARD_WORDS.test(words)) return true;
   if (!BUILD_TO_SUIT_WORDS.test(words)) return false;
-  const priceRow = findPriceMetric(ex.metrics ?? [], strategy.kind, screenYearOf(ex));
+  const priceRow = findPriceMetric(ex.metrics ?? [], kind, screenYearOf(ex));
   return priceRow != null && !priceRowIsLand(priceRow);
 }
 
