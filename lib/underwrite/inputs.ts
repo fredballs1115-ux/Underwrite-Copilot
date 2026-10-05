@@ -1283,6 +1283,11 @@ export function deriveUnderwriteInputs(
   }
   mark("rentGrowthPct", "assumption", "Default 3.0%/yr — set your view");
   mark("expenseGrowthPct", "assumption", "Default 3.0%/yr — set your view");
+  // A stated occupancy under half: the class's ratio is a share of a mostly
+  // empty building's income, while its taxes and insurance are owed on the
+  // whole building (research pass 38). Said; the figure is the owner's.
+  const statedOcc = rrOcc ?? (occPct != null ? occPct / 100 : null);
+  const mostlyEmpty = statedOcc != null && statedOcc < 0.5;
   sources.expenseLines = t12Er != null
     ? {
         provenance: "extracted",
@@ -1292,7 +1297,9 @@ export function deriveUnderwriteInputs(
         // Derived when the NOI it ties to came from the OM; an assumption when
         // the NOI itself was assumed.
         provenance: sources.inPlaceRentAnnual?.provenance === "derived" ? "derived" : "assumption",
-        note: `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${classWord} default) — break out from a T-12`,
+        note: mostlyEmpty
+          ? `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${classWord} default) — the class's ratio struck on a mostly empty building's income (${Math.round(statedOcc! * 100)}% occupied as stated), though its taxes and insurance do not fall with occupancy — enter the T-12's expenses`
+          : `Total opex to tie NOI (${Math.round(cd.expenseRatio * 100)}% of EGI ${classWord} default) — break out from a T-12`,
       };
   mark("mgmtFeePct", "assumption", "Folded into operating expenses — split out if you track it");
   mark("reservesPsf", "assumption", `${classWord} default $${cd.reservesPsf.toFixed(2)}/SF/yr`);
