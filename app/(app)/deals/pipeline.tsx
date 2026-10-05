@@ -872,7 +872,9 @@ export function Pipeline({
       )}
       {atLimit && errorMessage && (
         <section className="rounded-xl border border-caution/30 bg-caution/5 p-5">
-          <p className="text-sm font-medium text-caution">{errorMessage}</p>
+          <p role="alert" className="text-sm font-medium text-caution">
+            {errorMessage}
+          </p>
           <Link
             href="/billing"
             className="mt-3 inline-flex rounded-lg bg-brand px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong"
@@ -2945,8 +2947,10 @@ function NewDealForm({
       )}
       {mode === "upload" && (
         <>
+      {/* An alert: it arrives through the address bar after an upload the
+          server refused, and was said to no one (research pass 33). */}
       {errorMessage && (
-        <p className="mt-3 rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
+        <p role="alert" className="mt-3 rounded-lg bg-kill/10 px-3 py-2 text-sm text-kill">
           {errorMessage}
         </p>
       )}

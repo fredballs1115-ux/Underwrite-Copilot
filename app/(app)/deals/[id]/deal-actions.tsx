@@ -51,7 +51,6 @@ export function DealActions({
         ref={triggerRef}
         type="button"
         aria-label="Deal actions"
-        aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => {
           setOpen((o) => !o);
@@ -129,9 +128,12 @@ export function DealActions({
               </form>
             )}
 
+            {/* The question is the group's name, and focus lands on Cancel —
+                the button pressed is gone, and focus had dropped to the page
+                (research pass 33). */}
             {mode === "delete" && (
-              <div className="space-y-2.5 p-1.5">
-                <p className="text-sm leading-relaxed">
+              <div role="group" aria-labelledby={`${dealId}-delete-q`} className="space-y-2.5 p-1.5">
+                <p id={`${dealId}-delete-q`} className="text-sm leading-relaxed">
                   Delete this deal permanently? Its documents and analysis are
                   removed and this can&apos;t be undone.
                 </p>
@@ -148,6 +150,7 @@ export function DealActions({
                   <button
                     type="button"
                     onClick={close}
+                    autoFocus
                     className="rounded-lg border border-line px-3 py-1.5 text-sm font-medium transition-colors hover:bg-faint"
                   >
                     Cancel

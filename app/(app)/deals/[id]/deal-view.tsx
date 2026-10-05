@@ -666,12 +666,16 @@ export function DealView({
     syncUrl("analyses", key);
   }
 
-  /** Jump links from Overview still use the old keys — map and go. */
+  /** Jump links from Overview still use the old keys — map and go. The
+   *  link that was pressed leaves the page with the section it lived in, so
+   *  focus moves to the tab now open rather than dropping to the page,
+   *  where a screen reader says nothing (research pass 33). */
   function navigateLegacy(key: string) {
     const target = LEGACY_TABS[key];
     if (!target) return;
     if (target.analysis) selectAnalysis(target.analysis);
     else selectSection(target.section);
+    requestAnimationFrame(() => document.getElementById(`tab-${target.section}`)?.focus());
   }
 
   function sectionState(
@@ -2015,7 +2019,11 @@ function DealErrorBanner({ message }: { message: string }) {
   if (!shown) return null;
   return (
     <div className="flex items-start gap-3 rounded-xl border border-kill/30 bg-kill/5 p-4">
-      <p className="flex-1 text-sm font-medium text-kill">{message}</p>
+      {/* An alert: it arrives after an action, through the address bar, and
+          was said to no one (research pass 33). */}
+      <p role="alert" className="flex-1 text-sm font-medium text-kill">
+        {message}
+      </p>
       <button
         type="button"
         aria-label="Dismiss"
@@ -2025,7 +2033,7 @@ function DealErrorBanner({ message }: { message: string }) {
           url.searchParams.delete("error");
           window.history.replaceState(null, "", url);
         }}
-        className="shrink-0 rounded-md p-1 text-kill/70 transition-colors hover:bg-kill/10 hover:text-kill"
+        className="shrink-0 rounded-md p-1 text-kill transition-colors hover:bg-kill/10"
       >
         <svg
           viewBox="0 0 24 24"
@@ -2113,7 +2121,7 @@ function ProgressRail({
       <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
         <div className="flex items-center gap-3">
           <Spinner />
-          <span className="text-sm">
+          <span role="status" className="text-sm">
             {job.status === "queued"
               ? QUEUED_LABEL
               : (STEP_LABELS[job.step ?? ""] ?? "Working…")}
@@ -2144,7 +2152,9 @@ function ProgressRail({
     <div className="rounded-xl border border-line bg-surface p-4 shadow-sm">
       <div className="flex items-center gap-3">
         <Spinner />
-        <span className="text-sm">
+        {/* The step is the live status, said as it changes; the clock stays
+            outside it, or a screen reader would read every second. */}
+        <span role="status" className="text-sm">
           {job.status === "queued"
             ? QUEUED_LABEL
             : (STEP_LABELS[job.step ?? ""] ?? "Analyzing…")}
@@ -2193,14 +2203,11 @@ function ProgressRail({
   );
 }
 
+/** The rail's spinner, a picture only: the step beside it is the status a
+ *  screen reader hears (research pass 33 — a fixed "Working" was all it
+ *  said while the step changed underneath). */
 function Spinner() {
-  return (
-    <span
-      role="status"
-      aria-label="Working"
-      className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-brand"
-    />
-  );
+  return <span aria-hidden className="h-4 w-4 animate-spin rounded-full border-2 border-line border-t-brand" />;
 }
 
 /* ------------------------------------------------------------------ */

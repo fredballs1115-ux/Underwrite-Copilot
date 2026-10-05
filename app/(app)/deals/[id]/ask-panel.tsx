@@ -21,14 +21,26 @@ const safeWhen = (at: string) => {
 
 function AskButton() {
   const { pending } = useFormStatus();
+  // While it reads, the button stays focusable (aria-disabled, a second press
+  // refused) and says so once: a focused button that disables itself sent
+  // focus to the page, and "Reading the OM…" was never heard (research
+  // pass 33).
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="shrink-0 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong disabled:opacity-60"
-    >
-      {pending ? "Reading the OM…" : "Ask"}
-    </button>
+    <>
+      <button
+        type="submit"
+        aria-disabled={pending || undefined}
+        onClick={pending ? (e) => e.preventDefault() : undefined}
+        className={`shrink-0 rounded-lg bg-brand px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-brand-strong ${
+          pending ? "cursor-progress opacity-60" : ""
+        }`}
+      >
+        {pending ? "Reading the OM…" : "Ask"}
+      </button>
+      <span role="status" className="sr-only">
+        {pending ? "Reading the OM…" : ""}
+      </span>
+    </>
   );
 }
 
@@ -68,6 +80,10 @@ export function AskPanel({
   useEffect(() => {
     if (state?.ok) formRef.current?.reset();
   }, [state]);
+  // The answer lands in the thread with no word to a screen reader; one
+  // polite line says it has (research pass 33). The thread itself is not a
+  // live region, which would read every answer again.
+  const answered = state?.ok ? "The answer is in the thread above." : "";
 
   const askable = hasOm && !isSample;
   // Who asked, on a team deal, after the date: the reader as "you", a
@@ -188,7 +204,7 @@ export function AskPanel({
               key={state?.error ? `err-${state.question}` : "fresh"}
               defaultValue={state?.error ? (state.question ?? "") : ""}
               placeholder="e.g. What does the OM say about the tax abatement schedule?"
-              className="min-w-0 flex-1 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted/70 focus:outline-none focus:ring-2 focus:ring-brand/30"
+              className="min-w-0 flex-1 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-sm placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-brand/30"
             />
             <AskButton />
           </div>
@@ -197,6 +213,9 @@ export function AskPanel({
               {state.error}
             </p>
           )}
+          <p role="status" className="sr-only">
+            {answered}
+          </p>
         </form>
       )}
     </section>

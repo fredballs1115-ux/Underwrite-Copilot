@@ -105,3 +105,44 @@ describe("the call chips and a range's base read at 4.5:1 (research pass 33, ite
     expect(readFileSync(join(process.cwd(), "app/landing-interactive.tsx"), "utf8")).toMatch(opaque);
   });
 });
+
+describe("focus never drops to the page, and a status is said (research pass 33, items 8 and 9)", () => {
+  const src = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
+  it("moves focus to the section a jump link opens", () => {
+    expect(src("app/(app)/deals/[id]/deal-view.tsx")).toMatch(
+      /function navigateLegacy[\s\S]{0,400}requestAnimationFrame\(\(\) => document\.getElementById\(`tab-\$\{target\.section\}`\)\?\.focus\(\)\)/,
+    );
+  });
+
+  it("names the delete question and lands on its Cancel; the actions button promises no menu", () => {
+    const actions = src("app/(app)/deals/[id]/deal-actions.tsx");
+    expect(actions).not.toMatch(/aria-haspopup="menu"/);
+    expect(actions).toMatch(/role="group" aria-labelledby=\{`\$\{dealId\}-delete-q`\}/);
+    expect(actions).toMatch(/onClick=\{close\}\s*autoFocus[\s\S]{0,200}Cancel/);
+  });
+
+  it("sends 'Back to the top' to the deal's title, out of the bar that hides", () => {
+    expect(src("app/(app)/deals/[id]/deal-sticky-bar.tsx")).toMatch(/document\.getElementById\("deal-title"\)\?\.focus\(\{ preventScroll: true \}\)/);
+    expect(src("app/(app)/deals/[id]/deal-hero.tsx")).toMatch(/<h1 id="deal-title" tabIndex=\{-1\}/);
+  });
+
+  it("keeps a saving button focusable and says its pending words once", () => {
+    for (const f of ["app/(app)/pending-button.tsx", "app/(app)/deals/[id]/ask-panel.tsx"]) {
+      const b = src(f);
+      expect(b, f).toMatch(/aria-disabled=\{pending \|\| undefined\}/);
+      expect(b, f).toMatch(/onClick=\{pending \? \(e\) => e\.preventDefault\(\) : undefined\}/);
+      expect(b, f).toMatch(/role="status" className="sr-only"/);
+      expect(b, f).not.toMatch(/disabled=\{(?:disabled \|\| )?pending\}/);
+    }
+    expect(src("app/(app)/deals/[id]/ask-panel.tsx")).toContain("The answer is in the thread above.");
+  });
+
+  it("says the screen's step as it changes, never a fixed 'Working', and an error that arrives by the address bar", () => {
+    const view = src("app/(app)/deals/[id]/deal-view.tsx");
+    expect(view).not.toMatch(/aria-label="Working"/);
+    expect((view.match(/<span role="status" className="text-sm">/g) ?? []).length).toBe(2);
+    expect(view).toMatch(/<p role="alert" className="flex-1 text-sm font-medium text-kill">/);
+    const pipeline = src("app/(app)/deals/pipeline.tsx");
+    expect(pipeline).toMatch(/<p role="alert" className="mt-3 rounded-lg bg-kill\/10/);
+  });
+});

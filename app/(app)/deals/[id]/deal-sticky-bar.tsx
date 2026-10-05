@@ -54,7 +54,15 @@ export function DealStickyBar({
         <DealAvatar dealId={dealId} />
         <button
           type="button"
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          // Focus goes to the deal's title as the page returns to it: the bar
+          // turns inert once the header is back in view, and focus left in it
+          // dropped to the page (research pass 33). A reader who asked for
+          // less motion jumps rather than glides.
+          onClick={() => {
+            const still = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+            window.scrollTo({ top: 0, behavior: still ? "auto" : "smooth" });
+            document.getElementById("deal-title")?.focus({ preventScroll: true });
+          }}
           className="min-w-0 flex-1 truncate text-left text-sm font-semibold hover:text-brand"
         >
           <span className="sr-only">Back to the top: </span>

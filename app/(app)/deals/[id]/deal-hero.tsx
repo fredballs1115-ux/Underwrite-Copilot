@@ -95,7 +95,11 @@ export function DealHero({
         <div className="@container/facts flex min-w-0 flex-col justify-center gap-4 px-6 py-5 [grid-area:facts]">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight @3xl:text-2xl">{title}</h1>
+              {/* Focusable from script only: "Back to the top" lands here,
+                  out of the sticky bar that hides as it goes. */}
+              <h1 id="deal-title" tabIndex={-1} className="text-xl font-semibold tracking-tight @3xl:text-2xl">
+                {title}
+              </h1>
               {chips}
             </div>
             <p className="mt-1 line-clamp-2 text-sm text-muted">{subtitle}</p>
