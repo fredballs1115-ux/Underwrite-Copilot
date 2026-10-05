@@ -37,7 +37,7 @@
 import { compactUsd } from "@/lib/money";
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import agencyRules from "@/data/research/agency_rules.json";
-import { parseMoney } from "@/lib/criteria";
+import { parseCount, parseMoney } from "@/lib/criteria";
 import { researchAge, staleMark } from "@/lib/research-age";
 import {
   CONDO_NOT_STATED,
