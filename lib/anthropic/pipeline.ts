@@ -4,7 +4,7 @@ import { withArticle } from "@/lib/article";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { downloadOmPdf } from "@/lib/storage";
 import { readFirstSignal } from "./first-signal";
-import { describeRunFailure, ScreenError } from "./failure";
+import { DATABASE_READ_FAILURE, describeRunFailure, ScreenError } from "./failure";
 import { NO_FIGURES_FAILURE, NO_OM_FAILURE, pageCapFailure } from "./document-failures";
 import { RunGate, concurrencyFromEnv } from "./run-gate";
 import { newLedger, summarizeUsage, usageLogLine, withUsageLedger, type UsageLedger } from "./usage";
@@ -799,9 +799,13 @@ async function runAnalysisSteps(
       .from("deals")
       .select("id, name, asset_class, om_storage_path, extraction, qa, verdict")
       .eq("id", dealId)
-      .single();
+      .maybeSingle();
 
-    if (error || !deal) throw new Error("Deal not found.");
+    // A read that failed is not a deal that is gone: one blip had told the
+    // reader looking at the deal it was "no longer available" (research
+    // pass 30). Only a read that answered with no row says that.
+    if (error) throw new ScreenError(DATABASE_READ_FAILURE, error.message);
+    if (!deal) throw new Error("Deal not found.");
     // Manual deals have no OM — the stored extraction (the buyer's typed
     // facts) is the source, and a synthesized fact sheet stands in for the
     // document. No extraction either means there's nothing to screen.
@@ -1504,9 +1508,10 @@ async function runReconciliationSteps(
       .from("deals")
       .select("id, om_storage_path, extraction, first_signal, address, asset_class")
       .eq("id", dealId)
-      .single();
+      .maybeSingle();
 
-    if (error || !deal) throw new Error("Deal not found.");
+    if (error) throw new ScreenError(DATABASE_READ_FAILURE, error.message);
+    if (!deal) throw new Error("Deal not found.");
     if (!deal.om_storage_path) {
       throw new Error("No OM file is attached to this deal.");
     }

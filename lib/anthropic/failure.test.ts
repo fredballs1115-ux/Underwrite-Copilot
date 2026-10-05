@@ -8,6 +8,7 @@ import {
 } from "./failure";
 import { newLedger, withUsageLedger } from "./usage";
 import { needsOperator } from "./operator-failures";
+import { documentFailure } from "./document-failures";
 
 /** The SDK's APIError, by shape: an HTTP status and its "401 {…}" message. */
 function apiError(status: number, type: string, message: string): Error {
@@ -80,9 +81,27 @@ describe("describeRunFailure — the analyst reads a sentence, the log keeps the
     const conn = Object.assign(new Error("Connection error."), { name: "APIConnectionError" });
     expect(describeRunFailure(conn).message).toMatch(/couldn't reach/);
     expect(describeRunFailure(new Error("fetch failed")).message).toMatch(/couldn't reach/);
-    expect(describeRunFailure(new Error("Storage download failed: Object not found")).message).toMatch(
-      /re-upload/,
-    );
+    const missing = describeRunFailure(new Error("Storage download failed: Object not found")).message;
+    expect(missing).toBe("The OM is missing from our file storage — upload it again with Replace OM.");
+    // A retry reads nothing again: the deal page offers Replace OM.
+    expect(documentFailure(missing)).toBe("replace");
+  });
+
+  it("our file storage failing on the network names our storage, never the analysis service (research pass 30)", () => {
+    for (const raw of [
+      "Storage download failed: fetch failed",
+      "Storage download failed: The operation was aborted due to timeout",
+      "Storage download failed: Gateway Timeout",
+      "Storage upload failed: socket hang up",
+    ]) {
+      const m = describeRunFailure(new Error(raw)).message;
+      expect(m, raw).toBe(
+        "We couldn't read the OM back from our file storage just now — try again in a minute; if it keeps failing, upload it again with Replace OM.",
+      );
+      expect(m, raw).not.toMatch(/analysis service/);
+      // A passing fault keeps its retry.
+      expect(documentFailure(m), raw).toBeNull();
+    }
   });
 
   it("the SDK parser's own message becomes 'incomplete or unreadable'", () => {

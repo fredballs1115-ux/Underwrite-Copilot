@@ -31,6 +31,11 @@ export const TOO_LARGE_FAILURE =
 export const REJECTED_FAILURE =
   "The analysis service could not accept this document — if it is a secured copy, save an unlocked one (print it to PDF) and upload it with Replace OM; otherwise try again.";
 
+/** The OM is gone from our file storage (the object is not there): a retry
+ *  reads nothing again, so the way on is the file uploaded again. */
+export const STORAGE_MISSING_FAILURE =
+  "The OM is missing from our file storage — upload it again with Replace OM.";
+
 /** A deal with neither an OM nor typed facts: nothing to screen. */
 export const NO_OM_FAILURE =
   "No OM file is attached to this deal — upload one, or enter the deal's facts by hand.";
@@ -64,6 +69,8 @@ export function documentFailure(message: string | null | undefined): DocumentRem
   if (!m) return null;
   if (m === NO_OM_FAILURE) return "attach";
   if (m === REJECTED_FAILURE) return "replace_or_retry";
-  if (m === NO_FIGURES_FAILURE || TOO_LARGE.test(m) || PAGE_CAP.test(m) || REFUSAL.test(m)) return "replace";
+  if (m === NO_FIGURES_FAILURE || m === STORAGE_MISSING_FAILURE || TOO_LARGE.test(m) || PAGE_CAP.test(m) || REFUSAL.test(m)) {
+    return "replace";
+  }
   return null;
 }

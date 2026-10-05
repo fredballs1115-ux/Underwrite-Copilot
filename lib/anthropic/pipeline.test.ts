@@ -1920,6 +1920,19 @@ describe("runAnalysis — the run keeps its claim alive and cleans up after itse
     }
   });
 
+  it("one failed read of the deal is our database's, never a deal 'no longer available' (research pass 30)", async () => {
+    state.failDealReads = 1;
+    await runAnalysis("d1");
+    expect(job().status).toBe("error");
+    expect(job().error).toBe("We couldn't read this deal from our database just now — try again in a minute.");
+    expect(readFirstSignal).not.toHaveBeenCalled();
+    // A deal that is really gone still says so.
+    state = freshState();
+    delete state.deals.d1;
+    state.jobs = [];
+    await expect(runAnalysis("d1")).resolves.toBeUndefined();
+  });
+
   it("a verdict is never synthesized over a read of the deal's results that failed", async () => {
     // Every read up to the verdict answers; the verdict's own read blips.
     const reads = vi.fn();

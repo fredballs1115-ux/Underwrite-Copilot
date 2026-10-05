@@ -62,8 +62,9 @@ describe("documentFailure — the failures a retry of the same file cannot fix",
     expect(documentFailure(f.message)).toBe("replace_or_retry");
   });
 
-  it("a deal with no OM is offered one", () => {
+  it("a deal with no OM is offered one, and an OM gone from storage is uploaded again", () => {
     expect(documentFailure(NO_OM_FAILURE)).toBe("attach");
+    expect(documentFailure(describeRunFailure(new Error("Storage download failed: Object not found")).message)).toBe("replace");
   });
 
   it("a failure a retry may fix, and the operator's, are not the document's", () => {
@@ -74,7 +75,8 @@ describe("documentFailure — the failures a retry of the same file cannot fix",
       apiError(401, "authentication_error", "invalid x-api-key"),
       apiError(400, "invalid_request_error", "Your credit balance is too low to access the Anthropic API."),
       Object.assign(new Error("Connection error."), { name: "APIConnectionError" }),
-      new Error("Storage download failed: Object not found"),
+      // Our storage on a blip; an object that is gone is the document's (below).
+      new Error("Storage download failed: fetch failed"),
       new Error("Failed to parse structured output: Unterminated string in JSON at position 6"),
     ]) {
       const m = describeRunFailure(err).message;

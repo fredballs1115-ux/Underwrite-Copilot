@@ -12,7 +12,7 @@
  */
 import { recordUsage, usageOfResponse } from "./usage";
 import { ACCOUNT_PAUSED_FAILURE, CREDENTIALS_FAILURE } from "./operator-failures";
-import { REJECTED_FAILURE, TOO_LARGE_FAILURE, refusalFailure } from "./document-failures";
+import { REJECTED_FAILURE, STORAGE_MISSING_FAILURE, TOO_LARGE_FAILURE, refusalFailure } from "./document-failures";
 
 /** An error whose message was written for the analyst and shows as it is. */
 export class ScreenError extends Error {
@@ -56,8 +56,18 @@ const UNREACHABLE =
   "We couldn't reach the analysis service — check back in a minute and try again.";
 const UNREADABLE =
   "Claude's answer came back incomplete or unreadable — try again.";
-const STORAGE =
-  "We couldn't read the OM back from storage — re-upload it and try again.";
+// Our own file storage, named as itself: a storage read that failed on the
+// network carries the same words as the analysis service's ("fetch failed",
+// a timeout), and was told it could not reach the analysis service.
+const STORAGE_UNREACHABLE =
+  "We couldn't read the OM back from our file storage just now — try again in a minute; if it keeps failing, upload it again with Replace OM.";
+const STORAGE_MISSING = STORAGE_MISSING_FAILURE;
+
+/** One read of the deal from our database failed — a network blip, a
+ *  timeout — where the deal is still there: never "no longer available"
+ *  about a deal the reader is looking at (research pass 30). */
+export const DATABASE_READ_FAILURE =
+  "We couldn't read this deal from our database just now — try again in a minute.";
 const UNEXPECTED = "The screen hit an unexpected error — try again.";
 
 function messageOf(err: unknown): string {
@@ -133,6 +143,12 @@ export function describeRunFailure(err: unknown): RunFailure {
 
   const name = nameOf(err);
   const msg = messageOf(err);
+  // Our file storage first: its failures carry the connection words below
+  // ("fetch failed", a timeout, a gateway's 5xx), and read as the analysis
+  // service's (research pass 30). A missing object is gone, not unreachable.
+  if (/^storage (?:download|upload) failed\b|not found in storage|\bbucket\b/i.test(msg)) {
+    return { message: /object not found|not found in storage/i.test(msg) ? STORAGE_MISSING : STORAGE_UNREACHABLE, detail };
+  }
   if (/^APIConnection/.test(name) || /ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|fetch failed|socket hang up|network error|timed out|timeout/i.test(msg)) {
     return { message: UNREACHABLE, detail };
   }
@@ -140,7 +156,7 @@ export function describeRunFailure(err: unknown): RunFailure {
   if (isStructuredParseFailure(err) || /structured output|Unterminated string|Unexpected token|Unexpected end of JSON|in JSON at position/i.test(msg)) {
     return { message: UNREADABLE, detail };
   }
-  if (/storage download failed|object not found|not found in storage|bucket/i.test(msg)) return { message: STORAGE, detail };
+  if (/object not found/i.test(msg)) return { message: STORAGE_MISSING, detail };
   if (/^Deal not found\.?$/i.test(msg)) return { message: "This deal is no longer available.", detail };
 
   return { message: looksReadable(msg) ? msg : UNEXPECTED, detail };
