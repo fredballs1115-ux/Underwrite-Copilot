@@ -27,7 +27,7 @@ import { TEAM_TRIAL_DEALS } from "@/lib/teams";
 // drifted (the page said 7.1% while the engine computed 6.9%).
 import { computeModel } from "@/lib/model/compute";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
-import { sampleWorkbookPreview } from "@/lib/sample-derive";
+import { sampleDerivedInputs, sampleWorkbookPreview } from "@/lib/sample-derive";
 import { buyBoxRead, dealCheckSource, type BuyBoxChipTone } from "@/lib/buy-box-chip";
 import { sampleLegal } from "@/lib/sample-legal";
 import { ruleCounts } from "@/lib/research-data";
@@ -267,6 +267,10 @@ const STATS: { value: number; suffix: string; label: string }[] = [
 // cells of its Sensitivity tab (lib/sample-derive) — so the tile and the
 // workbook it links can never disagree.
 const XLSX_PREVIEW_ROWS: [string, string, string][] = sampleWorkbookPreview();
+
+// The stress bench's base: the same derivation, run here so the browser
+// gets the inputs and never the derivation (its readers hold data tables).
+const BENCH = sampleDerivedInputs();
 
 // The plan cards' lists are the billing page's too (lib/marketing-constants
 // FREE_PLAN, PRO_PLAN_LINES), each Pro line held to the gate that makes it
@@ -830,7 +834,7 @@ export default function Home() {
             </Reveal>
             <Reveal delay={80}>
               <div className="mt-8">
-                <StressBench />
+                <StressBench base={BENCH.inputs} units={BENCH.meta.units} />
               </div>
             </Reveal>
             {/* The bench stresses one screened deal. /tools is the same

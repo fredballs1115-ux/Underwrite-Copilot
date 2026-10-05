@@ -1,30 +1,51 @@
 "use client";
 
-// "Break it yourself": the deterministic return engine, running in the
-// reader's browser on the illustrative sample deal. Three levers — exit cap,
-// rent growth, vacancy — and every tick recomputes through the SAME
-// computeModel the product ships (pure code, no server round-trip, no AI).
-// This makes the toolkit tile's "drag the levers, watch it break" claim a
-// demonstration instead of a promise. Sample data only, labeled as such.
+// "Break it yourself": the screening model's engine (lib/underwrite/engine,
+// through the deal page's own playground layer), running in the reader's
+// browser on the illustrative sample deal. Three levers — exit cap, rent
+// growth, vacancy — and every tick re-runs the engine that prices each deal
+// page's returns and builds the Excel workbook (pure code, no server
+// round-trip, no AI). Its base is the sample's base case as the workbook and
+// the homepage's Excel tile derive it (lib/sample-derive, the T-12 leading),
+// handed down from the server so no derivation runs in the browser — the
+// bench, the tile and the workbook print one figure (research pass 40, M1:
+// it had run the first-draft model under words naming it the workbook's
+// engine, its dot "the broker's base", which was that model's reconciled
+// case). No new arithmetic: a lever left at its base is the base's own input.
 // No animation — state changes only, so reduced-motion needs no branch.
 
 import { useMemo, useState } from "react";
-import { computeModel } from "@/lib/model/compute";
-import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
+import { computeUnderwrite, type UnderwriteInputs } from "@/lib/underwrite/engine";
+import { fmtPct, fmtX, runScenario } from "@/lib/underwrite/playground";
+import { noIrrText } from "@/lib/underwrite/no-irr";
+import { SAMPLE_DEMO_BOX } from "@/lib/sample-deal";
 import { SLIDER_SWEEP_BPS } from "@/lib/marketing-constants";
 import { compactUsd } from "@/lib/money";
 
-const BASE = SAMPLE_DEAL.model.inputs;
 // The exit-cap lever sweeps the SAME band the product's slider does
-// (SLIDER_SWEEP_BPS each way, in percentage points here), centered on the
-// broker's base.
+// (SLIDER_SWEEP_BPS each way, in percentage points here), centred on the
+// base case's exit cap.
 const CAP_HALF = SLIDER_SWEEP_BPS / 100;
+// A model's rate to two places, as the lever shows it: the base sits on the
+// lever's own grid, so "Reset to base" and a drag back land on one figure.
+const pct2 = (dec: number) => Math.round(dec * 10_000) / 100;
+// A lever at its base runs the base's own input, never the rounded figure.
+const moved = (v: number, base: number) => Math.abs(v - base) > 1e-9;
 
-const fmtPct = (n: number | null) =>
-  n == null || !isFinite(n) ? "—" : `${n.toFixed(1)}%`;
-const fmtX = (n: number | null) =>
-  n == null || !isFinite(n) ? "—" : `${n.toFixed(2)}x`;
 const fmtM = (n: number) => compactUsd(n);
+
+type Levers = { exitCapPct?: number; rentGrowthPct?: number; vacancyPct?: number };
+
+/** The returns as the deal page's playground reads them (`runScenario`),
+ *  and the engine's own exit value and year-1 NOI under the same levers. */
+function scenario(model: UnderwriteInputs, levers: Levers) {
+  const r = computeUnderwrite({ ...model, expenseLines: model.expenseLines.map((l) => ({ ...l })), ...levers });
+  return {
+    ...runScenario(model, levers),
+    exitValue: r.residual.grossSaleProceeds,
+    year1Noi: r.cashFlow[0]?.noi ?? null,
+  };
+}
 
 function Lever({
   label,
@@ -77,7 +98,7 @@ function Lever({
 // ── IRR gauge ── an analog needle over the same number the big readout
 // prints, swinging live as the levers move. Scale 0–25% IRR; the accent
 // tick marks the demo mandate's target (a real stored criterion, not an
-// invented hurdle) and the faint dot marks the broker's base case.
+// invented hurdle) and the faint dot marks the base case.
 // aria-hidden — the numeric IRR reads right below it.
 const GAUGE_MAX = 25;
 const GAUGE_HURDLE = SAMPLE_DEMO_BOX.minIrrPct ?? null;
@@ -120,32 +141,38 @@ function IrrGauge({ irr, baseIrr }: { irr: number | null; baseIrr: number | null
   );
 }
 
-export function StressBench() {
-  const [exitCap, setExitCap] = useState(BASE.exitCapPct);
-  const [rentGrowth, setRentGrowth] = useState(BASE.rentGrowthPct);
-  const [vacancy, setVacancy] = useState(BASE.vacancyPct);
+export function StressBench({
+  base: model,
+  units,
+}: {
+  /** the sample's derived inputs (lib/sample-derive), the workbook's own */
+  base: UnderwriteInputs;
+  units: number | null;
+}) {
+  const capBase = pct2(model.exitCapPct);
+  const growthBase = pct2(model.rentGrowthPct);
+  const vacancyBase = pct2(model.vacancyPct);
+  const [exitCap, setExitCap] = useState(capBase);
+  const [rentGrowth, setRentGrowth] = useState(growthBase);
+  const [vacancy, setVacancy] = useState(vacancyBase);
 
-  const base = useMemo(() => computeModel(BASE).returns, []);
+  const base = useMemo(() => scenario(model, {}), [model]);
   const r = useMemo(
     () =>
-      computeModel({
-        ...BASE,
-        exitCapPct: exitCap,
-        rentGrowthPct: rentGrowth,
-        vacancyPct: vacancy,
-      }).returns,
-    [exitCap, rentGrowth, vacancy],
+      scenario(model, {
+        ...(moved(exitCap, capBase) ? { exitCapPct: exitCap / 100 } : {}),
+        ...(moved(rentGrowth, growthBase) ? { rentGrowthPct: rentGrowth / 100 } : {}),
+        ...(moved(vacancy, vacancyBase) ? { vacancyPct: vacancy / 100 } : {}),
+      }),
+    [model, exitCap, rentGrowth, vacancy, capBase, growthBase, vacancyBase],
   );
 
-  const touched =
-    exitCap !== BASE.exitCapPct ||
-    rentGrowth !== BASE.rentGrowthPct ||
-    vacancy !== BASE.vacancyPct;
+  const touched = moved(exitCap, capBase) || moved(rentGrowth, growthBase) || moved(vacancy, vacancyBase);
   const dIrr =
     r.leveredIrrPct != null && base.leveredIrrPct != null
-      ? r.leveredIrrPct - base.leveredIrrPct
+      ? (r.leveredIrrPct - base.leveredIrrPct) * 100
       : null;
-  // Tone follows the DELTA from the broker's base — the panel never invents
+  // Tone follows the DELTA from the base case — the panel never invents
   // a hurdle rate, it just shows what the levers do to the stated case.
   const tone =
     dIrr == null || !touched
@@ -157,10 +184,15 @@ export function StressBench() {
           : "text-white";
 
   const reset = () => {
-    setExitCap(BASE.exitCapPct);
-    setRentGrowth(BASE.rentGrowthPct);
-    setVacancy(BASE.vacancyPct);
+    setExitCap(capBase);
+    setRentGrowth(growthBase);
+    setVacancy(vacancyBase);
   };
+  const asPct = (dec: number | null) => (dec == null ? null : dec * 100);
+  // The vacancy lever keeps its old band (about 2–15% at half-point
+  // steps), anchored on the base so the base is one of its stops.
+  const vacancyMin = pct2((vacancyBase - 0.5 * Math.min(14, Math.floor(vacancyBase / 0.5))) / 100);
+  const vacancyMax = pct2((vacancyBase + 12 * 0.5) / 100);
 
   return (
     <div>
@@ -169,9 +201,9 @@ export function StressBench() {
           <Lever
             label="Exit cap"
             value={exitCap}
-            base={BASE.exitCapPct}
-            min={BASE.exitCapPct - CAP_HALF}
-            max={BASE.exitCapPct + CAP_HALF}
+            base={capBase}
+            min={capBase - CAP_HALF}
+            max={capBase + CAP_HALF}
             step={0.05}
             unit="%"
             onChange={setExitCap}
@@ -179,7 +211,7 @@ export function StressBench() {
           <Lever
             label="Rent growth"
             value={rentGrowth}
-            base={BASE.rentGrowthPct}
+            base={growthBase}
             min={0}
             max={6}
             step={0.25}
@@ -189,9 +221,9 @@ export function StressBench() {
           <Lever
             label="Vacancy"
             value={vacancy}
-            base={BASE.vacancyPct}
-            min={2}
-            max={15}
+            base={vacancyBase}
+            min={vacancyMin}
+            max={vacancyMax}
             step={0.5}
             unit="%"
             onChange={setVacancy}
@@ -215,11 +247,11 @@ export function StressBench() {
 
         <div className="min-w-[15rem]">
           <div aria-hidden className={tone}>
-            <IrrGauge irr={r.leveredIrrPct} baseIrr={base.leveredIrrPct} />
+            <IrrGauge irr={asPct(r.leveredIrrPct)} baseIrr={asPct(base.leveredIrrPct)} />
             <p className="mt-1 text-center text-[10px] text-white/55">
               tick = the demo mandate&apos;s{" "}
               {GAUGE_HURDLE != null ? `${GAUGE_HURDLE}%` : ""} IRR target · dot
-              = broker&apos;s base
+              = the base case
             </p>
           </div>
           <dl className="mt-4 grid grid-cols-2 content-start gap-x-10 gap-y-5">
@@ -233,11 +265,16 @@ export function StressBench() {
               {fmtPct(r.leveredIrrPct)}
             </dd>
             <dd className="mt-0.5 h-4 text-xs text-white/50">
-              {touched && dIrr != null && (
-                <span className={tone}>
-                  {dIrr > 0 ? "+" : ""}
-                  {dIrr.toFixed(1)}pts vs the broker&apos;s base
-                </span>
+              {r.leveredIrrPct == null && r.noIrr ? (
+                <span>{noIrrText(r.noIrr)}</span>
+              ) : (
+                touched &&
+                dIrr != null && (
+                  <span className={tone}>
+                    {dIrr > 0 ? "+" : ""}
+                    {dIrr.toFixed(1)}pts vs the base case
+                  </span>
+                )
               )}
             </dd>
           </div>
@@ -246,7 +283,7 @@ export function StressBench() {
               Equity multiple
             </dt>
             <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-              {fmtX(r.equityMultiple)}
+              {fmtX(r.leveredEquityMultiple)}
             </dd>
           </div>
           <div>
@@ -254,7 +291,7 @@ export function StressBench() {
               Cash-on-cash (Yr 1)
             </dt>
             <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-              {fmtPct(r.cashOnCashPct)}
+              {fmtPct(r.cocYr1Pct)}
             </dd>
           </div>
           <div>
@@ -270,16 +307,17 @@ export function StressBench() {
               Year-1 NOI
             </dt>
             <dd className="mt-0.5 font-mono text-xl font-semibold tabular-nums">
-              {fmtM(r.year1Noi)}
+              {r.year1Noi == null ? "—" : fmtM(r.year1Noi)}
             </dd>
           </div>
           </dl>
         </div>
       </div>
       <p className="mt-3 text-center text-[11px] leading-relaxed text-white/60">
-        Illustrative sample deal ({BASE.units} units, {fmtM(BASE.purchasePrice)}
-        ) — not a real listing. Same deterministic <code>computeModel</code>{" "}
-        that prices every real screen and builds the Excel workbook.
+        Illustrative sample deal ({units != null ? `${units} units, ` : ""}
+        {fmtM(model.purchasePrice)}), not a real listing — the screening engine
+        behind each deal page&apos;s returns and the Excel workbook, run from
+        the workbook&apos;s own base case.
       </p>
     </div>
   );

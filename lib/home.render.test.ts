@@ -8,9 +8,10 @@ import React from "react";
 import { prerenderToNodeStream } from "react-dom/static";
 import { renderToStaticMarkup } from "react-dom/server";
 import { a11yIssues } from "./render-lint";
-import { sampleWorkbookPreview } from "./sample-derive";
+import { sampleDerivedInputs, sampleWorkbookPreview } from "./sample-derive";
 import type { SampleLegal } from "./sample-legal";
 import { DemoPanel } from "@/app/landing-interactive";
+import { StressBench } from "@/app/landing-stress";
 import { ReturnsHeadline } from "@/app/(app)/deals/[id]/model-view";
 import { buyBoxRead, dealCheckSource } from "./buy-box-chip";
 import { SAMPLE_DEAL, SAMPLE_DEMO_BOX } from "./sample-deal";
@@ -148,6 +149,29 @@ describe("the homepage's sample figures are the surfaces' own", () => {
     for (const [k, v, e] of sampleWorkbookPreview()) expect(tile).toContain(`${k} ${v} ${e}`);
     expect(tile).toContain("Exit cap 5.45% IRR 9.3%");
     expect(tile).not.toContain("Rent growth");
+  }, 60_000);
+
+  // Research pass 40, M1: the stress bench ran the first-draft model
+  // (lib/model/compute) at its reconciled case — 8.7% — under words naming it
+  // the engine that "builds the Excel workbook", its dot "the broker's base",
+  // while the Excel tile beside it printed the workbook's 9.3%. It runs the
+  // screening engine from the workbook's own base case now, and says so.
+  it("the stress bench runs the workbook's engine from the workbook's base case, and says which", async () => {
+    const { inputs, meta } = sampleDerivedInputs();
+    const bench = words(renderToStaticMarkup(React.createElement(StressBench, { base: inputs, units: meta.units }))).replace(/&#x27;/g, "'");
+    const tileIrr = sampleWorkbookPreview()[1][2].replace("IRR ", "");
+    expect(tileIrr).toBe("9.3%");
+    expect(bench).toContain(`Levered IRR ${tileIrr}`);
+    expect(bench).toContain("Equity multiple 1.53x");
+    expect(bench).toContain("dot = the base case");
+    expect(bench).toContain("the screening engine behind each deal page's returns and the Excel workbook, run from the workbook's own base case");
+    expect(bench).not.toMatch(/computeModel|broker/i);
+    // The page hands the bench that derivation: its section prints the tile's figure.
+    const html = await renderHome();
+    const at = html.indexOf('id="stress"');
+    expect(at).toBeGreaterThan(-1);
+    const section = words(html.slice(at, html.indexOf("</section>", at)));
+    expect(section).toContain(`Levered IRR ${tileIrr}`);
   }, 60_000);
 
   it("the miniature's Financials tab is the deal page's first-draft card: its figures, to its places, and its model's name", () => {
