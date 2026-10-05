@@ -200,6 +200,66 @@ describe("a preferred equity position, read as a position (research pass 28, rou
   });
 });
 
+// The batch audit: a current pay the memorandum does not state was run as
+// zero — "nothing is paid in cash", a 3.8% yield to redemption and the tag
+// "Pref equity, 4% to Jun 2029" — though the total and the accrual beside it
+// gave an 8% current pay.
+describe("a current pay the memorandum does not state", () => {
+  const position = (...rows: ExtractionResult["metrics"]) =>
+    ex([metric("Preferred equity amount", "$10,000,000"), ...rows, metric("Mandatory redemption date", "June 2029")], "preferred_equity");
+
+  it("is the preferred return less the accrual, said as derived, where both are stated", () => {
+    for (const rows of [[metric("Preferred return", "12%"), metric("Accrual rate", "4%")], [metric("Preferred return", "12%, of which 4% accrues")]]) {
+      const r = readPosition(position(...rows), 10_000_000, ON)!;
+      expect(r.terms).toMatchObject({ totalPct: 12, currentPayPct: 8, currentPayDerived: true, accrualPct: 4, accrualDerived: false });
+      expect(r.currentPayYear).toBe(800_000);
+      expect(r.headline).toContain("at 8.00% current pay (the preferred return less the accrual) and 4.00% accruing");
+      expect(r.yieldPct!).toBeGreaterThan(11);
+      expect(r.yieldPct!).toBeLessThan(12);
+      expect(r.sentences.join(" ")).toContain("Current pay is cash and accrual a promise: $800k a year is paid in cash");
+      expect(positionTag(r)).toBe("Pref equity, 12% to Jun 2029");
+    }
+  });
+
+  it("reads \"N% current\" as the current pay, with or without \"pay\"", () => {
+    const r = readPosition(position(metric("Preferred return", "12% (8% current, 4% accrued)")), 10_000_000, ON)!;
+    expect(r.terms).toMatchObject({ totalPct: 12, currentPayPct: 8, currentPayDerived: false, accrualPct: 4, accrualDerived: false });
+    expect(r.headline).toMatch(/^A preferred equity position of \$10\.0M at 8\.00% current pay and 4\.00% accruing, to be redeemed by Jun 2029: 11\.\d% to redemption/);
+    expect(positionTag(r)).toBe("Pref equity, 12% to Jun 2029");
+  });
+
+  it("says the memorandum states none where it does not, and withholds the yield and the tag's rate rather than run them at zero", () => {
+    const r = readPosition(position(metric("Accrual rate", "4%")), 10_000_000, ON)!;
+    expect(r.terms.currentPayPct).toBeNull();
+    expect(r.yieldPct).toBeNull();
+    expect(r.currentPayYear).toBeNull();
+    expect(r.currentYieldPct).toBeNull();
+    expect(r.headline).toBe(
+      "A preferred equity position of $10.0M at 4.00% accruing, to be redeemed by Jun 2029: the memorandum states no current pay, so no yield to redemption is read.",
+    );
+    const said = r.sentences.join(" ");
+    expect(said).toContain("Current pay is cash and accrual a promise: the memorandum states no current pay; $1.07M accrues to be paid at redemption, not counting any compounding.");
+    expect(said).not.toContain("nothing is paid in cash");
+    expect(positionTag(r)).toBe("Pref equity to Jun 2029");
+    expect(positionCaption(r)).toBe("32 months to its Jun 2029 redemption; the memorandum states no current pay, so no yield to redemption is read.");
+    // A preferred return stated in all, its parts not: said, and the tag's
+    // rate is the return stated.
+    const whole = readPosition(position(metric("Preferred return", "12%")), 10_000_000, ON)!;
+    expect(whole.yieldPct).toBeNull();
+    expect(whole.headline).toBe(
+      "A preferred equity position of $10.0M at a 12.00% preferred return, to be redeemed by Jun 2029: the memorandum states no current pay, so no yield to redemption is read.",
+    );
+    expect(positionTag(whole)).toBe("Pref equity, 12% to Jun 2029");
+    // A current pay the words state as none is a zero, and the yield is read.
+    for (const zero of [[metric("Current pay rate", "0%"), metric("Accrual rate", "12%")], [metric("Preferred return", "12%, fully accruing")]]) {
+      const z = readPosition(position(...zero), 10_000_000, ON)!;
+      expect(z.terms.currentPayPct).toBe(0);
+      expect(z.yieldPct).not.toBeNull();
+      expect(z.sentences.join(" ")).toContain("nothing is paid in cash");
+    }
+  });
+});
+
 // The extraction asks for each row this reads, by the reader's own labels,
 // and files the position as its own kind (lib/interest reads it from there).
 describe("the extraction asks for the rows a position is read from", () => {

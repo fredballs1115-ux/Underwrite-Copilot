@@ -72,7 +72,15 @@ export interface PositionTerms {
   amount: number | null;
   /** the preferred return as written, both parts */
   preferredReturn: string | null;
+  /** the preferred return in all, where the words state one figure for it
+   *  apart from its parts ("12%, of which 4% accrues" is 12) */
+  totalPct: number | null;
+  /** the cash part; null where the memorandum states none and it cannot be
+   *  derived — never read as zero, which a "0%" or "fully accruing" states */
   currentPayPct: number | null;
+  /** the current pay is not stated but the total and the accrual are: the
+   *  current pay is the one less the other, said as derived */
+  currentPayDerived: boolean;
   accrualPct: number | null;
   /** the accrual is not stated but the total and the current pay are: the
    *  accrual is the one less the other, said as derived */
@@ -153,6 +161,35 @@ const partPct = (text: string, part: RegExp): number | null => {
   return Number.isFinite(n) && n > 0 && n < 50 ? n : null;
 };
 
+/** The words a cash part is named with: "8% current pay", "8% current",
+ *  "8% paid currently" (the batch audit: "12% (8% current, 4% accrued)" had
+ *  read no current pay). */
+const CURRENT_PART = /(?:paid\s+)?current(?:ly)?(?:[\s-]*pay)?/;
+/** The words an accrual is named with: "4% accruing", "4% accrues". */
+const ACCRUAL_PART = /accru/;
+/** A current pay the words state as none: "0%", "0% current pay", "no
+ *  current pay", "fully accruing" — a stated zero, where a blank is none. */
+const ZERO_CURRENT =
+  /^\s*0(?:\.0+)?\s*(?:%|percent\b)|\b0(?:\.0+)?\s*(?:%|percent)\s*(?:paid\s+)?current|\bno\s+current[\s-]*pay\b|\b(?:fully|entirely|wholly)\s+accru(?:ing|ed|es)\b|\ball\s+accru(?:ing|es)\b|\baccru(?:es|ing)\s+in\s+full\b/i;
+
+/** The preferred return in all: a percentage the words name as the return
+ *  ("12% preferred return"), else the one percentage they do not name as a
+ *  part — "12%", "12%, of which 4% accrues", "12% (8% current, 4%
+ *  accrued)". Null for none, or for two such figures. */
+function totalOf(text: string): number | null {
+  const named = partPct(text, /pref(?:erred)?(?:\s+return)?\b|total|all[\s-]*in/);
+  if (named != null) return named;
+  const loose = [...text.matchAll(/(\d+(?:\.\d+)?)\s*(?:%|percent\b|per cent\b)/gi)]
+    .filter((m) => {
+      const after = text.slice((m.index ?? 0) + m[0].length);
+      return !new RegExp(`^\\s*(?:${CURRENT_PART.source}|${ACCRUAL_PART.source})`, "i").test(after);
+    })
+    .map((m) => Number(m[1]))
+    .filter((n) => Number.isFinite(n) && n > 0 && n < 50);
+  const distinct = [...new Set(loose)];
+  return distinct.length === 1 ? distinct[0] : null;
+}
+
 const compoundingOf = (text: string): boolean | null => {
   if (/\bnon[\s-]*compound|\bsimple\b|\bnot\s+compound/i.test(text)) return false;
   if (/\bcompound(?:s|ed|ing)?\b/i.test(text)) return true;
@@ -174,18 +211,28 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
   const remediesRow = rowOf(ex, REMEDIES_ROW);
 
   // The preferred return as written may state its parts ("12% preferred
-  // return, 8% current pay"): each part is read by the words it is named
-  // with, the parts' own rows first.
+  // return, 8% current pay", "12% (8% current, 4% accrued)"): each part is
+  // read by the words it is named with, the parts' own rows first. A
+  // current pay the words state as none is a zero; one they do not state
+  // is none, never a zero (the batch audit: a stated accrual beside no
+  // stated current pay had read "nothing is paid in cash" and a 3.8% yield).
   const returnText = returnRow?.value ?? "";
-  const currentPayPct = currentRow ? onePct(currentRow.value) : partPct(returnText, /current[\s-]*pay/);
-  let accrualPct = accrualRow ? onePct(accrualRow.value) : partPct(returnText, /accru/);
+  const statedZero = (text: string) => (ZERO_CURRENT.test(text) ? 0 : null);
+  let currentPayPct = currentRow
+    ? (onePct(currentRow.value) ?? statedZero(currentRow.value))
+    : (partPct(returnText, CURRENT_PART) ?? statedZero(returnText));
+  let accrualPct = accrualRow ? onePct(accrualRow.value) : partPct(returnText, ACCRUAL_PART);
   let accrualDerived = false;
-  // The total less the cash part is what accrues — said as derived — only
-  // where the total is one figure and the current pay is below it.
-  const total = returnRow ? (partPct(returnText, /pref(?:erred)?(?:\s+return)?\b|total|all[\s-]*in/) ?? onePct(returnText)) : null;
+  let currentPayDerived = false;
+  // The total less one part is the other — said as derived — only where the
+  // total is one figure and the part stated is not above it.
+  const total = returnRow ? totalOf(returnText) : null;
   if (accrualPct == null && total != null && currentPayPct != null && total > currentPayPct) {
     accrualPct = Math.round((total - currentPayPct) * 1e6) / 1e6;
     accrualDerived = true;
+  } else if (currentPayPct == null && total != null && accrualPct != null && total >= accrualPct) {
+    currentPayPct = Math.round((total - accrualPct) * 1e6) / 1e6;
+    currentPayDerived = true;
   }
   const redemption = redemptionRow ? readStatedDate(redemptionRow.value, 1990, 2100, "last") : null;
   const seniorMaturity = seniorMaturityRow ? readStatedDate(seniorMaturityRow.value, 1990, 2100, "first") : null;
@@ -193,7 +240,9 @@ export function readPositionTerms(ex: MetricRows): PositionTerms {
   return {
     amount: amountRow ? money(amountRow.value) : null,
     preferredReturn: returnRow ? returnRow.value.trim() : null,
+    totalPct: total,
     currentPayPct,
+    currentPayDerived,
     accrualPct,
     accrualDerived,
     compounds: accrualPct != null ? compoundingOf(compoundWords) : null,
@@ -245,16 +294,21 @@ export function readPosition(
   const redeemedPast = !thisMonth && daysLeft != null && daysLeft < 0;
   const monthsLeft = terms.redemption && !redeemedPast ? Math.max(0, monthsBetween(today, terms.redemption)) : null;
 
-  const current = terms.currentPayPct != null ? terms.currentPayPct / 100 : 0;
+  // The cash part is read only where the memorandum states it (or the total
+  // and the accrual give it): a current pay not stated is never run as
+  // zero, so no yield is solved without it (the batch audit).
+  const currentKnown = terms.currentPayPct != null;
+  const current = currentKnown ? terms.currentPayPct! / 100 : 0;
   const accrual = terms.accrualPct != null ? terms.accrualPct / 100 : 0;
-  const currentPayYear = terms.currentPayPct != null ? amount * current : null;
+  const currentPayYear = currentKnown ? amount * current : null;
   const accruedSimple = terms.accrualPct != null && monthsLeft != null ? amount * accrual * (monthsLeft / 12) : null;
   // Compounding, the accrued return earns the preferred return itself (the
   // current pay and the accrual together) — what "compounding" means of an
   // unpaid preferred return — so a position bought at par earns exactly
-  // its preferred return.
+  // its preferred return. Without the current pay that return is not
+  // known, and the compounding is not read.
   let accruedCompound: number | null = null;
-  if (terms.accrualPct != null && monthsLeft != null) {
+  if (terms.accrualPct != null && monthsLeft != null && currentKnown) {
     let owed = 0;
     for (let t = 0; t < monthsLeft; t++) owed = owed * (1 + (current + accrual) / 12) + (amount * accrual) / 12;
     accruedCompound = owed;
@@ -263,12 +317,11 @@ export function readPosition(
   // simple accrual — the lower yield.
   const accruedForYield = terms.compounds === true ? accruedCompound : accruedSimple;
   // The last dollar on the stated compounding; where the words say neither,
-  // compounding — the higher stack.
-  const accruedForStack = terms.compounds === false ? accruedSimple : accruedCompound;
+  // compounding — the higher stack — where it can be read.
+  const accruedForStack = terms.compounds === false || accruedCompound == null ? accruedSimple : accruedCompound;
 
   let yieldPct: number | null = null;
-  const anyRate = terms.currentPayPct != null || terms.accrualPct != null;
-  if (pay != null && monthsLeft != null && monthsLeft >= 1 && anyRate) {
+  if (pay != null && monthsLeft != null && monthsLeft >= 1 && currentKnown) {
     const flows = [-pay];
     for (let t = 1; t <= monthsLeft; t++) {
       flows.push((amount * current) / 12 + (t === monthsLeft ? amount + (accruedForYield ?? 0) : 0));
@@ -313,8 +366,10 @@ export function readPosition(
 
 function rateWords(t: PositionTerms): string {
   const parts: string[] = [];
-  if (t.currentPayPct != null) parts.push(`${pctText(t.currentPayPct)} current pay`);
+  if (t.currentPayPct != null) parts.push(`${pctText(t.currentPayPct)} current pay${t.currentPayDerived ? " (the preferred return less the accrual)" : ""}`);
   if (t.accrualPct != null) parts.push(`${pctText(t.accrualPct)} accruing${t.accrualDerived ? " (the preferred return less the current pay)" : ""}`);
+  // A preferred return stated in all, its parts not: the figure alone.
+  if (parts.length === 0 && t.totalPct != null) parts.push(withArticle(`${pctText(t.totalPct)} preferred return`));
   return parts.join(" and ");
 }
 
@@ -330,14 +385,26 @@ function positionSentences(r: Omit<PositionRead, "headline" | "sentences">): str
     out.push(`${lead}: ${pctText(r.yieldPct, 1)} to redemption at its ${money2(r.price)} price.`);
   } else if (!t.redemption) {
     out.push(`${lead}. The memorandum states no redemption date, so no yield to redemption is read.`);
+  } else if (t.currentPayPct == null) {
+    // No cash part stated: never run as zero (the batch audit).
+    out.push(`${lead}: the memorandum states no current pay, so no yield to redemption is read.`);
   } else {
     out.push(`${lead}.`);
   }
   // Current pay is cash, accrual a promise.
   if (r.currentPayYear != null || (t.accrualPct != null && r.monthsLeft != null)) {
-    const cash = r.currentPayYear != null ? `${money2(r.currentPayYear)} a year is paid in cash` : "nothing is paid in cash";
+    const cash =
+      r.currentPayYear == null
+        ? "the memorandum states no current pay"
+        : r.currentPayYear === 0
+          ? "nothing is paid in cash"
+          : `${money2(r.currentPayYear)} a year is paid in cash`;
     let owed = "";
-    if (t.accrualPct != null && r.monthsLeft != null && r.accruedSimple != null && r.accruedCompound != null) {
+    if (t.accrualPct != null && r.monthsLeft != null && r.accruedSimple != null && r.accruedCompound == null) {
+      // The compounding earns the preferred return, which the current pay
+      // not stated leaves unknown.
+      owed = `; ${money2(r.accruedSimple)} accrues to be paid at redemption, not counting any compounding`;
+    } else if (t.accrualPct != null && r.monthsLeft != null && r.accruedSimple != null && r.accruedCompound != null) {
       if (t.compounds === true) owed = `; ${money2(r.accruedCompound)} accrues, compounding, to be paid at redemption`;
       else if (t.compounds === false) owed = `; ${money2(r.accruedSimple)} accrues, not compounding, to be paid at redemption`;
       else
@@ -394,6 +461,9 @@ export function positionCaption(r: PositionRead | null): string {
         : `Under a month to its ${when} redemption.`;
   }
   if (r.monthsLeft == null) return "";
+  const months = `${r.monthsLeft} ${r.monthsLeft === 1 ? "month" : "months"}`;
+  // No cash part stated: no yield was solved, and the small print says why.
+  if (t.currentPayPct == null) return `${months} to its ${when} redemption; the memorandum states no current pay, so no yield to redemption is read.`;
   // The yield's accrual on the side lib/position reads it: as stated, else
   // simple — the lower.
   const basis =
@@ -404,7 +474,7 @@ export function positionCaption(r: PositionRead | null): string {
         : t.compounds === false
           ? "the accrual simple, as stated"
           : "the accrual read as simple, the lower yield — the memorandum does not say whether it compounds";
-  return `${r.monthsLeft} ${r.monthsLeft === 1 ? "month" : "months"} to its ${when} redemption, ${basis}.`;
+  return `${months} to its ${when} redemption, ${basis}.`;
 }
 
 /** What the property model's returns are, beside the position's own. */
@@ -415,11 +485,14 @@ export function positionModelLine(r: PositionRead | null): string | null {
   return `The property model runs the whole building at the position's price; that is not this position's return — ${yieldPart}${stackPart}.`;
 }
 
-/** The tag a pipeline row wears: "Pref equity, 12% to Jun 2029". */
+/** The tag a pipeline row wears: "Pref equity, 12% to Jun 2029" — the rate
+ *  the current pay and the accrual come to, or the preferred return stated
+ *  in all; none where the current pay is not stated and no total is, never
+ *  the accrual alone as if nothing were paid in cash (the batch audit). */
 export function positionTag(r: PositionRead | null): string | null {
   if (!r) return null;
   const t = r.terms;
-  const total = t.currentPayPct != null || t.accrualPct != null ? (t.currentPayPct ?? 0) + (t.accrualPct ?? 0) : null;
+  const total = t.currentPayPct != null ? t.currentPayPct + (t.accrualPct ?? 0) : t.totalPct;
   const rate = total != null ? ` ${Number(total.toFixed(2))}%` : "";
   const to = t.redemption && !r.redeemedPast ? ` to ${monthYear(t.redemption)}` : "";
   if (r.redeemedPast) return "Pref equity, past redemption";
