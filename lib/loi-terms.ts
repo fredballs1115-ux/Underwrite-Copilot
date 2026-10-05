@@ -16,13 +16,13 @@
 // books, records and leases. Four rules.
 //
 //   THE WRONG DOCUMENT IS REFUSED, WITH THE REASON. A note, a share of the
-//   owning entity and the leased fee are not the property; an auction and a
-//   bankruptcy sale are bid for under their own terms, and so is a sale with
-//   a stalking-horse bid — priced or not, and whatever method the
-//   memorandum names (it had been refused only where the bid parsed as
-//   dollars, so "In place — terms in the data room" drafted a purchase from
-//   the owner). No draft is made, and the panel and the route say the same
-//   one sentence (lib/loi-refusal).
+//   owning entity, a preferred equity position in it and the leased fee are
+//   not the property; an auction and a bankruptcy sale are bid for under
+//   their own terms, and so is a sale with a stalking-horse bid — priced or
+//   not, and whatever method the memorandum names (it had been refused only
+//   where the bid parsed as dollars, so "In place — terms in the data room"
+//   drafted a purchase from the owner). No draft is made, and the panel and
+//   the route say the same one sentence (lib/loi-refusal).
 //
 //   WHAT THE MEMORANDUM STATES IS SAID, AND NOTHING IS INVENTED. A
 //   leasehold's draft names the leasehold interest under its ground lease as
@@ -93,6 +93,9 @@ function refusalOf(ex: ExtractionResult | null | undefined): LoiRefusalKind | nu
   const { kind } = interestOf(ex);
   if (kind === "note") return "note";
   if (kind === "partial_interest") return "share";
+  // A preferred equity position, its own kind or a share whose rows say one
+  // (lib/interest `interestOf`).
+  if (kind === "preferred_equity") return "position";
   if (kind === "leased_fee") return "leased_fee";
   const sale = readSale(ex);
   if (sale) {

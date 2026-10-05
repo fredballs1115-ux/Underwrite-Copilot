@@ -179,6 +179,26 @@ describe("the LOI is refused where the memorandum sells something else, or sells
     ],
     ["a share", { ...extraction, interest: interest("partial_interest", { share: "49% limited partnership interest" }) }, "share"],
     ["a share of no stated percentage", { ...extraction, interest: interest("partial_interest") }, "share"],
+    // A preferred equity position (lib/position): its own kind, and a share
+    // filed before the kind was asked whose rows say a position.
+    [
+      "a preferred equity position",
+      {
+        ...extraction,
+        interest: interest("preferred_equity"),
+        metrics: [...extraction.metrics, row("Preferred equity amount", "$15,000,000"), row("Preferred return", "12% preferred return, 8% current pay")],
+      },
+      "position",
+    ],
+    [
+      "a share whose rows say a preferred equity position",
+      {
+        ...extraction,
+        interest: interest("partial_interest"),
+        metrics: [...extraction.metrics, row("Preferred equity amount", "$15,000,000"), row("Current pay rate", "8.0%")],
+      },
+      "position",
+    ],
     ["the leased fee", { ...extraction, interest: interest("leased_fee", { groundLease: "Ground lease to 2071" }) }, "leased_fee"],
     ["an auction", { ...extraction, sale: sale("auction"), metrics: [...extraction.metrics, row("Starting bid", "$2,500,000")] }, "auction"],
     // An auction's figures make an auction whatever the method says (lib/sale-terms).
@@ -233,6 +253,7 @@ describe("the LOI is refused where the memorandum sells something else, or sells
 
   it("says why in each sentence: a note is bought under a loan sale agreement, an auction under its own terms", () => {
     expect(LOI_REFUSAL.note).toMatch(/loan sale agreement, not a property letter of intent/);
+    expect(LOI_REFUSAL.position).toMatch(/sells a preferred equity position in the owning entity, not the property — a position is bought under the entity's own agreements/);
     expect(LOI_REFUSAL.auction).toMatch(/bid for under the auction's own terms/);
     // True of a stalking horse whether or not the memorandum prices it.
     expect(LOI_REFUSAL.bids).toMatch(/states a stalking-horse bid — the property is sold through bidding that higher bids can reopen/);
