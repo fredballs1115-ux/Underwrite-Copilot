@@ -31,6 +31,7 @@ import { metroDemand, type MetroDemand } from "@/lib/metro-demand";
 import { metroForAddress } from "@/lib/market-match";
 import { PlaceBand } from "@/app/place-band";
 import { DataNotices } from "@/app/data-notices";
+import { linkOk } from "@/lib/link-audit";
 
 // ISR, five-minute window: without a revalidate this page is fully static
 // and browsers may serve a year-stale copy under stale-while-revalidate —
@@ -497,6 +498,25 @@ export default async function DemoPage() {
                     <dd className="mt-0.5 font-mono text-base font-semibold tabular-nums">
                       {`$${phillyMedian.price.toLocaleString("en-US")}`}
                     </dd>
+                    {/* Redfin's figure, credited to Redfin and linked to the
+                        page the research file cites for it (research pass
+                        31, C4: it had printed with no source at all). */}
+                    {phillyMedian.sourceHref && (
+                      <dd className="mt-0.5 text-[10px] leading-snug text-muted" data-qa="redfin-credit">
+                        {linkOk(phillyMedian.sourceHref) !== false ? (
+                          <a
+                            href={phillyMedian.sourceHref}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline decoration-dotted underline-offset-2 hover:text-ink"
+                          >
+                            Redfin public dataset
+                          </a>
+                        ) : (
+                          "Redfin public dataset"
+                        )}
+                      </dd>
+                    )}
                   </div>
                 )}
               </dl>

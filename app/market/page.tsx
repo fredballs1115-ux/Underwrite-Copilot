@@ -34,7 +34,7 @@ import { RentBoard } from "./rent-board";
 import { ZoriLine } from "./zori-line";
 import { liveRealtor } from "@/lib/realtor-read";
 import { RealtorLine } from "./realtor-line";
-import { mergeBenchmarks, seedBenchmarks, seedRules } from "@/lib/research-data";
+import { mergeBenchmarks, redfinSourceHref, seedBenchmarks, seedRules } from "@/lib/research-data";
 import { signedInBenchmarkRows, signedInStockCounts } from "@/lib/research-read";
 import { DC_AREA_METRO, FMR_BEDS, fmrEffectiveOf, fmrLabel, fmrOf, fmrTwoBed, fmrWhen, readFmrMetric } from "@/lib/fmr";
 import { datedLong } from "@/lib/debt-index";
@@ -450,6 +450,7 @@ async function MidAtlanticTable({ signedIn }: { signedIn: boolean }) {
     .sort((a, b) => (a.price!.low ?? 0) - (b.price!.low ?? 0));
   if (priceRows.length === 0) return null;
   const tableStale = staleMark(researchAge(priceRows[0].price!.as_of, todayIso()));
+  const redfinHref = redfinSourceHref(priceRows[0].price!.source);
 
   const money = (n: number | null) => (n === null ? "—" : `$${Math.round(n / 1000)}k`);
   const range = (b: { low: number | null; high: number | null } | undefined) =>
@@ -466,7 +467,21 @@ async function MidAtlanticTable({ signedIn }: { signedIn: boolean }) {
           Mid-Atlantic 2–4 unit market
         </h2>
         <span className="text-[11px] text-muted">
-          {`${priceRows[0].price!.as_of} · Redfin public dataset`}
+          {`${priceRows[0].price!.as_of} · `}
+          {/* Redfin credited and linked to the page the research file cites
+              for these rows (research pass 31, C4: named, never linked). */}
+          {redfinHref && linkOk(redfinHref) !== false ? (
+            <a
+              href={redfinHref}
+              target="_blank"
+              rel="noreferrer"
+              className="underline decoration-dotted underline-offset-2 hover:text-ink"
+            >
+              Redfin public dataset
+            </a>
+          ) : (
+            "Redfin public dataset"
+          )}
           {/* The month's figures are dated its last day; past the research
               rule's limit (lib/research-age) the date says its age and that
               it is stale — the deal page's rows say the same of these rows. */}

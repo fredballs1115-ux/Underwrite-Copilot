@@ -10,6 +10,7 @@ import {
   mergeBenchmarks,
   mergeRules,
   metroFmr,
+  redfinSourceHref,
   ruleCounts,
   ruleName,
   seedBenchmarks,
@@ -328,7 +329,14 @@ describe("HUD's fair market rents — the year in the data, the newest year only
 describe("twoToFourMedian — a sale median with its month, from the research file", () => {
   it("Philadelphia's May 2026 median and change, the month the file's own period states", () => {
     const m = twoToFourMedian("philadelphia_pa");
-    expect(m).toEqual({ price: 363_500, yoy: "+6.9%", asOf: "2026-05-31" });
+    // With the Redfin page the file cites for it, read out of the file's
+    // own source (research pass 31, C4), never an address typed.
+    expect(m).toEqual({
+      price: 363_500,
+      yoy: "+6.9%",
+      asOf: "2026-05-31",
+      sourceHref: "https://www.redfin.com/news/data-center/downloads/",
+    });
     expect(monthOf(m!.asOf)).toBe("May 2026");
     // The benchmark rows the deal pages read carry the same month.
     const row = seeds.find((b) => b.metro === "Philadelphia, PA" && b.metric === "median_sale_price_2_4_unit");
@@ -344,6 +352,27 @@ describe("twoToFourMedian — a sale median with its month, from the research fi
     expect(demo).toContain('twoToFourMedian("philadelphia_pa")');
     expect(demo).not.toContain("$363,500");
     expect(demo).not.toContain("+6.9% YoY");
+  });
+
+  it("Redfin's page is read out of the file's own source, and only a redfin.com address is Redfin's", () => {
+    const source = multifamilySeed.supply_demand.on_market_depth_may_2026.sources[0];
+    expect(source).toMatch(/^https:\/\/www\.redfin\.com\/news\/data-center\/downloads\/ — /);
+    expect(redfinSourceHref(source)).toBe("https://www.redfin.com/news/data-center/downloads/");
+    expect(redfinSourceHref("https://www.zillow.com/research/data/ — a note")).toBeNull();
+    expect(redfinSourceHref("https://redfin.com.example.org/x")).toBeNull();
+    expect(redfinSourceHref("Redfin public dataset")).toBeNull();
+    expect(redfinSourceHref(null)).toBeNull();
+    // The benchmark rows /market's table reads carry the same source.
+    const row = seeds.find((b) => b.metro === "Philadelphia, PA" && b.metric === "median_sale_price_2_4_unit");
+    expect(redfinSourceHref(row?.source)).toBe("https://www.redfin.com/news/data-center/downloads/");
+  });
+
+  it("/demo and /market credit Redfin in words and link the page the file cites (research pass 31, C4)", () => {
+    const demo = readFileSync(join(process.cwd(), "app/demo/page.tsx"), "utf8");
+    expect(demo).toMatch(/href=\{phillyMedian\.sourceHref\}[^<]{0,400}>\s*Redfin public dataset\s*<\/a>/);
+    const market = readFileSync(join(process.cwd(), "app/market/page.tsx"), "utf8");
+    expect(market).toContain("redfinSourceHref(priceRows[0].price!.source)");
+    expect(market).toMatch(/href=\{redfinHref\}[^<]{0,400}>\s*Redfin public dataset\s*<\/a>/);
   });
 });
 
