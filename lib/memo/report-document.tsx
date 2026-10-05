@@ -5,7 +5,7 @@ import { screenYearOf, type BuyBoxCheck } from "@/lib/criteria";
 import { siteFlagsStale, type FloodMapView, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { placedBySentence } from "@/lib/placed-by";
 import { currentBriefLine } from "@/lib/permit-split";
-import { REPORT_FLOOD_SIZE } from "@/lib/basemaps";
+import { OSM_LOCATION_WORDS, REPORT_FLOOD_SIZE } from "@/lib/basemaps";
 import type {
   ExtractionResult,
   ChallengerResult,
@@ -418,6 +418,17 @@ function PhotosBlock({ photos }: { photos: MemoCover[] }) {
   );
 }
 
+/** The site map's credit: what it is drawn from, what its centre is, and —
+ *  where Photon placed the point — OpenStreetMap's data. */
+export function siteMapCredit(view: Pick<FloodMapView, "ring" | "placedByOsm">): string {
+  const centre =
+    view.ring !== false
+      ? "the ring marks the building."
+      : "the frame is centred on the street the address names, not the building: the map data has no house number for it.";
+  const osm = view.placedByOsm ? ` ${OSM_LOCATION_WORDS.charAt(0).toUpperCase()}${OSM_LOCATION_WORDS.slice(1)}.` : "";
+  return `FEMA National Flood Hazard Layer over USGS The National Map; ${centre}${osm}`;
+}
+
 function SiteBlock({ view, lookedUp }: { view: FloodMapView; lookedUp?: string | null }) {
   return (
     <View wrap={false}>
@@ -426,34 +437,39 @@ function SiteBlock({ view, lookedUp }: { view: FloodMapView; lookedUp?: string |
           <View style={{ position: "relative", width: SITE_MAP_W, height: SITE_MAP_H, marginTop: 2 }}>
             {/* eslint-disable-next-line jsx-a11y/alt-text -- react-pdf's Image takes no alt */}
             <Image src={view.image} style={{ width: SITE_MAP_W, height: SITE_MAP_H, borderRadius: 4, objectFit: "cover" }} />
-            {/* The ring over a dark halo, so it reads over the pale tints. */}
-            <View
-              style={{
-                position: "absolute",
-                left: SITE_MAP_W / 2 - 8,
-                top: SITE_MAP_H / 2 - 8,
-                width: 16,
-                height: 16,
-                borderRadius: 8,
-                borderWidth: 1.5,
-                borderColor: "#1f2937",
-              }}
-            />
-            <View
-              style={{
-                position: "absolute",
-                left: SITE_MAP_W / 2 - 6.5,
-                top: SITE_MAP_H / 2 - 6.5,
-                width: 13,
-                height: 13,
-                borderRadius: 6.5,
-                borderWidth: 2,
-                borderColor: "#ffffff",
-              }}
-            />
+            {/* The ring over a dark halo, so it reads over the pale tints —
+                only where the frame's centre is the building's own point. */}
+            {view.ring !== false && (
+              <>
+                <View
+                  style={{
+                    position: "absolute",
+                    left: SITE_MAP_W / 2 - 8,
+                    top: SITE_MAP_H / 2 - 8,
+                    width: 16,
+                    height: 16,
+                    borderRadius: 8,
+                    borderWidth: 1.5,
+                    borderColor: "#1f2937",
+                  }}
+                />
+                <View
+                  style={{
+                    position: "absolute",
+                    left: SITE_MAP_W / 2 - 6.5,
+                    top: SITE_MAP_H / 2 - 6.5,
+                    width: 13,
+                    height: 13,
+                    borderRadius: 6.5,
+                    borderWidth: 2,
+                    borderColor: "#ffffff",
+                  }}
+                />
+              </>
+            )}
           </View>
           <Text style={{ fontSize: 6.5, color: C.muted, marginTop: 3, textAlign: "right" }}>
-            FEMA National Flood Hazard Layer over USGS The National Map; the ring marks the building.
+            {siteMapCredit(view)}
           </Text>
         </>
       ) : null}
@@ -466,7 +482,7 @@ function SiteBlock({ view, lookedUp }: { view: FloodMapView; lookedUp?: string |
                 <Image src={k.image} style={{ width: 8, height: 8, marginRight: 4, borderWidth: 0.5, borderColor: C.line }} />
               ) : null}
               <Text style={{ fontSize: 7.5, color: C.ink, fontFamily: k.here ? "Helvetica-Bold" : "Helvetica" }}>
-                {str(k.here ? `${k.label} - at the building` : k.label)}
+                {str(k.here ? `${k.label} - ${view.ring !== false ? "at the building" : "at the frame's centre"}` : k.label)}
               </Text>
             </View>
           ))}

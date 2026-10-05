@@ -47,7 +47,7 @@ import { cookies } from "next/headers";
 import { compareReturns } from "@/lib/compare-figures";
 import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
-import { pointIsBuilding } from "@/lib/deal-location";
+import { placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { verdictBehind, type JobLike } from "@/lib/screen-run";
 
@@ -251,6 +251,8 @@ function toCol(
       hasStreetAddress: !!address?.street,
       // Ringed only where the point is the building's (the batch-2 audit).
       pointIsBuilding: pointIsBuilding((deal.photo as DealVisualCache | null) ?? null, address),
+      // Photon placed the point: the aerial's credit names OpenStreetMap.
+      osmPlaced: placedByOpenStreetMap((deal.photo as DealVisualCache | null) ?? null, address),
       hasAddress: !!address?.label,
     }),
     // The deal's cover (#442), built as the pipeline page builds it, so the

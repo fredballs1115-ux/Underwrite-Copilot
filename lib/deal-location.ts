@@ -113,6 +113,10 @@ import type { LocationPrecision } from "@/lib/imagery-plan";
 
 export interface DealLocation extends Point {
   precision: LocationPrecision;
+  /** which geocoder placed it: a map or a picture framed on a point Photon
+   *  placed credits OpenStreetMap (lib/basemaps `OSM_LOCATION_PARTS`).
+   *  Absent on a point cached before the source was recorded. */
+  source?: GeocodeSource;
 }
 
 /** 30 days: buildings do not move, and both geocoders are free services. */
@@ -190,6 +194,25 @@ export function pointIsBuilding(
   );
 }
 
+/** Whether the deal's point, as cached for this address, was placed by
+ *  Photon — a geocoder on OpenStreetMap's data, asked where the Census
+ *  geocoder found nothing — so a picture or a map framed on it credits
+ *  OpenStreetMap (the batch-2 audit, LOW-8). A point not placed for this
+ *  address yet says nothing. */
+export function placedByOpenStreetMap(
+  cache: DealVisualCache | null,
+  address: StructuredAddress | null,
+  now = Date.now(),
+): boolean {
+  return (
+    cacheFresh(cache, now, address) &&
+    cache?.geoMiss !== true &&
+    typeof cache?.lat === "number" &&
+    typeof cache?.lng === "number" &&
+    cache?.geoSource === "photon"
+  );
+}
+
 /** Swappable in tests; production uses the shared resolver. */
 export interface LocationDeps {
   geocode?: (address: StructuredAddress | null) => Promise<Geocoded | null>;
@@ -222,6 +245,7 @@ export async function resolveDealLocation(
         lat: cache.lat,
         lng: cache.lng,
         precision: cache.geoPrecision ?? addressPrecision(address),
+        ...(cache.geoSource ? { source: cache.geoSource } : {}),
       };
     }
   }
@@ -250,7 +274,7 @@ export async function resolveDealLocation(
     : { ...stamp, geoMiss: true, lat: undefined, lng: undefined, geoPrecision: undefined, geoSource: undefined };
   await writeCache(supabase, dealId, cache, patch);
 
-  return hit ? { lat: hit.lat, lng: hit.lng, precision: hit.precision } : null;
+  return hit ? { lat: hit.lat, lng: hit.lng, precision: hit.precision, source: hit.source } : null;
 }
 
 /**

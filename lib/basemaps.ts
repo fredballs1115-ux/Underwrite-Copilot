@@ -50,9 +50,31 @@ export type BasemapId = "satellite" | "hybrid" | "streets";
  *
  * The street tiles carry it, and so does every place the site shows what
  * Photon — a geocoder on OpenStreetMap's data — found: the address search's
- * suggestions and the pins the comps map places.
+ * suggestions, the pins the comps map places, and — where Photon placed the
+ * deal because the Census geocoder could not (the batch-2 audit, LOW-8) —
+ * every picture and map framed on the deal's point (`OSM_LOCATION_PARTS`):
+ * the deal page's aerial, flood view and map, the pipeline map, the compare
+ * columns, the shared screen, and the memo's cover.
  */
 export const OSM_COPYRIGHT_URL = "https://www.openstreetmap.org/copyright";
+
+/** What a picture or a map framed on a point Photon placed says beside its
+ *  own credit, "OpenStreetMap" linked where the surface can carry a link. */
+export const OSM_LOCATION_PARTS: readonly (string | { name: string; url: string })[] = [
+  "location © ",
+  { name: "OpenStreetMap", url: OSM_COPYRIGHT_URL },
+  " contributors",
+];
+
+/** The same words where a surface carries no link — a card's corner, a PDF
+ *  — the copyright page's address said in their place. */
+export const OSM_LOCATION_WORDS = "location © OpenStreetMap contributors (openstreetmap.org/copyright)";
+
+/** An image's credit with the location's added where Photon placed the
+ *  point it is framed on. */
+export function withOsmLocation(credit: string, placedByOsm: boolean): string {
+  return placedByOsm ? `${credit} · ${OSM_LOCATION_WORDS}` : credit;
+}
 
 /** The credit as a Leaflet attribution control prints it: "© OpenStreetMap
  *  contributors", "OpenStreetMap" a link to the copyright page. One string,

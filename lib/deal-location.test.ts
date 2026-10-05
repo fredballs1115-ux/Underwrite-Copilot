@@ -5,6 +5,7 @@ import {
   GEO_VERSION,
   cacheFresh,
   geoKey,
+  placedByOpenStreetMap,
   pointIsBuilding,
   resolveDealLocation,
   type DealVisualCache,
@@ -96,13 +97,37 @@ describe("pointIsBuilding (the batch-2 audit)", () => {
   });
 });
 
+describe("placedByOpenStreetMap (the batch-2 audit, LOW-8)", () => {
+  const placed = (source: "census" | "photon"): DealVisualCache => ({
+    geoAt: new Date(NOW - 1000).toISOString(),
+    geoV: GEO_VERSION,
+    geoFor: geoKey(ADDR),
+    lat: 38.94,
+    lng: -76.96,
+    geoPrecision: "street",
+    geoSource: source,
+  });
+
+  it("is true where Photon placed the point for this address, and only then", () => {
+    expect(placedByOpenStreetMap(placed("photon"), ADDR, NOW)).toBe(true);
+    expect(placedByOpenStreetMap(placed("census"), ADDR, NOW)).toBe(false);
+    // A point not placed for this address, an old one or a miss says nothing.
+    expect(placedByOpenStreetMap({ ...placed("photon"), geoFor: "another address" }, ADDR, NOW)).toBe(false);
+    expect(placedByOpenStreetMap({ ...placed("photon"), geoAt: new Date(NOW - 31 * 86_400_000).toISOString() }, ADDR, NOW)).toBe(false);
+    expect(placedByOpenStreetMap({ ...placed("photon"), geoMiss: true, lat: undefined, lng: undefined }, ADDR, NOW)).toBe(false);
+    expect(placedByOpenStreetMap(null, ADDR, NOW)).toBe(false);
+  });
+});
+
 describe("resolveDealLocation", () => {
   it("records the precision the geocoder ANSWERED with, not the one the address implied", async () => {
     const { client, writes } = fakeSupabase(null);
     // A street address the geocoder could only place to the block.
     const blockHit: Geocoded = { ...CENSUS, precision: "block", source: "photon" };
     const loc = await resolveDealLocation(client, "d1", ADDR, null, deps(async () => blockHit));
-    expect(loc).toMatchObject({ precision: "block" });
+    // Which geocoder placed it rides with the point, so a map framed on it
+    // credits OpenStreetMap where Photon placed it (the batch-2 audit, LOW-8).
+    expect(loc).toMatchObject({ precision: "block", source: "photon" });
     expect(writes.at(-1)).toMatchObject({
       geoPrecision: "block",
       geoSource: "photon",
@@ -144,7 +169,7 @@ describe("resolveDealLocation", () => {
     const loc = await resolveDealLocation(client, "d1", ADDR, current, deps(async () => { asked++; return CENSUS; }));
     expect(asked).toBe(0);
     expect(writes).toHaveLength(0);
-    expect(loc).toMatchObject({ precision: "street" });
+    expect(loc).toMatchObject({ precision: "street", source: "census" });
   });
 
   it("re-resolves a location cached for another address, and keeps the new one with its address (#441)", async () => {

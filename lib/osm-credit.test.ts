@@ -3,7 +3,8 @@ import { describe, expect, it } from "vitest";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { AddressSearchCredit } from "@/app/(app)/address-search-credit";
-import { BASEMAPS, OSM_ATTRIBUTION, OSM_COPYRIGHT_URL } from "./basemaps";
+import { BASEMAPS, OSM_ATTRIBUTION, OSM_COPYRIGHT_URL, OSM_LOCATION_PARTS, OSM_LOCATION_WORDS, withOsmLocation } from "./basemaps";
+import { creditText } from "./credit-parts";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
 // OpenStreetMap's attribution guideline, as zori probe run 37263390061
@@ -45,6 +46,19 @@ describe("OpenStreetMap's credit, in the guideline's own form", () => {
     const dropdownEnd = open.indexOf("</div>\n      )}");
     expect(dropdownEnd).toBeGreaterThan(-1);
     expect(credit).toBeLessThan(dropdownEnd);
+  });
+
+  // The batch-2 audit, LOW-8: a deal Photon placed (the Census geocoder
+  // having found nothing) is drawn on OpenStreetMap's data wherever its
+  // point frames a picture or pins a map.
+  it("is said beside a picture's own credit where Photon placed the point it is framed on, and nowhere else", () => {
+    expect(creditText(OSM_LOCATION_PARTS)).toBe("location © OpenStreetMap contributors");
+    expect(OSM_LOCATION_PARTS[1]).toEqual({ name: "OpenStreetMap", url: OSM_COPYRIGHT_URL });
+    expect(withOsmLocation("Imagery: USGS The National Map", true)).toBe(
+      "Imagery: USGS The National Map · location © OpenStreetMap contributors (openstreetmap.org/copyright)",
+    );
+    expect(withOsmLocation("Imagery: USGS The National Map", false)).toBe("Imagery: USGS The National Map");
+    expect(OSM_LOCATION_WORDS).toContain("openstreetmap.org/copyright");
   });
 
   it("is on the comps map's attribution over every basemap, its pins being Photon's", () => {

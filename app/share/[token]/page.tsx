@@ -13,7 +13,8 @@ import { shownAssetClass } from "@/lib/pipeline-slots";
 import { SHARE_REFUSAL_COPY, resolveShare } from "@/lib/share-resolve";
 import { Expired, ShareView } from "./share-view";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
-import { pointIsBuilding, type DealVisualCache } from "@/lib/deal-location";
+import { placedByOpenStreetMap, pointIsBuilding, type DealVisualCache } from "@/lib/deal-location";
+import { withOsmLocation } from "@/lib/basemaps";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
 import { SHARE_AERIAL } from "@/lib/image-frames";
 import { SITE_NAME } from "@/lib/page-meta";
@@ -118,7 +119,8 @@ export default async function SharePage({
           {
             kind: "aerial" as const,
             src: `/api/share/${token}/aerial?w=${SHARE_AERIAL.w}&h=${SHARE_AERIAL.h}`,
-            credit: SHARE_AERIAL_CREDIT,
+            // Photon placed the point: the credit names OpenStreetMap too.
+            credit: withOsmLocation(SHARE_AERIAL_CREDIT, placedByOpenStreetMap((deal.photo as DealVisualCache | null) ?? null, address)),
             ring: pointIsBuilding((deal.photo as DealVisualCache | null) ?? null, address),
           },
         ]

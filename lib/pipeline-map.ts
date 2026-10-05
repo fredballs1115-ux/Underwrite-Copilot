@@ -18,6 +18,16 @@ export interface MapPlace {
   lat: number;
   lng: number;
   precision: LocationPrecision;
+  /** the geocoder that placed it (lib/deal-location): a pin Photon placed
+   *  is OpenStreetMap's data, and the map then credits OpenStreetMap */
+  source?: "census" | "photon";
+}
+
+/** Whether any pin on the map sits where Photon — a geocoder on
+ *  OpenStreetMap's data — placed it: the map then credits OpenStreetMap over
+ *  every basemap, not only its street tiles (the batch-2 audit, LOW-8). */
+export function osmPlacedAny(points: readonly { place: MapPlace }[]): boolean {
+  return points.some((p) => p.place.source === "photon");
 }
 
 export interface MapDeal {

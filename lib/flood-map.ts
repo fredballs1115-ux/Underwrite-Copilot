@@ -409,14 +409,22 @@ export async function floodMapFor(
   const flood = current ? current.flood : undefined;
   const legend = await within(floodLegend(), 3_000, VENDORED_LEGEND);
   const picture = await within(
-    (async (): Promise<{ image: string; classes: FloodClassKey[] } | null> => {
+    (async (): Promise<{ image: string; classes: FloodClassKey[]; ring: boolean; placedByOsm: boolean } | null> => {
       const loc = await resolveDealLocation(supabase, dealId, address, cache);
       if (!loc || loc.precision === "area") return null;
       const record = await ensureFloodFrame(supabase, dealId, loc, cache);
       if (!record) return null;
       const jpeg = await floodCrop(dealId, record, REPORT_FLOOD_SIZE.width * 2, REPORT_FLOOD_SIZE.height * 2);
       if (!intactImage(jpeg, "image/jpeg")) return null;
-      return { image: `data:image/jpeg;base64,${jpeg.toString("base64")}`, classes: record.classes.report };
+      return {
+        image: `data:image/jpeg;base64,${jpeg.toString("base64")}`,
+        classes: record.classes.report,
+        // The centre is the building only where the house itself was placed
+        // (lib/deal-location `pointIsBuilding`'s rule): a point on the
+        // street is the street's.
+        ring: loc.precision === "street",
+        placedByOsm: loc.source === "photon",
+      };
     })(),
     20_000,
     null,
@@ -428,7 +436,12 @@ export async function floodMapFor(
         floodKeyFor(picture.classes, flood, legend).map(async (k) => ({ label: k.label, image: await swatchPng(k.key), here: k.here })),
       )
     : [];
-  return { image: picture?.image ?? null, key, line };
+  return {
+    image: picture?.image ?? null,
+    key,
+    line,
+    ...(picture ? { ring: picture.ring, placedByOsm: picture.placedByOsm } : {}),
+  };
 }
 
 // ── How FEMA and USGS answer from the site's own network (#472) ────────────

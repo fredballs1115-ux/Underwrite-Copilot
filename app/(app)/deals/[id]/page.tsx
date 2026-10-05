@@ -67,7 +67,7 @@ import { PICTURE_CREDIT, ensureDealPicture, galleryPage, memorandumPhotoCredit }
 import { assetClassLabel } from "@/lib/asset-class";
 import { assetWords, countNoun } from "@/lib/asset-words";
 import { shownAssetClass } from "@/lib/pipeline-slots";
-import { cacheFresh, resolveDealLocation, type DealVisualCache, pointIsBuilding } from "@/lib/deal-location";
+import { cacheFresh, resolveDealLocation, type DealVisualCache, placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { claimRecordComps, runRecordComps } from "@/lib/public-comps/run";
 import type { RecordCompsResult } from "@/lib/public-comps/core";
 import { claimSiteFlags, runSiteFlags } from "@/lib/site-flags/run";
@@ -1229,6 +1229,9 @@ export default async function DealPage({
               // The aerial's centre is ringed only where it is the building's
               // own point (lib/deal-location), never a street's or a town's.
               pointIsBuilding={pointIsBuilding(visualCache, dealAddress)}
+              // Photon placed the point (the Census geocoder found nothing):
+              // the pictures framed on it credit OpenStreetMap.
+              osmPlaced={placedByOpenStreetMap(visualCache, dealAddress)}
               // Never Google's: the visual draws USGS's aerial, FEMA's flood
               // map and an OpenStreetMap view beside its pictures, and Google's
               // Maps Platform terms (zori probe run 37266021924) forbid its

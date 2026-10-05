@@ -5240,6 +5240,58 @@ describe("PropertyVisual — the building's own photograph leads, then the overh
     expect(area).toContain("Neighborhood placement");
     // No flood prop, no Flood tab.
     expect(renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null }))).not.toContain("/flood?");
+
+    // A point placed on the street, not at the house: the zone is the frame
+    // centre's, never "at the building" (the batch-2 audit's ring rule).
+    const street = visibleText(renderToStaticMarkup(React.createElement(PropertyVisual, { ...props, pointIsBuilding: false })));
+    expect(street).toContain("1% annual chance flood hazard — at the frame's centre");
+    expect(street).not.toContain("at the building");
+    const src = readSource(joinPath(process.cwd(), "app/(app)/deals/[id]/property-visual.tsx"), "utf8");
+    expect(src).toMatch(/\{pointIsBuilding && \(\s*<span\s+aria-hidden\s+data-picture="flood-pin"/);
+    expect(src).toMatch(/credit: \["FEMA flood zones · USGS imagery", \.\.\.osmCredit\],\s+thumb,[\s\S]{0,200}ring: pointIsBuilding,/);
+  });
+
+  // The batch-2 audit, LOW-8: where the Census geocoder found nothing and
+  // Photon — a geocoder on OpenStreetMap's data — placed the deal, every
+  // picture framed on that point credits OpenStreetMap, linked to its
+  // copyright page as the guideline asks.
+  it("credits OpenStreetMap beside the aerial's and the flood view's own credit where Photon placed the point", () => {
+    const flood = {
+      src: "/api/deals/d1/flood?v=1.39.975000,-75.180000",
+      classes: { page: ["sfha" as const], full: ["sfha" as const] },
+      here: "sfha" as const,
+      zone: "Zone AE",
+      line: null,
+    };
+    const osm = renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null, flood, osmPlaced: true }));
+    expect(a11yIssues(osm), "a11y property-visual osm").toEqual([]);
+    const text = visibleText(osm);
+    expect(gluedWords(text)).toEqual([]);
+    const words = text.replace(/\s+/g, " ");
+    expect(words).toContain("Imagery: USGS The National Map · location © OpenStreetMap contributors");
+    expect(words).toContain("FEMA flood zones · USGS imagery · location © OpenStreetMap contributors");
+    expect(osm.match(/<a href="https:\/\/www\.openstreetmap\.org\/copyright"[^>]*>OpenStreetMap<\/a>/g)?.length).toBe(2);
+    // A point the Census placed says nothing of OpenStreetMap.
+    expect(renderToStaticMarkup(React.createElement(PropertyVisual, { ...base, picture: null, flood }))).not.toContain("OpenStreetMap");
+    // The page, the compare columns and the shared screen each ask the one
+    // reader, and the maps credit a Photon pin over every basemap.
+    const dealPage = readSource(joinPath(process.cwd(), "app/(app)/deals/[id]/page.tsx"), "utf8");
+    expect(dealPage).toContain("osmPlaced={placedByOpenStreetMap(visualCache, dealAddress)}");
+    expect(readSource(joinPath(process.cwd(), "app/(app)/deals/compare/page.tsx"), "utf8")).toContain(
+      "osmPlaced: placedByOpenStreetMap((deal.photo as DealVisualCache | null) ?? null, address),",
+    );
+    expect(readSource(joinPath(process.cwd(), "app/share/[token]/page.tsx"), "utf8")).toContain(
+      "credit: withOsmLocation(SHARE_AERIAL_CREDIT, placedByOpenStreetMap((deal.photo as DealVisualCache | null) ?? null, address)),",
+    );
+    expect(readSource(joinPath(process.cwd(), "app/(app)/deals/[id]/property-map.tsx"), "utf8")).toContain(
+      'if (loc.source === "photon") map.attributionControl?.addAttribution(OSM_ATTRIBUTION);',
+    );
+    const pipelineMap = readSource(joinPath(process.cwd(), "app/(app)/deals/pipeline-map.tsx"), "utf8");
+    expect(pipelineMap).toContain("const osmPins = osmPlacedAny(points);");
+    expect(pipelineMap).toContain("if (osmPins) map.attributionControl?.addAttribution(OSM_ATTRIBUTION);");
+    expect(readSource(joinPath(process.cwd(), "app/(app)/deals/page.tsx"), "utf8")).toContain(
+      "...(cache.geoSource ? { source: cache.geoSource } : {}),",
+    );
   });
 
   const gallery = [

@@ -649,4 +649,11 @@ export interface FloodMapView {
   key: { label: string; image: string | null; here: boolean }[];
   /** `floodZoneLine`; null while the lookup has not answered */
   line: string | null;
+  /** the frame's centre is the building's own point (a street address
+   *  placed at the house), so the report rings it; false where it is the
+   *  street's — absent reads as true, for a view built before the rule */
+  ring?: boolean;
+  /** Photon, a geocoder on OpenStreetMap's data, placed the point the frame
+   *  is drawn around: the credit names OpenStreetMap (the batch-2 audit) */
+  placedByOsm?: boolean;
 }

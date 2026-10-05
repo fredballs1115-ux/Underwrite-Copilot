@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_TO_PLACE,
   PIN_UNSCREENED,
+  osmPlacedAny,
   partitionForMap,
   pinColor,
   PIN_LABEL,
@@ -37,6 +38,14 @@ describe("the pipeline map's rules (#431)", () => {
     expect(p.toPlace.map((d) => d.id)).toEqual(["b"]);
     expect(p.unplaceable.map((d) => d.id)).toEqual(["c", "d"]);
     expect(MAX_TO_PLACE).toBeGreaterThan(0);
+  });
+
+  // The batch-2 audit, LOW-8: a pin Photon placed is OpenStreetMap's data.
+  it("credits OpenStreetMap while any pin on it sits where Photon placed it", () => {
+    const at = (source?: "census" | "photon") => ({ place: { lat: 39.95, lng: -75.16, precision: "street" as const, ...(source ? { source } : {}) } });
+    expect(osmPlacedAny([at("census"), at("photon")])).toBe(true);
+    expect(osmPlacedAny([at("census"), at()])).toBe(false);
+    expect(osmPlacedAny([])).toBe(false);
   });
 
   it("colours a pin by its call — the split bar's four — and hollows a placement vaguer than a street", () => {

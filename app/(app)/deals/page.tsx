@@ -381,7 +381,14 @@ export default async function DealsPage({
         if (!cacheFresh(cache, Date.now(), (d.address as StructuredAddress | null) ?? null)) return { place: null };
         if (cache?.geoMiss) return { place: null, placeMiss: true };
         return typeof cache?.lat === "number" && typeof cache?.lng === "number"
-          ? { place: { lat: cache.lat, lng: cache.lng, precision: cache.geoPrecision ?? ((d.address as StructuredAddress | null)?.street?.trim() ? "street" : "area") } }
+          ? {
+              place: {
+                lat: cache.lat,
+                lng: cache.lng,
+                precision: cache.geoPrecision ?? ((d.address as StructuredAddress | null)?.street?.trim() ? "street" : "area"),
+                ...(cache.geoSource ? { source: cache.geoSource } : {}),
+              },
+            }
           : { place: null };
       })(),
       // The card's pictures, best first and each pinned with its credit

@@ -9,7 +9,8 @@ import {
   floodSwatchBorder,
   type FloodClassKey,
 } from "@/lib/flood-style";
-import { photographerParts } from "@/lib/credit-parts";
+import { photographerParts, type CreditPart } from "@/lib/credit-parts";
+import { OSM_LOCATION_PARTS } from "@/lib/basemaps";
 import { CreditPartsText } from "@/app/credit-parts";
 import { MarketCaption } from "../market-caption";
 import { PhotoViewer, type ViewerFrame } from "./photo-viewer";
@@ -141,12 +142,15 @@ const MOSAIC =
 /** The cover inside the mosaic: the frame's own shape on a phone, the
  *  mosaic's full height beside the tiles. */
 const MOSAIC_COVER = "aspect-[16/9] @2xl:aspect-auto @2xl:h-full";
+/** A link inside a credit drawn over a picture. */
+const OSM_LINK = "underline decoration-dotted underline-offset-2 hover:text-white";
 
 export function PropertyVisual({
   dealId,
   label,
   hasStreetAddress,
   pointIsBuilding = hasStreetAddress,
+  osmPlaced = false,
   googleEnabled,
   hasAddress = true,
   picture = null,
@@ -165,6 +169,12 @@ export function PropertyVisual({
    *  it ringed — a street's centreline or a town's centre is never the
    *  building (the batch-2 audit). */
   pointIsBuilding?: boolean;
+  /** Photon — a geocoder on OpenStreetMap's data — placed the deal's point,
+   *  the Census geocoder having found nothing (lib/deal-location
+   *  `placedByOpenStreetMap`): the aerial and the flood view, each framed on
+   *  that point, credit OpenStreetMap beside their own credit (the batch-2
+   *  audit, LOW-8) */
+  osmPlaced?: boolean;
   /** GOOGLE_MAPS_API_KEY is set (checked server-side) — unlocks the Street
    *  photo AND the sharp satellite frame, which are separate Google APIs */
   googleEnabled: boolean;
@@ -355,6 +365,12 @@ export function PropertyVisual({
   const gallerySrcSet = (g: StoredPhotoSizes & { i: number }) =>
     photoSrcSet((size) => `/api/deals/${dealId}/picture?size=${size}&g=${g.i}`, g);
 
+  // A picture framed on a point Photon placed names OpenStreetMap after its
+  // own credit (lib/basemaps `OSM_LOCATION_PARTS`); nothing otherwise.
+  const osmCredit: readonly CreditPart[] = osmPlaced ? [" · ", ...OSM_LOCATION_PARTS] : [];
+  // Where the flood zone is read: the building only where the point is its own.
+  const floodWhere = pointIsBuilding ? "at the building" : "at the frame's centre";
+
   // The full-screen viewer's pictures (#445): the views the page has, the
   // map apart, each credited exactly as its own view is.
   const viewerAerial = `/api/deals/${dealId}/aerial?src=usgs&w=${VIEWER.w}&h=${VIEWER.h}`;
@@ -423,9 +439,12 @@ export function PropertyVisual({
             label: v.label,
             src: viewerAerial,
             alt: `Aerial photograph of ${label}`,
-            credit: hasStreetAddress
-              ? "Imagery: USGS The National Map"
-              : "Imagery: USGS The National Map · neighborhood placement, no street address on this deal",
+            credit: [
+              hasStreetAddress
+                ? "Imagery: USGS The National Map"
+                : "Imagery: USGS The National Map · neighborhood placement, no street address on this deal",
+              ...osmCredit,
+            ],
             thumb,
             ring: pointIsBuilding,
           },
@@ -439,9 +458,11 @@ export function PropertyVisual({
                 // The whole frame, at the pixels it is drawn at.
                 src: `${flood.src}&w=${VIEWER.w * 2}&h=${VIEWER.h * 2}${floodR}`,
                 alt: `Aerial photograph of the blocks around ${label}, with FEMA's flood hazard zones drawn over it`,
-                credit: "FEMA flood zones · USGS imagery",
+                credit: ["FEMA flood zones · USGS imagery", ...osmCredit],
                 thumb,
-                ring: true,
+                // The frame is drawn around the deal's point, which is the
+                // building only where the geocoder placed it at the house.
+                ring: pointIsBuilding,
               },
             ]
           : [];
@@ -667,6 +688,7 @@ export function PropertyVisual({
             />
             <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
               Imagery: USGS The National Map
+              <CreditPartsText parts={osmCredit} linkClassName={OSM_LINK} />
             </span>
             {/* The overhead is drawn at the photograph's own grain (#429), a
                 block or two across, so a street address's building is ringed
@@ -740,20 +762,23 @@ export function PropertyVisual({
                   )}
                   {floodState === "ready" && (
                     <>
-                      {/* The frame is drawn around the building's location. */}
-                      <span
-                        aria-hidden
-                        data-picture="flood-pin"
-                        className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.45),0_1px_6px_rgba(0,0,0,0.5)]"
-                      >
-                        <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
-                      </span>
+                      {/* The frame is drawn around the deal's point, ringed
+                          only where that point is the building's own. */}
+                      {pointIsBuilding && (
+                        <span
+                          aria-hidden
+                          data-picture="flood-pin"
+                          className="pointer-events-none absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 rounded-full border-[2.5px] border-white shadow-[0_0_0_2px_rgba(0,0,0,0.45),0_1px_6px_rgba(0,0,0,0.5)]"
+                        >
+                          <span className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white" />
+                        </span>
+                      )}
                       {flood.zone ? (
                         <span
                           data-picture="flood-zone"
                           className="absolute bottom-0 left-0 rounded-tr bg-black/60 px-2 py-0.5 text-[11px] font-semibold text-white"
                         >
-                          {`${flood.zone} at the building`}
+                          {`${flood.zone} ${floodWhere}`}
                         </span>
                       ) : null}
                     </>
@@ -762,6 +787,7 @@ export function PropertyVisual({
               )}
               <span className="absolute bottom-0 right-0 rounded-tl bg-black/55 px-1.5 py-0.5 text-[10px] text-white">
                 FEMA flood zones · USGS imagery
+                <CreditPartsText parts={osmCredit} linkClassName={OSM_LINK} />
               </span>
             </div>
             <div className="border-t border-line px-4 py-3">
@@ -778,7 +804,7 @@ export function PropertyVisual({
                             className="h-3.5 w-3.5 shrink-0 rounded-sm border-[1.5px]"
                             style={{ background: floodSwatchBackground(style), borderColor: floodSwatchBorder(style) }}
                           />
-                          <span>{k.here ? `${FLOOD_CLASS_LABEL[k.key]} — at the building` : FLOOD_CLASS_LABEL[k.key]}</span>
+                          <span>{k.here ? `${FLOOD_CLASS_LABEL[k.key]} — ${floodWhere}` : FLOOD_CLASS_LABEL[k.key]}</span>
                         </li>
                       );
                     })}

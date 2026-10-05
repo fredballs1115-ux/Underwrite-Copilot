@@ -80,6 +80,12 @@ describe("bannerSources — the pictures a card tries, best first, each with its
     // building's own.
     expect(bannerSources({ ...base, pointIsBuilding: false }, CARD)[0].marker).toBeUndefined();
     expect(bannerSources({ ...base, pointIsBuilding: true }, CARD)[0].marker).toBe(true);
+    // A point Photon placed is OpenStreetMap's data: the aerial's credit says
+    // so (the batch-2 audit, LOW-8); a Census point's says nothing more.
+    expect(bannerSources({ ...base, osmPlaced: true }, CARD)[0].credit).toBe(
+      `${IMAGE_CREDIT.aerial} · location © OpenStreetMap contributors (openstreetmap.org/copyright)`,
+    );
+    expect(bannerSources({ ...base, osmPlaced: false }, CARD)[0].credit).toBe(IMAGE_CREDIT.aerial);
     // A frame may pin its zoom.
     expect(bannerSources(base, { ...CARD, z: 16 })[0].src).toBe(`/api/deals/d1/aerial?src=usgs&w=${CARD.w}&h=${CARD.h}&z=16`);
   });

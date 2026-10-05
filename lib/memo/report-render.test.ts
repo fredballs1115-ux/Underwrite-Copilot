@@ -1866,6 +1866,16 @@ describe("ReportDocument (full report)", () => {
     expect(wordsOnly).toContain("The site");
     expect(wordsOnly).toContain("a Special Flood Hazard Area");
     expect(wordsOnly).not.toContain("the ring marks the building");
+
+    // A point placed on the street, not at the house, and placed by Photon:
+    // no ring, the zone read at the frame's centre, OpenStreetMap credited
+    // (the batch-2 audit).
+    const street = (await pdfTextOf(await render({ ...view, ring: false, placedByOsm: true }))).replace(/\s+/g, " ");
+    expect(street).toContain(
+      "FEMA National Flood Hazard Layer over USGS The National Map; the frame is centred on the street the address names, not the building: the map data has no house number for it. Location © OpenStreetMap contributors (openstreetmap.org/copyright).",
+    );
+    expect(street).toContain("1% annual chance flood hazard - at the frame's centre");
+    expect(street).not.toContain("the ring marks the building");
   }, 45000);
 
   it("gives the memorandum's other photographs a page of their own, each with its page's credit, and none for fewer than two (#459)", async () => {

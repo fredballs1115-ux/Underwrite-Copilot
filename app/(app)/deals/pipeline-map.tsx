@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type * as Leaflet from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { BASEMAPS, BASEMAP_ORDER, type BasemapId } from "@/lib/basemaps";
+import { BASEMAPS, BASEMAP_ORDER, OSM_ATTRIBUTION, type BasemapId } from "@/lib/basemaps";
 import {
   MAX_TO_PLACE,
   PIN_LABEL,
@@ -15,6 +15,7 @@ import {
   pinTitle,
   placementLine,
   partitionForMap,
+  osmPlacedAny,
   previewHtml,
   tooltipHtml,
   type MapDeal,
@@ -285,6 +286,19 @@ export function PipelineMap({
       });
     }
   }, [ready, points, selected, compareMode]);
+
+  // A pin Photon placed is OpenStreetMap's data: the map credits it over
+  // every basemap while one is drawn (the batch-2 audit, LOW-8). The street
+  // tiles carry the same string, which the control prints once.
+  const osmPins = osmPlacedAny(points);
+  const osmCredited = useRef(false);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!ready || !map || osmPins === osmCredited.current) return;
+    if (osmPins) map.attributionControl?.addAttribution(OSM_ATTRIBUTION);
+    else map.attributionControl?.removeAttribution(OSM_ATTRIBUTION);
+    osmCredited.current = osmPins;
+  }, [ready, osmPins]);
 
   // Basemap switch: swap the tile layer in place, keeping the view and pins.
   useEffect(() => {

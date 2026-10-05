@@ -29,6 +29,7 @@
 // show one skyline twice, where their overheads tell the buildings apart.
 
 import { IMAGE_CREDIT } from "@/lib/imagery-plan";
+import { withOsmLocation } from "@/lib/basemaps";
 import { DEAL_BANNER, DEAL_CARD, DEAL_THUMB } from "@/lib/image-frames";
 import { isPreview } from "@/lib/photo-preview";
 import { cardSrcSet, coverSlotSizes, type StoredPhotoSizes } from "@/lib/photo-srcset";
@@ -136,6 +137,10 @@ export interface BannerFacts {
    *  `pointIsBuilding`): only then is it ringed. Absent, the street address
    *  decides, as it did before the point's precision was read. */
   pointIsBuilding?: boolean;
+  /** Photon — a geocoder on OpenStreetMap's data — placed the point the
+   *  aerial is framed on (lib/deal-location `placedByOpenStreetMap`): its
+   *  credit names OpenStreetMap too (the batch-2 audit, LOW-8) */
+  osmPlaced?: boolean;
   /** the deal has an address at all — without one there is no overhead */
   hasAddress: boolean;
   /** the photograph of the deal's market, tried before the aerial — the
@@ -270,7 +275,7 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
     out.push({
       kind: "aerial",
       src: `/api/deals/${id}/aerial?src=usgs&w=${frame.w}&h=${frame.h}${z}`,
-      credit: IMAGE_CREDIT.aerial,
+      credit: withOsmLocation(IMAGE_CREDIT.aerial, f.osmPlaced === true),
       ...((f.pointIsBuilding ?? f.hasStreetAddress) ? { marker: true } : {}),
     });
   }

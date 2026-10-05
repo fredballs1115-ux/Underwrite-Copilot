@@ -3,6 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { StructuredAddress } from "@/lib/address";
 import { usgsAerialUrl } from "@/lib/basemaps";
 import { resolveDealLocation, type DealLocation, type DealVisualCache } from "@/lib/deal-location";
+import type { GeocodeSource } from "@/lib/geocode";
 import {
   IMAGE_CREDIT,
   MAX_SOURCE_ZOOM,
@@ -275,6 +276,9 @@ async function exportAerial(
 export interface BestImage {
   response: Response;
   source: ImageSource;
+  /** the geocoder that placed the point an overhead is framed on — "photon"
+   *  asks the credit to name OpenStreetMap (lib/basemaps `withOsmLocation`) */
+  placedBy?: GeocodeSource;
 }
 
 /**
@@ -305,20 +309,20 @@ async function fetchOneRaw(
   address: StructuredAddress | null,
   cache: DealVisualCache | null,
   size: { width: number; height: number; zoom?: number },
-): Promise<Response | null> {
+): Promise<{ response: Response; placedBy?: GeocodeSource } | null> {
+  const only = (response: Response | null) => (response ? { response } : null);
   if (source === "photo") {
-    return fetchStoredPicture(dealId, cache, size);
+    return only(await fetchStoredPicture(dealId, cache, size));
   }
   if (source === "streetview") {
-    return fetchStreetViewImage(supabase, dealId, address, cache, size);
+    return only(await fetchStreetViewImage(supabase, dealId, address, cache, size));
   }
   // Both overhead sources need coordinates; resolving also caches them for
   // the map, so the pin and the photo can never disagree.
   const loc = await resolveDealLocation(supabase, dealId, address, cache);
   if (!loc) return null;
-  return source === "satellite"
-    ? fetchGoogleSatelliteImage(loc, size)
-    : fetchAerialImage(loc, size);
+  const response = source === "satellite" ? await fetchGoogleSatelliteImage(loc, size) : await fetchAerialImage(loc, size);
+  return response ? { response, ...(loc.source ? { placedBy: loc.source } : {}) } : null;
 }
 
 /**
@@ -334,7 +338,7 @@ export async function fetchOneImage(
   size: { width: number; height: number; zoom?: number },
 ): Promise<BestImage | null> {
   const res = await fetchOneRaw(source, supabase, dealId, address, cache, size);
-  return res ? { response: res, source } : null;
+  return res ? { ...res, source } : null;
 }
 
 async function runPlan(
@@ -347,7 +351,7 @@ async function runPlan(
 ): Promise<BestImage | null> {
   for (const source of plan) {
     const res = await fetchOneRaw(source, supabase, dealId, address, cache, size);
-    if (res) return { response: res, source };
+    if (res) return { ...res, source };
   }
   return null;
 }
