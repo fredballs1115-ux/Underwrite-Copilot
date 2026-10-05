@@ -6,7 +6,8 @@
 // accessibility floor (`a11yIssues`).
 import { describe, expect, it } from "vitest";
 import React from "react";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CompName, CompsMap, type MapComp } from "@/app/(app)/deals/[id]/comps-map";
 import { ScrollRegion } from "@/app/scroll-region";
@@ -76,5 +77,50 @@ describe("a wide table a keyboard can scroll (research pass 33, item 18)", () =>
   it.each(FLAGGED)("%s scrolls each flagged table in a named region", (file, labels) => {
     const src = readFileSync(file, "utf8");
     expect([...src.matchAll(/<ScrollRegion label="([^"]+)"/g)].map((m) => m[1])).toEqual(labels);
+  });
+});
+
+/** Every .tsx source under a directory. */
+function sources(dir: string): string[] {
+  return readdirSync(dir).flatMap((name) => {
+    const p = join(dir, name);
+    if (statSync(p).isDirectory()) return sources(p);
+    return p.endsWith(".tsx") ? [p] : [];
+  });
+}
+
+describe("a copy that says so (research pass 33, items 9 and 25)", () => {
+  it("announces every button label that turns to 'Copied', as the market page's citation button does", () => {
+    // A label that changes is heard only inside a live region; the button
+    // that copies is that region (app/market/copy-cite.tsx's pattern).
+    const found: string[] = [];
+    const silent: string[] = [];
+    for (const file of sources("app")) {
+      const src = readFileSync(file, "utf8");
+      for (const m of src.matchAll(/\?\s*"[Cc]opied/g)) {
+        const open = src.lastIndexOf("<button", m.index);
+        if (open === -1 || src.lastIndexOf("</button>", m.index) > open) continue;
+        found.push(file);
+        if (!src.slice(open, m.index).includes('aria-live="polite"')) silent.push(file);
+      }
+    }
+    expect(found.sort()).toEqual(
+      [
+        "app/(app)/deals/[id]/bridge/bridge-view.tsx",
+        "app/(app)/deals/[id]/share-control.tsx",
+        "app/(app)/deals/[id]/valuations/valuations-view.tsx",
+        "app/market/copy-cite.tsx",
+        "app/tools/deal-math-tools.tsx",
+      ].sort(),
+    );
+    expect(silent).toEqual([]);
+  });
+
+  it("closes the share panel on Escape and hands focus back to the Share button, as the deal menu does", () => {
+    // The key itself is a browser's to press (checked in Chromium by hand);
+    // the handler and the hand-back are held here.
+    const src = readFileSync("app/(app)/deals/[id]/share-control.tsx", "utf8");
+    expect(src).toMatch(/if \(e\.key !== "Escape"\) return;\s*setOpen\(false\);\s*triggerRef\.current\?\.focus\(\);/);
+    expect(src).toMatch(/<button\s+ref=\{triggerRef\}[^>]*\n\s*type="button"\n\s*onClick=\{\(\) => setOpen\(\(v\) => !v\)\}/);
   });
 });

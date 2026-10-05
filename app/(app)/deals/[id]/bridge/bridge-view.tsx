@@ -206,6 +206,7 @@ function CopyLine({ text }: { text: string }) {
           }
         }}
         className="shrink-0 rounded-md border border-brand px-3 py-1.5 text-sm font-medium text-brand transition hover:bg-brand hover:text-white"
+        aria-live="polite"
       >
         {copied ? "Copied" : "Copy"}
       </button>

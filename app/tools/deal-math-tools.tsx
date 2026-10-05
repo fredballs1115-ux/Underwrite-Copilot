@@ -291,6 +291,7 @@ function CopyButton({
       // that has to be remembered three times is a rule that gets missed
       // the fourth time.
       className={`rounded-lg border border-line px-2.5 py-1 text-xs font-medium text-muted transition-colors hover:border-brand hover:text-brand print:hidden ${className}`}
+      aria-live="polite"
     >
       {done ? "Copied" : label}
     </button>

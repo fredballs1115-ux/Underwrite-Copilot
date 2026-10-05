@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createShareLink, revokeShareLink } from "./share-actions";
 
 const DATE_FMT = new Intl.DateTimeFormat("en-US", {
@@ -31,6 +31,20 @@ export function ShareControl({
 }) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  // Escape closes the panel and hands keyboard focus back to the Share
+  // button that opened it, as the deal menu does.
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      triggerRef.current?.focus();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
 
   async function copy(shareId: string) {
     const url = `${appUrl}/share/${shareId}`;
@@ -47,6 +61,7 @@ export function ShareControl({
   return (
     <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
@@ -110,6 +125,7 @@ export function ShareControl({
                     type="button"
                     onClick={() => copy(s.id)}
                     className="shrink-0 rounded-md border border-line px-2 py-1 text-[11px] font-medium transition-colors hover:bg-faint"
+                    aria-live="polite"
                   >
                     {copied === s.id ? "Copied ✓" : "Copy"}
                   </button>
