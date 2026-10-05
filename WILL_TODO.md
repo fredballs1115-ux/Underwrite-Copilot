@@ -499,6 +499,45 @@ to weigh:
    one rule of thumb stated as near-certain. A step may repeat them as
    fact; sourcing, dating or removing them is yours.
 
+**From the check of what grows with an account (research pass 42,
+October 5).** One read from Supabase returns at most the project's row
+limit (1,000 by default), as an ordinary answer, and no page asked for a
+total. The fix round, still running, pages every list a page counts, says
+where a list is cut, and dates every call wherever a deal is summarized. These are yours:
+1. **Your project's row limit**: Supabase's dashboard, Settings, API, "Max
+   rows". Every "past 1,000" in the report means that number.
+2. **The pipeline at scale.** At 1,000 deals the pipeline page is about
+   10 MB of HTML, more than half of it the drawn covers written into the
+   page. Serving the cover as a cached picture, or showing the newest N
+   with "the newest N of M", changes what the page shows and loads.
+3. **Whose deals analytics pools.** It reads every deal the reader can
+   see, a team's included; the fix round will make its words say so. Say if it
+   should read the reader's own screens only, as the market page does.
+4. **Whether a rate move is a saved version.** The model's rate follows
+   the day's Treasury, so a deal viewed on a day the rate moved saves a new
+   Assumption Bridge version, up to one a weekday. Keeping only what a
+   reader sets changes what the bridge keeps.
+5. **A free re-screen of older deals.** A deal screened before the site
+   read what a memorandum sells reads as a fee simple; the fix round will
+   say so on the deal and its card. Re-screening every such deal costs model
+   calls.
+6. **A font that prints every name.** The memo and report print in
+   Helvetica, which has no Japanese, Arabic or emoji, so the fix round
+   will print "Deal (name not printable in this PDF's font)" and the address.
+   Embedding a Unicode font means a licence, more bytes and every page
+   measured again.
+7. **The free-deal limit's database check** needs a lock to hold under
+   load. It is a migration; the details are in our chat.
+8. **Ask's 25 questions.** The panel will say how many are asked; whether
+   the plan's own line states the limit is yours.
+9. **Counts only the database can give** (each one query in the SQL
+   editor):
+   - `select count(*) from benchmarks;`
+   - `select count(*) from profiles where email_weekly_digest;`
+   - `select count(*) from deals where extraction is not null and not (extraction ? 'interest');`
+   - `select deal_id, count(*) from deal_versions group by 1 order by 2 desc limit 5;`
+   - `select url, count(*) from regulatory_alerts group by url order by 2 desc limit 5;`
+
 **From the security review of October 5 (research pass 39):**
 1. **Run migration 0036 first** (item 1 under 2026-09-30 below), before
    anything else on this page: the review found its exposures live today.
