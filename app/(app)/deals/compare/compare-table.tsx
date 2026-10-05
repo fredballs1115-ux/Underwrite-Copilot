@@ -361,6 +361,13 @@ const BEST_PILL = (
   </>
 );
 
+/** A row's name in the table's sticky first column: wrapped at 9rem while
+ *  the column is narrow, so the width goes to the deals (on one line it took
+ *  202px of a tablet's 516, beside deal columns of 115px), and on one line
+ *  once the page's column is wide. */
+const LABEL_CELL =
+  "sticky left-0 z-10 w-36 bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted @4xl:w-auto @4xl:whitespace-nowrap";
+
 export function CompareTable({ cols }: { cols: Col[] }) {
   // Never crown a hero number on a deal the screen rejected — that's the
   // exact pro-forma trap the product exists to counter — nor on one whose
@@ -635,12 +642,25 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     );
   };
 
+  // Cards or the table, by the width of the page's own column — a container
+  // query, as the pipeline's grid counts its columns from its own width —
+  // never the window's: the window's `sm` turned the table on from 640px,
+  // but beside the 240px sidebar an 820px tablet has a 516px column, and
+  // four deals showed two and a half with nothing saying the rest scrolled
+  // (research pass 36).
+  // The table from the width that holds its columns — a 9rem label column
+  // and some 8rem a deal, never under its own 36rem — and the cards below.
+  const layout =
+    cols.length > 3
+      ? { cards: "@2xl:hidden", table: "@2xl:block" }
+      : { cards: "@xl:hidden", table: "@xl:block" };
+
   return (
-    <>
-      {/* Phone: one card per deal with the table's rows stacked, so a phone
-          reads a whole deal instead of one column and a sliver of the next.
-          From `sm` up the table takes over. */}
-      <ul className="grid gap-3 sm:hidden" aria-label="Deals compared">
+    <div className="@container">
+      {/* One card per deal with the table's rows stacked, so a narrow
+          column reads a whole deal instead of one column and a sliver of
+          the next. Where the column holds the table, the table. */}
+      <ul className={`grid gap-3 ${layout.cards}`} aria-label="Deals compared">
         {cols.map((c, ci) => {
           const reason = reasonLine(c);
           return (
@@ -693,103 +713,108 @@ export function CompareTable({ cols }: { cols: Col[] }) {
         })}
       </ul>
 
-      <div className="hidden overflow-x-auto rounded-2xl border border-line bg-surface shadow-card sm:block">
-        <table className="w-full min-w-[36rem] border-collapse text-sm">
-          <thead>
-            <tr>
-              <th className="sticky left-0 z-10 bg-surface" />
-              {cols.map((c) => {
-                const reason = reasonLine(c);
-                return (
-                  <th
-                    key={c.id}
-                    className="border-b border-l border-line p-4 text-left align-top"
-                  >
-                    {c.pictures && (
-                      <DealBanner sources={c.pictures} cover={c.cover ?? null} label={c.name} className="mb-3 w-full max-w-[16rem]" />
-                    )}
-                    <Link
-                      href={`/deals/${c.id}`}
-                      className="font-medium text-ink hover:text-brand"
-                    >
-                      {c.name}
-                    </Link>
-                    <div className="mt-2">
-                      <CallPill c={c} />
-                    </div>
-                    {reason && (
-                      <p className="mt-2 max-w-[16rem] text-xs font-normal leading-relaxed text-muted">
-                        {reason}
-                      </p>
-                    )}
-                    {!c.hasModel && (
-                      <Link
-                        href={`/deals/${c.id}?tab=model`}
-                        className="mt-2 inline-block text-[11px] font-medium text-brand hover:text-brand-strong"
-                      >
-                        No model yet — generate →
-                      </Link>
-                    )}
-                  </th>
-                );
-              })}
-            </tr>
-          </thead>
-          <tbody>
-            {/* Mandate fit leads — an analyst checks the box before the returns.
-                Hidden entirely until a buy box exists to check against. */}
-            {cols.some((c) => c.fit) && (
-              <tr className="border-b border-line">
-                <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  Buy box
-                </td>
-                {cols.map((c) => (
-                  <td key={c.id} className="border-l border-line px-4 py-3 align-top">
-                    {c.fit ? (
-                      <>
-                        <span className={`font-semibold ${fitShown(c)!.cls}`}>
-                          {fitShown(c)!.text}
-                        </span>
-                        {c.fitNote && (
-                          <p className="mt-0.5 max-w-[16rem] text-xs leading-relaxed text-muted">
-                            {c.fitNote}
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-muted">—</span>
-                    )}
-                  </td>
-                ))}
-              </tr>
-            )}
-            {rows.map((mr, ri) => (
-              <tr key={mr.label} className="border-b border-line last:border-0">
-                <td className="sticky left-0 z-10 whitespace-nowrap bg-surface px-4 py-3 text-[11px] font-medium uppercase tracking-wide text-muted">
-                  {labelOf[ri]}
-                </td>
-                {cols.map((c, ci) => {
-                  const val = mr.get(c);
-                  const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
+      {/* Where it still runs past its column, a soft shadow at the edge that
+          has more says so and leaves once there is nothing left to scroll —
+          the site's own affordance for a wide table (scroll-shadows-x). */}
+      <div className={`hidden rounded-2xl border border-line bg-surface shadow-card ${layout.table}`}>
+        <div className="scroll-shadows-x overflow-x-auto rounded-[15px]">
+          <table className="w-full min-w-[36rem] border-collapse text-sm">
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 bg-surface" />
+                {cols.map((c) => {
+                  const reason = reasonLine(c);
                   return (
-                    <td
+                    <th
                       key={c.id}
-                      className={`border-l border-line px-4 py-3 ${
-                        mr.mono ? "font-mono tabular-nums" : ""
-                      } ${isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"}`}
+                      className="border-b border-l border-line p-4 text-left align-top"
                     >
-                      {val ?? <span className="text-muted">—</span>}
-                      {omMark(mr, c, val)}
-                      {isBest && BEST_PILL}
-                      {barFor(mr, c, ri, ci, isBest)}
-                    </td>
+                      {c.pictures && (
+                        <DealBanner sources={c.pictures} cover={c.cover ?? null} label={c.name} className="mb-3 w-full max-w-[16rem]" />
+                      )}
+                      <Link
+                        href={`/deals/${c.id}`}
+                        className="font-medium text-ink hover:text-brand"
+                      >
+                        {c.name}
+                      </Link>
+                      <div className="mt-2">
+                        <CallPill c={c} />
+                      </div>
+                      {reason && (
+                        <p className="mt-2 max-w-[16rem] text-xs font-normal leading-relaxed text-muted">
+                          {reason}
+                        </p>
+                      )}
+                      {!c.hasModel && (
+                        <Link
+                          href={`/deals/${c.id}?tab=model`}
+                          className="mt-2 inline-block text-[11px] font-medium text-brand hover:text-brand-strong"
+                        >
+                          No model yet — generate →
+                        </Link>
+                      )}
+                    </th>
                   );
                 })}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {/* Mandate fit leads — an analyst checks the box before the returns.
+                  Hidden entirely until a buy box exists to check against. */}
+              {cols.some((c) => c.fit) && (
+                <tr className="border-b border-line">
+                  <td className={LABEL_CELL}>
+                    Buy box
+                  </td>
+                  {cols.map((c) => (
+                    <td key={c.id} className="border-l border-line px-4 py-3 align-top">
+                      {c.fit ? (
+                        <>
+                          <span className={`font-semibold ${fitShown(c)!.cls}`}>
+                            {fitShown(c)!.text}
+                          </span>
+                          {c.fitNote && (
+                            <p className="mt-0.5 max-w-[16rem] text-xs leading-relaxed text-muted">
+                              {c.fitNote}
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-muted">—</span>
+                      )}
+                    </td>
+                  ))}
+                </tr>
+              )}
+              {rows.map((mr, ri) => (
+                <tr key={mr.label} className="border-b border-line last:border-0">
+                  <td className={LABEL_CELL}>
+                    {labelOf[ri]}
+                  </td>
+                  {cols.map((c, ci) => {
+                    const val = mr.get(c);
+                    const isBest = (mr.best?.(c) ?? false) && cols.length > 1;
+                    return (
+                      <td
+                        key={c.id}
+                        className={`border-l border-line px-4 py-3 ${
+                          mr.mono ? "font-mono tabular-nums" : ""
+                        } ${isBest ? "font-semibold text-brand" : mr.cls?.(c) || "text-ink"}`}
+                      >
+                        {val ?? <span className="text-muted">—</span>}
+                        {omMark(mr, c, val)}
+                        {isBest && BEST_PILL}
+                        {barFor(mr, c, ri, ci, isBest)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

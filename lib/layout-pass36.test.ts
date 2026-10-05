@@ -20,6 +20,7 @@ import { DealActions } from "@/app/(app)/deals/[id]/deal-actions";
 import { StageSelect } from "@/app/(app)/deals/[id]/stage-select";
 import { OffersDueControl } from "@/app/(app)/deals/offers-due";
 import { ShareView } from "@/app/share/[token]/share-view";
+import { CompareTable, type Col } from "@/app/(app)/deals/compare/compare-table";
 import { SAMPLE_DEAL } from "./sample-deal";
 import { a11yIssues, gluedWords, visibleText } from "./render-lint";
 
@@ -253,6 +254,60 @@ describe("the shared screen says the call beside the title (research pass 36, F3
     // A run that stopped is never said to be re-screening.
     const stalled = elementWith(render({ verdictStale: true, staleWhy: "stalled" }), 'data-qa="share-call"');
     expect(stalled).not.toMatch(/re-screening/);
+  });
+});
+
+describe("the compare page decides cards or table by its own column (research pass 36, F5)", () => {
+  // The window's `sm` turned the table on at 640px, where the sidebar leaves
+  // a tablet 516px: four deals showed two and a half, nothing saying more.
+  const col = (id: string, name: string): Col => ({
+    id,
+    name,
+    assetClass: "multifamily",
+    market: "North Dallas, TX",
+    coveredMarket: "Dallas–Fort Worth",
+    verdict: "caution",
+    reason: null,
+    hasModel: true,
+    fit: null,
+    fitNote: null,
+    strategy: "Stabilized",
+    planDeal: false,
+    irr: 14.2,
+    em: 1.82,
+    coc: 6.1,
+    cap: 5.6,
+    yoc: null,
+    leverage: null,
+    price: "$68,000,000",
+    noi: "$3,808,000",
+  });
+  const COLS = [col("a", "The Maddox"), col("b", "Oak Terrace"), col("c", "Tysons Corner Plaza"), col("d", "Riverbend")];
+  const render = (n: number) => renderToStaticMarkup(h(CompareTable, { cols: COLS.slice(0, n) }));
+
+  it("switches at the width that holds the deals' columns, read off the column (a container query)", () => {
+    for (const [n, at] of [[2, "@xl"], [3, "@xl"], [4, "@2xl"]] as const) {
+      const html = render(n);
+      expect(a11yIssues(html), `${n} deals`).toEqual([]);
+      expect(html, `${n} deals`).toMatch(new RegExp(`^<div class="@container"><ul class="grid gap-3 ${at}:hidden" aria-label="Deals compared">`));
+      expect(html, `${n} deals`).toMatch(new RegExp(`<div class="hidden [^"]*${at}:block"><div class="scroll-shadows-x overflow-x-auto[^"]*"><table`));
+      // Nothing is decided by the window any more.
+      expect(html, `${n} deals`).not.toMatch(/\bsm:(?:hidden|block)\b/);
+    }
+  });
+
+  it("wraps the row names while the column is narrow and keeps them on one line once it is wide", () => {
+    const html = render(4);
+    const labels = [...html.matchAll(/<td class="(sticky left-0[^"]*)">([^<]+)<\/td>/g)];
+    expect(labels.length).toBeGreaterThan(5);
+    for (const [, cls, name] of labels) {
+      const c = cls.split(" ");
+      expect(c, name).toEqual(expect.arrayContaining(["w-36", "@4xl:w-auto", "@4xl:whitespace-nowrap"]));
+      expect(c, name).not.toContain("whitespace-nowrap");
+    }
+    // The scroll's own shadows (globals.css), the site's affordance for a
+    // wide table: one at whichever edge has more, none with nothing to scroll.
+    expect(src("app/globals.css")).toMatch(/\.scroll-shadows-x \{[\s\S]*?background-attachment: local, local, scroll, scroll;/);
   });
 });
 

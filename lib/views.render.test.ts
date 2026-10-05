@@ -1507,10 +1507,13 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     expect(text).toContain("Cap over 10-yr Treasury");
     expect(text).toContain("+66 bps");
     expect(text).toContain("+316 bps");
-    // The phone layout: a card per deal, the table hidden below `sm`.
+    // The narrow layout: a card per deal, the table hidden below the width
+    // of the page's own column that holds four deals (a container query,
+    // research pass 36), and scrolling under the site's edge shadows past it.
     expect(html).toContain('aria-label="Deals compared"');
     expect((html.match(/<li /g) ?? []).length).toBe(COLS.length);
-    expect(html).toMatch(/class="hidden overflow-x-auto[^"]*sm:block"/);
+    expect(html).toMatch(/<div class="@container"><ul class="grid gap-3 @2xl:hidden" aria-label="Deals compared">/);
+    expect(html).toMatch(/<div class="hidden [^"]*@2xl:block"><div class="scroll-shadows-x overflow-x-auto[^"]*"><table/);
     // One deal alone has no spread to draw.
     const single = renderToStaticMarkup(React.createElement(CompareTable, { cols: [COLS[0]] }));
     expect(single).not.toContain("data-spread-bar");
