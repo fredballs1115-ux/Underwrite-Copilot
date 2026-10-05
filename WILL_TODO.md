@@ -355,6 +355,56 @@ are yours:
     bar rows and the full-width word tiles make each panel 18–116px taller
     at 390. Folding them (item 2) is the answer to that, and it is yours.
 
+**Deals the model cannot run honestly yet (research passes 37 and 38).**
+The fixes that are ours withhold the returns, refuse the misread figure
+and say why; each of these would change what the model computes, so it is
+yours:
+1. **Anchor year 1 on a stated NOI when no price is stated.** On a "call
+   for offers" deal the model runs on a $10M placeholder price, and a
+   stated NOI over $2.5M is judged against it and set aside. Letting the
+   NOI anchor year 1 ends a dead end where typing a price never shows a
+   return. Recommended.
+2. **The exit cap where none is stated**: the model's own entry rather
+   than a flat 6.00% (an 8% entry printed 25.1% where its own entry gives
+   15.0%). Already on your list; the page now says the gap.
+3. **A nearly vacant building and land**: the rent line is grossed up
+   through 97–99% vacancy, and land carries an assumed 6% NOI and a loan.
+   A lease-up path, a land residual, or the returns withheld for good.
+4. **A non-recourse floor at the sale**, so an equity multiple never reads
+   below 0x.
+5. **Prices stated as a share or a rate**: "75% of UPB" times the stated
+   balance, "per unit" times the count, "per acre" times the acres, each
+   marked derived. Today such a price is refused and the deal reads as
+   unpriced.
+6. **An NOI stated a month at a time**: multiply by twelve with the words
+   kept, or refuse it.
+7. **Which end of a stated cap range the exit takes** (the low end today,
+   the flattering one for an exit).
+8. **A leasehold or master lease ending inside the hold**: run the model
+   to the lease's end. Its returns are withheld until then.
+9. **Price support in the NOI** (a seller's master lease on vacant space,
+   a rent guarantee): run the NOI without it, or end it at its term.
+10. **A C-PACE installment as debt service** in the model and its
+    coverage.
+11. **A GP stake's promote**: modelling it is large; its returns are
+    withheld as a share of a share until then.
+12. **Duplexes to fourplexes** now file as multifamily, which changes
+    those deals' defaults (a fourplex had run on a 100,000 SF placeholder).
+    Say if you would rather the re-filing waited.
+
+**From the pre-merge audit (2026-10-05):**
+1. **The memo PDF prints your 1031 clock.** The shared screen and every
+   Claude step keep it out because a counterparty who learns the buyer's
+   deadline holds the price, and the memo is the page you forward. Decide
+   whether the memo carries it, or only on request.
+2. **"Senior living apartments (LIHTC, 62+)"** now files as rental
+   housing, by the site's rule that an age-restricted building selling no
+   care is housing. Say if "senior living" should win.
+3. **A sandwich position's model** still capitalises its income forever
+   (the lines say so, and the leasehold card carries the term).
+4. **Offers due before your relinquished property transfers** raise a
+   reverse-exchange question the 1031 clock does not ask.
+
 **Run the research seed after the merge** (`node scripts/seed-research.mjs`,
 the step that writes the FY2027 fair market rents). The runner read every
 source link the audit had marked dead. Two research figures changed:
