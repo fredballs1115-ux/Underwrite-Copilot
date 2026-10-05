@@ -46,6 +46,32 @@ unlevered and 10.43% levered today, against 6.19% and 5.69% on the
 memorandum's $3.96M at the same 6% exit, or 7.77% and 9.29% with the exit
 at its stated 5.5%.
 
+**When a screen goes wrong (research pass 30).** The fixes that are ours
+are in this batch (a stalled run no longer reads as running, a failure a
+retry cannot fix offers Replace OM instead of Try again, and more). Three
+are yours:
+1. **Deploys and running screens.** `render.yaml` now gives the web service
+   five minutes (`maxShutdownDelaySeconds: 300`, Render's maximum) to finish
+   the screens running when a deploy lands, since screens run in-process
+   until the worker is deployed. Watch the next deploy's log: a screen
+   started just before it should finish. If the service was not created
+   from the Blueprint, set the same value in Render's dashboard.
+2. **A failed screen keeps its free deal** until the deal is deleted. Whether
+   a screen that never produced a verdict should give its slot back is a
+   billing policy.
+3. **Replacing a deal's memorandum has no billing check**: a free account
+   can screen any number of different memoranda under one deal by
+   replacing its OM. Whether a replacement counts as a new screen is yours.
+
+**Re-filed classes (research pass 28, as pass 23's were told to you).** A
+deck naming a dialysis center, an urgent care, an ambulatory surgery
+center, a freestanding ER or a veterinary clinic now files as medical
+office; an SNF, a nursing home, post-acute care and a rehabilitation center
+as senior housing; and senior apartments, affordable senior housing and
+"62+" apartments with no care or service word as rental housing. Each runs
+on its class's existing defaults; the commit messages give the measured
+moves. A deal anchored on a stated NOI keeps its NOI.
+
 **Pictures (research pass 29, judged by eye on the real components).**
 The defects that were ours are being fixed in this batch (the market
 caption's contrast, a credit shown over the drawn cover while a photo
