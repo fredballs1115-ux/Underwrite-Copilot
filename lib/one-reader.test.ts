@@ -10,7 +10,7 @@ import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import ExcelJS from "exceljs";
 import type { ExtractedMetric, ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
-import { inferStrategy, planSummary } from "./deal-strategy";
+import { inferStrategy, planSummary, signalGoingInCap } from "./deal-strategy";
 import { basisTag, pickSlots } from "./pipeline-slots";
 import { vsMarketHeading } from "./research-data";
 import { pipelineExportRow, type ExportRowContext } from "./pipeline-export-row";
@@ -243,6 +243,28 @@ describe("the going-in cap: the memorandum's, else the first signal's, withheld 
       deriveInternalComps("other", "multifamily", { assetClass: "multifamily" }, [read, unread, leased]).map((c) => [c.dealId, c.capLabel]),
     );
     expect(comps).toEqual({ read: "5.6%", unread: null, leased: null });
+  });
+
+  it("reads the first signal's cap as the percentage it states, never its digits glued together (audit C3b MED-1)", () => {
+    // "approx. 6%" had read 0.6, "-1.5%" +1.5, "6.2% on T-12" 6.212.
+    const cases: [string, number | null][] = [
+      ["approx. 6%", 6],
+      ["est. 6%", 6],
+      ["Approx. 7%", 7],
+      ["-1.5%", null],
+      ["6.2% on T-12", 6.2],
+      ["5.6% on 2026 NOI", 5.6],
+      ["5.25%–5.50%", 5.25],
+      ["5.5", 5.5],
+      ["n/a", null],
+    ];
+    for (const [text, pct] of cases) expect(signalGoingInCap({ goingInCap: text })?.pct ?? null, text).toBe(pct);
+    // The buy box, the analytics and the market memory read the same figure.
+    const e = ex([m("Asking price", "$24,000,000"), m("In-place NOI", "$1,440,000"), m("Units", "120")]);
+    const signal = signalOf({ askPrice: "$24,000,000", goingInCap: "approx. 6%" });
+    const row = { id: "x", name: "x", asset_class: "multifamily", created_at: "2026-10-01T00:00:00Z", is_sample: false, stage: "screening", verdict: null, extraction: e, first_signal: signal };
+    expect(deriveAnalytics([row]).map((d) => d.capPct)).toEqual([6]);
+    expect(buildComps([row]).map((c) => c.capPct)).toEqual([6]);
   });
 
   it("a 49% share: the memorandum's cap on the header, the card, the workbook and now the compare table", async () => {

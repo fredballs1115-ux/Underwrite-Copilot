@@ -154,7 +154,14 @@ export function signalGoingInCap(
 ): { text: string; pct: number } | null {
   const text = signal?.goingInCap?.trim() || null;
   if (!text) return null;
-  const pct = Number(text.replace(/[^\d.]/g, ""));
+  // The percentage as written, never its digits glued together (audit C3b:
+  // "approx. 6%" had read 0.6, "-1.5%" +1.5 and "6.2% on T-12" 6.212): a
+  // range at its low end, the rule a stated cap range runs on; else the
+  // first percentage (`parsePct`, its sign kept, so a negative falls out of
+  // the band); else a bare figure.
+  const range = text.match(/(\d+(?:\.\d+)?)\s*%?\s*(?:-|–|—|to)\s*(\d+(?:\.\d+)?)\s*%/i);
+  const bare = text.match(/^\s*(\d+(?:\.\d+)?)\s*$/);
+  const pct = range ? Math.min(Number(range[1]), Number(range[2])) : (parsePct(text) ?? (bare ? Number(bare[1]) : NaN));
   return Number.isFinite(pct) && pct > 0.5 && pct <= IMPLIED_CAP_CEILING * 100 ? { text, pct } : null;
 }
 
