@@ -11,6 +11,7 @@ import {
   TZ_COOKIE,
   cookieValueOf,
   dayIn,
+  readerDateLong,
   readerTimeZone,
   readerToday,
   tzCookieUpdate,
@@ -66,6 +67,31 @@ describe("dayIn and readerToday — a day near midnight", () => {
     expect(readerToday("America/Los_Angeles", at("2026-10-05T06:30:00Z"))).toBe("2026-10-04");
     expect(readerToday("not a zone", at("2026-10-05T06:30:00Z"))).toBe("2026-10-05");
     expect(readerToday("Europe/London", lateEvening)).toBe("2026-10-05");
+  });
+});
+
+// Research pass 35 (F5): the letter of intent, the memo and the report were
+// dated by the server's clock, which runs UTC — from 8 pm Eastern a letter
+// was dated tomorrow, and "open for acceptance for 7 days from the date
+// above" ran from a day that had not come.
+describe("readerDateLong — a document's date, on the reader's day", () => {
+  it("at 11:30 pm in New York is that evening's date, though UTC has turned", () => {
+    const lateEvening = at("2026-10-06T03:30:00Z");
+    expect(lateEvening.toISOString().slice(0, 10)).toBe("2026-10-06");
+    expect(readerDateLong("America/New_York", lateEvening)).toBe("October 5, 2026");
+    expect(readerDateLong("America%2FNew_York", lateEvening)).toBe("October 5, 2026");
+    // No cookie (a reader's first page): Eastern's day.
+    expect(readerDateLong(undefined, lateEvening)).toBe("October 5, 2026");
+    // 8:30 pm in Los Angeles; past midnight in London and in UTC.
+    expect(readerDateLong("America/Los_Angeles", lateEvening)).toBe("October 5, 2026");
+    expect(readerDateLong("Europe/London", lateEvening)).toBe("October 6, 2026");
+    expect(readerDateLong("UTC", lateEvening)).toBe("October 6, 2026");
+  });
+
+  it("writes the long form the documents print, across a month's and a year's end", () => {
+    expect(readerDateLong("America/New_York", at("2026-11-01T03:30:00Z"))).toBe("October 31, 2026");
+    expect(readerDateLong("America/New_York", at("2027-01-01T04:30:00Z"))).toBe("December 31, 2026");
+    expect(readerDateLong("Pacific/Honolulu", at("2026-10-05T20:00:00Z"))).toBe("October 5, 2026");
   });
 });
 
@@ -138,6 +164,16 @@ describe("the signed-in pages count from the reader's day", () => {
     const deal = read("app/(app)/deals/[id]/page.tsx");
     expect(deal).toContain("today={todayIso}");
     expect(deal).toContain("todayIso={todayIso}");
+  });
+
+  // The documents' own date, read once per request from the cookie the
+  // signed-in layout writes: the letter of intent, the memo and the report.
+  it("the letter of intent, the memo and the report are dated through readerDateLong, never the server's clock", () => {
+    for (const rel of ["app/api/deals/[id]/loi/route.ts", "app/api/deals/[id]/memo/route.ts", "app/api/deals/[id]/report/route.ts"]) {
+      const src = read(rel);
+      expect(src, rel).toMatch(/const dateStr = readerDateLong\(\s*\(await cookies\(\)\)\.get\(TZ_COOKIE\)\?\.value\s*\)/);
+      expect(src, rel).not.toMatch(/new Date\(\)\.toLocaleDateString\(/);
+    }
   });
 
   it("the signed-in layout writes the cookie", () => {

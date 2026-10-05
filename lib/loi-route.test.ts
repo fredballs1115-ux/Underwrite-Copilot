@@ -21,6 +21,15 @@ const OWNER = "11111111-1111-4111-8111-111111111111";
 const db = vi.hoisted(() => ({
   user: null as { id: string } | null,
   row: null as Record<string, unknown> | null,
+  /** the reader's time-zone cookie (lib/reader-day), as the browser writes it */
+  tz: undefined as string | undefined,
+}));
+
+// The request's cookies: the route dates the letter on the reader's day.
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: (name: string) => (name === "uc_tz" && db.tz != null ? { name, value: db.tz } : undefined),
+  }),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -128,6 +137,7 @@ const row = (label: string, value: string) => ({ label, value, flagged: false, p
 
 beforeEach(() => {
   db.user = { id: OWNER };
+  db.tz = undefined;
   db.row = {
     id: DEAL,
     user_id: OWNER,
@@ -138,6 +148,33 @@ beforeEach(() => {
     extraction,
     first_signal: signal,
   };
+});
+
+// Research pass 35 (F5): the letter was dated by the server's clock, which
+// runs UTC, so from 8 pm Eastern it was dated tomorrow — and its offer is
+// "open for acceptance for 7 days from the date above".
+describe("the LOI is dated on the reader's own day", () => {
+  it("at 11:30 pm in New York the letter is dated that evening, though the server's UTC day has turned", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-06T03:30:00Z"));
+    try {
+      db.tz = "America%2FNew_York";
+      let letter = await letterText(await download());
+      expect(letter).toContain("October 5, 2026");
+      expect(letter).not.toContain("October 6, 2026");
+      expect(letter).toContain("open for acceptance for 7 days from the date above");
+      // No cookie yet (the reader's first page): Eastern's day.
+      db.tz = undefined;
+      expect(await letterText(await download())).toContain("October 5, 2026");
+      // A reader in London is past midnight: their day.
+      db.tz = "Europe%2FLondon";
+      letter = await letterText(await download());
+      expect(letter).toContain("October 6, 2026");
+      expect(letter).not.toContain("October 5, 2026");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("the LOI route and the panel read the deal's plan the same way", () => {

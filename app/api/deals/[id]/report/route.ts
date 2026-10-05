@@ -1,4 +1,6 @@
+import { cookies } from "next/headers";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { TZ_COOKIE, readerDateLong } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
 import { buildReportData, renderReportPdf } from "@/lib/memo/report-document";
 import type { MemoData } from "@/lib/memo/memo-document";
@@ -112,11 +114,9 @@ export async function GET(
     );
   }
 
-  const dateStr = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  // The day the report is dated: the reader's own (lib/reader-day), never
+  // the server's UTC day, which is tomorrow from 8 pm Eastern.
+  const dateStr = readerDateLong((await cookies()).get(TZ_COOKIE)?.value);
 
   let buyBoxChecks: BuyBoxCheck[] = [];
   // The buy-box target IRR anchors the sensitivity page's color scale, so

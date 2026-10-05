@@ -102,6 +102,24 @@ export function readerToday(raw: string | null | undefined, now: Date = new Date
   return dayIn(readerTimeZone(raw), now);
 }
 
+/**
+ * The reader's day written out — "October 5, 2026" — for a document dated
+ * the day it was asked for: the letter of intent, the memo and the full
+ * report. The server's clock runs UTC, so from 8 pm Eastern (5 pm Pacific)
+ * its own day is tomorrow, and a letter dated by it holds itself open "from
+ * the date above" — a day that has not come. Read through `readerToday`, so
+ * the document and the page's countdowns keep one day.
+ */
+export function readerDateLong(raw: string | null | undefined, now: Date = new Date()): string {
+  const [y, m, d] = readerToday(raw, now).split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d)).toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
 /** One cookie's value out of a `document.cookie` string; null where the
  *  string carries none of that name. */
 export function cookieValueOf(cookies: string | null | undefined, name: string): string | null {

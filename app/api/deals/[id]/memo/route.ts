@@ -2,7 +2,7 @@ import React from "react";
 import { cookies } from "next/headers";
 import { renderToBuffer } from "@react-pdf/renderer";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
+import { TZ_COOKIE, readerDateLong, readerToday } from "@/lib/reader-day";
 import { isPro } from "@/lib/billing";
 import {
   MemoDocument,
@@ -100,11 +100,9 @@ export async function GET(
       302,
     );
   }
-  const dateStr = new Date().toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
+  // The day the memo is dated: the reader's own (lib/reader-day), never the
+  // server's UTC day, which is tomorrow from 8 pm Eastern.
+  const dateStr = readerDateLong((await cookies()).get(TZ_COOKIE)?.value);
 
   // The buyer's standing criteria, so the forwarded page carries the fit call.
   // Best-effort: no box (or a pre-0008 schema) just means no buy-box row.
