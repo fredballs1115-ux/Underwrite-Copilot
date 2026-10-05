@@ -395,8 +395,18 @@ export async function backfillCard(
       const photo: DealVisualCache = gallery
         ? { ...current, gallery: (current.gallery ?? []).map((g, i) => (i === gallery - 1 ? next : g)) }
         : { ...current, picture: next };
-      const { error } = await supabase.from("deals").update({ photo }).eq("id", dealId);
-      if (!error) return;
+      // Written only while the database still holds this photograph at its
+      // place: a replacement landing between the read and the write is never
+      // undone, and a write that matched nothing stored nothing (the batch-2
+      // audit).
+      const heroAt = gallery ? `photo->gallery->${gallery - 1}->>hero` : "photo->picture->>hero";
+      const { data: wrote, error } = await supabase
+        .from("deals")
+        .update({ photo })
+        .eq("id", dealId)
+        .eq(heroAt, picture.hero)
+        .select("id");
+      if (!error && Array.isArray(wrote) && wrote.length > 0) return;
     }
   } catch {
     // A card copy is a saving, never a reason a request fails.
@@ -462,9 +472,16 @@ function photoScope(dealId: string) {
 }
 
 /** Every stored file of one picture: its hero, its thumbnail, its card copy
- *  and its full-size copy. */
+ *  and its full-size copy. A card copy is swept by the path it is stored at
+ *  even where it is not recorded: one stored after a response
+ *  (`backfillCard`) can lose its record to another write to the photo cache
+ *  made from an earlier read, and the copy's path is the hero's own with its
+ *  size changed. Removing a path that holds nothing is a no-op. Every sweep
+ *  goes through here — a replaced picture's as much as a deleted deal's —
+ *  so no copy outlives its picture (the batch-2 audit). */
 function pathsOf(picture: DealPicture): string[] {
-  return [picture.hero, picture.thumb, ...(picture.card ? [picture.card] : []), ...(picture.full ? [picture.full] : [])];
+  const card = picture.card ?? cardPathOf(picture);
+  return [picture.hero, picture.thumb, ...(card ? [card] : []), ...(picture.full ? [picture.full] : [])];
 }
 
 /**
@@ -626,19 +643,12 @@ function galleryPaths(cache: DealVisualCache | null | undefined): string[] {
   return (cache?.gallery ?? []).flatMap(pathsOf);
 }
 
-/** Every storage path a deal's pictures occupy — for the deletion sweeps.
- *  A card copy is swept by the path it is stored at even where it is not
- *  recorded: one stored after a response (`backfillCard`) can lose its
- *  record to another write to the photo cache made from an earlier read,
- *  and the copy's path is the hero's own with its size changed. Removing a
- *  path that holds nothing is a no-op. */
+/** Every storage path a deal's pictures occupy — for the deletion sweeps,
+ *  each picture's files as `pathsOf` lists them (an unrecorded card copy
+ *  included). */
 export function picturePaths(cache: DealVisualCache | null | undefined): string[] {
-  const swept = (p: DealPicture): string[] => {
-    const card = p.card ? null : cardPathOf(p);
-    return card ? [...pathsOf(p), card] : pathsOf(p);
-  };
   const pic = cache?.picture;
-  return [...(pic ? swept(pic) : []), ...(cache?.gallery ?? []).flatMap(swept)];
+  return [...(pic ? pathsOf(pic) : []), ...(cache?.gallery ?? []).flatMap(pathsOf)];
 }
 
 const searches = new RunGate(() => MAX_IN_FLIGHT);
