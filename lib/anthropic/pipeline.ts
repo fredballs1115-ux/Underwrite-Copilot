@@ -62,6 +62,7 @@ import { readStudentHousing, studentNote } from "@/lib/student-housing";
 import { mhNote, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageNote } from "@/lib/self-storage";
 import { regulationForDeal, regulationNote, type RegulationRead } from "@/lib/rent-regulation";
+import { forwardNote, readForwardPurchase } from "@/lib/forward-purchase";
 import { otherPortfolioMarkets, portfolioFor, portfolioNote, readPortfolio } from "@/lib/portfolio";
 import { addressUpgrade, parseStructuredAddress, type StructuredAddress } from "@/lib/address";
 import { offersDueOf, offersDueUpgrade } from "@/lib/offering";
@@ -1196,6 +1197,9 @@ async function runAnalysisSteps(
       // lists the memorandum's own words call for.
       let challengeEx: ExtractionResult | null = null;
       let challengeKind: StrategyKind | null = null;
+      // A forward purchase (lib/forward-purchase), set where its note is
+      // among the notes: the challenger's plan paragraph is the purchase's.
+      let challengeForward = false;
       try {
         const { data: dr } = await admin
           .from("deals")
@@ -1276,6 +1280,17 @@ async function runAnalysisSteps(
           ex,
         );
         if (plausibility) notes.push(plausibility);
+        // A forward purchase or a build-to-suit bought at delivery
+        // (lib/forward-purchase): the price at delivery, the clock to it and
+        // to the outside date, the deposit and the yield at delivery, then
+        // the forward-purchase traps by name — in place of the construction
+        // paragraph a development gets, since the buyer carries no
+        // construction (the instruction's own plan paragraph is swapped too).
+        const forward = readForwardPurchase(ex, new Date(), strategy);
+        if (forward) {
+          notes.push(forwardNote(forward));
+          challengeForward = true;
+        }
 
         // A portfolio: what the extraction established about the properties
         // (the markets, the income's concentration, the allocation against
@@ -1405,7 +1420,7 @@ async function runAnalysisSteps(
       // class's (research pass 23): a cannabis tenant, a special-purpose
       // building sold to be converted, a lab, a cold-storage building.
       const keyed = keyedTrapsFor(challengeEx, challengeKind);
-      const challenges = await challengeAssumptions(om(), challengeClass, reconNote, keyed);
+      const challenges = await challengeAssumptions(om(), challengeClass, reconNote, keyed, challengeForward);
       await writeResult(admin, dealId, "challenges", challenges);
       await markDone("challenge");
     }

@@ -48,6 +48,7 @@ import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
 import { regulationForDeal, regulationShortLine } from "@/lib/rent-regulation";
+import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { storedFloodShortLine, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { addressUpgrade, type StructuredAddress } from "@/lib/address";
 import { keyTermRows } from "@/lib/key-terms";
@@ -121,12 +122,15 @@ function strategyLineFor(extraction: ExtractionResult | null, strategy: DealStra
   const kind = dealTypeLabel(strategy.label, extraction);
   const m = (n: number) =>
     n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString("en-US")}`;
+  // A forward purchase's NOI is the one stated at delivery (lib/deal-strategy
+  // `forwardDeliveryNoi`), over the price the buyer pays then.
+  const noiWord = plan?.forward ? "NOI at delivery" : "stabilized NOI";
   if (plan?.stabilizedNoi && plan.totalCost != null && plan.yieldOnCost != null) {
-    return `${kind} · stabilized NOI ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
+    return `${kind} · ${noiWord} ${m(plan.stabilizedNoi.value)} on ${m(plan.totalCost)} total cost (${yieldOnCostText(plan.yieldOnCost)} yield on cost${
       plan.costPerUnit != null ? `; ${m(plan.costPerUnit)} per planned unit all-in` : ""
     })`;
   }
-  if (plan?.stabilizedNoi) return `${kind} · stabilized NOI ${m(plan.stabilizedNoi.value)}`;
+  if (plan?.stabilizedNoi) return `${kind} · ${noiWord} ${m(plan.stabilizedNoi.value)}`;
   return kind;
 }
 
@@ -252,6 +256,16 @@ function regulationLineFor(deal: DealRow, extraction: ExtractionResult | null, t
   return r ? regulationShortLine(r) : "";
 }
 
+/** A forward purchase or a build-to-suit bought at delivery
+ *  (lib/forward-purchase), in one line for the memo's header: the price paid
+ *  at delivery, the works the developer's, the yield at delivery, the outside
+ *  date and the deposit, read on `today` with the kind the memo reads. ""
+ *  where the buyer is not paying for a building at its completion. */
+function forwardLineFor(extraction: ExtractionResult | null, strategy: DealStrategy, today: string): string {
+  const r = readForwardPurchase(extraction, new Date(`${today}T12:00:00Z`), strategy);
+  return r ? forwardShortLine(r) : "";
+}
+
 function taxAbatementLineFor(extraction: ExtractionResult | null): string {
   const r = readTaxAbatement(extraction);
   return r ? taxAbatementShortLine(r) : "";
@@ -343,6 +357,11 @@ export type MemoData = {
    *  share as stated and the allowance in force (lib/rent-regulation), in
    *  one line; "" where none reaches it and the memorandum names none */
   regulationLine?: string;
+  /** a forward purchase or a build-to-suit bought at delivery — the price
+   *  at delivery, the works the developer's, the yield at delivery, the
+   *  outside date and the deposit (lib/forward-purchase), in one line; "" on
+   *  anything else */
+  forwardLine?: string;
   /** FEMA's flood zone at the building (lib/site-flags `floodShortLine`,
    *  #426) — a Special Flood Hazard Area or a drawn hazard; "" for minimal
    *  hazard, no digital map or a lookup that has not answered */
@@ -651,6 +670,7 @@ export function buildMemoData(
     assumableLine: pdfSafe(assumableLineFor(extraction ?? null)),
     affordableLine: pdfSafe(affordableLineFor(extraction ?? null)),
     regulationLine: pdfSafe(regulationLineFor(deal, extraction ?? null, today)),
+    forwardLine: pdfSafe(forwardLineFor(extraction ?? null, strategy, today)),
     singleTenantLine: pdfSafe(singleTenantLineFor(extraction ?? null)),
     hotelLine: pdfSafe(hotelLineFor(extraction ?? null)),
     saleLine: pdfSafe(saleLineFor(extraction ?? null)),
@@ -1138,6 +1158,9 @@ export function MemoPage({ data }: { data: MemoData }) {
             {/* How it is sold (#456): an auction's starting bid is where the
                 price starts, and a court's or a lender's sale is as-is. */}
             {data.saleLine && <Text style={[s.sub, { color: "#8a5a00", fontFamily: "Helvetica-Bold" }]}>{data.saleLine}</Text>}
+            {/* A forward purchase (lib/forward-purchase): the price is paid at
+                delivery and the developer funds the works. */}
+            {data.forwardLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.forwardLine}</Text>}
             {/* The seller's loan offered for assumption (#419), as stated. */}
             {data.assumableLine && <Text style={[s.sub, { color: "#114e54" }]}>{data.assumableLine}</Text>}
             {/* A note the seller offers to carry (#462), as stated. */}

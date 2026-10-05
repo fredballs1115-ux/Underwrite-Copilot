@@ -249,6 +249,31 @@ describe("keyTermRows — the deal-defining rows lead the key terms", () => {
     ]);
   });
 
+  it("a forward purchase's delivery, outside date, deposit and cap at delivery lead right after the price (lib/forward-purchase)", () => {
+    const forward = [
+      { label: "NOI (stabilized, pro forma)", value: "$3,960,000", flagged: true },
+      { label: "Deposit", value: "10% at signing", flagged: false },
+      { label: "Homes (proposed)", value: "180", flagged: false },
+      { label: "Outside date", value: "December 31, 2028", flagged: false },
+      { label: "Delivery date", value: "June 2028", flagged: false },
+      { label: "Purchase price", value: "$72,000,000", flagged: false },
+    ];
+    expect(keyTermRows(forward, "development", SCREEN_YEAR, 5).map((m) => m.label)).toEqual([
+      "Purchase price",
+      "Delivery date",
+      "Outside date",
+      "Deposit",
+      "NOI (stabilized, pro forma)",
+    ]);
+    // A standing building's earnest-money deposit is no forward purchase's.
+    const stabilized = [
+      { label: "Deposit", value: "$500,000 earnest money", flagged: false },
+      { label: "Going-in cap rate", value: "5.50%", flagged: false },
+      { label: "Asking price", value: "$42,000,000", flagged: false },
+    ];
+    expect(keyTermRows(stabilized, "stabilized", SCREEN_YEAR, 2).map((m) => m.label)).toEqual(["Asking price", "Going-in cap rate"]);
+  });
+
   it("a student building's pre-leasing and walk lead after the price (#468)", () => {
     const student = [
       { label: "Occupancy", value: "96%", flagged: false },

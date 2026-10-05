@@ -29,7 +29,9 @@ export const yieldOnCostText = (d: number): string => `${(d * 100).toFixed(2)}%`
 export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] {
   return [
     [
-      "Stabilized NOI",
+      // A forward purchase's NOI is the one the OM states at delivery (on a
+      // build-to-suit, the lease's first year).
+      plan.forward ? "NOI at delivery" : "Stabilized NOI",
       plan.stabilizedNoi ? moneyCompact(plan.stabilizedNoi.value) : "not stated",
     ],
     // A price the OM states for something other than the project — a
@@ -49,12 +51,18 @@ export function planFacts(plan: PlanSummary, noun = "unit"): [string, string][] 
       // the doors times a door's cost, and the label says it was multiplied.
       plan.budget?.allIn ? "Budget (total cost less price)" : plan.budget?.program ? "Budget (doors × cost a door)" : "Budget",
       // An all-in total with no price stated: the works are inside it and
-      // cannot be split out — the total cost row carries the figure.
+      // cannot be split out — the total cost row carries the figure. On a
+      // forward purchase the developer funds the works: a budget the OM
+      // states is the developer's, never added to the price.
       plan.budget
         ? plan.budget.isTotal
           ? "inside the stated total"
           : moneyCompact(plan.budget.budget)
-        : "not stated",
+        : plan.forward
+          ? plan.developerBudget
+            ? `${moneyCompact(plan.developerBudget.budget)}, the developer's`
+            : "the developer's"
+          : "not stated",
     ],
     ["Total cost", plan.totalCost != null ? moneyCompact(plan.totalCost) : "—"],
     ["Yield on cost", plan.yieldOnCost != null ? yieldOnCostText(plan.yieldOnCost) : "—"],

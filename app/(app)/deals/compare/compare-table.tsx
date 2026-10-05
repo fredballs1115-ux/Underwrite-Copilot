@@ -156,6 +156,10 @@ export type Col = {
    *  "Rent rules: check" — lib/rent-regulation `regulationTag`); absent
    *  where none reaches it and the memorandum names no regime */
   regulation?: string | null;
+  /** a forward purchase or a build-to-suit bought at delivery ("Forward,
+   *  delivers Q2 2028", "Build-to-suit, 6.00% at delivery" —
+   *  lib/forward-purchase `forwardTag`); absent otherwise */
+  forward?: string | null;
   /** what a hotel is sold with ("Mgmt encumbered, PIP $35k/key" —
    *  lib/hotel-deal `hotelTag`, #455); absent on anything but a hotel */
   hotel?: string | null;
@@ -360,6 +364,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
     // never "none", for a deal with no read — the site's rules not reaching
     // a regime here is not a finding that the building has none.
     { label: "Rent regulation", get: (c) => c.regulation || "—" },
+    // A forward purchase (lib/forward-purchase): the price is paid at
+    // delivery and the developer funds the works — a dash, never "none".
+    { label: "Forward purchase", get: (c) => c.forward || "—" },
     { label: "Tenancy", get: (c) => c.tenancy || "—" },
     // A shadow anchor is not bought, and a roll before the sale is income
     // the model counts and the buyer may not keep (#457).

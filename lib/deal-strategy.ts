@@ -376,6 +376,58 @@ export function buildsSomething(extraction: ExtractionResult | null | undefined,
   return capitalBudgetFromMetrics(metrics, null) != null || renovationProgramBudget(metrics, null) != null;
 }
 
+// ── A forward purchase ───────────────────────────────────────────────────
+// The predicate the plan needs (lib/forward-purchase reads the rest, and
+// re-exports these): it lives here because lib/forward-purchase imports
+// this module, and `planSummary` must know a forward purchase to say the
+// developer funds the works.
+
+/** The words that name a purchase at completion. A build-to-suit counts
+ *  only beside a price for the whole asset (`isForwardPurchase`): a site
+ *  sold for a build-to-suit is the buyer's own development. */
+const FORWARD_WORDS =
+  /\bforward[- ](?:purchase|sale|commitment|takeout|take[- ]out)\b|\bpurchased?\s+(?:at|upon|on)\s+(?:the\s+)?(?:completion|delivery|substantial completion|certificate of occupancy|issuance of (?:the\s+)?(?:certificate of occupancy|c\.?\s?o\.?))\b|\btake[- ]?out (?:commitment|purchase|buyer)\b/i;
+/** A single tenant's build-to-suit, by its own words. */
+export const BUILD_TO_SUIT_WORDS = /\bbuild[- ]to[- ]suit\b|\bbts\b/i;
+
+/** Every word the memorandum gave the screen, for a forward purchase's words. */
+export function forwardWordsOf(ex: ExtractionResult): string {
+  return [
+    ex.dealName ?? "",
+    ex.buyerNotes ?? "",
+    ex.strategy?.summary ?? "",
+    ex.strategy?.timeline ?? "",
+    ...(ex.metrics ?? []).flatMap((m) => [m.label, m.value]),
+  ].join(" \n ");
+}
+
+/**
+ * Whether the deal is a purchase at completion: a development (or a
+ * conversion delivered with its works) whose memorandum's words say the
+ * buyer pays at completion, or a build-to-suit priced as the whole asset.
+ */
+export function isForwardPurchase(
+  ex: ExtractionResult | null | undefined,
+  strategy: DealStrategy = inferStrategy(ex ?? null),
+): boolean {
+  if (!ex) return false;
+  if (strategy.kind !== "development" && strategy.kind !== "conversion") return false;
+  const words = forwardWordsOf(ex);
+  if (FORWARD_WORDS.test(words)) return true;
+  if (!BUILD_TO_SUIT_WORDS.test(words)) return false;
+  const priceRow = findPriceMetric(ex.metrics ?? [], strategy.kind, screenYearOf(ex));
+  return priceRow != null && !priceRowIsLand(priceRow);
+}
+
+/** The NOI a forward purchase's memorandum states at delivery: the
+ *  stabilized figure, or on a build-to-suit the lease's first year, since
+ *  its rent starts at delivery (a community's first year is its lease-up,
+ *  never its yield at delivery). Null where neither is stated. */
+export function forwardDeliveryNoi(metrics: MetricLike[], buildToSuit: boolean): NoiFigure | null {
+  const nois = noiFigures(metrics);
+  return nois.find((f) => f.kind === "stabilized") ?? (buildToSuit ? (nois.find((f) => f.kind === "year1") ?? null) : null);
+}
+
 // ── The plan's cost ──────────────────────────────────────────────────────
 
 // The plan's cost is read from ONE row, and never from a line of the
@@ -825,11 +877,26 @@ export interface PlanSummary {
    *  whole and the loan sits on top of it, said and never added in; null
    *  or absent otherwise */
   entityLoan?: number | null;
-  /** the stabilized pro forma NOI, when the OM states one */
+  /** the stabilized pro forma NOI, when the OM states one — on a forward
+   *  purchase (`forward`) the NOI the OM states at delivery
+   *  (`forwardDeliveryNoi`: the stabilized figure, or on a build-to-suit the
+   *  lease's first year), its own label kept */
   stabilizedNoi: NoiFigure | null;
+  /** the buyer's budget for the works — null on a forward purchase, whose
+   *  works the developer funds (`developerBudget`) */
   budget: CapitalBudget | null;
-  /** price + budget, when both are known */
+  /** price + budget, when both are known — on a forward purchase the price
+   *  alone, the buyer's whole cost */
   totalCost: number | null;
+  /** a forward purchase or a build-to-suit bought at delivery
+   *  (`isForwardPurchase`): the developer funds the works, so the price is
+   *  the buyer's whole cost and the yield on cost is the NOI at delivery
+   *  over it; absent or false otherwise */
+  forward?: boolean;
+  /** on a forward purchase, the budget the memorandum states for the works:
+   *  the developer's, said and never added to the price; null or absent
+   *  otherwise */
+  developerBudget?: CapitalBudget | null;
   /** stabilized NOI ÷ total cost, decimal, when both are known */
   yieldOnCost: number | null;
   /** why no total cost or yield on cost is struck where the price is shown,
@@ -883,7 +950,14 @@ export function planSummary(
   // A leased fee's buyer holds the land: the works and their cost are the
   // leaseholder's, so the plan has no cost or yield of the buyer's to state.
   const landOnly = interest.kind === "leased_fee";
-  const stabilizedNoi = noiFigures(metrics).find((f) => f.kind === "stabilized") ?? null;
+  // A forward purchase or a build-to-suit bought at delivery (research pass
+  // 28): the developer funds the works, so the price is the buyer's whole
+  // cost and the yield on cost is the NOI the memorandum states at delivery
+  // over it — a budget it states is the developer's, said and never added.
+  const forward = isForwardPurchase(extraction, strategy);
+  const stabilizedNoi = forward
+    ? forwardDeliveryNoi(metrics, BUILD_TO_SUIT_WORDS.test(forwardWordsOf(extraction)))
+    : (noiFigures(metrics).find((f) => f.kind === "stabilized") ?? null);
   // A metric row with its page first; the strategy's own wording when the
   // budget appears nowhere else. Against a land price the works are bounded
   // by the absolute ceiling only — a site is a fraction of what is built.
@@ -892,15 +966,22 @@ export function planSummary(
   // the doors times a door's cost, derived and said so — never added to a
   // total the memorandum does state. Read against the building's price
   // alone: the equity's whole is no price to take out of an all-in total.
-  const budget = landOnly
+  const statedBudget = landOnly
     ? null
     : (capitalBudgetFromMetrics(metrics, price, wholeAsset) ??
       budgetFromText(extraction.strategy?.capitalBudget, price, wholeAsset) ??
       (strategy.kind === "value_add" ? renovationProgramBudget(metrics, price, wholeAsset) : null));
+  const budget = forward ? null : statedBudget;
   // Price plus the works; or, when the OM states an all-in total and no
   // price, that total itself — a yield on cost needs no split of the two.
-  const totalCost =
-    price != null && budget ? price + budget.budget : budget?.isTotal ? budget.budget : null;
+  // On a forward purchase the price alone.
+  const totalCost = forward
+    ? price
+    : price != null && budget
+      ? price + budget.budget
+      : budget?.isTotal
+        ? budget.budget
+        : null;
   const yieldOnCost =
     stabilizedNoi && totalCost != null && totalCost > 0 ? stabilizedNoi.value / totalCost : null;
   const units = unitCountFromMetrics(metrics);
@@ -934,6 +1015,7 @@ export function planSummary(
     budget,
     totalCost,
     yieldOnCost,
+    ...(forward ? { forward: true, developerBudget: statedBudget } : {}),
     costWithheld:
       entityLoan != null && totalCost == null
         ? `No total cost or yield on cost is struck on the equity's whole: the building's cost is that plus the entity's ${money(entityLoan)} loan, which the model does not add.`
@@ -1158,10 +1240,11 @@ export function assessPlausibility(
  *  plainly what is not. */
 function planLine(plan: PlanSummary): string {
   const parts: string[] = [];
+  // A forward purchase's NOI is the one the memorandum states at delivery,
+  // which on a build-to-suit is the lease's first year.
+  const noiWord = plan.forward ? "NOI at delivery" : "stabilized NOI";
   parts.push(
-    plan.stabilizedNoi
-      ? `stabilized NOI ${money(plan.stabilizedNoi.value)} (${plan.stabilizedNoi.label})`
-      : "stabilized NOI not stated",
+    plan.stabilizedNoi ? `${noiWord} ${money(plan.stabilizedNoi.value)} (${plan.stabilizedNoi.label})` : `${noiWord} not stated`,
   );
   // A share's grossed-up price, either label, reads as it did: the
   // parenthesis below names the equity's whole beside the entity's loan.
@@ -1192,9 +1275,15 @@ function planLine(plan: PlanSummary): string {
               : "the OM states no price"
           }, so the acquisition inside it is not separable)`
         : `${plan.budget.allIn ? "budget " : ""}${money(plan.budget.budget)}${plan.budget.allIn ? ` (${plan.budget.label} less the price)` : ` (${plan.budget.label})`}`
-      : "construction / renovation budget not stated in the figures",
+      : plan.forward
+        ? // The developer funds a forward purchase's works: a budget the
+          // memorandum states is the developer's, never added to the price.
+          plan.developerBudget
+          ? `the ${money(plan.developerBudget.budget)} budget (${plan.developerBudget.label}) is the developer's, who funds the works — never added to the price`
+          : "no construction budget is the buyer's: the developer funds the works"
+        : "construction / renovation budget not stated in the figures",
   );
-  if (plan.totalCost != null) parts.push(`total cost ${money(plan.totalCost)}`);
+  if (plan.totalCost != null) parts.push(plan.forward ? `total cost ${money(plan.totalCost)}, the price` : `total cost ${money(plan.totalCost)}`);
   // As the deal page prints it, so a verdict that quotes it quotes the
   // page's own figure.
   if (plan.yieldOnCost != null) parts.push(`yield on total cost ${yieldOnCostText(plan.yieldOnCost)}`);
@@ -1204,6 +1293,17 @@ function planLine(plan: PlanSummary): string {
   if (plan.capitalBudgetText) parts.push(`budget as worded: ${plan.capitalBudgetText}`);
   return parts.join("; ");
 }
+
+/** How a plan's stabilized pro forma is tested — the paragraph a plan deal's
+ *  brief carries after its figures. */
+const PLAN_TEXT =
+  "The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today. Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.";
+
+/** The paragraph a forward purchase's brief carries in its place: the
+ *  developer funds the works, so no construction budget, carry, interest
+ *  reserve or construction loan is the buyer's. */
+const FORWARD_PLAN_TEXT =
+  "A FORWARD PURCHASE: the buyer pays the price at delivery and the developer funds the works, so the buyer carries no construction — no budget, no carry through the works, no interest reserve and no construction or bridge loan of its own; the price is the buyer's whole cost. The NOI the memorandum states at delivery is the delivered building's figure, not today's income: test it against today's leased comparables, and judge the purchase on its yield at delivery against the exit cap, on the clock to delivery against the outside date, and on the deposit at risk before delivery — never on a going-in cap on a building that stands.";
 
 /**
  * The strategy, the plan's figures and the findings as one paragraph for the
@@ -1226,9 +1326,11 @@ export function plausibilityNote(
     const summary = strategy.summary && strategy.summary !== reading ? ` — ${strategy.summary}` : "";
     bits.push(`DEAL STRATEGY: ${dealTypeLabel(strategy.label, extraction)}${summary} ${reading}`);
     if (plan) bits.push(`THE PLAN AS THE OM STATES IT: ${planLine(plan)}.`);
-    bits.push(
-      "The stabilized NOI is the sponsor's post-completion pro forma — not a misread and not today's income: it is expected to sit above today's income (far above it on a conversion or a development), so struck over the acquisition price alone it reads as a cap the building does not earn today. Test whether it is as conservative as the deck presents it: the rents and occupancy behind it against today's market, the operating ratio, the construction or renovation budget and schedule against comparable projects, the carry and the income (if any) through the works, and the yield on total cost against the exit cap and against the cost of construction debt. Judge the plan on yield on cost, downtime and execution risk — never on a going-in cap on the acquisition price.",
-    );
+    // A forward purchase (research pass 28): the buyer carries no
+    // construction, so the construction paragraph a development gets is the
+    // purchase's own — the facts and traps by name follow in the
+    // challenger's notes (lib/forward-purchase `forwardNote`).
+    bits.push(plan?.forward || isForwardPurchase(extraction, strategy) ? FORWARD_PLAN_TEXT : PLAN_TEXT);
   }
   if (findings.length) {
     bits.push(

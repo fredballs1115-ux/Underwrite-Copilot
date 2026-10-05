@@ -63,6 +63,28 @@ describe("pipelineExportRow — the meeting workbook reads a deal as every surfa
     expect(pipelineExportRow(deal(), ctx).regulation).toBeNull();
   });
 
+  it("says a forward purchase on the route's day, as the pipeline card says it, and carries it in the price cell's note (lib/forward-purchase)", async () => {
+    const forward = {
+      dealName: "Ridgeline Distribution",
+      assetClass: "industrial",
+      market: "Columbus, OH",
+      address: "",
+      strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [m("Purchase price", "$48,000,000"), m("Delivery date", "Q3 2027")],
+    } as ExtractionResult;
+    const row = pipelineExportRow(deal({ extraction: forward, asset_class: "industrial" }), { ...ctx, today: "2026-10-05" });
+    expect(row.forward).toBe("Build-to-suit, delivers Q3 2027");
+    expect(row.forward).toBe(pickSlots(forward, null, "industrial", { address: null, siteFlags: null, today: "2026-10-05" }).forward);
+    const buf = await buildPipelineWorkbook([row], new Date("2026-10-05T12:00:00Z"), null);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf as unknown as ArrayBuffer);
+    // Row 6 is the deal; column 7 its price.
+    expect(JSON.stringify(wb.getWorksheet("Pipeline")!.getRow(6).getCell(7).note)).toContain(
+      "Build-to-suit, delivers Q3 2027: the price is paid at delivery and the developer funds the works",
+    );
+    expect(pipelineExportRow(deal(), ctx).forward).toBeNull();
+  });
+
   it("prints the deal's one class: the deck's on a deal filed Auto, the analyst's where they filed one", async () => {
     expect(pipelineExportRow(deal(), ctx).assetClass).toBe("multifamily");
     expect(pipelineExportRow(deal({ asset_class: "office" }), ctx).assetClass).toBe("office");

@@ -318,6 +318,23 @@ function buildCover(
       r++;
     }
   }
+  // A forward purchase or a build-to-suit bought at delivery
+  // (lib/forward-purchase): the price at delivery, the clock, the yield and
+  // the deposit, then what this model does with them — the price as paid at
+  // closing, its year-one NOI beside the memorandum's at delivery.
+  if (meta.forward) {
+    fact("The forward purchase", meta.forward.line);
+    ws.getCell(r - 1, 3).alignment = { wrapText: true, vertical: "top" };
+    ws.getRow(r - 1).height = 40;
+    if (meta.forward.read) {
+      const c = ws.getCell(r, 3);
+      c.value = meta.forward.read;
+      c.font = { name: ARIAL, size: 9, color: MUTED };
+      c.alignment = { wrapText: true, vertical: "top" };
+      ws.getRow(r).height = 52;
+      r++;
+    }
+  }
   // The seller's loan offered for assumption (#419): as stated, then what
   // it is worth against this model's own new loan.
   if (meta.assumable) {

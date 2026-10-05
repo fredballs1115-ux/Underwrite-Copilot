@@ -26,6 +26,8 @@ import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
 import { readManufacturedHousing } from "@/lib/manufactured-housing";
 import { SelfStoragePanel } from "@/app/self-storage-panel";
 import { readSelfStorage } from "@/lib/self-storage";
+import { ForwardPanel } from "@/app/forward-panel";
+import { readForwardPurchase } from "@/lib/forward-purchase";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { ValueAddPanel } from "@/app/value-add-panel";
@@ -1453,6 +1455,17 @@ export default async function DealPage({
         <SalePanel
           sale={readSale(extraction)}
           ceiling={derived ? saleCeiling(extraction, derived.inputs, buyBox?.minIrrPct ?? SALE_HURDLE_PCT) : null}
+        />
+        {/* A forward purchase or a build-to-suit bought at delivery
+            (lib/forward-purchase): the clock from today to the delivery and
+            the outside date, the deposit's share of the price, and the yield
+            at delivery against the model's exit cap — the buyer carries no
+            construction. Read on the reader's day, with the page's kind. */}
+        <ForwardPanel
+          forward={readForwardPurchase(extraction, new Date(`${todayIso}T12:00:00Z`), strategy)}
+          today={todayIso}
+          exitCapPct={derived ? derived.inputs.exitCapPct * 100 : null}
+          modelLine={derived?.meta.forward?.read ?? ""}
         />
         {/* A covenant or a contract that sets the rents (#453): the units it
             binds, until when, each tier against its limit — said before any

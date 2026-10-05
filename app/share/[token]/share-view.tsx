@@ -34,6 +34,8 @@ import { ManufacturedHousingPanel } from "@/app/manufactured-housing-panel";
 import { readManufacturedHousing } from "@/lib/manufactured-housing";
 import { SelfStoragePanel } from "@/app/self-storage-panel";
 import { readSelfStorage } from "@/lib/self-storage";
+import { ForwardPanel } from "@/app/forward-panel";
+import { readForwardPurchase } from "@/lib/forward-purchase";
 import { SalePanel } from "@/app/sale-panel";
 import { RosterPanel } from "@/app/roster-panel";
 import { readRoster } from "@/lib/tenant-roster";
@@ -356,6 +358,15 @@ export function ShareView({
       {/* How it is sold (#456): the starting bid, the premium on top, the
           reserve and the deadline — or who is selling, and as-is. */}
       <SalePanel sale={readSale(safeExtraction)} />
+
+      {/* A forward purchase (lib/forward-purchase): the price at delivery,
+          the clock to it and to the outside date, the deposit and the yield
+          at delivery — the model's exit cap beside it needs the model, which
+          the sender's deal page carries. Read on the loader's day. */}
+      <ForwardPanel
+        forward={readForwardPurchase(safeExtraction, today ? new Date(`${today}T12:00:00Z`) : undefined, strategy)}
+        today={today}
+      />
 
       {/* A covenant or a contract that sets the rents (#453): how much of the
           building is restricted, until when, and what the model is not. */}

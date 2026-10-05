@@ -35,10 +35,14 @@ export async function challengeAssumptions(
   /** the trap lists the memorandum's own words call for (prompts
    *  `keyedTrapsFor`), read after the class's own */
   keyed: readonly KeyedTrapList[] = [],
+  /** a forward purchase (lib/forward-purchase): its paragraph stands where
+   *  a plan's construction paragraph would — the buyer carries no
+   *  construction — and its facts and traps ride in `reconNote` */
+  forward = false,
 ): Promise<ChallengerResult> {
   const client = getAnthropic();
   const instruction =
-    challengerInstruction(assetClass, keyed) +
+    challengerInstruction(assetClass, keyed, forward) +
     (reconNote?.trim()
       ? `\n\n${reconNote.trim()} Where a figure the OM relies on is contradicted by the rent roll or T-12, treat that as a first-order challenge and put the exact discrepancy to the broker.`
       : "");

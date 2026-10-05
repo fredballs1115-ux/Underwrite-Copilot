@@ -27,6 +27,7 @@ import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
 import { regulationForDeal, regulationTag, type DealForRegulation } from "@/lib/rent-regulation";
+import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import type { ListJobStatus } from "@/lib/screen-run";
 
@@ -114,6 +115,11 @@ export interface PipelineSlots {
    *  (lib/rent-regulation `regulationTag`); absent or null where none reaches
    *  it, and where the caller passed no place to read the rules at */
   regulation?: string | null;
+  /** a forward purchase or a build-to-suit bought at delivery — "Forward,
+   *  delivers Q2 2028", "Build-to-suit, 6.00% at delivery" (lib/forward-
+   *  purchase `forwardTag`); absent or null where the buyer is not paying
+   *  for a building at its completion */
+  forward?: string | null;
   /** the price by the class's own basis, as a listing card shows it —
    *  "$274k/unit", "$200k/key", "$212/SF" (`basisTag`, #469); absent or
    *  null on a plan deal, a note, the land, a share with no stated
@@ -203,7 +209,8 @@ export interface SlotPlace {
  *  minute — the first signal is all there is: its ask fills the price, as
  *  on the deal page, and every other slot waits for the terms. `place` is
  *  where the deal is and the day it is read on: the rent rules are read only
- *  where it is given, and the slot is null where it is not. */
+ *  where it is given, and the slot is null where it is not; a forward
+ *  purchase's clock counts from its day, else from the clock's. */
 export function pickSlots(
   extraction: ExtractionResult | null,
   signal: FirstSignal | null,
@@ -219,6 +226,9 @@ export function pickSlots(
   // A note's cap slot (#423's rule): the collateral's cap withheld, the
   // note's yield to maturity in its place where the note pays or may.
   const note = plan ? null : noteCapSlot(extraction);
+  // The day a dated slot is read on: the reader's own where the caller
+  // hands it (lib/reader-day), else the clock's.
+  const asOf = place?.today ? new Date(`${place.today}T12:00:00Z`) : new Date();
   return {
     // The going-in cap only, and only on an operating asset: the same rule
     // the meeting .xlsx, the analytics and the comp memory apply, so a
@@ -278,6 +288,10 @@ export function pickSlots(
           regulationForDeal({ extraction, address: place.address, siteFlags: place.siteFlags, assetClass: storedClass ?? null }, place.today),
         )
       : null,
+    // A forward purchase (lib/forward-purchase): the price is paid at
+    // delivery — the yield then, or the delivery it counts down to — read
+    // with the kind the row reads.
+    forward: forwardTag(readForwardPurchase(extraction, asOf, strategy)),
     // The price by the unit or the foot, as a listing card shows it (#469),
     // in the deal's one class.
     basis: basisTag(extraction, strategy.kind, storedClass),

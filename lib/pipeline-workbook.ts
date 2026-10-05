@@ -95,6 +95,10 @@ export interface PipelineExportRow {
    *  "Rent rules: check" (lib/rent-regulation `regulationTag`); carried in
    *  the price cell's note */
   regulation?: string | null;
+  /** a forward purchase or a build-to-suit bought at delivery — "Forward,
+   *  delivers Q2 2028", "Build-to-suit, 6.00% at delivery"
+   *  (lib/forward-purchase `forwardTag`); carried in the price cell's note */
+  forward?: string | null;
   /** the going-in cap on today's income — always null on a plan deal, and
    *  on a note (`capWithheld`) */
   cap: string | null;
@@ -289,6 +293,7 @@ export async function buildPipelineWorkbook(
         d.mh ? `${d.mh}: a manufactured-housing park — the deal page reads the lot rent against the market's, the park-owned homes and the water and sewer.` : null,
         d.storage ? `${d.storage}: a self-storage facility — the deal page reads its two occupancies and the rent sitting tenants pay against the street rate.` : null,
         d.regulation ? `${d.regulation}: the rent rules that reach the building — the deal page reads the regime, the regulated share and the allowance in force against the model's growth.` : null,
+        d.forward ? `${d.forward}: the price is paid at delivery and the developer funds the works — the deal page reads the clock, the deposit and the yield at delivery.` : null,
       ].filter((n): n is string => n != null);
       if (notes.length) priceCell.note = notes.join(" ");
 

@@ -1586,7 +1586,7 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const bare = (label: string) => label.replace(/ · model$/, "");
     const tableRows = (html: string) => [...html.matchAll(/<td class="sticky left-0[^"]*">([^<]+)<\/td>/g)].map((m) => bare(m[1]));
     const cardRows = (html: string) => [...html.matchAll(/<dt class="text-\[10px\][^"]*">([^<]+)<\/dt>/g)].map((m) => bare(m[1]));
-    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
+    const DEAL_TYPE_ROWS = ["Flood zone", "Affordability", "Rent regulation", "Forward purchase", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Seller financing", "Hotel", "Sale", "Reports", "Broker", "Pre-leasing", "Manufactured housing", "Self-storage"];
     // Four deals none of which states a hotel, a sale, a restriction or any
     // of the other deal-type facts: no column of dashes for any of them.
     const html = renderToStaticMarkup(React.createElement(CompareTable, { cols: COLS }));
@@ -1630,6 +1630,19 @@ describe("CompareTable — a stabilized asset, a conversion and a rejected deal 
     const cells = visibleText(row);
     expect(cells).toContain("Rent-stabilized, 41 of 48");
     expect(cells.match(/—/g)).toHaveLength(2);
+    expect(cells).not.toMatch(/\bnone\b/i);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(visibleText(html))).toEqual([]);
+  });
+
+  it("sets a forward purchase side by side (lib/forward-purchase): the tag where the price is paid at delivery, a dash beside every other deal", () => {
+    const cols: Col[] = [COLS[0], { ...COLS[1], forward: "Build-to-suit, 6.00% at delivery" }];
+    const html = renderToStaticMarkup(React.createElement(CompareTable, { cols }));
+    const row = html.match(/<tr\b(?:(?!<\/tr>)[\s\S])*?>Forward purchase<\/td>[\s\S]*?<\/tr>/)?.[0] ?? "";
+    expect(row).not.toBe("");
+    const cells = visibleText(row);
+    expect(cells).toContain("Build-to-suit, 6.00% at delivery");
+    expect(cells.match(/—/g)).toHaveLength(1);
     expect(cells).not.toMatch(/\bnone\b/i);
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(visibleText(html))).toEqual([]);
@@ -8795,6 +8808,128 @@ describe("Pipeline — the rent rules' tag (lib/rent-regulation)", () => {
       const tag = (words: string) => html.match(new RegExp(`<span[^>]*title="${words}:[^"]*"[^>]*>`))?.[0] ?? "";
       expect(tag("Rent-stabilized, 41 of 48"), initialView).toContain("text-caution");
       expect(tag("Rent rules: check"), initialView).toContain("text-muted");
+      expect(gluedWords(text), initialView).toEqual([]);
+      expect(a11yIssues(html), initialView).toEqual([]);
+    }
+  });
+});
+
+// ── A forward purchase (lib/forward-purchase) ─────────────────────────────
+import { ForwardPanel } from "@/app/forward-panel";
+import { forwardModelLine, forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
+
+const FWD_TODAY = new Date("2026-10-05T12:00:00Z");
+const forwardDeck = (summary: string, metrics: { label: string; value: string }[]) =>
+  ({
+    dealName: "Ridgeline Distribution",
+    assetClass: "industrial",
+    totalPages: 48,
+    strategy: { kind: "development", summary, capitalBudget: "", timeline: "" },
+    metrics: metrics.map((m) => ({ ...m, flagged: false, page: "p. 4", basis: "na" as const })),
+  }) as unknown as ExtractionResult;
+const BTS_FORWARD = forwardDeck("Forward purchase of a 300,000 SF build-to-suit distribution center at completion", [
+  { label: "Purchase price", value: "$48,000,000" },
+  { label: "NOI (Year 1)", value: "$2,880,000" },
+  { label: "Delivery cap rate", value: "6.00%" },
+  { label: "Delivery date", value: "Q3 2027" },
+  { label: "Outside date", value: "March 31, 2028" },
+  { label: "Deposit", value: "$2,400,000 at signing" },
+  { label: "Rent commencement", value: "Substantial completion" },
+  { label: "Developer", value: "Ridgeline Logistics Partners" },
+  { label: "Completion guaranty", value: "Parent guaranty of completion" },
+]);
+
+describe("ForwardPanel (lib/forward-purchase) — the clock to delivery and the outside date, the deposit, the yield at delivery against the model's exit cap", () => {
+  it("draws the clock from today, the deposit's share of the price and the yield against the exit cap, a tile a stated fact, then the model's read", () => {
+    const r = readForwardPurchase(BTS_FORWARD, FWD_TODAY)!;
+    const modelLine = forwardModelLine(r, { noi1: 2_880_000, noiAssumed: false, price: 48_000_000 })!;
+    const html = render(React.createElement(ForwardPanel, { forward: r, today: "2026-10-05", exitCapPct: 6.5, modelLine }));
+    dumpView("forward-panel", html);
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="forward-panel"');
+    expect(text).toContain("Build-to-suit, bought at delivery");
+    expect(text).toContain("$48.0M paid at delivery, Q3 2027");
+    for (const bar of ["fwd-clock", "fwd-delivery", "fwd-outside", "fwd-deposit", "fwd-yield", "fwd-exit"]) {
+      expect(html.match(new RegExp(`data-bar="${bar}"`, "g")), bar).toHaveLength(1);
+    }
+    expect(text).toContain("Today, Oct 5, 2026");
+    expect(text).toContain("Delivery, Q3 2027 (read as Sep 30, 2027): 11 months away");
+    expect(text).toContain("Outside date, Mar 31, 2028, 6 months after the delivery");
+    expect(text).toContain("Deposit $2.40M, 5% of the price, at risk before delivery. As stated: $2,400,000 at signing");
+    expect(text).toContain("6.00% at delivery, the cap as stated");
+    expect(text).toContain("The model's exit cap, 6.50%");
+    for (const key of ["developer", "guaranty"]) expect(html).toContain(`data-fwd="${key}"`);
+    // The read's first sentence in the open, the rest one click away.
+    expect(text).toContain("the price is the buyer's whole cost, never the price plus the developer's budget.");
+    expect(html).toContain("Read the rest (4 more)");
+    expect(text).toContain("The model runs the price as paid at closing with income from its first year");
+    expect(a11yIssues(html), "forward panel").toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+
+  it("draws no clock past the delivery or with no model's exit cap on the shared screen, and nothing on anything else", () => {
+    const later = readForwardPurchase(BTS_FORWARD, new Date("2027-11-01T12:00:00Z"))!;
+    const html = render(React.createElement(ForwardPanel, { forward: later, today: "2027-11-01" }));
+    const text = visibleText(html);
+    expect(html).not.toContain('data-bar="fwd-clock"');
+    expect(html).not.toContain('data-bar="fwd-exit"');
+    expect(html.match(/data-bar="fwd-yield"/g)).toHaveLength(1);
+    // A passed delivery is what to settle first: the warning tone.
+    expect(html).toContain("border-l-caution");
+    expect(text).toContain("has passed; whether the building was delivered is the memorandum");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ForwardPanel, { forward: null }))).toBe("");
+  });
+});
+
+describe("ShareView — a forward purchase (lib/forward-purchase)", () => {
+  it("draws the purchase without the model's exit cap, on the loader's day, and nothing on the sample", () => {
+    const props = {
+      dealName: "Ridgeline Distribution",
+      assetClass: "industrial",
+      expiresAt: "2026-10-30T12:00:00Z",
+      verdictStale: false,
+      picture: null,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      today: "2026-10-05",
+    };
+    const html = renderToStaticMarkup(React.createElement(ShareView, { ...props, extraction: BTS_FORWARD }));
+    const text = visibleText(html);
+    expect(html).toContain('data-qa="forward-panel"');
+    expect(html.match(/data-bar="fwd-clock"/g)).toHaveLength(1);
+    expect(html).not.toContain('data-bar="fwd-exit"');
+    // The key terms lead with when the price is paid, after the price.
+    expect(text).toContain("Delivery date");
+    expect(gluedWords(text)).toEqual([]);
+    expect(a11yIssues(html)).toEqual([]);
+    expect(renderToStaticMarkup(React.createElement(ShareView, { ...props, assetClass: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction }))).not.toContain("forward-panel");
+  });
+});
+
+describe("Pipeline — a forward purchase's tag (lib/forward-purchase)", () => {
+  const tag = forwardTag(readForwardPurchase(BTS_FORWARD, FWD_TODAY))!;
+  const forward = card({
+    id: "fw",
+    name: "Ridgeline Distribution",
+    assetClass: "industrial",
+    verdict: "pass",
+    slots: { cap: null, price: "$48,000,000", yoc: "6.0%", forward: tag },
+    market: "Columbus, OH",
+    coveredMarket: null,
+  });
+  const props = { errorMessage: null, notice: null, onboarding: { hasBuyBox: true, sampleId: null, hasScreenedOm: true }, billing: BILLING, todayIso: TODAY };
+
+  it("says the purchase at delivery in the brand's tone on the row and the card", () => {
+    expect(tag).toBe("Build-to-suit, 6.00% at delivery");
+    for (const initialView of ["list", "cards"] as const) {
+      const html = render(React.createElement(Pipeline, { ...props, deals: withThumbs([forward]), initialView }));
+      const text = visibleText(html);
+      expect(text, initialView).toContain("Build-to-suit, 6.00% at delivery");
+      const chip = html.match(/<span[^>]*title="Build-to-suit, 6.00% at delivery:[^"]*"[^>]*>/)?.[0] ?? "";
+      expect(chip, initialView).toContain("text-brand");
       expect(gluedWords(text), initialView).toEqual([]);
       expect(a11yIssues(html), initialView).toEqual([]);
     }

@@ -44,6 +44,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
         price: "$12,500,000",
         sale: "Auction, 5% premium",
         interest: "49% share",
+        forward: "Build-to-suit, 6.00% at delivery",
         debt: "Assumable 3.45%",
         sellerNote: "Seller financing 5.00%",
         affordable: "LIHTC, 75% restricted",
@@ -63,7 +64,7 @@ describe("dealTags — one list, in one order, for the list row and the card", (
       { tag: "Flood AE" },
     );
     expect(tags.map((t) => t.key)).toEqual([
-      "flood", "sale", "interest", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage",
+      "flood", "sale", "interest", "forward", "debt", "sellerNote", "affordable", "regulation", "tenancy", "roster", "valueAdd", "abatement", "hotel", "reports", "student", "mh", "storage",
     ]);
     // The broker and the basis are no tag: one is a CSV column, the other
     // the price's own second line.
@@ -75,7 +76,10 @@ describe("dealTags — one list, in one order, for the list row and the card", (
     // The tone warns where the words do.
     const tone = (key: string) => tags.find((t) => t.key === key)?.tone;
     expect([tone("sale"), tone("regulation"), tone("roster"), tone("abatement"), tone("reports"), tone("student"), tone("mh"), tone("storage")]).toEqual(Array(8).fill("caution"));
-    expect([tone("interest"), tone("debt"), tone("sellerNote"), tone("affordable"), tone("tenancy"), tone("valueAdd"), tone("hotel")]).toEqual(Array(7).fill("brand"));
+    expect([tone("interest"), tone("forward"), tone("debt"), tone("sellerNote"), tone("affordable"), tone("tenancy"), tone("valueAdd"), tone("hotel")]).toEqual(Array(8).fill("brand"));
+    expect(tags.find((t) => t.key === "forward")?.title).toBe(
+      "Build-to-suit, 6.00% at delivery: the price is paid at delivery and the developer funds the works — the deal page reads the clock, the deposit and the yield at delivery",
+    );
     expect(dealTags(slots({ student: "Pre-leased 87%, +5 pts y/y", mh: "Lot rent $430 vs $525 mkt", storage: "In-place 21.1% over street" })).map((t) => t.tone)).toEqual(["brand", "brand", "brand"]);
   });
 

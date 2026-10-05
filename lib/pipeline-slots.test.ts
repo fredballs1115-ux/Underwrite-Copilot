@@ -49,7 +49,7 @@ const ex = (metrics: ExtractedMetric[], over: Partial<ExtractionResult> = {}): E
 describe("pickSlots — the pipeline row agrees with the export on which figure a deal carries", () => {
   it("a stabilized asset: its going-in cap, its price, no yield on cost", () => {
     const s = pickSlots(ex([m("Asking price", "$42,000,000"), m("Going-in cap rate", "5.50%"), m("In-place NOI", "$2,310,000")]), null);
-    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, basis: null });
+    expect(s).toEqual({ cap: "5.50%", capWithheld: null, noteYield: null, price: "$42,000,000", yoc: null, interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, basis: null });
   });
 
   it("says a covenant on the rents beside the price (#453), and nothing on a market-rate deal", () => {
@@ -158,6 +158,22 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
     expect(pickSlots(walkUp, null, "multifamily").regulation).toBeNull();
   });
 
+  it("says a forward purchase's yield at delivery, or the delivery it counts down to, on the day handed in (lib/forward-purchase)", () => {
+    const strategy = { kind: "development" as const, summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" };
+    const rows = [m("Purchase price", "$48,000,000"), m("Delivery date", "Q3 2027")];
+    const on = (today: string) => ({ address: null, siteFlags: null, today });
+    expect(pickSlots(ex(rows, { strategy }), null, "industrial", on("2026-10-05")).forward).toBe("Build-to-suit, delivers Q3 2027");
+    // Past the delivery the tag stops counting down.
+    expect(pickSlots(ex(rows, { strategy }), null, "industrial", on("2027-11-01")).forward).toBe("Build-to-suit purchase");
+    // A cap at delivery is said, and never read as the going-in cap.
+    const capped = pickSlots(ex([...rows, m("Delivery cap rate", "6.00%"), m("NOI (Year 1)", "$2,880,000")], { strategy }), null, "industrial", on("2026-10-05"));
+    expect(capped.forward).toBe("Build-to-suit, 6.00% at delivery");
+    expect(capped.cap).toBeNull();
+    // The developer funds the works: the yield slot is the NOI at delivery over the price.
+    expect(capped.yoc).toBe("6.0%");
+    expect(pickSlots(ex([m("Asking price", "$20,000,000"), m("Units", "240")]), null).forward).toBeNull();
+  });
+
   it("says a storage facility's lease-up or premium over street (#471), and nothing on anything else", () => {
     const rows = [m("Asking price", "$9,800,000"), m("Occupancy", "72%"), m("In-place rent", "$1.20/SF/mo"), m("Street rate", "$1.00/SF/mo")];
     expect(pickSlots({ ...ex(rows), assetClass: "self_storage" }, null).storage).toBe("Lease-up, 72% occupied, In-place 20% over street");
@@ -250,7 +266,7 @@ describe("pickSlots — the pipeline row agrees with the export on which figure 
       }),
       null,
     );
-    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, basis: null });
+    expect(s).toEqual({ cap: null, capWithheld: null, noteYield: null, price: "$8,000,000", yoc: "11.0%", interest: null, debt: null, affordable: null, tenancy: null, hotel: null, sale: null, roster: null, valueAdd: null, abatement: null, sellerNote: null, reports: null, broker: null, student: null, mh: null, storage: null, regulation: null, forward: null, basis: null });
   });
 
   it("before the extraction lands, the first signal's ask fills the price — only when it is a figure", () => {

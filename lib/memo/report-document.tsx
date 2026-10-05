@@ -71,6 +71,7 @@ import { readSiteReports, siteReportsShortLine } from "@/lib/site-reports";
 import { readStudentHousing, studentShortLine } from "@/lib/student-housing";
 import { mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageShortLine } from "@/lib/self-storage";
+import { forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
 import type { AssumableView } from "@/lib/assumable-debt";
 import type { InputSource } from "@/lib/underwrite/inputs";
 import { yearsText as leaseYears } from "@/lib/ground-lease-term";
@@ -1005,6 +1006,12 @@ export interface ReportInput {
    *  model built nothing worth printing, and nothing where the caller read
    *  no regulation */
   regulation?: { line: string; read: string } | null;
+  /** a forward purchase or a build-to-suit bought at delivery, and what the
+   *  model does with it — the price as paid at closing, its year-one NOI
+   *  beside the memorandum's at delivery (lib/forward-purchase via the
+   *  derived model's `meta.forward`) — printed over the grids; absent where
+   *  the caller built no model, and then the line prints alone */
+  forward?: { line: string; read: string } | null;
   /** FEMA's flood map at the building (lib/flood-map `floodMapFor`, #427,
    *  #472): the deal's flood frame cut to the band, the key of the zones it
    *  shows and the zone sentence; null for no page */
@@ -1048,6 +1055,7 @@ export function buildReportData(
   mh?: { line: string; read: string } | null,
   storage?: { line: string; read: string } | null,
   regulation?: { line: string; read: string } | null,
+  forward?: { line: string; read: string } | null,
 ): ReportInput {
   const extraction = (deal.extraction as ExtractionResult | null) ?? null;
   const pages = extraction?.totalPages;
@@ -1087,6 +1095,7 @@ export function buildReportData(
     // the model's: where the model's reads are withheld, the line still
     // prints, without the model's growth set beside the allowance.
     regulation: regulation ? (withheld ? { line: regulation.line, read: "" } : regulation) : null,
+    forward: modelRead(forward),
     deal,
     // Page 1 IS the memo, dismissed submarket checks and the cover aerial
     // included: the analyst's own words on an override travel with the
@@ -1546,6 +1555,10 @@ export function ReportDocument({ input }: { input: ReportInput }) {
   // The rent rules that reach the building, as the route read them: the
   // rules need the deal's place and a day, which the route holds.
   const regulation = input.regulation ?? null;
+  // A forward purchase (lib/forward-purchase): the model's read where the
+  // caller derived the model, else the purchase's line alone.
+  const forwardRead = readForwardPurchase(extraction);
+  const forward = input.forward ?? (forwardRead ? { line: forwardShortLine(forwardRead), read: "" } : null);
   const challenges = deal.challenges as ChallengerResult | null;
   const comps = deal.comps as BrokerCompsResult | null;
   const market = deal.market as MarketResult | null;
@@ -1764,6 +1777,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
 
           {/* The plan deal has no sensitivity page, so its assumptions read
               lands here, under the grid it is judged on. */}
+          {!sensitivity && <SingleTenantCaveat lease={forward} />}
           {!sensitivity && <AffordableCaveat read={affordable} />}
           {!sensitivity && <SingleTenantCaveat lease={regulation} />}
           {!sensitivity && <SingleTenantCaveat lease={singleTenant} />}
@@ -1810,6 +1824,7 @@ export function ReportDocument({ input }: { input: ReportInput }) {
               {str(`The note, on its own terms: ${noteFigures}`)}
             </Text>
           ) : null}
+          <SingleTenantCaveat lease={forward} />
           <AffordableCaveat read={affordable} />
           <SingleTenantCaveat lease={regulation} />
           <SingleTenantCaveat lease={singleTenant} />

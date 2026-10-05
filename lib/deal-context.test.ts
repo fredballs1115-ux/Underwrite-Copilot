@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { ExtractedMetric, ExtractionResult } from "@/lib/anthropic/types";
 import { dealContextFor } from "./deal-context";
 import { regulationForDeal } from "./rent-regulation";
@@ -335,6 +335,49 @@ describe("dealContextFor — a self-storage facility (#471)", () => {
     const ctx = dealContextFor(storage)!;
     expect(ctx).toContain("Self-storage: It is 91% occupied by units, 84% economically: the 7 points between the units let and the rent collected");
     expect(ctx).toContain("21.1% over it, the premium years of rate increases built");
+  });
+});
+
+describe("dealContextFor — a forward purchase (lib/forward-purchase)", () => {
+  const bts: ExtractionResult = {
+    dealName: "Ridgeline Distribution",
+    assetClass: "industrial",
+    strategy: { kind: "development", summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+    metrics: [
+      m("Purchase price", "$48,000,000"),
+      m("NOI (Year 1)", "$2,880,000"),
+      m("Delivery cap rate", "6.00%"),
+      m("Delivery date", "Q3 2027"),
+      m("Outside date", "March 31, 2028"),
+      m("Deposit", "$2,400,000 at signing"),
+      m("Developer", "Ridgeline Logistics Partners"),
+    ],
+  };
+
+  it("says the price is paid at delivery and the developer funds the works, then the yield at delivery over the price", () => {
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    try {
+      const ctx = dealContextFor(bts)!;
+      expect(ctx).toContain(
+        "Forward purchase: A build-to-suit bought at delivery: the buyer pays $48.0M at delivery, Q3 2027 (read as Sep 30, 2027), and the developer funds the works",
+      );
+      expect(ctx).toContain("It is struck at a 6.00% cap at delivery, as stated.");
+      expect(ctx).toContain("Developer as stated: Ridgeline Logistics Partners.");
+      // The plan's own figures, said as the NOI at delivery over the price.
+      expect(ctx).toContain(
+        "The OM's NOI at delivery (NOI (Year 1)) of $2.9M is the delivered building's figure — over the $48.0M price, the buyer's whole cost, it is a 6.00% yield on cost, not today's income.",
+      );
+      expect(ctx).not.toContain("finished project's figure");
+      // Said with what the price buys, before the deal's type.
+      expect(ctx.indexOf("Forward purchase:")).toBeLessThan(ctx.indexOf("Deal type:"));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("says nothing of a forward purchase on a development the buyer builds", () => {
+    const own = { ...bts, strategy: { ...bts.strategy!, summary: "Ground-up distribution center" } };
+    expect(dealContextFor(own)).not.toContain("Forward purchase");
   });
 });
 

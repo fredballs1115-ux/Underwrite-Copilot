@@ -51,6 +51,7 @@ import {
   ebitdaFigure,
   findPriceMetric,
   inferStrategy,
+  isForwardPurchase,
   isPlanDeal,
   noiFigures,
   renovationProgramBudget,
@@ -65,6 +66,7 @@ import { readStudentHousing, studentModelLine, studentShortLine } from "@/lib/st
 import { mhModelLine, mhShortLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageModelLine, storageShortLine } from "@/lib/self-storage";
 import { regulationModelLine, regulationShortLine, type RegulationRead } from "@/lib/rent-regulation";
+import { forwardModelLine, forwardShortLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { allInPct, debtRateNote, type DebtIndex, type PermanentSpread, type RateSeed } from "@/lib/debt-index";
 import type { RentRollSummary, T12Summary } from "@/lib/actuals/types";
 import type { UnderwriteInputs } from "./engine";
@@ -197,6 +199,12 @@ export interface WorkbookMeta {
    *  Absent where no rule reaches the building and the memorandum names
    *  none. */
   regulation?: { line: string; read: string } | null;
+  /** a forward purchase or a build-to-suit bought at delivery
+   *  (lib/forward-purchase): the price at delivery, the clock, the yield and
+   *  the deposit in a line, then what this model does with them — the price
+   *  as paid at closing with income from its first year, and its year-one
+   *  NOI beside the memorandum's at delivery. Absent on anything else. */
+  forward?: { line: string; read: string } | null;
   /** display-only occupancy (decimal), null if not extractable */
   occupancyPct: number | null;
   rsf: number;
@@ -387,6 +395,24 @@ function storageMeta(extraction: ExtractionResult | null, inputs: UnderwriteInpu
 function regulationMeta(r: RegulationRead | null | undefined, inputs: Pick<UnderwriteInputs, "rentGrowthPct">): WorkbookMeta["regulation"] {
   if (!r) return null;
   return { line: regulationShortLine(r), read: regulationModelLine(r, inputs.rentGrowthPct * 100) ?? "" };
+}
+
+/** The cover's lines about a forward purchase (lib/forward-purchase): the
+ *  read in a line, then what this model does with it — the price as paid at
+ *  closing, income from its first year, and its year-one NOI beside the
+ *  memorandum's at delivery. Null on anything else. */
+function forwardMeta(
+  extraction: ExtractionResult | null,
+  inputs: UnderwriteInputs,
+  noi1: number,
+  noiAssumed: boolean,
+): WorkbookMeta["forward"] {
+  const r = readForwardPurchase(extraction);
+  if (!r) return null;
+  return {
+    line: forwardShortLine(r),
+    read: forwardModelLine(r, { noi1, noiAssumed, price: inputs.purchasePrice }) ?? "",
+  };
 }
 
 /** The cover's lines about a multi-tenant property's listed tenants
@@ -734,6 +760,10 @@ export function deriveUnderwriteInputs(
   // A value-add that states its program a door at a time and no total
   // (#460) carries the doors times a door's cost — the plan's own budget,
   // from lib/deal-strategy, so the model and the plan spend one figure.
+  // A forward purchase or a build-to-suit bought at delivery
+  // (lib/forward-purchase): the developer funds the works. Said in the
+  // capital line's note — the model's figures are unchanged.
+  const forwardDeal = isForwardPurchase(extraction, strategy);
   const budgetRead =
     capitalBudgetFromMetrics(metrics, statedPrice, !priceIsLand) ??
     budgetFromText(extraction?.strategy?.capitalBudget, statedPrice, !priceIsLand) ??
@@ -923,7 +953,14 @@ export function deriveUnderwriteInputs(
           : budgetRead.isTotal
             ? " (stated all-in; the OM gives no price to take out of it)"
             : ""
-      } — spent in year 1 in this annual model; the OM's own timeline may run longer`,
+      }${
+        // A forward purchase (lib/forward-purchase): the developer funds the
+        // works and the price is all-in at delivery, which the note says —
+        // the model still charges the budget, an owner's call to change.
+        forwardDeal
+          ? " — the developer's budget: on a forward purchase the developer funds the works and the price is all-in at delivery, yet this model charges it as the buyer's first-year capital; enter 0 to run the price alone"
+          : " — spent in year 1 in this annual model; the OM's own timeline may run longer"
+      }`,
       budgetRead.page,
     );
   } else if (repairsCapital != null) {
@@ -946,7 +983,9 @@ export function deriveUnderwriteInputs(
       "assumption",
       strategy.kind === "stabilized" || strategy.kind === "unknown"
         ? "No capital plan in the OM — enter one if the PCA finds work"
-        : `${withArticle(strategy.label.toLowerCase(), true)} deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it`,
+        : forwardDeal
+          ? "No construction budget is the buyer's: on a forward purchase the developer funds the works and the price is all-in at delivery"
+          : `${withArticle(strategy.label.toLowerCase(), true)} deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it`,
     );
   }
   mark("amFeePctEquity", "assumption", "Default 0.5% of equity/yr");
@@ -1012,6 +1051,7 @@ export function deriveUnderwriteInputs(
       mh: mhMeta(extraction, inputs),
       storage: storageMeta(extraction, inputs),
       regulation: regulationMeta(deal?.regulation, inputs),
+      forward: forwardMeta(extraction, inputs, noi, sources.inPlaceRentAnnual?.provenance === "assumption"),
       sale: saleFloor ? { line: saleShortLine(saleFloor), read: saleCeilingRead(extraction, inputs) } : null,
       hotel: hotelRead
         ? {

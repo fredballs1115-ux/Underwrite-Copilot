@@ -37,6 +37,7 @@ import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
 import { regulationForDeal, regulationTag } from "@/lib/rent-regulation";
+import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import { TZ_COOKIE, readerToday } from "@/lib/reader-day";
 import { cookies } from "next/headers";
 import { compareReturns } from "@/lib/compare-figures";
@@ -202,6 +203,9 @@ function toCol(
         today,
       ),
     ),
+    // A forward purchase (lib/forward-purchase), read on the reader's day
+    // with the kind the column reads.
+    forward: forwardTag(readForwardPurchase(ex, new Date(`${today}T12:00:00Z`), strat)),
     hotel: hotelTag(ex),
     sale: saleTag(ex),
     noteYtm: figs.noteYtmPct,

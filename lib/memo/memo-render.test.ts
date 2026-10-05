@@ -476,6 +476,41 @@ describe("MemoDocument (redesigned)", () => {
     expect(buildMemoData({ ...deal, asset_class: SAMPLE_DEAL.asset_class, extraction: SAMPLE_DEAL.extraction } as unknown as DealRow, "September 30, 2026", []).storageLine).toBe("");
   }, 30000);
 
+  it("says a forward purchase under the title, on the day it is given (lib/forward-purchase), and nothing on the sample", async () => {
+    const extraction = {
+      ...SAMPLE_DEAL.extraction,
+      assetClass: "industrial",
+      strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Purchase price", value: "$48,000,000", flagged: false, page: "", basis: "na" },
+        { label: "NOI (Year 1)", value: "$2,880,000", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery cap rate", value: "6.00%", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery date", value: "Q3 2027", flagged: false, page: "", basis: "na" },
+        { label: "Deposit", value: "$2,400,000 at signing", flagged: false, page: "", basis: "na" },
+      ],
+    };
+    const deal = {
+      name: "Ridgeline Distribution",
+      asset_class: "industrial",
+      extraction,
+      challenges: SAMPLE_DEAL.challenges,
+      comps: SAMPLE_DEAL.comps,
+      market: SAMPLE_DEAL.market,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const data = buildMemoData(deal, "October 5, 2026", [], null, null, null, "2026-10-05");
+    expect(data.forwardLine).toBe("Build-to-suit: $48.0M paid at delivery (Q3 2027), the works the developer's; 6.00% at delivery; deposit $2.40M");
+    // The plan's line under the type is the NOI at delivery over the price.
+    expect(data.strategyLine).toMatch(/^Development · NOI at delivery \$2\.9M on \$48\.0M total cost \(6\.00% yield on cost/);
+    const buf = await renderToBuffer(
+      React.createElement(MemoDocument, { data }) as unknown as Parameters<typeof renderToBuffer>[0],
+    );
+    const text = (await pdfTextOf(buf)).replace(/\s+/g, " ");
+    expect(text).toContain("Build-to-suit: $48.0M paid at delivery (Q3 2027), the works the developer's");
+    expect(buildMemoData(SAMPLE_DEAL as unknown as DealRow, "October 5, 2026", [], null, null, null, "2026-10-05").forwardLine).toBe("");
+  }, 30000);
+
   it("says the rent rules that reach the building under the title, on the day it is given (lib/rent-regulation), and nothing on the sample", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

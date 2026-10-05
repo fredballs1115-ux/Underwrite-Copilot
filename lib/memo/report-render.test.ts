@@ -1157,6 +1157,54 @@ describe("ReportDocument (full report)", () => {
     expect(withheld.regulation).toEqual({ line: derived.meta.regulation!.line, read: "" });
   }, 60000);
 
+  it("carries a forward purchase as buildReportData's last argument, and prints it under the plan page's grid where the report has one (lib/forward-purchase)", async () => {
+    const extraction: ExtractionResult = {
+      dealName: "Ridgeline Distribution",
+      assetClass: "industrial",
+      market: "Columbus, OH",
+      address: "",
+      strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Purchase price", value: "$48,000,000", flagged: false, page: "p. 2" },
+        { label: "NOI (stabilized, pro forma)", value: "$2,880,000", flagged: false, page: "p. 4" },
+        { label: "Delivery cap rate", value: "6.00%", flagged: false, page: "p. 4" },
+        { label: "Construction budget", value: "$31,000,000", flagged: false, page: "p. 6" },
+        { label: "Delivery date", value: "Q3 2027", flagged: false, page: "p. 4" },
+      ],
+    };
+    const deal = {
+      name: extraction.dealName,
+      asset_class: "industrial",
+      extraction,
+      challenges: null,
+      comps: null,
+      market: null,
+      reconciliation: null,
+      verdict: SAMPLE_DEAL.verdict,
+      prior_screen: null,
+    } as unknown as DealRow;
+    const derived = deriveUnderwriteInputs(extraction, extraction.dealName!);
+    expect(derived.meta.forward?.read).toMatch(/^The model runs the price as paid at closing with income from its first year/);
+    const refCap = { pct: derived.inputs.exitCapPct, provenance: derived.sources.exitCapPct?.provenance ?? ("assumption" as const) };
+    // The developer funds the works: no budget is the buyer's, so the plan
+    // has no yield-on-cost grid to stress and the route builds no plan page.
+    expect(buildPlanReport(extraction, refCap)).toBeNull();
+    const args = (plan: ReturnType<typeof buildPlanReport>) =>
+      buildReportData(deal, "October 5, 2026", [], null, undefined, plan, null, undefined, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, derived.meta.forward ?? null);
+    const input = args(null);
+    expect(input.forward).toEqual(derived.meta.forward);
+    // Page one is the memo, which says the purchase under the title.
+    const page1 = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(page1).toContain("Build-to-suit: $48.0M paid at delivery (Q3 2027), the works the developer's; 6.00% at delivery");
+    // Where a plan page is drawn — here the same deck's grid, as if the
+    // buyer built it — the purchase and the model's read print under it.
+    const own = { ...extraction, strategy: { ...extraction.strategy!, summary: "Ground-up distribution center" } };
+    const ownPlan = buildPlanReport(own, refCap);
+    expect(ownPlan).not.toBeNull();
+    const text = (await pdfTextOf(await renderToBuffer(React.createElement(ReportDocument, { input: args(ownPlan) }) as unknown as Parameters<typeof renderToBuffer>[0]))).replace(/\s+/g, " ");
+    expect(text).toContain("The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, Q3 2027.");
+  }, 60000);
+
   it("prints what the third-party reports found over the grids, and the repairs the model carries (#465)", async () => {
     const extraction = {
       ...SAMPLE_DEAL.extraction,

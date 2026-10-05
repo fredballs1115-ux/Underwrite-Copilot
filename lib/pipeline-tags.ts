@@ -1,11 +1,12 @@
 // The tags a pipeline deal carries beside its figures — a flood zone, how
-// it is sold, what the price buys, the seller's loan, a covenant on the
-// rents, the rent rules, the one lease, the listed tenants, a renovation
-// program, a tax abatement, a hotel's contracts, the third-party reports,
-// and the reads of a student building, a park and a storage facility (no
-// tag reads a module's tables here: the pipeline's client draws these, so
-// each tone is read off the slot's own words) — in ONE order, each
-// with its tone and its tooltip, so the list row and the card draw one list
+// it is sold, what the price buys, a purchase at delivery, the seller's
+// loan, a covenant on the rents, the rent rules, the one lease, the listed
+// tenants, a renovation program, a tax abatement, a hotel's contracts, the
+// third-party reports, and the reads of a student building, a park and a
+// storage facility (no tag reads a module's tables here: the pipeline's
+// client draws these, so each tone is read off the slot's own words) — in
+// ONE order, each with its tone and its tooltip, so the list row and the
+// card draw one list
 // (lib/pipeline-slots reads each slot). And the card's rule for which of
 // them its picture carries: a chip there is never cut, so one that cannot
 // fit whole on a picture as wide as its card's waits on the card's own
@@ -52,6 +53,9 @@ export function dealTags(slots: PipelineSlots, flood?: { tag: string | null } | 
     tag("sale", slots.sale, "caution", "the figure is where the bidding opens or the seller is not an owner — the deal page reads the sale"),
     // A share's price, a note's, the land's under a ground lease (#415).
     tag("interest", slots.interest, "brand", "the price does not buy the building outright — the deal page says what it buys"),
+    // A forward purchase (lib/forward-purchase): the price is paid when the
+    // building is delivered, and the developer funds the works.
+    tag("forward", slots.forward, "brand", "the price is paid at delivery and the developer funds the works — the deal page reads the clock, the deposit and the yield at delivery"),
     // The seller's loan, offered for assumption (#419).
     tag("debt", slots.debt, "brand", "the seller's loan is offered for assumption — the deal page prices it against today's rate"),
     // A note the seller will carry (#462).

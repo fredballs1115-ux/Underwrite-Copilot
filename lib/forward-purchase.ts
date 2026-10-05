@@ -28,11 +28,13 @@
 
 import type { ExtractionResult } from "@/lib/anthropic/types";
 import {
+  BUILD_TO_SUIT_WORDS,
   buildingPriceOf,
   findPriceMetric,
+  forwardDeliveryNoi,
+  forwardWordsOf,
   inferStrategy,
-  noiFigures,
-  priceRowIsLand,
+  isForwardPurchase,
   type DealStrategy,
 } from "@/lib/deal-strategy";
 import { findGoingInCap, parsePct, parsePrice, screenYearOf } from "@/lib/criteria";
@@ -40,17 +42,16 @@ import { parseUsd } from "@/lib/money";
 import { readStatedDate } from "@/lib/note-yield";
 import { withArticle } from "@/lib/article";
 
+// The predicate the plan needs lives in lib/deal-strategy, which this module
+// imports (`planSummary` reads it to say the developer funds the works);
+// re-exported here so every surface reads the purchase from one module.
+export { isForwardPurchase };
+
 type MetricRow = { label: string; value: string; page?: string };
 
 const rowOf = (metrics: readonly MetricRow[], re: RegExp, not?: RegExp) =>
   metrics.find((m) => re.test(m.label) && !(not && not.test(m.label))) ?? null;
 
-/** The words that name a purchase at completion. A build-to-suit counts
- *  only beside a price for the whole asset (`isForwardPurchase`): a site
- *  sold for a build-to-suit is the buyer's own development. */
-const FORWARD_WORDS =
-  /\bforward[- ](?:purchase|sale|commitment|takeout|take[- ]out)\b|\bpurchased?\s+(?:at|upon|on)\s+(?:the\s+)?(?:completion|delivery|substantial completion|certificate of occupancy|issuance of (?:the\s+)?(?:certificate of occupancy|c\.?\s?o\.?))\b|\btake[- ]?out (?:commitment|purchase|buyer)\b/i;
-const BTS_WORDS = /\bbuild[- ]to[- ]suit\b|\bbts\b/i;
 const BTR_WORDS = /\bbuild[- ]to[- ]rent\b|\bbtr\b|\bsingle[- ]family rental\b|\brental homes?\b/i;
 
 /** "Delivery date", "Substantial completion", "Estimated delivery",
@@ -78,35 +79,6 @@ export function forwardTermRows<M extends MetricRow>(metrics: ReadonlyArray<M>):
     rowOf(metrics, DELIVERY_CAP_ROW),
     rowOf(metrics, RENT_COMMENCEMENT_ROW),
   ].filter((m): m is M => m != null) as M[];
-}
-
-/** Every word the memorandum gave the screen, for the purchase's words. */
-function wordsOf(ex: ExtractionResult): string {
-  return [
-    ex.dealName ?? "",
-    ex.buyerNotes ?? "",
-    ex.strategy?.summary ?? "",
-    ex.strategy?.timeline ?? "",
-    ...(ex.metrics ?? []).flatMap((m) => [m.label, m.value]),
-  ].join(" \n ");
-}
-
-/**
- * Whether the deal is a purchase at completion: a development (or a
- * conversion delivered with its works) whose memorandum's words say the
- * buyer pays at completion, or a build-to-suit priced as the whole asset.
- */
-export function isForwardPurchase(
-  ex: ExtractionResult | null | undefined,
-  strategy: DealStrategy = inferStrategy(ex ?? null),
-): boolean {
-  if (!ex) return false;
-  if (strategy.kind !== "development" && strategy.kind !== "conversion") return false;
-  const words = wordsOf(ex);
-  if (FORWARD_WORDS.test(words)) return true;
-  if (!BTS_WORDS.test(words)) return false;
-  const priceRow = findPriceMetric(ex.metrics ?? [], strategy.kind, screenYearOf(ex));
-  return priceRow != null && !priceRowIsLand(priceRow);
 }
 
 // ── Dates read on their last day ─────────────────────────────────────────
@@ -227,7 +199,7 @@ export function readForwardPurchase(
 ): ForwardRead | null {
   if (!ex || !isForwardPurchase(ex, strategy)) return null;
   const metrics = (ex.metrics ?? []) as MetricRow[];
-  const words = wordsOf(ex);
+  const words = forwardWordsOf(ex);
   const priceRow = findPriceMetric(metrics, strategy.kind, screenYearOf(ex));
   const stated = priceRow ? parsePrice(priceRow.value) : null;
   const price = buildingPriceOf(ex, stated != null && stated > 0 ? stated : null);
@@ -257,12 +229,13 @@ export function readForwardPurchase(
       }
     : null;
 
-  const kind: ForwardRead["kind"] = BTS_WORDS.test(words) ? "bts" : BTR_WORDS.test(words) ? "btr" : "forward";
+  const kind: ForwardRead["kind"] = BUILD_TO_SUIT_WORDS.test(words) ? "bts" : BTR_WORDS.test(words) ? "btr" : "forward";
   const capRow = rowOf(metrics, DELIVERY_CAP_ROW) ?? findGoingInCap(metrics);
   const capRead = capRow ? parsePct(capRow.value) : null;
   const capStated = capRead != null && capRead > 0.5 && capRead < 20 ? capRead : null;
-  const nois = noiFigures(metrics);
-  const atDelivery = nois.find((f) => f.kind === "stabilized") ?? (kind === "bts" ? (nois.find((f) => f.kind === "year1") ?? null) : null);
+  // The plan's own rule (lib/deal-strategy), so the plan's yield on cost and
+  // this read stand on one NOI.
+  const atDelivery = forwardDeliveryNoi(metrics, kind === "bts");
   const fromNoi = atDelivery && price != null && price > 0 ? (atDelivery.value / price) * 100 : null;
   const deliveryYieldPct = capStated ?? (fromNoi != null && fromNoi > 0.5 && fromNoi < 20 ? fromNoi : null);
   const yieldFrom: ForwardRead["yieldFrom"] = capStated != null ? "stated_cap" : deliveryYieldPct != null ? "noi_over_price" : null;

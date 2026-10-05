@@ -44,6 +44,21 @@ describe("plan deals are judged on their own terms", () => {
     }
   });
 
+  it("a forward purchase's paragraph stands where the plan's construction paragraph would: the buyer carries no construction (research pass 28)", () => {
+    for (const cls of ["industrial", "sfr_btr", "auto"] as const) {
+      const p = challengerInstruction(cls, [], true);
+      expect(p, cls).toContain("THIS OM SELLS A FORWARD PURCHASE");
+      expect(p, cls).toContain("no construction or bridge loan, no interest reserve and no carry through the works is the buyer's");
+      expect(p, cls).toContain("never the price plus the developer's budget");
+      expect(p, cls).not.toContain("IF THE OM DESCRIBES A PLAN");
+      expect(p, cls).not.toContain("DEBT becomes construction or bridge financing, the interest reserve and carry through the works");
+      // Everything else the challenger is told stands as it was.
+      expect(p, cls).toContain("Give 3–6 challenges, most severe first.");
+    }
+    expect(challengerInstruction("industrial", [], false)).toBe(challengerInstruction("industrial"));
+    expect(challengerInstruction("industrial", ["cold_storage"], true)).toContain("COLD-STORAGE TRAPS");
+  });
+
   it("the market check tests the figures BEHIND the stabilized pro forma, not NOI ÷ price", () => {
     const p = marketCheckInstruction("multifamily");
     expect(p).toContain("If the OM describes a plan");

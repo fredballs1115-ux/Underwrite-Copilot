@@ -25,6 +25,7 @@ import { readStudentHousing, studentContextLine } from "@/lib/student-housing";
 import { mhContextLine, readManufacturedHousing } from "@/lib/manufactured-housing";
 import { readSelfStorage, storageContextLine } from "@/lib/self-storage";
 import { regulationContextLine, type RegulationRead } from "@/lib/rent-regulation";
+import { forwardContextLine, readForwardPurchase } from "@/lib/forward-purchase";
 import { portfolioContextLine, readPortfolio } from "@/lib/portfolio";
 
 const compact = (n: number): string =>
@@ -102,6 +103,11 @@ export function dealContextFor(
   // How it is sold (#456): an auction's starting bid is not a price, and a
   // receiver, a trustee or a lender never ran the building.
   const sale = readSale(extraction);
+  // A forward purchase or a build-to-suit bought at delivery (research pass
+  // 28): the price is paid at delivery and the developer funds the works —
+  // the clock, the deposit and the yield at delivery, read with the kind
+  // the screen reads.
+  const forward = readForwardPurchase(extraction, new Date(), strategy);
   // The listed tenants of a multi-tenant property (#457): how much of the
   // rent rolls before the model's sale, the anchors in and out of the
   // sale, and the rights that ride on them.
@@ -140,6 +146,7 @@ export function dealContextFor(
     ...(interest ? [interestContextLine(interest)] : []),
     ...(sale ? [saleContextLine(sale)] : []),
     ...(range ? [range] : []),
+    ...(forward ? [forwardContextLine(forward)] : []),
     ...(assumable ? [assumableContextLine(assumable)] : []),
     ...(sellerNote ? [sellerFinancingContextLine(sellerNote)] : []),
     ...(noteFinancing ? [notePurchaseFinancingContextLine(noteFinancing)] : []),
@@ -164,7 +171,18 @@ export function dealContextFor(
   // Whose strategy it is on a note or a leased fee (the deal header's own
   // label): the steps read the type as the collateral's, never the price's.
   const lines = [`Deal type: ${dealTypeLabel(strategy.label, extraction)}${strategy.summary ? ` — ${strategy.summary}` : "."}`];
-  if (plan?.stabilizedNoi) {
+  if (plan?.stabilizedNoi && plan.forward) {
+    // A forward purchase's NOI is the one stated at delivery (on a
+    // build-to-suit the lease's first year), over the price the buyer pays
+    // then — its whole cost, since the developer funds the works.
+    lines.push(
+      `The OM's NOI at delivery (${plan.stabilizedNoi.label}) of ${compact(plan.stabilizedNoi.value)} is the delivered building's figure${
+        plan.totalCost != null && plan.yieldOnCost != null
+          ? ` — over the ${compact(plan.totalCost)} price, the buyer's whole cost, it is ${withArticle(yieldOnCostText(plan.yieldOnCost))} yield on cost`
+          : ""
+      }, not today's income.`,
+    );
+  } else if (plan?.stabilizedNoi) {
     lines.push(
       `The OM's stabilized NOI of ${compact(plan.stabilizedNoi.value)} is the finished project's figure${
         plan.totalCost != null && plan.yieldOnCost != null

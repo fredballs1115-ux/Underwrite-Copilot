@@ -37,6 +37,8 @@ import { omLoanTerms } from "@/app/(app)/deals/[id]/debt-sizer";
 import { SIZER_LENDER_TESTS, modelLoanCoverageLine } from "@/lib/sizer-terms";
 import { a11yIssues, dumpView, gluedWords, visibleText as textOf } from "./render-lint";
 import { regulationForDeal } from "./rent-regulation";
+import { readForwardPurchase } from "./forward-purchase";
+import { ForwardPanel } from "@/app/forward-panel";
 import { modelVsMarket } from "./model-vs-market";
 import { LOI_REFUSAL, LOI_REFUSAL_CODE } from "./loi-refusal";
 import { STALE_MS } from "./screen-run";
@@ -1034,6 +1036,63 @@ describe("DealView — the sample deal renders every section without a runtime e
     );
     expect(text).toContain("That is the regime's allowance for the units it regulates, not a market figure: the model's 3.0%/yr runs 3.0 points over both.");
     expect(text).toContain("For the market-rate units, over the past year the metro's asking rents moved +2.6%");
+    expect(a11yIssues(html)).toEqual([]);
+    expect(gluedWords(text)).toEqual([]);
+  });
+});
+
+describe("DealView — a forward purchase carries no construction (lib/forward-purchase)", () => {
+  type Ex = NonNullable<Props["results"]["extraction"]>;
+  const row = (label: string, value: string) => ({ label, value, flagged: false, page: "p. 4", basis: "na" as const });
+  const deck = (summary: string): Ex =>
+    ({
+      dealName: "Ridgeline Homes",
+      assetClass: "sfr_btr",
+      totalPages: 40,
+      strategy: { kind: "development", summary, capitalBudget: "", timeline: "" },
+      metrics: [
+        row("Purchase price", "$72,000,000"),
+        row("Homes", "180"),
+        row("NOI (stabilized, pro forma)", "$3,960,000"),
+        row("Construction budget", "$58,000,000"),
+        row("Estimated delivery", "June 2028"),
+        row("Outside date", "December 31, 2028"),
+        row("Deposit", "10% at signing, non-refundable after due diligence"),
+      ],
+    }) as Ex;
+  const FORWARD = deck("Forward purchase of a 180-home build-to-rent community, purchase at certificate of occupancy");
+  const OWN = deck("Ground-up 180-home build-to-rent community");
+  const financials = (extraction: Ex) => {
+    const p = sampleProps("financials");
+    return render({ ...p, isSample: false, results: { ...p.results, extraction } } as Props);
+  };
+
+  it("the Financials tab draws no construction loan on a forward purchase, and draws one where the buyer builds the same deck", () => {
+    const forward = financials(FORWARD);
+    expect(forward).not.toContain('aria-label="Construction and take-out debt"');
+    expect(financials(OWN)).toContain('aria-label="Construction and take-out debt"');
+    expect(a11yIssues(forward)).toEqual([]);
+    expect(gluedWords(textOf(forward))).toEqual([]);
+  });
+
+  it("the deal page draws the purchase with the derived model's exit cap and read, on the reader's day", () => {
+    // As app/(app)/deals/[id]/page.tsx draws it: the read on the page's day
+    // with the page's kind, the model's exit cap and `meta.forward.read`.
+    const today = "2026-10-05";
+    const derived = deriveUnderwriteInputs(FORWARD, "Ridgeline Homes");
+    const html = renderToStaticMarkup(
+      React.createElement(ForwardPanel, {
+        forward: readForwardPurchase(FORWARD, new Date(`${today}T12:00:00Z`), inferStrategy(FORWARD)),
+        today,
+        exitCapPct: derived.inputs.exitCapPct * 100,
+        modelLine: derived.meta.forward?.read ?? "",
+      }),
+    );
+    const text = textOf(html);
+    expect(html.match(/data-bar="fwd-exit"/g)).toHaveLength(1);
+    expect(text).toContain(`The model's exit cap, ${(derived.inputs.exitCapPct * 100).toFixed(2)}%`);
+    expect(text).toContain("5.50% at delivery, the stated NOI over the price");
+    expect(text).toContain("Its year-one NOI is an assumed 6.00% of the price, $4.32M, above the $3.96M the memorandum states at delivery.");
     expect(a11yIssues(html)).toEqual([]);
     expect(gluedWords(text)).toEqual([]);
   });

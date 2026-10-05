@@ -540,6 +540,57 @@ describe("deriveUnderwriteInputs — the rent rules that reach the building, bes
   });
 });
 
+describe("deriveUnderwriteInputs — a forward purchase, said and never changed (lib/forward-purchase)", () => {
+  const strategy = (summary: string) => ({ kind: "development" as const, summary, capitalBudget: "", timeline: "" });
+  const btr = ex(
+    [
+      metric("Purchase price", "$72,000,000"),
+      metric("Homes", "180"),
+      metric("NOI (stabilized, pro forma)", "$3,960,000"),
+      metric("Estimated delivery", "June 2028"),
+      metric("Deposit", "10% at signing, non-refundable after due diligence"),
+    ],
+    { assetClass: "sfr_btr", strategy: strategy("Forward purchase of a 180-home build-to-rent community, purchase at certificate of occupancy") },
+  );
+
+  it("says the purchase in a line and the model's year-one NOI beside the memorandum's at delivery", () => {
+    const m = deriveUnderwriteInputs(btr, "fallback");
+    expect(m.meta.forward?.line).toBe("Forward purchase: $72.0M paid at delivery (June 2028), the works the developer's; 5.50% at delivery on the stated NOI; deposit 10% at signing, non-refundable after due diligence");
+    expect(m.meta.forward?.read).toBe(
+      "The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, June 2028, and the deposit paid at signing sits outside its cash flows. Its year-one NOI is an assumed 6.00% of the price, $4.32M, above the $3.96M the memorandum states at delivery.",
+    );
+    // No budget is the buyer's: the capital line's note says the developer
+    // funds the works, never "enter the construction cost".
+    expect(m.inputs.capitalImprovementsYr1).toBe(0);
+    expect(m.sources.capitalImprovementsYr1?.note).toBe(
+      "No construction budget is the buyer's: on a forward purchase the developer funds the works and the price is all-in at delivery",
+    );
+    // Anything else carries none.
+    expect(deriveUnderwriteInputs(ex([metric("Asking price", "$20,000,000"), metric("Units", "240")]), "fallback").meta.forward).toBeNull();
+  });
+
+  it("says a budget stated on a forward deck is the developer's, and charges it as before — the model's figures are the owner's to change", () => {
+    const withBudget = ex([...btr.metrics, metric("Construction budget", "$58,000,000", { page: "p. 12" })], {
+      assetClass: "sfr_btr",
+      strategy: btr.strategy,
+    });
+    const m = deriveUnderwriteInputs(withBudget, "fallback");
+    expect(m.inputs.capitalImprovementsYr1).toBe(58_000_000);
+    expect(m.sources.capitalImprovementsYr1?.note).toBe(
+      "Construction budget — the developer's budget: on a forward purchase the developer funds the works and the price is all-in at delivery, yet this model charges it as the buyer's first-year capital; enter 0 to run the price alone",
+    );
+    // The same deck the buyer builds reads as before.
+    const own = ex(withBudget.metrics, { assetClass: "sfr_btr", strategy: strategy("Ground-up 180-home community") });
+    const o = deriveUnderwriteInputs(own, "fallback");
+    expect(o.meta.forward).toBeNull();
+    expect(o.inputs).toEqual(m.inputs);
+    expect(o.sources.capitalImprovementsYr1?.note).toBe("Construction budget — spent in year 1 in this annual model; the OM's own timeline may run longer");
+    expect(deriveUnderwriteInputs(ex(btr.metrics, { assetClass: "sfr_btr", strategy: strategy("Ground-up 180-home community") }), "fallback").sources.capitalImprovementsYr1?.note).toBe(
+      "A development deal with no budget in the OM — enter the construction / renovation cost; yield on cost is meaningless without it",
+    );
+  });
+});
+
 describe("deriveUnderwriteInputs — the PCA's immediate repairs are capital at closing (#465)", () => {
   const base = [metric("Asking price", "$42,000,000"), metric("NOI (in-place)", "$2,520,000"), metric("Units", "240")];
 

@@ -22,6 +22,7 @@ import { studentHousingTag } from "@/lib/student-housing";
 import { manufacturedHousingTag } from "@/lib/manufactured-housing";
 import { selfStorageTag } from "@/lib/self-storage";
 import { regulationForDeal, regulationTag } from "@/lib/rent-regulation";
+import { forwardTag, readForwardPurchase } from "@/lib/forward-purchase";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
 import { verdictBehind, type JobLike } from "@/lib/screen-run";
 import { shownAssetClass, statedCapSlot } from "@/lib/pipeline-slots";
@@ -57,7 +58,8 @@ export interface ExportRowContext {
   /** the teammate who added the deal, where it is not the reader's own */
   addedBy: string | null;
   /** the day the rows are read on, an ISO day — the route's own UTC day:
-   *  it decides the rent allowance in force (lib/rent-regulation) */
+   *  it decides the rent allowance in force (lib/rent-regulation) and the
+   *  clock to a forward purchase's delivery (lib/forward-purchase) */
   today: string;
   /** the moment the rows are read, in ms — a run that stopped making
    *  progress by then is stalled, never "Re-screening" (lib/screen-run
@@ -127,6 +129,9 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
         ctx.today,
       ),
     ),
+    // A forward purchase (lib/forward-purchase), read on the route's day as
+    // the pipeline card reads it on the reader's.
+    forward: forwardTag(readForwardPurchase(extraction, new Date(`${ctx.today}T12:00:00Z`), strategy)),
     // The pipeline card's own cap reader: none on a plan deal, none on a
     // note (its collateral's cap is not the buyer's figure, and the cell
     // says the cap is withheld).

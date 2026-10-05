@@ -1331,6 +1331,53 @@ describe("runAnalysis — the happy path", () => {
     expect(errSpy).not.toHaveBeenCalled();
   });
 
+  it("a forward purchase: the challenger reads the purchase's facts and traps in place of the construction paragraph, and the deal context says it (lib/forward-purchase)", async () => {
+    vi.mocked(extractTerms).mockResolvedValue({
+      ...EXTRACTION,
+      assetClass: "industrial",
+      strategy: { kind: "development", summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+      metrics: [
+        { label: "Purchase price", value: "$48,000,000", flagged: false, page: "", basis: "na" },
+        { label: "NOI (Year 1)", value: "$2,880,000", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery cap rate", value: "6.00%", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Construction budget", value: "$31,000,000", flagged: false, page: "", basis: "pro_forma" },
+        { label: "Delivery date", value: "Q3 2027", flagged: false, page: "", basis: "na" },
+        { label: "Outside date", value: "March 31, 2028", flagged: false, page: "", basis: "na" },
+        { label: "Deposit", value: "$2,400,000 at signing", flagged: false, page: "", basis: "na" },
+      ],
+    } as unknown as ExtractionResult);
+    vi.useFakeTimers({ now: new Date("2026-10-05T12:00:00Z"), toFake: ["Date"] });
+    try {
+      await runAnalysis("d1");
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(job().status).toBe("done");
+    const call = vi.mocked(challengeAssumptions).mock.calls[0];
+    // The instruction's plan paragraph is the purchase's.
+    expect(call[4]).toBe(true);
+    const note = call[2] ?? "";
+    expect(note).toContain("Forward purchase: A build-to-suit bought at delivery: the buyer pays $48.0M at delivery, Q3 2027 (read as Sep 30, 2027)");
+    expect(note).toContain("FORWARD-PURCHASE TRAPS, checked by name");
+    expect(note).toContain("(b) THE OUTSIDE DATE AND THE DEPOSIT");
+    // The plan's text is the purchase's too: the budget is the developer's,
+    // and nothing asks the buyer about construction debt.
+    expect(note).toContain("A FORWARD PURCHASE: the buyer pays the price at delivery and the developer funds the works");
+    expect(note).toContain("the $31.0M budget (Construction budget) is the developer's");
+    expect(note).not.toContain("against the cost of construction debt");
+    const context = vi.mocked(scrutinizeComps).mock.calls[0][1] ?? "";
+    expect(context).toContain("Forward purchase: A build-to-suit bought at delivery");
+    expect(context).not.toContain("FORWARD-PURCHASE TRAPS");
+    expect(errSpy).not.toHaveBeenCalled();
+
+    // An ordinary deal's challenger keeps the plan paragraph.
+    vi.mocked(challengeAssumptions).mockClear();
+    vi.mocked(extractTerms).mockResolvedValue(EXTRACTION);
+    await runAnalysis("d1");
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][4]).toBe(false);
+    expect(vi.mocked(challengeAssumptions).mock.calls[0][2] ?? "").not.toContain("Forward purchase");
+  });
+
   it("a rent-regulated building: the challenger and the deal context read the rules that reach it, the allowance in force and the regulation traps (lib/rent-regulation)", async () => {
     state.deals.d1.address = { city: "Washington", state: "DC" };
     vi.mocked(extractTerms).mockResolvedValue({

@@ -13,10 +13,12 @@ import {
   findPriceMetric,
   isPlanDeal,
   noiFigures,
+  notYetDelivered,
   priceRowIsLand,
   unitCountRow,
   type StrategyKind,
 } from "./deal-strategy";
+import { forwardTermRows } from "./forward-purchase";
 import { noteTermRows } from "./note-yield";
 import { affordableTermRows } from "./affordable";
 import { singleTenantTermRows } from "./single-tenant";
@@ -84,6 +86,11 @@ export function keyTermRows<M extends KeyTermMetric>(
   // An auction has no asking price (#456): its starting bid, the buyer's
   // premium, the reserve and the deadline stand where the price would.
   for (const row of saleTermRows(rows)) lead(row);
+  // A forward purchase (lib/forward-purchase): when the price is paid — the
+  // delivery, the outside date, the deposit, the cap at delivery and rent
+  // commencement — right after the price, on a building not yet delivered
+  // (an earnest-money "Deposit" on a standing building is not this).
+  if (notYetDelivered(kind)) for (const row of forwardTermRows(rows)) lead(row);
   if (interest === "note") {
     for (const row of noteTermRows(rows)) lead(row);
     // Financing the seller offers on a note is of the note's purchase: it

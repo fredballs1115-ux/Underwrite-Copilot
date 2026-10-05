@@ -1442,6 +1442,35 @@ describe("the cover says what is being sold, and what the model is and is not on
     expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The park")).toThrow();
   });
 
+  it("a forward purchase (lib/forward-purchase): the price at delivery and the clock, then the model's year-one NOI beside the memorandum's at delivery", async () => {
+    const forward = deriveUnderwriteInputs(
+      {
+        ...extraction,
+        assetClass: "industrial",
+        strategy: { kind: "development", summary: "Forward purchase of a build-to-suit distribution center at completion", capitalBudget: "", timeline: "" },
+        metrics: [
+          { label: "Purchase price", value: "$48,000,000", flagged: false, page: "p. 2" },
+          { label: "NOI (Year 1)", value: "$2,880,000", flagged: false, page: "p. 4" },
+          { label: "Delivery cap rate", value: "6.00%", flagged: false, page: "p. 4" },
+          { label: "Delivery date", value: "Q3 2027", flagged: false, page: "p. 4" },
+          { label: "Outside date", value: "March 31, 2028", flagged: false, page: "p. 4" },
+        ],
+      },
+      "fallback",
+    );
+    const { wb } = await loadIntoHf(await buildUnderwriteWorkbook(forward));
+    const cover = wb.getWorksheet("Cover")!;
+    const r = findRow(cover, 2, "The forward purchase");
+    expect(String(cover.getCell(r, 3).value)).toBe(
+      "Build-to-suit: $48.0M paid at delivery (Q3 2027), the works the developer's; 6.00% at delivery; outside date Mar 31, 2028",
+    );
+    expect(String(cover.getCell(r + 1, 3).value)).toMatch(
+      /^The model runs the price as paid at closing with income from its first year: on a forward purchase that day is delivery, Q3 2027\./,
+    );
+    const { wb: plainWb } = await loadIntoHf(await buildUnderwriteWorkbook(model));
+    expect(() => findRow(plainWb.getWorksheet("Cover")!, 2, "The forward purchase")).toThrow();
+  });
+
   it("a self-storage facility (#471): its occupancies and rates, then what the model does with the premium over street", async () => {
     const storage = deriveUnderwriteInputs(
       {

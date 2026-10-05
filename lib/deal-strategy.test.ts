@@ -20,6 +20,7 @@ import {
   timelineFromMetrics,
 } from "./deal-strategy";
 import { parseMoney, screenYearOf } from "./criteria";
+import { planFacts } from "./plan-facts";
 
 /** The year the bare rows below were screened in; none carries a year. */
 const SCREEN_YEAR = 2026;
@@ -676,6 +677,80 @@ describe("plausibilityNote", () => {
     expect(note).toMatch(/THE PLAN AS THE OM STATES IT/);
     expect(note).toMatch(/FIGURES THAT DO NOT TIE/);
     expect(note).toMatch(/label/);
+  });
+});
+
+// A forward purchase or a build-to-suit bought at delivery (research pass
+// 28): the developer funds the works, so the plan's total cost is the price,
+// a budget the memorandum states is the developer's, and the yield on cost
+// is the NOI at delivery over the price — the buyer carries no construction.
+describe("planSummary / plausibilityNote — a forward purchase", () => {
+  const dev = { kind: "development" as const, summary: "", capitalBudget: "", timeline: "" };
+  const bts = ex(
+    [
+      metric("Purchase price", "$48,000,000"),
+      metric("NOI (Year 1)", "$2,880,000"),
+      metric("Cap rate", "6.00%"),
+      metric("Construction budget", "$31,000,000"),
+      metric("Delivery date", "Q3 2027"),
+    ],
+    {
+      assetClass: "industrial",
+      strategy: { ...dev, summary: "Forward purchase of a 300,000 SF build-to-suit distribution center at completion" },
+    },
+  );
+  const btr = ex([metric("Purchase price", "$72,000,000"), metric("Homes", "180"), metric("NOI (stabilized, pro forma)", "$3,960,000")], {
+    assetClass: "sfr_btr",
+    strategy: { ...dev, summary: "Forward purchase of a 180-home build-to-rent community, purchase at certificate of occupancy" },
+  });
+
+  it("strikes the total cost at the price, says the stated budget is the developer's, and reads the yield at delivery", () => {
+    const plan = planSummary(bts, inferStrategy(bts))!;
+    expect(plan).toMatchObject({ forward: true, price: 48_000_000, budget: null, totalCost: 48_000_000 });
+    expect(plan.developerBudget?.budget).toBe(31_000_000);
+    // A build-to-suit's NOI at delivery is the lease's first year.
+    expect(plan.stabilizedNoi).toMatchObject({ label: "NOI (Year 1)", value: 2_880_000 });
+    expect(plan.yieldOnCost).toBeCloseTo(0.06, 10);
+    // A community's is its stabilized figure, over the price alone.
+    const community = planSummary(btr, inferStrategy(btr))!;
+    expect(community).toMatchObject({ forward: true, budget: null, developerBudget: null, totalCost: 72_000_000 });
+    expect(community.yieldOnCost).toBeCloseTo(0.055, 10);
+    // The same deck the buyer builds is a development: price plus budget.
+    const own = ex(bts.metrics, { assetClass: "industrial", strategy: { ...dev, summary: "Ground-up distribution center" } });
+    const ownPlan = planSummary(own, inferStrategy(own))!;
+    expect(ownPlan.forward).toBeUndefined();
+    expect(ownPlan.totalCost).toBe(79_000_000);
+    expect(ownPlan.stabilizedNoi).toBeNull();
+  });
+
+  it("says the plan's facts as a forward purchase: the NOI at delivery and the developer's budget", () => {
+    expect(planFacts(planSummary(bts, inferStrategy(bts))!)).toEqual([
+      ["NOI at delivery", "$2.9M"],
+      ["Price", "$48.0M"],
+      ["Budget", "$31.0M, the developer's"],
+      ["Total cost", "$48.0M"],
+      ["Yield on cost", "6.00%"],
+    ]);
+    expect(planFacts(planSummary(btr, inferStrategy(btr))!)[2]).toEqual(["Budget", "the developer's"]);
+  });
+
+  it("hands the challenger the purchase's plan text in place of the construction paragraph", () => {
+    const s = inferStrategy(bts);
+    const note = plausibilityNote(assessPlausibility(bts, s), s, planSummary(bts, s), bts);
+    expect(note).toMatch(/^DEAL STRATEGY: Development/);
+    expect(note).toContain("NOI at delivery $2.9M (NOI (Year 1))");
+    expect(note).toContain("the $31.0M budget (Construction budget) is the developer's, who funds the works — never added to the price");
+    expect(note).toContain("total cost $48.0M, the price");
+    expect(note).toContain("yield on total cost 6.00%");
+    expect(note).toContain("A FORWARD PURCHASE: the buyer pays the price at delivery and the developer funds the works, so the buyer carries no construction");
+    expect(note).not.toContain("against the cost of construction debt");
+    // The community states no budget: none is the buyer's.
+    const sb = inferStrategy(btr);
+    expect(plausibilityNote([], sb, planSummary(btr, sb), btr)).toContain("no construction budget is the buyer's: the developer funds the works");
+    // A development the buyer builds keeps the construction paragraph.
+    const own = ex(bts.metrics, { assetClass: "industrial", strategy: { ...dev, summary: "Ground-up distribution center" } });
+    const so = inferStrategy(own);
+    expect(plausibilityNote([], so, planSummary(own, so), own)).toContain("against the cost of construction debt");
   });
 });
 
