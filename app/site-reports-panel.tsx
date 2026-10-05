@@ -118,7 +118,7 @@ export function SiteReportsPanel({ reports, modelLine = "" }: { reports: SiteRep
       <ul className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5" data-qa="site-report-tiles">
         {tiles.map((t) => (
           <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]}`} data-report={t.key} title={t.title}>
-            <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-80">{t.label}</span>
+            <span className="block text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>
             <span className="block text-sm font-semibold leading-tight">{t.value}</span>
             <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>
           </li>

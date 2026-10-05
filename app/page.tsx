@@ -869,7 +869,7 @@ export default function Home() {
                 <div className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
                   {groupedTools().map(({ group, tools }) => (
                     <div key={group}>
-                      <p className="text-[11px] font-semibold uppercase tracking-widest text-white/45">
+                      <p className="text-[11px] font-semibold uppercase tracking-widest text-white/55">
                         {group}
                       </p>
                       <ul className="mt-2 flex flex-wrap gap-1.5">
@@ -1202,7 +1202,7 @@ export default function Home() {
               {FAQ.map((f, i) => (
                 <details key={f.q} className="group">
                   <summary className="flex cursor-pointer items-center gap-3 px-5 py-4 text-sm font-medium transition-colors hover:bg-faint [&::-webkit-details-marker]:hidden">
-                    <span className="font-mono text-xs tabular-nums text-brand/50">
+                    <span className="font-mono text-xs tabular-nums text-brand/80">
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="flex-1">{f.q}</span>

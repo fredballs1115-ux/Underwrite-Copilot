@@ -126,9 +126,12 @@ export function LiveHeadlinesView({
 
       {/* The sources as one line, each in the state it answered in — a dot
           for one that answered, an amber dot for a copy from earlier, a
-          hollow one for a source that did not answer just now. */}
+          hollow one for a source that did not answer just now. Each link is
+          a 24px-tall target (WCAG 2.5.8): 4px of padding each way, taken
+          back by a negative margin so the line does not move, and wrapped
+          rows 8px apart so two rows' targets meet rather than overlap. */}
       <div className="mt-5 border-t border-line pt-3">
-        <ul aria-label="Sources" className="flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[11px] text-muted">
+        <ul aria-label="Sources" className="flex flex-wrap items-center gap-x-3.5 gap-y-2 text-[11px] text-muted">
           <li className="font-semibold uppercase tracking-[0.14em] text-ink">Sources</li>
           {live.sources.map((s) => (
             <SourceChip key={s.id} source={s} />
@@ -138,7 +141,7 @@ export function LiveHeadlinesView({
               key={h.name}
               title={`${h.name} topic searches stand behind the sources that named it, each item naming its outlet`}
             >
-              <a href={h.home} target="_blank" rel="noreferrer" className="hover:text-brand">
+              <a href={h.home} target="_blank" rel="noreferrer" className="-my-1 inline-flex py-1 hover:text-brand">
                 via {h.name}
               </a>
             </li>
@@ -163,7 +166,11 @@ function Story({ h }: { h: RankedHeadline }) {
 }
 
 /** The kicker above a headline — what the story touches, and the covered
- *  market it names, in the front page's small capitals. */
+ *  market it names, in the front page's small capitals. The market's link
+ *  reaches 10px above its line (`pt-2.5 -mt-2.5`, the line itself not
+ *  moving), so it is a 24px-tall target (WCAG 2.5.8) without growing down
+ *  into the headline's link just beneath it; above it is only the
+ *  article's or the list item's own padding. */
 function Kicker({ h, small }: { h: RankedHeadline; small?: boolean }) {
   const tags = headlineSignals(h);
   const market = headlineMarkets(h)[0];
@@ -181,7 +188,11 @@ function Kicker({ h, small }: { h: RankedHeadline; small?: boolean }) {
         </>
       )}
       {market && (
-        <a href={market.href} title={`${market.name} — open the market brief`} className="text-ink hover:text-brand">
+        <a
+          href={market.href}
+          title={`${market.name} — open the market brief`}
+          className="-mt-2.5 inline-block pt-2.5 text-ink hover:text-brand"
+        >
           {market.label}
         </a>
       )}
@@ -248,11 +259,11 @@ function SourceChip({ source: s }: { source: SourceStatus }) {
     </>
   );
   return (
-    <li className={`inline-flex items-center ${state === "off" ? "text-muted/70" : "text-ink"}`} title={title}>
+    <li className={`inline-flex items-center ${state === "off" ? "text-muted" : "text-ink"}`} title={title}>
       {state === "off" ? (
         <span className="inline-flex items-center gap-1.5">{inner}</span>
       ) : (
-        <a href={s.home} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 hover:text-brand">
+        <a href={s.home} target="_blank" rel="noreferrer" className="-my-1 inline-flex items-center gap-1.5 py-1 hover:text-brand">
           {inner}
         </a>
       )}

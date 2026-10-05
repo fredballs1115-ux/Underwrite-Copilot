@@ -88,8 +88,8 @@ export function ScoredFeedView({
   return (
     <>
       {alerts.length > 0 && (
-        <section className="rounded-xl border border-red-500/30 bg-red-500/5 p-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wide text-red-600">
+        <section className="rounded-xl border border-kill/30 bg-kill/5 p-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-kill">
             Law &amp; rule changes
           </h2>
           <ul className="mt-2 space-y-1.5 text-sm">

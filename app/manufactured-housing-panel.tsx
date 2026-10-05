@@ -212,7 +212,7 @@ export function ManufacturedHousingPanel({ park, modelLine = "" }: { park: Manuf
         <ul className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6" data-qa="mh-tiles">
           {tiles.map((t) => (
             <li key={t.key} className={`rounded-lg border px-2.5 py-2 ${TONE[t.tone]}`} data-mh={t.key}>
-              <span className="block text-[10px] font-semibold uppercase tracking-wider opacity-80">{t.label}</span>
+              <span className="block text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>
               <span className="block text-sm font-semibold leading-tight">{t.value}</span>
               {t.sub && <span className="block text-[11px] leading-snug text-muted">{t.sub}</span>}
             </li>

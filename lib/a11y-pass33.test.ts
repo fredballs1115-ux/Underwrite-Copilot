@@ -180,3 +180,104 @@ describe("the homepage's running trace can be stopped (research pass 33, item 21
     expect(a11yIssues(html)).toEqual([]);
   });
 });
+
+// ── Contrast, by arithmetic on the palette's own tokens (item 23) ──────────
+type RGB = [number, number, number];
+const CSS = readFileSync("app/globals.css", "utf8");
+/** A token's colour as globals.css states it, or white. */
+function token(name: string): RGB {
+  if (name === "white") return [255, 255, 255];
+  const hex = new RegExp(`--color-${name}:\\s*#([0-9a-f]{6})`, "i").exec(CSS)?.[1];
+  if (!hex) throw new Error(`no --color-${name} in globals.css`);
+  return [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
+}
+/** "kill/10" over the layers beneath it, composited in sRGB as a browser
+ *  does; the last layer is opaque. */
+function layered(spec: string, under: RGB): RGB {
+  const [name, pct] = spec.split("/");
+  const a = pct == null ? 1 : Number(pct) / 100;
+  const c = token(name);
+  return c.map((v, i) => v * a + under[i] * (1 - a)) as RGB;
+}
+function ratio(fg: string, ...backdrop: string[]): number {
+  let bg = token(backdrop[backdrop.length - 1]);
+  for (const layer of backdrop.slice(0, -1).reverse()) bg = layered(layer, bg);
+  const lum = (rgb: RGB) => {
+    const [r, g, b] = rgb.map((v) => {
+      const s = v / 255;
+      return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+    });
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  };
+  const [hi, lo] = [lum(layered(fg, bg)), lum(bg)].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+describe("text that reads at 4.5:1 where the pass measured it under (research pass 33, item 23)", () => {
+  const src = (f: string) => readFileSync(f, "utf8");
+
+  it("the news sources that did not answer: muted, not faded, on the canvas", () => {
+    expect(ratio("muted/70", "canvas")).toBeLessThan(4.5);
+    expect(ratio("muted", "canvas")).toBeGreaterThanOrEqual(4.5);
+    expect(src("app/(app)/news/live-headlines.tsx")).toContain('state === "off" ? "text-muted" : "text-ink"');
+  });
+
+  it("the research panel's and the law feed's red is the palette's kill", () => {
+    expect(ratio("kill", "kill/10", "surface")).toBeGreaterThanOrEqual(4.5);
+    expect(ratio("kill", "kill/5", "canvas")).toBeGreaterThanOrEqual(4.5);
+    for (const f of ["app/(app)/deals/[id]/research-panel.tsx", "app/(app)/news/scored-feed.tsx"]) {
+      expect(src(f)).not.toMatch(/\b(?:bg|text|border)-red-\d{3}\b/);
+    }
+    expect(src("app/(app)/deals/[id]/research-panel.tsx")).toContain('applies: { label: "Applies", cls: "bg-kill/10 text-kill" }');
+    expect(src("app/(app)/news/scored-feed.tsx")).toContain('<h2 className="text-xs font-semibold uppercase tracking-wide text-kill">');
+  });
+
+  it("a deal-type panel's tile label is its tone, never 80% of it", () => {
+    for (const tone of ["pass", "caution", "kill"]) {
+      // The worst case: a tinted tile on a panel flagged caution, on white.
+      expect(ratio(`${tone}/80`, `${tone}/5`, "caution/5", "surface")).toBeLessThan(4.5);
+      expect(ratio(tone, `${tone}/5`, "caution/5", "surface")).toBeGreaterThanOrEqual(4.5);
+    }
+    for (const f of ["site-reports-panel", "student-housing-panel", "regulation-panel", "self-storage-panel", "manufactured-housing-panel"]) {
+      expect(src(`app/${f}.tsx`)).toContain('className="block text-[10px] font-semibold uppercase tracking-wider">{t.label}</span>');
+      expect(src(`app/${f}.tsx`)).not.toContain("opacity-80");
+    }
+  });
+
+  it("the actuals card's In line and Material chips, on its faint comparison box", () => {
+    for (const tone of ["pass", "caution"]) {
+      expect(ratio(tone, `${tone}/10`, "faint/60", "surface")).toBeLessThan(4.5);
+      expect(ratio(tone, `${tone}/5`, "faint/60", "surface")).toBeGreaterThanOrEqual(4.5);
+    }
+    const s = src("app/(app)/deals/[id]/property-actuals.tsx");
+    expect(s).toContain('in_line: { label: "In line", cls: "bg-pass/5 text-pass" }');
+    expect(s).toContain('material: { label: "Material", cls: "bg-caution/5 text-caution" }');
+  });
+
+  it("the homepage's tool groups on the dark band and its FAQ numbers, the row and its hover", () => {
+    expect(ratio("white/45", "sidebar")).toBeLessThan(4.5);
+    expect(ratio("white/55", "sidebar")).toBeGreaterThanOrEqual(4.5);
+    expect(ratio("brand/80", "surface")).toBeGreaterThanOrEqual(4.5);
+    expect(ratio("brand/80", "faint")).toBeGreaterThanOrEqual(4.5);
+    const s = src("app/page.tsx");
+    expect(s).toMatch(/tracking-widest text-white\/55">\s*\{group\}/);
+    expect(s).toContain('<span className="font-mono text-xs tabular-nums text-brand/80">');
+  });
+
+  it("the market page's dash for a figure the research does not state", () => {
+    expect(ratio("line", "surface")).toBeLessThan(3);
+    expect(ratio("muted", "surface")).toBeGreaterThanOrEqual(4.5);
+    expect(src("app/market/page.tsx")).toContain('{value ?? <span className="text-muted">—</span>}');
+  });
+
+  it("the news page's source and kicker links are 24px tall without moving their line (WCAG 2.5.8)", () => {
+    // Measured by the pass's own method in Chromium at 390 and 1280: every
+    // target passes, none overlaps another, and no link's text moves; on a
+    // phone, the wrapped source line's rows sit 4px further apart.
+    const s = src("app/(app)/news/live-headlines.tsx");
+    expect(s).toContain('aria-label="Sources" className="flex flex-wrap items-center gap-x-3.5 gap-y-2');
+    expect(s).toContain('className="-my-1 inline-flex items-center gap-1.5 py-1 hover:text-brand"');
+    expect(s).toContain('className="-my-1 inline-flex py-1 hover:text-brand"');
+    expect(s).toContain('className="-mt-2.5 inline-block pt-2.5 text-ink hover:text-brand"');
+  });
+});

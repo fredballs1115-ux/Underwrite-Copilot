@@ -55,7 +55,7 @@ const OUTCOME_META: Record<
   { label: string; cls: string }
 > = {
   exempt: { label: "Exempt", cls: "bg-emerald-500/10 text-emerald-600" },
-  applies: { label: "Applies", cls: "bg-red-500/10 text-red-600" },
+  applies: { label: "Applies", cls: "bg-kill/10 text-kill" },
   possibly_applies: { label: "Possibly applies", cls: "bg-amber-500/10 text-amber-600" },
   not_applicable: { label: "Not applicable", cls: "bg-line/60 text-muted" },
 };
@@ -460,7 +460,7 @@ export async function ResearchPanel({
             <span
               className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
                 leverage.tone === "negative"
-                  ? "bg-red-500/10 text-red-600"
+                  ? "bg-kill/10 text-kill"
                   : leverage.tone === "thin"
                     ? "bg-amber-500/10 text-amber-600"
                     : "bg-emerald-500/10 text-emerald-600"
@@ -490,7 +490,7 @@ export async function ResearchPanel({
                 <p
                   className={`mt-1 text-xs leading-relaxed ${
                     seededLeverage.tone === "negative"
-                      ? "text-red-600"
+                      ? "text-kill"
                       : seededLeverage.tone === "thin"
                         ? "text-amber-600"
                         : "text-emerald-600"

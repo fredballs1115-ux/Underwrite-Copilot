@@ -2,8 +2,11 @@ import type { RentRollSummary, T12Summary, NoiComparison } from "@/lib/actuals/t
 import { assetWords, rentQuotedMonthly } from "@/lib/asset-words";
 
 const SEV: Record<NoiComparison["severity"], { label: string; cls: string }> = {
-  in_line: { label: "In line", cls: "bg-pass/10 text-pass" },
-  material: { label: "Material", cls: "bg-caution/10 text-caution" },
+  // A 5% tint, since the chip sits on the faint comparison box: at 10%
+  // the 10px label read 4.37:1 (pass) and 4.39:1 (caution), at 5% 4.67:1
+  // and 4.69:1. Kill reads 4.85:1 at 10% and keeps it.
+  in_line: { label: "In line", cls: "bg-pass/5 text-pass" },
+  material: { label: "Material", cls: "bg-caution/5 text-caution" },
   red_flag: { label: "Red flag", cls: "bg-kill/10 text-kill" },
 };
 

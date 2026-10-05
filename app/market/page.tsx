@@ -1372,7 +1372,7 @@ function Stat({ label, value }: { label: string; value: string | null }) {
     <div className="flex items-baseline justify-between gap-2">
       <dt className="text-xs text-muted">{label}</dt>
       <dd className="font-mono text-sm tabular-nums">
-        {value ?? <span className="text-line">—</span>}
+        {value ?? <span className="text-muted">—</span>}
       </dd>
     </div>
   );
