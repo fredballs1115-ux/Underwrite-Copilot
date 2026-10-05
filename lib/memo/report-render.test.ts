@@ -9,7 +9,8 @@ import { afterEach, describe, it, expect, vi } from "vitest";
 import { BLS_NOTICE, FRED_NOTICE } from "@/lib/data-notices";
 import React from "react";
 import { renderToBuffer } from "@react-pdf/renderer";
-import { buildReportData, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, retradePrices } from "./report-document";
+import { buildReportData, caveatOnPaper, proseDays, rangeRead, readDay, renderReportPdf, ReportDocument, retradePrices } from "./report-document";
+import { readInterest } from "@/lib/interest";
 import { MemoDocument, buildMemoData } from "./memo-document";
 import { assumableView, readAssumable } from "@/lib/assumable-debt";
 import { leaseholdExitView, readLeaseholdExit, termReadFor } from "@/lib/leasehold-exit";
@@ -1820,7 +1821,42 @@ describe("ReportDocument (full report)", () => {
     const without = await render(null);
     expect((await pdfFillCountOf(buf)) - (await pdfFillCountOf(without))).toBeGreaterThanOrEqual(6);
     expect(await pdfTextOf(without)).not.toContain("The exit, on the ground lease's term");
+    // The model's caveat above the grids points to the block on paper,
+    // which has no link to the calculator (research pass 35); with no block
+    // it stands as written.
+    expect(text).toContain(
+      "On a leasehold the value at exit is what the term left will bear — see The exit, on the ground lease's term, below.",
+    );
+    expect(text).not.toContain("ground lease calculator");
+    expect((await pdfTextOf(without)).replace(/\s+/g, " ")).toContain(
+      "On a leasehold the value at exit is what the term left will bear — run the ground lease calculator on the stated term.",
+    );
   }, 45000);
+
+  it("points a master lease's caveat on paper to the master lease's own term, and leaves any other caveat as written (research pass 35)", () => {
+    const sandwich = {
+      ...SAMPLE_DEAL.extraction,
+      interest: {
+        kind: "leasehold",
+        summary: "Leasehold interest under a master lease of the building, sublet to 14 office tenants",
+        share: "",
+        groundLease: "Master lease of the building from its owner",
+        loan: "",
+        page: "",
+      },
+    } as ExtractionResult;
+    const caveat = readInterest(sandwich, 6_500_000)?.modelCaveat ?? "";
+    expect(caveat).toContain("run the ground lease calculator on the stated term, with the master rent as its rent.");
+    const view = { lease: "master lease" } as unknown as Parameters<typeof caveatOnPaper>[1];
+    expect(caveatOnPaper(caveat, view)).toBe(
+      "The screening model capitalises the exit like a fee-simple building. On a master lease the position ends with the lease, so the value at exit is what the term left will bear — see The exit, on the master lease's term, below.",
+    );
+    expect(caveatOnPaper(caveat, null)).toBe(caveat);
+    // A leased fee's caveat names the calculator's leased-fee side, which no
+    // block of the report runs: as written.
+    const leasedFee = readInterest({ ...SAMPLE_DEAL.extraction, interest: { kind: "leased_fee", summary: "", share: "", groundLease: "", loan: "", page: "" } } as ExtractionResult, 6_500_000)?.modelCaveat ?? "";
+    expect(caveatOnPaper(leasedFee, view)).toBe(leasedFee);
+  });
 
   it("says what a leasehold's max bid returns on the lease's term, not only on the capitalised exit (research pass 35)", async () => {
     vi.useFakeTimers({ now: new Date(Date.UTC(2026, 9, 5)), toFake: ["Date"] });

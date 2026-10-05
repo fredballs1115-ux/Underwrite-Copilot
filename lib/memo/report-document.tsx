@@ -695,6 +695,22 @@ function PortfolioBlock({ portfolio, noun }: { portfolio: PortfolioRead; noun: {
   );
 }
 
+/**
+ * A leasehold's model caveat as paper says it. On the web it sends the
+ * reader to the ground lease calculator on the stated term; a PDF has no
+ * link, and where the report runs that term itself (`LeaseholdBlock`,
+ * "The exit, on the ground lease's term") it points there instead
+ * (research pass 35). Where the report draws no block, the caveat stands
+ * as written.
+ */
+export function caveatOnPaper(caveat: string, leasehold: LeaseholdExitView | null | undefined): string {
+  if (!leasehold) return caveat;
+  return caveat.replace(
+    /run the ground lease calculator on the stated term(, with the master rent as its rent)?\./,
+    `see The exit, on the ${leasehold.lease ?? "ground lease"}'s term, below.`,
+  );
+}
+
 const COUNT_WORDS = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
 /** A count of lines as a sentence says it: "the first two", never "the
  *  first 2" (research pass 35); ten and over stay figures. */
@@ -2126,7 +2142,7 @@ export function ReportDocument({
           </Text>
           {interest?.modelCaveat ? (
             <Text style={{ fontSize: 8, color: C.caution, fontFamily: "Helvetica-Bold", marginBottom: 6 }}>
-              {str(`${interest.label}: ${interest.modelCaveat}`)}
+              {str(`${interest.label}: ${caveatOnPaper(interest.modelCaveat, input.leasehold)}`)}
             </Text>
           ) : null}
           {ownTerms ? (
