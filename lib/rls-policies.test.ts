@@ -21,6 +21,7 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "n
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
+import { STALE_MS } from "./screen-run";
 
 const DIR = join(__dirname, "..", "supabase", "migrations");
 
@@ -523,5 +524,30 @@ describe("the guards 0036 put on writes a user's session could otherwise shape",
 
   it("Ask's thread only grows", () => {
     expect(on("deals", "deal_qa_append_only")).toMatchObject({ timing: "before", events: "update of qa" });
+  });
+});
+
+describe("the guard 0037 puts on a deal's live job rows (research pass 39)", () => {
+  // The app keeps one job row a deal and claims it for each run (lib/jobs
+  // claimJob), so a second live row is never the app's: a user's write that
+  // would leave a deal with two queued or running rows is refused.
+  it("runs before an insert and every update that could make a row live or move it", () => {
+    expect(finalTriggers().get("analysis_jobs/analysis_jobs_one_live_run")).toMatchObject({
+      timing: "before",
+      events: "insert or update of status, deal_id, payload, updated_at",
+      fn: "analysis_jobs_one_live_run",
+    });
+  });
+
+  it("trusts the service role, dates a user's live row by the database, takes the deal's lock, and reads live by the app's stall rule", () => {
+    const body = finalFunctionBodies().get("analysis_jobs_one_live_run")!;
+    expect(body).toContain("if auth.uid() is null then return new; end if;");
+    expect(body).toContain("if new.status is distinct from 'queued' and new.status is distinct from 'running' then return new; end if;");
+    expect(body).toContain("new.updated_at := now();");
+    expect(body).toContain("perform pg_advisory_xact_lock(hashtextextended('analysis_jobs one live run ' || new.deal_id::text, 0));");
+    expect(body).toContain("j.deal_id = new.deal_id and j.id <> new.id and j.status in ('queued', 'running')");
+    // The window is lib/screen-run's: a row silent this long is a dead run.
+    expect(body).toContain(`j.updated_at > now() - interval '${STALE_MS / 60_000} minutes'`);
+    expect(body).toContain("raise exception 'analysis_job_already_live'");
   });
 });

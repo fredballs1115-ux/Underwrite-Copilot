@@ -123,12 +123,15 @@ export async function generateModel(formData: FormData) {
   // A claim the database did not take claimed nothing: never run on it.
   if (claim.outcome === "busy" || claim.outcome === "error") return;
   if (claim.outcome === "none") {
-    await supabase.from("analysis_jobs").insert({
+    // A row the database would not insert claimed nothing either — another
+    // run of the deal is live (migration 0037) or the write failed.
+    const { error: insErr } = await supabase.from("analysis_jobs").insert({
       deal_id: dealId,
       status: "running",
       step: "model",
       progress: 5,
     });
+    if (insErr) return;
   } else {
     await supabase
       .from("analysis_jobs")
