@@ -946,12 +946,18 @@ function buildAssumptions(
   // The engine charges TI × the building's whole rentable SF in every year
   // (the Cash Flow tab's Tenant Improvements line) — so the label says so,
   // and a per-lease allowance on the space that rolls is not typed in here.
+  // Each says first what its figure is — a default of none, where the model
+  // holds none (research pass 40, M4) — then how the Cash Flow tab charges it.
+  const chargedNote = (key: "tiPsf" | "lcPct", how: string) => {
+    const s = sources[key];
+    label(ws.getCell(r - 1, 3), s ? `${sourceText(s)}. ${how}` : how, { color: s ? provColor(s.provenance) : MUTED, size: 9 });
+  };
   input("TI $/SF/yr, whole building", inp.tiPsf, "TIPSF", FMT.psf);
-  label(ws.getCell(r - 1, 3), "Charged on every SF of the building, every year — not a per-lease allowance", { color: MUTED, size: 9 });
+  chargedNote("tiPsf", "Charged on every SF of the building, every year — not a per-lease allowance");
   // The same for the commission: the Cash Flow tab charges it on the year's
   // whole rent, every year, not on the leases that roll.
   input("Leasing Commission % of all rent, every year", inp.lcPct, "LCPct", FMT.pct1);
-  label(ws.getCell(r - 1, 3), "Charged on the year's whole rent, every year — not a commission on the leases that roll", { color: MUTED, size: 9 });
+  chargedNote("lcPct", "Charged on the year's whole rent, every year — not a commission on the leases that roll");
 
   header("Fees");
   input("Asset Management Fee % of equity/yr", inp.amFeePctEquity, "AMFeePctEquity", FMT.pct2, "amFeePctEquity");

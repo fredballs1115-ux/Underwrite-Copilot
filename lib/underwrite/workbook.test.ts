@@ -1066,6 +1066,18 @@ describe("the workbook's labels and colours say what their cells are", () => {
     for (const label of ["Expense Recoveries (annual)", "Other Revenue (annual)"]) {
       expect(row(label), label).toEqual({ value: 0, source: folded });
     }
+    // Leasing capital too (research pass 40, M4): each says its zero is a
+    // default of none, then how the Cash Flow tab charges it.
+    expect(row("TI $/SF/yr, whole building")).toEqual({
+      value: 0,
+      source:
+        "Assumption — None modelled — enter it to carry tenant improvements: the returns carry no leasing capital. Charged on every SF of the building, every year — not a per-lease allowance",
+    });
+    expect(row("Leasing Commission % of all rent, every year")).toEqual({
+      value: 0,
+      source:
+        "Assumption — None modelled — enter it to carry leasing commissions: the returns carry none. Charged on the year's whole rent, every year — not a commission on the leases that roll",
+    });
     // The named ranges the formulas read are where they were.
     for (const [label, name] of [
       ["Acquisition Fee %", "AcqFeePct"],
@@ -1084,7 +1096,7 @@ describe("the workbook's labels and colours say what their cells are", () => {
     const assum = wb.getWorksheet("Assumptions")!;
     const row = findRow(assum, 1, "TI $/SF/yr, whole building");
     expect(assum.getCell(row, 2).name).toBe("TIPSF");
-    expect(String(assum.getCell(row, 3).value)).toBe("Charged on every SF of the building, every year — not a per-lease allowance");
+    expect(String(assum.getCell(row, 3).value)).toMatch(/\. Charged on every SF of the building, every year — not a per-lease allowance$/);
     // What the label says is what the ladder does: TI × RSF in every year.
     const cf = wb.getWorksheet("Cash Flow")!;
     const ti = findRow(cf, 1, "Tenant Improvements");

@@ -1474,6 +1474,11 @@ export function deriveUnderwriteInputs(
   for (const key of ["expenseRecoveriesAnnual", "otherRevenueAnnual"] as const) {
     mark(key, "assumption", "Folded into the potential gross revenue line — split it out of that line, never add it on top");
   }
+  // Leasing capital is held at none too, and said so (research pass 40, M4:
+  // the two rows printed $0.00 and 0.0% with nothing but how each is
+  // charged). What a class should carry is the owner's.
+  mark("tiPsf", "assumption", "None modelled — enter it to carry tenant improvements: the returns carry no leasing capital");
+  mark("lcPct", "assumption", "None modelled — enter it to carry leasing commissions: the returns carry none");
   // The exit defaults to the OM's stated going-in cap (which cap it defaults
   // to is the owner's call). Where the model's own entry — its year-1 NOI
   // over its price, the Deal Summary's "Going-In Cap (Yr-1 NOI / Price)" —
