@@ -99,8 +99,13 @@ export default async function LoginPage({
               {MARKET_COUNT} covered markets
             </Link>{" "}
             or the{" "}
+            {/* Not prefetched: /demo's script is the largest a public page
+                loads (research pass 25: 141 KB gzip a phone fetched on
+                every visit to the sign-in page, for a link few of them
+                follow); the page loads on the click. */}
             <Link
               href="/demo"
+              prefetch={false}
               className="font-medium text-white/80 underline decoration-dotted underline-offset-2 hover:text-white"
             >
               fully worked sample screen

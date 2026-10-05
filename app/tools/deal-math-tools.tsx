@@ -8880,16 +8880,18 @@ export function DealMathTools({ seeds = NO_SEEDS }: { seeds?: RateSeeds }) {
           
           It was one flat row, written when there were thirteen cards, and
           a flat row of twenty-six is a wall rather than a directory — the
-          page measures 187KB of HTML, 4,165 words and 189 input fields,
-          so finding the one card you came for is the page's real problem
-          now, not having enough of them. Six named clusters of three to
-          six scan at a glance, and the shape holds as the page grows
-          instead of degrading with every addition.
+          page measured 187KB of HTML, 4,165 words and 189 input fields at
+          twenty-six cards, and 467KB, 9,717 words and 436 controls at
+          forty-seven (research pass 25, 2026-10-05) — so finding the one
+          card you came for is the page's real problem, not having enough
+          of them. The named clusters (lib/tools/catalog's TOOL_GROUPS,
+          eight of them since forty cards) scan at a glance, and the shape
+          holds as the page grows instead of degrading with every addition.
 
           The grouping lives in the catalog beside the list, so it cannot
           drift from the cards it files. */}
       <nav aria-label="The calculators on this page" className="rounded-2xl border border-line bg-white p-4 sm:p-5 print:hidden">
-        {/* The block still needs a name of its own. Six cluster headings
+        {/* The block still needs a name of its own. The cluster headings
             tell you what is in it; this tells you what it is FOR, and
             the render test holds it there. */}
         <p className="mb-4 text-[11px] font-semibold uppercase tracking-widest text-ink">
