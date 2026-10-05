@@ -1578,7 +1578,7 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   row to a real metro area in the delineation, to a name, and to not being
   one the site reads. Its candidates are in the same file under the same
   id, and the sheet's folder takes the id with the colon replaced.
-  One hundred and sixty-seven are served (2026-09-30: Albuquerque, Birmingham, Boise,
+  One hundred and eighty-two are served (2026-09-30: Albuquerque, Birmingham, Boise,
   Bridgeport, Buffalo, Charleston, Des Moines, Grand Rapids, Greenville,
   Hartford, Honolulu, Knoxville, Louisville, Memphis, Milwaukee, New
   Orleans, Oklahoma City, Omaha, Providence, Tucson, Tulsa; then Albany,
@@ -1657,7 +1657,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   37236836751 — Rapid City and Bismarck — run 37236951448 — and Dover
   (West Loockerman Street, its credit the name inside "Tim Kiser (
   w:User:Malepheasant )", zori run 37240141265), Morgantown, Pittsfield
-  and Winchester — run 37237349944), each judged
+  and Winchester — run 37237349944; then round 12: Lake Havasu
+  City-Kingman (London Bridge from the water, wreaths on its piers), Hot
+  Springs, Carson City (the Capitol's cupola) and Casper (the city across
+  the plain from Casper Mountain, the round's weakest) — run 37277388755 —
+  Bangor, Glens Falls (Lake George, named for the metro area), Amherst
+  Town-Northampton (UMass Amherst in autumn), Dubuque and La Crosse (a
+  4.78:1 frame, the table's widest, which a 3x phone's card draws about
+  1.3x) — run 37278011774 — and Brunswick-St. Simons (the Sidney Lanier
+  Bridge), Fairbanks-College and Eau Claire — run 37278486927 — with
+  Gettysburg (cannons on Seminary Ridge), Jefferson City (the Capitol from
+  the air, its credit "KTrimble at English Wikipedia" as printed) and
+  Great Falls (the falls on the Missouri) from a one-market run each
+  (37279345706, 37279496897 and 37279768946)), each judged
   through the
   card's 16:10 and the deal page's 21:9 crops — never the 4:1 band, which a
   `cbsa:` row never draws; Hagerstown, Burlington (Vermont), Kalamazoo,
@@ -1690,8 +1702,14 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   reads as a map), Cheyenne (the file's own edge cuts the dome), Idaho
   Falls, Logan (the 21:9 cuts the summit), Redding (the Sundial Bridge's
   pylon lost at 21:9), Salisbury and Harrisonburg, so each keeps the
-  drawn cover too. A one-state title is mostly kept whole (the card
-  truncates a long one and the deal page shows it in full); 35 of the 152
+  drawn cover too. Round 12 left Helena (its Capitol portraits lose the
+  dome's statue at 21:9, and its one view of the city is soft over a
+  hillside of new houses, one-market run 37279647195), Fort Smith (streets
+  under wires and signs, a flood plate and a postcard) and Corvallis (buses
+  under wires, an archive aerial that reads as a map, and the courthouse,
+  whose clock and cupola the 21:9 cuts) on the drawn cover. A one-state
+  title is mostly kept whole (the card
+  truncates a long one and the deal page shows it in full); 35 of the 166
   are cut, most to their first city, three to the city the place is known
   by (Fort Myers, Daytona Beach, Sarasota) and two to the city's everyday
   name (Boise, Honolulu). A two-state title is cut to

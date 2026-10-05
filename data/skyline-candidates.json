@@ -6631,6 +6631,12 @@
         "Lake Havasu City London Bridge",
         "Lake Havasu City skyline",
         "Lake Havasu aerial"
+      ],
+      "candidates": [
+        {
+          "file": "20251127 LondonBridge.jpg",
+          "note": "Lake Havasu City-Kingman, AZ — Guninvalid, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37277388755)."
+        }
       ]
     },
     {
@@ -6651,6 +6657,12 @@
         "Hot Springs Arkansas Bathhouse Row",
         "Hot Springs Arkansas downtown",
         "Hot Springs Arkansas skyline"
+      ],
+      "candidates": [
+        {
+          "file": "Downtown Hot Springs, Arkansas (aerial).jpg",
+          "note": "Hot Springs, AR — Samuel Grant, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37277388755)."
+        }
       ]
     },
     {
@@ -6670,6 +6682,12 @@
         "Carson City Nevada downtown",
         "Carson City Nevada skyline",
         "Carson City Nevada capitol"
+      ],
+      "candidates": [
+        {
+          "file": "Nevada State Capitol Building - Carson City.jpg",
+          "note": "Carson City, NV — Quintin Soloviev, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37277388755)."
+        }
       ]
     },
     {
@@ -6709,6 +6727,12 @@
         "Great Falls Montana skyline",
         "Great Falls Montana downtown",
         "Great Falls Montana Missouri River"
+      ],
+      "candidates": [
+        {
+          "file": "Great Falls of the Missouri River (1).jpg",
+          "note": "Great Falls, MT — Chris06, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37279768946, a one-market run)."
+        }
       ]
     },
     {
@@ -6728,6 +6752,12 @@
         "Casper Wyoming downtown",
         "Casper Wyoming skyline",
         "Casper Wyoming North Platte River"
+      ],
+      "candidates": [
+        {
+          "file": "Casper from Casper Mountain.jpg",
+          "note": "Casper, WY — Milonica, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37277388755)."
+        }
       ]
     },
     {
@@ -6747,6 +6777,12 @@
         "Bangor Maine downtown",
         "Bangor Maine Penobscot River",
         "Bangor Maine skyline"
+      ],
+      "candidates": [
+        {
+          "file": "BangorSkyline.jpg",
+          "note": "Bangor, ME — GambitMG at English Wikipedia, Public domain. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
       ]
     },
     {
@@ -6767,6 +6803,12 @@
         "Glens Falls New York downtown",
         "Lake George New York",
         "Glens Falls Hudson River"
+      ],
+      "candidates": [
+        {
+          "file": "Lake George aerial view 2025.jpg",
+          "note": "Glens Falls, NY — Hayden Soloviev, CC BY 4.0; Lake George, named for the metro area. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
       ]
     },
     {
@@ -6787,6 +6829,12 @@
         "Northampton Massachusetts downtown",
         "Amherst Massachusetts downtown",
         "Connecticut River Oxbow from Mount Holyoke"
+      ],
+      "candidates": [
+        {
+          "file": "UMass Amherst campus aerial view.jpg",
+          "note": "Amherst Town-Northampton, MA — Quintin Soloviev, CC BY 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
       ]
     },
     {
@@ -6807,6 +6855,12 @@
         "Gettysburg battlefield panorama",
         "Gettysburg Pennsylvania downtown",
         "view from Little Round Top Gettysburg"
+      ],
+      "candidates": [
+        {
+          "file": "15-23-0291, artillery on seminary ridge - panoramio.jpg",
+          "note": "Gettysburg, PA — David Dugan, CC BY-SA 3.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37279345706, a one-market run)."
+        }
       ]
     },
     {
@@ -6826,6 +6880,12 @@
         "Dubuque Iowa skyline",
         "Dubuque Iowa downtown",
         "Dubuque Iowa Mississippi River"
+      ],
+      "candidates": [
+        {
+          "file": "Dubuque IA - overview.jpg",
+          "note": "Dubuque, IA — Dirk, CC BY 2.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
       ]
     },
     {
@@ -6846,6 +6906,12 @@
         "La Crosse Wisconsin skyline",
         "La Crosse from Grandad Bluff",
         "La Crosse Wisconsin downtown"
+      ],
+      "candidates": [
+        {
+          "file": "La Crosse panoramic aerial.jpg",
+          "note": "La Crosse, WI — Wikideas1, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278011774)."
+        }
       ]
     },
     {
@@ -6867,6 +6933,12 @@
         "St. Simons Island Georgia",
         "Brunswick Georgia downtown",
         "Jekyll Island Driftwood Beach"
+      ],
+      "candidates": [
+        {
+          "file": "Sidney Lanier Bridge Aerial.jpg",
+          "note": "Brunswick-St. Simons, GA — Devin Morris, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278486927)."
+        }
       ]
     },
     {
@@ -6886,6 +6958,12 @@
         "Jefferson City Missouri skyline",
         "Jefferson City Missouri River capitol",
         "Jefferson City Missouri downtown"
+      ],
+      "candidates": [
+        {
+          "file": "AP of Missouri State Capitol Building.jpg",
+          "note": "Jefferson City, MO — KTrimble at English Wikipedia, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37279496897, a one-market run)."
+        }
       ]
     },
     {
@@ -6924,6 +7002,12 @@
         "Fairbanks Alaska downtown",
         "Fairbanks Alaska skyline",
         "Fairbanks Alaska Chena River"
+      ],
+      "candidates": [
+        {
+          "file": "Aerial view of Fairbanks Alaska skyline (Quintin Soloviev).jpg",
+          "note": "Fairbanks-College, AK — Quintin Soloviev, CC BY-SA 4.0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278486927)."
+        }
       ]
     },
     {
@@ -6962,6 +7046,12 @@
         "Eau Claire Wisconsin downtown",
         "Eau Claire Wisconsin skyline",
         "Eau Claire Wisconsin river"
+      ],
+      "candidates": [
+        {
+          "file": "Eau Claire, Wisconsin downtown zoomed.jpg",
+          "note": "Eau Claire, WI — Wikideas1, CC0. The chosen file, in lib/skyline.ts (skyline-sheet run 37278486927)."
+        }
       ]
     }
   ]
