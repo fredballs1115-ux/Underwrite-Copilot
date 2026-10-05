@@ -27,7 +27,7 @@ import { pickSlots, readingTerms, shownAssetClass } from "@/lib/pipeline-slots";
 import { floodCell, floodTag, siteFlagsStale, type SiteFlagsResult } from "@/lib/site-flags/core";
 import { scoreMandateFit } from "@/lib/mandate";
 import { countyOf, placeDeal } from "@/lib/market-county";
-import { listJobStatus, type JobLike } from "@/lib/screen-run";
+import { listJobStatus, screenedDay, screenedOn, type JobLike } from "@/lib/screen-run";
 import { screenedAnOm } from "@/lib/onboarding";
 import { olderScreen } from "@/lib/older-screen";
 
@@ -320,6 +320,15 @@ export default async function DealsPage({
       assetClass: shownAssetClass(d.asset_class, extraction),
       createdAt: d.created_at,
       verdict: verdict?.verdict ?? null,
+      // The day the call on file was written (lib/screen-run `screenedOn`):
+      // the card's and the row's call say it, the CSV writes it. None for a
+      // deal with no call — never the day it was added.
+      screened: (() => {
+        const at = verdict?.verdict ? (d.verdict as { generatedAt?: string } | null)?.generatedAt : null;
+        const on = screenedOn(at);
+        const day = screenedDay(at);
+        return on && day ? { on, day } : null;
+      })(),
       stage: (d.stage as DealCard["stage"]) ?? "screening",
       // Any miss → outside; else any near-miss → near; all-pass → fits.
       // Unknown-only results (nothing checkable yet) stay null and render as —.

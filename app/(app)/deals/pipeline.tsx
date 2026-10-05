@@ -59,6 +59,10 @@ export type DealCard = {
   assetClass: string;
   createdAt: string;
   verdict: string | null; // "pass" | "caution" | "pass_on" | null
+  /** the day the call on file was written (lib/screen-run `screenedOn`,
+   *  "Sep 12, 2026", and `screenedDay`, the ISO day the CSV writes); null
+   *  for a deal with no call, never the day it was added */
+  screened?: { on: string; day: string } | null;
   /** the user's own tracker, independent of the verdict (raw DB value —
    *  normalized via lib/stages when read) */
   stage: string;
@@ -664,7 +668,7 @@ export function Pipeline({
     // its own column — the same two cells the meeting .xlsx writes, in its
     // words (lib/cap-slot `PLAN_CAP_NA`); the cell had been blank, which
     // reads as a cap the memorandum does not state.
-    const header = ["Deal", "Asset class", "Market", "Market read", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Manufactured housing", "Self-storage", "Rent regulation", "Forward purchase", "Mixed-use", "Operating business", "Condominium", "Sandwich position", "1031 exchange", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Stage", "Offers due", "Broker", "Added", "Added by"];
+    const header = ["Deal", "Asset class", "Market", "Market read", "Price", "Basis", "What the price buys", "Assumable debt", "Seller financing", "Affordability", "Tenancy", "Tenants", "Value-add", "Tax abatement", "Hotel", "Sale", "Reports", "Student housing", "Manufactured housing", "Self-storage", "Rent regulation", "Forward purchase", "Mixed-use", "Operating business", "Condominium", "Sandwich position", "1031 exchange", "Flood zone", "Cap rate", "Yield on cost", "Buy box", "Mandate score", "Mandate fit", "Status", "Screened", "Stage", "Offers due", "Broker", "Added", "Added by"];
     const lines = filtered.map((d) =>
       [
         d.name,
@@ -771,6 +775,9 @@ export function Pipeline({
               : d.verdict
                 ? (VERDICT_META[d.verdict]?.label ?? d.verdict)
                 : "Not screened",
+        // The day the call on file was written, ISO like the other dates;
+        // blank with no call — never the day the deal was added.
+        d.screened?.day ?? "",
         STAGE_LABEL[normalizeStage(d.stage)],
         d.offersDue ?? "",
         // The brokerage the memorandum names (#467).
@@ -1973,7 +1980,9 @@ const DealRow = memo(function DealRow({
         {v ? "Re-screening…" : d.hasOm === false ? "Screening the facts…" : "Reading the OM…"}
       </span>
     ) : v ? (
-      <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`}>{v.label}</span>
+      <span className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${v.cls}`} title={callTitle(v.label, d.screened)}>
+        {v.label}
+      </span>
     ) : (
       // Nothing has run yet: an empty ring where the verdict pill will sit.
       <span className="inline-flex h-6 items-center" title="Not screened yet — open the deal to run the screen">
@@ -2236,6 +2245,13 @@ const TILE_CALL: Record<string, string> = {
   pass_on: "bg-kill text-white",
 };
 
+/** A call's tooltip: the call and the day it was written ("Caution —
+ *  screened Sep 12, 2026"), or the call alone for one saved before the
+ *  pipeline dated it. */
+function callTitle(label: string, screened: DealCard["screened"]): string {
+  return screened ? `${label} — screened ${screened.on}` : label;
+}
+
 function TileCall({ d }: { d: DealCard }) {
   const v = d.verdict ? VERDICT_META[d.verdict] : null;
   const pill = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none shadow-sm";
@@ -2263,7 +2279,14 @@ function TileCall({ d }: { d: DealCard }) {
       </span>
     );
   }
-  if (v && d.verdict) return <span className={`${pill} ${TILE_CALL[d.verdict] ?? "bg-white/95 text-ink"}`}>{v.label}</span>;
+  // The day the call was written, in its tooltip: a call nine months old
+  // had read like yesterday's (research pass 42).
+  if (v && d.verdict)
+    return (
+      <span className={`${pill} ${TILE_CALL[d.verdict] ?? "bg-white/95 text-ink"}`} title={callTitle(v.label, d.screened)}>
+        {v.label}
+      </span>
+    );
   return (
     <span className={`${pill} bg-white/90 py-1.5 text-muted`} title="Not screened yet — open the deal to run the screen">
       <span aria-hidden className="h-2.5 w-2.5 rounded-full border-[1.5px] border-dashed border-muted/70" />

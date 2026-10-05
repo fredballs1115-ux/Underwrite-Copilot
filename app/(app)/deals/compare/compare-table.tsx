@@ -70,6 +70,10 @@ export type Col = {
   /** where the county alone placed it: "Collin County, TX" */
   readCounty?: string | null;
   verdict: string | null;
+  /** the day the call on file was written ("Sep 12, 2026",
+   *  lib/screen-run `screenedOn`); null with no call, never the day the
+   *  deal was added */
+  screened?: string | null;
   reason: string | null;
   /** why the call on file is the previous screen's, if it is: a re-screen
    *  still running toward its verdict, one that failed before reaching it,
@@ -410,6 +414,9 @@ export function CompareTable({ cols }: { cols: Col[] }) {
      *  and a memorandum's figure in it is marked (the audit of 2026-09-30) */
     src?: (c: Col) => FigureSource | null | undefined;
   }[] = [
+    // The day each call was written, first under the calls: two calls a
+    // year apart read alike otherwise (research pass 42).
+    { label: "Screened", get: (c) => c.screened ?? "—" },
     { label: "Market", get: (c) => c.market },
     {
       label: "Market read",

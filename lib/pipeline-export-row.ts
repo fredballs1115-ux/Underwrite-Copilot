@@ -30,7 +30,7 @@ import { goingConcernTag } from "@/lib/going-concern";
 import { condoTag } from "@/lib/condo";
 import { sandwichTag } from "@/lib/sandwich-lease";
 import type { SiteFlagsResult } from "@/lib/site-flags/core";
-import { verdictBehind, type JobLike } from "@/lib/screen-run";
+import { screenedDay, verdictBehind, type JobLike } from "@/lib/screen-run";
 import { shownAssetClass, statedCapSlot } from "@/lib/pipeline-slots";
 import type { PipelineExportRow } from "@/lib/pipeline-workbook";
 
@@ -190,6 +190,11 @@ export function pipelineExportRow(d: ExportDeal, ctx: ExportRowContext): Pipelin
     // pipeline page marks it (the card's "First read").
     fitFirstRead: fit != null && !extraction && signal != null,
     verdict: (d.verdict as { verdict?: string } | null)?.verdict ?? null,
+    // The day that call was written (lib/screen-run `screenedDay`), none
+    // without a call — never the day the deal was added.
+    screenedAt: (d.verdict as { verdict?: string } | null)?.verdict
+      ? screenedDay((d.verdict as { generatedAt?: string } | null)?.generatedAt)
+      : null,
     verdictBehind: verdictBehind(ctx.job, ctx.now),
     offersDue: ctx.offersDue,
     createdAt: d.created_at,

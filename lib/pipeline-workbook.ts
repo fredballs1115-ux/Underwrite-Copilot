@@ -163,6 +163,10 @@ export interface PipelineExportRow {
    *  cell says so beside the fit it shows */
   fitFirstRead?: boolean | null;
   verdict: string | null; // pass | caution | pass_on
+  /** the ISO day the call on file was written (lib/screen-run
+   *  `screenedDay`): the column after the call — null, and "—", for a deal
+   *  with no call, never the day it was added (research pass 42) */
+  screenedAt?: string | null;
   /** the call on file is the previous screen's: a re-screen is running,
    *  the latest screen failed before its verdict, or it stopped making
    *  progress on the way (lib/screen-run `verdictBehind`) — the cell says
@@ -219,6 +223,7 @@ export async function buildPipelineWorkbook(
     { width: 13 }, // Yield on cost
     { width: 16 }, // Buy box — "Outside (3 of 4)" on one line; a first read's longer words wrap
     { width: 24 }, // Verdict — "Re-screening (was Caution)", "Screen stalled (was Caution)" (10 cut them)
+    { width: 12 }, // Screened — the day the call was written
     { width: 12 }, // Offers due
     { width: 12 }, // Added
     { width: 16 }, // Added by
@@ -255,6 +260,7 @@ export async function buildPipelineWorkbook(
     "Yield on cost",
     "Buy box",
     "Verdict",
+    "Screened",
     "Offers due",
     "Added",
     "Added by",
@@ -464,17 +470,24 @@ export async function buildPipelineWorkbook(
           : { size: 10, bold: true, color: { argb: v.color } }
         : baseFont;
 
-      const dueCell = row.getCell(12);
+      // The day the call on file was written, beside it: a call nine months
+      // old, against other rates and older rules, had read like yesterday's
+      // in the pipeline meeting. The previous screen's day where the call is
+      // the previous screen's.
+      row.getCell(12).value = v ? (d.screenedAt ?? "—") : "—";
+      row.getCell(12).font = baseFont;
+
+      const dueCell = row.getCell(13);
       dueCell.value = d.offersDue ?? "—";
       dueCell.font =
         d.offersDue && d.offersDue < today && !isDead
           ? { size: 10, bold: true, color: { argb: KILL } }
           : baseFont;
 
-      row.getCell(13).value = d.createdAt.slice(0, 10);
-      row.getCell(13).font = baseFont;
-      row.getCell(14).value = d.addedBy ?? "";
+      row.getCell(14).value = d.createdAt.slice(0, 10);
       row.getCell(14).font = baseFont;
+      row.getCell(15).value = d.addedBy ?? "";
+      row.getCell(15).font = baseFont;
       lastDealRow = rowN;
       rowN++;
     }

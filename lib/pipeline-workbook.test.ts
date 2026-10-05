@@ -68,6 +68,7 @@ const HEADERS = [
   "Yield on cost",
   "Buy box",
   "Verdict",
+  "Screened",
   "Offers due",
   "Added",
   "Added by",
@@ -106,7 +107,24 @@ describe("pipeline workbook — the deal's kind is a column", () => {
     expect(conv.getCell(9).numFmt).toBe("0.00%");
     // The columns after the new pair still land where the headers say.
     expect(conv.getCell(11).value).toBe("Caution");
-    expect(conv.getCell(13).value).toBe("2026-09-08");
+    expect(conv.getCell(14).value).toBe("2026-09-08");
+  });
+
+  it("says the day each call was written, after the call — and no day at all with no call (research pass 42)", async () => {
+    const ws = (
+      await load([
+        { ...STABILIZED, screenedAt: "2025-12-02" },
+        { ...CONVERSION, screenedAt: null },
+        { ...LEGACY, verdict: null, screenedAt: null },
+      ])
+    ).getWorksheet("Pipeline")!;
+    expect(ws.getRow(4).getCell(12).value).toBe("Screened");
+    expect(ws.getRow(6).getCell(12).value).toBe("2025-12-02");
+    // A call saved before the pipeline dated one, and no call at all: a dash,
+    // never the day the deal was added (column 14).
+    expect(ws.getRow(7).getCell(12).value).toBe("—");
+    expect(ws.getRow(8).getCell(12).value).toBe("—");
+    expect(ws.getRow(8).getCell(14).value).toBe("2026-09-08");
   });
 
   it("a call the latest screen has not re-run says so beside the call it shows", async () => {

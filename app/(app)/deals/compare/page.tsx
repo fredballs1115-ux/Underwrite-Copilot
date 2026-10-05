@@ -53,7 +53,7 @@ import { shownAssetClass } from "@/lib/pipeline-slots";
 import type { DealVisualCache } from "@/lib/deal-location";
 import { placedByOpenStreetMap, pointIsBuilding } from "@/lib/deal-location";
 import { PICTURE_CREDIT } from "@/lib/deal-picture";
-import { verdictBehind, type JobLike } from "@/lib/screen-run";
+import { screenedOn, verdictBehind, type JobLike } from "@/lib/screen-run";
 
 export const metadata: Metadata = { title: "Compare deals" };
 
@@ -175,6 +175,9 @@ function toCol(
     readMarket: placed.read?.name ?? null,
     readCounty: placed.placedBy?.county ?? null,
     verdict: verdict?.verdict ?? null,
+    // The day that call was written (lib/screen-run `screenedOn`), none
+    // without a call — never the day the deal was added.
+    screened: verdict?.verdict ? screenedOn(verdict.generatedAt) : null,
     reason: verdict?.reason ?? null,
     // A re-screen still running, or one that failed before its verdict,
     // leaves the call on file the previous screen's (lib/screen-run, the

@@ -183,15 +183,31 @@ export function verdictBehind(job: JobLike | null | undefined, now: number = Dat
  *  server's render and the browser's agree; null for a verdict saved before
  *  the pipeline stamped one, or a stamp that does not parse. */
 export function screenedOn(generatedAt: string | null | undefined): string | null {
-  if (!generatedAt) return null;
-  const t = Date.parse(generatedAt);
-  if (!Number.isFinite(t)) return null;
+  const t = generatedTime(generatedAt);
+  if (t == null) return null;
   return new Date(t).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
     timeZone: "UTC",
   });
+}
+
+/** The same day as `screenedOn`, as an ISO date ("2026-09-12") — what the
+ *  pipeline's CSV and the meeting workbook write beside the call, so it
+ *  sorts and parses as a date the way their other date columns do (research
+ *  pass 42: a call nine months old had read like yesterday's wherever a
+ *  deal is summarized). Null where `screenedOn` is: no date is ever another
+ *  day's, the deal's "Added" included. */
+export function screenedDay(generatedAt: string | null | undefined): string | null {
+  const t = generatedTime(generatedAt);
+  return t == null ? null : new Date(t).toISOString().slice(0, 10);
+}
+
+function generatedTime(generatedAt: string | null | undefined): number | null {
+  if (!generatedAt) return null;
+  const t = Date.parse(generatedAt);
+  return Number.isFinite(t) ? t : null;
 }
 
 /** The results from a step onward — no step at all means the run died, or
