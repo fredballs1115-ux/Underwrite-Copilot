@@ -27,7 +27,7 @@ import {
   type ExchangeWindow,
 } from "@/lib/exchange-window";
 import { endIsAhead } from "@/lib/ground-lease-term";
-import { interestOf, leaseholdTermOf, shareHoldingOf } from "@/lib/interest";
+import { interestOf, leaseholdTermOf, namesDelawareTrust, shareHoldingOf } from "@/lib/interest";
 import { offersDueUpgrade } from "@/lib/offering";
 
 export interface DealExchange {
@@ -79,6 +79,9 @@ export function exchangeForDeal(
     // What a share is a share of: an undivided interest held as a tenant in
     // common is the real estate's, not an entity's (research pass 37).
     holding: shareHoldingOf(extraction),
+    // A trust is called a Delaware statutory trust only where its words say
+    // so (audit C5, LOW-6).
+    namesDst: namesDelawareTrust(extraction),
     leaseYearsLeft: lease ? lease.yearsLeft : null,
     leaseOptionYears: lease?.options?.years ?? null,
     // A term that already counts its options is a ceiling: the thirty years

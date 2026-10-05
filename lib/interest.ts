@@ -324,6 +324,16 @@ export function isDst(ex: ExtractionResult | null | undefined): boolean {
   return shareHoldingOf(ex) === "dst";
 }
 
+/** The trust's own words name a Delaware statutory trust ("Delaware
+ *  statutory trust", "DST") — where "beneficial interests" alone filed the
+ *  holding, the trust may be another kind (an Illinois land trust's), and
+ *  the 1031 flag says "the trust" (audit C5, LOW-6). */
+export function namesDelawareTrust(ex: ExtractionResult | null | undefined): boolean {
+  if (!isDst(ex)) return false;
+  const words = [ex?.interest?.share, ex?.interest?.summary].filter((w): w is string => typeof w === "string").join(" \n ");
+  return /\bdelaware\s+statutory\s+trusts?\b|\bdsts?\b/i.test(words);
+}
+
 /** The stated loan beside a share's grossed-up price, named for whose it is:
  *  the entity's — or, on an undivided interest held as a tenant in common,
  *  where no entity owns the property, the property's (research pass 37).

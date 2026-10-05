@@ -52,6 +52,26 @@ describe("the buy box's 1031 exchange against a deal (lib/exchange-window)", () 
       "1031 exchange: identify by Oct 30, 2026, close by Mar 14, 2027; the price buys an undivided interest in the real estate, held as a tenant in common; whether the co-ownership counts as real property or as a partnership interest is a question for your exchange counsel",
     );
     expect(tic.line).not.toContain("owning entity");
+    // Beneficial interests are a Delaware statutory trust's only where the
+    // words name one; an Illinois land trust's is "the trust" (audit C5,
+    // LOW-6).
+    const land = exchangeForDeal(
+      BLOCK,
+      deal([], { kind: "partial_interest", summary: "100% of the beneficial interests in an Illinois land trust holding title", share: "100% of the beneficial interests", groundLease: "", loan: "", page: "" }),
+      null,
+      TODAY,
+    )!;
+    expect(land).toMatchObject({ tag: "1031: trust — ask counsel", tone: "muted" });
+    expect(land.line).toContain("the price buys beneficial interests in the trust that holds the real estate");
+    expect(land.line).not.toMatch(/Delaware|DST/);
+    const dst = exchangeForDeal(
+      BLOCK,
+      deal([], { kind: "partial_interest", summary: "Beneficial interests in a Delaware statutory trust (DST) that owns the property", share: "10% of the beneficial interests", groundLease: "", loan: "", page: "" }),
+      null,
+      TODAY,
+    )!;
+    expect(dst).toMatchObject({ tag: "1031: DST — ask counsel" });
+    expect(dst.line).toContain("beneficial interests in a Delaware statutory trust that holds the real estate");
     // A preferred equity position, its own kind or a share filed before the
     // kind was asked whose rows say one (lib/interest `interestOf`).
     const position = exchangeForDeal(BLOCK, deal([], { kind: "preferred_equity", summary: "", share: "", groundLease: "", loan: "", page: "" }), null, TODAY)!;

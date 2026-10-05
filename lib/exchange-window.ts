@@ -188,7 +188,18 @@ function windowSentence(w: Omit<ExchangeWindow, "sentence">): string {
 /** One thing the deal and the exchange say together — a date fact or a
  *  question for exchange counsel, never a verdict. */
 export interface ExchangeFlag {
-  kind: "after_identify" | "id_period_over" | "after_close" | "note" | "entity_share" | "tic" | "dst" | "position" | "short_leasehold" | "lease_term";
+  kind:
+    | "after_identify"
+    | "id_period_over"
+    | "after_close"
+    | "note"
+    | "entity_share"
+    | "tic"
+    | "dst"
+    | "trust"
+    | "position"
+    | "short_leasehold"
+    | "lease_term";
   text: string;
 }
 
@@ -216,6 +227,11 @@ export function exchangeFit(
      *  the owning entity's (lib/interest `shareHoldingOf`) — an undivided
      *  interest held as a tenant in common is the real estate's */
     holding?: ShareHolding | null;
+    /** on a trust's beneficial interests, whether the words name a Delaware
+     *  statutory trust (lib/interest `namesDelawareTrust`); false says "the
+     *  trust" — an Illinois land trust's beneficial interest is no DST
+     *  (audit C5, LOW-6). Unset reads as named, as before. */
+    namesDst?: boolean;
     /** the lease's years left today and its options' years, where the
      *  price buys a leasehold (lib/interest's term); null where no end is
      *  read */
@@ -258,6 +274,11 @@ export function exchangeFit(
     flags.push({
       kind: "tic",
       text: `The price buys an undivided interest in the real estate, held as a tenant in common; whether the co-ownership counts as real property or as a partnership interest is ${ASK}.`,
+    });
+  } else if (deal.interestKind === "partial_interest" && deal.holding === "dst" && deal.namesDst === false) {
+    flags.push({
+      kind: "trust",
+      text: `The price buys beneficial interests in the trust that holds the real estate; whether those interests count as real property for the exchange is ${ASK}.`,
     });
   } else if (deal.interestKind === "partial_interest" && deal.holding === "dst") {
     // Beneficial interests in a Delaware statutory trust: what they are for
@@ -325,6 +346,7 @@ const TAG: Record<ExchangeFlag["kind"], string> = {
   entity_share: "1031: share — ask counsel",
   tic: "1031: TIC — ask counsel",
   dst: "1031: DST — ask counsel",
+  trust: "1031: trust — ask counsel",
   position: "1031: position — ask counsel",
   short_leasehold: "1031: lease under 30 yrs",
   // A term not read, or a ceiling of thirty years or more: the thirty years
