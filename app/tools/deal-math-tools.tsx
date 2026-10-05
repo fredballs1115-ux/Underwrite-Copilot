@@ -37,7 +37,7 @@ import {
   treasuryForTerm,
   type CurveSeed,
   type RateSeeds,
-} from "@/lib/live-rates";
+} from "@/lib/live-rates-core";
 import { groupedTools } from "@/lib/tools/catalog";
 import { readResidual } from "@/lib/tools/land-residual";
 import { readLand, readSpace } from "@/lib/tools/measure-math";

@@ -1257,9 +1257,17 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   photograph is the name linked to it, several are the name and then each
   place linked to its own page ("Bruce Emmerling (Downtown Richmond;
   Downtown Norfolk from the Elizabeth River)"), under "Photographs by".
-  The parts are `lib/credit-parts.ts` (no imports) and
-  `app/credit-parts.tsx`, so a client component draws a linked credit
-  without loading the table; the deal page's Market view links it and says
+  The parts are `lib/credit-parts.ts` (no imports; the grid's line is
+  built there too, `galleryCreditLineOf`, from each photograph's credit as
+  data) and `app/credit-parts.tsx`, so a client component draws a linked
+  credit without loading the table: `CityPhoto` is a server component that
+  looks the market up and hands its client half (`CityPhotoView`, which
+  holds the fallback) the two pictures and their credits as data, and the
+  pipeline's cards carry each market photograph's credit
+  (`BannerSource.marketCredit`), drawn under them by
+  `GalleryCreditPartsText` (research pass 25: the 211-row table had been in
+  the JavaScript of ten public pages and the pipeline); the deal page's
+  Market view links it and says
   "cropped to fit", and the full-screen viewer, which shows the photograph
   whole, links it without. **A band's credit comes after its words in the
   markup** (`PlaceBackdrop` takes the words as children, `CityPhoto` draws
@@ -1698,7 +1706,19 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   shape of the curve, and the two rules) with `lib/live-rates-read.ts`
   (the `server-only` read) and `app/rates-strip.tsx` (the pure strip — at
   the app root beside `place-band.tsx` because `/tools` and `/market` both
-  draw it). **The series list is `data/fred-series.json` and nowhere
+  draw it). **A browser never loads the table** (research pass 25,
+  2026-10-05): lib/live-rates parses it at its top, so everything that
+  needs no list of series — the shapes, ages and moves, the year-over-year
+  change, a year of permits, how a figure is said and dated, the curve, the
+  seeds, `treasuryForTerm`, `monthOf` (re-exported by lib/zori) and a row's
+  link (`seriesUrlOf`) — is `lib/live-rates-core.ts`, which lib/live-rates
+  re-exports, and every module a client component reaches imports the core
+  (/tools' cards, lib/metro-supply, lib/debt-index). The table had been in
+  the JavaScript of /tools, /demo and every deal page, 313 KB raw.
+  `lib/client-bundle-tables.test.ts` walks every client module's value
+  imports, through to the end and stopping at a "use server" module, and
+  fails on a path to any `data/*.json` or to lib/skyline's table.
+  **The series list is `data/fred-series.json` and nowhere
   else**: the cron script and the module both import it, so the two cannot
   disagree about what a series is, and `readSeriesTable` REFUSES a
   malformed entry rather than skipping it (a skipped entry is a series the
@@ -4626,7 +4646,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   check reads (`sectorJobsFor`), a stale sector kept and named with its
   date — as PLAIN DATA, because `deal-view.tsx` and `deal-sections.tsx`
   are client components and handing them the rows rather than the series
-  keeps the series table out of the browser bundle. `MetroDemandCard`
+  keeps the series table out of the browser bundle (held by
+  `lib/client-bundle-tables.test.ts`). `MetroDemandCard`
   (deal-sections.tsx, `data-bar="demand"`) draws it under the folded
   brief: the building's own sector full, the others faded, rental
   housing singling nothing out, each figure linked; the page threads it
@@ -4641,7 +4662,8 @@ Plus accounts + saved deals. (Stripe billing is a later phase.)
   is an apartment building, so nothing is singled out. The bars are
   `app/demand-bars.tsx` (`DemandBars`), the ONE picture the deal page's
   client card and the demo's server card both draw, so it takes plain
-  rows and imports nothing but a type. **`metroDemand` takes the deal's
+  rows and imports nothing that holds a table: its supply sentence is
+  lib/metro-supply's, which reads lib/live-rates-core. **`metroDemand` takes the deal's
   CLASS, not a sector, and writes the sentence under the heading itself**
   (`intro`), because the sentence is the class's: rental housing runs on
   all payrolls; a class that reads no sector — storage, land, a net

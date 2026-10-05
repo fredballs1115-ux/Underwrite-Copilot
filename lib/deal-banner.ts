@@ -32,6 +32,7 @@ import { IMAGE_CREDIT } from "@/lib/imagery-plan";
 import { DEAL_BANNER, DEAL_CARD, DEAL_THUMB } from "@/lib/image-frames";
 import { isPreview } from "@/lib/photo-preview";
 import type { MarketPicture } from "@/lib/market-picture";
+import type { PhotoCredit } from "@/lib/credit-parts";
 
 export interface BannerSource {
   src: string;
@@ -47,6 +48,10 @@ export interface BannerSource {
   /** a market photograph's table id (lib/skyline), for the page's one
    *  credit line with the photographer's and the licence's links */
   marketId?: string;
+  /** a market photograph's credit as data — what it shows, its photographer
+   *  and its licence, each linked — so the page's one credit line is drawn
+   *  in the browser without lib/skyline's table (research pass 25) */
+  marketCredit?: PhotoCredit;
   /** a market photograph's alt text: what it shows, and whose it is */
   alt?: string;
   /** the deal's own photograph, not yet looked for in its memorandum
@@ -134,6 +139,24 @@ export function shownMarketIds(
   return out;
 }
 
+/** The credits of the market photographs on screen (`shownMarketIds`), in
+ *  the same order: each read off a card's own market source, so the line is
+ *  built from what the cards carry and never from the table. */
+export function shownMarketCredits(
+  cards: { id: string; pictures?: BannerSource[] }[],
+  reported: ReadonlyMap<string, string | null>,
+): PhotoCredit[] {
+  const byId = new Map<string, PhotoCredit>();
+  for (const c of cards) {
+    for (const p of c.pictures ?? []) {
+      if (p.kind === "market" && p.marketId && p.marketCredit && !byId.has(p.marketId)) byId.set(p.marketId, p.marketCredit);
+    }
+  }
+  return shownMarketIds(cards, reported)
+    .map((id) => byId.get(id))
+    .filter((c): c is PhotoCredit => c !== undefined);
+}
+
 export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): BannerSource[] {
   const id = encodeURIComponent(f.dealId);
   const out: BannerSource[] = [];
@@ -160,6 +183,7 @@ export function bannerSources(f: BannerFacts, frame: BannerFrame = BANNER): Bann
       credit: f.market.credit,
       market: f.market.name,
       marketId: f.market.id,
+      marketCredit: { place: f.market.place, author: f.market.author, license: f.market.license },
       alt: `${f.market.place}: the market this deal is in, ${f.market.name}. No photograph of the building yet.`,
     });
   }

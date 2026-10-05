@@ -62,10 +62,12 @@ describe("a page's opening picture is fetched first", () => {
 
   it("keeps the fallback to the overhead when the photograph fails before hydration", () => {
     // Asked for first, the picture can fail before any listener is
-    // attached; the component checks on mount as DealBanner does.
-    const src = read("app/city-photo.tsx");
+    // attached; the component checks on mount as DealBanner does. The
+    // check lives in CityPhoto's client half (app/city-photo-view), which
+    // is handed both pictures resolved on the server.
+    const src = read("app/city-photo-view.tsx");
     expect(src).toMatch(/img\?\.complete \|\| img\.naturalWidth > 0\) return;/);
-    expect(src).toContain('m === "skyline" && view ? "aerial" : "none"');
-    expect(src).toContain('onError={() => setMode(skyline && view ? "aerial" : "none")}');
+    expect(src).toContain('m === "skyline" && hasAerial ? "aerial" : "none"');
+    expect(src).toContain('onError={() => setMode(mode === "skyline" && hasAerial ? "aerial" : "none")}');
   });
 });

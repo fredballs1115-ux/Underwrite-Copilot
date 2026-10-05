@@ -3,7 +3,7 @@ import {
   seedRate,
   treasuryForTerm,
   type LiveRate,
-} from "@/lib/live-rates";
+} from "@/lib/live-rates-core";
 import { withArticle } from "@/lib/article";
 import { sourceParts } from "@/lib/source-parts";
 

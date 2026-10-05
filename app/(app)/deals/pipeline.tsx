@@ -17,8 +17,8 @@ import { createDealFromBatch, createSampleDeal } from "./actions";
 import { BatchUpload } from "./batch-upload";
 import { DealThumb } from "./deal-thumb";
 import { DealBanner } from "./deal-banner";
-import { GalleryCreditText } from "@/app/photo-credit";
-import { shownMarketIds, type BannerSource } from "@/lib/deal-banner";
+import { GalleryCreditPartsText } from "@/app/credit-parts";
+import { shownMarketCredits, type BannerSource } from "@/lib/deal-banner";
 import type { DealCoverFacts } from "@/lib/deal-cover";
 import { PipelineMap } from "./pipeline-map";
 import type { MapDeal, MapPlace } from "@/lib/pipeline-map";
@@ -562,7 +562,7 @@ export function Pipeline({
   }
   const cardsOnScreen =
     view === "cards" ? STAGES.flatMap((s) => (sectionDrawn(s) && isOpen(s) ? (groups.get(s) ?? []) : [])) : [];
-  const marketPhotoIds = shownMarketIds(cardsOnScreen, marketShown);
+  const marketPhotoCredits = shownMarketCredits(cardsOnScreen, marketShown);
   function toggleSection(s: Stage) {
     setCollapsed((c) => ({ ...c, [s]: isOpen(s) }));
   }
@@ -1206,9 +1206,9 @@ export function Pipeline({
                 );
               })}
             </div>
-            {view === "cards" && marketPhotoIds.length > 0 ? (
+            {view === "cards" && marketPhotoCredits.length > 0 ? (
               <p className="mt-6 text-[11px] leading-relaxed text-muted" data-qa="market-photo-credit">
-                <GalleryCreditText ids={marketPhotoIds} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />
+                <GalleryCreditPartsText credits={marketPhotoCredits} linkClassName="underline decoration-dotted underline-offset-2 hover:text-ink" />
               </p>
             ) : null}
           </div>
