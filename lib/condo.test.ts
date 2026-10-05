@@ -104,6 +104,31 @@ describe("condominium units bought in bulk (pass 28, round 8)", () => {
     expect(readCondo(null, TODAY)).toBeNull();
   });
 
+  // The audit of 2026-10-05: an apartment building whose words mentioned a
+  // condominium was read as 240 condominium units, its whole count taken
+  // for the units offered.
+  it("reads no condominium off an apartment building's words, and never its whole count on the words alone", () => {
+    const plan = (summary: string): Partial<ExtractionResult> => ({ strategy: { kind: "stabilized", summary, capitalBudget: "", timeline: "" } });
+    const apartments = [row("Asking price", "$60,000,000"), row("Units", "240"), row("NOI (in-place)", "$3,300,000")];
+    for (const summary of ["Class A apartments built to condominium specifications.", "Renovate and sell as a condominium conversion.", "Condominium-grade finishes throughout."]) {
+      const d = deal("Multifamily", apartments, plan(summary));
+      expect(readCondo(d, TODAY), summary).toBeNull();
+      expect(condoTag(d, TODAY), summary).toBeNull();
+    }
+    // A condominium named beside no condominium row is no read either.
+    expect(readCondo(deal("Multifamily", apartments, { dealName: "The Aldridge Condominiums" }), TODAY)).toBeNull();
+    // Named beside a condominium's own row it is, and only that row is read:
+    // the building's 240 units are never taken for the units offered.
+    const fractured = deal("Multifamily", [...apartments, row("HOA dues", "$650/mo")], plan("A block of rental units in a 240-unit condominium."));
+    const r = readCondo(fractured, TODAY)!;
+    expect(r.unitsOffered).toBeNull();
+    expect(r.headline).toBe("The dues are $650 a unit a month, as stated.");
+    const block = deal("Multifamily", [...apartments, row("Units offered", "42"), row("Units in condominium", "240")], plan("42 condominium units offered in bulk."));
+    expect(readCondo(block, TODAY)).toMatchObject({ unitsOffered: 42, unitsInCondominium: 240, sharePct: 17.5 });
+    // A class that is a condominium still reads its own count as the units offered.
+    expect(readCondo(BULK, TODAY)!.unitsOffered).toBe(42);
+  });
+
   it("says the model sells the units as one building, and hands the challenger the traps", () => {
     const r = readCondo(BULK, TODAY)!;
     expect(condoModelLine(r, { exitCapPct: 0.06 })).toBe(
