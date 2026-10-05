@@ -37,9 +37,14 @@
 //   read against the hold of the model handed in. The cap stands: year 1 is
 //   inside the lease.
 //
-//   EVERYTHING ELSE STANDS. A leasehold's and a leased fee's model runs at
-//   what the price buys (the lease's building, the land's rent), and the
-//   price row says which, with the years to the lease's end.
+//   EVERYTHING ELSE STANDS, as the model runs it. A leasehold's model runs
+//   the lease's building at the leasehold's price. A leased fee's runs at
+//   the land's price but reads no ground rent as its income
+//   (lib/underwrite/inputs): year 1 runs on the NOI a building's model reads
+//   (a statement's or the memorandum's, else the price × the stated cap,
+//   else an assumed 6%), with a building's assumptions, and its price note
+//   names the stated ground rent beside it. The price row says which
+//   interest it is, with the years to the lease's end.
 //
 // The first rule reaches past the table (the audit of 2026-09-30): the deal
 // header, the pipeline card and the meeting workbook printed a note's
