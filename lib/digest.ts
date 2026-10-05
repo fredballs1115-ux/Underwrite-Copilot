@@ -7,6 +7,11 @@ import { emailPictureUrl } from "@/lib/email-picture";
 import { emailUnsubscribeUrl, oneClickHeaders } from "@/lib/email-unsubscribe";
 import { appUrl } from "@/lib/app-url";
 import { listJobStatus, type JobLike } from "@/lib/screen-run";
+import { readAll } from "@/lib/read-all";
+
+/** A failed read's message, for the log. */
+const messageOf = (e: unknown): string =>
+  e && typeof e === "object" && "message" in e ? String((e as { message: unknown }).message) : String(e);
 
 const VERDICT_EMAIL: Record<string, { label: string; color: string }> = {
   pass: { label: "Go", color: "#1b7a5e" },
@@ -67,25 +72,32 @@ export function digestWeek(now: number): string {
 }
 
 /** What one person's digest says, before the links around it. */
-export type DigestContent = Pick<DigestInput, "stages" | "offersDue" | "offersThrough" | "verdicts">;
+export type DigestContent = Pick<
+  DigestInput,
+  "stages" | "offersDue" | "offersDueTotal" | "offersThrough" | "verdicts" | "verdictsTotal"
+> & { offersDueTotal: number; verdictsTotal: number };
 
 const generatedAt = (d: DigestDealRow): string => d.verdict?.generatedAt ?? "";
 
 /**
- * The deals whose call landed in the last seven days, newest first — the
- * ones the digest lists, and so the ones whose job rows it reads.
+ * Every deal whose call landed in the last seven days, newest first.
  *
  * Real verdict recency: the pipeline stamps generatedAt on each verdict
  * generation. deals.updated_at bumps on ANY edit (a rename, a note) and
  * would fill this section with false positives. Pre-stamp verdicts simply
  * don't list — honest, not noisy.
  */
-export function recentVerdictDeals(deals: DigestDealRow[], now: number): DigestDealRow[] {
+function callsThisWeek(deals: DigestDealRow[], now: number): DigestDealRow[] {
   const weekAgo = new Date(now - 7 * DAY_MS).toISOString();
   return deals
     .filter((d) => d.verdict?.verdict && generatedAt(d) && generatedAt(d) >= weekAgo)
-    .sort((a, b) => generatedAt(b).localeCompare(generatedAt(a)))
-    .slice(0, LIST_MAX);
+    .sort((a, b) => generatedAt(b).localeCompare(generatedAt(a)));
+}
+
+/** The calls of the last seven days the digest lists — the newest LIST_MAX,
+ *  and so the ones whose job rows it reads; the rest are counted. */
+export function recentVerdictDeals(deals: DigestDealRow[], now: number): DigestDealRow[] {
+  return callsThisWeek(deals, now).slice(0, LIST_MAX);
 }
 
 /** Each deal's newest job row (a deal keeps one row that every run claims
@@ -113,6 +125,11 @@ export function newestJobs(rows: DigestJobRow[]): Map<string, DigestJobRow> {
  *   - A call whose deal is being re-screened, or whose re-screen stalled or
  *     failed before its verdict, carries the note the pipeline card's read
  *     gives it (`CALL_NOTE`); a job that is no screen leaves the call alone.
+ *   - Each list stops at LIST_MAX and counts the rest (`offersDueTotal`,
+ *     `verdictsTotal`): the email says "and 9 more due by Sun, Oct 11 —
+ *     open the pipeline", and the inbox preheader states the true count. A
+ *     cut list had dropped nine of fifteen deadlines with no sign (research
+ *     pass 42).
  */
 export function buildDigest(
   deals: DigestDealRow[],
@@ -148,18 +165,18 @@ export function buildDigest(
   const today = new Date(now).toISOString().slice(0, 10);
   const through = new Date(Date.parse(`${today}T00:00:00Z`) + (OFFERS_WINDOW_DAYS - 1) * DAY_MS);
   const lastDay = through.toISOString().slice(0, 10);
-  const offersDue = open
+  const dueThisWeek = open
     .filter((d) => d.offers_due && d.offers_due >= today && d.offers_due <= lastDay)
-    .sort((a, b) => (a.offers_due! < b.offers_due! ? -1 : a.offers_due! > b.offers_due! ? 1 : 0))
-    .slice(0, LIST_MAX)
-    .map((d) => ({
-      name: d.name,
-      due: DUE_FMT.format(new Date(`${d.offers_due}T00:00:00Z`)),
-      url: dealUrl(d.id),
-      pictureUrl: pictureUrl(d.id),
-    }));
+    .sort((a, b) => (a.offers_due! < b.offers_due! ? -1 : a.offers_due! > b.offers_due! ? 1 : 0));
+  const offersDue = dueThisWeek.slice(0, LIST_MAX).map((d) => ({
+    name: d.name,
+    due: DUE_FMT.format(new Date(`${d.offers_due}T00:00:00Z`)),
+    url: dealUrl(d.id),
+    pictureUrl: pictureUrl(d.id),
+  }));
 
-  const verdicts = recentVerdictDeals(deals, now).map((d) => {
+  const calls = callsThisWeek(deals, now);
+  const verdicts = calls.slice(0, LIST_MAX).map((d) => {
     const v = VERDICT_EMAIL[d.verdict!.verdict!] ?? { label: "Screened", color: "#114e54" };
     const status = listJobStatus(jobs.get(d.id) ?? null, true, now);
     return {
@@ -172,7 +189,14 @@ export function buildDigest(
     };
   });
 
-  return { stages, offersDue, offersThrough: DUE_FMT.format(through), verdicts };
+  return {
+    stages,
+    offersDue,
+    offersDueTotal: dueThisWeek.length,
+    offersThrough: DUE_FMT.format(through),
+    verdicts,
+    verdictsTotal: calls.length,
+  };
 }
 
 /**
@@ -193,22 +217,26 @@ export async function runWeeklyDigests(
 
   // Everyone still opted in whose last digest is older than 5 days — the
   // guard makes an accidental double-tick (or a worker restart mid-run)
-  // idempotent instead of double-sending.
+  // idempotent instead of double-sending. The cutoff is the query's, the
+  // claim's own `.or` below, and the read pages in id order (lib/read-all):
+  // the opt-in is on by default for every profile, and one capped read had
+  // seen at most the project's max rows, in no stated order, each later tick
+  // reading mostly the same already-stamped rows (research pass 42).
   const cutoff = new Date(now - 5 * DAY_MS).toISOString();
-  const { data: profiles, error: profErr } = await admin
-    .from("profiles")
-    .select("id, email_weekly_digest, last_digest_at")
-    .eq("email_weekly_digest", true);
-  if (profErr) {
+  const due = await readAll<{ id: string; last_digest_at: string | null }>(
+    (from, to) =>
+      admin
+        .from("profiles")
+        .select("id, last_digest_at")
+        .eq("email_weekly_digest", true)
+        .or(`last_digest_at.is.null,last_digest_at.lt.${cutoff}`)
+        .order("id")
+        .range(from, to),
     // The dominant failure class must never be invisible — a silent zero
     // here reads exactly like a normal quiet week.
-    console.error("[digest] profiles query failed:", profErr.message);
-    return 0;
-  }
-  const due = ((profiles ?? []) as {
-    id: string;
-    last_digest_at: string | null;
-  }[]).filter((p) => !p.last_digest_at || p.last_digest_at < cutoff);
+    (e) => console.error("[digest] profiles query failed:", messageOf(e)),
+  );
+  if (!due) return 0;
 
   const site = appUrl();
   let sent = 0;
@@ -253,19 +281,25 @@ export async function runWeeklyDigests(
       }
       const teamId = (mem?.team_id as string) ?? null;
 
-      let query = admin
-        .from("deals")
-        .select("id, name, stage, offers_due, verdict, updated_at, is_sample, user_id, team_id");
-      query = teamId
-        ? query.or(`user_id.eq.${profile.id},team_id.eq.${teamId}`)
-        : query.eq("user_id", profile.id);
-      const { data: dealRows, error: dealsErr } = await query;
-      if (dealsErr) {
-        console.error(`[digest] deals query failed for ${profile.id}:`, dealsErr.message);
+      // Every one of them, a page at a time in id order: the count, the
+      // stages and the deadlines are of the whole pipeline, never of the
+      // first response's rows.
+      const dealRows = await readAll<DigestDealRow>(
+        (from, to) => {
+          const query = admin
+            .from("deals")
+            .select("id, name, stage, offers_due, verdict, updated_at, is_sample, user_id, team_id");
+          return (teamId ? query.or(`user_id.eq.${profile.id},team_id.eq.${teamId}`) : query.eq("user_id", profile.id))
+            .order("id")
+            .range(from, to);
+        },
+        (e) => console.error(`[digest] deals query failed for ${profile.id}:`, messageOf(e)),
+      );
+      if (!dealRows) {
         await release();
         continue;
       }
-      const deals = ((dealRows ?? []) as DigestDealRow[]).filter((d) => !d.is_sample);
+      const deals = dealRows.filter((d) => !d.is_sample);
       if (deals.length === 0) continue;
 
       // The job rows of the deals whose calls the digest lists — ONE read

@@ -288,6 +288,10 @@ export interface DigestInput {
    *  soonest first; `pictureUrl` is the deal's square (#464,
    *  lib/email-picture) */
   offersDue: { name: string; due: string; url: string; pictureUrl?: string | null }[];
+  /** how many open deals' deadlines fall in the window — `offersDue` lists
+   *  the soonest few (lib/digest), and the rest are said as "and 9 more due
+   *  by Sun, Oct 11 — open the pipeline"; absent is the list's own length */
+  offersDueTotal?: number;
   /** the window's last day, as the deadlines are written ("Sun, Oct 11"):
    *  the section is headed "Offers due by" it, so it says the window it
    *  lists — a "this week" heading had listed eight days */
@@ -303,6 +307,10 @@ export interface DigestInput {
     pictureUrl?: string | null;
     note?: string | null;
   }[];
+  /** how many calls landed in the last 7 days — `verdicts` lists the newest
+   *  few, and the rest are said as "and 4 more since last week"; absent is
+   *  the list's own length */
+  verdictsTotal?: number;
   pipelineUrl: string;
   settingsUrl: string;
   /** the unsubscribe link (lib/email-unsubscribe): drawn in the footer
@@ -342,6 +350,14 @@ export function weeklyDigestEmail(input: DigestInput): {
   const dealsWord = `${open} open deal${open === 1 ? "" : "s"}`;
   const subject = `Your pipeline this week — ${dealsWord}`;
   const offersTitle = `Offers due by ${input.offersThrough}`;
+  // Each list stops at a few (lib/digest) and says how many it left out —
+  // a cut list had dropped nine of fifteen deadlines with no sign.
+  const offersTotal = Math.max(input.offersDueTotal ?? 0, input.offersDue.length);
+  const offersMore = offersTotal - input.offersDue.length;
+  const verdictsTotal = Math.max(input.verdictsTotal ?? 0, input.verdicts.length);
+  const verdictsMore = verdictsTotal - input.verdicts.length;
+  const offersMoreWords = offersMore > 0 ? `and ${offersMore} more due by ${input.offersThrough}` : null;
+  const verdictsMoreWords = verdictsMore > 0 ? `and ${verdictsMore} more since last week` : null;
 
   const text = [
     `Your pipeline this week — ${dealsWord}, by stage:`,
@@ -350,9 +366,11 @@ export function weeklyDigestEmail(input: DigestInput): {
     input.offersDue.length ? `` : null,
     input.offersDue.length ? `${offersTitle}:` : null,
     ...input.offersDue.map((o) => `  ${o.name} — ${o.due}: ${o.url}`),
+    offersMoreWords ? `  ${offersMoreWords} — open the pipeline: ${input.pipelineUrl}` : null,
     input.verdicts.length ? `` : null,
     input.verdicts.length ? `Verdicts since last week:` : null,
     ...input.verdicts.map((v) => `  ${v.label}: ${v.name}${v.note ? ` (${v.note})` : ""} — ${v.url}`),
+    verdictsMoreWords ? `  ${verdictsMoreWords}` : null,
     ``,
     `Open the pipeline: ${input.pipelineUrl}`,
     ``,
@@ -364,11 +382,16 @@ export function weeklyDigestEmail(input: DigestInput): {
     .join("\n");
 
   // The deadlines first — the one thing in a digest with a date on it — then
-  // the count and the calls.
+  // the count and the calls, each count the true one, not the list's.
+  const offersListed = input.offersDue.map((o) => `${o.name} (${o.due})`).join(", ");
   const preheader = [
-    input.offersDue.length ? `Offers due: ${input.offersDue.map((o) => `${o.name} (${o.due})`).join(", ")}.` : null,
+    input.offersDue.length
+      ? offersMore > 0
+        ? `${offersTotal} offers due by ${input.offersThrough}: ${offersListed}, and ${offersMore} more.`
+        : `Offers due: ${offersListed}.`
+      : null,
     `${dealsWord} in your pipeline.`,
-    input.verdicts.length ? `${input.verdicts.length} verdict${input.verdicts.length === 1 ? "" : "s"} since last week.` : null,
+    verdictsTotal ? `${verdictsTotal} verdict${verdictsTotal === 1 ? "" : "s"} since last week.` : null,
   ]
     .filter((l): l is string => l !== null)
     .join(" ");
@@ -415,11 +438,18 @@ export function weeklyDigestEmail(input: DigestInput): {
     )
     .join("");
 
-  const section = (title: string, rows: string) =>
+  // What a cut list left out, under it (`more`, already escaped).
+  const section = (title: string, rows: string, more: string | null = null) =>
     rows
       ? `<p style="margin:20px 0 6px;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#5f6b69;">${esc(title)}</p>
-         <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${rows}</table>`
+         <table role="presentation" cellpadding="0" cellspacing="0" width="100%">${rows}</table>${
+           more ? `<p style="margin:6px 0 0;font-size:13px;color:#5f6b69;">${more}</p>` : ""
+         }`
       : "";
+  const offersMoreHtml = offersMoreWords
+    ? `${esc(offersMoreWords)} — <a href="${esc(input.pipelineUrl)}" style="color:#114e54;font-weight:600;">open the pipeline</a>`
+    : null;
+  const verdictsMoreHtml = verdictsMoreWords ? esc(verdictsMoreWords) : null;
 
   const html = emailDocument({
     title: subject,
@@ -430,8 +460,8 @@ export function weeklyDigestEmail(input: DigestInput): {
             <p style="margin:0;font-size:13px;color:#5f6b69;">Monday pipeline digest</p>
             <h1 style="margin:6px 0 0;font-size:20px;line-height:1.3;color:#18211f;letter-spacing:-0.01em;">${dealsWord} in your pipeline</h1>
             ${section("Open deals by stage", stageRows)}
-            ${section(offersTitle, offerRows)}
-            ${section("Verdicts since last week", verdictRows)}
+            ${section(offersTitle, offerRows, offersMoreHtml)}
+            ${section("Verdicts since last week", verdictRows, verdictsMoreHtml)}
             ${button(input.pipelineUrl, "Open the pipeline")}
           </td>
         </tr>${footerRow(
