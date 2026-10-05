@@ -4,8 +4,8 @@ import { createSupabaseServerClient, getCurrentUser } from "@/lib/supabase/serve
 import type { ExtractionResult, FirstSignal } from "@/lib/anthropic/types";
 import { bridgeSentence } from "@/lib/bridge/attribution";
 import { screeningModelCaveat } from "@/lib/bridge/model-caveat";
-import { getOrBuildBridge, listDealVersions, snapshotVersion } from "@/lib/bridge/versions";
-import { currentVersionId, defaultPair } from "@/lib/bridge/version-rules";
+import { getOrBuildBridge, listDealVersionsCounted, snapshotVersion } from "@/lib/bridge/versions";
+import { currentVersionId, defaultPair, versionListCut } from "@/lib/bridge/version-rules";
 import { currentDealModel } from "@/lib/bridge/deal-assumptions";
 import { unstatedPrice } from "@/lib/underwrite/report-grid";
 import {
@@ -100,7 +100,9 @@ export default async function BridgePage({
     });
   }
 
-  const versions = await listDealVersions(supabase, id);
+  // The newest sixty, and how many there are: a list cut short says so.
+  const { versions, total: versionTotal } = await listDealVersionsCounted(supabase, id);
+  const listCut = versionListCut(versions.length, versionTotal);
   // The version that is the deal as it stands: kept, so not offered for
   // deletion — a view would only take it again.
   const liveId = currentVersionId(current, versions);
@@ -291,6 +293,12 @@ export default async function BridgePage({
         <section className="rounded-lg border border-line bg-surface">
           <h2 className="border-b border-line px-5 py-3 text-sm font-semibold text-ink">
             Saved versions
+            {listCut ? (
+              <span className="font-normal text-muted" data-qa="versions-cut">
+                {" — "}
+                {listCut}
+              </span>
+            ) : null}
           </h2>
           <ul>
             {versions.map((v) => (

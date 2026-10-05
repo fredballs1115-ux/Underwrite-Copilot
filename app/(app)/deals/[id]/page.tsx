@@ -167,6 +167,7 @@ import { briefDelta, type BriefDelta } from "@/lib/brief-delta";
 import { modelVsMarketFor, type ModelVsMarket } from "@/lib/model-vs-market";
 import { todayReads, type TodayReads } from "@/lib/model-vs-market-read";
 import { snapshotVersion } from "@/lib/bridge/versions";
+import { versionBadge } from "@/lib/bridge/version-rules";
 import { listSubmarkets } from "@/lib/market/store";
 import { dealSubmarketCheck } from "@/lib/market/deal-checks";
 import { SubmarketCard } from "./submarket-card";
@@ -1494,7 +1495,9 @@ export default async function DealPage({
             {versionCount >= 2 && (
               <Link
                 href={`/deals/${id}/bridge`}
-                title="Assumption bridge — which input moved the IRR, and by how much"
+                // The badge counts every saved version of the deal's
+                // assumptions — said, never a bare figure beside the name.
+                title={versionBadge(versionCount).title}
                 className="flex items-center gap-1.5 rounded-lg border border-line bg-surface py-1.5 pl-2.5 pr-3 text-xs font-medium shadow-sm transition-colors hover:bg-faint"
               >
                 <svg
@@ -1510,8 +1513,8 @@ export default async function DealPage({
                   <path d="M4 19V9M10 19V5M16 19v-7M22 19h-20" />
                 </svg>
                 Bridge
-                <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand">
-                  {versionCount}
+                <span className="rounded-full bg-brand/10 px-1.5 py-px text-[10px] font-semibold text-brand" data-qa="bridge-count">
+                  {versionBadge(versionCount).text}
                 </span>
               </Link>
             )}
